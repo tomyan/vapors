@@ -81,9 +81,11 @@ jobs:
         run: cargo xtask setup --ci
       - name: screenshot of the clear window
         run: cargo xtask screenshot clear_window target/clear_window.png --expect 12,200,34
+      - name: screenshot of the gradient fixture, fitted
+        run: cargo xtask screenshot image_window target/image_window.png --expect 128,128,128 -- --open crates/platform/examples/fixtures/gradient.png
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: screenshots
-          path: target/clear_window.png
+          path: target/*.png
           if-no-files-found: ignore

@@ -20,7 +20,7 @@ const EXAMPLE_DEADLINE: Duration = Duration::from_secs(120);
 /// Run `example` from the `vapors-platform` crate, save its first frame to
 /// `out`, and when `expect` is given fail unless the centre pixel is that
 /// colour.
-pub fn run(example: &str, out: &Path, expect: Option<&str>) -> ExitCode {
+pub fn run(example: &str, out: &Path, expect: Option<&str>, example_args: &[String]) -> ExitCode {
     let expected = match expect.map(parse_rgb) {
         Some(Err(message)) => return fail(&message),
         Some(Ok(rgb)) => Some(rgb),
@@ -30,7 +30,7 @@ pub fn run(example: &str, out: &Path, expect: Option<&str>) -> ExitCode {
         Ok(xvfb) => xvfb,
         Err(message) => return fail(&message),
     };
-    let result = run_example(example, out, &xvfb.display);
+    let result = run_example(example, out, &xvfb.display, example_args);
     drop(xvfb);
     if let Err(message) = result {
         return fail(&message);
@@ -38,7 +38,12 @@ pub fn run(example: &str, out: &Path, expect: Option<&str>) -> ExitCode {
     report(out, expected)
 }
 
-fn run_example(example: &str, out: &Path, display: &str) -> Result<(), String> {
+fn run_example(
+    example: &str,
+    out: &Path,
+    display: &str,
+    example_args: &[String],
+) -> Result<(), String> {
     let mut command = Command::new("cargo");
     command
         .args([
@@ -52,6 +57,7 @@ fn run_example(example: &str, out: &Path, display: &str) -> Result<(), String> {
         ])
         .arg("--screenshot")
         .arg(out)
+        .args(example_args)
         .env("DISPLAY", display);
     if std::env::var_os("VAPORS_GPU_ADAPTER").is_none() {
         // Software rendering is what a virtual display can present.

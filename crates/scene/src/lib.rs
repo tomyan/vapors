@@ -3,5 +3,7 @@
 //! can be asserted on in tests without a device.
 
 mod color;
+mod transform;
 
 pub use color::Color;
+pub use transform::{Size, Transform};

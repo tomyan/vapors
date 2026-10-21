@@ -1,12 +1,14 @@
-//! Platform: a window with a wgpu surface and a frame loop.
+//! Platform: a window with a wgpu surface, a frame loop and input events.
 //!
 //! This is the seed of the framework's platform layer. For now it opens
-//! one window, picks the adapter by the `vapors-gpu` rule, and calls a
-//! frame handler with the surface texture each time the window redraws.
+//! one window, picks the adapter by the `vapors-gpu` rule, hands every
+//! input to the app as an [`Event`] and every redraw as a [`Frame`].
 
 mod error;
+mod event;
 mod surface;
 mod window;
 
 pub use error::PlatformError;
-pub use window::{Frame, Next, WindowOptions, run};
+pub use event::Event;
+pub use window::{App, Frame, Next, WindowOptions, run};
