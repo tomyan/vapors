@@ -27,13 +27,24 @@ pub fn clear(
         view_formats: &[],
     });
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    clear_view(device, queue, &view, color);
+    texture
+}
+
+/// Clear an existing render target to `color`.
+pub fn clear_view(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    view: &wgpu::TextureView,
+    color: Color,
+) {
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
         label: Some("clear"),
     });
     encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         label: Some("clear"),
         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view: &view,
+            view,
             depth_slice: None,
             resolve_target: None,
             ops: wgpu::Operations {
@@ -47,7 +58,6 @@ pub fn clear(
         multiview_mask: None,
     });
     queue.submit([encoder.finish()]);
-    texture
 }
 
 fn to_wgpu(color: Color) -> wgpu::Color {

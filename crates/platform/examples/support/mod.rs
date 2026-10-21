@@ -25,33 +25,7 @@ pub fn clear(frame: &Frame<'_>, color: Color) {
     let view = frame
         .texture
         .create_view(&wgpu::TextureViewDescriptor::default());
-    let mut encoder = frame
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("clear"),
-        });
-    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some("clear"),
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view: &view,
-            depth_slice: None,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Clear(wgpu::Color {
-                    r: f64::from(color.r),
-                    g: f64::from(color.g),
-                    b: f64::from(color.b),
-                    a: f64::from(color.a),
-                }),
-                store: wgpu::StoreOp::Store,
-            },
-        })],
-        depth_stencil_attachment: None,
-        timestamp_writes: None,
-        occlusion_query_set: None,
-        multiview_mask: None,
-    });
-    frame.queue.submit([encoder.finish()]);
+    vapors_renderer::clear_view(frame.device, frame.queue, &view, color);
 }
 
 /// Report the first frame; on the second, save the screenshot if asked and exit.

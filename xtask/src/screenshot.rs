@@ -10,6 +10,7 @@ use std::path::Path;
 use std::process::{Command, ExitCode};
 use std::time::Duration;
 
+use crate::config::Config;
 use crate::deadline::{Finished, run_with_deadline};
 use crate::pixels::{centre_pixel, parse_rgb};
 use crate::xvfb::Xvfb;
@@ -17,10 +18,23 @@ use crate::xvfb::Xvfb;
 /// How long the example may take from launch to writing its PNG.
 const EXAMPLE_DEADLINE: Duration = Duration::from_secs(120);
 
-/// Run `example` from the `vapors-platform` crate, save its first frame to
-/// `out`, and when `expect` is given fail unless the centre pixel is that
-/// colour.
-pub fn run(example: &str, out: &Path, expect: Option<&str>, example_args: &[String]) -> ExitCode {
+/// What to run: an example or a binary of the configured package.
+pub struct Target {
+    /// Example or binary name.
+    pub name: String,
+    /// True for `--bin`, false for `--example`.
+    pub is_binary: bool,
+}
+
+/// Run `target` from the package named in `.config/factory.toml`, save its
+/// first frame to `out`, and when `expect` is given fail unless the centre
+/// pixel is that colour.
+pub fn run(target: &Target, out: &Path, expect: Option<&str>, example_args: &[String]) -> ExitCode {
+    let package =
+        match Config::load().and_then(|c| c.require("screenshot.package").map(str::to_owned)) {
+            Ok(package) => package,
+            Err(error) => return fail(&error.to_string()),
+        };
     let expected = match expect.map(parse_rgb) {
         Some(Err(message)) => return fail(&message),
         Some(Ok(rgb)) => Some(rgb),
@@ -30,7 +44,7 @@ pub fn run(example: &str, out: &Path, expect: Option<&str>, example_args: &[Stri
         Ok(xvfb) => xvfb,
         Err(message) => return fail(&message),
     };
-    let result = run_example(example, out, &xvfb.display, example_args);
+    let result = run_example(&package, target, out, &xvfb.display, example_args);
     drop(xvfb);
     if let Err(message) = result {
         return fail(&message);
@@ -39,22 +53,20 @@ pub fn run(example: &str, out: &Path, expect: Option<&str>, example_args: &[Stri
 }
 
 fn run_example(
-    example: &str,
+    package: &str,
+    target: &Target,
     out: &Path,
     display: &str,
     example_args: &[String],
 ) -> Result<(), String> {
+    let kind = if target.is_binary {
+        "--bin"
+    } else {
+        "--example"
+    };
     let mut command = Command::new("cargo");
     command
-        .args([
-            "run",
-            "-q",
-            "-p",
-            "vapors-platform",
-            "--example",
-            example,
-            "--",
-        ])
+        .args(["run", "-q", "-p", package, kind, &target.name, "--"])
         .arg("--screenshot")
         .arg(out)
         .args(example_args)
@@ -76,9 +88,10 @@ fn run_example(
             }
             Ok(())
         }
-        Finished::Exited { output, .. } => Err(format!("example `{example}` failed:\n{output}")),
+        Finished::Exited { output, .. } => Err(format!("`{}` failed:\n{output}", target.name)),
         Finished::TimedOut => Err(format!(
-            "example `{example}` did not finish within {}s; it never wrote its screenshot",
+            "`{}` did not finish within {}s; it never wrote its screenshot",
+            target.name,
             EXAMPLE_DEADLINE.as_secs()
         )),
     }

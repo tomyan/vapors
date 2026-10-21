@@ -1,0 +1,7 @@
+# Per-repository settings for the factory (xtask). The xtask code is the
+# same in every repository that uses it; what differs lives here.
+# Shape: flat tables of `key = "value"`.
+
+[screenshot]
+# The package whose examples and binaries `cargo xtask screenshot` runs.
+package = "vapors-platform"
