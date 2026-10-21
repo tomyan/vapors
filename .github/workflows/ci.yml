@@ -22,8 +22,9 @@ jobs:
     timeout-minutes: 30 # initial ceiling; docs/budgets.md holds the measured value
     steps:
       - uses: actions/checkout@v4
-      # Reads rust-toolchain.toml for the channel, components and targets.
-      - uses: dtolnay/rust-toolchain@master
+      # rustup reads rust-toolchain.toml: channel, components, targets. One pin.
+      - name: install pinned toolchain
+        run: rustup toolchain install && rustup show active-toolchain
       - uses: Swatinem/rust-cache@v2
       - uses: cargo-bins/cargo-binstall@main
       - name: install pinned tools
