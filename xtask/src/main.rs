@@ -6,12 +6,17 @@
 
 mod ci;
 mod command;
+mod deadline;
 mod gpu_info;
+mod pixels;
 mod report;
+mod screenshot;
 mod setup;
 mod steps;
 mod tools;
+mod xvfb;
 
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
@@ -42,6 +47,16 @@ enum Command {
     CheckTools,
     /// Write docs/gpu-limits.md from the adapters and limits wgpu reports here.
     GpuInfo,
+    /// Run a windowed example under Xvfb and save its frame as a PNG.
+    Screenshot {
+        /// Example in the vapors-platform crate, such as `clear_window`.
+        example: String,
+        /// Where to write the PNG.
+        out: PathBuf,
+        /// Fail unless the centre pixel is this colour, as `r,g,b`.
+        #[arg(long)]
+        expect: Option<String>,
+    },
     /// Check formatting and lints without running tests.
     Lint,
     /// Run one test tier (default: unit).
@@ -68,6 +83,11 @@ fn main() -> ExitCode {
         Command::Setup { ci } => return setup::run(ci),
         Command::CheckTools => return setup::check(),
         Command::GpuInfo => return gpu_info::run(),
+        Command::Screenshot {
+            example,
+            out,
+            expect,
+        } => return screenshot::run(&example, &out, expect.as_deref()),
         Command::Ci => steps::ci(),
         Command::Lint => steps::lint(),
         Command::Test { tier: Tier::Unit } => steps::unit_tests(),

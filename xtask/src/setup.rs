@@ -2,14 +2,13 @@
 //! the factory, and say what was done.
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
 use crate::tools::{self, Tool};
 
 const TOOLS_FILE: &str = ".config/tools.toml";
 const HOOK_SOURCE: &str = "hooks/pre-push";
-const HOOK_TARGET: &str = ".git/hooks/pre-push";
 
 /// Install missing or mismatched tools, and the git hook unless `ci`.
 pub fn run(ci: bool) -> ExitCode {
@@ -102,25 +101,40 @@ fn install(tool: &Tool) -> Result<(), String> {
 }
 
 fn install_hook() -> Result<(), String> {
-    if !Path::new(".git").is_dir() {
-        return Err("no .git directory here; run from the repository root".into());
-    }
-    fs::copy(HOOK_SOURCE, HOOK_TARGET)
-        .map_err(|e| format!("could not copy {HOOK_SOURCE} to {HOOK_TARGET}: {e}"))?;
-    make_executable(HOOK_TARGET)?;
-    println!("ok   pre-push hook      installed at {HOOK_TARGET}");
+    let hooks_dir = hooks_dir()?;
+    let target = hooks_dir.join("pre-push");
+    fs::create_dir_all(&hooks_dir)
+        .map_err(|e| format!("could not create {}: {e}", hooks_dir.display()))?;
+    fs::copy(HOOK_SOURCE, &target)
+        .map_err(|e| format!("could not copy {HOOK_SOURCE} to {}: {e}", target.display()))?;
+    make_executable(&target)?;
+    println!("ok   pre-push hook      installed at {}", target.display());
     Ok(())
 }
 
+/// The hooks directory of this repository, which for a worktree is in
+/// the main repository, not under the worktree's `.git` file.
+fn hooks_dir() -> Result<PathBuf, String> {
+    let output = Command::new("git")
+        .args(["rev-parse", "--git-common-dir"])
+        .output()
+        .map_err(|e| format!("could not run git: {e}"))?;
+    if !output.status.success() {
+        return Err("not inside a git repository; run from the repository root".into());
+    }
+    let common = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    Ok(Path::new(&common).join("hooks"))
+}
+
 #[cfg(unix)]
-fn make_executable(path: &str) -> Result<(), String> {
+fn make_executable(path: &Path) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
     fs::set_permissions(path, fs::Permissions::from_mode(0o755))
-        .map_err(|e| format!("could not make {path} executable: {e}"))
+        .map_err(|e| format!("could not make {} executable: {e}", path.display()))
 }
 
 #[cfg(not(unix))]
-fn make_executable(_path: &str) -> Result<(), String> {
+fn make_executable(_path: &Path) -> Result<(), String> {
     Ok(())
 }
 

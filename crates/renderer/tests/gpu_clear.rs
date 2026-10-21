@@ -12,7 +12,7 @@ fn clear_fills_every_pixel_with_the_colour() {
 
     // When
     let texture = clear(&gpu.device, &gpu.queue, 7, 5, color);
-    let pixels = read_rgba8(&gpu, &texture);
+    let pixels = read_rgba8(&gpu.device, &gpu.queue, &texture);
 
     // Then
     assert_eq!(pixels.len(), 7 * 5 * 4);

@@ -1,0 +1,23 @@
+[package]
+name = "vapors-platform"
+description = "Windows, surfaces and input from the operating system: winit on desktop, the canvas on the web."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+wgpu.workspace = true
+pollster.workspace = true
+winit.workspace = true
+vapors-gpu.workspace = true
+
+[dev-dependencies]
+png.workspace = true
+vapors-scene.workspace = true
+vapors-renderer.workspace = true
+vapors-gpu-harness.workspace = true
+
+[lints]
+workspace = true

@@ -1,7 +1,12 @@
 #!/bin/sh
-# Installed into .git/hooks by `cargo xtask setup`. Runs the fast checks
-# before a push so most failures never reach CI. Bypass with
-# `git push --no-verify`; CI remains the gate.
+# Installed into the repository's hooks directory by `cargo xtask setup`.
+# Runs the fast checks before a push so most failures never reach CI.
+# Bypass with `git push --no-verify`; CI remains the gate.
 set -e
+# Git hooks run with the caller's PATH, which may lack rustup's bin dir.
+if ! command -v cargo >/dev/null 2>&1; then
+    PATH="$HOME/.cargo/bin:$PATH"
+    export PATH
+fi
 cargo xtask lint
 cargo xtask test --tier unit
