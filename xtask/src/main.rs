@@ -56,6 +56,9 @@ enum Command {
         /// Fail unless the centre pixel is this colour, as `r,g,b`.
         #[arg(long)]
         expect: Option<String>,
+        /// Arguments passed to the example after `--`, such as `--open file.png`.
+        #[arg(last = true)]
+        example_args: Vec<String>,
     },
     /// Check formatting and lints without running tests.
     Lint,
@@ -87,7 +90,8 @@ fn main() -> ExitCode {
             example,
             out,
             expect,
-        } => return screenshot::run(&example, &out, expect.as_deref()),
+            example_args,
+        } => return screenshot::run(&example, &out, expect.as_deref(), &example_args),
         Command::Ci => steps::ci(),
         Command::Lint => steps::lint(),
         Command::Test { tier: Tier::Unit } => steps::unit_tests(),

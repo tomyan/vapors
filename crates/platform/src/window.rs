@@ -1,5 +1,5 @@
 //! The event loop: one window, redrawn continuously, each redraw handed
-//! to the app as a [`Frame`].
+//! to the app as a [`Frame`], each input handed to it as an [`Event`].
 
 use std::sync::Arc;
 
@@ -10,6 +10,7 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::window::{Window, WindowId};
 
 use crate::PlatformError;
+use crate::event::{Event, from_winit};
 use crate::surface::Gpu;
 
 /// How to open the window.
@@ -45,29 +46,34 @@ pub enum Next {
     Exit,
 }
 
-/// Open a window and call `on_frame` for every redraw until it returns
-/// [`Next::Exit`] or the window is closed.
+/// The app's side of the window: it gets every input and draws every frame.
+pub trait App {
+    /// An input arrived. Called between frames.
+    fn event(&mut self, event: Event);
+    /// Draw this frame.
+    fn frame(&mut self, frame: &Frame<'_>) -> Next;
+}
+
+/// Open a window and drive `app` until it returns [`Next::Exit`] or the
+/// window is closed.
 ///
 /// # Errors
 ///
 /// [`PlatformError`] when the event loop, window, adapter, device or
 /// surface cannot be set up. Each variant's message names what was found.
-pub fn run(
-    options: WindowOptions,
-    on_frame: impl FnMut(&Frame<'_>) -> Next + 'static,
-) -> Result<(), PlatformError> {
+pub fn run(options: WindowOptions, app: impl App + 'static) -> Result<(), PlatformError> {
     let event_loop = EventLoop::new().map_err(|e| PlatformError::Windowing(e.to_string()))?;
-    let mut app = App {
+    let mut handler = Handler {
         options,
-        on_frame: Box::new(on_frame),
+        app: Box::new(app),
         state: None,
         presented: 0,
         error: None,
     };
     event_loop
-        .run_app(&mut app)
+        .run_app(&mut handler)
         .map_err(|e| PlatformError::Windowing(e.to_string()))?;
-    match app.error {
+    match handler.error {
         Some(error) => Err(error),
         None => Ok(()),
     }
@@ -78,15 +84,15 @@ struct State {
     gpu: Gpu,
 }
 
-struct App {
+struct Handler {
     options: WindowOptions,
-    on_frame: Box<dyn FnMut(&Frame<'_>) -> Next>,
+    app: Box<dyn App>,
     state: Option<State>,
     presented: u64,
     error: Option<PlatformError>,
 }
 
-impl App {
+impl Handler {
     fn open(&mut self, event_loop: &ActiveEventLoop) -> Result<(), PlatformError> {
         let attributes = Window::default_attributes()
             .with_title(&self.options.title)
@@ -96,6 +102,11 @@ impl App {
             .map_err(|e| PlatformError::Windowing(e.to_string()))?;
         let window = Arc::new(window);
         let gpu = Gpu::for_window(&window)?;
+        let size = window.inner_size();
+        self.app.event(Event::Resized {
+            width: size.width,
+            height: size.height,
+        });
         window.request_redraw();
         self.state = Some(State { window, gpu });
         Ok(())
@@ -105,19 +116,8 @@ impl App {
         let Some(state) = self.state.as_mut() else {
             return;
         };
-        let surface_texture = match state.gpu.surface.get_current_texture() {
-            wgpu::CurrentSurfaceTexture::Success(t)
-            | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
-            wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {
-                state.window.request_redraw();
-                return;
-            }
-            _ => {
-                let size = state.window.inner_size();
-                state.gpu.resize(size.width, size.height);
-                state.window.request_redraw();
-                return;
-            }
+        let Some(surface_texture) = acquire(state) else {
+            return;
         };
         let frame = Frame {
             adapter: &state.gpu.adapter,
@@ -126,7 +126,7 @@ impl App {
             texture: &surface_texture.texture,
             index: self.presented,
         };
-        let next = (self.on_frame)(&frame);
+        let next = self.app.frame(&frame);
         state.gpu.queue.present(surface_texture);
         self.presented += 1;
         match next {
@@ -136,7 +136,27 @@ impl App {
     }
 }
 
-impl ApplicationHandler for App {
+/// The next surface texture, or `None` after reconfiguring and asking for
+/// another redraw.
+fn acquire(state: &mut State) -> Option<wgpu::SurfaceTexture> {
+    match state.gpu.surface.get_current_texture() {
+        wgpu::CurrentSurfaceTexture::Success(t) | wgpu::CurrentSurfaceTexture::Suboptimal(t) => {
+            Some(t)
+        }
+        wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {
+            state.window.request_redraw();
+            None
+        }
+        _ => {
+            let size = state.window.inner_size();
+            state.gpu.resize(size.width, size.height);
+            state.window.request_redraw();
+            None
+        }
+    }
+}
+
+impl ApplicationHandler for Handler {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.state.is_none()
             && let Err(error) = self.open(event_loop)
@@ -147,15 +167,20 @@ impl ApplicationHandler for App {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
-        match event {
-            WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::Resized(size) => {
-                if let Some(state) = self.state.as_mut() {
-                    state.gpu.resize(size.width, size.height);
-                }
-            }
-            WindowEvent::RedrawRequested => self.redraw(event_loop),
-            _ => {}
+        if let WindowEvent::CloseRequested = event {
+            event_loop.exit();
+            return;
+        }
+        if let WindowEvent::Resized(size) = event
+            && let Some(state) = self.state.as_mut()
+        {
+            state.gpu.resize(size.width, size.height);
+        }
+        if let Some(app_event) = from_winit(&event) {
+            self.app.event(app_event);
+        }
+        if let WindowEvent::RedrawRequested = event {
+            self.redraw(event_loop);
         }
     }
 }

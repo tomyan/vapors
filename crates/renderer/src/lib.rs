@@ -4,5 +4,9 @@
 //! `gpu` tier (`cargo xtask test --tier gpu`).
 
 mod clear;
+mod image;
+mod upload;
 
 pub use clear::clear;
+pub use image::ImagePipeline;
+pub use upload::upload_rgba8;
