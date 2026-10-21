@@ -7,7 +7,9 @@
 mod ci;
 mod command;
 mod report;
+mod setup;
 mod steps;
+mod tools;
 
 use std::process::ExitCode;
 
@@ -26,8 +28,17 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Install the pinned tools and the pre-push hook; say what was done.
+    Setup {
+        /// On a CI runner: install tools only, no git hook.
+        #[arg(long)]
+        ci: bool,
+    },
     /// Run everything CI runs, in CI's order, stopping at the first failure.
     Ci,
+    /// Check every pinned tool is installed at its pinned version.
+    #[command(hide = true)]
+    CheckTools,
     /// Check formatting and lints without running tests.
     Lint,
     /// Run one test tier (default: unit).
@@ -49,6 +60,8 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
     let reporter = report::Reporter::new(cli.verbose);
     let steps = match cli.command {
+        Command::Setup { ci } => return setup::run(ci),
+        Command::CheckTools => return setup::check(),
         Command::Ci => steps::ci(),
         Command::Lint => steps::lint(),
         Command::Test { tier: Tier::Unit } => steps::unit_tests(),

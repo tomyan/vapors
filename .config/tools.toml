@@ -1,9 +1,13 @@
 # Pinned versions of the tools the factory runs. `cargo xtask setup`
-# installs them (from slice S1) and `cargo xtask ci` checks them.
-# Bumping a version is a deliberate pull request.
+# installs them and `cargo xtask ci` checks them. Bumping a version is a
+# deliberate pull request. Shape: `[tools]` maps crate to version;
+# `[binaries]` maps a crate to its binary name where they differ.
 [tools]
 cargo-nextest = "0.9.149"
 cargo-deny = "0.20.2"
 trunk = "0.22.0"
 wasm-bindgen-cli = "0.2.129"
 bacon = "3.26.0"
+
+[binaries]
+wasm-bindgen-cli = "wasm-bindgen"
