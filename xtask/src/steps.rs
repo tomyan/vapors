@@ -27,6 +27,13 @@ impl Step {
     }
 }
 
+const TOOLS: Step = Step {
+    name: "tools",
+    program: "cargo",
+    args: &["xtask", "check-tools"],
+    fix: "run `cargo xtask setup`",
+};
+
 const FMT: Step = Step {
     name: "fmt",
     program: "cargo",
@@ -57,7 +64,7 @@ const UNIT: Step = Step {
 
 /// Everything CI runs, fastest first.
 pub fn ci() -> Vec<Step> {
-    vec![FMT, CLIPPY, UNIT]
+    vec![TOOLS, FMT, CLIPPY, UNIT]
 }
 
 /// Formatting and lints only.
@@ -83,7 +90,7 @@ mod tests {
         let names: Vec<&str> = steps.iter().map(|s| s.name).collect();
 
         // Then
-        assert_eq!(names, ["fmt", "clippy", "unit"]);
+        assert_eq!(names, ["tools", "fmt", "clippy", "unit"]);
     }
 
     #[test]

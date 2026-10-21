@@ -1,0 +1,43 @@
+# CI runs exactly one factory command. Anything CI checks, `cargo xtask ci`
+# checks locally the same way.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+  NEXTEST_PROFILE: ci
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 30 # initial ceiling; docs/budgets.md holds the measured value
+    steps:
+      - uses: actions/checkout@v4
+      # Reads rust-toolchain.toml for the channel, components and targets.
+      - uses: dtolnay/rust-toolchain@master
+      - uses: Swatinem/rust-cache@v2
+      - uses: cargo-bins/cargo-binstall@main
+      - name: install pinned tools
+        run: cargo xtask setup --ci
+      - name: factory ci
+        run: cargo xtask ci
+      - name: build timings
+        if: always()
+        run: cargo build --workspace --all-targets --timings
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: timings
+          path: |
+            target/cargo-timings/
+            target/nextest/ci/junit.xml
+          if-no-files-found: ignore
