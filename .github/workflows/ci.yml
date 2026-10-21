@@ -70,7 +70,7 @@ jobs:
     env:
       VAPORS_GPU_ADAPTER: llvmpipe
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: install lavapipe, Xvfb and winit's X11 libraries
         run: sudo apt-get update -q && sudo apt-get install -y -q mesa-vulkan-drivers xvfb libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev
       - name: install pinned toolchain
@@ -81,7 +81,7 @@ jobs:
         run: cargo xtask setup --ci
       - name: screenshot of the clear window
         run: cargo xtask screenshot clear_window target/clear_window.png --expect 12,200,34
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: screenshots
