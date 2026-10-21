@@ -6,6 +6,7 @@
 
 mod ci;
 mod command;
+mod gpu_info;
 mod report;
 mod setup;
 mod steps;
@@ -39,6 +40,8 @@ enum Command {
     /// Check every pinned tool is installed at its pinned version.
     #[command(hide = true)]
     CheckTools,
+    /// Write docs/gpu-limits.md from the adapters and limits wgpu reports here.
+    GpuInfo,
     /// Check formatting and lints without running tests.
     Lint,
     /// Run one test tier (default: unit).
@@ -54,6 +57,8 @@ enum Command {
 enum Tier {
     /// Needs nothing beyond the toolchain. Runs on every save.
     Unit,
+    /// Needs a GPU adapter; `VAPORS_GPU_ADAPTER` names which. Fails, never skips, without one.
+    Gpu,
 }
 
 fn main() -> ExitCode {
@@ -62,9 +67,11 @@ fn main() -> ExitCode {
     let steps = match cli.command {
         Command::Setup { ci } => return setup::run(ci),
         Command::CheckTools => return setup::check(),
+        Command::GpuInfo => return gpu_info::run(),
         Command::Ci => steps::ci(),
         Command::Lint => steps::lint(),
         Command::Test { tier: Tier::Unit } => steps::unit_tests(),
+        Command::Test { tier: Tier::Gpu } => steps::gpu_tests(),
     };
     ci::run(&steps, &reporter)
 }

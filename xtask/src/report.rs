@@ -46,16 +46,27 @@ fn seconds(duration: Duration) -> String {
 }
 
 /// The lines of tool output worth reading when a step fails: rustc and
-/// clippy diagnostics with their locations, nextest failures and panics.
-/// Trimmed, and with repeats removed (nextest prints each failure twice).
+/// clippy diagnostics with their locations, nextest failures, and panics
+/// with their message (the lines after `panicked at`, up to a blank line
+/// or a `note:`). Trimmed, and with repeats removed, because nextest
+/// prints each failure twice.
 pub fn failure_lines(output: &str) -> Vec<&str> {
     let mut lines: Vec<&str> = Vec::new();
+    let mut in_panic_message = false;
     for line in output.lines().map(str::trim) {
-        if is_failure_line(line) && !lines.contains(&line) {
+        in_panic_message = continues_panic_message(in_panic_message, line);
+        if (in_panic_message || is_failure_line(line)) && !lines.contains(&line) {
             lines.push(line);
+        }
+        if line.contains("panicked at") {
+            in_panic_message = true;
         }
     }
     lines
+}
+
+fn continues_panic_message(was_in_message: bool, line: &str) -> bool {
+    was_in_message && !line.is_empty() && !line.starts_with("note:")
 }
 
 fn is_failure_line(line: &str) -> bool {
@@ -99,9 +110,29 @@ mod tests {
         let lines = failure_lines(output);
 
         // Then
-        assert_eq!(lines.len(), 2);
+        assert_eq!(lines.len(), 3);
         assert!(lines[0].starts_with("FAIL ["));
         assert!(lines[1].contains("panicked at crates/scene/src/color.rs:40:9"));
+        assert_eq!(lines[2], "assertion failed");
+    }
+
+    #[test]
+    fn panic_message_lines_follow_the_panicked_at_line() {
+        // Given
+        let output = "thread 't' panicked at crates/x.rs:9:5:\nno GPU adapter: wanted \"nvidia\"; found llvmpipe.\nFix: set VAPORS_GPU_ADAPTER.\nnote: run with `RUST_BACKTRACE=1`\n\n   Summary [ 0.1s]\n";
+
+        // When
+        let lines = failure_lines(output);
+
+        // Then
+        assert_eq!(
+            lines,
+            [
+                "thread 't' panicked at crates/x.rs:9:5:",
+                "no GPU adapter: wanted \"nvidia\"; found llvmpipe.",
+                "Fix: set VAPORS_GPU_ADAPTER."
+            ]
+        );
     }
 
     #[test]
