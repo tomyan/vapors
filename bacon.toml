@@ -1,0 +1,10 @@
+# `bacon` runs the unit tier on every save. `bacon clippy` for lints.
+default_job = "unit"
+
+[jobs.unit]
+command = ["cargo", "nextest", "run", "--workspace", "--color", "always"]
+need_stdout = true
+
+[jobs.clippy]
+command = ["cargo", "clippy", "--workspace", "--all-targets", "--color", "always", "--", "-D", "warnings"]
+need_stdout = false

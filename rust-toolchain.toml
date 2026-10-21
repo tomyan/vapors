@@ -1,0 +1,7 @@
+# Pinned so every machine and CI build with the same compiler.
+# Bumping this is a deliberate pull request, not a side effect of `rustup update`.
+[toolchain]
+channel = "1.99.1"
+components = ["clippy", "rustfmt"]
+targets = ["wasm32-unknown-unknown"]
+profile = "minimal"

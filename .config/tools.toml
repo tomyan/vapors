@@ -1,0 +1,9 @@
+# Pinned versions of the tools the factory runs. `cargo xtask setup`
+# installs them (from slice S1) and `cargo xtask ci` checks them.
+# Bumping a version is a deliberate pull request.
+[tools]
+cargo-nextest = "0.9.149"
+cargo-deny = "0.20.2"
+trunk = "0.22.0"
+wasm-bindgen-cli = "0.2.129"
+bacon = "3.26.0"

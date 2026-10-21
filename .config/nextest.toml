@@ -1,0 +1,16 @@
+# Test runner settings. Every test has a deadline; a test that hangs is
+# killed and reported, never waited on. Retries are off: a test that
+# fails intermittently is a bug to fix, not a result to re-roll.
+#
+# The 30s period is a starting value; it is replaced by a number from the
+# timing reports gathered in slice S1 (see docs/budgets.md once it exists).
+[profile.default]
+retries = 0
+fail-fast = false
+slow-timeout = { period = "30s", terminate-after = 2 }
+
+[profile.ci]
+retries = 0
+fail-fast = false
+failure-output = "immediate-final"
+slow-timeout = { period = "30s", terminate-after = 2 }
