@@ -20,6 +20,7 @@ vapors-gpu = { path = "crates/gpu" }
 vapors-gpu-harness = { path = "crates/gpu-harness" }
 vapors-renderer = { path = "crates/renderer" }
 vapors-platform = { path = "crates/platform" }
+vapors-canvas = { path = "crates/canvas" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

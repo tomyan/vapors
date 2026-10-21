@@ -7,6 +7,6 @@ mod clear;
 mod image;
 mod upload;
 
-pub use clear::clear;
+pub use clear::{clear, clear_view};
 pub use image::ImagePipeline;
 pub use upload::upload_rgba8;

@@ -6,6 +6,7 @@
 
 mod ci;
 mod command;
+mod config;
 mod deadline;
 mod gpu_info;
 mod pixels;
@@ -49,8 +50,11 @@ enum Command {
     GpuInfo,
     /// Run a windowed example under Xvfb and save its frame as a PNG.
     Screenshot {
-        /// Example in the vapors-platform crate, such as `clear_window`.
+        /// Example (or, with --bin, binary) of the package named in .config/factory.toml.
         example: String,
+        /// Run a binary of that package instead of an example.
+        #[arg(long)]
+        bin: bool,
         /// Where to write the PNG.
         out: PathBuf,
         /// Fail unless the centre pixel is this colour, as `r,g,b`.
@@ -88,10 +92,17 @@ fn main() -> ExitCode {
         Command::GpuInfo => return gpu_info::run(),
         Command::Screenshot {
             example,
+            bin,
             out,
             expect,
             example_args,
-        } => return screenshot::run(&example, &out, expect.as_deref(), &example_args),
+        } => {
+            let target = screenshot::Target {
+                name: example,
+                is_binary: bin,
+            };
+            return screenshot::run(&target, &out, expect.as_deref(), &example_args);
+        }
         Command::Ci => steps::ci(),
         Command::Lint => steps::lint(),
         Command::Test { tier: Tier::Unit } => steps::unit_tests(),

@@ -15,6 +15,7 @@ vapors-gpu.workspace = true
 
 [dev-dependencies]
 png.workspace = true
+vapors-canvas.workspace = true
 vapors-scene.workspace = true
 vapors-renderer.workspace = true
 vapors-gpu-harness.workspace = true
