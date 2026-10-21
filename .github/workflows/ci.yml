@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30 # initial ceiling; docs/budgets.md holds the measured value
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # rustup reads rust-toolchain.toml: channel, components, targets. One pin.
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
@@ -51,7 +51,7 @@ jobs:
       # lavapipe is the CI reference adapter; the tier fails if it is not the one found.
       VAPORS_GPU_ADAPTER: llvmpipe
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: install lavapipe
         run: sudo apt-get update -q && sudo apt-get install -y -q mesa-vulkan-drivers vulkan-tools && vulkaninfo --summary | grep -E 'deviceName|driverName'
       - name: install pinned toolchain
