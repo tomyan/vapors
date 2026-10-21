@@ -1,49 +1,57 @@
 //! Copying a texture into host memory so a test can assert on pixels.
 
-use crate::Gpu;
-
 /// Rows in a copied buffer start on 256-byte boundaries (wgpu's
 /// `COPY_BYTES_PER_ROW_ALIGNMENT`).
 const ROW_ALIGN: u32 = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
 
-/// Read an `Rgba8Unorm` texture back as tightly packed RGBA bytes, row
-/// by row from the top.
+/// Read an 8-bit RGBA or BGRA texture back as tightly packed RGBA bytes,
+/// row by row from the top. BGRA sources are swizzled to RGBA.
 ///
 /// # Panics
 ///
-/// If the texture is not `Rgba8Unorm` or the buffer cannot be mapped;
-/// both are programming errors in the test, and the message says which.
+/// If the texture format is not one of `Rgba8Unorm`, `Rgba8UnormSrgb`,
+/// `Bgra8Unorm`, `Bgra8UnormSrgb`, or the buffer cannot be mapped; both
+/// are programming errors in the caller, and the message says which.
 #[must_use]
-pub fn read_rgba8(gpu: &Gpu, texture: &wgpu::Texture) -> Vec<u8> {
-    assert_eq!(
-        texture.format(),
-        wgpu::TextureFormat::Rgba8Unorm,
-        "read_rgba8 needs an Rgba8Unorm texture"
-    );
+pub fn read_rgba8(device: &wgpu::Device, queue: &wgpu::Queue, texture: &wgpu::Texture) -> Vec<u8> {
+    let swap_red_blue = match texture.format() {
+        wgpu::TextureFormat::Rgba8Unorm | wgpu::TextureFormat::Rgba8UnormSrgb => false,
+        wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Bgra8UnormSrgb => true,
+        other => panic!("read_rgba8 needs an 8-bit RGBA or BGRA texture, got {other:?}"),
+    };
     let (width, height) = (texture.width(), texture.height());
     let padded_row = padded_bytes_per_row(width * 4);
-    let buffer = copy_to_buffer(gpu, texture, padded_row);
-    let padded = map_and_copy(gpu, &buffer);
-    unpad_rows(&padded, width * 4, padded_row, height)
+    let buffer = copy_to_buffer(device, queue, texture, padded_row);
+    let padded = map_and_copy(device, &buffer);
+    let mut bytes = unpad_rows(&padded, width * 4, padded_row, height);
+    if swap_red_blue {
+        for pixel in bytes.as_chunks_mut::<4>().0 {
+            pixel.swap(0, 2);
+        }
+    }
+    bytes
 }
 
 fn padded_bytes_per_row(unpadded: u32) -> u32 {
     unpadded.div_ceil(ROW_ALIGN) * ROW_ALIGN
 }
 
-fn copy_to_buffer(gpu: &Gpu, texture: &wgpu::Texture, padded_row: u32) -> wgpu::Buffer {
+fn copy_to_buffer(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    texture: &wgpu::Texture,
+    padded_row: u32,
+) -> wgpu::Buffer {
     let size = u64::from(padded_row) * u64::from(texture.height());
-    let buffer = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+    let buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("readback"),
         size,
         usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
         mapped_at_creation: false,
     });
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("readback"),
-        });
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("readback"),
+    });
     encoder.copy_texture_to_buffer(
         texture.as_image_copy(),
         wgpu::TexelCopyBufferInfo {
@@ -56,17 +64,17 @@ fn copy_to_buffer(gpu: &Gpu, texture: &wgpu::Texture, padded_row: u32) -> wgpu::
         },
         texture.size(),
     );
-    gpu.queue.submit([encoder.finish()]);
+    queue.submit([encoder.finish()]);
     buffer
 }
 
-fn map_and_copy(gpu: &Gpu, buffer: &wgpu::Buffer) -> Vec<u8> {
+fn map_and_copy(device: &wgpu::Device, buffer: &wgpu::Buffer) -> Vec<u8> {
     let slice = buffer.slice(..);
     let (sender, receiver) = std::sync::mpsc::channel();
     slice.map_async(wgpu::MapMode::Read, move |result| {
         sender.send(result).expect("receiver alive");
     });
-    gpu.device
+    device
         .poll(wgpu::PollType::Wait {
             submission_index: None,
             timeout: None,

@@ -13,8 +13,13 @@ rust-version = "1.99"
 clap = { version = "4", features = ["derive"] }
 wgpu = "30"
 pollster = "1"
+winit = "0.30"
+png = "0.18"
 vapors-scene = { path = "crates/scene" }
+vapors-gpu = { path = "crates/gpu" }
 vapors-gpu-harness = { path = "crates/gpu-harness" }
+vapors-renderer = { path = "crates/renderer" }
+vapors-platform = { path = "crates/platform" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

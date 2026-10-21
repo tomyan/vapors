@@ -1,14 +1,11 @@
 //! Test support for the GPU tier.
 //!
-//! A GPU test calls [`gpu()`] for a device. Which adapter it gets is
-//! decided by `VAPORS_GPU_ADAPTER`: when set, the adapter whose name
-//! contains that text (case-insensitive) is required and anything else
-//! is a failure that lists what was found; when unset, the first
-//! hardware adapter is used, or the first software one if that is all
-//! there is. A tier that cannot run fails. It never skips.
+//! A GPU test calls [`gpu()`] for a device. Which adapter it gets is the
+//! `vapors-gpu` rule: `VAPORS_GPU_ADAPTER` names it when set, otherwise
+//! the first hardware adapter, otherwise the first software one. A tier
+//! that cannot run fails. It never skips.
 
 mod readback;
-mod select;
 
 pub use readback::read_rgba8;
 
@@ -21,9 +18,6 @@ pub struct Gpu {
     /// The queue every test submits to.
     pub queue: wgpu::Queue,
 }
-
-/// Name of the environment variable that selects the adapter.
-pub const ADAPTER_ENV: &str = "VAPORS_GPU_ADAPTER";
 
 /// Open the adapter the environment asks for.
 ///
@@ -39,8 +33,11 @@ pub fn gpu() -> Gpu {
         ..wgpu::InstanceDescriptor::new_without_display_handle()
     });
     let adapters = pollster::block_on(instance.enumerate_adapters(wgpu::Backends::PRIMARY));
-    let wanted = std::env::var(ADAPTER_ENV).ok();
-    let adapter = select::adapter(adapters, wanted.as_deref());
+    let wanted = vapors_gpu::wanted_from_env();
+    let adapter = match vapors_gpu::select(adapters, wanted.as_deref()) {
+        Ok(adapter) => adapter,
+        Err(error) => panic!("{error}"),
+    };
     let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
         label: Some("vapors gpu test"),
         ..Default::default()

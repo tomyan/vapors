@@ -1,0 +1,161 @@
+//! The event loop: one window, redrawn continuously, each redraw handed
+//! to the app as a [`Frame`].
+
+use std::sync::Arc;
+
+use winit::application::ApplicationHandler;
+use winit::dpi::LogicalSize;
+use winit::event::WindowEvent;
+use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::window::{Window, WindowId};
+
+use crate::PlatformError;
+use crate::surface::Gpu;
+
+/// How to open the window.
+pub struct WindowOptions {
+    /// Title bar text.
+    pub title: String,
+    /// Logical width in points.
+    pub width: u32,
+    /// Logical height in points.
+    pub height: u32,
+}
+
+/// One redraw: the surface texture to draw into and the device to do it with.
+pub struct Frame<'a> {
+    /// The adapter drawing this window, for its name in reports.
+    pub adapter: &'a wgpu::Adapter,
+    /// Device for this window.
+    pub device: &'a wgpu::Device,
+    /// Queue for this window.
+    pub queue: &'a wgpu::Queue,
+    /// The surface texture for this frame; drawn into, then presented.
+    pub texture: &'a wgpu::Texture,
+    /// Frames presented before this one. Zero on the first frame.
+    pub index: u64,
+}
+
+/// What the app wants after a frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Next {
+    /// Keep going.
+    Continue,
+    /// Close the window and return from [`run`].
+    Exit,
+}
+
+/// Open a window and call `on_frame` for every redraw until it returns
+/// [`Next::Exit`] or the window is closed.
+///
+/// # Errors
+///
+/// [`PlatformError`] when the event loop, window, adapter, device or
+/// surface cannot be set up. Each variant's message names what was found.
+pub fn run(
+    options: WindowOptions,
+    on_frame: impl FnMut(&Frame<'_>) -> Next + 'static,
+) -> Result<(), PlatformError> {
+    let event_loop = EventLoop::new().map_err(|e| PlatformError::Windowing(e.to_string()))?;
+    let mut app = App {
+        options,
+        on_frame: Box::new(on_frame),
+        state: None,
+        presented: 0,
+        error: None,
+    };
+    event_loop
+        .run_app(&mut app)
+        .map_err(|e| PlatformError::Windowing(e.to_string()))?;
+    match app.error {
+        Some(error) => Err(error),
+        None => Ok(()),
+    }
+}
+
+struct State {
+    window: Arc<Window>,
+    gpu: Gpu,
+}
+
+struct App {
+    options: WindowOptions,
+    on_frame: Box<dyn FnMut(&Frame<'_>) -> Next>,
+    state: Option<State>,
+    presented: u64,
+    error: Option<PlatformError>,
+}
+
+impl App {
+    fn open(&mut self, event_loop: &ActiveEventLoop) -> Result<(), PlatformError> {
+        let attributes = Window::default_attributes()
+            .with_title(&self.options.title)
+            .with_inner_size(LogicalSize::new(self.options.width, self.options.height));
+        let window = event_loop
+            .create_window(attributes)
+            .map_err(|e| PlatformError::Windowing(e.to_string()))?;
+        let window = Arc::new(window);
+        let gpu = Gpu::for_window(&window)?;
+        window.request_redraw();
+        self.state = Some(State { window, gpu });
+        Ok(())
+    }
+
+    fn redraw(&mut self, event_loop: &ActiveEventLoop) {
+        let Some(state) = self.state.as_mut() else {
+            return;
+        };
+        let surface_texture = match state.gpu.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(t)
+            | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
+            wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {
+                state.window.request_redraw();
+                return;
+            }
+            _ => {
+                let size = state.window.inner_size();
+                state.gpu.resize(size.width, size.height);
+                state.window.request_redraw();
+                return;
+            }
+        };
+        let frame = Frame {
+            adapter: &state.gpu.adapter,
+            device: &state.gpu.device,
+            queue: &state.gpu.queue,
+            texture: &surface_texture.texture,
+            index: self.presented,
+        };
+        let next = (self.on_frame)(&frame);
+        state.gpu.queue.present(surface_texture);
+        self.presented += 1;
+        match next {
+            Next::Continue => state.window.request_redraw(),
+            Next::Exit => event_loop.exit(),
+        }
+    }
+}
+
+impl ApplicationHandler for App {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if self.state.is_none()
+            && let Err(error) = self.open(event_loop)
+        {
+            self.error = Some(error);
+            event_loop.exit();
+        }
+    }
+
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        match event {
+            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::Resized(size) => {
+                if let Some(state) = self.state.as_mut() {
+                    state.gpu.resize(size.width, size.height);
+                }
+            }
+            WindowEvent::RedrawRequested => self.redraw(event_loop),
+            _ => {}
+        }
+    }
+}

@@ -62,3 +62,28 @@ jobs:
         run: cargo xtask setup --ci
       - name: gpu tier
         run: cargo xtask test --tier gpu
+
+  window:
+    name: window
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VAPORS_GPU_ADAPTER: llvmpipe
+    steps:
+      - uses: actions/checkout@v4
+      - name: install lavapipe, Xvfb and winit's X11 libraries
+        run: sudo apt-get update -q && sudo apt-get install -y -q mesa-vulkan-drivers xvfb libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev
+      - name: install pinned toolchain
+        run: rustup toolchain install && rustup show active-toolchain
+      - uses: Swatinem/rust-cache@v2
+      - uses: cargo-bins/cargo-binstall@main
+      - name: install pinned tools
+        run: cargo xtask setup --ci
+      - name: screenshot of the clear window
+        run: cargo xtask screenshot clear_window target/clear_window.png --expect 12,200,34
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: target/clear_window.png
+          if-no-files-found: ignore
