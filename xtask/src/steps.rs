@@ -55,16 +55,24 @@ const CLIPPY: Step = Step {
     fix: "fix the lint, or allow it at the site with a comment saying why",
 };
 
+// GPU tests are integration test binaries named `gpu_*`; the tiers split on that.
 const UNIT: Step = Step {
     name: "unit",
     program: "cargo",
-    args: &["nextest", "run", "--workspace"],
+    args: &["nextest", "run", "--workspace", "-E", "not binary(/^gpu_/)"],
     fix: "run the failing test alone with `cargo nextest run <name>`",
+};
+
+const GPU: Step = Step {
+    name: "gpu",
+    program: "cargo",
+    args: &["nextest", "run", "--workspace", "-E", "binary(/^gpu_/)"],
+    fix: "needs a Vulkan adapter; the failure names what was found and how to select one",
 };
 
 /// Everything CI runs, fastest first.
 pub fn ci() -> Vec<Step> {
-    vec![TOOLS, FMT, CLIPPY, UNIT]
+    vec![TOOLS, FMT, CLIPPY, UNIT, GPU]
 }
 
 /// Formatting and lints only.
@@ -75,6 +83,11 @@ pub fn lint() -> Vec<Step> {
 /// The unit tier.
 pub fn unit_tests() -> Vec<Step> {
     vec![UNIT]
+}
+
+/// The GPU tier.
+pub fn gpu_tests() -> Vec<Step> {
+    vec![GPU]
 }
 
 #[cfg(test)]
@@ -90,7 +103,7 @@ mod tests {
         let names: Vec<&str> = steps.iter().map(|s| s.name).collect();
 
         // Then
-        assert_eq!(names, ["tools", "fmt", "clippy", "unit"]);
+        assert_eq!(names, ["tools", "fmt", "clippy", "unit", "gpu"]);
     }
 
     #[test]

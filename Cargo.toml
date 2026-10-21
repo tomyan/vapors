@@ -11,6 +11,10 @@ rust-version = "1.99"
 
 [workspace.dependencies]
 clap = { version = "4", features = ["derive"] }
+wgpu = "30"
+pollster = "1"
+vapors-scene = { path = "crates/scene" }
+vapors-gpu-harness = { path = "crates/gpu-harness" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

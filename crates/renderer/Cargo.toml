@@ -1,0 +1,18 @@
+[package]
+name = "vapors-renderer"
+description = "wgpu rendering of the scene: quads, glyphs, paths, compositing."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+wgpu.workspace = true
+vapors-scene.workspace = true
+
+[dev-dependencies]
+vapors-gpu-harness.workspace = true
+
+[lints]
+workspace = true

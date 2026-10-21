@@ -1,0 +1,16 @@
+[package]
+name = "vapors-gpu-harness"
+description = "Test support: pick a GPU adapter by name, fail loudly if it is missing, read textures back."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+wgpu.workspace = true
+pollster.workspace = true
+
+[lints]
+workspace = true
