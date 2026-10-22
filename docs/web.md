@@ -63,16 +63,21 @@ injected into the page; `[dev] port` in `.config/factory.toml` sets
 the port, default 8080. `sudo -n tailscale serve --bg --https=443
 http://127.0.0.1:<port>` puts that server on the tailnet over https, so
 the page on the phone reloads on save; the command prints the URL once
-and then trunk's rebuild lines (`starting build`, `success`, errors;
-every line with `--verbose`). The dev build goes to `target/web-dev`,
+and then trunk's rebuild lines (`starting build`, `success`, errors, and
+after an error every line until the next build so rustc's locations and
+`help:` show; every line with `--verbose`). The dev build goes to `target/web-dev`,
 apart from the static `target/web`.
 
-It replaces whatever `tailscale serve` was serving. Ctrl-C stops trunk;
-the proxy stays pointed at the dead port until `cargo xtask serve` puts
-the static build back. The first build must print trunk's `server
-listening at:` line within 600 s (the demo measured 30 s with its
-dependencies compiled, a few minutes cold) or the command fails naming
-trunk. Each missing piece is refused by name with its fix: trunk not on
+It replaces whatever `tailscale serve` was serving. Ctrl-C in the
+terminal stops trunk (they share the terminal); the proxy stays pointed
+at the dead port until `cargo xtask serve` puts the static build back.
+There is no signal handler by decision: a SIGTERM or SIGKILL to xtask
+orphans trunk and its cargo build, and `pkill trunk` is the recovery.
+Every failure after trunk has started kills it and, on Unix, the cargo
+build in its process group. The first build must print trunk's `server
+listening at:` line or accept a TCP connection on the port within 600 s
+(the demo measured 30 s with its dependencies compiled, a few minutes
+cold) or the command fails naming trunk with its last 40 lines. Each missing piece is refused by name with its fix: trunk not on
 PATH (`cargo xtask setup`), the port in use, tailscale not on PATH, sudo
 wanting a password (the line to run by hand is printed).
 

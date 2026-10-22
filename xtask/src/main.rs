@@ -16,8 +16,11 @@ mod screenshot;
 mod serve;
 mod setup;
 mod steps;
+mod stream;
 mod tailscale;
 mod tools;
+mod trunk;
+mod trunk_process;
 mod web;
 mod xvfb;
 

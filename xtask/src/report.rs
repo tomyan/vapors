@@ -1,20 +1,26 @@
 //! Compact output: one line per fact, the failure lines, the fix and
 //! the command that reproduces it. Full output only with `--verbose`.
 
+use std::cell::RefCell;
 use std::time::Duration;
 
 use crate::command::Outcome;
 use crate::steps::Step;
+use crate::stream::StreamFilter;
 
 /// Prints step results in the factory's one-line format.
 pub struct Reporter {
     verbose: bool,
+    stream: RefCell<StreamFilter>,
 }
 
 impl Reporter {
     /// A reporter that prints full output when `verbose` is true.
     pub fn new(verbose: bool) -> Self {
-        Self { verbose }
+        Self {
+            verbose,
+            stream: RefCell::new(StreamFilter::default()),
+        }
     }
 
     /// Report one step's outcome.
@@ -35,10 +41,9 @@ impl Reporter {
     }
 
     /// One line from a long-running tool, as `trunk    <line>`: every
-    /// line with `--verbose`, otherwise the ones that mark a rebuild
-    /// (starting, success, error, warning) with their timestamp cut.
+    /// line with `--verbose`, otherwise what [`StreamFilter`] keeps.
     pub fn stream(&self, tool: &str, line: &str) {
-        if let Some(text) = streamed_line(self.verbose, line) {
+        if let Some(text) = self.stream.borrow_mut().line(self.verbose, line) {
             println!("{tool:<8} {text}");
         }
     }
@@ -48,36 +53,6 @@ impl Reporter {
         let verdict = if passed == total { "ok" } else { "FAIL" };
         println!("{verdict}   {passed}/{total} steps in {}", seconds(elapsed));
     }
-}
-
-/// What `stream` prints for `line`, if anything: every line with
-/// `verbose`, otherwise only a rebuild line, both without the timestamp.
-pub fn streamed_line(verbose: bool, line: &str) -> Option<&str> {
-    let text = without_timestamp(line);
-    (verbose || is_rebuild_line(text)).then_some(text)
-}
-
-/// trunk prefixes each line with an RFC 3339 timestamp and a level;
-/// the text after the level is what a reader needs.
-fn without_timestamp(line: &str) -> &str {
-    let trimmed = line.trim();
-    match trimmed.split_once("  ") {
-        Some((stamp, rest)) if stamp.ends_with('Z') && stamp.contains('T') => rest.trim(),
-        _ => trimmed,
-    }
-}
-
-fn is_rebuild_line(text: &str) -> bool {
-    [
-        "starting build",
-        "success",
-        "error",
-        "warning",
-        "server listening",
-        "http://",
-    ]
-    .iter()
-    .any(|mark| text.contains(mark))
 }
 
 fn seconds(duration: Duration) -> String {
@@ -199,49 +174,5 @@ summary
 
         // Then
         assert_eq!(lines, [] as [&str; 0]);
-    }
-}
-
-#[cfg(test)]
-mod stream_tests {
-    use super::*;
-
-    #[test]
-    fn trunks_timestamp_and_level_are_cut_from_a_line() {
-        // When / Then
-        assert_eq!(
-            without_timestamp("2026-10-22T10:28:39.440574Z  INFO ✅ success"),
-            "INFO ✅ success"
-        );
-        assert_eq!(
-            without_timestamp("   Compiling wgpu v30.0.1"),
-            "Compiling wgpu v30.0.1"
-        );
-    }
-
-    #[test]
-    fn stream_prints_every_line_with_verbose_and_rebuild_lines_without() {
-        // Given
-        let compiling = "   Compiling wgpu v30.0.1";
-        let success = "2026-10-22T10:28:39.440574Z  INFO ✅ success";
-
-        // When / Then
-        assert_eq!(streamed_line(false, compiling), None);
-        assert_eq!(streamed_line(false, success), Some("INFO ✅ success"));
-        assert_eq!(
-            streamed_line(true, compiling),
-            Some("Compiling wgpu v30.0.1")
-        );
-    }
-
-    #[test]
-    fn only_rebuild_lines_are_streamed_without_verbose() {
-        // When / Then
-        assert!(is_rebuild_line("INFO 📦 starting build"));
-        assert!(is_rebuild_line("INFO ✅ success"));
-        assert!(is_rebuild_line("ERROR error from build pipeline"));
-        assert!(is_rebuild_line("INFO 📡 server listening at:"));
-        assert!(!is_rebuild_line("Compiling wgpu v30.0.1"));
-        assert!(!is_rebuild_line("INFO node packages []"));
     }
 }
