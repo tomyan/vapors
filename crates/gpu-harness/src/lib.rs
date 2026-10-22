@@ -17,7 +17,8 @@ pub struct Gpu {
     pub queue: wgpu::Queue,
 }
 
-/// Open the adapter the environment asks for.
+/// Open the adapter the environment asks for, with the window's limits
+/// (the defaults, three raised to the adapter's; see `vapors_gpu`).
 ///
 /// # Panics
 ///
@@ -36,8 +37,13 @@ pub fn gpu() -> Gpu {
         Ok(adapter) => adapter,
         Err(error) => panic!("{error}"),
     };
+    let required_limits = match vapors_gpu::raised_limits(&adapter.limits()) {
+        Ok(limits) => limits,
+        Err(error) => panic!("{error}"),
+    };
     let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
         label: Some("vapors gpu test"),
+        required_limits,
         ..Default::default()
     }))
     .expect("the selected adapter refused to open a device");

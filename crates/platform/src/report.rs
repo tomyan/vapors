@@ -3,12 +3,42 @@
 //! returned by the time most things happen, so failures go to the console
 //! and, with the status, into the page's `status` element when it has one.
 
+use std::sync::OnceLock;
+
 use crate::PlatformError;
+
+/// What every reported line starts with, set once by `run`.
+static PREFIX: OnceLock<String> = OnceLock::new();
+
+/// The prefix for `app_name`, or for a title when the name is empty: the
+/// title's first word without a trailing colon, or `vapors` when the
+/// title is empty too.
+pub fn prefix_from(app_name: &str, title: &str) -> String {
+    let name = if app_name.trim().is_empty() {
+        title
+            .split_whitespace()
+            .next()
+            .unwrap_or("vapors")
+            .trim_end_matches(':')
+    } else {
+        app_name.trim()
+    };
+    name.to_owned()
+}
+
+/// Fix the prefix for this process. The first call wins; `run` makes it.
+pub fn set_prefix(app_name: &str, title: &str) {
+    drop(PREFIX.set(prefix_from(app_name, title)));
+}
+
+fn prefix() -> &'static str {
+    PREFIX.get().map_or("vapors", String::as_str)
+}
 
 /// A failure that does not end the app: say so where the user can see.
 #[cfg(not(target_family = "wasm"))]
 pub fn report_error(message: &str) {
-    eprintln!("vapors: {message}");
+    eprintln!("{}: {message}", prefix());
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -18,13 +48,16 @@ pub fn fatal(_error: &PlatformError) {}
 /// natively, the `status` element on the web. It replaces the last one.
 #[cfg(not(target_family = "wasm"))]
 pub fn report_status(text: &str) {
-    println!("{text}");
+    println!("{}: {text}", prefix());
 }
 
 /// A failure that does not end the app: say so where the user can see.
 #[cfg(target_family = "wasm")]
 pub fn report_error(message: &str) {
-    web_sys::console::error_1(&wasm_bindgen::JsValue::from_str(message));
+    web_sys::console::error_1(&wasm_bindgen::JsValue::from_str(&format!(
+        "{}: {message}",
+        prefix()
+    )));
     crate::web::set_status(message);
 }
 
@@ -38,4 +71,28 @@ pub fn fatal(error: &PlatformError) {
 #[cfg(target_family = "wasm")]
 pub fn report_status(text: &str) {
     crate::web::set_status(text);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_prefix_is_the_app_name_or_the_titles_first_word() {
+        // Given
+        let cases = [
+            ("touche", "touche: IMG_4821.jpg", "touche"),
+            ("", "touche: IMG_4821.jpg", "touche"),
+            ("", "vapors web demo", "vapors"),
+            ("  ", "", "vapors"),
+        ];
+
+        for (app_name, title, expected) in cases {
+            // When
+            let prefix = prefix_from(app_name, title);
+
+            // Then
+            assert_eq!(prefix, expected, "app_name {app_name:?}, title {title:?}");
+        }
+    }
 }

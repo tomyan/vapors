@@ -36,6 +36,7 @@ fn main() -> ExitCode {
         screenshot: support::flag_value("--screenshot").map(PathBuf::from),
     };
     let options = WindowOptions {
+        app_name: "vapors".into(),
         title: "vapors: clear window".into(),
         width: 640,
         height: 400,

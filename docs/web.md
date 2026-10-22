@@ -58,6 +58,19 @@ to the web input's `accept` (`image/*` plus every extension, so phones
 offer their photo library). An empty list is refused.
 `report_status(&str)` writes a non-error line, stdout natively and the
 status element on the web; the image app says `opened <name> <w>x<h>`.
+Lines on stdout, stderr and the console start with `WindowOptions.app_name`
+(or the title's first word when it is empty), so touche's say `touche:`;
+the status element shows the bare text.
+
+## Device limits
+
+The window device asks for the default limits with `max_buffer_size`,
+`max_texture_dimension_2d` and `max_storage_buffer_binding_size` raised
+to what the adapter reports, so a large photo's texture and readback fit;
+`Frame::limits()` says what was granted, and the adapter status line
+states the texture and buffer ceilings. The GPU test harness opens its
+device the same way. An adapter below the default for any of the three
+is refused by name.
 
 On Linux the picker asks the XDG desktop portal over D-Bus
 (rfd's `xdg-portal` backend; nothing to install at build time, a portal

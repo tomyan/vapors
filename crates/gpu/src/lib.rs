@@ -5,9 +5,13 @@
 //! case-insensitive substring of its name) and nothing else will do.
 //! When unset, the first hardware adapter wins, then the first software
 //! one. No adapter is an error that lists what was found and the fix.
+//! Devices ask for the default limits with the three image-size limits
+//! raised to the adapter's ([`raised_limits`]).
 
+mod limits;
 mod select;
 
+pub use limits::{LimitsBelowDefault, raised_limits};
 pub use select::{Candidate, NoAdapter, choose};
 
 /// Name of the environment variable that selects the adapter.
