@@ -151,9 +151,5 @@ pub(super) fn animation(
 }
 
 fn text_values(text: &str) -> Vec<ComponentValue> {
-    crate::token::tokenize(text)
-        .expect("literal")
-        .into_iter()
-        .map(ComponentValue::Token)
-        .collect()
+    crate::parse::component::values_of_text(text).expect("literal")
 }

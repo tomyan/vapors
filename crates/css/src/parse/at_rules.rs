@@ -64,7 +64,9 @@ fn conditional(
         &TokenKind::OpenCurly,
         &format!("\"{{\" after the {name} condition"),
     )?;
-    conditions.push(wrap(prelude));
+    let condition = wrap(prelude);
+    crate::cascade::validate_condition(&condition)?;
+    conditions.push(condition);
     rules::rule_list(stream, sheet, conditions, true)?;
     conditions.pop();
     if !stream.eat(&TokenKind::CloseCurly) {

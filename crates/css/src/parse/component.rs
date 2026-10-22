@@ -89,7 +89,7 @@ fn is_stray_close(kind: &TokenKind) -> bool {
 }
 
 /// Remove leading and trailing whitespace tokens.
-pub(super) fn trim_whitespace(values: &mut Vec<ComponentValue>) {
+pub(crate) fn trim_whitespace(values: &mut Vec<ComponentValue>) {
     while values.last().is_some_and(ComponentValue::is_whitespace) {
         values.pop();
     }
@@ -117,4 +117,14 @@ pub(crate) fn split_commas(values: &[ComponentValue]) -> Vec<Vec<ComponentValue>
         trim_whitespace(p);
     }
     parts
+}
+
+/// The component values of a value written as text.
+///
+/// # Errors
+/// A tokenizer refusal or an unbalanced bracket.
+pub(crate) fn values_of_text(text: &str) -> crate::Result<Vec<ComponentValue>> {
+    let tokens = crate::token::tokenize(text)?;
+    let mut stream = super::stream::Stream::new(tokens);
+    values_until(&mut stream, &[])
 }

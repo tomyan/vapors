@@ -30,6 +30,12 @@ impl<'a> Node<'a> {
     }
 }
 
+impl std::fmt::Debug for Node<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Node({})", self.tree.data(self.id).tag)
+    }
+}
+
 impl PartialEq for Node<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id && std::ptr::eq(self.tree, other.tree)

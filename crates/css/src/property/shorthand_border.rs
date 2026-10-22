@@ -43,8 +43,7 @@ pub(super) fn expand(
     }
     let initial = |id: PropertyId| -> Value {
         let text = id.def().initial;
-        let tokens = crate::token::tokenize(text).expect("initial values tokenize");
-        let values: Vec<ComponentValue> = tokens.into_iter().map(ComponentValue::Token).collect();
+        let values = crate::parse::component::values_of_text(text).expect("initial values parse");
         parse_longhand(id, &values, at).expect("initial values parse")
     };
     let width = width.unwrap_or_else(|| initial(width_id));

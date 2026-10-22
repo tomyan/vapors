@@ -69,7 +69,7 @@ pub fn parse_calc(value: &ComponentValue) -> Result<Calc> {
 /// # Errors
 /// Anything that is not a CSS Color Level 4 colour.
 pub fn parse_color_text(text: &str) -> Result<Color> {
-    let values = values_of(text)?;
+    let values = crate::parse::component::values_of_text(text)?;
     color_parse::parse(&values)
 }
 
@@ -79,7 +79,7 @@ pub fn parse_color_text(text: &str) -> Result<Color> {
 /// Malformed syntax, a type mismatch between operands, or division by a
 /// literal zero.
 pub fn parse_calc_text(text: &str) -> Result<Calc> {
-    let values = values_of(text)?;
+    let values = crate::parse::component::values_of_text(text)?;
     match values.as_slice() {
         [v] => calc_parse::parse(v),
         _ => Err(crate::Error::new(
@@ -94,7 +94,7 @@ pub fn parse_calc_text(text: &str) -> Result<Calc> {
 /// # Errors
 /// A unit the engine does not have, or a unitless number other than 0.
 pub fn parse_length_text(text: &str) -> Result<Length> {
-    let values = values_of(text)?;
+    let values = crate::parse::component::values_of_text(text)?;
     match values.as_slice() {
         [v] => Length::parse(v),
         _ => Err(crate::Error::new(
@@ -102,11 +102,4 @@ pub fn parse_length_text(text: &str) -> Result<Length> {
             "expected one length",
         )),
     }
-}
-
-/// The component values of a value written as text.
-fn values_of(text: &str) -> Result<Vec<ComponentValue>> {
-    let tokens = crate::token::tokenize(text)?;
-    let mut stream = crate::parse::stream::Stream::new(tokens);
-    crate::parse::component::values_until(&mut stream, &[])
 }

@@ -99,3 +99,47 @@ pub fn siblings(children: &[&str]) -> (Tree, Vec<NodeId>) {
     let ids = children.iter().map(|d| add(&mut tree, parent, d)).collect();
     (tree, ids)
 }
+
+use vapors_css::cascade::{Cascade, ComputedStyle, Environment};
+
+/// The default test environment: 800x600 viewport, light scheme.
+pub fn env() -> Environment {
+    Environment {
+        viewport_width: 800.0,
+        viewport_height: 600.0,
+        ..Environment::default()
+    }
+}
+
+/// An author-only cascade from `src`.
+pub fn cascade(src: &str) -> Cascade {
+    Cascade::new().author(sheet(src))
+}
+
+/// Compute every node of `tree` under `src`, in document order.
+pub fn computed_all(src: &str, tree: &Tree) -> Vec<ComputedStyle> {
+    match cascade(src).compute_tree(&tree.node(tree.root()), &env()) {
+        Ok(styles) => styles.into_iter().map(|(_, s)| s).collect(),
+        Err(e) => panic!("compute refused: {e}\n{src}"),
+    }
+}
+
+/// The computed style of one node.
+pub fn computed(src: &str, tree: &Tree, node: NodeId) -> ComputedStyle {
+    let index = tree.ids().position(|id| id == node).expect("node in tree");
+    computed_all(src, tree).swap_remove(index)
+}
+
+/// The computed value of `property` as CSS text.
+pub fn css(style: &ComputedStyle, property: &str) -> String {
+    style
+        .get_by_name(property)
+        .unwrap_or_else(|| panic!("{property} is not a longhand"))
+        .to_css()
+}
+
+/// The computed value at the leaf of `chain`.
+pub fn css_at(src: &str, descs: &[&str], property: &str) -> String {
+    let (tree, leaf) = chain(descs);
+    css(&computed(src, &tree, leaf), property)
+}

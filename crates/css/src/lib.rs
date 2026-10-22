@@ -7,6 +7,7 @@
 //! crate compiles for wasm32.
 
 pub mod ast;
+pub mod cascade;
 pub mod error;
 pub mod parse;
 pub mod property;
