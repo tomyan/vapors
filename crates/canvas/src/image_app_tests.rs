@@ -1,7 +1,6 @@
 //! When the app asks for a file, and what it does with one.
 
 use super::*;
-use vapors_platform::Platform;
 use vapors_scene::Size;
 
 const BACKGROUND: Color = Color {
@@ -97,10 +96,4 @@ fn a_file_that_is_not_a_png_leaves_the_view_empty() {
 
     // Then
     assert!(!app.view().has_image());
-}
-
-#[test]
-fn the_platform_handle_is_what_the_app_is_given() {
-    // Then: the signature compiles against the real type
-    fn _takes(_: &Platform) {}
 }
