@@ -26,6 +26,7 @@ fn main() {
 fn start() -> Result<(), String> {
     let image = decode_png(GRADIENT).map_err(|message| format!("gradient.png: {message}"))?;
     let options = WindowOptions {
+        app_name: "vapors".into(),
         title: "vapors web demo".into(),
         width: 640,
         height: 400,

@@ -68,7 +68,13 @@ impl Handler {
     }
 
     fn gpu_ready(&mut self, gpu: Gpu) {
-        crate::report::report_status(&format!("adapter: {}", gpu.adapter_summary()));
+        let limits = gpu.limits();
+        crate::report::report_status(&format!(
+            "adapter: {}; max texture {} px, max buffer {} MiB",
+            gpu.adapter_summary(),
+            limits.max_texture_dimension_2d,
+            limits.max_buffer_size >> 20
+        ));
         self.gpu = Some(gpu);
         if let Some(window) = &self.window {
             let size = window.inner_size();

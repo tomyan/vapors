@@ -17,6 +17,9 @@ use crate::surface::Gpu;
 /// How to open the window. On the web the page's CSS sizes the canvas and
 /// `width` and `height` are not used.
 pub struct WindowOptions {
+    /// The name that prefixes every reported line, as `touche:`. When
+    /// empty, the title's first word (without a trailing colon) is used.
+    pub app_name: String,
     /// Title bar text.
     pub title: String,
     /// Logical width in points.
@@ -40,6 +43,16 @@ pub struct Frame<'a> {
     /// Device pixels per logical pixel: the window's scale factor, the
     /// page's `devicePixelRatio` on the web. 2.0 on a high-density display.
     pub scale_factor: f64,
+}
+
+impl Frame<'_> {
+    /// The limits the window's device was opened with: the defaults, with
+    /// `max_buffer_size`, `max_texture_dimension_2d` and
+    /// `max_storage_buffer_binding_size` raised to the adapter's.
+    #[must_use]
+    pub fn limits(&self) -> wgpu::Limits {
+        self.device.limits()
+    }
 }
 
 /// What the app wants after a frame.
@@ -85,6 +98,7 @@ pub(crate) enum Message {
 /// surface cannot be set up. Each variant's message names what was found.
 #[cfg(not(target_family = "wasm"))]
 pub fn run(options: WindowOptions, app: impl App + 'static) -> Result<(), PlatformError> {
+    crate::report::set_prefix(&options.app_name, &options.title);
     crate::log_forward::install();
     let event_loop = EventLoop::with_user_event()
         .build()
@@ -111,6 +125,7 @@ pub fn run(options: WindowOptions, app: impl App + 'static) -> Result<(), Platfo
 pub fn run(options: WindowOptions, app: impl App + 'static) -> Result<(), PlatformError> {
     use winit::platform::web::EventLoopExtWebSys;
 
+    crate::report::set_prefix(&options.app_name, &options.title);
     crate::web::install_panic_hook();
 
     crate::webgpu::required(crate::web::has_webgpu())?;
