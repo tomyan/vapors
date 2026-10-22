@@ -26,10 +26,12 @@ pub fn has_webgpu() -> bool {
     })
 }
 
-/// Make `<button id="open">` open the picker from its own click, which
-/// every browser counts as user activation; a tap on the canvas does
-/// not always. A page without the button is told so. The click closure
-/// lives as long as the page.
+/// Make `<button id="open">` send [`Message::OpenRequested`], so the app
+/// opens the picker with its own file kinds. A click is user activation
+/// in every browser, and it stays usable for a few seconds, long enough
+/// for the event to come back through the loop; a tap on the canvas is
+/// not always activation. A page without the button is told so. The
+/// click closure lives as long as the page.
 pub fn wire_open_button(proxy: EventLoopProxy<Message>) {
     let Some(button) = element(OPEN_ID).and_then(|e| e.dyn_into::<HtmlElement>().ok()) else {
         crate::report::report_error(&format!(
@@ -37,7 +39,8 @@ pub fn wire_open_button(proxy: EventLoopProxy<Message>) {
         ));
         return;
     };
-    let on_click = Closure::<dyn FnMut()>::new(move || crate::picker::open(proxy.clone()));
+    let on_click =
+        Closure::<dyn FnMut()>::new(move || crate::tasks::send(&proxy, Message::OpenRequested));
     button.set_onclick(Some(on_click.as_ref().unchecked_ref()));
     on_click.forget();
 }

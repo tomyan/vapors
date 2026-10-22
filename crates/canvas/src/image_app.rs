@@ -2,7 +2,7 @@
 //! and the file picker to put an image in it. The native example and the
 //! web demo both run this.
 
-use vapors_platform::{App, Event, Frame, Next, Platform, report_error};
+use vapors_platform::{App, Event, FileKind, Frame, Next, Platform, report_error, report_status};
 use vapors_scene::Color;
 
 use crate::{ImageView, RgbaImage, decode_png};
@@ -36,9 +36,15 @@ impl ImageApp {
         &self.view
     }
 
+    /// What the picker offers. Decoding knows PNG only, so far.
+    fn file_kinds() -> Vec<FileKind> {
+        vec![FileKind::new("PNG image", ["png"])]
+    }
+
     fn opens_picker(&self, event: &Event) -> bool {
         match event {
             Event::Character(text) => text == "o",
+            Event::OpenRequested => true,
             Event::Tap { .. } | Event::PrimaryButton { pressed: false } => !self.view.has_image(),
             _ => false,
         }
@@ -46,7 +52,13 @@ impl ImageApp {
 
     fn file_opened(&mut self, name: &str, bytes: &[u8]) {
         match decode_png(bytes) {
-            Ok(image) => self.view.set_image(image),
+            Ok(image) => {
+                report_status(&format!(
+                    "opened {name} {}x{}",
+                    image.size.width, image.size.height
+                ));
+                self.view.set_image(image);
+            }
             Err(message) => report_error(&format!("{name}: {message}")),
         }
     }
@@ -54,8 +66,10 @@ impl ImageApp {
 
 impl App for ImageApp {
     fn event(&mut self, event: Event, platform: &Platform) {
-        if self.opens_picker(&event) {
-            platform.pick_file();
+        if self.opens_picker(&event)
+            && let Err(error) = platform.pick_file(&Self::file_kinds())
+        {
+            report_error(&error.to_string());
         }
         if let Event::FileOpened { name, bytes } = &event {
             self.file_opened(name, bytes);

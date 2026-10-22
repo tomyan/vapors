@@ -41,6 +41,7 @@ fn o_opens_the_picker_with_or_without_an_image() {
     // When / Then
     assert!(picks(&empty, &Event::Character("o".into())));
     assert!(picks(&showing, &Event::Character("o".into())));
+    assert!(picks(&showing, &Event::OpenRequested));
     assert!(!picks(&showing, &Event::Character("p".into())));
 }
 

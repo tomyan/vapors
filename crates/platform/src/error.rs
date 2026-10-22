@@ -15,6 +15,8 @@ pub enum PlatformError {
     Device(String),
     /// The surface offered no format the renderer accepts.
     Surface(String),
+    /// The file picker was asked for something it cannot show.
+    Picker(String),
 }
 
 impl fmt::Display for PlatformError {
@@ -29,6 +31,7 @@ impl fmt::Display for PlatformError {
             ),
             Self::Device(message) => write!(f, "device: {message}"),
             Self::Surface(message) => write!(f, "surface: {message}"),
+            Self::Picker(message) => write!(f, "picker: {message}"),
         }
     }
 }
