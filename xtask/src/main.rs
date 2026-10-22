@@ -18,6 +18,7 @@ mod screenshot;
 mod serve;
 mod setup;
 mod steps;
+mod stop;
 mod stream;
 mod tailscale;
 mod tools;
