@@ -2,11 +2,11 @@
 //! with every refusal naming its line and column.
 
 mod at_rules;
-mod component;
+pub(crate) mod component;
 mod declarations;
 mod keyframes;
 mod rules;
-mod stream;
+pub(crate) mod stream;
 
 use crate::Result;
 use crate::ast::Stylesheet;

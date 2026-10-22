@@ -66,7 +66,7 @@ fn until_close(
 /// Consume component values until one of `stop` appears at the top level
 /// (not consumed) or the input ends. Leading and trailing whitespace are
 /// trimmed.
-pub(super) fn values_until(stream: &mut Stream, stop: &[TokenKind]) -> Result<Vec<ComponentValue>> {
+pub(crate) fn values_until(stream: &mut Stream, stop: &[TokenKind]) -> Result<Vec<ComponentValue>> {
     let mut out = Vec::new();
     while let Some(kind) = stream.peek() {
         if stop.contains(kind) {
@@ -98,7 +98,7 @@ pub(super) fn trim_whitespace(values: &mut Vec<ComponentValue>) {
 }
 
 /// Split component values on top-level commas, each part trimmed.
-pub(super) fn split_commas(values: &[ComponentValue]) -> Vec<Vec<ComponentValue>> {
+pub(crate) fn split_commas(values: &[ComponentValue]) -> Vec<Vec<ComponentValue>> {
     let mut parts = vec![Vec::new()];
     for v in values {
         if matches!(

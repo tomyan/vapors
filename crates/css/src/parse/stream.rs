@@ -3,14 +3,14 @@
 use crate::token::{Token, TokenKind};
 use crate::{Error, Position, Result};
 
-pub(super) struct Stream {
+pub(crate) struct Stream {
     tokens: Vec<Token>,
     index: usize,
     end: Position,
 }
 
 impl Stream {
-    pub(super) fn new(tokens: Vec<Token>) -> Self {
+    pub(crate) fn new(tokens: Vec<Token>) -> Self {
         let end = tokens
             .last()
             .map_or(Position { line: 1, column: 1 }, |t| t.position);
