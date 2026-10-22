@@ -4,4 +4,12 @@
 //! GPU tests for this crate live in `tests/gpu_*.rs`, are named `gpu_*`,
 //! and run in the `gpu` tier (`cargo xtask test --tier gpu`).
 
+mod font_system;
 pub mod fonts;
+mod layout;
+mod style;
+
+pub use font_system::FontSystem;
+pub use layout::{Align, Glyph, GlyphRun, Layout, LayoutOptions, LineInfo, PlacedGlyph};
+pub use parley;
+pub use style::{Family, Span, Style};

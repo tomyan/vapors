@@ -1,8 +1,9 @@
 //! Colours as the scene carries them: non-premultiplied, encoded sRGB,
 //! each channel a float in 0..=1.
 
-/// A non-premultiplied sRGB colour with alpha, channels in 0..=1.
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// A non-premultiplied sRGB colour with alpha, channels in 0..=1. The
+/// default is transparent black, as CSS `transparent`.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Color {
     /// Red, 0..=1.
     pub r: f32,
