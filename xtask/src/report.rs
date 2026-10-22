@@ -1,20 +1,26 @@
 //! Compact output: one line per fact, the failure lines, the fix and
 //! the command that reproduces it. Full output only with `--verbose`.
 
+use std::cell::RefCell;
 use std::time::Duration;
 
 use crate::command::Outcome;
 use crate::steps::Step;
+use crate::stream::StreamFilter;
 
 /// Prints step results in the factory's one-line format.
 pub struct Reporter {
     verbose: bool,
+    stream: RefCell<StreamFilter>,
 }
 
 impl Reporter {
     /// A reporter that prints full output when `verbose` is true.
     pub fn new(verbose: bool) -> Self {
-        Self { verbose }
+        Self {
+            verbose,
+            stream: RefCell::new(StreamFilter::default()),
+        }
     }
 
     /// Report one step's outcome.
@@ -31,6 +37,14 @@ impl Reporter {
         if !outcome.passed {
             println!("     fix: {}", step.fix);
             println!("     reproduce: {}", step.reproduce());
+        }
+    }
+
+    /// One line from a long-running tool, as `trunk    <line>`: every
+    /// line with `--verbose`, otherwise what [`StreamFilter`] keeps.
+    pub fn stream(&self, tool: &str, line: &str) {
+        if let Some(text) = self.stream.borrow_mut().line(self.verbose, line) {
+            println!("{tool:<8} {text}");
         }
     }
 
