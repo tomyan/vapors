@@ -1,4 +1,6 @@
-//! One image in a viewport, with the transform the user is steering.
+//! One image in a viewport, with the transform the user is steering:
+//! scroll or pinch zooms about the pointer or the fingers, a drag or a
+//! one-finger pan moves it, a double tap fits it or shows it actual size.
 
 use vapors_platform::{Event, Frame};
 use vapors_renderer::{ImagePipeline, clear_view, upload_rgba8};
@@ -27,6 +29,7 @@ pub struct ImageView {
     viewport: Size,
     transform: Transform,
     pointer: [f32; 2],
+    dragging: bool,
     background: Color,
 }
 
@@ -45,6 +48,7 @@ impl ImageView {
             uploaded: None,
             viewport,
             pointer: [0.0, 0.0],
+            dragging: false,
             background,
         }
     }
@@ -70,6 +74,21 @@ impl ImageView {
         self.transform = self.transform.zoomed_about(anchor, factor);
     }
 
+    /// Move the image by `dx`, `dy` viewport pixels.
+    pub fn pan(&mut self, dx: f32, dy: f32) {
+        self.transform.translate[0] += dx;
+        self.transform.translate[1] += dy;
+    }
+
+    /// Fit the image unless it is fitted already, then show it actual size.
+    pub fn toggle_fit(&mut self) {
+        if self.transform == Transform::fit(self.image.size, self.viewport) {
+            self.actual_size();
+        } else {
+            self.fit();
+        }
+    }
+
     /// Answer an input event.
     pub fn event(&mut self, event: &Event) {
         match event {
@@ -80,11 +99,22 @@ impl ImageView {
                 };
                 self.fit();
             }
-            Event::PointerMoved { x, y } => self.pointer = [*x, *y],
+            Event::PointerMoved { x, y } => self.pointer_moved([*x, *y]),
+            Event::PrimaryButton { pressed } => self.dragging = *pressed,
             Event::Scroll { steps } => self.zoom(self.pointer, ZOOM_STEP.powf(*steps)),
+            Event::Pinch { x, y, factor } => self.zoom([*x, *y], *factor),
+            Event::Pan { dx, dy } => self.pan(*dx, *dy),
+            Event::DoubleTap { .. } => self.toggle_fit(),
             Event::Character(text) => self.key(text),
-            _ => {}
+            Event::Touch { .. } | Event::Tap { .. } | Event::FileOpened { .. } => {}
         }
+    }
+
+    fn pointer_moved(&mut self, to: [f32; 2]) {
+        if self.dragging {
+            self.pan(to[0] - self.pointer[0], to[1] - self.pointer[1]);
+        }
+        self.pointer = to;
     }
 
     fn key(&mut self, text: &str) {
@@ -145,63 +175,5 @@ fn clear_frame(frame: &Frame<'_>, color: Color) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn view() -> ImageView {
-        let image = RgbaImage {
-            size: Size {
-                width: 200,
-                height: 100,
-            },
-            rgba: vec![0; 200 * 100 * 4],
-        };
-        let mut view = ImageView::new(image, Color::from_rgba8(40, 40, 40, 255));
-        view.event(&Event::Resized {
-            width: 400,
-            height: 400,
-        });
-        view
-    }
-
-    #[test]
-    fn resize_fits_the_image() {
-        // Given / When
-        let view = view();
-
-        // Then
-        assert_eq!(view.transform().scale, 2.0);
-        assert_eq!(view.transform().translate, [0.0, 100.0]);
-    }
-
-    #[test]
-    fn scroll_zooms_about_the_pointer() {
-        // Given
-        let mut view = view();
-        view.event(&Event::PointerMoved { x: 100.0, y: 200.0 });
-        let under_pointer = view.transform().image_point([100.0, 200.0]);
-
-        // When
-        view.event(&Event::Scroll { steps: 1.0 });
-
-        // Then
-        assert!((view.transform().scale - 2.5).abs() < 1e-5);
-        let after = view.transform().image_point([100.0, 200.0]);
-        assert!((after[0] - under_pointer[0]).abs() < 1e-4);
-        assert!((after[1] - under_pointer[1]).abs() < 1e-4);
-    }
-
-    #[test]
-    fn keys_fit_actual_size_and_zoom() {
-        // Given
-        let mut view = view();
-
-        // When / Then
-        view.event(&Event::Character("1".into()));
-        assert_eq!(view.transform().scale, 1.0);
-        view.event(&Event::Character("+".into()));
-        assert!((view.transform().scale - 1.25).abs() < 1e-5);
-        view.event(&Event::Character("0".into()));
-        assert_eq!(view.transform().scale, 2.0);
-    }
-}
+#[path = "image_view_tests.rs"]
+mod tests;
