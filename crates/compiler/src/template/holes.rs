@@ -1,6 +1,6 @@
-//! `{...}` holes: reading one with balanced braces (skipping string
-//! and character literals), and telling a block keyword from an
-//! expression.
+//! `{...}` holes: reading one with balanced braces (skipping string,
+//! raw string and character literals), and telling a block keyword
+//! from an expression.
 
 use super::Parser;
 use crate::CompileError;
@@ -74,12 +74,30 @@ fn balanced_len(text: &str) -> Option<usize> {
                 }
             }
             b'"' => i += string_len(&text[i..])?,
+            b'r' => i += raw_string_end(&text[i..]).unwrap_or(0),
             b'\'' => i += char_literal_len(&text[i..]).unwrap_or(0),
             _ => {}
         }
         i += 1;
     }
     None
+}
+
+/// At the `r` of `r"..."` or `r#"..."#` (also inside `br` and `cr`
+/// literals), the index of the literal's last byte. In a raw string
+/// `\` escapes nothing, and the string ends only at `"` followed by as
+/// many `#` as it opened with.
+fn raw_string_end(text: &str) -> Option<usize> {
+    let after_prefix = text.strip_prefix('r')?;
+    let hashes = after_prefix
+        .bytes()
+        .take_while(|byte| *byte == b'#')
+        .count();
+    let body = after_prefix[hashes..].strip_prefix('"')?;
+    let closer = format!("\"{}", "#".repeat(hashes));
+    let end = body.find(&closer)?;
+    let opened = text.len() - body.len();
+    Some(opened + end + closer.len() - 1)
 }
 
 /// Bytes from the opening quote to the closing one, inclusive.

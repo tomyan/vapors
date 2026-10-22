@@ -19,6 +19,9 @@ impl Parser<'_> {
     }
 
     fn parse_if(&mut self, hole: &Hole) -> Result<Node, CompileError> {
+        if is_if_expression(&hole.body) {
+            return Err(self.error(hole.offset, IF_EXPRESSION));
+        }
         let condition = after_keyword(hole, "if");
         if condition.code.is_empty() {
             return Err(self.error(
@@ -97,4 +100,12 @@ fn sub_expr(clause: &Expr, start: usize, end: usize) -> Expr {
         code: raw.trim().to_string(),
         offset: clause.offset + start + leading,
     }
+}
+
+const IF_EXPRESSION: &str = "this is a Rust if-expression, but `{if` opens a template block: compute the value in a Memo or a closure in <script> and write `{name}`, or use `{if cond}..{else}..{/if}`";
+
+/// `if c { a } else { b }` parses as a whole Rust expression; the
+/// opening of a template block (`if c`) does not.
+fn is_if_expression(body: &str) -> bool {
+    matches!(syn::parse_str::<syn::Expr>(body), Ok(syn::Expr::If(_)))
 }
