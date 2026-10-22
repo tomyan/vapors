@@ -65,6 +65,11 @@ impl Config {
         Ok(Self { values })
     }
 
+    /// The value for `table.key`, if set.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.values.get(key).map(String::as_str)
+    }
+
     /// The value for `table.key`, or an error naming it and the file.
     pub fn require(&self, key: &str) -> Result<&str, ConfigError> {
         self.values

@@ -8,6 +8,7 @@ mod ci;
 mod command;
 mod config;
 mod deadline;
+mod dev;
 mod gpu_info;
 mod pixels;
 mod report;
@@ -15,7 +16,11 @@ mod screenshot;
 mod serve;
 mod setup;
 mod steps;
+mod stream;
+mod tailscale;
 mod tools;
+mod trunk;
+mod trunk_process;
 mod web;
 mod xvfb;
 
@@ -72,6 +77,8 @@ enum Command {
     Web,
     /// Serve target/web on the tailnet over https and print the URL.
     Serve,
+    /// Rebuild the web package on save (trunk serve, debug) behind the tailnet https proxy.
+    Dev,
     /// Check formatting and lints without running tests.
     Lint,
     /// Run one test tier (default: unit).
@@ -113,6 +120,7 @@ fn main() -> ExitCode {
         }
         Command::Web => return web::run(),
         Command::Serve => return serve::run(),
+        Command::Dev => return dev::run(&reporter),
         Command::Ci => match web::web_package() {
             Ok(package) => steps::ci(&package),
             Err(message) => return fail("ci", &message),

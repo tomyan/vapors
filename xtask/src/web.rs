@@ -64,7 +64,7 @@ pub fn web_package() -> Result<String, String> {
 
 /// The directory of `package`, from `cargo pkgid`, whose answer for a
 /// path dependency is `path+file:///<dir>#<name>@<version>`.
-fn package_dir(package: &str) -> Result<PathBuf, String> {
+pub fn package_dir(package: &str) -> Result<PathBuf, String> {
     let output = Command::new("cargo")
         .args(["pkgid", "-p", package])
         .output()
