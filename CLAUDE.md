@@ -9,8 +9,11 @@ the factory plan in `~/projects/touche/FACTORY.md`.
 ```
 cargo xtask --help        every factory command
 cargo xtask setup         install pinned tools and the pre-push hook
-cargo xtask ci            what CI runs: tools, fmt, clippy, unit; fastest first
+cargo xtask ci            what CI runs: tools, fmt, clippy, wasm, unit, gpu; fastest first
 cargo xtask lint          fmt and clippy only
+cargo xtask wasm          clippy for the web package on wasm32-unknown-unknown
+cargo xtask web           trunk release build of the web package into target/web
+cargo xtask serve         put target/web on the tailnet over https; prints the URL
 cargo xtask test          one tier (default unit)
 bacon                     unit tier on every save
 ```

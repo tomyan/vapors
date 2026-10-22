@@ -12,9 +12,11 @@ mod gpu_info;
 mod pixels;
 mod report;
 mod screenshot;
+mod serve;
 mod setup;
 mod steps;
 mod tools;
+mod web;
 mod xvfb;
 
 use std::path::PathBuf;
@@ -64,6 +66,12 @@ enum Command {
         #[arg(last = true)]
         example_args: Vec<String>,
     },
+    /// Lint the web package for wasm32-unknown-unknown (the `wasm` CI step).
+    Wasm,
+    /// Build the web package with trunk into target/web.
+    Web,
+    /// Serve target/web on the tailnet over https and print the URL.
+    Serve,
     /// Check formatting and lints without running tests.
     Lint,
     /// Run one test tier (default: unit).
@@ -103,10 +111,24 @@ fn main() -> ExitCode {
             };
             return screenshot::run(&target, &out, expect.as_deref(), &example_args);
         }
-        Command::Ci => steps::ci(),
+        Command::Web => return web::run(),
+        Command::Serve => return serve::run(),
+        Command::Ci => match web::web_package() {
+            Ok(package) => steps::ci(&package),
+            Err(message) => return fail("ci", &message),
+        },
+        Command::Wasm => match web::web_package() {
+            Ok(package) => steps::wasm_lint(&package),
+            Err(message) => return fail("wasm", &message),
+        },
         Command::Lint => steps::lint(),
         Command::Test { tier: Tier::Unit } => steps::unit_tests(),
         Command::Test { tier: Tier::Gpu } => steps::gpu_tests(),
     };
     ci::run(&steps, &reporter)
+}
+
+fn fail(command: &str, message: &str) -> ExitCode {
+    println!("FAIL {command}: {message}");
+    ExitCode::FAILURE
 }
