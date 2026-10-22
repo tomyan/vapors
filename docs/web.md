@@ -6,28 +6,47 @@ the canvas, pinch or scroll to zoom, drag or one finger to pan, a double
 tap to toggle fit and actual size, `o` or a tap on an empty canvas to
 open a file.
 
-## What the page needs
+## Page contract
+
+The elements the platform looks for, by id (`vapors_platform::page`):
 
 - `<canvas id="vapors">`, sized by CSS. The platform attaches to it and
   reports its size in physical pixels; a page without it fails with a
   Windowing error naming the id.
-- `<p id="status">`, optional. The adapter line is written there once the
-  GPU is ready, and every error after `run()` returns (`run()` returns at
-  once on the web; the browser owns the loop).
+- `<p id="status">`, optional. `report_status` writes there: the adapter
+  line once the GPU is ready, and what was opened. Each line replaces
+  the last.
+- `<p id="error" hidden>`, optional. `report_error` writes there and
+  removes the `hidden` attribute, so a page can tell an error from a
+  status line by the element rather than by console text. Errors come
+  after `run()` returns too (`run()` returns at once on the web; the
+  browser owns the loop). A page without `#error` gets its errors in
+  `#status`. `report_status` never writes to `#error`. Both also go to
+  the console, errors with `console.error`.
 - `<button id="open">`, for touch screens, placed top right so it does
   not cover the label strip the image app draws top left. Its click reaches the app as
   `Event::OpenRequested`, and the app answers with `pick_file` and its
   file kinds: a click is user activation in every browser, a tap on the
-  canvas is not always. A page without it is told so in the
-  console and the status element; `o` and a tap on an empty canvas still
-  try.
+  canvas is not always. A page without it is told so as an error; `o`
+  and a tap on an empty canvas still try.
 - CSS: `html,body{margin:0;height:100%} canvas{width:100vw;height:100vh;
   display:block;touch-action:none}`. Without `touch-action:none` the
   browser scrolls instead of sending touches.
 - WebGPU: Chrome or Edge 113+, Safari 26+, Firefox 141+, over https or
   localhost. There is no WebGL fallback. `navigator.gpu` is checked
   before anything else, so a browser without WebGPU reads the `NoWebGpu`
-  error and that list in the status element rather than a surface error.
+  error and that list (in `#error`, or `#status`) rather than a surface
+  error.
+
+`scripts/check-page-contract.sh target/web <work dir>`, after `cargo
+xtask web`, loads four copies of the built page in headless Chromium
+and prints each one's `#status` and `#error`. On 2026-10-22 (Chromium
+155, SwiftShader): the page as built showed the adapter line in
+`#status` and `#error` still hidden and empty; without the Open button,
+the adapter line in `#status` and the missing-button error in `#error`;
+without WebGPU, the `NoWebGpu` error in `#error` and `#status` still
+reading `starting`; without WebGPU and without `#error`, the error in
+`#status`.
 
 ## Build
 
@@ -95,7 +114,7 @@ offer their photo library). An empty list is refused.
 status element on the web; the image app says `opened <name> <w>x<h>`.
 Lines on stdout, stderr and the console start with `WindowOptions.app_name`
 (or the title's first word when it is empty), so touche's say `touche:`;
-the status element shows the bare text.
+the `#status` and `#error` elements show the bare text.
 
 ## Device limits
 

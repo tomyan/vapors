@@ -1,7 +1,8 @@
 //! Where failures and status go. Native: fatal errors return from `run`,
 //! other failures go to stderr, status lines to stdout. Web: `run` has
 //! returned by the time most things happen, so failures go to the console
-//! and, with the status, into the page's `status` element when it has one.
+//! and to the page's `error` element, or its `status` element when it has
+//! no `error` element; status lines go to `status` only (`page.rs`).
 
 use std::sync::OnceLock;
 
@@ -58,7 +59,7 @@ pub fn report_error(message: &str) {
         "{}: {message}",
         prefix()
     )));
-    crate::web::set_status(message);
+    crate::web::write_report(crate::page::Report::Error, message);
 }
 
 #[cfg(target_family = "wasm")]
@@ -70,7 +71,7 @@ pub fn fatal(error: &PlatformError) {
 /// natively, the `status` element on the web. It replaces the last one.
 #[cfg(target_family = "wasm")]
 pub fn report_status(text: &str) {
-    crate::web::set_status(text);
+    crate::web::write_report(crate::page::Report::Status, text);
 }
 
 #[cfg(test)]
