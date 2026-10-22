@@ -1,6 +1,10 @@
 //! Batching and the flush loop that runs scheduled effects.
 
+use std::cell::RefCell;
+use std::collections::VecDeque;
+
 use crate::error::NodeInfo;
+use crate::guard::Restore;
 use crate::node::NodeId;
 use crate::propagate::update_if_necessary;
 use crate::runtime::with_runtime;
@@ -16,12 +20,10 @@ const MAX_FLUSH_PASSES: u32 = 100;
 /// the batch recomputes once.
 pub fn batch<R>(f: impl FnOnce() -> R) -> R {
     with_runtime(|runtime| runtime.batch_depth += 1);
+    let depth = Restore::new(|| with_runtime(|runtime| runtime.batch_depth -= 1));
     let result = f();
-    let flush_now = with_runtime(|runtime| {
-        runtime.batch_depth -= 1;
-        runtime.batch_depth == 0
-    });
-    if flush_now {
+    drop(depth);
+    if with_runtime(|runtime| runtime.batch_depth == 0) {
         flush();
     }
     result
@@ -41,6 +43,7 @@ fn flush() {
     if already {
         return;
     }
+    let _flushing = Restore::new(|| with_runtime(|runtime| runtime.flushing = false));
     let mut passes = 0;
     loop {
         let effects = take_pending();
@@ -49,14 +52,35 @@ fn flush() {
         }
         passes += 1;
         if passes > MAX_FLUSH_PASSES {
-            with_runtime(|runtime| runtime.flushing = false);
             refuse_runaway(&effects);
         }
-        for effect in effects {
-            update_if_necessary(effect);
-        }
+        run_pass(effects);
     }
-    with_runtime(|runtime| runtime.flushing = false);
+}
+
+/// Runs one pass in order. If an effect panics, the ones after it are
+/// scheduled again, so the next flush runs them rather than losing them.
+fn run_pass(effects: Vec<NodeId>) {
+    let queue = RefCell::new(VecDeque::from(effects));
+    let _unrun = Restore::new(|| reschedule(queue.borrow_mut().drain(..)));
+    loop {
+        let next = queue.borrow_mut().pop_front();
+        let Some(effect) = next else {
+            break;
+        };
+        update_if_necessary(effect);
+    }
+}
+
+fn reschedule(effects: impl Iterator<Item = NodeId>) {
+    with_runtime(|runtime| {
+        for id in effects {
+            if let Some(node) = runtime.node_mut(id) {
+                node.scheduled = true;
+                runtime.pending.push(id);
+            }
+        }
+    });
 }
 
 /// The scheduled effects in creation order, with their flags cleared

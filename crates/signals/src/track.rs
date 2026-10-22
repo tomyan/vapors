@@ -1,6 +1,7 @@
 //! Dependency tracking: which observer is running, and subscribing the
 //! sources it reads.
 
+use crate::guard::Restore;
 use crate::node::NodeId;
 use crate::runtime::{Runtime, with_runtime};
 
@@ -8,9 +9,10 @@ use crate::runtime::{Runtime, with_runtime};
 /// it reads.
 pub fn untrack<R>(f: impl FnOnce() -> R) -> R {
     with_runtime(|runtime| runtime.observers.push(None));
-    let result = f();
-    with_runtime(|runtime| runtime.observers.pop());
-    result
+    let _frame = Restore::new(|| {
+        with_runtime(|runtime| runtime.observers.pop());
+    });
+    f()
 }
 
 /// Records that the running observer, if any, read `source`.

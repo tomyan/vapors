@@ -23,6 +23,7 @@ mod access;
 mod effect;
 mod error;
 mod flush;
+mod guard;
 mod memo;
 mod node;
 mod owner;

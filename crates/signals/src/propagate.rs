@@ -2,7 +2,8 @@
 //! keeps memos glitch-free and runs each computation at most once per
 //! change.
 
-use crate::node::{NodeId, State};
+use crate::guard::Restore;
+use crate::node::{NodeId, OwnerId, State};
 use crate::owner;
 use crate::runtime::{Runtime, with_runtime};
 use crate::track::clear_sources;
@@ -109,18 +110,41 @@ pub(crate) fn recompute(id: NodeId) {
     if let Some(scope) = scope {
         owner::dispose_contents(scope);
     }
+    let changed = run_computing(id, scope, || (compute.borrow_mut())());
+    if changed {
+        with_runtime(|runtime| notify_observers(runtime, id));
+    }
+}
+
+/// Runs `compute` as `id`: tracked, on the computing stack, with its
+/// scope as the owner. All three are restored on return or unwind.
+fn run_computing(id: NodeId, scope: Option<OwnerId>, compute: impl FnOnce() -> bool) -> bool {
     let previous_owner = with_runtime(|runtime| {
         runtime.computing.push(id);
         runtime.observers.push(Some(id));
         std::mem::replace(&mut runtime.current_owner, scope)
     });
-    let changed = (compute.borrow_mut())();
-    with_runtime(|runtime| {
-        runtime.computing.pop();
-        runtime.observers.pop();
-        runtime.current_owner = previous_owner;
-        if changed {
-            notify_observers(runtime, id);
-        }
+    let _restore = Restore::new(move || {
+        with_runtime(|runtime| {
+            runtime.computing.pop();
+            runtime.observers.pop();
+            runtime.current_owner = previous_owner;
+            if std::thread::panicking() {
+                settle_after_panic(runtime, id);
+            }
+        });
     });
+    compute()
+}
+
+/// After a panic: a memo is left dirty, so the next read computes it
+/// again; an effect is left clean with the subscriptions it made before
+/// panicking, so the next change to one of them runs it again.
+fn settle_after_panic(runtime: &mut Runtime, id: NodeId) {
+    if let Some(node) = runtime.node_mut(id) {
+        node.state = match node.info.kind {
+            crate::Kind::Effect => State::Clean,
+            _ => State::Dirty,
+        };
+    }
 }

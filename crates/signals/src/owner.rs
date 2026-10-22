@@ -1,6 +1,7 @@
 //! Owners: the scopes that dispose signals, memos, effects and cleanups
 //! together.
 
+use crate::guard::Restore;
 use crate::node::{Cleanup, Compute, NodeId, OwnerId, ValueCell};
 use crate::runtime::{Runtime, with_runtime};
 
@@ -39,9 +40,9 @@ impl Owner {
     /// Runs `f` with this owner current, then restores the previous one.
     pub fn with<R>(&self, f: impl FnOnce() -> R) -> R {
         let previous = with_runtime(|runtime| runtime.current_owner.replace(self.id));
-        let result = f();
-        with_runtime(|runtime| runtime.current_owner = previous);
-        result
+        let _restore =
+            Restore::new(move || with_runtime(|runtime| runtime.current_owner = previous));
+        f()
     }
 
     /// Disposes the owner and everything it owns. A disposed owner's

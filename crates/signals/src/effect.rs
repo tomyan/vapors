@@ -8,6 +8,7 @@ use std::panic::Location;
 use std::rc::Rc;
 
 use crate::error::{Kind, NodeInfo};
+use crate::flush::batch;
 use crate::node::{NodeId, State};
 use crate::owner::dispose_node;
 use crate::propagate::recompute;
@@ -58,7 +59,9 @@ impl Effect {
             node.scope = Some(scope);
             (id, node.info)
         });
-        recompute(id);
+        // The first run is batched like a re-run inside a flush: a signal
+        // it writes is picked up after it returns, never inside it.
+        batch(|| recompute(id));
         Effect { id, info }
     }
 
