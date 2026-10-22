@@ -2,6 +2,8 @@
 //! the scope of names that auto-unwrap, and the clones a `move`
 //! closure needs of the script's plain bindings.
 
+mod declared;
+
 use std::collections::HashSet;
 
 use super::allowances::Allowance;
@@ -47,6 +49,8 @@ pub(crate) struct Emitter<'a> {
     depth: usize,
     counter: usize,
     scopes: Vec<Vec<String>>,
+    generated: HashSet<String>,
+    loop_bindings: Vec<(String, usize)>,
 }
 
 impl<'a> Emitter<'a> {
@@ -58,6 +62,8 @@ impl<'a> Emitter<'a> {
             depth: 0,
             counter: 0,
             scopes: Vec::new(),
+            generated: HashSet::new(),
+            loop_bindings: Vec::new(),
         }
     }
 
@@ -87,6 +93,7 @@ impl<'a> Emitter<'a> {
     pub fn fresh(&mut self, stem: &str) -> String {
         let name = format!("{stem}{}", self.counter);
         self.counter += 1;
+        self.reserve(&name);
         name
     }
 

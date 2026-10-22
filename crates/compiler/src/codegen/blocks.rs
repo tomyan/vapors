@@ -30,6 +30,11 @@ impl Emitter<'_> {
         let anchor = self.fresh("for_anchor");
         self.emit_anchor(&anchor, place);
         let (index, item) = self.loop_names(block)?;
+        for name in [&index, &item] {
+            if name != "_index" {
+                self.declare_loop_binding(name, block.offset)?;
+            }
+        }
         let iterable = self.raw(&block.iterable)?;
         let key = block.key.as_ref().map(|key| self.raw(key)).transpose()?;
         let handle = self.open_block_call("keyed", place);

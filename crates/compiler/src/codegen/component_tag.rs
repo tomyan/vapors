@@ -23,6 +23,7 @@ impl Emitter<'_> {
         }
         let last = tag.name.rsplit("::").next().unwrap_or(&tag.name);
         let var = self.fresh(&last.to_lowercase());
+        self.reserve(&format!("{var}_props"));
         let fields = self.emit_prop_values(tag, &var)?;
         self.line(Allowance::NeedlessUpdate.attribute());
         self.line(format!("let {var}_props = {}Props {{", tag.name));
@@ -54,6 +55,7 @@ impl Emitter<'_> {
                 AttrValue::Literal(value) => format!("{value:?}.into()"),
                 AttrValue::Expr(expr) => {
                     let local = format!("{var}_{name}");
+                    self.reserve(&local);
                     self.line(format!("let {local} = {};", self.raw(expr)?));
                     local
                 }

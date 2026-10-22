@@ -13,6 +13,7 @@ mod component_tag;
 mod element;
 mod emit;
 mod format;
+mod names;
 mod script;
 mod script_syntax;
 mod shell;
@@ -37,6 +38,7 @@ pub fn generate(component: &Component) -> Result<String, CompileError> {
     let mut emitter = Emitter::new(&source, &info);
     emitter.indent(3);
     emitter.emit_nodes(&component.template.children, &Place::roots())?;
+    names::check_generated(&source, &emitter.declared(), emitter.generated())?;
     let body = emitter.finish();
     let raw = shell::assemble(component, &info, &body);
     let formatted = format::format(&source, &raw)?;

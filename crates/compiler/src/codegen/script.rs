@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use proc_macro2::LineColumn;
 use syn::spanned::Spanned;
 
+use super::names::{bound_names, check_declared};
 use super::script_syntax::{binding, call_of_new, named, reactive_kind};
 use super::syn_map::{offset_in, render};
 use crate::CompileError;
@@ -38,6 +39,8 @@ pub(crate) struct ScriptInfo {
     pub bindings: Vec<String>,
     /// The statements to run at mount, rendered.
     pub statements: Vec<String>,
+    /// Every name the script binds, with its position.
+    pub declared: Vec<(String, usize)>,
 }
 
 /// Parses and classifies the script.
@@ -85,6 +88,10 @@ fn classify(
         return Ok(());
     };
     let offset = position(section, local.span().start());
+    for name in bound_names(&local.pat) {
+        check_declared(source, &name, offset)?;
+        info.declared.push((name, offset));
+    }
     let is_prop = local.attrs.iter().any(|attr| attr.path().is_ident("prop"));
     let (name, ty) = binding(&local.pat);
     let init = local.init.as_ref().map(|init| (*init.expr).clone());
