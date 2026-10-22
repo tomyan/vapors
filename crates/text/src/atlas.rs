@@ -12,21 +12,8 @@ use std::collections::{HashMap, HashSet};
 
 use crate::atlas_page::AtlasPage;
 use crate::atlas_types::GlyphKey;
-pub use crate::atlas_types::{AtlasError, AtlasGlyph, PageKind};
+pub use crate::atlas_types::{AtlasConfig, AtlasError, AtlasGlyph, PageKind};
 use crate::raster::{Coverage, GlyphRequest, Rasterizer};
-
-/// Atlas sizing.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct AtlasConfig {
-    /// Side of each square page in pixels.
-    pub page_size: u32,
-}
-
-impl Default for AtlasConfig {
-    fn default() -> Self {
-        Self { page_size: 1024 }
-    }
-}
 
 pub(crate) struct Entry {
     pub(crate) glyph: AtlasGlyph,
@@ -206,3 +193,7 @@ pub(crate) fn glyph_at(origin: [u32; 2], coverage: &Coverage) -> AtlasGlyph {
 #[cfg(test)]
 #[path = "atlas_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "atlas_limits_tests.rs"]
+mod limits_tests;

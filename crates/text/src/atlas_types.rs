@@ -4,6 +4,19 @@ use std::fmt;
 
 use crate::raster::{GlyphRequest, Hinting, RasterError};
 
+/// Atlas sizing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AtlasConfig {
+    /// Side of each square page in pixels.
+    pub page_size: u32,
+}
+
+impl Default for AtlasConfig {
+    fn default() -> Self {
+        Self { page_size: 1024 }
+    }
+}
+
 /// Which page a glyph is in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PageKind {

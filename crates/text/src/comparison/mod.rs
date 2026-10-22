@@ -9,6 +9,8 @@
 
 #[cfg(not(target_family = "wasm"))]
 mod chromium;
+#[cfg(not(target_family = "wasm"))]
+mod chromium_process;
 mod composite;
 mod html;
 mod measure;

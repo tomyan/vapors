@@ -4,9 +4,9 @@
 
 use std::fmt;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, ExitStatus, Stdio};
-use std::time::{Duration, Instant};
+use std::process::{Child, Command, Stdio};
 
+use super::chromium_process::{check_size, on_path, read_all, remove_stale, wait_with_deadline};
 use super::measure::Rgba;
 use super::png_file::read_png;
 
@@ -20,11 +20,6 @@ const CANDIDATES: [&str; 4] = [
     "google-chrome",
     "google-chrome-stable",
 ];
-
-/// Chromium here starts and screenshots a page in about 1 s; a cold CI
-/// runner was measured at under 10 s. 60 s is the ceiling before the run
-/// is declared hung.
-const DEADLINE: Duration = Duration::from_secs(60);
 
 /// Why Chromium could not be used.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -152,103 +147,6 @@ impl Chromium {
     }
 }
 
-/// Delete an earlier screenshot so a stale image can never be read back.
-fn remove_stale(png: &Path) -> Result<(), ChromiumError> {
-    match std::fs::remove_file(png) {
-        Ok(()) => Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(ChromiumError::Failed(format!(
-            "cannot remove the previous {}: {e}",
-            png.display()
-        ))),
-    }
-}
-
-fn check_size(image: &Rgba, png: &Path, wanted: [u32; 2]) -> Result<(), ChromiumError> {
-    if [image.width, image.height] == wanted {
-        return Ok(());
-    }
-    Err(ChromiumError::Failed(format!(
-        "{} is {}x{}, wanted {}x{}. Fix: the window size or scale was not honoured; \
-         check --force-device-scale-factor and that no display scaling applies",
-        png.display(),
-        image.width,
-        image.height,
-        wanted[0],
-        wanted[1]
-    )))
-}
-
-fn wait_with_deadline(child: &mut Child) -> Result<ExitStatus, ChromiumError> {
-    let started = Instant::now();
-    loop {
-        if let Some(status) = child
-            .try_wait()
-            .map_err(|e| ChromiumError::Failed(format!("waiting: {e}")))?
-        {
-            return Ok(status);
-        }
-        if started.elapsed() > DEADLINE {
-            let _ = child.kill();
-            return Err(ChromiumError::Failed(format!(
-                "did not finish within {}s; killed",
-                DEADLINE.as_secs()
-            )));
-        }
-        std::thread::sleep(Duration::from_millis(50));
-    }
-}
-
-fn read_all(mut stream: impl std::io::Read) -> String {
-    let mut text = String::new();
-    let _ = stream.read_to_string(&mut text);
-    text
-}
-
-fn on_path(name: &str) -> Option<PathBuf> {
-    let path = std::env::var_os("PATH")?;
-    std::env::split_paths(&path)
-        .map(|dir| dir.join(name))
-        .find(|candidate| candidate.is_file())
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_stale_screenshot_is_removed_and_a_missing_one_is_fine() {
-        // Given
-        let dir = std::env::temp_dir().join(format!("vapors-chromium-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).expect("tmp dir");
-        let png = dir.join("stale.png");
-        std::fs::write(&png, b"old").expect("write");
-
-        // When
-        remove_stale(&png).expect("removed");
-        let again = remove_stale(&png);
-
-        // Then
-        assert!(!png.exists());
-        assert_eq!(again, Ok(()));
-        std::fs::remove_dir_all(&dir).expect("cleanup");
-    }
-
-    #[test]
-    fn a_screenshot_of_the_wrong_size_is_refused_naming_both_sizes() {
-        // Given
-        let image = Rgba {
-            width: 10,
-            height: 5,
-            data: vec![0; 200],
-        };
-
-        // When
-        let error = check_size(&image, Path::new("x.png"), [20, 10]).expect_err("wrong size");
-
-        // Then
-        let message = error.to_string();
-        assert!(message.contains("10x5, wanted 20x10"), "{message}");
-        assert!(message.contains("Fix:"), "{message}");
-    }
-}
+#[path = "chromium_tests.rs"]
+mod tests;

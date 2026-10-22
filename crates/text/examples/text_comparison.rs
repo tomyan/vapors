@@ -29,32 +29,39 @@ mod native {
         let gpu = vapors_gpu_harness::gpu();
         let mut system = FontSystem::bundle_only();
         let params = params_from_flags()?;
-        let html_path = write_html(out)?;
         let chromium = Chromium::find().map_err(|e| e.to_string())?;
-        let mut rows = Vec::new();
-        for scale in SCALES {
-            let ours = render_page(&gpu.device, &gpu.queue, &mut system, params, scale);
-            write_png(
-                &out.join(format!("text_comparison_vapors_{scale}x.png")),
-                &ours,
-            )?;
-            let theirs = chromium
-                .screenshot(
-                    &html_path,
-                    &out.join(format!("text_comparison_chromium_{scale}x.png")),
-                    PAGE_WIDTH,
-                    PAGE_HEIGHT,
-                    scale,
-                )
-                .map_err(|e| e.to_string())?;
-            rows.push((scale, ours, theirs));
-        }
+        let rows = render_rows(out, &gpu, &mut system, params, &chromium)?;
         write_composite(out, &gpu, &mut system, params, &chromium, &rows)?;
         for (scale, ours, theirs) in &rows {
             print_ink_table(*scale, ours, theirs);
         }
         rows.iter()
             .try_for_each(|(scale, ours, theirs)| check_band(*scale, ours, theirs))
+    }
+
+    /// Both renderings at each scale, the PNGs written beside the HTML.
+    fn render_rows(
+        out: &Path,
+        gpu: &vapors_gpu_harness::Gpu,
+        system: &mut FontSystem,
+        params: BlendParams,
+        chromium: &Chromium,
+    ) -> Result<Vec<(u32, Rgba, Rgba)>, String> {
+        let html_path = write_html(out)?;
+        let mut rows = Vec::new();
+        for scale in SCALES {
+            let ours = render_page(&gpu.device, &gpu.queue, system, params, scale);
+            write_png(
+                &out.join(format!("text_comparison_vapors_{scale}x.png")),
+                &ours,
+            )?;
+            let png = out.join(format!("text_comparison_chromium_{scale}x.png"));
+            let theirs = chromium
+                .screenshot(&html_path, &png, PAGE_WIDTH, PAGE_HEIGHT, scale)
+                .map_err(|e| e.to_string())?;
+            rows.push((scale, ours, theirs));
+        }
+        Ok(rows)
     }
 
     fn write_composite(

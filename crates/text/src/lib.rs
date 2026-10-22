@@ -13,9 +13,14 @@ mod draw;
 mod font_system;
 pub mod fonts;
 mod layout;
+mod layout_runs;
+mod layout_types;
 mod pen;
 mod pipeline;
+mod pipeline_gpu;
+mod quads;
 mod raster;
+mod raster_types;
 mod style;
 
 pub use atlas::{AtlasConfig, AtlasError, AtlasGlyph, GlyphAtlas, PageKind};

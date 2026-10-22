@@ -86,7 +86,43 @@ const BODY: &str = "Retouching is the slow part. The agent proposes a curve, the
 /// The blocks, top to bottom. The 13 px body is the one measured.
 #[must_use]
 pub fn blocks() -> Vec<Block> {
-    let body = |size: f32, top: u32, height: u32| Block {
+    vec![
+        heading(),
+        readout(),
+        body(12.0, 144, 72),
+        body(13.0, 228, 78),
+        body(14.0, 318, 84),
+        body(15.0, 414, 90),
+        mono(),
+    ]
+}
+
+fn heading() -> Block {
+    Block {
+        text: "The quick brown fox jumps over the lazy dog",
+        family: Family::Geist,
+        size: 28.0,
+        weight: 600.0,
+        tabular_figures: false,
+        line_height: 1.2,
+        top: 24,
+        height: 72,
+    }
+}
+
+/// The DESIGN.md colour readout, with tabular figures.
+fn readout() -> Block {
+    Block {
+        text: "R 238, G 231, B 222 → 245",
+        tabular_figures: true,
+        top: 108,
+        height: 24,
+        ..body(13.0, 108, 24)
+    }
+}
+
+fn body(size: f32, top: u32, height: u32) -> Block {
+    Block {
         text: BODY,
         family: Family::Geist,
         size,
@@ -95,43 +131,17 @@ pub fn blocks() -> Vec<Block> {
         line_height: 1.5,
         top,
         height,
-    };
-    vec![
-        Block {
-            text: "The quick brown fox jumps over the lazy dog",
-            family: Family::Geist,
-            size: 28.0,
-            weight: 600.0,
-            tabular_figures: false,
-            line_height: 1.2,
-            top: 24,
-            height: 72,
-        },
-        Block {
-            text: "R 238, G 231, B 222 → 245",
-            family: Family::Geist,
-            size: 13.0,
-            weight: 400.0,
-            tabular_figures: true,
-            line_height: 1.5,
-            top: 108,
-            height: 24,
-        },
-        body(12.0, 144, 72),
-        body(13.0, 228, 78),
-        body(14.0, 318, 84),
-        body(15.0, 414, 90),
-        Block {
-            text: "let alpha = adjust(coverage, luminance); // gamma 1.2, contrast 0.2",
-            family: Family::GeistMono,
-            size: 13.0,
-            weight: 400.0,
-            tabular_figures: false,
-            line_height: 1.5,
-            top: 516,
-            height: 40,
-        },
-    ]
+    }
+}
+
+fn mono() -> Block {
+    Block {
+        text: "let alpha = adjust(coverage, luminance); // gamma 1.2, contrast 0.2",
+        family: Family::GeistMono,
+        top: 516,
+        height: 40,
+        ..body(13.0, 516, 40)
+    }
 }
 
 /// Index in [`blocks`] of the 13 px body: the block whose mean ink is
