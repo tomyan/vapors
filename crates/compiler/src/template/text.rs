@@ -2,6 +2,7 @@
 //! JSX newline rule for whitespace-only runs.
 
 use super::Parser;
+use super::entities::decode;
 use super::holes::Kind;
 use crate::CompileError;
 use crate::ast::{Expr, Node, Part, Text};
@@ -14,6 +15,7 @@ impl Parser<'_> {
         let offset = self.pos;
         let mut parts = Vec::new();
         let mut literal = String::new();
+        let mut literal_start = self.pos;
         loop {
             match self.peek() {
                 None | Some('<') => break,
@@ -22,7 +24,7 @@ impl Parser<'_> {
                     if hole.kind != Kind::Expr {
                         break;
                     }
-                    push_literal(&mut parts, &mut literal);
+                    self.push_literal(&mut parts, &mut literal, literal_start)?;
                     parts.push(Part::Expr(Expr {
                         code: hole.body,
                         offset: hole.body_offset,
@@ -33,19 +35,33 @@ impl Parser<'_> {
                     return Err(self.error(self.pos, "stray `}` in text: it has no matching `{`"));
                 }
                 Some(c) => {
+                    if literal.is_empty() {
+                        literal_start = self.pos;
+                    }
                     literal.push(c);
                     self.bump(c.len_utf8());
                 }
             }
         }
-        push_literal(&mut parts, &mut literal);
+        self.push_literal(&mut parts, &mut literal, literal_start)?;
         Ok(text_node(parts, offset))
     }
-}
 
-fn push_literal(parts: &mut Vec<Part>, literal: &mut String) {
-    if !literal.is_empty() {
-        parts.push(Part::Literal(std::mem::take(literal)));
+    /// Ends a literal run that began at `start`, decoding its
+    /// character references.
+    fn push_literal(
+        &self,
+        parts: &mut Vec<Part>,
+        literal: &mut String,
+        start: usize,
+    ) -> Result<(), CompileError> {
+        if literal.is_empty() {
+            return Ok(());
+        }
+        let decoded = decode(literal).map_err(|(at, message)| self.error(start + at, message))?;
+        literal.clear();
+        parts.push(Part::Literal(decoded));
+        Ok(())
     }
 }
 

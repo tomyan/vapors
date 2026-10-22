@@ -6,6 +6,7 @@ mod attributes;
 mod children;
 mod control_flow;
 mod elements;
+mod entities;
 mod holes;
 mod snippets;
 mod text;

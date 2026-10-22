@@ -2,6 +2,7 @@
 //! shorthand, each name once.
 
 use super::Parser;
+use super::entities::decode;
 use crate::CompileError;
 use crate::ast::{AttrValue, Attribute, Attributes, Expr};
 
@@ -126,7 +127,9 @@ impl Parser<'_> {
                     ));
                 }
                 self.bump(1);
-                Ok(AttrValue::Literal(value))
+                let decoded =
+                    decode(&value).map_err(|(at, message)| self.error(offset + 1 + at, message))?;
+                Ok(AttrValue::Literal(decoded))
             }
             _ => Err(self.error(
                 offset,
