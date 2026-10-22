@@ -15,6 +15,7 @@ mod screenshot;
 mod serve;
 mod setup;
 mod steps;
+mod tailscale;
 mod tools;
 mod web;
 mod xvfb;
