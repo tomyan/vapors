@@ -24,8 +24,16 @@ pub struct Handler {
     window: Option<Arc<Window>>,
     gpu: Option<Gpu>,
     presented: u64,
+    /// Redraws in a row that produced no texture; see [`acquire`].
+    missed: u32,
     error: Option<PlatformError>,
 }
+
+/// Consecutive redraws without a texture before giving up: a second at
+/// 60 Hz. An occluded window on some compositors reports Occluded for
+/// as long as it is hidden, so this is a first number to be measured
+/// against that; the failure names the outcome so a reader can tell.
+const MISSED_LIMIT: u32 = 60;
 
 impl Handler {
     pub fn new(options: WindowOptions, app: Box<dyn App>, platform: Platform) -> Self {
@@ -37,6 +45,7 @@ impl Handler {
             window: None,
             gpu: None,
             presented: 0,
+            missed: 0,
             error: None,
         }
     }
@@ -84,9 +93,20 @@ impl Handler {
         let (Some(window), Some(gpu)) = (&self.window, self.gpu.as_mut()) else {
             return;
         };
-        let Some(surface_texture) = acquire(window, gpu) else {
-            return;
+        let surface_texture = match acquire(window, gpu) {
+            Ok(texture) => texture,
+            Err(outcome) => {
+                self.missed += 1;
+                if self.missed >= MISSED_LIMIT {
+                    let error = PlatformError::Surface(format!(
+                        "no frame for {MISSED_LIMIT} redraws in a row; the last outcome was {outcome}"
+                    ));
+                    self.fail(event_loop, error);
+                }
+                return;
+            }
         };
+        self.missed = 0;
         let frame = Frame {
             adapter: &gpu.adapter,
             device: &gpu.device,
@@ -104,24 +124,25 @@ impl Handler {
     }
 }
 
-/// The next surface texture, or `None` after reconfiguring and asking for
-/// another redraw.
-fn acquire(window: &Window, gpu: &mut Gpu) -> Option<wgpu::SurfaceTexture> {
-    match gpu.surface.get_current_texture() {
-        wgpu::CurrentSurfaceTexture::Success(t) | wgpu::CurrentSurfaceTexture::Suboptimal(t) => {
-            Some(t)
-        }
-        wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {
-            window.request_redraw();
-            None
-        }
-        _ => {
-            let size = window.inner_size();
-            gpu.resize(size.width, size.height);
-            window.request_redraw();
-            None
-        }
+/// The next surface texture, or the name of the outcome that gave none,
+/// after reconfiguring where that helps and asking for another redraw.
+fn acquire(window: &Window, gpu: &mut Gpu) -> Result<wgpu::SurfaceTexture, &'static str> {
+    use wgpu::CurrentSurfaceTexture as Outcome;
+
+    let outcome = match gpu.surface.get_current_texture() {
+        Outcome::Success(t) | Outcome::Suboptimal(t) => return Ok(t),
+        Outcome::Timeout => "Timeout",
+        Outcome::Occluded => "Occluded",
+        Outcome::Outdated => "Outdated",
+        Outcome::Lost => "Lost",
+        Outcome::Validation => "Validation",
+    };
+    if !matches!(outcome, "Timeout" | "Occluded") {
+        let size = window.inner_size();
+        gpu.resize(size.width, size.height);
     }
+    window.request_redraw();
+    Err(outcome)
 }
 
 impl ApplicationHandler<Message> for Handler {
