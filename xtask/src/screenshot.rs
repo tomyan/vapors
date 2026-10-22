@@ -67,9 +67,9 @@ fn run_example(
     let mut command = Command::new("cargo");
     command
         .args(["run", "-q", "-p", package, kind, &target.name, "--"])
+        .args(example_args)
         .arg("--screenshot")
         .arg(out)
-        .args(example_args)
         .env("DISPLAY", display);
     if std::env::var_os("VAPORS_GPU_ADAPTER").is_none() {
         // Software rendering is what a virtual display can present.
