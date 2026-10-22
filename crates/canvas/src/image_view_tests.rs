@@ -99,7 +99,7 @@ fn double_tap_fits_unless_fitted_then_goes_to_actual_size() {
     view.event(&Event::DoubleTap { x: 50.0, y: 50.0 });
     assert_eq!(
         view.transform(),
-        Transform::fit(view.image.size, view.viewport)
+        Transform::fit(view.image_size().unwrap(), view.viewport)
     );
     view.event(&Event::DoubleTap { x: 50.0, y: 50.0 });
     assert_eq!(view.transform().scale, 1.0);
@@ -119,4 +119,45 @@ fn primary_button_drag_pans_and_release_stops_it() {
 
     // Then
     assert_eq!(view.transform().translate, [10.0, 105.0]);
+}
+
+#[test]
+fn an_empty_view_ignores_fit_and_double_tap() {
+    // Given
+    let mut view = ImageView::empty(Color::from_rgba8(0, 0, 0, 255));
+    view.event(&Event::Resized {
+        width: 400,
+        height: 400,
+    });
+
+    // When
+    view.event(&Event::DoubleTap { x: 1.0, y: 1.0 });
+    view.event(&Event::Character("0".into()));
+
+    // Then
+    assert!(!view.has_image());
+    assert_eq!(view.transform().scale, 1.0);
+}
+
+#[test]
+fn setting_an_image_fits_it() {
+    // Given
+    let mut view = ImageView::empty(Color::from_rgba8(0, 0, 0, 255));
+    view.event(&Event::Resized {
+        width: 400,
+        height: 400,
+    });
+
+    // When
+    view.set_image(RgbaImage {
+        size: Size {
+            width: 200,
+            height: 100,
+        },
+        rgba: vec![0; 200 * 100 * 4],
+    });
+
+    // Then
+    assert!(view.has_image());
+    assert_eq!(view.transform().scale, 2.0);
 }

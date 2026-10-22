@@ -1,5 +1,5 @@
 //! Work that ends by sending a [`Message`] into the event loop: GPU setup
-//! now, the file picker later. Native blocks on the future where it is;
+//! here, the file picker in `picker.rs`. Native blocks on the future where it is;
 //! the web spawns it on the browser's loop, since nothing may block there.
 
 use std::sync::Arc;

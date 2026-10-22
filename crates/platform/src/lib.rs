@@ -12,6 +12,10 @@ mod event;
 mod gestures;
 mod handler;
 mod input;
+mod picker;
+#[cfg(target_family = "wasm")]
+mod picker_web;
+mod platform;
 mod report;
 mod surface;
 mod tasks;
@@ -22,4 +26,6 @@ mod window;
 pub use error::PlatformError;
 pub use event::{Event, TouchPhase};
 pub use gestures::Gestures;
+pub use platform::Platform;
+pub use report::report_error;
 pub use window::{App, Frame, Next, WindowOptions, run};

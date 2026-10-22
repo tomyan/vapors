@@ -2,14 +2,15 @@
 //! scroll or pinch zooms about the pointer or the fingers, a drag or a
 //! one-finger pan moves it, a double tap fits it or shows it actual size.
 
-use vapors_platform::{Event, Frame};
-use vapors_renderer::{ImagePipeline, clear_view, upload_rgba8};
+use vapors_platform::Event;
+use vapors_renderer::ImagePipeline;
 use vapors_scene::{Color, Size, Transform};
 
 /// Factor per scroll step or per `+`/`-` press.
 const ZOOM_STEP: f32 = 1.25;
 
 /// Tightly packed 8-bit RGBA pixels with their size.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RgbaImage {
     /// Width and height in pixels.
     pub size: Size,
@@ -17,20 +18,21 @@ pub struct RgbaImage {
     pub rgba: Vec<u8>,
 }
 
-struct Uploaded {
-    pipeline: ImagePipeline,
-    texture: wgpu::Texture,
+/// The image on the GPU, made on the first frame that needs it.
+pub(crate) struct Uploaded {
+    pub(crate) pipeline: ImagePipeline,
+    pub(crate) texture: wgpu::Texture,
 }
 
 /// An image placed in a viewport under a user-steered transform.
 pub struct ImageView {
-    image: RgbaImage,
-    uploaded: Option<Uploaded>,
-    viewport: Size,
+    pub(crate) image: Option<RgbaImage>,
+    pub(crate) uploaded: Option<Uploaded>,
+    pub(crate) viewport: Size,
     transform: Transform,
     pointer: [f32; 2],
     dragging: bool,
-    background: Color,
+    pub(crate) background: Color,
 }
 
 impl ImageView {
@@ -38,19 +40,46 @@ impl ImageView {
     /// resize, which the platform sends before the first frame.
     #[must_use]
     pub fn new(image: RgbaImage, background: Color) -> Self {
-        let viewport = Size {
-            width: 1,
-            height: 1,
-        };
+        let mut view = Self::empty(background);
+        view.set_image(image);
+        view
+    }
+
+    /// Only `background`, until [`ImageView::set_image`].
+    #[must_use]
+    pub fn empty(background: Color) -> Self {
         Self {
-            transform: Transform::fit(image.size, viewport),
-            image,
+            image: None,
             uploaded: None,
-            viewport,
+            viewport: Size {
+                width: 1,
+                height: 1,
+            },
+            transform: Transform {
+                scale: 1.0,
+                translate: [0.0, 0.0],
+            },
             pointer: [0.0, 0.0],
             dragging: false,
             background,
         }
+    }
+
+    /// Replace what is shown with `image`, fitted.
+    pub fn set_image(&mut self, image: RgbaImage) {
+        self.image = Some(image);
+        self.uploaded = None;
+        self.fit();
+    }
+
+    /// True once an image has been set.
+    #[must_use]
+    pub fn has_image(&self) -> bool {
+        self.image.is_some()
+    }
+
+    fn image_size(&self) -> Option<Size> {
+        self.image.as_ref().map(|image| image.size)
     }
 
     /// The current placement of the image in the viewport.
@@ -61,12 +90,16 @@ impl ImageView {
 
     /// Fit the image to the viewport, centred.
     pub fn fit(&mut self) {
-        self.transform = Transform::fit(self.image.size, self.viewport);
+        if let Some(size) = self.image_size() {
+            self.transform = Transform::fit(size, self.viewport);
+        }
     }
 
     /// One image pixel per viewport pixel, centred.
     pub fn actual_size(&mut self) {
-        self.transform = Transform::actual_size(self.image.size, self.viewport);
+        if let Some(size) = self.image_size() {
+            self.transform = Transform::actual_size(size, self.viewport);
+        }
     }
 
     /// Multiply the scale by `factor`, keeping the image under `anchor` still.
@@ -82,7 +115,10 @@ impl ImageView {
 
     /// Fit the image unless it is fitted already, then show it actual size.
     pub fn toggle_fit(&mut self) {
-        if self.transform == Transform::fit(self.image.size, self.viewport) {
+        let fitted = self
+            .image_size()
+            .map(|size| Transform::fit(size, self.viewport));
+        if fitted == Some(self.transform) {
             self.actual_size();
         } else {
             self.fit();
@@ -134,44 +170,6 @@ impl ImageView {
             self.viewport.height as f32 / 2.0,
         ]
     }
-
-    /// Clear the frame to the background and draw the image.
-    pub fn draw(&mut self, frame: &Frame<'_>) {
-        clear_frame(frame, self.background);
-        let (viewport, transform) = (self.viewport, self.transform);
-        let uploaded = self.upload(frame);
-        let view = frame
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-        uploaded.pipeline.draw(
-            frame.device,
-            frame.queue,
-            &view,
-            viewport,
-            &uploaded.texture,
-            transform,
-        );
-    }
-
-    fn upload(&mut self, frame: &Frame<'_>) -> &Uploaded {
-        self.uploaded.get_or_insert_with(|| Uploaded {
-            pipeline: ImagePipeline::new(frame.device, frame.texture.format()),
-            texture: upload_rgba8(
-                frame.device,
-                frame.queue,
-                self.image.size.width,
-                self.image.size.height,
-                &self.image.rgba,
-            ),
-        })
-    }
-}
-
-fn clear_frame(frame: &Frame<'_>, color: Color) {
-    let view = frame
-        .texture
-        .create_view(&wgpu::TextureViewDescriptor::default());
-    clear_view(frame.device, frame.queue, &view, color);
 }
 
 #[cfg(test)]

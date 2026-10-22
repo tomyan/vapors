@@ -15,6 +15,14 @@ vapors-gpu.workspace = true
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 pollster.workspace = true
 
+# The system file dialog. GTK3 on Linux (needs libgtk-3-dev to build);
+# native dialogs on macOS and Windows need no feature.
+[target.'cfg(target_os = "linux")'.dependencies]
+rfd = { version = "0.17.2", default-features = false, features = ["gtk3"] }
+
+[target.'cfg(all(not(target_family = "wasm"), not(target_os = "linux")))'.dependencies]
+rfd = { version = "0.17.2", default-features = false }
+
 [target.'cfg(target_family = "wasm")'.dependencies]
 web-time = "1"
 wasm-bindgen = "0.2.129"
@@ -22,11 +30,17 @@ wasm-bindgen-futures = "0.4.79"
 js-sys = "0.3.106"
 console_error_panic_hook = "0.1.7"
 web-sys = { version = "0.3.106", features = [
+    "Blob",
     "console",
     "Document",
     "Element",
+    "Event",
+    "EventTarget",
+    "File",
+    "FileList",
     "HtmlCanvasElement",
     "HtmlElement",
+    "HtmlInputElement",
     "Node",
     "Window",
 ] }

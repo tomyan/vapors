@@ -5,12 +5,13 @@ use std::sync::Arc;
 
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
-use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
+use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window, WindowId};
 
 use crate::PlatformError;
 use crate::event::Event;
 use crate::input::Input;
+use crate::platform::Platform;
 use crate::surface::Gpu;
 use crate::tasks;
 use crate::window::{App, Frame, Message, Next, WindowOptions};
@@ -18,7 +19,7 @@ use crate::window::{App, Frame, Message, Next, WindowOptions};
 pub struct Handler {
     options: WindowOptions,
     app: Box<dyn App>,
-    proxy: EventLoopProxy<Message>,
+    platform: Platform,
     input: Input,
     window: Option<Arc<Window>>,
     gpu: Option<Gpu>,
@@ -27,11 +28,11 @@ pub struct Handler {
 }
 
 impl Handler {
-    pub fn new(options: WindowOptions, app: Box<dyn App>, proxy: EventLoopProxy<Message>) -> Self {
+    pub fn new(options: WindowOptions, app: Box<dyn App>, platform: Platform) -> Self {
         Self {
             options,
             app,
-            proxy,
+            platform,
             input: Input::new(),
             window: None,
             gpu: None,
@@ -52,7 +53,7 @@ impl Handler {
             .create_window(attributes)
             .map_err(|e| PlatformError::Windowing(e.to_string()))?;
         let window = Arc::new(window);
-        tasks::start_gpu(Arc::clone(&window), self.proxy.clone());
+        tasks::start_gpu(Arc::clone(&window), self.platform.proxy());
         self.window = Some(window);
         Ok(())
     }
@@ -62,16 +63,19 @@ impl Handler {
         self.gpu = Some(gpu);
         if let Some(window) = &self.window {
             let size = window.inner_size();
-            self.app.event(Event::Resized {
-                width: size.width,
-                height: size.height,
-            });
+            self.app.event(
+                Event::Resized {
+                    width: size.width,
+                    height: size.height,
+                },
+                &self.platform,
+            );
             window.request_redraw();
         }
     }
 
     fn fail(&mut self, event_loop: &ActiveEventLoop, error: PlatformError) {
-        crate::report::error(&error);
+        crate::report::fatal(&error);
         self.error = Some(error);
         event_loop.exit();
     }
@@ -133,6 +137,9 @@ impl ApplicationHandler<Message> for Handler {
         match message {
             Message::GpuReady(Ok(gpu)) => self.gpu_ready(gpu),
             Message::GpuReady(Err(error)) => self.fail(event_loop, error),
+            Message::FileChosen { name, bytes } => self
+                .app
+                .event(Event::FileOpened { name, bytes }, &self.platform),
         }
     }
 
@@ -147,7 +154,7 @@ impl ApplicationHandler<Message> for Handler {
             gpu.resize(size.width, size.height);
         }
         for app_event in self.input.translate(&event) {
-            self.app.event(app_event);
+            self.app.event(app_event, &self.platform);
         }
         if let WindowEvent::RedrawRequested = event {
             self.redraw(event_loop);

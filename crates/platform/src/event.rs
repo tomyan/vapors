@@ -74,7 +74,8 @@ pub enum Event {
         /// Y in pixels where the second finger lifted.
         y: f32,
     },
-    /// The file the user chose from the picker. Never sent on cancel.
+    /// The file the user chose from the picker opened by
+    /// [`Platform::pick_file`](crate::Platform::pick_file). Never sent on cancel.
     FileOpened {
         /// The file's name, without a directory.
         name: String,

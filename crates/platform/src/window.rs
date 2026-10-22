@@ -11,6 +11,7 @@ use winit::event_loop::EventLoop;
 use crate::PlatformError;
 use crate::event::Event;
 use crate::handler::Handler;
+use crate::platform::Platform;
 use crate::surface::Gpu;
 
 /// How to open the window. On the web the page's CSS sizes the canvas and
@@ -49,8 +50,9 @@ pub enum Next {
 
 /// The app's side of the window: it gets every input and draws every frame.
 pub trait App {
-    /// An input arrived. Called between frames.
-    fn event(&mut self, event: Event);
+    /// An input arrived. Called between frames. `platform` is for what the
+    /// app may ask for in return, such as a file picker.
+    fn event(&mut self, event: Event, platform: &Platform);
     /// Draw this frame.
     fn frame(&mut self, frame: &Frame<'_>) -> Next;
 }
@@ -59,6 +61,13 @@ pub trait App {
 pub(crate) enum Message {
     /// The window's GPU is set up, or could not be.
     GpuReady(Result<Gpu, PlatformError>),
+    /// The user chose a file in the picker.
+    FileChosen {
+        /// Its name, without a directory.
+        name: String,
+        /// Its contents.
+        bytes: Vec<u8>,
+    },
 }
 
 /// Open a window and drive `app` until it returns [`Next::Exit`] or the
@@ -73,7 +82,8 @@ pub fn run(options: WindowOptions, app: impl App + 'static) -> Result<(), Platfo
     let event_loop = EventLoop::with_user_event()
         .build()
         .map_err(|e| PlatformError::Windowing(e.to_string()))?;
-    let mut handler = Handler::new(options, Box::new(app), event_loop.create_proxy());
+    let platform = Platform::new(event_loop.create_proxy());
+    let mut handler = Handler::new(options, Box::new(app), platform);
     event_loop
         .run_app(&mut handler)
         .map_err(|e| PlatformError::Windowing(e.to_string()))?;
@@ -97,7 +107,8 @@ pub fn run(options: WindowOptions, app: impl App + 'static) -> Result<(), Platfo
     let event_loop = EventLoop::with_user_event()
         .build()
         .map_err(|e| PlatformError::Windowing(e.to_string()))?;
-    let handler = Handler::new(options, Box::new(app), event_loop.create_proxy());
+    let platform = Platform::new(event_loop.create_proxy());
+    let handler = Handler::new(options, Box::new(app), platform);
     event_loop.spawn_app(handler);
     Ok(())
 }
