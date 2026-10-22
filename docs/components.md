@@ -63,6 +63,16 @@ the one difference from the brief in this slice.
 - **Text** may hold `{expr}` holes. A whitespace-only run that contains
   a newline is formatting and produces nothing. One on a single line
   produces one space. This is the JSX rule.
+- **Character references** in text and quoted attribute values are
+  decoded: `&amp;` `&lt;` `&gt;` `&quot;` `&apos;` `&nbsp;`, `&#NN;`
+  and `&#xNN;`. An unknown `&name;`, or a number that names no
+  character, is refused at the `&`. An `&` that does not start
+  `&name;` is kept as written, so `salt & pepper` needs no escaping.
+- **Holes** hold any Rust expression, including string and raw string
+  literals that contain `{`, `}` or quotes. A whole Rust
+  if-expression, `{if a { x } else { y }}`, is refused, because `{if`
+  opens a template block. Compute the value in a memo or a script
+  closure, or use `{if}..{else}..{/if}`.
 - **Attributes** come in three forms: `name="literal"`,
   `name={expr}`, and the shorthand `{name}`, which means
   `name={name}`. A bare `name` with no value is refused with the fix.
@@ -111,17 +121,28 @@ the one difference from the brief in this slice.
   moves only the rows that are not on the longest increasing run of old
   positions. A removed row is disposed. The todo-list example checks
   that a reorder makes only `insert_before` calls.
+- Two rows with the same key are refused when the items change. The
+  message names the key and the `{for}`'s `file:line:col`. The check
+  runs before any row is touched, so the rows stay as they were and
+  the next update applies normally.
+- A block at the top of a branch, a row or a component belongs to it.
+  Removing or moving the branch, row or component removes or moves the
+  inner block's current nodes too. A component's `roots()` lists them.
 - A prop is read once at mount unless its type is `Signal<T>`, in which
   case it reads like a signal. A child's props are not re-sent when the
   parent's values change.
 - Signals follow Leptos's semantics. Effects run after the write, or
   after the outermost `batch`, in creation order. A diamond runs once.
-  Reading a disposed signal, or a memo cycle, is refused with the
-  node's name. See the `vapors-signals` crate docs.
+  An effect's first run follows the same rule: a signal it writes is
+  picked up after the run ends. Reading a disposed signal, or a memo
+  cycle, is refused with the node's name. A panic in user code leaves
+  the runtime usable once it is caught. See the `vapors-signals` crate
+  docs.
 
 ## Refusals
 
-Every refusal is printed as `file:line:col: message`, with 1-based
+Every refusal is printed as `file:line:col: message` (the build adds
+rustc's `error: ` in front), with 1-based
 lines and columns counted in characters. The message names the fix.
 The compiler refuses:
 
@@ -143,6 +164,11 @@ The compiler refuses:
   ends.
 - a signal or memo with no type annotation; a `#[prop]` with no type,
   no default, or a pattern in place of a single name;
+- a script, prop or loop binding named `dom`, `parent`, `before`,
+  `props`, `owner`, `roots` or `event`, which the generated code uses,
+  or named like a node the generated code creates for this template
+  (`p0`, `button3`); and a raw identifier such as `r#gen`;
+- an unknown character reference, and a Rust if-expression in a hole;
 - `bind:` on an element that is not a control, on a property other than
   `value` or `checked`, or together with a handler for the same event;
 - deferred features: `{snippet}`/`{render}`, which parse but do not
@@ -157,7 +183,7 @@ cargo run -p vapors-compiler --bin wisp-check -- path/to/file.wisp
 It prints `ok: <file> compiles to component `Name`` and exits 0, or
 prints the refusal and exits 1. It runs code generation as well as
 parsing, so it reports the same refusals as the build. It is a native
-binary only.
+binary: its wasm build panics, saying so.
 
 ## Wiring it into a crate
 
@@ -194,13 +220,15 @@ becomes a nested module.
   each `.wisp` file. Watching the directories means a new file triggers
   a rebuild. It also means that editing any file in `src` reruns the
   build script.
-- On a refusal, every refusal from every file is printed to stderr and
-  the script exits with status 1. Nothing is written.
+- On a refusal, every refusal from every file is printed to stderr as
+  `error: file:line:col: message` and the script exits with status 1.
+  Nothing is written.
 - It also refuses: a directory with no `.wisp` files; two files or
   directories that would make the same module, such as
   `text-input.wisp` and `text_input.wisp`; a directory name that is not
-  a Rust module name; and a missing `OUT_DIR`, which happens when it is
-  called outside `build.rs`.
+  a Rust module name; a file or directory whose name makes a Rust
+  keyword, such as `type.wisp`; and a missing `OUT_DIR`, which happens
+  when it is called outside `build.rs`.
 
 ## The generated code
 
@@ -213,18 +241,22 @@ For `counter.wisp` the compiler writes:
 - `Counter::mount(dom, parent, props)` and `mount_before(dom, parent,
   before, props)`, which run the script under the component's `Owner`
   and build the template through `Dom`;
-- `roots()` and `unmount(dom)`, which disposes the owner, so its
-  effects stop, and removes the root nodes.
+- `roots()`, the top-level nodes as they are now, and `unmount(dom)`,
+  which reads them, disposes the owner, so its effects stop, and
+  removes them.
 
 The file is included into the user's crate, where clippy pedantic runs
 on it. The compiler reads syntax, not types. A few lints therefore
 depend on facts it cannot see, such as whether a captured binding is
-`Copy`, or whether a text hole's value is already a `String`. Those
-lints are allowed on `mount_before` only, and only when the code that
-trips them was generated. Each allowance carries its reason in the
-attribute. The list and the reasons are in
-`crates/compiler/src/codegen/allowances.rs`. Lints in the user's own
-script code are still reported.
+`Copy`, or whether a text hole's value is already a `String`. Each
+such lint is allowed on the one generated `let` that trips it, with
+its reason in the attribute. A hole's expression is bound by its own
+statement first, so the allowance never covers code the user wrote.
+Lints in the user's script and expressions are still reported. Two
+allowances sit on `mount_before` because they judge the function
+itself: its length, which follows the template's size, and an empty
+props struct taken by value. The list and the reasons are in
+`crates/compiler/src/codegen/allowances.rs`.
 
 ## Deferred
 
