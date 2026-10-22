@@ -1,6 +1,7 @@
-//! A hidden `<input type="file">` appended to the page, clicked, and read
-//! on `change`. One closure is leaked per pick, which is the cost of a
-//! callback the browser may never call (a cancelled picker fires nothing).
+//! A hidden `<input type="file">` appended to the page, clicked, read on
+//! `change` and removed on `change` or `cancel`. Two closures are leaked
+//! per pick, which is the cost of callbacks the browser may never call
+//! (an old browser fires neither event for a cancelled picker).
 
 use wasm_bindgen::prelude::*;
 use web_sys::{File, HtmlInputElement};
@@ -32,16 +33,30 @@ pub fn open(proxy: EventLoopProxy<Message>) -> JsResult<()> {
     body.append_child(&input).map_err(|e| js(&e))?;
     let on_change = Closure::once_into_js(move |event: web_sys::Event| chosen(&event, &proxy));
     input.set_onchange(Some(on_change.unchecked_ref()));
+    let on_cancel = Closure::once_into_js(move |event: web_sys::Event| cancelled(&event));
+    input.set_oncancel(Some(on_cancel.unchecked_ref()));
     input.click();
     Ok(())
 }
 
-/// The `change` handler: take the first file, read it, remove the input.
-fn chosen(event: &web_sys::Event, proxy: &EventLoopProxy<Message>) {
-    let Some(input) = event
+fn input_of(event: &web_sys::Event) -> Option<HtmlInputElement> {
+    event
         .target()
         .and_then(|t| t.dyn_into::<HtmlInputElement>().ok())
-    else {
+}
+
+/// The `cancel` handler: the input has nothing more to say.
+fn cancelled(event: &web_sys::Event) {
+    if let Some(input) = input_of(event) {
+        input.remove();
+    }
+}
+
+/// The `change` handler: remove the input, take the first file, read it.
+/// A change with no files is a cancel in browsers that report it that
+/// way, so it sends nothing, as a cancel must.
+fn chosen(event: &web_sys::Event, proxy: &EventLoopProxy<Message>) {
+    let Some(input) = input_of(event) else {
         return;
     };
     input.remove();

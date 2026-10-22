@@ -92,11 +92,13 @@ pub fn run(options: WindowOptions, app: impl App + 'static) -> Result<(), Platfo
 }
 
 /// Attach to the page's `<canvas id="vapors">`, spawn the handler on the
-/// browser's event loop and return at once. Anything that fails after this
+/// browser's event loop and return at once. Errors here are returned for
+/// the caller to report, as on native; anything that fails after this
 /// returns is written to the console and to the `status` element.
 ///
 /// # Errors
 ///
+/// [`PlatformError::NoWebGpu`] when the browser has no `navigator.gpu`,
 /// [`PlatformError::Windowing`] when the page has no such canvas or the
 /// browser refuses an event loop.
 #[cfg(target_family = "wasm")]
@@ -104,11 +106,14 @@ pub fn run(options: WindowOptions, app: impl App + 'static) -> Result<(), Platfo
     use winit::platform::web::EventLoopExtWebSys;
 
     crate::web::install_panic_hook();
+
+    crate::webgpu::required(crate::web::has_webgpu())?;
     crate::web::canvas()?;
     let event_loop = EventLoop::with_user_event()
         .build()
         .map_err(|e| PlatformError::Windowing(e.to_string()))?;
     let platform = Platform::new(event_loop.create_proxy());
+    crate::web::wire_open_button(platform.proxy());
     let handler = Handler::new(options, Box::new(app), platform);
     event_loop.spawn_app(handler);
     Ok(())

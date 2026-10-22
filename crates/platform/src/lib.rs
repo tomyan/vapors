@@ -23,6 +23,7 @@ mod surface;
 mod tasks;
 #[cfg(target_family = "wasm")]
 mod web;
+mod webgpu;
 mod window;
 
 pub use error::PlatformError;
