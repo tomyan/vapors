@@ -1,4 +1,5 @@
-//! Copying a texture into host memory so a test can assert on pixels.
+//! Copying a texture into host memory: tests assert on it, screenshots
+//! and the automation API's frame capture are built on it.
 
 /// Rows in a copied buffer start on 256-byte boundaries (wgpu's
 /// `COPY_BYTES_PER_ROW_ALIGNMENT`).

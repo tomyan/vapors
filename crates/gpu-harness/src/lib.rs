@@ -5,9 +5,7 @@
 //! the first hardware adapter, otherwise the first software one. A tier
 //! that cannot run fails. It never skips.
 
-mod readback;
-
-pub use readback::read_rgba8;
+pub use vapors_renderer::read_rgba8;
 
 /// The adapter this process is testing on, with its device and queue.
 pub struct Gpu {
