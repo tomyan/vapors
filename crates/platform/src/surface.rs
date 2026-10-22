@@ -8,7 +8,8 @@ use crate::PlatformError;
 
 /// A window's GPU resources.
 pub struct Gpu {
-    /// The adapter chosen by the `vapors-gpu` rule among those that can present here.
+    /// The adapter chosen by the `vapors-gpu` rule among those that can
+    /// present here; on the web, the one the browser offers.
     pub adapter: wgpu::Adapter,
     /// Device for the app's work.
     pub device: wgpu::Device,
@@ -20,27 +21,37 @@ pub struct Gpu {
     pub config: wgpu::SurfaceConfiguration,
 }
 
+#[cfg(not(target_family = "wasm"))]
+const BACKENDS: wgpu::Backends = wgpu::Backends::PRIMARY;
+/// WebGPU only: no WebGL fallback, so a browser without WebGPU fails by name.
+#[cfg(target_family = "wasm")]
+const BACKENDS: wgpu::Backends = wgpu::Backends::BROWSER_WEBGPU;
+
 impl Gpu {
-    /// Create everything needed to draw into `window`.
+    /// Create everything needed to draw into `window`. Async because the
+    /// browser answers adapter and device requests with promises; native
+    /// callers block on it.
     ///
     /// # Errors
     ///
     /// When no adapter can present to the window, the device cannot be
     /// opened, or the surface offers no 8-bit non-sRGB format.
-    pub fn for_window(window: &Arc<Window>) -> Result<Self, PlatformError> {
+    pub async fn for_window(window: &Arc<Window>) -> Result<Self, PlatformError> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::PRIMARY,
+            backends: BACKENDS,
             ..wgpu::InstanceDescriptor::new_without_display_handle()
         });
         let surface = instance
             .create_surface(Arc::clone(window))
             .map_err(|e| PlatformError::Surface(e.to_string()))?;
-        let adapter = choose_adapter(&instance, &surface)?;
-        let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-            label: Some("vapors window"),
-            ..Default::default()
-        }))
-        .map_err(|e| PlatformError::Device(e.to_string()))?;
+        let adapter = choose_adapter(&instance, &surface).await?;
+        let (device, queue) = adapter
+            .request_device(&wgpu::DeviceDescriptor {
+                label: Some("vapors window"),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| PlatformError::Device(e.to_string()))?;
         let size = window.inner_size();
         let config = configuration(&surface, &adapter, size.width.max(1), size.height.max(1))?;
         surface.configure(&device, &config);
@@ -59,19 +70,45 @@ impl Gpu {
         self.config.height = height.max(1);
         self.surface.configure(&self.device, &self.config);
     }
+
+    /// The adapter's name and backend, for a status line.
+    #[must_use]
+    pub fn adapter_summary(&self) -> String {
+        let info = self.adapter.get_info();
+        format!("{} ({:?})", info.name, info.backend)
+    }
 }
 
-fn choose_adapter(
+/// The `vapors-gpu` rule over every adapter that can present to `surface`.
+#[cfg(not(target_family = "wasm"))]
+async fn choose_adapter(
     instance: &wgpu::Instance,
     surface: &wgpu::Surface<'_>,
 ) -> Result<wgpu::Adapter, PlatformError> {
-    let presentable: Vec<wgpu::Adapter> =
-        pollster::block_on(instance.enumerate_adapters(wgpu::Backends::PRIMARY))
-            .into_iter()
-            .filter(|adapter| adapter.is_surface_supported(surface))
-            .collect();
+    let presentable: Vec<wgpu::Adapter> = instance
+        .enumerate_adapters(BACKENDS)
+        .await
+        .into_iter()
+        .filter(|adapter| adapter.is_surface_supported(surface))
+        .collect();
     let wanted = vapors_gpu::wanted_from_env();
     Ok(vapors_gpu::select(presentable, wanted.as_deref())?)
+}
+
+/// The browser chooses: WebGPU does not enumerate adapters.
+#[cfg(target_family = "wasm")]
+async fn choose_adapter(
+    instance: &wgpu::Instance,
+    surface: &wgpu::Surface<'_>,
+) -> Result<wgpu::Adapter, PlatformError> {
+    instance
+        .request_adapter(&wgpu::RequestAdapterOptions {
+            compatible_surface: Some(surface),
+            power_preference: wgpu::PowerPreference::HighPerformance,
+            ..Default::default()
+        })
+        .await
+        .map_err(|e| PlatformError::NoWebGpu(e.to_string()))
 }
 
 /// The default configuration with a non-sRGB 8-bit format, so clear
