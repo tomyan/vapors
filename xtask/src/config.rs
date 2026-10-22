@@ -43,6 +43,7 @@ impl Config {
     pub fn parse(text: &str) -> Result<Self, ConfigError> {
         let mut table: Option<String> = None;
         let mut values = BTreeMap::new();
+        let mut lines_of: BTreeMap<String, usize> = BTreeMap::new();
         for (index, raw) in text.lines().enumerate() {
             let line = raw.trim();
             let number = index + 1;
@@ -60,7 +61,14 @@ impl Config {
                 });
             };
             let (key, value) = key_value(line, number)?;
-            values.insert(format!("{table}.{key}"), value);
+            let full = format!("{table}.{key}");
+            if let Some(first) = lines_of.insert(full.clone(), number) {
+                return Err(ConfigError {
+                    line: number,
+                    reason: format!("duplicate key `{full}`; first on line {first}"),
+                });
+            }
+            values.insert(full, value);
         }
         Ok(Self { values })
     }
@@ -68,6 +76,19 @@ impl Config {
     /// The value for `table.key`, if set.
     pub fn get(&self, key: &str) -> Option<&str> {
         self.values.get(key).map(String::as_str)
+    }
+
+    /// Every `key = value` whose full key starts with `prefix` (such as
+    /// `files.allow.`), keyed by the rest, so a table can hold a list of
+    /// paths with a reason each.
+    pub fn entries_under(&self, prefix: &str) -> BTreeMap<String, String> {
+        self.values
+            .iter()
+            .filter_map(|(key, value)| {
+                key.strip_prefix(prefix)
+                    .map(|rest| (rest.to_owned(), value.clone()))
+            })
+            .collect()
     }
 
     /// The value for `table.key`, or an error naming it and the file.
@@ -107,50 +128,25 @@ fn key_value(line: &str, number: usize) -> Result<(String, String), ConfigError>
         .strip_prefix('"')
         .and_then(|v| v.strip_suffix('"'))
         .ok_or_else(|| refuse("value must be a double-quoted string"))?;
-    if key.trim().is_empty() || value.is_empty() {
+    let key = unquoted_key(key.trim()).ok_or_else(|| {
+        refuse("key must be bare (no quotes or spaces) or a double-quoted string without escapes")
+    })?;
+    if key.is_empty() || value.is_empty() {
         return Err(refuse("key and value must both be non-empty"));
     }
-    Ok((key.trim().to_owned(), value.to_owned()))
+    Ok((key, value.to_owned()))
+}
+
+/// A bare key as is; a double-quoted key without its quotes; `None`
+/// for anything else (a quote inside, a backslash, a space in a bare key).
+fn unquoted_key(key: &str) -> Option<String> {
+    if let Some(inner) = key.strip_prefix('"') {
+        let inner = inner.strip_suffix('"')?;
+        return (!inner.contains(['"', '\\'])).then(|| inner.to_owned());
+    }
+    (!key.contains(['"', ' ', '\t'])).then(|| key.to_owned())
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn reads_a_value_by_table_and_key() {
-        // Given
-        let text = "# settings\n[screenshot]\npackage = \"vapors-platform\"\n";
-
-        // When
-        let config = Config::parse(text).expect("valid");
-
-        // Then
-        assert_eq!(config.require("screenshot.package"), Ok("vapors-platform"));
-    }
-
-    #[test]
-    fn a_missing_key_says_how_to_add_it() {
-        // Given
-        let config = Config::parse("[screenshot]\n").expect("valid");
-
-        // When
-        let error = config.require("screenshot.package").expect_err("missing");
-
-        // Then
-        assert!(error.reason.contains("[screenshot]"));
-        assert!(error.reason.contains("package = "));
-    }
-
-    #[test]
-    fn refuses_an_entry_before_a_header_naming_the_line() {
-        // Given
-        let text = "package = \"x\"\n";
-
-        // When
-        let error = Config::parse(text).expect_err("no header");
-
-        // Then
-        assert_eq!(error.line, 1);
-    }
-}
+#[path = "config_tests.rs"]
+mod tests;

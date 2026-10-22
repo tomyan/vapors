@@ -26,7 +26,9 @@ Test deadlines: `.config/nextest.toml`.
 - Tests first. A check is proven by breaking what it guards, watching
   it fail, restoring. Say so in the commit.
 - A tier that cannot run fails and names what is missing. Never skip.
-- Files about 200 lines; functions 10 to 15 lines; no `unsafe`.
+- Files about 200 lines (checked: the `files` step of `cargo xtask lint`,
+  `[files] max_lines` in `.config/factory.toml`, allow with a reason);
+  functions 10 to 15 lines; no `unsafe`.
 - Warnings are errors in CI (`-D warnings`, clippy pedantic).
 - Every failure message names the fix and the reproducing command.
 

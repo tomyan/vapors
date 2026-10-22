@@ -204,3 +204,7 @@ fn distance(a: [f32; 2], b: [f32; 2]) -> f32 {
 #[cfg(test)]
 #[path = "gestures_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "gestures_tap_tests.rs"]
+mod tap_tests;

@@ -9,6 +9,8 @@ mod command;
 mod config;
 mod deadline;
 mod dev;
+mod files;
+mod files_walk;
 mod gpu_info;
 mod pixels;
 mod report;
@@ -53,6 +55,9 @@ enum Command {
     /// Check every pinned tool is installed at its pinned version.
     #[command(hide = true)]
     CheckTools,
+    /// Check every source file is within `[files] max_lines` (the `files` step).
+    #[command(hide = true)]
+    CheckFiles,
     /// Write docs/gpu-limits.md from the adapters and limits wgpu reports here.
     GpuInfo,
     /// Run a windowed example under Xvfb and save its frame as a PNG.
@@ -104,6 +109,7 @@ fn main() -> ExitCode {
     let steps = match cli.command {
         Command::Setup { ci } => return setup::run(ci),
         Command::CheckTools => return setup::check(),
+        Command::CheckFiles => return files::run(),
         Command::GpuInfo => return gpu_info::run(),
         Command::Screenshot {
             example,

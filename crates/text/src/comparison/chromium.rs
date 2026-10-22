@@ -126,7 +126,11 @@ impl Chromium {
         height: u32,
         scale: u32,
     ) -> Result<Child, ChromiumError> {
+        // Headless Chromium asks xdg-desktop-portal over the session bus
+        // before its first request; where the portal cannot start, D-Bus
+        // activation waits 120 s. With no session bus address it skips that.
         Command::new(&self.binary)
+            .env_remove("DBUS_SESSION_BUS_ADDRESS")
             .args([
                 "--headless=new",
                 "--no-sandbox",
