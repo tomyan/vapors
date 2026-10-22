@@ -1,0 +1,17 @@
+[package]
+name = "vapors-web-demo"
+description = "The image app in a browser: a gradient fitted to the page, pinch and scroll to zoom, drag to pan, tap to open a file. Built with trunk by `cargo xtask web`."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+vapors-canvas.workspace = true
+vapors-platform.workspace = true
+vapors-scene.workspace = true
+
+[lints]
+workspace = true

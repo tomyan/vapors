@@ -71,11 +71,17 @@ impl Gpu {
         self.surface.configure(&self.device, &self.config);
     }
 
-    /// The adapter's name and backend, for a status line.
+    /// The adapter's name and backend, for a status line. Browsers do not
+    /// name their adapter, so the web says so instead of showing nothing.
     #[must_use]
     pub fn adapter_summary(&self) -> String {
         let info = self.adapter.get_info();
-        format!("{} ({:?})", info.name, info.backend)
+        let name = if info.name.is_empty() {
+            "unnamed adapter"
+        } else {
+            &info.name
+        };
+        format!("{name} ({:?})", info.backend)
     }
 }
 
