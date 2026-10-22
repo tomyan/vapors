@@ -1,120 +1,5 @@
-//! The names the property table lists, the vendor-prefixed names dropped
-//! on purpose, and the sumi terminal extras refused with a hint.
-
-/// Every property the crate accepts, sorted. Custom properties (`--*`)
-/// are accepted on top of this list.
-pub static SUPPORTED_PROPERTIES: &[&str] = &[
-    "align-content",
-    "align-items",
-    "align-self",
-    "animation",
-    "animation-delay",
-    "animation-direction",
-    "animation-duration",
-    "animation-fill-mode",
-    "animation-iteration-count",
-    "animation-name",
-    "animation-play-state",
-    "animation-timing-function",
-    "aspect-ratio",
-    "background-color",
-    "border",
-    "border-bottom-color",
-    "border-bottom-left-radius",
-    "border-bottom-right-radius",
-    "border-bottom-style",
-    "border-bottom-width",
-    "border-color",
-    "border-left-color",
-    "border-left-style",
-    "border-left-width",
-    "border-radius",
-    "border-right-color",
-    "border-right-style",
-    "border-right-width",
-    "border-style",
-    "border-top-color",
-    "border-top-left-radius",
-    "border-top-right-radius",
-    "border-top-style",
-    "border-top-width",
-    "border-width",
-    "bottom",
-    "box-shadow",
-    "box-sizing",
-    "color",
-    "column-gap",
-    "cursor",
-    "display",
-    "filter",
-    "flex",
-    "flex-basis",
-    "flex-direction",
-    "flex-grow",
-    "flex-shrink",
-    "flex-wrap",
-    "font-family",
-    "font-feature-settings",
-    "font-size",
-    "font-style",
-    "font-variation-settings",
-    "font-weight",
-    "gap",
-    "grid-auto-columns",
-    "grid-auto-flow",
-    "grid-auto-rows",
-    "grid-column",
-    "grid-column-end",
-    "grid-column-start",
-    "grid-row",
-    "grid-row-end",
-    "grid-row-start",
-    "grid-template-columns",
-    "grid-template-rows",
-    "height",
-    "inset",
-    "justify-content",
-    "justify-items",
-    "justify-self",
-    "left",
-    "letter-spacing",
-    "line-height",
-    "margin",
-    "margin-bottom",
-    "margin-left",
-    "margin-right",
-    "margin-top",
-    "max-height",
-    "max-width",
-    "min-height",
-    "min-width",
-    "opacity",
-    "overflow",
-    "overflow-x",
-    "overflow-y",
-    "padding",
-    "padding-bottom",
-    "padding-left",
-    "padding-right",
-    "padding-top",
-    "position",
-    "right",
-    "row-gap",
-    "text-align",
-    "text-decoration",
-    "top",
-    "transform",
-    "transition",
-    "transition-delay",
-    "transition-duration",
-    "transition-property",
-    "transition-timing-function",
-    "user-select",
-    "visibility",
-    "white-space",
-    "width",
-    "z-index",
-];
+//! The vendor-prefixed names dropped on purpose, and the sumi terminal
+//! extras refused with a hint.
 
 /// Vendor-prefixed properties the crate drops without refusing, each with
 /// the reason. Anything prefixed and not listed here is refused.
@@ -149,4 +34,24 @@ pub(super) fn sumi_extra_hint(name: &str) -> Option<&'static str> {
         "border-title" => "draw the title as an element",
         _ => return None,
     })
+}
+
+/// A sumi terminal value and the hint for it: `opacity: dim`, the box
+/// drawing border styles.
+pub(super) fn sumi_value_hint(property: &str, keyword: &str) -> Option<String> {
+    let border = property == "border" || property.ends_with("-style");
+    match keyword {
+        "dim" if property == "opacity" => Some(
+            "opacity: dim is sumi's terminal dim attribute; use a number between 0 and 1"
+                .to_owned(),
+        ),
+        "rounded" if border => Some(
+            "border: rounded is sumi's box drawing; use border-style: solid with border-radius"
+                .to_owned(),
+        ),
+        "single" | "heavy" | "ascii" if border => {
+            Some(format!("{keyword} is a sumi box-drawing border; use solid"))
+        }
+        _ => None,
+    }
 }

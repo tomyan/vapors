@@ -1,6 +1,7 @@
 //! The parsed stylesheet: rules, declarations and component values.
 
 use crate::Position;
+use crate::property::Longhand;
 use crate::selector::Selector;
 use crate::serialize;
 use crate::token::{Token, TokenKind};
@@ -53,6 +54,9 @@ pub struct Declaration {
     pub value: Vec<ComponentValue>,
     /// Whether `!important` was present.
     pub important: bool,
+    /// The typed longhands this declaration sets; empty for a custom
+    /// property.
+    pub longhands: Vec<Longhand>,
     /// Where the property name starts.
     pub position: Position,
 }

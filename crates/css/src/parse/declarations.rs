@@ -67,10 +67,12 @@ fn declaration(stream: &mut Stream) -> Result<Option<Declaration>> {
         return Ok(None);
     }
     property::check_name(&name, position)?;
+    let longhands = property::parse_declaration(&name, &value, position)?;
     Ok(Some(Declaration {
         name,
         value,
         important,
+        longhands,
         position,
     }))
 }

@@ -12,6 +12,7 @@ pub mod parse;
 pub mod property;
 pub mod selector;
 pub mod serialize;
+pub mod syntax;
 pub mod token;
 pub mod tree;
 pub mod value;

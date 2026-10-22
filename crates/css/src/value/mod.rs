@@ -11,6 +11,8 @@ mod color_parse;
 mod color_space;
 mod length;
 mod named_colors;
+mod typed;
+mod typed_calc;
 mod var;
 
 pub use calc::{Calc, CalcKind, EvalError};
@@ -18,6 +20,7 @@ pub use calc_parse::is_math_function;
 pub use color::{Color, ColorScheme};
 pub use length::{Length, LengthUnit};
 pub use named_colors::NAMED_COLORS;
+pub use typed::{Time, TimeUnit, Value};
 pub use var::{VarError, substitute_vars};
 
 use crate::Result;
@@ -42,6 +45,23 @@ pub struct Context {
     /// What percentages resolve against; `None` when the property has no
     /// containing-block size yet, which makes a percentage unresolvable.
     pub percent_base: Option<f64>,
+}
+
+/// Parse a colour from component values.
+///
+/// # Errors
+/// Anything that is not a CSS Color Level 4 colour.
+pub fn parse_color(values: &[ComponentValue]) -> Result<Color> {
+    color_parse::parse(values)
+}
+
+/// Parse a math function from one component value.
+///
+/// # Errors
+/// Malformed syntax, a type mismatch between operands, or division by a
+/// literal zero.
+pub fn parse_calc(value: &ComponentValue) -> Result<Calc> {
+    calc_parse::parse(value)
 }
 
 /// Parse a colour from text, for tests and tools.
