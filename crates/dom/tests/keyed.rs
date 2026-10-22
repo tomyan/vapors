@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use vapors_dom::blocks::keyed;
 use vapors_dom::recording::{Call, RecordingDom};
-use vapors_dom::{Dom, NodeId};
+use vapors_dom::{Dom, NodeId, Root};
 use vapors_signals::{Effect, Owner, Signal};
 
 type Shared = Rc<RefCell<RecordingDom>>;
@@ -27,7 +27,7 @@ fn row(
     before: Option<NodeId>,
     index: Signal<usize>,
     item: Signal<String>,
-) -> Vec<NodeId> {
+) -> Vec<Root> {
     let li = dom.borrow_mut().create_element("li");
     dom.borrow_mut().insert_before(parent, li, before);
     let text = dom.borrow_mut().create_text("");
@@ -37,7 +37,7 @@ fn row(
         let value = format!("{}: {}", index.get(), item.get());
         dom.borrow_mut().set_text(text, &value);
     });
-    vec![li]
+    vec![Root::Node(li)]
 }
 
 fn mount(dom: &Shared, root: NodeId, anchor: NodeId, items: Signal<Vec<String>>) {

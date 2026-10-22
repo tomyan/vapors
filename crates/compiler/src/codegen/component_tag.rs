@@ -50,7 +50,9 @@ impl Emitter<'_> {
         self.dedent(1);
         self.line("});");
         if place.roots {
-            self.line(format!("roots.extend({var}.roots().iter().copied());"));
+            self.line(format!(
+                "roots.extend({var}.root_entries().iter().cloned());"
+            ));
         }
         Ok(())
     }

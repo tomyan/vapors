@@ -7,7 +7,7 @@
 #[path = "common/codegen.rs"]
 mod codegen;
 
-use codegen::{assert_has, at, generated_with, refusal};
+use codegen::{assert_has, assert_lacks, at, generated_with, refusal};
 
 const SCRIPT: &str = "let count: Signal<i32> = Signal::new(0);\nlet items: Signal<Vec<(u32, String)>> = Signal::new(Vec::new());";
 
@@ -34,7 +34,7 @@ fn if_block_uses_conditional_with_an_anchor() {
     assert_has(&code, "create_text(\"yes\")");
     assert_has(&code, "create_text(\"no\")");
     assert_has(&code, "insert_before(parent, p2, before);");
-    assert_has(&code, "roots.push(p2);");
+    assert_has(&code, "roots.push(Root::Node(p2));");
 }
 
 #[test]
@@ -53,7 +53,29 @@ fn top_level_if_inserts_before_the_components_before() {
 
     // Then
     assert_has(&code, "insert_before(parent, if_anchor0, before);");
-    assert_has(&code, "roots.push(if_anchor0);");
+    assert_lacks(&code, "roots.push(Root::Node(if_anchor0));");
+}
+
+#[test]
+fn a_top_level_block_is_a_root_through_its_handle() {
+    // When
+    let code = generated_with(SCRIPT, "{if count.get() > 0}<p>yes</p>{/if}");
+
+    // Then: the handle lists the branch's nodes and the anchor as they are now
+    assert_has(
+        &code,
+        "let conditional_block1 = vapors_dom::blocks::conditional(",
+    );
+    assert_has(&code, "roots.push(Root::Block(conditional_block1));");
+}
+
+#[test]
+fn a_block_inside_an_element_is_not_a_root() {
+    // When
+    let code = generated_with(SCRIPT, "<div>{if count.get() > 0}<p>yes</p>{/if}</div>");
+
+    // Then
+    assert_lacks(&code, "Root::Block");
 }
 
 #[test]

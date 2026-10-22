@@ -33,7 +33,7 @@ fn header(path: &str, style: &str) -> String {
         "use std::cell::RefCell;
 use std::rc::Rc;
 #[allow(unused_imports)]
-use vapors_dom::{{Dom, Event, NodeId, PropertyValue}};
+use vapors_dom::{{Dom, Event, NodeId, PropertyValue, Root}};
 #[allow(unused_imports)]
 use vapors_signals::{{Effect, Memo, Owner, Signal}};
 
@@ -97,7 +97,7 @@ fn component_struct(name: &str, info: &ScriptInfo) -> String {
         "/// `{name}`: its signals, and what `unmount` removes.
 pub struct {name} {{
 {fields}    owner: Owner,
-    roots: Vec<NodeId>,
+    roots: Vec<Root>,
 }}
 "
     )
@@ -158,16 +158,26 @@ fn mount_methods(
 
 fn accessors() -> String {
     "
-    /// The top-level nodes mounted, in order.
+    /// The top-level nodes now, in order, including those of a block
+    /// or child component at the top level.
     #[must_use]
-    pub fn roots(&self) -> &[NodeId] {
+    pub fn roots(&self) -> Vec<NodeId> {
+        vapors_dom::current_nodes(&self.roots)
+    }
+
+    /// The top-level entries, for a parent that mounts this component
+    /// at its own top level.
+    #[must_use]
+    pub fn root_entries(&self) -> &[Root] {
         &self.roots
     }
 
-    /// Disposes the signals and effects and removes the nodes.
+    /// Reads the top-level nodes, disposes the signals and effects, and
+    /// removes the nodes.
     pub fn unmount<D: Dom>(self, dom: &Rc<RefCell<D>>) {
+        let nodes = self.roots();
         self.owner.dispose();
-        for node in self.roots {
+        for node in nodes {
             dom.borrow_mut().remove(node);
         }
     }

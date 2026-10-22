@@ -106,7 +106,7 @@ fn roots_is_must_use() {
     let code = generated("<div></div>");
 
     // Then
-    assert_has(&code, "#[must_use]\npub fn roots(&self) -> &[NodeId]");
+    assert_has(&code, "#[must_use]\npub fn roots(&self) -> Vec<NodeId>");
 }
 
 #[test]

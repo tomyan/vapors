@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use vapors_dom::blocks::conditional;
 use vapors_dom::recording::{Call, RecordingDom};
-use vapors_dom::{Dom, NodeId};
+use vapors_dom::{Dom, NodeId, Root};
 use vapors_signals::{Effect, Owner, Signal};
 
 type Shared = Rc<RefCell<RecordingDom>>;
@@ -21,12 +21,12 @@ fn setup() -> (Shared, NodeId, NodeId) {
     (dom, root, anchor)
 }
 
-fn paragraph(dom: &Shared, parent: NodeId, before: Option<NodeId>, text: &str) -> Vec<NodeId> {
+fn paragraph(dom: &Shared, parent: NodeId, before: Option<NodeId>, text: &str) -> Vec<Root> {
     let p = dom.borrow_mut().create_element("p");
     dom.borrow_mut().insert_before(parent, p, before);
     let t = dom.borrow_mut().create_text(text);
     dom.borrow_mut().append(p, t);
-    vec![p]
+    vec![Root::Node(p)]
 }
 
 #[test]

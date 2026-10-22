@@ -81,7 +81,10 @@ fn top_level_child_component_contributes_its_roots() {
         &code,
         "Greeting::mount_before(dom, parent, before, GreetingProps {",
     );
-    assert_has(&code, "roots.extend(greeting0.roots().iter().copied());");
+    assert_has(
+        &code,
+        "roots.extend(greeting0.root_entries().iter().cloned());",
+    );
 }
 
 #[test]
@@ -174,8 +177,8 @@ fn top_level_elements_become_roots() {
 
     // Then
     assert_has(&code, "insert_before(parent, div0, before);");
-    assert_has(&code, "roots.push(div0);");
-    assert_has(&code, "roots.push(span1);");
+    assert_has(&code, "roots.push(Root::Node(div0));");
+    assert_has(&code, "roots.push(Root::Node(span1));");
     assert_has(&code, "Counter { owner, roots }");
 }
 

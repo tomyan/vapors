@@ -12,7 +12,7 @@ use vapors_signals::{Effect, Owner, Signal, untrack};
 
 use super::Fragment;
 use super::sequence::longest_increasing;
-use crate::{Dom, NodeId};
+use crate::{BlockNodes, Dom, NodeId, Root};
 
 struct Row<K, V> {
     key: K,
@@ -26,19 +26,26 @@ struct Row<K, V> {
 
 /// A row builder: dom, parent, insert-before, index signal, item signal.
 pub trait RowBuilder<D, V>:
-    Fn(&Rc<RefCell<D>>, NodeId, Option<NodeId>, Signal<usize>, Signal<V>) -> Vec<NodeId>
+    Fn(&Rc<RefCell<D>>, NodeId, Option<NodeId>, Signal<usize>, Signal<V>) -> Vec<Root>
 {
 }
 impl<D, V, F> RowBuilder<D, V> for F where
-    F: Fn(&Rc<RefCell<D>>, NodeId, Option<NodeId>, Signal<usize>, Signal<V>) -> Vec<NodeId>
+    F: Fn(&Rc<RefCell<D>>, NodeId, Option<NodeId>, Signal<usize>, Signal<V>) -> Vec<Root>
 {
 }
 
 /// Keeps one row per `(key, item)` of `items` built before `anchor`.
+/// Returns the block's current nodes, for whatever owns its position.
 ///
 /// # Panics
 /// When two items share a key; keys must be unique per row.
-pub fn keyed<D, K, V, I, R>(dom: &Rc<RefCell<D>>, parent: NodeId, anchor: NodeId, items: I, row: R)
+pub fn keyed<D, K, V, I, R>(
+    dom: &Rc<RefCell<D>>,
+    parent: NodeId,
+    anchor: NodeId,
+    items: I,
+    row: R,
+) -> BlockNodes
 where
     D: Dom + 'static,
     K: Eq + Hash + Clone + 'static,
@@ -48,12 +55,27 @@ where
 {
     let dom = Rc::clone(dom);
     let block_owner = Owner::new();
-    let mut rows: Vec<Row<K, V>> = Vec::new();
+    let rows: Rc<RefCell<Vec<Row<K, V>>>> = Rc::new(RefCell::new(Vec::new()));
+    let state = Rc::clone(&rows);
     Effect::new(move || {
         let next = items();
-        let old = std::mem::take(&mut rows);
-        rows = untrack(|| block_owner.with(|| reconcile(&dom, parent, anchor, old, next, &row)));
+        let old = std::mem::take(&mut *state.borrow_mut());
+        let built =
+            untrack(|| block_owner.with(|| reconcile(&dom, parent, anchor, old, next, &row)));
+        *state.borrow_mut() = built;
     });
+    BlockNodes::new(move || {
+        let mut nodes: Vec<NodeId> = rows.borrow().iter().flat_map(row_nodes).collect();
+        nodes.push(anchor);
+        nodes
+    })
+}
+
+/// A row's marker and then its fragment's nodes as of now.
+fn row_nodes<K, V>(row: &Row<K, V>) -> Vec<NodeId> {
+    let mut nodes = vec![row.marker];
+    nodes.extend(row.fragment.nodes());
+    nodes
 }
 
 fn reconcile<D, K, V>(
@@ -143,10 +165,8 @@ fn move_before<D: Dom, K, V>(
     row: &Row<K, V>,
     before: NodeId,
 ) {
-    dom.borrow_mut()
-        .insert_before(parent, row.marker, Some(before));
-    for node in &row.fragment.nodes {
-        dom.borrow_mut().insert_before(parent, *node, Some(before));
+    for node in row_nodes(row) {
+        dom.borrow_mut().insert_before(parent, node, Some(before));
     }
 }
 

@@ -13,8 +13,7 @@ impl Emitter<'_> {
         let anchor = self.fresh("if_anchor");
         self.emit_anchor(&anchor, place);
         let condition = self.raw(&block.condition)?;
-        self.line("vapors_dom::blocks::conditional(");
-        self.indent(1);
+        let handle = self.open_block_call("conditional", place);
         self.line(format!("dom, {}, {anchor},", place.parent));
         let clones = self.clones_for(&[&block.condition])?;
         self.emit_closure(&clones, &[format!("move || {condition},")]);
@@ -23,8 +22,7 @@ impl Emitter<'_> {
             Some(nodes) => self.emit_builder(nodes, BUILDER)?,
             None => self.line("|_dom, _parent, _before| Vec::new(),"),
         }
-        self.dedent(1);
-        self.line(");");
+        self.close_block_call(handle);
         Ok(())
     }
 
@@ -34,8 +32,7 @@ impl Emitter<'_> {
         let (index, item) = self.loop_names(block)?;
         let iterable = self.raw(&block.iterable)?;
         let key = block.key.as_ref().map(|key| self.raw(key)).transpose()?;
-        self.line("vapors_dom::blocks::keyed(");
-        self.indent(1);
+        let handle = self.open_block_call("keyed", place);
         self.line(format!("dom, {}, {anchor},", place.parent));
         let mut read_by_items = vec![&block.iterable];
         read_by_items.extend(block.key.as_ref());
@@ -51,8 +48,7 @@ impl Emitter<'_> {
         let built = self.emit_builder(&block.children, &signature);
         self.pop_scope();
         built?;
-        self.dedent(1);
-        self.line(");");
+        self.close_block_call(handle);
         Ok(())
     }
 
@@ -79,7 +75,29 @@ impl Emitter<'_> {
         self.line(format!(
             "let {anchor} = dom.borrow_mut().create_text(\"\");"
         ));
-        self.attach(anchor, place);
+        self.position(anchor, place);
+    }
+
+    /// Starts a call into `vapors_dom::blocks`; among the roots its
+    /// handle is kept, so the block's nodes go with whatever owns them.
+    fn open_block_call(&mut self, function: &str, place: &Place) -> Option<String> {
+        let handle = place
+            .roots
+            .then(|| self.fresh(&format!("{function}_block")));
+        match &handle {
+            Some(handle) => self.line(format!("let {handle} = vapors_dom::blocks::{function}(")),
+            None => self.line(format!("vapors_dom::blocks::{function}(")),
+        }
+        self.indent(1);
+        handle
+    }
+
+    fn close_block_call(&mut self, handle: Option<String>) {
+        self.dedent(1);
+        self.line(");");
+        if let Some(handle) = handle {
+            self.line(format!("roots.push(Root::Block({handle}));"));
+        }
     }
 
     /// A builder closure: the nodes of a branch or row, returned as roots.

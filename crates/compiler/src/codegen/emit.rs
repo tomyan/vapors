@@ -123,15 +123,23 @@ impl<'a> Emitter<'a> {
         }
     }
 
-    /// Places a freshly created node: at the end of its parent, or
-    /// before `before` among the roots.
+    /// Places a freshly created node and, among the roots, records it.
     pub fn attach(&mut self, var: &str, place: &Place) {
+        self.position(var, place);
+        if place.roots {
+            self.line(format!("roots.push(Root::Node({var}));"));
+        }
+    }
+
+    /// Places a node at the end of its parent, or before `before` among
+    /// the roots, without recording it (a block's anchor is recorded
+    /// through the block).
+    pub fn position(&mut self, var: &str, place: &Place) {
         if place.roots {
             self.line(format!(
                 "dom.borrow_mut().insert_before({}, {var}, before);",
                 place.parent
             ));
-            self.line(format!("roots.push({var});"));
         } else {
             self.line(format!("dom.borrow_mut().append({}, {var});", place.parent));
         }

@@ -11,17 +11,16 @@ use std::rc::Rc;
 
 use vapors_signals::{Owner, untrack};
 
-use crate::{Dom, NodeId};
+use crate::{Dom, NodeId, Root, current_nodes};
 
 pub use conditional::conditional;
 pub use keyed::keyed;
 
-/// A built branch or row: the nodes it placed and the owner of the
-/// signals and effects created while building it.
+/// A built branch or row: what it placed at its top level and the
+/// owner of the signals and effects created while building it.
 pub struct Fragment {
     owner: Owner,
-    /// The top-level nodes placed, in order.
-    pub nodes: Vec<NodeId>,
+    roots: Vec<Root>,
 }
 
 impl Fragment {
@@ -32,18 +31,25 @@ impl Fragment {
         dom: &Rc<RefCell<D>>,
         parent: NodeId,
         before: Option<NodeId>,
-        build: impl FnOnce(&Rc<RefCell<D>>, NodeId, Option<NodeId>) -> Vec<NodeId>,
+        build: impl FnOnce(&Rc<RefCell<D>>, NodeId, Option<NodeId>) -> Vec<Root>,
     ) -> Fragment {
         let owner = Owner::new();
-        let nodes = owner.with(|| untrack(|| build(dom, parent, before)));
-        Fragment { owner, nodes }
+        let roots = owner.with(|| untrack(|| build(dom, parent, before)));
+        Fragment { owner, roots }
     }
 
-    /// Disposes the owner (stopping the effects, running cleanups) and
-    /// removes the nodes.
+    /// The top-level nodes now, nested blocks' included, in order.
+    #[must_use]
+    pub fn nodes(&self) -> Vec<NodeId> {
+        current_nodes(&self.roots)
+    }
+
+    /// Reads the nodes, then disposes the owner (stopping the effects,
+    /// running cleanups) and removes them.
     pub fn remove<D: Dom>(self, dom: &Rc<RefCell<D>>) {
+        let nodes = self.nodes();
         self.owner.dispose();
-        for node in self.nodes {
+        for node in nodes {
             dom.borrow_mut().remove(node);
         }
     }

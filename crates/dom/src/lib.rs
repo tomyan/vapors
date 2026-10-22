@@ -14,8 +14,10 @@
 pub mod blocks;
 mod event;
 pub mod recording;
+mod roots;
 
 pub use event::{Event, Handler};
+pub use roots::{BlockNodes, Root, current_nodes};
 
 /// Identifies a node in the tree. The [`Dom`] implementation decides
 /// what the number means.
