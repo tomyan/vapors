@@ -12,6 +12,7 @@ rust-version.workspace = true
 [dependencies]
 wgpu.workspace = true
 vapors-scene.workspace = true
+vapors-renderer.workspace = true
 parley = { version = "=0.12.0", default-features = false, features = ["std", "complex-scripts"] }
 fontique = { version = "=0.12.0", default-features = false, features = ["std"] }
 skrifa = "=0.44.0"
@@ -24,11 +25,11 @@ log = "0.4"
 # build needs no fontconfig headers.
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 fontique = { version = "=0.12.0", default-features = false, features = ["std", "system", "fontconfig-dlopen"] }
+# The comparison page reads Chromium's screenshot and writes its own.
+png.workspace = true
 
 [dev-dependencies]
 vapors-gpu-harness.workspace = true
-vapors-renderer.workspace = true
-png.workspace = true
 
 [lints]
 workspace = true

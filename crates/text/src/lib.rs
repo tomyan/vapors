@@ -6,6 +6,7 @@
 
 mod atlas;
 mod atlas_page;
+pub mod comparison;
 mod draw;
 mod font_system;
 pub mod fonts;

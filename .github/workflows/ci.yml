@@ -81,6 +81,16 @@ jobs:
         run: cargo xtask setup --ci
       - name: gpu tier
         run: cargo xtask test --tier gpu
+      # The text comparison page: vapors-text beside headless Chrome (the
+      # runner image ships google-chrome), composite uploaded for eyes.
+      - name: text comparison page
+        run: cargo run -p vapors-text --example text_comparison -- --out target
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: text-comparison
+          path: target/text_comparison*.png
+          if-no-files-found: error
 
   window:
     name: window
