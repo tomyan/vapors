@@ -1,5 +1,5 @@
 //! Loose text inside a body: literal runs with `{expr}` holes, and the
-//! JSX newline rule for whitespace-only runs.
+//! rule that collapses whitespace-only runs.
 
 use super::Parser;
 use super::entities::decode;
@@ -8,9 +8,8 @@ use crate::CompileError;
 use crate::ast::{Expr, Node, Part, Text};
 
 impl Parser<'_> {
-    /// Reads text up to the next tag or block. A whitespace-only run
-    /// containing a newline is formatting and yields nothing; one on a
-    /// single line yields one space.
+    /// Reads text up to the next tag or block; see `collapse_whitespace`
+    /// for the one whitespace rule.
     pub fn parse_loose_text(&mut self) -> Result<Option<Node>, CompileError> {
         let offset = self.pos;
         let mut parts = Vec::new();
@@ -58,30 +57,43 @@ impl Parser<'_> {
         if literal.is_empty() {
             return Ok(());
         }
-        let decoded = decode(literal).map_err(|(at, message)| self.error(start + at, message))?;
+        let part = match whitespace_run(literal) {
+            Run::Kept => Some(Part::Literal(
+                decode(literal).map_err(|(at, message)| self.error(start + at, message))?,
+            )),
+            Run::Dropped => None,
+            Run::Space => Some(Part::Literal(" ".into())),
+        };
         literal.clear();
-        parts.push(Part::Literal(decoded));
+        parts.extend(part);
         Ok(())
     }
 }
 
 fn text_node(parts: Vec<Part>, offset: usize) -> Option<Node> {
-    let only_whitespace = match parts.as_slice() {
-        [] => return None,
-        [Part::Literal(value)] => value.trim().is_empty(),
-        _ => false,
-    };
-    if !only_whitespace {
-        return Some(Node::Text(Text { parts, offset }));
+    (!parts.is_empty()).then_some(Node::Text(Text { parts, offset }))
+}
+
+/// What the whitespace rule does with a literal run.
+enum Run {
+    /// It has something other than whitespace: kept as written.
+    Kept,
+    /// Whitespace-only with a newline: formatting, dropped.
+    Dropped,
+    /// Whitespace-only on one line: one space.
+    Space,
+}
+
+/// A whitespace-only run always sits between two non-text things (an
+/// element, a tag boundary or a hole), since adjacent text is one run:
+/// it is dropped when it contains a newline and is one space otherwise.
+/// The check is on the raw text, so `&nbsp;` is never collapsed.
+fn whitespace_run(raw: &str) -> Run {
+    if !raw.chars().all(|c| c.is_ascii_whitespace()) {
+        Run::Kept
+    } else if raw.contains('\n') {
+        Run::Dropped
+    } else {
+        Run::Space
     }
-    let Part::Literal(value) = &parts[0] else {
-        unreachable!("matched above");
-    };
-    if value.contains('\n') {
-        return None;
-    }
-    Some(Node::Text(Text {
-        parts: vec![Part::Literal(" ".into())],
-        offset,
-    }))
 }

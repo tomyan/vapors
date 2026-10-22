@@ -60,9 +60,17 @@ the one difference from the brief in this slice.
 - **Elements** come from a fixed HTML vocabulary, listed in
   `crates/compiler/src/template/vocabulary.rs`. Void elements such as
   `input` and `br` close themselves. Any other lowercase tag is refused.
-- **Text** may hold `{expr}` holes. A whitespace-only run that contains
-  a newline is formatting and produces nothing. One on a single line
-  produces one space. This is the JSX rule.
+- **Text** may hold `{expr}` holes. One rule covers whitespace. A
+  whitespace-only run between two non-text things (an element, an
+  opening or closing tag, or a hole) is dropped when it contains a
+  newline, and becomes one space otherwise. A run with anything else in
+  it is kept as written. So `<p>\n  hello {name}\n</p>` gives the
+  static text `"\n  hello "` and the hole's own text node, with nothing
+  after it; `{a} {b}` keeps its space; `{a}` and `{b}` on separate lines
+  have none between them; and in `<b>a</b>` followed by `text` on the
+  next line, the text keeps its newline and indent. `&nbsp;` is never
+  collapsed. A hole is always its own text node, holding exactly its
+  value.
 - **Character references** in text and quoted attribute values are
   decoded: `&amp;` `&lt;` `&gt;` `&quot;` `&apos;` `&nbsp;`, `&#NN;`
   and `&#xNN;`. An unknown `&name;`, or a number that names no
