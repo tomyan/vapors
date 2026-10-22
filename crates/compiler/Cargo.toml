@@ -1,0 +1,24 @@
+[package]
+name = "vapors-compiler"
+description = "Compiles .wisp single-file components (Rust script, CSS style, HTML template) to readable Rust over the vapors-dom builder trait."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+syn.workspace = true
+prettyplease.workspace = true
+quote.workspace = true
+proc-macro2.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+
+[[bin]]
+name = "wisp-check"
+path = "src/bin/wisp_check.rs"
+
+[lints]
+workspace = true
