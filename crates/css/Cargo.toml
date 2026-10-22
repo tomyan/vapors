@@ -1,0 +1,14 @@
+[package]
+name = "vapors-css"
+description = "The CSS engine: a stylesheet as text in, computed styles per element out. Selectors, cascade, var(), calc(), media queries, transitions and keyframes. No I/O; compiles for wasm."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+vapors-scene.workspace = true
+
+[lints]
+workspace = true

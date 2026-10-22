@@ -22,6 +22,7 @@ vapors-renderer = { path = "crates/renderer" }
 vapors-platform = { path = "crates/platform" }
 vapors-canvas = { path = "crates/canvas" }
 vapors-text = { path = "crates/text" }
+vapors-css = { path = "crates/css" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
