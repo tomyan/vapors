@@ -24,7 +24,7 @@ fn zero_arg_handler_is_wrapped() {
         &code,
         "listen(div0, \"click\", Box::new(move |_event: &mut Event|",
     );
-    assert_has(&code, "increment()");
+    assert_has(&code, "{ increment(); }");
 }
 
 #[test]

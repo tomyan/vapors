@@ -1,6 +1,7 @@
 //! Text runs: a literal is one text node created once; a `{expr}` hole
 //! is a text node of its own with an effect that re-sets exactly it.
 
+use super::allowances::Allowance;
 use super::emit::{Emitter, Place};
 use crate::CompileError;
 use crate::ast::{Expr, Part, Text};
@@ -32,6 +33,7 @@ impl Emitter<'_> {
         self.attach(&var, place);
         let value = self.unwrapped(expr)?;
         let clones = self.clones_for(&[expr])?;
+        self.allow(Allowance::ImplicitClone);
         self.emit_effect(
             &clones,
             &[

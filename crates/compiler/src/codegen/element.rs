@@ -93,7 +93,7 @@ impl Emitter<'_> {
     fn handler_expr(&self, expr: &Expr) -> Result<String, CompileError> {
         let code = self.raw(expr)?;
         match self.script.handlers.get(&code) {
-            Some(0) => Ok(format!("move |_event: &mut Event| {code}()")),
+            Some(0) => Ok(format!("move |_event: &mut Event| {{ {code}(); }}")),
             _ => Ok(code),
         }
     }
@@ -132,7 +132,7 @@ impl Emitter<'_> {
             )],
         );
         self.line(format!(
-            "dom.borrow_mut().listen({var}, {event:?}, Box::new(move |event: &mut Event| {signal}.set({read})));"
+            "dom.borrow_mut().listen({var}, {event:?}, Box::new(move |event: &mut Event| {{ {signal}.set({read}); }}));"
         ));
         Ok(())
     }

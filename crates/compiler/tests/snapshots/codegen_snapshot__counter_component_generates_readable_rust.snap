@@ -37,6 +37,10 @@ impl Counter {
         reason = "a closure gets a clone of each binding it captures; the compiler cannot see which are Copy"
     )]
     #[allow(
+        clippy::implicit_clone,
+        reason = "a text hole shows any Display value through to_string; the compiler cannot see when it is already a String"
+    )]
+    #[allow(
         clippy::needless_pass_by_value,
         reason = "every component takes its props struct by value, empty or not, so parents mount them alike"
     )]
@@ -62,7 +66,9 @@ impl Counter {
                         .listen(
                             button0,
                             "click",
-                            Box::new(move |_event: &mut Event| increment()),
+                            Box::new(move |_event: &mut Event| {
+                                increment();
+                            }),
                         );
                 }
                 let text1 = dom.borrow_mut().create_text("Clicked ");

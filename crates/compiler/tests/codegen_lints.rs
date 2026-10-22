@@ -34,9 +34,12 @@ fn props_defaults_are_written_out_with_the_reason_they_are_not_derived() {
 }
 
 #[test]
-fn mount_before_allows_cloning_a_binding_that_may_be_copy() {
+fn cloning_a_captured_binding_is_allowed_with_the_reason() {
+    // Given
+    let script = "let count: Signal<i32> = Signal::new(0);\nlet increment = move || count.update(|n| *n += 1);";
+
     // When
-    let code = generated("<div></div>");
+    let code = generated_with(script, "<button onclick={increment}>+</button>");
 
     // Then
     assert_has(&code, "clippy::clone_on_copy");
@@ -44,6 +47,44 @@ fn mount_before_allows_cloning_a_binding_that_may_be_copy() {
         &code,
         "reason = \"a closure gets a clone of each binding it captures; the compiler cannot see which are Copy\"",
     );
+}
+
+#[test]
+fn a_text_hole_is_allowed_to_call_to_string_on_a_string() {
+    // When
+    let code = generated("<span>{1 + 1}</span>");
+
+    // Then
+    assert_has(&code, "clippy::implicit_clone");
+    assert_has(
+        &code,
+        "reason = \"a text hole shows any Display value through to_string; the compiler cannot see when it is already a String\"",
+    );
+}
+
+#[test]
+fn a_child_component_is_allowed_a_props_update_that_may_be_complete() {
+    // When
+    let code = generated("<Greeting name=\"Sumi\" />");
+
+    // Then
+    assert_has(&code, "clippy::needless_update");
+    assert_has(
+        &code,
+        "reason = \"a child's props end with ..Default::default(); the compiler cannot see when every prop is already given\"",
+    );
+}
+
+#[test]
+fn no_allowance_is_written_for_code_that_was_not_generated() {
+    // When
+    let code = generated_with(PROP, "<div>static</div>");
+
+    // Then
+    assert_lacks(&code, "clone_on_copy");
+    assert_lacks(&code, "implicit_clone");
+    assert_lacks(&code, "needless_update");
+    assert_lacks(&code, "needless_pass_by_value");
 }
 
 #[test]
@@ -57,15 +98,6 @@ fn empty_props_are_taken_by_value_with_the_reason() {
         &code,
         "every component takes its props struct by value, empty or not, so parents mount them alike",
     );
-}
-
-#[test]
-fn props_with_fields_are_consumed_and_need_no_allowance() {
-    // When
-    let code = generated_with(PROP, "<span>{label}</span>");
-
-    // Then
-    assert_lacks(&code, "needless_pass_by_value");
 }
 
 #[test]

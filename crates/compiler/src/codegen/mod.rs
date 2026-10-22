@@ -7,6 +7,7 @@
 //! and expression attribute gets its own effect, each `{if}` and
 //! `{for}` an anchor and a call into `vapors_dom::blocks`.
 
+mod allowances;
 mod blocks;
 mod component_tag;
 mod element;
@@ -36,8 +37,8 @@ pub fn generate(component: &Component) -> Result<String, CompileError> {
     let mut emitter = Emitter::new(&source, &info);
     emitter.indent(3);
     emitter.emit_nodes(&component.template.children, &Place::roots())?;
-    let body = emitter.finish();
-    let raw = shell::assemble(component, &info, &body);
+    let (body, allowances) = emitter.finish();
+    let raw = shell::assemble(component, &info, &body, allowances);
     let formatted = format::format(&source, &raw)?;
     // A plain comment, not `//!`: the file is `include!`d into a module,
     // where inner attributes are not allowed.

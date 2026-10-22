@@ -2,6 +2,7 @@
 //! from the attributes; a literal converts with `into`, an expression
 //! is passed raw, and `bind:name={signal}` passes the signal itself.
 
+use super::allowances::Allowance;
 use super::emit::{Emitter, Place};
 use crate::CompileError;
 use crate::ast::{AttrValue, ComponentTag};
@@ -44,6 +45,7 @@ impl Emitter<'_> {
             };
             self.line(format!("{name}: {value},"));
         }
+        self.allow(Allowance::NeedlessUpdate);
         self.line("..Default::default()");
         self.dedent(1);
         self.line("});");

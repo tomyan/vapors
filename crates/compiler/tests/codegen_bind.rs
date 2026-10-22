@@ -20,7 +20,7 @@ fn bind_value_on_text_input() {
         &code,
         "listen(input0, \"input\", Box::new(move |event: &mut Event|",
     );
-    assert_has(&code, "name.set(event.value().to_string())");
+    assert_has(&code, "name.set(event.value().to_string());");
     // And the display half, from the signal
     assert_has(
         &code,
@@ -39,7 +39,7 @@ fn bind_checked_on_checkbox() {
         &code,
         "listen(input0, \"change\", Box::new(move |event: &mut Event|",
     );
-    assert_has(&code, "on.set(event.checked())");
+    assert_has(&code, "on.set(event.checked());");
     assert_has(
         &code,
         "set_property(input0, \"checked\", PropertyValue::Bool(on.get()))",
@@ -59,7 +59,7 @@ fn bind_value_on_select_uses_change() {
         &code,
         "listen(select0, \"change\", Box::new(move |event: &mut Event|",
     );
-    assert_has(&code, "name.set(event.value().to_string())");
+    assert_has(&code, "name.set(event.value().to_string());");
     assert_has(
         &code,
         "set_property(select0, \"value\", PropertyValue::Text(name.get()))",

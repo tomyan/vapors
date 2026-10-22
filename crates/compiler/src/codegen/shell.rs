@@ -1,13 +1,20 @@
 //! The file around the template code: imports, the style constant,
 //! the props and component structs, and the mount and unmount methods.
 
+use std::collections::BTreeSet;
 use std::fmt::Write;
 
+use super::allowances::{Allowance, attributes};
 use super::script::ScriptInfo;
 use crate::ast::Component;
 
 /// The whole generated file, before prettyplease lays it out.
-pub(crate) fn assemble(component: &Component, info: &ScriptInfo, body: &str) -> String {
+pub(crate) fn assemble(
+    component: &Component,
+    info: &ScriptInfo,
+    body: &str,
+    allowances: BTreeSet<Allowance>,
+) -> String {
     let name = &component.name;
     let style = component
         .style
@@ -16,7 +23,7 @@ pub(crate) fn assemble(component: &Component, info: &ScriptInfo, body: &str) -> 
     let mut file = header(&component.path, style);
     file.push_str(&props_struct(name, info));
     file.push_str(&component_struct(name, info));
-    file.push_str(&mount_methods(name, info, body));
+    file.push_str(&mount_methods(name, info, body, allowances));
     file.push_str(&accessors());
     file
 }
@@ -69,21 +76,12 @@ impl Default for {name}Props {{
 
 const DEFAULTS_AS_WRITTEN: &str =
     "the defaults are the #[prop] initialisers as written in the .wisp";
-const CLONES: &str =
-    "a closure gets a clone of each binding it captures; the compiler cannot see which are Copy";
-const PROPS_BY_VALUE: &str =
-    "every component takes its props struct by value, empty or not, so parents mount them alike";
-
 /// Lints on `mount_before` that depend on types the compiler cannot see.
-fn mount_allowances(info: &ScriptInfo) -> String {
-    let mut allowances = format!("    #[allow(clippy::clone_on_copy, reason = \"{CLONES}\")]\n");
+fn mount_allowances(info: &ScriptInfo, mut allowances: BTreeSet<Allowance>) -> String {
     if info.props.is_empty() {
-        let _ = writeln!(
-            allowances,
-            "    #[allow(clippy::needless_pass_by_value, reason = \"{PROPS_BY_VALUE}\")]"
-        );
+        allowances.insert(Allowance::NeedlessPassByValue);
     }
-    allowances
+    attributes(&allowances)
 }
 
 fn component_struct(name: &str, info: &ScriptInfo) -> String {
@@ -123,9 +121,14 @@ fn field_lists(info: &ScriptInfo) -> (String, String) {
     )
 }
 
-fn mount_methods(name: &str, info: &ScriptInfo, body: &str) -> String {
+fn mount_methods(
+    name: &str,
+    info: &ScriptInfo,
+    body: &str,
+    allowances: BTreeSet<Allowance>,
+) -> String {
     let (returned, built) = field_lists(info);
-    let allowances = mount_allowances(info);
+    let allowances = mount_allowances(info, allowances);
     let prop_names: Vec<&str> = info.props.iter().map(|prop| prop.name.as_str()).collect();
     let prop_names = prop_names.join(", ");
     let mut statements = String::new();
