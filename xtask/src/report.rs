@@ -30,7 +30,7 @@ impl Reporter {
         if self.verbose {
             print!("{}", outcome.output);
         } else if !outcome.passed {
-            for line in failure_lines(&outcome.output) {
+            for line in lines_to_show(&outcome.output) {
                 println!("     {line}");
             }
         }
@@ -57,6 +57,21 @@ impl Reporter {
 
 fn seconds(duration: Duration) -> String {
     format!("{:.1}s", duration.as_secs_f64())
+}
+
+/// What to print for a failing step: its classified lines (diagnostics,
+/// failures, panics) when there are any; otherwise every non-empty
+/// line, because a failing step's cause must never be hidden.
+pub fn lines_to_show(output: &str) -> Vec<&str> {
+    let classified = failure_lines(output);
+    if !classified.is_empty() {
+        return classified;
+    }
+    output
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect()
 }
 
 /// The lines of tool output worth reading when a step fails: rustc and
@@ -94,85 +109,5 @@ fn is_failure_line(line: &str) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn clippy_diagnostic_keeps_message_and_location() {
-        // Given
-        let output = "    Checking scene\nwarning: unused variable: `x`\n  --> crates/scene/src/lib.rs:3:9\n   |\n3  |     let x = 1;\n";
-
-        // When
-        let lines = failure_lines(output);
-
-        // Then
-        assert_eq!(
-            lines,
-            [
-                "warning: unused variable: `x`",
-                "--> crates/scene/src/lib.rs:3:9"
-            ]
-        );
-    }
-
-    #[test]
-    fn nextest_failure_keeps_test_name_and_panic() {
-        // Given
-        let output = "        PASS [   0.01s] xtask steps::tests::ci_runs_fastest_checks_first\n        FAIL [   0.01s] vapors-scene color::tests::round_trip\nthread 'color::tests::round_trip' panicked at crates/scene/src/color.rs:40:9:\nassertion failed\n";
-
-        // When
-        let lines = failure_lines(output);
-
-        // Then
-        assert_eq!(lines.len(), 3);
-        assert!(lines[0].starts_with("FAIL ["));
-        assert!(lines[1].contains("panicked at crates/scene/src/color.rs:40:9"));
-        assert_eq!(lines[2], "assertion failed");
-    }
-
-    #[test]
-    fn panic_message_lines_follow_the_panicked_at_line() {
-        // Given
-        let output = "thread 't' panicked at crates/x.rs:9:5:\nno GPU adapter: wanted \"nvidia\"; found llvmpipe.\nFix: set VAPORS_GPU_ADAPTER.\nnote: run with `RUST_BACKTRACE=1`\n\n   Summary [ 0.1s]\n";
-
-        // When
-        let lines = failure_lines(output);
-
-        // Then
-        assert_eq!(
-            lines,
-            [
-                "thread 't' panicked at crates/x.rs:9:5:",
-                "no GPU adapter: wanted \"nvidia\"; found llvmpipe.",
-                "Fix: set VAPORS_GPU_ADAPTER."
-            ]
-        );
-    }
-
-    #[test]
-    fn repeated_failure_lines_appear_once() {
-        // Given
-        let output = "  FAIL [ 0.1s] a::b
-summary
-  FAIL [ 0.1s] a::b
-";
-
-        // When
-        let lines = failure_lines(output);
-
-        // Then
-        assert_eq!(lines, ["FAIL [ 0.1s] a::b"]);
-    }
-
-    #[test]
-    fn passing_output_has_no_failure_lines() {
-        // Given
-        let output = "    Finished `dev` profile\n        PASS [   0.01s] xtask steps::tests::x\n";
-
-        // When
-        let lines = failure_lines(output);
-
-        // Then
-        assert_eq!(lines, [] as [&str; 0]);
-    }
-}
+#[path = "report_tests.rs"]
+mod tests;

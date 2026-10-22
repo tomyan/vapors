@@ -1,25 +1,23 @@
 //! The file-length rule as a check: every source file under the
 //! workspace is at most `[files] max_lines` long, unless it is named
 //! under `[files.generated]` or allowed under `[files.allow]` with a
-//! reason, which is printed. The failure names each file with its line
-//! count and the fix.
+//! reason. The failure names each file with its line count and the fix;
+//! an allowance naming no file, or a file now within the limit, is
+//! refused as stale. Allowed files and their reasons are printed when
+//! `cargo xtask check-files` runs by itself or `lint` runs with
+//! `--verbose`; the `files` step shows only the refusals.
 
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::ExitCode;
 
 use crate::config::Config;
+use crate::files_walk::{count_lines, workspace_files};
 
 /// The rule says about 200. 220 leaves room for a module doc comment
 /// and a test-module mount without forcing a split that would only
 /// move lines; a file past it has a second responsibility to give away.
 pub const DEFAULT_MAX_LINES: usize = 220;
-
-/// Extensions the rule covers.
-const EXTENSIONS: [&str; 5] = ["rs", "wgsl", "html", "js", "toml"];
-
-/// Directories never walked: build output, git, dependencies, fonts.
-const SKIPPED_DIRS: [&str; 4] = ["target", ".git", "node_modules", "fonts"];
 
 /// The rule as configured.
 #[derive(Debug, PartialEq, Eq)]
@@ -74,7 +72,14 @@ pub fn run() -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(message) => {
-            println!("{message}");
+            // Every refusal starts with `error:` so the reporter shows it.
+            for line in message.lines() {
+                if line.starts_with("error:") || line.starts_with("allowed") {
+                    println!("{line}");
+                } else {
+                    println!("error: {line}");
+                }
+            }
             ExitCode::FAILURE
         }
     }
@@ -89,7 +94,39 @@ fn check() -> Result<Vec<String>, String> {
             Ok((path.display().to_string(), lines))
         })
         .collect::<Result<Vec<_>, String>>()?;
+    check_allowances(&counted, &rule)?;
     report(&over_limit(&counted, &rule), &rule)
+}
+
+/// Every `[files.allow]` and `[files.generated]` entry names a counted
+/// file, and every allowed file is still over the limit.
+///
+/// # Errors
+///
+/// One `error:` line per stale entry, naming it and the fix.
+pub fn check_allowances(counted: &[(String, usize)], rule: &Rule) -> Result<(), String> {
+    let mut stale = Vec::new();
+    for (table, entries) in [("allow", &rule.allow), ("generated", &rule.generated)] {
+        for path in entries.keys() {
+            match counted.iter().find(|(p, _)| p == path) {
+                None => stale.push(format!(
+                    "error: [files.{table}] `{path}` names no file; stale allowance; remove it"
+                )),
+                Some((_, lines)) if table == "allow" && *lines <= rule.max_lines => {
+                    stale.push(format!(
+                        "error: [files.allow] `{path}` is {lines} lines, within {}; stale allowance; remove it",
+                        rule.max_lines
+                    ));
+                }
+                Some(_) => {}
+            }
+        }
+    }
+    if stale.is_empty() {
+        Ok(())
+    } else {
+        Err(stale.join("\n"))
+    }
 }
 
 /// The files over `rule.max_lines`, allowed or not; generated ones are
@@ -133,52 +170,6 @@ pub fn report(findings: &[Finding], rule: &Rule) -> Result<Vec<String>, String> 
     } else {
         Err([allowed, over].concat().join("\n"))
     }
-}
-
-/// Every covered file under `root`, as `crates/...` paths, sorted.
-///
-/// # Errors
-///
-/// A message naming a directory that could not be read.
-pub fn workspace_files(root: &Path) -> Result<Vec<PathBuf>, String> {
-    let mut found = Vec::new();
-    walk(root, Path::new(""), &mut found)?;
-    found.sort();
-    Ok(found)
-}
-
-fn walk(root: &Path, relative: &Path, found: &mut Vec<PathBuf>) -> Result<(), String> {
-    let dir = root.join(relative);
-    let entries = std::fs::read_dir(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    for entry in entries {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let name = entry.file_name();
-        let path = relative.join(&name);
-        let kind = entry.file_type().map_err(|e| e.to_string())?;
-        if kind.is_dir() && !SKIPPED_DIRS.contains(&name.to_string_lossy().as_ref()) {
-            walk(root, &path, found)?;
-        } else if kind.is_file() && covered(&path) {
-            found.push(path);
-        }
-    }
-    Ok(())
-}
-
-fn covered(path: &Path) -> bool {
-    path.extension()
-        .and_then(|e| e.to_str())
-        .is_some_and(|e| EXTENSIONS.contains(&e))
-}
-
-/// Lines in `path`, as `wc -l` counts them.
-///
-/// # Errors
-///
-/// A message naming the file when it cannot be read.
-#[allow(clippy::naive_bytecount)] // source files are small; a crate for this is not worth a dependency
-pub fn count_lines(path: &Path) -> Result<usize, String> {
-    let text = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    Ok(text.iter().filter(|&&b| b == b'\n').count())
 }
 
 #[cfg(test)]

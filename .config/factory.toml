@@ -17,7 +17,8 @@ package = "vapors-web-demo"
 # a test-module mount without forcing a split that would only move lines.
 max_lines = "220"
 
-# Files allowed over the limit, each with its reason, printed by the check.
+# Files allowed over the limit, each with its reason. `cargo xtask check-files`
+# and `lint --verbose` print them; the `files` step shows only refusals.
 [files.allow]
 
 # Files not written by hand; left out of the check.

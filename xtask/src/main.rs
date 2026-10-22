@@ -10,6 +10,7 @@ mod config;
 mod deadline;
 mod dev;
 mod files;
+mod files_walk;
 mod gpu_info;
 mod pixels;
 mod report;

@@ -11,9 +11,18 @@ fn rule(max_lines: usize) -> Rule {
 }
 
 #[test]
-fn a_file_at_the_limit_passes_and_one_over_is_found() {
+fn a_file_at_the_limit_passes() {
     // Given
-    let counted = vec![("a.rs".to_owned(), 220), ("b.rs".to_owned(), 221)];
+    let counted = vec![("a.rs".to_owned(), 220)];
+
+    // When / Then
+    assert_eq!(over_limit(&counted, &rule(220)), []);
+}
+
+#[test]
+fn a_file_one_over_the_limit_is_found_with_its_count() {
+    // Given
+    let counted = vec![("b.rs".to_owned(), 221)];
 
     // When
     let findings = over_limit(&counted, &rule(220));
@@ -30,25 +39,33 @@ fn a_file_at_the_limit_passes_and_one_over_is_found() {
 }
 
 #[test]
-fn generated_files_are_left_out_and_allowed_ones_carry_their_reason() {
+fn generated_files_are_left_out() {
     // Given
     let mut rule = rule(10);
     rule.generated
         .insert("gen.rs".into(), "written by build.rs".into());
-    rule.allow.insert("table.rs".into(), "a data table".into());
-    let counted = vec![
-        ("gen.rs".to_owned(), 500),
-        ("table.rs".to_owned(), 300),
-        ("big.rs".to_owned(), 11),
-    ];
+    let counted = vec![("gen.rs".to_owned(), 500), ("big.rs".to_owned(), 11)];
 
     // When
     let findings = over_limit(&counted, &rule);
 
     // Then
-    assert_eq!(findings.len(), 2);
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].path, "big.rs");
+}
+
+#[test]
+fn allowed_files_carry_their_reason() {
+    // Given
+    let mut rule = rule(10);
+    rule.allow.insert("table.rs".into(), "a data table".into());
+    let counted = vec![("table.rs".to_owned(), 300)];
+
+    // When
+    let findings = over_limit(&counted, &rule);
+
+    // Then
     assert_eq!(findings[0].allowed.as_deref(), Some("a data table"));
-    assert_eq!(findings[1].path, "big.rs");
 }
 
 #[test]
@@ -140,30 +157,50 @@ fn a_max_lines_that_is_not_a_number_is_refused_naming_the_setting() {
 }
 
 #[test]
-fn the_walk_finds_covered_files_and_skips_target_and_fonts() {
+fn an_allowance_naming_no_file_is_refused_as_stale() {
     // Given
-    let root = std::env::temp_dir().join(format!("xtask-files-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&root);
-    for dir in ["crates/a", "target/debug", "fonts"] {
-        std::fs::create_dir_all(root.join(dir)).expect("dirs");
-    }
-    std::fs::write(root.join("crates/a/lib.rs"), "a\nb\nc\n").expect("rs");
-    std::fs::write(root.join("crates/a/shader.wgsl"), "x\n").expect("wgsl");
-    std::fs::write(root.join("crates/a/notes.md"), "not covered\n").expect("md");
-    std::fs::write(root.join("target/debug/big.rs"), "\n".repeat(999)).expect("target");
-    std::fs::write(root.join("fonts/font.toml"), "\n".repeat(999)).expect("fonts");
+    let mut rule = rule(220);
+    rule.allow
+        .insert("crates/gone.rs".into(), "was a table".into());
+    rule.generated.insert("out.rs".into(), "by build.rs".into());
+    let counted = vec![("crates/a.rs".to_owned(), 10)];
 
     // When
-    let files = workspace_files(&root).expect("walks");
+    let error = check_allowances(&counted, &rule).expect_err("stale");
 
     // Then
     assert_eq!(
-        files,
-        [
-            PathBuf::from("crates/a/lib.rs"),
-            PathBuf::from("crates/a/shader.wgsl")
-        ]
+        error,
+        "error: [files.allow] `crates/gone.rs` names no file; stale allowance; remove it\n\
+         error: [files.generated] `out.rs` names no file; stale allowance; remove it"
     );
-    assert_eq!(count_lines(&root.join("crates/a/lib.rs")), Ok(3));
-    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn an_allowed_file_now_within_the_limit_is_refused_as_stale() {
+    // Given
+    let mut rule = rule(220);
+    rule.allow.insert("crates/a.rs".into(), "a table".into());
+
+    // When
+    let error = check_allowances(&[("crates/a.rs".to_owned(), 200)], &rule).expect_err("stale");
+
+    // Then
+    assert_eq!(
+        error,
+        "error: [files.allow] `crates/a.rs` is 200 lines, within 220; stale allowance; remove it"
+    );
+}
+
+#[test]
+fn a_live_allowance_passes() {
+    // Given
+    let mut rule = rule(220);
+    rule.allow.insert("crates/a.rs".into(), "a table".into());
+
+    // When / Then
+    assert_eq!(
+        check_allowances(&[("crates/a.rs".to_owned(), 300)], &rule),
+        Ok(())
+    );
 }
