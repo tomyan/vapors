@@ -54,12 +54,12 @@ fn pans_and_pinches_follow_the_fingers() {
                 (1, Moved, 200.0, 0.0, 20),
             ],
             &[
+                Event::Pan { dx: 50.0, dy: 0.0 },
                 Event::Pinch {
                     x: 100.0,
                     y: 0.0,
                     factor: 2.0,
                 },
-                Event::Pan { dx: 50.0, dy: 0.0 },
             ],
         ),
         (
@@ -173,6 +173,34 @@ fn slow_moved_cancelled_and_two_finger_presses_are_not_taps() {
 
     // When / Then
     check(cases);
+}
+
+#[test]
+fn a_repeated_started_replaces_the_finger_instead_of_adding_one() {
+    // Given: the same id starts twice, as a confused stream can send
+    let script: &[Step] = &[
+        (0, Started, 0.0, 0.0, 0),
+        (0, Started, 50.0, 0.0, 10),
+        (0, Moved, 60.0, 0.0, 20),
+    ];
+
+    // When
+    let events = play(script);
+
+    // Then: a pan from the second start, no phantom pinch
+    assert_eq!(events, [Event::Pan { dx: 10.0, dy: 0.0 }]);
+}
+
+#[test]
+fn moved_and_ended_for_an_unknown_finger_are_ignored() {
+    // Given
+    let script: &[Step] = &[(9, Moved, 10.0, 0.0, 0), (9, Ended, 10.0, 0.0, 10)];
+
+    // When
+    let events = play(script);
+
+    // Then
+    assert_eq!(events, []);
 }
 
 #[test]

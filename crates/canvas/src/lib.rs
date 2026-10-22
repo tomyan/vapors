@@ -7,6 +7,8 @@
 mod image_app;
 mod image_view;
 mod image_view_draw;
+#[cfg(test)]
+mod pinch_tests;
 mod png;
 
 pub use image_app::ImageApp;

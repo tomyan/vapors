@@ -44,6 +44,7 @@ pub enum Event {
         y: f32,
     },
     /// Two fingers moved apart or together, or a trackpad was pinched.
+    /// Sent after the `Pan` of the same movement; apply in that order.
     Pinch {
         /// Anchor X in pixels: the point to zoom about.
         x: f32,
