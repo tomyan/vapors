@@ -123,11 +123,19 @@ time for the first frame:
 
 ```
 (cd target/web && python3 -m http.server 8000 --bind 127.0.0.1 &)
-chromium --headless=new --no-sandbox --disable-gpu-sandbox \
+env -u DBUS_SESSION_BUS_ADDRESS \
+  chromium --headless=new --no-sandbox --disable-gpu-sandbox \
   --use-angle=swiftshader --enable-unsafe-webgpu \
   --enable-features=Vulkan,WebGPU --window-size=640,400 \
   --virtual-time-budget=8000 --screenshot=web-demo.png http://127.0.0.1:8000/
 ```
+
+`env -u DBUS_SESSION_BUS_ADDRESS` matters on a box with
+xdg-desktop-portal installed but unable to start (no display):
+Chromium's network service asks the portal over the session bus before
+its first request, and D-Bus activation waits 120 s, so every HTTP
+load stalls past any deadline. With no session bus address it skips
+the portal; curl and file:// are never affected.
 
 The gradient fitted in 640x400 reads 128,128,128 at the centre and the
 background 40,40,40 in the corner. The top 44 px are the label strip
