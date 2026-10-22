@@ -5,6 +5,8 @@
 
 use winit::event_loop::EventLoopProxy;
 
+use crate::PlatformError;
+use crate::file_kind::{self, FileKind};
 use crate::picker;
 use crate::window::Message;
 
@@ -22,12 +24,19 @@ impl Platform {
         self.proxy.clone()
     }
 
-    /// Open the system's file picker for one image. The choice arrives as
-    /// [`Event::FileOpened`](crate::Event::FileOpened); cancelling sends
-    /// nothing. On the web this must be called from inside a user input
-    /// event, which is where the app's `event` runs, or the browser
-    /// refuses to open the picker.
-    pub fn pick_file(&self) {
-        picker::open(self.proxy());
+    /// Open the system's file picker for one file of one of `kinds`. The
+    /// choice arrives as [`Event::FileOpened`](crate::Event::FileOpened);
+    /// cancelling sends nothing. On the web this must be called from
+    /// inside a user input event, which is where the app's `event` runs,
+    /// or the browser refuses to open the picker.
+    ///
+    /// # Errors
+    ///
+    /// [`PlatformError::Picker`] when `kinds` is empty or a kind has no
+    /// extensions; the picker is not opened.
+    pub fn pick_file(&self, kinds: &[FileKind]) -> Result<(), PlatformError> {
+        file_kind::check(kinds)?;
+        picker::open(self.proxy(), kinds.to_vec());
+        Ok(())
     }
 }

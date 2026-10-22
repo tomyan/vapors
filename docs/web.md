@@ -14,9 +14,10 @@ open a file.
 - `<p id="status">`, optional. The adapter line is written there once the
   GPU is ready, and every error after `run()` returns (`run()` returns at
   once on the web; the browser owns the loop).
-- `<button id="open">`, for touch screens. The platform wires its click
-  to the file picker: a click is user activation in every browser, a tap
-  on the canvas is not always. A page without it is told so in the
+- `<button id="open">`, for touch screens. Its click reaches the app as
+  `Event::OpenRequested`, and the app answers with `pick_file` and its
+  file kinds: a click is user activation in every browser, a tap on the
+  canvas is not always. A page without it is told so in the
   console and the status element; `o` and a tap on an empty canvas still
   try.
 - CSS: `html,body{margin:0;height:100%} canvas{width:100vw;height:100vh;
@@ -51,7 +52,14 @@ and prints the line to run by hand.
 
 ## The native file picker
 
-`Platform::pick_file` on Linux asks the XDG desktop portal over D-Bus
+`Platform::pick_file(&[FileKind])` takes what to offer: each kind is a
+description and its extensions, mapped to the native dialog's filters and
+to the web input's `accept` (`image/*` plus every extension, so phones
+offer their photo library). An empty list is refused.
+`report_status(&str)` writes a non-error line, stdout natively and the
+status element on the web; the image app says `opened <name> <w>x<h>`.
+
+On Linux the picker asks the XDG desktop portal over D-Bus
 (rfd's `xdg-portal` backend; nothing to install at build time, a portal
 service at run time). What the portal says when it fails is reported as
 `file dialog: <cause>` on stderr; the only wait that is not the user's is

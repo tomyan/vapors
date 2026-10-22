@@ -16,8 +16,8 @@ fn js(error: &JsValue) -> String {
     error.as_string().unwrap_or_else(|| format!("{error:?}"))
 }
 
-/// Append the input, hook its `change`, click it.
-pub fn open(proxy: EventLoopProxy<Message>) -> JsResult<()> {
+/// Append the input with `accept`, hook its `change`, click it.
+pub fn open(proxy: EventLoopProxy<Message>, accept: &str) -> JsResult<()> {
     let document = web_sys::window()
         .and_then(|w| w.document())
         .ok_or("no document")?;
@@ -28,7 +28,7 @@ pub fn open(proxy: EventLoopProxy<Message>) -> JsResult<()> {
         .dyn_into()
         .map_err(|_| "created element is not an <input>".to_owned())?;
     input.set_type("file");
-    input.set_accept("image/*");
+    input.set_accept(accept);
     input.set_hidden(true);
     body.append_child(&input).map_err(|e| js(&e))?;
     let on_change = Closure::once_into_js(move |event: web_sys::Event| chosen(&event, &proxy));

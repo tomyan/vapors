@@ -61,6 +61,9 @@ pub trait App {
 pub(crate) enum Message {
     /// The window's GPU is set up, or could not be.
     GpuReady(Result<Gpu, PlatformError>),
+    /// The page's Open button was pressed.
+    #[cfg_attr(not(target_family = "wasm"), allow(dead_code))] // only the web has the button
+    OpenRequested,
     /// The user chose a file in the picker.
     FileChosen {
         /// Its name, without a directory.

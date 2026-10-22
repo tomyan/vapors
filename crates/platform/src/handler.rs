@@ -68,7 +68,7 @@ impl Handler {
     }
 
     fn gpu_ready(&mut self, gpu: Gpu) {
-        crate::report::status(&format!("adapter: {}", gpu.adapter_summary()));
+        crate::report::report_status(&format!("adapter: {}", gpu.adapter_summary()));
         self.gpu = Some(gpu);
         if let Some(window) = &self.window {
             let size = window.inner_size();
@@ -161,6 +161,7 @@ impl ApplicationHandler<Message> for Handler {
             Message::FileChosen { name, bytes } => self
                 .app
                 .event(Event::FileOpened { name, bytes }, &self.platform),
+            Message::OpenRequested => self.app.event(Event::OpenRequested, &self.platform),
         }
     }
 

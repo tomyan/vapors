@@ -142,7 +142,10 @@ impl ImageView {
             Event::Pan { dx, dy } => self.pan(*dx, *dy),
             Event::DoubleTap { .. } => self.toggle_fit(),
             Event::Character(text) => self.key(text),
-            Event::Touch { .. } | Event::Tap { .. } | Event::FileOpened { .. } => {}
+            Event::Touch { .. }
+            | Event::Tap { .. }
+            | Event::OpenRequested
+            | Event::FileOpened { .. } => {}
         }
     }
 

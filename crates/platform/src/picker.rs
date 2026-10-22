@@ -13,16 +13,18 @@
 
 use winit::event_loop::EventLoopProxy;
 
+use crate::file_kind::FileKind;
 use crate::window::Message;
 
 /// Open the picker; the result, if any, is sent to the event loop.
 #[cfg(not(target_family = "wasm"))]
-pub fn open(proxy: EventLoopProxy<Message>) {
+pub fn open(proxy: EventLoopProxy<Message>, kinds: Vec<FileKind>) {
     std::thread::spawn(move || {
-        let Some(path) = rfd::FileDialog::new()
-            .add_filter("PNG image", &["png"])
-            .pick_file()
-        else {
+        let mut dialog = rfd::FileDialog::new();
+        for kind in &kinds {
+            dialog = dialog.add_filter(&kind.description, &kind.extensions);
+        }
+        let Some(path) = dialog.pick_file() else {
             return;
         };
         let name = path
@@ -40,8 +42,9 @@ pub fn open(proxy: EventLoopProxy<Message>) {
 
 /// Open the picker; the result, if any, is sent to the event loop.
 #[cfg(target_family = "wasm")]
-pub fn open(proxy: EventLoopProxy<Message>) {
-    if let Err(message) = crate::picker_web::open(proxy) {
+#[allow(clippy::needless_pass_by_value)] // same signature as native, which moves the kinds to a thread
+pub fn open(proxy: EventLoopProxy<Message>, kinds: Vec<FileKind>) {
+    if let Err(message) = crate::picker_web::open(proxy, &crate::file_kind::accept(&kinds)) {
         crate::report::report_error(&format!("could not open the file picker: {message}"));
     }
 }

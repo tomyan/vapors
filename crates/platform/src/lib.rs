@@ -9,6 +9,7 @@ mod attributes;
 mod clock;
 mod error;
 mod event;
+mod file_kind;
 mod gestures;
 mod handler;
 mod input;
@@ -28,7 +29,8 @@ mod window;
 
 pub use error::PlatformError;
 pub use event::{Event, TouchPhase};
+pub use file_kind::FileKind;
 pub use gestures::Gestures;
 pub use platform::Platform;
-pub use report::report_error;
+pub use report::{report_error, report_status};
 pub use window::{App, Frame, Next, WindowOptions, run};

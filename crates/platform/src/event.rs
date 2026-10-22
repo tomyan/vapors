@@ -75,6 +75,10 @@ pub enum Event {
         /// Y in pixels where the second finger lifted.
         y: f32,
     },
+    /// The page's Open button was pressed: call
+    /// [`Platform::pick_file`](crate::Platform::pick_file) with the kinds
+    /// the app wants. Only the web sends it.
+    OpenRequested,
     /// The file the user chose from the picker opened by
     /// [`Platform::pick_file`](crate::Platform::pick_file). Never sent on cancel.
     FileOpened {
