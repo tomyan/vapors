@@ -1,0 +1,13 @@
+[package]
+name = "vapors-signals"
+description = "Signals, memos, effects, batches and owner scopes with Leptos's semantics on a single-threaded runtime that runs identically on native and wasm."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

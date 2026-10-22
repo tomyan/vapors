@@ -2464,6 +2464,10 @@ name = "vapors-scene"
 version = "0.0.0"
 
 [[package]]
+name = "vapors-signals"
+version = "0.0.0"
+
+[[package]]
 name = "vapors-text"
 version = "0.0.0"
 dependencies = [
