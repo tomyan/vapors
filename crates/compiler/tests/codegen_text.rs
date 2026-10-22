@@ -34,7 +34,7 @@ fn an_expression_hole_gets_its_own_text_node_and_effect() {
         &code,
         "let count_text2 = dom.borrow_mut().create_text(\"\");",
     );
-    assert_has(&code, "let value = (count.get()).to_string();");
+    assert_has(&code, "let shown = &(count.get());");
     assert_has(&code, "set_text(count_text2, &value);");
     assert_has(&code, "create_text(\" \")");
     assert_eq!(code.matches("Effect::new(").count(), 1, "{code}");
@@ -77,7 +77,7 @@ fn a_complex_expression_hole_is_named_after_its_position() {
 
     // Then
     assert_has(&code, "let text1 = dom.borrow_mut().create_text(\"\");");
-    assert_has(&code, "let value = (count.get() * 2).to_string();");
+    assert_has(&code, "let shown = &(count.get() * 2);");
 }
 
 #[test]

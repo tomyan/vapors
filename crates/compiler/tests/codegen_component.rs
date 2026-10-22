@@ -63,9 +63,10 @@ fn child_component_is_mounted_with_props() {
     );
 
     // Then
+    assert_has(&code, "let greeting3_props = GreetingProps {");
     assert_has(
         &code,
-        "Greeting::mount_before(dom, div0, None, GreetingProps {",
+        "Greeting::mount_before(dom, div0, None, greeting3_props);",
     );
     assert_has(&code, "name: \"Sumi\".into(),");
     assert_has(&code, "..Default::default()");
@@ -79,7 +80,7 @@ fn top_level_child_component_contributes_its_roots() {
     // Then
     assert_has(
         &code,
-        "Greeting::mount_before(dom, parent, before, GreetingProps {",
+        "Greeting::mount_before(dom, parent, before, greeting0_props);",
     );
     assert_has(
         &code,
@@ -96,8 +97,9 @@ fn bind_prop_passes_the_signal_itself() {
     let code = generated_with(script, "<Field bind:value={name} />");
 
     // Then
-    assert_has(&code, "value: name,");
-    assert_lacks(&code, "value: name.get()");
+    assert_has(&code, "let field0_value = name;");
+    assert_has(&code, "value: field0_value,");
+    assert_lacks(&code, "name.get()");
 }
 
 #[test]
@@ -115,7 +117,7 @@ fn props_become_a_struct_with_defaults() {
     assert_has(&code, "label: String::from(\"Count\"),");
     assert_has(&code, "props: CounterProps,");
     assert_has(&code, "let CounterProps { label } = props;");
-    assert_has(&code, "(label).to_string()");
+    assert_has(&code, "let shown = &(label);");
     assert_lacks(&code, "label.get()");
 }
 

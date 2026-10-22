@@ -1,20 +1,14 @@
 //! The file around the template code: imports, the style constant,
 //! the props and component structs, and the mount and unmount methods.
 
-use std::collections::BTreeSet;
 use std::fmt::Write;
 
-use super::allowances::{Allowance, attributes};
+use super::allowances::Allowance;
 use super::script::ScriptInfo;
 use crate::ast::Component;
 
 /// The whole generated file, before prettyplease lays it out.
-pub(crate) fn assemble(
-    component: &Component,
-    info: &ScriptInfo,
-    body: &str,
-    allowances: BTreeSet<Allowance>,
-) -> String {
+pub(crate) fn assemble(component: &Component, info: &ScriptInfo, body: &str) -> String {
     let name = &component.name;
     let style = component
         .style
@@ -23,7 +17,7 @@ pub(crate) fn assemble(
     let mut file = header(&component.path, style);
     file.push_str(&props_struct(name, info));
     file.push_str(&component_struct(name, info));
-    file.push_str(&mount_methods(name, info, body, allowances));
+    file.push_str(&mount_methods(name, info, body));
     file.push_str(&accessors());
     file
 }
@@ -77,11 +71,16 @@ impl Default for {name}Props {{
 const DEFAULTS_AS_WRITTEN: &str =
     "the defaults are the #[prop] initialisers as written in the .wisp";
 /// Lints on `mount_before` that depend on types the compiler cannot see.
-fn mount_allowances(info: &ScriptInfo, mut allowances: BTreeSet<Allowance>) -> String {
+fn mount_allowances(info: &ScriptInfo) -> String {
+    let mut allowances = format!("    {}\n", Allowance::TooManyLines.attribute());
     if info.props.is_empty() {
-        allowances.insert(Allowance::NeedlessPassByValue);
+        let _ = writeln!(
+            allowances,
+            "    {}",
+            Allowance::NeedlessPassByValue.attribute()
+        );
     }
-    attributes(&allowances)
+    allowances
 }
 
 fn component_struct(name: &str, info: &ScriptInfo) -> String {
@@ -121,14 +120,9 @@ fn field_lists(info: &ScriptInfo) -> (String, String) {
     )
 }
 
-fn mount_methods(
-    name: &str,
-    info: &ScriptInfo,
-    body: &str,
-    allowances: BTreeSet<Allowance>,
-) -> String {
+fn mount_methods(name: &str, info: &ScriptInfo, body: &str) -> String {
     let (returned, built) = field_lists(info);
-    let allowances = mount_allowances(info, allowances);
+    let allowances = mount_allowances(info);
     let prop_names: Vec<&str> = info.props.iter().map(|prop| prop.name.as_str()).collect();
     let prop_names = prop_names.join(", ");
     let mut statements = String::new();

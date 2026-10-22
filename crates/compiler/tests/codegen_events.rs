@@ -74,9 +74,9 @@ fn dynamic_attributes_are_patched_in_effects() {
 
     // Then
     assert_has(&code, "set_attribute(div0, \"class\", &value)");
-    assert_has(&code, "let value = (cls()).to_string();");
+    assert_has(&code, "let shown = &(cls());");
     assert_has(&code, "set_attribute(div0, \"disabled\", &value)");
-    assert_has(&code, "let value = (locked.get()).to_string();");
+    assert_has(&code, "let shown = &(locked.get());");
     assert_eq!(code.matches("Effect::new(").count(), 2, "{code}");
 }
 

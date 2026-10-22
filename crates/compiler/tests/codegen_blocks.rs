@@ -97,8 +97,8 @@ fn for_block_uses_keyed_with_index_and_item_signals() {
         "(items.get()).into_iter().enumerate().map(|(i, x)| ((x.0), x)).collect()",
     );
     assert_has(&code, "i: Signal<usize>, x: Signal<_>| {");
-    assert_has(&code, "let value = (i.get()).to_string();");
-    assert_has(&code, "let value = (x.get().1).to_string();");
+    assert_has(&code, "let shown = &(i.get());");
+    assert_has(&code, "let shown = &(x.get().1);");
 }
 
 #[test]
@@ -161,6 +161,6 @@ fn a_loop_binding_shadows_a_signal_of_the_same_name_only_inside_the_loop() {
     );
 
     // Then
-    assert_has(&code, "(count.get()).to_string()");
-    assert_has(&code, "(count.get().1).to_string()");
+    assert_has(&code, "let shown = &(count.get());");
+    assert_has(&code, "let shown = &(count.get().1);");
 }

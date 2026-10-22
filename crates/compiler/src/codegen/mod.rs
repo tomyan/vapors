@@ -37,8 +37,8 @@ pub fn generate(component: &Component) -> Result<String, CompileError> {
     let mut emitter = Emitter::new(&source, &info);
     emitter.indent(3);
     emitter.emit_nodes(&component.template.children, &Place::roots())?;
-    let (body, allowances) = emitter.finish();
-    let raw = shell::assemble(component, &info, &body, allowances);
+    let body = emitter.finish();
+    let raw = shell::assemble(component, &info, &body);
     let formatted = format::format(&source, &raw)?;
     // A plain comment, not `//!`: the file is `include!`d into a module,
     // where inner attributes are not allowed.

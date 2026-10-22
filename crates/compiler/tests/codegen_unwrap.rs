@@ -20,7 +20,7 @@ fn replace_identifier_basic() {
     let code = generated_with(SCRIPT, "<span>{count + 1}</span>");
 
     // Then
-    assert_has(&code, "(count.get() + 1).to_string()");
+    assert_has(&code, "let shown = &(count.get() + 1);");
 }
 
 #[test]
@@ -29,7 +29,7 @@ fn replace_identifier_in_function_call() {
     let code = generated_with(SCRIPT, "<span>{i32::abs(count)}</span>");
 
     // Then
-    assert_has(&code, "(i32::abs(count.get())).to_string()");
+    assert_has(&code, "let shown = &(i32::abs(count.get()));");
 }
 
 #[test]
@@ -41,7 +41,7 @@ fn replace_identifier_no_partial_match() {
     let code = generated_with(&script, "<span>{discount + counting}</span>");
 
     // Then
-    assert_has(&code, "(discount + counting).to_string()");
+    assert_has(&code, "let shown = &(discount + counting);");
     assert_lacks(&code, "get()");
 }
 
@@ -55,7 +55,7 @@ fn replace_identifier_not_a_field_name() {
     let code = generated_with(&script, "<span>{point.count}</span>");
 
     // Then
-    assert_has(&code, "(point.count).to_string()");
+    assert_has(&code, "let shown = &(point.count);");
 }
 
 #[test]
@@ -64,7 +64,7 @@ fn replace_identifier_multiple_occurrences() {
     let code = generated_with(SCRIPT, "<span>{count * count}</span>");
 
     // Then
-    assert_has(&code, "(count.get() * count.get()).to_string()");
+    assert_has(&code, "let shown = &(count.get() * count.get());");
 }
 
 #[test]
@@ -73,7 +73,7 @@ fn method_call_on_a_signal_reads_it_first() {
     let code = generated_with(SCRIPT, "<span>{items.len()}</span>");
 
     // Then
-    assert_has(&code, "(items.get().len()).to_string()");
+    assert_has(&code, "let shown = &(items.get().len());");
 }
 
 #[test]
@@ -85,8 +85,8 @@ fn an_explicit_signal_method_is_left_alone() {
     );
 
     // Then
-    assert_has(&code, "(count.get()).to_string()");
-    assert_has(&code, "(items.with(|v| v.len())).to_string()");
+    assert_has(&code, "let shown = &(count.get());");
+    assert_has(&code, "let shown = &(items.with(|v| v.len()));");
     assert_lacks(&code, "get().get()");
 }
 
@@ -96,7 +96,7 @@ fn a_plain_variable_is_left_alone() {
     let code = generated_with(SCRIPT, "<span>{label}</span>");
 
     // Then
-    assert_has(&code, "(label).to_string()");
+    assert_has(&code, "let shown = &(label);");
 }
 
 #[test]
@@ -105,7 +105,7 @@ fn attribute_expressions_are_raw() {
     let code = generated_with(SCRIPT, "<span title={count.get().to_string()}></span>");
 
     // Then
-    assert_has(&code, "let value = (count.get().to_string()).to_string();");
+    assert_has(&code, "let shown = &(count.get().to_string());");
 }
 
 #[test]

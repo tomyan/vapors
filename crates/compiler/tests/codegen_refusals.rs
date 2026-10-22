@@ -113,7 +113,7 @@ fn a_hole_reading_nothing_still_compiles_to_a_static_text() {
     let code = codegen::generated("<span>{1 + 1}</span>");
 
     // Then: it is still an effect; the compiler does not try to prove constancy
-    codegen::assert_has(&code, "let value = (1 + 1).to_string();");
+    codegen::assert_has(&code, "let shown = &(1 + 1);");
 }
 
 #[test]

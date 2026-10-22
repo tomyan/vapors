@@ -33,12 +33,8 @@ impl Counter {
     }
     /// Mounts the component in `parent` before `before` (at the end when `None`).
     #[allow(
-        clippy::clone_on_copy,
-        reason = "a closure gets a clone of each binding it captures; the compiler cannot see which are Copy"
-    )]
-    #[allow(
-        clippy::implicit_clone,
-        reason = "a text hole or expression attribute shows any Display value through to_string; the compiler cannot see when it is already a String"
+        clippy::too_many_lines,
+        reason = "mount_before builds the whole template, so its length follows the template's size"
     )]
     #[allow(
         clippy::needless_pass_by_value,
@@ -61,6 +57,10 @@ impl Counter {
                 dom.borrow_mut().insert_before(parent, button0, before);
                 roots.push(Root::Node(button0));
                 {
+                    #[allow(
+                        clippy::clone_on_copy,
+                        reason = "a closure gets a clone of each binding it captures; the compiler cannot see which are Copy"
+                    )]
                     let increment = increment.clone();
                     dom.borrow_mut()
                         .listen(
@@ -78,7 +78,12 @@ impl Counter {
                 {
                     let dom = Rc::clone(dom);
                     Effect::new(move || {
-                        let value = (count.get()).to_string();
+                        let shown = &(count.get());
+                        #[allow(
+                            clippy::implicit_clone,
+                            reason = "a text hole or expression attribute shows any Display value through to_string; the compiler cannot see when it is already a String"
+                        )]
+                        let value = shown.to_string();
                         dom.borrow_mut().set_text(count_text2, &value);
                     });
                 }

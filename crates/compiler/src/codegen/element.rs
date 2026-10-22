@@ -2,7 +2,7 @@
 //! set once, an expression patched in an effect, `on<event>` a
 //! listener, `bind:` a listener plus a property effect.
 
-use super::allowances::Allowance;
+use super::allowances::shown_text;
 use super::emit::{Emitter, Place};
 use crate::CompileError;
 use crate::ast::{AttrValue, Attribute, Element, Expr};
@@ -50,17 +50,12 @@ impl Emitter<'_> {
             AttrValue::Expr(expr) => {
                 let value = self.raw(expr)?;
                 let clones = self.clones_for(&[expr])?;
-                self.allow(Allowance::ImplicitClone);
-                self.emit_effect(
-                    &clones,
-                    &[
-                        format!("let value = ({value}).to_string();"),
-                        format!(
-                            "dom.borrow_mut().set_attribute({var}, {:?}, &value);",
-                            attribute.name
-                        ),
-                    ],
-                );
+                let mut body = shown_text(&value).to_vec();
+                body.push(format!(
+                    "dom.borrow_mut().set_attribute({var}, {:?}, &value);",
+                    attribute.name
+                ));
+                self.emit_effect(&clones, &body);
                 Ok(())
             }
         }

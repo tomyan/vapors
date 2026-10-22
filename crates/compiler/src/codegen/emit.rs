@@ -2,7 +2,7 @@
 //! the scope of names that auto-unwrap, and the clones a `move`
 //! closure needs of the script's plain bindings.
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::HashSet;
 
 use super::allowances::Allowance;
 use super::script::ScriptInfo;
@@ -47,7 +47,6 @@ pub(crate) struct Emitter<'a> {
     depth: usize,
     counter: usize,
     scopes: Vec<Vec<String>>,
-    allowances: BTreeSet<Allowance>,
 }
 
 impl<'a> Emitter<'a> {
@@ -59,7 +58,6 @@ impl<'a> Emitter<'a> {
             depth: 0,
             counter: 0,
             scopes: Vec::new(),
-            allowances: BTreeSet::new(),
         }
     }
 
@@ -76,19 +74,13 @@ impl<'a> Emitter<'a> {
             .push(format!("{}{}", "    ".repeat(self.depth), text.as_ref()));
     }
 
-    /// The lines emitted, and the lints the code they hold may trip.
-    pub fn finish(self) -> (String, BTreeSet<Allowance>) {
-        let body = self.lines.iter().fold(String::new(), |mut text, line| {
+    /// The lines emitted.
+    pub fn finish(self) -> String {
+        self.lines.iter().fold(String::new(), |mut text, line| {
             text.push_str(line);
             text.push('\n');
             text
-        });
-        (body, self.allowances)
-    }
-
-    /// Records a lint the emitted code may trip; see `allowances`.
-    pub fn allow(&mut self, allowance: Allowance) {
-        self.allowances.insert(allowance);
+        })
     }
 
     /// A fresh variable name with the given stem.
@@ -197,10 +189,8 @@ impl<'a> Emitter<'a> {
 
     /// `let name = name.clone();` for each clone.
     pub fn emit_clones(&mut self, clones: &[String]) {
-        if !clones.is_empty() {
-            self.allow(Allowance::CloneOnCopy);
-        }
         for name in clones {
+            self.line(Allowance::CloneOnCopy.attribute());
             self.line(format!("let {name} = {name}.clone();"));
         }
     }
