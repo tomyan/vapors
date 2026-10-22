@@ -38,7 +38,7 @@ impl Counter {
     )]
     #[allow(
         clippy::implicit_clone,
-        reason = "a text hole shows any Display value through to_string; the compiler cannot see when it is already a String"
+        reason = "a text hole or expression attribute shows any Display value through to_string; the compiler cannot see when it is already a String"
     )]
     #[allow(
         clippy::needless_pass_by_value,

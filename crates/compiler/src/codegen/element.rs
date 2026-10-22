@@ -2,6 +2,7 @@
 //! set once, an expression patched in an effect, `on<event>` a
 //! listener, `bind:` a listener plus a property effect.
 
+use super::allowances::Allowance;
 use super::emit::{Emitter, Place};
 use crate::CompileError;
 use crate::ast::{AttrValue, Attribute, Element, Expr};
@@ -49,6 +50,7 @@ impl Emitter<'_> {
             AttrValue::Expr(expr) => {
                 let value = self.raw(expr)?;
                 let clones = self.clones_for(&[expr])?;
+                self.allow(Allowance::ImplicitClone);
                 self.emit_effect(
                     &clones,
                     &[

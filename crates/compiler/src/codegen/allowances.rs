@@ -31,7 +31,7 @@ impl Allowance {
                 "a closure gets a clone of each binding it captures; the compiler cannot see which are Copy"
             }
             Allowance::ImplicitClone => {
-                "a text hole shows any Display value through to_string; the compiler cannot see when it is already a String"
+                "a text hole or expression attribute shows any Display value through to_string; the compiler cannot see when it is already a String"
             }
             Allowance::NeedlessPassByValue => {
                 "every component takes its props struct by value, empty or not, so parents mount them alike"

@@ -58,7 +58,7 @@ fn a_text_hole_is_allowed_to_call_to_string_on_a_string() {
     assert_has(&code, "clippy::implicit_clone");
     assert_has(
         &code,
-        "reason = \"a text hole shows any Display value through to_string; the compiler cannot see when it is already a String\"",
+        "reason = \"a text hole or expression attribute shows any Display value through to_string; the compiler cannot see when it is already a String\"",
     );
 }
 
@@ -107,4 +107,16 @@ fn roots_is_must_use() {
 
     // Then
     assert_has(&code, "#[must_use]\npub fn roots(&self) -> &[NodeId]");
+}
+
+#[test]
+fn an_expression_attribute_is_allowed_to_call_to_string_on_a_string() {
+    // Given
+    let script = "let theme: Signal<String> = Signal::new(String::new());";
+
+    // When
+    let code = generated_with(script, "<div class={theme.get()}></div>");
+
+    // Then
+    assert_has(&code, "clippy::implicit_clone");
 }
