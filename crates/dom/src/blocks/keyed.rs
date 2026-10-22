@@ -5,6 +5,7 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::hash::Hash;
 use std::rc::Rc;
 
@@ -35,20 +36,24 @@ impl<D, V, F> RowBuilder<D, V> for F where
 }
 
 /// Keeps one row per `(key, item)` of `items` built before `anchor`.
-/// Returns the block's current nodes, for whatever owns its position.
+/// `site` is the `{for}`'s `file:line:col`, for refusals. Returns the
+/// block's current nodes, for whatever owns its position.
 ///
 /// # Panics
-/// When two items share a key; keys must be unique per row.
+/// When two items share a key, naming the key and `site`. The check
+/// runs before any row is touched, so the rows stay as they were and
+/// the next update applies normally.
 pub fn keyed<D, K, V, I, R>(
     dom: &Rc<RefCell<D>>,
     parent: NodeId,
     anchor: NodeId,
+    site: &'static str,
     items: I,
     row: R,
 ) -> BlockNodes
 where
     D: Dom + 'static,
-    K: Eq + Hash + Clone + 'static,
+    K: Eq + Hash + Clone + Debug + 'static,
     V: PartialEq + Clone + 'static,
     I: Fn() -> Vec<(K, V)> + 'static,
     R: RowBuilder<D, V> + 'static,
@@ -59,6 +64,7 @@ where
     let state = Rc::clone(&rows);
     Effect::new(move || {
         let next = items();
+        refuse_duplicate_keys(&next, site);
         let old = std::mem::take(&mut *state.borrow_mut());
         let built =
             untrack(|| block_owner.with(|| reconcile(&dom, parent, anchor, old, next, &row)));
@@ -91,7 +97,6 @@ where
     K: Eq + Hash + Clone + 'static,
     V: PartialEq + Clone + 'static,
 {
-    refuse_duplicate_keys(&next);
     let mut kept: HashMap<K, (usize, Row<K, V>)> = old
         .into_iter()
         .enumerate()
@@ -125,13 +130,13 @@ where
     built
 }
 
-fn refuse_duplicate_keys<K: Eq + Hash, V>(next: &[(K, V)]) {
+fn refuse_duplicate_keys<K: Eq + Hash + Debug, V>(next: &[(K, V)], site: &str) {
     let mut seen = std::collections::HashSet::with_capacity(next.len());
-    let unique = next.iter().all(|(key, _)| seen.insert(key));
-    assert!(
-        unique,
-        "keyed {{for}}: two rows share a key; give `key=` an expression that is unique per row"
-    );
+    if let Some((key, _)) = next.iter().find(|(key, _)| !seen.insert(key)) {
+        panic!(
+            "{site}: two rows of this {{for}} share the key {key:?}; give `key=` an expression that is unique per row"
+        );
+    }
 }
 
 /// Which new positions hold a kept row that need not move: the longest

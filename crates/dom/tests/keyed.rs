@@ -45,6 +45,7 @@ fn mount(dom: &Shared, root: NodeId, anchor: NodeId, items: Signal<Vec<String>>)
         dom,
         root,
         anchor,
+        "test.wisp:1:1",
         move || {
             items
                 .get()

@@ -164,3 +164,18 @@ fn a_loop_binding_shadows_a_signal_of_the_same_name_only_inside_the_loop() {
     assert_has(&code, "let shown = &(count.get());");
     assert_has(&code, "let shown = &(count.get().1);");
 }
+
+#[test]
+fn a_keyed_for_passes_its_position_in_the_wisp() {
+    // When: the {for} is on line 5, column 5, after the script
+    let code = generated_with(
+        SCRIPT,
+        "<ul>{for (i, x) in items.get() key=x.0}<li>{x.1}</li>{/for}</ul>",
+    );
+
+    // Then
+    assert_has(
+        &code,
+        "vapors_dom::blocks::keyed(dom, ul0, for_anchor1, \"counter.wisp:5:5\",",
+    );
+}

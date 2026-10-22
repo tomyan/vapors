@@ -12,6 +12,7 @@ mod blocks;
 mod component_tag;
 mod element;
 mod emit;
+mod for_block;
 mod format;
 mod names;
 mod script;

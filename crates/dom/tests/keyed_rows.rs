@@ -45,6 +45,7 @@ fn mount(dom: &Shared, root: NodeId, anchor: NodeId, items: Signal<Vec<String>>)
         dom,
         root,
         anchor,
+        "test.wisp:1:1",
         move || {
             items
                 .get()
@@ -112,7 +113,14 @@ fn a_changed_item_with_the_same_key_updates_its_row_in_place() {
     owner.set();
     let (dom, root, anchor) = setup();
     let items = Signal::new(vec![(1u32, "one".to_string())]);
-    keyed(&dom, root, anchor, move || items.get(), row);
+    keyed(
+        &dom,
+        root,
+        anchor,
+        "test.wisp:1:1",
+        move || items.get(),
+        row,
+    );
     dom.borrow_mut().clear_calls();
 
     // When
@@ -136,6 +144,7 @@ fn removed_rows_have_their_effects_disposed() {
         &dom,
         root,
         anchor,
+        "test.wisp:1:1",
         move || {
             items
                 .get()
