@@ -4,6 +4,7 @@
 use std::path::{Path, PathBuf};
 
 use super::path_error;
+use crate::naming::is_keyword;
 use crate::{CompileError, component_name};
 
 /// A directory that holds `.wisp` files, directly or below.
@@ -69,7 +70,7 @@ fn add_entry(dir: &mut Dir, entry: PathBuf) -> Result<(), Vec<CompileError>> {
             dir.dirs.push(Dir { module, ..sub });
         }
     } else if entry.extension().is_some_and(|ext| ext == "wisp") {
-        let module = snake_case(&component_name(&entry).map_err(|err| vec![err])?);
+        let module = file_module(&entry).map_err(|err| vec![err])?;
         dir.files.push(WispFile {
             path: entry,
             module,
@@ -105,7 +106,7 @@ fn dir_module(path: &Path) -> Result<String, CompileError> {
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or_default();
-    if syn::parse_str::<syn::Ident>(name).is_ok() {
+    if syn::parse_str::<syn::Ident>(name).is_ok() && !is_keyword(name) {
         return Ok(name.to_string());
     }
     Err(path_error(
@@ -113,6 +114,18 @@ fn dir_module(path: &Path) -> Result<String, CompileError> {
         format!(
             "the directory name `{name}` is not a Rust module name, and its .wisp files become module `{name}`: rename it with letters, digits and `_`"
         ),
+    ))
+}
+
+/// The module a `.wisp` file becomes; a Rust keyword is refused.
+fn file_module(path: &Path) -> Result<String, CompileError> {
+    let module = snake_case(&component_name(path)?);
+    if !is_keyword(&module) {
+        return Ok(module);
+    }
+    Err(path_error(
+        path,
+        format!("this file becomes module `{module}`, which is a Rust keyword: rename the file"),
     ))
 }
 

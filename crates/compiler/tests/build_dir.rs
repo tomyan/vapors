@@ -168,3 +168,20 @@ fn a_directory_name_that_is_not_a_module_name_is_refused() {
     // Then
     assert_eq!(errors[0].path, src.join("my forms").display().to_string());
 }
+
+#[test]
+fn a_file_named_after_a_rust_keyword_is_refused_naming_the_file() {
+    // Given: `type.wisp` would be `pub mod type`
+    let (src, out) = dirs("keyword_file");
+    write(&src, "type.wisp", COUNTER);
+
+    // When
+    let errors = compile_dir_into(&src, &out).expect_err("type is a keyword");
+
+    // Then
+    assert_eq!(errors[0].path, src.join("type.wisp").display().to_string());
+    assert!(
+        errors[0].message.contains("`type`") && errors[0].message.contains("keyword"),
+        "{errors:?}"
+    );
+}
