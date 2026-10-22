@@ -1,0 +1,12 @@
+[package]
+name = "vapors-compiler-examples"
+description = "Worked .wisp components compiled by build.rs, driven by the recording Dom in tests."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true

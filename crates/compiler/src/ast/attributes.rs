@@ -72,6 +72,15 @@ impl AttrValue {
         }
     }
 
+    /// The expression of an expression value.
+    #[must_use]
+    pub fn expr(&self) -> Option<&Expr> {
+        match self {
+            AttrValue::Expr(expr) => Some(expr),
+            AttrValue::Literal(_) => None,
+        }
+    }
+
     /// The code of an expression value.
     #[must_use]
     pub fn expr_code(&self) -> Option<&str> {

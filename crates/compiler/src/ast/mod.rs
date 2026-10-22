@@ -11,6 +11,10 @@ pub use blocks::{ForBlock, IfBlock, Render, Snippet};
 pub struct Component {
     /// The type name, from the file name (`counter.wisp` is `Counter`).
     pub name: String,
+    /// The file as named to the compiler.
+    pub path: String,
+    /// The file's text, for positioning later refusals.
+    pub text: String,
     /// The `<script>` section, if present.
     pub script: Option<Section>,
     /// The `<style>` section, if present, untouched.

@@ -1,0 +1,91 @@
+---
+source: crates/compiler/tests/codegen_snapshot.rs
+expression: code
+---
+//! Generated from `src/counter.wisp` by vapors-compiler; edit the .wisp, not this file.
+use std::cell::RefCell;
+use std::rc::Rc;
+#[allow(unused_imports)]
+use vapors_dom::{Dom, Event, NodeId, PropertyValue};
+#[allow(unused_imports)]
+use vapors_signals::{Effect, Memo, Owner, Signal};
+/// The `<style>` of `src/counter.wisp`, resolved at run time by the css crate.
+pub const STYLE: &str = "\nbutton { padding: 4px 8px; }\n";
+/// What a parent passes to [`Counter::mount`]; each prop has a default.
+pub struct CounterProps {}
+impl Default for CounterProps {
+    fn default() -> Self {
+        Self {}
+    }
+}
+/// `Counter`: its signals, and what `unmount` removes.
+pub struct Counter {
+    /// `count`, declared in `<script>`.
+    pub count: Signal<i32>,
+    owner: Owner,
+    roots: Vec<NodeId>,
+}
+impl Counter {
+    /// Mounts the component at the end of `parent`.
+    pub fn mount<D: Dom + 'static>(
+        dom: &Rc<RefCell<D>>,
+        parent: NodeId,
+        props: CounterProps,
+    ) -> Self {
+        Self::mount_before(dom, parent, None, props)
+    }
+    /// Mounts the component in `parent` before `before` (at the end when `None`).
+    pub fn mount_before<D: Dom + 'static>(
+        dom: &Rc<RefCell<D>>,
+        parent: NodeId,
+        before: Option<NodeId>,
+        props: CounterProps,
+    ) -> Self {
+        let CounterProps {} = props;
+        let owner = Owner::new();
+        let (count, roots) = owner
+            .with(|| {
+                let count: Signal<i32> = Signal::named("count", 0);
+                let increment = move || count.update(|n| *n += 1);
+                let mut roots = Vec::new();
+                let button0 = dom.borrow_mut().create_element("button");
+                dom.borrow_mut().insert_before(parent, button0, before);
+                roots.push(button0);
+                {
+                    let increment = increment.clone();
+                    dom.borrow_mut()
+                        .listen(
+                            button0,
+                            "click",
+                            Box::new(move |_event: &mut Event| increment()),
+                        );
+                }
+                let text1 = dom.borrow_mut().create_text("Clicked ");
+                dom.borrow_mut().append(button0, text1);
+                let count_text2 = dom.borrow_mut().create_text("");
+                dom.borrow_mut().append(button0, count_text2);
+                {
+                    let dom = Rc::clone(dom);
+                    Effect::new(move || {
+                        let value = (count.get()).to_string();
+                        dom.borrow_mut().set_text(count_text2, &value);
+                    });
+                }
+                let text3 = dom.borrow_mut().create_text(" times");
+                dom.borrow_mut().append(button0, text3);
+                (count, roots)
+            });
+        Counter { count, owner, roots }
+    }
+    /// The top-level nodes mounted, in order.
+    pub fn roots(&self) -> &[NodeId] {
+        &self.roots
+    }
+    /// Disposes the signals and effects and removes the nodes.
+    pub fn unmount<D: Dom>(self, dom: &Rc<RefCell<D>>) {
+        self.owner.dispose();
+        for node in self.roots {
+            dom.borrow_mut().remove(node);
+        }
+    }
+}

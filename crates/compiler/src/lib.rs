@@ -6,6 +6,7 @@
 //! `file:line:col`.
 
 pub mod ast;
+mod codegen;
 mod error;
 mod naming;
 mod sections;
@@ -14,6 +15,7 @@ mod template;
 
 use std::path::Path;
 
+pub use codegen::generate;
 pub use error::CompileError;
 pub use naming::component_name;
 use source::Source;
@@ -31,11 +33,21 @@ pub fn parse_str(path: &str, text: &str) -> Result<ast::Component, CompileError>
     let template = template::parse(&source, sections.template_start, sections.template_end)?;
     Ok(ast::Component {
         name,
+        path: path.to_string(),
+        text: text.to_string(),
         script: sections.script,
         style: sections.style,
         template_offset: sections.template_start,
         template,
     })
+}
+
+/// Parses and generates: the Rust for a `.wisp` file's text.
+///
+/// # Errors
+/// A [`CompileError`] from parsing or from code generation.
+pub fn compile_str(path: &str, text: &str) -> Result<String, CompileError> {
+    generate(&parse_str(path, text)?)
 }
 
 /// Reads and parses a `.wisp` file.

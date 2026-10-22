@@ -28,10 +28,10 @@ vapors-dom = { path = "crates/dom" }
 vapors-compiler = { path = "crates/compiler" }
 # Pinned exactly: the compiler's output is formatted by prettyplease and
 # must parse with the same syn; a drift changes generated code and snapshots.
-syn = { version = "=3.0.9", features = ["full", "visit-mut", "printing", "extra-traits"] }
+syn = { version = "=3.0.9", features = ["full", "visit", "visit-mut", "printing", "extra-traits", "parsing"] }
 prettyplease = "=0.3.0"
 quote = "=1.0.47"
-proc-macro2 = "=1.0.107"
+proc-macro2 = { version = "=1.0.107", features = ["span-locations"] }
 insta = "=1.49.0"
 
 [workspace.lints.rust]
