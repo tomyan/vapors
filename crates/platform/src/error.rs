@@ -38,6 +38,12 @@ impl fmt::Display for PlatformError {
 
 impl std::error::Error for PlatformError {}
 
+impl From<vapors_gpu::LimitsBelowDefault> for PlatformError {
+    fn from(error: vapors_gpu::LimitsBelowDefault) -> Self {
+        Self::Device(error.to_string())
+    }
+}
+
 impl From<vapors_gpu::NoAdapter> for PlatformError {
     fn from(error: vapors_gpu::NoAdapter) -> Self {
         Self::NoAdapter(error)

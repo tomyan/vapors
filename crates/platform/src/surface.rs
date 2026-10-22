@@ -34,8 +34,9 @@ impl Gpu {
     ///
     /// # Errors
     ///
-    /// When no adapter can present to the window, the device cannot be
-    /// opened, or the surface offers no 8-bit non-sRGB format.
+    /// When no adapter can present to the window, the adapter offers less
+    /// than the default for a raised limit, the device cannot be opened,
+    /// or the surface offers no 8-bit non-sRGB format.
     pub async fn for_window(window: &Arc<Window>) -> Result<Self, PlatformError> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: BACKENDS,
@@ -45,9 +46,11 @@ impl Gpu {
             .create_surface(Arc::clone(window))
             .map_err(|e| PlatformError::Surface(e.to_string()))?;
         let adapter = choose_adapter(&instance, &surface).await?;
+        let required_limits = vapors_gpu::raised_limits(&adapter.limits())?;
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("vapors window"),
+                required_limits,
                 ..Default::default()
             })
             .await
@@ -62,6 +65,14 @@ impl Gpu {
             surface,
             config,
         })
+    }
+
+    /// The limits the device was opened with: the defaults, with
+    /// `max_buffer_size`, `max_texture_dimension_2d` and
+    /// `max_storage_buffer_binding_size` raised to the adapter's.
+    #[must_use]
+    pub fn limits(&self) -> wgpu::Limits {
+        self.device.limits()
     }
 
     /// Resize the surface. Zero-sized windows are configured as 1x1.
