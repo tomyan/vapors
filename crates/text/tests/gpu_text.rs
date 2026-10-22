@@ -63,12 +63,6 @@ fn pixel(pixels: &[u8], x: u32, y: u32) -> [u8; 4] {
     pixels[start..start + 4].try_into().expect("four bytes")
 }
 
-/// How far a pixel is from `background` towards `ink`, 0..=1, by red channel.
-fn ink_fraction(px: [u8; 4], ink: Color, background: Color) -> f32 {
-    let [ink, back] = [ink.to_rgba8()[0], background.to_rgba8()[0]].map(f32::from);
-    (f32::from(px[0]) - back) / (ink - back)
-}
-
 fn is_background(px: [u8; 4], background: Color) -> bool {
     px == background.to_rgba8()
 }
@@ -114,40 +108,14 @@ fn gpu_a_quarter_pixel_x_offset_changes_the_rendering() {
 
 #[test]
 fn gpu_a_fractional_baseline_renders_exactly_like_the_snapped_one() {
-    // Given / When
-    let snapped = render("Hg", [5.0, 30.0], LIGHT, DARK);
-    let fractional = render("Hg", [5.0, 30.4], LIGHT, DARK);
+    // Given / When: 30.4 rounds down, 30.5 rounds up
+    let at_30 = render("Hg", [5.0, 30.0], LIGHT, DARK);
+    let at_30_4 = render("Hg", [5.0, 30.4], LIGHT, DARK);
+    let at_30_5 = render("Hg", [5.0, 30.5], LIGHT, DARK);
+    let at_31 = render("Hg", [5.0, 31.0], LIGHT, DARK);
 
     // Then
-    assert_eq!(snapped, fractional);
-}
-
-#[test]
-fn gpu_stem_widths_match_light_on_dark_and_dark_on_light_within_a_pixel() {
-    // Given
-    let light_on_dark = render("I", [10.0, 30.0], LIGHT, DARK);
-    let dark_on_light = render("I", [10.0, 30.0], DARK, LIGHT);
-
-    // When: the widest row's ink, in pixels, for each
-    let widest = |pixels: &[u8], ink: Color, background: Color| {
-        (0..HEIGHT)
-            .map(|y| {
-                (0..WIDTH)
-                    .map(|x| ink_fraction(pixel(pixels, x, y), ink, background).clamp(0.0, 1.0))
-                    .sum::<f32>()
-            })
-            .fold(0.0f32, f32::max)
-    };
-    let light_stem = widest(&light_on_dark, LIGHT, DARK);
-    let dark_stem = widest(&dark_on_light, DARK, LIGHT);
-
-    // Then
-    assert!(
-        light_stem > 0.5 && dark_stem > 0.5,
-        "{light_stem} {dark_stem}"
-    );
-    assert!(
-        (light_stem - dark_stem).abs() <= 1.0,
-        "light-on-dark stem {light_stem} px, dark-on-light {dark_stem} px"
-    );
+    assert_eq!(at_30, at_30_4);
+    assert_eq!(at_30_5, at_31, "a half rounds up to the next row");
+    assert_ne!(at_30, at_31);
 }

@@ -199,3 +199,21 @@ fn render_pipeline(
         cache: None,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Chromium's Skia build on Linux: `SK_GAMMA_EXPONENT=1.2` and
+    /// `SK_GAMMA_CONTRAST=0.2` in chromium's `skia/BUILD.gn`; confirmed
+    /// on the comparison page (docs/text.md).
+    #[test]
+    fn default_parameters_are_chromiums_linux_values() {
+        // When
+        let params = BlendParams::default();
+
+        // Then
+        assert_eq!(params.gamma, 1.2);
+        assert_eq!(params.contrast, 0.2);
+    }
+}

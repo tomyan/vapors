@@ -36,21 +36,27 @@ fn vs_main(in: VertexIn) -> VertexOut {
     return out;
 }
 
+// Encoded luminance of the ink: the channels are linearised, weighted,
+// and re-encoded. For grey ink this is the grey value itself.
 fn luminance(color: vec3<f32>) -> f32 {
-    return dot(color, vec3<f32>(0.2126, 0.7152, 0.0722));
+    let linear = pow(color, vec3<f32>(params.gamma));
+    let lum = dot(linear, vec3<f32>(0.2126, 0.7152, 0.0722));
+    return pow(lum, 1.0 / params.gamma);
 }
 
 // Coverage to alpha for text of encoded luminance `src` over the
-// assumed background `1 - src`.
+// assumed background `1 - src`, as Skia's SkMaskGamma builds its table:
+// the contrast boost always applies; only the final solve needs src and
+// dst apart, and at the midpoint the boosted coverage is the answer.
 fn adjust(coverage: f32, src: f32) -> f32 {
     let dst = 1.0 - src;
-    if abs(src - dst) < 1.0 / 256.0 {
-        return coverage;
-    }
     let lin_src = pow(src, params.gamma);
     let lin_dst = pow(dst, params.gamma);
     let contrast = params.contrast * lin_dst;
     let boosted = coverage + coverage * (1.0 - coverage) * contrast;
+    if abs(src - dst) < 1.0 / 256.0 {
+        return boosted;
+    }
     let lin = lin_src * boosted + lin_dst * (1.0 - boosted);
     let result = pow(lin, 1.0 / params.gamma);
     return clamp((result - dst) / (src - dst), 0.0, 1.0);
