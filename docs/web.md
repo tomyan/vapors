@@ -44,14 +44,16 @@ it on a phone on the same tailnet. `sudo tailscale serve reset` stops it.
 ## Screenshot headlessly
 
 From inside `target/web`, serve it and shoot it with Chromium's
-software WebGPU (verified on Chromium 142, Debian 13, 2026-10-22):
+software WebGPU (verified on Chromium 155, Debian 13, 2026-10-22).
+SwiftShader rasterises on the CPU, so the capture waits 8 s of virtual
+time for the first frame:
 
 ```
 (cd target/web && python3 -m http.server 8000 --bind 127.0.0.1 &)
 chromium --headless=new --no-sandbox --disable-gpu-sandbox \
   --use-angle=swiftshader --enable-unsafe-webgpu \
   --enable-features=Vulkan,WebGPU --window-size=640,400 \
-  --virtual-time-budget=5000 --screenshot=web-demo.png http://127.0.0.1:8000/
+  --virtual-time-budget=8000 --screenshot=web-demo.png http://127.0.0.1:8000/
 ```
 
 The gradient fitted in 640x400 reads 128,128,128 at the centre and the
