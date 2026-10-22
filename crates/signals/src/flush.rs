@@ -44,14 +44,12 @@ fn flush() {
         return;
     }
     let _flushing = Restore::new(|| with_runtime(|runtime| runtime.flushing = false));
-    let mut passes = 0;
-    loop {
+    for pass in 1.. {
         let effects = take_pending();
         if effects.is_empty() {
-            break;
+            return;
         }
-        passes += 1;
-        if passes > MAX_FLUSH_PASSES {
+        if pass > MAX_FLUSH_PASSES {
             refuse_runaway(&effects);
         }
         run_pass(effects);

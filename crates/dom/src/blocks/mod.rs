@@ -4,6 +4,7 @@
 
 mod conditional;
 mod keyed;
+mod rows;
 mod sequence;
 
 use std::cell::RefCell;

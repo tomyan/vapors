@@ -9,31 +9,11 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::rc::Rc;
 
-use vapors_signals::{Effect, Owner, Signal, untrack};
+use vapors_signals::{Effect, Owner, untrack};
 
-use super::Fragment;
+use super::rows::{Row, RowBuilder, create, remove, reuse, row_nodes};
 use super::sequence::longest_increasing;
-use crate::{BlockNodes, Dom, NodeId, Root};
-
-struct Row<K, V> {
-    key: K,
-    index: Signal<usize>,
-    item: Signal<V>,
-    /// An empty text node placed first, so a row with no nodes still
-    /// has a position.
-    marker: NodeId,
-    fragment: Fragment,
-}
-
-/// A row builder: dom, parent, insert-before, index signal, item signal.
-pub trait RowBuilder<D, V>:
-    Fn(&Rc<RefCell<D>>, NodeId, Option<NodeId>, Signal<usize>, Signal<V>) -> Vec<Root>
-{
-}
-impl<D, V, F> RowBuilder<D, V> for F where
-    F: Fn(&Rc<RefCell<D>>, NodeId, Option<NodeId>, Signal<usize>, Signal<V>) -> Vec<Root>
-{
-}
+use crate::{BlockNodes, Dom, NodeId};
 
 /// Keeps one row per `(key, item)` of `items` built before `anchor`.
 /// `site` is the `{for}`'s `file:line:col`, for refusals. Returns the
@@ -77,13 +57,6 @@ where
     })
 }
 
-/// A row's marker and then its fragment's nodes as of now.
-fn row_nodes<K, V>(row: &Row<K, V>) -> Vec<NodeId> {
-    let mut nodes = vec![row.marker];
-    nodes.extend(row.fragment.nodes());
-    nodes
-}
-
 fn reconcile<D, K, V>(
     dom: &Rc<RefCell<D>>,
     parent: NodeId,
@@ -97,27 +70,19 @@ where
     K: Eq + Hash + Clone + 'static,
     V: PartialEq + Clone + 'static,
 {
-    let mut kept: HashMap<K, (usize, Row<K, V>)> = old
-        .into_iter()
-        .enumerate()
-        .map(|(position, row)| (row.key.clone(), (position, row)))
-        .collect();
-    let old_positions: Vec<Option<usize>> = next
-        .iter()
-        .map(|(key, _)| kept.get(key).map(|(position, _)| *position))
-        .collect();
-    let stays = stays(&old_positions);
+    let mut kept = by_key(old);
+    let stays = stays(&old_positions(&next, &kept));
     let mut built = Vec::with_capacity(next.len());
     let mut before = anchor;
     for (index, (key, item)) in next.into_iter().enumerate().rev() {
         let row = match kept.remove(&key) {
-            Some((_, mut existing)) => {
-                update(&mut existing, index, &item);
-                if !stays[index] {
-                    move_before(dom, parent, &existing, before);
-                }
-                existing
-            }
+            Some((_, existing)) => reuse(
+                dom,
+                parent,
+                existing,
+                (index, &item),
+                (!stays[index]).then_some(before),
+            ),
             None => create(dom, parent, before, key, index, item, row),
         };
         before = row.marker;
@@ -128,6 +93,24 @@ where
     }
     built.reverse();
     built
+}
+
+/// The previous rows by key, each with its old position.
+fn by_key<K: Eq + Hash + Clone, V>(old: Vec<Row<K, V>>) -> HashMap<K, (usize, Row<K, V>)> {
+    old.into_iter()
+        .enumerate()
+        .map(|(position, row)| (row.key.clone(), (position, row)))
+        .collect()
+}
+
+/// For each new item, the old position of the row with its key.
+fn old_positions<K: Eq + Hash, V, R>(
+    next: &[(K, V)],
+    kept: &HashMap<K, (usize, R)>,
+) -> Vec<Option<usize>> {
+    next.iter()
+        .map(|(key, _)| kept.get(key).map(|(position, _)| *position))
+        .collect()
 }
 
 fn refuse_duplicate_keys<K: Eq + Hash + Debug, V>(next: &[(K, V)], site: &str) {
@@ -153,56 +136,4 @@ fn stays(old_positions: &[Option<usize>]) -> Vec<bool> {
         stays[kept[i].0] = true;
     }
     stays
-}
-
-fn update<K, V: PartialEq + Clone + 'static>(row: &mut Row<K, V>, index: usize, item: &V) {
-    if row.index.get_untracked() != index {
-        row.index.set(index);
-    }
-    if row.item.with_untracked(|current| current != item) {
-        row.item.set(item.clone());
-    }
-}
-
-fn move_before<D: Dom, K, V>(
-    dom: &Rc<RefCell<D>>,
-    parent: NodeId,
-    row: &Row<K, V>,
-    before: NodeId,
-) {
-    for node in row_nodes(row) {
-        dom.borrow_mut().insert_before(parent, node, Some(before));
-    }
-}
-
-fn create<D: Dom, K, V: Clone + 'static>(
-    dom: &Rc<RefCell<D>>,
-    parent: NodeId,
-    before: NodeId,
-    key: K,
-    index: usize,
-    item: V,
-    row: &impl RowBuilder<D, V>,
-) -> Row<K, V> {
-    let marker = dom.borrow_mut().create_text("");
-    dom.borrow_mut().insert_before(parent, marker, Some(before));
-    let index = Signal::new(index);
-    let item = Signal::new(item);
-    let fragment = Fragment::build(dom, parent, Some(before), |dom, parent, before| {
-        row(dom, parent, before, index, item)
-    });
-    Row {
-        key,
-        index,
-        item,
-        marker,
-        fragment,
-    }
-}
-
-fn remove<D: Dom, K, V: 'static>(dom: &Rc<RefCell<D>>, row: Row<K, V>) {
-    row.fragment.remove(dom);
-    dom.borrow_mut().remove(row.marker);
-    row.index.dispose();
-    row.item.dispose();
 }
