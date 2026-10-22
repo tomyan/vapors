@@ -18,7 +18,7 @@ env:
 jobs:
   ci:
     name: ci
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
     timeout-minutes: 30 # initial ceiling; docs/budgets.md holds the measured value
     steps:
       - uses: actions/checkout@v7
@@ -45,7 +45,7 @@ jobs:
 
   gpu:
     name: gpu
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
     timeout-minutes: 30
     env:
       # lavapipe is the CI reference adapter; the tier fails if it is not the one found.
@@ -65,7 +65,7 @@ jobs:
 
   window:
     name: window
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
     timeout-minutes: 30
     env:
       VAPORS_GPU_ADAPTER: llvmpipe
