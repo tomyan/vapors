@@ -7,10 +7,12 @@
 mod image_app;
 mod image_view;
 mod image_view_draw;
+mod label;
 #[cfg(test)]
 mod pinch_tests;
 mod png;
 
 pub use image_app::ImageApp;
 pub use image_view::{ImageView, RgbaImage};
+pub use label::{INK, LabelDraw, STRIP_COLOR, STRIP_HEIGHT, label_text};
 pub use png::decode_png;

@@ -1,16 +1,21 @@
 //! The image app: one [`ImageView`], the keys and gestures that steer it,
-//! and the file picker to put an image in it. The native example and the
-//! web demo both run this.
+//! the file picker to put an image in it, and the label strip naming the
+//! file and the zoom. The native example and the web demo both run this.
 
 use vapors_platform::{App, Event, FileKind, Frame, Next, Platform, report_error, report_status};
 use vapors_scene::Color;
+use vapors_text::FontSystem;
 
+use crate::label::{LabelDraw, label_text};
 use crate::{ImageView, RgbaImage, decode_png};
 
 /// Shows one image. `o` opens the picker; so does a tap or click while
 /// nothing is shown, for a phone without a keyboard.
 pub struct ImageApp {
     view: ImageView,
+    file_name: Option<String>,
+    fonts: FontSystem,
+    label: Option<LabelDraw>,
 }
 
 impl ImageApp {
@@ -19,21 +24,31 @@ impl ImageApp {
     pub fn new(background: Color) -> Self {
         Self {
             view: ImageView::empty(background),
+            file_name: None,
+            fonts: FontSystem::new(),
+            label: None,
         }
     }
 
-    /// Showing `image`, fitted.
+    /// Showing `image` from the file called `name`, fitted.
     #[must_use]
-    pub fn showing(image: RgbaImage, background: Color) -> Self {
-        Self {
-            view: ImageView::new(image, background),
-        }
+    pub fn showing(name: &str, image: RgbaImage, background: Color) -> Self {
+        let mut app = Self::new(background);
+        app.view.set_image(image);
+        app.file_name = Some(name.to_owned());
+        app
     }
 
     /// The view, for its transform.
     #[must_use]
     pub fn view(&self) -> &ImageView {
         &self.view
+    }
+
+    /// What the label strip says right now.
+    #[must_use]
+    pub fn label(&self) -> String {
+        label_text(self.file_name.as_deref(), self.view.transform().scale)
     }
 
     /// What the picker offers. Decoding knows PNG only, so far.
@@ -58,6 +73,7 @@ impl ImageApp {
                     image.size.width, image.size.height
                 ));
                 self.view.set_image(image);
+                self.file_name = Some(name.to_owned());
             }
             Err(message) => report_error(&format!("{name}: {message}")),
         }
@@ -79,6 +95,11 @@ impl App for ImageApp {
 
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
         self.view.draw(frame);
+        let text = self.label();
+        let label = self
+            .label
+            .get_or_insert_with(|| LabelDraw::new(frame.device, frame.texture.format()));
+        label.draw(frame, &mut self.fonts, &text);
         Next::Continue
     }
 }

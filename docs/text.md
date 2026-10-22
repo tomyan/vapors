@@ -104,6 +104,32 @@ means the same thing in both renderings. Family names inside the inline
 attribute and Chromium silently falls back to a serif (the first run did
 exactly that, and a test now pins it).
 
+## The label in the image app
+
+`vapors-canvas`'s `ImageApp` draws a 44 px strip (`#171b1f`) across the
+top of every frame with `"<file name>  <zoom>%"` in Geist 13 px
+(`#e4e8ec`, tabular figures) 12 px from the left; `no file` before
+anything is opened. The constants are in `crates/canvas/src/label.rs`.
+The strip is the touche design's bar; the centre pixel the screenshot
+steps check is below it. On the web the page's Open button sits at the
+top right so it does not cover the label.
+
+## Using it
+
+```rust
+let mut fonts = FontSystem::new();            // bundle, then system fonts; bundle_only() on the web
+let style = Style { tabular_figures: true, color: ink, ..Style::new(Family::Geist, 13.0) };
+let layout = Layout::new(&mut fonts, "R 238, G 231, B 222", &style, &LayoutOptions::default());
+let mut atlas = GlyphAtlas::new(AtlasConfig::default());
+let mut pipeline = TextPipeline::new(&device, target_format, &atlas);
+atlas.begin_frame();                           // once per frame: what eviction keeps
+pipeline.draw(&RenderTarget { device, queue, view, viewport }, &mut atlas, &layout, [12.0, 14.0], BlendParams::default())?;
+```
+
+`LayoutOptions::scale` is device pixels per logical pixel; the layout
+comes back in device pixels and `Hinting::for_scale` picks light
+hinting below 2x. `Layout::styled` takes spans that override ranges.
+
 ## Deferred
 
 - Text editing: selection, caret, IME, clipboard (F4).

@@ -2395,9 +2395,11 @@ name = "vapors-canvas"
 version = "0.0.0"
 dependencies = [
  "png",
+ "vapors-gpu-harness",
  "vapors-platform",
  "vapors-renderer",
  "vapors-scene",
+ "vapors-text",
  "wgpu",
 ]
 

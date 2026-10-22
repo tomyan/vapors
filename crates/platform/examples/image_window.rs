@@ -40,9 +40,10 @@ impl App for ImageWindow {
 }
 
 fn main() -> ExitCode {
-    let app = match support::flag_value("--open").as_deref().map(open) {
+    let path = support::flag_value("--open");
+    let app = match path.as_deref().map(open) {
         None => ImageApp::new(BACKGROUND),
-        Some(Ok(image)) => ImageApp::showing(image, BACKGROUND),
+        Some(Ok(image)) => ImageApp::showing(&file_name(path.as_deref()), image, BACKGROUND),
         Some(Err(message)) => {
             eprintln!("image_window: {message}");
             return ExitCode::FAILURE;
@@ -58,6 +59,13 @@ fn main() -> ExitCode {
         height: 400,
     };
     support::exit_code(run(options, window), "image_window")
+}
+
+/// The last component of `path`, for the label.
+fn file_name(path: Option<&str>) -> String {
+    path.and_then(|p| std::path::Path::new(p).file_name())
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default()
 }
 
 /// Read and decode the PNG at `path`; messages name the file.

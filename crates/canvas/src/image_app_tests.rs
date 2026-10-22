@@ -36,7 +36,7 @@ fn o_opens_the_picker_with_or_without_an_image() {
         },
         rgba: vec![0; 4],
     };
-    let showing = ImageApp::showing(image, BACKGROUND);
+    let showing = ImageApp::showing("dot.png", image, BACKGROUND);
 
     // When / Then
     assert!(picks(&empty, &Event::Character("o".into())));
@@ -50,6 +50,7 @@ fn a_tap_or_click_opens_the_picker_only_while_empty() {
     // Given
     let empty = ImageApp::new(BACKGROUND);
     let showing = ImageApp::showing(
+        "dot.png",
         RgbaImage {
             size: Size {
                 width: 1,
@@ -88,6 +89,26 @@ fn an_opened_png_is_shown_fitted() {
 }
 
 #[test]
+fn the_label_follows_the_file_name_and_the_zoom() {
+    // Given
+    let mut app = ImageApp::new(BACKGROUND);
+    app.view.event(&Event::Resized {
+        width: 300,
+        height: 200,
+    });
+    assert_eq!(app.label(), "no file  100%");
+
+    // When
+    app.file_opened("dot.png", &one_pixel_png());
+    app.view.event(&Event::Character("1".into()));
+
+    // Then
+    assert_eq!(app.label(), "dot.png  100%");
+    app.view.event(&Event::Character("+".into()));
+    assert_eq!(app.label(), "dot.png  125%");
+}
+
+#[test]
 fn a_file_that_is_not_a_png_leaves_the_view_empty() {
     // Given
     let mut app = ImageApp::new(BACKGROUND);
@@ -97,4 +118,5 @@ fn a_file_that_is_not_a_png_leaves_the_view_empty() {
 
     // Then
     assert!(!app.view().has_image());
+    assert_eq!(app.label(), "no file  100%");
 }
