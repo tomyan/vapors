@@ -21,8 +21,8 @@ pub struct Outcome {
 /// failure whose output names the program, never as a panic.
 pub fn run(step: &Step) -> Outcome {
     let started = Instant::now();
-    let result = Command::new(step.program)
-        .args(step.args)
+    let result = Command::new(&step.program)
+        .args(&step.args)
         .stdin(Stdio::null())
         .output();
     let duration = started.elapsed();

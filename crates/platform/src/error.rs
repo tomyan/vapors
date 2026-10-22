@@ -9,6 +9,8 @@ pub enum PlatformError {
     Windowing(String),
     /// No adapter can present to this window; the message lists what was found.
     NoAdapter(vapors_gpu::NoAdapter),
+    /// The browser offered no WebGPU adapter.
+    NoWebGpu(String),
     /// The adapter would not open a device.
     Device(String),
     /// The surface offered no format the renderer accepts.
@@ -20,6 +22,11 @@ impl fmt::Display for PlatformError {
         match self {
             Self::Windowing(message) => write!(f, "windowing: {message}"),
             Self::NoAdapter(error) => write!(f, "{error}"),
+            Self::NoWebGpu(message) => write!(
+                f,
+                "no WebGPU adapter: {message}. Fix: open this page in a browser with WebGPU \
+                 (Chrome or Edge 113+, Safari 26+, Firefox 141+) over https or localhost."
+            ),
             Self::Device(message) => write!(f, "device: {message}"),
             Self::Surface(message) => write!(f, "surface: {message}"),
         }

@@ -29,8 +29,8 @@ jobs:
       - uses: cargo-bins/cargo-binstall@main
       - name: install pinned tools
         run: cargo xtask setup --ci
-      - name: lint and unit
-        run: cargo xtask lint && cargo xtask test --tier unit
+      - name: lint, wasm lint and unit
+        run: cargo xtask lint && cargo xtask wasm && cargo xtask test --tier unit
       - name: build timings
         if: always()
         run: cargo build --workspace --all-targets --timings
@@ -42,6 +42,25 @@ jobs:
             target/cargo-timings/
             target/nextest/ci/junit.xml
           if-no-files-found: ignore
+
+  web:
+    name: web
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: install pinned toolchain
+        run: rustup toolchain install && rustup show active-toolchain
+      - uses: Swatinem/rust-cache@v2
+      - uses: cargo-bins/cargo-binstall@main
+      - name: install pinned tools
+        run: cargo xtask setup --ci
+      - name: build the web demo with trunk
+        run: cargo xtask web
+      - uses: actions/upload-artifact@v7
+        with:
+          name: web
+          path: target/web
 
   gpu:
     name: gpu

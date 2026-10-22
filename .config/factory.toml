@@ -5,3 +5,8 @@
 [screenshot]
 # The package whose examples and binaries `cargo xtask screenshot` runs.
 package = "vapors-platform"
+
+[web]
+# The package `cargo xtask web` builds with trunk and the `wasm` CI step
+# lints for wasm32-unknown-unknown.
+package = "vapors-web-demo"

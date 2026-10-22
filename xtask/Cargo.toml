@@ -9,6 +9,8 @@ publish = false
 [dependencies]
 clap.workspace = true
 png.workspace = true
+# Pinned: it parses `tailscale status --json`, and a parser change is a deliberate bump.
+serde_json = "=1.0.154"
 
 [lints]
 workspace = true

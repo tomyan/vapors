@@ -8,7 +8,7 @@ mod support;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use vapors_platform::{App, Event, Frame, Next, WindowOptions, run};
+use vapors_platform::{App, Event, Frame, Next, Platform, WindowOptions, run};
 use vapors_scene::Color;
 
 const CLEAR: Color = Color {
@@ -23,7 +23,7 @@ struct ClearWindow {
 }
 
 impl App for ClearWindow {
-    fn event(&mut self, _event: Event) {}
+    fn event(&mut self, _event: Event, _platform: &Platform) {}
 
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
         support::clear(frame, CLEAR);
