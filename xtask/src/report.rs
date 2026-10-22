@@ -75,21 +75,26 @@ pub fn lines_to_show(output: &str) -> Vec<&str> {
 }
 
 /// The lines of tool output worth reading when a step fails: rustc and
-/// clippy diagnostics with their locations, nextest failures, and panics
-/// with their message (the lines after `panicked at`, up to a blank line
-/// or a `note:`). Trimmed, and with repeats removed, because nextest
+/// clippy diagnostics with their locations, nextest failures, signals
+/// and timeouts, panics with their message (the lines after `panicked
+/// at`, up to a blank line or a `note:`), and cargo's `Caused by:`
+/// blocks whole, which hold a failed build script's `--- stdout` and
+/// `--- stderr`. Trimmed, and with repeats removed, because nextest
 /// prints each failure twice.
 pub fn failure_lines(output: &str) -> Vec<&str> {
     let mut lines: Vec<&str> = Vec::new();
     let mut in_panic_message = false;
-    for line in output.lines().map(str::trim) {
+    let mut in_cause = false;
+    for raw in output.lines() {
+        let line = raw.trim();
         in_panic_message = continues_panic_message(in_panic_message, line);
-        if (in_panic_message || is_failure_line(line)) && !lines.contains(&line) {
+        in_cause = continues_cause(in_cause, raw);
+        let kept = in_panic_message || (in_cause && !line.is_empty()) || is_failure_line(line);
+        if kept && !lines.contains(&line) {
             lines.push(line);
         }
-        if line.contains("panicked at") {
-            in_panic_message = true;
-        }
+        in_panic_message |= line.contains("panicked at");
+        in_cause |= line == "Caused by:";
     }
     lines
 }
@@ -98,16 +103,42 @@ fn continues_panic_message(was_in_message: bool, line: &str) -> bool {
     was_in_message && !line.is_empty() && !line.starts_with("note:")
 }
 
+/// Cargo indents everything under `Caused by:`, with blank lines
+/// between a build script's stdout and stderr; the block ends at the
+/// next unindented line.
+fn continues_cause(was_in_cause: bool, raw: &str) -> bool {
+    was_in_cause && (raw.trim().is_empty() || raw.starts_with(char::is_whitespace))
+}
+
 fn is_failure_line(line: &str) -> bool {
     line.starts_with("error")
         || line.starts_with("warning:")
         || line.starts_with("-->")
         || line.starts_with("FAIL [")
+        || is_signal_or_timeout(line)
         || line.contains("panicked at")
+        || line == "Caused by:"
         || line.starts_with("Diff in")
         || line.starts_with("could not start")
+}
+
+/// nextest's line for a test killed by a signal (`SIGSEGV [ 0.01s]`,
+/// `SIGABRT [`, any `SIG` name) or by its deadline (`TIMEOUT [`).
+fn is_signal_or_timeout(line: &str) -> bool {
+    let Some((word, rest)) = line.split_once(' ') else {
+        return false;
+    };
+    let signal = word.starts_with("SIG")
+        && word
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit());
+    (signal || word == "TIMEOUT") && rest.trim_start().starts_with('[')
 }
 
 #[cfg(test)]
 #[path = "report_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "report_causes_tests.rs"]
+mod causes_tests;
