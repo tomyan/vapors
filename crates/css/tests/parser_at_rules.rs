@@ -177,3 +177,18 @@ fn keyframe_invalid_selector_is_refused_naming_it() {
     assert_eq!(err.position.column, 16);
     assert!(err.message.contains("middle"), "{err}");
 }
+
+#[test]
+fn keyframes_none_and_important_in_keyframes_are_refused() {
+    // Given: review item 18.
+    let err = refusal("@keyframes none { from { opacity: 0; } }");
+    assert!(err.message.contains("none"), "{err}");
+    let err = refusal("@keyframes x { from { opacity: 0 !important; } }");
+    assert!(err.message.contains("!important"), "{err}");
+}
+
+#[test]
+fn supports_selector_function_is_refused_naming_it() {
+    let err = refusal("@supports selector(:has(a)) { .x { color: red; } }");
+    assert!(err.message.contains("selector()"), "{err}");
+}

@@ -39,7 +39,8 @@ let width = styles[0].1.get_by_name("width");         // a Value; .to_css() for 
 `Element` is the trait the matcher walks: tag, id, classes, attributes,
 parent, siblings, first child, emptiness, state flags and the nearest
 container's laid-out size. Implement it on your tree as a cheap handle;
-`tree::Node` is the reference implementation. State flags
+`tree::Node` is the reference implementation, with O(1) parent, first
+child and sibling links and O(n) `children()`. State flags
 (`:hover`, `:focus`, `:focus-visible`, `:focus-within`, `:active`,
 `:checked`, `:disabled`, `:enabled`) are set by the tree layer; the
 engine infers none from another, so whoever moves focus also sets
@@ -80,6 +81,10 @@ run a second pass after layout (sumi did the same).
   curves, `cubic-bezier()`, `steps()`; interpolation of lengths,
   numbers, and colours in Oklab; `Transition::sample` and
   `Animation::sample` take elapsed milliseconds and return values.
+  Lengths interpolate when both ends have the same unit (px with px,
+  % with %); two different units snap at the halfway point, which is
+  the specification's behaviour for values with no common type, since
+  the computed style has already turned every unit but `%` into px.
 
 ## Refused
 
@@ -117,9 +122,20 @@ flag on element E can restyle, from the selectors that use that flag:
 - the whole tree when it appears inside `:has()`, or on a non-subject
   compound of a selector nested in `:is()`, `:not()` or `:where()`.
 
-The scopes union across selectors and over-approximate: a flagged
-element is restyled whenever a rule could change, never less.
+Only the combinator right after the flagged compound decides between
+descendants and later siblings: everything further right stays inside
+what that combinator selects (`.a:hover .b + .c` is in `.a`'s subtree).
+A rule in the element scope whose declarations reach into the subtree
+widens it to the element's descendants: an inherited property,
+`font-size` (which drives `em` and `ch` below), or a custom property.
+
+The scopes union across rules and over-approximate: a flagged element
+is restyled whenever a rule could change, never less.
 `RestyleScope::elements(&e)` enumerates the set in document order.
+
+Rules are bucketed by their subject compound (id, else first class,
+else tag, else universal); `Cascade::candidates(&e)` is the rules the
+matcher runs on for an element, in source order.
 
 ## Adding a property
 

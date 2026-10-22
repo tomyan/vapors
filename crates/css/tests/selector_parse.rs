@@ -325,3 +325,26 @@ fn parse_nth_invalid() {
         assert!(Nth::parse(expr).is_err(), "{expr:?} should be refused");
     }
 }
+
+#[test]
+fn an_plus_b_whitespace_forms_from_the_specification() {
+    // Given: review item 13.
+    for (expr, a, b) in [
+        ("2n +1", 2, 1),
+        ("+n+1", 1, 1),
+        ("2n+ 1", 2, 1),
+        ("-n -2", -1, -2),
+    ] {
+        assert_eq!(
+            Nth::parse(expr).unwrap_or_else(|e| panic!("{expr}: {e}")),
+            Nth { a, b },
+            "{expr}"
+        );
+    }
+}
+
+#[test]
+fn nth_child_of_selector_is_refused_naming_of() {
+    let err = parse_selector_list("li:nth-child(2n of .a)").expect_err("refused");
+    assert!(err.message.contains("of"), "{err}");
+}

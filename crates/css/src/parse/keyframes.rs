@@ -19,6 +19,12 @@ pub(super) fn block(stream: &mut Stream, sheet: &mut Stylesheet, at: Position) -
             ));
         }
     };
+    if name.eq_ignore_ascii_case("none") {
+        return Err(Error::new(
+            at,
+            "@keyframes none: `none` is the animation-name for no animation and cannot name one",
+        ));
+    }
     stream.next();
     stream.skip_whitespace();
     let open_at = stream.position();
@@ -58,6 +64,15 @@ fn stop(stream: &mut Stream, stops: &mut Vec<KeyframeStop>) -> Result<()> {
         .map(|part| offset(part, stream.position()))
         .collect::<Result<Vec<f64>>>()?;
     let declarations = declarations::block(stream)?;
+    if let Some(d) = declarations.iter().find(|d| d.important) {
+        return Err(Error::new(
+            d.position,
+            format!(
+                "{}: !important is not allowed in @keyframes (Animations Level 1 section 3.1)",
+                d.name
+            ),
+        ));
+    }
     for offset in offsets {
         stops.push(KeyframeStop {
             offset,

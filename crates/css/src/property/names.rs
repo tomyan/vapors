@@ -22,6 +22,22 @@ pub static IGNORED_VENDOR_PROPERTIES: &[(&str, &str)] = &[
     ),
 ];
 
+/// A CSS shorthand the crate knows of but does not expand, and the
+/// longhands to write instead.
+pub(super) fn unsupported_shorthand_hint(name: &str) -> Option<&'static str> {
+    Some(match name {
+        "font" => "write font-size, font-family, font-weight, font-style and line-height",
+        "border-top" | "border-right" | "border-bottom" | "border-left" => {
+            "write border-top-width, border-top-style and border-top-color (and so on per side)"
+        }
+        "background" => "write background-color",
+        "outline" | "place-items" | "place-content" | "grid-area" | "grid-template" | "grid" => {
+            "write the longhands the table lists"
+        }
+        _ => return None,
+    })
+}
+
 /// A sumi terminal extra and the vapors property that replaces it.
 pub(super) fn sumi_extra_hint(name: &str) -> Option<&'static str> {
     Some(match name {

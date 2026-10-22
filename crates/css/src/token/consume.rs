@@ -58,20 +58,23 @@ pub(super) fn name(cur: &mut Cursor) -> Result<String> {
 /// Consume an escaped code point after the backslash (4.3.7).
 fn escape(cur: &mut Cursor) -> Result<char> {
     let at = cur.position();
-    let hex = cur.take_while(|c| c.is_ascii_hexdigit());
+    let mut hex = String::new();
+    while hex.len() < 6 && cur.peek(0).is_some_and(|c| c.is_ascii_hexdigit()) {
+        hex.extend(cur.bump());
+    }
     if hex.is_empty() {
         return cur
             .bump()
             .ok_or_else(|| Error::new(at, "escape at end of input; remove the backslash"));
     }
-    if hex.len() > 6 {
-        return Err(Error::new(at, "escape has more than six hex digits"));
-    }
     if cur.peek(0).is_some_and(is_whitespace) {
         cur.bump();
     }
     let code = u32::from_str_radix(&hex, 16).map_err(|e| Error::new(at, e.to_string()))?;
-    Ok(char::from_u32(code).unwrap_or('\u{fffd}'))
+    // Zero, surrogates and anything past U+10FFFF are U+FFFD (4.3.7).
+    Ok(char::from_u32(code)
+        .filter(|c| *c != '\0')
+        .unwrap_or('\u{fffd}'))
 }
 
 /// Consume a quoted string after its opening quote (4.3.5).
@@ -180,7 +183,14 @@ fn url_is_quoted(cur: &Cursor) -> bool {
 
 fn url(cur: &mut Cursor, start: Position) -> Result<TokenKind> {
     cur.take_while(is_whitespace);
-    let body = cur.take_while(|c| c != ')' && !is_whitespace(c) && c != '"' && c != '\'');
+    let mut body = String::new();
+    while let Some(c) = cur.peek(0) {
+        if c == ')' || is_whitespace(c) || c == '"' || c == '\'' {
+            break;
+        }
+        cur.bump();
+        body.push(if c == '\\' { escape(cur)? } else { c });
+    }
     cur.take_while(is_whitespace);
     if cur.bump() != Some(')') {
         return Err(Error::new(

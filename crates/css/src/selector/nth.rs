@@ -66,26 +66,20 @@ impl Nth {
         if kinds.len() != values.iter().filter(|v| !v.is_whitespace()).count() {
             return Err(refuse());
         }
-        from_kinds(&kinds, has_space_before_sign(values)).ok_or_else(refuse)
+        if kinds
+            .iter()
+            .any(|k| matches!(k, TokenKind::Ident(w) if w.eq_ignore_ascii_case("of")))
+        {
+            return Err(NthError(format!(
+                "{} (`of <selector>` is not supported; use :is() on the element)",
+                crate::serialize::component_values(values).trim()
+            )));
+        }
+        from_kinds(&kinds).ok_or_else(refuse)
     }
 }
 
-/// Whether whitespace precedes a signed number directly (`2n +1` is
-/// invalid: the sign must be its own delimiter when spaced).
-fn has_space_before_sign(values: &[ComponentValue]) -> bool {
-    values.windows(2).any(|w| {
-        w[0].is_whitespace()
-            && matches!(
-                &w[1],
-                ComponentValue::Token(Token {
-                    kind: TokenKind::Number { signed: true, .. },
-                    ..
-                })
-            )
-    })
-}
-
-fn from_kinds(kinds: &[&TokenKind], spaced_sign: bool) -> Option<Nth> {
+fn from_kinds(kinds: &[&TokenKind]) -> Option<Nth> {
     match kinds {
         [TokenKind::Ident(w)] if w.eq_ignore_ascii_case("odd") => Some(Nth { a: 2, b: 1 }),
         [TokenKind::Ident(w)] if w.eq_ignore_ascii_case("even") => Some(Nth { a: 2, b: 0 }),
@@ -99,6 +93,17 @@ fn from_kinds(kinds: &[&TokenKind], spaced_sign: bool) -> Option<Nth> {
             a: 0,
             b: int(*value)?,
         }),
+        // `+n`, `+n+1`: a leading plus delimiter before the ident.
+        [TokenKind::Delim('+'), TokenKind::Ident(name), rest @ ..]
+            if name.starts_with(['n', 'N']) =>
+        {
+            from_kinds(
+                &std::iter::once(&&TokenKind::Ident(name.clone()))
+                    .chain(rest.iter())
+                    .copied()
+                    .collect::<Vec<_>>(),
+            )
+        }
         [head, rest @ ..] => {
             let (a, b_in_head) = head_part(head)?;
             if rest.is_empty() {
@@ -112,7 +117,7 @@ fn from_kinds(kinds: &[&TokenKind], spaced_sign: bool) -> Option<Nth> {
             }
             Some(Nth {
                 a,
-                b: tail_part(rest, spaced_sign)?,
+                b: tail_part(rest)?,
             })
         }
         [] => None,
@@ -143,7 +148,7 @@ fn head_part(head: &TokenKind) -> Option<(i32, Option<i32>)> {
 
 /// After the `n` part: a signed integer, or a sign delimiter then an
 /// unsigned integer.
-fn tail_part(rest: &[&TokenKind], spaced_sign: bool) -> Option<i32> {
+fn tail_part(rest: &[&TokenKind]) -> Option<i32> {
     match rest {
         [
             TokenKind::Number {
@@ -151,7 +156,7 @@ fn tail_part(rest: &[&TokenKind], spaced_sign: bool) -> Option<i32> {
                 integer: true,
                 signed: true,
             },
-        ] if !spaced_sign => int(*value),
+        ] => int(*value),
         [
             TokenKind::Delim(sign),
             TokenKind::Number {

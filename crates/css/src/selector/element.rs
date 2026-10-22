@@ -11,6 +11,8 @@ pub trait Element: Clone + PartialEq {
     fn id(&self) -> Option<&str>;
     /// Whether `class` is in the class list.
     fn has_class(&self, class: &str) -> bool;
+    /// The class list, for rule bucketing.
+    fn class_names(&self) -> Vec<&str>;
     /// An attribute's value.
     fn attribute(&self, name: &str) -> Option<&str>;
     /// The parent element; `None` for the root.

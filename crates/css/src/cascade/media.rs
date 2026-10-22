@@ -125,8 +125,8 @@ fn query(items: &mut Items<'_>) -> Result<MediaQuery> {
             condition,
         });
     }
-    if only || negated && items.values.get(items.index).is_none() {
-        return Err(items.error("@media: `only` and `not` need a media type"));
+    if only {
+        return Err(items.error("@media: `only` needs a media type (only screen, only all)"));
     }
     let condition = condition_list(items, "@media")?;
     Ok(MediaQuery {

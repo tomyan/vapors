@@ -226,3 +226,26 @@ fn media_vw_resolves_against_the_environment_viewport() {
         BLACK
     );
 }
+
+#[test]
+fn not_before_a_condition_is_accepted_and_only_needs_a_type() {
+    // Given: review item 19.
+    let mut e = env();
+    e.viewport_width = 500.0;
+    assert_eq!(
+        color_under(
+            "@media not (min-width: 600px) { .card { color: red; } }",
+            &e
+        ),
+        RED
+    );
+    assert_eq!(
+        color_under("@media only screen { .card { color: red; } }", &e),
+        RED
+    );
+    let err = refusal("@media only (min-width: 1px) { }");
+    assert!(
+        err.message.contains("only") && err.message.contains("media type"),
+        "{err}"
+    );
+}

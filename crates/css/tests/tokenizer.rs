@@ -219,3 +219,32 @@ fn cdo_and_cdc_are_dropped() {
         [TokenKind::Whitespace, ident("a"), TokenKind::Whitespace]
     );
 }
+
+#[test]
+fn input_is_preprocessed_per_syntax_level_3() {
+    // Given: review item 11; CR, CRLF and FF become LF, NUL becomes U+FFFD.
+    let tokens = tokenize("a\r\nb\rc\u{c}d \0").expect("tokenizes");
+    let d = tokens.iter().find(|t| t.kind == ident("d")).expect("d");
+    assert_eq!((d.position.line, d.position.column), (4, 1));
+    assert_eq!(tokens.last().map(|t| &t.kind), Some(&ident("\u{fffd}")));
+}
+
+#[test]
+fn escapes_consume_at_most_six_hex_digits_and_null_becomes_replacement() {
+    assert_eq!(kinds(r"\0000411"), [ident("A1")]);
+    assert_eq!(kinds(r"\0 x"), [ident("\u{fffd}x")]);
+    assert_eq!(kinds(r"\110000 x"), [ident("\u{fffd}x")], "out of range");
+}
+
+#[test]
+fn unquoted_url_resolves_escapes() {
+    assert_eq!(kinds(r"url(a\)b)"), [TokenKind::Url("a)b".to_owned())]);
+    assert_eq!(kinds(r"url(a\41 b)"), [TokenKind::Url("aAb".to_owned())]);
+}
+
+#[test]
+fn a_refusal_at_the_end_of_input_points_past_the_last_token() {
+    // Given: review item 17; the brace is missing at the end of input.
+    let err = vapors_css::parse(".ab\n").unwrap_err();
+    assert_eq!((err.position.line, err.position.column), (2, 1));
+}

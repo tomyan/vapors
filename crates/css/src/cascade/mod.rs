@@ -5,6 +5,7 @@
 //! important), then specificity, then source order. Unmatched properties
 //! inherit when the table says so, else take their initial value.
 
+mod buckets;
 mod collect;
 mod compute;
 mod compute_resolve;
@@ -89,6 +90,7 @@ pub(crate) struct CascadeRule {
 pub struct Cascade {
     rules: Vec<CascadeRule>,
     keyframes: Vec<Keyframes>,
+    buckets: buckets::Buckets,
 }
 
 impl Default for Cascade {
@@ -104,6 +106,7 @@ impl Cascade {
         Self {
             rules: Vec::new(),
             keyframes: Vec::new(),
+            buckets: buckets::Buckets::default(),
         }
     }
 
@@ -123,6 +126,7 @@ impl Cascade {
         for rule in sheet.rules {
             let conditions =
                 Conditions::parse(&rule.conditions).expect("the parser accepted these conditions");
+            self.buckets.insert(&rule.selector, self.rules.len());
             self.rules.push(CascadeRule {
                 origin,
                 order: self.rules.len(),
@@ -140,6 +144,23 @@ impl Cascade {
         self.keyframes.iter().rev().find(|k| k.name == name)
     }
 
+    /// The rules whose subject compound could match `element`: those
+    /// bucketed under its id, one of its classes, its tag, or none of
+    /// these, in source order. The matcher runs on these only.
+    pub fn candidates<E: Element>(&self, element: &E) -> impl Iterator<Item = &Rule> {
+        self.candidate_rules(element).map(|r| &r.rule)
+    }
+
+    pub(crate) fn candidate_rules<E: Element>(
+        &self,
+        element: &E,
+    ) -> impl Iterator<Item = &CascadeRule> {
+        self.buckets
+            .candidates(element)
+            .into_iter()
+            .map(|i| &self.rules[i])
+    }
+
     /// The computed style of one element given its parent's.
     ///
     /// # Errors
@@ -151,7 +172,7 @@ impl Cascade {
         parent: Option<&ComputedStyle>,
         env: &Environment,
     ) -> Result<ComputedStyle> {
-        let winners = collect::winners(&self.rules, element, env);
+        let winners = collect::winners(self.candidate_rules(element), element, env);
         compute::style(&winners, parent, env)
     }
 

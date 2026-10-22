@@ -221,3 +221,11 @@ fn custom_properties_keep_their_raw_value() {
     assert_eq!(prop(&s.rules[0], "--accent"), "rgb(1, 2, 3)");
     assert_eq!(prop(&s.rules[0], "--gap"), "4px");
 }
+
+#[test]
+fn important_with_whitespace_after_the_bang_is_accepted() {
+    // Given: review item 10; `! important` is valid CSS.
+    let s = sheet(".x { color: red ! important; }");
+    assert!(s.rules[0].declarations[0].important);
+    assert_eq!(prop(&s.rules[0], "color"), "red");
+}

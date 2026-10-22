@@ -20,14 +20,6 @@ impl<'a> Node<'a> {
     pub fn id(self) -> NodeId {
         self.id
     }
-
-    fn sibling(self, offset: isize) -> Option<Self> {
-        let parent = self.tree.data(self.id).parent?;
-        let siblings = &self.tree.data(parent).children;
-        let index = siblings.iter().position(|c| *c == self.id)?;
-        let target = index.checked_add_signed(offset)?;
-        siblings.get(target).map(|id| Self::new(self.tree, *id))
-    }
 }
 
 impl std::fmt::Debug for Node<'_> {
@@ -55,6 +47,15 @@ impl Element for Node<'_> {
         self.tree.data(self.id).classes.iter().any(|c| c == class)
     }
 
+    fn class_names(&self) -> Vec<&str> {
+        self.tree
+            .data(self.id)
+            .classes
+            .iter()
+            .map(String::as_str)
+            .collect()
+    }
+
     fn attribute(&self, name: &str) -> Option<&str> {
         self.tree
             .data(self.id)
@@ -71,11 +72,17 @@ impl Element for Node<'_> {
     }
 
     fn previous_sibling(&self) -> Option<Self> {
-        self.sibling(-1)
+        self.tree
+            .data(self.id)
+            .previous_sibling
+            .map(|p| Self::new(self.tree, p))
     }
 
     fn next_sibling(&self) -> Option<Self> {
-        self.sibling(1)
+        self.tree
+            .data(self.id)
+            .next_sibling
+            .map(|n| Self::new(self.tree, n))
     }
 
     fn first_child(&self) -> Option<Self> {

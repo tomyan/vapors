@@ -43,8 +43,8 @@ pub(crate) struct Winners {
     pub(crate) custom: BTreeMap<String, Candidate<Vec<ComponentValue>>>,
 }
 
-pub(crate) fn winners<E: Element>(
-    rules: &[CascadeRule],
+pub(crate) fn winners<'a, E: Element>(
+    rules: impl Iterator<Item = &'a CascadeRule>,
     element: &E,
     env: &Environment,
 ) -> Winners {

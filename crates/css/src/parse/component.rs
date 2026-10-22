@@ -125,6 +125,6 @@ pub(crate) fn split_commas(values: &[ComponentValue]) -> Vec<Vec<ComponentValue>
 /// A tokenizer refusal or an unbalanced bracket.
 pub(crate) fn values_of_text(text: &str) -> crate::Result<Vec<ComponentValue>> {
     let tokens = crate::token::tokenize(text)?;
-    let mut stream = super::stream::Stream::new(tokens);
+    let mut stream = super::stream::Stream::new(tokens, crate::token::end_position(text));
     values_until(&mut stream, &[])
 }

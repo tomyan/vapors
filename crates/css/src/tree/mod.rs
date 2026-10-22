@@ -66,11 +66,14 @@ pub(crate) struct NodeData {
     pub(crate) states: States,
     pub(crate) parent: Option<NodeId>,
     pub(crate) children: Vec<NodeId>,
+    pub(crate) previous_sibling: Option<NodeId>,
+    pub(crate) next_sibling: Option<NodeId>,
     pub(crate) has_text: bool,
     pub(crate) container_size: Option<(f32, f32)>,
 }
 
-/// An element tree held in an arena.
+/// An element tree held in an arena. Parent, first child and both
+/// sibling links are O(1); `children()` is O(n) in the child count.
 pub struct Tree {
     nodes: Vec<NodeData>,
 }
@@ -93,6 +96,11 @@ impl Tree {
     /// Append a child element to `parent`.
     pub fn append(&mut self, parent: NodeId, tag: &str) -> NodeId {
         let id = self.push(tag, Some(parent));
+        let previous = self.nodes[parent.0].children.last().copied();
+        if let Some(prev) = previous {
+            self.nodes[prev.0].next_sibling = Some(id);
+        }
+        self.nodes[id.0].previous_sibling = previous;
         self.nodes[parent.0].children.push(id);
         id
     }
@@ -153,6 +161,8 @@ impl Tree {
             states: States::NONE,
             parent,
             children: Vec::new(),
+            previous_sibling: None,
+            next_sibling: None,
             has_text: false,
             container_size: None,
         });

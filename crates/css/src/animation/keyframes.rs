@@ -45,7 +45,9 @@ impl Cascade {
     ) -> Result<Animation> {
         let keyframes = self.keyframes(&spec.name).ok_or_else(|| {
             Error::new(
-                crate::Position::default(),
+                PropertyId::from_name("animation-name")
+                    .and_then(|id| style.declared_at(id))
+                    .unwrap_or_default(),
                 format!(
                     "animation {:?}: no @keyframes block of that name",
                     spec.name

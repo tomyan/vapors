@@ -10,10 +10,9 @@ pub(crate) struct Stream {
 }
 
 impl Stream {
-    pub(crate) fn new(tokens: Vec<Token>) -> Self {
-        let end = tokens
-            .last()
-            .map_or(Position { line: 1, column: 1 }, |t| t.position);
+    /// `end` is the position just past the input, where a refusal at the
+    /// end of input points.
+    pub(crate) fn new(tokens: Vec<Token>, end: Position) -> Self {
         Self {
             tokens,
             index: 0,

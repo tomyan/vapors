@@ -97,6 +97,13 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>> {
     Ok(tokens)
 }
 
+/// The position just past the end of `src`, where a refusal at the end
+/// of input points.
+#[must_use]
+pub fn end_position(src: &str) -> Position {
+    Cursor::new(src).end()
+}
+
 /// Consume one token (4.3.1). `None` for a comment or CDO/CDC.
 fn next(cur: &mut Cursor, start: Position) -> Result<Option<TokenKind>> {
     if cur.starts_with("/*") {

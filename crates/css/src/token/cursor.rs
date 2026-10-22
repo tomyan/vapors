@@ -9,15 +9,27 @@ pub(super) struct Cursor {
 }
 
 impl Cursor {
+    /// Preprocess per Syntax Level 3 section 3.3: CR, CRLF and FF become
+    /// LF; NUL becomes U+FFFD.
     pub(super) fn new(src: &str) -> Self {
+        let normalised = src
+            .replace("\r\n", "\n")
+            .replace(['\r', '\u{c}'], "\n")
+            .replace('\0', "\u{fffd}");
         Self {
-            chars: src.chars().collect(),
+            chars: normalised.chars().collect(),
             index: 0,
             position: Position { line: 1, column: 1 },
         }
     }
 
     pub(super) fn position(&self) -> Position {
+        self.position
+    }
+
+    /// The position just past the last character.
+    pub(super) fn end(mut self) -> Position {
+        while self.bump().is_some() {}
         self.position
     }
 

@@ -106,6 +106,12 @@ pub fn check_name(name: &str, position: Position) -> Result<()> {
     if is_supported(name) {
         return Ok(());
     }
+    if let Some(hint) = names::unsupported_shorthand_hint(name) {
+        return Err(Error::new(
+            position,
+            format!("shorthand {name:?} is not supported; {hint}"),
+        ));
+    }
     if let Some(hint) = names::sumi_extra_hint(name) {
         return Err(Error::new(
             position,

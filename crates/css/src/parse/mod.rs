@@ -19,6 +19,6 @@ use crate::token::tokenize;
 /// syntax, an unknown property or at-rule, or a sumi terminal extra.
 pub fn parse(src: &str) -> Result<Stylesheet> {
     let tokens = tokenize(src)?;
-    let mut stream = stream::Stream::new(tokens);
+    let mut stream = stream::Stream::new(tokens, crate::token::end_position(src));
     rules::stylesheet(&mut stream)
 }

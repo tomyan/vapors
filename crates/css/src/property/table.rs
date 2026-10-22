@@ -122,6 +122,13 @@ pub static PROPERTIES: &[PropertyDef] = &[
     ),
     def("color", true, "rgb(0 0 0)", "<color>"),
     def("column-gap", false, "normal", GAP),
+    def("container-name", false, "none", "none | <custom-ident>+"),
+    def(
+        "container-type",
+        false,
+        "normal",
+        "normal | size | inline-size",
+    ),
     def("cursor", true, "auto", CURSOR),
     def(
         "display",

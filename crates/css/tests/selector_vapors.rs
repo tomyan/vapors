@@ -122,3 +122,19 @@ fn empty_selector_in_list_is_refused() {
     let err = refusal("a, { color: red; }");
     assert!(err.message.contains("empty selector"), "{err}");
 }
+
+#[test]
+fn has_nested_at_any_depth_is_refused() {
+    // Given: review item 14.
+    for text in [
+        ":has(:is(:has(a)))",
+        ":has(.a :not(:has(b)))",
+        ":has(:is(.x, :where(:has(c))))",
+    ] {
+        let err = parse_selector_list(text).expect_err(text);
+        assert!(
+            err.message.contains(":has() inside :has()"),
+            "{text}: {err}"
+        );
+    }
+}

@@ -286,3 +286,28 @@ fn steps_one_jump_none_is_refused_naming_it() {
     assert!(err.message.contains("jump-none"), "{err}");
     accepts("transition-timing-function: steps(2, jump-none)");
 }
+
+#[test]
+fn container_type_and_name_declare_a_container() {
+    // Given: review item 15.
+    accepts("container-type: inline-size");
+    accepts("container-type: size");
+    accepts("container-name: sidebar");
+    accepts("container-name: none");
+}
+
+#[test]
+fn known_but_unsupported_shorthands_are_refused_by_name() {
+    // Given: review item 18.
+    for (decl, hint) in [
+        ("font: 12px serif", "font-size"),
+        ("border-top: 1px solid", "border-top-width"),
+        ("background: red", "background-color"),
+    ] {
+        let err = refusal(&format!("a {{ {decl}; }}"));
+        assert!(
+            err.message.contains("not supported") && err.message.contains(hint),
+            "{decl}: {err}"
+        );
+    }
+}

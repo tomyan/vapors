@@ -140,22 +140,31 @@ fn relative_list(args: &[ComponentValue], at: Position) -> Result<Vec<RelativeSe
     }
 }
 
-/// `:has()` may not nest; refuse at the inner colon.
+/// `:has()` may not nest at any depth; refuse at the inner colon.
 fn refuse_nested_has(args: &[ComponentValue]) -> Result<()> {
-    for pair in args.windows(2) {
-        let colon = matches!(
-            &pair[0],
-            ComponentValue::Token(Token {
-                kind: TokenKind::Colon,
-                ..
-            })
-        );
-        let has = matches!(&pair[1], ComponentValue::Function { name, .. } if name.eq_ignore_ascii_case("has"));
-        if colon && has {
-            return Err(Error::new(
-                pair[0].position(),
-                ":has() inside :has() is not allowed",
-            ));
+    for (i, v) in args.iter().enumerate() {
+        if let ComponentValue::Function {
+            name, args: inner, ..
+        } = v
+        {
+            let after_colon = i > 0
+                && matches!(
+                    &args[i - 1],
+                    ComponentValue::Token(Token {
+                        kind: TokenKind::Colon,
+                        ..
+                    })
+                );
+            if after_colon && name.eq_ignore_ascii_case("has") {
+                return Err(Error::new(
+                    args[i - 1].position(),
+                    ":has() inside :has() is not allowed",
+                ));
+            }
+            refuse_nested_has(inner)?;
+        }
+        if let ComponentValue::Block { contents, .. } = v {
+            refuse_nested_has(contents)?;
         }
     }
     Ok(())

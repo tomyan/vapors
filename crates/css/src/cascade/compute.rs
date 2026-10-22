@@ -61,12 +61,18 @@ pub(crate) fn style(
     }
     let font_size_id = PropertyId::from_name("font-size").expect("table");
     values[font_size_id.index()] = Value::Length(Length::px(font_size));
+    let positions = winners
+        .longhands
+        .iter()
+        .map(|w| w.as_ref().map(|c| c.position))
+        .collect();
     Ok(ComputedStyle {
         values,
         custom,
         font_size,
         root_font_size,
         color,
+        positions,
     })
 }
 

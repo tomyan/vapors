@@ -79,6 +79,12 @@ fn condition(items: &[&ComponentValue], index: &mut usize, at: Position) -> Resu
         *index += 1;
         return Ok(!condition(items, index, at)?);
     }
+    if let Some(ComponentValue::Function { name, .. }) = items.get(*index) {
+        return Err(Error::new(
+            at,
+            format!("@supports {name}() is not supported; only (property: value) conditions are"),
+        ));
+    }
     let Some(ComponentValue::Block {
         open: TokenKind::OpenParen,
         contents,

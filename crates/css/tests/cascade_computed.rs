@@ -178,3 +178,31 @@ fn keyframes_are_reachable_by_name() {
     assert_eq!(cascade.keyframes("pulse").map(|k| k.stops.len()), Some(2));
     assert!(cascade.keyframes("nope").is_none());
 }
+
+#[test]
+fn rules_are_bucketed_by_the_subject_compound() {
+    // Given: review item 16; a `span` rule is never a candidate for a div,
+    // nor is `.b.a` (keyed on its first class) for an element without .b.
+    let (tree, leaf) = chain(&["div.a"]);
+    let cascade = Cascade::new().author(sheet("span { color: red; } #x { color: red; } .a { color: red; } div { color: red; } * { color: red; } .b.a { color: red; }"));
+    let candidates: Vec<String> = cascade
+        .candidates(&tree.node(leaf))
+        .map(vapors_css::ast::Rule::selector_text)
+        .collect();
+    assert_eq!(candidates, [".a", "div", "*"]);
+}
+
+#[test]
+fn unknown_keyframes_error_names_the_declaration_position() {
+    let (tree, leaf) = chain(&["div.x"]);
+    let cascade = Cascade::new().author(sheet(".x {\n  animation: nope 1s;\n}"));
+    let style = cascade
+        .compute(&tree.node(leaf), None, &env())
+        .expect("computes");
+    let spec = vapors_css::animation::animations(&style)
+        .into_iter()
+        .next()
+        .expect("spec");
+    let err = cascade.animation(&spec, &style, &env()).unwrap_err();
+    assert_eq!((err.position.line, err.position.column), (2, 3), "{err}");
+}

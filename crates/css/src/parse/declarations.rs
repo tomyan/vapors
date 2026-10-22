@@ -77,26 +77,36 @@ fn declaration(stream: &mut Stream) -> Result<Option<Declaration>> {
     }))
 }
 
-/// Strip a trailing `!important`, reporting whether it was there.
+/// Strip a trailing `!important` (whitespace allowed after the `!`),
+/// reporting whether it was there.
 fn take_important(value: &mut Vec<ComponentValue>) -> bool {
-    let n = value.len();
-    if n < 2 {
+    let is_bang = |v: &ComponentValue| {
+        matches!(
+            v,
+            ComponentValue::Token(Token {
+                kind: TokenKind::Delim('!'),
+                ..
+            })
+        )
+    };
+    let is_important = |v: &ComponentValue| matches!(v, ComponentValue::Token(Token { kind: TokenKind::Ident(s), .. }) if s.eq_ignore_ascii_case("important"));
+    let Some(last) = value.last() else {
+        return false;
+    };
+    if !is_important(last) {
         return false;
     }
-    let bang = matches!(
-        &value[n - 2],
-        ComponentValue::Token(Token {
-            kind: TokenKind::Delim('!'),
-            ..
-        })
-    );
-    let important = matches!(&value[n - 1], ComponentValue::Token(Token { kind: TokenKind::Ident(s), .. }) if s.eq_ignore_ascii_case("important"));
-    if !(bang && important) {
-        return false;
+    let bang_at = value[..value.len() - 1]
+        .iter()
+        .rposition(|v| !v.is_whitespace());
+    match bang_at {
+        Some(i) if is_bang(&value[i]) => {
+            value.truncate(i);
+            trim_whitespace(value);
+            true
+        }
+        _ => false,
     }
-    value.truncate(n - 2);
-    trim_whitespace(value);
-    true
 }
 
 fn check_value(value: &[ComponentValue], name: &str, position: crate::Position) -> Result<()> {

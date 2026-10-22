@@ -17,6 +17,7 @@ pub struct ComputedStyle {
     pub(crate) font_size: f64,
     pub(crate) root_font_size: f64,
     pub(crate) color: Rgba,
+    pub(crate) positions: Vec<Option<crate::Position>>,
 }
 
 impl ComputedStyle {
@@ -55,6 +56,12 @@ impl ComputedStyle {
     #[must_use]
     pub fn color(&self) -> Rgba {
         self.color
+    }
+
+    /// Where the winning declaration for `id` was written, if any was.
+    #[must_use]
+    pub fn declared_at(&self, id: PropertyId) -> Option<crate::Position> {
+        self.positions[id.index()]
     }
 
     /// Every longhand with its computed value, in table order.
