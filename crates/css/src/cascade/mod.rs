@@ -20,6 +20,8 @@ mod supports;
 pub use computed::ComputedStyle;
 pub use restyle::RestyleScope;
 
+pub(crate) use compute::resolve_for;
+
 use crate::Result;
 use crate::ast::{Keyframes, Rule, Stylesheet};
 use crate::selector::Element;

@@ -53,8 +53,13 @@ pub(super) fn transition(
             };
             slots[slot.0] = Some(slot.1);
         }
-        let is_none = slots[0].as_ref().and_then(Value::as_keyword) == Some("none");
-        if slots[1].is_none() && !is_none {
+        // `animation: none` leaves the name at its default of none; only
+        // a named animation needs a duration.
+        let named = slots[0]
+            .as_ref()
+            .and_then(Value::as_keyword)
+            .is_some_and(|n| n != "none");
+        if slots[1].is_none() && named {
             return Err(Error::new(
                 at,
                 "transition needs a duration (sumi dropped such an item; vapors refuses it)",
@@ -70,6 +75,7 @@ pub(super) fn transition(
             column.push(slot.unwrap_or(default));
         }
     }
+    super::declaration::check_transition_properties(&Value::CommaList(columns[0].clone()), at)?;
     Ok(ids
         .iter()
         .zip(columns)
@@ -128,7 +134,13 @@ pub(super) fn animation(
                 }
             }
         }
-        if slots[1].is_none() {
+        // `animation: none` leaves the name at its default of none; only
+        // a named animation needs a duration.
+        let named = slots[0]
+            .as_ref()
+            .and_then(Value::as_keyword)
+            .is_some_and(|n| n != "none");
+        if slots[1].is_none() && named {
             return Err(Error::new(
                 at,
                 "animation needs a duration (sumi dropped such an item; vapors refuses it)",

@@ -6,6 +6,7 @@
 //! module. Nothing here reads files: stylesheets arrive as strings, so the
 //! crate compiles for wasm32.
 
+pub mod animation;
 pub mod ast;
 pub mod cascade;
 pub mod error;

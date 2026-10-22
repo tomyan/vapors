@@ -188,3 +188,16 @@ fn specified_value<'a>(
         }
     })
 }
+
+/// Resolve a specified value of `id` as if declared on the element whose
+/// computed style is `style`: the `@keyframes` path.
+pub(crate) fn resolve_for(
+    value: &Value,
+    id: PropertyId,
+    style: &ComputedStyle,
+    env: &Environment,
+) -> Result<Value> {
+    let percent_base = (id.name() == "line-height").then_some(style.font_size);
+    let ctx = context(style.font_size, style.root_font_size, percent_base, env);
+    resolve(value, &ctx, env.color_scheme, style.color)
+}

@@ -94,9 +94,13 @@ pub fn parse_declaration(
         return shorthand::expand(name, values, value_at);
     }
     let id = PropertyId::from_name(name).expect("caller checked the name");
+    let value = parse_longhand(id, values, value_at)?;
+    if name == "transition-property" {
+        check_transition_properties(&value, value_at)?;
+    }
     Ok(vec![Longhand {
         id,
-        value: Specified::Value(parse_longhand(id, values, value_at)?),
+        value: Specified::Value(value),
     }])
 }
 
@@ -216,4 +220,24 @@ fn contains_var(values: &[ComponentValue]) -> bool {
         ComponentValue::Block { contents, .. } => contains_var(contents),
         ComponentValue::Token(_) => false,
     })
+}
+
+/// Every ident in `transition-property` must be a property.
+pub(super) fn check_transition_properties(value: &Value, at: Position) -> Result<()> {
+    let items = match value {
+        Value::CommaList(items) => items.as_slice(),
+        single => std::slice::from_ref(single),
+    };
+    for item in items {
+        if let Some(name) = item.as_keyword()
+            && !["all", "none"].contains(&name)
+            && !super::is_supported(name)
+        {
+            return Err(Error::new(
+                at,
+                format!("transition-property: {name:?} is not a property"),
+            ));
+        }
+    }
+    Ok(())
 }
