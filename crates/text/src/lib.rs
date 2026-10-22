@@ -6,18 +6,22 @@
 
 mod atlas;
 mod atlas_page;
+mod draw;
 mod font_system;
 pub mod fonts;
 mod layout;
 mod pen;
+mod pipeline;
 mod raster;
 mod style;
 
 pub use atlas::{AtlasConfig, AtlasError, AtlasGlyph, GlyphAtlas, PageKind};
 pub use atlas_page::AtlasPage;
+pub use draw::RenderTarget;
 pub use font_system::FontSystem;
 pub use layout::{Align, Glyph, GlyphRun, Layout, LayoutOptions, LineInfo, PlacedGlyph};
 pub use parley;
+pub use pipeline::{BlendParams, TextPipeline};
 pub use raster::{
     Coverage, GlyphRequest, Hinting, RasterError, Rasterizer, SUBPIXEL_STEPS, subpixel_of,
 };
