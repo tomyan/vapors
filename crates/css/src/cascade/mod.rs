@@ -191,6 +191,6 @@ impl Cascade {
     /// `docs/css.md`, "Incremental restyle".
     #[must_use]
     pub fn restyle_scope(&self, flag: crate::tree::States) -> RestyleScope {
-        restyle::scope(self.rules.iter().map(|r| &r.rule.selector), flag)
+        restyle::scope(self.rules.iter().map(|r| &r.rule), flag)
     }
 }

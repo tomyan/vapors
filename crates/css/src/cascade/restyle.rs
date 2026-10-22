@@ -2,6 +2,7 @@
 //! pseudo-class, which elements a flip of that flag on one element can
 //! restyle. Over-approximates, never under.
 
+use crate::ast::Rule;
 use crate::selector::{Combinator, Element, PseudoClass, Selector};
 use crate::tree::States;
 
@@ -66,16 +67,29 @@ fn descendants<E: Element>(e: &E, out: &mut Vec<E>) {
     }
 }
 
-/// The scope for `flag` over every selector.
-pub(super) fn scope<'a>(
-    selectors: impl Iterator<Item = &'a Selector>,
-    flag: States,
-) -> RestyleScope {
+/// The scope for `flag` over every rule. A rule whose declarations reach
+/// into the subtree (an inherited property, `font-size` which drives em
+/// and ch, or a custom property) widens an element-only scope to the
+/// element's descendants.
+pub(super) fn scope<'a>(rules: impl Iterator<Item = &'a Rule>, flag: States) -> RestyleScope {
     let mut scope = RestyleScope::default();
-    for selector in selectors {
-        scope.merge(selector_scope(selector, flag));
+    for rule in rules {
+        let mut this = selector_scope(&rule.selector, flag);
+        if this.element && reaches_subtree(rule) {
+            this.descendants = true;
+        }
+        scope.merge(this);
     }
     scope
+}
+
+fn reaches_subtree(rule: &Rule) -> bool {
+    rule.declarations.iter().any(|d| {
+        d.name.starts_with("--")
+            || d.longhands
+                .iter()
+                .any(|l| l.id.inherited() || l.id.name() == "font-size")
+    })
 }
 
 fn selector_scope(selector: &Selector, flag: States) -> RestyleScope {
@@ -90,16 +104,14 @@ fn selector_scope(selector: &Selector, flag: States) -> RestyleScope {
             Use::None => {}
             Use::Elsewhere => scope.whole_tree = true,
             Use::Here if i == last => scope.element = true,
-            Use::Here => {
-                let sibling = selector.combinators[i..]
-                    .iter()
-                    .any(|c| matches!(c, Combinator::NextSibling | Combinator::SubsequentSibling));
-                if sibling {
+            // The combinator right after the flagged compound decides:
+            // everything further right stays inside what it selects.
+            Use::Here => match selector.combinators[i] {
+                Combinator::NextSibling | Combinator::SubsequentSibling => {
                     scope.later_siblings = true;
-                } else {
-                    scope.descendants = true;
                 }
-            }
+                Combinator::Child | Combinator::Descendant => scope.descendants = true,
+            },
         }
     }
     scope

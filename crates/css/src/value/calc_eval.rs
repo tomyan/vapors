@@ -27,7 +27,9 @@ impl Calc {
             Self::Clamp(args) => {
                 let [lo, v, hi] = args.as_ref();
                 let (lo, v, hi) = (lo.evaluate(ctx)?, v.evaluate(ctx)?, hi.evaluate(ctx)?);
-                Ok(v.max(lo).min(hi))
+                // clamp(MIN, VAL, MAX) = max(MIN, min(VAL, MAX)): MIN wins
+                // when it is above MAX (Values Level 4 section 10.3).
+                Ok(lo.max(v.min(hi)))
             }
         }
     }

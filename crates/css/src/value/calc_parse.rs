@@ -115,6 +115,7 @@ fn sum_items(items: &mut Items<'_>) -> Result<Calc> {
 
 fn product(items: &mut Items<'_>) -> Result<Calc> {
     let mut factors = vec![factor(items)?];
+    let mut kind = factors[0].kind();
     loop {
         let save = items.index;
         items.skip_whitespace();
@@ -134,11 +135,11 @@ fn product(items: &mut Items<'_>) -> Result<Calc> {
             }
             factors.push(Calc::Invert(Box::new(rhs)));
         } else {
-            if factors[0].kind().product(rhs.kind()).is_none() {
-                return Err(
-                    items.error("cannot multiply two lengths; one side of * must be a number")
-                );
-            }
+            // The running product's kind, not the first factor's: a
+            // product of two lengths anywhere in the chain is refused.
+            kind = kind.product(rhs.kind()).ok_or_else(|| {
+                items.error("cannot multiply two lengths; the other factors of * must be numbers")
+            })?;
             factors.push(rhs);
         }
     }

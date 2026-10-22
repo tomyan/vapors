@@ -120,3 +120,36 @@ fn calc_kinds_follow_the_operands() {
         assert_eq!(parse_calc_text(expr).expect(expr).kind(), kind, "{expr}");
     }
 }
+
+#[test]
+fn product_of_two_lengths_anywhere_in_the_chain_is_refused() {
+    // Given: the review found `calc(2 * 4px * 3px)` passed and panicked.
+    for expr in [
+        "calc(2 * 4px * 3px)",
+        "calc(1px * 1px)",
+        "calc(1px / 1px)",
+        "calc(2 * 3px / 1px)",
+    ] {
+        let err = parse_calc_text(expr).expect_err(expr);
+        assert!(
+            err.message.contains("length") || err.message.contains("number"),
+            "{expr}: {err}"
+        );
+        assert_eq!(
+            (err.position.line, err.position.column > 0),
+            (1, true),
+            "{expr}"
+        );
+    }
+}
+
+#[test]
+fn division_by_a_literal_zero_number_is_refused_too() {
+    // sumi's calc_test case.
+    assert!(parse_calc_text("calc(1 / 0)").is_err());
+}
+
+#[test]
+fn clamp_with_min_above_max_returns_min() {
+    assert_eq!(eval("clamp(30px, 20px, 10px)", None), 30.0);
+}
