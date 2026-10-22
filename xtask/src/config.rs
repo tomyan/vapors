@@ -70,6 +70,19 @@ impl Config {
         self.values.get(key).map(String::as_str)
     }
 
+    /// Every `key = value` whose full key starts with `prefix` (such as
+    /// `files.allow.`), keyed by the rest, so a table can hold a list of
+    /// paths with a reason each.
+    pub fn entries_under(&self, prefix: &str) -> BTreeMap<String, String> {
+        self.values
+            .iter()
+            .filter_map(|(key, value)| {
+                key.strip_prefix(prefix)
+                    .map(|rest| (rest.to_owned(), value.clone()))
+            })
+            .collect()
+    }
+
     /// The value for `table.key`, or an error naming it and the file.
     pub fn require(&self, key: &str) -> Result<&str, ConfigError> {
         self.values
@@ -127,6 +140,25 @@ mod tests {
 
         // Then
         assert_eq!(config.require("screenshot.package"), Ok("vapors-platform"));
+    }
+
+    #[test]
+    fn entries_under_a_prefix_are_keyed_by_the_rest() {
+        // Given
+        let text = "[files.allow]\ncrates/a.rs = \"a table\"\ncrates/b.rs = \"a list\"\n[files]\nmax_lines = \"220\"\n";
+        let config = Config::parse(text).expect("valid");
+
+        // When
+        let allow = config.entries_under("files.allow.");
+
+        // Then
+        assert_eq!(allow.len(), 2);
+        assert_eq!(
+            allow.get("crates/a.rs").map(String::as_str),
+            Some("a table")
+        );
+        assert!(config.entries_under("files.generated.").is_empty());
+        assert_eq!(config.get("files.max_lines"), Some("220"));
     }
 
     #[test]

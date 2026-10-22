@@ -10,3 +10,15 @@ package = "vapors-platform"
 # The package `cargo xtask web` builds with trunk and the `wasm` CI step
 # lints for wasm32-unknown-unknown.
 package = "vapors-web-demo"
+
+[files]
+# The file-length rule as a check (the `files` step of `lint` and `ci`).
+# The rule says about 200; 220 leaves room for a module doc comment and
+# a test-module mount without forcing a split that would only move lines.
+max_lines = "220"
+
+# Files allowed over the limit, each with its reason, printed by the check.
+[files.allow]
+
+# Files not written by hand; left out of the check.
+[files.generated]

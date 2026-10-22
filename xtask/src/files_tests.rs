@@ -1,0 +1,169 @@
+//! The counting rule, the allow and generated lists, and the message.
+
+use super::*;
+
+fn rule(max_lines: usize) -> Rule {
+    Rule {
+        max_lines,
+        generated: BTreeMap::new(),
+        allow: BTreeMap::new(),
+    }
+}
+
+#[test]
+fn a_file_at_the_limit_passes_and_one_over_is_found() {
+    // Given
+    let counted = vec![("a.rs".to_owned(), 220), ("b.rs".to_owned(), 221)];
+
+    // When
+    let findings = over_limit(&counted, &rule(220));
+
+    // Then
+    assert_eq!(
+        findings,
+        [Finding {
+            path: "b.rs".into(),
+            lines: 221,
+            allowed: None
+        }]
+    );
+}
+
+#[test]
+fn generated_files_are_left_out_and_allowed_ones_carry_their_reason() {
+    // Given
+    let mut rule = rule(10);
+    rule.generated
+        .insert("gen.rs".into(), "written by build.rs".into());
+    rule.allow.insert("table.rs".into(), "a data table".into());
+    let counted = vec![
+        ("gen.rs".to_owned(), 500),
+        ("table.rs".to_owned(), 300),
+        ("big.rs".to_owned(), 11),
+    ];
+
+    // When
+    let findings = over_limit(&counted, &rule);
+
+    // Then
+    assert_eq!(findings.len(), 2);
+    assert_eq!(findings[0].allowed.as_deref(), Some("a data table"));
+    assert_eq!(findings[1].path, "big.rs");
+}
+
+#[test]
+fn the_refusal_names_each_file_its_count_and_the_fix_and_prints_allowed_reasons() {
+    // Given
+    let findings = vec![
+        Finding {
+            path: "table.rs".into(),
+            lines: 300,
+            allowed: Some("a data table".into()),
+        },
+        Finding {
+            path: "crates/x/big.rs".into(),
+            lines: 241,
+            allowed: None,
+        },
+    ];
+
+    // When
+    let error = report(&findings, &rule(220)).expect_err("one over");
+
+    // Then
+    assert_eq!(
+        error,
+        "allowed  table.rs (300 lines): a data table\n\
+         error: crates/x/big.rs: 241 lines, over 220; fix: split it, or allow it in .config/factory.toml under [files.allow] as `crates/x/big.rs = \"<reason>\"`"
+    );
+}
+
+#[test]
+fn only_allowed_findings_pass_with_their_reasons_listed() {
+    // Given
+    let findings = vec![Finding {
+        path: "table.rs".into(),
+        lines: 300,
+        allowed: Some("a data table".into()),
+    }];
+
+    // When / Then
+    assert_eq!(
+        report(&findings, &rule(220)),
+        Ok(vec![
+            "allowed  table.rs (300 lines): a data table".to_owned()
+        ])
+    );
+    assert_eq!(report(&[], &rule(220)), Ok(vec![]));
+}
+
+#[test]
+fn the_rule_reads_max_lines_and_the_two_lists_from_the_settings() {
+    // Given
+    let text = "[files]\nmax_lines = \"180\"\n[files.allow]\ncrates/a.rs = \"a table\"\n[files.generated]\nout.rs = \"by build.rs\"\n";
+    let config = Config::parse(text).expect("valid");
+
+    // When
+    let rule = Rule::from_config(&config).expect("a rule");
+
+    // Then
+    assert_eq!(rule.max_lines, 180);
+    assert_eq!(
+        rule.allow.get("crates/a.rs").map(String::as_str),
+        Some("a table")
+    );
+    assert_eq!(
+        rule.generated.get("out.rs").map(String::as_str),
+        Some("by build.rs")
+    );
+    assert_eq!(
+        Rule::from_config(&Config::parse("[web]\npackage = \"x\"\n").expect("valid"))
+            .expect("defaults")
+            .max_lines,
+        DEFAULT_MAX_LINES
+    );
+}
+
+#[test]
+fn a_max_lines_that_is_not_a_number_is_refused_naming_the_setting() {
+    // Given
+    let config = Config::parse("[files]\nmax_lines = \"many\"\n").expect("valid");
+
+    // When
+    let error = Rule::from_config(&config).expect_err("not a number");
+
+    // Then
+    assert_eq!(
+        error,
+        ".config/factory.toml: [files] max_lines = \"many\" is not a number"
+    );
+}
+
+#[test]
+fn the_walk_finds_covered_files_and_skips_target_and_fonts() {
+    // Given
+    let root = std::env::temp_dir().join(format!("xtask-files-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    for dir in ["crates/a", "target/debug", "fonts"] {
+        std::fs::create_dir_all(root.join(dir)).expect("dirs");
+    }
+    std::fs::write(root.join("crates/a/lib.rs"), "a\nb\nc\n").expect("rs");
+    std::fs::write(root.join("crates/a/shader.wgsl"), "x\n").expect("wgsl");
+    std::fs::write(root.join("crates/a/notes.md"), "not covered\n").expect("md");
+    std::fs::write(root.join("target/debug/big.rs"), "\n".repeat(999)).expect("target");
+    std::fs::write(root.join("fonts/font.toml"), "\n".repeat(999)).expect("fonts");
+
+    // When
+    let files = workspace_files(&root).expect("walks");
+
+    // Then
+    assert_eq!(
+        files,
+        [
+            PathBuf::from("crates/a/lib.rs"),
+            PathBuf::from("crates/a/shader.wgsl")
+        ]
+    );
+    assert_eq!(count_lines(&root.join("crates/a/lib.rs")), Ok(3));
+    let _ = std::fs::remove_dir_all(root);
+}

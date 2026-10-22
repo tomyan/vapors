@@ -45,6 +45,16 @@ fn tools() -> Step {
     )
 }
 
+/// Every source file within `[files] max_lines`; `cargo xtask check-files`.
+fn files() -> Step {
+    Step::new(
+        "files",
+        "cargo",
+        &["xtask", "check-files"],
+        "split the file, or allow it in .config/factory.toml under [files.allow] with a reason",
+    )
+}
+
 fn fmt() -> Step {
     Step::new(
         "fmt",
@@ -116,7 +126,15 @@ fn gpu() -> Step {
 /// Everything CI runs, fastest first. `web_package` is `web.package`
 /// from `.config/factory.toml`.
 pub fn ci(web_package: &str) -> Vec<Step> {
-    vec![tools(), fmt(), clippy(), wasm(web_package), unit(), gpu()]
+    vec![
+        tools(),
+        fmt(),
+        files(),
+        clippy(),
+        wasm(web_package),
+        unit(),
+        gpu(),
+    ]
 }
 
 /// The wasm lint alone.
@@ -126,7 +144,7 @@ pub fn wasm_lint(web_package: &str) -> Vec<Step> {
 
 /// Formatting and lints only.
 pub fn lint() -> Vec<Step> {
-    vec![fmt(), clippy()]
+    vec![fmt(), files(), clippy()]
 }
 
 /// The unit tier.
@@ -152,7 +170,10 @@ mod tests {
         let names: Vec<&str> = steps.iter().map(|s| s.name.as_str()).collect();
 
         // Then
-        assert_eq!(names, ["tools", "fmt", "clippy", "wasm", "unit", "gpu"]);
+        assert_eq!(
+            names,
+            ["tools", "fmt", "files", "clippy", "wasm", "unit", "gpu"]
+        );
     }
 
     #[test]
