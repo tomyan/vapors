@@ -44,7 +44,7 @@ fn a_refusal_is_printed_rustc_style_and_fails() {
     assert!(report.failed);
     assert_eq!(report.stderr.len(), 1, "{:?}", report.stderr);
     assert!(
-        report.stderr[0].starts_with(&format!("{}:1:1: ", src.join("a.wisp").display())),
+        report.stderr[0].starts_with(&format!("error: {}:1:1: ", src.join("a.wisp").display())),
         "{:?}",
         report.stderr
     );
@@ -68,7 +68,11 @@ fn a_missing_out_dir_fails_and_names_it() {
 
     // Then
     assert!(report.failed);
-    assert!(report.stderr[0].contains("OUT_DIR"), "{:?}", report.stderr);
+    assert!(
+        report.stderr[0].starts_with("error: OUT_DIR"),
+        "{:?}",
+        report.stderr
+    );
     assert!(report.stderr[0].contains("build.rs"), "{:?}", report.stderr);
 }
 

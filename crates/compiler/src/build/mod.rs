@@ -40,14 +40,15 @@ pub struct Compiled {
 pub struct BuildScriptReport {
     /// `cargo::` instructions.
     pub stdout: Vec<String>,
-    /// Refusals, one `file:line:col: message` per line.
+    /// Refusals, one `error: file:line:col: message` per line, as rustc
+    /// prints them.
     pub stderr: Vec<String>,
     /// True when the build must stop.
     pub failed: bool,
 }
 
 /// Compiles every `.wisp` under `src` into `OUT_DIR` from a build
-/// script. On a refusal it prints each as `file:line:col: message` and
+/// script. On a refusal it prints each as `error: file:line:col: message` and
 /// exits with status 1, which fails the build.
 pub fn compile_dir(src: impl AsRef<Path>) {
     let src = resolve_src(src.as_ref(), std::env::var_os("CARGO_MANIFEST_DIR"));
@@ -85,7 +86,13 @@ pub fn build_script_report(src: &Path, out_dir: Option<OsString>) -> BuildScript
             stderr: Vec::new(),
             failed: false,
         },
-        Err(errors) => failed(src, errors.iter().map(ToString::to_string).collect()),
+        Err(errors) => failed(
+            src,
+            errors
+                .iter()
+                .map(|error| format!("error: {error}"))
+                .collect(),
+        ),
     }
 }
 
