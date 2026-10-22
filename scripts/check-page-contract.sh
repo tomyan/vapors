@@ -91,7 +91,12 @@ echo "browser: $chrome ($("$chrome" --version 2>/dev/null || echo 'version unkno
 prepare
 serve
 check as-built '^adapter: ' hidden
-check no-open-button '^adapter: ' 'touch screens cannot open files'
+# Relaxed: #status may still read `starting` here. The adapter line
+# comes after real GPU setup, which virtual time does not wait for, and
+# on the CI runner it once arrived after the dump (run 39805470449).
+# What this case pins is that the error is in #error and not in
+# #status; the as-built case pins the status line.
+check no-open-button '^(starting|adapter: )' 'touch screens cannot open files'
 check no-webgpu '^starting$' '^no WebGPU adapter'
 check no-webgpu-no-error-element '^no WebGPU adapter' absent
 [ "$failed" = 0 ] || { echo "the page contract does not hold; reproduce: cargo xtask web && $0 target/web \$(mktemp -d)" >&2; exit 1; }

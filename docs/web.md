@@ -45,7 +45,9 @@ naming the case. CI runs it in the `web` job with the runner's
 `google-chrome`; the browser is `$CHROME`, else `google-chrome`, else
 `chromium`. The cases: the page as built shows the adapter line in
 `#status` and `#error` hidden and empty; without the Open button, the
-adapter line in `#status` and the missing-button error in `#error`;
+missing-button error in `#error` and `#status` reading `starting` or
+the adapter line, whichever the dump catches (the adapter line follows
+real GPU setup, which Chrome's virtual time does not wait for);
 without WebGPU, the `NoWebGpu` error in `#error` and `#status` still
 `starting`; without WebGPU and without `#error`, the error in
 `#status`. Verified on Chromium 155 here on 2026-10-22.
