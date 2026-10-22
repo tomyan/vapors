@@ -55,18 +55,21 @@ const CLIPPY: Step = Step {
     fix: "fix the lint, or allow it at the site with a comment saying why",
 };
 
-// GPU tests are integration test binaries named `gpu_*`; the tiers split on that.
+// GPU tests are test functions whose names start with `gpu_` (kept in
+// `tests/gpu_*.rs` files); the tiers split on the function name because
+// nextest refuses a `binary()` filter that matches no binary, and a
+// repository may have no GPU tests yet.
 const UNIT: Step = Step {
     name: "unit",
     program: "cargo",
-    args: &["nextest", "run", "--workspace", "-E", "not binary(/^gpu_/)"],
+    args: &["nextest", "run", "--workspace", "-E", "not test(/^gpu_/)"],
     fix: "run the failing test alone with `cargo nextest run <name>`",
 };
 
 const GPU: Step = Step {
     name: "gpu",
     program: "cargo",
-    args: &["nextest", "run", "--workspace", "-E", "binary(/^gpu_/)"],
+    args: &["nextest", "run", "--workspace", "-E", "test(/^gpu_/)"],
     fix: "needs a Vulkan adapter; the failure names what was found and how to select one",
 };
 

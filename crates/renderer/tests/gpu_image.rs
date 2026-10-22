@@ -12,7 +12,7 @@ const WHITE: [u8; 4] = [255, 255, 255, 255];
 const BACKGROUND: [u8; 4] = [40, 40, 40, 255];
 
 #[test]
-fn a_two_by_two_image_at_scale_two_fills_quadrants_exactly() {
+fn gpu_a_two_by_two_image_at_scale_two_fills_quadrants_exactly() {
     // Given: a 2x2 image (red, green / blue, white) and a 4x4 target
     let gpu = gpu();
     let source = [RED, GREEN, BLUE, WHITE].concat();
@@ -55,7 +55,7 @@ fn a_two_by_two_image_at_scale_two_fills_quadrants_exactly() {
 }
 
 #[test]
-fn pixels_outside_the_image_keep_the_background() {
+fn gpu_pixels_outside_the_image_keep_the_background() {
     // Given
     let gpu = gpu();
     let texture = upload_rgba8(&gpu.device, &gpu.queue, 1, 1, &RED);
