@@ -38,5 +38,11 @@ pub fn generate(component: &Component) -> Result<String, CompileError> {
     emitter.emit_nodes(&component.template.children, &Place::roots())?;
     let body = emitter.finish();
     let raw = shell::assemble(component, &info, &body);
-    format::format(&source, &raw)
+    let formatted = format::format(&source, &raw)?;
+    // A plain comment, not `//!`: the file is `include!`d into a module,
+    // where inner attributes are not allowed.
+    Ok(format!(
+        "// Generated from `{}` by vapors-compiler; edit the .wisp, not this file.\n\n{formatted}",
+        component.path
+    ))
 }

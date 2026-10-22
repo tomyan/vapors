@@ -184,9 +184,12 @@ fn the_file_names_its_source_and_warns_against_editing() {
     // When
     let code = generated("<div></div>");
 
-    // Then
-    assert_has(
-        &code,
-        "//! Generated from `counter.wisp` by vapors-compiler; edit the .wisp, not this file.",
+    // Then: a plain comment, since `include!` refuses inner attributes
+    assert!(
+        code.starts_with(
+            "// Generated from `counter.wisp` by vapors-compiler; edit the .wisp, not this file.\n"
+        ),
+        "{code}"
     );
+    assert_lacks(&code, "//!");
 }

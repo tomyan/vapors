@@ -6,6 +6,7 @@
 //! `file:line:col`.
 
 pub mod ast;
+pub mod build;
 mod codegen;
 mod error;
 mod naming;
@@ -50,17 +51,25 @@ pub fn compile_str(path: &str, text: &str) -> Result<String, CompileError> {
     generate(&parse_str(path, text)?)
 }
 
+/// Reads, parses and generates: the Rust for a `.wisp` file.
+///
+/// # Errors
+/// A [`CompileError`] for an unreadable file (positioned at 1:1), or
+/// from parsing or code generation.
+pub fn compile_file(path: &Path) -> Result<String, CompileError> {
+    compile_str(&path.display().to_string(), &read_source(path)?)
+}
+
 /// Reads and parses a `.wisp` file.
 ///
 /// # Errors
 /// A [`CompileError`] for an unreadable file (positioned at 1:1) or
 /// for the first thing the parser did not recognise.
 pub fn parse_file(path: &Path) -> Result<ast::Component, CompileError> {
-    let text = std::fs::read_to_string(path).map_err(|err| CompileError {
-        path: path.display().to_string(),
-        line: 1,
-        col: 1,
-        message: format!("cannot read the file: {err}"),
-    })?;
-    parse_str(&path.display().to_string(), &text)
+    parse_str(&path.display().to_string(), &read_source(path)?)
+}
+
+fn read_source(path: &Path) -> Result<String, CompileError> {
+    std::fs::read_to_string(path)
+        .map_err(|err| build::path_error(path, format!("cannot read the file: {err}")))
 }

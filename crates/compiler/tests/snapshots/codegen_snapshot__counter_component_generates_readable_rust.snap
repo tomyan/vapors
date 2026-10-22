@@ -2,7 +2,8 @@
 source: crates/compiler/tests/codegen_snapshot.rs
 expression: code
 ---
-//! Generated from `src/counter.wisp` by vapors-compiler; edit the .wisp, not this file.
+// Generated from `src/counter.wisp` by vapors-compiler; edit the .wisp, not this file.
+
 use std::cell::RefCell;
 use std::rc::Rc;
 #[allow(unused_imports)]

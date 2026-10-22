@@ -23,8 +23,7 @@ pub(crate) fn assemble(component: &Component, info: &ScriptInfo, body: &str) -> 
 
 fn header(path: &str, style: &str) -> String {
     format!(
-        "//! Generated from `{path}` by vapors-compiler; edit the .wisp, not this file.
-use std::cell::RefCell;
+        "use std::cell::RefCell;
 use std::rc::Rc;
 #[allow(unused_imports)]
 use vapors_dom::{{Dom, Event, NodeId, PropertyValue}};
