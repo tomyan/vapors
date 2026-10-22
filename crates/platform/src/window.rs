@@ -79,6 +79,7 @@ pub(crate) enum Message {
 /// surface cannot be set up. Each variant's message names what was found.
 #[cfg(not(target_family = "wasm"))]
 pub fn run(options: WindowOptions, app: impl App + 'static) -> Result<(), PlatformError> {
+    crate::log_forward::install();
     let event_loop = EventLoop::with_user_event()
         .build()
         .map_err(|e| PlatformError::Windowing(e.to_string()))?;

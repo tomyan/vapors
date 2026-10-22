@@ -12,6 +12,8 @@ mod event;
 mod gestures;
 mod handler;
 mod input;
+#[cfg(not(target_family = "wasm"))]
+mod log_forward;
 mod picker;
 #[cfg(target_family = "wasm")]
 mod picker_web;

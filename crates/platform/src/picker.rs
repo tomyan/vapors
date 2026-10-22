@@ -2,6 +2,14 @@
 //! thread, so the window keeps drawing. Web: a hidden `<input type=file>`
 //! clicked from the user's own event, read with `File.arrayBuffer()`.
 //! Either way the file comes back as [`Message::FileChosen`].
+//!
+//! On Linux rfd asks the XDG desktop portal over D-Bus. The only wait
+//! that is not the user's is the portal's reply to the `OpenFile` call,
+//! which libdbus bounds at its default 25 s (rfd passes -1, meaning
+//! `DBUS_TIMEOUT_USE_DEFAULT`); measured here with no portal: the dialog
+//! returns None after 25.1 s with the cause logged, and the log forwarder
+//! turns that into a report. The wait for the user's choice is unbounded
+//! on purpose.
 
 use winit::event_loop::EventLoopProxy;
 

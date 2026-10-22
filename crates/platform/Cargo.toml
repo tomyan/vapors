@@ -14,11 +14,13 @@ vapors-gpu.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 pollster.workspace = true
+log = "0.4"
 
-# The system file dialog. GTK3 on Linux (needs libgtk-3-dev to build);
-# native dialogs on macOS and Windows need no feature.
+# The system file dialog. On Linux the XDG desktop portal over D-Bus,
+# which rfd drives itself (no GTK to link, no async runtime); native
+# dialogs on macOS and Windows need no feature.
 [target.'cfg(target_os = "linux")'.dependencies]
-rfd = { version = "0.17.2", default-features = false, features = ["gtk3"] }
+rfd = { version = "0.17.2", default-features = false, features = ["xdg-portal"] }
 
 [target.'cfg(all(not(target_family = "wasm"), not(target_os = "linux")))'.dependencies]
 rfd = { version = "0.17.2", default-features = false }

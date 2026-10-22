@@ -22,9 +22,6 @@ jobs:
     timeout-minutes: 30 # initial ceiling; docs/budgets.md holds the measured value
     steps:
       - uses: actions/checkout@v7
-      # rfd's GTK3 file dialog links GTK at build time.
-      - name: install GTK
-        run: sudo apt-get update -q && sudo apt-get install -y -q libgtk-3-dev
       # rustup reads rust-toolchain.toml: channel, components, targets. One pin.
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
@@ -74,8 +71,8 @@ jobs:
       VAPORS_GPU_ADAPTER: llvmpipe
     steps:
       - uses: actions/checkout@v7
-      - name: install lavapipe, and GTK for rfd's file dialog
-        run: sudo apt-get update -q && sudo apt-get install -y -q mesa-vulkan-drivers vulkan-tools libgtk-3-dev && vulkaninfo --summary | grep -E 'deviceName|driverName'
+      - name: install lavapipe
+        run: sudo apt-get update -q && sudo apt-get install -y -q mesa-vulkan-drivers vulkan-tools && vulkaninfo --summary | grep -E 'deviceName|driverName'
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
       - uses: Swatinem/rust-cache@v2
@@ -93,8 +90,8 @@ jobs:
       VAPORS_GPU_ADAPTER: llvmpipe
     steps:
       - uses: actions/checkout@v7
-      - name: install lavapipe, Xvfb, winit's X11 libraries and GTK for rfd's file dialog
-        run: sudo apt-get update -q && sudo apt-get install -y -q mesa-vulkan-drivers xvfb libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libgtk-3-dev
+      - name: install lavapipe, Xvfb and winit's X11 libraries
+        run: sudo apt-get update -q && sudo apt-get install -y -q mesa-vulkan-drivers xvfb libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
       - uses: Swatinem/rust-cache@v2
