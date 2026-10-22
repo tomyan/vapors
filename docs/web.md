@@ -38,15 +38,17 @@ The elements the platform looks for, by id (`vapors_platform::page`):
   error and that list (in `#error`, or `#status`) rather than a surface
   error.
 
-`scripts/check-page-contract.sh target/web <work dir>`, after `cargo
-xtask web`, loads four copies of the built page in headless Chromium
-and prints each one's `#status` and `#error`. On 2026-10-22 (Chromium
-155, SwiftShader): the page as built showed the adapter line in
-`#status` and `#error` still hidden and empty; without the Open button,
-the adapter line in `#status` and the missing-button error in `#error`;
+`scripts/check-page-contract.sh target/web <new or empty dir>`, after
+`cargo xtask web`, loads four copies of the built page in headless
+Chrome and checks each one's `#status` and `#error`; a mismatch fails
+naming the case. CI runs it in the `web` job with the runner's
+`google-chrome`; the browser is `$CHROME`, else `google-chrome`, else
+`chromium`. The cases: the page as built shows the adapter line in
+`#status` and `#error` hidden and empty; without the Open button, the
+adapter line in `#status` and the missing-button error in `#error`;
 without WebGPU, the `NoWebGpu` error in `#error` and `#status` still
-reading `starting`; without WebGPU and without `#error`, the error in
-`#status`.
+`starting`; without WebGPU and without `#error`, the error in
+`#status`. Verified on Chromium 155 here on 2026-10-22.
 
 ## Build
 
