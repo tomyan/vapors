@@ -20,8 +20,14 @@ jobs:
     name: ci
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
     timeout-minutes: 30 # initial ceiling; docs/budgets.md holds the measured value
+    env:
+      # A CJK system font is installed below, so the system-font fallback
+      # test must find one; it fails loudly rather than passing by luck.
+      VAPORS_SYSTEM_FONTS: 1
     steps:
       - uses: actions/checkout@v7
+      - name: install a CJK system font for the fallback test
+        run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk && fc-list :lang=zh | head -1
       # rustup reads rust-toolchain.toml: channel, components, targets. One pin.
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain

@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use parley::fontique::{Blob, Collection, CollectionOptions, GenericFamily};
+use parley::fontique::{Blob, Collection, CollectionOptions, FallbackKey, GenericFamily, Script};
 use parley::{FontContext, FontData, LayoutContext, RangedBuilder};
 use vapors_scene::Color;
 
@@ -54,6 +54,24 @@ impl FontSystem {
     #[must_use]
     pub fn has_system_fonts(&mut self) -> bool {
         self.system_fonts && self.fonts.collection.family_names().count() > 2
+    }
+
+    /// Register the fonts in `bytes` and make their families the fallback
+    /// for `script` (an ISO 15924 tag such as `*b"Hani"`), after any
+    /// fallback already there. This is how the web will add a fetched
+    /// font for a script the bundle lacks. Returns how many families the
+    /// data held; zero means it was not a font.
+    pub fn register_fallback(&mut self, bytes: Vec<u8>, script: [u8; 4]) -> usize {
+        let families = self
+            .fonts
+            .collection
+            .register_fonts(Blob::from(bytes), None);
+        let ids: Vec<_> = families.iter().map(|(id, _)| *id).collect();
+        let key = FallbackKey::new(Script::from_bytes(script), None);
+        self.fonts
+            .collection
+            .append_fallbacks(key, ids.iter().copied());
+        ids.len()
     }
 
     /// True when `font` is one of the bundled files.

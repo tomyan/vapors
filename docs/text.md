@@ -18,7 +18,13 @@ release (`crates/text/fonts/README.md` has version, URL and checksums).
 Neither has an optical size axis; the `opsz` setting is accepted and
 ignored by them. On native the bundle is registered first and system
 fonts fall back behind it; on the web only the bundle exists and a
-character outside it draws `.notdef`.
+character outside it draws `.notdef`. `FontSystem::register_fallback`
+adds a font as the fallback for one script, which is how the web will
+take a fetched font (F6). The per-character fallback test uses a 2 KB
+one-glyph subset of Droid Sans Fallback (`crates/text/fonts/test/`,
+Apache 2.0) so it does not depend on the machine's fonts; the
+system-font test requires a CJK font only when `VAPORS_SYSTEM_FONTS=1`,
+which CI sets after installing `fonts-noto-cjk`.
 
 ## Rendering
 
