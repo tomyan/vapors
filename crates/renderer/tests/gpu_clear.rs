@@ -5,7 +5,7 @@ use vapors_renderer::clear;
 use vapors_scene::Color;
 
 #[test]
-fn clear_fills_every_pixel_with_the_colour() {
+fn gpu_clear_fills_every_pixel_with_the_colour() {
     // Given
     let gpu = gpu();
     let color = Color::from_rgba8(12, 200, 34, 255);
