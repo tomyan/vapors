@@ -6,6 +6,8 @@ use crate::ast::ComponentValue;
 use crate::token::{Token, TokenKind};
 use crate::{Error, Result};
 
+const SHAPE: &str = "a range is `name op value`, `value op name` or `lo op name op hi`";
+
 /// `name op value`, `value op name`, `lo op name op hi`.
 pub(super) fn range_form(
     items: &[&ComponentValue],
@@ -16,44 +18,19 @@ pub(super) fn range_form(
         .position(|v| ident(Some(v)).is_some())
         .ok_or_else(|| refuse("expected a feature name in the range"))?;
     let name = ident(Some(items[name_at])).expect("found above");
-    let parse_value = |v: &ComponentValue| match name.as_str() {
-        "resolution" => resolution(v, refuse),
-        _ => length_px(v, refuse),
-    };
     let mut tests = Vec::new();
-    if name_at == 2 {
+    match name_at {
+        0 => {}
         // value op name: flip the operator.
-        tests.push((
+        2 => tests.push((
             comparison(&items[..2], refuse)?.flipped(),
-            parse_value(items[0])?,
-        ));
-    } else if name_at != 0 {
-        return Err(refuse(
-            "a range is `name op value`, `value op name` or `lo op name op hi`",
-        ));
+            value(&name, items[0], refuse)?,
+        )),
+        _ => return Err(refuse(SHAPE)),
     }
     let rest = &items[name_at + 1..];
     if !rest.is_empty() {
-        let op_len = if matches!(
-            rest.get(1),
-            Some(ComponentValue::Token(Token {
-                kind: TokenKind::Delim('='),
-                ..
-            }))
-        ) {
-            2
-        } else {
-            1
-        };
-        if rest.len() != op_len + 1 {
-            return Err(refuse(
-                "a range is `name op value`, `value op name` or `lo op name op hi`",
-            ));
-        }
-        tests.push((
-            comparison(&rest[..op_len], refuse)?,
-            parse_value(rest[op_len])?,
-        ));
+        tests.push(trailing_test(&name, rest, refuse)?);
     }
     match name.as_str() {
         "width" => Ok(Feature::Size(SizeAxis::Width, tests)),
@@ -62,6 +39,37 @@ pub(super) fn range_form(
         _ => Err(refuse(
             "only width, height and resolution take the range syntax",
         )),
+    }
+}
+
+/// `op value` after the name.
+fn trailing_test(
+    name: &str,
+    rest: &[&ComponentValue],
+    refuse: &dyn Fn(&str) -> Error,
+) -> Result<(Comparison, f64)> {
+    let second_is_eq = matches!(
+        rest.get(1),
+        Some(ComponentValue::Token(Token {
+            kind: TokenKind::Delim('='),
+            ..
+        }))
+    );
+    let op_len = if second_is_eq { 2 } else { 1 };
+    if rest.len() != op_len + 1 {
+        return Err(refuse(SHAPE));
+    }
+    Ok((
+        comparison(&rest[..op_len], refuse)?,
+        value(name, rest[op_len], refuse)?,
+    ))
+}
+
+/// The feature's value: dppx for resolution, px otherwise.
+fn value(name: &str, v: &ComponentValue, refuse: &dyn Fn(&str) -> Error) -> Result<f64> {
+    match name {
+        "resolution" => resolution(v, refuse),
+        _ => length_px(v, refuse),
     }
 }
 

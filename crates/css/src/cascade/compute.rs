@@ -45,44 +45,10 @@ pub(crate) fn style(
     for id in PropertyId::all() {
         specified.push(specified_value(id, winners, parent, &lookup)?);
     }
-    let parent_font_size = parent.map_or(env.root_font_size, |p| p.font_size);
-    // rem on the root element refers to the initial font size (Values
-    // Level 4 section 6.1.2); below the root it is the root's computed one.
-    let rem_for_font = parent.map_or(env.root_font_size, |p| p.root_font_size);
-    let font_size_id = PropertyId::from_name("font-size").expect("table");
-    let font_ctx = context(parent_font_size, rem_for_font, Some(parent_font_size), env);
-    let font_size = match resolve(
-        &specified[font_size_id.index()],
-        &font_ctx,
-        env.color_scheme,
-        Rgba::from_rgba8(0, 0, 0, 255),
-    )? {
-        Value::Length(l) => l.value,
-        other => {
-            return Err(Error::new(
-                Position::default(),
-                format!("font-size computed to {}", other.to_css()),
-            ));
-        }
-    };
+    let font_size = font_size(&specified, parent, env)?;
     let root_font_size = parent.map_or(font_size, |p| p.root_font_size);
     let ctx = context(font_size, root_font_size, None, env);
-    let parent_color = parent.map_or(Rgba::from_rgba8(0, 0, 0, 255), |p| p.color);
-    let color_id = PropertyId::from_name("color").expect("table");
-    let color = match resolve(
-        &specified[color_id.index()],
-        &ctx,
-        env.color_scheme,
-        parent_color,
-    )? {
-        Value::Color(Color::Rgba(c)) => c,
-        other => {
-            return Err(Error::new(
-                Position::default(),
-                format!("color computed to {}", other.to_css()),
-            ));
-        }
-    };
+    let color = color(&specified, parent, &ctx, env)?;
     let mut values = Vec::with_capacity(PROPERTIES.len());
     for (id, value) in PropertyId::all().zip(&specified) {
         let percent_base = (id.name() == "line-height").then_some(font_size);
@@ -93,6 +59,7 @@ pub(crate) fn style(
         values
             .push(resolve(value, &ctx, env.color_scheme, color).map_err(|e| at(&e, winners, id))?);
     }
+    let font_size_id = PropertyId::from_name("font-size").expect("table");
     values[font_size_id.index()] = Value::Length(Length::px(font_size));
     Ok(ComputedStyle {
         values,
@@ -101,6 +68,49 @@ pub(crate) fn style(
         root_font_size,
         color,
     })
+}
+
+/// The computed font size: em and % against the parent's; rem on the
+/// root refers to the initial font size (Values Level 4 section 6.1.2).
+fn font_size(
+    specified: &[Value],
+    parent: Option<&ComputedStyle>,
+    env: &Environment,
+) -> Result<f64> {
+    let parent_font_size = parent.map_or(env.root_font_size, |p| p.font_size);
+    let rem = parent.map_or(env.root_font_size, |p| p.root_font_size);
+    let ctx = context(parent_font_size, rem, Some(parent_font_size), env);
+    let id = PropertyId::from_name("font-size").expect("table");
+    match resolve(
+        &specified[id.index()],
+        &ctx,
+        env.color_scheme,
+        Rgba::from_rgba8(0, 0, 0, 255),
+    )? {
+        Value::Length(l) => Ok(l.value),
+        other => Err(Error::new(
+            Position::default(),
+            format!("font-size computed to {}", other.to_css()),
+        )),
+    }
+}
+
+/// The computed colour; `currentcolor` here means the parent's.
+fn color(
+    specified: &[Value],
+    parent: Option<&ComputedStyle>,
+    ctx: &Context,
+    env: &Environment,
+) -> Result<Rgba> {
+    let parent_color = parent.map_or(Rgba::from_rgba8(0, 0, 0, 255), |p| p.color);
+    let id = PropertyId::from_name("color").expect("table");
+    match resolve(&specified[id.index()], ctx, env.color_scheme, parent_color)? {
+        Value::Color(Color::Rgba(c)) => Ok(c),
+        other => Err(Error::new(
+            Position::default(),
+            format!("color computed to {}", other.to_css()),
+        )),
+    }
 }
 
 fn at(error: &Error, winners: &Winners, id: PropertyId) -> Error {

@@ -31,43 +31,49 @@ pub(super) fn parse(contents: &[ComponentValue], at: Position) -> Result<Attribu
             case_insensitive: false,
         });
     };
-    items.skip_whitespace();
-    let value = match items.next() {
-        Some(ComponentValue::Token(Token {
-            kind: TokenKind::Ident(v) | TokenKind::String(v),
-            ..
-        })) => v.clone(),
-        _ => {
-            return Err(Error::new(
-                at,
-                format!("attribute selector [{name}...] needs a value after the operator"),
-            ));
-        }
-    };
-    items.skip_whitespace();
-    let case_insensitive = match items.next() {
-        None => false,
-        Some(ComponentValue::Token(Token {
-            kind: TokenKind::Ident(f),
-            ..
-        })) if f.eq_ignore_ascii_case("i") => true,
-        Some(ComponentValue::Token(Token {
-            kind: TokenKind::Ident(f),
-            ..
-        })) if f.eq_ignore_ascii_case("s") => false,
-        Some(v) => {
-            return Err(Error::new(
-                v.position(),
-                "expected \"i\", \"s\" or \"]\" after the attribute value",
-            ));
-        }
-    };
+    let value = value(&mut items, &name, at)?;
+    let case_insensitive = case_flag(&mut items)?;
     Ok(AttributeSelector {
         name,
         operator,
         value,
         case_insensitive,
     })
+}
+
+/// The value after the operator: an identifier or a string.
+fn value(items: &mut Items<'_>, name: &str, at: Position) -> Result<String> {
+    items.skip_whitespace();
+    match items.next() {
+        Some(ComponentValue::Token(Token {
+            kind: TokenKind::Ident(v) | TokenKind::String(v),
+            ..
+        })) => Ok(v.clone()),
+        _ => Err(Error::new(
+            at,
+            format!("attribute selector [{name}...] needs a value after the operator"),
+        )),
+    }
+}
+
+/// An optional `i` (case-insensitive) or `s` flag.
+fn case_flag(items: &mut Items<'_>) -> Result<bool> {
+    items.skip_whitespace();
+    match items.next() {
+        None => Ok(false),
+        Some(ComponentValue::Token(Token {
+            kind: TokenKind::Ident(f),
+            ..
+        })) if f.eq_ignore_ascii_case("i") => Ok(true),
+        Some(ComponentValue::Token(Token {
+            kind: TokenKind::Ident(f),
+            ..
+        })) if f.eq_ignore_ascii_case("s") => Ok(false),
+        Some(v) => Err(Error::new(
+            v.position(),
+            "expected \"i\", \"s\" or \"]\" after the attribute value",
+        )),
+    }
 }
 
 fn operator(items: &mut Items<'_>, at: Position) -> Result<Option<AttributeOperator>> {

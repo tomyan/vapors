@@ -16,34 +16,8 @@ pub(super) fn write(c: &Calc, out: &mut String) {
             out.push_str("1 / ");
             write(a, out);
         }
-        Calc::Sum(terms) => {
-            out.push_str("calc(");
-            for (i, t) in terms.iter().enumerate() {
-                match t {
-                    Calc::Negate(inner) if i > 0 => {
-                        out.push_str(" - ");
-                        write(inner, out);
-                    }
-                    _ => {
-                        if i > 0 {
-                            out.push_str(" + ");
-                        }
-                        write(t, out);
-                    }
-                }
-            }
-            out.push(')');
-        }
-        Calc::Product(factors) => {
-            out.push_str("calc(");
-            for (i, f) in factors.iter().enumerate() {
-                if i > 0 {
-                    out.push_str(" * ");
-                }
-                write(f, out);
-            }
-            out.push(')');
-        }
+        Calc::Sum(terms) => sum(terms, out),
+        Calc::Product(factors) => product(factors, out),
         Calc::Min(args) | Calc::Max(args) => {
             out.push_str(if matches!(c, Calc::Min(_)) {
                 "min("
@@ -68,4 +42,36 @@ fn args_text(args: &[Calc], out: &mut String) {
         }
         write(a, out);
     }
+}
+
+/// `calc(a + b - c)`: a negated term prints as subtraction.
+fn sum(terms: &[Calc], out: &mut String) {
+    out.push_str("calc(");
+    for (i, t) in terms.iter().enumerate() {
+        match t {
+            Calc::Negate(inner) if i > 0 => {
+                out.push_str(" - ");
+                write(inner, out);
+            }
+            _ => {
+                if i > 0 {
+                    out.push_str(" + ");
+                }
+                write(t, out);
+            }
+        }
+    }
+    out.push(')');
+}
+
+/// `calc(a * b)`.
+fn product(factors: &[Calc], out: &mut String) {
+    out.push_str("calc(");
+    for (i, f) in factors.iter().enumerate() {
+        if i > 0 {
+            out.push_str(" * ");
+        }
+        write(f, out);
+    }
+    out.push(')');
 }

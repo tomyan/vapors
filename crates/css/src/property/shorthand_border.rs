@@ -13,53 +13,41 @@ pub(super) fn expand(
     values: &[ComponentValue],
     at: Position,
 ) -> Result<Vec<Longhand>> {
-    let width_id = ids[0];
-    let style_id = ids[4];
-    let color_id = ids[8];
-    let mut width = None;
-    let mut style = None;
-    let mut color = None;
+    let group_ids = [ids[0], ids[4], ids[8]];
+    let [width_id, style_id, color_id] = group_ids;
+    let mut found: [Option<Value>; 3] = [None, None, None];
     for part in parts(values) {
-        if width.is_none()
-            && let Ok(v) = parse_longhand(width_id, &part, at)
-        {
-            width = Some(v);
-        } else if style.is_none()
-            && let Ok(v) = parse_longhand(style_id, &part, at)
-        {
-            style = Some(v);
-        } else if color.is_none()
-            && let Ok(v) = parse_longhand(color_id, &part, at)
-        {
-            color = Some(v);
-        } else {
+        let slot = group_ids
+            .iter()
+            .enumerate()
+            .find(|(i, id)| found[*i].is_none() && parse_longhand(**id, &part, at).is_ok());
+        let Some((i, id)) = slot else {
             return Err(refusal(
                 "border",
                 "<line-width> || <line-style> || <color>",
                 values,
                 at,
             ));
-        }
-    }
-    let initial = |id: PropertyId| -> Value {
-        let text = id.def().initial;
-        let values = crate::parse::component::values_of_text(text).expect("initial values parse");
-        parse_longhand(id, &values, at).expect("initial values parse")
-    };
-    let width = width.unwrap_or_else(|| initial(width_id));
-    let style = style.unwrap_or_else(|| initial(style_id));
-    let color = color.unwrap_or_else(|| initial(color_id));
-    let mut out = Vec::new();
-    for (i, id) in ids.iter().enumerate() {
-        let value = match i / 4 {
-            0 => width.clone(),
-            1 => style.clone(),
-            _ => color.clone(),
         };
-        out.push(Longhand {
-            id: *id,
-            value: Specified::Value(value),
-        });
+        found[i] = parse_longhand(*id, &part, at).ok();
     }
-    Ok(out)
+    let width = found[0].take().unwrap_or_else(|| initial(width_id, at));
+    let style = found[1].take().unwrap_or_else(|| initial(style_id, at));
+    let color = found[2].take().unwrap_or_else(|| initial(color_id, at));
+    let by_group = [width, style, color];
+    Ok(ids
+        .iter()
+        .enumerate()
+        .map(|(i, id)| Longhand {
+            id: *id,
+            value: Specified::Value(by_group[i / 4].clone()),
+        })
+        .collect())
+}
+
+/// A longhand's initial value, parsed.
+fn initial(id: PropertyId, at: Position) -> Value {
+    let values =
+        crate::parse::component::values_of_text(id.def().initial).expect("initial values parse");
+    parse_longhand(id, &values, at).expect("initial values parse")
 }

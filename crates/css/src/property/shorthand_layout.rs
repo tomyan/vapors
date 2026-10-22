@@ -14,40 +14,27 @@ pub(super) fn flex(
     at: Position,
 ) -> Result<Vec<Longhand>> {
     let parts = parts(values);
+    let as_text: Vec<String> = parts
+        .iter()
+        .map(|p| crate::serialize::component_values(p))
+        .collect();
     let number = |p: &[ComponentValue]| {
         crate::syntax::match_value(&crate::syntax::parse_grammar("<number [0,inf]>"), p)
     };
     let basis = |p: &[ComponentValue]| parse_longhand(ids[2], p, at).ok();
-    let zero = Value::Length(crate::value::Length::px(0.0));
+    let one = Value::Number(1.0);
+    let zero_px = Value::Length(crate::value::Length::px(0.0));
     let auto = Value::Keyword("auto".to_owned());
-    let (grow, shrink, basis) = match parts.as_slice() {
-        [k] if crate::serialize::component_values(k) == "none" => {
-            (Value::Number(0.0), Value::Number(0.0), auto)
-        }
-        [k] if crate::serialize::component_values(k) == "auto" => {
-            (Value::Number(1.0), Value::Number(1.0), auto)
-        }
-        [g] if number(g).is_some() => (number(g).expect("checked"), Value::Number(1.0), zero),
-        [b] if basis(b).is_some() => (
-            Value::Number(1.0),
-            Value::Number(1.0),
-            basis(b).expect("checked"),
-        ),
-        [g, s] if number(g).is_some() && number(s).is_some() => (
-            number(g).expect("checked"),
-            number(s).expect("checked"),
-            zero,
-        ),
-        [g, b] if number(g).is_some() && basis(b).is_some() => (
-            number(g).expect("checked"),
-            Value::Number(1.0),
-            basis(b).expect("checked"),
-        ),
-        [g, s, b] if number(g).is_some() && number(s).is_some() && basis(b).is_some() => (
-            number(g).expect("checked"),
-            number(s).expect("checked"),
-            basis(b).expect("checked"),
-        ),
+    let classified: Vec<(Option<Value>, Option<Value>)> =
+        parts.iter().map(|p| (number(p), basis(p))).collect();
+    let (grow, shrink, basis) = match (as_text.as_slice(), classified.as_slice()) {
+        ([k], _) if k == "none" => (Value::Number(0.0), Value::Number(0.0), auto),
+        ([k], _) if k == "auto" => (one.clone(), one, auto),
+        (_, [(Some(g), _)]) => (g.clone(), one, zero_px),
+        (_, [(None, Some(b))]) => (one.clone(), one, b.clone()),
+        (_, [(Some(g), _), (Some(s), _)]) => (g.clone(), s.clone(), zero_px),
+        (_, [(Some(g), _), (None, Some(b))]) => (g.clone(), one, b.clone()),
+        (_, [(Some(g), _), (Some(s), _), (_, Some(b))]) => (g.clone(), s.clone(), b.clone()),
         _ => {
             return Err(refusal(
                 "flex",
