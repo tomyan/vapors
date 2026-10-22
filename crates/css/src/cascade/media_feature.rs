@@ -1,10 +1,9 @@
 //! One media or container feature: `(name: value)`, `(name)`, or the
 //! range syntax `(name >= value)` and `(lo < name <= hi)`.
 
-use super::Environment;
 use crate::ast::ComponentValue;
 use crate::token::{Token, TokenKind};
-use crate::value::{ColorScheme, Context, Length, LengthUnit};
+use crate::value::{ColorScheme, Length, LengthUnit};
 use crate::{Error, Position, Result};
 
 /// A parsed feature.
@@ -37,72 +36,13 @@ pub(crate) enum Comparison {
 }
 
 impl Comparison {
-    fn holds(self, actual: f64, wanted: f64) -> bool {
+    pub(super) fn holds(self, actual: f64, wanted: f64) -> bool {
         match self {
             Self::Less => actual < wanted,
             Self::LessEq => actual <= wanted,
             Self::Eq => (actual - wanted).abs() < f64::EPSILON,
             Self::GreaterEq => actual >= wanted,
             Self::Greater => actual > wanted,
-        }
-    }
-}
-
-/// What size features compare against: the viewport or a container.
-pub(crate) struct Sizes {
-    width: f64,
-    height: f64,
-    resolution: f64,
-    color_scheme: ColorScheme,
-    reduced_motion: bool,
-    /// What feature lengths resolve against.
-    ctx: Context,
-}
-
-impl Sizes {
-    pub(crate) fn viewport(env: &Environment) -> Self {
-        Self::container(env.viewport_width, env.viewport_height, env)
-    }
-
-    #[allow(clippy::cast_possible_truncation)] // f64 holds any f32 exactly
-    pub(crate) fn container(
-        width: impl Into<f64>,
-        height: impl Into<f64>,
-        env: &Environment,
-    ) -> Self {
-        Self {
-            width: width.into(),
-            height: height.into(),
-            resolution: env.resolution,
-            color_scheme: env.color_scheme,
-            reduced_motion: env.reduced_motion,
-            ctx: Context {
-                font_size: env.root_font_size,
-                root_font_size: env.root_font_size,
-                viewport_width: env.viewport_width,
-                viewport_height: env.viewport_height,
-                zero_advance: env.root_font_size * env.zero_advance_em,
-                percent_base: None,
-            },
-        }
-    }
-}
-
-impl Feature {
-    pub(crate) fn holds(&self, sizes: &Sizes) -> bool {
-        match self {
-            Self::Size(axis, tests) => {
-                let actual = match axis {
-                    SizeAxis::Width => sizes.width,
-                    SizeAxis::Height => sizes.height,
-                };
-                tests
-                    .iter()
-                    .all(|(op, l)| l.to_px(&sizes.ctx).is_ok_and(|v| op.holds(actual, v)))
-            }
-            Self::Resolution(tests) => tests.iter().all(|(op, v)| op.holds(sizes.resolution, *v)),
-            Self::ColorScheme(s) => sizes.color_scheme == *s,
-            Self::ReducedMotion(r) => sizes.reduced_motion == *r,
         }
     }
 }
@@ -161,45 +101,49 @@ fn colon_form(
     value: &[&ComponentValue],
     refuse: &dyn Fn(&str) -> Error,
 ) -> Result<Feature> {
-    let single = || {
-        value
-            .first()
-            .copied()
-            .filter(|_| value.len() == 1)
-            .ok_or_else(|| refuse("expected one value after :"))
-    };
-    let (base, op) = match name.strip_prefix("min-") {
-        Some(base) => (base, Comparison::GreaterEq),
-        None => match name.strip_prefix("max-") {
-            Some(base) => (base, Comparison::LessEq),
-            None => (name, Comparison::Eq),
-        },
+    let single = value
+        .first()
+        .copied()
+        .filter(|_| value.len() == 1)
+        .ok_or_else(|| refuse("expected one value after :"))?;
+    let (base, op) = match (name.strip_prefix("min-"), name.strip_prefix("max-")) {
+        (Some(base), _) => (base, Comparison::GreaterEq),
+        (_, Some(base)) => (base, Comparison::LessEq),
+        _ => (name, Comparison::Eq),
     };
     match base {
         "width" => Ok(Feature::Size(
             SizeAxis::Width,
-            vec![(op, length(single()?, refuse)?)],
+            vec![(op, length(single, refuse)?)],
         )),
         "height" => Ok(Feature::Size(
             SizeAxis::Height,
-            vec![(op, length(single()?, refuse)?)],
+            vec![(op, length(single, refuse)?)],
         )),
-        "resolution" => Ok(Feature::Resolution(vec![(
-            op,
-            resolution(single()?, refuse)?,
-        )])),
-        "prefers-color-scheme" if name == base => match ident(Some(single()?)).as_deref() {
-            Some("light") => Ok(Feature::ColorScheme(ColorScheme::Light)),
-            Some("dark") => Ok(Feature::ColorScheme(ColorScheme::Dark)),
-            _ => Err(refuse("prefers-color-scheme takes light or dark")),
-        },
-        "prefers-reduced-motion" if name == base => match ident(Some(single()?)).as_deref() {
-            Some("reduce") => Ok(Feature::ReducedMotion(true)),
-            Some("no-preference") => Ok(Feature::ReducedMotion(false)),
-            _ => Err(refuse(
-                "prefers-reduced-motion takes reduce or no-preference",
-            )),
-        },
+        "resolution" => Ok(Feature::Resolution(vec![(op, resolution(single, refuse)?)])),
+        _ if name == base => preference(base, single, refuse),
+        _ => Err(refuse(
+            "only width, height and resolution take min- and max-",
+        )),
+    }
+}
+
+/// `prefers-color-scheme` and `prefers-reduced-motion`.
+fn preference(
+    name: &str,
+    value: &ComponentValue,
+    refuse: &dyn Fn(&str) -> Error,
+) -> Result<Feature> {
+    let word = ident(Some(value));
+    match (name, word.as_deref()) {
+        ("prefers-color-scheme", Some("light")) => Ok(Feature::ColorScheme(ColorScheme::Light)),
+        ("prefers-color-scheme", Some("dark")) => Ok(Feature::ColorScheme(ColorScheme::Dark)),
+        ("prefers-color-scheme", _) => Err(refuse("prefers-color-scheme takes light or dark")),
+        ("prefers-reduced-motion", Some("reduce")) => Ok(Feature::ReducedMotion(true)),
+        ("prefers-reduced-motion", Some("no-preference")) => Ok(Feature::ReducedMotion(false)),
+        ("prefers-reduced-motion", _) => Err(refuse(
+            "prefers-reduced-motion takes reduce or no-preference",
+        )),
         _ => Err(refuse(
             "unknown feature; supported: width, height, resolution (with min-/max-), prefers-color-scheme, prefers-reduced-motion",
         )),

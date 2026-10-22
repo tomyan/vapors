@@ -1,6 +1,6 @@
 //! Attribute selectors: the inside of `[...]`.
 
-use super::parse::Items;
+use super::items::Items;
 use super::{AttributeOperator, AttributeSelector};
 use crate::ast::ComponentValue;
 use crate::token::{Token, TokenKind};

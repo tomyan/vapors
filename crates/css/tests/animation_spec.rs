@@ -1,27 +1,18 @@
-//! Transition and animation specs read from a computed style. Translated
-//! from sumi's `runtime/css/transition_parse_test.go` and
-//! `animation_parse_test.go`; the parsing itself is the shorthand tests.
+//! Specs from a computed style (`src/animation/spec.rs`). Translated from sumi `transition_parse_test.go` and `animation_parse_test.go`.
 
 mod support;
 
-use support::{chain, computed};
+use support::animation_specs::{animations_of, property, transitions_of};
+use support::chain;
 use vapors_css::animation::{
-    AnimationSpec, Direction, FillMode, IterationCount, PlayState, TimingFunction,
-    TransitionProperty, TransitionSpec, animations, transitions,
+    Direction, FillMode, IterationCount, PlayState, TimingFunction, TransitionProperty, animations,
 };
 
-fn transitions_of(decls: &str) -> Vec<TransitionSpec> {
-    let (tree, leaf) = chain(&["div.x"]);
-    transitions(&computed(&format!(".x {{ {decls} }}"), &tree, leaf))
-}
-
-fn animations_of(decls: &str) -> Vec<AnimationSpec> {
-    let (tree, leaf) = chain(&["div.x"]);
-    animations(&computed(&format!(".x {{ {decls} }}"), &tree, leaf))
-}
-
-fn property(name: &str) -> TransitionProperty {
-    TransitionProperty::Property(vapors_css::property::PropertyId::from_name(name).expect(name))
+#[test]
+fn no_animation_leaves_the_list_empty() {
+    let (tree, leaf) = chain(&["div"]);
+    let style = support::computed("div { color: red; }", &tree, leaf);
+    assert_eq!(animations(&style), []);
 }
 
 #[test]

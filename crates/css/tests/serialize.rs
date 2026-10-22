@@ -1,19 +1,9 @@
-//! Serialize round-trips a stylesheet through CSS text. Translated from
-//! sumi's `parser/style/serialize_test.go`.
+//! Serialize round-trips (`src/serialize.rs`). Translated from sumi `parser/style/serialize_test.go`.
 
 mod support;
 
-use support::{prop, sheet};
-use vapors_css::ast::Stylesheet;
-
-fn round_trip(src: &str) -> Stylesheet {
-    let first = sheet(src);
-    let text = first.to_css();
-    match vapors_css::parse(&text) {
-        Ok(s) => s,
-        Err(e) => panic!("reparse of serialized form refused: {e}\n{text}"),
-    }
-}
+use support::prop;
+use support::serialize::round_trip;
 
 #[test]
 fn serialize_round_trips_rules() {

@@ -17,7 +17,7 @@ pub struct PropertyDef {
     pub syntax: &'static str,
 }
 
-const fn def(
+pub(super) const fn def(
     name: &'static str,
     inherited: bool,
     initial: &'static str,
@@ -31,28 +31,30 @@ const fn def(
     }
 }
 
-const ALIGN: &str = "normal | stretch | center | start | end | flex-start | flex-end | baseline";
-const ALIGN_CONTENT: &str = "normal | stretch | center | start | end | flex-start | flex-end | space-between | space-around | space-evenly";
-const JUSTIFY_ITEMS: &str =
+pub(super) const ALIGN: &str =
+    "normal | stretch | center | start | end | flex-start | flex-end | baseline";
+pub(super) const ALIGN_CONTENT: &str = "normal | stretch | center | start | end | flex-start | flex-end | space-between | space-around | space-evenly";
+pub(super) const JUSTIFY_ITEMS: &str =
     "normal | stretch | center | start | end | flex-start | flex-end | baseline | left | right";
-const SELF: &str =
+pub(super) const SELF: &str =
     "auto | normal | stretch | center | start | end | flex-start | flex-end | baseline";
-const BORDER_STYLE: &str = "none | hidden | solid | dashed | dotted | double";
-const BORDER_WIDTH: &str = "thin | medium | thick | <length [0,inf]>";
-const RADIUS: &str = "<length-percentage [0,inf]>";
-const INSET: &str = "auto | <length-percentage>";
-const MARGIN: &str = "auto | <length-percentage>";
-const PADDING: &str = "<length-percentage [0,inf]>";
-const SIZE: &str = "auto | min-content | max-content | fit-content | <length-percentage [0,inf]>";
-const MAX_SIZE: &str =
+pub(super) const BORDER_STYLE: &str = "none | hidden | solid | dashed | dotted | double";
+pub(super) const BORDER_WIDTH: &str = "thin | medium | thick | <length [0,inf]>";
+pub(super) const RADIUS: &str = "<length-percentage [0,inf]>";
+pub(super) const INSET: &str = "auto | <length-percentage>";
+pub(super) const MARGIN: &str = "auto | <length-percentage>";
+pub(super) const PADDING: &str = "<length-percentage [0,inf]>";
+pub(super) const SIZE: &str =
+    "auto | min-content | max-content | fit-content | <length-percentage [0,inf]>";
+pub(super) const MAX_SIZE: &str =
     "none | min-content | max-content | fit-content | <length-percentage [0,inf]>";
-const GAP: &str = "normal | <length-percentage [0,inf]>";
-const OVERFLOW: &str = "visible | hidden | clip | scroll | auto";
-const GRID_LINE: &str = "auto | <integer> | span <integer [1,inf]>";
-const CURSOR: &str = "auto | default | none | pointer | text | move | grab | grabbing | not-allowed | crosshair | col-resize | row-resize | ew-resize | ns-resize | nesw-resize | nwse-resize | wait | progress | help | zoom-in | zoom-out";
+pub(super) const GAP: &str = "normal | <length-percentage [0,inf]>";
+pub(super) const OVERFLOW: &str = "visible | hidden | clip | scroll | auto";
+pub(super) const GRID_LINE: &str = "auto | <integer> | span <integer [1,inf]>";
+pub(super) const CURSOR: &str = "auto | default | none | pointer | text | move | grab | grabbing | not-allowed | crosshair | col-resize | row-resize | ew-resize | ns-resize | nesw-resize | nwse-resize | wait | progress | help | zoom-in | zoom-out";
 
-/// Every longhand, sorted by name.
-pub static PROPERTIES: &[PropertyDef] = &[
+/// Longhands a to g, sorted by name; `table_rest` has the rest.
+pub(super) static FIRST_HALF: &[PropertyDef] = &[
     def("align-content", false, "normal", ALIGN_CONTENT),
     def("align-items", false, "normal", ALIGN),
     def("align-self", false, "auto", SELF),
@@ -192,97 +194,4 @@ pub static PROPERTIES: &[PropertyDef] = &[
         "none | <track-list>",
     ),
     def("grid-template-rows", false, "none", "none | <track-list>"),
-    def("height", false, "auto", SIZE),
-    def(
-        "justify-content",
-        false,
-        "normal",
-        "normal | stretch | center | start | end | flex-start | flex-end | space-between | space-around | space-evenly | left | right",
-    ),
-    def("justify-items", false, "normal", JUSTIFY_ITEMS),
-    def(
-        "justify-self",
-        false,
-        "auto",
-        "auto | normal | stretch | center | start | end | flex-start | flex-end | baseline | left | right",
-    ),
-    def("left", false, "auto", INSET),
-    def("letter-spacing", true, "normal", "normal | <length>"),
-    def(
-        "line-height",
-        true,
-        "normal",
-        "normal | <number [0,inf]> | <length-percentage [0,inf]>",
-    ),
-    def("margin-bottom", false, "0px", MARGIN),
-    def("margin-left", false, "0px", MARGIN),
-    def("margin-right", false, "0px", MARGIN),
-    def("margin-top", false, "0px", MARGIN),
-    def("max-height", false, "none", MAX_SIZE),
-    def("max-width", false, "none", MAX_SIZE),
-    def("min-height", false, "auto", SIZE),
-    def("min-width", false, "auto", SIZE),
-    def(
-        "opacity",
-        false,
-        "1",
-        "<number [0,1]> | <percentage [0,100]>",
-    ),
-    def("overflow-x", false, "visible", OVERFLOW),
-    def("overflow-y", false, "visible", OVERFLOW),
-    def("padding-bottom", false, "0px", PADDING),
-    def("padding-left", false, "0px", PADDING),
-    def("padding-right", false, "0px", PADDING),
-    def("padding-top", false, "0px", PADDING),
-    def(
-        "position",
-        false,
-        "static",
-        "static | relative | absolute | fixed | sticky",
-    ),
-    def("right", false, "auto", INSET),
-    def("row-gap", false, "normal", GAP),
-    def(
-        "text-align",
-        true,
-        "start",
-        "start | end | left | right | center | justify",
-    ),
-    def(
-        "text-decoration",
-        false,
-        "none",
-        "none | underline line-through | line-through underline | underline | line-through",
-    ),
-    def("top", false, "auto", INSET),
-    def("transform", false, "none", "none | <transform-function>+"),
-    def("transition-delay", false, "0s", "<time>#"),
-    def("transition-duration", false, "0s", "<time [0,inf]>#"),
-    def(
-        "transition-property",
-        false,
-        "all",
-        "none | [ all | <custom-ident> ]#",
-    ),
-    def(
-        "transition-timing-function",
-        false,
-        "ease",
-        "<easing-function>#",
-    ),
-    def(
-        "user-select",
-        false,
-        "auto",
-        "auto | text | none | contain | all",
-    ),
-    def("visibility", true, "visible", "visible | hidden | collapse"),
-    def(
-        "white-space",
-        true,
-        "normal",
-        "normal | nowrap | pre | pre-wrap | pre-line",
-    ),
-    def("width", false, "auto", SIZE),
-    def("z-index", false, "auto", "auto | <integer>"),
 ];

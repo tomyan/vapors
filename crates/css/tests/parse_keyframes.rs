@@ -1,93 +1,8 @@
-//! @media, @container, @supports and @keyframes blocks. Translated from
-//! sumi's `style_atrule_test.go`, `media_test.go` and `style_keyframe_test.go`;
-//! sumi's `(display-mode: terminal)` becomes a width query.
+//! `@keyframes` blocks (`src/parse/keyframes.rs`). Translated from sumi `style_keyframe_test.go`.
 
 mod support;
 
-use support::{prop, refusal, sheet};
-
-#[test]
-fn media_block_rules_carry_query() {
-    // Given
-    let input = "\n.card { color: red; }\n@media (min-width: 600px) {\n\t.card { border-style: solid; }\n}\n.other { color: blue; }\n";
-
-    // When
-    let s = sheet(input);
-
-    // Then
-    assert_eq!(s.rules.len(), 3, "flat, source order");
-    assert_eq!(s.rules[0].media_text(), None);
-    assert_eq!(s.rules[2].media_text(), None);
-    assert_eq!(
-        s.rules[1].media_text().as_deref(),
-        Some("(min-width: 600px)")
-    );
-    assert_eq!(prop(&s.rules[1], "border-style"), "solid");
-}
-
-#[test]
-fn media_block_with_multiple_rules() {
-    // When
-    let s = sheet("@media (max-width: 400px) { .a { color: red; } .b { color: blue; } }");
-
-    // Then
-    assert_eq!(s.rules.len(), 2);
-    for r in &s.rules {
-        assert_eq!(r.media_text().as_deref(), Some("(max-width: 400px)"));
-    }
-}
-
-#[test]
-fn media_block_with_keyframes_untouched() {
-    // When
-    let s = sheet(
-        "@media (min-width: 1px) { .a { color: red; } } @keyframes pulse { from { color: red; } to { color: blue; } }",
-    );
-
-    // Then
-    assert_eq!((s.rules.len(), s.keyframes.len()), (1, 1));
-}
-
-#[test]
-fn unterminated_media_block_is_refused() {
-    // When
-    let err = refusal("@media (min-width: 1px) { .a { color: red; }");
-
-    // Then: the refusal points at the brace that was never closed.
-    assert_eq!(err.position.column, 25);
-    assert!(err.message.contains("@media"), "{err}");
-}
-
-#[test]
-fn container_and_supports_blocks_tag_their_rules() {
-    // When
-    let s = sheet(
-        "@container (min-width: 40px) { .label { color: red; } } @supports (display: grid) { .g { display: grid; } }",
-    );
-
-    // Then
-    assert_eq!(
-        s.rules[0].container_text().as_deref(),
-        Some("(min-width: 40px)")
-    );
-    assert_eq!(
-        s.rules[1].supports_text().as_deref(),
-        Some("(display: grid)")
-    );
-}
-
-#[test]
-fn nested_conditional_blocks_stack_their_conditions() {
-    // When
-    let s = sheet("@media (min-width: 1px) { @supports (display: grid) { .a { color: red; } } }");
-
-    // Then
-    assert_eq!(s.rules[0].media_text().as_deref(), Some("(min-width: 1px)"));
-    assert_eq!(
-        s.rules[0].supports_text().as_deref(),
-        Some("(display: grid)")
-    );
-}
+use support::{refusal, sheet};
 
 #[test]
 fn parse_keyframes_basic() {
@@ -185,10 +100,4 @@ fn keyframes_none_and_important_in_keyframes_are_refused() {
     assert!(err.message.contains("none"), "{err}");
     let err = refusal("@keyframes x { from { opacity: 0 !important; } }");
     assert!(err.message.contains("!important"), "{err}");
-}
-
-#[test]
-fn supports_selector_function_is_refused_naming_it() {
-    let err = refusal("@supports selector(:has(a)) { .x { color: red; } }");
-    assert!(err.message.contains("selector()"), "{err}");
 }

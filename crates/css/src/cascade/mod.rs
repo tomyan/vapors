@@ -11,7 +11,9 @@ mod compute;
 mod compute_resolve;
 mod computed;
 mod conditions;
+mod environment;
 mod media;
+mod media_eval;
 mod media_feature;
 mod media_items;
 mod media_range;
@@ -19,6 +21,7 @@ mod restyle;
 mod supports;
 
 pub use computed::ComputedStyle;
+pub use environment::Environment;
 pub use restyle::RestyleScope;
 
 pub(crate) use compute::resolve_for;
@@ -26,7 +29,6 @@ pub(crate) use compute::resolve_for;
 use crate::Result;
 use crate::ast::{Keyframes, Rule, Stylesheet};
 use crate::selector::Element;
-use crate::value::ColorScheme;
 use conditions::Conditions;
 
 /// Where a stylesheet comes from.
@@ -36,40 +38,6 @@ pub enum Origin {
     UserAgent,
     /// The component's `<style>` and any sheet the app adds.
     Author,
-}
-
-/// What the caller knows that `@media` and the relative units need.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Environment {
-    /// Viewport width in px.
-    pub viewport_width: f64,
-    /// Viewport height in px.
-    pub viewport_height: f64,
-    /// The colour scheme for `light-dark()` and `prefers-color-scheme`.
-    pub color_scheme: ColorScheme,
-    /// `prefers-reduced-motion: reduce` when true.
-    pub reduced_motion: bool,
-    /// Device pixels per CSS pixel, for `resolution`.
-    pub resolution: f64,
-    /// The font size the root inherits from (the user agent default).
-    pub root_font_size: f64,
-    /// The advance of `0` as a fraction of the font size, for `ch`, until
-    /// the text layer supplies the real measurement.
-    pub zero_advance_em: f64,
-}
-
-impl Default for Environment {
-    fn default() -> Self {
-        Self {
-            viewport_width: 0.0,
-            viewport_height: 0.0,
-            color_scheme: ColorScheme::Light,
-            reduced_motion: false,
-            resolution: 1.0,
-            root_font_size: 16.0,
-            zero_advance_em: 0.5,
-        }
-    }
 }
 
 /// Check one at-rule condition at parse time.

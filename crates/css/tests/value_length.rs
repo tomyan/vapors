@@ -1,18 +1,9 @@
-//! Lengths and their resolution to px. vapors-specific: sumi had only the
-//! cell.
+//! Lengths (`src/value/length.rs`). vapors-specific; sumi had only the cell.
 
-use vapors_css::value::{Context, Length, LengthUnit, parse_length_text};
+mod support;
 
-fn context() -> Context {
-    Context {
-        font_size: 20.0,
-        root_font_size: 16.0,
-        viewport_width: 1000.0,
-        viewport_height: 500.0,
-        zero_advance: 9.0,
-        percent_base: Some(200.0),
-    }
-}
+use support::value_length::context;
+use vapors_css::value::{Length, LengthUnit, parse_length_text};
 
 #[test]
 fn every_unit_resolves_against_the_context() {

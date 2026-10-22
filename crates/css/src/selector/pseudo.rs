@@ -1,6 +1,7 @@
 //! Pseudo-classes: the names, their arguments, and the refusals.
 
-use super::parse::{Items, complex, explicit_combinator, selector_list};
+use super::items::Items;
+use super::parse::{complex, explicit_combinator, selector_list};
 use super::{Combinator, Nth, PseudoClass, RelativeSelector, Selector};
 use crate::ast::ComponentValue;
 use crate::token::{Token, TokenKind};

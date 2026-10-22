@@ -69,45 +69,12 @@ fn resolve_stop(
     style: &ComputedStyle,
     env: &Environment,
 ) -> Result<Stop> {
-    let lookup = |name: &str| style.custom(name);
     let timing_id = PropertyId::from_name("animation-timing-function").expect("table");
     let mut values = Vec::new();
     let mut timing = None;
     for decl in &stop.declarations {
         for longhand in &decl.longhands {
-            let specified = match &longhand.value {
-                Specified::Value(v) => v.clone(),
-                Specified::Initial | Specified::Inherit | Specified::Unset => {
-                    return Err(Error::new(
-                        decl.position,
-                        format!(
-                            "{}: CSS-wide keywords are not allowed in @keyframes",
-                            decl.name
-                        ),
-                    ));
-                }
-                Specified::Pending { property, tokens } => {
-                    let resolved = crate::property::resolve_pending(
-                        property,
-                        tokens,
-                        &lookup,
-                        longhand.id,
-                        decl.position,
-                    )?;
-                    match resolved {
-                        Specified::Value(v) => v,
-                        _ => {
-                            return Err(Error::new(
-                                decl.position,
-                                format!(
-                                    "{}: CSS-wide keywords are not allowed in @keyframes",
-                                    decl.name
-                                ),
-                            ));
-                        }
-                    }
-                }
-            };
+            let specified = stop_value(decl, longhand, style)?;
             if longhand.id == timing_id {
                 timing = TimingFunction::from_value(&specified);
                 continue;
@@ -127,6 +94,35 @@ fn resolve_stop(
         values,
         timing,
     })
+}
+
+/// One longhand's specified value in a stop; `var()` resolves in the
+/// element's scope and CSS-wide keywords are refused.
+fn stop_value(
+    decl: &crate::ast::Declaration,
+    longhand: &crate::property::Longhand,
+    style: &ComputedStyle,
+) -> Result<Value> {
+    let wide = || {
+        Error::new(
+            decl.position,
+            format!(
+                "{}: CSS-wide keywords are not allowed in @keyframes",
+                decl.name
+            ),
+        )
+    };
+    let resolved = match &longhand.value {
+        Specified::Pending { property, tokens } => {
+            let lookup = |name: &str| style.custom(name);
+            crate::property::resolve_pending(property, tokens, &lookup, longhand.id, decl.position)?
+        }
+        other => other.clone(),
+    };
+    match resolved {
+        Specified::Value(v) => Ok(v),
+        _ => Err(wide()),
+    }
 }
 
 /// Give every animated property a value at 0 and at 1 from `style`.

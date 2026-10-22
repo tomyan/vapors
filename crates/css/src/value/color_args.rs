@@ -82,41 +82,42 @@ fn component(value: &ComponentValue) -> Result<Component> {
         percent,
         angle_unit: None,
     };
-    match value {
-        ComponentValue::Token(Token {
-            kind: TokenKind::Number { value, .. },
-            ..
-        }) => Ok(plain(*value, false)),
-        ComponentValue::Token(Token {
-            kind: TokenKind::Percentage(p),
-            ..
-        }) => Ok(plain(*p, true)),
-        ComponentValue::Token(Token {
-            kind: TokenKind::Ident(n),
-            ..
-        }) if n.eq_ignore_ascii_case("none") => Ok(plain(0.0, false)),
-        ComponentValue::Token(Token {
-            kind: TokenKind::Dimension { value, unit },
-            position,
-        }) => {
-            let angle_unit = ["deg", "rad", "grad", "turn"]
-                .into_iter()
-                .find(|u| *u == unit)
-                .ok_or_else(|| {
-                    Error::new(
-                        *position,
-                        format!("{unit} is not an angle unit; use deg, rad, grad or turn"),
-                    )
-                })?;
-            Ok(Component {
-                number: *value,
-                percent: false,
-                angle_unit: Some(angle_unit),
-            })
+    let kind = match value {
+        ComponentValue::Token(Token { kind, .. }) => kind,
+        other => {
+            return Err(Error::new(
+                other.position(),
+                "colour components are numbers, percentages, angles or none",
+            ));
         }
-        other => Err(Error::new(
-            other.position(),
+    };
+    match kind {
+        TokenKind::Number { value, .. } => Ok(plain(*value, false)),
+        TokenKind::Percentage(p) => Ok(plain(*p, true)),
+        TokenKind::Ident(n) if n.eq_ignore_ascii_case("none") => Ok(plain(0.0, false)),
+        TokenKind::Dimension {
+            value: number,
+            unit,
+        } => Ok(Component {
+            number: *number,
+            percent: false,
+            angle_unit: Some(angle_unit(unit, value.position())?),
+        }),
+        _ => Err(Error::new(
+            value.position(),
             "colour components are numbers, percentages, angles or none",
         )),
     }
+}
+
+fn angle_unit(unit: &str, at: Position) -> Result<&'static str> {
+    ["deg", "rad", "grad", "turn"]
+        .into_iter()
+        .find(|u| *u == unit)
+        .ok_or_else(|| {
+            Error::new(
+                at,
+                format!("{unit} is not an angle unit; use deg, rad, grad or turn"),
+            )
+        })
 }

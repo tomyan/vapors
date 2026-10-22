@@ -1,7 +1,8 @@
 //! `border: <width> || <style> || <color>` for all four sides.
 
 use super::PropertyId;
-use super::declaration::{Longhand, Specified, parse_longhand, refusal};
+use super::declaration::{Longhand, Specified, parse_longhand};
+use super::declaration_check::refusal;
 use super::shorthand::parts;
 use crate::ast::ComponentValue;
 use crate::value::Value;

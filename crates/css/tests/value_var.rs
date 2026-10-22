@@ -1,31 +1,9 @@
-//! `var()` substitution. Translated from sumi's `runtime/css/vars_test.go`;
-//! sumi expanded strings and collapsed cycles and unresolved references to
-//! "" (dropping the property), vapors substitutes tokens and refuses both,
-//! naming the variable.
+//! `var()` substitution (`src/value/var.rs`). Translated from sumi `vars_test.go`; unresolved and cyclic references are refused.
 
-use std::collections::BTreeMap;
+mod support;
 
-use vapors_css::ast::ComponentValue;
-use vapors_css::serialize::component_values;
-use vapors_css::value::{VarError, substitute_vars};
-
-fn tokens(text: &str) -> Vec<ComponentValue> {
-    let sheet = vapors_css::parse(&format!("a {{ --v: {text}; }}")).expect("parses");
-    sheet.rules[0].declarations[0].value.clone()
-}
-
-fn expand(value: &str, vars: &[(&str, &str)]) -> Result<String, VarError> {
-    let table: BTreeMap<String, Vec<ComponentValue>> = vars
-        .iter()
-        .map(|(k, v)| ((*k).to_owned(), tokens(v)))
-        .collect();
-    let lookup = |name: &str| table.get(name).map(Vec::as_slice);
-    substitute_vars(&tokens(value), &lookup).map(|v| component_values(&v))
-}
-
-fn ok(value: &str, vars: &[(&str, &str)]) -> String {
-    expand(value, vars).unwrap_or_else(|e| panic!("{value}: {e}"))
-}
+use support::value_var::{expand, ok};
+use vapors_css::value::VarError;
 
 #[test]
 fn expand_var_simple() {

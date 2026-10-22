@@ -54,7 +54,7 @@ pub(super) fn ident(v: &ComponentValue) -> Option<String> {
 /// | cubic-bezier(n, n, n, n) | steps(n [, position]?)`
 fn easing(v: &ComponentValue) -> Option<Value> {
     if let Some(k) = ident(v) {
-        return [
+        let names = [
             "linear",
             "ease",
             "ease-in",
@@ -62,53 +62,54 @@ fn easing(v: &ComponentValue) -> Option<Value> {
             "ease-in-out",
             "step-start",
             "step-end",
-        ]
-        .contains(&k.as_str())
-        .then_some(Value::Keyword(k));
+        ];
+        return names.contains(&k.as_str()).then_some(Value::Keyword(k));
     }
     let (name, args) = function(v)?;
     match (name.to_ascii_lowercase().as_str(), args.as_slice()) {
-        ("cubic-bezier", [a, b, c, d]) => {
-            let nums: Option<Vec<Value>> = [a, b, c, d]
-                .iter()
-                .map(|p| types::plain_number(single(p)?))
-                .collect();
-            let nums = nums?;
-            let x_in_range = |n: &Value| matches!(n, Value::Number(x) if (0.0..=1.0).contains(x));
-            if !x_in_range(&nums[0]) || !x_in_range(&nums[2]) {
-                return None;
-            }
-            Some(Value::Function("cubic-bezier".to_owned(), nums))
-        }
-        ("steps", [n]) => {
-            let count = types::positive_integer(single(n)?)?;
-            Some(Value::Function("steps".to_owned(), vec![count]))
-        }
-        ("steps", [n, pos]) => {
-            let count = types::positive_integer(single(n)?)?;
-            let pos = ident(single(pos)?)?;
-            let known = [
-                "start",
-                "end",
-                "jump-start",
-                "jump-end",
-                "jump-none",
-                "jump-both",
-            ];
-            if !known.contains(&pos.as_str()) {
-                return None;
-            }
-            // jump-none needs two steps to have anywhere to go.
-            if pos == "jump-none" && count == Value::Integer(1) {
-                return None;
-            }
-            Some(Value::Function(
-                "steps".to_owned(),
-                vec![count, Value::Keyword(pos)],
-            ))
-        }
+        ("cubic-bezier", [a, b, c, d]) => cubic_bezier([a, b, c, d]),
+        ("steps", [n]) => Some(Value::Function(
+            "steps".to_owned(),
+            vec![types::positive_integer(single(n)?)?],
+        )),
+        ("steps", [n, pos]) => steps(n, pos),
         _ => None,
     }
+}
+
+/// Four numbers; the x control points stay in 0..=1.
+fn cubic_bezier(args: [&Vec<ComponentValue>; 4]) -> Option<Value> {
+    let nums: Option<Vec<Value>> = args
+        .iter()
+        .map(|p| types::plain_number(single(p)?))
+        .collect();
+    let nums = nums?;
+    let x_in_range = |n: &Value| matches!(n, Value::Number(x) if (0.0..=1.0).contains(x));
+    if !x_in_range(&nums[0]) || !x_in_range(&nums[2]) {
+        return None;
+    }
+    Some(Value::Function("cubic-bezier".to_owned(), nums))
+}
+
+/// `steps(n, position)`; jump-none needs two steps to have anywhere to go.
+fn steps(n: &[ComponentValue], pos: &[ComponentValue]) -> Option<Value> {
+    let count = types::positive_integer(single(n)?)?;
+    let pos = ident(single(pos)?)?;
+    let known = [
+        "start",
+        "end",
+        "jump-start",
+        "jump-end",
+        "jump-none",
+        "jump-both",
+    ];
+    if !known.contains(&pos.as_str()) || (pos == "jump-none" && count == Value::Integer(1)) {
+        return None;
+    }
+    Some(Value::Function(
+        "steps".to_owned(),
+        vec![count, Value::Keyword(pos)],
+    ))
 }
 
 /// `translate(lp [, lp]?) | translateX(lp) | translateY(lp) | scale(n [, n]?)`

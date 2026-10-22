@@ -1,7 +1,8 @@
 //! The `flex` and `grid-row`/`grid-column` shorthands.
 
 use super::PropertyId;
-use super::declaration::{Longhand, parse_longhand, refusal};
+use super::declaration::{Longhand, parse_longhand};
+use super::declaration_check::refusal;
 use super::shorthand::{parts, set};
 use crate::ast::ComponentValue;
 use crate::value::Value;

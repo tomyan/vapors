@@ -1,29 +1,9 @@
-//! Value syntax per property family. vapors-specific.
+//! Basic value types (`src/syntax/types.rs`) through the property grammars.
 
 mod support;
 
-use support::{refusal, sheet};
-
-/// The longhand values of one declaration, as `name: value` text.
-fn longhands(decl: &str) -> Vec<String> {
-    let s = sheet(&format!("a {{ {decl}; }}"));
-    s.rules[0].declarations[0]
-        .longhands
-        .iter()
-        .map(|l| format!("{}: {}", l.id.name(), l.value.to_css()))
-        .collect()
-}
-
-fn accepts(decl: &str) {
-    accepts_as(decl, decl);
-}
-
-/// `decl` parses and serializes canonically as `want`.
-fn accepts_as(decl: &str, want: &str) {
-    let got = longhands(decl);
-    assert_eq!(got.len(), 1, "{decl}: {got:?}");
-    assert_eq!(got[0], want, "{decl}");
-}
+use support::property_values::{accepts, accepts_as};
+use support::refusal;
 
 #[test]
 fn keyword_properties() {
@@ -154,90 +134,6 @@ fn colour_properties() {
 }
 
 #[test]
-fn font_properties() {
-    for decl in [
-        "font-family: \"Inter Var\", system-ui, sans-serif",
-        "font-family: Inter",
-        "font-size: 14px",
-        "font-size: 120%",
-        "font-size: 1.2em",
-        "font-feature-settings: \"tnum\"",
-        "font-feature-settings: \"tnum\" 1, \"liga\" off",
-        "font-feature-settings: normal",
-        "font-variation-settings: \"wght\" 500, \"wdth\" 80",
-        "font-variation-settings: normal",
-    ] {
-        accepts(decl);
-    }
-    assert!(
-        refusal("a { font-feature-settings: tnum; }")
-            .message
-            .contains("string")
-    );
-}
-
-#[test]
-fn shadow_transform_and_filter_lists() {
-    accepts_as(
-        "box-shadow: 0 2px 8px rgb(0 0 0 / 40%)",
-        "box-shadow: 0px 2px 8px rgb(0 0 0 / 0.4)",
-    );
-    accepts_as(
-        "box-shadow: inset 0 0 0 1px red, 0 1px 2px black",
-        "box-shadow: inset 0px 0px 0px 1px rgb(255 0 0), 0px 1px 2px rgb(0 0 0)",
-    );
-    for decl in [
-        "box-shadow: none",
-        "transform: none",
-        "transform: translate(10px, 20%)",
-        "transform: translate(10px)",
-        "transform: translateX(1px) translateY(2px)",
-        "transform: scale(1.1)",
-        "transform: scale(1, 2)",
-        "transform: translate(1px, 2px) scale(2)",
-        "filter: none",
-        "filter: blur(4px)",
-    ] {
-        accepts(decl);
-    }
-    for bad in [
-        "transform: rotate(45deg)",
-        "filter: grayscale(1)",
-        "box-shadow: 1px",
-    ] {
-        let err = refusal(&format!("a {{ {bad}; }}"));
-        assert!(
-            err.message.contains("translate")
-                || err.message.contains("blur")
-                || err.message.contains("shadow"),
-            "{bad}: {err}"
-        );
-    }
-}
-
-#[test]
-fn grid_properties_for_taffy() {
-    for decl in [
-        "grid-template-columns: 1fr 2fr",
-        "grid-template-columns: repeat(3, 1fr)",
-        "grid-template-columns: minmax(100px, 1fr) auto",
-        "grid-template-rows: none",
-        "grid-auto-rows: min-content",
-        "grid-auto-columns: 40px",
-        "grid-row-start: 2",
-        "grid-column-end: span 2",
-        "grid-row-start: auto",
-    ] {
-        accepts(decl);
-    }
-    assert!(
-        refusal("a { grid-template-columns: [a] 1fr; }")
-            .message
-            .contains("line names")
-    );
-}
-
-#[test]
 fn time_and_easing_longhands() {
     for decl in [
         "transition-duration: 200ms",
@@ -280,34 +176,10 @@ fn gap_longhands() {
 }
 
 #[test]
-fn steps_one_jump_none_is_refused_naming_it() {
-    // Given: review item 9; jump-none needs at least two steps.
-    let err = refusal("a { transition-timing-function: steps(1, jump-none); }");
-    assert!(err.message.contains("jump-none"), "{err}");
-    accepts("transition-timing-function: steps(2, jump-none)");
-}
-
-#[test]
 fn container_type_and_name_declare_a_container() {
     // Given: review item 15.
     accepts("container-type: inline-size");
     accepts("container-type: size");
     accepts("container-name: sidebar");
     accepts("container-name: none");
-}
-
-#[test]
-fn known_but_unsupported_shorthands_are_refused_by_name() {
-    // Given: review item 18.
-    for (decl, hint) in [
-        ("font: 12px serif", "font-size"),
-        ("border-top: 1px solid", "border-top-width"),
-        ("background: red", "background-color"),
-    ] {
-        let err = refusal(&format!("a {{ {decl}; }}"));
-        assert!(
-            err.message.contains("not supported") && err.message.contains(hint),
-            "{decl}: {err}"
-        );
-    }
 }

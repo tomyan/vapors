@@ -1,5 +1,4 @@
-//! The incremental restyle rule: which elements a state-flag flip on one
-//! element can restyle. vapors-specific.
+//! The incremental restyle rule (`src/cascade/restyle.rs`). vapors-specific.
 
 mod support;
 

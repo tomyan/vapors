@@ -8,6 +8,7 @@ mod keyframes;
 mod sampler;
 mod spec;
 mod timing;
+mod timing_curve;
 mod transition;
 
 pub use interpolate::interpolate;

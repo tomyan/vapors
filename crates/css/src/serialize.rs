@@ -73,17 +73,25 @@ pub fn token(kind: &TokenKind, out: &mut String) {
             number(*value, out);
             out.push_str(unit);
         }
-        TokenKind::Whitespace => out.push(' '),
-        TokenKind::Colon => out.push(':'),
-        TokenKind::Semicolon => out.push(';'),
-        TokenKind::Comma => out.push(','),
-        TokenKind::OpenSquare => out.push('['),
-        TokenKind::CloseSquare => out.push(']'),
-        TokenKind::OpenParen => out.push('('),
-        TokenKind::CloseParen => out.push(')'),
-        TokenKind::OpenCurly => out.push('{'),
-        TokenKind::CloseCurly => out.push('}'),
-        TokenKind::Delim(c) => out.push(*c),
+        other => out.push(punctuation(other)),
+    }
+}
+
+/// The single character of a punctuation or delimiter token.
+fn punctuation(kind: &TokenKind) -> char {
+    match kind {
+        TokenKind::Whitespace => ' ',
+        TokenKind::Colon => ':',
+        TokenKind::Semicolon => ';',
+        TokenKind::Comma => ',',
+        TokenKind::OpenSquare => '[',
+        TokenKind::CloseSquare => ']',
+        TokenKind::OpenParen => '(',
+        TokenKind::CloseParen => ')',
+        TokenKind::OpenCurly => '{',
+        TokenKind::CloseCurly => '}',
+        TokenKind::Delim(c) => *c,
+        _ => unreachable!("token() handles every other kind"),
     }
 }
 

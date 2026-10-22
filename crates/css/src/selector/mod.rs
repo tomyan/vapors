@@ -3,6 +3,7 @@
 
 mod attribute;
 mod element;
+mod items;
 mod matching;
 mod nth;
 mod parse;

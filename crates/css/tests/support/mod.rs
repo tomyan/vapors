@@ -143,3 +143,21 @@ pub fn css_at(src: &str, descs: &[&str], property: &str) -> String {
     let (tree, leaf) = chain(descs);
     css(&computed(src, &tree, leaf), property)
 }
+
+pub mod animation_sample;
+pub mod animation_specs;
+pub mod animation_timing;
+pub mod cascade;
+pub mod cascade_computed;
+pub mod cascade_media;
+pub mod cascade_vars;
+pub mod property_shorthand;
+pub mod property_values;
+pub mod selector_match;
+pub mod selector_parse;
+pub mod serialize;
+pub mod tokenizer;
+pub mod value_calc;
+pub mod value_color;
+pub mod value_length;
+pub mod value_var;

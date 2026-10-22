@@ -1,108 +1,12 @@
-//! Shorthands and their expansion into longhands.
+//! Shorthand expansion into longhands; the list is in `shorthand_table`.
+
+pub use super::shorthand_table::SHORTHANDS;
 
 use super::declaration::{Longhand, Specified, parse_longhand};
 use super::{PropertyId, shorthand_border, shorthand_layout, shorthand_motion};
 use crate::ast::ComponentValue;
 use crate::value::Value;
 use crate::{Error, Position, Result};
-
-/// Every shorthand and the longhands it sets, in the order it sets them.
-pub static SHORTHANDS: &[(&str, &[&str])] = &[
-    (
-        "animation",
-        &[
-            "animation-name",
-            "animation-duration",
-            "animation-timing-function",
-            "animation-delay",
-            "animation-iteration-count",
-            "animation-direction",
-            "animation-fill-mode",
-            "animation-play-state",
-        ],
-    ),
-    (
-        "border",
-        &[
-            "border-top-width",
-            "border-right-width",
-            "border-bottom-width",
-            "border-left-width",
-            "border-top-style",
-            "border-right-style",
-            "border-bottom-style",
-            "border-left-style",
-            "border-top-color",
-            "border-right-color",
-            "border-bottom-color",
-            "border-left-color",
-        ],
-    ),
-    (
-        "border-color",
-        &[
-            "border-top-color",
-            "border-right-color",
-            "border-bottom-color",
-            "border-left-color",
-        ],
-    ),
-    (
-        "border-radius",
-        &[
-            "border-top-left-radius",
-            "border-top-right-radius",
-            "border-bottom-right-radius",
-            "border-bottom-left-radius",
-        ],
-    ),
-    (
-        "border-style",
-        &[
-            "border-top-style",
-            "border-right-style",
-            "border-bottom-style",
-            "border-left-style",
-        ],
-    ),
-    (
-        "border-width",
-        &[
-            "border-top-width",
-            "border-right-width",
-            "border-bottom-width",
-            "border-left-width",
-        ],
-    ),
-    ("flex", &["flex-grow", "flex-shrink", "flex-basis"]),
-    ("gap", &["row-gap", "column-gap"]),
-    ("grid-column", &["grid-column-start", "grid-column-end"]),
-    ("grid-row", &["grid-row-start", "grid-row-end"]),
-    ("inset", &["top", "right", "bottom", "left"]),
-    (
-        "margin",
-        &["margin-top", "margin-right", "margin-bottom", "margin-left"],
-    ),
-    ("overflow", &["overflow-x", "overflow-y"]),
-    (
-        "padding",
-        &[
-            "padding-top",
-            "padding-right",
-            "padding-bottom",
-            "padding-left",
-        ],
-    ),
-    (
-        "transition",
-        &[
-            "transition-property",
-            "transition-duration",
-            "transition-timing-function",
-            "transition-delay",
-        ],
-    ),
-];
 
 /// Whether `name` is a shorthand.
 #[must_use]

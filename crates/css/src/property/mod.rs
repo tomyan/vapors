@@ -3,22 +3,35 @@
 //! parse of a declaration into typed longhand values.
 
 mod declaration;
+mod declaration_check;
 mod names;
 mod shorthand;
 mod shorthand_border;
 mod shorthand_layout;
 mod shorthand_motion;
+mod shorthand_table;
 mod table;
+mod table_rest;
 
 use std::sync::OnceLock;
 
 use crate::syntax::{Grammar, parse_grammar};
 use crate::{Error, Position, Result};
 
-pub use declaration::{Longhand, Specified, parse_declaration, resolve_pending};
+pub use declaration::{Longhand, Specified, parse_declaration};
+pub use declaration_check::resolve_pending;
 pub use names::IGNORED_VENDOR_PROPERTIES;
 pub use shorthand::{SHORTHANDS, is_shorthand};
-pub use table::{PROPERTIES, PropertyDef};
+pub use table::PropertyDef;
+
+/// Every longhand, sorted by name: the two halves of the table joined.
+pub static PROPERTIES: std::sync::LazyLock<Vec<PropertyDef>> = std::sync::LazyLock::new(|| {
+    table::FIRST_HALF
+        .iter()
+        .chain(table_rest::SECOND_HALF)
+        .copied()
+        .collect()
+});
 
 /// A longhand property: an index into [`PROPERTIES`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]

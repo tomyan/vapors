@@ -3,7 +3,7 @@
 
 use super::media::{self, MediaQueryList};
 use super::supports::{self, SupportsCondition};
-use super::{Environment, media_feature};
+use super::{Environment, media_eval};
 use crate::Result;
 use crate::ast::Condition;
 use crate::selector::Element;
@@ -38,7 +38,7 @@ impl Conditions {
             && self.container.iter().all(|c| {
                 element
                     .container_size()
-                    .is_some_and(|(w, h)| c.holds(&media_feature::Sizes::container(w, h, env)))
+                    .is_some_and(|(w, h)| c.holds(&media_eval::Sizes::container(w, h, env)))
             })
     }
 }

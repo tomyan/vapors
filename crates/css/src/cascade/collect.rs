@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use super::{CascadeRule, Environment, Origin};
 use crate::Position;
-use crate::ast::ComponentValue;
+use crate::ast::{ComponentValue, Declaration};
 use crate::property::{PROPERTIES, Specified};
 use crate::selector::{Element, Specificity, matches};
 
@@ -59,37 +59,45 @@ pub(crate) fn winners<'a, E: Element>(
         let specificity = rule.rule.selector.specificity();
         for decl in &rule.rule.declarations {
             let rank = rank(rule.origin, decl.important);
-            if decl.name.starts_with("--") {
-                let candidate = Candidate {
-                    rank,
-                    specificity,
-                    order: rule.order,
-                    value: decl.value.clone(),
-                    position: decl.position,
-                };
-                let slot = winners.custom.entry(decl.name.clone());
-                slot.and_modify(|current| {
-                    if candidate.beats(current) {
-                        *current = candidate.clone();
-                    }
-                })
-                .or_insert(candidate);
-                continue;
-            }
-            for longhand in &decl.longhands {
-                let candidate = Candidate {
-                    rank,
-                    specificity,
-                    order: rule.order,
-                    value: longhand.value.clone(),
-                    position: decl.position,
-                };
-                let slot = &mut winners.longhands[longhand.id.index()];
-                if slot.as_ref().is_none_or(|current| candidate.beats(current)) {
-                    *slot = Some(candidate);
-                }
-            }
+            winners.consider(decl, rank, specificity, rule.order);
         }
     }
     winners
+}
+
+impl Winners {
+    /// Let one declaration compete for the properties it sets.
+    fn consider(&mut self, decl: &Declaration, rank: u8, specificity: Specificity, order: usize) {
+        let position = decl.position;
+        if decl.name.starts_with("--") {
+            let new = Candidate {
+                rank,
+                specificity,
+                order,
+                value: decl.value.clone(),
+                position,
+            };
+            match self.custom.get_mut(&decl.name) {
+                Some(current) if !new.beats(current) => {}
+                Some(current) => *current = new,
+                None => {
+                    self.custom.insert(decl.name.clone(), new);
+                }
+            }
+            return;
+        }
+        for longhand in &decl.longhands {
+            let new = Candidate {
+                rank,
+                specificity,
+                order,
+                value: longhand.value.clone(),
+                position,
+            };
+            let slot = &mut self.longhands[longhand.id.index()];
+            if slot.as_ref().is_none_or(|current| new.beats(current)) {
+                *slot = Some(new);
+            }
+        }
+    }
 }

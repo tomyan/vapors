@@ -3,7 +3,8 @@
 //! separates alternatives. `@container` uses the same condition tree.
 
 use super::Environment;
-use super::media_feature::{self, Feature, Sizes};
+use super::media_eval::Sizes;
+use super::media_feature::{self, Feature};
 use super::media_items::Items;
 use crate::ast::ComponentValue;
 use crate::parse::component::split_commas;
