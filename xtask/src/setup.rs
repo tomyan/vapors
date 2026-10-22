@@ -116,6 +116,10 @@ fn install_hook() -> Result<(), String> {
 /// the main repository, not under the worktree's `.git` file.
 fn hooks_dir() -> Result<PathBuf, String> {
     let output = Command::new("git")
+        // Git hooks export these; a spawn here must reach only this checkout.
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .env_remove("GIT_INDEX_FILE")
         .args(["rev-parse", "--git-common-dir"])
         .output()
         .map_err(|e| format!("could not run git: {e}"))?;
