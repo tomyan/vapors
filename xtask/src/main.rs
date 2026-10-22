@@ -25,6 +25,7 @@ mod trunk;
 mod trunk_process;
 mod web;
 mod xvfb;
+mod xvfb_display;
 
 use std::path::PathBuf;
 use std::process::ExitCode;

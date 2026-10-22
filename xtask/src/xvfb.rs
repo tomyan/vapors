@@ -5,6 +5,8 @@ use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use crate::xvfb_display::{DisplaySearch, current_uid, process_is_running};
+
 /// How long Xvfb gets to create its socket before we give up on it.
 const STARTUP_DEADLINE: Duration = Duration::from_secs(5);
 const FIRST_DISPLAY: u32 = 99;
@@ -21,9 +23,7 @@ impl Xvfb {
     /// Start Xvfb on the first free display number, waiting until its
     /// socket exists.
     pub fn start() -> Result<Self, String> {
-        let number = free_display().ok_or_else(|| {
-            format!("no free X display between :{FIRST_DISPLAY} and :{LAST_DISPLAY}")
-        })?;
+        let number = free_display()?;
         let display = format!(":{number}");
         let child = Command::new("Xvfb")
             .args([&display, "-screen", "0", "1280x800x24", "-nolisten", "tcp"])
@@ -69,6 +69,21 @@ fn socket_exists(number: u32) -> bool {
     Path::new(&format!("/tmp/.X11-unix/X{number}")).exists()
 }
 
-fn free_display() -> Option<u32> {
-    (FIRST_DISPLAY..=LAST_DISPLAY).find(|n| !socket_exists(*n))
+/// The first free display, after removing stale locks (one line each).
+fn free_display() -> Result<u32, String> {
+    let search = DisplaySearch {
+        root: Path::new("/tmp"),
+        uid: current_uid()?,
+        is_running: &process_is_running,
+    };
+    let claimed = search.claim(FIRST_DISPLAY..=LAST_DISPLAY)?.ok_or_else(|| {
+        format!(
+            "no free X display between :{FIRST_DISPLAY} and :{LAST_DISPLAY}; each has a lock \
+             held by a running process or a socket in /tmp/.X11-unix"
+        )
+    })?;
+    for line in &claimed.removed {
+        println!("xvfb     {line}");
+    }
+    Ok(claimed.number)
 }
