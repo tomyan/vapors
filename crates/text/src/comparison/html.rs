@@ -72,12 +72,17 @@ fn block_html(block: &Block) -> String {
 }
 
 /// Single quotes: these land inside a double-quoted `style` attribute.
+/// A named family is escaped as a CSS string, then as HTML.
 fn family_css(family: Family<'_>) -> String {
     match family {
         Family::Geist => "'Geist'".to_owned(),
         Family::GeistMono => "'Geist Mono'".to_owned(),
-        Family::Named(name) => format!("'{name}'"),
+        Family::Named(name) => format!("'{}'", escape(&css_string(name))),
     }
+}
+
+fn css_string(name: &str) -> String {
+    name.replace('\\', "\\\\").replace('\'', "\\'")
 }
 
 fn css(color: Color) -> String {
@@ -89,6 +94,7 @@ fn escape(text: &str) -> String {
     text.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 #[cfg(test)]
@@ -127,6 +133,15 @@ mod tests {
                 "{value}"
             );
         }
+    }
+
+    #[test]
+    fn a_named_family_is_escaped_as_a_css_string_and_as_html() {
+        assert_eq!(
+            family_css(Family::Named("O'Neil \\ Sons")),
+            "'O\\'Neil \\\\ Sons'"
+        );
+        assert_eq!(family_css(Family::Named("a\"b")), "'a&quot;b'");
     }
 
     #[test]

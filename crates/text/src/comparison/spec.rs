@@ -138,10 +138,11 @@ pub fn blocks() -> Vec<Block> {
 /// compared with Chromium's.
 pub const MEASURED_BLOCK: usize = 3;
 
-/// `[x, y, width, height]` of the measured block in the first panel.
+/// `[x, y, width, height]` of the measured block in the first panel,
+/// in device pixels at `scale`.
 #[must_use]
-pub fn body_measure_rect() -> [u32; 4] {
-    block_rect(0, MEASURED_BLOCK)
+pub fn body_measure_rect(scale: u32) -> [u32; 4] {
+    block_rect(0, MEASURED_BLOCK).map(|v| v * scale)
 }
 
 /// `[x, y, width, height]` of block `block` in panel `panel`.
@@ -178,11 +179,12 @@ mod tests {
     fn the_measured_region_is_the_13px_body() {
         // When
         let block = blocks()[MEASURED_BLOCK];
-        let rect = body_measure_rect();
+        let rect = body_measure_rect(1);
 
         // Then
         assert_eq!(block.size, 13.0);
         assert_eq!(block.text, BODY);
         assert_eq!(rect, [24, 228, 412, 78]);
+        assert_eq!(body_measure_rect(2), [48, 456, 824, 156]);
     }
 }

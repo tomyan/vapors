@@ -1,9 +1,10 @@
 //! Headless Chromium as the reference renderer: find it, screenshot a
-//! page at a fixed size, refuse anything but a PNG of that size.
+//! page at a fixed size and scale, refuse anything but a PNG of that
+//! size.
 
 use std::fmt;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, ExitStatus, Stdio};
 use std::time::{Duration, Instant};
 
 use super::measure::Rgba;
@@ -86,63 +87,99 @@ impl Chromium {
             .unwrap_or_else(|| self.binary.display().to_string())
     }
 
-    /// Screenshot `html` at `width` by `height` CSS pixels at scale 1 into
-    /// `png`, and read it back.
+    /// Screenshot `html` at `width` by `height` CSS pixels at `scale`
+    /// device pixels per CSS pixel into `png`, and read it back.
     ///
     /// # Errors
     ///
     /// [`ChromiumError::Failed`] when it exits non-zero, hangs past the
-    /// deadline, or the PNG is not the requested size.
+    /// deadline, a stale `png` cannot be removed first, or the PNG is not
+    /// the requested size.
     pub fn screenshot(
         &self,
         html: &Path,
         png: &Path,
         width: u32,
         height: u32,
+        scale: u32,
     ) -> Result<Rgba, ChromiumError> {
-        let url = format!("file://{}", html.display());
-        let mut child = Command::new(&self.binary)
+        remove_stale(png)?;
+        let mut child = self.spawn(html, png, width, height, scale)?;
+        // Drained on its own thread so a chatty Chromium cannot fill the
+        // pipe, block, and be reported as hung.
+        let stderr = child
+            .stderr
+            .take()
+            .map(|stream| std::thread::spawn(move || read_all(stream)));
+        let status = wait_with_deadline(&mut child)?;
+        let stderr = stderr.and_then(|t| t.join().ok()).unwrap_or_default();
+        if !status.success() {
+            return Err(ChromiumError::Failed(format!(
+                "exited with {status}:\n{stderr}"
+            )));
+        }
+        let image = read_png(png).map_err(ChromiumError::Failed)?;
+        check_size(&image, png, [width * scale, height * scale])?;
+        Ok(image)
+    }
+
+    fn spawn(
+        &self,
+        html: &Path,
+        png: &Path,
+        width: u32,
+        height: u32,
+        scale: u32,
+    ) -> Result<Child, ChromiumError> {
+        Command::new(&self.binary)
             .args([
                 "--headless=new",
                 "--no-sandbox",
                 "--hide-scrollbars",
-                "--force-device-scale-factor=1",
+                &format!("--force-device-scale-factor={scale}"),
                 // Fonts load after first paint; give the page settled time.
                 "--virtual-time-budget=5000",
                 &format!("--window-size={width},{height}"),
                 &format!("--screenshot={}", png.display()),
-                &url,
+                &format!("file://{}", html.display()),
             ])
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|e| {
                 ChromiumError::Failed(format!("cannot start {}: {e}", self.binary.display()))
-            })?;
-        let status = wait_with_deadline(&mut child)?;
-        if !status.success() {
-            let stderr = child.stderr.take().map(read_all).unwrap_or_default();
-            return Err(ChromiumError::Failed(format!(
-                "exited with {status}:\n{stderr}"
-            )));
-        }
-        let image = read_png(png).map_err(ChromiumError::Failed)?;
-        if (image.width, image.height) != (width, height) {
-            return Err(ChromiumError::Failed(format!(
-                "{} is {}x{}, wanted {width}x{height}. Fix: the window size was not honoured; \
-                 check --force-device-scale-factor and that no display scaling applies",
-                png.display(),
-                image.width,
-                image.height
-            )));
-        }
-        Ok(image)
+            })
     }
 }
 
-fn wait_with_deadline(
-    child: &mut std::process::Child,
-) -> Result<std::process::ExitStatus, ChromiumError> {
+/// Delete an earlier screenshot so a stale image can never be read back.
+fn remove_stale(png: &Path) -> Result<(), ChromiumError> {
+    match std::fs::remove_file(png) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(ChromiumError::Failed(format!(
+            "cannot remove the previous {}: {e}",
+            png.display()
+        ))),
+    }
+}
+
+fn check_size(image: &Rgba, png: &Path, wanted: [u32; 2]) -> Result<(), ChromiumError> {
+    if [image.width, image.height] == wanted {
+        return Ok(());
+    }
+    Err(ChromiumError::Failed(format!(
+        "{} is {}x{}, wanted {}x{}. Fix: the window size or scale was not honoured; \
+         check --force-device-scale-factor and that no display scaling applies",
+        png.display(),
+        image.width,
+        image.height,
+        wanted[0],
+        wanted[1]
+    )))
+}
+
+fn wait_with_deadline(child: &mut Child) -> Result<ExitStatus, ChromiumError> {
     let started = Instant::now();
     loop {
         if let Some(status) = child
@@ -173,4 +210,45 @@ fn on_path(name: &str) -> Option<PathBuf> {
     std::env::split_paths(&path)
         .map(|dir| dir.join(name))
         .find(|candidate| candidate.is_file())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_stale_screenshot_is_removed_and_a_missing_one_is_fine() {
+        // Given
+        let dir = std::env::temp_dir().join(format!("vapors-chromium-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("tmp dir");
+        let png = dir.join("stale.png");
+        std::fs::write(&png, b"old").expect("write");
+
+        // When
+        remove_stale(&png).expect("removed");
+        let again = remove_stale(&png);
+
+        // Then
+        assert!(!png.exists());
+        assert_eq!(again, Ok(()));
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
+
+    #[test]
+    fn a_screenshot_of_the_wrong_size_is_refused_naming_both_sizes() {
+        // Given
+        let image = Rgba {
+            width: 10,
+            height: 5,
+            data: vec![0; 200],
+        };
+
+        // When
+        let error = check_size(&image, Path::new("x.png"), [20, 10]).expect_err("wrong size");
+
+        // Then
+        let message = error.to_string();
+        assert!(message.contains("10x5, wanted 20x10"), "{message}");
+        assert!(message.contains("Fix:"), "{message}");
+    }
 }

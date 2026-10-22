@@ -4,7 +4,8 @@
 //! parameters tuned. `docs/text.md` records the outcome.
 //!
 //! The page spec and HTML compile everywhere; running Chromium and
-//! reading PNGs are native only.
+//! reading PNGs are native only. Both 1x and 2x are rendered: the brief's
+//! requirement 1 names both displays.
 
 #[cfg(not(target_family = "wasm"))]
 mod chromium;
@@ -18,7 +19,7 @@ mod spec;
 
 #[cfg(not(target_family = "wasm"))]
 pub use chromium::{Chromium, ChromiumError};
-pub use composite::compose;
+pub use composite::{GAP, compose, row_width};
 pub use html::{FONT_FILES, html};
 pub use measure::{INK_BAND, Rgba, ink_within_band, mean_ink};
 pub use page::{render_labels, render_page};

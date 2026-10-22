@@ -14,5 +14,5 @@ mod png;
 
 pub use image_app::ImageApp;
 pub use image_view::{ImageView, RgbaImage};
-pub use label::{INK, LabelDraw, STRIP_COLOR, STRIP_HEIGHT, label_text};
+pub use label::{INK, LabelDraw, STRIP_COLOR, STRIP_HEIGHT, label_text, strip_height};
 pub use png::decode_png;

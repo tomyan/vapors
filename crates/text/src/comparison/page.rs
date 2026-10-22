@@ -11,7 +11,8 @@ use crate::{
 use super::measure::Rgba;
 use super::spec::{Block, PADDING, PAGE_HEIGHT, PAGE_WIDTH, PANEL_WIDTH, SCHEMES, Scheme, blocks};
 
-/// Render the whole page at 1x.
+/// Render the whole page at `scale` device pixels per logical pixel:
+/// 1 with light hinting, 2 with none (`Hinting::for_scale`).
 ///
 /// # Panics
 ///
@@ -23,10 +24,11 @@ pub fn render_page(
     queue: &wgpu::Queue,
     system: &mut FontSystem,
     params: BlendParams,
+    scale: u32,
 ) -> Rgba {
     let viewport = Size {
-        width: PAGE_WIDTH,
-        height: PAGE_HEIGHT,
+        width: PAGE_WIDTH * scale,
+        height: PAGE_HEIGHT * scale,
     };
     let (texture, view) = target(device, queue, viewport, &SCHEMES[0]);
     let mut text = Text::new(device, texture.format());
@@ -38,18 +40,23 @@ pub fn render_page(
         viewport,
     };
     for (index, scheme) in (0u32..).zip(SCHEMES.iter()) {
-        let left = px(PANEL_WIDTH * index);
-        let rect = [left, 0.0, left + px(PANEL_WIDTH), px(PAGE_HEIGHT)];
+        let left = px(PANEL_WIDTH * index * scale);
+        let rect = [
+            left,
+            0.0,
+            left + px(PANEL_WIDTH * scale),
+            px(viewport.height),
+        ];
         solid.fill(device, queue, &view, viewport, rect, scheme.background);
         for block in blocks() {
-            let layout = block_layout(system, &block, scheme);
-            let origin = [left + px(PADDING), px(block.top)];
+            let layout = block_layout(system, &block, scheme, scale);
+            let origin = [left + px(PADDING * scale), px(block.top * scale)];
             text.draw(&render_target, &layout, origin, params);
         }
     }
     Rgba {
-        width: PAGE_WIDTH,
-        height: PAGE_HEIGHT,
+        width: viewport.width,
+        height: viewport.height,
         data: read_rgba8(device, queue, &texture),
     }
 }
@@ -113,7 +120,7 @@ fn target(
     (texture, view)
 }
 
-fn block_layout(system: &mut FontSystem, block: &Block, scheme: &Scheme) -> Layout {
+fn block_layout(system: &mut FontSystem, block: &Block, scheme: &Scheme, scale: u32) -> Layout {
     let style = Style {
         weight: block.weight,
         tabular_figures: block.tabular_figures,
@@ -123,6 +130,7 @@ fn block_layout(system: &mut FontSystem, block: &Block, scheme: &Scheme) -> Layo
     };
     let options = LayoutOptions {
         width: Some(px(Block::width())),
+        scale: px(scale),
         ..LayoutOptions::default()
     };
     Layout::new(system, block.text, &style, &options)

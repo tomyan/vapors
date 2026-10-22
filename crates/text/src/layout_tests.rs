@@ -236,6 +236,7 @@ fn bytes_that_are_not_a_font_register_no_fallback() {
 /// fonts-noto-cjk): the test then requires system fallback to work.
 /// Unset, the test checks the two outcomes are consistent with each
 /// other, since whether this machine has such a font is unknown.
+#[cfg(not(target_family = "wasm"))]
 const SYSTEM_FONTS_ENV: &str = "VAPORS_SYSTEM_FONTS";
 
 #[cfg(not(target_family = "wasm"))]

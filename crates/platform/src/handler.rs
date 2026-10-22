@@ -113,6 +113,7 @@ impl Handler {
             queue: &gpu.queue,
             texture: &surface_texture.texture,
             index: self.presented,
+            scale_factor: window.scale_factor(),
         };
         let next = self.app.frame(&frame);
         gpu.queue.present(surface_texture);
