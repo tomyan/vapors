@@ -69,16 +69,17 @@ fn numbers_percentages_and_dimensions_carry_their_values() {
     let got = kinds("1.5 -2 50% 10px +3e2em .5");
 
     // Then
-    let number = |v: f64, int: bool| TokenKind::Number {
+    let number = |v: f64, int: bool, signed: bool| TokenKind::Number {
         value: v,
         integer: int,
+        signed,
     };
     assert_eq!(
         got,
         [
-            number(1.5, false),
+            number(1.5, false, false),
             TokenKind::Whitespace,
-            number(-2.0, true),
+            number(-2.0, true, true),
             TokenKind::Whitespace,
             TokenKind::Percentage(50.0),
             TokenKind::Whitespace,
@@ -92,7 +93,7 @@ fn numbers_percentages_and_dimensions_carry_their_values() {
                 unit: "em".to_owned()
             },
             TokenKind::Whitespace,
-            number(0.5, false),
+            number(0.5, false, false),
         ]
     );
 }

@@ -53,13 +53,12 @@ fn qualified_rule(
         )));
     }
     let decls = declarations::block(stream)?;
-    for selector in split_commas(&prelude) {
+    let parsed = crate::selector::parse_from_prelude(&prelude, position)?;
+    for (selector, parsed) in split_commas(&prelude).into_iter().zip(parsed) {
         let position = selector.first().map_or(position, ComponentValue::position);
-        if selector.is_empty() {
-            return Err(Error::new(position, "empty selector in selector list"));
-        }
         sheet.rules.push(Rule {
             prelude: selector,
+            selector: parsed,
             conditions: conditions.to_vec(),
             declarations: decls.clone(),
             position,

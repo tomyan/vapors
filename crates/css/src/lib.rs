@@ -10,8 +10,10 @@ pub mod ast;
 pub mod error;
 pub mod parse;
 pub mod property;
+pub mod selector;
 pub mod serialize;
 pub mod token;
+pub mod tree;
 
 pub use error::{Error, Position, Result};
 pub use parse::parse;

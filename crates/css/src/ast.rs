@@ -1,6 +1,7 @@
 //! The parsed stylesheet: rules, declarations and component values.
 
 use crate::Position;
+use crate::selector::Selector;
 use crate::serialize;
 use crate::token::{Token, TokenKind};
 
@@ -19,6 +20,8 @@ pub struct Stylesheet {
 pub struct Rule {
     /// The selector's component values, as written.
     pub prelude: Vec<ComponentValue>,
+    /// The parsed selector.
+    pub selector: Selector,
     /// Enclosing `@media`, `@container` and `@supports` conditions,
     /// outermost first.
     pub conditions: Vec<Condition>,

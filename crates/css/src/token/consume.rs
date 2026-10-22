@@ -101,6 +101,7 @@ pub(super) fn string(cur: &mut Cursor, quote: char, start: Position) -> Result<T
 /// Consume a number and whatever makes it a percentage or dimension
 /// (4.3.3 and 4.3.12).
 pub(super) fn numeric(cur: &mut Cursor, start: Position) -> Result<TokenKind> {
+    let signed = matches!(cur.peek(0), Some('+' | '-'));
     let (text, integer) = number_text(cur);
     let value: f64 = text
         .parse()
@@ -113,7 +114,11 @@ pub(super) fn numeric(cur: &mut Cursor, start: Position) -> Result<TokenKind> {
         let unit = name(cur)?.to_ascii_lowercase();
         return Ok(TokenKind::Dimension { value, unit });
     }
-    Ok(TokenKind::Number { value, integer })
+    Ok(TokenKind::Number {
+        value,
+        integer,
+        signed,
+    })
 }
 
 fn number_text(cur: &mut Cursor) -> (String, bool) {

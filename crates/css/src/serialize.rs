@@ -59,7 +59,12 @@ pub fn token(kind: &TokenKind, out: &mut String) {
         TokenKind::Url(s) => {
             let _ = write!(out, "url({s})");
         }
-        TokenKind::Number { value, .. } => number(*value, out),
+        TokenKind::Number { value, signed, .. } => {
+            if *signed && *value >= 0.0 {
+                out.push('+');
+            }
+            number(*value, out);
+        }
         TokenKind::Percentage(v) => {
             number(*v, out);
             out.push('%');

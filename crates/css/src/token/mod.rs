@@ -35,12 +35,15 @@ pub enum TokenKind {
     String(String),
     /// `url(...)` with an unquoted argument.
     Url(String),
-    /// A number; `integer` is true when written without `.` or exponent.
+    /// A number; `integer` is true when written without `.` or exponent,
+    /// `signed` when it started with `+` or `-` (the An+B grammar needs it).
     Number {
         /// The value.
         value: f64,
         /// Whether it was written as an integer.
         integer: bool,
+        /// Whether a sign character was written.
+        signed: bool,
     },
     /// A number followed by `%`.
     Percentage(f64),
