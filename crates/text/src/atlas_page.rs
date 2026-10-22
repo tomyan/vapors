@@ -54,11 +54,18 @@ impl AtlasPage {
         self.dirty = false;
     }
 
+    /// True when a `width` by `height` glyph could ever be placed in an
+    /// empty page.
+    #[must_use]
+    pub fn fits(&self, width: u32, height: u32) -> bool {
+        width + PADDING <= self.size && height + PADDING <= self.size
+    }
+
     /// Reserve `width` by `height` pixels; the top-left of the reserved
     /// area, or `None` when the page is full.
     pub fn allocate(&mut self, width: u32, height: u32) -> Option<[u32; 2]> {
         let (padded_w, padded_h) = (width + PADDING, height + PADDING);
-        if padded_w > self.size || padded_h > self.size {
+        if !self.fits(width, height) {
             return None;
         }
         if self.shelf_x + padded_w > self.size {
@@ -138,14 +145,43 @@ mod tests {
         assert_eq!(fifth, None, "page is full");
     }
 
+    /// Shelf packing is order dependent: the reviewer's shape. Four 4x4
+    /// and two 4x1 glyphs (5x5 and 5x2 with padding) in a 13 px page need
+    /// three 5-high shelves when interleaved (15 px) and two 5-high plus
+    /// one 2-high when tallest first (12 px).
+    #[test]
+    fn tallest_first_fits_where_interleaved_order_does_not() {
+        // Given
+        let interleaved = [(4, 1), (4, 4), (4, 1), (4, 4), (4, 4), (4, 4)];
+        let tallest_first = [(4, 4), (4, 4), (4, 4), (4, 4), (4, 1), (4, 1)];
+
+        // When
+        let mut page = AtlasPage::new(13, 1);
+        let in_order: Vec<_> = interleaved
+            .iter()
+            .map(|&(w, h)| page.allocate(w, h))
+            .collect();
+        page.clear();
+        let sorted: Vec<_> = tallest_first
+            .iter()
+            .map(|&(w, h)| page.allocate(w, h))
+            .collect();
+
+        // Then
+        assert!(in_order.iter().any(Option::is_none), "{in_order:?}");
+        assert!(sorted.iter().all(Option::is_some), "{sorted:?}");
+    }
+
     #[test]
     fn a_glyph_larger_than_the_page_is_refused() {
         // Given
         let mut page = AtlasPage::new(8, 1);
 
         // When / Then
+        assert!(!page.fits(8, 2));
         assert_eq!(page.allocate(8, 2), None);
         assert_eq!(page.allocate(2, 8), None);
+        assert!(page.fits(7, 7));
     }
 
     #[test]

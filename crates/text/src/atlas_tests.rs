@@ -8,6 +8,7 @@ use parley::fontique::Blob;
 use skrifa::MetadataProvider;
 
 use super::*;
+use crate::atlas_types::GlyphKey;
 use crate::fonts::GEIST;
 use crate::raster::{GlyphRequest, Hinting};
 
@@ -21,10 +22,14 @@ fn glyph_id(font: &FontData, c: char) -> u32 {
 }
 
 fn request(font: &FontData, c: char, subpixel: u8) -> GlyphRequest<'_> {
+    request_at(font, c, subpixel, 16.0)
+}
+
+fn request_at(font: &FontData, c: char, subpixel: u8, size: f32) -> GlyphRequest<'_> {
     GlyphRequest {
         font,
         id: glyph_id(font, c),
-        size: 16.0,
+        size,
         coords: &[],
         subpixel,
         hinting: Hinting::Light,
@@ -129,6 +134,78 @@ fn a_full_page_evicts_glyphs_unused_this_frame_and_they_rasterise_again() {
     // Then
     assert!(evicted > 0, "nothing was evicted");
     assert!(atlas.rasterisations() > after_a + 25, "a rasterised again");
+}
+
+#[test]
+fn eviction_takes_the_least_recently_used_glyph_first() {
+    // Given: a and b in the page, then a used again, so b is the oldest
+    let font = geist();
+    let mut atlas = atlas(32);
+    atlas.begin_frame();
+    atlas.get(&request(&font, 'a', 0)).expect("ok");
+    atlas.get(&request(&font, 'b', 0)).expect("ok");
+    atlas.begin_frame();
+    atlas.get(&request(&font, 'a', 0)).expect("ok");
+
+    // When: later frames fill the page until something is evicted
+    let mut c = 'c';
+    while atlas.evictions() == 0 {
+        atlas.begin_frame();
+        atlas.get(&request(&font, c, 0)).expect("ok");
+        c = char::from(u8::try_from(c).expect("ascii") + 1);
+    }
+    let present = |atlas: &GlyphAtlas, c| {
+        atlas
+            .entries
+            .contains_key(&GlyphKey::of(&request(&font, c, 0)))
+    };
+
+    // Then: b went first; a only if more room was needed after b
+    assert!(!present(&atlas, 'b'), "b was the least recently used");
+    assert!(
+        present(&atlas, 'a') || atlas.evictions() >= 2,
+        "a evicted before b"
+    );
+}
+
+#[test]
+fn a_glyph_larger_than_the_page_is_refused_once_and_drawn_as_notdef() {
+    // Given: a 128 px page; W at 150 px is wider than it, .notdef is not
+    let font = geist();
+    let mut atlas = atlas(128);
+
+    // When
+    let first = atlas
+        .get(&request_at(&font, 'W', 0, 150.0))
+        .expect("notdef stands in");
+    let rasterised = atlas.rasterisations();
+    let second = atlas
+        .get(&request_at(&font, 'W', 0, 150.0))
+        .expect("still notdef");
+
+    // Then
+    assert!(first.notdef && !first.is_empty());
+    assert_eq!(first, second);
+    assert_eq!(atlas.too_large(), 1);
+    assert_eq!(atlas.rasterisations(), rasterised, "not attempted again");
+}
+
+#[test]
+fn a_notdef_larger_than_the_page_is_an_error_naming_glyph_size_and_page() {
+    // Given
+    let font = geist();
+    let mut atlas = atlas(32);
+
+    // When
+    let error = atlas
+        .get(&request_at(&font, 'W', 0, 400.0))
+        .expect_err("nothing can stand in");
+
+    // Then
+    let message = error.to_string();
+    assert!(message.contains("glyph 0 at 400 px"), "{message}");
+    assert!(message.contains("32x32"), "{message}");
+    assert!(message.contains("Fix:"), "{message}");
 }
 
 #[test]

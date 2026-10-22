@@ -2,14 +2,18 @@
 //! font, size, variation, subpixel offset and hinting. Coverage goes to
 //! an R8 page, colour glyphs to an RGBA8 page (not rasterised yet; the
 //! page exists so the renderer's shape is settled). When a page fills,
-//! every glyph the current frame has not used is evicted and the rest
-//! repacked; both evictions and rasterisations are counted for tests.
+//! the least recently used glyphs not needed by the current frame are
+//! evicted until the new one fits (`atlas_evict.rs`). A glyph larger
+//! than a page is refused once, logged with its size, and `.notdef`
+//! stands in from then on. Evictions, rasterisations and refusals are
+//! counted for tests.
 
-use std::collections::HashMap;
-use std::fmt;
+use std::collections::{HashMap, HashSet};
 
 use crate::atlas_page::AtlasPage;
-use crate::raster::{Coverage, GlyphRequest, Hinting, RasterError, Rasterizer};
+use crate::atlas_types::GlyphKey;
+pub use crate::atlas_types::{AtlasError, AtlasGlyph, PageKind};
+use crate::raster::{Coverage, GlyphRequest, Rasterizer};
 
 /// Atlas sizing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,109 +28,25 @@ impl Default for AtlasConfig {
     }
 }
 
-/// Which page a glyph is in.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum PageKind {
-    /// 8-bit coverage.
-    Coverage,
-    /// 8-bit RGBA colour.
-    Colour,
-}
-
-/// Where a glyph is in the atlas and how to place it on the baseline.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct AtlasGlyph {
-    /// The page.
-    pub page: PageKind,
-    /// `[x, y, width, height]` in page pixels.
-    pub rect: [u32; 4],
-    /// Left edge from the glyph origin, pixels.
-    pub left: i32,
-    /// Top edge from the baseline, pixels; negative is up.
-    pub top: i32,
-    /// True when this is `.notdef` standing in for a glyph that failed.
-    pub notdef: bool,
-}
-
-impl AtlasGlyph {
-    /// True for glyphs with no ink.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.rect[2] == 0 || self.rect[3] == 0
-    }
-}
-
-/// Why a glyph could not be placed.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AtlasError {
-    /// Rasterisation failed outright.
-    Raster(RasterError),
-    /// The glyphs this frame needs do not fit one page.
-    Full {
-        /// Page side in pixels.
-        page_size: u32,
-        /// Glyphs used this frame when it overflowed.
-        used_this_frame: usize,
-    },
-}
-
-impl fmt::Display for AtlasError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Raster(error) => error.fmt(f),
-            Self::Full {
-                page_size,
-                used_this_frame,
-            } => write!(
-                f,
-                "glyph atlas page of {page_size}x{page_size} is full with {used_this_frame} glyphs \
-                 in use this frame. Fix: raise AtlasConfig::page_size or draw less text per frame."
-            ),
-        }
-    }
-}
-
-impl std::error::Error for AtlasError {}
-
-#[derive(Clone, Hash, PartialEq, Eq)]
-struct GlyphKey {
-    font: u64,
-    index: u32,
-    id: u32,
-    size_bits: u32,
-    coords: Vec<i16>,
-    subpixel: u8,
-    hinting: Hinting,
-}
-
-impl GlyphKey {
-    fn of(request: &GlyphRequest<'_>) -> Self {
-        Self {
-            font: request.font.data.id(),
-            index: request.font.index,
-            id: request.id,
-            size_bits: request.size.to_bits(),
-            coords: request.coords.iter().map(|c| c.to_bits()).collect(),
-            subpixel: request.subpixel,
-            hinting: request.hinting,
-        }
-    }
-}
-
-struct Entry {
-    glyph: AtlasGlyph,
-    coverage: Coverage,
-    last_used: u64,
+pub(crate) struct Entry {
+    pub(crate) glyph: AtlasGlyph,
+    pub(crate) coverage: Coverage,
+    /// Stamp of the last `get`; higher is more recent.
+    pub(crate) last_used: u64,
+    /// Frame of the last `get`; the current frame's glyphs are kept.
+    pub(crate) frame: u64,
 }
 
 /// Rasterised glyphs packed into pages.
 pub struct GlyphAtlas {
-    coverage: AtlasPage,
+    pub(crate) coverage: AtlasPage,
     colour: AtlasPage,
     rasterizer: Rasterizer,
-    entries: HashMap<GlyphKey, Entry>,
-    frame: u64,
-    evictions: u64,
+    pub(crate) entries: HashMap<GlyphKey, Entry>,
+    too_large: HashSet<GlyphKey>,
+    pub(crate) frame: u64,
+    stamp: u64,
+    pub(crate) evictions: u64,
     rasterisations: u64,
 }
 
@@ -139,13 +59,16 @@ impl GlyphAtlas {
             colour: AtlasPage::new(config.page_size, 4),
             rasterizer: Rasterizer::new(),
             entries: HashMap::new(),
+            too_large: HashSet::new(),
             frame: 1,
+            stamp: 0,
             evictions: 0,
             rasterisations: 0,
         }
     }
 
-    /// Start a frame: glyphs fetched from now on are the ones eviction keeps.
+    /// Start a frame: glyphs fetched from now on are never evicted to
+    /// make room for others in the same frame.
     pub fn begin_frame(&mut self) {
         self.frame += 1;
     }
@@ -160,6 +83,12 @@ impl GlyphAtlas {
     #[must_use]
     pub fn rasterisations(&self) -> u64 {
         self.rasterisations
+    }
+
+    /// Glyphs refused for being larger than a page.
+    #[must_use]
+    pub fn too_large(&self) -> usize {
+        self.too_large.len()
     }
 
     /// The R8 page.
@@ -180,16 +109,22 @@ impl GlyphAtlas {
     }
 
     /// Where `request` is in the atlas, rasterising and packing it first
-    /// if needed.
+    /// if needed. A glyph larger than the page is logged once and comes
+    /// back as `.notdef` with `notdef` set.
     ///
     /// # Errors
     ///
-    /// [`AtlasError`] when it cannot be rasterised or the frame's glyphs
-    /// overflow a page.
+    /// [`AtlasError`] when it cannot be rasterised, the frame's glyphs
+    /// overflow a page, or `.notdef` itself is larger than a page.
     pub fn get(&mut self, request: &GlyphRequest<'_>) -> Result<AtlasGlyph, AtlasError> {
         let key = GlyphKey::of(request);
+        if self.too_large.contains(&key) {
+            return self.notdef_for(request);
+        }
+        self.stamp += 1;
         if let Some(entry) = self.entries.get_mut(&key) {
-            entry.last_used = self.frame;
+            entry.last_used = self.stamp;
+            entry.frame = self.frame;
             return Ok(entry.glyph);
         }
         let coverage = self
@@ -197,16 +132,51 @@ impl GlyphAtlas {
             .rasterize(request)
             .map_err(AtlasError::Raster)?;
         self.rasterisations += 1;
+        if !self.coverage.fits(coverage.width, coverage.height) {
+            return self.refuse(request, key, &coverage);
+        }
         let glyph = self.place(&coverage)?;
-        self.entries.insert(
-            key,
-            Entry {
-                glyph,
-                coverage,
-                last_used: self.frame,
-            },
-        );
+        self.entries.insert(key, self.entry(glyph, coverage));
         Ok(glyph)
+    }
+
+    fn entry(&self, glyph: AtlasGlyph, coverage: Coverage) -> Entry {
+        Entry {
+            glyph,
+            coverage,
+            last_used: self.stamp,
+            frame: self.frame,
+        }
+    }
+
+    /// Log the oversized glyph once, remember it, and answer with `.notdef`.
+    fn refuse(
+        &mut self,
+        request: &GlyphRequest<'_>,
+        key: GlyphKey,
+        coverage: &Coverage,
+    ) -> Result<AtlasGlyph, AtlasError> {
+        let error = AtlasError::TooLarge {
+            font: request.font.data.id(),
+            glyph: request.id,
+            size: request.size,
+            bitmap: [coverage.width, coverage.height],
+            page_size: self.coverage.size(),
+        };
+        if request.id == 0 {
+            return Err(error);
+        }
+        log::error!("{error}; drawing .notdef");
+        self.too_large.insert(key);
+        self.notdef_for(request)
+    }
+
+    fn notdef_for(&mut self, request: &GlyphRequest<'_>) -> Result<AtlasGlyph, AtlasError> {
+        let notdef = GlyphRequest { id: 0, ..*request };
+        self.get(&notdef).map(|glyph| AtlasGlyph {
+            notdef: true,
+            ..glyph
+        })
     }
 
     fn place(&mut self, coverage: &Coverage) -> Result<AtlasGlyph, AtlasError> {
@@ -214,43 +184,16 @@ impl GlyphAtlas {
             return Ok(glyph_at([0, 0], coverage));
         }
         let (w, h) = (coverage.width, coverage.height);
-        let origin = if let Some(origin) = self.coverage.allocate(w, h) {
-            origin
-        } else {
-            self.evict_unused();
-            self.coverage.allocate(w, h).ok_or(AtlasError::Full {
-                page_size: self.coverage.size(),
-                used_this_frame: self.entries.len(),
-            })?
+        let origin = match self.coverage.allocate(w, h) {
+            Some(origin) => origin,
+            None => self.make_room(w, h)?,
         };
-        self.coverage
-            .blit(origin, coverage.width, coverage.height, &coverage.data);
+        self.coverage.blit(origin, w, h, &coverage.data);
         Ok(glyph_at(origin, coverage))
-    }
-
-    /// Drop every glyph this frame has not used and repack the rest.
-    fn evict_unused(&mut self) {
-        let frame = self.frame;
-        let before = self.entries.len();
-        self.entries.retain(|_, entry| entry.last_used == frame);
-        self.evictions += (before - self.entries.len()) as u64;
-        self.coverage.clear();
-        for entry in self.entries.values_mut() {
-            if entry.coverage.is_empty() {
-                continue;
-            }
-            let (w, h) = (entry.coverage.width, entry.coverage.height);
-            let origin = self
-                .coverage
-                .allocate(w, h)
-                .expect("survivors fitted before, so they fit a cleared page");
-            self.coverage.blit(origin, w, h, &entry.coverage.data);
-            entry.glyph = glyph_at(origin, &entry.coverage);
-        }
     }
 }
 
-fn glyph_at(origin: [u32; 2], coverage: &Coverage) -> AtlasGlyph {
+pub(crate) fn glyph_at(origin: [u32; 2], coverage: &Coverage) -> AtlasGlyph {
     AtlasGlyph {
         page: PageKind::Coverage,
         rect: [origin[0], origin[1], coverage.width, coverage.height],

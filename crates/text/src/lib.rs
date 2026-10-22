@@ -5,7 +5,9 @@
 //! and run in the `gpu` tier (`cargo xtask test --tier gpu`).
 
 mod atlas;
+mod atlas_evict;
 mod atlas_page;
+mod atlas_types;
 pub mod comparison;
 mod draw;
 mod font_system;
