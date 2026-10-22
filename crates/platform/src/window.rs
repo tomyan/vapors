@@ -10,7 +10,8 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::window::{Window, WindowId};
 
 use crate::PlatformError;
-use crate::event::{Event, from_winit};
+use crate::event::Event;
+use crate::input::Input;
 use crate::surface::Gpu;
 
 /// How to open the window.
@@ -66,6 +67,7 @@ pub fn run(options: WindowOptions, app: impl App + 'static) -> Result<(), Platfo
     let mut handler = Handler {
         options,
         app: Box::new(app),
+        input: Input::new(),
         state: None,
         presented: 0,
         error: None,
@@ -87,6 +89,7 @@ struct State {
 struct Handler {
     options: WindowOptions,
     app: Box<dyn App>,
+    input: Input,
     state: Option<State>,
     presented: u64,
     error: Option<PlatformError>,
@@ -176,7 +179,7 @@ impl ApplicationHandler for Handler {
         {
             state.gpu.resize(size.width, size.height);
         }
-        if let Some(app_event) = from_winit(&event) {
+        for app_event in self.input.translate(&event) {
             self.app.event(app_event);
         }
         if let WindowEvent::RedrawRequested = event {

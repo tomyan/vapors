@@ -83,7 +83,7 @@ impl ImageView {
             Event::PointerMoved { x, y } => self.pointer = [*x, *y],
             Event::Scroll { steps } => self.zoom(self.pointer, ZOOM_STEP.powf(*steps)),
             Event::Character(text) => self.key(text),
-            Event::PrimaryButton { .. } => {}
+            _ => {}
         }
     }
 

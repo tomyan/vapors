@@ -31,6 +31,80 @@ pub enum Event {
     },
     /// A key produced this text on press.
     Character(String),
+    /// One finger on a touch screen, raw. Gestures are derived from these
+    /// and sent as well.
+    Touch {
+        /// Which finger; stable from `Started` to `Ended` or `Cancelled`.
+        id: u64,
+        /// Where in the touch this event is.
+        phase: TouchPhase,
+        /// X in pixels.
+        x: f32,
+        /// Y in pixels.
+        y: f32,
+    },
+    /// Two fingers moved apart or together, or a trackpad was pinched.
+    Pinch {
+        /// Anchor X in pixels: the point to zoom about.
+        x: f32,
+        /// Anchor Y in pixels.
+        y: f32,
+        /// Multiplicative change in spread since the last `Pinch`.
+        factor: f32,
+    },
+    /// A finger, or the midpoint of two, moved by this much.
+    Pan {
+        /// Change in X, in pixels.
+        dx: f32,
+        /// Change in Y, in pixels.
+        dy: f32,
+    },
+    /// A finger went down and up within 300 ms without moving 20 px.
+    Tap {
+        /// X in pixels where the finger lifted.
+        x: f32,
+        /// Y in pixels where the finger lifted.
+        y: f32,
+    },
+    /// A second tap within 300 ms and 30 px of the first. Sent after
+    /// that tap's own [`Event::Tap`].
+    DoubleTap {
+        /// X in pixels where the second finger lifted.
+        x: f32,
+        /// Y in pixels where the second finger lifted.
+        y: f32,
+    },
+    /// The file the user chose from the picker. Never sent on cancel.
+    FileOpened {
+        /// The file's name, without a directory.
+        name: String,
+        /// Its whole contents.
+        bytes: Vec<u8>,
+    },
+}
+
+/// Where in its life a touch is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TouchPhase {
+    /// The finger went down.
+    Started,
+    /// The finger moved.
+    Moved,
+    /// The finger lifted.
+    Ended,
+    /// The system took the touch away; no `Ended` follows.
+    Cancelled,
+}
+
+impl TouchPhase {
+    fn from_winit(phase: winit::event::TouchPhase) -> Self {
+        match phase {
+            winit::event::TouchPhase::Started => Self::Started,
+            winit::event::TouchPhase::Moved => Self::Moved,
+            winit::event::TouchPhase::Ended => Self::Ended,
+            winit::event::TouchPhase::Cancelled => Self::Cancelled,
+        }
+    }
 }
 
 /// Lines per pixel for pixel-delta scrolls. A first value; measured later
@@ -61,6 +135,12 @@ pub fn from_winit(event: &WindowEvent) -> Option<Event> {
                 MouseScrollDelta::LineDelta(_, lines) => *lines,
                 MouseScrollDelta::PixelDelta(position) => position.y as f32 / PIXELS_PER_LINE,
             },
+        }),
+        WindowEvent::Touch(touch) => Some(Event::Touch {
+            id: touch.id,
+            phase: TouchPhase::from_winit(touch.phase),
+            x: touch.location.x as f32,
+            y: touch.location.y as f32,
         }),
         WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => event
             .text

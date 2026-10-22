@@ -13,6 +13,9 @@ pollster.workspace = true
 winit.workspace = true
 vapors-gpu.workspace = true
 
+[target.'cfg(target_family = "wasm")'.dependencies]
+web-time = "1"
+
 [dev-dependencies]
 png.workspace = true
 vapors-canvas.workspace = true

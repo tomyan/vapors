@@ -2019,6 +2019,7 @@ dependencies = [
  "vapors-gpu-harness",
  "vapors-renderer",
  "vapors-scene",
+ "web-time",
  "wgpu",
  "winit",
 ]
