@@ -40,6 +40,9 @@ pub struct Frame<'a> {
     pub texture: &'a wgpu::Texture,
     /// Frames presented before this one. Zero on the first frame.
     pub index: u64,
+    /// Device pixels per logical pixel: the window's scale factor, the
+    /// page's `devicePixelRatio` on the web. 2.0 on a high-density display.
+    pub scale_factor: f64,
 }
 
 impl Frame<'_> {

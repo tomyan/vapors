@@ -31,5 +31,9 @@ fn start() -> Result<(), String> {
         width: 640,
         height: 400,
     };
-    run(options, ImageApp::showing(image, BACKGROUND)).map_err(|e| e.to_string())
+    run(
+        options,
+        ImageApp::showing("gradient.png", image, BACKGROUND),
+    )
+    .map_err(|e| e.to_string())
 }

@@ -1,0 +1,132 @@
+//! The wgpu side of text: one pipeline drawing atlas quads with the
+//! gamma and contrast shader, the atlas texture it samples, and the
+//! buffers it draws from. Create once per target format.
+
+use crate::GlyphAtlas;
+use crate::pipeline_gpu::{bind_group_layout, coverage_texture, render_pipeline};
+
+/// The two shader parameters. See `docs/text.md` for how they were chosen.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BlendParams {
+    /// Exponent taking encoded channels to linear light.
+    pub gamma: f32,
+    /// Coverage boost for dark text on light backgrounds; 0 is none.
+    pub contrast: f32,
+}
+
+impl Default for BlendParams {
+    /// Chromium's Skia build on Linux uses 1.2 and 0.2; the comparison
+    /// page in `docs/text.md` is where these were confirmed or moved.
+    fn default() -> Self {
+        Self {
+            gamma: 1.2,
+            contrast: 0.2,
+        }
+    }
+}
+
+/// Floats per vertex: position 2, uv 2, colour 4.
+pub(crate) const FLOATS_PER_VERTEX: usize = 8;
+pub(crate) const VERTEX_SIZE: u64 = (FLOATS_PER_VERTEX * std::mem::size_of::<f32>()) as u64;
+
+/// Draws laid-out text into a render target.
+pub struct TextPipeline {
+    pub(crate) pipeline: wgpu::RenderPipeline,
+    pub(crate) layout: wgpu::BindGroupLayout,
+    pub(crate) sampler: wgpu::Sampler,
+    pub(crate) uniforms: wgpu::Buffer,
+    pub(crate) texture: wgpu::Texture,
+    pub(crate) vertices: Option<wgpu::Buffer>,
+}
+
+impl TextPipeline {
+    /// A pipeline for targets of `format`, with an atlas texture matching
+    /// `atlas`'s coverage page.
+    #[must_use]
+    pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat, atlas: &GlyphAtlas) -> Self {
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("text"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("text.wgsl").into()),
+        });
+        let layout = bind_group_layout(device);
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("text"),
+            bind_group_layouts: &[Some(&layout)],
+            immediate_size: 0,
+        });
+        Self {
+            pipeline: render_pipeline(device, &pipeline_layout, &shader, format),
+            layout,
+            sampler: device.create_sampler(&wgpu::SamplerDescriptor {
+                label: Some("text nearest"),
+                mag_filter: wgpu::FilterMode::Nearest,
+                min_filter: wgpu::FilterMode::Nearest,
+                ..Default::default()
+            }),
+            uniforms: device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("text params"),
+                size: 16,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            }),
+            texture: coverage_texture(device, atlas.coverage_page().size()),
+            vertices: None,
+        }
+    }
+
+    /// Make sure the vertex buffer holds at least `bytes`; it is reused
+    /// across frames and only grows.
+    pub(crate) fn reserve_vertices(&mut self, device: &wgpu::Device, bytes: u64) {
+        if self.vertices.as_ref().is_some_and(|b| b.size() >= bytes) {
+            return;
+        }
+        self.vertices = Some(device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("text quads"),
+            size: bytes.max(VERTEX_SIZE * 6 * 64),
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        }));
+    }
+
+    pub(crate) fn bind_group(&self, device: &wgpu::Device) -> wgpu::BindGroup {
+        let view = self
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("text"),
+            layout: &self.layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: self.uniforms.as_entire_binding(),
+                },
+            ],
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Chromium's Skia build on Linux: `SK_GAMMA_EXPONENT=1.2` and
+    /// `SK_GAMMA_CONTRAST=0.2` in chromium's `skia/BUILD.gn`; confirmed
+    /// on the comparison page (docs/text.md).
+    #[test]
+    fn default_parameters_are_chromiums_linux_values() {
+        // When
+        let params = BlendParams::default();
+
+        // Then
+        assert_eq!(params.gamma, 1.2);
+        assert_eq!(params.contrast, 0.2);
+    }
+}

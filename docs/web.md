@@ -14,7 +14,8 @@ open a file.
 - `<p id="status">`, optional. The adapter line is written there once the
   GPU is ready, and every error after `run()` returns (`run()` returns at
   once on the web; the browser owns the loop).
-- `<button id="open">`, for touch screens. Its click reaches the app as
+- `<button id="open">`, for touch screens, placed top right so it does
+  not cover the label strip the image app draws top left. Its click reaches the app as
   `Event::OpenRequested`, and the app answers with `pick_file` and its
   file kinds: a click is user activation in every browser, a tap on the
   canvas is not always. A page without it is told so in the
@@ -129,7 +130,10 @@ chromium --headless=new --no-sandbox --disable-gpu-sandbox \
 ```
 
 The gradient fitted in 640x400 reads 128,128,128 at the centre and the
-background 40,40,40 in the corner. `--dump-dom` in place of
+background 40,40,40 in the corner. The top 44 px are the label strip
+(23,27,31) with `gradient.png  <zoom>%` on it in Geist; `--dump-dom`
+cannot see canvas text, so to check the label read the strip's pixels
+for values that are not the strip colour. `--dump-dom` in place of
 `--screenshot` prints the page, with the status element's text. Chromium
 155 keeps `navigator.gpu` under every disable flag, so to see the
 no-WebGPU path add `<script>delete Navigator.prototype.gpu;</script>` to

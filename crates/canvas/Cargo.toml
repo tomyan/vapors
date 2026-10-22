@@ -13,6 +13,10 @@ png.workspace = true
 vapors-scene.workspace = true
 vapors-renderer.workspace = true
 vapors-platform.workspace = true
+vapors-text.workspace = true
+
+[dev-dependencies]
+vapors-gpu-harness.workspace = true
 
 [lints]
 workspace = true

@@ -5,10 +5,13 @@
 
 mod clear;
 mod image;
+mod quad;
 mod readback;
+mod solid;
 mod upload;
 
 pub use clear::{clear, clear_view};
 pub use image::ImagePipeline;
 pub use readback::read_rgba8;
+pub use solid::SolidPipeline;
 pub use upload::upload_rgba8;

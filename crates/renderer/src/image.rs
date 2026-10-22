@@ -4,6 +4,8 @@
 
 use vapors_scene::{Size, Transform};
 
+use crate::quad::{VERTEX_COUNT, VERTEX_SIZE, Vertex, quad_vertices, vertex_bytes};
+
 /// A pipeline that draws one 2D texture as a quad. Create once per
 /// target format; draw many times.
 pub struct ImagePipeline {
@@ -12,17 +14,6 @@ pub struct ImagePipeline {
     sampler: wgpu::Sampler,
     vertices: wgpu::Buffer,
 }
-
-/// One vertex: viewport position in clip space, texture coordinate.
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct Vertex {
-    position: [f32; 2],
-    uv: [f32; 2],
-}
-
-const VERTEX_COUNT: u32 = 6;
-const VERTEX_SIZE: u64 = (std::mem::size_of::<Vertex>()) as u64;
 
 impl ImagePipeline {
     /// Build the pipeline for targets of `format`.
@@ -75,7 +66,7 @@ impl ImagePipeline {
             height: texture.height(),
         };
         let quad = quad_vertices(transform.image_bounds(image), viewport);
-        queue.write_buffer(&self.vertices, 0, &as_bytes(&quad));
+        queue.write_buffer(&self.vertices, 0, &vertex_bytes(&quad));
         let bind_group = self.bind_group(device, texture);
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("image"),
@@ -161,11 +152,7 @@ fn render_pipeline(
             module: shader,
             entry_point: Some("vs_main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[Some(wgpu::VertexBufferLayout {
-                array_stride: VERTEX_SIZE,
-                step_mode: wgpu::VertexStepMode::Vertex,
-                attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2],
-            })],
+            buffers: &[Some(Vertex::layout())],
         },
         fragment: Some(wgpu::FragmentState {
             module: shader,
@@ -183,78 +170,4 @@ fn render_pipeline(
         multiview_mask: None,
         cache: None,
     })
-}
-
-/// Two triangles covering the image's viewport rectangle, in clip space.
-fn quad_vertices(bounds: [[f32; 2]; 2], viewport: Size) -> [Vertex; VERTEX_COUNT as usize] {
-    let [[left, top], [right, bottom]] = bounds;
-    let corner = |x: f32, y: f32, u: f32, v: f32| Vertex {
-        position: to_clip([x, y], viewport),
-        uv: [u, v],
-    };
-    [
-        corner(left, top, 0.0, 0.0),
-        corner(right, top, 1.0, 0.0),
-        corner(left, bottom, 0.0, 1.0),
-        corner(right, top, 1.0, 0.0),
-        corner(right, bottom, 1.0, 1.0),
-        corner(left, bottom, 0.0, 1.0),
-    ]
-}
-
-/// Viewport pixels (origin top-left, y down) to clip space (-1..1, y up).
-#[allow(clippy::cast_precision_loss)] // pixel counts are far below 2^24
-fn to_clip(point: [f32; 2], viewport: Size) -> [f32; 2] {
-    [
-        point[0] / viewport.width as f32 * 2.0 - 1.0,
-        1.0 - point[1] / viewport.height as f32 * 2.0,
-    ]
-}
-
-fn as_bytes(vertices: &[Vertex; VERTEX_COUNT as usize]) -> Vec<u8> {
-    vertices
-        .iter()
-        .flat_map(|v| [v.position[0], v.position[1], v.uv[0], v.uv[1]])
-        .flat_map(f32::to_le_bytes)
-        .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn viewport_corners_map_to_clip_corners() {
-        // Given
-        let viewport = Size {
-            width: 640,
-            height: 400,
-        };
-
-        // When
-        let top_left = to_clip([0.0, 0.0], viewport);
-        let bottom_right = to_clip([640.0, 400.0], viewport);
-
-        // Then
-        assert_eq!(top_left, [-1.0, 1.0]);
-        assert_eq!(bottom_right, [1.0, -1.0]);
-    }
-
-    #[test]
-    fn quad_covers_the_bounds_with_matching_texture_coordinates() {
-        // Given
-        let viewport = Size {
-            width: 100,
-            height: 100,
-        };
-
-        // When
-        let quad = quad_vertices([[0.0, 0.0], [50.0, 100.0]], viewport);
-
-        // Then: first vertex is the top-left at uv 0,0; last is bottom-left at uv 0,1
-        assert_eq!(quad[0].position, [-1.0, 1.0]);
-        assert_eq!(quad[0].uv, [0.0, 0.0]);
-        assert_eq!(quad[4].position, [0.0, -1.0]);
-        assert_eq!(quad[4].uv, [1.0, 1.0]);
-    }
 }
