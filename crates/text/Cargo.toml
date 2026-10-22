@@ -1,0 +1,32 @@
+[package]
+name = "vapors-text"
+description = "Text: Parley layout over the bundled Geist fonts, CPU glyph rasterisation into an atlas, gamma-correct drawing through wgpu."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+# Pinned exactly: fontique, skrifa and zeno must agree on read-fonts, and
+# the rasteriser's output is what the comparison page signed off.
+[dependencies]
+wgpu.workspace = true
+vapors-scene.workspace = true
+parley = { version = "=0.12.0", default-features = false, features = ["std", "complex-scripts"] }
+fontique = { version = "=0.12.0", default-features = false, features = ["std"] }
+skrifa = "=0.44.0"
+zeno = { version = "=0.3.3", default-features = false, features = ["std", "eval"] }
+log = "0.4"
+
+# System fonts come from fontconfig, loaded at run time (dlopen) so the
+# build needs no fontconfig headers.
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+fontique = { version = "=0.12.0", default-features = false, features = ["std", "system", "fontconfig-dlopen"] }
+
+[dev-dependencies]
+vapors-gpu-harness.workspace = true
+vapors-renderer.workspace = true
+png.workspace = true
+
+[lints]
+workspace = true
