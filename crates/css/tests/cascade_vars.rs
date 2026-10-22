@@ -159,3 +159,32 @@ fn supports_with_and_or_and_malformed_refused() {
             .contains("@supports")
     );
 }
+
+#[test]
+fn shorthands_with_var_substitute_then_expand() {
+    // Given: review item 3; the var() path must expand shorthands too.
+    let (tree, leaf) = support::chain(&["div.x"]);
+    let src = "html { --x: 1px; --y: 2px; --c: red; --s: 2; }
+        .x { padding: var(--x) var(--y); border: 1px solid var(--c); flex: var(--s); }";
+    let style = computed(src, &tree, leaf);
+    assert_eq!(css(&style, "padding-top"), "1px");
+    assert_eq!(css(&style, "padding-right"), "2px");
+    assert_eq!(css(&style, "border-top-width"), "1px");
+    assert_eq!(css(&style, "border-left-style"), "solid");
+    assert_eq!(css(&style, "border-bottom-color"), "rgb(255 0 0)");
+    assert_eq!(css(&style, "flex-grow"), "2");
+    assert_eq!(css(&style, "flex-shrink"), "1");
+    assert_eq!(css(&style, "flex-basis"), "0px");
+}
+
+#[test]
+fn relative_units_inside_calc_resolve_at_compute_leaving_percent() {
+    let (tree, leaf) = support::chain(&["div.x"]);
+    let style = computed(
+        ".x { font-size: 20px; width: calc(1em + 10%); height: calc(10vw - 1rem); }",
+        &tree,
+        leaf,
+    );
+    assert_eq!(css(&style, "width"), "calc(20px + 10%)");
+    assert_eq!(css(&style, "height"), "64px");
+}

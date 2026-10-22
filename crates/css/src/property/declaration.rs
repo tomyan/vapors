@@ -19,8 +19,14 @@ pub enum Specified {
     Initial,
     /// `unset`
     Unset,
-    /// Component values containing `var()`, parsed after substitution.
-    Pending(Vec<ComponentValue>),
+    /// Component values containing `var()`, parsed after substitution
+    /// under the declared property (a shorthand expands then).
+    Pending {
+        /// The property as declared, longhand or shorthand.
+        property: String,
+        /// The declared value.
+        tokens: Vec<ComponentValue>,
+    },
 }
 
 impl Specified {
@@ -32,14 +38,14 @@ impl Specified {
             Self::Inherit => "inherit".to_owned(),
             Self::Initial => "initial".to_owned(),
             Self::Unset => "unset".to_owned(),
-            Self::Pending(values) => crate::serialize::component_values(values),
+            Self::Pending { tokens, .. } => crate::serialize::component_values(tokens),
         }
     }
 
     /// Whether `var()` substitution is still to come.
     #[must_use]
     pub fn is_pending(&self) -> bool {
-        matches!(self, Self::Pending(_))
+        matches!(self, Self::Pending { .. })
     }
 }
 
@@ -81,7 +87,10 @@ pub fn parse_declaration(
             .collect());
     }
     if contains_var(values) {
-        let pending = Specified::Pending(values.to_vec());
+        let pending = Specified::Pending {
+            property: name.to_owned(),
+            tokens: values.to_vec(),
+        };
         return Ok(longhand_ids(name)
             .into_iter()
             .map(|id| Longhand {
@@ -240,4 +249,28 @@ pub(super) fn check_transition_properties(value: &Value, at: Position) -> Result
         }
     }
     Ok(())
+}
+
+/// Substitute `var()` in a pending declaration and parse it under the
+/// declared property, returning what longhand `id` gets.
+///
+/// # Errors
+/// An unresolved variable or cycle, or a value that fails the grammar,
+/// each naming the declaration at `at`.
+pub fn resolve_pending<'a>(
+    property: &str,
+    tokens: &[ComponentValue],
+    lookup: &dyn Fn(&str) -> Option<&'a [ComponentValue]>,
+    id: PropertyId,
+    at: Position,
+) -> Result<Specified> {
+    let substituted = crate::value::substitute_vars(tokens, lookup)
+        .map_err(|e| Error::new(at, format!("{property}: {e}")))?;
+    let longhands = parse_declaration(property, &substituted, at)
+        .map_err(|e| Error::new(at, format!("after var() substitution, {}", e.message)))?;
+    longhands
+        .into_iter()
+        .find(|l| l.id == id)
+        .map(|l| l.value)
+        .ok_or_else(|| Error::new(at, format!("{property} does not set {}", id.name())))
 }

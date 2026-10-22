@@ -98,6 +98,10 @@ fn easing(v: &ComponentValue) -> Option<Value> {
             if !known.contains(&pos.as_str()) {
                 return None;
             }
+            // jump-none needs two steps to have anywhere to go.
+            if pos == "jump-none" && count == Value::Integer(1) {
+                return None;
+            }
             Some(Value::Function(
                 "steps".to_owned(),
                 vec![count, Value::Keyword(pos)],

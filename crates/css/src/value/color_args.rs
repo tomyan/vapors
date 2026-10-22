@@ -23,6 +23,13 @@ impl Component {
         }
     }
 
+    /// A component where a bare number means a percentage (saturation,
+    /// lightness, whiteness, blackness: Color Level 4 sections 7 and 8),
+    /// as a fraction.
+    pub(super) fn fraction(self) -> f64 {
+        self.number / 100.0
+    }
+
     /// A hue in degrees.
     pub(super) fn angle(self) -> f64 {
         match self.angle_unit {

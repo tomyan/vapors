@@ -1,14 +1,22 @@
-//! The range form of a media feature: `name op value`, `value op name`
-//! and `lo op name op hi`.
+//! The range form of a media feature (Media Queries Level 4 section
+//! 2.4.3): `name op value`, `value op name` and `lo op name op hi`, with
+//! `<`, `<=`, `=`, `>=`, `>` written as one or two delimiters.
 
-use super::media_feature::{Comparison, Feature, SizeAxis, ident, length_px, resolution};
+use super::media_feature::{Comparison, Feature, SizeAxis, ident, length, resolution};
 use crate::ast::ComponentValue;
 use crate::token::{Token, TokenKind};
+use crate::value::Length;
 use crate::{Error, Result};
 
 const SHAPE: &str = "a range is `name op value`, `value op name` or `lo op name op hi`";
 
-/// `name op value`, `value op name`, `lo op name op hi`.
+/// One side's comparison, normalised to "name op value".
+enum Bound {
+    Length(Comparison, Length),
+    Resolution(Comparison, f64),
+}
+
+/// Parse the range form.
 pub(super) fn range_form(
     items: &[&ComponentValue],
     refuse: &dyn Fn(&str) -> Error,
@@ -18,59 +26,69 @@ pub(super) fn range_form(
         .position(|v| ident(Some(v)).is_some())
         .ok_or_else(|| refuse("expected a feature name in the range"))?;
     let name = ident(Some(items[name_at])).expect("found above");
-    let mut tests = Vec::new();
-    match name_at {
-        0 => {}
-        // value op name: flip the operator.
-        2 => tests.push((
-            comparison(&items[..2], refuse)?.flipped(),
-            value(&name, items[0], refuse)?,
-        )),
-        _ => return Err(refuse(SHAPE)),
+    let mut bounds = Vec::new();
+    if name_at > 0 {
+        // `value op name`: the operator reads the other way round.
+        let (value, ops) = items[..name_at]
+            .split_first()
+            .ok_or_else(|| refuse(SHAPE))?;
+        bounds.push(bound(
+            &name,
+            comparison(ops, refuse)?.flipped(),
+            value,
+            refuse,
+        )?);
     }
     let rest = &items[name_at + 1..];
-    if !rest.is_empty() {
-        tests.push(trailing_test(&name, rest, refuse)?);
+    if let Some((value, ops)) = rest.split_last() {
+        bounds.push(bound(&name, comparison(ops, refuse)?, value, refuse)?);
     }
-    match name.as_str() {
-        "width" => Ok(Feature::Size(SizeAxis::Width, tests)),
-        "height" => Ok(Feature::Size(SizeAxis::Height, tests)),
-        "resolution" => Ok(Feature::Resolution(tests)),
-        _ => Err(refuse(
-            "only width, height and resolution take the range syntax",
-        )),
-    }
-}
-
-/// `op value` after the name.
-fn trailing_test(
-    name: &str,
-    rest: &[&ComponentValue],
-    refuse: &dyn Fn(&str) -> Error,
-) -> Result<(Comparison, f64)> {
-    let second_is_eq = matches!(
-        rest.get(1),
-        Some(ComponentValue::Token(Token {
-            kind: TokenKind::Delim('='),
-            ..
-        }))
-    );
-    let op_len = if second_is_eq { 2 } else { 1 };
-    if rest.len() != op_len + 1 {
+    if bounds.is_empty() {
         return Err(refuse(SHAPE));
     }
-    Ok((
-        comparison(&rest[..op_len], refuse)?,
-        value(name, rest[op_len], refuse)?,
-    ))
+    feature(&name, bounds, refuse)
 }
 
-/// The feature's value: dppx for resolution, px otherwise.
-fn value(name: &str, v: &ComponentValue, refuse: &dyn Fn(&str) -> Error) -> Result<f64> {
-    match name {
-        "resolution" => resolution(v, refuse),
-        _ => length_px(v, refuse),
-    }
+fn bound(
+    name: &str,
+    op: Comparison,
+    value: &ComponentValue,
+    refuse: &dyn Fn(&str) -> Error,
+) -> Result<Bound> {
+    Ok(match name {
+        "resolution" => Bound::Resolution(op, resolution(value, refuse)?),
+        _ => Bound::Length(op, length(value, refuse)?),
+    })
+}
+
+fn feature(name: &str, bounds: Vec<Bound>, refuse: &dyn Fn(&str) -> Error) -> Result<Feature> {
+    let axis = match name {
+        "width" => SizeAxis::Width,
+        "height" => SizeAxis::Height,
+        "resolution" => {
+            let tests = bounds
+                .into_iter()
+                .map(|b| match b {
+                    Bound::Resolution(op, v) => (op, v),
+                    Bound::Length(..) => unreachable!("bound() keyed on the name"),
+                })
+                .collect();
+            return Ok(Feature::Resolution(tests));
+        }
+        _ => {
+            return Err(refuse(
+                "only width, height and resolution take the range syntax",
+            ));
+        }
+    };
+    let tests = bounds
+        .into_iter()
+        .map(|b| match b {
+            Bound::Length(op, l) => (op, l),
+            Bound::Resolution(..) => unreachable!("bound() keyed on the name"),
+        })
+        .collect();
+    Ok(Feature::Size(axis, tests))
 }
 
 impl Comparison {
@@ -85,6 +103,7 @@ impl Comparison {
     }
 }
 
+/// `<`, `<=`, `=`, `>=` or `>` from one or two delimiter tokens.
 fn comparison(items: &[&ComponentValue], refuse: &dyn Fn(&str) -> Error) -> Result<Comparison> {
     let delims: Vec<char> = items
         .iter()
@@ -96,6 +115,9 @@ fn comparison(items: &[&ComponentValue], refuse: &dyn Fn(&str) -> Error) -> Resu
             _ => None,
         })
         .collect();
+    if delims.len() != items.len() {
+        return Err(refuse(SHAPE));
+    }
     match delims.as_slice() {
         ['<'] => Ok(Comparison::Less),
         ['<', '='] => Ok(Comparison::LessEq),

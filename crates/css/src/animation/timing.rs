@@ -151,21 +151,46 @@ impl TimingFunction {
     }
 }
 
-/// Solve `B_x(u) = t` by Newton iteration, then return `B_y(u)`.
+/// Solve `B_x(u) = t` by Newton iteration, falling back to bisection
+/// when the derivative is small or a step leaves 0..=1, then return
+/// `B_y(u)`.
 fn bezier_y(x1: f64, y1: f64, x2: f64, y2: f64, t: f64) -> f64 {
+    let u = newton(x1, x2, t).unwrap_or_else(|| bisect(x1, x2, t));
+    bezier(y1, y2, u)
+}
+
+/// Eight Newton steps; `None` when they do not converge.
+fn newton(x1: f64, x2: f64, t: f64) -> Option<f64> {
     let mut u = t;
     for _ in 0..8 {
-        let x = bezier(x1, x2, u) - t;
-        if x.abs() < 1e-7 {
-            break;
+        let error = bezier(x1, x2, u) - t;
+        if error.abs() < 1e-7 {
+            return Some(u);
         }
-        let dx = bezier_derivative(x1, x2, u);
-        if dx.abs() < 1e-7 {
-            break;
+        let slope = bezier_derivative(x1, x2, u);
+        if slope.abs() < 1e-6 {
+            return None;
         }
-        u -= x / dx;
+        u -= error / slope;
+        if !(0.0..=1.0).contains(&u) {
+            return None;
+        }
     }
-    bezier(y1, y2, u.clamp(0.0, 1.0))
+    ((bezier(x1, x2, u) - t).abs() < 1e-6).then_some(u)
+}
+
+/// Bisection on 0..=1: `B_x` is monotonic there since x1 and x2 are.
+fn bisect(x1: f64, x2: f64, t: f64) -> f64 {
+    let (mut lo, mut hi) = (0.0, 1.0);
+    for _ in 0..50 {
+        let mid = f64::midpoint(lo, hi);
+        if bezier(x1, x2, mid) < t {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    f64::midpoint(lo, hi)
 }
 
 /// One axis of the curve: `3(1-u)²u·p1 + 3(1-u)u²·p2 + u³`.

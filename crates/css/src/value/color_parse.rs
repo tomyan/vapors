@@ -100,8 +100,8 @@ fn function(name: &str, args: &[ComponentValue], at: Position) -> Result<Color> 
     let [c0, c1, c2] = components;
     let (r, g, b) = match lower.as_str() {
         "rgb" | "rgba" => (c0.scaled(255.0), c1.scaled(255.0), c2.scaled(255.0)),
-        "hsl" | "hsla" => color_space::hsl_to_rgb(c0.angle(), c1.scaled(1.0), c2.scaled(1.0)),
-        "hwb" => color_space::hwb_to_rgb(c0.angle(), c1.scaled(1.0), c2.scaled(1.0)),
+        "hsl" | "hsla" => color_space::hsl_to_rgb(c0.angle(), c1.fraction(), c2.fraction()),
+        "hwb" => color_space::hwb_to_rgb(c0.angle(), c1.fraction(), c2.fraction()),
         "lab" => color_space::lab_to_rgb(c0.scaled(100.0), c1.scaled(125.0), c2.scaled(125.0)),
         "lch" => {
             let (a, b) = color_space::polar_to_ab(c1.scaled(150.0), c2.angle());

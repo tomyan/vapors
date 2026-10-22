@@ -4,14 +4,15 @@
 use super::Environment;
 use crate::ast::ComponentValue;
 use crate::token::{Token, TokenKind};
-use crate::value::{ColorScheme, Context, Length};
+use crate::value::{ColorScheme, Context, Length, LengthUnit};
 use crate::{Error, Position, Result};
 
 /// A parsed feature.
 #[derive(Clone, Debug)]
 pub(crate) enum Feature {
-    /// `width` or `height` compared to a value: (which, op, px).
-    Size(SizeAxis, Vec<(Comparison, f64)>),
+    /// `width` or `height` compared to lengths, resolved at evaluation
+    /// against the environment (vw, vh, rem).
+    Size(SizeAxis, Vec<(Comparison, Length)>),
     /// `resolution` compared to dppx.
     Resolution(Vec<(Comparison, f64)>),
     /// `prefers-color-scheme: light | dark`.
@@ -54,6 +55,8 @@ pub(crate) struct Sizes {
     resolution: f64,
     color_scheme: ColorScheme,
     reduced_motion: bool,
+    /// What feature lengths resolve against.
+    ctx: Context,
 }
 
 impl Sizes {
@@ -73,6 +76,14 @@ impl Sizes {
             resolution: env.resolution,
             color_scheme: env.color_scheme,
             reduced_motion: env.reduced_motion,
+            ctx: Context {
+                font_size: env.root_font_size,
+                root_font_size: env.root_font_size,
+                viewport_width: env.viewport_width,
+                viewport_height: env.viewport_height,
+                zero_advance: env.root_font_size * env.zero_advance_em,
+                percent_base: None,
+            },
         }
     }
 }
@@ -85,7 +96,9 @@ impl Feature {
                     SizeAxis::Width => sizes.width,
                     SizeAxis::Height => sizes.height,
                 };
-                tests.iter().all(|(op, v)| op.holds(actual, *v))
+                tests
+                    .iter()
+                    .all(|(op, l)| l.to_px(&sizes.ctx).is_ok_and(|v| op.holds(actual, v)))
             }
             Self::Resolution(tests) => tests.iter().all(|(op, v)| op.holds(sizes.resolution, *v)),
             Self::ColorScheme(s) => sizes.color_scheme == *s,
@@ -120,11 +133,11 @@ pub(crate) fn parse(contents: &[ComponentValue], at: Position, what: &str) -> Re
         return match name.as_str() {
             "width" => Ok(Feature::Size(
                 SizeAxis::Width,
-                vec![(Comparison::Greater, 0.0)],
+                vec![(Comparison::Greater, Length::px(0.0))],
             )),
             "height" => Ok(Feature::Size(
                 SizeAxis::Height,
-                vec![(Comparison::Greater, 0.0)],
+                vec![(Comparison::Greater, Length::px(0.0))],
             )),
             "prefers-reduced-motion" => Ok(Feature::ReducedMotion(true)),
             _ => Err(refuse("this feature needs a value")),
@@ -165,11 +178,11 @@ fn colon_form(
     match base {
         "width" => Ok(Feature::Size(
             SizeAxis::Width,
-            vec![(op, length_px(single()?, refuse)?)],
+            vec![(op, length(single()?, refuse)?)],
         )),
         "height" => Ok(Feature::Size(
             SizeAxis::Height,
-            vec![(op, length_px(single()?, refuse)?)],
+            vec![(op, length(single()?, refuse)?)],
         )),
         "resolution" => Ok(Feature::Resolution(vec![(
             op,
@@ -193,18 +206,13 @@ fn colon_form(
     }
 }
 
-/// A length in px; relative units resolve against the root defaults.
-pub(super) fn length_px(v: &ComponentValue, refuse: &dyn Fn(&str) -> Error) -> Result<f64> {
+/// A length feature value; `%` has no meaning here.
+pub(super) fn length(v: &ComponentValue, refuse: &dyn Fn(&str) -> Error) -> Result<Length> {
     let length = Length::parse(v).map_err(|e| refuse(&e.message))?;
-    let ctx = Context {
-        font_size: 16.0,
-        root_font_size: 16.0,
-        viewport_width: 0.0,
-        viewport_height: 0.0,
-        zero_advance: 8.0,
-        percent_base: None,
-    };
-    length.to_px(&ctx).map_err(|e| refuse(&e.to_string()))
+    if length.unit == LengthUnit::Percent {
+        return Err(refuse("a percentage has no meaning in a size feature"));
+    }
+    Ok(length)
 }
 
 /// `<number>dppx | x | dpi`.

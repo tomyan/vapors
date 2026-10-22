@@ -4,6 +4,33 @@ use super::Context;
 use super::calc::{Calc, EvalError};
 
 impl Calc {
+    /// The same expression with every non-percentage length in px, so
+    /// only `%` terms remain for layout to resolve.
+    #[must_use]
+    pub fn with_absolute_lengths(&self, ctx: &Context) -> Self {
+        let map = |items: &[Self]| items.iter().map(|c| c.with_absolute_lengths(ctx)).collect();
+        match self {
+            Self::Length(l) if l.unit != super::LengthUnit::Percent => {
+                Self::Length(super::Length::px(l.to_px(ctx).unwrap_or(l.value)))
+            }
+            Self::Number(_) | Self::Length(_) => self.clone(),
+            Self::Negate(a) => Self::Negate(Box::new(a.with_absolute_lengths(ctx))),
+            Self::Invert(a) => Self::Invert(Box::new(a.with_absolute_lengths(ctx))),
+            Self::Sum(items) => Self::Sum(map(items)),
+            Self::Product(items) => Self::Product(map(items)),
+            Self::Min(items) => Self::Min(map(items)),
+            Self::Max(items) => Self::Max(map(items)),
+            Self::Clamp(args) => {
+                let [a, b, c] = args.as_ref();
+                Self::Clamp(Box::new([
+                    a.with_absolute_lengths(ctx),
+                    b.with_absolute_lengths(ctx),
+                    c.with_absolute_lengths(ctx),
+                ]))
+            }
+        }
+    }
+
     /// The expression's value: px for lengths, a plain number otherwise.
     ///
     /// # Errors

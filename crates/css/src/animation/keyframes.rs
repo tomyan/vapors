@@ -8,8 +8,7 @@ use super::spec::AnimationSpec;
 use super::timing::TimingFunction;
 use crate::cascade::{Cascade, ComputedStyle, Environment};
 use crate::property::{PropertyId, Specified};
-use crate::syntax::match_value;
-use crate::value::{Value, substitute_vars};
+use crate::value::Value;
 use crate::{Error, Result};
 
 /// One resolved stop.
@@ -85,13 +84,26 @@ fn resolve_stop(
                         ),
                     ));
                 }
-                Specified::Pending(tokens) => {
-                    let substituted = substitute_vars(tokens, &lookup).map_err(|e| {
-                        Error::new(decl.position, format!("{}: {e}", longhand.id.name()))
-                    })?;
-                    match_value(longhand.id.grammar(), &substituted).ok_or_else(|| {
-                        Error::new(decl.position, format!("{}: after var() substitution the value does not match the syntax {}", longhand.id.name(), longhand.id.def().syntax))
-                    })?
+                Specified::Pending { property, tokens } => {
+                    let resolved = crate::property::resolve_pending(
+                        property,
+                        tokens,
+                        &lookup,
+                        longhand.id,
+                        decl.position,
+                    )?;
+                    match resolved {
+                        Specified::Value(v) => v,
+                        _ => {
+                            return Err(Error::new(
+                                decl.position,
+                                format!(
+                                    "{}: CSS-wide keywords are not allowed in @keyframes",
+                                    decl.name
+                                ),
+                            ));
+                        }
+                    }
                 }
             };
             if longhand.id == timing_id {

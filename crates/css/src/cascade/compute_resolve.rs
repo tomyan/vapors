@@ -24,6 +24,8 @@ pub(super) fn resolve(
         Value::Calc(c) if c.kind() == CalcKind::Length || ctx.percent_base.is_some() => {
             Value::Length(Length::px(evaluate(c, ctx)?))
         }
+        // A % term stays for layout; every other unit resolves now.
+        Value::Calc(c) => Value::Calc(c.with_absolute_lengths(ctx)),
         Value::Color(c) => Value::Color(Color::Rgba(c.resolve(scheme, current))),
         Value::Function(name, args) => {
             Value::Function(name.clone(), resolve_all(args, ctx, scheme, current)?)

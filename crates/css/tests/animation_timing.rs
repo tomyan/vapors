@@ -187,3 +187,35 @@ fn jump_none_and_jump_both_evaluation() {
         (f.evaluate(0.1) - 1.0 / 3.0).abs() < 1e-9 && (f.evaluate(0.6) - 2.0 / 3.0).abs() < 1e-9
     );
 }
+
+/// Reference solve of x(u) = t by bisection to 1e-9.
+fn bisect_bezier(x1: f64, y1: f64, x2: f64, y2: f64, t: f64) -> f64 {
+    let axis = |p1: f64, p2: f64, u: f64| {
+        let inv = 1.0 - u;
+        3.0 * inv * inv * u * p1 + 3.0 * inv * u * u * p2 + u * u * u
+    };
+    let (mut lo, mut hi) = (0.0, 1.0);
+    for _ in 0..60 {
+        let mid = f64::midpoint(lo, hi);
+        if axis(x1, x2, mid) < t {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    axis(y1, y2, f64::midpoint(lo, hi))
+}
+
+#[test]
+fn cubic_bezier_with_a_flat_middle_matches_a_bisection_reference() {
+    // Given: review item 5; Newton alone stalls where the derivative is small.
+    let f = TimingFunction::parse("cubic-bezier(1, 0, 0, 1)").expect("parses");
+    for t in [0.1, 0.3, 0.5, 0.7, 0.9] {
+        let want = bisect_bezier(1.0, 0.0, 0.0, 1.0, t);
+        assert!(
+            (f.evaluate(t) - want).abs() < 1e-4,
+            "t={t}: {} vs {want}",
+            f.evaluate(t)
+        );
+    }
+}

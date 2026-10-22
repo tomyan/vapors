@@ -278,3 +278,11 @@ fn gap_longhands() {
     accepts("column-gap: 2%");
     accepts("row-gap: normal");
 }
+
+#[test]
+fn steps_one_jump_none_is_refused_naming_it() {
+    // Given: review item 9; jump-none needs at least two steps.
+    let err = refusal("a { transition-timing-function: steps(1, jump-none); }");
+    assert!(err.message.contains("jump-none"), "{err}");
+    accepts("transition-timing-function: steps(2, jump-none)");
+}

@@ -9,7 +9,7 @@ use vapors_scene::Color as Rgba;
 use super::collect::Winners;
 use super::{ComputedStyle, Environment};
 use crate::ast::ComponentValue;
-use crate::property::{PROPERTIES, PropertyId, Specified};
+use crate::property::{PROPERTIES, PropertyId, Specified, resolve_pending};
 use crate::syntax::match_value;
 use crate::value::{Color, Context, Length, Value, substitute_vars};
 
@@ -181,20 +181,14 @@ fn specified_value<'a>(
         Specified::Inherit => inherited(),
         Specified::Initial => initial(id).clone(),
         Specified::Unset => default(),
-        Specified::Pending(tokens) => {
-            let substituted = substitute_vars(tokens, lookup)
-                .map_err(|e| Error::new(candidate.position, format!("{}: {e}", id.name())))?;
-            match_value(id.grammar(), &substituted).ok_or_else(|| {
-                Error::new(
-                    candidate.position,
-                    format!(
-                        "{}: after var() substitution, {:?} does not match the syntax {}",
-                        id.name(),
-                        crate::serialize::component_values(&substituted),
-                        id.def().syntax
-                    ),
-                )
-            })?
+        Specified::Pending { property, tokens } => {
+            match resolve_pending(property, tokens, lookup, id, candidate.position)? {
+                Specified::Value(v) => v,
+                Specified::Inherit => inherited(),
+                Specified::Initial => initial(id).clone(),
+                Specified::Unset => default(),
+                Specified::Pending { .. } => unreachable!("substitution removes every var()"),
+            }
         }
     })
 }

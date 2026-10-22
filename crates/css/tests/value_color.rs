@@ -190,3 +190,11 @@ fn oklab_lightness_of_white_is_one() {
         "{l} {a} {b}"
     );
 }
+
+#[test]
+fn hsl_and_hwb_bare_numbers_are_percentages() {
+    // Given: CSS Color 4 modern syntax, review item 4.
+    rgb_near(srgb("hsl(120 100 50)"), 0, 255, 0, "hsl numbers");
+    rgb_near(srgb("hwb(0 0 0)"), 255, 0, 0, "hwb numbers");
+    rgb_near(srgb("hsl(120 100 50 / 0.5)"), 0, 255, 0, "with alpha");
+}
