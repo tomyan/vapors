@@ -15,6 +15,7 @@ mod handler;
 mod input;
 #[cfg(not(target_family = "wasm"))]
 mod log_forward;
+pub mod page;
 mod picker;
 #[cfg(target_family = "wasm")]
 mod picker_web;
