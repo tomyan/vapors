@@ -1,0 +1,22 @@
+error: unclosed array, expected `]`
+ --> ../missing-crate/Cargo.toml:1:12
+  |
+1 | package = [
+  |            ^
+error: unclosed array, expected `]`
+ --> ../missing-crate/Cargo.toml:1:12
+  |
+1 | package = [
+  |            ^
+error: unclosed array, expected `]`
+ --> ../missing-crate/Cargo.toml:1:12
+  |
+1 | package = [
+  |            ^
+error: failed to get `missing` as a dependency of package `scratch-build v0.0.0 (/scratch/report-scratch)`
+
+Caused by:
+  failed to load source for dependency `missing`
+
+Caused by:
+  unable to update /scratch/missing-crate

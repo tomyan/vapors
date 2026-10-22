@@ -1,0 +1,12 @@
+   Compiling scratch-build v0.0.0 (/scratch/report-scratch)
+warning: scratch-build@0.0.0: checking for libfoo
+error: failed to run custom build command for `scratch-build v0.0.0 (/scratch/report-scratch)`
+
+Caused by:
+  process didn't exit successfully: `/scratch/report-scratch-target/debug/build/scratch-build-2c16db07e015c966/build-script-build` (exit status: 1)
+  --- stdout
+  cargo:warning=checking for libfoo
+  looked in /usr/lib/foo
+
+  --- stderr
+  libfoo not found: install libfoo-dev or set FOO_DIR

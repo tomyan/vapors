@@ -18,6 +18,7 @@ mod screenshot;
 mod serve;
 mod setup;
 mod steps;
+mod stop;
 mod stream;
 mod tailscale;
 mod tools;
@@ -25,6 +26,7 @@ mod trunk;
 mod trunk_process;
 mod web;
 mod xvfb;
+mod xvfb_display;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
