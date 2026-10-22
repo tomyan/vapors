@@ -38,6 +38,10 @@ pub const STYLE: &str = {style:?};
 }
 
 fn props_struct(name: &str, info: &ScriptInfo) -> String {
+    let doc = format!("/// What a parent passes to [`{name}::mount`]; each prop has a default.\n");
+    if info.props.is_empty() {
+        return format!("{doc}#[derive(Default)]\npub struct {name}Props {{}}\n");
+    }
     let mut fields = String::new();
     let mut defaults = String::new();
     for prop in &info.props {
@@ -49,10 +53,10 @@ fn props_struct(name: &str, info: &ScriptInfo) -> String {
         let _ = writeln!(defaults, "            {}: {},", prop.name, prop.default);
     }
     format!(
-        "/// What a parent passes to [`{name}::mount`]; each prop has a default.
-pub struct {name}Props {{
+        "{doc}pub struct {name}Props {{
 {fields}}}
 
+#[allow(clippy::derivable_impls, reason = \"{DEFAULTS_AS_WRITTEN}\")]
 impl Default for {name}Props {{
     fn default() -> Self {{
         Self {{
@@ -61,6 +65,25 @@ impl Default for {name}Props {{
 }}
 "
     )
+}
+
+const DEFAULTS_AS_WRITTEN: &str =
+    "the defaults are the #[prop] initialisers as written in the .wisp";
+const CLONES: &str =
+    "a closure gets a clone of each binding it captures; the compiler cannot see which are Copy";
+const PROPS_BY_VALUE: &str =
+    "every component takes its props struct by value, empty or not, so parents mount them alike";
+
+/// Lints on `mount_before` that depend on types the compiler cannot see.
+fn mount_allowances(info: &ScriptInfo) -> String {
+    let mut allowances = format!("    #[allow(clippy::clone_on_copy, reason = \"{CLONES}\")]\n");
+    if info.props.is_empty() {
+        let _ = writeln!(
+            allowances,
+            "    #[allow(clippy::needless_pass_by_value, reason = \"{PROPS_BY_VALUE}\")]"
+        );
+    }
+    allowances
 }
 
 fn component_struct(name: &str, info: &ScriptInfo) -> String {
@@ -102,6 +125,7 @@ fn field_lists(info: &ScriptInfo) -> (String, String) {
 
 fn mount_methods(name: &str, info: &ScriptInfo, body: &str) -> String {
     let (returned, built) = field_lists(info);
+    let allowances = mount_allowances(info);
     let prop_names: Vec<&str> = info.props.iter().map(|prop| prop.name.as_str()).collect();
     let prop_names = prop_names.join(", ");
     let mut statements = String::new();
@@ -116,7 +140,7 @@ fn mount_methods(name: &str, info: &ScriptInfo, body: &str) -> String {
     }}
 
     /// Mounts the component in `parent` before `before` (at the end when `None`).
-    pub fn mount_before<D: Dom + 'static>(dom: &Rc<RefCell<D>>, parent: NodeId, before: Option<NodeId>, props: {name}Props) -> Self {{
+{allowances}    pub fn mount_before<D: Dom + 'static>(dom: &Rc<RefCell<D>>, parent: NodeId, before: Option<NodeId>, props: {name}Props) -> Self {{
         let {name}Props {{ {prop_names} }} = props;
         let owner = Owner::new();
         let {returned} = owner.with(|| {{
@@ -132,6 +156,7 @@ fn mount_methods(name: &str, info: &ScriptInfo, body: &str) -> String {
 fn accessors() -> String {
     "
     /// The top-level nodes mounted, in order.
+    #[must_use]
     pub fn roots(&self) -> &[NodeId] {
         &self.roots
     }

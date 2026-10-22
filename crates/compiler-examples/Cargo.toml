@@ -8,5 +8,12 @@ repository.workspace = true
 rust-version.workspace = true
 publish = false
 
+[dependencies]
+vapors-dom.workspace = true
+vapors-signals.workspace = true
+
+[build-dependencies]
+vapors-compiler.workspace = true
+
 [lints]
 workspace = true

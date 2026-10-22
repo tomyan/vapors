@@ -50,7 +50,8 @@ pub struct BuildScriptReport {
 /// script. On a refusal it prints each as `file:line:col: message` and
 /// exits with status 1, which fails the build.
 pub fn compile_dir(src: impl AsRef<Path>) {
-    let report = build_script_report(src.as_ref(), std::env::var_os("OUT_DIR"));
+    let src = resolve_src(src.as_ref(), std::env::var_os("CARGO_MANIFEST_DIR"));
+    let report = build_script_report(&src, std::env::var_os("OUT_DIR"));
     for line in &report.stdout {
         println!("{line}");
     }
@@ -59,6 +60,16 @@ pub fn compile_dir(src: impl AsRef<Path>) {
     }
     if report.failed {
         std::process::exit(1);
+    }
+}
+
+/// `src` joined to the crate's directory when it is relative, so a
+/// refusal's path opens from wherever cargo was run.
+#[must_use]
+pub fn resolve_src(src: &Path, manifest_dir: Option<OsString>) -> PathBuf {
+    match manifest_dir {
+        Some(dir) if src.is_relative() => Path::new(&dir).join(src),
+        _ => src.to_path_buf(),
     }
 }
 

@@ -13,12 +13,8 @@ use vapors_signals::{Effect, Memo, Owner, Signal};
 /// The `<style>` of `src/counter.wisp`, resolved at run time by the css crate.
 pub const STYLE: &str = "\nbutton { padding: 4px 8px; }\n";
 /// What a parent passes to [`Counter::mount`]; each prop has a default.
+#[derive(Default)]
 pub struct CounterProps {}
-impl Default for CounterProps {
-    fn default() -> Self {
-        Self {}
-    }
-}
 /// `Counter`: its signals, and what `unmount` removes.
 pub struct Counter {
     /// `count`, declared in `<script>`.
@@ -36,6 +32,14 @@ impl Counter {
         Self::mount_before(dom, parent, None, props)
     }
     /// Mounts the component in `parent` before `before` (at the end when `None`).
+    #[allow(
+        clippy::clone_on_copy,
+        reason = "a closure gets a clone of each binding it captures; the compiler cannot see which are Copy"
+    )]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "every component takes its props struct by value, empty or not, so parents mount them alike"
+    )]
     pub fn mount_before<D: Dom + 'static>(
         dom: &Rc<RefCell<D>>,
         parent: NodeId,
@@ -79,6 +83,7 @@ impl Counter {
         Counter { count, owner, roots }
     }
     /// The top-level nodes mounted, in order.
+    #[must_use]
     pub fn roots(&self) -> &[NodeId] {
         &self.roots
     }

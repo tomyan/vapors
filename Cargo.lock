@@ -2481,6 +2481,11 @@ dependencies = [
 [[package]]
 name = "vapors-compiler-examples"
 version = "0.0.0"
+dependencies = [
+ "vapors-compiler",
+ "vapors-dom",
+ "vapors-signals",
+]
 
 [[package]]
 name = "vapors-css"
