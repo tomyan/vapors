@@ -1,6 +1,7 @@
 //! The trunk handle against a shell standing in for trunk.
 
 use std::net::TcpListener;
+use std::time::Instant;
 
 use super::*;
 
@@ -23,6 +24,24 @@ fn alive(pid: u32) -> bool {
         .stderr(Stdio::null())
         .status()
         .is_ok_and(|status| status.success())
+}
+
+/// The kernel delivers a group signal after `kill` returns, so a check
+/// right after the drop races it: poll until the process is gone.
+/// Measured well under 50 ms on the dev box on 2026-10-22; 2 s leaves
+/// room for a loaded CI runner and still names a leak within the test.
+const GONE_DEADLINE: Duration = Duration::from_secs(2);
+
+/// True once `pid` is gone, polling every 20 ms up to [`GONE_DEADLINE`].
+fn gone_within_deadline(pid: u32) -> bool {
+    let started = Instant::now();
+    while alive(pid) {
+        if started.elapsed() >= GONE_DEADLINE {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    true
 }
 
 #[test]
@@ -120,7 +139,10 @@ fn dropping_the_handle_kills_the_child() {
     drop(trunk);
 
     // Then
-    assert!(!alive(pid), "the child outlived its handle");
+    assert!(
+        gone_within_deadline(pid),
+        "the child {pid} outlived its handle by {GONE_DEADLINE:?}"
+    );
 }
 
 #[cfg(unix)]
@@ -140,7 +162,10 @@ fn dropping_the_handle_kills_the_childs_own_children_too() {
     drop(trunk);
 
     // Then
-    assert!(!alive(build), "the grandchild outlived the group");
+    assert!(
+        gone_within_deadline(build),
+        "the grandchild {build} outlived the group by {GONE_DEADLINE:?}"
+    );
 }
 
 #[test]
