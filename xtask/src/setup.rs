@@ -89,6 +89,9 @@ fn installed_version(tool: &Tool) -> Option<String> {
 fn install(tool: &Tool) -> Result<(), String> {
     let spec = format!("{}@{}", tool.crate_name, tool.version);
     println!("     installing {spec} with cargo binstall");
+    // Not through sccache: setup installs sccache, so it cannot need it.
+    // binstall downloads binaries; a tool it must compile compiles
+    // uncached, once per machine.
     let status = Command::new("cargo")
         .args(["binstall", "-y", &spec])
         .status()

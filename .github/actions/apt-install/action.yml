@@ -23,7 +23,7 @@ runs:
         PACKAGES: ${{ inputs.packages }}
       run: |
         [ -n "${ImageOS:-}" ] && [ -n "${ImageVersion:-}" ] || { echo "::error::ImageOS or ImageVersion is unset; the apt cache key needs the runner image"; exit 1; }
-        echo "key=apt-$ImageOS-$ImageVersion-$(printf '%s' "$PACKAGES" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+        echo "key=apt-$ImageOS-$ImageVersion-$(printf %s "$PACKAGES" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
     - name: restore the .debs
       id: cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -42,12 +42,14 @@ runs:
         sudo apt-get install -y -q -o Dir::Cache::Archives="$archives" -o APT::Keep-Downloaded-Packages=true $PACKAGES
         sudo chown -R "$(id -u):$(id -g)" "$archives"
         echo "$(ls "$archives"/*.deb 2>/dev/null | wc -l) .debs kept for the cache"
+    # Always runs and exits at once without mesa-major: `cargo xtask
+    # gate` runs it too, and models no `if:` on an input.
     - name: the Mesa the reference images were made with
-      if: inputs.mesa-major != ''
       shell: bash
       env:
         MESA_MAJOR: ${{ inputs.mesa-major }}
       run: |
+        [ -n "$MESA_MAJOR" ] || exit 0
         version=$(dpkg-query -W -f='${Version}' mesa-vulkan-drivers)
         echo "mesa-vulkan-drivers $version"
         case "$version" in

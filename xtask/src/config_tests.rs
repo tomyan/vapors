@@ -102,3 +102,33 @@ fn refuses_an_entry_before_a_header_naming_the_line() {
     // Then
     assert_eq!(error.line, 1);
 }
+
+#[test]
+fn a_quoted_key_may_hold_an_equals_sign() {
+    // Given: a gate setup line with `=` in it
+    let text = "[gate.setup]\n\"fc-list :lang=zh | head -1\" = \"checks the CJK font\"\n";
+
+    // When
+    let config = Config::parse(text).expect("valid");
+
+    // Then
+    assert_eq!(
+        config.get("gate.setup.fc-list :lang=zh | head -1"),
+        Some("checks the CJK font")
+    );
+}
+
+#[test]
+fn a_single_quoted_key_is_literal_and_may_hold_double_quotes() {
+    // Given: a runner-only line with double quotes, as TOML writes a literal string
+    let text = "[gate.setup]\n'archives=\"$HOME/.cache/apt-archives\"' = \"the apt cache\"\n";
+
+    // When
+    let config = Config::parse(text).expect("valid");
+
+    // Then
+    assert_eq!(
+        config.get("gate.setup.archives=\"$HOME/.cache/apt-archives\""),
+        Some("the apt cache")
+    );
+}
