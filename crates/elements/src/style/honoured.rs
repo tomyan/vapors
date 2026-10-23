@@ -102,7 +102,7 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
         "left",
         Inert("has no effect while position is static, which F2c S1 requires"),
     ),
-    ("letter-spacing", Deferred("F2c S6")),
+    ("letter-spacing", Read),
     ("line-height", Read),
     ("margin-bottom", Read),
     ("margin-left", Read),
@@ -126,7 +126,7 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
         Inert("has no effect while position is static, which F2c S1 requires"),
     ),
     ("row-gap", Read),
-    ("text-align", Deferred("F2c S6")),
+    ("text-align", Read),
     ("text-decoration", Deferred("F2c S6")),
     (
         "top",

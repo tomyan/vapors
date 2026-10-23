@@ -58,5 +58,6 @@ fixtures![
     paint_boxes::PaintBoxes,
     shell::Shell,
     sizing::Sizing,
+    text_align::TextAlign,
     text_wrap::TextWrap,
 ];

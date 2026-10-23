@@ -3,7 +3,7 @@
 
 use vapors_css::value::{Color, LengthUnit, Value};
 use vapors_scene::Color as Rgba;
-use vapors_text::{Family, LineHeight, Style};
+use vapors_text::{Align, Family, LineHeight, Style};
 
 use super::values::{Reader, keyword, later, shape};
 
@@ -22,6 +22,10 @@ pub(crate) struct TextStyle {
     pub(crate) weight: f32,
     pub(crate) line_height: LineHeight,
     pub(crate) color: Rgba,
+    /// `letter-spacing`, CSS pixels.
+    pub(crate) letter_spacing: f32,
+    /// `text-align`: how a block lines up its inline content.
+    pub(crate) align: Align,
 }
 
 impl TextStyle {
@@ -35,6 +39,7 @@ impl TextStyle {
             weight: self.weight,
             line_height: self.line_height,
             color: self.color,
+            letter_spacing: self.letter_spacing,
             ..Style::new(family, self.size)
         }
     }
@@ -51,6 +56,8 @@ pub(crate) fn text_style(reader: &mut Reader<'_>) -> TextStyle {
         weight: reader.read("font-weight", weight, 400.0),
         line_height: reader.read("line-height", line_height, LineHeight::Normal),
         color: reader.read("color", color, Rgba::default()),
+        letter_spacing: reader.read("letter-spacing", letter_spacing, 0.0),
+        align: reader.read("text-align", align, Align::Start),
     }
 }
 
@@ -121,6 +128,29 @@ pub(super) fn color(value: &Value) -> Result<Rgba, String> {
     match value {
         Value::Color(Color::Rgba(rgba)) => Ok(*rgba),
         _ => Err(shape("a resolved colour")),
+    }
+}
+
+#[allow(clippy::cast_possible_truncation)]
+fn letter_spacing(value: &Value) -> Result<f32, String> {
+    match value {
+        Value::Keyword(k) if k == "normal" => Ok(0.0),
+        Value::Length(length) if length.unit == LengthUnit::Px => Ok(length.value as f32),
+        _ => Err(shape("`normal` or a length in px")),
+    }
+}
+
+/// Left-to-right only, as vapors lays text out now: `left` is the
+/// start edge and `right` the end.
+fn align(value: &Value) -> Result<Align, String> {
+    match keyword(value)? {
+        "start" | "left" => Ok(Align::Start),
+        "end" | "right" => Ok(Align::End),
+        "center" => Ok(Align::Center),
+        "justify" => Ok(Align::Justify),
+        other => Err(format!(
+            "`{other}` is not a text-align vapors-elements reads; use start, end, left, right, center or justify"
+        )),
     }
 }
 

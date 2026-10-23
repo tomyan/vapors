@@ -9,6 +9,8 @@ fn style(weight: f32) -> TextStyle {
         weight,
         line_height: LineHeight::Normal,
         color: vapors_scene::Color::default(),
+        letter_spacing: 0.0,
+        align: vapors_text::Align::Start,
     }
 }
 

@@ -40,7 +40,7 @@ pub(crate) fn text_layout(
     let options = LayoutOptions {
         width,
         scale,
-        ..LayoutOptions::default()
+        align: run.style.align,
     };
     let spans: Vec<Span<'static>> = run
         .spans
