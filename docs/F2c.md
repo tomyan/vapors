@@ -801,3 +801,10 @@ differs from the plan.
 - **D6 `br` and `a` in F2d (2026-10-23).** Forced line breaks and links
   are the first item after F2c: touche's chat panel and About page need
   them. Until then they are refused, naming F2d.
+- **D7 Hover after layout settles a frame later (2026-10-24).** An
+  update that moves content under a still pointer notices the new
+  hover after painting. It sets the flags and asks for another frame,
+  which restyles; the hover style shows one frame later. Chromium also
+  re-hovers after layout. The randomized differential test compares
+  settled frames, updating until no change is pending, and fails if
+  that takes more than three updates.
