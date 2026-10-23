@@ -586,8 +586,19 @@ differs from the plan.
   breakpoint; all match Chromium within 1/64 px. An element with no box
   compares as zeros, as `getBoundingClientRect` gives it.
 - **Demo.** `shell`: the 44 px bar, the canvas, the 280 px side panel,
-  and under 600 px the canvas alone; its pixels are checked at 640x400
-  natively and on the web, and at 390x800 and 1280x800 in the gpu tier.
+  and under 600 px the canvas alone; its pixels are checked at 640x400,
+  390x800 and 1280x800, natively and on the web.
+- **Scaled layout.** A fixture viewport may name a device scale
+  (`640x400@1.5`); the oracle passes it to Chromium and refuses a page
+  whose `devicePixelRatio` differs. `borders` is laid out at 1, 1.5 and
+  2.625, where border widths snap to whole device pixels.
+- **Web screenshots per section.** The page contract takes one
+  screenshot of each demo per `at WxH` section of its `.pixels` file,
+  with the window and canvas at that size (`check_pixels --viewports`
+  lists them, `--clicks <file> WxH` gives a section's clicks), and
+  checks it through `check_pixels`, which picks the section by the
+  screenshot's size. Removing the boxes demo's `flex-wrap` fails the
+  412x800 web screenshot.
 - **Not in S4.** `position` and its alignment grammar stay with S8;
   `order` is not in vapors-css's table.
 

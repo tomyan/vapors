@@ -119,7 +119,7 @@ prepare() {
   # which an app that draws only on change (F2c S2) never reaches. That
   # a resize is redrawn is the `resize` case's to check.
   counter='<script>var current = GPUCanvasContext.prototype.getCurrentTexture; GPUCanvasContext.prototype.getCurrentTexture = function () { if (document.body) { document.body.dataset.frames = String((Number(document.body.dataset.frames) || 0) + 1); document.body.dataset.frameHeight = String(this.canvas.height); } return current.apply(this, arguments); };</script>'
-  frames="<style>canvas { width: 640px !important; height: 400px !important; }</style>$counter"
+  frames=$(frames_at 640 400)
   page as-built-shot "$frames" "$full_size"
   # Only the image demo opens files through the page's Open button; an
   # elements demo hides it and the status line, and needs neither.
@@ -138,12 +138,18 @@ prepare() {
   for demo in $demos index; do
     page "$demo-overlap" "$overlaps" "(function () { if (status.textContent.indexOf('adapter: ') !== 0) return false; document.body.dataset.overlaps = vaporsOverlaps(); return true; })()"
   done
+  # One screenshot of each demo per section of its .pixels file, the
+  # canvas at that section's size.
   for demo in $demos; do
-    if [ -n "$($check_pixels --clicks "crates/demos/demos/$demo.pixels")" ]; then
-      page "$demo-shot" "$frames$(clicker "$demo")" "$(after_clicks "$demo")"
-    else
-      page "$demo-shot" "$frames" "$full_size"
-    fi
+    sizes=$(viewports "$demo") || exit 1
+    for wh in $sizes; do
+      w=${wh%x*}; h=${wh#*x}; shot="$demo-shot-$wh"
+      if [ -n "$($check_pixels --clicks "crates/demos/demos/$demo.pixels" "$wh")" ]; then
+        page "$shot" "$(frames_at "$w" "$h")$(clicker "$demo" "$wh")" "$(after_clicks "$h")"
+      else
+        page "$shot" "$(frames_at "$w" "$h")" "(Number(document.body.dataset.frameHeight) || 0) >= $h"
+      fi
+    done
   done
   page unknown-demo "" "!error.hidden"
   # The canvas resized by CSS after its first frame, as a window resize
@@ -157,6 +163,8 @@ prepare() {
 
 # The demos whose screenshots are held to crates/demos/demos/<name>.pixels.
 demos="hello counter boxes shell"
+# The window shoot uses: 640x400, but for a demo section's screenshot.
+size=640,400
 
 # A script defining vaporsOverlaps(): the visible elements whose boxes
 # meet the canvas's, other than the canvas, #error, and what the page
@@ -164,25 +172,39 @@ demos="hello counter boxes shell"
 # or `none`.
 overlaps='<script>function vaporsOverlaps() { var c = document.getElementById("vapors").getBoundingClientRect(), found = []; document.querySelectorAll("body *").forEach(function (e) { if (e.id === "vapors" || e.id === "error" || e.tagName === "SCRIPT" || e.tagName === "STYLE") return; var r = e.getBoundingClientRect(); if (r.width === 0 || r.height === 0 || getComputedStyle(e).visibility === "hidden") return; if (r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top) found.push(e.tagName.toLowerCase() + (e.id ? "#" + e.id : "")); }); return found.join(" ") || "none"; }</script>'
 
-# clicker <demo>: a script that makes the demo's .pixels clicks on the
+# viewports <demo>: each section's size in the demo's .pixels as WxH, a
+# line each; fails, naming the file, when check_pixels cannot read it.
+viewports() {
+  out=$($check_pixels --viewports "crates/demos/demos/$1.pixels") \
+    || { echo "crates/demos/demos/$1.pixels: check_pixels could not read its sections" >&2; return 1; }
+  printf '%s\n' "$out" | tr ' ' x
+}
+
+# frames_at <w> <h>: the screenshot copy's canvas at w x h CSS px (see
+# frames in prepare), with the frame counter its hold reads.
+frames_at() {
+  printf '%s' "<style>canvas { width: $1px !important; height: $2px !important; }</style>$counter"
+}
+
+# clicker <demo> <WxH>: a script that makes the WxH section's clicks on the
 # canvas as a mouse would (move, press, release, pointer id 1; a move has no
 # button and lists itself as its coalesced event, which winit reads), in the
 # order the file lists them; check_pixels reads the file, so the native
 # screenshot and this one make the same clicks.
 clicker() {
-  calls=$($check_pixels --clicks "crates/demos/demos/$1.pixels" | while read -r x y; do printf 'vaporsClick(%s, %s); ' "$x" "$y"; done) \
+  calls=$($check_pixels --clicks "crates/demos/demos/$1.pixels" "$2" | while read -r x y; do printf 'vaporsClick(%s, %s); ' "$x" "$y"; done) \
     || { echo "crates/demos/demos/$1.pixels: check_pixels could not read its clicks" >&2; exit 1; }
   printf '%s' "<script>function vaporsClick(x, y) { var c = document.getElementById('vapors'); var o = { clientX: x, clientY: y, bubbles: true, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: 0, buttons: 1 }; var move = { clientX: x, clientY: y, bubbles: true, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: -1, buttons: 0 }; move.coalescedEvents = [new PointerEvent('pointermove', move)]; c.dispatchEvent(new PointerEvent('pointermove', move)); c.dispatchEvent(new PointerEvent('pointerdown', o)); o.buttons = 0; c.dispatchEvent(new PointerEvent('pointerup', o)); } function vaporsClicks() { $calls}</script>"
 }
 
-# after_clicks <demo>: the hold condition. The clicks wait for a frame
-# at the screenshot's 400 px (see frames in prepare: a click made on the
+# after_clicks <h>: the hold condition. The clicks wait for a frame
+# at the screenshot's height (see frames in prepare: a click made on the
 # first, 313 px tall layout lands on another element); the hold then
 # ends once a frame after the clicks has begun, the one they asked for.
 # The page draws only on change, so a click that asks for no frame never
 # ends the hold, and `held` reports the server's timeout.
 after_clicks() {
-  echo "(function () { var f = Number(document.body.dataset.frames) || 0; if ((Number(document.body.dataset.frameHeight) || 0) < 400) return false; if (window.vaporsClickedAt === undefined) { vaporsClicks(); window.vaporsClickedAt = f; } return f > window.vaporsClickedAt; })()"
+  echo "(function () { var f = Number(document.body.dataset.frames) || 0; if ((Number(document.body.dataset.frameHeight) || 0) < $1) return false; if (window.vaporsClickedAt === undefined) { vaporsClicks(); window.vaporsClickedAt = f; } return f > window.vaporsClickedAt; })()"
 }
 
 # held <page>: fails when the server let <page>'s hold go at its 30 s
@@ -258,11 +280,11 @@ url() {
 }
 
 # The page as Chromium draws it, as $work/<page>.png, after the page's
-# own hold; its stderr in $work/<page>.log.
+# own hold; its stderr in $work/<page>.log. The window is $size, `W,H`.
 shoot() {
   env -u DBUS_SESSION_BUS_ADDRESS timeout 60 "$chrome" --headless=new --no-sandbox \
     --disable-gpu-sandbox --use-angle=swiftshader --enable-unsafe-webgpu \
-    --enable-features=Vulkan,WebGPU --window-size=640,400 --enable-logging=stderr --v=0 \
+    --enable-features=Vulkan,WebGPU --window-size="$size" --enable-logging=stderr --v=0 \
     --virtual-time-budget=8000 --screenshot="$work/$1.png" "$(url "$@")" 2>"$work/$1.log"
 }
 
@@ -390,13 +412,19 @@ overlap() {
 for demo in $demos index; do overlap "$demo"; done
 # Each demo as Chromium shows the canvas after its clicks, held to the
 # same crates/demos/demos/<name>.pixels as the native screenshot, by the
-# same code.
+# same code, one screenshot per section at that section's window size;
+# check_pixels picks the section by the screenshot's size.
+shots=""
 for demo in $demos; do
-  if shoot "$demo-shot" "?demo=$demo" && held "$demo-shot"; then
-    $check_pixels "crates/demos/demos/$demo.pixels" "$work/$demo-shot.png" || { fail "$demo-shot: the canvas fails demos/$demo.pixels; $work/$demo-shot.png"; console "$demo-shot"; }
-  else
-    fail "$demo-shot: $chrome exited non-zero or passed 60 s"; console "$demo-shot"
-  fi
+  sizes=$(viewports "$demo") || exit 1
+  for wh in $sizes; do
+    shot="$demo-shot-$wh"; shots="$shots $shot"; size="${wh%x*},${wh#*x}"
+    if shoot "$shot" "?demo=$demo" && held "$shot"; then
+      $check_pixels "crates/demos/demos/$demo.pixels" "$work/$shot.png" || { fail "$shot: the canvas fails demos/$demo.pixels; $work/$shot.png"; console "$shot"; }
+    else
+      fail "$shot: $chrome exited non-zero or passed 60 s"; console "$shot"
+    fi
+  done
 done
 [ "$failed" = 0 ] || { echo "the page contract does not hold; reproduce: cargo xtask web && $0 target/web \$(mktemp -d)" >&2; exit 1; }
-echo "ok   the page contract holds in all ten cases, no HTML over the canvas of: $demos index; the gradient screenshot and the screenshots of: $demos"
+echo "ok   the page contract holds in all ten cases, no HTML over the canvas of: $demos index; the gradient screenshot and the screenshots:$shots"
