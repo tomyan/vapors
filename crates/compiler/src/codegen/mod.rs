@@ -36,7 +36,7 @@ fn emit_template<'a>(
 ) -> Result<Emitter<'a>, CompileError> {
     let mut emitter = Emitter::new(source, info)
         .with_width(width)
-        .with_scope(component.style.is_some());
+        .with_scope(component.style.is_some() && component.scope.is_some());
     emitter.indent(3);
     emitter.emit_nodes(&component.template.children, &Place::roots())?;
     Ok(emitter)

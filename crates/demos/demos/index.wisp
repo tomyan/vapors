@@ -1,5 +1,5 @@
 <style>
-body { margin: 0; padding: 24px; background-color: #171b1f; color: #e4e8ec; font-size: 15px; }
+:global(body) { margin: 0; padding: 24px; background-color: #171b1f; color: #e4e8ec; font-size: 15px; }
 h1 { margin-top: 0; font-size: 20px; }
 .demo { display: flex; margin-top: 8px; }
 .name { width: 140px; font-family: "Geist Mono", monospace; color: #8ab4f8; }

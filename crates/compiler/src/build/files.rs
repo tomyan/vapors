@@ -5,7 +5,17 @@ use std::path::{Path, PathBuf};
 
 use super::tree::{Dir, scan};
 use super::{Compiled, modules, path_error};
-use crate::{CompileError, compile_file_under};
+use crate::{CompileError, compile_file_global, compile_file_under};
+
+/// Whether each component's `<style>` is scoped to its own elements,
+/// or added by the app as a global sheet.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Styles {
+    /// Scoped (decision D1): each mount adds its style under its scope.
+    Scoped,
+    /// Global: the app adds `STYLE` as a sheet; nothing is scoped.
+    Global,
+}
 
 /// Compiles every `.wisp` under `src` into `out/wisp/` and writes
 /// `out/wisp.rs`.
@@ -14,6 +24,18 @@ use crate::{CompileError, compile_file_under};
 /// Every refusal from every file, or the directory or output that
 /// could not be read or written. Nothing is written after a refusal.
 pub fn compile_dir_into(src: &Path, out: &Path) -> Result<Compiled, Vec<CompileError>> {
+    compile_dir_into_styled(src, out, Styles::Scoped)
+}
+
+/// [`compile_dir_into`] with each component's style `styles`.
+///
+/// # Errors
+/// As [`compile_dir_into`].
+pub fn compile_dir_into_styled(
+    src: &Path,
+    out: &Path,
+    styles: Styles,
+) -> Result<Compiled, Vec<CompileError>> {
     let tree = scan(src)?;
     if tree.is_empty() {
         return Err(vec![path_error(
@@ -24,7 +46,7 @@ pub fn compile_dir_into(src: &Path, out: &Path) -> Result<Compiled, Vec<CompileE
     let generated = out.join("wisp");
     let mut outputs = Vec::new();
     let mut errors = Vec::new();
-    let root = src.parent().unwrap_or(src);
+    let root = (src.parent().unwrap_or(src), styles);
     compile_tree(&tree, root, &generated, &mut outputs, &mut errors);
     if !errors.is_empty() {
         return Err(errors);
@@ -41,13 +63,17 @@ type Output = (PathBuf, String);
 
 fn compile_tree(
     dir: &Dir,
-    root: &Path,
+    root: (&Path, Styles),
     target: &Path,
     outputs: &mut Vec<Output>,
     errors: &mut Vec<CompileError>,
 ) {
     for file in &dir.files {
-        match compile_file_under(&file.path, root) {
+        let compiled = match root {
+            (root, Styles::Scoped) => compile_file_under(&file.path, root),
+            (_, Styles::Global) => compile_file_global(&file.path),
+        };
+        match compiled {
             Ok(code) => outputs.push((target.join(format!("{}.rs", file.module)), code)),
             Err(err) => errors.push(err),
         }

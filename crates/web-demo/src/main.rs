@@ -49,6 +49,6 @@ fn start() -> Result<(), String> {
     let demo = vapors_demos::find(&name)?;
     // An elements demo draws its own controls; the page's would cover them.
     hide_page_controls();
-    let app = ElementsApp::new(vapors_demos::document(&demo)?);
+    let app = ElementsApp::new(vapors_demos::document(&demo));
     run(options, app).map_err(|e| e.to_string())
 }

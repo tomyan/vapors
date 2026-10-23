@@ -1,6 +1,6 @@
 <style>
-html, body { height: 100%; }
-body {
+:global(html), :global(body) { height: 100%; }
+:global(body) {
   margin: 0;
   display: grid;
   grid-template-rows: 44px minmax(0, 1fr);
@@ -31,7 +31,7 @@ button { cursor: pointer; padding: 6px 12px; border: none; border-radius: 6px; b
 }
 .layer { height: 28px; padding: 0 8px; display: flex; align-items: center; background-color: #f1f3f5; border-radius: 4px; }
 @media (width < 600px) {
-  body { grid-template-columns: minmax(0, 1fr); }
+  :global(body) { grid-template-columns: minmax(0, 1fr); }
   .bar { grid-column-end: 2; }
   .panel { display: none; }
 }

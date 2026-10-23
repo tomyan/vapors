@@ -15,12 +15,13 @@ pub(crate) fn assemble(component: &Component, info: &ScriptInfo, body: &str) -> 
         .as_ref()
         .map_or("", |section| section.text.as_str());
     let mut file = header(&component.path, style);
-    if component.style.is_some() {
-        file.push_str(&scope_constant(&component.scope));
+    let scope = component.style.as_ref().and(component.scope.as_ref());
+    if let Some(scope) = scope {
+        file.push_str(&scope_constant(scope));
     }
     file.push_str(&props_struct(name, info));
     file.push_str(&component_struct(name, info));
-    file.push_str(&mount_methods(name, info, body, component.style.is_some()));
+    file.push_str(&mount_methods(name, info, body, scope.is_some()));
     file.push_str(&accessors());
     file
 }

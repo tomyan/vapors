@@ -35,7 +35,7 @@ pub fn parse_str(path: &str, text: &str) -> Result<ast::Component, CompileError>
     Ok(ast::Component {
         name,
         path: path.to_string(),
-        scope: path.to_string(),
+        scope: Some(path.to_string()),
         text: text.to_string(),
         script: sections.script,
         style: sections.style,
@@ -86,11 +86,24 @@ pub fn compile_file_under(path: &Path, root: &Path) -> Result<String, CompileErr
         )
     })?;
     let mut component = parse_file(path)?;
-    component.scope = relative
-        .components()
-        .map(|part| part.as_os_str().to_string_lossy())
-        .collect::<Vec<_>>()
-        .join("/");
+    component.scope = Some(
+        relative
+            .components()
+            .map(|part| part.as_os_str().to_string_lossy())
+            .collect::<Vec<_>>()
+            .join("/"),
+    );
+    generate(&component)
+}
+
+/// [`compile_file`] for a component whose `<style>` the app adds as a
+/// global sheet: nothing is scoped.
+///
+/// # Errors
+/// As [`compile_file`].
+pub fn compile_file_global(path: &Path) -> Result<String, CompileError> {
+    let mut component = parse_file(path)?;
+    component.scope = None;
     generate(&component)
 }
 
