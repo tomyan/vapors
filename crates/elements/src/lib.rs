@@ -20,6 +20,8 @@ mod node;
 mod paint;
 mod paint_inline;
 mod painted;
+mod restyle;
+mod restyle_pass;
 mod style;
 mod tags;
 mod tree;

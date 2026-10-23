@@ -83,6 +83,19 @@ pub(super) fn scope<'a>(rules: impl Iterator<Item = &'a Rule>, flag: States) -> 
     scope
 }
 
+/// The scope for `flag` from the selectors alone: an element-only
+/// scope is not widened for what its declarations pass down.
+pub(super) fn selectors_scope<'a>(
+    rules: impl Iterator<Item = &'a Rule>,
+    flag: States,
+) -> RestyleScope {
+    let mut scope = RestyleScope::default();
+    for rule in rules {
+        scope.merge(selector_scope(&rule.selector, flag));
+    }
+    scope
+}
+
 fn reaches_subtree(rule: &Rule) -> bool {
     rule.declarations.iter().any(|d| {
         d.name.starts_with("--")

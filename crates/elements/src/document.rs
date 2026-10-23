@@ -26,6 +26,10 @@ pub struct Document {
     pub(crate) pointer: crate::events::Pointer,
     /// Parley layouts kept between updates.
     pub(crate) texts: crate::layout::TextCache,
+    /// What changed since the last update, for restyle.
+    pub(crate) dirty: crate::restyle::Dirty,
+    /// The styles kept from the last update.
+    pub(crate) kept: Option<crate::restyle::Kept>,
 }
 
 impl Document {
@@ -47,6 +51,8 @@ impl Document {
             changed: true,
             pointer: crate::events::Pointer::default(),
             texts: crate::layout::TextCache::default(),
+            dirty: crate::restyle::Dirty::default(),
+            kept: None,
         }
     }
 
@@ -79,6 +85,7 @@ impl Document {
     /// added.
     pub fn add_stylesheet(&mut self, name: &str, text: &str) -> Result<(), ElementError> {
         self.changed = true;
+        self.dirty.everything();
         self.sheets.add_author(name, text)
     }
 

@@ -192,4 +192,14 @@ impl Cascade {
     pub fn restyle_scope(&self, flag: crate::tree::States) -> RestyleScope {
         restyle::scope(self.rules.iter().map(|r| &r.rule), flag)
     }
+
+    /// [`Cascade::restyle_scope`] from the selectors alone: a flag on a
+    /// subject compound scopes the element only, even when its rule sets
+    /// an inherited property. For a caller that compares each restyled
+    /// element's computed style with its last and restyles the children
+    /// when it changed, which covers what they inherit.
+    #[must_use]
+    pub fn restyle_scope_of_selectors(&self, flag: crate::tree::States) -> RestyleScope {
+        restyle::selectors_scope(self.rules.iter().map(|r| &r.rule), flag)
+    }
 }
