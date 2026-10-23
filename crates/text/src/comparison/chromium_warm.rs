@@ -9,9 +9,10 @@ use super::chromium::{Chromium, ChromiumError};
 /// The first launch on a fresh runner: the 1x paint test, which starts
 /// the job's first Chromium, took 15.4 s in run 40020237373 (its other
 /// Chromium tests took 2.2 to 5.5 s); twice that passed the 20 s
-/// screenshot deadline in runs 40018292931 and 40019496284. 45 s is
-/// about three times the measurement.
-const COLD_START: Duration = Duration::from_secs(45);
+/// screenshot deadline in runs 40018292931 and 40019496284. This warm-up
+/// itself took 36.2 s in run 40023109923, the worst seen. 110 s is about
+/// three times that.
+const COLD_START: Duration = Duration::from_secs(110);
 
 impl Chromium {
     /// One screenshot of a blank page in `work`, with the cold-start
