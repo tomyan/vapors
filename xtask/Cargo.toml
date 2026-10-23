@@ -10,7 +10,9 @@ publish = false
 clap.workspace = true
 png.workspace = true
 # Pinned: it parses `tailscale status --json`, and a parser change is a deliberate bump.
-serde_json = "=1.0.154"
+# preserve_order: mapping keys keep the file's order, so the gate runs
+# jobs and steps in the order ci.yml lists them, not sorted.
+serde_json = { version = "=1.0.154", features = ["preserve_order"] }
 # Pinned: it reads .github/workflows/ci.yml for `cargo xtask gate`; a
 # parser change is a deliberate bump. Maintained, pure Rust (serde_yaml,
 # archived, pulled in unsafe-libyaml, RUSTSEC-2024-0449).

@@ -12,6 +12,8 @@ all-features = true
 # winit's `wayland-csd-adwaita-notitle` feature, and RUSTSEC-2024-0449
 # (unsafe-libyaml) by moving xtask's gate from serde_yaml to yaml-rust2.
 ignore = []
+# A yanked version was withdrawn by its author; using one fails.
+yanked = "deny"
 
 [licenses]
 # Permissive licences only: vapors is built into touche, which is sold,
@@ -25,11 +27,12 @@ allow = [
     "ISC",                            # rustls, ring, libloading
     "Zlib",                           # bytemuck, miniz_oxide, raw-window-handle
     "0BSD",                           # adler2
-    "BSL-1.0",                        # ryu
     "Unicode-3.0",                    # the ICU data crates and unicode-ident
     "Unlicense",                      # memchr, aho-corasick, walkdir (also MIT)
 ]
 confidence-threshold = 0.93
+# An allowed licence no dependency uses fails, so the list cannot go stale.
+unused-allowed-license = "deny"
 
 [licenses.private]
 # This workspace's own crates are not published (`publish = false`, which

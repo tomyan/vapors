@@ -35,3 +35,16 @@ fn a_key_that_is_not_a_scalar_is_refused() {
     let refusal = parse("? [a, b]\n: 1\n", "ci.yml").expect_err("a list as a key");
     assert!(refusal.contains("a key that is not"), "{refusal}");
 }
+
+#[test]
+fn mapping_keys_keep_the_files_order_not_sorted() {
+    // Given: job names out of alphabetical order
+    let text = "jobs:\n  window: 1\n  ci: 2\n  web: 3\n  gpu: 4\n";
+
+    // When
+    let value = parse(text, "ci.yml").expect("yaml");
+
+    // Then: the gate runs jobs in the order CI lists them
+    let names: Vec<&String> = value["jobs"].as_object().expect("map").keys().collect();
+    assert_eq!(names, ["window", "ci", "web", "gpu"]);
+}
