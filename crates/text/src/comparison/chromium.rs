@@ -140,17 +140,14 @@ impl Chromium {
             .stdout(Stdio::piped())
             .spawn()
             .map_err(|e| self.cannot_start(&e))?;
-        let stdout = child
-            .stdout
-            .take()
-            .map(|stream| std::thread::spawn(move || read_all(stream)));
-        let stderr = child
-            .stderr
-            .take()
-            .map(|stream| std::thread::spawn(move || read_all(stream)));
-        let status = wait_with_deadline(&mut child)?;
-        let stdout = stdout.and_then(|t| t.join().ok()).unwrap_or_default();
-        let stderr = stderr.and_then(|t| t.join().ok()).unwrap_or_default();
+        let stdout = drain(child.stdout.take().ok_or_else(|| not_piped("stdout"))?);
+        let stderr = drain(child.stderr.take().ok_or_else(|| not_piped("stderr"))?);
+        let (status, stderr) = finish(&mut child, &stderr, self.deadline)?;
+        let stdout = stdout
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .map_err(|_| {
+                ChromiumError::Failed("its stdout was still open 2 s after it exited".to_owned())
+            })?;
         if !status.success() {
             return Err(ChromiumError::Failed(format!(
                 "exited with {status}:\n{stderr}"
@@ -201,6 +198,10 @@ impl Chromium {
     fn cannot_start(&self, error: &std::io::Error) -> ChromiumError {
         ChromiumError::Failed(format!("cannot start {}: {error}", self.binary.display()))
     }
+}
+
+fn not_piped(stream: &str) -> ChromiumError {
+    ChromiumError::Failed(format!("its {stream} was not piped"))
 }
 
 #[cfg(test)]
