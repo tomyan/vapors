@@ -4,6 +4,7 @@
 mod boxes;
 mod calcs;
 mod inline;
+mod keep;
 mod measure;
 mod text_cache;
 mod tree;
@@ -14,6 +15,7 @@ use vapors_text::FontSystem;
 pub(crate) use boxes::{Content, LayoutBox, build};
 pub(crate) use calcs::Calcs;
 pub(crate) use inline::{InlineRun, InlineSpan};
+pub(crate) use keep::KeptBoxes;
 pub(crate) use text_cache::TextCache;
 use tree::BoxTree;
 
@@ -32,25 +34,30 @@ pub struct BoxRect {
 
 /// Lays `boxes` out in a viewport of `size` CSS pixels, which is the
 /// initial containing block: the root's percentages resolve against it,
-/// and an `auto` height is still its content's. Returns the boxes with
-/// each one's border box, in box order.
+/// and an `auto` height is still its content's. A box unchanged since
+/// the update `kept` holds takes its cache and layout first. Returns
+/// the boxes with each one's border box, in box order, and how many
+/// times Taffy laid a box out rather than reading its cache.
 ///
 /// # Errors
 /// A `calc()` that did not resolve (see `Calcs`).
 pub(crate) fn lay_out(
-    boxes: Vec<LayoutBox>,
+    mut boxes: Vec<LayoutBox>,
     texts: (&mut FontSystem, &mut TextCache),
+    kept: &KeptBoxes,
     scale: f32,
     size: (f32, f32),
     calcs: &Calcs,
-) -> Result<(Vec<LayoutBox>, Vec<BoxRect>), String> {
+) -> Result<(Vec<LayoutBox>, Vec<BoxRect>, usize), String> {
     let (fonts, cache) = texts;
+    kept.lend(&mut boxes, scale);
     let mut tree = BoxTree {
         boxes,
         fonts,
         cache,
         scale,
         calcs,
+        laid_out: 0,
     };
     let available = Size {
         width: AvailableSpace::Definite(size.0),
@@ -69,7 +76,7 @@ pub(crate) fn lay_out(
     place(&tree.boxes, 0, (0.0, 0.0), &mut rects);
     match calcs.failure() {
         Some(failure) => Err(failure),
-        None => Ok((tree.boxes, rects)),
+        None => Ok((tree.boxes, rects, tree.laid_out)),
     }
 }
 

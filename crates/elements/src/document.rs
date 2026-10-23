@@ -30,6 +30,10 @@ pub struct Document {
     pub(crate) dirty: crate::restyle::Dirty,
     /// The styles kept from the last update.
     pub(crate) kept: Option<crate::restyle::Kept>,
+    /// The boxes the last update laid out, for the next to reuse.
+    pub(crate) boxes: crate::layout::KeptBoxes,
+    /// Boxes the last update laid out rather than read from cache.
+    pub(crate) laid_out: usize,
 }
 
 impl Document {
@@ -53,6 +57,8 @@ impl Document {
             texts: crate::layout::TextCache::default(),
             dirty: crate::restyle::Dirty::default(),
             kept: None,
+            boxes: crate::layout::KeptBoxes::default(),
+            laid_out: 0,
         }
     }
 

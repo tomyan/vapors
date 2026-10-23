@@ -16,6 +16,7 @@ use crate::node::Kind;
 use crate::style::Used;
 
 /// What a box is.
+#[derive(PartialEq)]
 pub(crate) enum Content {
     /// An element's box; its children are boxes too.
     Element(NodeId),

@@ -46,8 +46,9 @@ impl Document {
         let boxes = build(&self.arena, used, root);
         let size = (viewport.width, viewport.height);
         let texts = (&mut self.fonts, &mut self.texts);
-        let (boxes, rects) = lay_out(boxes, texts, viewport.scale, size, &calcs)
-            .map_err(|failure| vec![ElementError::Layout(failure)])?;
+        let (boxes, rects, laid_out) =
+            lay_out(boxes, texts, &self.boxes, viewport.scale, size, &calcs)
+                .map_err(|failure| vec![ElementError::Layout(failure)])?;
         let mut input = PaintInput {
             used,
             root,
@@ -58,6 +59,8 @@ impl Document {
             scale: viewport.scale,
         };
         let painted = paint(&boxes, &rects, &mut input);
+        self.boxes.keep(boxes, viewport.scale);
+        self.laid_out = laid_out;
         self.rehover_in(&painted);
         Ok(self.painted.insert(painted))
     }
@@ -67,6 +70,13 @@ impl Document {
     #[must_use]
     pub fn elements_restyled(&self) -> usize {
         self.kept.as_ref().map_or(0, |kept| kept.restyled)
+    }
+
+    /// How many times the last update's layout laid a box out rather
+    /// than reading its cache: what the incremental tests count.
+    #[must_use]
+    pub fn boxes_laid_out(&self) -> usize {
+        self.laid_out
     }
 
     /// How many Parley layouts the last update built rather than kept

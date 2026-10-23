@@ -21,6 +21,9 @@ pub(crate) struct BoxTree<'f> {
     pub(crate) cache: &'f mut super::TextCache,
     pub(crate) scale: f32,
     pub(crate) calcs: &'f Calcs,
+    /// Boxes laid out, not read from their cache: what the incremental
+    /// tests count.
+    pub(crate) laid_out: usize,
 }
 
 impl BoxTree<'_> {
@@ -56,6 +59,7 @@ impl BoxTree<'_> {
         inputs: LayoutInput,
         block: Option<&mut BlockContext<'_>>,
     ) -> LayoutOutput {
+        self.laid_out += 1;
         let has_children = !self.node(id).children.is_empty();
         match (self.node(id).style.display, has_children) {
             (Display::None, _) => compute_hidden_layout(self, id),
