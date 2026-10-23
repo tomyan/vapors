@@ -2544,6 +2544,7 @@ name = "vapors-elements"
 version = "0.0.0"
 dependencies = [
  "taffy",
+ "vapors-compiler-examples",
  "vapors-css",
  "vapors-dom",
  "vapors-scene",

@@ -10,6 +10,7 @@ mod css_element;
 mod document;
 mod dom_impl;
 mod error;
+mod html;
 mod layout;
 mod node;
 mod paint;
