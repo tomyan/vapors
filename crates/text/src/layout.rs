@@ -39,6 +39,7 @@ impl Layout {
         options: &LayoutOptions,
     ) -> Self {
         let mut builder = system.ranged_builder(text, options.scale);
+        builder.set_base_direction(options.direction);
         for property in base.properties(options.scale) {
             builder.push_default(property);
         }

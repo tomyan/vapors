@@ -30,6 +30,9 @@ pub struct LayoutOptions {
     pub align: Align,
     /// Device pixels per logical pixel; the layout is in device pixels.
     pub scale: f32,
+    /// The paragraph's base direction. `Auto`, the default, takes it
+    /// from the text's first strong character.
+    pub direction: parley::BaseDirection,
 }
 
 impl Default for LayoutOptions {
@@ -38,6 +41,7 @@ impl Default for LayoutOptions {
             width: None,
             align: Align::Start,
             scale: 1.0,
+            direction: parley::BaseDirection::Auto,
         }
     }
 }

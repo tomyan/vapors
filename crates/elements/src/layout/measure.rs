@@ -41,6 +41,8 @@ pub(crate) fn text_layout(
         width,
         scale,
         align: run.style.align,
+        // Left to right only: right-to-left text is refused (`bidi`).
+        direction: vapors_text::parley::BaseDirection::Ltr,
     };
     let spans: Vec<Span<'static>> = run
         .spans

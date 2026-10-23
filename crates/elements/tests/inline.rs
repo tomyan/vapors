@@ -156,3 +156,23 @@ fn a_hidden_inline_element_leaves_its_paragraph_whole() {
         .collect();
     assert_eq!(texts, ["a b"]);
 }
+
+#[test]
+fn right_to_left_text_is_refused_naming_its_element() {
+    // Given: Hebrew, which vapors does not lay out right to left yet
+    let mut doc = document();
+    let body = doc.body();
+    let p = element(&mut doc, body, "p", "greeting");
+    text(&mut doc, p, "Hello, שלום");
+
+    // When
+    let errors = refusals(&mut doc);
+
+    // Then
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("<p class=\"greeting\">") && e.contains("right to left")),
+        "{errors:?}"
+    );
+}

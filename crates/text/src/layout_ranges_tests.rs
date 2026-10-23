@@ -81,3 +81,26 @@ fn the_space_a_line_breaks_after_is_not_in_a_fragment() {
         hello.width()
     );
 }
+
+#[test]
+fn a_left_to_right_layout_puts_the_start_on_the_left_whatever_the_text() {
+    // Given: Hebrew, whose own direction is right to left
+    let style = Style::new(Family::Geist, 16.0);
+    let lay = |direction| {
+        let options = LayoutOptions {
+            width: Some(200.0),
+            direction,
+            ..LayoutOptions::default()
+        };
+        Layout::new(&mut FontSystem::bundle_only(), "שלום", &style, &options)
+    };
+
+    // When
+    let ltr = lay(crate::parley::BaseDirection::Ltr);
+    let auto = lay(crate::parley::BaseDirection::Auto);
+
+    // Then: its line starts at the left only when the direction is set
+    let left = |layout: &Layout| layout.glyphs().map(|g| g.x).fold(f32::MAX, f32::min);
+    assert!(left(&ltr) < 1.0, "{}", left(&ltr));
+    assert!(left(&auto) > 100.0, "{}", left(&auto));
+}

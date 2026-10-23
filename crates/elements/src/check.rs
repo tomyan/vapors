@@ -37,6 +37,7 @@ pub(crate) fn check_tree(arena: &Arena, root: NodeId) -> Vec<ElementError> {
             errors.push(ElementError::UnsupportedTag(refusal));
         }
         errors.extend(attribute_refusals(arena, node, element));
+        errors.extend(right_to_left_text(arena, node));
         for (event, _) in &element.listeners {
             if let Some(refusal) = tags::unfired(event) {
                 errors.push(ElementError::UnfiredEvent(format!(
@@ -47,6 +48,22 @@ pub(crate) fn check_tree(arena: &Arena, root: NodeId) -> Vec<ElementError> {
         }
     }
     errors
+}
+
+/// A refusal when a text child of `node` holds right-to-left text,
+/// which is not laid out right to left yet.
+fn right_to_left_text(arena: &Arena, node: NodeId) -> Option<ElementError> {
+    let found = arena.children(node).into_iter().find_map(|child| {
+        match &arena.get(child, "check").kind {
+            Kind::Text(text) => text.chars().find(|c| crate::bidi::right_to_left(*c)),
+            Kind::Element(_) => None,
+        }
+    })?;
+    Some(ElementError::UnsupportedAttribute(format!(
+        "{}: its text holds {found:?} (U+{:04X}), from a script written right to left; vapors-elements lays text out left to right only (not scheduled in docs/F2c.md)",
+        describe(arena, node),
+        u32::from(found)
+    )))
 }
 
 /// The attributes of `element` the tree refuses: a `disabled` that

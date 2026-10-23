@@ -1,5 +1,5 @@
 <style>
-/* viewport 640x400 390x800 */
+/* viewport 640x400 640x400@2 */
 /* Inline formatting contexts (F2c S6): spans, bold and monospace runs
    in one paragraph, whitespace collapsed across element boundaries, an
    anonymous block beside a block, and inline boxes that wrap.

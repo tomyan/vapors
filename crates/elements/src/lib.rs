@@ -5,6 +5,7 @@
 //! `docs/F2c.md`.
 
 mod arena;
+mod bidi;
 mod check;
 mod corners;
 mod css_element;
