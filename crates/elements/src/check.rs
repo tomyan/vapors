@@ -49,20 +49,14 @@ pub(crate) fn check_tree(arena: &Arena, root: NodeId) -> Vec<ElementError> {
     errors
 }
 
-/// The attributes of `element` the tree refuses: `style`, and a
-/// `disabled` that would mean something other than it says.
+/// The attributes of `element` the tree refuses: a `disabled` that
+/// would mean something other than it says.
 fn attribute_refusals(
     arena: &Arena,
     node: NodeId,
     element: &crate::node::Element,
 ) -> Vec<ElementError> {
     let mut found = Vec::new();
-    if element.attributes.contains_key("style") {
-        found.push(
-            "a `style` attribute is not applied by vapors-elements yet: inline styles arrive in F2c S5 (docs/F2c.md); move the declarations into the component's <style> or a stylesheet"
-                .to_owned(),
-        );
-    }
     found.extend(disabled_value(
         &element.tag,
         element.attributes.get("disabled"),
@@ -71,6 +65,26 @@ fn attribute_refusals(
         .into_iter()
         .map(|refusal| {
             ElementError::UnsupportedAttribute(format!("{}: {refusal}", describe(arena, node)))
+        })
+        .collect()
+}
+
+/// Each element's `style` attribute that does not parse, naming the
+/// element and the line and column in the attribute. A tree with one
+/// cannot be styled, so the update stops at these.
+pub(crate) fn style_attribute_refusals(arena: &Arena, root: NodeId) -> Vec<ElementError> {
+    elements(arena, root)
+        .into_iter()
+        .filter_map(|node| {
+            let element = arena.get(node, "style_attribute_refusals").element()?;
+            let error = vapors_css::parse_inline(element.attributes.get("style")?).err()?;
+            Some(ElementError::UnsupportedAttribute(format!(
+                "{}: its style attribute {}:{}: {}",
+                describe(arena, node),
+                error.position.line,
+                error.position.column,
+                error.message
+            )))
         })
         .collect()
 }

@@ -20,4 +20,4 @@ pub mod tree;
 pub mod value;
 
 pub use error::{Error, Position, Result};
-pub use parse::parse;
+pub use parse::{parse, parse_inline};

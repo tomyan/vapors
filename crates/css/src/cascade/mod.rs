@@ -12,6 +12,7 @@ mod compute_resolve;
 mod computed;
 mod conditions;
 mod environment;
+mod inline;
 mod media;
 mod media_eval;
 mod media_feature;
@@ -22,6 +23,7 @@ mod supports;
 
 pub use computed::ComputedStyle;
 pub use environment::Environment;
+pub use inline::INLINE_SHEET;
 pub use restyle::RestyleScope;
 
 pub(crate) use compute::resolve_for;
@@ -146,7 +148,8 @@ impl Cascade {
         parent: Option<&ComputedStyle>,
         env: &Environment,
     ) -> Result<ComputedStyle> {
-        let winners = collect::winners(self.candidate_rules(element), element, env);
+        let inline = inline::declarations(element)?;
+        let winners = collect::winners(self.candidate_rules(element), element, env, &inline);
         compute::style(&winners, parent, env)
     }
 

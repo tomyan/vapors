@@ -119,6 +119,9 @@ impl Sheets {
     /// The name a sheet was added under, by its cascade order (0 is the
     /// user-agent sheet).
     pub(crate) fn name(&self, index: usize) -> &str {
+        if index == vapors_css::cascade::INLINE_SHEET {
+            return "style attribute";
+        }
         self.names
             .get(index)
             .map_or("an unnamed sheet", String::as_str)
