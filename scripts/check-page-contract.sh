@@ -164,6 +164,13 @@ echo "browser: $chrome ($("$chrome" --version 2>/dev/null || echo 'version unkno
 prepare
 serve
 check as-built '^adapter: ' hidden
+# SwiftShader's WebGPU presents through Chromium's Vulkan; without a
+# Vulkan driver (vkCreateInstance fails) the canvas's swap chain cannot
+# be made and the device is lost at the first frame (the runner, run
+# 39929758159; here with VK_ICD_FILENAMES pointing nowhere).
+if grep -q 'vkCreateInstance() failed' "$work/as-built.log"; then
+  fail "Chromium has no Vulkan driver, so SwiftShader's WebGPU cannot present; fix: install mesa-vulkan-drivers (lavapipe)"
+fi
 check no-open-button '^adapter: ' 'touch screens cannot open files'
 check no-webgpu '^starting$' '^no WebGPU adapter'
 check no-webgpu-no-error-element '^no WebGPU adapter' absent
