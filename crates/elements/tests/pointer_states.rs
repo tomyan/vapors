@@ -85,7 +85,7 @@ fn quad_colours(doc: &Rc<RefCell<Document>>) -> Vec<[u8; 4]> {
         .iter()
         .filter_map(|item| match item {
             Item::Quad(quad) => Some(quad.background.to_rgba8()),
-            Item::Text { .. } => None,
+            Item::Text { .. } | Item::Shadow(_) => None,
         })
         .collect()
 }

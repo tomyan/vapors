@@ -29,8 +29,7 @@ impl Platform {
     pub(crate) fn new(proxy: EventLoopProxy<Message>) -> Self {
         Self {
             proxy: Some(proxy),
-            lost: DeviceLost::default(),
-            redraw: RedrawFlag::default(),
+            ..Self::detached()
         }
     }
 
