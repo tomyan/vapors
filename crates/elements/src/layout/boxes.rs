@@ -34,7 +34,7 @@ pub(crate) struct LayoutBox {
 }
 
 impl LayoutBox {
-    fn new(content: Content, style: Style) -> Self {
+    pub(crate) fn new(content: Content, style: Style) -> Self {
         Self {
             content,
             style,

@@ -42,13 +42,20 @@ impl Document {
         self.texts.begin();
         let calcs = self.styled(viewport)?;
         let (root, body) = (self.root(), self.body());
-        let used = &self.kept.as_ref().expect("styled keeps the styles").used;
+        let kept = self.kept.as_ref().expect("styled keeps the styles");
+        let used = &kept.used;
         let boxes = build(&self.arena, used, root);
         let size = (viewport.width, viewport.height);
         let texts = (&mut self.fonts, &mut self.texts);
-        let (boxes, rects, laid_out) =
-            lay_out(boxes, texts, &self.boxes, viewport.scale, size, &calcs)
-                .map_err(|failure| vec![ElementError::Layout(failure)])?;
+        let (boxes, rects, laid_out) = lay_out(
+            boxes,
+            texts,
+            (&self.boxes, &|node| kept.may_keep_layout(node)),
+            viewport.scale,
+            size,
+            &calcs,
+        )
+        .map_err(|failure| vec![ElementError::Layout(failure)])?;
         let mut input = PaintInput {
             used,
             root,

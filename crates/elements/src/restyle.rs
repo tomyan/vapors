@@ -52,6 +52,23 @@ pub(crate) struct Kept {
     pub(crate) refused: HashMap<NodeId, Vec<ElementError>>,
     /// Elements restyled by the last update.
     pub(crate) restyled: usize,
+    /// Which elements the last update restyled: their computed styles,
+    /// and so the addresses their calc handles hold, are new.
+    pub(crate) restyled_nodes: std::collections::HashSet<NodeId>,
+}
+
+impl Kept {
+    /// Whether `node`'s box may take the last update's layout: not when
+    /// it was restyled and its style holds a calc handle, which compares
+    /// by address (see `layout::keep`).
+    pub(crate) fn may_keep_layout(&self, node: NodeId) -> bool {
+        !self.restyled_nodes.contains(&node)
+            || !self.styles.get(node).is_some_and(|style| {
+                style
+                    .iter()
+                    .any(|(_, value)| matches!(value, vapors_css::value::Value::Calc(_)))
+            })
+    }
 }
 
 impl Document {

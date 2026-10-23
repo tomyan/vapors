@@ -44,13 +44,13 @@ pub struct BoxRect {
 pub(crate) fn lay_out(
     mut boxes: Vec<LayoutBox>,
     texts: (&mut FontSystem, &mut TextCache),
-    kept: &KeptBoxes,
+    kept: (&KeptBoxes, &dyn Fn(vapors_dom::NodeId) -> bool),
     scale: f32,
     size: (f32, f32),
     calcs: &Calcs,
 ) -> Result<(Vec<LayoutBox>, Vec<BoxRect>, usize), String> {
     let (fonts, cache) = texts;
-    kept.lend(&mut boxes, scale);
+    kept.0.lend(&mut boxes, scale, kept.1);
     let mut tree = BoxTree {
         boxes,
         fonts,

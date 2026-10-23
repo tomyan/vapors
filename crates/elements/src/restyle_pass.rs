@@ -28,6 +28,11 @@ impl Document {
             self.dirty_roots()
         };
         self.dirty = Dirty::default();
+        self.kept
+            .as_mut()
+            .expect("set above or by an earlier update")
+            .restyled_nodes
+            .clear();
         match self.restyle_all(&roots, &singles, viewport) {
             Ok(count) => {
                 self.kept.as_mut().expect("set above").restyled = count;
@@ -64,6 +69,7 @@ impl Document {
             used: HashMap::new(),
             refused: HashMap::new(),
             restyled: 0,
+            restyled_nodes: HashSet::new(),
         }
     }
 
@@ -132,11 +138,9 @@ impl Document {
             self.sheets
                 .compute_element(&self.arena, node, parent, &environment(viewport))?;
         let changed = kept.styles.get(node) != Some(&style);
-        self.kept
-            .as_mut()
-            .expect("restyle sets it")
-            .styles
-            .set(node, style);
+        let kept = self.kept.as_mut().expect("restyle sets it");
+        kept.styles.set(node, style);
+        kept.restyled_nodes.insert(node);
         self.keep_used(node, viewport);
         Ok(changed)
     }

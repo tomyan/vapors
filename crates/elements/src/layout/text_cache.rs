@@ -4,58 +4,89 @@
 //! A layout no update asked for is dropped at the end of the next one.
 
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
+use std::mem::{Discriminant, discriminant};
 use std::rc::Rc;
 
-use vapors_text::{FontSystem, Layout, LineHeight};
+use vapors_dom::NodeId;
+use vapors_text::{Align, FontSystem, Layout, LineHeight};
 
 use super::inline::{InlineRun, InlineSpan};
 use super::measure::text_layout;
-use crate::style::TextStyle;
+use crate::style::{Face, TextStyle};
 
-/// What a layout is kept by: the run and the width, the run compared
-/// whole, so two runs never share a layout by a hash collision.
-#[derive(Clone, PartialEq)]
+/// What a layout is kept by: the run's text, styles and visibility,
+/// and the width and scale, every float by its bits. Eq and Hash both
+/// derive from these, so they agree (a NaN equals itself here).
+#[derive(Clone, Hash, PartialEq, Eq)]
 struct Key {
-    run: InlineRun,
+    text: String,
+    style: StyleKey,
+    visible: bool,
+    spans: Vec<SpanKey>,
     width: Option<u32>,
     scale: u32,
 }
 
-impl Eq for Key {}
+#[derive(Clone, Hash, PartialEq, Eq)]
+struct SpanKey {
+    node: NodeId,
+    range: std::ops::Range<usize>,
+    visible: bool,
+    style: StyleKey,
+}
 
-impl Hash for Key {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.run.text.hash(state);
-        self.width.hash(state);
-        self.scale.hash(state);
-        hash_style(&self.run.style, state);
-        for span in &self.run.spans {
-            hash_span(span, state);
+#[derive(Clone, Hash, PartialEq, Eq)]
+struct StyleKey {
+    face: Discriminant<Face>,
+    /// Size, weight and letter spacing.
+    numbers: [u32; 3],
+    /// Which kind of line height, and its number.
+    line_height: (u8, u32),
+    color: [u32; 4],
+    italic: bool,
+    align: Discriminant<Align>,
+}
+
+impl Key {
+    fn of(run: &InlineRun, width: Option<f32>, scale: f32) -> Self {
+        Self {
+            text: run.text.clone(),
+            style: StyleKey::of(&run.style),
+            visible: run.visible,
+            spans: run.spans.iter().map(SpanKey::of).collect(),
+            width: width.map(f32::to_bits),
+            scale: scale.to_bits(),
         }
     }
 }
 
-fn hash_span<H: Hasher>(span: &InlineSpan, state: &mut H) {
-    span.node.hash(state);
-    span.range.hash(state);
-    span.visible.hash(state);
-    hash_style(&span.style, state);
+impl SpanKey {
+    fn of(span: &InlineSpan) -> Self {
+        Self {
+            node: span.node,
+            range: span.range.clone(),
+            visible: span.visible,
+            style: StyleKey::of(&span.style),
+        }
+    }
 }
 
-fn hash_style<H: Hasher>(style: &TextStyle, state: &mut H) {
-    std::mem::discriminant(&style.face).hash(state);
-    for value in [style.size, style.weight, style.letter_spacing] {
-        value.to_bits().hash(state);
+impl StyleKey {
+    fn of(style: &TextStyle) -> Self {
+        let line_height = match style.line_height {
+            LineHeight::Normal => (0, 0),
+            LineHeight::FontSizeRelative(v) => (1, v.to_bits()),
+            LineHeight::Px(v) => (2, v.to_bits()),
+        };
+        Self {
+            face: discriminant(&style.face),
+            numbers: [style.size, style.weight, style.letter_spacing].map(f32::to_bits),
+            line_height,
+            color: [style.color.r, style.color.g, style.color.b, style.color.a].map(f32::to_bits),
+            italic: style.italic,
+            align: discriminant(&style.align),
+        }
     }
-    match style.line_height {
-        LineHeight::Normal => 0u32.hash(state),
-        LineHeight::FontSizeRelative(v) | LineHeight::Px(v) => v.to_bits().hash(state),
-    }
-    for channel in [style.color.r, style.color.g, style.color.b, style.color.a] {
-        channel.to_bits().hash(state);
-    }
-    (style.italic, std::mem::discriminant(&style.align)).hash(state);
 }
 
 /// The layouts asked for this update, and those kept from the last.
@@ -76,11 +107,7 @@ impl TextCache {
         run: &InlineRun,
         width: Option<f32>,
     ) -> Rc<Layout> {
-        let key = Key {
-            run: run.clone(),
-            width: width.map(f32::to_bits),
-            scale: scale.to_bits(),
-        };
+        let key = Key::of(run, width, scale);
         if let Some(layout) = self.current.get(&key) {
             return Rc::clone(layout);
         }
@@ -102,5 +129,39 @@ impl TextCache {
     /// How many layouts this update built rather than kept.
     pub(crate) fn built(&self) -> usize {
         self.built
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_run_whose_style_holds_a_nan_is_kept_like_any_other() {
+        // Given: a letter spacing that is not a number
+        let style = TextStyle {
+            face: Face::Geist,
+            size: 16.0,
+            weight: 400.0,
+            line_height: LineHeight::Normal,
+            color: vapors_scene::Color::default(),
+            letter_spacing: f32::NAN,
+            align: Align::Start,
+            italic: false,
+        };
+        let run = InlineRun {
+            text: "nan".to_owned(),
+            style,
+            visible: true,
+            spans: Vec::new(),
+        };
+        let (mut fonts, mut cache) = (FontSystem::bundle_only(), TextCache::default());
+
+        // When: asked for twice
+        cache.layout(&mut fonts, 1.0, &run, None);
+        cache.layout(&mut fonts, 1.0, &run, None);
+
+        // Then: laid out once
+        assert_eq!(cache.built(), 1);
     }
 }

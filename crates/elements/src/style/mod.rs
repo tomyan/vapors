@@ -12,6 +12,7 @@ mod honoured;
 mod inline;
 mod scope;
 mod sizes;
+mod styles;
 mod text_style;
 mod used;
 mod values;
@@ -20,14 +21,14 @@ use vapors_css::cascade::{Cascade, ComputedStyle, Environment};
 
 use vapors_dom::NodeId;
 
-use crate::arena::{Arena, index_of};
+use crate::arena::Arena;
 use crate::css_element::ElementRef;
 use crate::error::ElementError;
 
 pub(crate) use box_style::box_style;
 pub use cursor::{ALL_CURSORS, Cursor};
 pub(crate) use decoration::BoxShadow;
-#[cfg(test)]
+pub(crate) use styles::Styles;
 pub(crate) use text_style::Face;
 pub(crate) use text_style::TextStyle;
 pub(crate) use used::{Context, Used, used};
@@ -159,40 +160,6 @@ impl Sheets {
         self.names
             .get(index)
             .map_or("an unnamed sheet", String::as_str)
-    }
-}
-
-/// Computed styles by slot; `None` for text nodes and detached nodes.
-#[derive(Default)]
-pub(crate) struct Styles(Vec<Option<ComputedStyle>>);
-
-impl Styles {
-    /// The style kept for `node`, if any.
-    pub(crate) fn get(&self, node: NodeId) -> Option<&ComputedStyle> {
-        self.0.get(index_of(node) as usize).and_then(Option::as_ref)
-    }
-
-    /// Keeps `style` for `node`.
-    pub(crate) fn set(&mut self, node: NodeId, style: ComputedStyle) {
-        let slot = index_of(node) as usize;
-        if self.0.len() <= slot {
-            self.0.resize_with(slot + 1, || None);
-        }
-        self.0[slot] = Some(style);
-    }
-
-    /// The element's style.
-    ///
-    /// # Panics
-    /// When `node` was not under the root when styles were computed: the
-    /// caller walked a different tree from the one styled.
-    pub(crate) fn of(&self, node: NodeId) -> &ComputedStyle {
-        self.0
-            .get(index_of(node) as usize)
-            .and_then(Option::as_ref)
-            .unwrap_or_else(|| {
-                panic!("{node:?} has no computed style; it was not in the styled tree")
-            })
     }
 }
 
