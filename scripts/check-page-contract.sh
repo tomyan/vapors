@@ -1,8 +1,9 @@
 #!/bin/sh
 # The page contract on the built web demo, in headless Chrome: an error
 # lands in #error when the page has one and in #status when it has not;
-# a status line never lands in #error. Four copies of the built page,
-# each checked; any mismatch fails naming the case.
+# a status line never lands in #error; a lost GPU device is reported in
+# #error with the fix. Five copies of the built page, each checked; any
+# mismatch fails naming the case.
 #
 # Usage: scripts/check-page-contract.sh target/web <new or empty dir>
 # after `cargo xtask web`. CI runs it in the `web` job. Needs python3
@@ -38,13 +39,40 @@ prepare() {
   sed "s#</head>#$nogpu</head>#" "$work/index.html" > "$work/no-webgpu.html"
   sed "s#</head>#$nogpu</head>#; s#<p id=\"error\"[^>]*></p>##" "$work/index.html" \
     > "$work/no-webgpu-no-error-element.html"
+  # The device is destroyed 1 s after the page gets it, between frames,
+  # as a GPU reset does: WebGPU's device.lost resolves with "destroyed".
+  # Animation frames stop 500 ms before that, as in a backgrounded tab,
+  # so no frame already asked for is left to run: only the loss itself,
+  # not a next frame, can report it.
+  # Virtual time does not wait for that answer from the GPU process, but
+  # it pauses while a request is pending: the page loads /wait, which
+  # the server holds until the page posts /done once #error shows, or
+  # for 15 s (serve below).
+  lose='<script>var request = GPUAdapter.prototype.requestDevice; GPUAdapter.prototype.requestDevice = function () { return request.apply(this, arguments).then(function (device) { setTimeout(function () { Window.prototype.requestAnimationFrame = window.requestAnimationFrame = function () { return 0; }; }, 500); setTimeout(function () { device.destroy(); }, 1000); return device; }); }; addEventListener("DOMContentLoaded", function () { var error = document.getElementById("error"); new MutationObserver(function () { if (!error.hidden) { fetch("/done", { method: "POST" }); } }).observe(error, { attributes: true }); });</script>'
+  sed "s#</head>#$lose</head>#; s#</body>#<img src=\"/wait\" alt=\"\" hidden></body>#" "$work/index.html" > "$work/device-lost.html"
   grep -q '<p id="error"' "$work/as-built.html" || { echo "$web/index.html: no <p id=\"error\">" >&2; exit 1; }
 }
 
 # The server answers within 10 s or the check fails (it starts in well
-# under 1 s here).
+# under 1 s here). It serves the copies, and holds /wait until a POST to
+# /done or 15 s (the device-lost case; that page shows its error well
+# under 1 s after the loss here).
 serve() {
-  (cd "$work" && exec python3 -m http.server "$port" --bind 127.0.0.1) >/dev/null 2>&1 &
+  (cd "$work" && exec python3 -c "
+import http.server, threading
+done = threading.Event()
+class Pages(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        if self.path != '/wait':
+            return super().do_GET()
+        done.wait(15)
+        self.send_response(204); self.end_headers()
+    def do_POST(self):
+        done.set()
+        self.send_response(204); self.end_headers()
+    def log_message(self, *args):
+        pass
+http.server.ThreadingHTTPServer(('127.0.0.1', $port), Pages).serve_forever()") >/dev/null 2>&1 &
   server=$!
   trap 'kill $server' EXIT
   python3 -c "
@@ -99,5 +127,6 @@ check as-built '^adapter: ' hidden
 check no-open-button '^(starting|adapter: )' 'touch screens cannot open files'
 check no-webgpu '^starting$' '^no WebGPU adapter'
 check no-webgpu-no-error-element '^no WebGPU adapter' absent
+check device-lost '^(starting|adapter: )' '^the GPU device was lost \(Destroyed: .*\); fix: reload the page$'
 [ "$failed" = 0 ] || { echo "the page contract does not hold; reproduce: cargo xtask web && $0 target/web \$(mktemp -d)" >&2; exit 1; }
-echo "ok   the page contract holds in all four cases"
+echo "ok   the page contract holds in all five cases"

@@ -87,6 +87,10 @@ pub(crate) enum Message {
         /// Its contents.
         bytes: Vec<u8>,
     },
+    /// wgpu reported the window's device lost; the loss is in the
+    /// platform's state. Sent so the loop stops now, not at the next
+    /// frame, which a backgrounded tab may never draw.
+    DeviceLost,
 }
 
 /// Open a window and drive `app` until it returns [`Next::Exit`] or the

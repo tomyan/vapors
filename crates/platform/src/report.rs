@@ -32,6 +32,11 @@ pub fn set_prefix(app_name: &str, title: &str) {
     drop(PREFIX.set(prefix_from(app_name, title)));
 }
 
+/// The app's name in reports, as `run` set it.
+pub fn app_name() -> &'static str {
+    prefix()
+}
+
 fn prefix() -> &'static str {
     PREFIX.get().map_or("vapors", String::as_str)
 }

@@ -6,6 +6,7 @@
 use winit::event_loop::EventLoopProxy;
 
 use crate::PlatformError;
+use crate::device_lost::{DeviceLost, Lost};
 use crate::file_kind::{self, FileKind};
 use crate::picker;
 use crate::window::Message;
@@ -13,11 +14,30 @@ use crate::window::Message;
 /// Given to the app with every event.
 pub struct Platform {
     proxy: EventLoopProxy<Message>,
+    lost: DeviceLost,
 }
 
 impl Platform {
     pub(crate) fn new(proxy: EventLoopProxy<Message>) -> Self {
-        Self { proxy }
+        Self {
+            proxy,
+            lost: DeviceLost::default(),
+        }
+    }
+
+    /// The state the window's device is watched into.
+    pub(crate) fn lost_state(&self) -> DeviceLost {
+        self.lost.clone()
+    }
+
+    /// The window's GPU device loss, once it has happened. After a loss
+    /// the platform draws no more frames and has reported it; an app
+    /// that makes GPU calls outside `frame` (a readback still running)
+    /// asks here first, since such a call on a lost device panics in
+    /// wgpu.
+    #[must_use]
+    pub fn device_lost(&self) -> Option<Lost> {
+        self.lost.get()
     }
 
     pub(crate) fn proxy(&self) -> EventLoopProxy<Message> {
