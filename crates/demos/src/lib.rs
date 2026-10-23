@@ -23,8 +23,6 @@ pub type Mount = fn(&Rc<RefCell<Document>>, NodeId);
 pub struct Demo {
     /// Its name in `?demo=`, and its file stem under `demos/`.
     pub name: &'static str,
-    /// The component's `<style>`, added as a global sheet (F2c S1 to S4).
-    pub style: &'static str,
     /// The pixel checks for its screenshots, or `None` for a demo
     /// without any (the index).
     pub pixels: Option<&'static str>,
@@ -60,7 +58,6 @@ pub fn all() -> Vec<Demo> {
     vec![
         Demo {
             name: "hello",
-            style: hello::STYLE,
             pixels: Some(include_str!("../demos/hello.pixels")),
             mount: |dom, parent| {
                 std::mem::forget(hello::Hello::mount(dom, parent, hello::HelloProps {}));
@@ -68,7 +65,6 @@ pub fn all() -> Vec<Demo> {
         },
         Demo {
             name: "counter",
-            style: counter::STYLE,
             pixels: Some(include_str!("../demos/counter.pixels")),
             mount: |dom, parent| {
                 std::mem::forget(counter::Counter::mount(
@@ -80,7 +76,6 @@ pub fn all() -> Vec<Demo> {
         },
         Demo {
             name: "boxes",
-            style: boxes::STYLE,
             pixels: Some(include_str!("../demos/boxes.pixels")),
             mount: |dom, parent| {
                 std::mem::forget(boxes::Boxes::mount(dom, parent, boxes::BoxesProps {}));
@@ -88,15 +83,20 @@ pub fn all() -> Vec<Demo> {
         },
         Demo {
             name: "shell",
-            style: shell::STYLE,
             pixels: Some(include_str!("../demos/shell.pixels")),
             mount: |dom, parent| {
                 std::mem::forget(shell::Shell::mount(dom, parent, shell::ShellProps {}));
             },
         },
         Demo {
+            name: "panel",
+            pixels: Some(include_str!("../demos/panel.pixels")),
+            mount: |dom, parent| {
+                std::mem::forget(panel::Panel::mount(dom, parent, panel::PanelProps {}));
+            },
+        },
+        Demo {
             name: INDEX,
-            style: index::STYLE,
             pixels: None,
             mount: |dom, parent| {
                 std::mem::forget(index::Index::mount(dom, parent, index::IndexProps {}));
@@ -105,21 +105,16 @@ pub fn all() -> Vec<Demo> {
     ]
 }
 
-/// A document showing `demo`: its style as a global sheet, its
-/// component mounted in `body`, on the platform's fonts (the bundle,
-/// then system fonts natively; the bundle alone on the web).
-///
-/// # Errors
-/// The demo's style does not parse, naming the line.
-pub fn document(demo: &Demo) -> Result<Rc<RefCell<Document>>, String> {
+/// A document showing `demo`: its component mounted in `body`, which
+/// adds its scoped style, on the platform's fonts (the bundle, then
+/// system fonts natively; the bundle alone on the web). A style that
+/// does not parse is refused by the first update, naming the file.
+#[must_use]
+pub fn document(demo: &Demo) -> Rc<RefCell<Document>> {
     let document = Rc::new(RefCell::new(Document::new(FontSystem::new())));
-    document
-        .borrow_mut()
-        .add_stylesheet(&format!("{}.wisp", demo.name), demo.style)
-        .map_err(|error| error.to_string())?;
     let body = document.borrow().body();
     (demo.mount)(&document, body);
-    Ok(document)
+    document
 }
 
 /// Clicks at `point` (CSS pixels) as a mouse does: moves there,

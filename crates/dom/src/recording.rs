@@ -53,6 +53,10 @@ pub enum Call {
         node: NodeId,
         event: String,
     },
+    AddStyle {
+        scope: String,
+        css: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]

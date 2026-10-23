@@ -89,4 +89,11 @@ impl Dom for RecordingDom {
             event: event.into(),
         });
     }
+
+    fn add_style(&mut self, scope: &str, css: &str) {
+        self.calls.push(Call::AddStyle {
+            scope: scope.into(),
+            css: css.into(),
+        });
+    }
 }

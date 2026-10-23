@@ -21,6 +21,12 @@ pub use error::CompileError;
 pub use naming::component_name;
 use source::Source;
 
+/// The attribute generated code tags each element with, to its
+/// component's style scope; reserved in templates. It must equal
+/// `vapors_dom::SCOPE_ATTRIBUTE`, which generated code names (checked
+/// in vapors-compiler-examples).
+pub const SCOPE_ATTRIBUTE: &str = "data-wisp";
+
 /// Parses the text of a `.wisp` file. `path` names the file in
 /// refusals and gives the component its name.
 ///
@@ -35,6 +41,7 @@ pub fn parse_str(path: &str, text: &str) -> Result<ast::Component, CompileError>
     Ok(ast::Component {
         name,
         path: path.to_string(),
+        scope: Some(path.to_string()),
         text: text.to_string(),
         script: sections.script,
         style: sections.style,
@@ -67,6 +74,43 @@ pub fn compile_file(path: &Path) -> Result<String, CompileError> {
 /// for the first thing the parser did not recognise.
 pub fn parse_file(path: &Path) -> Result<ast::Component, CompileError> {
     parse_str(&path.display().to_string(), &read_source(path)?)
+}
+
+/// [`compile_file`] with the component's scope named by its path under
+/// `root`, so it is the same on every machine.
+///
+/// # Errors
+/// As [`compile_file`]; and a file not under `root`, naming both.
+pub fn compile_file_under(path: &Path, root: &Path) -> Result<String, CompileError> {
+    let relative = path.strip_prefix(root).map_err(|_| {
+        build::path_error(
+            path,
+            format!(
+                "is not under {}, which names its style's scope",
+                root.display()
+            ),
+        )
+    })?;
+    let mut component = parse_file(path)?;
+    component.scope = Some(
+        relative
+            .components()
+            .map(|part| part.as_os_str().to_string_lossy())
+            .collect::<Vec<_>>()
+            .join("/"),
+    );
+    generate(&component)
+}
+
+/// [`compile_file`] for a component whose `<style>` the app adds as a
+/// global sheet: nothing is scoped.
+///
+/// # Errors
+/// As [`compile_file`].
+pub fn compile_file_global(path: &Path) -> Result<String, CompileError> {
+    let mut component = parse_file(path)?;
+    component.scope = None;
+    generate(&component)
 }
 
 fn read_source(path: &Path) -> Result<String, CompileError> {

@@ -35,6 +35,10 @@ pub enum PropertyValue {
     Number(f64),
 }
 
+/// The attribute a component's `mount` sets on each element it creates,
+/// to the scope its `<style>` was added under (see [`Dom::add_style`]).
+pub const SCOPE_ATTRIBUTE: &str = "data-wisp";
+
 /// The tree a component mounts into.
 pub trait Dom {
     /// Creates an element with the given tag, attached nowhere yet.
@@ -57,4 +61,9 @@ pub trait Dom {
     fn remove(&mut self, node: NodeId);
     /// Calls `handler` for each `event` (such as `click`) on the node.
     fn listen(&mut self, node: NodeId, event: &str, handler: Handler);
+    /// Adds a component's `<style>` under `scope`, the value its
+    /// elements carry in [`SCOPE_ATTRIBUTE`]: its rules match
+    /// only those elements. Each mount calls it; a scope already added
+    /// is not added again.
+    fn add_style(&mut self, scope: &str, css: &str);
 }

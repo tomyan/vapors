@@ -15,5 +15,8 @@ vapors-signals.workspace = true
 [build-dependencies]
 vapors-compiler.workspace = true
 
+[dev-dependencies]
+vapors-compiler.workspace = true
+
 [lints]
 workspace = true

@@ -88,7 +88,7 @@ fn main() -> Result<(), String> {
         .map_err(|e| e.to_string());
     }
     let demo = vapors_demos::find(&name)?;
-    let app = ElementsApp::new(vapors_demos::document(&demo)?);
+    let app = ElementsApp::new(vapors_demos::document(&demo));
     run(
         options,
         Counted {

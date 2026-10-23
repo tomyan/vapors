@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use vapors_css::cascade::Environment;
 use vapors_dom::NodeId;
 
-use crate::check::{check_tree, describe, elements, implemented};
+use crate::check::{check_tree, describe, elements, implemented, style_attribute_refusals};
 use crate::document::Document;
 use crate::error::ElementError;
 use crate::layout::{Calcs, build, lay_out};
@@ -70,6 +70,12 @@ impl Document {
     ) -> Result<(HashMap<NodeId, Used>, Calcs), Vec<ElementError>> {
         let env = environment(viewport);
         let mut errors = check_tree(&self.arena, self.root());
+        errors.extend_from_slice(self.sheets.refused());
+        let unparsed = style_attribute_refusals(&self.arena, self.root());
+        if !unparsed.is_empty() {
+            errors.extend(unparsed);
+            return Err(errors);
+        }
         let styles = self
             .sheets
             .compute(&self.arena, self.root(), &env)

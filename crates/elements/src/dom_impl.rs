@@ -17,6 +17,11 @@ impl Dom for Document {
             .insert(Node::new(Kind::Element(Element::new(tag))))
     }
 
+    fn add_style(&mut self, scope: &str, css: &str) {
+        self.changed = true;
+        self.sheets.add_scoped(scope, css);
+    }
+
     fn create_text(&mut self, text: &str) -> NodeId {
         self.arena.insert(Node::new(Kind::Text(text.to_owned())))
     }
