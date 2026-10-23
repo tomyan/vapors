@@ -19,19 +19,19 @@ jobs:
   ci:
     name: ci
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    # About 2.5x the worst of 20 runs before this (1907 s,
-    # scripts/ci-times.sh in touche, 2026-10-23), which includes apt
-    # cache misses; with a cache hit the job took at most 115 s (PR #24).
+    # About 2.5x the worst of the 37 runs to 2026-10-23: 1907 s in run
+    # 39803408769, an apt cache miss. With a cache hit it took 85 s
+    # (run 39932437148).
     timeout-minutes: 80
     env:
       # A CJK system font is installed below, so the system-font fallback
       # test must find one; it fails loudly rather than passing by luck.
       VAPORS_SYSTEM_FONTS: 1
     steps:
-      - uses: actions/checkout@v7
-      # Step timeout: about 2.5x the worst apt step in 20 runs before this
-      # (1811 s, scripts/ci-times.sh in touche, 2026-10-23). A cache miss,
-      # as after a runner image update, can take that long again.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Step timeout: about 2.5x the worst of the 37 runs: 1811 s in run
+      # 39803408769. A cache miss, as after a runner image update, can
+      # take that long again; a hit took 13 s (run 39932437148).
       - name: install a CJK system font for the fallback test
         timeout-minutes: 76
         uses: ./.github/actions/apt-install
@@ -43,8 +43,8 @@ jobs:
       # rustup reads rust-toolchain.toml: channel, components, targets. One pin.
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
-      - uses: Swatinem/rust-cache@v2
-      - uses: cargo-bins/cargo-binstall@main
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
         run: cargo xtask setup --ci
       - name: lint, wasm lint and unit
@@ -52,7 +52,7 @@ jobs:
       - name: build timings
         if: always()
         run: cargo build --workspace --all-targets --timings
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: timings
@@ -64,16 +64,16 @@ jobs:
   web:
     name: web
     runs-on: ubuntu-24.04
-    # About 2.5x the worst of 20 runs before this (69 s,
-    # scripts/ci-times.sh in touche, 2026-10-23), which includes apt
-    # cache misses; with a cache hit the job took at most 115 s (PR #24).
+    # About 2.5x the worst of the 37 runs to 2026-10-23 without an apt
+    # step, which this job no longer has (#27): 69 s in run 39805979396.
+    # With the Rust cache it took 47 s (run 39930654120).
     timeout-minutes: 3
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
-      - uses: Swatinem/rust-cache@v2
-      - uses: cargo-bins/cargo-binstall@main
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
         run: cargo xtask setup --ci
       - name: build the web demo with trunk
@@ -84,7 +84,7 @@ jobs:
       # canvas composites white (run 39934974057).
       - name: page contract in headless Chrome
         run: scripts/check-page-contract.sh target/web "$(mktemp -d)"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: web
           path: target/web
@@ -92,30 +92,32 @@ jobs:
   gpu:
     name: gpu
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    # About 2.5x the worst of 20 runs before this (522 s,
-    # scripts/ci-times.sh in touche, 2026-10-23), which includes apt
-    # cache misses; with a cache hit the job took at most 115 s (PR #24).
-    timeout-minutes: 22
+    # About 2.5x the worst of the 37 runs to 2026-10-23: 1819 s in run
+    # 39801264114, an apt cache miss. With a cache hit it took 113 s
+    # (run 39930654120).
+    timeout-minutes: 76
     env:
       # lavapipe is the CI reference adapter; the tier fails if it is not the one found.
       VAPORS_GPU_ADAPTER: llvmpipe
     steps:
-      - uses: actions/checkout@v7
-      # Step timeout: about 2.5x the worst apt step in 20 runs before this
-      # (387 s, scripts/ci-times.sh in touche, 2026-10-23).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Step timeout: about 2.5x the worst of the 37 runs: 1812 s in run
+      # 39801264114; a hit took 16 s (run 39930654120).
       - name: install lavapipe
-        timeout-minutes: 17
+        timeout-minutes: 76
         uses: ./.github/actions/apt-install
         with:
           packages: mesa-vulkan-drivers vulkan-tools
           mesa-major: 25 # 25.2.8 on ubuntu-24.04, 2026-10-23
       - name: lavapipe is the Vulkan device
         run: |
-          vulkaninfo --summary | grep -E 'deviceName|driverName'
+          devices=$(vulkaninfo --summary)
+          printf '%s\n' "$devices" | grep -E 'deviceName|driverName'
+          case $devices in *llvmpipe*) ;; *) echo "::error::no llvmpipe device after installing lavapipe; fix: check the install step and mesa-major"; exit 1 ;; esac
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
-      - uses: Swatinem/rust-cache@v2
-      - uses: cargo-bins/cargo-binstall@main
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
         run: cargo xtask setup --ci
       - name: gpu tier
@@ -124,7 +126,7 @@ jobs:
       # runner image ships google-chrome), composite uploaded for eyes.
       - name: text comparison page
         run: cargo run -p vapors-text --example text_comparison -- --out target
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: text-comparison
@@ -134,16 +136,16 @@ jobs:
   window:
     name: window
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    # About 2.5x the worst of 20 runs before this (780 s,
-    # scripts/ci-times.sh in touche, 2026-10-23), which includes apt
-    # cache misses; with a cache hit the job took at most 115 s (PR #24).
+    # About 2.5x the worst of the 37 runs to 2026-10-23: 780 s in run
+    # 39803145234, an apt cache miss. With a cache hit it took 49 s
+    # (run 39930654120).
     timeout-minutes: 33
     env:
       VAPORS_GPU_ADAPTER: llvmpipe
     steps:
-      - uses: actions/checkout@v7
-      # Step timeout: about 2.5x the worst apt step in 20 runs before this
-      # (733 s, scripts/ci-times.sh in touche, 2026-10-23).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Step timeout: about 2.5x the worst of the 37 runs: 733 s in run
+      # 39803145234; a hit took 13 s (run 39932437148).
       - name: install lavapipe, Xvfb and winit's X11 libraries
         timeout-minutes: 31
         uses: ./.github/actions/apt-install
@@ -152,15 +154,15 @@ jobs:
           mesa-major: 25 # 25.2.8 on ubuntu-24.04, 2026-10-23
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
-      - uses: Swatinem/rust-cache@v2
-      - uses: cargo-bins/cargo-binstall@main
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
         run: cargo xtask setup --ci
       - name: screenshot of the clear window
         run: cargo xtask screenshot clear_window target/clear_window.png --expect 12,200,34
       - name: screenshot of the gradient fixture, fitted
         run: cargo xtask screenshot image_window target/image_window.png --expect 128,128,128 -- --open crates/platform/examples/fixtures/gradient.png
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: screenshots
