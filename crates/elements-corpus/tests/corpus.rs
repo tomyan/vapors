@@ -127,8 +127,13 @@ fn differences(
 #[test]
 fn every_fixture_lays_out_as_chromium_does() {
     // Given
+    let fixtures = all();
+    assert!(
+        !fixtures.is_empty(),
+        "no layout fixtures: the corpus checks nothing"
+    );
     let mut failures = Vec::new();
-    for fixture in all() {
+    for fixture in fixtures {
         let (viewport, theirs) = chromium_boxes(fixture.name);
 
         // When

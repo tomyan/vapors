@@ -37,10 +37,6 @@ impl Counter {
         reason = "mount_before builds the whole template, so its length follows the template's size"
     )]
     #[allow(
-        clippy::similar_names,
-        reason = "generated node names are a stem and a counter, so text3 and text13 differ by one inserted digit; this also leaves the script's own bindings unchecked for similar names"
-    )]
-    #[allow(
         clippy::needless_pass_by_value,
         reason = "every component takes its props struct by value, empty or not, so parents mount them alike"
     )]

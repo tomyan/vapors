@@ -1,10 +1,14 @@
 //! Reading computed values: each property is read through [`Reader`],
-//! which records a refusal (property, value, reason) for a value the
-//! tree does not implement and carries on with a stand-in, so one
-//! update reports every refusal at once. A refusal always fails the
-//! update; the stand-in is never drawn.
+//! which records a refusal (property, value, reason, and where it was
+//! declared) for a value the tree does not implement and carries on
+//! with a stand-in, so one update reports every refusal at once. A
+//! refusal always fails the update; the stand-in is never drawn. An
+//! inherited value is refused once, at the element that declared it,
+//! not again at each descendant that inherits it.
 
+use vapors_css::Position;
 use vapors_css::cascade::ComputedStyle;
+use vapors_css::property::PropertyId;
 use vapors_css::value::{LengthUnit, Value};
 
 /// A value the tree does not implement.
@@ -13,18 +17,50 @@ pub(crate) struct Refusal {
     pub(crate) property: &'static str,
     pub(crate) value: String,
     pub(crate) reason: String,
+    /// The winning declaration's sheet (by cascade order) and position;
+    /// `None` when no declaration applied here.
+    pub(crate) declared: Option<(usize, Position)>,
+}
+
+/// An element's computed style and its parent's: whether a refused
+/// value is this element's to report.
+#[derive(Clone, Copy)]
+pub(crate) struct Styles<'a> {
+    pub(crate) own: &'a ComputedStyle,
+    pub(crate) parent: Option<&'a ComputedStyle>,
+}
+
+impl Styles<'_> {
+    /// The refusal for `property` at this element, or `None` when the
+    /// value is the parent's, inherited without a declaration here: the
+    /// ancestor that declared it reports it.
+    pub(crate) fn refusal(&self, property: &'static str, reason: String) -> Option<Refusal> {
+        let id = PropertyId::from_name(property)
+            .unwrap_or_else(|| panic!("`{property}` is not a longhand in vapors-css's table"));
+        let declared = self.own.declared_in(id).zip(self.own.declared_at(id));
+        let inherited =
+            declared.is_none() && self.parent.is_some_and(|p| p.get(id) == self.own.get(id));
+        (!inherited).then(|| Refusal {
+            property,
+            value: self.own.get(id).to_css(),
+            reason,
+            declared,
+        })
+    }
 }
 
 /// Reads one element's computed style, collecting refusals.
 pub(crate) struct Reader<'a> {
     style: &'a ComputedStyle,
+    styles: Styles<'a>,
     pub(crate) refusals: Vec<Refusal>,
 }
 
 impl<'a> Reader<'a> {
-    pub(crate) fn new(style: &'a ComputedStyle) -> Self {
+    pub(crate) fn new(styles: Styles<'a>) -> Self {
         Self {
-            style,
+            style: styles.own,
+            styles,
             refusals: Vec::new(),
         }
     }
@@ -41,11 +77,7 @@ impl<'a> Reader<'a> {
         match read(value) {
             Ok(result) => result,
             Err(reason) => {
-                self.refusals.push(Refusal {
-                    property,
-                    value: value.to_css(),
-                    reason,
-                });
+                self.refusals.extend(self.styles.refusal(property, reason));
                 stand_in
             }
         }
@@ -82,20 +114,17 @@ pub(crate) fn amount(value: &Value) -> Result<Amount, String> {
         Value::Length(length) if length.unit == LengthUnit::Percent => {
             Ok(Amount::Fraction((length.value / 100.0) as f32))
         }
-        Value::Calc(_) => {
-            Err("is a calc() with a % term, which arrives in F2c S4 (docs/F2c.md)".to_owned())
-        }
-        other => Err(format!(
-            "is not a length or percentage the tree reads ({other:?})"
+        Value::Calc(_) => Err(format!(
+            "is a calc() with a % term, which only layout can resolve; it {}",
+            later("F2c S4")
         )),
+        _ => Err(shape("a length or percentage")),
     }
 }
 
 /// The keyword, or a refusal naming the value.
 pub(crate) fn keyword(value: &Value) -> Result<&str, String> {
-    value
-        .as_keyword()
-        .ok_or_else(|| format!("is not a keyword ({value:?})"))
+    value.as_keyword().ok_or_else(|| shape("a keyword"))
 }
 
 /// `name` arrives in `slice`: the reason for a refused value.
@@ -108,5 +137,14 @@ pub(crate) fn later(slice: &str) -> String {
 pub(crate) fn unknown(keyword: &str) -> String {
     format!(
         "`{keyword}` is not a value vapors-elements knows; the CSS grammar and the mapping in vapors-elements/src/style disagree"
+    )
+}
+
+/// The reason for a computed value of a shape this crate does not read
+/// as `expected`: vapors-css and vapors-elements disagree about the
+/// property's computed form, which is a bug in one of them.
+pub(crate) fn shape(expected: &str) -> String {
+    format!(
+        "is computed in a form vapors-elements does not read as {expected}; vapors-css and vapors-elements disagree about this property's computed value"
     )
 }

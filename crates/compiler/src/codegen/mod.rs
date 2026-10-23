@@ -27,7 +27,28 @@ use crate::ast::Component;
 use crate::source::Source;
 use emit::{Emitter, Place};
 
-/// Generates the Rust for a parsed component.
+/// The template emitted with node counters of `width` digits.
+fn emit_template<'a>(
+    component: &Component,
+    source: &'a Source,
+    info: &'a script::ScriptInfo,
+    width: usize,
+) -> Result<Emitter<'a>, CompileError> {
+    let mut emitter = Emitter::new(source, info).with_width(width);
+    emitter.indent(3);
+    emitter.emit_nodes(&component.template.children, &Place::roots())?;
+    Ok(emitter)
+}
+
+/// Decimal digits in `n`: 1 for 0 to 9.
+fn digits(n: usize) -> usize {
+    n.checked_ilog10().map_or(1, |log| log as usize + 1)
+}
+
+/// Generates the Rust for a parsed component. Node names are a stem and
+/// a counter of one width for the whole component (`text03`, `text13`
+/// in a template of more than ten), found by emitting once to count
+/// them; a component of ten names or fewer is emitted once.
 ///
 /// # Errors
 /// A [`CompileError`] for a script or expression that does not parse,
@@ -36,9 +57,11 @@ use emit::{Emitter, Place};
 pub fn generate(component: &Component) -> Result<String, CompileError> {
     let source = Source::new(&component.path, &component.text);
     let info = script::analyse(&source, component.script.as_ref())?;
-    let mut emitter = Emitter::new(&source, &info);
-    emitter.indent(3);
-    emitter.emit_nodes(&component.template.children, &Place::roots())?;
+    let mut emitter = emit_template(component, &source, &info, 1)?;
+    let width = digits(emitter.names_made().saturating_sub(1));
+    if width > 1 {
+        emitter = emit_template(component, &source, &info, width)?;
+    }
     names::check_generated(&source, &emitter.declared(), emitter.generated())?;
     let body = emitter.finish();
     let raw = shell::assemble(component, &info, &body);

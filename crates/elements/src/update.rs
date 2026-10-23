@@ -12,7 +12,7 @@ use crate::document::Document;
 use crate::error::ElementError;
 use crate::layout::{build, lay_out};
 use crate::paint::{PaintInput, Painted, paint};
-use crate::style::{Refusal, Used, initial_style, used};
+use crate::style::{ElementStyles, Refusal, Used, initial_style, used};
 
 /// What the window or canvas gives the document each frame.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -75,7 +75,9 @@ impl Document {
             if !implemented(&self.arena, node) {
                 continue;
             }
-            match used(styles.of(node), &initial) {
+            let own = styles.of(node);
+            let parent = self.parent(node).map(|parent| styles.of(parent));
+            match used(ElementStyles { own, parent }, &initial) {
                 Ok(style) => drop(out.insert(node, style)),
                 Err(refusals) => errors.extend(self.unhonoured(node, refusals)),
             }
@@ -100,6 +102,9 @@ impl Document {
             property: r.property,
             value: r.value,
             reason: r.reason,
+            declared: r.declared.map(|(sheet, at)| {
+                format!("{}:{}:{}", self.sheets.name(sheet), at.line, at.column)
+            }),
         })
     }
 }

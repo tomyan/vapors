@@ -5,7 +5,7 @@ use vapors_css::value::{Color, LengthUnit, Value};
 use vapors_scene::Color as Rgba;
 use vapors_text::{Family, LineHeight, Style};
 
-use super::values::{Reader, keyword, later};
+use super::values::{Reader, keyword, later, shape};
 
 /// The faces vapors bundles; the only ones named before F2c S6.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -58,7 +58,7 @@ pub(crate) fn text_style(reader: &mut Reader<'_>) -> TextStyle {
 fn font_size(value: &Value) -> Result<f32, String> {
     match value {
         Value::Length(length) if length.unit == LengthUnit::Px => Ok(length.value as f32),
-        other => Err(format!("is not a computed size in px ({other:?})")),
+        _ => Err(shape("a computed size in px")),
     }
 }
 
@@ -78,7 +78,7 @@ fn face(value: &Value) -> Result<Face, String> {
             .collect::<Vec<_>>()
             .join(" ")
             .to_ascii_lowercase(),
-        other => return Err(format!("is not a family name ({other:?})")),
+        _ => return Err(shape("a family name")),
     };
     match name.as_str() {
         "geist" | "sans-serif" | "system-ui" | "ui-sans-serif" => Ok(Face::Geist),
@@ -101,7 +101,7 @@ fn weight(value: &Value) -> Result<f32, String> {
             "is relative to the parent's weight, which {}",
             later("F2c S6")
         )),
-        other => Err(format!("is not a weight ({other:?})")),
+        _ => Err(shape("a weight")),
     }
 }
 
@@ -113,14 +113,14 @@ fn line_height(value: &Value) -> Result<LineHeight, String> {
         Value::Length(length) if length.unit == LengthUnit::Px => {
             Ok(LineHeight::Px(length.value as f32))
         }
-        other => Err(format!("is not a line height the tree reads ({other:?})")),
+        _ => Err(shape("a line height the tree reads")),
     }
 }
 
 pub(super) fn color(value: &Value) -> Result<Rgba, String> {
     match value {
         Value::Color(Color::Rgba(rgba)) => Ok(*rgba),
-        other => Err(format!("is not a resolved colour ({other:?})")),
+        _ => Err(shape("a resolved colour")),
     }
 }
 

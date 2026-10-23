@@ -61,3 +61,15 @@ fn a_dump_without_boxes_is_refused() {
     // Then
     assert!(error.contains("document.fonts.ready"), "{error}");
 }
+
+#[test]
+fn a_page_that_reports_unloaded_fonts_is_refused() {
+    // Given
+    let dom = "<pre id=\"vapors-boxes\">{\"error\":\"fonts did not load: Geist (error)\"}</pre>";
+
+    // When
+    let error = boxes_from_dom(dom).expect_err("refused");
+
+    // Then
+    assert!(error.contains("Geist (error)"), "{error}");
+}

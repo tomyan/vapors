@@ -168,3 +168,23 @@ fn a_refused_update_drops_the_previous_result() {
     // Then
     assert!(doc.painted().is_none());
 }
+
+#[test]
+fn a_style_attribute_is_refused_naming_the_element_and_the_slice() {
+    // Given
+    let mut doc = document();
+    let body = doc.body();
+    let div = element(&mut doc, body, "div", "panel");
+    doc.set_attribute(div, "style", "color: red");
+
+    // When
+    let errors = refusals(&mut doc);
+
+    // Then
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    let error = &errors[0];
+    assert!(
+        error.contains("<div class=\"panel\">: a `style` attribute") && error.contains("F2c S5"),
+        "{error}"
+    );
+}

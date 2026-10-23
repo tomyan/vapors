@@ -17,7 +17,8 @@ pub struct ComputedStyle {
     pub(crate) font_size: f64,
     pub(crate) root_font_size: f64,
     pub(crate) color: Rgba,
-    pub(crate) positions: Vec<Option<crate::Position>>,
+    /// The sheet and position of each longhand's winning declaration.
+    pub(crate) positions: Vec<Option<(usize, crate::Position)>>,
 }
 
 impl ComputedStyle {
@@ -61,7 +62,16 @@ impl ComputedStyle {
     /// Where the winning declaration for `id` was written, if any was.
     #[must_use]
     pub fn declared_at(&self, id: PropertyId) -> Option<crate::Position> {
-        self.positions[id.index()]
+        self.positions[id.index()].map(|(_, position)| position)
+    }
+
+    /// Which sheet the winning declaration for `id` came from, as the
+    /// index of the sheet in the order it was added to the cascade (the
+    /// first `user_agent` or `author` call is 0); `None` when no
+    /// declaration applied, so the value is inherited or initial.
+    #[must_use]
+    pub fn declared_in(&self, id: PropertyId) -> Option<usize> {
+        self.positions[id.index()].map(|(sheet, _)| sheet)
     }
 
     /// Every longhand with its computed value, in table order.

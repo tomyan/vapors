@@ -8,7 +8,7 @@
 use vapors_css::cascade::ComputedStyle;
 use vapors_css::property::PropertyId;
 
-use super::values::{Refusal, later};
+use super::values::{Refusal, Styles, later};
 
 /// What the tree does with a property.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -146,35 +146,35 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ("z-index", Deferred("F2c S8")),
 ];
 
-/// The deferred properties of `style` that are not at their initial
-/// value in `initial`.
-pub(crate) fn check_honoured(style: &ComputedStyle, initial: &ComputedStyle) -> Vec<Refusal> {
+/// The deferred properties of `styles.own` that are not at their
+/// initial value in `initial`, each reported at the element that
+/// declared it.
+pub(crate) fn check_honoured(styles: Styles<'_>, initial: &ComputedStyle) -> Vec<Refusal> {
     TABLE
         .iter()
         .filter_map(|(name, treatment)| match treatment {
-            Deferred(slice) => deferred_in_use(style, initial, name, slice),
+            Deferred(slice) => deferred_in_use(styles, initial, name, slice),
             Read | Inert(_) => None,
         })
         .collect()
 }
 
 fn deferred_in_use(
-    style: &ComputedStyle,
+    styles: Styles<'_>,
     initial: &ComputedStyle,
     name: &'static str,
     slice: &str,
 ) -> Option<Refusal> {
     let id = PropertyId::from_name(name)
         .unwrap_or_else(|| panic!("`{name}` is not in vapors-css's table"));
-    let value = style.get(id);
-    (value != initial.get(id)).then(|| Refusal {
-        property: name,
-        value: value.to_css(),
-        reason: format!(
-            "is not implemented by vapors-elements yet: it {}",
-            later(slice)
-        ),
-    })
+    if styles.own.get(id) == initial.get(id) {
+        return None;
+    }
+    let reason = format!(
+        "is not implemented by vapors-elements yet: it {}",
+        later(slice)
+    );
+    styles.refusal(name, reason)
 }
 
 #[cfg(test)]

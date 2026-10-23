@@ -65,17 +65,29 @@ html {{ font-family: Geist; }}
 </style>
 <style>{style}</style>
 </head><body>{template}<script>
-document.fonts.ready.then(() => {{
+// Every @font-face is loaded, used or not, so a font that fails cannot
+// pass unnoticed; the boxes are written only when all have loaded.
+const write = (value) => {{
+  const out = document.createElement("pre");
+  out.id = "{BOXES_ID}";
+  out.textContent = JSON.stringify(value);
+  document.documentElement.append(out);
+}};
+document.fonts.ready
+  .then(() => Promise.allSettled([...document.fonts].map((face) => face.load())))
+  .then(() => {{
+  const failed = [...document.fonts].filter((face) => face.status !== "loaded");
+  if (failed.length > 0) {{
+    write({{ error: "fonts did not load: " + failed.map((face) => face.family + " (" + face.status + ")").join(", ") }});
+    return;
+  }}
   const boxes = [];
   for (const element of document.querySelectorAll("html, body, body *")) {{
     if (element.tagName === "SCRIPT") continue;
     const r = element.getBoundingClientRect();
     boxes.push({{ tag: element.tagName.toLowerCase(), x: r.x, y: r.y, width: r.width, height: r.height }});
   }}
-  const out = document.createElement("pre");
-  out.id = "{BOXES_ID}";
-  out.textContent = JSON.stringify({{ viewport: [innerWidth, innerHeight], boxes }});
-  document.documentElement.append(out);
+  write({{ viewport: [innerWidth, innerHeight], boxes }});
 }});
 </script></body></html>
 "#,
@@ -89,7 +101,8 @@ document.fonts.ready.then(() => {{
 ///
 /// # Errors
 /// When the page never wrote its boxes (a script error, or fonts that
-/// never loaded), naming what to look at.
+/// never settled), naming what to look at; or when it wrote an error
+/// instead, as it does when a font failed to load.
 pub fn boxes_from_dom(dom: &str) -> Result<String, String> {
     let open = format!("<pre id=\"{BOXES_ID}\">");
     let start = dom.find(&open).ok_or(format!(
@@ -99,10 +112,17 @@ pub fn boxes_from_dom(dom: &str) -> Result<String, String> {
         + dom[start..]
             .find("</pre>")
             .ok_or("the boxes <pre> is not closed")?;
-    Ok(dom[start..end]
+    let text = dom[start..end]
         .replace("&lt;", "<")
         .replace("&gt;", ">")
-        .replace("&amp;", "&"))
+        .replace("&amp;", "&");
+    match serde_json::from_str::<serde_json::Value>(&text) {
+        Ok(page) if page.get("error").is_some() => Err(format!(
+            "the page refused to measure: {}; the fixture's boxes would not be Chromium's with the bundled fonts",
+            page["error"]
+        )),
+        _ => Ok(text),
+    }
 }
 
 #[cfg(test)]

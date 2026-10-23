@@ -72,11 +72,7 @@ const DEFAULTS_AS_WRITTEN: &str =
     "the defaults are the #[prop] initialisers as written in the .wisp";
 /// Lints on `mount_before` that depend on types the compiler cannot see.
 fn mount_allowances(info: &ScriptInfo) -> String {
-    let mut allowances = format!(
-        "    {}\n    {}\n",
-        Allowance::TooManyLines.attribute(),
-        Allowance::SimilarNames.attribute()
-    );
+    let mut allowances = format!("    {}\n", Allowance::TooManyLines.attribute());
     if info.props.is_empty() {
         let _ = writeln!(
             allowances,

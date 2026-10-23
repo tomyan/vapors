@@ -20,7 +20,7 @@ use crate::error::ElementError;
 pub(crate) use box_style::box_style;
 pub(crate) use text_style::TextStyle;
 pub(crate) use used::{Used, used};
-pub(crate) use values::Refusal;
+pub(crate) use values::{Refusal, Styles as ElementStyles};
 
 const UA_SHEET: &str = include_str!("ua.css");
 
@@ -74,6 +74,16 @@ impl Sheets {
             styles.0[index_of(element.id) as usize] = Some(style);
         }
         Ok(styles)
+    }
+}
+
+impl Sheets {
+    /// The name a sheet was added under, by its cascade order (0 is the
+    /// user-agent sheet).
+    pub(crate) fn name(&self, index: usize) -> &str {
+        self.names
+            .get(index)
+            .map_or("an unnamed sheet", String::as_str)
     }
 }
 

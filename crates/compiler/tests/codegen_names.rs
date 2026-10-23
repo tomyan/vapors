@@ -6,7 +6,7 @@
 #[path = "common/codegen.rs"]
 mod codegen;
 
-use codegen::{assert_has, generated_with, refusal};
+use codegen::{assert_has, assert_lacks, generated, generated_with, refusal};
 
 #[test]
 fn a_script_binding_named_like_a_generated_parameter_is_refused() {
@@ -100,4 +100,28 @@ fn a_raw_identifier_prop_is_refused_at_its_position() {
     // Then
     assert_eq!(err.line, 2, "{err}");
     assert!(err.message.contains("raw identifier"), "{err}");
+}
+
+#[test]
+fn node_names_share_one_counter_width_past_ten() {
+    // Given: eleven elements, so counters run 0 to 10
+    let template = "<p></p>".repeat(11);
+
+    // When
+    let code = generated(&template);
+
+    // Then
+    assert_has(&code, "let p00 = dom");
+    assert_has(&code, "let p10 = dom");
+    assert_lacks(&code, "let p0 = dom");
+}
+
+#[test]
+fn up_to_ten_names_keep_one_digit() {
+    // When
+    let code = generated(&"<p></p>".repeat(10));
+
+    // Then
+    assert_has(&code, "let p0 = dom");
+    assert_has(&code, "let p9 = dom");
 }

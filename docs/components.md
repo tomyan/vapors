@@ -260,15 +260,15 @@ depend on facts it cannot see, such as whether a captured binding is
 such lint is allowed on the one generated `let` that trips it, with
 its reason in the attribute. A hole's expression is bound by its own
 statement first, so the allowance never covers code the user wrote.
-Lints in the user's script and expressions are still reported, with
-one exception below. Three allowances sit on `mount_before` because
-they judge the function itself: its length, which follows the
-template's size; an empty props struct taken by value; and
-`similar_names`, because generated node names are a stem and a counter
-and clippy calls `text3` and `text13` similar. That last one also
-stops clippy reporting similar names among the script's own bindings.
-Node names of one fixed width would retire it. The list and the
-reasons are in `crates/compiler/src/codegen/allowances.rs`.
+Lints in the user's script and expressions are still reported. Two
+allowances sit on `mount_before` because they judge the function
+itself: its length, which follows the template's size, and an empty
+props struct taken by value. Generated node names need none: each is
+a stem and a counter, and the counters share one width per component
+(`text03` and `text13` in a template of more than ten names), so
+clippy's `similar_names` never sees two that differ by an inserted
+digit. The list and the reasons are in
+`crates/compiler/src/codegen/allowances.rs`.
 
 ## Deferred
 

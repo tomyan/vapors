@@ -166,7 +166,10 @@ two places answering one question. The traits (`TraversePartialTree`,
 - **Units.** Layout is in CSS px, as `f32`, unrounded. Paint snaps each
   edge to device pixels: `round(x * scale)`. Chromium snaps rects the
   same way, so 1px borders stay crisp at 1.5x.
-- **calc().** Taffy stores a calc as an opaque pointer and resolves it
+- **calc().** As built in S1: a computed `calc()` that still holds a %
+  term (every other unit is resolved by the cascade) is refused, naming
+  S4; the side table below arrives with S4's flex and grid mapping.
+  Taffy stores a calc as an opaque pointer and resolves it
   through `resolve_calc_value(ptr, basis)`. Our calc values live in
   `Rc`s owned by the node's used style. The pointer is used only as a
   key into a side table and is never dereferenced, so no `unsafe` is
@@ -372,7 +375,7 @@ touche can write its top bar, panel grid and buttons as components.
 | **S2 click** | Hit testing, pointer events, `click`, bubbling, `:hover`/`:active`, `pointer-events`, refusal of unfired event names, `Next::Wait` redraw on demand | `counter.wisp` from `compiler-examples` counts clicks and taps natively and on the phone. Idle CPU near zero on desktop. |
 | **S3 box model** | Borders (solid; other styles refused), `border-radius`, `box-shadow`, the UA button style | Buttons look like buttons; the pixel comparison covers radii and shadows |
 | **S4 flex and grid** | Every flex and grid property in the CSS table mapped to Taffy 0.15, the `position` and alignment grammar moved to 0.15's shape, the `layout-oracle` corpus (with Taffy's generated fixtures as a source of cases) | The touche shell layout (44 px bar, canvas region, side panel) as a fixture matching Chromium at three viewport sizes |
-| **S5 scoped styles** | D1: per-component `<style>`, nested components | touche's first panel as nested components, each with its own CSS |
+| **S5 scoped styles** | D1: per-component `<style>`, nested components; the `style` attribute (refused until then) | touche's first panel as nested components, each with its own CSS |
 | **S6 inline text** | Inline formatting contexts with spans, anonymous blocks, whitespace collapsing, the font properties (`font-family`, `font-weight`, `font-style`, `line-height`, `letter-spacing`, `font-feature-settings`, `text-align`), heading and paragraph margins with collapsing, background on inline elements, hit testing into spans | A paragraph with `strong`, `em` and `code`, matching Chromium's line breaks and boxes |
 | **S7 incremental** | Restyle, relayout and text relayout scoped as in the table above, with counted tests; the 1,000-element update-time measurement | A counter in a large tree updates only its own text node's chain; the number is recorded |
 | **S8 positioned** | `position: relative`/`absolute`/`fixed`, `z-index`, stacking contexts in paint and hit test, `overflow: hidden` (rect clip) | A toast component above the shell |

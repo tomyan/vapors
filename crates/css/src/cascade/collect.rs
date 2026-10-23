@@ -17,6 +17,18 @@ pub(crate) struct Candidate<V> {
     order: usize,
     pub(crate) value: V,
     pub(crate) position: Position,
+    /// The sheet the declaration came from, by the order sheets were
+    /// added to the cascade.
+    pub(crate) sheet: usize,
+}
+
+/// Where a rule stands in the cascade: what ranks its declarations.
+#[derive(Clone, Copy)]
+struct Standing {
+    rank: u8,
+    specificity: Specificity,
+    order: usize,
+    sheet: usize,
 }
 
 impl<V> Candidate<V> {
@@ -58,8 +70,13 @@ pub(crate) fn winners<'a, E: Element>(
         }
         let specificity = rule.rule.selector.specificity();
         for decl in &rule.rule.declarations {
-            let rank = rank(rule.origin, decl.important);
-            winners.consider(decl, rank, specificity, rule.order);
+            let standing = Standing {
+                rank: rank(rule.origin, decl.important),
+                specificity,
+                order: rule.order,
+                sheet: rule.sheet,
+            };
+            winners.consider(decl, standing);
         }
     }
     winners
@@ -67,7 +84,13 @@ pub(crate) fn winners<'a, E: Element>(
 
 impl Winners {
     /// Let one declaration compete for the properties it sets.
-    fn consider(&mut self, decl: &Declaration, rank: u8, specificity: Specificity, order: usize) {
+    fn consider(&mut self, decl: &Declaration, standing: Standing) {
+        let Standing {
+            rank,
+            specificity,
+            order,
+            sheet,
+        } = standing;
         let position = decl.position;
         if decl.name.starts_with("--") {
             let new = Candidate {
@@ -76,6 +99,7 @@ impl Winners {
                 order,
                 value: decl.value.clone(),
                 position,
+                sheet,
             };
             match self.custom.get_mut(&decl.name) {
                 Some(current) if !new.beats(current) => {}
@@ -93,6 +117,7 @@ impl Winners {
                 order,
                 value: longhand.value.clone(),
                 position,
+                sheet,
             };
             let slot = &mut self.longhands[longhand.id.index()];
             if slot.as_ref().is_none_or(|current| new.beats(current)) {

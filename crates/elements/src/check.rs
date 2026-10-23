@@ -36,6 +36,12 @@ pub(crate) fn check_tree(arena: &Arena, root: NodeId) -> Vec<ElementError> {
         if let Some(refusal) = tags::unsupported(&element.tag) {
             errors.push(ElementError::UnsupportedTag(refusal));
         }
+        if element.attributes.contains_key("style") {
+            errors.push(ElementError::UnsupportedAttribute(format!(
+                "{}: a `style` attribute is not applied by vapors-elements yet: inline styles arrive in F2c S5 (docs/F2c.md); move the declarations into the component's <style> or a stylesheet",
+                describe(arena, node)
+            )));
+        }
         for (event, _) in &element.listeners {
             if let Some(refusal) = tags::unfired(event) {
                 errors.push(ElementError::UnfiredEvent(format!(

@@ -11,7 +11,7 @@ use taffy::{
 use vapors_css::value::Value;
 
 use super::box_align::{align_content, align_items, align_self};
-use super::values::{Amount, Reader, amount, keyword, later, unknown};
+use super::values::{Amount, Reader, amount, keyword, later, shape, unknown};
 
 /// The Taffy style of the element `reader` reads.
 pub(crate) fn box_style(reader: &mut Reader<'_>) -> Style {
@@ -151,7 +151,7 @@ fn aspect_ratio(value: &Value) -> Result<Option<f32>, String> {
     match value {
         Value::Ratio(width, height) => Ok(Some((width / height) as f32)),
         Value::Keyword(k) if k == "auto" => Ok(None),
-        other => Err(format!("is not a ratio ({other:?})")),
+        _ => Err(shape("a ratio")),
     }
 }
 
@@ -160,7 +160,7 @@ fn number(value: &Value) -> Result<f32, String> {
     match value {
         Value::Number(n) => Ok(*n as f32),
         Value::Integer(n) => Ok(*n as f32),
-        other => Err(format!("is not a number ({other:?})")),
+        _ => Err(shape("a number")),
     }
 }
 

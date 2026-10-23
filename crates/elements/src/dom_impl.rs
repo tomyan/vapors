@@ -51,6 +51,11 @@ impl Dom for Document {
     /// Detaches the node and frees it with its subtree: its id and its
     /// descendants' ids are stale from here on, and using one panics.
     fn remove(&mut self, node: NodeId) {
+        assert!(
+            node != self.root() && node != self.body(),
+            "remove: {node:?} is the document's <{}>, which components mount under and which is never removed",
+            if node == self.root() { "html" } else { "body" }
+        );
         self.arena.detach(node);
         self.arena.free_subtree(node);
     }

@@ -64,7 +64,7 @@ pub(crate) fn style(
     let positions = winners
         .longhands
         .iter()
-        .map(|w| w.as_ref().map(|c| c.position))
+        .map(|w| w.as_ref().map(|c| (c.sheet, c.position)))
         .collect();
     Ok(ComputedStyle {
         values,

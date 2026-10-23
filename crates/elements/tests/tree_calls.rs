@@ -148,3 +148,25 @@ fn setting_an_attribute_on_a_text_node_panics() {
     // When
     doc.set_attribute(node, "class", "a");
 }
+
+#[test]
+#[should_panic(expected = "the document's <body>")]
+fn removing_the_body_panics_naming_it() {
+    // Given
+    let mut doc = document();
+    let body = doc.body();
+
+    // When
+    doc.remove(body);
+}
+
+#[test]
+#[should_panic(expected = "the document's <html>")]
+fn removing_the_root_panics_naming_it() {
+    // Given
+    let mut doc = document();
+    let root = doc.root();
+
+    // When
+    doc.remove(root);
+}

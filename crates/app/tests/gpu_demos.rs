@@ -45,6 +45,14 @@ fn render(name: &str) -> Vec<u8> {
 
 #[test]
 fn gpu_every_demo_passes_its_pixel_checks_offscreen() {
+    let checked = vapors_demos::all()
+        .iter()
+        .filter(|demo| demo.pixels.is_some())
+        .count();
+    assert!(
+        checked > 0,
+        "no demo has a .pixels file: nothing would be checked"
+    );
     for demo in vapors_demos::all() {
         // Given
         let Some(text) = demo.pixels else { continue };
