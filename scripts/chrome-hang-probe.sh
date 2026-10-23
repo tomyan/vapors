@@ -18,7 +18,7 @@ probe() {  # probe <variant> <extra flags...>
     local png="$out/$variant-$i.png" log="$out/$variant-$i.log"
     rm -f "$png"
     local start=$(date +%s.%N)
-    env -u DBUS_SESSION_BUS_ADDRESS timeout -s KILL 30 "$chrome" "${base[@]}" "$@" --screenshot="$png" "file://$page" > /dev/null 2> "$log"
+    env -u DBUS_SESSION_BUS_ADDRESS ${PROBE_ENV:-} timeout -s KILL 30 "$chrome" "${base[@]}" "$@" --screenshot="$png" "file://$page" > /dev/null 2> "$log"
     local code=$?
     local secs=$(echo "$(date +%s.%N) - $start" | bc)
     times+=("$(printf '%.1f' "$secs")")
@@ -28,7 +28,15 @@ probe() {  # probe <variant> <extra flags...>
   done
   echo "$variant: $runs runs, $failed failed, $slow over 5 s; seconds: ${times[*]}"
 }
-probe launcher --virtual-time-budget=5000
-probe no-virtual-time
-probe launcher-verbose --virtual-time-budget=5000 --enable-logging=stderr --v=1
+probe unset --virtual-time-budget=5000
+PROBE_ENV=DBUS_SESSION_BUS_ADDRESS=disabled: probe dbus-disabled --virtual-time-budget=5000
+probe scale-2x --virtual-time-budget=5000 --force-device-scale-factor=2
+# Under load: one busy loop per core, as the gpu tier's other tests
+# (lavapipe) load the runner while the comparison test runs Chrome.
+loads=()
+for _ in $(seq 1 "$(nproc)"); do (while :; do :; done) & loads+=($!); done
+probe loaded-unset --virtual-time-budget=5000 --enable-logging=stderr --v=0
+PROBE_ENV=DBUS_SESSION_BUS_ADDRESS=disabled: probe loaded-dbus-disabled --virtual-time-budget=5000
+probe loaded-no-virtual-time
+kill "${loads[@]}"
 ls "$out" | head -50

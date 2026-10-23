@@ -128,7 +128,7 @@ jobs:
       - name: Chrome hang probe
         run: |
           cargo run -q -p vapors-text --example text_comparison -- --out target/probe || echo "the example failed; probing the page it wrote"
-          scripts/chrome-hang-probe.sh "$PWD/target/probe/text_comparison.html" "$PWD/target/probe/out" 30
+          scripts/chrome-hang-probe.sh "$PWD/target/probe/text_comparison.html" "$PWD/target/probe/out" 20
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
