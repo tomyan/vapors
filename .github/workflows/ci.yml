@@ -124,7 +124,10 @@ jobs:
       - name: install pinned tools
         run: cargo xtask setup --ci
       - name: gpu tier
-        run: cargo xtask test --tier gpu
+        run: |
+          google-chrome --version || true
+          command -v chromium chromium-browser google-chrome || true
+          cargo nextest run --workspace -E 'test(/^gpu_/)' --status-level all --final-status-level all --no-fail-fast
       # The text comparison page: vapors-text beside headless Chrome (the
       # runner image ships google-chrome), composite uploaded for eyes.
       - name: text comparison page
