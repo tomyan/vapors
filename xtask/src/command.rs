@@ -23,6 +23,7 @@ pub fn run(step: &Step) -> Outcome {
     let started = Instant::now();
     let result = Command::new(&step.program)
         .args(&step.args)
+        .envs(step.env.iter().map(|(name, value)| (name, value)))
         .stdin(Stdio::null())
         .output();
     let duration = started.elapsed();

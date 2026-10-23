@@ -1,88 +1,71 @@
-//! The gate's list, its steps, and the one answer it shares with CI.
+//! The gate's setup lines, its steps, and this repository's workflow.
+
+use std::path::Path;
 
 use super::*;
 
-fn config(text: &str) -> Config {
-    Config::parse(text).expect("valid settings")
-}
-
 const SETTINGS: &str = r#"
-[gate]
-02 = "cargo xtask test --tier unit"
-01 = "cargo xtask lint"
-10 = "VAPORS_GPU_ADAPTER=llvmpipe cargo xtask test --tier gpu"
-
 [gate.setup]
-"sudo " = "apt installs and freeing disk"
-"rustup " = "the toolchain"
+"df -h / | tail -1" = "logs the runner's free disk"
+"rustup toolchain install && rustup show active-toolchain" = "the toolchain"
 "#;
 
 #[test]
-fn the_gate_runs_its_commands_in_key_order() {
+fn the_setup_lines_are_the_gate_setup_keys_exactly() {
     // When
-    let commands = gate_commands(&config(SETTINGS));
+    let lines = setup_lines(&Config::parse(SETTINGS).expect("valid"));
 
     // Then
     assert_eq!(
-        commands,
+        lines.into_iter().collect::<Vec<_>>(),
         [
-            "cargo xtask lint",
-            "cargo xtask test --tier unit",
-            "VAPORS_GPU_ADAPTER=llvmpipe cargo xtask test --tier gpu"
+            "df -h / | tail -1",
+            "rustup toolchain install && rustup show active-toolchain"
         ]
     );
 }
 
 #[test]
-fn the_setup_prefixes_are_the_gate_setup_keys() {
-    // When / Then
-    assert_eq!(setup_prefixes(&config(SETTINGS)), ["rustup ", "sudo "]);
-}
+fn a_gate_step_is_bash_with_pipefail_and_reproduces_with_its_environment() {
+    // Given
+    let planned = PlannedStep {
+        name: "gpu: gpu tier".to_owned(),
+        run: "cargo xtask test --tier gpu".to_owned(),
+        env: [("CI", "true"), ("VAPORS_GPU_ADAPTER", "llvmpipe")]
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .into(),
+    };
 
-#[test]
-fn a_gate_step_runs_its_command_in_sh_and_reproduces_as_a_pasteable_line() {
     // When
-    let step = step_for("scripts/check.sh target/web \"$(mktemp -d)\"");
+    let step = step_for(&planned);
 
     // Then
-    assert_eq!(step.program, "sh");
-    assert_eq!(step.name, "scripts/check.sh target/web \"$(mktemp -d)\"");
+    assert_eq!(step.name, "gpu: gpu tier");
     assert_eq!(
         step.reproduce(),
-        "sh -c 'scripts/check.sh target/web \"$(mktemp -d)\"'"
+        "CI=true VAPORS_GPU_ADAPTER=llvmpipe bash -eo pipefail -c 'cargo xtask test --tier gpu'"
     );
 }
 
 #[test]
-fn a_gate_step_is_named_by_its_command_without_the_environment() {
-    // When
-    let step =
-        step_for("NEXTEST_PROFILE=ci VAPORS_GPU_ADAPTER=llvmpipe cargo xtask test --tier gpu");
-
-    // Then
-    assert_eq!(step.name, "cargo xtask test --tier gpu");
-}
-
-#[test]
-fn this_repositorys_gate_runs_exactly_what_ci_yml_runs() {
+fn this_repositorys_workflow_is_one_the_gate_can_run() {
     // Given
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let settings =
         std::fs::read_to_string(root.join(".config/factory.toml")).expect("factory.toml");
     let workflow = std::fs::read_to_string(root.join(WORKFLOW)).expect("ci.yml");
-    let settings = config(&settings);
 
     // When
-    let agreed = agree(
-        &gate_commands(&settings),
+    let planned = plan(
         &workflow,
-        &setup_prefixes(&settings),
+        &setup_lines(&Config::parse(&settings).expect("valid")),
     );
 
     // Then
-    assert_eq!(
-        agreed,
-        Ok(()),
-        "fix: make [gate] in .config/factory.toml and {WORKFLOW} run the same commands"
+    let planned = planned
+        .unwrap_or_else(|why| panic!("{WORKFLOW}: {why}; fix: make the step one the gate models"));
+    assert!(
+        planned.iter().all(|step| !step.run.contains("sudo ")),
+        "a setup step is planned: {planned:?}"
     );
 }

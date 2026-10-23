@@ -12,6 +12,7 @@ mod dev;
 mod files;
 mod files_walk;
 mod gate;
+mod gate_plan;
 mod gate_workflow;
 mod gpu_info;
 mod pixels;
@@ -20,6 +21,7 @@ mod screenshot;
 mod screenshot_package;
 mod serve;
 mod setup;
+mod step;
 mod steps;
 mod stop;
 mod stream;
@@ -89,7 +91,7 @@ enum Command {
     Serve,
     /// Rebuild the web package on save (trunk serve, debug) behind the tailnet https proxy.
     Dev,
-    /// Run every command CI runs, in [gate] order, ending `gate: pass <sha>`.
+    /// Run every step of .github/workflows/ci.yml here, in order, ending `gate: pass <sha>`.
     Gate,
     /// Check formatting and lints without running tests.
     Lint,
