@@ -11,7 +11,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 
-use serde_yaml::Value;
+use serde_json::Value;
 
 use crate::gate_step::{JOB_KEYS, timeout_of};
 use crate::gate_steps::Planner;
@@ -53,18 +53,18 @@ pub struct Sources<'a> {
 /// A workflow that is not YAML, a step the gate does not model (by job
 /// and step), or a `[gate.setup]` or `[gate.actions]` entry nothing uses.
 pub fn plan(workflow: &str, sources: &Sources<'_>) -> Result<Vec<PlannedStep>, String> {
-    let doc: Value = serde_yaml::from_str(workflow).map_err(|e| format!("not YAML: {e}"))?;
+    let doc = crate::gate_yaml::parse(workflow, "the workflow")?;
     check_keys(&doc, &WORKFLOW_KEYS, "the workflow")?;
     let jobs = doc
         .get("jobs")
-        .and_then(Value::as_mapping)
+        .and_then(Value::as_object)
         .ok_or("no `jobs:`")?;
     let mut planner = Planner::new(sources, workspace(&doc, jobs)?);
     let mut base = BTreeMap::from([("CI".to_owned(), "true".to_owned())]);
     base.extend(env_of(&doc, "the workflow")?);
     let mut steps = Vec::new();
     for (name, job) in jobs {
-        let name = name.as_str().ok_or("a job name that is not a string")?;
+        let name = name.as_str();
         steps.extend(plan_job(&mut planner, name, job, &base)?);
     }
     planner.check_all_used()?;
@@ -85,7 +85,7 @@ fn plan_job(
     env.extend(env_of(job, name)?);
     let steps = job
         .get("steps")
-        .and_then(Value::as_sequence)
+        .and_then(Value::as_array)
         .ok_or_else(|| format!("{name}: no `steps:`"))?;
     planner.job(name, timeout, &env, steps)
 }

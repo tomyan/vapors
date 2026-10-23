@@ -20,6 +20,7 @@ mod gate_run;
 mod gate_step;
 mod gate_steps;
 mod gate_workflow;
+mod gate_yaml;
 mod gpu_info;
 #[cfg(test)]
 #[path = "hook_tests.rs"]

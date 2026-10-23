@@ -12,8 +12,9 @@ png.workspace = true
 # Pinned: it parses `tailscale status --json`, and a parser change is a deliberate bump.
 serde_json = "=1.0.154"
 # Pinned: it reads .github/workflows/ci.yml for `cargo xtask gate`; a
-# parser change is a deliberate bump. Archived upstream but stable.
-serde_yaml = "=0.9.34"
+# parser change is a deliberate bump. Maintained, pure Rust (serde_yaml,
+# archived, pulled in unsafe-libyaml, RUSTSEC-2024-0449).
+yaml-rust2 = { version = "=0.13.0", default-features = false }
 
 [lints]
 workspace = true

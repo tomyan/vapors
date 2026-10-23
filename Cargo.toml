@@ -13,7 +13,12 @@ rust-version = "1.99"
 clap = { version = "4", features = ["derive"] }
 wgpu = "30"
 pollster = "1"
-winit = "0.30"
+# winit's default features, except Wayland's client-side decorations
+# without their title text (`-notitle`): the titled variant pulls in
+# ab_glyph and ttf-parser, which is unmaintained (RUSTSEC-2026-0192). On a
+# compositor that draws no decorations itself, such as GNOME, the frame
+# is drawn without a title (touche DESIGN.md, 2. Tech stack, platform notes).
+winit = { version = "0.30", default-features = false, features = ["rwh_06", "x11", "wayland", "wayland-dlopen", "wayland-csd-adwaita-notitle"] }
 png = "0.18"
 vapors-scene = { path = "crates/scene" }
 vapors-gpu = { path = "crates/gpu" }

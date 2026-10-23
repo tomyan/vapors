@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 
-use serde_yaml::Value;
+use serde_json::Value;
 
 use crate::gate_workflow::check_keys;
 
@@ -23,7 +23,7 @@ pub struct Composite {
 /// The composite action at `path` (its `action.yml`'s text in `text`),
 /// called with `with`.
 pub fn composite(text: &str, path: &str, with: Option<&Value>) -> Result<Composite, String> {
-    let doc: Value = serde_yaml::from_str(text).map_err(|e| format!("{path}: not YAML: {e}"))?;
+    let doc = crate::gate_yaml::parse(text, path)?;
     check_keys(&doc, &ACTION_KEYS, path)?;
     let runs = doc
         .get("runs")
@@ -36,7 +36,7 @@ pub fn composite(text: &str, path: &str, with: Option<&Value>) -> Result<Composi
     }
     let steps = runs
         .get("steps")
-        .and_then(Value::as_sequence)
+        .and_then(Value::as_array)
         .ok_or_else(|| format!("{path}: no `runs.steps:`"))?
         .clone();
     Ok(Composite {
@@ -54,7 +54,7 @@ fn inputs(
     let given = given(with, path)?;
     let declared = doc
         .get("inputs")
-        .and_then(Value::as_mapping)
+        .and_then(Value::as_object)
         .cloned()
         .unwrap_or_default();
     if let Some(unknown) = given
@@ -67,9 +67,7 @@ fn inputs(
     }
     let mut resolved = BTreeMap::new();
     for (name, input) in &declared {
-        let name = name
-            .as_str()
-            .ok_or_else(|| format!("{path}: an input name that is not a string"))?;
+        let name = name.as_str();
         let default = input.get("default").and_then(Value::as_str);
         let value = given
             .get(name)
@@ -91,13 +89,11 @@ fn given(with: Option<&Value>, path: &str) -> Result<BTreeMap<String, String>, S
         return Ok(BTreeMap::new());
     };
     let map = with
-        .as_mapping()
+        .as_object()
         .ok_or_else(|| format!("{path}: `with:` is not a mapping"))?;
     map.iter()
         .map(|(name, value)| {
-            let name = name
-                .as_str()
-                .ok_or_else(|| format!("{path}: a `with:` name that is not a string"))?;
+            let name = name.as_str();
             let value = match value {
                 Value::String(text) => text.clone(),
                 Value::Number(number) => number.to_string(),
@@ -121,7 +117,7 @@ pub fn with_inputs_in_env(
     label: &str,
 ) -> Result<Value, String> {
     let mut step = step.clone();
-    if let Some(env) = step.get_mut("env").and_then(Value::as_mapping_mut) {
+    if let Some(env) = step.get_mut("env").and_then(Value::as_object_mut) {
         for value in env.values_mut() {
             if let Value::String(text) = value {
                 *text = substitute(text, inputs, label)?;

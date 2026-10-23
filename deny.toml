@@ -8,21 +8,10 @@ all-features = true
 [advisories]
 # The advisory database is fetched on every run; a fetch that fails fails
 # the check (xtask never passes --disable-fetch).
-ignore = [
-    # ttf-parser is unmaintained, with no fixed release. It is reached only
-    # through winit -> sctk-adwaita -> ab_glyph -> owned_ttf_parser, which
-    # draws the title text of Linux Wayland window decorations from
-    # system fonts: no font we did not install is parsed. Retired by a
-    # winit release that drops sctk-adwaita's ab_glyph, or by winit's
-    # `wayland-csd-adwaita-notitle` feature in vapors (decorations without
-    # title text where the compositor draws none, as on GNOME).
-    { id = "RUSTSEC-2026-0192", reason = "ttf-parser via winit's Wayland decoration titles only; system fonts only" },
-    # unsafe-libyaml is unmaintained. It is reached only through
-    # serde_yaml, which xtask's gate uses to read this repository's own
-    # .github/workflows/ci.yml, never input from outside. Retired by moving
-    # the gate's parser to a maintained YAML crate.
-    { id = "RUSTSEC-2024-0449", reason = "unsafe-libyaml via serde_yaml in xtask only; reads our own ci.yml" },
-]
+# Nothing is ignored. RUSTSEC-2026-0192 (ttf-parser) was retired by
+# winit's `wayland-csd-adwaita-notitle` feature, and RUSTSEC-2024-0449
+# (unsafe-libyaml) by moving xtask's gate from serde_yaml to yaml-rust2.
+ignore = []
 
 [licenses]
 # Permissive licences only: vapors is built into touche, which is sold,
