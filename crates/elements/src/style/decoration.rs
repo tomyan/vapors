@@ -119,7 +119,7 @@ fn width_px(value: &Value) -> Result<f32, String> {
         Value::Keyword(k) if k == "thick" => Ok(5.0),
         _ => match amount(value)? {
             Amount::Px(px) => Ok(px),
-            Amount::Fraction(_) => Err(shape("a border width in px")),
+            Amount::Fraction(_) | Amount::Calc(_) => Err(shape("a border width in px")),
         },
     }
 }
@@ -127,7 +127,7 @@ fn width_px(value: &Value) -> Result<f32, String> {
 fn radius(value: &Value) -> Result<f32, String> {
     match amount(value)? {
         Amount::Px(px) => Ok(px),
-        Amount::Fraction(_) => Err(format!(
+        Amount::Fraction(_) | Amount::Calc(_) => Err(format!(
             "is a percentage, which makes elliptical corners on a box that is not square; vapors draws circular corners, so give the radius in px (a large one, such as 9999px, makes a pill), until {}",
             later("a slice after F2c")
         )),
@@ -163,7 +163,7 @@ fn one_shadow(value: &Value, current: Rgba) -> Result<BoxShadow, String> {
             Value::Color(Color::Rgba(rgba)) => colour = *rgba,
             other => match amount(other)? {
                 Amount::Px(px) => lengths.push(px),
-                Amount::Fraction(_) => return Err(shape("a shadow length")),
+                Amount::Fraction(_) | Amount::Calc(_) => return Err(shape("a shadow length")),
             },
         }
     }

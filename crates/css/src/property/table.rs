@@ -2,7 +2,7 @@
 //! Sorted by name. Each entry: name, inherited, initial value as the
 //! canonical text of the value, and the value grammar (see `syntax`).
 //!
-//! The flex and grid entries are what Taffy 0.9's `Style` reads.
+//! The flex and grid entries are what Taffy 0.15's `Style` reads.
 
 /// One longhand property.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

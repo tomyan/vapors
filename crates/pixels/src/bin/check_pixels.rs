@@ -2,14 +2,15 @@
 //! pixel checks on a screenshot taken elsewhere, the web page's in
 //! particular. Prints each failure and exits 1 when any check fails.
 //! The section checked is the one for the screenshot's size divided by
-//! the scale. `check_pixels --clicks <file.pixels>` prints the 640x400
-//! section's clicks, one
-//! `X Y` per line, for the page-contract script to make before its
-//! screenshot.
+//! the scale. `check_pixels --clicks <file.pixels> [WxH]` prints the
+//! clicks of the `WxH` section (640x400 without one), one `X Y` per line,
+//! for the page-contract script to make before its screenshot.
+//! `check_pixels --viewports <file.pixels>` prints each section's size,
+//! one `W H` per line, for the script to take a screenshot at each.
 
 use std::process::ExitCode;
 
-use vapors_pixels::{DEFAULT_VIEWPORT, Image, failures, parse, section};
+use vapors_pixels::{DEFAULT_VIEWPORT, Image, Spec, failures, parse, section};
 
 fn main() -> ExitCode {
     match run() {
@@ -26,10 +27,11 @@ fn main() -> ExitCode {
 
 fn run() -> Result<(), String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if let [flag, pixels] = args.as_slice()
-        && flag == "--clicks"
-    {
-        return print_clicks(pixels);
+    match args.as_slice() {
+        [flag, pixels] if flag == "--viewports" => return print_viewports(pixels),
+        [flag, pixels] if flag == "--clicks" => return print_clicks(pixels, DEFAULT_VIEWPORT),
+        [flag, pixels, size] if flag == "--clicks" => return print_clicks(pixels, viewport(size)?),
+        _ => {}
     }
     let [pixels, png, rest @ ..] = args.as_slice() else {
         return Err("usage: check_pixels <file.pixels> <screenshot.png> [scale]".to_owned());
@@ -101,11 +103,32 @@ fn read_png(path: &str) -> Result<(u32, u32, Vec<u8>), String> {
     Ok((info.width, info.height, rgba))
 }
 
-fn print_clicks(pixels: &str) -> Result<(), String> {
+fn specs(pixels: &str) -> Result<Vec<Spec>, String> {
     let text = std::fs::read_to_string(pixels).map_err(|e| format!("{pixels}: {e}"))?;
-    let specs = parse(pixels.trim_end_matches(".pixels"), &text)?;
-    for [x, y] in section(&specs, DEFAULT_VIEWPORT)?.clicks.clone() {
+    parse(pixels.trim_end_matches(".pixels"), &text)
+}
+
+fn print_clicks(pixels: &str, viewport: [u32; 2]) -> Result<(), String> {
+    for [x, y] in section(&specs(pixels)?, viewport)?.clicks.clone() {
         println!("{x} {y}");
     }
     Ok(())
+}
+
+fn print_viewports(pixels: &str) -> Result<(), String> {
+    for spec in specs(pixels)? {
+        let [width, height] = spec.viewport;
+        println!("{width} {height}");
+    }
+    Ok(())
+}
+
+/// `WxH` as a section's size, refused naming the shape wanted.
+fn viewport(size: &str) -> Result<[u32; 2], String> {
+    let parsed = size
+        .split_once('x')
+        .and_then(|(w, h)| Some([w.parse().ok()?, h.parse().ok()?]));
+    parsed.ok_or(format!(
+        "`{size}` is not a size; give one as WxH, such as 390x800"
+    ))
 }

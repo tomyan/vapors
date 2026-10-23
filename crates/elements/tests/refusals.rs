@@ -67,7 +67,7 @@ fn a_value_the_tree_does_not_lay_out_yet_is_refused() {
     let mut doc = document();
     let body = doc.body();
     element(&mut doc, body, "div", "shell");
-    doc.add_stylesheet("app.css", ".shell { display: grid; }")
+    doc.add_stylesheet("app.css", ".shell { display: contents; }")
         .expect("parses");
 
     // When
@@ -77,7 +77,7 @@ fn a_value_the_tree_does_not_lay_out_yet_is_refused() {
     assert!(
         errors
             .iter()
-            .any(|e| e.contains("`display: grid`") && e.contains("F2c S4")),
+            .any(|e| e.contains("`display: contents`") && e.contains("not scheduled")),
         "{errors:?}"
     );
 }

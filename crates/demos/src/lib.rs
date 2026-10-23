@@ -87,6 +87,14 @@ pub fn all() -> Vec<Demo> {
             },
         },
         Demo {
+            name: "shell",
+            style: shell::STYLE,
+            pixels: Some(include_str!("../demos/shell.pixels")),
+            mount: |dom, parent| {
+                std::mem::forget(shell::Shell::mount(dom, parent, shell::ShellProps {}));
+            },
+        },
+        Demo {
             name: INDEX,
             style: index::STYLE,
             pixels: None,

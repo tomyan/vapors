@@ -1,4 +1,5 @@
-{"viewport": [640,313], "scale": 1,
+{"viewports": [
+{"viewport": [640,400], "scale": 1,
 "boxes": [
 {"height":365.8125,"tag":"html","width":640,"x":0,"y":0},
 {"height":336.375,"tag":"body","width":624,"x":8,"y":21.4375},
@@ -11,4 +12,5 @@
 {"height":21,"tag":"div","width":220,"x":8,"y":336.8125},
 {"height":21,"tag":"div","width":67.984375,"x":8,"y":336.8125},
 {"height":21,"tag":"div","width":67.140625,"x":75.984375,"y":336.8125}
+]}
 ]}

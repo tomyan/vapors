@@ -558,6 +558,50 @@ differs from the plan.
   reduced growth for a radius smaller than the spread. A negative blur
   is refused.
 
+### S4
+
+- **Grid.** `display: grid` with `grid-template-columns`/`-rows`
+  (lengths, %, `fr`, `auto`, `min-content`, `max-content`, `minmax()`,
+  `repeat(<count>, ..)`), `grid-auto-columns`/`-rows`, `grid-auto-flow`
+  (with `dense`), line and `span` placement, and `justify-items` and
+  `justify-self` (`left`/`right` refused). vapors-css refuses line names
+  and `repeat(auto-fill | auto-fit, ..)`; neither is mapped yet.
+  `inline-grid` is laid out where it is blockified (a flex or grid
+  item).
+- **Sizing keywords.** `min-content`, `max-content` and `fit-content`
+  in `width`, `height` and `flex-basis`. In `min-*` and `max-*` they
+  are refused: Taffy 0.15 takes lengths or `auto` there.
+- **calc() with %.** Taffy holds such a calc as an opaque handle (the
+  address of the computed `Calc`, never dereferenced) and asks for its
+  value against a basis; `layout/calcs.rs` answers from clones taken
+  while the computed styles were alive. A handle it does not know, or a
+  calc that does not evaluate, fails the update.
+- **Corpus.** The oracle now lays each fixture out in an iframe of
+  exactly its viewport, so a fixture may be narrower than Chromium's
+  500 px minimum window and is as tall as asked (it was 313 px for a
+  400 px window), and may name several viewports
+  (`/* viewport 390x800 768x1024 1280x800 */`). New fixtures:
+  `grid_tracks`, `sizing` (sizing keywords, calc with %, flex-basis
+  content) and `shell`, touche's shell at three widths with its 600 px
+  breakpoint; all match Chromium within 1/64 px. An element with no box
+  compares as zeros, as `getBoundingClientRect` gives it.
+- **Demo.** `shell`: the 44 px bar, the canvas, the 280 px side panel,
+  and under 600 px the canvas alone; its pixels are checked at 640x400,
+  390x800 and 1280x800, natively and on the web.
+- **Scaled layout.** A fixture viewport may name a device scale
+  (`640x400@1.5`); the oracle passes it to Chromium and refuses a page
+  whose `devicePixelRatio` differs. `borders` is laid out at 1, 1.5 and
+  2.625, where border widths snap to whole device pixels.
+- **Web screenshots per section.** The page contract takes one
+  screenshot of each demo per `at WxH` section of its `.pixels` file,
+  with the window and canvas at that size (`check_pixels --viewports`
+  lists them, `--clicks <file> WxH` gives a section's clicks), and
+  checks it through `check_pixels`, which picks the section by the
+  screenshot's size. Removing the boxes demo's `flex-wrap` fails the
+  412x800 web screenshot.
+- **Not in S4.** `position` and its alignment grammar stay with S8;
+  `order` is not in vapors-css's table.
+
 ## Decisions (2026-10-23)
 
 - **D1 Scoping.** A compiler change in S5: `mount` registers its

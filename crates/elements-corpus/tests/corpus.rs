@@ -15,8 +15,9 @@ use vapors_text::FontSystem;
 /// Chromium lays out in 1/64 px units.
 const LAYOUT_UNIT: f64 = 1.0 / 64.0;
 
+/// Chromium's boxes for each viewport of fixture `name`.
 #[allow(clippy::cast_possible_truncation)] // viewports are a few hundred pixels
-fn chromium_boxes(name: &str) -> (Viewport, Vec<(String, BoxRect)>) {
+fn chromium_boxes(name: &str) -> Vec<(Viewport, Vec<(String, BoxRect)>)> {
     let path = fixtures_dir().join(format!("{name}.boxes.json"));
     let text = std::fs::read_to_string(&path).unwrap_or_else(|e| {
         panic!(
@@ -26,25 +27,38 @@ fn chromium_boxes(name: &str) -> (Viewport, Vec<(String, BoxRect)>) {
     });
     let json: Value =
         serde_json::from_str(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-    let size = |i: usize| json["viewport"][i].as_f64().expect("viewport") as f32;
-    let scale = json["scale"].as_f64().unwrap_or_else(|| {
-        panic!(
-            "{}: no scale; run cargo run -p vapors-elements-corpus --example layout_oracle",
-            path.display()
-        )
-    }) as f32;
-    let viewport = Viewport {
-        width: size(0),
-        height: size(1),
-        scale,
-    };
-    let boxes = json["boxes"]
+    let sections = json["viewports"]
         .as_array()
-        .expect("boxes")
+        .unwrap_or_else(|| panic!("{}: no viewports", path.display()));
+    assert!(
+        !sections.is_empty(),
+        "{}: an empty viewport list compares nothing; run cargo run -p vapors-elements-corpus --example layout_oracle",
+        path.display()
+    );
+    sections
         .iter()
-        .map(read_box)
-        .collect();
-    (viewport, boxes)
+        .map(|section| {
+            let size = |i: usize| section["viewport"][i].as_f64().expect("viewport") as f32;
+            let scale = section["scale"].as_f64().unwrap_or_else(|| {
+                panic!(
+                    "{}: a viewport with no scale; run cargo run -p vapors-elements-corpus --example layout_oracle",
+                    path.display()
+                )
+            }) as f32;
+            let viewport = Viewport {
+                width: size(0),
+                height: size(1),
+                scale,
+            };
+            let boxes = section["boxes"]
+                .as_array()
+                .expect("boxes")
+                .iter()
+                .map(read_box)
+                .collect();
+            (viewport, boxes)
+        })
+        .collect()
 }
 
 #[allow(clippy::cast_possible_truncation)]
@@ -79,9 +93,14 @@ fn our_boxes(fixture: &Fixture, viewport: Viewport) -> Vec<(String, BoxRect)> {
         .into_iter()
         .map(|node| {
             let tag = doc.tag(node).expect("an element").to_owned();
-            let rect = painted
-                .border_box(node)
-                .unwrap_or_else(|| panic!("<{tag}> has no box"));
+            // An element with no box (display: none, or inside one) is
+            // all zeros, as getBoundingClientRect gives it.
+            let rect = painted.border_box(node).unwrap_or(BoxRect {
+                x: 0.0,
+                y: 0.0,
+                width: 0.0,
+                height: 0.0,
+            });
             (tag, rect)
         })
         .collect()
@@ -140,15 +159,20 @@ fn every_fixture_lays_out_as_chromium_does() {
     );
     let mut failures = Vec::new();
     for fixture in fixtures {
-        let (viewport, theirs) = chromium_boxes(fixture.name);
+        for (viewport, theirs) in chromium_boxes(fixture.name) {
+            // When
+            let ours = our_boxes(&fixture, viewport);
 
-        // When
-        let ours = our_boxes(&fixture, viewport);
-
-        // Then
-        let found = differences(&ours, &theirs, tolerance(fixture.style));
-        if !found.is_empty() {
-            failures.push(format!("{}:\n  {}", fixture.name, found.join("\n  ")));
+            // Then
+            let found = differences(&ours, &theirs, tolerance(fixture.style));
+            if !found.is_empty() {
+                let size = format!("{}x{}@{}", viewport.width, viewport.height, viewport.scale);
+                failures.push(format!(
+                    "{} at {size}:\n  {}",
+                    fixture.name,
+                    found.join("\n  ")
+                ));
+            }
         }
     }
     assert!(

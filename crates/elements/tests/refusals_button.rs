@@ -1,5 +1,6 @@
 //! What a button refuses until later slices: `disabled="false"`, which
-//! disables in HTML, and inline layout outside a flex container.
+//! disables in HTML, and inline layout outside a flex or grid
+//! container.
 
 mod support;
 
@@ -59,4 +60,20 @@ fn disabled_false_on_an_element_where_disabled_does_nothing_is_not_refused() {
 
     // Then
     assert!(updated.is_ok());
+}
+
+#[test]
+fn a_button_in_a_grid_container_is_blockified_and_laid_out() {
+    // Given: a grid item, which CSS Display 3 section 2.7 blockifies
+    let mut doc = document();
+    let body = doc.body();
+    element(&mut doc, body, "button", "");
+    doc.add_stylesheet("app.css", "body { display: grid; }")
+        .expect("parses");
+
+    // When
+    let updated = doc.update(support::viewport(200.0, 100.0));
+
+    // Then
+    assert!(updated.is_ok(), "{:?}", updated.err());
 }

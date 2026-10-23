@@ -5,19 +5,21 @@
 use taffy::{
     BlockContext, Cache, CacheTree, Display, Layout, LayoutInput, LayoutOutput, LayoutPartialTree,
     NodeId, RunMode, Style, TraversePartialTree, TraverseTree, compute_block_layout,
-    compute_cached_layout, compute_flexbox_layout, compute_hidden_layout, compute_leaf_layout,
-    compute_oof_layout,
+    compute_cached_layout, compute_flexbox_layout, compute_grid_layout, compute_hidden_layout,
+    compute_leaf_layout, compute_oof_layout,
 };
 use vapors_text::FontSystem;
 
 use super::boxes::{Content, LayoutBox};
+use super::calcs::Calcs;
 use super::measure::measure_text;
 
-/// The boxes, and what measuring text needs.
+/// The boxes, what measuring text needs, and the calcs Taffy may ask for.
 pub(crate) struct BoxTree<'f> {
     pub(crate) boxes: Vec<LayoutBox>,
     pub(crate) fonts: &'f mut FontSystem,
     pub(crate) scale: f32,
+    pub(crate) calcs: &'f Calcs,
 }
 
 impl BoxTree<'_> {
@@ -58,6 +60,7 @@ impl BoxTree<'_> {
             (Display::None, _) => compute_hidden_layout(self, id),
             (Display::Block, true) => compute_block_layout(self, id, inputs, block),
             (Display::Flex, true) => compute_flexbox_layout(self, id, inputs),
+            (Display::Grid, true) => compute_grid_layout(self, id, inputs),
             (_, false) => self.leaf(id, inputs),
             (display, true) => unreachable!("{display:?} is refused when styles are read"),
         }
@@ -65,12 +68,12 @@ impl BoxTree<'_> {
 
     fn leaf(&mut self, id: NodeId, inputs: LayoutInput) -> LayoutOutput {
         let index = usize::from(id);
-        let (fonts, scale) = (&mut *self.fonts, self.scale);
+        let (fonts, scale, calcs) = (&mut *self.fonts, self.scale, self.calcs);
         let node = &self.boxes[index];
         compute_leaf_layout(
             inputs,
             &node.style,
-            refuse_calc,
+            |handle, basis| calcs.resolve(handle, basis),
             |known, available| match &node.content {
                 Content::Text { text, style, .. } => {
                     measure_text(fonts, scale, text, style, known, available)
@@ -79,12 +82,6 @@ impl BoxTree<'_> {
             },
         )
     }
-}
-
-/// `calc()` with a % term is refused when styles are read (F2c S4), so
-/// Taffy never holds one.
-fn refuse_calc(_calc: *const (), _basis: f32) -> f32 {
-    unreachable!("calc() values are refused before layout until F2c S4")
 }
 
 /// The children of a box, as Taffy ids.
@@ -130,7 +127,7 @@ impl LayoutPartialTree for BoxTree<'_> {
     }
 
     fn resolve_calc_value(&self, calc: *const (), basis: f32) -> f32 {
-        refuse_calc(calc, basis)
+        self.calcs.resolve(calc, basis)
     }
 
     fn set_unrounded_layout(&mut self, id: NodeId, layout: &Layout) {

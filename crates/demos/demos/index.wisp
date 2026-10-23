@@ -10,4 +10,5 @@ h1 { margin-top: 0; font-size: 20px; }
 <div class="demo"><div class="name">?demo=hello</div><div>F2c S1: a styled panel with text</div></div>
 <div class="demo"><div class="name">?demo=counter</div><div>F2c S2: a button that counts clicks and taps</div></div>
 <div class="demo"><div class="name">?demo=boxes</div><div>F2c S3: borders, rounded corners, shadows, buttons</div></div>
+<div class="demo"><div class="name">?demo=shell</div><div>F2c S4: touche's shell, a grid that drops its panel on a phone</div></div>
 <div class="demo"><div class="name">?demo=image</div><div>F0: the image view, pinch and drag</div></div>

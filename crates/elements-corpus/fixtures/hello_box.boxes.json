@@ -1,7 +1,9 @@
-{"viewport": [640,313], "scale": 1,
+{"viewports": [
+{"viewport": [640,400], "scale": 1,
 "boxes": [
 {"height":151,"tag":"html","width":640,"x":0,"y":0},
 {"height":103,"tag":"body","width":640,"x":0,"y":24},
 {"height":103,"tag":"div","width":592,"x":24,"y":24},
 {"height":40,"tag":"div","width":552,"x":44,"y":71}
+]}
 ]}

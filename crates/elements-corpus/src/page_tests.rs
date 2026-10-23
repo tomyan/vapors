@@ -1,5 +1,13 @@
 use super::*;
 
+fn at(width: u32, height: u32, scale: f64) -> FixtureViewport {
+    FixtureViewport {
+        width,
+        height,
+        scale,
+    }
+}
+
 #[test]
 fn a_fixture_splits_into_style_template_and_viewport() {
     // Given
@@ -9,8 +17,7 @@ fn a_fixture_splits_into_style_template_and_viewport() {
     let source = split("x", text).expect("splits");
 
     // Then
-    assert_eq!(source.viewport, [320, 200]);
-    assert!((source.scale - 1.0).abs() < f64::EPSILON);
+    assert_eq!(source.viewports, [at(320, 200, 1.0)]);
     assert!(source.style.contains("div { width: 1px; }"));
     assert_eq!(source.template, "\n<div></div>\n");
 }
@@ -25,33 +32,6 @@ fn a_fixture_without_a_viewport_comment_is_refused() {
 
     // Then
     assert!(error.contains("/* viewport WxH */"), "{error}");
-}
-
-#[test]
-fn a_viewport_may_name_a_device_scale() {
-    // Given
-    let text = "<style>/* viewport 640x400@2.625 */</style><div></div>";
-
-    // When
-    let source = split("x", text).expect("splits");
-
-    // Then
-    assert_eq!(source.viewport, [640, 400]);
-    assert!((source.scale - 2.625).abs() < f64::EPSILON);
-}
-
-#[test]
-fn a_viewport_with_a_scale_that_is_not_a_positive_number_is_refused() {
-    for scale in ["two", "0", "-1", ""] {
-        // Given
-        let text = format!("<style>/* viewport 640x400@{scale} */</style><div></div>");
-
-        // When
-        let error = split("x", &text).expect_err("refused");
-
-        // Then
-        assert!(error.contains("/* viewport WxH@S */"), "{scale}: {error}");
-    }
 }
 
 #[test]
@@ -100,4 +80,77 @@ fn a_page_that_reports_unloaded_fonts_is_refused() {
 
     // Then
     assert!(error.contains("Geist (error)"), "{error}");
+}
+
+#[test]
+fn a_fixture_may_name_several_viewports() {
+    // Given
+    let text = "<style>/* viewport 390x800 1280x800 */</style><div></div>";
+
+    // When
+    let source = split("x", text).expect("splits");
+
+    // Then
+    assert_eq!(source.viewports, [at(390, 800, 1.0), at(1280, 800, 1.0)]);
+}
+
+#[test]
+fn a_viewport_may_name_a_device_scale() {
+    // Given
+    let text = "<style>/* viewport 640x400 640x400@2.625 */</style><div></div>";
+
+    // When
+    let source = split("x", text).expect("splits");
+
+    // Then
+    assert_eq!(source.viewports, [at(640, 400, 1.0), at(640, 400, 2.625)]);
+}
+
+#[test]
+fn a_viewport_with_a_scale_that_is_not_a_positive_number_is_refused() {
+    for scale in ["two", "0", "-1", ""] {
+        // Given
+        let text = format!("<style>/* viewport 640x400@{scale} */</style><div></div>");
+
+        // When
+        let error = split("x", &text).expect_err("refused");
+
+        // Then
+        assert!(error.contains("/* viewport WxH@S */"), "{scale}: {error}");
+    }
+}
+
+#[test]
+fn the_framed_page_sizes_its_iframe_to_the_viewport_and_escapes_the_fixture() {
+    // Given
+    let source = split(
+        "x",
+        "<style>/* viewport 390x800 */</style><p title=\"a\">&amp;</p>",
+    )
+    .expect("splits");
+
+    // When
+    let page = framed(&source, source.viewports[0]);
+
+    // Then
+    assert!(
+        page.contains(r#"<iframe width="390" height="800" srcdoc=""#),
+        "{page}"
+    );
+    assert!(
+        page.contains("title=&quot;a&quot;") && page.contains("&amp;amp;"),
+        "{page}"
+    );
+}
+
+#[test]
+fn a_viewport_comment_with_no_sizes_is_refused() {
+    // Given
+    let text = "<style>/* viewport   */</style><div></div>";
+
+    // When
+    let error = split("x", text).expect_err("refused");
+
+    // Then
+    assert!(error.contains("/* viewport WxH */"), "{error}");
 }
