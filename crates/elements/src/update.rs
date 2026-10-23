@@ -84,9 +84,14 @@ impl Document {
             let flex_item = self
                 .parent(node)
                 .and_then(|parent| out.get(&parent))
-                .is_some_and(|parent: &Used| parent.layout.display == taffy::Display::Flex);
+                .is_some_and(|parent: &Used| {
+                    matches!(
+                        parent.layout.display,
+                        taffy::Display::Flex | taffy::Display::Grid
+                    )
+                });
             let own = styles.of(node);
-            calcs.add(own);
+            calcs.add(own, &describe(&self.arena, node));
             let parent = self.parent(node).map(|parent| styles.of(parent));
             let context = Context {
                 initial: &initial,

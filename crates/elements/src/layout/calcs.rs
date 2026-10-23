@@ -10,19 +10,33 @@ use std::collections::HashMap;
 use vapors_css::cascade::ComputedStyle;
 use vapors_css::value::{Calc, Context, Value};
 
+/// One calc, and where it came from, for a failure to name.
+struct Entry {
+    calc: Calc,
+    /// The element, as errors name it (`<div class="panel">`).
+    element: String,
+    property: &'static str,
+}
+
 /// The calcs of every styled element, by handle.
 #[derive(Default)]
 pub(crate) struct Calcs {
-    by_handle: HashMap<usize, Calc>,
+    by_handle: HashMap<usize, Entry>,
     failure: RefCell<Option<String>>,
 }
 
 impl Calcs {
-    /// Adds the calcs in `style`, keyed by the address Taffy is given.
-    pub(crate) fn add(&mut self, style: &ComputedStyle) {
-        for (_, value) in style.iter() {
+    /// Adds the calcs in `style`, the computed style of `element`,
+    /// keyed by the address Taffy is given.
+    pub(crate) fn add(&mut self, style: &ComputedStyle, element: &str) {
+        for (property, value) in style.iter() {
             if let Value::Calc(calc) = value {
-                self.by_handle.insert(handle(calc), calc.clone());
+                let entry = Entry {
+                    calc: calc.clone(),
+                    element: element.to_owned(),
+                    property: property.name(),
+                };
+                self.by_handle.insert(handle(calc), entry);
             }
         }
     }
@@ -33,17 +47,20 @@ impl Calcs {
     /// out as 0; `failure` then refuses the update.
     #[allow(clippy::cast_possible_truncation)] // CSS lengths are far inside f32
     pub(crate) fn resolve(&self, handle_ptr: *const (), basis: f32) -> f32 {
-        let Some(calc) = self.by_handle.get(&(handle_ptr as usize)) else {
+        let Some(entry) = self.by_handle.get(&(handle_ptr as usize)) else {
             self.fail(format!(
                 "layout asked for a calc() it was never given (handle {handle_ptr:p})"
             ));
             return 0.0;
         };
-        match calc.evaluate(&context(basis)) {
+        match entry.calc.evaluate(&context(basis)) {
             Ok(px) => px as f32,
             Err(error) => {
                 self.fail(format!(
-                    "a calc() with a % term does not evaluate against {basis} px: {error}"
+                    "{}: `{}: {}` does not evaluate when % is {basis} px: {error}",
+                    entry.element,
+                    entry.property,
+                    Value::Calc(entry.calc.clone()).to_css()
                 ));
                 0.0
             }

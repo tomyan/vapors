@@ -30,7 +30,7 @@ pub(crate) struct Used {
 pub(crate) struct Context<'a> {
     /// Every property at its initial value.
     pub(crate) initial: &'a ComputedStyle,
-    /// The parent is a flex container.
+    /// The parent is a flex or grid container, which blockifies it.
     pub(crate) flex_item: bool,
     /// Device pixels per CSS pixel, for border widths.
     pub(crate) scale: f32,

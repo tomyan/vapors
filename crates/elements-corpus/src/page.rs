@@ -61,7 +61,11 @@ pub fn split(name: &str, text: &str) -> Result<Source, String> {
 fn viewports(style: &str) -> Option<Vec<FixtureViewport>> {
     let after = &style[style.find("/* viewport ")? + "/* viewport ".len()..];
     let sizes = &after[..after.find(" */")?];
-    sizes.split_whitespace().map(viewport).collect()
+    let viewports: Vec<FixtureViewport> = sizes
+        .split_whitespace()
+        .map(viewport)
+        .collect::<Option<_>>()?;
+    (!viewports.is_empty()).then_some(viewports)
 }
 
 fn viewport(text: &str) -> Option<FixtureViewport> {
@@ -131,7 +135,8 @@ document.fonts.ready
     const r = element.getBoundingClientRect();
     boxes.push({{ tag: element.tagName.toLowerCase(), x: r.x, y: r.y, width: r.width, height: r.height }});
   }}
-  write({{ viewport: [innerWidth, innerHeight], scale: devicePixelRatio, boxes }});
+  const root = document.documentElement;
+  write({{ viewport: [root.clientWidth, root.clientHeight], scale: devicePixelRatio, boxes }});
 }});
 </script></body></html>
 "#,
@@ -142,7 +147,7 @@ document.fonts.ready
 
 /// The page's JSON from a dumped DOM: `{"viewport": [w, h], "scale": s,
 /// "boxes": [..]}`, the viewport and scale as the page measured them
-/// (`innerWidth`, `innerHeight`, `devicePixelRatio`).
+/// (the root's `clientWidth` and `clientHeight`, and `devicePixelRatio`).
 ///
 /// # Errors
 /// When the page never wrote its boxes (a script error, or fonts that

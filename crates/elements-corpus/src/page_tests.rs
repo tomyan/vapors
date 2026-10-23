@@ -142,3 +142,15 @@ fn the_framed_page_sizes_its_iframe_to_the_viewport_and_escapes_the_fixture() {
         "{page}"
     );
 }
+
+#[test]
+fn a_viewport_comment_with_no_sizes_is_refused() {
+    // Given
+    let text = "<style>/* viewport   */</style><div></div>";
+
+    // When
+    let error = split("x", text).expect_err("refused");
+
+    // Then
+    assert!(error.contains("/* viewport WxH */"), "{error}");
+}

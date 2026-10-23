@@ -30,6 +30,11 @@ fn chromium_boxes(name: &str) -> Vec<(Viewport, Vec<(String, BoxRect)>)> {
     let sections = json["viewports"]
         .as_array()
         .unwrap_or_else(|| panic!("{}: no viewports", path.display()));
+    assert!(
+        !sections.is_empty(),
+        "{}: an empty viewport list compares nothing; run cargo run -p vapors-elements-corpus --example layout_oracle",
+        path.display()
+    );
     sections
         .iter()
         .map(|section| {
