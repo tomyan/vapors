@@ -51,6 +51,9 @@ Test deadlines: `.config/nextest.toml`.
   functions 10 to 15 lines; no `unsafe`.
 - Warnings are errors in CI (`-D warnings`, clippy pedantic).
 - Every failure message names the fix and the reproducing command.
+- Where a service asks for a contact address (a crates.io User-Agent,
+  for example), give the repository URL, https://github.com/tomyan/vapors.
+  Never give a person's email address.
 
 ## Slice loop
 
