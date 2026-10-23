@@ -4,6 +4,7 @@
 //! a blocking dialog on another thread (native).
 
 use std::cell::Cell;
+use std::sync::Arc;
 
 use winit::event_loop::EventLoopProxy;
 
@@ -14,6 +15,7 @@ use crate::device_lost::{DeviceLost, Lost};
 use crate::file_kind::{self, FileKind};
 use crate::picker;
 use crate::redraw::RedrawFlag;
+use crate::waker::Waker;
 use crate::window::Message;
 
 /// Given to the app with every event.
@@ -21,7 +23,7 @@ pub struct Platform {
     /// `None` for a detached platform, which has no event loop.
     proxy: Option<EventLoopProxy<Message>>,
     lost: DeviceLost,
-    redraw: RedrawFlag,
+    redraw: Arc<RedrawFlag>,
     cursor: Cell<Option<Cursor>>,
 }
 
@@ -41,7 +43,7 @@ impl Platform {
         Self {
             proxy: None,
             lost: DeviceLost::default(),
-            redraw: RedrawFlag::default(),
+            redraw: Arc::default(),
             cursor: Cell::new(None),
         }
     }
@@ -53,8 +55,23 @@ impl Platform {
         self.redraw.raise();
     }
 
+    /// A handle that asks for a frame from outside `event`: from a page
+    /// script's call, a future, or another thread natively. Keep it from
+    /// the first event; an app returning [`Next::Wait`](crate::Next::Wait)
+    /// calls `wake` when work that started elsewhere has something to
+    /// show. A detached platform's waker raises the request
+    /// [`take_redraw_request`](Self::take_redraw_request) reads.
+    #[must_use]
+    pub fn waker(&self) -> Waker {
+        match &self.proxy {
+            Some(proxy) => Waker::for_loop(proxy.clone()),
+            None => Waker::detached(Arc::clone(&self.redraw)),
+        }
+    }
+
     /// Whether a frame was asked for since the last call; clears it.
     /// The loop reads it after each event; a test may too.
+    #[must_use]
     pub fn take_redraw_request(&self) -> bool {
         self.redraw.take()
     }

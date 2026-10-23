@@ -91,6 +91,9 @@ jobs:
       # canvas composites white (run 39934974057).
       - name: page contract in headless Chrome
         run: scripts/check-page-contract.sh target/web "$(mktemp -d)"
+      # The waker on the page: none idle, one frame per wake.
+      - name: the waker in headless Chrome
+        run: scripts/web-wake-frames.sh target/web "$(mktemp -d)"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: web
@@ -183,6 +186,9 @@ jobs:
         run: cargo xtask setup --ci
       - name: screenshot of the clear window
         run: cargo xtask screenshot clear_window target/clear_window.png --expect 12,200,34
+      # The waker in a window: none idle, one frame per wake from a thread.
+      - name: the waker in a window
+        run: xvfb-run -a cargo run -p vapors-platform --example wake_window
       - name: screenshot of the gradient fixture, fitted
         run: cargo xtask screenshot image_window target/image_window.png --expect 128,128,128 -- --open crates/platform/examples/fixtures/gradient.png
       # Each F2c demo in a window; the example holds the screenshot to the

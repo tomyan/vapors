@@ -2686,7 +2686,10 @@ dependencies = [
  "vapors-canvas",
  "vapors-demos",
  "vapors-platform",
+ "vapors-renderer",
  "vapors-scene",
+ "wasm-bindgen",
+ "wgpu",
 ]
 
 [[package]]
