@@ -109,6 +109,11 @@ impl Document {
                 Err(refusals) => errors.extend(self.unhonoured(node, refusals)),
             }
         }
+        for node in elements(&self.arena, self.root()) {
+            if out.get(&node).is_some_and(|style| style.inline) {
+                errors.extend(self.mixed_metrics(node, &out, viewport.scale));
+            }
+        }
         if errors.is_empty() {
             Ok((out, calcs))
         } else {

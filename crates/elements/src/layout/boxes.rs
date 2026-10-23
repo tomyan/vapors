@@ -68,6 +68,9 @@ fn add_element(source: &Source<'_>, node: NodeId, boxes: &mut Vec<LayoutBox>) ->
     for child in source.arena.children(node) {
         match &source.arena.get(child, "build").kind {
             Kind::Text(text) => run.push_text(text),
+            // No box, and no break in the run around it (CSS Display 3,
+            // 2.5: `display: none` generates nothing).
+            Kind::Element(_) if source.used[&child].layout.display == Display::None => {}
             Kind::Element(_) if source.used[&child].inline => add_inline(source, child, &mut run),
             Kind::Element(_) => {
                 let ended = std::mem::replace(&mut run, Collector::new(style.text, style.visible));

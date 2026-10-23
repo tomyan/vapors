@@ -5,6 +5,7 @@
 mod support;
 
 use support::{document, element, refusals, text, viewport};
+use vapors_dom::Dom;
 use vapors_elements::Document;
 use vapors_scene::{Color, Item};
 
@@ -126,4 +127,32 @@ fn padding_on_an_inline_element_is_refused_naming_the_side() {
             && e.contains("inline element")),
         "{errors:?}"
     );
+}
+
+#[test]
+fn a_hidden_inline_element_leaves_its_paragraph_whole() {
+    // Given: `<p>a <span style="display:none">x</span> b</p>`
+    let mut doc = document();
+    let body = doc.body();
+    let p = element(&mut doc, body, "p", "");
+    text(&mut doc, p, "a ");
+    let span = element(&mut doc, p, "span", "");
+    doc.set_attribute(span, "style", "display: none");
+    text(&mut doc, span, "x");
+    text(&mut doc, p, " b");
+
+    // When
+    let painted = doc.update(viewport(400.0, 100.0)).expect("updates");
+
+    // Then: one text run, one line
+    let texts: Vec<&str> = painted
+        .scene()
+        .items()
+        .iter()
+        .filter_map(|item| match item {
+            Item::Text { text, .. } => Some(painted.text(*text).text()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, ["a b"]);
 }

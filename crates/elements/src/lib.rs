@@ -13,6 +13,7 @@ mod dom_impl;
 mod error;
 mod events;
 mod html;
+mod inline_check;
 mod layout;
 mod node;
 mod paint;
