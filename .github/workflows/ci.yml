@@ -38,11 +38,12 @@ jobs:
       VAPORS_SYSTEM_FONTS: 1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Step timeout: about 2.5x its worst with the cache, 13 s in run
-      # 39932437148, rounded up to a minute. A miss from a slow mirror,
-      # as after a runner image update, fails here; rerun to fill the cache.
+      # Step timeout: about 2.5x the worst measured, rounded up to a minute.
+      # Over the last 40 runs (2026-10-23): a cache miss took 12 to 35 s
+      # (run 40031283392), a hit 13 s on average and 21 s at worst. One miss
+      # stalled on the mirror past the old 1-minute limit (run 40036716064).
       - name: install a CJK system font for the fallback test
-        timeout-minutes: 1
+        timeout-minutes: 2
         uses: ./.github/actions/apt-install
         with:
           packages: fonts-noto-cjk
@@ -144,11 +145,11 @@ jobs:
       VAPORS_GPU_ADAPTER: llvmpipe
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Step timeout: about 2.5x its worst with the cache, 16 s in run
-      # 39930654120, rounded up to a minute. A miss from a slow mirror
-      # fails here; rerun to fill the cache.
+      # Step timeout: about 2.5x the worst measured, rounded up to a minute.
+      # Over the last 40 runs (2026-10-23): a cache miss took 10 to 11 s,
+      # a hit 14 s on average and 32 s at worst (run 40028433485).
       - name: install lavapipe
-        timeout-minutes: 1
+        timeout-minutes: 2
         uses: ./.github/actions/apt-install
         with:
           packages: mesa-vulkan-drivers vulkan-tools
@@ -214,11 +215,11 @@ jobs:
       VAPORS_GPU_ADAPTER: llvmpipe
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Step timeout: about 2.5x its worst with the cache, 13 s in run
-      # 39932437148, rounded up to a minute. A miss from a slow mirror
-      # fails here; rerun to fill the cache.
+      # Step timeout: about 2.5x the worst measured, rounded up to a minute.
+      # Over the last 40 runs (2026-10-23): a cache miss took 10 to 52 s
+      # (run 40030067596), a hit 15 s on average and 21 s at worst.
       - name: install lavapipe, Xvfb and winit's X11 libraries
-        timeout-minutes: 1
+        timeout-minutes: 3
         uses: ./.github/actions/apt-install
         with:
           packages: mesa-vulkan-drivers xvfb libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev
