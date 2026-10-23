@@ -8,6 +8,7 @@ mod cursor;
 mod decoration;
 mod grid_style;
 mod honoured;
+mod scope;
 mod sizes;
 mod text_style;
 mod used;
@@ -30,10 +31,13 @@ pub(crate) use values::{Refusal, Styles as ElementStyles};
 
 const UA_SHEET: &str = include_str!("ua.css");
 
-/// The stylesheets, in cascade order, and their names for errors.
+/// The stylesheets, in cascade order, and their names for errors; the
+/// component scopes added, and the scoped styles that did not parse.
 pub(crate) struct Sheets {
     cascade: Cascade,
     names: Vec<String>,
+    scopes: std::collections::HashSet<String>,
+    refused: Vec<ElementError>,
 }
 
 impl Sheets {
@@ -47,6 +51,8 @@ impl Sheets {
         Self {
             cascade: Cascade::new().user_agent(ua),
             names: vec!["ua.css".to_owned()],
+            scopes: std::collections::HashSet::new(),
+            refused: Vec::new(),
         }
     }
 
@@ -58,6 +64,32 @@ impl Sheets {
         self.cascade = std::mem::take(&mut self.cascade).author(sheet);
         self.names.push(name.to_owned());
         Ok(())
+    }
+
+    /// A component's style under its `scope`, added once however often
+    /// it is mounted. One that does not parse is kept as a refusal for
+    /// every update (see [`Sheets::refused`]): `Dom::add_style` returns
+    /// nothing, as the generated code's other calls do.
+    pub(crate) fn add_scoped(&mut self, scope: &str, text: &str) {
+        if !self.scopes.insert(scope.to_owned()) {
+            return;
+        }
+        match vapors_css::parse(text) {
+            Ok(sheet) => {
+                self.cascade =
+                    std::mem::take(&mut self.cascade).author(scope::scoped(sheet, scope));
+                self.names.push(scope.to_owned());
+            }
+            Err(error) => self.refused.push(ElementError::Css {
+                sheet: scope.to_owned(),
+                error,
+            }),
+        }
+    }
+
+    /// The scoped styles that did not parse.
+    pub(crate) fn refused(&self) -> &[ElementError] {
+        &self.refused
     }
 
     /// The computed style of every element under `root`, by slot.

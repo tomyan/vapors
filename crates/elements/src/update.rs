@@ -70,6 +70,7 @@ impl Document {
     ) -> Result<(HashMap<NodeId, Used>, Calcs), Vec<ElementError>> {
         let env = environment(viewport);
         let mut errors = check_tree(&self.arena, self.root());
+        errors.extend_from_slice(self.sheets.refused());
         let styles = self
             .sheets
             .compute(&self.arena, self.root(), &env)
