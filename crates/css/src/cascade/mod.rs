@@ -12,6 +12,7 @@ mod compute_resolve;
 mod computed;
 mod conditions;
 mod environment;
+mod font_weight;
 mod inline;
 mod media;
 mod media_eval;

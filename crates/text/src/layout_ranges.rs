@@ -6,7 +6,7 @@ use std::ops::Range;
 
 use parley::{Affinity, Cursor, Selection};
 
-use crate::layout::Layout;
+use crate::layout::{Layout, LineInfo};
 
 /// A range's extent on one line, in device pixels from the layout's
 /// origin.
@@ -35,6 +35,24 @@ impl Layout {
                 self.extent(part, line)
             })
             .collect()
+    }
+
+    /// Where byte `index` lies, as an empty fragment: the line holding
+    /// it (the last line for the text's end) and the x of its edge.
+    #[must_use]
+    #[allow(clippy::cast_possible_truncation)] // Parley's f64 boxes come from f32 positions
+    pub fn caret(&self, index: usize) -> Fragment {
+        let lines: Vec<LineInfo> = self.lines().collect();
+        let line = lines
+            .iter()
+            .position(|info| info.text_range.contains(&index))
+            .unwrap_or(lines.len().saturating_sub(1));
+        let cursor = Cursor::from_byte_index(self.inner(), index, Affinity::Downstream);
+        Fragment {
+            line,
+            x: cursor.geometry(self.inner(), 0.0).x0 as f32,
+            width: 0.0,
+        }
     }
 
     /// The x extent of `part`, all on line `line`.

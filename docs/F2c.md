@@ -671,9 +671,11 @@ differs from the plan.
     `text-align` (left to right only).
   - The bundled faces have no italic. vapors draws Skia's synthetic
     slant (`SYNTHETIC_SLANT`, a quarter), as Chromium does.
+  - `bolder` and `lighter` compute to numbers from the inherited
+    weight (CSS Fonts 4's table, in vapors-css). `b` and `strong` are
+    `bolder`, as in Chromium's UA sheet.
   - Deferred to a slice after F2c: `font-feature-settings`,
-    `font-variation-settings`, `text-decoration`, families by name, and
-    `bolder`/`lighter`.
+    `font-variation-settings`, `text-decoration` and families by name.
 - **Tags.** `span`, `b`, `strong`, `em`, `i`, `var`, `code`, `kbd`,
   `samp`, `mark` and `abbr` are implemented.
   - `small` waits: Chromium resolves `smaller` through a keyword table.
@@ -683,6 +685,14 @@ differs from the plan.
   - Chromium's 13 px default for `code` under a `medium` font size is
     not copied.
 - **Refused, naming the element:**
+  - an inline element whose font size, content area or line height
+    differs from its block's. Chromium's line baseline is the maximum
+    over the strut and every inline box of its rounded ascent plus
+    half-leading, and vapors places inline boxes on the block's strut.
+    A line mixing metrics comes in a slice after F2c. Weight and face
+    alone are laid out: the bundled faces share their vertical metrics.
+  - text from a right-to-left script, or a right-to-left mark. Runs are
+    laid out left to right (Parley's base direction set to Ltr).
   - a block inside an inline element;
   - a margin, padding or border on an inline element;
   - an atomic inline (`inline-block`) outside a flex or grid container.

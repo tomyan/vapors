@@ -63,8 +63,14 @@ fn fragments(
         .lines()
         .map(|line| (line.top / scale, line.height / scale))
         .collect();
-    layout
-        .fragments(span.range.clone())
+    // An element holding no text still has a box: an empty fragment
+    // where it lies, as Chromium gives it.
+    let found = if span.range.is_empty() {
+        vec![layout.caret(span.range.start)]
+    } else {
+        layout.fragments(span.range.clone())
+    };
+    found
         .into_iter()
         .map(|fragment| {
             let (top, height) = lines[fragment.line];

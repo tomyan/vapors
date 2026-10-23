@@ -31,7 +31,7 @@ h6 { font-size: 0.67em; margin-top: 2.33em; margin-bottom: 2.33em; }
    default); vapors keeps the inherited size, so a page that sets its
    font size in px matches Chromium. */
 span, b, strong, code, kbd, samp, mark, abbr, em, i, var { display: inline; }
-b, strong { font-weight: bold; }
+b, strong { font-weight: bolder; }
 em, i, var { font-style: italic; }
 code, kbd, samp { font-family: monospace; }
 mark { background-color: yellow; color: black; }

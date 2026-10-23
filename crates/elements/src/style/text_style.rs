@@ -109,10 +109,9 @@ fn weight(value: &Value) -> Result<f32, String> {
         Value::Integer(n) => Ok(*n as f32),
         Value::Keyword(k) if k == "normal" => Ok(400.0),
         Value::Keyword(k) if k == "bold" => Ok(700.0),
-        Value::Keyword(_) => Err(format!(
-            "is relative to the parent's weight, which {}",
-            later("a slice after F2c")
-        )),
+        Value::Keyword(_) => Err(
+            "is a weight vapors-css should have computed to a number (bolder and lighter are resolved in the cascade); report it as a vapors-css bug".to_owned(),
+        ),
         _ => Err(shape("a weight")),
     }
 }

@@ -104,3 +104,25 @@ fn a_left_to_right_layout_puts_the_start_on_the_left_whatever_the_text() {
     assert!(left(&ltr) < 1.0, "{}", left(&ltr));
     assert!(left(&auto) > 100.0, "{}", left(&auto));
 }
+
+#[test]
+fn a_caret_lies_on_the_line_holding_its_byte_at_that_bytes_edge() {
+    // Given: "Hello world" broken after "Hello "
+    let layout = laid_out("Hello world", Some(60.0));
+
+    // When
+    let start = layout.caret(0);
+    let second = layout.caret(6);
+    let end = layout.caret(11);
+
+    // Then
+    assert_eq!((start.line, start.width), (0, 0.0));
+    assert!(start.x.abs() < 0.01, "{start:?}");
+    assert_eq!((second.line, second.width), (1, 0.0));
+    assert!(second.x.abs() < 0.01, "{second:?}");
+    assert_eq!(end.line, 1);
+    assert!(
+        (end.x - laid_out("world", None).width()).abs() < 0.01,
+        "{end:?}"
+    );
+}
