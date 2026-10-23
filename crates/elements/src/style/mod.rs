@@ -8,6 +8,7 @@ mod cursor;
 mod decoration;
 mod grid_style;
 mod honoured;
+mod inline;
 mod scope;
 mod sizes;
 mod text_style;

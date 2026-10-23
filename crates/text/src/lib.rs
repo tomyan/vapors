@@ -13,6 +13,7 @@ mod draw;
 mod font_system;
 pub mod fonts;
 mod layout;
+mod layout_ranges;
 mod layout_runs;
 mod layout_types;
 mod line_metrics;
@@ -29,6 +30,8 @@ pub use atlas_page::AtlasPage;
 pub use draw::RenderTarget;
 pub use font_system::FontSystem;
 pub use layout::{Align, Glyph, GlyphRun, Layout, LayoutOptions, LineInfo, PlacedGlyph};
+pub use layout_ranges::Fragment;
+pub use line_metrics::content_area;
 pub use parley;
 pub use pipeline::{BlendParams, TextPipeline};
 pub use raster::{
