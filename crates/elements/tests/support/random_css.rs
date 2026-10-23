@@ -5,7 +5,7 @@
 /// `:last-child`, `:empty`, an ancestor attribute, `:hover` on a
 /// non-subject compound, `:active`, `@media`, calc with % and em, vw,
 /// relative and absolute positioning, and z-index on positioned boxes
-/// and on flex items.
+/// and on flex items, and `overflow: hidden`.
 pub const CSS: &str = "
 :root { --pad: 3px; }
 body { margin: 0; font-size: 14px; color: #222222; }
@@ -27,6 +27,7 @@ body { margin: 0; font-size: 14px; color: #222222; }
 .abs { position: absolute; right: 0; top: 0; width: 20px; height: 5px; }
 .up { z-index: 2; }
 .down { z-index: -1; }
+.cut { overflow: hidden; height: 12px; }
 ";
 
 pub const CLASSES: &[&str] = &[
@@ -40,6 +41,8 @@ pub const CLASSES: &[&str] = &[
     "box abs up",
     "box pos down",
     "box up",
+    "box cut",
+    "row cut",
     "row",
     "",
 ];

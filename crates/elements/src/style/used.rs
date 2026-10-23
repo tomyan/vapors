@@ -57,6 +57,7 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
     } else if context.in_inline && layout.display != taffy::Display::None {
         reader.refuse("display", inline::BLOCK_IN_INLINE.to_owned());
     }
+    super::overflow::refuse_rounded_clip(&mut reader, &layout, &decoration);
     let result = Used {
         z_index: applied_z_index(&mut reader, &layout, context.flex_item),
         layout,
@@ -74,6 +75,14 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
         Ok(result)
     } else {
         Err(refusals)
+    }
+}
+
+impl Used {
+    /// `overflow` is `hidden` or `clip`: descendants are cut off at the
+    /// padding box.
+    pub(crate) fn clips(&self) -> bool {
+        self.layout.overflow.x != taffy::Overflow::Visible
     }
 }
 

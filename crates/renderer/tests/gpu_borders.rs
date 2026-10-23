@@ -30,6 +30,7 @@ fn render(width: u32, height: u32, draw: impl FnOnce(&wgpu::Device, &Target<'_>)
             queue: &gpu.queue,
             view: &view,
             viewport,
+            scissor: None,
         },
     );
     read_rgba8(&gpu.device, &gpu.queue, &target)

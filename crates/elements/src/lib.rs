@@ -7,6 +7,7 @@
 mod arena;
 mod bidi;
 mod check;
+mod clip;
 mod corners;
 mod css_element;
 mod document;

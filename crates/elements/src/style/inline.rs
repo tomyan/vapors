@@ -30,6 +30,12 @@ pub(crate) fn refuse_box_edges(reader: &mut Reader<'_>, style: &Style) {
             "is not static on an inline element, which has no box of its own to place yet (a slice after F2c, docs/F2c.md); make the element inline-block in a flex container, or a block".to_owned(),
         );
     }
+    if style.overflow.x != taffy::Overflow::Visible {
+        reader.refuse(
+            "overflow-x",
+            "clips an inline element, which has no box of its own to clip to; make it inline-block in a flex container, or a block".to_owned(),
+        );
+    }
     let zero = LengthPercentage::length(0.0);
     let auto_zero = LengthPercentageAuto::length(0.0);
     let sides = ["top", "right", "bottom", "left"];

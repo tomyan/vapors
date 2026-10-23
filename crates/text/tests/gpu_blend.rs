@@ -56,6 +56,7 @@ fn render(text: &str, ink: Color, background: Color, params: BlendParams) -> Vec
             width: WIDTH,
             height: HEIGHT,
         },
+        scissor: None,
     };
     pipeline
         .draw(&render_target, &mut atlas, &layout, origin, params)

@@ -39,6 +39,7 @@ fn draw(quads: &[Quad], width: u32, height: u32) -> Vec<u8> {
             queue: &gpu.queue,
             view: &view,
             viewport,
+            scissor: None,
         },
         quads,
     );

@@ -1,10 +1,11 @@
 //! GPU tier: glyphs land where the layout puts them, quarter-pixel x
 //! offsets are real, baselines snap, and the contrast adjustment keeps
-//! stems the same width light-on-dark and dark-on-light.
+//! stems the same width light-on-dark and dark-on-light, and a scissor
+//! keeps glyphs from the pixels outside it.
 
 use vapors_gpu_harness::{gpu, read_rgba8};
 use vapors_renderer::clear;
-use vapors_scene::{Color, Size};
+use vapors_scene::{Color, Scissor, Size};
 use vapors_text::{
     AtlasConfig, BlendParams, Family, FontSystem, GlyphAtlas, Layout, LayoutOptions, RenderTarget,
     Style, TextPipeline,
@@ -28,6 +29,17 @@ const LIGHT: Color = Color {
 /// Render `text` in Geist 16 px with its first baseline starting at
 /// `baseline` (x, y) in `ink` on `background`.
 fn render(text: &str, baseline: [f32; 2], ink: Color, background: Color) -> Vec<u8> {
+    render_under(text, baseline, ink, background, None)
+}
+
+/// [`render`], drawing only inside `scissor`.
+fn render_under(
+    text: &str,
+    baseline: [f32; 2],
+    ink: Color,
+    background: Color,
+    scissor: Option<Scissor>,
+) -> Vec<u8> {
     let params = BlendParams::default();
     let gpu = gpu();
     let mut system = FontSystem::bundle_only();
@@ -51,6 +63,7 @@ fn render(text: &str, baseline: [f32; 2], ink: Color, background: Color) -> Vec<
         queue: &gpu.queue,
         view: &view,
         viewport,
+        scissor,
     };
     pipeline
         .draw(&render_target, &mut atlas, &layout, origin, params)
@@ -118,4 +131,37 @@ fn gpu_a_fractional_baseline_renders_exactly_like_the_snapped_one() {
     assert_eq!(at_30, at_30_4);
     assert_eq!(at_30_5, at_31, "a half rounds up to the next row");
     assert_ne!(at_30, at_31);
+}
+
+/// The columns, left to right, that hold any ink.
+fn inked_columns(pixels: &[u8]) -> Vec<u32> {
+    (0..WIDTH)
+        .filter(|&x| (0..HEIGHT).any(|y| !is_background(pixel(pixels, x, y), DARK)))
+        .collect()
+}
+
+#[test]
+fn gpu_a_scissor_keeps_glyphs_inside_it() {
+    // Given: a word from x = 4 that inks past x = 20 unclipped
+    let scissor = Scissor {
+        x: 0,
+        y: 0,
+        width: 20,
+        height: HEIGHT,
+    };
+    let unclipped = inked_columns(&render("IIIIIIII", [4.0, 30.0], LIGHT, DARK));
+    assert!(unclipped.iter().any(|&x| x >= 20), "{unclipped:?}");
+
+    // When
+    let clipped = inked_columns(&render_under(
+        "IIIIIIII",
+        [4.0, 30.0],
+        LIGHT,
+        DARK,
+        Some(scissor),
+    ));
+
+    // Then
+    assert!(!clipped.is_empty(), "nothing drawn inside the scissor");
+    assert!(clipped.iter().all(|&x| x < 20), "{clipped:?}");
 }

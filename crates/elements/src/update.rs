@@ -64,6 +64,7 @@ impl Document {
             fonts: &mut self.fonts,
             cache: &mut self.texts,
             scale: viewport.scale,
+            clip: None,
         };
         let painted = paint(&boxes, &rects, &mut input);
         self.boxes.keep(boxes, viewport.scale);

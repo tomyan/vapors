@@ -1,6 +1,7 @@
-//! Paint: the laid-out boxes as a scene in device pixels, in tree order
-//! (each element's background, then its children), with every edge
-//! snapped to the device pixel grid as Chromium snaps it.
+//! Paint: the laid-out boxes as a scene in device pixels, in stacking
+//! order (`paint_order`), each under the clip of the boxes that cut it
+//! off (`clip`), with every edge snapped to the device pixel grid as
+//! Chromium snaps it.
 
 use std::collections::HashMap;
 
@@ -25,6 +26,8 @@ pub(crate) struct PaintInput<'a> {
     pub(crate) fonts: &'a mut FontSystem,
     pub(crate) cache: &'a mut crate::layout::TextCache,
     pub(crate) scale: f32,
+    /// The clip of the box being painted; set by `paint`.
+    pub(crate) clip: Option<BoxRect>,
 }
 
 /// Paints `boxes` (box 0 the root) at the rects layout gave them.
@@ -44,17 +47,38 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
             painted.rects.insert(node, rects[index]);
         }
     }
-    let stacking = |index: usize| match boxes[index].content {
-        Content::Element(node) => stacking_of(&input.used[&node]),
-        Content::Text(_) => Stacking::default(),
-    };
-    for index in paint_order(boxes, &stacking) {
+    let order = paint_order(boxes, &|index| stacking_of(boxes, index, input));
+    let clips = crate::clip::clips(boxes, rects, &|index| clipping(boxes, index, input));
+    for index in order {
+        input.clip = clips[index];
+        let device = clips[index].map(|clip| snapped(clip, input.scale));
+        painted.scene.set_clip(device);
         paint_own(boxes, rects, index, input, &mut painted);
     }
     painted
 }
 
-fn stacking_of(used: &Used) -> Stacking {
+/// Whether box `index` cuts off its content. The root never does: its
+/// `overflow` is the viewport's. Nor does the body unless the root's
+/// `overflow` is not `visible`; otherwise the body's is the viewport's
+/// (CSS Overflow 3 section 3.3).
+fn clipping(boxes: &[LayoutBox], index: usize, input: &PaintInput<'_>) -> bool {
+    let Content::Element(node) = boxes[index].content else {
+        return false;
+    };
+    let clips = |node: NodeId| input.used.get(&node).is_some_and(Used::clips);
+    match node {
+        node if node == input.root => false,
+        node if node == input.body => clips(node) && clips(input.root),
+        node => clips(node),
+    }
+}
+
+fn stacking_of(boxes: &[LayoutBox], index: usize, input: &PaintInput<'_>) -> Stacking {
+    let Content::Element(node) = boxes[index].content else {
+        return Stacking::default();
+    };
+    let used = &input.used[&node];
     Stacking {
         // a z-index is kept only where it applies: on a static box, a
         // flex or grid item, which then stacks as if positioned
@@ -99,7 +123,7 @@ fn paint_own(
 fn paint_element(node: NodeId, rect: BoxRect, input: &PaintInput<'_>, out: &mut Painted) {
     let used = &input.used[&node];
     if used.visible && used.takes_pointer {
-        out.hits.push((node, rect));
+        out.hits.push((node, crate::clip::within(input.clip, rect)));
         out.cursors.insert(node, used.cursor);
     }
     if !used.visible {

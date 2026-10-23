@@ -51,6 +51,7 @@ fixtures![
     block_margins::BlockMargins,
     borders::Borders,
     centred_panel::CentredPanel,
+    clipping::Clipping,
     flex_row::FlexRow,
     grid_tracks::GridTracks,
     hello_box::HelloBox,

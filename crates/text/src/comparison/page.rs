@@ -38,6 +38,7 @@ pub fn render_page(
         queue,
         view: &view,
         viewport,
+        scissor: None,
     };
     for (index, scheme) in (0u32..).zip(SCHEMES.iter()) {
         let left = px(PANEL_WIDTH * index * scale);
@@ -79,6 +80,7 @@ pub fn render_labels(
         queue,
         view: &view,
         viewport,
+        scissor: None,
     };
     let style = Style {
         color: scheme.ink,

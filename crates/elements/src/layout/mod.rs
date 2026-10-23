@@ -82,7 +82,7 @@ pub(crate) fn lay_out(
 }
 
 /// Each out-of-flow box's containing block, by box index.
-fn containing_blocks(boxes: &[LayoutBox]) -> Vec<Option<usize>> {
+pub(crate) fn containing_blocks(boxes: &[LayoutBox]) -> Vec<Option<usize>> {
     let mut containing = vec![None; boxes.len()];
     for (index, layout_box) in boxes.iter().enumerate() {
         for &hoisted in &layout_box.hoisted {
