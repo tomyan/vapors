@@ -19,6 +19,9 @@ pub enum Event {
         /// Y in pixels.
         y: f32,
     },
+    /// The pointer left the window; its position is unknown until it
+    /// moves again.
+    PointerLeft,
     /// The primary button went down or up.
     PrimaryButton {
         /// True on press.
@@ -129,6 +132,7 @@ pub fn from_winit(event: &WindowEvent) -> Option<Event> {
             x: position.x as f32,
             y: position.y as f32,
         }),
+        WindowEvent::CursorLeft { .. } => Some(Event::PointerLeft),
         WindowEvent::MouseInput {
             state,
             button: winit::event::MouseButton::Left,

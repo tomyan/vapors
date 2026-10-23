@@ -2,7 +2,7 @@
 
 use super::*;
 
-fn view() -> ImageView {
+pub(super) fn view() -> ImageView {
     let image = RgbaImage {
         size: Size {
             width: 200,

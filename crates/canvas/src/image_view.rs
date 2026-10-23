@@ -137,6 +137,7 @@ impl ImageView {
                 self.fit();
             }
             Event::PointerMoved { x, y } => self.pointer_moved([*x, *y]),
+            Event::PointerLeft => self.pointer = None,
             Event::PrimaryButton { pressed } => self.dragging = *pressed,
             Event::Scroll { steps } => self.zoom(self.scroll_anchor(), ZOOM_STEP.powf(*steps)),
             Event::Pinch { x, y, factor } => self.zoom([*x, *y], *factor),
@@ -185,3 +186,7 @@ impl ImageView {
 #[cfg(test)]
 #[path = "image_view_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "image_view_pointer_tests.rs"]
+mod pointer_tests;
