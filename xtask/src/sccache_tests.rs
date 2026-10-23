@@ -114,3 +114,30 @@ fn cache_errors_during_the_run_fail_it() {
     // Then
     assert!(refusal.contains("1 cache errors this run"), "{refusal}");
 }
+
+#[test]
+fn counters_that_went_down_are_refused_as_a_server_restart() {
+    // Given: the server restarted mid-run, zeroing its counters (an error
+    // before the restart would vanish)
+    let before = Stats {
+        hits: 50,
+        misses: 10,
+        errors: 0,
+    };
+    let after = Stats {
+        hits: 3,
+        misses: 1,
+        errors: 0,
+    };
+
+    // When
+    let refusal = hit_rate(before, after).expect_err("restarted");
+
+    // Then
+    assert!(refusal.contains("restarted"), "{refusal}");
+}
+
+#[test]
+fn the_server_xtask_starts_never_stops_for_idleness() {
+    assert!(ENV.contains(&("SCCACHE_IDLE_TIMEOUT", "0")));
+}

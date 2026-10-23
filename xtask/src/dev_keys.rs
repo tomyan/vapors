@@ -17,7 +17,7 @@ pub fn keyed_providers(words: &str, path: &str) -> Result<Vec<String>, String> {
     let keyed: Vec<String> = words
         .lines()
         .filter_map(provider_constant)
-        .filter(|(name, _)| words.contains(&format!("{name} => Ok(&")))
+        .filter(|(name, _)| maps_to_a_key(words, name))
         .map(|(_, id)| id)
         .collect();
     if keyed.is_empty() {
@@ -26,6 +26,15 @@ pub fn keyed_providers(words: &str, path: &str) -> Result<Vec<String>, String> {
         ));
     }
     Ok(keyed)
+}
+
+/// Whether a match arm, a line of its own, maps `name` to a key:
+/// `PROVIDER_<NAME> => Ok(&`. A comment holding that text is not one.
+fn maps_to_a_key(words: &str, name: &str) -> bool {
+    let arm = format!("{name} => Ok(&");
+    words
+        .lines()
+        .any(|line| line.trim_start().starts_with(&arm))
 }
 
 /// `PROVIDER_<NAME>` and its id from `pub const PROVIDER_<NAME>: &str = "<id>";`.

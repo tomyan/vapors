@@ -166,3 +166,15 @@ fn the_notice_names_the_provider_and_the_file_but_never_the_key() {
     assert!(!line.contains(KEY), "{line}");
     let _ = std::fs::remove_file(file);
 }
+
+#[test]
+fn a_mapping_in_a_comment_does_not_make_a_provider_keyed() {
+    // Given: the stub's arm only in a comment
+    let words = format!("{WORDS}\n// PROVIDER_STUB => Ok(&stub::KEY),\n");
+
+    // When
+    let keyed = keyed_providers(&words, "words.rs").expect("keyed");
+
+    // Then
+    assert_eq!(keyed, ["anthropic", "openai"]);
+}

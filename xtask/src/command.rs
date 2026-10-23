@@ -41,6 +41,10 @@ pub fn run(step: &Step) -> Outcome {
 /// (`sccache`), except for sccache's own step.
 fn spawn(step: &Step) -> Result<Child, String> {
     let mut command = Command::new(&step.program);
+    // Every step gets the cache, builds or not, and so every step is
+    // refused without sccache: one rule, rather than a list of which
+    // steps compile that could fall behind. sccache's own step is the
+    // exception, since it is the check.
     if step.program != "sccache" {
         crate::sccache::apply(&mut command)?;
     }
@@ -97,7 +101,7 @@ fn wait(child: &mut Child, deadline: Option<Duration>) -> Result<bool, String> {
 /// `kill -KILL -<pid>` the group survived on the runner: vapors run
 /// 40006425576, where the gate's deadline test took 21 s, and likewise vapors
 /// #30. The kill's own failure is returned to be reported.
-fn kill_group(child: &mut Child) -> Result<(), String> {
+pub(crate) fn kill_group(child: &mut Child) -> Result<(), String> {
     let group = format!("-{}", child.id());
     let killed = Command::new("kill")
         .args(["-s", "KILL", "--", &group])
@@ -106,6 +110,8 @@ fn kill_group(child: &mut Child) -> Result<(), String> {
     let _ = child.wait();
     match killed {
         Ok(out) if out.status.success() => Ok(()),
+        // ESRCH: every process of the group had exited by the kill.
+        Ok(out) if String::from_utf8_lossy(&out.stderr).contains("No such process") => Ok(()),
         Ok(out) => Err(format!(
             "kill -s KILL -- {group}: {}",
             String::from_utf8_lossy(&out.stderr).trim()
@@ -145,3 +151,7 @@ fn joined(handle: Option<JoinHandle<String>>) -> String {
     }
     handle.join().unwrap_or_default()
 }
+
+#[cfg(test)]
+#[path = "command_tests.rs"]
+mod tests;

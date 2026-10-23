@@ -53,10 +53,19 @@ pub fn apply(command: &mut Command) -> Result<(), String> {
 }
 
 /// The environment `apply` sets.
-pub const ENV: [(&str, &str); 3] = [
+pub const ENV: [(&str, &str); 4] = [
     ("RUSTC_WRAPPER", "sccache"),
     ("CARGO_INCREMENTAL", "0"),
+    SERVER_ENV[0],
+    SERVER_ENV[1],
+];
+
+/// The settings a server takes when it starts. `SCCACHE_IDLE_TIMEOUT=0`:
+/// a server that stopped after 600 s idle and restarted would zero its
+/// counters mid-run and hide cache errors.
+const SERVER_ENV: [(&str, &str); 2] = [
     ("SCCACHE_CACHE_SIZE", CACHE_SIZE),
+    ("SCCACHE_IDLE_TIMEOUT", "0"),
 ];
 
 /// Whether sccache answered, checked once per xtask run.
@@ -77,7 +86,11 @@ pub fn stats() -> Result<Stats, String> {
         &["--show-stats", "--stats-format", "json"],
         FIX,
     );
-    step.env = vec![("SCCACHE_CACHE_SIZE".to_owned(), CACHE_SIZE.to_owned())];
+    // The server, if this starts it, takes these settings.
+    step.env = SERVER_ENV
+        .iter()
+        .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
+        .collect();
     step.deadline = Some(ANSWER_DEADLINE);
     let outcome = crate::command::run(&step);
     if !outcome.passed {
@@ -152,7 +165,12 @@ fn check_size(value: &Value) -> Result<(), String> {
 ///
 /// Cache errors between the readings: those compilations ran uncached.
 pub fn hit_rate(before: Stats, after: Stats) -> Result<String, String> {
-    let errors = after.errors.saturating_sub(before.errors);
+    if after.hits < before.hits || after.misses < before.misses || after.errors < before.errors {
+        return Err(format!(
+            "sccache's counters went down ({before:?} to {after:?}): its server restarted during the run, so cache errors before the restart are not counted; fix: rerun (xtask starts the server with SCCACHE_IDLE_TIMEOUT=0; `sccache --stop-server` restarts it)"
+        ));
+    }
+    let errors = after.errors - before.errors;
     if errors > 0 {
         return Err(format!(
             "{errors} cache errors this run, so those compilations ran uncached; fix: check `sccache --show-stats` and the disk under ~/.cache/sccache"
@@ -162,8 +180,8 @@ pub fn hit_rate(before: Stats, after: Stats) -> Result<String, String> {
 }
 
 fn rate(before: Stats, after: Stats) -> String {
-    let hits = after.hits.saturating_sub(before.hits);
-    let misses = after.misses.saturating_sub(before.misses);
+    let hits = after.hits - before.hits;
+    let misses = after.misses - before.misses;
     let total = hits + misses;
     if total == 0 {
         return "sccache: no compilations this run (everything was fresh)".to_owned();
