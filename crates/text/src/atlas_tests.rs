@@ -33,6 +33,7 @@ fn request_at(font: &FontData, c: char, subpixel: u8, size: f32) -> GlyphRequest
         coords: &[],
         subpixel,
         hinting: Hinting::Light,
+        skew: 0.0,
     }
 }
 

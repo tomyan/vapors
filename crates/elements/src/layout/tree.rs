@@ -75,9 +75,7 @@ impl BoxTree<'_> {
             &node.style,
             |handle, basis| calcs.resolve(handle, basis),
             |known, available| match &node.content {
-                Content::Text { text, style, .. } => {
-                    measure_text(fonts, scale, text, style, known, available)
-                }
+                Content::Text(run) => measure_text(fonts, scale, run, known, available),
                 Content::Element(_) => taffy::Size::ZERO,
             },
         )

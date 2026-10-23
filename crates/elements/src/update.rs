@@ -87,26 +87,31 @@ impl Document {
             if !implemented(&self.arena, node) {
                 continue;
             }
-            let flex_item = self
-                .parent(node)
-                .and_then(|parent| out.get(&parent))
-                .is_some_and(|parent: &Used| {
-                    matches!(
-                        parent.layout.display,
-                        taffy::Display::Flex | taffy::Display::Grid
-                    )
-                });
+            let parent_used: Option<&Used> = self.parent(node).and_then(|parent| out.get(&parent));
+            let flex_item = parent_used.is_some_and(|parent| {
+                matches!(
+                    parent.layout.display,
+                    taffy::Display::Flex | taffy::Display::Grid
+                )
+            });
+            let in_inline = parent_used.is_some_and(|parent| parent.inline);
             let own = styles.of(node);
             calcs.add(own, &describe(&self.arena, node));
             let parent = self.parent(node).map(|parent| styles.of(parent));
             let context = Context {
                 initial: &initial,
                 flex_item,
+                in_inline,
                 scale: viewport.scale,
             };
             match used(ElementStyles { own, parent }, &context) {
                 Ok(style) => drop(out.insert(node, style)),
                 Err(refusals) => errors.extend(self.unhonoured(node, refusals)),
+            }
+        }
+        for node in elements(&self.arena, self.root()) {
+            if out.get(&node).is_some_and(|style| style.inline) {
+                errors.extend(self.mixed_metrics(node, &out, viewport.scale));
             }
         }
         if errors.is_empty() {

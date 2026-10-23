@@ -1,5 +1,5 @@
 //! What a button refuses until later slices: `disabled="false"`, which
-//! disables in HTML, and inline layout outside a flex or grid
+//! disables in HTML, and an atomic inline outside a flex or grid
 //! container.
 
 mod support;
@@ -29,7 +29,7 @@ fn a_disabled_attribute_of_false_is_refused_since_it_disables() {
 }
 
 #[test]
-fn a_button_outside_a_flex_container_is_refused_until_inline_layout() {
+fn a_button_outside_a_flex_or_grid_container_is_refused_as_an_atomic_inline() {
     // Given: body is a block container, so the button stays inline-block
     let mut doc = document();
     let body = doc.body();
@@ -42,7 +42,7 @@ fn a_button_outside_a_flex_container_is_refused_until_inline_layout() {
     assert!(
         errors
             .iter()
-            .any(|e| e.contains("`display: inline-block`") && e.contains("F2c S6")),
+            .any(|e| e.contains("`display: inline-block`") && e.contains("atomic inline")),
         "{errors:?}"
     );
 }

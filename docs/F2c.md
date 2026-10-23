@@ -646,6 +646,65 @@ differs from the plan.
 - **Not in S5.** `@keyframes` names stay global; `:global { ... }` blocks
   and `:global` inside `:is()` are not supported.
 
+### S6
+
+- **Inline runs.** A block's consecutive inline content (text, and
+  `display: inline` elements, nested) is one inline run: one string,
+  with white space collapsed across element boundaries, and each inline
+  element's byte range and text style. Taffy lays a run out as one
+  anonymous block. Parley lays it out with each element's style over
+  its range.
+- **Inline boxes.** Each inline element has one fragment per line it is
+  on (`Layout::fragments`, without the space a line breaks after).
+  - A fragment is the element's content area, placed as Chromium places
+    it: the line's half-leading over the block's font, the block's
+    ascent, less the element's ascent. Every ascent and descent is
+    rounded to a device pixel.
+  - The fragments' union is the element's border box.
+  - Each fragment takes the pointer, and is filled with the element's
+    background before the text.
+
+  `inline_text.wisp` and `text_align.wisp` match Chromium within
+  0.1 px. Chromium sums advances in 1/64 px, Parley in floats.
+- **Text properties.**
+  - Read now: `font-style` (italic and oblique), `letter-spacing` and
+    `text-align` (left to right only).
+  - The bundled faces have no italic. vapors draws Skia's synthetic
+    slant (`SYNTHETIC_SLANT`, a quarter), as Chromium does.
+  - `bolder` and `lighter` compute to numbers from the inherited
+    weight (CSS Fonts 4's table, in vapors-css). `b` and `strong` are
+    `bolder`, as in Chromium's UA sheet.
+  - Deferred to a slice after F2c: `font-feature-settings`,
+    `font-variation-settings`, `text-decoration` and families by name.
+- **Tags.** `span`, `b`, `strong`, `em`, `i`, `var`, `code`, `kbd`,
+  `samp`, `mark` and `abbr` are implemented.
+  - `small` waits: Chromium resolves `smaller` through a keyword table.
+  - `br` and `a` come first after F2c (D6). `del`, `s`, `sub`, `sup`
+    and `u` are not scheduled.
+  - Generic `monospace` is the bundled Geist Mono (D5).
+  - Chromium's 13 px default for `code` under a `medium` font size is
+    not copied.
+- **Refused, naming the element:**
+  - an inline element whose font size, content area or line height
+    differs from its block's. Chromium's line baseline is the maximum
+    over the strut and every inline box of its rounded ascent plus
+    half-leading, and vapors places inline boxes on the block's strut.
+    A line mixing metrics comes in a slice after F2c. Weight and face
+    alone are laid out: the bundled faces share their vertical metrics.
+  - text from a right-to-left script, or a right-to-left mark. Runs are
+    laid out left to right (Parley's base direction set to Ltr).
+  - a block inside an inline element;
+  - a margin, padding or border on an inline element;
+  - an atomic inline (`inline-block`) outside a flex or grid container.
+
+  A grid container now blockifies its children, as a flex container
+  does.
+- **Demo.** `text`: a heading and one paragraph of bold, italic and
+  code that wraps, with a span that counts its own taps and turns
+  yellow once tapped. Its pixel checks click the span at 640x400 and
+  390x800. With spans out of the hit list, the span stays white and the
+  check fails.
+
 ## Decisions (2026-10-23)
 
 - **D1 Scoping.** A compiler change in S5: `mount` registers its
@@ -664,3 +723,12 @@ differs from the plan.
   0.15 changed in the areas vapors uses. cargo-deny's advisories check
   stays on. The Chromium corpus is the regression gate; a layout bug
   it catches in Taffy is reported before it is worked around.
+- **D5 Monospace is Geist Mono (2026-10-23).** Generic `monospace` (and
+  `ui-monospace`) is the bundled Geist Mono, the brand's monospace,
+  where Chromium uses the system's (DejaVu Sans Mono on this Debian).
+  Layout fixtures that compare monospace text name Geist Mono, so they
+  compare like for like. Chromium's 13 px default size for monospace
+  under a `medium` font size is not copied.
+- **D6 `br` and `a` in F2d (2026-10-23).** Forced line breaks and links
+  are the first item after F2c: touche's chat panel and About page need
+  them. Until then they are refused, naming F2d.

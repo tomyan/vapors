@@ -50,12 +50,12 @@ fn an_inherited_refused_value_is_refused_once_at_the_element_that_declared_it() 
 
 #[test]
 fn an_inherited_deferred_property_is_refused_once_at_its_declarer() {
-    // Given: letter-spacing (deferred, inherited) on .outer
+    // Given: font-feature-settings (deferred, inherited) on .outer
     let mut doc = document();
     let body = doc.body();
     let outer = element(&mut doc, body, "div", "outer");
     element(&mut doc, outer, "div", "inner");
-    doc.add_stylesheet("app.css", ".outer { letter-spacing: 1px; }")
+    doc.add_stylesheet("app.css", ".outer { font-feature-settings: \"liga\" 0; }")
         .expect("parses");
 
     // When
@@ -64,7 +64,7 @@ fn an_inherited_deferred_property_is_refused_once_at_its_declarer() {
     // Then
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(
-        errors[0].contains("<div class=\"outer\">") && errors[0].contains("letter-spacing"),
+        errors[0].contains("<div class=\"outer\">") && errors[0].contains("font-feature-settings"),
         "{errors:?}"
     );
 }

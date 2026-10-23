@@ -61,6 +61,7 @@ pub(crate) fn style(
     }
     let font_size_id = PropertyId::from_name("font-size").expect("table");
     values[font_size_id.index()] = Value::Length(Length::px(font_size));
+    super::font_weight::resolve_relative(&mut values, parent);
     let positions = winners
         .longhands
         .iter()

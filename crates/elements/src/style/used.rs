@@ -8,6 +8,7 @@ use super::box_style;
 use super::cursor::{Cursor, cursor};
 use super::decoration::{Decoration, decoration};
 use super::honoured::check_honoured;
+use super::inline;
 use super::text_style::{TextStyle, color, text_style};
 use super::values::{Reader, Refusal, Styles, keyword};
 
@@ -24,6 +25,8 @@ pub(crate) struct Used {
     pub(crate) visible: bool,
     /// `pointer-events: auto`.
     pub(crate) takes_pointer: bool,
+    /// `display: inline`: its text joins its parent's inline run.
+    pub(crate) inline: bool,
 }
 
 /// What a used style depends on besides the element's computed styles.
@@ -32,6 +35,8 @@ pub(crate) struct Context<'a> {
     pub(crate) initial: &'a ComputedStyle,
     /// The parent is a flex or grid container, which blockifies it.
     pub(crate) flex_item: bool,
+    /// The parent is an inline element.
+    pub(crate) in_inline: bool,
     /// Device pixels per CSS pixel, for border widths.
     pub(crate) scale: f32,
 }
@@ -42,8 +47,16 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
     let mut reader = Reader::new(styles);
     let text = text_style(&mut reader);
     let decoration = decoration(&mut reader, context.scale, text.color);
+    let layout = box_style(&mut reader, context.flex_item, decoration.border);
+    let inline = inline::is_inline(&mut reader, context.flex_item);
+    if inline {
+        inline::refuse_box_edges(&mut reader, &layout);
+    } else if context.in_inline && layout.display != taffy::Display::None {
+        reader.refuse("display", inline::BLOCK_IN_INLINE.to_owned());
+    }
     let result = Used {
-        layout: box_style(&mut reader, context.flex_item, decoration.border),
+        layout,
+        inline,
         text,
         background: reader.read("background-color", color, Color::default()),
         decoration,

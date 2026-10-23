@@ -8,6 +8,7 @@ mod cursor;
 mod decoration;
 mod grid_style;
 mod honoured;
+mod inline;
 mod scope;
 mod sizes;
 mod text_style;
@@ -25,6 +26,8 @@ use crate::error::ElementError;
 pub(crate) use box_style::box_style;
 pub use cursor::{ALL_CURSORS, Cursor};
 pub(crate) use decoration::BoxShadow;
+#[cfg(test)]
+pub(crate) use text_style::Face;
 pub(crate) use text_style::TextStyle;
 pub(crate) use used::{Context, Used, used};
 pub(crate) use values::{Refusal, Styles as ElementStyles};

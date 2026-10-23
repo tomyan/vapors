@@ -30,6 +30,9 @@ pub struct LayoutOptions {
     pub align: Align,
     /// Device pixels per logical pixel; the layout is in device pixels.
     pub scale: f32,
+    /// The paragraph's base direction. `Auto`, the default, takes it
+    /// from the text's first strong character.
+    pub direction: parley::BaseDirection,
 }
 
 impl Default for LayoutOptions {
@@ -38,6 +41,7 @@ impl Default for LayoutOptions {
             width: None,
             align: Align::Start,
             scale: 1.0,
+            direction: parley::BaseDirection::Auto,
         }
     }
 }
@@ -49,6 +53,10 @@ pub struct LineInfo {
     pub text_range: Range<usize>,
     /// Baseline y, unsnapped.
     pub baseline: f32,
+    /// The line box's top, device pixels.
+    pub top: f32,
+    /// The line box's height, device pixels.
+    pub height: f32,
     /// Inked width.
     pub advance: f32,
 }
@@ -76,6 +84,11 @@ pub struct GlyphRun {
     pub size: f32,
     /// Variation coordinates the run was shaped with.
     pub coords: Vec<NormalizedCoord>,
+    /// How far x moves right per pixel up: [`SYNTHETIC_SLANT`] when the
+    /// run's italic is synthesised, else 0.
+    ///
+    /// [`SYNTHETIC_SLANT`]: crate::SYNTHETIC_SLANT
+    pub skew: f32,
     /// Ink colour.
     pub color: Color,
     /// The glyphs, in visual order.
@@ -99,6 +112,8 @@ pub struct PlacedGlyph<'a> {
     pub size: f32,
     /// Variation coordinates the run was shaped with.
     pub coords: &'a [NormalizedCoord],
+    /// The run's slant (see [`GlyphRun::skew`]).
+    pub skew: f32,
     /// Ink colour.
     pub color: Color,
 }

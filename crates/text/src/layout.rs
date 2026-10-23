@@ -12,6 +12,7 @@ use crate::style::{Span, Style};
 /// A paragraph laid out by Parley, in device pixels.
 pub struct Layout {
     inner: parley::Layout<Color>,
+    text: String,
     scale: f32,
     runs: Vec<GlyphRun>,
 }
@@ -38,6 +39,7 @@ impl Layout {
         options: &LayoutOptions,
     ) -> Self {
         let mut builder = system.ranged_builder(text, options.scale);
+        builder.set_base_direction(options.direction);
         for property in base.properties(options.scale) {
             builder.push_default(property);
         }
@@ -52,6 +54,7 @@ impl Layout {
         let runs = glyph_runs(&inner);
         Self {
             inner,
+            text: text.to_owned(),
             scale: options.scale,
             runs,
         }
@@ -80,6 +83,8 @@ impl Layout {
         self.inner.lines().map(|line| LineInfo {
             text_range: line.text_range(),
             baseline: line.metrics().baseline,
+            top: line.metrics().block_min_coord,
+            height: line.metrics().block_max_coord - line.metrics().block_min_coord,
             advance: line.metrics().advance,
         })
     }
@@ -101,6 +106,7 @@ impl Layout {
                 advance: g.advance,
                 size: run.size,
                 coords: &run.coords,
+                skew: run.skew,
                 color: run.color,
             })
         })
@@ -124,6 +130,12 @@ impl Layout {
             .map(|c| c.advance())
             .sum();
         line.metrics().offset + run_offset(&line, &run) + before
+    }
+
+    /// The text laid out.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
     }
 
     /// Parley's layout, for details this type does not expose.

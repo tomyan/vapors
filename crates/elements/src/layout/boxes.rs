@@ -1,30 +1,26 @@
 //! The box tree: what Taffy lays out, derived from the document on each
-//! update. An element with `display: none` has no box; each run of
-//! consecutive text nodes becomes an anonymous text box whose text is
-//! collapsed as `white-space: normal` collapses it, and a run that
-//! collapses to nothing has no box (the empty anchors `{if}` and `{for}`
-//! leave, and the whitespace between blocks).
+//! update. An element with `display: none` has no box. Each run of a
+//! block's consecutive inline content (text nodes and `display: inline`
+//! elements) becomes one anonymous box holding an [`InlineRun`]; a run
+//! that collapses to nothing has no box (the empty anchors `{if}` and
+//! `{for}` leave, and the whitespace between blocks).
 
 use std::collections::HashMap;
 
 use taffy::{Cache, Display, Layout, Style};
 use vapors_dom::NodeId;
 
+use super::inline::{Collector, InlineRun, InlineSpan};
 use crate::arena::Arena;
 use crate::node::Kind;
-use crate::style::{TextStyle, Used};
+use crate::style::Used;
 
 /// What a box is.
 pub(crate) enum Content {
     /// An element's box; its children are boxes too.
     Element(NodeId),
-    /// An anonymous box holding collapsed text in its parent's style;
-    /// `visible` is the parent's `visibility`.
-    Text {
-        text: String,
-        style: TextStyle,
-        visible: bool,
-    },
+    /// An anonymous box holding an inline run.
+    Text(InlineRun),
 }
 
 /// One box: its content, Taffy style, children, and Taffy's results.
@@ -48,95 +44,79 @@ impl LayoutBox {
     }
 }
 
+/// What building reads: the tree and each element's used style.
+struct Source<'a> {
+    arena: &'a Arena,
+    used: &'a HashMap<NodeId, Used>,
+}
+
 /// Builds the boxes under `root`; box 0 is the root's.
 pub(crate) fn build(arena: &Arena, used: &HashMap<NodeId, Used>, root: NodeId) -> Vec<LayoutBox> {
     let mut boxes = Vec::new();
-    add_element(arena, used, root, &mut boxes);
+    add_element(&Source { arena, used }, root, &mut boxes);
     boxes
 }
 
-fn add_element(
-    arena: &Arena,
-    used: &HashMap<NodeId, Used>,
-    node: NodeId,
-    boxes: &mut Vec<LayoutBox>,
-) -> Option<usize> {
-    let style = &used[&node];
+fn add_element(source: &Source<'_>, node: NodeId, boxes: &mut Vec<LayoutBox>) -> Option<usize> {
+    let style = &source.used[&node];
     if style.layout.display == Display::None {
         return None;
     }
     let index = boxes.len();
     boxes.push(LayoutBox::new(Content::Element(node), style.layout.clone()));
-    let mut run = String::new();
-    for child in arena.children(node) {
-        match &arena.get(child, "build").kind {
-            Kind::Text(text) => run.push_str(text),
+    let mut run = Collector::new(style.text, style.visible);
+    for child in source.arena.children(node) {
+        match &source.arena.get(child, "build").kind {
+            Kind::Text(text) => run.push_text(text),
+            // No box, and no break in the run around it (CSS Display 3,
+            // 2.5: `display: none` generates nothing).
+            Kind::Element(_) if source.used[&child].layout.display == Display::None => {}
+            Kind::Element(_) if source.used[&child].inline => add_inline(source, child, &mut run),
             Kind::Element(_) => {
-                add_text(&mut run, style, index, boxes);
-                if let Some(child_box) = add_element(arena, used, child, boxes) {
+                let ended = std::mem::replace(&mut run, Collector::new(style.text, style.visible));
+                add_run(ended, index, boxes);
+                if let Some(child_box) = add_element(source, child, boxes) {
                     boxes[index].children.push(child_box);
                 }
             }
         }
     }
-    add_text(&mut run, style, index, boxes);
+    add_run(run, index, boxes);
     Some(index)
 }
 
-fn add_text(run: &mut String, parent_style: &Used, parent: usize, boxes: &mut Vec<LayoutBox>) {
-    let text = collapse(run);
-    run.clear();
-    if text.is_empty() {
+/// An inline element's text into `run`, its inline descendants' too.
+/// A block inside one is refused when styles are read.
+fn add_inline(source: &Source<'_>, node: NodeId, run: &mut Collector) {
+    let style = &source.used[&node];
+    if style.layout.display == Display::None {
         return;
     }
+    let (slot, start) = (run.open(), run.position());
+    for child in source.arena.children(node) {
+        match &source.arena.get(child, "build").kind {
+            Kind::Text(text) => run.push_text(text),
+            Kind::Element(_) => add_inline(source, child, run),
+        }
+    }
+    let span = InlineSpan {
+        node,
+        range: start..run.position(),
+        style: style.text,
+        visible: style.visible,
+    };
+    run.close(slot, span);
+}
+
+fn add_run(run: Collector, parent: usize, boxes: &mut Vec<LayoutBox>) {
+    let Some(run) = run.finish() else {
+        return;
+    };
     let index = boxes.len();
     let box_style = Style {
         display: Display::Block,
         ..Style::default()
     };
-    let content = Content::Text {
-        text,
-        style: parent_style.text,
-        visible: parent_style.visible,
-    };
-    boxes.push(LayoutBox::new(content, box_style));
+    boxes.push(LayoutBox::new(Content::Text(run), box_style));
     boxes[parent].children.push(index);
-}
-
-/// `white-space: normal`: each run of spaces, tabs and line breaks is
-/// one space, and none is kept at either end of the run.
-pub(crate) fn collapse(text: &str) -> String {
-    text.split([' ', '\t', '\n', '\r', '\u{c}'])
-        .filter(|word| !word.is_empty())
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::collapse;
-
-    #[test]
-    fn whitespace_runs_collapse_to_one_space_and_the_ends_are_trimmed() {
-        // Given
-        let text = "\n    Hello,\t  vapors \n";
-
-        // When
-        let collapsed = collapse(text);
-
-        // Then
-        assert_eq!(collapsed, "Hello, vapors");
-    }
-
-    #[test]
-    fn a_no_break_space_is_not_collapsed() {
-        // Given
-        let text = "a\u{a0}\u{a0}b";
-
-        // When
-        let collapsed = collapse(text);
-
-        // Then
-        assert_eq!(collapsed, "a\u{a0}\u{a0}b");
-    }
 }

@@ -31,6 +31,11 @@ fn glyph_run(run: &parley::GlyphRun<'_, Color>) -> GlyphRun {
         font: inner.font().clone(),
         size: inner.font_size(),
         coords: inner.normalized_coords().to_vec(),
+        skew: if inner.synthesis().skew().is_some() {
+            crate::SYNTHETIC_SLANT
+        } else {
+            0.0
+        },
         color: run.style().brush,
         glyphs: run
             .positioned_glyphs()

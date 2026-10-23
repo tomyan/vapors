@@ -3,6 +3,7 @@
 
 mod boxes;
 mod calcs;
+mod inline;
 mod measure;
 mod tree;
 
@@ -11,6 +12,7 @@ use vapors_text::FontSystem;
 
 pub(crate) use boxes::{Content, LayoutBox, build};
 pub(crate) use calcs::Calcs;
+pub(crate) use inline::{InlineRun, InlineSpan};
 pub(crate) use measure::text_layout;
 use tree::BoxTree;
 
