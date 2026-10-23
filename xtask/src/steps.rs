@@ -203,3 +203,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "steps_nextest_tests.rs"]
+mod nextest_tests;
