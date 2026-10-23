@@ -80,17 +80,26 @@ impl ImageApp {
     }
 }
 
+impl ImageApp {
+    /// What a frame shows: when it changes, the app asks for a frame.
+    fn shown(&self) -> (vapors_scene::Transform, bool, Option<String>) {
+        (
+            self.view.transform(),
+            self.view.has_image(),
+            self.file_name.clone(),
+        )
+    }
+}
+
+/// Draws only when the view, the image or the file name changes: an
+/// idle image app draws no frames.
 impl App for ImageApp {
     fn event(&mut self, event: Event, platform: &Platform) {
-        if self.opens_picker(&event)
-            && let Err(error) = platform.pick_file(&Self::file_kinds())
-        {
-            report_error(&error.to_string());
+        let before = self.shown();
+        self.handle(&event, platform);
+        if self.shown() != before {
+            platform.request_redraw();
         }
-        if let Event::FileOpened { name, bytes } = &event {
-            self.file_opened(name, bytes);
-        }
-        self.view.event(&event);
     }
 
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
@@ -100,7 +109,21 @@ impl App for ImageApp {
             .label
             .get_or_insert_with(|| LabelDraw::new(frame.device, frame.texture.format()));
         label.draw(frame, &mut self.fonts, &text);
-        Next::Continue
+        Next::Wait
+    }
+}
+
+impl ImageApp {
+    fn handle(&mut self, event: &Event, platform: &Platform) {
+        if self.opens_picker(event)
+            && let Err(error) = platform.pick_file(&Self::file_kinds())
+        {
+            report_error(&error.to_string());
+        }
+        if let Event::FileOpened { name, bytes } = event {
+            self.file_opened(name, bytes);
+        }
+        self.view.event(event);
     }
 }
 

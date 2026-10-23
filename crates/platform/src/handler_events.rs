@@ -35,6 +35,7 @@ impl ApplicationHandler<Message> for Handler {
             // records before it wakes. Nothing to do if it ever did.
             Message::DeviceLost => {}
         }
+        self.redraw_if_asked();
     }
 
     /// A lost device stops everything here first: a resize would
@@ -51,10 +52,15 @@ impl ApplicationHandler<Message> for Handler {
             && let Some(gpu) = self.gpu.as_mut()
         {
             gpu.resize(size.width, size.height);
+            self.platform.request_redraw();
+        }
+        if let WindowEvent::ScaleFactorChanged { .. } = event {
+            self.platform.request_redraw();
         }
         for app_event in self.input.translate(&event) {
             self.app.event(app_event, &self.platform);
         }
+        self.redraw_if_asked();
         if let WindowEvent::RedrawRequested = event {
             self.redraw(event_loop);
         }

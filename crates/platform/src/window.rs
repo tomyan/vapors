@@ -58,8 +58,14 @@ impl Frame<'_> {
 /// What the app wants after a frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Next {
-    /// Keep going.
+    /// Draw again as soon as possible: every display refresh, for an app
+    /// that is animating.
     Continue,
+    /// Draw again only when something changes: when the app calls
+    /// [`Platform::request_redraw`](crate::Platform::request_redraw)
+    /// while handling an event, or the window needs it (shown, resized,
+    /// its scale changed). An idle app that returns this draws nothing.
+    Wait,
     /// Close the window and return from [`run`].
     Exit,
 }

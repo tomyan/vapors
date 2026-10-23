@@ -9,12 +9,14 @@ use crate::PlatformError;
 use crate::device_lost::{DeviceLost, Lost};
 use crate::file_kind::{self, FileKind};
 use crate::picker;
+use crate::redraw::RedrawFlag;
 use crate::window::Message;
 
 /// Given to the app with every event.
 pub struct Platform {
     proxy: EventLoopProxy<Message>,
     lost: DeviceLost,
+    redraw: RedrawFlag,
 }
 
 impl Platform {
@@ -22,7 +24,20 @@ impl Platform {
         Self {
             proxy,
             lost: DeviceLost::default(),
+            redraw: RedrawFlag::default(),
         }
+    }
+
+    /// Ask for a frame: what an app that returns
+    /// [`Next::Wait`](crate::Next::Wait) calls from `event` when what it
+    /// shows has changed. Several calls before the frame draw it once.
+    pub fn request_redraw(&self) {
+        self.redraw.raise();
+    }
+
+    /// Whether a frame was asked for since the last call; clears it.
+    pub(crate) fn take_redraw_request(&self) -> bool {
+        self.redraw.take()
     }
 
     /// The state the window's device is watched into.
