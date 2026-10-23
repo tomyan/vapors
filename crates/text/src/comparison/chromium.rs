@@ -125,16 +125,23 @@ impl Chromium {
         Ok(image)
     }
 
-    /// The DOM of `html` at `width` by `height` CSS pixels, after its
-    /// scripts and fonts have settled, as `--dump-dom` prints it.
+    /// The DOM of `html` at `width` by `height` CSS pixels and device
+    /// scale `scale`, after its scripts and fonts have settled, as
+    /// `--dump-dom` prints it.
     ///
     /// # Errors
     ///
     /// [`ChromiumError::Failed`] when it exits non-zero or hangs past the
     /// deadline.
-    pub fn dump_dom(&self, html: &Path, width: u32, height: u32) -> Result<String, ChromiumError> {
+    pub fn dump_dom(
+        &self,
+        html: &Path,
+        width: u32,
+        height: u32,
+        scale: f64,
+    ) -> Result<String, ChromiumError> {
         let mut child = self
-            .command(width, height, 1)
+            .command(width, height, scale)
             .arg("--dump-dom")
             .arg(format!("file://{}", html.display()))
             .stdout(Stdio::piped())
@@ -164,7 +171,7 @@ impl Chromium {
         height: u32,
         scale: u32,
     ) -> Result<Child, ChromiumError> {
-        self.command(width, height, scale)
+        self.command(width, height, f64::from(scale))
             .arg(format!("--screenshot={}", png.display()))
             .arg(format!("file://{}", html.display()))
             .stdout(Stdio::null())
@@ -176,7 +183,7 @@ impl Chromium {
     /// xdg-desktop-portal over the session bus before its first request;
     /// where the portal cannot start, D-Bus activation waits 120 s. With
     /// no session bus address it skips that.
-    fn command(&self, width: u32, height: u32, scale: u32) -> Command {
+    fn command(&self, width: u32, height: u32, scale: f64) -> Command {
         let mut command = Command::new(&self.binary);
         command
             .env_remove("DBUS_SESSION_BUS_ADDRESS")

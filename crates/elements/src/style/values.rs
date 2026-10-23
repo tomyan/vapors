@@ -83,6 +83,12 @@ impl<'a> Reader<'a> {
         }
     }
 
+    /// Records a refusal of `property`'s value for `reason` (unless the
+    /// value is inherited unchanged, which its declarer reports).
+    pub(crate) fn refuse(&mut self, property: &'static str, reason: String) {
+        self.refusals.extend(self.styles.refusal(property, reason));
+    }
+
     /// The computed value of `property`.
     ///
     /// # Panics

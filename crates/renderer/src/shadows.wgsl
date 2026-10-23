@@ -54,12 +54,21 @@ fn corner_radius(p: vec2<f32>, centre: vec2<f32>, radii: vec4<f32>) -> f32 {
     return select(radii.z, radii.y, p.y < centre.y);
 }
 
+fn corner_term(p: vec2<f32>, corner: vec2<f32>, inward: vec2<f32>, r: f32) -> f32 {
+    let centre = corner + inward * r;
+    let in_square = all((p - centre) * inward < vec2(0.0));
+    return select(-1e9, length(p - centre) - r, r > 0.0 && in_square);
+}
+
+// As in quads.wgsl: exact for radii fitted on the CPU, none clamped.
 fn rounded_distance(p: vec2<f32>, rect: vec4<f32>, radii: vec4<f32>) -> f32 {
-    let centre = (rect.xy + rect.zw) * 0.5;
-    let half = max((rect.zw - rect.xy) * 0.5, vec2(0.0));
-    let r = min(corner_radius(p, centre, radii), min(half.x, half.y));
-    let q = abs(p - centre) - half + vec2(r);
-    return length(max(q, vec2(0.0))) + min(max(q.x, q.y), 0.0) - r;
+    let q = max(rect.xy - p, p - rect.zw);
+    var d = max(q.x, q.y);
+    d = max(d, corner_term(p, rect.xy, vec2(1.0, 1.0), radii.x));
+    d = max(d, corner_term(p, vec2(rect.z, rect.y), vec2(-1.0, 1.0), radii.y));
+    d = max(d, corner_term(p, rect.zw, vec2(-1.0, -1.0), radii.z));
+    d = max(d, corner_term(p, vec2(rect.x, rect.w), vec2(1.0, -1.0), radii.w));
+    return d;
 }
 
 fn gaussian(x: f32, sigma: f32) -> f32 {
@@ -84,6 +93,8 @@ fn shadow_x(x: f32, y: f32, sigma: f32, corner: f32, half: vec2<f32>) -> f32 {
 fn blurred(p: vec2<f32>, rect: vec4<f32>, radii: vec4<f32>, sigma: f32) -> f32 {
     let centre = (rect.xy + rect.zw) * 0.5;
     let half = (rect.zw - rect.xy) * 0.5;
+    // The blur's closed form takes one radius, no larger than half the
+    // shorter side: its domain, not a clamp on what is drawn sharp.
     let corner = min(corner_radius(p, centre, radii), min(half.x, half.y));
     let q = p - centre;
     let low = q.y - half.y;

@@ -46,7 +46,27 @@ pub(crate) fn decoration(reader: &mut Reader<'_>, scale: f32, current: Rgba) -> 
         out.radii[i] = reader.read(corner_property(corner), radius, 0.0);
     }
     out.shadows = reader.read("box-shadow", |v| shadows(v, current), Vec::new());
+    refuse_elliptical_inner_corners(reader, &out);
     out
+}
+
+/// A rounded corner whose two borders differ in width has an elliptical
+/// inner edge (CSS Backgrounds 3 §5.2: each axis loses its own width);
+/// vapors draws circular corners, so it is refused.
+fn refuse_elliptical_inner_corners(reader: &mut Reader<'_>, decoration: &Decoration) {
+    // Each corner with its two sides, as indices into `border`.
+    let meeting = [(0, 3), (0, 1), (2, 1), (2, 3)];
+    for (i, (a, b)) in meeting.into_iter().enumerate() {
+        let (wa, wb) = (decoration.border[a], decoration.border[b]);
+        if decoration.radii[i] > 0.0 && (wa - wb).abs() > f32::EPSILON {
+            reader.refuse(
+                corner_property(CORNERS[i]),
+                format!(
+                    "rounds a corner where a {wa}px and a {wb}px border meet, which makes an elliptical inner corner; vapors draws circular corners, so give the two borders one width, or this corner no radius"
+                ),
+            );
+        }
+    }
 }
 
 fn border_width(reader: &mut Reader<'_>, side: &str, scale: f32) -> f32 {
@@ -148,6 +168,12 @@ fn one_shadow(value: &Value, current: Rgba) -> Result<BoxShadow, String> {
         }
     }
     let at = |i: usize| lengths.get(i).copied().unwrap_or(0.0);
+    if at(2) < 0.0 {
+        return Err(format!(
+            "has a negative blur radius ({} px), which CSS does not allow",
+            at(2)
+        ));
+    }
     Ok(BoxShadow {
         offset: [at(0), at(1)],
         blur: at(2),

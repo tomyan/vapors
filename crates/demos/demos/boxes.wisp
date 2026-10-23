@@ -34,7 +34,7 @@ body {
   border-bottom: 3px solid #1976d2;
   border-left: 3px solid #fbc02d;
 }
-.outline {
+.rounded {
   width: 150px;
   height: 90px;
   padding: 12px;
@@ -55,7 +55,7 @@ button { cursor: pointer; font-size: 14px; padding: 8px 16px; }
 <div class="cards">
   <div class="card">A card: rounded corners and a soft shadow.</div>
   <div class="sides">Four borders, one colour per side.</div>
-  <div class="outline">An outline with round corners.</div>
+  <div class="rounded">A 2px border with round corners.</div>
 </div>
 <div class="buttons">
   <button class="primary" onclick={press}>Primary</button>

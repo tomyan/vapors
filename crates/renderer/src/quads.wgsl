@@ -54,20 +54,27 @@ fn vs_main(@builtin(vertex_index) vertex: u32, instance: Instance) -> Out {
 }
 
 // The radius of the corner whose quadrant `p` is in, about the centre.
-fn corner_radius(p: vec2<f32>, centre: vec2<f32>, radii: vec4<f32>) -> f32 {
-    if (p.x < centre.x) {
-        return select(radii.w, radii.x, p.y < centre.y);
-    }
-    return select(radii.z, radii.y, p.y < centre.y);
+// The distance past one corner's arc, for a point in that corner's
+// square (the r x r square at the corner); otherwise none.
+fn corner_term(p: vec2<f32>, corner: vec2<f32>, inward: vec2<f32>, r: f32) -> f32 {
+    let centre = corner + inward * r;
+    let in_square = all((p - centre) * inward < vec2(0.0));
+    return select(-1e9, length(p - centre) - r, r > 0.0 && in_square);
 }
 
-// Signed distance from `p` to a rounded rectangle: negative inside.
+// Signed distance from `p` to a rectangle with circular corners of the
+// given radii, negative inside. Radii arrive already fitted to the box
+// (CSS's single factor, applied on the CPU), so a corner may be larger
+// than half a side when its neighbours are small; each corner is cut
+// in its own square, so no radius is clamped here.
 fn rounded_distance(p: vec2<f32>, rect: vec4<f32>, radii: vec4<f32>) -> f32 {
-    let centre = (rect.xy + rect.zw) * 0.5;
-    let half = max((rect.zw - rect.xy) * 0.5, vec2(0.0));
-    let r = min(corner_radius(p, centre, radii), min(half.x, half.y));
-    let q = abs(p - centre) - half + vec2(r);
-    return length(max(q, vec2(0.0))) + min(max(q.x, q.y), 0.0) - r;
+    let q = max(rect.xy - p, p - rect.zw);
+    var d = max(q.x, q.y);
+    d = max(d, corner_term(p, rect.xy, vec2(1.0, 1.0), radii.x));
+    d = max(d, corner_term(p, vec2(rect.z, rect.y), vec2(-1.0, 1.0), radii.y));
+    d = max(d, corner_term(p, rect.zw, vec2(-1.0, -1.0), radii.z));
+    d = max(d, corner_term(p, vec2(rect.x, rect.w), vec2(1.0, -1.0), radii.w));
+    return d;
 }
 
 // The side whose border `p` is in: the edge it is nearest to, measured
@@ -93,7 +100,16 @@ fn fs_main(in: Out) -> @location(0) vec4<f32> {
     let outer = clamp(0.5 - rounded_distance(in.pixel, in.rect, in.radii), 0.0, 1.0);
     let inner_rect = in.rect + vec4(in.border.w, in.border.x, -in.border.y, -in.border.z);
     let widest = max(max(in.border.x, in.border.y), max(in.border.z, in.border.w));
-    let inner_radii = max(in.radii - vec4(widest), vec4(0.0));
+    // Each inner corner is its outer radius less the borders that meet
+    // there; the element tree refuses a rounded corner whose two widths
+    // differ (that inner corner would be an ellipse), so they are equal.
+    let meeting = vec4(
+        max(in.border.x, in.border.w),
+        max(in.border.x, in.border.y),
+        max(in.border.z, in.border.y),
+        max(in.border.z, in.border.w),
+    );
+    let inner_radii = max(in.radii - meeting, vec4(0.0));
     let in_border = clamp(0.5 + rounded_distance(in.pixel, inner_rect, inner_radii), 0.0, 1.0);
     let edge = select(vec4(0.0), border_color(in), widest > 0.0);
     let m = select(0.0, in_border, widest > 0.0);

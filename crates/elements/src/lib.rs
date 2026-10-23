@@ -6,6 +6,7 @@
 
 mod arena;
 mod check;
+mod corners;
 mod css_element;
 mod document;
 mod dom_impl;

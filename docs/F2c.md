@@ -525,11 +525,29 @@ differs from the plan.
   same.
 - **Paint against Chromium.** `crates/elements-corpus/tests/gpu_paint.rs`
   draws each paint fixture with vapors and with headless Chromium at 1x
-  and 2x and compares the pixels: where Chromium's 3x3 neighbourhood is
-  one colour, ours must be within 2; elsewhere within 96, with at most
-  0.5% of pixels off by more than 2. Measured on `paint_boxes`: no flat
-  pixel off, the worst edge pixel off by 86 (a corner join), 0.275% off
-  at 1x and 0.151% at 2x. The composites are uploaded by CI's gpu job.
+  and 2x and holds the pixels to three rules (`paint_check`): where
+  Chromium's 3x3 neighbourhood is one colour, ours is within 2; every
+  pixel is within 96; and in each fixture element's border box, at most
+  2 pixels are off by more than half the local contrast (the larger
+  channel range of either image's 5x5 neighbourhood). The third rule is
+  what catches a wrong radius or a 1 px shift: a misplaced edge moves a
+  pixel by about the whole local contrast, anti-aliasing unlike Skia's
+  by a fraction of it. Measured on `paint_boxes` (2026-10-23): ours has
+  no pixel off by more than half the contrast in any element at 1x or
+  2x. `gpu_paint_rules.rs` checks the rules: Chromium's own rendering
+  with a radius, a shadow, a border width or a position changed must
+  fail them, at both scales. The composites are uploaded by CI's gpu
+  job.
+- **Radii.** Corner radii that do not fit their box are scaled by one
+  factor, the smallest of each side's length over the sum of its two
+  radii (Backgrounds 3 §5.5), computed in `paint`; the shader draws each
+  corner exactly. An inner corner's radius is the outer one less the
+  two border widths meeting there; where those widths differ the inner
+  corner is an ellipse, which vapors does not draw, so a radius with
+  unequal meeting widths is refused, naming the radius declaration. A
+  spread shadow's radius follows Backgrounds 3 §7.1.1, including the
+  reduced growth for a radius smaller than the spread. A negative blur
+  is refused.
 
 ## Decisions (2026-10-23)
 

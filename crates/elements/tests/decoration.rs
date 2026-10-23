@@ -131,3 +131,58 @@ fn the_cursor_is_the_hovered_elements_and_the_arrow_elsewhere() {
     assert_eq!((over, outside), (Cursor::Pointer, Cursor::Default));
     let _ = Document::hit;
 }
+
+#[test]
+fn a_rounded_corner_where_borders_of_two_widths_meet_is_refused_naming_it() {
+    // Given: the top-left corner is rounded and its borders are 2 and 4 px
+    let mut doc = document();
+    let body = doc.body();
+    element(&mut doc, body, "div", "box");
+    doc.add_stylesheet("app.css", ".box { border-top: 2px solid red; border-left: 4px solid red; border-top-left-radius: 8px; }")
+        .expect("parses");
+
+    // When
+    let errors = refusals(&mut doc);
+
+    // Then
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    let error = &errors[0];
+    assert!(
+        error.starts_with("app.css:1:63: <div class=\"box\">: `border-top-left-radius: 8px`"),
+        "{error}"
+    );
+    assert!(error.contains("elliptical inner corner"), "{error}");
+}
+
+#[test]
+fn equal_borders_at_a_rounded_corner_and_unequal_ones_at_a_square_corner_are_drawn() {
+    // Given: rounded top-left with equal widths; square bottom-right with 1 and 5
+    let sheet = "body { margin: 0; } .box { width: 10px; height: 10px; border-top: 2px solid red; border-left: 2px solid red; border-bottom: 1px solid red; border-right: 5px solid red; border-top-left-radius: 6px; }";
+
+    // When
+    let items = painted_items(sheet, 1.0);
+
+    // Then
+    assert_eq!(items.len(), 1, "{items:?}");
+}
+
+#[test]
+fn a_negative_shadow_blur_is_refused() {
+    // Given
+    let mut doc = document();
+    let body = doc.body();
+    element(&mut doc, body, "div", "box");
+    doc.add_stylesheet("app.css", ".box { box-shadow: 0 2px -4px red; }")
+        .expect("parses");
+
+    // When
+    let errors = refusals(&mut doc);
+
+    // Then
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("negative blur radius") && e.starts_with("app.css:1:")),
+        "{errors:?}"
+    );
+}

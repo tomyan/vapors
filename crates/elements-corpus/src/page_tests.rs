@@ -10,6 +10,7 @@ fn a_fixture_splits_into_style_template_and_viewport() {
 
     // Then
     assert_eq!(source.viewport, [320, 200]);
+    assert!((source.scale - 1.0).abs() < f64::EPSILON);
     assert!(source.style.contains("div { width: 1px; }"));
     assert_eq!(source.template, "\n<div></div>\n");
 }
@@ -24,6 +25,33 @@ fn a_fixture_without_a_viewport_comment_is_refused() {
 
     // Then
     assert!(error.contains("/* viewport WxH */"), "{error}");
+}
+
+#[test]
+fn a_viewport_may_name_a_device_scale() {
+    // Given
+    let text = "<style>/* viewport 640x400@2.625 */</style><div></div>";
+
+    // When
+    let source = split("x", text).expect("splits");
+
+    // Then
+    assert_eq!(source.viewport, [640, 400]);
+    assert!((source.scale - 2.625).abs() < f64::EPSILON);
+}
+
+#[test]
+fn a_viewport_with_a_scale_that_is_not_a_positive_number_is_refused() {
+    for scale in ["two", "0", "-1", ""] {
+        // Given
+        let text = format!("<style>/* viewport 640x400@{scale} */</style><div></div>");
+
+        // When
+        let error = split("x", &text).expect_err("refused");
+
+        // Then
+        assert!(error.contains("/* viewport WxH@S */"), "{scale}: {error}");
+    }
 }
 
 #[test]

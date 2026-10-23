@@ -94,6 +94,18 @@ impl Document {
             .map(|e| e.tag.as_str())
     }
 
+    /// An element's attribute, or `None` when it has none of that name
+    /// (or `node` is a text node).
+    #[must_use]
+    pub fn attribute(&self, node: NodeId, name: &str) -> Option<&str> {
+        self.arena
+            .get(node, "attribute")
+            .element()?
+            .attributes
+            .get(name)
+            .map(String::as_str)
+    }
+
     /// The text of a text node, or `None` for an element.
     #[must_use]
     pub fn text(&self, node: NodeId) -> Option<&str> {

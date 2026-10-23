@@ -10,6 +10,9 @@ body { margin: 0; padding: 16px; background-color: #e9ecef; display: flex; flex-
 .card { width: 120px; height: 70px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 12px #00000059; }
 .hard { width: 80px; height: 60px; background-color: #ffffff; box-shadow: 6px 6px 0 #171b1f; }
 .spread { width: 80px; height: 60px; background-color: #ffffff; border-radius: 4px; box-shadow: 0 0 0 4px #3a7bd5; }
+.soft { width: 80px; height: 60px; background-color: #ffffff; border-radius: 8px; }
+.corner { width: 60px; height: 60px; background-color: #3a7bd5; border-top-left-radius: 40px; }
+.mixed { width: 100px; height: 40px; background-color: #2e7d32; border-radius: 20px 9999px 9999px 20px; }
 </style>
 
 <div class="plain"></div>
@@ -20,3 +23,6 @@ body { margin: 0; padding: 16px; background-color: #e9ecef; display: flex; flex-
 <div class="card"></div>
 <div class="hard"></div>
 <div class="spread"></div>
+<div class="soft"></div>
+<div class="corner"></div>
+<div class="mixed"></div>

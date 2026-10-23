@@ -8,6 +8,7 @@ use vapors_dom::NodeId;
 use vapors_scene::{Color, Item, Quad, Rect, Scene, Shadow, TextId};
 use vapors_text::FontSystem;
 
+use crate::corners;
 use crate::layout::{BoxRect, Content, LayoutBox, text_layout};
 use crate::painted::Painted;
 use crate::style::{BoxShadow, TextStyle, Used};
@@ -97,7 +98,7 @@ fn paint_element(node: NodeId, rect: BoxRect, input: &PaintInput<'_>, out: &mut 
     }
     let border_box = snapped(rect, input.scale);
     let decoration = &used.decoration;
-    let radii = decoration.radii.map(|r| r * input.scale);
+    let radii = corners::fitted(decoration.radii.map(|r| r * input.scale), border_box);
     for shadow in decoration.shadows.iter().rev() {
         out.scene.push(Item::Shadow(shadow_item(
             shadow,
@@ -136,7 +137,7 @@ fn shadow_item(shadow: &BoxShadow, caster: Rect, radii: [f32; 4], scale: f32) ->
             caster.right + dx + spread,
             caster.bottom + dy + spread,
         ),
-        radii: radii.map(|r| if r > 0.0 { (r + spread).max(0.0) } else { 0.0 }),
+        radii: radii.map(|r| corners::spread(r, spread)),
         blur: shadow.blur * scale,
         color: shadow.color,
         caster,

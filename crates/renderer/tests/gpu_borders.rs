@@ -149,3 +149,27 @@ fn gpu_a_shadow_darkens_below_its_box_but_not_under_it() {
         "it fades with distance: {fading}"
     );
 }
+
+#[test]
+fn gpu_a_radius_larger_than_half_a_side_is_drawn_whole_when_its_neighbours_are_square() {
+    // Given: 40 on the top-left of a 60x60 box, square elsewhere (it fits:
+    // 40 + 0 on each side it touches)
+    let white = [255, 255, 255, 255];
+    let quad = Quad {
+        radii: [40.0, 0.0, 0.0, 0.0],
+        ..Quad::fill(Rect::new(0.0, 0.0, 60.0, 60.0), colour(white))
+    };
+
+    // When
+    let pixels = boxes(&[quad], 60, 60);
+
+    // Then: (10, 10) is 42 px from the arc's centre (40, 40), outside it;
+    // a radius clamped to half the side (30) would fill it
+    assert_eq!(pixel(&pixels, 60, 10, 10), BACK);
+    assert_eq!(pixel(&pixels, 60, 25, 25), white, "inside the 40 px arc");
+    assert_eq!(
+        pixel(&pixels, 60, 58, 1),
+        white,
+        "the square top-right corner"
+    );
+}
