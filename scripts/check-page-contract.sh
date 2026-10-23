@@ -38,15 +38,18 @@ browser() {
 # swiftshader and =native, --disable-vulkan-surface, ANGLE on Vulkan with
 # and without its features, Skia Graphite, and Vulkan off with the
 # SwiftShader adapter. With this driver run 39937335978 passed three times.
-# Validated paths, one per browser package (2026-10-23):
+# Validated paths, one per browser package (2026-10-23); a browser
+# elsewhere is refused:
 #   /opt/google/chrome/vk_swiftshader_icd.json  Google Chrome 155.0.8059.39 (the runner)
 #   /usr/lib/chromium/vk_swiftshader_icd.json   Chromium 155.0.8059.79 (Debian 13)
 # A browser update that moves or drops the file, or the library it names,
 # fails here by name.
 vulkan_driver() {
-  case $(readlink -f "$(command -v "$1")") in
+  binary=$(readlink -f "$(command -v "$1")")
+  case $binary in
     /opt/google/chrome/*) icd=/opt/google/chrome/vk_swiftshader_icd.json ;;
-    *) icd=/usr/lib/chromium/vk_swiftshader_icd.json ;;
+    /usr/bin/chromium | /usr/lib/chromium/*) icd=/usr/lib/chromium/vk_swiftshader_icd.json ;;
+    *) echo "$1 ($2) resolves to $binary, outside the browser packages this script has validated; fix: validate its vk_swiftshader_icd.json and add it to vulkan_driver in $0" >&2; exit 1 ;;
   esac
   [ -r "$icd" ] || { echo "$1 ($2): no $icd, so no SwiftShader Vulkan driver; fix: find where this version ships vk_swiftshader_icd.json and update vulkan_driver in $0" >&2; exit 1; }
   name=$(sed -n 's|.*"library_path": *"\./\([^"/]*\)".*|\1|p' "$icd")
@@ -237,7 +240,10 @@ check() {
 }
 
 chrome=$(browser)
-version=$("$chrome" --version 2>/dev/null || echo 'version unknown')
+version=$("$chrome" --version 2>/dev/null) && [ -n "$version" ] || {
+  echo "$chrome --version failed or printed nothing; fix: check the browser starts (run it with --version)" >&2
+  exit 1
+}
 echo "browser: $chrome ($version)"
 VK_DRIVER_FILES=$(vulkan_driver "$chrome" "$version")
 export VK_DRIVER_FILES
