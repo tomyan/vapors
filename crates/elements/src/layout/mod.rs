@@ -5,6 +5,7 @@ mod boxes;
 mod calcs;
 mod inline;
 mod measure;
+mod text_cache;
 mod tree;
 
 use taffy::{AvailableSpace, NodeId, Size, compute_root_layout};
@@ -13,7 +14,7 @@ use vapors_text::FontSystem;
 pub(crate) use boxes::{Content, LayoutBox, build};
 pub(crate) use calcs::Calcs;
 pub(crate) use inline::{InlineRun, InlineSpan};
-pub(crate) use measure::text_layout;
+pub(crate) use text_cache::TextCache;
 use tree::BoxTree;
 
 /// A box's border box in document coordinates, CSS pixels.
@@ -38,14 +39,16 @@ pub struct BoxRect {
 /// A `calc()` that did not resolve (see `Calcs`).
 pub(crate) fn lay_out(
     boxes: Vec<LayoutBox>,
-    fonts: &mut FontSystem,
+    texts: (&mut FontSystem, &mut TextCache),
     scale: f32,
     size: (f32, f32),
     calcs: &Calcs,
 ) -> Result<(Vec<LayoutBox>, Vec<BoxRect>), String> {
+    let (fonts, cache) = texts;
     let mut tree = BoxTree {
         boxes,
         fonts,
+        cache,
         scale,
         calcs,
     };

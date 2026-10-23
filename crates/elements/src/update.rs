@@ -37,10 +37,12 @@ impl Document {
     /// is painted then, and the previous result is dropped.
     pub fn update(&mut self, viewport: Viewport) -> Result<&Painted, Vec<ElementError>> {
         self.painted = None;
+        self.texts.begin();
         let (used, calcs) = self.used_styles(viewport)?;
         let boxes = build(&self.arena, &used, self.root());
         let size = (viewport.width, viewport.height);
-        let (boxes, rects) = lay_out(boxes, &mut self.fonts, viewport.scale, size, &calcs)
+        let texts = (&mut self.fonts, &mut self.texts);
+        let (boxes, rects) = lay_out(boxes, texts, viewport.scale, size, &calcs)
             .map_err(|failure| vec![ElementError::Layout(failure)])?;
         let mut input = PaintInput {
             used: &used,
@@ -48,11 +50,20 @@ impl Document {
             body: self.body(),
             propagated: None,
             fonts: &mut self.fonts,
+            cache: &mut self.texts,
             scale: viewport.scale,
         };
         let painted = paint(&boxes, &rects, &mut input);
         self.rehover_in(&painted);
         Ok(self.painted.insert(painted))
+    }
+
+    /// How many Parley layouts the last update built rather than kept
+    /// from the one before: what the incremental tests count, and what
+    /// the `stress` demo shows.
+    #[must_use]
+    pub fn text_layouts_built(&self) -> usize {
+        self.texts.built()
     }
 
     /// The last successful update's result, if the document has not

@@ -15,7 +15,7 @@ use crate::style::Cursor;
 pub struct Painted {
     pub(crate) canvas: Color,
     pub(crate) scene: Scene,
-    pub(crate) texts: Vec<Layout>,
+    pub(crate) texts: Vec<std::rc::Rc<Layout>>,
     pub(crate) rects: HashMap<NodeId, BoxRect>,
     /// Elements with a box, `visibility: visible` and `pointer-events:
     /// auto`, in painting order: a later one is drawn over an earlier.

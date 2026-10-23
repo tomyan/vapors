@@ -9,7 +9,7 @@ use vapors_scene::{Color, Item, Quad, Rect, Scene, Shadow, TextId};
 use vapors_text::FontSystem;
 
 use crate::corners;
-use crate::layout::{BoxRect, Content, InlineRun, LayoutBox, text_layout};
+use crate::layout::{BoxRect, Content, InlineRun, LayoutBox};
 use crate::painted::Painted;
 use crate::style::{BoxShadow, Used};
 
@@ -22,6 +22,7 @@ pub(crate) struct PaintInput<'a> {
     /// Which of them gave the canvas its colour; set by `paint`.
     pub(crate) propagated: Option<NodeId>,
     pub(crate) fonts: &'a mut FontSystem,
+    pub(crate) cache: &'a mut crate::layout::TextCache,
     pub(crate) scale: f32,
 }
 
@@ -138,7 +139,9 @@ fn shadow_item(shadow: &BoxShadow, caster: Rect, radii: [f32; 4], scale: f32) ->
 }
 
 fn paint_text(run: &InlineRun, rect: BoxRect, input: &mut PaintInput<'_>, out: &mut Painted) {
-    let layout = text_layout(input.fonts, input.scale, run, Some(rect.width));
+    let layout = input
+        .cache
+        .layout(input.fonts, input.scale, run, Some(rect.width));
     crate::paint_inline::paint_spans(run, &layout, rect, input, out);
     let id = TextId(u32::try_from(out.texts.len()).expect("fewer than 2^32 text runs"));
     out.texts.push(layout);

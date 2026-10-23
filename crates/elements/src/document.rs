@@ -24,6 +24,8 @@ pub struct Document {
     /// `take_changed`: a tree, attribute, text or pointer-state change.
     pub(crate) changed: bool,
     pub(crate) pointer: crate::events::Pointer,
+    /// Parley layouts kept between updates.
+    pub(crate) texts: crate::layout::TextCache,
 }
 
 impl Document {
@@ -44,6 +46,7 @@ impl Document {
             painted: None,
             changed: true,
             pointer: crate::events::Pointer::default(),
+            texts: crate::layout::TextCache::default(),
         }
     }
 

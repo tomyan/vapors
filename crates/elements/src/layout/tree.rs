@@ -18,6 +18,7 @@ use super::measure::measure_text;
 pub(crate) struct BoxTree<'f> {
     pub(crate) boxes: Vec<LayoutBox>,
     pub(crate) fonts: &'f mut FontSystem,
+    pub(crate) cache: &'f mut super::TextCache,
     pub(crate) scale: f32,
     pub(crate) calcs: &'f Calcs,
 }
@@ -68,14 +69,15 @@ impl BoxTree<'_> {
 
     fn leaf(&mut self, id: NodeId, inputs: LayoutInput) -> LayoutOutput {
         let index = usize::from(id);
-        let (fonts, scale, calcs) = (&mut *self.fonts, self.scale, self.calcs);
+        let (fonts, cache, scale, calcs) =
+            (&mut *self.fonts, &mut *self.cache, self.scale, self.calcs);
         let node = &self.boxes[index];
         compute_leaf_layout(
             inputs,
             &node.style,
             |handle, basis| calcs.resolve(handle, basis),
             |known, available| match &node.content {
-                Content::Text(run) => measure_text(fonts, scale, run, known, available),
+                Content::Text(run) => measure_text((fonts, cache), scale, run, known, available),
                 Content::Element(_) => taffy::Size::ZERO,
             },
         )
