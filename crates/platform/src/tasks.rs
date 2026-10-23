@@ -49,10 +49,13 @@ thread_local! {
 pub fn lost_waker(proxy: EventLoopProxy<Message>) -> impl Fn() + Send + 'static {
     LOST_PROXY.with(|slot| *slot.borrow_mut() = Some(proxy));
     || {
-        LOST_PROXY.with(|slot| {
-            if let Some(proxy) = slot.borrow().as_ref() {
-                send(proxy, Message::DeviceLost);
-            }
+        LOST_PROXY.with(|slot| match slot.borrow().as_ref() {
+            Some(proxy) => send(proxy, Message::DeviceLost),
+            // Set above before the callback can run; if it ever is not,
+            // say so: the loss still stops the loop at the next frame.
+            None => crate::report::report_error(
+                "the GPU device was lost and the event loop could not be woken (no proxy); it stops at the next frame",
+            ),
         });
     }
 }

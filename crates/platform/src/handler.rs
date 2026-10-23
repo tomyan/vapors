@@ -3,10 +3,8 @@
 
 use std::sync::Arc;
 
-use winit::application::ApplicationHandler;
-use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
-use winit::window::{Window, WindowId};
+use winit::window::Window;
 
 use crate::PlatformError;
 use crate::device_lost::stop_for;
@@ -16,7 +14,7 @@ use crate::platform::Platform;
 use crate::surface::Gpu;
 use crate::surface_texture::acquire;
 use crate::tasks;
-use crate::window::{App, Frame, Message, Next, WindowOptions};
+use crate::window::{App, Frame, Next, WindowOptions};
 
 pub struct Handler {
     options: WindowOptions,
@@ -29,6 +27,8 @@ pub struct Handler {
     /// Redraws in a row that produced no texture; see [`acquire`].
     missed: u32,
     error: Option<PlatformError>,
+    /// Set when a lost device stopped the loop; see `stop_if_lost`.
+    stopped_for_loss: bool,
 }
 
 /// Consecutive redraws without a texture before giving up: a second at
@@ -49,6 +49,7 @@ impl Handler {
             presented: 0,
             missed: 0,
             error: None,
+            stopped_for_loss: false,
         }
     }
 
@@ -113,11 +114,16 @@ impl Handler {
     }
 
     /// Stop the loop with the loss's error, if the device is lost: the
-    /// GPU is dropped so nothing calls it again. True when it stopped.
+    /// GPU is dropped so nothing calls it again, and the loss is
+    /// reported once however many paths see it. True when stopped.
     fn stop_if_lost(&mut self, event_loop: &ActiveEventLoop) -> bool {
+        if self.stopped_for_loss {
+            return true;
+        }
         let Some(error) = self.lost_stop() else {
             return false;
         };
+        self.stopped_for_loss = true;
         self.gpu = None;
         self.fail(event_loop, error);
         true
@@ -162,44 +168,5 @@ impl Handler {
     }
 }
 
-impl ApplicationHandler<Message> for Handler {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if self.window.is_none()
-            && let Err(error) = self.open(event_loop)
-        {
-            self.fail(event_loop, error);
-        }
-    }
-
-    fn user_event(&mut self, event_loop: &ActiveEventLoop, message: Message) {
-        match message {
-            Message::GpuReady(Ok(gpu)) => self.gpu_ready(gpu),
-            Message::GpuReady(Err(error)) => self.fail(event_loop, error),
-            Message::FileChosen { name, bytes } => self
-                .app
-                .event(Event::FileOpened { name, bytes }, &self.platform),
-            Message::OpenRequested => self.app.event(Event::OpenRequested, &self.platform),
-            Message::DeviceLost => {
-                self.stop_if_lost(event_loop);
-            }
-        }
-    }
-
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
-        if let WindowEvent::CloseRequested = event {
-            event_loop.exit();
-            return;
-        }
-        if let WindowEvent::Resized(size) = event
-            && let Some(gpu) = self.gpu.as_mut()
-        {
-            gpu.resize(size.width, size.height);
-        }
-        for app_event in self.input.translate(&event) {
-            self.app.event(app_event, &self.platform);
-        }
-        if let WindowEvent::RedrawRequested = event {
-            self.redraw(event_loop);
-        }
-    }
-}
+#[path = "handler_events.rs"]
+mod events;

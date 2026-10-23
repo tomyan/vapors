@@ -55,8 +55,10 @@ prepare() {
 
 # The server answers within 10 s or the check fails (it starts in well
 # under 1 s here). It serves the copies, and holds /wait until a POST to
-# /done or 15 s (the device-lost case; that page shows its error well
-# under 1 s after the loss here).
+# /done or 15 s: the device-lost page, from Chromium's start to its
+# dump with the error shown, took 1.5 s here (Debian 13, Chromium 155,
+# 2026-10-23), and 15 s is ten times that. The flag is set once: only
+# the device-lost page waits on it.
 serve() {
   (cd "$work" && exec python3 -c "
 import http.server, threading

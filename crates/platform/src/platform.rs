@@ -34,7 +34,9 @@ impl Platform {
     /// the platform draws no more frames and has reported it; an app
     /// that makes GPU calls outside `frame` (a readback still running)
     /// asks here first, since such a call on a lost device panics in
-    /// wgpu.
+    /// wgpu. A deliberate `Device::destroy` counts as a loss (reason
+    /// `Destroyed`); dropping the device does not (pinned by
+    /// `tests/gpu_device_lost.rs`).
     #[must_use]
     pub fn device_lost(&self) -> Option<Lost> {
         self.lost.get()
