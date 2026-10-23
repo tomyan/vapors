@@ -2,7 +2,8 @@
 # The waker on the built page (?demo=wake) in headless Chromium in real
 # time: after 3 s of start-up the page must have drawn, then draw no
 # frame in 2 s idle, then exactly one frame for each of 3 calls to
-# vapors_demo_wake, 300 ms apart (frames counted with getCurrentTexture).
+# vapors_demo_wake, 300 ms apart, and one or two for a burst of 5 calls
+# with no wait between (frames counted with getCurrentTexture).
 #
 # Usage: scripts/web-wake-frames.sh target/web <new or empty dir>
 # after `cargo xtask web`. Needs python3 and chromium (or $CHROME).
@@ -31,7 +32,10 @@ head = ('<script>var frames = 0; var current = GPUCanvasContext.prototype.getCur
         ' for (var i = 0; i < 3; i++) { var at = frames;'
         ' try { window.wasmBindings.vapors_demo_wake(); } catch (x) { report("refused: vapors_demo_wake threw " + x); return; }'
         ' await wait(300); each.push(frames - at); }'
-        ' report("idle " + idle + "; per wake " + each.join(",")); })();</script>')
+        ' var before = frames;'
+        ' try { for (var j = 0; j < 5; j++) { window.wasmBindings.vapors_demo_wake(); } } catch (x) { report("refused: vapors_demo_wake threw " + x); return; }'
+        ' await wait(300); var burst = frames - before;'
+        ' report("idle " + idle + "; per wake " + each.join(",") + "; burst " + (burst >= 1 && burst <= 2 ? "1-2" : burst)); })();</script>')
 open(target, 'w').write(text.replace('</head>', head + '</head>').replace('</body>', '<img src="/wait" hidden></body>'))
 PY
 # The page's load waits on /wait until it posts /done (at most 20 s), so
@@ -63,7 +67,7 @@ counts=$(env -u DBUS_SESSION_BUS_ADDRESS VK_DRIVER_FILES="$icd" timeout 60 "$chr
   --window-size=640,400 --dump-dom "http://127.0.0.1:$port/wake.html?demo=wake" 2>/dev/null \
   | sed -n 's#.*<pre id="wake">\([^<]*\)</pre>.*#\1#p')
 case $counts in
-  "idle 0; per wake 1,1,1") echo "wake: $counts" ;;
+  "idle 0; per wake 1,1,1; burst 1-2") echo "wake: $counts" ;;
   '') echo "wake: no counts; the page never reported" >&2; exit 1 ;;
-  *) echo "wake: $counts; expected idle 0; per wake 1,1,1" >&2; exit 1 ;;
+  *) echo "wake: $counts; expected idle 0; per wake 1,1,1; burst 1-2" >&2; exit 1 ;;
 esac

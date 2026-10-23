@@ -34,22 +34,18 @@ impl App for WakeApp {
     }
 }
 
-/// Wake the demo once.
+/// Wake the demo once. The waker is cloned out of the cell first, so
+/// the cell is not borrowed while the wake runs.
 ///
 /// # Errors
 ///
-/// No event has reached the app yet, so it has no waker.
+/// No event has reached the app yet, so it has no waker; or the loop
+/// has ended (`LoopClosed`).
 #[cfg(target_family = "wasm")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn vapors_demo_wake() -> Result<(), String> {
-    WAKER.with(|w| match w.borrow().as_ref() {
-        Some(waker) => {
-            waker.wake();
-            Ok(())
-        }
-        None => Err(
-            "the wake demo has had no event yet, so it has no waker; fix: wait for its first frame"
-                .into(),
-        ),
-    })
+    let waker = WAKER.with(|w| w.borrow().clone()).ok_or(
+        "the wake demo has had no event yet, so it has no waker; fix: wait for its first frame",
+    )?;
+    waker.wake().map_err(|closed| closed.to_string())
 }

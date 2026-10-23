@@ -11,8 +11,8 @@ fn a_wake_asks_for_one_frame() {
     let waker = platform.waker();
 
     // When
-    waker.wake();
-    waker.wake();
+    waker.wake().expect("detached");
+    waker.wake().expect("detached");
 
     // Then
     assert!(platform.take_redraw_request(), "a wake asks for a frame");
@@ -29,7 +29,7 @@ fn a_clone_wakes_the_same_platform() {
     let clone = platform.waker().clone();
 
     // When
-    clone.wake();
+    clone.wake().expect("detached");
 
     // Then
     assert!(platform.take_redraw_request());
@@ -54,7 +54,8 @@ fn natively_a_waker_can_go_to_another_thread() {
     // When
     std::thread::spawn(move || waker.wake())
         .join()
-        .expect("the thread ran");
+        .expect("the thread ran")
+        .expect("detached");
 
     // Then
     assert!(platform.take_redraw_request());

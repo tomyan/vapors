@@ -12,6 +12,19 @@ use winit::event_loop::EventLoopProxy;
 use crate::redraw::RedrawFlag;
 use crate::window::Message;
 
+/// Why a wake asked for no frame: the event loop has ended, so the
+/// window and its app are gone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LoopClosed;
+
+impl std::fmt::Display for LoopClosed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("the event loop has ended, so the wake asked for no frame")
+    }
+}
+
+impl std::error::Error for LoopClosed {}
+
 /// Asks the loop for a frame; cheap to clone and keep.
 #[derive(Clone)]
 pub struct Waker {
@@ -40,12 +53,19 @@ impl Waker {
         }
     }
 
-    /// Ask for a frame. After the loop has ended there is no frame to
-    /// draw and nothing to say: the wake is dropped.
-    pub fn wake(&self) {
+    /// Ask for a frame.
+    ///
+    /// # Errors
+    ///
+    /// [`LoopClosed`] when the loop has ended: no frame will come, and
+    /// the caller says so if its work needed one.
+    pub fn wake(&self) -> Result<(), LoopClosed> {
         match &self.target {
-            Target::Loop(proxy) => crate::tasks::send(proxy, Message::Wake),
-            Target::Detached(flag) => flag.raise(),
+            Target::Loop(proxy) => proxy.send_event(Message::Wake).map_err(|_| LoopClosed),
+            Target::Detached(flag) => {
+                flag.raise();
+                Ok(())
+            }
         }
     }
 }
