@@ -5,7 +5,10 @@
 //! https, so the page on the phone reloads on save. The previous static
 //! serve is replaced; `cargo xtask serve` puts it back. Ctrl-C stops
 //! trunk (it shares the terminal); the tailscale proxy stays pointed at
-//! the dead port until `cargo xtask serve`.
+//! the dead port until `cargo xtask serve`. With `--key
+//! <provider>=<file>`, trunk proxies `/dev/keys.json` to a loopback
+//! server that answers it from those files (`dev_keys_server`), so the
+//! debug page can ask a model without a key typed in.
 
 use std::ffi::OsStr;
 use std::net::TcpListener;
@@ -14,6 +17,8 @@ use std::process::{Command, ExitCode};
 use std::time::Duration;
 
 use crate::config::Config;
+use crate::dev_keys::{self, DevKey};
+use crate::dev_keys_server::{self, KEYS_PATH};
 use crate::report::Reporter;
 use crate::tailscale::{Target, find_in, require_tailscale, served_url, start_serving};
 use crate::trunk::Trunk;
@@ -33,12 +38,12 @@ pub const DEV_DIST: &str = "target/web-dev";
 pub const READY_DEADLINE: Duration = Duration::from_secs(600);
 
 /// Run the loop until trunk exits.
-pub fn run(reporter: &Reporter) -> ExitCode {
-    match serve(reporter) {
+pub fn run(reporter: &Reporter, key_arguments: &[String]) -> ExitCode {
+    match serve(reporter, key_arguments) {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {
             println!("FAIL dev: {message}");
-            println!("     reproduce: cargo xtask dev");
+            println!("     reproduce: cargo xtask dev (with the same --key arguments)");
             ExitCode::FAILURE
         }
     }
@@ -46,24 +51,92 @@ pub fn run(reporter: &Reporter) -> ExitCode {
 
 /// Every refusal before trunk starts, then the loop. `Trunk` kills its
 /// process group when dropped, so every `?` after the spawn kills it.
-fn serve(reporter: &Reporter) -> Result<(), String> {
+fn serve(reporter: &Reporter, key_arguments: &[String]) -> Result<(), String> {
+    let keys = checked_keys(key_arguments, &providers_for(key_arguments)?)?;
     let trunk = require_trunk()?;
     let tailscale = require_tailscale()?;
-    let config = Config::load().map_err(|e| e.to_string())?;
-    let port = port_from(&config)?;
+    let port = port_from(&Config::load().map_err(|e| e.to_string())?)?;
     check_port_free(port)?;
     let package = web_package()?;
     let crate_dir = package_dir(&package)?;
     let root = std::env::current_dir().map_err(|e| format!("no current directory: {e}"))?;
-    let mut trunk = Trunk::spawn(trunk_command(&trunk, &crate_dir, &trunk_args(port, &root)))?;
+    let (notices, keys_port) = serve_keys(keys)?;
+    let args = trunk_args(port, &root, keys_port);
+    let mut trunk = Trunk::spawn(trunk_command(&trunk, &crate_dir, &args)?)?;
     trunk.wait_until_ready(port, reporter, READY_DEADLINE)?;
     start_serving(&tailscale, &Target::LocalPort(port))?;
-    let url = served_url(&tailscale)?;
+    announce(&served_url(&tailscale)?, &package, port, &notices);
+    trunk.follow(reporter)
+}
+
+/// The keys server started; its notice lines (never a key) and port.
+fn serve_keys(keys: Vec<DevKey>) -> Result<(Vec<String>, u16), String> {
+    let notices = keys.iter().map(dev_keys::notice).collect();
+    Ok((notices, dev_keys_server::start(keys)?))
+}
+
+fn announce(url: &str, package: &str, port: u16, notices: &[String]) {
     println!(
         "ok   dev      {url} (trunk debug build of {package} on 127.0.0.1:{port}; reloads on save)"
     );
     println!("     Ctrl-C stops it; `cargo xtask serve` puts the static build back on the tailnet");
-    trunk.follow(reporter)
+    for line in notices {
+        println!("{line}");
+    }
+}
+
+/// Every `--key` parsed and its file read once, so a bad one is refused
+/// before anything starts. The keys read are dropped here.
+pub fn checked_keys(arguments: &[String], providers: &[String]) -> Result<Vec<DevKey>, String> {
+    let keys = arguments
+        .iter()
+        .map(|argument| dev_keys::parse(argument, providers))
+        .collect::<Result<Vec<_>, _>>()?;
+    for key in &keys {
+        dev_keys::read(key)?;
+    }
+    refuse_repeats(&keys)?;
+    Ok(keys)
+}
+
+/// The keyed providers when any `--key` is given; the words file is not
+/// read otherwise.
+fn providers_for(arguments: &[String]) -> Result<Vec<String>, String> {
+    if arguments.is_empty() {
+        return Ok(Vec::new());
+    }
+    keyed_providers(&Config::load().map_err(|e| e.to_string())?)
+}
+
+/// The providers the page's words file (`[dev] words`) gives a key.
+///
+/// # Errors
+///
+/// No `[dev] words`, or a file that cannot be read or names none.
+pub fn keyed_providers(config: &Config) -> Result<Vec<String>, String> {
+    let path = config
+        .require("dev.words")
+        .map_err(|e| format!("{e}; fix: set `[dev] words` to the page's words file, which says which providers take a key"))?;
+    let words = std::fs::read_to_string(path).map_err(|e| {
+        format!("{path} (`[dev] words` in .config/factory.toml) cannot be read: {e}")
+    })?;
+    dev_keys::keyed_providers(&words, path)
+}
+
+/// Refuse a provider given twice, naming both files (each has been
+/// read, so each is a real file, not a key typed in its place).
+fn refuse_repeats(keys: &[DevKey]) -> Result<(), String> {
+    for (index, key) in keys.iter().enumerate() {
+        if let Some(earlier) = keys[..index].iter().find(|k| k.provider == key.provider) {
+            return Err(format!(
+                "{} is given twice in --key, as {} and {}; fix: give each provider one --key",
+                key.provider,
+                earlier.file.display(),
+                key.file.display()
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// The trunk binary, or the refusal naming the fix.
@@ -102,8 +175,9 @@ pub fn check_port_free(port: u16) -> Result<(), String> {
 }
 
 /// trunk's arguments: a debug build served on the loopback port,
-/// rebuilt on any save under `root`, into [`DEV_DIST`].
-pub fn trunk_args(port: u16, root: &Path) -> Vec<String> {
+/// rebuilt on any save under `root`, into [`DEV_DIST`], with
+/// `/dev/keys.json` proxied to the keys server on `keys_port`.
+pub fn trunk_args(port: u16, root: &Path, keys_port: u16) -> Vec<String> {
     vec![
         "serve".into(),
         "--address".into(),
@@ -114,13 +188,18 @@ pub fn trunk_args(port: u16, root: &Path) -> Vec<String> {
         root.display().to_string(),
         "--dist".into(),
         root.join(DEV_DIST).display().to_string(),
+        "--proxy-backend".into(),
+        format!("http://127.0.0.1:{keys_port}{KEYS_PATH}"),
+        "--proxy-rewrite".into(),
+        KEYS_PATH.into(),
     ]
 }
 
-fn trunk_command(trunk: &Path, crate_dir: &Path, args: &[String]) -> Command {
+fn trunk_command(trunk: &Path, crate_dir: &Path, args: &[String]) -> Result<Command, String> {
     let mut command = Command::new(trunk);
+    crate::sccache::apply(&mut command)?;
     command.args(args).current_dir(crate_dir);
-    command
+    Ok(command)
 }
 
 #[cfg(test)]

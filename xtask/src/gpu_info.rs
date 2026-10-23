@@ -9,7 +9,11 @@ const OUTPUT: &str = "docs/gpu-limits.md";
 
 /// Run the `gpu_info` example and write its table to `docs/gpu-limits.md`.
 pub fn run() -> ExitCode {
-    let output = Command::new("cargo")
+    let mut cargo = Command::new("cargo");
+    if let Err(why) = crate::sccache::apply(&mut cargo) {
+        return fail(&why);
+    }
+    let output = cargo
         .args([
             "run",
             "-q",

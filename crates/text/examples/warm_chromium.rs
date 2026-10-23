@@ -14,11 +14,14 @@ fn main() -> ExitCode {
         .and_then(|()| Chromium::find().map_err(|e| e.to_string()))
         .and_then(|chrome| {
             let took = chrome.warm(&work).map_err(|e| e.to_string())?;
-            Ok((chrome.version(), took))
+            Ok((
+                format!("{} ({})", chrome.binary().display(), chrome.version()),
+                took,
+            ))
         });
     match warmed {
-        Ok((version, took)) => {
-            println!("ok   warm     {version} in {:.1} s", took.as_secs_f64());
+        Ok((browser, took)) => {
+            println!("ok   warm     {browser} in {:.1} s", took.as_secs_f64());
             ExitCode::SUCCESS
         }
         Err(message) => {

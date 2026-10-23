@@ -1,7 +1,8 @@
 //! `cargo xtask web`: build the web package with trunk into `target/web`
-//! and say where it went and how big it is.
+//! and say where it went and how big it is. `--debug` builds the debug
+//! page into `target/web-debug` instead, for checks of what only a debug
+//! build does (`check_dev_keys`).
 
-use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::time::Duration;
@@ -12,38 +13,82 @@ use crate::deadline::{Finished, run_with_deadline};
 /// Where trunk writes the page, relative to the workspace root.
 pub const DIST: &str = "target/web";
 
+/// Where trunk writes the debug page.
+pub const DEBUG_DIST: &str = "target/web-debug";
+
+/// One trunk build: release or debug, and its directory.
+pub struct Build {
+    /// Debug (no `--release`).
+    pub debug: bool,
+    /// The directory, relative to the workspace root.
+    pub dist: &'static str,
+}
+
+impl Build {
+    /// The release page, or with `debug` the debug page.
+    #[must_use]
+    pub fn of(debug: bool) -> Self {
+        let dist = if debug { DEBUG_DIST } else { DIST };
+        Self { debug, dist }
+    }
+
+    /// trunk's arguments, up to the dist directory. The public URL is
+    /// relative (`./`), so the page loads its script and wasm from beside
+    /// itself and works at `/` and under a path such as `/vapors/`;
+    /// trunk's default `/` loads them from the server root, and under
+    /// `/vapors/` the page stays at `starting` (vapors #32, checked by hand
+    /// on 2026-10-23, trunk 0.22.0, Chromium 155).
+    #[must_use]
+    pub fn trunk_args(&self) -> Vec<&'static str> {
+        if self.debug {
+            vec!["build", "--public-url", "./", "--dist"]
+        } else {
+            vec!["build", "--release", "--public-url", "./", "--dist"]
+        }
+    }
+}
+
 /// How long the trunk build may take. A cold release build with the
 /// wasm-opt download measured 45 s on the dev box on 2026-10-22; CI
 /// runners are slower and download more, hence the margin.
 const BUILD_DEADLINE: Duration = Duration::from_secs(600);
 
 /// Build the package named by `web.package` and report the dist directory.
-pub fn run() -> ExitCode {
-    match build() {
+pub fn run(debug: bool) -> ExitCode {
+    let build = Build::of(debug);
+    match build_page(&build) {
         Ok(line) => {
             println!("ok   web      {line}");
             ExitCode::SUCCESS
         }
         Err(message) => {
             println!("FAIL web: {message}");
-            println!("     reproduce: cargo xtask web");
+            println!(
+                "     reproduce: cargo xtask web{}",
+                if debug { " --debug" } else { "" }
+            );
             ExitCode::FAILURE
         }
     }
 }
 
-fn build() -> Result<String, String> {
+fn build_page(build: &Build) -> Result<String, String> {
     let package = web_package()?;
     let crate_dir = package_dir(&package)?;
     let dist = std::env::current_dir()
         .map_err(|e| format!("no current directory: {e}"))?
-        .join(DIST);
+        .join(build.dist);
     let mut command = Command::new("trunk");
-    command.args(build_args(&dist)).current_dir(&crate_dir);
+    crate::sccache::apply(&mut command)?;
+    command
+        .args(build.trunk_args())
+        .arg(&dist)
+        .current_dir(&crate_dir);
     match run_with_deadline(command, BUILD_DEADLINE)? {
-        Finished::Exited { success: true, .. } => Ok(format!("{DIST} {}", size_of(&dist)?)),
+        Finished::Exited { success: true, .. } => Ok(format!("{} {}", build.dist, size_of(&dist)?)),
         Finished::Exited { output, .. } => Err(format!(
-            "`trunk build --release` in {} failed:\n{output}",
+            "`trunk {}` in {} failed:\n{output}",
+            build.trunk_args().join(" "),
             crate_dir.display()
         )),
         Finished::TimedOut => Err(format!(
@@ -51,22 +96,6 @@ fn build() -> Result<String, String> {
             BUILD_DEADLINE.as_secs()
         )),
     }
-}
-
-/// trunk's arguments for a release build into `dist`. The public URL is
-/// relative (`./`), so the page loads its script and wasm from beside
-/// itself and works at `/` and under a path such as `/vapors/`; trunk's
-/// default `/` loads them from the server root, and under `/vapors/` the
-/// page stays at `starting` (checked by hand on 2026-10-23, trunk 0.22.0,
-/// Chromium 155, with scripts/check-page-contract.sh serving the page
-/// one directory down).
-pub fn build_args(dist: &Path) -> Vec<OsString> {
-    let mut args: Vec<OsString> = ["build", "--release", "--public-url", "./", "--dist"]
-        .into_iter()
-        .map(OsString::from)
-        .collect();
-    args.push(dist.into());
-    args
 }
 
 /// `web.package` from `.config/factory.toml`.
@@ -118,23 +147,5 @@ fn size_of(dir: &Path) -> Result<String, String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_release_build_uses_a_relative_public_url_so_a_subpath_serves_it() {
-        // Given
-        let dist = Path::new("/w/target/web");
-
-        // When
-        let args = build_args(dist);
-
-        // Then
-        let at = args
-            .iter()
-            .position(|a| a == "--public-url")
-            .expect("a public URL");
-        assert_eq!(args[at + 1], "./");
-        assert_eq!(args.last().map(OsString::as_os_str), Some(dist.as_os_str()));
-    }
-}
+#[path = "web_tests.rs"]
+mod tests;
