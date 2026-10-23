@@ -883,3 +883,11 @@ differs from the plan.
   re-hovers after layout. The randomized differential test compares
   settled frames, updating until no change is pending, and fails if
   that takes more than three updates.
+- **D8 Clicks in a `.pixels` file stay back to back (2026-10-24).**
+  The format gains no way to wait for a frame between clicks. A check
+  that needs one, such as dismissing a toast that an earlier click
+  raised, is a Rust test that updates the document after each click
+  (`crates/demos/tests/toasts.rs`).
+- **D9 Text clipping is checked in `gpu_text` (2026-10-24).** Glyph
+  edges differ from Chromium's by more than the paint fixtures' rules
+  allow, so the `clipping` fixture has no text; its comment says so.
