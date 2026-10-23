@@ -9,6 +9,8 @@ mod command;
 mod config;
 mod deadline;
 mod dev;
+mod dev_keys;
+mod dev_keys_server;
 mod files;
 mod files_walk;
 mod gate;
@@ -21,6 +23,7 @@ mod gate_workflow;
 mod gpu_info;
 mod pixels;
 mod report;
+mod sccache;
 mod screenshot;
 mod screenshot_package;
 mod serve;
@@ -90,11 +93,20 @@ enum Command {
     /// Lint the web package for wasm32-unknown-unknown (the `wasm` CI step).
     Wasm,
     /// Build the web package with trunk into target/web.
-    Web,
+    Web {
+        /// A debug build into target/web-debug, for `check_dev_keys`.
+        #[arg(long)]
+        debug: bool,
+    },
     /// Serve target/web on the tailnet over https and print the URL.
     Serve,
     /// Rebuild the web package on save (trunk serve, debug) behind the tailnet https proxy.
-    Dev,
+    Dev {
+        /// A key for the debug page, as `<provider>=<file>` (anthropic or
+        /// openai); the file must be mode 600. Repeat for each provider.
+        #[arg(long = "key", value_name = "PROVIDER=FILE")]
+        keys: Vec<String>,
+    },
     /// Run every step of .github/workflows/ci.yml here, in order, ending `gate: pass <sha>`.
     Gate,
     /// Check formatting and lints without running tests.
@@ -137,11 +149,11 @@ fn main() -> ExitCode {
             };
             return screenshot::run(&target, &out, expect.as_deref(), &example_args);
         }
-        Command::Web => return web::run(),
+        Command::Web { debug } => return web::run(debug),
         Command::Serve => return serve::run(),
-        Command::Dev => return dev::run(&reporter),
+        Command::Dev { keys } => return dev::run(&reporter, &keys),
         Command::Ci => match web::web_package() {
-            Ok(package) => steps::ci(&package),
+            Ok(package) => return ci_with_hit_rate(&steps::ci(&package), &reporter),
             Err(message) => return fail("ci", &message),
         },
         Command::Wasm => match web::web_package() {
@@ -154,6 +166,24 @@ fn main() -> ExitCode {
         Command::Test { tier: Tier::Gpu } => steps::gpu_tests(),
     };
     ci::run(&steps, &reporter)
+}
+
+/// `cargo xtask ci`, then sccache's hit rate over the run; sccache must
+/// answer before and after.
+fn ci_with_hit_rate(steps: &[steps::Step], reporter: &report::Reporter) -> ExitCode {
+    let before = match sccache::stats() {
+        Ok(stats) => stats,
+        Err(why) => return fail("sccache", &why),
+    };
+    let code = ci::run(steps, reporter);
+    match sccache::stats() {
+        Ok(after) => match sccache::hit_rate(before, after) {
+            Ok(line) => println!("{line}"),
+            Err(why) => return fail("sccache", &why),
+        },
+        Err(why) => return fail("sccache", &why),
+    }
+    code
 }
 
 fn fail(command: &str, message: &str) -> ExitCode {

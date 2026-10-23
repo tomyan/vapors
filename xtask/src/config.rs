@@ -138,8 +138,9 @@ fn key_value(line: &str, number: usize) -> Result<(String, String), ConfigError>
 /// `key` and the rest after its `=`: a quoted key ends at its closing
 /// quote, so it may hold `=` (a gate setup line such as `:lang=zh`).
 fn split_key(line: &str) -> Option<(&str, &str)> {
-    let quoted = line.strip_prefix('"').and_then(|inner| {
-        let end = inner.find('"')? + 2;
+    let quote = line.chars().next().filter(|c| *c == '"' || *c == '\'');
+    let quoted = quote.and_then(|quote| {
+        let end = line[1..].find(quote)? + 2;
         let rest = line[end..].trim_start().strip_prefix('=')?;
         Some((&line[..end], rest))
     });
@@ -148,9 +149,15 @@ fn split_key(line: &str) -> Option<(&str, &str)> {
     quoted.or_else(|| line.split_once('='))
 }
 
-/// A bare key as is; a double-quoted key without its quotes; `None`
-/// for anything else (a quote inside, a backslash, a space in a bare key).
+/// A bare key as is; a double-quoted key without its quotes; a
+/// single-quoted key (TOML's literal string, which may hold double
+/// quotes) as written between them; `None` for anything else (a quote
+/// inside, a backslash in a double-quoted key, a space in a bare key).
 fn unquoted_key(key: &str) -> Option<String> {
+    if let Some(inner) = key.strip_prefix('\'') {
+        let inner = inner.strip_suffix('\'')?;
+        return (!inner.contains('\'')).then(|| inner.to_owned());
+    }
     if let Some(inner) = key.strip_prefix('"') {
         let inner = inner.strip_suffix('"')?;
         return (!inner.contains(['"', '\\'])).then(|| inner.to_owned());

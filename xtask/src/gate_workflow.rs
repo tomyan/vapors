@@ -67,19 +67,15 @@ fn env_value(value: &Value, name: &str, label: &str) -> Result<String, String> {
 
 /// The workspace root relative to the gate's root (this checkout): `..`
 /// once per component of the checkout's `path:`. Every job's run steps
-/// must run in the checkout (`defaults.run`, the job's over the
-/// workflow's), since the gate runs them from there.
+/// must run in the checkout under `bash` (`defaults.run`, the job's over
+/// the workflow's), as the gate runs them: from the checkout, with
+/// `bash -eo pipefail`, which is what `shell: bash` gives in CI.
 pub fn workspace(doc: &Value, jobs: &serde_yaml::Mapping) -> Result<String, String> {
     let path = own_checkout_path(doc)?;
     let workflow = run_defaults(doc, "the workflow")?;
     for (name, job) in jobs {
         let label = name.as_str().unwrap_or("a job");
-        let directory = run_defaults(job, label)?.or(workflow).unwrap_or(".");
-        if normal(directory) != path {
-            return Err(format!(
-                "{label}: run steps run in `{directory}`, not this repository's checkout `{path}`; the gate runs from the checkout"
-            ));
-        }
+        check_job_defaults(&run_defaults(job, label)?.over(workflow), label, &path)?;
     }
     let depth = path.split('/').filter(|part| *part != ".").count();
     Ok(if depth == 0 {
@@ -89,21 +85,59 @@ pub fn workspace(doc: &Value, jobs: &serde_yaml::Mapping) -> Result<String, Stri
     })
 }
 
-/// `defaults.run.working-directory` of `value`; a shell is refused.
-fn run_defaults<'a>(value: &'a Value, label: &str) -> Result<Option<&'a str>, String> {
+fn check_job_defaults(defaults: &RunDefaults<'_>, label: &str, path: &str) -> Result<(), String> {
+    let directory = defaults.directory.unwrap_or(".");
+    if normal(directory) != path {
+        return Err(format!(
+            "{label}: run steps run in `{directory}`, not this repository's checkout `{path}`; the gate runs from the checkout"
+        ));
+    }
+    match defaults.shell {
+        Some("bash") => Ok(()),
+        Some(other) => Err(format!(
+            "{label}: run steps run under `{other}`; the gate runs bash -eo pipefail; fix: defaults.run.shell: bash"
+        )),
+        None => Err(format!(
+            "{label}: run steps run under CI's default `bash -e`, without pipefail, unlike the gate; fix: defaults.run.shell: bash"
+        )),
+    }
+}
+
+/// `defaults.run` of a workflow or a job.
+#[derive(Clone, Copy, Default)]
+struct RunDefaults<'a> {
+    directory: Option<&'a str>,
+    shell: Option<&'a str>,
+}
+
+impl RunDefaults<'_> {
+    /// These, each falling back to `outer`'s.
+    fn over(self, outer: Self) -> Self {
+        Self {
+            directory: self.directory.or(outer.directory),
+            shell: self.shell.or(outer.shell),
+        }
+    }
+}
+
+fn run_defaults<'a>(value: &'a Value, label: &str) -> Result<RunDefaults<'a>, String> {
     let Some(defaults) = value.get("defaults") else {
-        return Ok(None);
+        return Ok(RunDefaults::default());
     };
     check_keys(defaults, &["run"], &format!("{label}: defaults"))?;
     let Some(run) = defaults.get("run") else {
-        return Ok(None);
+        return Ok(RunDefaults::default());
     };
     check_keys(
         run,
-        &["working-directory"],
+        &["working-directory", "shell"],
         &format!("{label}: defaults.run"),
     )?;
-    Ok(run.get("working-directory").and_then(Value::as_str))
+    let text = |key: &str| run.get(key).and_then(Value::as_str);
+    Ok(RunDefaults {
+        directory: text("working-directory"),
+        shell: text("shell"),
+    })
 }
 
 /// The one `path:` this repository is checked out to (`actions/checkout`

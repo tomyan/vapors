@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use serde_yaml::Value;
 
-use crate::gate_action::composite;
+use crate::gate_action::{composite, with_inputs_in_env};
 use crate::gate_plan::{PlannedStep, Sources};
 use crate::gate_step::{
     ACTION_STEP_KEYS, WORKFLOW_STEP_KEYS, label, lines, runs_on_success, script, timeout_of,
@@ -98,6 +98,10 @@ impl<'a> Planner<'a> {
         let runs = runs_on_success(&label, step)?;
         let timeout = timeout_of(step, &label)?.or(scope.step_timeout);
         let mut env = scope.env.clone();
+        let step = &match scope.inputs {
+            Some(inputs) => with_inputs_in_env(step, inputs, &label)?,
+            None => step.clone(),
+        };
         env.extend(env_of(step, &label)?);
         let inner = Scope {
             env: &env,

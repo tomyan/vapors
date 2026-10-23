@@ -27,10 +27,7 @@ pub fn run(step: &Step) -> Outcome {
     let started = Instant::now();
     let (passed, output) = match spawn(step) {
         Ok(child) => finish(child, step.deadline),
-        Err(error) => (
-            false,
-            format!("could not start `{}`: {error}", step.program),
-        ),
+        Err(error) => (false, error),
     };
     Outcome {
         passed,
@@ -40,9 +37,13 @@ pub fn run(step: &Step) -> Outcome {
 }
 
 /// The step's process, the leader of its own process group so that a
-/// deadline kills what it started too.
-fn spawn(step: &Step) -> std::io::Result<Child> {
+/// deadline kills what it started too, with the compilation cache set
+/// (`sccache`), except for sccache's own step.
+fn spawn(step: &Step) -> Result<Child, String> {
     let mut command = Command::new(&step.program);
+    if step.program != "sccache" {
+        crate::sccache::apply(&mut command)?;
+    }
     command
         .args(&step.args)
         .envs(step.env.iter().map(|(name, value)| (name, value)))
@@ -53,7 +54,9 @@ fn spawn(step: &Step) -> std::io::Result<Child> {
     if let Some(dir) = &step.dir {
         command.current_dir(dir);
     }
-    command.spawn()
+    command
+        .spawn()
+        .map_err(|error| format!("could not start `{}`: {error}", step.program))
 }
 
 fn finish(mut child: Child, deadline: Option<Duration>) -> (bool, String) {
@@ -77,23 +80,38 @@ fn wait(child: &mut Child, deadline: Option<Duration>) -> Result<bool, String> {
             return Ok(status.success());
         }
         if deadline.is_some_and(|limit| started.elapsed() > limit) {
-            kill_group(child);
             let limit = deadline.unwrap_or_default().as_secs();
-            return Err(format!(
-                "killed: still running after {limit} s, its deadline"
-            ));
+            return Err(match kill_group(child) {
+                Ok(()) => format!("killed: still running after {limit} s, its deadline"),
+                Err(why) => format!(
+                    "still running after {limit} s, its deadline, and its group could not be killed: {why}"
+                ),
+            });
         }
         std::thread::sleep(Duration::from_millis(100));
     }
 }
 
-/// SIGKILL to the step's process group, then reap the leader.
-fn kill_group(child: &mut Child) {
-    let _ = Command::new("kill")
-        .args(["-KILL", &format!("-{}", child.id())])
-        .status();
+/// SIGKILL to the step's process group, then reap the leader, with
+/// `kill -s KILL -- -<pid>`, procps's documented form for a group. With
+/// `kill -KILL -<pid>` the group survived on the runner: vapors run
+/// 40006425576, where the gate's deadline test took 21 s, and likewise vapors
+/// #30. The kill's own failure is returned to be reported.
+fn kill_group(child: &mut Child) -> Result<(), String> {
+    let group = format!("-{}", child.id());
+    let killed = Command::new("kill")
+        .args(["-s", "KILL", "--", &group])
+        .output();
     let _ = child.kill();
     let _ = child.wait();
+    match killed {
+        Ok(out) if out.status.success() => Ok(()),
+        Ok(out) => Err(format!(
+            "kill -s KILL -- {group}: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        )),
+        Err(e) => Err(format!("kill: {e}")),
+    }
 }
 
 fn drain(stream: Option<impl Read + Send + 'static>) -> Option<JoinHandle<String>> {

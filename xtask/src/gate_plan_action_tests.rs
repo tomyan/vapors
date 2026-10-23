@@ -122,3 +122,16 @@ fn a_step_ci_runs_on_success_is_planned_and_one_only_on_failure_is_not() {
         "failure() never runs when the gate passes"
     );
 }
+
+#[test]
+fn an_input_in_a_composite_steps_env_is_substituted() {
+    // When
+    let planned = plan_of(WORKFLOW).expect("a plan");
+
+    // Then
+    let again = planned
+        .iter()
+        .find(|step| step.name == "ci: greet: say it again")
+        .expect("planned");
+    assert_eq!(again.env["WHO"], "world");
+}

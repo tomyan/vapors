@@ -108,10 +108,37 @@ fn a_working_directory_default_other_than_the_checkout_path_is_refused() {
         "gpu: run steps run in `other`",
     );
     refused(
-        &WORKFLOW.replace(
-            "    working-directory: touche",
-            "    working-directory: touche\n    shell: sh",
-        ),
-        "the workflow: defaults.run: `shell:`",
+        &WORKFLOW.replace("    shell: bash\n", "    shell: sh\n"),
+        "ci: run steps run under `sh`",
     );
+}
+
+#[test]
+fn a_job_whose_run_steps_are_not_bash_is_refused() {
+    // Given: no shell, so CI runs `bash -e` without pipefail
+    let workflow = WORKFLOW.replace("    shell: bash\n", "");
+
+    // Then
+    refused(
+        &workflow,
+        "ci: run steps run under CI's default `bash -e`, without pipefail",
+    );
+}
+
+#[test]
+fn a_jobs_own_bash_default_is_enough() {
+    // Given: the workflow names no shell, each job names bash
+    let workflow = WORKFLOW
+        .replace("    shell: bash\n", "")
+        .replace(
+            "    timeout-minutes: 10\n",
+            "    timeout-minutes: 10\n    defaults:\n      run:\n        shell: bash\n",
+        )
+        .replace(
+            "    timeout-minutes: 20\n",
+            "    timeout-minutes: 20\n    defaults:\n      run:\n        shell: bash\n",
+        );
+
+    // When / Then
+    assert!(plan_of(&workflow).is_ok(), "{:?}", plan_of(&workflow));
 }

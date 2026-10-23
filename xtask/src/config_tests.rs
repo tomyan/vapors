@@ -117,3 +117,18 @@ fn a_quoted_key_may_hold_an_equals_sign() {
         Some("checks the CJK font")
     );
 }
+
+#[test]
+fn a_single_quoted_key_is_literal_and_may_hold_double_quotes() {
+    // Given: a runner-only line with double quotes, as TOML writes a literal string
+    let text = "[gate.setup]\n'archives=\"$HOME/.cache/apt-archives\"' = \"the apt cache\"\n";
+
+    // When
+    let config = Config::parse(text).expect("valid");
+
+    // Then
+    assert_eq!(
+        config.get("gate.setup.archives=\"$HOME/.cache/apt-archives\""),
+        Some("the apt cache")
+    );
+}

@@ -53,7 +53,7 @@ fn clippy() -> Step {
 /// target, so a native-only `use` in a shared crate fails here and not
 /// in the trunk build.
 fn wasm(web_package: &str) -> Step {
-    Step::new(
+    denying_warnings(Step::new(
         "wasm",
         "cargo",
         &[
@@ -67,7 +67,39 @@ fn wasm(web_package: &str) -> Step {
             "warnings",
         ],
         "put the native-only code under cfg(not(target_family = \"wasm\")) and give the web its own",
-    )
+    ))
+}
+
+/// `step` with `RUSTFLAGS=-D warnings`, as CI sets it: clippy's own
+/// `-- -D warnings` covers only the package named, and a warning in a
+/// dependency (runtime, engine, document, viewer) would pass.
+fn denying_warnings(mut step: Step) -> Step {
+    step.env
+        .push(("RUSTFLAGS".to_owned(), "-D warnings".to_owned()));
+    step
+}
+
+/// The web package linted as trunk builds it, in release: code under
+/// `cfg(debug_assertions)` is gone there, so a binding only debug code
+/// reads is unused (#34's `stub_scenario`, which passed `wasm` and failed
+/// the page build).
+fn wasm_release(web_package: &str) -> Step {
+    denying_warnings(Step::new(
+        "wasm release",
+        "cargo",
+        &[
+            "clippy",
+            "--target",
+            "wasm32-unknown-unknown",
+            "-p",
+            web_package,
+            "--release",
+            "--",
+            "-D",
+            "warnings",
+        ],
+        "a binding or import only debug builds use: cfg it out in release, or use it there",
+    ))
 }
 
 // GPU tests are test functions whose names start with `gpu_` (kept in
@@ -101,14 +133,15 @@ pub fn ci(web_package: &str) -> Vec<Step> {
         files(),
         clippy(),
         wasm(web_package),
+        wasm_release(web_package),
         unit(),
         gpu(),
     ]
 }
 
-/// The wasm lint alone.
+/// The wasm lints alone, debug and release.
 pub fn wasm_lint(web_package: &str) -> Vec<Step> {
-    vec![wasm(web_package)]
+    vec![wasm(web_package), wasm_release(web_package)]
 }
 
 /// Formatting and lints only.
@@ -127,51 +160,8 @@ pub fn gpu_tests() -> Vec<Step> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn ci_runs_fastest_checks_first() {
-        // Given
-        let steps = ci("vapors-web-demo");
-
-        // When
-        let names: Vec<&str> = steps.iter().map(|s| s.name.as_str()).collect();
-
-        // Then
-        assert_eq!(
-            names,
-            ["tools", "fmt", "files", "clippy", "wasm", "unit", "gpu"]
-        );
-    }
-
-    #[test]
-    fn reproduce_line_is_the_pasteable_command() {
-        // Given
-        let step = fmt();
-
-        // When
-        let line = step.reproduce();
-
-        // Then
-        assert_eq!(line, "cargo fmt --all --check");
-    }
-
-    #[test]
-    fn wasm_step_lints_the_configured_package_for_the_browser_target() {
-        // Given
-        let step = wasm("vapors-web-demo");
-
-        // When
-        let line = step.reproduce();
-
-        // Then
-        assert_eq!(
-            line,
-            "cargo clippy --target wasm32-unknown-unknown -p vapors-web-demo -- -D warnings"
-        );
-    }
-}
+#[path = "steps_tests.rs"]
+mod tests;
 
 #[cfg(test)]
 #[path = "steps_nextest_tests.rs"]

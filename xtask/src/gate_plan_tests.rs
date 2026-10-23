@@ -13,6 +13,7 @@ env:
 defaults:
   run:
     working-directory: touche
+    shell: bash
 jobs:
   ci:
     runs-on: ubuntu-24.04
@@ -65,6 +66,11 @@ runs:
     - name: say it
       shell: bash
       run: echo "${{ inputs.greeting }} ${{ inputs.who }}" >> "$GITHUB_OUTPUT"
+    - name: say it again
+      shell: bash
+      env:
+        WHO: ${{ inputs.who }}
+      run: echo "again $WHO"
 "#;
 
 pub(super) fn setup() -> BTreeSet<String> {
@@ -125,12 +131,13 @@ fn the_plan_is_every_run_step_less_setup_in_file_order_actions_expanded() {
         names,
         [
             "ci: greet: say it",
+            "ci: greet: say it again",
             "ci: lint",
             "gpu: cargo xtask test --tier gpu"
         ],
         "a `- run:` step is named by its first line"
     );
-    assert_eq!(planned[1].run, "cargo xtask lint && cargo xtask wasm");
+    assert_eq!(planned[2].run, "cargo xtask lint && cargo xtask wasm");
 }
 
 #[test]
@@ -139,7 +146,7 @@ fn each_step_gets_workflow_then_job_then_step_env_and_ci_true() {
     let planned = plan_of(WORKFLOW).expect("a plan");
 
     // Then
-    let gpu = &planned[2].env;
+    let gpu = &planned[3].env;
     assert_eq!(gpu["RUSTFLAGS"], "-D warnings");
     assert_eq!(
         gpu["NEXTEST_PROFILE"], "gpu-override",
@@ -148,7 +155,7 @@ fn each_step_gets_workflow_then_job_then_step_env_and_ci_true() {
     assert_eq!(gpu["VAPORS_GPU_ADAPTER"], "llvmpipe");
     assert_eq!(gpu["EXTRA"], "1");
     assert_eq!(gpu["CI"], "true");
-    assert_eq!(planned[1].env["NEXTEST_PROFILE"], "ci");
+    assert_eq!(planned[2].env["NEXTEST_PROFILE"], "ci");
 }
 
 #[test]
@@ -159,7 +166,7 @@ fn a_composite_actions_step_runs_from_the_workspace_with_its_inputs() {
     // Then: `with:` over the default, and the workspace root is the checkout's parent
     assert_eq!(planned[0].run, r#"echo "hello world" >> "$GITHUB_OUTPUT""#);
     assert_eq!(planned[0].dir, "..");
-    assert_eq!(planned[1].dir, ".");
+    assert_eq!(planned[2].dir, ".");
 }
 
 #[test]
@@ -174,9 +181,9 @@ fn each_step_carries_its_jobs_timeout_and_its_own() {
         Some(Duration::from_mins(2)),
         "the calling step's, for the action's steps"
     );
-    assert_eq!(planned[1].step_timeout, None);
-    assert_eq!(planned[2].job, "gpu");
-    assert_eq!(planned[2].job_timeout, Duration::from_mins(20));
+    assert_eq!(planned[2].step_timeout, None);
+    assert_eq!(planned[3].job, "gpu");
+    assert_eq!(planned[3].job_timeout, Duration::from_mins(20));
 }
 
 #[test]

@@ -113,6 +113,24 @@ fn given(with: Option<&Value>, path: &str) -> Result<BTreeMap<String, String>, S
         .collect()
 }
 
+/// `step` with each `${{ inputs.<name> }}` in its `env:` values replaced,
+/// so the env check sees the values the action is called with.
+pub fn with_inputs_in_env(
+    step: &Value,
+    inputs: &BTreeMap<String, String>,
+    label: &str,
+) -> Result<Value, String> {
+    let mut step = step.clone();
+    if let Some(env) = step.get_mut("env").and_then(Value::as_mapping_mut) {
+        for value in env.values_mut() {
+            if let Value::String(text) = value {
+                *text = substitute(text, inputs, label)?;
+            }
+        }
+    }
+    Ok(step)
+}
+
 /// `run` with each `${{ inputs.<name> }}` replaced by its value; any
 /// other expression is left for the script check to refuse.
 pub fn substitute(
