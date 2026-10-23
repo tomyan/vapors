@@ -55,6 +55,14 @@ impl ElementsApp {
         }
     }
 
+    /// Takes input as if the display scale were `scale`, until the first
+    /// frame says what it is: for driving `event` without a window.
+    #[must_use]
+    pub fn with_scale(mut self, scale: f32) -> Self {
+        self.scale = scale;
+        self
+    }
+
     /// Where the app's failure is kept; clone it before `run` takes the app.
     #[must_use]
     pub fn failure(&self) -> Failure {
@@ -97,6 +105,17 @@ impl ElementsApp {
 }
 
 impl ElementsApp {
+    /// What to do after a frame: draw again at once if the document
+    /// changed since it was last asked (by something outside an event,
+    /// or by the update itself), else wait for the next change.
+    pub fn next_after_frame(&mut self) -> Next {
+        if self.document.borrow_mut().take_changed() {
+            Next::Continue
+        } else {
+            Next::Wait
+        }
+    }
+
     fn act(&mut self, action: Action) {
         let document = &self.document;
         match action {
@@ -126,7 +145,7 @@ impl App for ElementsApp {
 
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
         match self.draw(frame) {
-            Ok(()) => Next::Wait,
+            Ok(()) => self.next_after_frame(),
             Err(message) => {
                 report_error(&message);
                 self.failure.set(&message);

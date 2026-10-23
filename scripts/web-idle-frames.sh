@@ -4,6 +4,9 @@
 # waits 3 s for start-up, then counts getCurrentTexture calls (one per
 # frame) over the next 3 s. An app that redraws only on change draws 0.
 #
+# A page that drew no frame by 3 s, or showed an error, is refused: an
+# idle count of 0 from a page that never drew would be a false pass.
+#
 # Usage: scripts/web-idle-frames.sh target/web <new or empty dir> [demo ...]
 # after `cargo xtask web`; demos default to hello counter image.
 # Needs python3 and chromium (or $CHROME). Prints one line per demo and
@@ -23,8 +26,12 @@ source, target = sys.argv[1:3]
 text = open(source).read()
 head = ('<script>var frames = 0, start; var current = GPUCanvasContext.prototype.getCurrentTexture;'
         ' GPUCanvasContext.prototype.getCurrentTexture = function () { frames++; return current.apply(this, arguments); };'
-        ' setTimeout(function () { start = frames; }, 3000);'
-        ' setTimeout(function () { var p = document.createElement("pre"); p.id = "idle"; p.textContent = String(frames - start);'
+        ' var refused = "";'
+        ' setTimeout(function () { start = frames; var e = document.getElementById("error");'
+        ' if (frames === 0) refused = "the page drew no frame in 3 s";'
+        ' else if (e && e.textContent) refused = "the page reported an error: " + e.textContent; }, 3000);'
+        ' setTimeout(function () { var p = document.createElement("pre"); p.id = "idle";'
+        ' p.textContent = refused ? "refused: " + refused : String(frames - start);'
         ' document.body.append(p); fetch("/done", { method: "POST" }); }, 6000);</script>')
 open(target, 'w').write(text.replace('</head>', head + '</head>').replace('</body>', '<img src="/wait" hidden></body>'))
 PY
@@ -58,8 +65,11 @@ for demo in $demos; do
   count=$(env -u DBUS_SESSION_BUS_ADDRESS VK_DRIVER_FILES="$icd" timeout 60 "$chrome" --headless=new --no-sandbox \
     --disable-gpu-sandbox --use-angle=swiftshader --enable-unsafe-webgpu --enable-features=Vulkan,WebGPU \
     --window-size=640,400 --dump-dom "http://127.0.0.1:$port/idle.html?demo=$demo" 2>/dev/null \
-    | sed -n 's#.*<pre id="idle">\([0-9]*\)</pre>.*#\1#p')
-  if [ -z "$count" ]; then echo "$demo: no count; the page never reported" >&2; missing=1; continue; fi
+    | sed -n 's#.*<pre id="idle">\([^<]*\)</pre>.*#\1#p')
+  case $count in
+    '') echo "$demo: no count; the page never reported" >&2; missing=1; continue ;;
+    refused:*) echo "$demo: $count" >&2; missing=1; continue ;;
+  esac
   echo "$demo: $count frames in 3 s idle"
 done
 exit $missing

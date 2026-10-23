@@ -45,3 +45,18 @@ fn a_button_outside_a_flex_container_is_refused_until_inline_layout() {
         "{errors:?}"
     );
 }
+
+#[test]
+fn disabled_false_on_an_element_where_disabled_does_nothing_is_not_refused() {
+    // Given: HTML ignores disabled on a div
+    let mut doc = document();
+    let body = doc.body();
+    let div = element(&mut doc, body, "div", "");
+    doc.set_attribute(div, "disabled", "false");
+
+    // When
+    let updated = doc.update(support::viewport(100.0, 100.0));
+
+    // Then
+    assert!(updated.is_ok());
+}

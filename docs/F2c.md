@@ -470,7 +470,8 @@ differs from the plan.
 
   The web "before" numbers were taken with the same page script before
   `scripts/web-idle-frames.sh` existed; the "after" numbers come from
-  the script.
+  the script, which refuses a page that drew no frame or showed an
+  error, so a page that never drew cannot pass as idle.
 - **Pointer input.** `Document::pointer_moved`, `pointer_pressed`,
   `pointer_released`, `pointer_left` and `tapped` (CSS pixels) hit-test
   the last update, set `:hover` and `:active`, and dispatch
@@ -480,17 +481,21 @@ differs from the plan.
   CSS longhand; `visibility` is read. A touch reaches the document only
   as its tap, so one tap is one click. `pointerenter`/`pointerleave` are
   not fired (refused like any unfired event).
-- **Button.** Supported where it is a flex or grid item, which
+- **Button.** Supported where it is a flex item (grid arrives in S4), which
   blockifies it; elsewhere it stays inline-block and is refused until
-  S6. `disabled="false"` is refused, since it disables in HTML and the
+  S6. `disabled="false"` on a button is refused (on other elements HTML
+  ignores `disabled`, and so does vapors), since it disables in HTML and the
   `Dom` cannot remove an attribute until F4. `cursor` moved to S3: the
   platform has no way to set it yet.
 - **Page contract.** A hold that reached the server's 30 s deadline used
   to end silently and let the dump or screenshot run anyway; it now
   fails naming the page. The screenshot copies size the canvas at
   640x400 themselves and hold on a frame at that size, because headless
-  Chromium lays the page out 313 px tall until it takes the screenshot,
-  and an app that draws on change may not redraw for that late resize.
+  Chromium lays the page out 313 px tall while it loads and resizes it
+  to `--window-size` only to take the screenshot, after the hold has
+  ended: a hold waiting for a 400 px frame would never end. A resize
+  itself is redrawn: the `resize` case changes the canvas's CSS size
+  after the first frame and holds until a frame at the new size.
   Each demo's `.pixels` file may list `click X Y` lines, made before the
   screenshot natively (by the example) and on the web (synthetic
   pointer events on the canvas).

@@ -82,10 +82,12 @@ impl ImageApp {
 
 impl ImageApp {
     /// What a frame shows: when it changes, the app asks for a frame.
-    fn shown(&self) -> (vapors_scene::Transform, bool, Option<String>) {
+    /// The image's generation changes with every image set, so a new
+    /// image of the same size and name is drawn too.
+    fn shown(&self) -> (vapors_scene::Transform, u64, Option<String>) {
         (
             self.view.transform(),
-            self.view.has_image(),
+            self.view.generation(),
             self.file_name.clone(),
         )
     }

@@ -28,7 +28,8 @@ h6 { font-size: 0.67em; margin-top: 2.33em; margin-bottom: 2.33em; }
 
 /* A vapors button, not Chromium's native one: no border until borders
    arrive (F2c S3). Inline-block, so it is laid out only where it is
-   blockified (a flex or grid item) until inline layout arrives (S6). */
+   blockified (a flex item; grid arrives in S4) until inline layout
+   arrives (S6). */
 button {
   display: inline-block;
   padding: 1px 6px;

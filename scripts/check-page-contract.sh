@@ -112,13 +112,14 @@ prepare() {
   # screenshot was taken before any frame (vapors main, white centre,
   # after #25). Headless Chromium lays the page out 313 px tall while it
   # loads and resizes it to the 400 px of --window-size only to take the
-  # screenshot (here, Chromium 155); the apps draw only on change (F2c
-  # S2), so a frame for that late resize may not have presented when the
-  # screenshot is taken. The screenshot copies therefore size the canvas
-  # at 640x400 CSS px themselves, and the hold waits for a frame at that
-  # size rather than for a count of frames, which an idle app never
-  # reaches.
-  frames='<style>canvas { width: 640px !important; height: 400px !important; }</style><script>var current = GPUCanvasContext.prototype.getCurrentTexture; GPUCanvasContext.prototype.getCurrentTexture = function () { if (document.body) { document.body.dataset.frames = String((Number(document.body.dataset.frames) || 0) + 1); document.body.dataset.frameHeight = String(this.canvas.height); } return current.apply(this, arguments); };</script>'
+  # screenshot, after the hold has ended (here, Chromium 155), so a hold
+  # waiting for a frame at 400 px would never end. The screenshot copies
+  # therefore size the canvas at 640x400 CSS px themselves, and the hold
+  # waits for a frame at that size rather than for a count of frames,
+  # which an app that draws only on change (F2c S2) never reaches. That
+  # a resize is redrawn is the `resize` case's to check.
+  counter='<script>var current = GPUCanvasContext.prototype.getCurrentTexture; GPUCanvasContext.prototype.getCurrentTexture = function () { if (document.body) { document.body.dataset.frames = String((Number(document.body.dataset.frames) || 0) + 1); document.body.dataset.frameHeight = String(this.canvas.height); } return current.apply(this, arguments); };</script>'
+  frames="<style>canvas { width: 640px !important; height: 400px !important; }</style>$counter"
   page as-built-shot "$frames" "$full_size"
   page no-open-button "" "!error.hidden && $adapter" 's#<button id="open">Open</button>##'
   page no-webgpu "$nogpu" ""
@@ -136,6 +137,10 @@ prepare() {
     fi
   done
   page unknown-demo "" "!error.hidden"
+  # The canvas resized by CSS after its first frame, as a window resize
+  # or a rotation does: the page draws only on change, so the hold ends
+  # only if the resize asks for a frame and it is drawn at 300 px.
+  page resize "$counter" "(function () { var f = Number(document.body.dataset.frames) || 0; if (f >= 1 && !window.vaporsResized) { var c = document.getElementById('vapors'); c.style.width = '500px'; c.style.height = '300px'; window.vaporsResized = true; } return (Number(document.body.dataset.frameHeight) || 0) === 300; })()"
   page subpath "" "$adapter"
   ln -s . "$work/vapors"
   grep -q '<p id="error"' "$work/as-built.html" || { echo "$web/index.html: no <p id=\"error\">" >&2; exit 1; }
@@ -354,6 +359,7 @@ check device-lost '^adapter: ' '^the GPU device was lost \(Destroyed: .*\); fix:
 check hello '^adapter: ' hidden '?demo=hello'
 check unknown-demo '^starting$' '^no demo is called `nope`' '?demo=nope'
 check subpath '^adapter: ' hidden '' vapors/
+check resize '^adapter: ' hidden '?demo=hello'
 # Each demo as Chromium shows the canvas after its clicks, held to the
 # same crates/demos/demos/<name>.pixels as the native screenshot, by the
 # same code.
@@ -365,4 +371,4 @@ for demo in $demos; do
   fi
 done
 [ "$failed" = 0 ] || { echo "the page contract does not hold; reproduce: cargo xtask web && $0 target/web \$(mktemp -d)" >&2; exit 1; }
-echo "ok   the page contract holds in all eight cases, the gradient screenshot and the screenshots of: $demos"
+echo "ok   the page contract holds in all nine cases, the gradient screenshot and the screenshots of: $demos"

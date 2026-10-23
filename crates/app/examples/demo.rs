@@ -122,23 +122,24 @@ impl App for Shot {
         self.app.event(event, platform);
     }
 
+    /// The app's own answer, so a change that asks for no frame is not
+    /// hidden: after the first frame the clicks are made and the app
+    /// says whether they changed anything; the screenshot is the frame
+    /// that follows (or the first, when there are no clicks).
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
-        if self.app.frame(frame) == Next::Exit {
+        let next = self.app.frame(frame);
+        let Some(path) = &self.path else { return next };
+        if next == Next::Exit {
             return Next::Exit;
         }
-        match &self.path {
-            Some(_) if frame.index == 0 => {
-                for point in &self.spec.clicks {
-                    vapors_demos::click(&self.document, *point);
-                }
-                Next::Continue
+        if frame.index == 0 && !self.spec.clicks.is_empty() {
+            for point in &self.spec.clicks {
+                vapors_demos::click(&self.document, *point);
             }
-            Some(path) => {
-                *self.result.borrow_mut() = Some(self.check(frame, path));
-                Next::Exit
-            }
-            _ => Next::Continue,
+            return self.app.next_after_frame();
         }
+        *self.result.borrow_mut() = Some(self.check(frame, path));
+        Next::Exit
     }
 }
 

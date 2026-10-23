@@ -21,6 +21,8 @@ pub type Point = [f32; 2];
 pub(crate) struct Pointer {
     pub(crate) pressed: Option<NodeId>,
     pub(crate) hovered: Option<NodeId>,
+    /// Where the pointer last moved, until it leaves the window.
+    pub(crate) position: Option<Point>,
 }
 
 impl Document {
@@ -33,10 +35,14 @@ impl Document {
         }
     }
 
-    /// The pointer left the window: nothing is hovered.
+    /// The pointer left the window: nothing is hovered, and a press in
+    /// progress is abandoned (`:active` clears, no `click` follows),
+    /// since without pointer capture its release is never seen.
     pub fn pointer_left(document: &Rc<RefCell<Document>>) {
-        document.borrow_mut().set_flag_chain(States::HOVER, None);
-        document.borrow_mut().pointer.hovered = None;
+        let mut doc = document.borrow_mut();
+        doc.set_flag_chain(States::HOVER, None);
+        doc.set_flag_chain(States::ACTIVE, None);
+        doc.pointer = Pointer::default();
     }
 
     /// The primary button went down at `point`: the target and its
@@ -75,7 +81,22 @@ impl Document {
         self.painted.as_ref()?.hit(point)
     }
 
+    /// After an update: the element under the pointer's last position may
+    /// have changed with the layout, so `:hover` follows it (the next
+    /// update shows it) without an event.
+    pub(crate) fn rehover_in(&mut self, painted: &crate::painted::Painted) {
+        let Some(point) = self.pointer.position else {
+            return;
+        };
+        let target = painted.hit(point);
+        if target != self.pointer.hovered {
+            self.set_flag_chain(States::HOVER, target);
+            self.pointer.hovered = target;
+        }
+    }
+
     fn hover(&mut self, point: Point) -> Option<NodeId> {
+        self.pointer.position = Some(point);
         let target = self.hit(point);
         if target != self.pointer.hovered {
             self.set_flag_chain(States::HOVER, target);

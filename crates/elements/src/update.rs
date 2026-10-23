@@ -53,7 +53,9 @@ impl Document {
             fonts: &mut self.fonts,
             scale: viewport.scale,
         };
-        Ok(self.painted.insert(paint(&boxes, &rects, &mut input)))
+        let painted = paint(&boxes, &rects, &mut input);
+        self.rehover_in(&painted);
+        Ok(self.painted.insert(painted))
     }
 
     /// The last successful update's result, if the document has not

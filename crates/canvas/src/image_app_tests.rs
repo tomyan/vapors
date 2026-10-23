@@ -120,3 +120,28 @@ fn a_file_that_is_not_a_png_leaves_the_view_empty() {
     assert!(!app.view().has_image());
     assert_eq!(app.label(), "no file  100%");
 }
+
+fn png_of(pixel: [u8; 4]) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    let mut encoder = png::Encoder::new(&mut bytes, 1, 1);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    let mut writer = encoder.write_header().expect("header");
+    writer.write_image_data(&pixel).expect("data");
+    drop(writer);
+    bytes
+}
+
+#[test]
+fn opening_a_second_image_of_the_same_size_and_name_changes_what_is_shown() {
+    // Given: one 1x1 image open, fitted
+    let mut app = ImageApp::new(BACKGROUND);
+    app.file_opened("same.png", &png_of([1, 2, 3, 255]));
+    let before = app.shown();
+
+    // When: another 1x1 image of the same name
+    app.file_opened("same.png", &png_of([200, 100, 50, 255]));
+
+    // Then: the app asks for a frame, so the new pixels are drawn
+    assert_ne!(app.shown(), before);
+}

@@ -101,9 +101,14 @@ pub(crate) fn implemented(arena: &Arena, node: NodeId) -> bool {
 
 /// A `disabled` attribute disables by being present, as in HTML, so
 /// `disabled="false"` disables too; a `.wisp` that sets it from an
-/// expression would get exactly that. Refused until the tree can remove
-/// an attribute (a `Dom` change, scheduled with the inputs in F4).
+/// expression would get exactly that. Refused where `disabled` has an
+/// effect, which in F2c is a button (elsewhere HTML ignores it), until
+/// the tree can remove an attribute (a `Dom` change, with the inputs in
+/// F4).
 fn disabled_value(tag: &str, value: Option<&String>) -> Option<String> {
+    if tag != "button" {
+        return None;
+    }
     match value.map(String::as_str) {
         Some("false") => Some(format!(
             "<{tag} disabled=\"false\"> is disabled: an HTML boolean attribute disables by being present; leave it out to enable, since the tree cannot remove an attribute until F4"
