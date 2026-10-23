@@ -33,6 +33,7 @@ mod screenshot;
 mod screenshot_package;
 mod serve;
 mod setup;
+mod setup_install;
 mod stamp_page;
 mod step;
 mod steps;

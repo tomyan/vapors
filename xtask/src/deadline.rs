@@ -2,6 +2,7 @@
 
 use std::io::Read;
 use std::process::{Command, Stdio};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -15,7 +16,10 @@ pub enum Finished {
         output: String,
     },
     /// It was killed at the deadline.
-    TimedOut,
+    TimedOut {
+        /// Its combined output up to the kill.
+        output: String,
+    },
 }
 
 const POLL: Duration = Duration::from_millis(50);
@@ -47,27 +51,51 @@ pub fn run_with_deadline(mut command: Command, deadline: Duration) -> Result<Fin
         if started.elapsed() >= deadline {
             let _ = child.kill();
             let _ = child.wait();
-            return Ok(Finished::TimedOut);
+            // Not joined: a grandchild may still hold the pipe open.
+            let output = snapshot(stdout.as_ref(), stderr.as_ref());
+            return Ok(Finished::TimedOut { output });
         }
         thread::sleep(POLL);
     }
 }
 
-fn read_in_background<R: Read + Send + 'static>(mut reader: R) -> thread::JoinHandle<String> {
-    thread::spawn(move || {
-        let mut text = String::new();
-        let _ = reader.read_to_string(&mut text);
-        text
-    })
+/// A reader thread and the text it has read so far.
+struct Collected {
+    text: Arc<Mutex<String>>,
+    thread: thread::JoinHandle<()>,
 }
 
-fn join_outputs(
-    stdout: Option<thread::JoinHandle<String>>,
-    stderr: Option<thread::JoinHandle<String>>,
-) -> String {
+fn read_in_background<R: Read + Send + 'static>(mut reader: R) -> Collected {
+    let text = Arc::new(Mutex::new(String::new()));
+    let sink = Arc::clone(&text);
+    let thread = thread::spawn(move || {
+        let mut chunk = [0u8; 4096];
+        while let Ok(read) = reader.read(&mut chunk) {
+            if read == 0 {
+                break;
+            }
+            let mut text = sink.lock().unwrap_or_else(PoisonError::into_inner);
+            text.push_str(&String::from_utf8_lossy(&chunk[..read]));
+        }
+    });
+    Collected { text, thread }
+}
+
+/// The child exited: wait for the readers, then take everything.
+fn join_outputs(stdout: Option<Collected>, stderr: Option<Collected>) -> String {
+    let collected: Vec<Collected> = [stdout, stderr].into_iter().flatten().collect();
+    for reader in &collected {
+        while !reader.thread.is_finished() {
+            thread::sleep(POLL);
+        }
+    }
+    snapshot(collected.first(), collected.get(1))
+}
+
+fn snapshot(stdout: Option<&Collected>, stderr: Option<&Collected>) -> String {
     let mut text = String::new();
-    for handle in [stdout, stderr].into_iter().flatten() {
-        text.push_str(&handle.join().unwrap_or_default());
+    for reader in [stdout, stderr].into_iter().flatten() {
+        text.push_str(&reader.text.lock().unwrap_or_else(PoisonError::into_inner));
     }
     text
 }
@@ -91,7 +119,7 @@ mod tests {
                 assert!(success);
                 assert_eq!(output.trim(), "hello");
             }
-            Finished::TimedOut => panic!("should not time out"),
+            Finished::TimedOut { .. } => panic!("should not time out"),
         }
     }
 
@@ -106,7 +134,25 @@ mod tests {
         let finished = run_with_deadline(command, Duration::from_millis(200)).expect("spawns");
 
         // Then
-        assert!(matches!(finished, Finished::TimedOut));
+        assert!(matches!(finished, Finished::TimedOut { .. }));
+        assert!(started.elapsed() < Duration::from_secs(5));
+    }
+
+    #[test]
+    fn a_command_killed_at_the_deadline_keeps_its_output_so_far() {
+        // Given: the shell's `sleep` child keeps the pipe open past the kill.
+        let mut command = Command::new("sh");
+        command.args(["-c", "echo partial; sleep 10"]);
+
+        // When
+        let started = Instant::now();
+        let finished = run_with_deadline(command, Duration::from_millis(500)).expect("spawns");
+
+        // Then
+        let Finished::TimedOut { output } = finished else {
+            panic!("should time out");
+        };
+        assert_eq!(output.trim(), "partial");
         assert!(started.elapsed() < Duration::from_secs(5));
     }
 }

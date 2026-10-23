@@ -5,6 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
+use crate::setup_install;
 use crate::tools::{self, Tool};
 
 const TOOLS_FILE: &str = ".config/tools.toml";
@@ -65,8 +66,8 @@ fn ensure(tool: &Tool) -> Result<(), String> {
             Ok(())
         }
         found => {
-            println!("{}", mismatch(tool, found.as_deref()));
-            install(tool)
+            println!("{}", setup_install::before_install(tool, found.as_deref()));
+            setup_install::install(tool)
         }
     }
 }
@@ -84,23 +85,6 @@ fn installed_version(tool: &Tool) -> Option<String> {
     let text = String::from_utf8_lossy(&output.stdout);
     // Tools print `<name> <version>`; some add a hash or date after.
     text.split_whitespace().nth(1).map(str::to_owned)
-}
-
-fn install(tool: &Tool) -> Result<(), String> {
-    let spec = format!("{}@{}", tool.crate_name, tool.version);
-    println!("     installing {spec} with cargo binstall");
-    // Not through sccache: setup installs sccache, so it cannot need it.
-    // binstall downloads binaries; a tool it must compile compiles
-    // uncached, once per machine.
-    let status = Command::new("cargo")
-        .args(["binstall", "-y", &spec])
-        .status()
-        .map_err(|e| format!("could not run cargo binstall: {e}; install it from https://github.com/cargo-bins/cargo-binstall"))?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!("cargo binstall {spec} failed with {status}"))
-    }
 }
 
 fn install_hook() -> Result<(), String> {
