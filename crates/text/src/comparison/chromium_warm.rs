@@ -13,11 +13,12 @@ use super::chromium::{Chromium, ChromiumError};
 /// before the warm-up, took 15.4 s in run 40020237373. Google Chrome's
 /// first launch took 1.26 s blank and
 /// 12.7 to 20.2 s with text (runs 40018468987, 40019150781, 40020711297).
-/// Every later launch took 0.6 to 0.9 s. 91 s is 2.5 times the worst,
-/// 36.2 s. The cost is the browser's own first run, spread over start-up;
+/// Every later launch took 0.6 to 0.9 s. Five runs of this warm-up on
+/// vapors #40 (run 40026130114) took 22.3, 33.5, 57.9, 15.3 and 35.9 s.
+/// 145 s is 2.5 times the worst, 57.9 s (job 120665457660). The cost is the browser's own first run, spread over start-up;
 /// building fontconfig's cache first does not remove it (0.22 s, then
 /// 20.2 s, run 40020711297).
-const COLD_START: Duration = Duration::from_secs(91);
+const COLD_START: Duration = Duration::from_secs(145);
 
 /// Text in a system font, so the first launch's text start-up is paid here.
 const WARM_PAGE: &str =
