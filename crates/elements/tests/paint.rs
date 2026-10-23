@@ -4,7 +4,6 @@
 mod support;
 
 use support::{document, element, text};
-use vapors_dom::Dom;
 use vapors_elements::Viewport;
 use vapors_scene::{Color, Item, Quad, Rect};
 
