@@ -677,9 +677,9 @@ differs from the plan.
 - **Tags.** `span`, `b`, `strong`, `em`, `i`, `var`, `code`, `kbd`,
   `samp`, `mark` and `abbr` are implemented.
   - `small` waits: Chromium resolves `smaller` through a keyword table.
-  - `a`, `br`, `del`, `s`, `sub`, `sup` and `u` are not scheduled.
-  - Generic `monospace` is the bundled Geist Mono, where Chromium uses
-    the system's (DejaVu Sans Mono here).
+  - `br` and `a` come first after F2c (D6). `del`, `s`, `sub`, `sup`
+    and `u` are not scheduled.
+  - Generic `monospace` is the bundled Geist Mono (D5).
   - Chromium's 13 px default for `code` under a `medium` font size is
     not copied.
 - **Refused, naming the element:**
@@ -713,3 +713,12 @@ differs from the plan.
   0.15 changed in the areas vapors uses. cargo-deny's advisories check
   stays on. The Chromium corpus is the regression gate; a layout bug
   it catches in Taffy is reported before it is worked around.
+- **D5 Monospace is Geist Mono (2026-10-23).** Generic `monospace` (and
+  `ui-monospace`) is the bundled Geist Mono, the brand's monospace,
+  where Chromium uses the system's (DejaVu Sans Mono on this Debian).
+  Layout fixtures that compare monospace text name Geist Mono, so they
+  compare like for like. Chromium's 13 px default size for monospace
+  under a `medium` font size is not copied.
+- **D6 `br` and `a` in F2d (2026-10-23).** Forced line breaks and links
+  are the first item after F2c: touche's chat panel and About page need
+  them. Until then they are refused, naming F2d.

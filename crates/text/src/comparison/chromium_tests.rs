@@ -69,17 +69,43 @@ fn a_browser_past_its_deadline_is_killed_with_its_children_and_its_stderr_report
         .expect_err("hung");
 
     // Then: the 1 s deadline, then naming the browser, whose `--version`
-    // hangs too and is cut off at its own 10 s
-    assert!(
-        started.elapsed() < std::time::Duration::from_secs(20),
-        "{:?}",
-        started.elapsed()
-    );
+    // hangs too and is cut off at its own 10 s. Each failure says how
+    // long the run took and what the fake browser had done by then, so
+    // a slow step under load is named
+    let elapsed = started.elapsed();
     let message = error.to_string();
-    assert!(message.contains("did not finish within 1s"), "{message}");
-    assert!(message.contains("version unknown"), "{message}");
-    assert!(message.contains("gpu process died"), "{message}");
-    let child = std::fs::read_to_string(&child_pid).expect("child pid");
+    let stage = |what: &str| {
+        format!(
+            "{what} after {elapsed:?}; the launcher's message: {message}; the child's pid file: {:?}",
+            std::fs::read_to_string(&child_pid).ok()
+        )
+    };
+    assert!(
+        elapsed < std::time::Duration::from_secs(20),
+        "{}",
+        stage("the kill was late")
+    );
+    assert!(
+        message.contains("did not finish within 1s"),
+        "{}",
+        stage("no deadline message")
+    );
+    assert!(
+        message.contains("version unknown"),
+        "{}",
+        stage("the browser not named")
+    );
+    assert!(
+        message.contains("gpu process died"),
+        "{}",
+        stage("no stderr: the fake browser's shell had not reached its first line")
+    );
+    let child = std::fs::read_to_string(&child_pid).unwrap_or_else(|_| {
+        panic!(
+            "{}",
+            stage("no child pid: the fake browser was killed before it started its child")
+        )
+    });
     let alive = std::process::Command::new("kill")
         .args(["-0", child.trim()])
         .status()

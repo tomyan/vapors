@@ -43,6 +43,7 @@ const SUPPORTED: &[&str] = &[
 /// Where each unimplemented tag arrives.
 const LATER: &[(&str, &[&str])] = &[
     ("F2c S10", &["img"]),
+    ("F2d, the first item after F2c", &["br", "a"]),
     ("F3", &["canvas"]),
     (
         "F4",
@@ -127,5 +128,16 @@ mod tests {
 
         // Then
         assert!(refusal.contains("not scheduled"), "{refusal}");
+    }
+
+    #[test]
+    fn line_breaks_and_links_are_refused_naming_f2d() {
+        for tag in ["br", "a"] {
+            // When
+            let refusal = unsupported(tag).expect("refused until F2d");
+
+            // Then
+            assert!(refusal.contains("F2d"), "{refusal}");
+        }
     }
 }
