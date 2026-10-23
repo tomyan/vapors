@@ -295,7 +295,8 @@ creates; the rule is Svelte 5's.
   `:is()`, `:not()`, `:where()` and `:has()`, requires it inside
   `:where()`, which adds no specificity. A scoped rule therefore gains
   exactly one attribute's specificity, (0,1,0), however many compounds
-  it has.
+  it has. When the subject is `:global(..)`, the last scoped compound
+  counts instead: `.card :global(p)` weighs (0,2,1).
 
 For example, in a component whose scope is `app/src/panel.wisp`:
 
@@ -312,8 +313,12 @@ For example, in a component whose scope is `app/src/panel.wisp`:
 - `:global(...)` leaves the compound holding it unscoped, for an
   element the component did not create: `:global(body) { margin: 0; }`,
   or `:global(.dark) .title` for `.title` under any `.dark`. It weighs
-  what its argument weighs. In a sheet added with `add_stylesheet`,
-  which has no scope, `:global` is refused, naming the line.
+  what its argument weighs. Only a top-level compound can be left
+  unscoped: a `:global` inside `:is()`, `:not()`, `:where()` or `:has()`
+  is refused, naming the line. In a sheet added with `add_stylesheet`,
+  which has no scope, `:global` is refused anywhere.
+- A scope added again with a different style (two components with the
+  same scope) is refused, naming the scope.
 - A style that does not parse is refused by the next update, naming the
   scope, line and column.
 - A crate whose components' styles the app adds as global sheets uses

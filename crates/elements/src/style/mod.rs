@@ -31,12 +31,16 @@ pub(crate) use values::{Refusal, Styles as ElementStyles};
 
 const UA_SHEET: &str = include_str!("ua.css");
 
+/// Why a `:global()` below a selector's top level is refused.
+const NESTED_GLOBAL: &str = ":global() leaves a top-level compound unscoped; inside :is(), :not(), :where() or :has() it would be ignored, so write that selector without it";
+
 /// The stylesheets, in cascade order, and their names for errors; the
 /// component scopes added, and the scoped styles that did not parse.
 pub(crate) struct Sheets {
     cascade: Cascade,
     names: Vec<String>,
-    scopes: std::collections::HashSet<String>,
+    /// Each scope added, with the style it was added with.
+    scopes: std::collections::HashMap<String, String>,
     refused: Vec<ElementError>,
 }
 
@@ -51,7 +55,7 @@ impl Sheets {
         Self {
             cascade: Cascade::new().user_agent(ua),
             names: vec!["ua.css".to_owned()],
-            scopes: std::collections::HashSet::new(),
+            scopes: std::collections::HashMap::new(),
             refused: Vec::new(),
         }
     }
@@ -78,20 +82,31 @@ impl Sheets {
     /// every update (see [`Sheets::refused`]): `Dom::add_style` returns
     /// nothing, as the generated code's other calls do.
     pub(crate) fn add_scoped(&mut self, scope: &str, text: &str) {
-        if !self.scopes.insert(scope.to_owned()) {
-            return;
-        }
-        match vapors_css::parse(text) {
-            Ok(sheet) => {
-                self.cascade =
-                    std::mem::take(&mut self.cascade).author(scope::scoped(sheet, scope));
-                self.names.push(scope.to_owned());
+        let refuse = |error| ElementError::Css {
+            sheet: scope.to_owned(),
+            error,
+        };
+        match self.scopes.get(scope) {
+            Some(added) if added == text => return,
+            Some(_) => {
+                return self.refused.push(refuse(vapors_css::Error::new(
+                    vapors_css::Position { line: 1, column: 1 },
+                    format!("scope `{scope}` was already added with another style: two components share a scope; give their files different paths"),
+                )));
             }
-            Err(error) => self.refused.push(ElementError::Css {
-                sheet: scope.to_owned(),
-                error,
-            }),
+            None => drop(self.scopes.insert(scope.to_owned(), text.to_owned())),
         }
+        let sheet = match vapors_css::parse(text) {
+            Ok(sheet) => sheet,
+            Err(error) => return self.refused.push(refuse(error)),
+        };
+        if let Some(position) = scope::first_nested_global(&sheet) {
+            return self
+                .refused
+                .push(refuse(vapors_css::Error::new(position, NESTED_GLOBAL)));
+        }
+        self.cascade = std::mem::take(&mut self.cascade).author(scope::scoped(sheet, scope));
+        self.names.push(scope.to_owned());
     }
 
     /// The scoped styles that did not parse.

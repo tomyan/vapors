@@ -22,16 +22,19 @@ pub(crate) fn scoped(mut sheet: Stylesheet, scope: &str) -> Stylesheet {
     sheet
 }
 
-/// Scopes each compound; the subject's test counts for specificity
-/// when `counted`.
+/// Scopes each compound but a `:global` one. When `counted`, the last
+/// scoped compound's test counts for specificity, so a rule whose
+/// subject is `:global(..)` still gains one attribute (Svelte 5).
 fn scope_selector(selector: &mut Selector, scope: &str, counted: bool) {
-    let last = selector.compounds.len().saturating_sub(1);
+    let counted_at = counted
+        .then(|| selector.compounds.iter().rposition(|c| !is_global(c)))
+        .flatten();
     for (index, compound) in selector.compounds.iter_mut().enumerate() {
         if is_global(compound) {
             continue;
         }
         scope_nested(compound, scope);
-        if counted && index == last {
+        if counted_at == Some(index) {
             compound.attributes.push(in_scope(scope));
         } else {
             compound.pseudo_classes.push(uncounted(scope));
@@ -66,14 +69,52 @@ fn is_global(compound: &Compound) -> bool {
         .any(|pseudo| matches!(pseudo, PseudoClass::Global(_)))
 }
 
-/// Where the first rule using `:global()` starts, for refusing it in a
-/// sheet that is not a component's: there is no scope to leave.
+/// Where the first rule using `:global()` anywhere starts, for refusing
+/// it in a sheet that is not a component's: there is no scope to leave.
 pub(crate) fn first_global(sheet: &Stylesheet) -> Option<Position> {
     sheet
         .rules
         .iter()
-        .find(|rule| rule.selector.compounds.iter().any(is_global))
+        .find(|rule| holds_global(&rule.selector))
         .map(|rule| rule.position)
+}
+
+/// Where the first rule with a `:global()` inside `:is()`, `:not()`,
+/// `:where()` or `:has()` starts. Only a top-level compound can be left
+/// unscoped, so one there is refused, not ignored.
+pub(crate) fn first_nested_global(sheet: &Stylesheet) -> Option<Position> {
+    sheet
+        .rules
+        .iter()
+        .find(|rule| {
+            rule.selector
+                .compounds
+                .iter()
+                .any(|c| arguments(c).any(holds_global))
+        })
+        .map(|rule| rule.position)
+}
+
+fn holds_global(selector: &Selector) -> bool {
+    selector
+        .compounds
+        .iter()
+        .any(|c| is_global(c) || arguments(c).any(holds_global))
+}
+
+/// The selectors inside a compound's `:is()`, `:not()`, `:where()` and
+/// `:has()`.
+fn arguments(compound: &Compound) -> impl Iterator<Item = &Selector> {
+    compound
+        .pseudo_classes
+        .iter()
+        .flat_map(|pseudo| match pseudo {
+            PseudoClass::Not(list) | PseudoClass::Is(list) | PseudoClass::Where(list) => {
+                list.iter().collect::<Vec<_>>()
+            }
+            PseudoClass::Has(relatives) => relatives.iter().map(|r| &r.selector).collect(),
+            _ => Vec::new(),
+        })
 }
 
 fn in_scope(scope: &str) -> AttributeSelector {

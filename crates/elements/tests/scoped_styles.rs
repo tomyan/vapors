@@ -149,3 +149,22 @@ fn a_scoped_style_that_does_not_parse_is_refused_by_the_update_naming_its_scope(
         "{found:?}"
     );
 }
+
+#[test]
+fn a_scope_added_again_with_another_style_is_refused_naming_it() {
+    // Given: two components that would share a scope
+    let mut doc = document();
+    doc.add_style("a", ".t { color: red; }");
+    doc.add_style("a", ".t { color: blue; }");
+
+    // When
+    let errors = support::refusals(&mut doc);
+
+    // Then
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("`a`") && e.contains("another style")),
+        "{errors:?}"
+    );
+}

@@ -77,3 +77,67 @@ fn global_in_a_sheet_that_is_not_a_components_is_refused_naming_its_line() {
         error.message
     );
 }
+
+#[test]
+fn a_global_subject_gains_its_one_attribute_on_the_last_scoped_compound() {
+    // Given: scoped `.card :global(p)` (0,1,1), then a later global
+    // `.card p` (0,1,1); scoped, it must count (0,2,1)
+    let mut doc = document();
+    let body = doc.body();
+    let card = element(&mut doc, body, "div", "card");
+    doc.set_attribute(card, SCOPE_ATTRIBUTE, "a");
+    element(&mut doc, card, "p", "");
+    doc.add_style(
+        "a",
+        ".card :global(p) { height: 2px; background-color: #ff0000; }",
+    );
+    doc.add_stylesheet("app.css", ".card p { background-color: #0000ff; }")
+        .expect("parses");
+
+    // When
+    let painted = doc.update(viewport(100.0, 100.0)).expect("updates");
+
+    // Then
+    let colours: Vec<Color> = painted
+        .scene()
+        .items()
+        .iter()
+        .filter_map(|item| match item {
+            vapors_scene::Item::Quad(quad) => Some(quad.background),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(colours, [Color::from_rgba8(255, 0, 0, 255)]);
+}
+
+#[test]
+fn global_below_the_top_level_is_refused_in_a_scoped_style() {
+    // Given
+    let mut doc = document();
+    doc.add_style("a", "p {}\n.x:is(:global(.y)) { color: red; }");
+
+    // When
+    let errors = support::refusals(&mut doc);
+
+    // Then
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.starts_with("a:2:") && e.contains(":global()")),
+        "{errors:?}"
+    );
+}
+
+#[test]
+fn global_below_the_top_level_is_refused_in_a_sheet() {
+    // Given
+    let mut doc = document();
+
+    // When
+    let error = doc
+        .add_stylesheet("app.css", ".x:not(:global(.y)) { color: red; }")
+        .expect_err("refused");
+
+    // Then
+    assert!(error.to_string().starts_with("app.css:1:"), "{error}");
+}
