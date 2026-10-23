@@ -3,6 +3,9 @@
 //! closure needs of the script's plain bindings.
 
 mod declared;
+mod place;
+
+pub(crate) use place::Place;
 
 use std::collections::HashSet;
 
@@ -13,34 +16,6 @@ use super::unwrap::{identifiers, unwrap_signals};
 use crate::CompileError;
 use crate::ast::{Expr, Node};
 use crate::source::Source;
-
-/// Where a node is placed: as a child of `parent`, and at the top
-/// level of a component or block (`roots`), before `before`.
-pub(crate) struct Place {
-    pub parent: String,
-    pub roots: bool,
-}
-
-impl Place {
-    pub fn roots() -> Place {
-        Place {
-            parent: "parent".into(),
-            roots: true,
-        }
-    }
-
-    pub fn child_of(parent: &str) -> Place {
-        Place {
-            parent: parent.into(),
-            roots: false,
-        }
-    }
-
-    /// The `before` argument for a child component mount.
-    pub fn before(&self) -> &'static str {
-        if self.roots { "before" } else { "None" }
-    }
-}
 
 pub(crate) struct Emitter<'a> {
     pub source: &'a Source,
@@ -55,6 +30,9 @@ pub(crate) struct Emitter<'a> {
     scopes: Vec<Vec<String>>,
     generated: HashSet<String>,
     loop_bindings: Vec<(String, usize)>,
+    /// Whether the component has a `<style>`: each element it creates
+    /// is then tagged with its scope.
+    pub scoped: bool,
 }
 
 impl<'a> Emitter<'a> {
@@ -69,6 +47,7 @@ impl<'a> Emitter<'a> {
             scopes: Vec::new(),
             generated: HashSet::new(),
             loop_bindings: Vec::new(),
+            scoped: false,
         }
     }
 
@@ -97,6 +76,12 @@ impl<'a> Emitter<'a> {
     /// Numbers names with `width` digits, zero-padded.
     pub fn with_width(mut self, width: usize) -> Self {
         self.width = width;
+        self
+    }
+
+    /// Tags each element with the component's scope when `scoped`.
+    pub fn with_scope(mut self, scoped: bool) -> Self {
+        self.scoped = scoped;
         self
     }
 

@@ -2,7 +2,8 @@
 //! where the rest arrive. A tag the compiler accepts but the tree does
 //! not implement is an error, never drawn as a `div`.
 
-/// Tags laid out and painted now: block-level containers.
+/// Tags laid out and painted now: block-level containers, and the
+/// inline elements of F2c S6.
 const SUPPORTED: &[&str] = &[
     "html",
     "body",
@@ -26,18 +27,23 @@ const SUPPORTED: &[&str] = &[
     "figure",
     "figcaption",
     "hr",
+    "span",
+    "b",
+    "strong",
+    "code",
+    "kbd",
+    "samp",
+    "mark",
+    "abbr",
+    "em",
+    "i",
+    "var",
 ];
 
 /// Where each unimplemented tag arrives.
 const LATER: &[(&str, &[&str])] = &[
-    (
-        "F2c S6",
-        &[
-            "span", "a", "abbr", "b", "br", "code", "del", "em", "i", "kbd", "mark", "s", "samp",
-            "small", "strong", "sub", "sup", "u", "var",
-        ],
-    ),
     ("F2c S10", &["img"]),
+    ("F2d, the first item after F2c", &["br", "a"]),
     ("F3", &["canvas"]),
     (
         "F4",
@@ -99,15 +105,15 @@ mod tests {
     #[test]
     fn a_scheduled_tag_is_refused_naming_its_slice() {
         // Given
-        let tag = "span";
+        let tag = "img";
 
         // When
         let refusal = unsupported(tag);
 
         // Then
-        let refusal = refusal.expect("span is refused in S1");
+        let refusal = refusal.expect("img is refused until S10");
         assert!(
-            refusal.contains("<span>") && refusal.contains("F2c S6"),
+            refusal.contains("<img>") && refusal.contains("F2c S10"),
             "{refusal}"
         );
     }
@@ -122,5 +128,16 @@ mod tests {
 
         // Then
         assert!(refusal.contains("not scheduled"), "{refusal}");
+    }
+
+    #[test]
+    fn line_breaks_and_links_are_refused_naming_f2d() {
+        for tag in ["br", "a"] {
+            // When
+            let refusal = unsupported(tag).expect("refused until F2d");
+
+            // Then
+            assert!(refusal.contains("F2d"), "{refusal}");
+        }
     }
 }

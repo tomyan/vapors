@@ -8,8 +8,8 @@ let strip: Memo<String> = Memo::new(move || {
 </script>
 
 <style>
-html, body { height: 100%; }
-body {
+:global(html), :global(body) { height: 100%; }
+:global(body) {
   margin: 0;
   display: flex;
   flex-direction: column;

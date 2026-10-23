@@ -8,7 +8,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use support::{document, viewport};
-use vapors_compiler_examples::counter::{Counter, CounterProps};
+use vapors_compiler_examples::counter::{Counter, CounterProps, SCOPE};
 use vapors_elements::Document;
 
 #[test]
@@ -33,7 +33,7 @@ fn tapping_the_button_counts_and_the_next_update_shows_it() {
     assert_eq!(counter.count.get(), 2);
     assert_eq!(
         doc.borrow().inner_html(body),
-        "<button>Clicked 2 times</button>"
+        format!("<button data-wisp=\"{SCOPE}\">Clicked 2 times</button>")
     );
     assert!(
         doc.borrow_mut().take_changed(),

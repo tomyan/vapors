@@ -19,47 +19,9 @@ failed=0
 
 fail() { echo "FAIL $*" >&2; failed=1; }
 
-browser() {
-  for candidate in "${CHROME:-}" google-chrome chromium; do
-    if [ -n "$candidate" ] && command -v "$candidate" >/dev/null 2>&1; then
-      echo "$candidate"; return
-    fi
-  done
-  echo "no browser: set CHROME, or install google-chrome or chromium" >&2
-  exit 1
-}
-
-# The browser's own SwiftShader Vulkan driver, as the only driver, for
-# the browser checks only; the gpu job's tests still run on lavapipe.
-# With lavapipe as the only driver, the compositor cannot read the WebGPU
-# canvas ("Unable to initialize SkSurface", "read from an uninitialized
-# SharedImage") and the screenshot is white: run 39934974057, jobs
-# 120352178274 and 120355716651, and here with VK_DRIVER_FILES set to
-# lavapipe's lvp_icd.json. Nine flag variants under lavapipe alone failed:
-# no Vulkan feature, --use-webgpu-adapter=swiftshader, --use-vulkan=
-# swiftshader and =native, --disable-vulkan-surface, ANGLE on Vulkan with
-# and without its features, Skia Graphite, and Vulkan off with the
-# SwiftShader adapter. With this driver run 39937335978 passed three times.
-# Validated paths, one per browser package (2026-10-23); a browser
-# elsewhere is refused:
-#   /opt/google/chrome/vk_swiftshader_icd.json  Google Chrome 155.0.8059.39 (the runner)
-#   /usr/lib/chromium/vk_swiftshader_icd.json   Chromium 155.0.8059.79 (Debian 13)
-# A browser update that moves or drops the file, or the library it names,
-# fails here by name.
-vulkan_driver() {
-  binary=$(readlink -f "$(command -v "$1")")
-  case $binary in
-    /opt/google/chrome/*) icd=/opt/google/chrome/vk_swiftshader_icd.json ;;
-    /usr/bin/chromium | /usr/lib/chromium/*) icd=/usr/lib/chromium/vk_swiftshader_icd.json ;;
-    *) echo "$1 ($2) resolves to $binary, outside the browser packages this script has validated; fix: validate its vk_swiftshader_icd.json and add it to vulkan_driver in $0" >&2; exit 1 ;;
-  esac
-  [ -r "$icd" ] || { echo "$1 ($2): no $icd, so no SwiftShader Vulkan driver; fix: find where this version ships vk_swiftshader_icd.json and update vulkan_driver in $0" >&2; exit 1; }
-  name=$(sed -n 's|.*"library_path": *"\./\([^"/]*\)".*|\1|p' "$icd")
-  [ -n "$name" ] || { echo "$1 ($2): $icd has no \"library_path\": \"./<file>\" (its shape changed); fix: update vulkan_driver in $0" >&2; exit 1; }
-  library=$(dirname "$icd")/$name
-  [ -f "$library" ] || { echo "$1 ($2): $icd names a library that is not at $library; fix: update vulkan_driver in $0" >&2; exit 1; }
-  echo "$icd"
-}
+# browser and vulkan_driver: the one choice of browser and its Vulkan
+# driver for every page check.
+. "$(dirname "$0")/browser.sh"
 
 # page <name> <script for <head>> <hold condition> [sed edit]: a copy of
 # the built page as <name>.html. With a hold condition (JavaScript over
@@ -162,7 +124,19 @@ prepare() {
 }
 
 # The demos whose screenshots are held to crates/demos/demos/<name>.pixels.
-demos="hello counter boxes shell"
+demos="hello counter boxes shell panel text stress"
+# Demos that change every frame never go idle, and headless Chromium's
+# virtual time then runs hundreds of software-rendered frames past the
+# 60 s deadline; `ticks=5` stops them after five frames.
+animated="stress"
+
+# query <demo>: the page's query string for <demo>.
+query() {
+  case " $animated " in
+    *" $1 "*) echo "?demo=$1&ticks=5" ;;
+    *) echo "?demo=$1" ;;
+  esac
+}
 # The window shoot uses: 640x400, but for a demo section's screenshot.
 size=640,400
 
@@ -403,7 +377,7 @@ check subpath '^adapter: ' hidden '' vapors/
 check resize '^adapter: ' hidden '?demo=hello'
 # overlap <demo>: no visible HTML control over the elements demo's canvas.
 overlap() {
-  dom=$(dump "$1-overlap" "?demo=$1") || { fail "$1-overlap: $chrome exited non-zero or passed 60 s"; console "$1-overlap"; return; }
+  dom=$(dump "$1-overlap" "$(query "$1")") || { fail "$1-overlap: $chrome exited non-zero or passed 60 s"; console "$1-overlap"; return; }
   held "$1-overlap" || return
   found=$(printf '%s' "$dom" | grep -o 'data-overlaps="[^"]*"' | sed 's#data-overlaps="\(.*\)"#\1#')
   echo "$1-overlap: HTML over the canvas: [${found:-not measured}]"
@@ -419,7 +393,7 @@ for demo in $demos; do
   sizes=$(viewports "$demo") || exit 1
   for wh in $sizes; do
     shot="$demo-shot-$wh"; shots="$shots $shot"; size="${wh%x*},${wh#*x}"
-    if shoot "$shot" "?demo=$demo" && held "$shot"; then
+    if shoot "$shot" "$(query "$demo")" && held "$shot"; then
       $check_pixels "crates/demos/demos/$demo.pixels" "$work/$shot.png" || { fail "$shot: the canvas fails demos/$demo.pixels; $work/$shot.png"; console "$shot"; }
     else
       fail "$shot: $chrome exited non-zero or passed 60 s"; console "$shot"

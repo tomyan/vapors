@@ -90,7 +90,7 @@ impl Rasterizer {
             }
         }
         .map_err(|e| e.to_string())?;
-        Ok(path.rasterize(subpixel_offset(request.subpixel)))
+        Ok(path.rasterize(subpixel_offset(request.subpixel), request.skew))
     }
 
     fn hinter(

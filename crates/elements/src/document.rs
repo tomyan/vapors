@@ -24,6 +24,16 @@ pub struct Document {
     /// `take_changed`: a tree, attribute, text or pointer-state change.
     pub(crate) changed: bool,
     pub(crate) pointer: crate::events::Pointer,
+    /// Parley layouts kept between updates.
+    pub(crate) texts: crate::layout::TextCache,
+    /// What changed since the last update, for restyle.
+    pub(crate) dirty: crate::restyle::Dirty,
+    /// The styles kept from the last update.
+    pub(crate) kept: Option<crate::restyle::Kept>,
+    /// The boxes the last update laid out, for the next to reuse.
+    pub(crate) boxes: crate::layout::KeptBoxes,
+    /// Boxes the last update laid out rather than read from cache.
+    pub(crate) laid_out: usize,
 }
 
 impl Document {
@@ -44,6 +54,11 @@ impl Document {
             painted: None,
             changed: true,
             pointer: crate::events::Pointer::default(),
+            texts: crate::layout::TextCache::default(),
+            dirty: crate::restyle::Dirty::default(),
+            kept: None,
+            boxes: crate::layout::KeptBoxes::default(),
+            laid_out: 0,
         }
     }
 
@@ -76,6 +91,7 @@ impl Document {
     /// added.
     pub fn add_stylesheet(&mut self, name: &str, text: &str) -> Result<(), ElementError> {
         self.changed = true;
+        self.dirty.everything();
         self.sheets.add_author(name, text)
     }
 

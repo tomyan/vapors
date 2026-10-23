@@ -13,7 +13,7 @@ use vapors_scene::{Color, Size};
 /// The demo at `spec`'s viewport after its clicks, painted offscreen.
 fn render(name: &str, spec: &Spec) -> Vec<u8> {
     let demo = vapors_demos::find(name).expect("a demo");
-    let shared = vapors_demos::document(&demo).expect("its style parses");
+    let shared = vapors_demos::document(&demo).document;
     let [width, height] = spec.viewport;
     #[allow(clippy::cast_precision_loss)] // viewports are small
     let viewport = Viewport {

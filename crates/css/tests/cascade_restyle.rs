@@ -175,3 +175,24 @@ fn subject_rules_that_set_inherited_properties_restyle_the_subtree() {
         }
     );
 }
+
+#[test]
+fn the_selector_scope_of_an_inherited_declaration_stays_on_the_element() {
+    // Given: a subject flag whose rule sets an inherited property
+    let cascade = cascade(".a:hover { color: red; }");
+
+    // When
+    let widened = cascade.restyle_scope(States::HOVER);
+    let selectors = cascade.restyle_scope_of_selectors(States::HOVER);
+
+    // Then: the full scope reaches the descendants, which inherit; the
+    // selectors' alone leave that to a caller that compares styles
+    assert!(widened.element && widened.descendants, "{widened:?}");
+    assert_eq!(
+        selectors,
+        RestyleScope {
+            element: true,
+            ..RestyleScope::default()
+        }
+    );
+}

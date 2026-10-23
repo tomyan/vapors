@@ -11,7 +11,7 @@ fn a_tag_from_a_later_slice_is_refused_naming_the_slice() {
     // Given
     let mut doc = document();
     let body = doc.body();
-    element(&mut doc, body, "span", "");
+    element(&mut doc, body, "img", "");
 
     // When
     let errors = refusals(&mut doc);
@@ -19,7 +19,7 @@ fn a_tag_from_a_later_slice_is_refused_naming_the_slice() {
     // Then
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(
-        errors[0].contains("<span>") && errors[0].contains("F2c S6"),
+        errors[0].contains("<img>") && errors[0].contains("F2c S10"),
         "{errors:?}"
     );
 }
@@ -29,10 +29,10 @@ fn a_removed_element_is_no_longer_refused() {
     // Given
     let mut doc = document();
     let body = doc.body();
-    let span = element(&mut doc, body, "span", "");
+    let img = element(&mut doc, body, "img", "");
 
     // When
-    doc.remove(span);
+    doc.remove(img);
 
     // Then
     assert!(doc.update(viewport(100.0, 100.0)).is_ok());
@@ -122,7 +122,7 @@ fn every_refusal_in_one_update_is_reported_together() {
     // Given
     let mut doc = document();
     let body = doc.body();
-    element(&mut doc, body, "span", "");
+    element(&mut doc, body, "img", "");
     element(&mut doc, body, "div", "card");
     doc.add_stylesheet("app.css", ".card { opacity: 0.5; }")
         .expect("parses");
@@ -141,33 +141,13 @@ fn a_refused_update_drops_the_previous_result() {
     doc.update(viewport(100.0, 100.0))
         .expect("an empty document updates");
     let body = doc.body();
-    element(&mut doc, body, "span", "");
+    element(&mut doc, body, "img", "");
 
     // When
     let _ = doc.update(viewport(100.0, 100.0));
 
     // Then
     assert!(doc.painted().is_none());
-}
-
-#[test]
-fn a_style_attribute_is_refused_naming_the_element_and_the_slice() {
-    // Given
-    let mut doc = document();
-    let body = doc.body();
-    let div = element(&mut doc, body, "div", "panel");
-    doc.set_attribute(div, "style", "color: red");
-
-    // When
-    let errors = refusals(&mut doc);
-
-    // Then
-    assert_eq!(errors.len(), 1, "{errors:?}");
-    let error = &errors[0];
-    assert!(
-        error.contains("<div class=\"panel\">: a `style` attribute") && error.contains("F2c S5"),
-        "{error}"
-    );
 }
 
 #[test]

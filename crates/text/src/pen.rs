@@ -38,10 +38,11 @@ impl OutlinePen for PathCommands {
 }
 
 impl PathCommands {
-    /// Coverage of the path shifted right by `dx` pixels, y flipped so the
+    /// Coverage of the path shifted right by `dx` pixels and slanted by
+    /// `skew` (x moves `skew` right per pixel up), y flipped so the
     /// bitmap's rows run down from above the baseline.
-    pub fn rasterize(&self, dx: f32) -> Coverage {
-        let flip = Transform::new(1.0, 0.0, 0.0, -1.0, dx, 0.0);
+    pub fn rasterize(&self, dx: f32, skew: f32) -> Coverage {
+        let flip = Transform::new(1.0, 0.0, skew, -1.0, dx, 0.0);
         let (data, placement) = Mask::new(&self.0)
             .format(Format::Alpha)
             .origin(Origin::TopLeft)

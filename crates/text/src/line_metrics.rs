@@ -17,20 +17,59 @@ use crate::style::Family;
 /// by name keeps Parley's unrounded metrics, since it is resolved by
 /// the font collection only during layout.
 pub(crate) fn normal(family: &Family<'_>, size: f32, scale: f32) -> LineHeight {
+    let Some(metrics) = device_metrics(family, size, scale) else {
+        return LineHeight::MetricsRelative(1.0);
+    };
+    let device = metrics.ascent.round() + (-metrics.descent).round() + metrics.leading.round();
+    LineHeight::Absolute(device / scale)
+}
+
+/// The content area of `family` at `size`, laid out at `scale`: its
+/// ascent and descent in logical pixels, each rounded to a whole device
+/// pixel as Blink rounds them. An inline element's box is this tall
+/// around the baseline. `None` for a family by name, whose font only
+/// the layout resolves.
+#[must_use]
+pub fn content_area(family: &Family<'_>, size: f32, scale: f32) -> Option<(f32, f32)> {
+    let metrics = device_metrics(family, size, scale)?;
+    Some((
+        metrics.ascent.round() / scale,
+        (-metrics.descent).round() / scale,
+    ))
+}
+
+fn device_metrics(family: &Family<'_>, size: f32, scale: f32) -> Option<Metrics> {
     let bytes = match family {
         Family::Geist => GEIST,
         Family::GeistMono => GEIST_MONO,
-        Family::Named(_) => return LineHeight::MetricsRelative(1.0),
+        Family::Named(_) => return None,
     };
     let font = skrifa::FontRef::new(bytes).expect("the bundled fonts parse (fonts.rs tests)");
-    let metrics = Metrics::new(&font, Size::new(size * scale), LocationRef::default());
-    let device = metrics.ascent.round() + (-metrics.descent).round() + metrics.leading.round();
-    LineHeight::Absolute(device / scale)
+    Some(Metrics::new(
+        &font,
+        Size::new(size * scale),
+        LocationRef::default(),
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn geists_content_area_at_15px_is_15_above_and_4_below_the_baseline() {
+        // When
+        let area = content_area(&Family::Geist, 15.0, 1.0);
+
+        // Then
+        assert_eq!(area, Some((15.0, 4.0)));
+    }
+
+    #[test]
+    fn a_named_familys_content_area_is_unknown_here() {
+        // Then
+        assert_eq!(content_area(&Family::Named("Inter"), 15.0, 1.0), None);
+    }
 
     #[test]
     fn geist_at_15px_is_19px_tall_at_1x_as_in_chromium() {

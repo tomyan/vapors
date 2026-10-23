@@ -3,11 +3,12 @@
 
 use vapors_css::value::{Color, LengthUnit, Value};
 use vapors_scene::Color as Rgba;
-use vapors_text::{Family, LineHeight, Style};
+use vapors_text::{Align, Family, LineHeight, Style};
 
 use super::values::{Reader, keyword, later, shape};
 
-/// The faces vapors bundles; the only ones named before F2c S6.
+/// The faces vapors bundles, the only ones named until system fonts by
+/// name arrive (a slice after F2c).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Face {
     Geist,
@@ -22,6 +23,12 @@ pub(crate) struct TextStyle {
     pub(crate) weight: f32,
     pub(crate) line_height: LineHeight,
     pub(crate) color: Rgba,
+    /// `letter-spacing`, CSS pixels.
+    pub(crate) letter_spacing: f32,
+    /// `text-align`: how a block lines up its inline content.
+    pub(crate) align: Align,
+    /// `font-style: italic` or `oblique`.
+    pub(crate) italic: bool,
 }
 
 impl TextStyle {
@@ -35,6 +42,8 @@ impl TextStyle {
             weight: self.weight,
             line_height: self.line_height,
             color: self.color,
+            letter_spacing: self.letter_spacing,
+            italic: self.italic,
             ..Style::new(family, self.size)
         }
     }
@@ -51,6 +60,9 @@ pub(crate) fn text_style(reader: &mut Reader<'_>) -> TextStyle {
         weight: reader.read("font-weight", weight, 400.0),
         line_height: reader.read("line-height", line_height, LineHeight::Normal),
         color: reader.read("color", color, Rgba::default()),
+        letter_spacing: reader.read("letter-spacing", letter_spacing, 0.0),
+        align: reader.read("text-align", align, Align::Start),
+        italic: reader.read("font-style", italic, false),
     }
 }
 
@@ -85,7 +97,7 @@ fn face(value: &Value) -> Result<Face, String> {
         "geist mono" | "monospace" | "ui-monospace" => Ok(Face::GeistMono),
         _ => Err(format!(
             "names a family vapors does not bundle; use Geist, Geist Mono, sans-serif or monospace until system fonts by name {}",
-            later("F2c S6")
+            later("a slice after F2c")
         )),
     }
 }
@@ -97,10 +109,9 @@ fn weight(value: &Value) -> Result<f32, String> {
         Value::Integer(n) => Ok(*n as f32),
         Value::Keyword(k) if k == "normal" => Ok(400.0),
         Value::Keyword(k) if k == "bold" => Ok(700.0),
-        Value::Keyword(_) => Err(format!(
-            "is relative to the parent's weight, which {}",
-            later("F2c S6")
-        )),
+        Value::Keyword(_) => Err(
+            "is a weight vapors-css should have computed to a number (bolder and lighter are resolved in the cascade); report it as a vapors-css bug".to_owned(),
+        ),
         _ => Err(shape("a weight")),
     }
 }
@@ -124,9 +135,43 @@ pub(super) fn color(value: &Value) -> Result<Rgba, String> {
     }
 }
 
+/// `italic` and `oblique` are both drawn italic: the bundled faces have
+/// no italic, so either is the synthesised slant Chromium also draws.
+/// An oblique angle other than the default is refused.
+fn italic(value: &Value) -> Result<bool, String> {
+    match value {
+        Value::Keyword(k) if k == "normal" => Ok(false),
+        Value::Keyword(k) if k == "italic" || k == "oblique" => Ok(true),
+        _ => Err(shape("`normal`, `italic` or `oblique` without an angle")),
+    }
+}
+
+#[allow(clippy::cast_possible_truncation)]
+fn letter_spacing(value: &Value) -> Result<f32, String> {
+    match value {
+        Value::Keyword(k) if k == "normal" => Ok(0.0),
+        Value::Length(length) if length.unit == LengthUnit::Px => Ok(length.value as f32),
+        _ => Err(shape("`normal` or a length in px")),
+    }
+}
+
+/// Left-to-right only, as vapors lays text out now: `left` is the
+/// start edge and `right` the end.
+fn align(value: &Value) -> Result<Align, String> {
+    match keyword(value)? {
+        "start" | "left" => Ok(Align::Start),
+        "end" | "right" => Ok(Align::End),
+        "center" => Ok(Align::Center),
+        "justify" => Ok(Align::Justify),
+        other => Err(format!(
+            "`{other}` is not a text-align vapors-elements reads; use start, end, left, right, center or justify"
+        )),
+    }
+}
+
 fn white_space(value: &Value) -> Result<(), String> {
     match keyword(value)? {
         "normal" => Ok(()),
-        _ => Err(later("F2c S6")),
+        _ => Err(later("a slice after F2c")),
     }
 }

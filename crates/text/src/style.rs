@@ -50,6 +50,11 @@ pub struct Style<'a> {
     pub kerning: bool,
     /// Line height. Default 1.2 times the font size.
     pub line_height: LineHeight,
+    /// Extra space after each character, logical pixels. Default 0.
+    pub letter_spacing: f32,
+    /// Italic. A face with no italic of its own is slanted (see
+    /// [`SYNTHETIC_SLANT`](crate::SYNTHETIC_SLANT)). Default off.
+    pub italic: bool,
     /// Ink colour. Default opaque black.
     pub color: Color,
 }
@@ -66,6 +71,8 @@ impl<'a> Style<'a> {
             tabular_figures: false,
             kerning: true,
             line_height: LineHeight::FontSizeRelative(1.2),
+            letter_spacing: 0.0,
+            italic: false,
             color: Color::from_rgba8(0, 0, 0, 255),
         }
     }
@@ -80,6 +87,12 @@ impl<'a> Style<'a> {
             StyleProperty::FontVariations(FontVariations::List(Cow::Owned(self.variations()))),
             StyleProperty::FontFeatures(FontFeatures::List(Cow::Owned(self.features()))),
             StyleProperty::LineHeight(self.line_height.parley(&self.family, self.size, scale)),
+            StyleProperty::LetterSpacing(self.letter_spacing),
+            StyleProperty::FontStyle(if self.italic {
+                parley::FontStyle::Italic
+            } else {
+                parley::FontStyle::Normal
+            }),
             StyleProperty::Brush(self.color),
         ]
     }

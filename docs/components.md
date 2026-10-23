@@ -179,6 +179,8 @@ The compiler refuses:
 - an unknown character reference, and a Rust if-expression in a hole;
 - `bind:` on an element that is not a control, on a property other than
   `value` or `checked`, or together with a handler for the same event;
+- a `data-wisp` attribute, which is reserved for the style scope (see
+  "Scoped styles");
 - deferred features: `{snippet}`/`{render}`, which parse but do not
   generate code, and children inside a component tag.
 
@@ -243,6 +245,8 @@ becomes a nested module.
 For `counter.wisp` the compiler writes:
 
 - `pub const STYLE: &str`, which holds the `<style>` text unchanged;
+- with a `<style>`, `pub const SCOPE: &str`, the scope its rules are
+  limited to (see "Scoped styles");
 - `CounterProps`, with one field per `#[prop]` and a `Default` impl;
 - `Counter`, with one public field per signal or memo, plus its owner
   and root nodes;
@@ -270,13 +274,64 @@ clippy's `similar_names` never sees two that differ by an inserted
 digit. The list and the reasons are in
 `crates/compiler/src/codegen/allowances.rs`.
 
+## Scoped styles
+
+A component's `<style>` applies only to the elements that component
+creates; the rule is Svelte 5's.
+
+- `SCOPE` is the crate's name, a `/`, and the file's path under the
+  directory `compile_dir` was given, counted from that directory's
+  parent: `compile_dir("src")` in `vapors-compiler-examples` gives
+  `vapors-compiler-examples/src/counter.wisp`. It is the same on every
+  machine.
+- `mount_before` first calls `dom.add_style(SCOPE, STYLE)`. A `Dom`
+  adds a scope once, however often the component is mounted.
+- Each element the component creates gets
+  `data-wisp="<SCOPE>"` (`vapors_dom::SCOPE_ATTRIBUTE`). A child
+  component's elements get the child's scope, not the parent's.
+- vapors-elements rewrites each selector so that every compound
+  requires the scope. The subject compound (the last) requires it as an
+  attribute selector. Every other compound, and every compound inside
+  `:is()`, `:not()`, `:where()` and `:has()`, requires it inside
+  `:where()`, which adds no specificity. A scoped rule therefore gains
+  exactly one attribute's specificity, (0,1,0), however many compounds
+  it has. When the subject is `:global(..)`, the last scoped compound
+  counts instead: `.card :global(p)` weighs (0,2,1).
+
+For example, in a component whose scope is `app/src/panel.wisp`:
+
+```css
+/* written */
+.panel .title:hover { color: red; }
+
+/* as matched */
+.panel:where([data-wisp="app/src/panel.wisp"])
+  .title:hover[data-wisp="app/src/panel.wisp"] { color: red; }
+/* specificity (0,4,0): .panel, .title, :hover, and the scope once */
+```
+
+- `:global(...)` leaves the compound holding it unscoped, for an
+  element the component did not create: `:global(body) { margin: 0; }`,
+  or `:global(.dark) .title` for `.title` under any `.dark`. It weighs
+  what its argument weighs. Only a top-level compound can be left
+  unscoped: a `:global` inside `:is()`, `:not()`, `:where()` or `:has()`
+  is refused, naming the line. In a sheet added with `add_stylesheet`,
+  which has no scope, `:global` is refused anywhere.
+- A scope added again with a different style (two components with the
+  same scope) is refused, naming the scope.
+- A style that does not parse is refused by the next update, naming the
+  scope, line and column.
+- A crate whose components' styles the app adds as global sheets uses
+  `compile_dir_global` instead. Nothing is then scoped, and the
+  generated code has no `SCOPE`, `add_style` or tags. The layout corpus
+  does this, so its CSS means what Chromium reads.
+- Not supported: `@keyframes` names are global; `:global { ... }`
+  blocks and `:global` inside `:is()` are not supported.
+
 ## Deferred
 
-- **CSS.** `STYLE` is the raw `<style>` text. The compiler does not
-  parse it, so a CSS error appears at run time, not at build time. The
-  `vapors-css` crate from F2a (`docs/css.md`) parses and cascades
-  stylesheets. Connecting a component's `STYLE` to it, with sumi's
-  per-component scoping, is not done yet.
+- **CSS.** The compiler does not parse `STYLE`, so a CSS error appears
+  at run time, when the update refuses it, not at build time.
 - **Elements (F2c).** The only `Dom` implementation is the recording
   fake in `vapors_dom::recording`, used by tests. The elements crate
   implements `Dom` over the real element tree, with layout and paint.

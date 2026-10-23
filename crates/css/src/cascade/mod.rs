@@ -12,6 +12,8 @@ mod compute_resolve;
 mod computed;
 mod conditions;
 mod environment;
+mod font_weight;
+mod inline;
 mod media;
 mod media_eval;
 mod media_feature;
@@ -22,6 +24,7 @@ mod supports;
 
 pub use computed::ComputedStyle;
 pub use environment::Environment;
+pub use inline::INLINE_SHEET;
 pub use restyle::RestyleScope;
 
 pub(crate) use compute::resolve_for;
@@ -146,7 +149,8 @@ impl Cascade {
         parent: Option<&ComputedStyle>,
         env: &Environment,
     ) -> Result<ComputedStyle> {
-        let winners = collect::winners(self.candidate_rules(element), element, env);
+        let inline = inline::declarations(element)?;
+        let winners = collect::winners(self.candidate_rules(element), element, env, &inline);
         compute::style(&winners, parent, env)
     }
 
@@ -187,5 +191,15 @@ impl Cascade {
     #[must_use]
     pub fn restyle_scope(&self, flag: crate::tree::States) -> RestyleScope {
         restyle::scope(self.rules.iter().map(|r| &r.rule), flag)
+    }
+
+    /// [`Cascade::restyle_scope`] from the selectors alone: a flag on a
+    /// subject compound scopes the element only, even when its rule sets
+    /// an inherited property. For a caller that compares each restyled
+    /// element's computed style with its last and restyles the children
+    /// when it changed, which covers what they inherit.
+    #[must_use]
+    pub fn restyle_scope_of_selectors(&self, flag: crate::tree::States) -> RestyleScope {
+        restyle::selectors_scope(self.rules.iter().map(|r| &r.rule), flag)
     }
 }

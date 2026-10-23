@@ -3,6 +3,7 @@
 
 use std::collections::BTreeMap;
 
+use super::inline::{INLINE_SHEET, INLINE_SPECIFICITY};
 use super::{CascadeRule, Environment, Origin};
 use crate::Position;
 use crate::ast::{ComponentValue, Declaration};
@@ -55,10 +56,13 @@ pub(crate) struct Winners {
     pub(crate) custom: BTreeMap<String, Candidate<Vec<ComponentValue>>>,
 }
 
+/// The winners among the rules that match `element`, and the
+/// declarations of its `style` attribute (`inline`).
 pub(crate) fn winners<'a, E: Element>(
     rules: impl Iterator<Item = &'a CascadeRule>,
     element: &E,
     env: &Environment,
+    inline: &[Declaration],
 ) -> Winners {
     let mut winners = Winners {
         longhands: vec![None; PROPERTIES.len()],
@@ -78,6 +82,15 @@ pub(crate) fn winners<'a, E: Element>(
             };
             winners.consider(decl, standing);
         }
+    }
+    for decl in inline {
+        let standing = Standing {
+            rank: rank(Origin::Author, decl.important),
+            specificity: INLINE_SPECIFICITY,
+            order: usize::MAX,
+            sheet: INLINE_SHEET,
+        };
+        winners.consider(decl, standing);
     }
     winners
 }

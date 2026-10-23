@@ -602,6 +602,178 @@ differs from the plan.
 - **Not in S4.** `position` and its alignment grammar stay with S8;
   `order` is not in vapors-css's table.
 
+### S5
+
+- **Scoped styles (D1).** A component with a `<style>` generates
+  `SCOPE`, `concat!(env!("CARGO_PKG_NAME"), "/", <path>)`, where the
+  path is the file's under the compiled directory's parent
+  (`demos/panel.wisp`). `mount_before` calls `Dom::add_style(SCOPE,
+  STYLE)`, and each element it creates gets
+  `set_attribute(el, SCOPE_ATTRIBUTE, SCOPE)` (`data-wisp`, defined once
+  in vapors-dom). The Document adds a scope's sheet once. Each of its
+  selectors requires the scope:
+  - The subject compound requires it as an attribute selector, so a
+    scoped rule gains one attribute of specificity.
+  - Every other compound, and the compounds inside `:is`, `:not`,
+    `:where` and `:has`, require it inside `:where()`, which adds none.
+    This is Svelte 5's rule.
+
+  A scoped sheet that does not parse is refused by every update, naming
+  its scope. The generated output changed: the compiler snapshot and
+  the counter's HTML now carry the scope.
+- **`:global(...)`.** vapors-css parses it like `:is()`. In a scoped
+  style, the compound holding it is left unscoped, so a component
+  writes `:global(body) { ... }`. In a sheet added with
+  `add_stylesheet` it is refused, naming the line. The demos style
+  `html` and `body` this way, and `vapors_demos::document` no longer
+  adds a global sheet.
+- **Global builds.** `compile_dir_global` compiles components whose
+  `STYLE` the app adds as a sheet, with nothing scoped. The layout
+  corpus uses it, so its CSS means what Chromium reads. A scoped copy
+  would be one attribute more specific than the same rule in Chromium.
+- **The `style` attribute.** vapors-css reads an element's `style`
+  attribute as author declarations above any selector's specificity
+  (Cascade 4 section 6.2). An important sheet declaration still beats a
+  normal inline one. The Document parses every `style` attribute before
+  styling. An attribute that does not parse is refused, naming the
+  element, line and column. A refused value from one is located as
+  `style attribute:line:column`.
+- **Demo.** `panel`: a panel and three `PanelRow` children, each with its
+  own CSS. Both use a `.title` class, and the panel's `.panel .title`
+  (red) is more specific than a row's `.title` (green dots). The pixel
+  checks hold the dots green at 640x400 and 390x800. With the subject
+  compound left unscoped, the dots turn red.
+- **Not in S5.** `@keyframes` names stay global; `:global { ... }` blocks
+  and `:global` inside `:is()` are not supported.
+
+### S6
+
+- **Inline runs.** A block's consecutive inline content (text, and
+  `display: inline` elements, nested) is one inline run: one string,
+  with white space collapsed across element boundaries, and each inline
+  element's byte range and text style. Taffy lays a run out as one
+  anonymous block. Parley lays it out with each element's style over
+  its range.
+- **Inline boxes.** Each inline element has one fragment per line it is
+  on (`Layout::fragments`, without the space a line breaks after).
+  - A fragment is the element's content area, placed as Chromium places
+    it: the line's half-leading over the block's font, the block's
+    ascent, less the element's ascent. Every ascent and descent is
+    rounded to a device pixel.
+  - The fragments' union is the element's border box.
+  - Each fragment takes the pointer, and is filled with the element's
+    background before the text.
+
+  `inline_text.wisp` and `text_align.wisp` match Chromium within
+  0.1 px. Chromium sums advances in 1/64 px, Parley in floats.
+- **Text properties.**
+  - Read now: `font-style` (italic and oblique), `letter-spacing` and
+    `text-align` (left to right only).
+  - The bundled faces have no italic. vapors draws Skia's synthetic
+    slant (`SYNTHETIC_SLANT`, a quarter), as Chromium does.
+  - `bolder` and `lighter` compute to numbers from the inherited
+    weight (CSS Fonts 4's table, in vapors-css). `b` and `strong` are
+    `bolder`, as in Chromium's UA sheet.
+  - Deferred to a slice after F2c: `font-feature-settings`,
+    `font-variation-settings`, `text-decoration` and families by name.
+- **Tags.** `span`, `b`, `strong`, `em`, `i`, `var`, `code`, `kbd`,
+  `samp`, `mark` and `abbr` are implemented.
+  - `small` waits: Chromium resolves `smaller` through a keyword table.
+  - `br` and `a` come first after F2c (D6). `del`, `s`, `sub`, `sup`
+    and `u` are not scheduled.
+  - Generic `monospace` is the bundled Geist Mono (D5).
+  - Chromium's 13 px default for `code` under a `medium` font size is
+    not copied.
+- **Refused, naming the element:**
+  - an inline element whose font size, content area or line height
+    differs from its block's. Chromium's line baseline is the maximum
+    over the strut and every inline box of its rounded ascent plus
+    half-leading, and vapors places inline boxes on the block's strut.
+    A line mixing metrics comes in a slice after F2c. Weight and face
+    alone are laid out: the bundled faces share their vertical metrics.
+  - text from a right-to-left script, or a right-to-left mark. Runs are
+    laid out left to right (Parley's base direction set to Ltr).
+  - a block inside an inline element;
+  - a margin, padding or border on an inline element;
+  - an atomic inline (`inline-block`) outside a flex or grid container.
+
+  A grid container now blockifies its children, as a flex container
+  does.
+- **Demo.** `text`: a heading and one paragraph of bold, italic and
+  code that wraps, with a span that counts its own taps and turns
+  yellow once tapped. Its pixel checks click the span at 640x400 and
+  390x800. With spans out of the hit list, the span stays white and the
+  check fails.
+
+### S7
+
+- **What is kept between updates:**
+  - each element's computed and used style, and the initial style
+    (`restyle.rs`, `restyle_pass.rs`);
+  - each Parley layout, keyed by its run and width
+    (`layout/text_cache.rs`);
+  - each box's Taffy cache and layout (`layout/keep.rs`).
+
+  An update restyles what the changes since the last one marked; the
+  table above gives the scopes.
+  - A pointer flag on a subject compound restyles the element alone
+    (`Cascade::restyle_scope_of_selectors`, new in vapors-css). Its
+    children are restyled only when its computed style changed, which
+    covers what they inherit.
+  - Layout is kept by diffing the rebuilt box tree against the last
+    one, not by marks. A box keeps its cache only when it and its whole
+    subtree are unchanged, at the same scale.
+- **Counted tests:**
+  - `elements_restyled`, `text_layouts_built` and `boxes_laid_out` are
+    pinned per kind of change (`incremental_*.rs`), each proven by
+    breaking its rule.
+  - After five kinds of change, every element's box equals a fresh
+    document's given the same changes.
+  - A seeded randomized differential test (`incremental_random.rs`)
+    makes 40 random changes per seed: classes, attributes,
+    `display: none` by the style attribute, text, insert, move, remove,
+    hover, press, resize, and sheets and scoped styles added. Its CSS
+    uses inherited properties, `var()`, `+` and `~`, `:nth-child`,
+    `:last-child`, `:empty`, an ancestor attribute, `:hover` on a
+    non-subject compound, `@media`, and calc with %, em and vw.
+    - After every change, each settled frame's boxes, computed styles
+      and display list must equal those of an update from scratch
+      (`Document::forget_kept`).
+    - CI runs 6 seeds; `VAPORS_INCREMENTAL_SEEDS` runs more and
+      `VAPORS_INCREMENTAL_SEED` one. 200 pass.
+    - Six broken scope rules each fail it.
+- **The 1,000-element measurement** (`update_time`, release, CPU only).
+  Setup: 1,001 elements, one counter text changed per update.
+  Machine: this box's i5-10500T, with a load average of 9 to 20 from
+  the other agents. Median update time:
+
+  | Point | Median |
+  |---|---|
+  | Before S7 | about 60 ms |
+  | Styles kept | 4.4 to 5.6 ms |
+  | Layout kept as well | 2.6 to 3.1 ms, p95 2.9 to 3.9 ms |
+
+  The remaining time is whole-tree walks: the tree check, the `style`
+  attribute check, the box build and diff, and paint.
+- **What those numbers say about the phone.** They show which phases
+  scale with the tree, and that keeping work removes them on the CPU
+  vapors runs on here. They do not give the phone's time:
+  - the Pixel 9 Pro's cores differ;
+  - the web build is wasm, usually slower than native;
+  - this box's load inflates and scatters them.
+
+  The `stress` demo prints each frame's measured update time, so the
+  phone's number comes from opening `?demo=stress` on the phone. Under
+  headless Chromium's virtual time, the page contract's screenshot
+  shows 0.00 ms: its clock does not advance during an update.
+- **Demo.** `stress`: 1,000 elements under a counter that ticks every
+  frame, through `ElementsApp::with_per_frame`, a hook called before
+  each update with the last one's duration.
+  - `?demo=stress&ticks=N` stops it after N frames, so the page
+    contract's headless page goes idle.
+  - `gpu_stress.rs` checks that the counter's ink changes between two
+    frames.
+
 ## Decisions (2026-10-23)
 
 - **D1 Scoping.** A compiler change in S5: `mount` registers its
@@ -620,3 +792,19 @@ differs from the plan.
   0.15 changed in the areas vapors uses. cargo-deny's advisories check
   stays on. The Chromium corpus is the regression gate; a layout bug
   it catches in Taffy is reported before it is worked around.
+- **D5 Monospace is Geist Mono (2026-10-23).** Generic `monospace` (and
+  `ui-monospace`) is the bundled Geist Mono, the brand's monospace,
+  where Chromium uses the system's (DejaVu Sans Mono on this Debian).
+  Layout fixtures that compare monospace text name Geist Mono, so they
+  compare like for like. Chromium's 13 px default size for monospace
+  under a `medium` font size is not copied.
+- **D6 `br` and `a` in F2d (2026-10-23).** Forced line breaks and links
+  are the first item after F2c: touche's chat panel and About page need
+  them. Until then they are refused, naming F2d.
+- **D7 Hover after layout settles a frame later (2026-10-24).** An
+  update that moves content under a still pointer notices the new
+  hover after painting. It sets the flags and asks for another frame,
+  which restyles; the hover style shows one frame later. Chromium also
+  re-hovers after layout. The randomized differential test compares
+  settled frames, updating until no change is pending, and fails if
+  that takes more than three updates.

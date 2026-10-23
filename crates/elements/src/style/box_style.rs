@@ -12,7 +12,7 @@ use vapors_css::value::Value;
 
 use super::box_align::{align_content, align_items, align_self};
 use super::sizes::{dimension, flex_basis, min_size, none_or_amount};
-use super::values::{Amount, Reader, amount, keyword, later, shape, unknown};
+use super::values::{Amount, Reader, amount, keyword, shape, unknown};
 
 /// The Taffy style of the element `reader` reads; `flex_item` when its
 /// parent is a flex container, which blockifies it (CSS Display 3,
@@ -89,11 +89,15 @@ fn paddings(reader: &mut Reader<'_>) -> Rect<LengthPercentage> {
 
 fn display(value: &Value) -> Result<Display, String> {
     match keyword(value)? {
-        "block" => Ok(Display::Block),
+        // An inline element has no box of its own (`style::inline`);
+        // its Taffy display is never read.
+        "block" | "inline" => Ok(Display::Block),
         "flex" => Ok(Display::Flex),
         "none" => Ok(Display::None),
         "grid" => Ok(Display::Grid),
-        "inline" | "inline-block" | "inline-flex" | "inline-grid" => Err(later("F2c S6")),
+        "inline-block" | "inline-flex" | "inline-grid" => Err(
+            "an atomic inline (inline-block, inline-flex, inline-grid) is laid out only as a flex or grid item; not scheduled in docs/F2c.md otherwise".to_owned(),
+        ),
         "contents" => Err("`contents` is not scheduled in docs/F2c.md".to_owned()),
         other => Err(unknown(other)),
     }

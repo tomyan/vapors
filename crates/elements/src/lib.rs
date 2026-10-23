@@ -5,6 +5,7 @@
 //! `docs/F2c.md`.
 
 mod arena;
+mod bidi;
 mod check;
 mod corners;
 mod css_element;
@@ -13,10 +14,14 @@ mod dom_impl;
 mod error;
 mod events;
 mod html;
+mod inline_check;
 mod layout;
 mod node;
 mod paint;
+mod paint_inline;
 mod painted;
+mod restyle;
+mod restyle_pass;
 mod style;
 mod tags;
 mod tree;

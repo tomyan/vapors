@@ -17,6 +17,11 @@ impl Emitter<'_> {
             element.tag
         ));
         self.attach(&var, place);
+        if self.scoped {
+            self.line(format!(
+                "dom.borrow_mut().set_attribute({var}, SCOPE_ATTRIBUTE, SCOPE);"
+            ));
+        }
         for attribute in element.attributes.iter() {
             self.emit_attribute(element, &var, attribute)?;
         }
@@ -29,6 +34,15 @@ impl Emitter<'_> {
         var: &str,
         attribute: &Attribute,
     ) -> Result<(), CompileError> {
+        if attribute.name == crate::SCOPE_ATTRIBUTE {
+            return Err(self.source.error(
+                attribute.offset,
+                format!(
+                    "`{}` is reserved: it names the component's style scope, which mount sets on each element; use another attribute name",
+                    crate::SCOPE_ATTRIBUTE
+                ),
+            ));
+        }
         if let Some(event) = attribute
             .name
             .strip_prefix("on")

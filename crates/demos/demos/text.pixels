@@ -1,0 +1,25 @@
+# The text demo at 640x400 CSS px at 1x: a 382 px panel at x 129..511,
+# y 125..274; its paragraph's three 24 px lines at y 182..206, 206..230
+# and 230..254. The code background is at x 443..481, y 184..205; the
+# tappable span on the second line at x 426..484, its content area at
+# y 208..229 (21 px of Geist 16 around the baseline).
+pixel 4 4 #e9ecef          page, top left
+pixel 135 200 #ffffff      the panel's fill, left of the text
+pixel 446 186 #dbe4ff      the code background, above its glyphs
+ink 150 184 420 206 #ffffff  the first line has ink
+ink 150 208 420 230 #ffffff  the second line has ink
+ink 150 232 270 254 #ffffff  the third line has ink
+
+# One tap on "Tap this": the span takes the click (its own listener),
+# and its background turns yellow.
+click 430 218
+pixel 440 209 #ffe066      the tapped span's background, above its letters
+
+# A phone's width: the 382 px panel fits at x 4..386, about 200 px lower;
+# the paragraph wraps the same way.
+at 390x800
+pixel 4 4 #e9ecef          page
+pixel 10 400 #ffffff       the panel's fill
+ink 25 384 300 406 #ffffff the first line has ink
+click 305 418
+pixel 315 410 #ffe066      the tapped span's background

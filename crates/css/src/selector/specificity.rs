@@ -63,12 +63,12 @@ impl Compound {
 }
 
 impl PseudoClass {
-    /// `:where()` adds nothing; `:not()`, `:is()` and `:has()` add their
+    /// `:where()` adds nothing; `:not()`, `:is()`, `:global()` and `:has()` add their
     /// most specific argument; every other pseudo-class counts as a class.
     fn specificity(&self) -> Specificity {
         match self {
             Self::Where(_) => Specificity::default(),
-            Self::Not(list) | Self::Is(list) => most_specific(list.iter()),
+            Self::Not(list) | Self::Is(list) | Self::Global(list) => most_specific(list.iter()),
             Self::Has(list) => most_specific(list.iter().map(|r| &r.selector)),
             _ => Specificity {
                 classes: 1,

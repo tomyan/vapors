@@ -1,0 +1,11 @@
+# The stress demo at 640x400 CSS px at 1x: a 34 px bar holding the tick
+# and the update time, then 100 rows of 9 cells, each cell 38 px wide
+# with a 2 px gap from x 8; past x 366 the page shows. The counter's
+# ink changing between frames is gpu_stress.rs's check.
+pixel 300 4 #171b1f        the bar
+pixel 20 31 #171b1f        the bar, below the tick's text
+ink 8 6 120 30 #171b1f     the tick has ink
+ink 140 6 360 30 #171b1f   the update time has ink
+pixel 10 45 #ffffff        the first cell's fill, left of its text
+pixel 47 45 #e9ecef        the gap between the first two cells
+pixel 500 200 #e9ecef      the page beside the rows

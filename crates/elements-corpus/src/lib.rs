@@ -54,8 +54,10 @@ fixtures![
     flex_row::FlexRow,
     grid_tracks::GridTracks,
     hello_box::HelloBox,
+    inline_text::InlineText,
     paint_boxes::PaintBoxes,
     shell::Shell,
     sizing::Sizing,
+    text_align::TextAlign,
     text_wrap::TextWrap,
 ];

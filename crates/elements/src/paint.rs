@@ -9,9 +9,9 @@ use vapors_scene::{Color, Item, Quad, Rect, Scene, Shadow, TextId};
 use vapors_text::FontSystem;
 
 use crate::corners;
-use crate::layout::{BoxRect, Content, LayoutBox, text_layout};
+use crate::layout::{BoxRect, Content, InlineRun, LayoutBox};
 use crate::painted::Painted;
-use crate::style::{BoxShadow, TextStyle, Used};
+use crate::style::{BoxShadow, Used};
 
 /// What paint reads besides the boxes.
 pub(crate) struct PaintInput<'a> {
@@ -22,6 +22,7 @@ pub(crate) struct PaintInput<'a> {
     /// Which of them gave the canvas its colour; set by `paint`.
     pub(crate) propagated: Option<NodeId>,
     pub(crate) fonts: &'a mut FontSystem,
+    pub(crate) cache: &'a mut crate::layout::TextCache,
     pub(crate) scale: f32,
 }
 
@@ -69,15 +70,7 @@ fn paint_box(
 ) {
     match &boxes[index].content {
         Content::Element(node) => paint_element(*node, rects[index], input, out),
-        Content::Text {
-            text,
-            style,
-            visible,
-        } => {
-            if *visible {
-                paint_text(text, style, rects[index], input, out);
-            }
-        }
+        Content::Text(run) => paint_text(run, rects[index], input, out),
     }
     for &child in &boxes[index].children {
         paint_box(boxes, rects, child, input, out);
@@ -145,14 +138,11 @@ fn shadow_item(shadow: &BoxShadow, caster: Rect, radii: [f32; 4], scale: f32) ->
     }
 }
 
-fn paint_text(
-    text: &str,
-    style: &TextStyle,
-    rect: BoxRect,
-    input: &mut PaintInput<'_>,
-    out: &mut Painted,
-) {
-    let layout = text_layout(input.fonts, input.scale, text, style, Some(rect.width));
+fn paint_text(run: &InlineRun, rect: BoxRect, input: &mut PaintInput<'_>, out: &mut Painted) {
+    let layout = input
+        .cache
+        .layout(input.fonts, input.scale, run, Some(rect.width));
+    crate::paint_inline::paint_spans(run, &layout, rect, input, out);
     let id = TextId(u32::try_from(out.texts.len()).expect("fewer than 2^32 text runs"));
     out.texts.push(layout);
     let origin = [rect.x * input.scale, rect.y * input.scale];
@@ -161,7 +151,7 @@ fn paint_text(
 
 /// `rect` in device pixels, each edge rounded to the nearest pixel, so
 /// two boxes that share an edge in CSS pixels share it on screen.
-fn snapped(rect: BoxRect, scale: f32) -> Rect {
+pub(crate) fn snapped(rect: BoxRect, scale: f32) -> Rect {
     Rect::new(
         (rect.x * scale).round(),
         (rect.y * scale).round(),

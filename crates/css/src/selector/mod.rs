@@ -141,6 +141,10 @@ pub enum PseudoClass {
     Where(Vec<Selector>),
     /// `:has(relative list)`
     Has(Vec<RelativeSelector>),
+    /// `:global(list)`: matched and weighed as `:is(list)`. In a
+    /// component's scoped style (vapors-elements) the compound holding
+    /// it is left unscoped, as Svelte's is.
+    Global(Vec<Selector>),
 }
 
 /// An argument of `:has()`: a selector anchored to the subject by a
