@@ -11,6 +11,8 @@ mod deadline;
 mod dev;
 mod files;
 mod files_walk;
+mod gate;
+mod gate_workflow;
 mod gpu_info;
 mod pixels;
 mod report;
@@ -87,6 +89,8 @@ enum Command {
     Serve,
     /// Rebuild the web package on save (trunk serve, debug) behind the tailnet https proxy.
     Dev,
+    /// Run every command CI runs, in [gate] order, ending `gate: pass <sha>`.
+    Gate,
     /// Check formatting and lints without running tests.
     Lint,
     /// Run one test tier (default: unit).
@@ -138,6 +142,7 @@ fn main() -> ExitCode {
             Ok(package) => steps::wasm_lint(&package),
             Err(message) => return fail("wasm", &message),
         },
+        Command::Gate => return gate::run(&reporter),
         Command::Lint => steps::lint(),
         Command::Test { tier: Tier::Unit } => steps::unit_tests(),
         Command::Test { tier: Tier::Gpu } => steps::gpu_tests(),

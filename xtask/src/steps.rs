@@ -25,15 +25,26 @@ impl Step {
         }
     }
 
-    /// The command line a reader can paste to reproduce this step.
+    /// The command line a reader can paste to reproduce this step; an
+    /// argument a shell would split or expand is single-quoted.
     pub fn reproduce(&self) -> String {
         let mut line = self.program.clone();
         for arg in &self.args {
             line.push(' ');
-            line.push_str(arg);
+            line.push_str(&shell_word(arg));
         }
         line
     }
+}
+
+fn shell_word(arg: &str) -> String {
+    let plain = arg
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || "-_./=,:+@%".contains(c));
+    if plain && !arg.is_empty() {
+        return arg.to_owned();
+    }
+    format!("'{}'", arg.replace('\'', "'\\''"))
 }
 
 fn tools() -> Step {

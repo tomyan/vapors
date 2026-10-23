@@ -24,3 +24,29 @@ max_lines = "220"
 
 # Files not written by hand; left out of the check.
 [files.generated]
+
+# `cargo xtask gate`: every command .github/workflows/ci.yml runs, in this
+# order (keys sort as text; fastest first), from the current worktree,
+# stopping at the first failure. A test holds this list and ci.yml's
+# commands to each other. A leading NAME=value is the job's environment
+# (ci.yml's `env:`); it is set here and ignored in the comparison.
+[gate]
+01 = "cargo xtask lint"
+02 = "cargo xtask wasm"
+03 = "NEXTEST_PROFILE=ci cargo xtask test --tier unit"
+04 = "cargo build --workspace --all-targets --timings"
+05 = "cargo xtask web"
+06 = "scripts/check-page-contract.sh target/web "$(mktemp -d)""
+07 = "NEXTEST_PROFILE=ci VAPORS_GPU_ADAPTER=llvmpipe cargo xtask test --tier gpu"
+08 = "VAPORS_GPU_ADAPTER=llvmpipe cargo run -p vapors-text --example text_comparison -- --out target"
+09 = "VAPORS_GPU_ADAPTER=llvmpipe cargo xtask screenshot clear_window target/clear_window.png --expect 12,200,34"
+10 = "VAPORS_GPU_ADAPTER=llvmpipe cargo xtask screenshot image_window target/image_window.png --expect 128,128,128 -- --open crates/platform/examples/fixtures/gradient.png"
+
+# Commands in ci.yml that set up the runner, which a worktree already has:
+# each prefix, and why it is not the gate's.
+[gate.setup]
+"sudo " = "apt packages"
+"rustup " = "the toolchain, from rust-toolchain.toml"
+"cargo xtask setup" = "the pinned tools, installed once per machine"
+"fc-list " = "checks the CJK font the runner's apt step installed"
+"vulkaninfo " = "logs the runner's lavapipe after its apt step"
