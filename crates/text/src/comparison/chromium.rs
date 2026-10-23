@@ -78,18 +78,6 @@ impl Chromium {
             .ok_or(ChromiumError::NotFound)
     }
 
-    /// The binary's `--version` line, for labels.
-    #[must_use]
-    pub fn version(&self) -> String {
-        Command::new(&self.binary)
-            .arg("--version")
-            .output()
-            .ok()
-            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
-            .filter(|v| !v.is_empty())
-            .unwrap_or_else(|| self.binary.display().to_string())
-    }
-
     /// Screenshot `html` at `width` by `height` CSS pixels at `scale`
     /// device pixels per CSS pixel into `png`, and read it back.
     ///
@@ -106,6 +94,18 @@ impl Chromium {
         height: u32,
         scale: u32,
     ) -> Result<Rgba, ChromiumError> {
+        self.shoot(html, png, [width, height], scale)
+            .map_err(|error| self.named(error))
+    }
+
+    fn shoot(
+        &self,
+        html: &Path,
+        png: &Path,
+        size: [u32; 2],
+        scale: u32,
+    ) -> Result<Rgba, ChromiumError> {
+        let [width, height] = size;
         remove_stale(png)?;
         let mut child = self.spawn(html, png, width, height, scale)?;
         let stderr = drain(
