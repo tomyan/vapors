@@ -1,11 +1,9 @@
 //! The quad pipeline's fixed wgpu objects: layout, pipeline, uniform and
 //! the render pass that loads what the target already holds.
 
-use crate::quads::instance_layout;
-
 pub(crate) fn bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("quads"),
+        label: Some("instanced"),
         entries: &[wgpu::BindGroupLayoutEntry {
             binding: 0,
             visibility: wgpu::ShaderStages::VERTEX,
@@ -21,7 +19,7 @@ pub(crate) fn bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout 
 
 pub(crate) fn uniform(device: &wgpu::Device) -> wgpu::Buffer {
     device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("quads viewport"),
+        label: Some("instanced viewport"),
         size: 16,
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
@@ -33,20 +31,21 @@ pub(crate) fn render_pipeline(
     layout: &wgpu::BindGroupLayout,
     shader: &wgpu::ShaderModule,
     format: wgpu::TextureFormat,
+    instance: wgpu::VertexBufferLayout<'_>,
 ) -> wgpu::RenderPipeline {
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("quads"),
+        label: Some("instanced"),
         bind_group_layouts: &[Some(layout)],
         immediate_size: 0,
     });
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("quads"),
+        label: Some("instanced"),
         layout: Some(&pipeline_layout),
         vertex: wgpu::VertexState {
             module: shader,
             entry_point: Some("vs_main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[Some(instance_layout())],
+            buffers: &[Some(instance)],
         },
         fragment: Some(wgpu::FragmentState {
             module: shader,
@@ -71,7 +70,7 @@ pub(crate) fn load_pass<'e>(
     view: &wgpu::TextureView,
 ) -> wgpu::RenderPass<'e> {
     encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some("quads"),
+        label: Some("instanced"),
         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
             view,
             depth_slice: None,

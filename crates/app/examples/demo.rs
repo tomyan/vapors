@@ -17,7 +17,7 @@ use std::rc::Rc;
 
 use vapors_app::ElementsApp;
 use vapors_elements::Document;
-use vapors_pixels::{Image, Spec, failures, parse};
+use vapors_pixels::{DEFAULT_VIEWPORT, Image, Spec, failures, parse, section};
 use vapors_platform::{App, Event, Frame, Next, Platform, WindowOptions, run};
 
 fn main() -> ExitCode {
@@ -40,7 +40,10 @@ fn start() -> Result<(), String> {
     let document = vapors_demos::document(&demo)?;
     let app = ElementsApp::new(Rc::clone(&document));
     let failure = app.failure();
-    let spec = parse(name, demo.pixels.unwrap_or_default())?;
+    // The window is 640x400, so the default section is the one checked
+    // here; `at` sections are checked offscreen by the gpu tier.
+    let specs = parse(name, demo.pixels.unwrap_or_default())?;
+    let spec = section(&specs, DEFAULT_VIEWPORT)?.clone();
     let shot = Shot::new(app, document, flag_value(&args, "--screenshot"), spec);
     let result = shot.result.clone();
     let options = WindowOptions {

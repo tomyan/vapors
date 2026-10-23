@@ -1,0 +1,14 @@
+{"viewport": [640,313], "scale": 1,
+"boxes": [
+{"height":125,"tag":"html","width":640,"x":0,"y":0},
+{"height":105,"tag":"body","width":620,"x":10,"y":10},
+{"height":38,"tag":"div","width":620,"x":10,"y":10},
+{"height":16,"tag":"div","width":598,"x":21,"y":21},
+{"height":4,"tag":"div","width":103,"x":10,"y":54},
+{"height":2,"tag":"hr","width":620,"x":10,"y":62},
+{"height":20,"tag":"div","width":620,"x":10,"y":68},
+{"height":20,"tag":"div","width":20,"x":10,"y":68},
+{"height":20,"tag":"div","width":20,"x":34,"y":68},
+{"height":20,"tag":"div","width":20,"x":58,"y":68},
+{"height":27,"tag":"div","width":620,"x":10,"y":88}
+]}

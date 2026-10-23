@@ -1,0 +1,22 @@
+# The boxes demo at 640x400 CSS px at 1x. The card is at x 30..204,
+# y 108..222 with a shadow below; the four-colour box at x 228..408,
+# y 108..228; the buttons sit at y about 256..292.
+pixel 4 4 #e9ecef          page, top left
+pixel 100 205 #ffffff      the card's fill, below its text
+pixel 318 109 #d32f2f      the four-colour box: top border, red
+pixel 406 170 #388e3c      right border, green
+pixel 318 226 #1976d2      bottom border, blue
+pixel 229 170 #fbc02d      left border, yellow
+pixel 300 180 #ffffff      inside it, white
+pixel 186 260 #3a7bd5      the primary button's fill
+pixel 184 273 #2f63ad      its 1px border
+ink 60 222 180 236 #e9ecef the card's shadow darkens the page below it
+
+# A phone's width (Tom's, 412 CSS px): the cards wrap two to a row, so
+# the first card lies on screen at x 17..191, y 237..351. As one row
+# that does not wrap, it would sit at x -79..95, and the gpu tier's
+# check at x 100 fails (proven by removing flex-wrap).
+at 412x800
+pixel 18 340 #ffffff       the first card, one pixel in from its left edge
+pixel 100 340 #ffffff      the first card's fill, past where an unwrapped row ends it
+pixel 185 340 #ffffff      the first card's fill near its right edge

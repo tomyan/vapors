@@ -79,6 +79,14 @@ pub fn all() -> Vec<Demo> {
             },
         },
         Demo {
+            name: "boxes",
+            style: boxes::STYLE,
+            pixels: Some(include_str!("../demos/boxes.pixels")),
+            mount: |dom, parent| {
+                std::mem::forget(boxes::Boxes::mount(dom, parent, boxes::BoxesProps {}));
+            },
+        },
+        Demo {
             name: INDEX,
             style: index::STYLE,
             pixels: None,

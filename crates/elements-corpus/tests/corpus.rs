@@ -27,10 +27,16 @@ fn chromium_boxes(name: &str) -> (Viewport, Vec<(String, BoxRect)>) {
     let json: Value =
         serde_json::from_str(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
     let size = |i: usize| json["viewport"][i].as_f64().expect("viewport") as f32;
+    let scale = json["scale"].as_f64().unwrap_or_else(|| {
+        panic!(
+            "{}: no scale; run cargo run -p vapors-elements-corpus --example layout_oracle",
+            path.display()
+        )
+    }) as f32;
     let viewport = Viewport {
         width: size(0),
         height: size(1),
-        scale: 1.0,
+        scale,
     };
     let boxes = json["boxes"]
         .as_array()

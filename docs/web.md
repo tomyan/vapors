@@ -4,7 +4,7 @@ The platform crate runs in a browser with WebGPU. `crates/web-demo` is
 the page that proves it. `?demo=<name>` picks what it shows:
 
 - no query: the index, a vapors-elements component listing the demos;
-- `?demo=hello`, `?demo=counter` and each later F2c slice's demo (`crates/demos`,
+- `?demo=hello`, `?demo=counter`, `?demo=boxes` and each later F2c slice's demo (`crates/demos`,
   docs/F2c.md "Demos"): a `.wisp` component on the canvas;
 - `?demo=image`: the image app, the gradient fixture fitted to the
   canvas, pinch or scroll to zoom, drag or one finger to pan, a double

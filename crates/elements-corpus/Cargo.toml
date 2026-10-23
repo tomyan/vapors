@@ -15,6 +15,13 @@ vapors-elements.workspace = true
 vapors-text.workspace = true
 serde_json = "=1.0.154"
 
+[dev-dependencies]
+wgpu.workspace = true
+vapors-app.workspace = true
+vapors-renderer.workspace = true
+vapors-scene.workspace = true
+vapors-gpu-harness.workspace = true
+
 [build-dependencies]
 vapors-compiler.workspace = true
 

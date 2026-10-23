@@ -24,9 +24,6 @@ pub(crate) enum Treatment {
 
 use Treatment::{Deferred, Inert, Read};
 
-const BORDER_INERT: Treatment =
-    Inert("has no effect while border-*-style is none, which F2c S1 requires");
-
 /// Every longhand, sorted by name, with its treatment.
 pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ("align-content", Read),
@@ -42,27 +39,27 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ("animation-timing-function", Deferred("a slice after F2c")),
     ("aspect-ratio", Read),
     ("background-color", Read),
-    ("border-bottom-color", BORDER_INERT),
-    ("border-bottom-left-radius", Deferred("F2c S3")),
-    ("border-bottom-right-radius", Deferred("F2c S3")),
-    ("border-bottom-style", Deferred("F2c S3")),
-    ("border-bottom-width", BORDER_INERT),
-    ("border-left-color", BORDER_INERT),
-    ("border-left-style", Deferred("F2c S3")),
-    ("border-left-width", BORDER_INERT),
-    ("border-right-color", BORDER_INERT),
-    ("border-right-style", Deferred("F2c S3")),
-    ("border-right-width", BORDER_INERT),
-    ("border-top-color", BORDER_INERT),
-    ("border-top-left-radius", Deferred("F2c S3")),
-    ("border-top-right-radius", Deferred("F2c S3")),
-    ("border-top-style", Deferred("F2c S3")),
-    ("border-top-width", BORDER_INERT),
+    ("border-bottom-color", Read),
+    ("border-bottom-left-radius", Read),
+    ("border-bottom-right-radius", Read),
+    ("border-bottom-style", Read),
+    ("border-bottom-width", Read),
+    ("border-left-color", Read),
+    ("border-left-style", Read),
+    ("border-left-width", Read),
+    ("border-right-color", Read),
+    ("border-right-style", Read),
+    ("border-right-width", Read),
+    ("border-top-color", Read),
+    ("border-top-left-radius", Read),
+    ("border-top-right-radius", Read),
+    ("border-top-style", Read),
+    ("border-top-width", Read),
     (
         "bottom",
         Inert("has no effect while position is static, which F2c S1 requires"),
     ),
-    ("box-shadow", Deferred("F2c S3")),
+    ("box-shadow", Read),
     ("box-sizing", Read),
     ("color", Read),
     ("column-gap", Read),
@@ -74,10 +71,7 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
         "container-type",
         Deferred("no slice yet: @container needs layout-time restyle"),
     ),
-    (
-        "cursor",
-        Deferred("F2c S3: the platform has no way to set the cursor yet"),
-    ),
+    ("cursor", Read),
     ("display", Read),
     ("filter", Deferred("F3")),
     ("flex-basis", Read),

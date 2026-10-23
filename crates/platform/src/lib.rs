@@ -7,6 +7,7 @@
 
 mod attributes;
 mod clock;
+mod cursor;
 mod device_lost;
 mod error;
 mod event;
@@ -31,6 +32,7 @@ mod web;
 mod webgpu;
 mod window;
 
+pub use cursor::Cursor;
 pub use device_lost::{DeviceLost, Lost};
 pub use error::PlatformError;
 pub use event::{Event, TouchPhase};
@@ -39,6 +41,16 @@ pub use gestures::Gestures;
 pub use platform::Platform;
 pub use report::{report_error, report_status};
 pub use window::{App, Frame, Next, WindowOptions, run};
+
+/// Hide the page's own HTML controls drawn over the canvas (the Open
+/// button and the status line), for an app that draws its own; errors
+/// are still shown, and a page without the Open button is not an error.
+/// Call it before [`run`]. Natively there is no page, so it does
+/// nothing.
+pub fn hide_page_controls() {
+    #[cfg(target_family = "wasm")]
+    web::hide_page_controls();
+}
 
 /// The value of `name` in the page URL's query string (`?demo=hello`).
 /// Natively there is no URL, so it is always `None`; a native app takes

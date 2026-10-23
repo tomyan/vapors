@@ -5,12 +5,13 @@
 use std::collections::HashMap;
 
 use vapors_dom::NodeId;
-use vapors_scene::{Color, Item, Quad, Rect, Scene, TextId};
+use vapors_scene::{Color, Item, Quad, Rect, Scene, Shadow, TextId};
 use vapors_text::FontSystem;
 
+use crate::corners;
 use crate::layout::{BoxRect, Content, LayoutBox, text_layout};
 use crate::painted::Painted;
-use crate::style::{TextStyle, Used};
+use crate::style::{BoxShadow, TextStyle, Used};
 
 /// What paint reads besides the boxes.
 pub(crate) struct PaintInput<'a> {
@@ -34,6 +35,7 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
         texts: Vec::new(),
         rects: HashMap::new(),
         hits: Vec::new(),
+        cursors: HashMap::new(),
     };
     for (index, layout_box) in boxes.iter().enumerate() {
         if let Content::Element(node) = layout_box.content {
@@ -82,19 +84,64 @@ fn paint_box(
     }
 }
 
-/// The element's background, unless it is hidden or gave the canvas its
-/// colour; and its place among the elements the pointer can hit.
+/// The element's shadows, then its background and border, unless it is
+/// hidden; a background that became the canvas's is not painted again.
+/// Also its place among the elements the pointer can hit.
 fn paint_element(node: NodeId, rect: BoxRect, input: &PaintInput<'_>, out: &mut Painted) {
     let used = &input.used[&node];
     if used.visible && used.takes_pointer {
         out.hits.push((node, rect));
+        out.cursors.insert(node, used.cursor);
     }
-    if used.visible && used.background.a > 0.0 && input.propagated != Some(node) {
+    if !used.visible {
+        return;
+    }
+    let border_box = snapped(rect, input.scale);
+    let decoration = &used.decoration;
+    let radii = corners::fitted(decoration.radii.map(|r| r * input.scale), border_box);
+    for shadow in decoration.shadows.iter().rev() {
+        out.scene.push(Item::Shadow(shadow_item(
+            shadow,
+            border_box,
+            radii,
+            input.scale,
+        )));
+    }
+    let background = if input.propagated == Some(node) {
+        Color::default()
+    } else {
+        used.background
+    };
+    let border = decoration.border.map(|w| w * input.scale);
+    if background.a > 0.0 || border.iter().any(|w| *w > 0.0) {
         let quad = Quad {
-            rect: snapped(rect, input.scale),
-            background: used.background,
+            rect: border_box,
+            background,
+            border,
+            border_colors: decoration.border_colors,
+            radii,
         };
         out.scene.push(Item::Quad(quad));
+    }
+}
+
+/// A CSS outer shadow as the scene draws it: the border box moved by
+/// the offset and grown by the spread, corners grown with it.
+fn shadow_item(shadow: &BoxShadow, caster: Rect, radii: [f32; 4], scale: f32) -> Shadow {
+    let [dx, dy] = shadow.offset.map(|v| v * scale);
+    let spread = shadow.spread * scale;
+    Shadow {
+        rect: Rect::new(
+            caster.left + dx - spread,
+            caster.top + dy - spread,
+            caster.right + dx + spread,
+            caster.bottom + dy + spread,
+        ),
+        radii: radii.map(|r| corners::spread(r, spread)),
+        blur: shadow.blur * scale,
+        color: shadow.color,
+        caster,
+        caster_radii: radii,
     }
 }
 

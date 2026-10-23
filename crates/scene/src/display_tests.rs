@@ -1,10 +1,10 @@
 use super::*;
 
 fn quad(left: f32) -> Item {
-    Item::Quad(Quad {
-        rect: Rect::new(left, 0.0, left + 1.0, 1.0),
-        background: Color::from_rgba8(1, 2, 3, 255),
-    })
+    Item::Quad(Quad::fill(
+        Rect::new(left, 0.0, left + 1.0, 1.0),
+        Color::from_rgba8(1, 2, 3, 255),
+    ))
 }
 
 fn text(id: u32) -> Item {
@@ -41,6 +41,7 @@ fn consecutive_items_of_one_kind_share_a_batch_in_painting_order() {
     let shape: Vec<(char, usize)> = batches
         .iter()
         .map(|batch| match batch {
+            Batch::Shadows(shadows) => ('s', shadows.len()),
             Batch::Quads(quads) => ('q', quads.len()),
             Batch::Texts(texts) => ('t', texts.len()),
         })

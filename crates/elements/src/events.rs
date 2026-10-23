@@ -74,6 +74,15 @@ impl Document {
         Self::pointer_released(document, point);
     }
 
+    /// The cursor over `point` in the last painted update: the hit
+    /// element's, or the default arrow over nothing or before the first.
+    #[must_use]
+    pub fn cursor(&self, point: Point) -> crate::Cursor {
+        self.painted
+            .as_ref()
+            .map_or(crate::Cursor::Default, |painted| painted.cursor(point))
+    }
+
     /// The element `point` hits in the last painted update, or `None`
     /// before the first, or after a refused one.
     #[must_use]

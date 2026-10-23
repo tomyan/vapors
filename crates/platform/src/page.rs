@@ -13,6 +13,10 @@ pub const STATUS_ID: &str = "status";
 /// `hidden` attribute is removed when an error is written.
 pub const ERROR_ID: &str = "error";
 
+/// The page's own controls, drawn over the canvas. An app that draws
+/// its own (an elements demo) hides them; see `hide_page_controls`.
+pub const PAGE_CONTROL_IDS: [&str; 2] = [OPEN_ID, STATUS_ID];
+
 /// What kind of line is being reported.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Report {
@@ -31,6 +35,15 @@ pub fn element_for(report: Report, page_has_error_element: bool) -> &'static str
         Report::Error if page_has_error_element => ERROR_ID,
         Report::Error | Report::Status => STATUS_ID,
     }
+}
+
+/// Whether writing a `report` line shows the element it goes to. An
+/// error is always shown, so a hidden status line that an error falls
+/// back to (a page without [`ERROR_ID`]) cannot hide it; a status line
+/// leaves its element as it is.
+#[must_use]
+pub fn shows_target(report: Report) -> bool {
+    report == Report::Error
 }
 
 /// The value of `name` in a query string such as `?demo=hello&x=1`:
@@ -90,5 +103,21 @@ mod tests {
                 "{report:?} with #error present: {has_error_element}"
             );
         }
+    }
+
+    #[test]
+    fn an_error_is_shown_wherever_it_is_written_and_a_status_line_is_not() {
+        // Given: an error written to #status on a page without #error,
+        // where the page controls (#status among them) are hidden
+        let hidden = PAGE_CONTROL_IDS;
+
+        // When
+        let error_shown = shows_target(Report::Error);
+        let status_shown = shows_target(Report::Status);
+
+        // Then
+        assert!(hidden.contains(&element_for(Report::Error, false)));
+        assert!(error_shown);
+        assert!(!status_shown);
     }
 }

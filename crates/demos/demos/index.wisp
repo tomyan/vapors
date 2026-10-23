@@ -9,4 +9,5 @@ h1 { margin-top: 0; font-size: 20px; }
 <p>Open one by adding ?demo= and its name to this page's address.</p>
 <div class="demo"><div class="name">?demo=hello</div><div>F2c S1: a styled panel with text</div></div>
 <div class="demo"><div class="name">?demo=counter</div><div>F2c S2: a button that counts clicks and taps</div></div>
+<div class="demo"><div class="name">?demo=boxes</div><div>F2c S3: borders, rounded corners, shadows, buttons</div></div>
 <div class="demo"><div class="name">?demo=image</div><div>F0: the image view, pinch and drag</div></div>

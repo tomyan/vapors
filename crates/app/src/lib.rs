@@ -4,6 +4,7 @@
 //! [`ElementsApp`] is the platform `App` that updates and paints the
 //! document every frame, natively and on the web canvas.
 
+mod cursor;
 mod elements_app;
 mod painter;
 mod pointer;

@@ -7,7 +7,7 @@
 
 use vapors_app::ElementsApp;
 use vapors_canvas::{ImageApp, decode_png};
-use vapors_platform::{WindowOptions, query_parameter, report_error, run};
+use vapors_platform::{WindowOptions, hide_page_controls, query_parameter, report_error, run};
 use vapors_scene::Color;
 
 const GRADIENT: &[u8] = include_bytes!("../../platform/examples/fixtures/gradient.png");
@@ -41,6 +41,8 @@ fn start() -> Result<(), String> {
         return run(options, app).map_err(|e| e.to_string());
     }
     let demo = vapors_demos::find(&name)?;
+    // An elements demo draws its own controls; the page's would cover them.
+    hide_page_controls();
     let app = ElementsApp::new(vapors_demos::document(&demo)?);
     run(options, app).map_err(|e| e.to_string())
 }

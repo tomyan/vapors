@@ -48,12 +48,13 @@ pub fn boxes(chromium: &Chromium, work: &Path, name: &str) -> Result<Value, Stri
     let page = work.join(format!("{name}.html"));
     std::fs::write(&page, html(&source)).map_err(|e| format!("{}: {e}", page.display()))?;
     let dom = chromium
-        .dump_dom(&page, source.viewport[0], source.viewport[1])
+        .dump_dom(&page, source.viewport[0], source.viewport[1], source.scale)
         .map_err(|e| format!("{name}: {e}"))?;
     let page: Value =
         serde_json::from_str(&boxes_from_dom(&dom).map_err(|e| format!("{name}: {e}"))?)
             .map_err(|e| format!("{name}: the page's boxes are not JSON: {e}"))?;
     check_viewport(name, &page, source.viewport[0])?;
+    check_scale(name, &page, source.scale)?;
     Ok(page)
 }
 
@@ -70,6 +71,20 @@ fn check_viewport(name: &str, page: &Value, width: u32) -> Result<(), String> {
     }
     Err(format!(
         "{name}: Chromium laid the page out {html} px wide, not the {width} px the fixture asks for; Chromium's minimum window width is about 500 px, so give the fixture a viewport at least that wide"
+    ))
+}
+
+/// The page's `devicePixelRatio` must be the scale the fixture asks for:
+/// boxes laid out at another would be compared at the wrong one.
+fn check_scale(name: &str, page: &Value, scale: f64) -> Result<(), String> {
+    let measured = page["scale"]
+        .as_f64()
+        .ok_or(format!("{name}: the page wrote no scale"))?;
+    if (measured - scale).abs() < 1e-6 {
+        return Ok(());
+    }
+    Err(format!(
+        "{name}: Chromium laid the page out at device scale {measured}, not the {scale} the fixture asks for; check that --force-device-scale-factor reaches it"
     ))
 }
 
@@ -94,8 +109,9 @@ pub fn to_text(boxes: &Value) -> String {
         .map(|rows| rows.iter().map(Value::to_string).collect())
         .unwrap_or_default();
     format!(
-        "{{\"viewport\": {},\n\"boxes\": [\n{}\n]}}\n",
+        "{{\"viewport\": {}, \"scale\": {},\n\"boxes\": [\n{}\n]}}\n",
         boxes["viewport"],
+        boxes["scale"],
         rows.join(",\n")
     )
 }

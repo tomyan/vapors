@@ -1,4 +1,5 @@
-//! `border: <width> || <style> || <color>` for all four sides.
+//! `border: <width> || <style> || <color>` for all four sides, and
+//! `border-top` (and each other side) for one.
 
 use super::PropertyId;
 use super::declaration::{Longhand, Specified, parse_longhand};
@@ -8,13 +9,17 @@ use crate::ast::ComponentValue;
 use crate::value::Value;
 use crate::{Position, Result};
 
-/// Expand `border`. Omitted parts take their initial values.
+/// Expand `border` (twelve longhands: four widths, four styles, four
+/// colours) or one side's shorthand (its width, style and colour).
+/// Omitted parts take their initial values.
 pub(super) fn expand(
+    name: &str,
     ids: &[PropertyId],
     values: &[ComponentValue],
     at: Position,
 ) -> Result<Vec<Longhand>> {
-    let group_ids = [ids[0], ids[4], ids[8]];
+    let per_group = ids.len() / 3;
+    let group_ids = [ids[0], ids[per_group], ids[2 * per_group]];
     let [width_id, style_id, color_id] = group_ids;
     let mut found: [Option<Value>; 3] = [None, None, None];
     for part in parts(values) {
@@ -24,7 +29,7 @@ pub(super) fn expand(
             .find(|(i, id)| found[*i].is_none() && parse_longhand(**id, &part, at).is_ok());
         let Some((i, id)) = slot else {
             return Err(refusal(
-                "border",
+                name,
                 "<line-width> || <line-style> || <color>",
                 values,
                 at,
@@ -41,7 +46,7 @@ pub(super) fn expand(
         .enumerate()
         .map(|(i, id)| Longhand {
             id: *id,
-            value: Specified::Value(by_group[i / 4].clone()),
+            value: Specified::Value(by_group[i / per_group].clone()),
         })
         .collect())
 }

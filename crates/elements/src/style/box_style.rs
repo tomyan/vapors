@@ -16,7 +16,8 @@ use super::values::{Amount, Reader, amount, keyword, later, shape, unknown};
 /// The Taffy style of the element `reader` reads; `flex_item` when its
 /// parent is a flex container, which blockifies it (CSS Display 3,
 /// 2.7): an inline-level display lays out as its block-level twin.
-pub(crate) fn box_style(reader: &mut Reader<'_>, flex_item: bool) -> Style {
+/// `border` is the used border widths (top, right, bottom, left).
+pub(crate) fn box_style(reader: &mut Reader<'_>, flex_item: bool, border: [f32; 4]) -> Style {
     let display = if flex_item { blockified } else { display };
     let mut style = Style {
         display: reader.read("display", display, Display::Block),
@@ -36,7 +37,12 @@ pub(crate) fn box_style(reader: &mut Reader<'_>, flex_item: bool) -> Style {
         aspect_ratio: reader.read("aspect-ratio", aspect_ratio, None),
         margin: margins(reader),
         padding: paddings(reader),
-        border: Rect::zero(),
+        border: Rect {
+            top: LengthPercentage::length(border[0]),
+            right: LengthPercentage::length(border[1]),
+            bottom: LengthPercentage::length(border[2]),
+            left: LengthPercentage::length(border[3]),
+        },
         ..Style::default()
     };
     flex(reader, &mut style);

@@ -7,7 +7,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use vapors_elements::{Document, ElementError, Point, Viewport};
+use vapors_elements::{Cursor, Document, ElementError, Point, Viewport};
 use vapors_platform::{App, Event, Frame, Next, Platform, report_error};
 use vapors_renderer::Target;
 use vapors_scene::Size;
@@ -40,6 +40,8 @@ pub struct ElementsApp {
     scale: f32,
     /// Where the pointer last moved, in CSS pixels.
     pointer: Point,
+    /// The cursor last shown.
+    cursor: Cursor,
 }
 
 impl ElementsApp {
@@ -52,6 +54,7 @@ impl ElementsApp {
             failure: Failure::default(),
             scale: 1.0,
             pointer: [0.0, 0.0],
+            cursor: Cursor::Default,
         }
     }
 
@@ -140,6 +143,11 @@ impl App for ElementsApp {
         }
         if self.document.borrow_mut().take_changed() {
             platform.request_redraw();
+        }
+        let cursor = self.document.borrow().cursor(self.pointer);
+        if cursor != self.cursor {
+            self.cursor = cursor;
+            platform.set_cursor(crate::cursor::shown(cursor));
         }
     }
 

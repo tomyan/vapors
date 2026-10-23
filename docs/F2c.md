@@ -500,6 +500,64 @@ differs from the plan.
   screenshot natively (by the example) and on the web (synthetic
   pointer events on the canvas).
 
+### S3
+
+- **Borders, radii, shadows.** Solid borders with a width and colour per
+  side (`dashed`, `dotted`, `double` refused); widths snapped to device
+  pixels as Blink snaps them (under one device pixel is one, otherwise
+  floored), and laid out by Taffy. Circular corner radii in px; a %
+  radius is refused, since it makes elliptical corners on a box that is
+  not square (`9999px` makes a pill). Outer `box-shadow` lists with
+  offset, blur and spread; `inset` refused. The quad shader draws a
+  box's background under its border with coverage from the signed
+  distance to the rounded edges; a corner join between two border
+  colours is split on the diagonal, where Skia blends it. Shadows are
+  a closed-form blurred rounded rectangle (Evan Wallace's method),
+  not drawn under the box.
+- **CSS.** vapors-css gains the per-side shorthands `border-top`,
+  `border-right`, `border-bottom`, `border-left`, which it refused.
+- **Cursor.** `Platform::set_cursor`; the document's cursor is the
+  hovered element's `cursor` (`auto` is the arrow until text selection
+  in F4, where a browser shows the text cursor over text).
+- **Button and hr.** A vapors button style (1px grey border, 3px radii,
+  a light fill), not Chromium's native look. `hr` is supported, drawn
+  with a solid grey border where Chromium's is `inset`; its box is the
+  same.
+- **Paint against Chromium.** `crates/elements-corpus/tests/gpu_paint.rs`
+  draws each paint fixture with vapors and with headless Chromium at 1x
+  and 2x and holds the pixels to three rules (`paint_check`): where
+  Chromium's 3x3 neighbourhood is one colour, ours is within 2; every
+  pixel is within 96; and in each fixture element's border box, at most
+  2 pixels are off by more than half the local contrast (the larger
+  channel range of either image's 5x5 neighbourhood). The third rule is
+  what catches a wrong radius or a 1 px shift: a misplaced edge moves a
+  pixel by about the whole local contrast, anti-aliasing unlike Skia's
+  by a fraction of it. Measured on `paint_boxes` (2026-10-23): ours has
+  no pixel off by more than half the contrast in any element at 1x or
+  2x. `gpu_paint_rules.rs` checks the rules: Chromium's own rendering
+  with a radius, a shadow, a border width or a position changed must
+  fail them, at both scales. The composites are uploaded by CI's gpu
+  job.
+- **Page controls.** The demo page's own Open button and status line
+  sat over an elements demo's canvas. An elements demo now calls
+  `vapors_platform::hide_page_controls()`. That hides both, and the
+  page then needs no Open button. Errors still show: `#error`, or
+  `#status` when the page has no `#error`, is un-hidden whenever an
+  error is written to it. The page contract checks that no visible
+  element other than `#error` overlaps the canvas of each elements demo
+  and the index. It also checks that only the image demo refuses a page
+  without the Open button.
+- **Radii.** Corner radii that do not fit their box are scaled by one
+  factor, the smallest of each side's length over the sum of its two
+  radii (Backgrounds 3 §5.5), computed in `paint`; the shader draws each
+  corner exactly. An inner corner's radius is the outer one less the
+  two border widths meeting there; where those widths differ the inner
+  corner is an ellipse, which vapors does not draw, so a radius with
+  unequal meeting widths is refused, naming the radius declaration. A
+  spread shadow's radius follows Backgrounds 3 §7.1.1, including the
+  reduced growth for a radius smaller than the spread. A negative blur
+  is refused.
+
 ## Decisions (2026-10-23)
 
 - **D1 Scoping.** A compiler change in S5: `mount` registers its

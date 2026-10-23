@@ -123,6 +123,11 @@ jobs:
       - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
         run: cargo xtask setup --ci
+      # The browser's first launch on a fresh runner took 15.4 to 36.2 s, past
+      # the tests' 20 s screenshot deadline, which assumes a warm one; see
+      # COLD_START in crates/text/src/comparison/chromium_warm.rs.
+      - name: warm headless Chromium
+        run: cargo run -p vapors-text --example warm_chromium
       - name: gpu tier
         run: cargo xtask test --tier gpu
       # The text comparison page: vapors-text beside headless Chrome (the
@@ -138,7 +143,9 @@ jobs:
         if: always()
         with:
           name: text-comparison
-          path: target/text_comparison*.png
+          path: |
+            target/text_comparison*.png
+            target/tmp/paint_*.png
           if-no-files-found: error
 
   window:
@@ -179,6 +186,8 @@ jobs:
       # The example clicks the button as counter.pixels lists, then checks.
       - name: screenshot of the counter demo after a click (F2c S2)
         run: cargo xtask screenshot demo target/counter.png -- counter
+      - name: screenshot of the boxes demo (F2c S3)
+        run: cargo xtask screenshot demo target/boxes.png -- boxes
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

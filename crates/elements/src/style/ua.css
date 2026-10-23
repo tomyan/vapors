@@ -26,13 +26,24 @@ h4 { margin-top: 1.33em; margin-bottom: 1.33em; }
 h5 { font-size: 0.83em; margin-top: 1.67em; margin-bottom: 1.67em; }
 h6 { font-size: 0.67em; margin-top: 2.33em; margin-bottom: 2.33em; }
 
-/* A vapors button, not Chromium's native one: no border until borders
-   arrive (F2c S3). Inline-block, so it is laid out only where it is
-   blockified (a flex item; grid arrives in S4) until inline layout
-   arrives (S6). */
+/* A vapors button, not Chromium's native one (whose look is the
+   platform's): a light fill, a 1px grey border, small radii.
+   Inline-block, so it is laid out only where it is blockified (a flex
+   item; grid arrives in S4) until inline layout arrives (S6). */
 button {
   display: inline-block;
   padding: 1px 6px;
-  background-color: #efefef;
+  border: 1px solid #8f8f9d;
+  border-radius: 3px;
+  background-color: #e9e9ed;
   color: #000000;
+}
+
+/* Chromium draws an hr's 1px border `inset` (two greys); vapors draws
+   solid borders, so it is one grey. The box is the same 2px tall. */
+hr {
+  display: block;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  border: 1px solid #c0c0c0;
 }

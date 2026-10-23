@@ -15,6 +15,7 @@ include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
 pub mod oracle;
 pub mod page;
+pub mod paint_check;
 
 /// Mounts a fixture's component into `parent`.
 pub type Mount = fn(&Rc<RefCell<Document>>, NodeId);
@@ -48,8 +49,11 @@ macro_rules! fixtures {
 
 fixtures![
     block_margins::BlockMargins,
+    borders::Borders,
+    borders_windows::BordersWindows,
     centred_panel::CentredPanel,
     flex_row::FlexRow,
     hello_box::HelloBox,
+    paint_boxes::PaintBoxes,
     text_wrap::TextWrap,
 ];

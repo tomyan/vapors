@@ -5,16 +5,20 @@
 
 mod clear;
 mod image;
+mod instanced;
 mod quad;
 mod quads;
 mod quads_setup;
 mod readback;
+mod shadows;
 mod solid;
 mod upload;
 
 pub use clear::{clear, clear_view};
 pub use image::ImagePipeline;
-pub use quads::{QuadPipeline, Target};
+pub use instanced::Target;
+pub use quads::QuadPipeline;
 pub use readback::read_rgba8;
+pub use shadows::ShadowPipeline;
 pub use solid::SolidPipeline;
 pub use upload::upload_rgba8;
