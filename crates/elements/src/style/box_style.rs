@@ -11,6 +11,7 @@ use taffy::{
 use vapors_css::value::Value;
 
 use super::box_align::{align_content, align_items, align_self};
+use super::sizes::{dimension, flex_basis, min_size, none_or_amount};
 use super::values::{Amount, Reader, amount, keyword, later, shape, unknown};
 
 /// The Taffy style of the element `reader` reads; `flex_item` when its
@@ -27,8 +28,8 @@ pub(crate) fn box_style(reader: &mut Reader<'_>, flex_item: bool, border: [f32; 
             height: reader.read("height", dimension, Dimension::auto()),
         },
         min_size: Size {
-            width: reader.read("min-width", auto_or_amount, LengthPercentageAuto::auto()),
-            height: reader.read("min-height", auto_or_amount, LengthPercentageAuto::auto()),
+            width: reader.read("min-width", min_size, LengthPercentageAuto::auto()),
+            height: reader.read("min-height", min_size, LengthPercentageAuto::auto()),
         },
         max_size: Size {
             width: reader.read("max-width", none_or_amount, LengthPercentageAuto::auto()),
@@ -46,6 +47,7 @@ pub(crate) fn box_style(reader: &mut Reader<'_>, flex_item: bool, border: [f32; 
         ..Style::default()
     };
     flex(reader, &mut style);
+    super::grid_style::grid(reader, &mut style);
     style
 }
 
@@ -90,8 +92,8 @@ fn display(value: &Value) -> Result<Display, String> {
         "block" => Ok(Display::Block),
         "flex" => Ok(Display::Flex),
         "none" => Ok(Display::None),
-        "grid" | "inline-grid" => Err(later("F2c S4")),
-        "inline" | "inline-block" | "inline-flex" => Err(later("F2c S6")),
+        "grid" => Ok(Display::Grid),
+        "inline" | "inline-block" | "inline-flex" | "inline-grid" => Err(later("F2c S6")),
         "contents" => Err("`contents` is not scheduled in docs/F2c.md".to_owned()),
         other => Err(unknown(other)),
     }
@@ -101,6 +103,7 @@ fn blockified(value: &Value) -> Result<Display, String> {
     match keyword(value)? {
         "inline" | "inline-block" => Ok(Display::Block),
         "inline-flex" => Ok(Display::Flex),
+        "inline-grid" => Ok(Display::Grid),
         _ => display(value),
     }
 }
@@ -117,43 +120,19 @@ fn length_percentage(value: &Value) -> Result<LengthPercentage, String> {
     Ok(match amount(value)? {
         Amount::Px(px) => LengthPercentage::length(px),
         Amount::Fraction(f) => LengthPercentage::percent(f),
+        Amount::Calc(calc) => LengthPercentage::calc(calc),
     })
 }
 
-fn auto_or_amount(value: &Value) -> Result<LengthPercentageAuto, String> {
+pub(super) fn auto_or_amount(value: &Value) -> Result<LengthPercentageAuto, String> {
     if value.as_keyword() == Some("auto") {
         return Ok(LengthPercentageAuto::auto());
     }
     Ok(match amount(value)? {
         Amount::Px(px) => LengthPercentageAuto::length(px),
         Amount::Fraction(f) => LengthPercentageAuto::percent(f),
+        Amount::Calc(calc) => LengthPercentageAuto::calc(calc),
     })
-}
-
-fn none_or_amount(value: &Value) -> Result<LengthPercentageAuto, String> {
-    match value.as_keyword() {
-        Some("none") => Ok(LengthPercentageAuto::auto()),
-        Some(_) => Err(later("F2c S4")),
-        None => auto_or_amount(value),
-    }
-}
-
-fn dimension(value: &Value) -> Result<Dimension, String> {
-    match value.as_keyword() {
-        Some("auto") => Ok(Dimension::auto()),
-        Some(_) => Err(later("F2c S4")),
-        None => Ok(match amount(value)? {
-            Amount::Px(px) => Dimension::length(px),
-            Amount::Fraction(f) => Dimension::percent(f),
-        }),
-    }
-}
-
-fn flex_basis(value: &Value) -> Result<Dimension, String> {
-    match value.as_keyword() {
-        Some("content") => Ok(Dimension::content()),
-        _ => dimension(value),
-    }
 }
 
 fn gap(value: &Value) -> Result<LengthPercentage, String> {

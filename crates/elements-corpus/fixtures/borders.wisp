@@ -1,5 +1,9 @@
 <style>
-/* viewport 640x400 */
+/* viewport 640x400 640x400@1.5 640x400@2.625 */
+/* At a fractional device scale, border widths snap to whole device
+   pixels, so their CSS widths are not those at 1x. 1.5 is Windows' 150%
+   display setting; 2.625 is the device pixel ratio of many Android
+   phones. */
 body { margin: 10px; }
 .card { border: 3px solid #333; padding: 8px; margin-bottom: 6px; border-radius: 6px; box-shadow: 0 2px 6px #0004; }
 .thin { border-top: thin solid red; border-bottom: thick solid blue; height: 10px; }

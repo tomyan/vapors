@@ -67,7 +67,7 @@ run a second pass after layout (sumi did the same).
   `transparent`, `currentColor`, `light-dark()`; `calc()`, `min()`,
   `max()`, `clamp()` with type checking; `var()` with fallbacks.
 - Properties: everything in `property/table.rs` plus the shorthands in
-  `property/shorthand.rs`. The flex and grid entries match Taffy 0.9's
+  `property/shorthand.rs`. The flex and grid entries match Taffy 0.15's
   `Style`. Custom properties inherit and are readable from the computed
   style.
 - At-rules: `@media` (types, `not`/`only`, `and`/`or`/`not`, comma lists,

@@ -10,7 +10,7 @@ use vapors_dom::NodeId;
 use crate::check::{check_tree, describe, elements, implemented};
 use crate::document::Document;
 use crate::error::ElementError;
-use crate::layout::{build, lay_out};
+use crate::layout::{Calcs, build, lay_out};
 use crate::paint::{PaintInput, paint};
 use crate::painted::Painted;
 use crate::style::{Context, ElementStyles, Refusal, Used, initial_style, used};
@@ -37,14 +37,11 @@ impl Document {
     /// is painted then, and the previous result is dropped.
     pub fn update(&mut self, viewport: Viewport) -> Result<&Painted, Vec<ElementError>> {
         self.painted = None;
-        let used = self.used_styles(viewport)?;
+        let (used, calcs) = self.used_styles(viewport)?;
         let boxes = build(&self.arena, &used, self.root());
-        let (boxes, rects) = lay_out(
-            boxes,
-            &mut self.fonts,
-            viewport.scale,
-            (viewport.width, viewport.height),
-        );
+        let size = (viewport.width, viewport.height);
+        let (boxes, rects) = lay_out(boxes, &mut self.fonts, viewport.scale, size, &calcs)
+            .map_err(|failure| vec![ElementError::Layout(failure)])?;
         let mut input = PaintInput {
             used: &used,
             root: self.root(),
@@ -65,7 +62,12 @@ impl Document {
         self.painted.as_ref()
     }
 
-    fn used_styles(&self, viewport: Viewport) -> Result<HashMap<NodeId, Used>, Vec<ElementError>> {
+    /// Each element's used style, and the calcs layout will ask for,
+    /// collected while the computed styles that hold them are alive.
+    fn used_styles(
+        &self,
+        viewport: Viewport,
+    ) -> Result<(HashMap<NodeId, Used>, Calcs), Vec<ElementError>> {
         let env = environment(viewport);
         let mut errors = check_tree(&self.arena, self.root());
         let styles = self
@@ -74,6 +76,7 @@ impl Document {
             .map_err(|e| vec![e])?;
         let initial = initial_style(&self.arena, self.root(), &env);
         let mut out = HashMap::new();
+        let mut calcs = Calcs::default();
         for node in elements(&self.arena, self.root()) {
             if !implemented(&self.arena, node) {
                 continue;
@@ -83,6 +86,7 @@ impl Document {
                 .and_then(|parent| out.get(&parent))
                 .is_some_and(|parent: &Used| parent.layout.display == taffy::Display::Flex);
             let own = styles.of(node);
+            calcs.add(own);
             let parent = self.parent(node).map(|parent| styles.of(parent));
             let context = Context {
                 initial: &initial,
@@ -95,7 +99,7 @@ impl Document {
             }
         }
         if errors.is_empty() {
-            Ok(out)
+            Ok((out, calcs))
         } else {
             Err(errors)
         }

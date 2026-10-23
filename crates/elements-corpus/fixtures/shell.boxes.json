@@ -1,0 +1,44 @@
+{"viewports": [
+{"viewport": [390,800], "scale": 1,
+"boxes": [
+{"height":800,"tag":"html","width":390,"x":0,"y":0},
+{"height":800,"tag":"body","width":390,"x":0,"y":0},
+{"height":44,"tag":"div","width":390,"x":0,"y":0},
+{"height":20,"tag":"div","width":214,"x":8,"y":12},
+{"height":32,"tag":"div","width":72,"x":230,"y":6},
+{"height":32,"tag":"div","width":72,"x":310,"y":6},
+{"height":756,"tag":"div","width":390,"x":0,"y":44},
+{"height":0,"tag":"div","width":0,"x":0,"y":0},
+{"height":0,"tag":"div","width":0,"x":0,"y":0},
+{"height":0,"tag":"div","width":0,"x":0,"y":0},
+{"height":0,"tag":"div","width":0,"x":0,"y":0}
+]},
+{"viewport": [768,1024], "scale": 1,
+"boxes": [
+{"height":1024,"tag":"html","width":768,"x":0,"y":0},
+{"height":1024,"tag":"body","width":768,"x":0,"y":0},
+{"height":44,"tag":"div","width":768,"x":0,"y":0},
+{"height":20,"tag":"div","width":592,"x":8,"y":12},
+{"height":32,"tag":"div","width":72,"x":608,"y":6},
+{"height":32,"tag":"div","width":72,"x":688,"y":6},
+{"height":980,"tag":"div","width":488,"x":0,"y":44},
+{"height":980,"tag":"div","width":280,"x":488,"y":44},
+{"height":28,"tag":"div","width":255,"x":501,"y":56},
+{"height":28,"tag":"div","width":255,"x":501,"y":92},
+{"height":28,"tag":"div","width":255,"x":501,"y":128}
+]},
+{"viewport": [1280,800], "scale": 1,
+"boxes": [
+{"height":800,"tag":"html","width":1280,"x":0,"y":0},
+{"height":800,"tag":"body","width":1280,"x":0,"y":0},
+{"height":44,"tag":"div","width":1280,"x":0,"y":0},
+{"height":20,"tag":"div","width":1104,"x":8,"y":12},
+{"height":32,"tag":"div","width":72,"x":1120,"y":6},
+{"height":32,"tag":"div","width":72,"x":1200,"y":6},
+{"height":756,"tag":"div","width":1000,"x":0,"y":44},
+{"height":756,"tag":"div","width":280,"x":1000,"y":44},
+{"height":28,"tag":"div","width":255,"x":1013,"y":56},
+{"height":28,"tag":"div","width":255,"x":1013,"y":92},
+{"height":28,"tag":"div","width":255,"x":1013,"y":128}
+]}
+]}

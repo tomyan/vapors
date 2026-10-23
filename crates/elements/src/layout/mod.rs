@@ -2,6 +2,7 @@
 //! each box's border box in document coordinates.
 
 mod boxes;
+mod calcs;
 mod measure;
 mod tree;
 
@@ -9,6 +10,7 @@ use taffy::{AvailableSpace, NodeId, Size, compute_root_layout};
 use vapors_text::FontSystem;
 
 pub(crate) use boxes::{Content, LayoutBox, build};
+pub(crate) use calcs::Calcs;
 pub(crate) use measure::text_layout;
 use tree::BoxTree;
 
@@ -29,16 +31,21 @@ pub struct BoxRect {
 /// initial containing block: the root's percentages resolve against it,
 /// and an `auto` height is still its content's. Returns the boxes with
 /// each one's border box, in box order.
+///
+/// # Errors
+/// A `calc()` that did not resolve (see `Calcs`).
 pub(crate) fn lay_out(
     boxes: Vec<LayoutBox>,
     fonts: &mut FontSystem,
     scale: f32,
     size: (f32, f32),
-) -> (Vec<LayoutBox>, Vec<BoxRect>) {
+    calcs: &Calcs,
+) -> Result<(Vec<LayoutBox>, Vec<BoxRect>), String> {
     let mut tree = BoxTree {
         boxes,
         fonts,
         scale,
+        calcs,
     };
     let available = Size {
         width: AvailableSpace::Definite(size.0),
@@ -55,7 +62,10 @@ pub(crate) fn lay_out(
         tree.boxes.len()
     ];
     place(&tree.boxes, 0, (0.0, 0.0), &mut rects);
-    (tree.boxes, rects)
+    match calcs.failure() {
+        Some(failure) => Err(failure),
+        None => Ok((tree.boxes, rects)),
+    }
 }
 
 fn place(boxes: &[LayoutBox], index: usize, origin: (f32, f32), rects: &mut [BoxRect]) {

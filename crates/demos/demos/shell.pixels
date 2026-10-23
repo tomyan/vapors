@@ -1,0 +1,19 @@
+# touche's shell: a 44 px bar, the canvas, and from 600 px wide a
+# 280 px side panel; under 600 px the canvas alone.
+pixel 4 4 #171b1f          the bar, top left
+pixel 4 43 #171b1f         the bar's last row
+pixel 4 44 #2b2b2b         the canvas starts under it
+pixel 300 300 #2b2b2b      the canvas
+pixel 359 300 #2b2b2b      the canvas's last column (640 - 280 = 360)
+pixel 360 300 #c7ccd1      the panel's 1px left border
+pixel 630 380 #ffffff      the panel's fill, bottom right
+
+at 390x800
+pixel 4 4 #171b1f          the bar
+pixel 385 400 #2b2b2b      the canvas reaches the right edge: no panel
+pixel 200 795 #2b2b2b      and the bottom
+
+at 1280x800
+pixel 999 400 #2b2b2b      the canvas's last column (1280 - 280 = 1000)
+pixel 1000 400 #c7ccd1     the panel's border
+pixel 1270 790 #ffffff     the panel's fill

@@ -156,7 +156,7 @@ prepare() {
 }
 
 # The demos whose screenshots are held to crates/demos/demos/<name>.pixels.
-demos="hello counter boxes"
+demos="hello counter boxes shell"
 
 # A script defining vaporsOverlaps(): the visible elements whose boxes
 # meet the canvas's, other than the canvas, #error, and what the page

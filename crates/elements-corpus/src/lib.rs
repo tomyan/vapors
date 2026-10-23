@@ -50,10 +50,12 @@ macro_rules! fixtures {
 fixtures![
     block_margins::BlockMargins,
     borders::Borders,
-    borders_windows::BordersWindows,
     centred_panel::CentredPanel,
     flex_row::FlexRow,
+    grid_tracks::GridTracks,
     hello_box::HelloBox,
     paint_boxes::PaintBoxes,
+    shell::Shell,
+    sizing::Sizing,
     text_wrap::TextWrap,
 ];

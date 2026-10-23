@@ -107,10 +107,13 @@ pub(crate) enum Amount {
     Px(f32),
     /// A fraction, 0.5 for 50%.
     Fraction(f32),
+    /// A `calc()` with a % term, which only layout can resolve: the
+    /// address of the computed `Calc`, the key layout looks it up by
+    /// (see `layout::calcs`). Never dereferenced.
+    Calc(*const ()),
 }
 
-/// A computed length or percentage. `calc()` mixing % with lengths is
-/// refused until layout can resolve it (F2c S4).
+/// A computed length or percentage, or a `calc()` that mixes them.
 #[allow(clippy::cast_possible_truncation)] // CSS lengths are far inside f32
 pub(crate) fn amount(value: &Value) -> Result<Amount, String> {
     match value {
@@ -120,10 +123,7 @@ pub(crate) fn amount(value: &Value) -> Result<Amount, String> {
         Value::Length(length) if length.unit == LengthUnit::Percent => {
             Ok(Amount::Fraction((length.value / 100.0) as f32))
         }
-        Value::Calc(_) => Err(format!(
-            "is a calc() with a % term, which only layout can resolve; it {}",
-            later("F2c S4")
-        )),
+        Value::Calc(calc) => Ok(Amount::Calc(std::ptr::from_ref(calc).cast())),
         _ => Err(shape("a length or percentage")),
     }
 }

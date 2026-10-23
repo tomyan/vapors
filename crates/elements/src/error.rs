@@ -10,6 +10,8 @@ pub enum ElementError {
     UnsupportedTag(String),
     /// A listener for an event the tree never fires.
     UnfiredEvent(String),
+    /// Layout could not finish: a `calc()` that did not resolve.
+    Layout(String),
     /// An attribute the tree does not honour (`style`), or a value of one
     /// it cannot honour (`disabled="false"`).
     UnsupportedAttribute(String),
@@ -42,7 +44,8 @@ impl fmt::Display for ElementError {
         match self {
             Self::UnsupportedTag(message)
             | Self::UnfiredEvent(message)
-            | Self::UnsupportedAttribute(message) => f.write_str(message),
+            | Self::UnsupportedAttribute(message)
+            | Self::Layout(message) => f.write_str(message),
             Self::Css { sheet, error } => write!(
                 f,
                 "{sheet}:{}:{}: {}",

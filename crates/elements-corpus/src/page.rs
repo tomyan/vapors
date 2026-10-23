@@ -9,9 +9,19 @@ pub struct Source {
     pub style: String,
     /// The template after it.
     pub template: String,
-    /// The viewport from the style's `/* viewport WxH */` comment.
-    pub viewport: [u32; 2],
-    /// The device scale, from an `@S` after the size; 1 without one.
+    /// The viewports from the style's `/* viewport WxH [WxH@S ..] */`
+    /// comment: the fixture is laid out at each.
+    pub viewports: Vec<FixtureViewport>,
+}
+
+/// One size and device scale a fixture is laid out at.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FixtureViewport {
+    /// Width in CSS px.
+    pub width: u32,
+    /// Height in CSS px.
+    pub height: u32,
+    /// Device pixels per CSS px: the `S` of `WxH@S`, 1 without one.
     pub scale: f64,
 }
 
@@ -22,8 +32,8 @@ pub const BOXES_ID: &str = "vapors-boxes";
 ///
 /// # Errors
 /// A file with a `<script>`, without exactly one `<style>`, or without a
-/// `/* viewport WxH */` or `/* viewport WxH@S */` comment, naming the
-/// fix.
+/// `/* viewport WxH */` comment whose sizes all parse (`WxH`, or `WxH@S`
+/// with S greater than 0), naming the fix.
 pub fn split(name: &str, text: &str) -> Result<Source, String> {
     if text.contains("<script>") {
         return Err(format!(
@@ -37,25 +47,51 @@ pub fn split(name: &str, text: &str) -> Result<Source, String> {
         .find("</style>")
         .ok_or(format!("{name}: <style> is not closed"))?;
     let style = text[start + "<style>".len()..end].to_owned();
-    let (viewport, scale) = viewport(&style).ok_or(format!(
-        "{name}: the <style> needs a `/* viewport WxH */` or `/* viewport WxH@S */` comment naming the page size and, optionally, a device scale greater than 0, such as /* viewport 400x300 */ or /* viewport 640x400@1.5 */"
+    let viewports = viewports(&style).ok_or(format!(
+        "{name}: the <style> needs a `/* viewport WxH */` comment naming the page size, such as /* viewport 400x300 */, or several, such as /* viewport 390x800 1280x800 */; a size may name a device scale greater than 0 as `/* viewport WxH@S */`, such as 640x400@1.5"
     ))?;
     let template = text[end + "</style>".len()..].to_owned();
     Ok(Source {
         style,
         template,
-        viewport,
+        viewports,
+    })
+}
+
+fn viewports(style: &str) -> Option<Vec<FixtureViewport>> {
+    let after = &style[style.find("/* viewport ")? + "/* viewport ".len()..];
+    let sizes = &after[..after.find(" */")?];
+    sizes.split_whitespace().map(viewport).collect()
+}
+
+fn viewport(text: &str) -> Option<FixtureViewport> {
+    let (size, scale) = text.split_once('@').unwrap_or((text, "1"));
+    let scale: f64 = scale.parse().ok().filter(|s: &f64| *s > 0.0)?;
+    let (width, height) = size.split_once('x')?;
+    Some(FixtureViewport {
+        width: width.parse().ok()?,
+        height: height.parse().ok()?,
         scale,
     })
 }
 
-fn viewport(style: &str) -> Option<([u32; 2], f64)> {
-    let after = &style[style.find("/* viewport ")? + "/* viewport ".len()..];
-    let text = &after[..after.find(" */")?];
-    let (size, scale) = text.split_once('@').unwrap_or((text, "1"));
-    let scale: f64 = scale.parse().ok().filter(|s: &f64| *s > 0.0)?;
-    let (width, height) = size.split_once('x')?;
-    Some(([width.parse().ok()?, height.parse().ok()?], scale))
+/// The page that shows the fixture at exactly `viewport`: the fixture's
+/// page in an iframe of that size, so its viewport is the iframe's.
+/// Headless Chromium will not make a window narrower than about 500 px,
+/// and lays a page out shorter than its window while it loads; an
+/// iframe has neither limit. The fixture page writes its boxes into
+/// this page (`window.parent`), where `--dump-dom` prints them.
+#[must_use]
+pub fn framed(source: &Source, viewport: FixtureViewport) -> String {
+    let inner = html(source).replace('&', "&amp;").replace('"', "&quot;");
+    format!(
+        r#"<!doctype html>
+<html><head><meta charset="utf-8"><style>html, body {{ margin: 0; }} iframe {{ border: 0; display: block; }} #{BOXES_ID} {{ display: none; }}</style></head>
+<body><iframe width="{w}" height="{h}" srcdoc="{inner}"></iframe></body></html>
+"#,
+        w = viewport.width,
+        h = viewport.height,
+    )
 }
 
 /// The page Chromium loads for `source`, with the font files beside it.
@@ -75,10 +111,11 @@ html {{ font-family: Geist; }}
 // Every @font-face is loaded, used or not, so a font that fails cannot
 // pass unnoticed; the boxes are written only when all have loaded.
 const write = (value) => {{
-  const out = document.createElement("pre");
+  const host = window.parent.document;
+  const out = host.createElement("pre");
   out.id = "{BOXES_ID}";
   out.textContent = JSON.stringify(value);
-  document.documentElement.append(out);
+  host.documentElement.append(out);
 }};
 document.fonts.ready
   .then(() => Promise.allSettled([...document.fonts].map((face) => face.load())))

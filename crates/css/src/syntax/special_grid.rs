@@ -1,4 +1,4 @@
-//! Grid track sizes and track lists, as Taffy 0.9 reads them.
+//! Grid track sizes and track lists, as Taffy 0.15 reads them.
 
 use super::special::{function, ident, single};
 use super::types::{self, Matched};

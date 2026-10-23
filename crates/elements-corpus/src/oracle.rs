@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use serde_json::Value;
 use vapors_text::comparison::{Chromium, FONT_FILES};
 
-use crate::page::{boxes_from_dom, html, split};
+use crate::page::{FixtureViewport, Source, boxes_from_dom, framed, split};
 
 /// The fixtures directory of this crate.
 #[must_use]
@@ -36,41 +36,67 @@ pub fn fixture_names() -> Result<Vec<String>, String> {
     Ok(names)
 }
 
-/// Chromium's boxes for fixture `name`, as the JSON the corpus holds.
+/// Chromium's boxes for fixture `name` at each of its viewports, as the
+/// JSON the corpus holds: `{"viewports": [{"viewport": [w, h], "scale": s,
+/// "boxes": [..]}, ..]}`.
 ///
 /// # Errors
 /// A fixture that does not split, a page that cannot be written, or a
-/// Chromium run that fails or writes no boxes.
+/// Chromium run that fails, writes no boxes, or lays the page out at
+/// another size than asked.
 pub fn boxes(chromium: &Chromium, work: &Path, name: &str) -> Result<Value, String> {
     let path = fixtures_dir().join(format!("{name}.wisp"));
     let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
     let source = split(name, &text)?;
-    let page = work.join(format!("{name}.html"));
-    std::fs::write(&page, html(&source)).map_err(|e| format!("{}: {e}", page.display()))?;
-    let dom = chromium
-        .dump_dom(&page, source.viewport[0], source.viewport[1], source.scale)
-        .map_err(|e| format!("{name}: {e}"))?;
-    let page: Value =
-        serde_json::from_str(&boxes_from_dom(&dom).map_err(|e| format!("{name}: {e}"))?)
-            .map_err(|e| format!("{name}: the page's boxes are not JSON: {e}"))?;
-    check_viewport(name, &page, source.viewport[0])?;
-    check_scale(name, &page, source.scale)?;
-    Ok(page)
+    let mut viewports = Vec::new();
+    for viewport in &source.viewports {
+        viewports.push(boxes_at(chromium, work, name, &source, *viewport)?);
+    }
+    Ok(serde_json::json!({ "viewports": viewports }))
 }
 
-/// Chromium's window has a minimum width (500 px headless, 155 here):
-/// a narrower fixture gets a wider page than it asked for. The height
-/// is whatever the page measured: headless `--dump-dom` gives a 640x400
-/// window a 313 px tall viewport, and the corpus lays out at that.
-fn check_viewport(name: &str, page: &Value, width: u32) -> Result<(), String> {
-    let html = page["viewport"][0]
-        .as_f64()
-        .ok_or(format!("{name}: the page wrote no viewport width"))?;
-    if (html - f64::from(width)).abs() < 0.001 {
+fn boxes_at(
+    chromium: &Chromium,
+    work: &Path,
+    name: &str,
+    source: &Source,
+    viewport: FixtureViewport,
+) -> Result<Value, String> {
+    let FixtureViewport {
+        width: w,
+        height: h,
+        scale,
+    } = viewport;
+    let page = work.join(format!("{name}_{w}x{h}@{scale}.html"));
+    std::fs::write(&page, framed(source, viewport))
+        .map_err(|e| format!("{}: {e}", page.display()))?;
+    // The window is the iframe's size, with room, and at least the
+    // width headless Chromium will make a window.
+    let dom = chromium
+        .dump_dom(&page, w.max(500) + 40, h + 40, scale)
+        .map_err(|e| format!("{name}: {e}"))?;
+    let measured: Value =
+        serde_json::from_str(&boxes_from_dom(&dom).map_err(|e| format!("{name}: {e}"))?)
+            .map_err(|e| format!("{name}: the page's boxes are not JSON: {e}"))?;
+    check_viewport(name, &measured, viewport)?;
+    check_scale(name, &measured, scale)?;
+    Ok(measured)
+}
+
+/// The fixture must have been laid out at exactly the size it asked for.
+fn check_viewport(name: &str, page: &Value, wanted: FixtureViewport) -> Result<(), String> {
+    let measured = [page["viewport"][0].as_f64(), page["viewport"][1].as_f64()];
+    if measured
+        == [
+            Some(f64::from(wanted.width)),
+            Some(f64::from(wanted.height)),
+        ]
+    {
         return Ok(());
     }
     Err(format!(
-        "{name}: Chromium laid the page out {html} px wide, not the {width} px the fixture asks for; Chromium's minimum window width is about 500 px, so give the fixture a viewport at least that wide"
+        "{name}: Chromium laid the fixture out at {measured:?}, not the {}x{} it asks for",
+        wanted.width, wanted.height
     ))
 }
 
@@ -103,13 +129,21 @@ pub fn write_fonts(work: &Path) -> Result<(), String> {
 /// The corpus file text for `boxes`: one box per line, so a change
 /// reads as a one-line diff.
 #[must_use]
-pub fn to_text(boxes: &Value) -> String {
+pub fn to_text(fixture: &Value) -> String {
+    let sections: Vec<String> = fixture["viewports"]
+        .as_array()
+        .map(|sections| sections.iter().map(section_text).collect())
+        .unwrap_or_default();
+    format!("{{\"viewports\": [\n{}\n]}}\n", sections.join(",\n"))
+}
+
+fn section_text(boxes: &Value) -> String {
     let rows: Vec<String> = boxes["boxes"]
         .as_array()
         .map(|rows| rows.iter().map(Value::to_string).collect())
         .unwrap_or_default();
     format!(
-        "{{\"viewport\": {}, \"scale\": {},\n\"boxes\": [\n{}\n]}}\n",
+        "{{\"viewport\": {}, \"scale\": {},\n\"boxes\": [\n{}\n]}}",
         boxes["viewport"],
         boxes["scale"],
         rows.join(",\n")

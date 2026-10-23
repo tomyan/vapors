@@ -188,6 +188,8 @@ jobs:
         run: cargo xtask screenshot demo target/counter.png -- counter
       - name: screenshot of the boxes demo (F2c S3)
         run: cargo xtask screenshot demo target/boxes.png -- boxes
+      - name: screenshot of the shell demo (F2c S4)
+        run: cargo xtask screenshot demo target/shell.png -- shell
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
