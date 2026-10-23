@@ -6,14 +6,10 @@ use web_sys::{Element, HtmlCanvasElement, HtmlElement};
 use winit::event_loop::EventLoopProxy;
 
 use crate::PlatformError;
+use crate::page::{ERROR_ID, Report, element_for};
 use crate::window::Message;
 
-/// The element id the canvas must have.
-pub const CANVAS_ID: &str = "vapors";
-/// The element id status text is written to, when the page has one.
-pub const STATUS_ID: &str = "status";
-/// The element id of the button that opens the file picker.
-pub const OPEN_ID: &str = "open";
+use crate::page::{CANVAS_ID, OPEN_ID};
 
 /// Whether `navigator.gpu` exists, read through `Reflect` so no
 /// unstable web-sys API is needed.
@@ -69,9 +65,16 @@ pub fn canvas() -> Result<HtmlCanvasElement, PlatformError> {
         })
 }
 
-/// Replace the text of the `status` element, if the page has one.
-pub fn set_status(text: &str) {
-    if let Some(element) = element(STATUS_ID) {
-        element.set_text_content(Some(text));
+/// Write `text` to the element [`element_for`] picks for `report`, if
+/// the page has it; an error element is also shown (its `hidden`
+/// attribute removed).
+pub fn write_report(report: Report, text: &str) {
+    let id = element_for(report, element(ERROR_ID).is_some());
+    let Some(target) = element(id) else {
+        return;
+    };
+    target.set_text_content(Some(text));
+    if id == ERROR_ID {
+        drop(target.remove_attribute("hidden"));
     }
 }
