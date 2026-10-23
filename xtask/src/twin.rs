@@ -10,19 +10,10 @@ use std::process::ExitCode;
 
 /// Compare `./xtask` with `<sibling>/xtask` and report.
 pub fn run(sibling: &Path) -> ExitCode {
-    let theirs = sibling.join("xtask");
-    match differences(Path::new("xtask"), &theirs) {
-        Ok(found) if found.is_empty() => {
-            println!("ok   twin     xtask is the same as {}", theirs.display());
+    match crate::gate_twin::check(Path::new("."), Some(sibling)) {
+        Ok(said) => {
+            println!("{said}");
             ExitCode::SUCCESS
-        }
-        Ok(found) => {
-            println!("FAIL twin: xtask differs from {}:", theirs.display());
-            for line in found {
-                println!("     {line}");
-            }
-            println!("     {}", fix_line(Path::new("."), sibling));
-            ExitCode::FAILURE
         }
         Err(why) => {
             println!("FAIL twin: {why}");

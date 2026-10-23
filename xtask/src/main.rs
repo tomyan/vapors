@@ -19,6 +19,7 @@ mod gate_plan;
 mod gate_run;
 mod gate_step;
 mod gate_steps;
+mod gate_twin;
 mod gate_workflow;
 mod gate_yaml;
 mod gpu_info;

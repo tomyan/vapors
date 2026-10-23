@@ -25,6 +25,10 @@ max_lines = "220"
 # Files not written by hand; left out of the check.
 [files.generated]
 
+# `[gate] twin` names a sibling checkout whose xtask must equal this
+# one's (xtask/src/gate_twin.rs). vapors sets none: xtask changes land
+# here first, and touche's gate checks its copy against vapors at its pin.
+
 # `cargo xtask gate` runs every `run` step of .github/workflows/ci.yml, as
 # CI runs it, except these: the runner's setup, which a worktree already
 # has. Each is an exact line of a step's script, with its reason; a step
