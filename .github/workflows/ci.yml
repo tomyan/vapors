@@ -123,6 +123,18 @@ jobs:
       - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
         run: cargo xtask setup --ci
+      # Diagnostic, not for merge: Chrome's launch times on a fresh runner,
+      # before any other Chrome launch in this job.
+      - name: Chrome hang probe
+        run: |
+          cargo run -q -p vapors-text --example text_comparison -- --out target/probe || echo "the example failed; probing the page it wrote"
+          scripts/chrome-hang-probe.sh "$PWD/target/probe/text_comparison.html" "$PWD/target/probe/out" 30
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: chrome-probe
+          path: target/probe/out
+          if-no-files-found: ignore
       - name: gpu tier
         run: cargo xtask test --tier gpu
       # The text comparison page: vapors-text beside headless Chrome (the
