@@ -21,6 +21,12 @@ pub use error::CompileError;
 pub use naming::component_name;
 use source::Source;
 
+/// The attribute generated code tags each element with, to its
+/// component's style scope; reserved in templates. It must equal
+/// `vapors_dom::SCOPE_ATTRIBUTE`, which generated code names (checked
+/// in vapors-compiler-examples).
+pub const SCOPE_ATTRIBUTE: &str = "data-wisp";
+
 /// Parses the text of a `.wisp` file. `path` names the file in
 /// refusals and gives the component its name.
 ///

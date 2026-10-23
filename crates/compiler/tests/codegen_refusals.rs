@@ -126,3 +126,23 @@ fn prop_with_a_destructuring_pattern_is_refused() {
     assert!(err.message.contains("#[prop] needs a single name"), "{err}");
     assert_eq!(err.line, 2, "{err}");
 }
+
+#[test]
+fn a_component_setting_the_scope_attribute_itself_is_refused() {
+    for template in [
+        "<div data-wisp=\"x\"></div>",
+        "<div data-wisp={name}></div>",
+    ] {
+        // When
+        let err = refusal(&format!(
+            "<script>\nlet name: String = String::new();\n</script>\n{template}"
+        ));
+
+        // Then
+        assert_eq!((err.line, err.col), (4, 6), "{template}: {err}");
+        assert!(
+            err.message.contains("data-wisp") && err.message.contains("reserved"),
+            "{err}"
+        );
+    }
+}

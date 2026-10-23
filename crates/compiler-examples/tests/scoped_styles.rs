@@ -85,3 +85,12 @@ fn a_component_without_a_style_adds_none_and_tags_nothing() {
         dom.borrow().to_html()
     );
 }
+
+#[test]
+fn the_compiler_reserves_the_attribute_the_dom_scopes_by() {
+    // Then: one name, held in two crates that do not depend on each other
+    assert_eq!(
+        vapors_compiler::SCOPE_ATTRIBUTE,
+        vapors_dom::SCOPE_ATTRIBUTE
+    );
+}
