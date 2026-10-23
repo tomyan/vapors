@@ -5,15 +5,16 @@
 use std::collections::HashMap;
 
 use vapors_dom::NodeId;
-use vapors_scene::{Item, Quad, Rect, Scene, TextId};
+use vapors_scene::{Color, Item, Quad, Rect, Scene, TextId};
 use vapors_text::{FontSystem, Layout};
 
 use crate::layout::{BoxRect, Content, LayoutBox, text_layout};
 use crate::style::Used;
 
-/// The result of an update: the scene, the text runs it names, and each
-/// element's border box.
+/// The result of an update: the canvas colour, the scene, the text runs
+/// it names, and each element's border box.
 pub struct Painted {
+    pub(crate) canvas: Color,
     pub(crate) scene: Scene,
     pub(crate) texts: Vec<Layout>,
     pub(crate) rects: HashMap<NodeId, BoxRect>,
@@ -22,13 +23,21 @@ pub struct Painted {
 /// What paint reads besides the boxes.
 pub(crate) struct PaintInput<'a> {
     pub(crate) used: &'a HashMap<NodeId, Used>,
+    /// `html` and `body`, whose backgrounds can become the canvas's.
+    pub(crate) root: NodeId,
+    pub(crate) body: NodeId,
+    /// Which of them gave the canvas its colour; set by `paint`.
+    pub(crate) propagated: Option<NodeId>,
     pub(crate) fonts: &'a mut FontSystem,
     pub(crate) scale: f32,
 }
 
 /// Paints `boxes` (box 0 the root) at the rects layout gave them.
 pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> Painted {
+    let (canvas, propagated) = canvas_background(input);
+    input.propagated = propagated;
     let mut painted = Painted {
+        canvas,
         scene: Scene::new(),
         texts: Vec::new(),
         rects: HashMap::new(),
@@ -42,6 +51,20 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
     painted
 }
 
+/// The canvas's colour, as CSS Backgrounds 3 section 2.11.2 gives it:
+/// the root's background, else the body's when the root's is
+/// transparent, else white; and the element whose background it took,
+/// which then paints none of its own.
+fn canvas_background(input: &PaintInput<'_>) -> (Color, Option<NodeId>) {
+    for node in [input.root, input.body] {
+        match input.used.get(&node) {
+            Some(used) if used.background.a > 0.0 => return (used.background, Some(node)),
+            _ => {}
+        }
+    }
+    (Color::from_rgba8(255, 255, 255, 255), None)
+}
+
 fn paint_box(
     boxes: &[LayoutBox],
     rects: &[BoxRect],
@@ -53,7 +76,7 @@ fn paint_box(
     match &boxes[index].content {
         Content::Element(node) => {
             let background = input.used[node].background;
-            if background.a > 0.0 {
+            if background.a > 0.0 && input.propagated != Some(*node) {
                 let rect = snapped(rect, input.scale);
                 out.scene.push(Item::Quad(Quad { rect, background }));
             }
@@ -83,6 +106,12 @@ fn snapped(rect: BoxRect, scale: f32) -> Rect {
 }
 
 impl Painted {
+    /// The colour under everything: what the window is cleared to.
+    #[must_use]
+    pub fn canvas(&self) -> Color {
+        self.canvas
+    }
+
     /// The display list.
     #[must_use]
     pub fn scene(&self) -> &Scene {

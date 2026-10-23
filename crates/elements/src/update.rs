@@ -41,6 +41,9 @@ impl Document {
         let (boxes, rects) = lay_out(boxes, &mut self.fonts, viewport.scale, viewport.width);
         let mut input = PaintInput {
             used: &used,
+            root: self.root(),
+            body: self.body(),
+            propagated: None,
             fonts: &mut self.fonts,
             scale: viewport.scale,
         };

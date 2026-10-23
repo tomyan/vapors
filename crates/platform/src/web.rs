@@ -78,3 +78,10 @@ pub fn write_report(report: Report, text: &str) {
         drop(target.remove_attribute("hidden"));
     }
 }
+
+/// The page URL's query string, `?` included, or empty.
+pub fn search() -> String {
+    web_sys::window()
+        .and_then(|window| window.location().search().ok())
+        .unwrap_or_default()
+}
