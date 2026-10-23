@@ -352,19 +352,19 @@ Effects call `set_text`, `set_attribute`, `insert_before` and
 platform events and no device. Tests assert dispatch order, `click`
 targeting, `:hover` and `:active` flags, and the signal values after.
 
-**Web.** `scripts/check-page-contract.sh` gains a case for the
-elements page: the as-built page shows the component, read as a pixel
-colour inside the styled div from the screenshot, and `#error` hidden.
+**Web and native proof, every slice.** See "Demos" below.
 
 ## Slices
 
-Each slice is visible or usable on its own. Native and web both run
-every slice from S1. The order serves touche's shell first. After S5,
+Each slice is visible or usable on its own and ends with a demo that
+runs in a native window and on the WebGPU canvas. The web demo is a
+first-class proof surface: a slice is not done until its page works on
+Tom's phone and laptop over the tailnet. The order serves touche's shell first. After S5,
 touche can write its top bar, panel grid and buttons as components.
 
 | Slice | Delivers | Visible as |
 |---|---|---|
-| **S1 hello box** | `vapors-elements` with the arena, `Dom`, `css::Element`, UA sheet, global sheets, whole-tree restyle; Taffy block and flex with text leaves (one style per text run); `background-color`, `padding`, `margin`, `width`/`height`, `color`, `font-size`; the `Scene` display list; `QuadPipeline` (solid rects only); `ScenePainter`; `ElementsApp`; a native example and the web page | `hello.wisp`: a styled div with padding and a sentence of text, in a window and on the phone. First geometry fixture and first Chromium pixel comparison. |
+| **S1 hello box** | `vapors-elements` with the arena, `Dom`, `css::Element`, UA sheet, global sheets, whole-tree restyle; Taffy block and flex with text leaves (one style per text run); `background-color`, `padding`, `margin`, `width`/`height`, `color`, `font-size`; the `Scene` display list; `QuadPipeline` (solid rects only); `ScenePainter`; `ElementsApp`; the demo set-up (`?demo=` routing, the index page, `--public-url /vapors/`, the shared `.pixels` checks, `[screenshot]` per D2) | `hello.wisp`: a styled div with padding and a sentence of text, in a window and on the phone. First geometry fixture and first Chromium pixel comparison. |
 | **S2 click** | Hit testing, pointer events, `click`, bubbling, `:hover`/`:active`, `pointer-events`, refusal of unfired event names, `Next::Wait` redraw on demand | `counter.wisp` from `compiler-examples` counts clicks and taps natively and on the phone. Idle CPU near zero on desktop. |
 | **S3 box model** | Borders (solid; other styles refused), `border-radius`, `box-shadow`, the UA button style | Buttons look like buttons; the pixel comparison covers radii and shadows |
 | **S4 flex and grid** | Every flex and grid property in the CSS table mapped to Taffy 0.15, the `position` and alignment grammar moved to 0.15's shape, the `layout-oracle` corpus (with Taffy's generated fixtures as a source of cases) | The touche shell layout (44 px bar, canvas region, side panel) as a fixture matching Chromium at three viewport sizes |
@@ -374,6 +374,53 @@ touche can write its top bar, panel grid and buttons as components.
 | **S8 positioned** | `position: relative`/`absolute`/`fixed`, `z-index`, stacking contexts in paint and hit test, `overflow: hidden` (rect clip) | A toast component above the shell |
 | **S9 scroll** | `overflow: scroll`/`auto`: scroll offset per element, wheel and touch pan to the innermost scrollable ancestor, offsets in whole device pixels, scrollbar painting with a UA style, clipped hit testing | A long list scrolls inside its region, on desktop and phone |
 | **S10 img** | `img` from `Document::register_image(name, RgbaImage)`; `src` absent gives an empty box, as in HTML; an unregistered `src` is an error naming it; natural size and aspect ratio in layout | A thumbnail in a list row |
+
+### Demos
+
+One web package, `vapors-web-demo`, holds every slice's demo. The page
+picks the demo from the query string, `?demo=<name>`. With no query it
+shows an index page listing the demos, itself drawn by vapors from
+S1 on. The image app stays as `?demo=image`, so its existing page
+checks keep running. The team lead serves the build at `/vapors/` on
+the tailnet, so trunk builds with `--public-url /vapors/`. Without that,
+asset URLs start at `/` and the page loads no wasm under a subpath.
+`check-page-contract.sh` gains a case that loads the page under
+`/vapors/` and fails if the wasm does not start.
+
+Each demo is a `.wisp` component in `crates/web-demo/src/demos/`. The
+native example `cargo run -p vapors-app --example demo -- <name>` runs
+the same component in a window.
+
+Every slice adds three checks for its demo:
+
+- **Native screenshot test.** `cargo xtask screenshot` runs the native
+  example under Xvfb and saves the frame. A test in the `gpu` tier
+  reads named pixels from it: a colour inside each styled box, and a
+  colour just outside it. Where a slice has an interaction, the test
+  replays it first: for S2, a synthetic click injected before the
+  capture, and it checks the count text changed by its ink.
+- **Web page-contract check.** The demo's URL is a case in
+  `check-page-contract.sh`. The case passes when `#error` is hidden
+  and empty and `#status` shows the adapter line.
+- **Web pixel check.** The same script takes the page's screenshot in
+  headless Chromium (WebGPU through SwiftShader, as the existing
+  gradient case does). It checks the same named pixels as the native
+  test. The pixel list is one file per demo,
+  `crates/web-demo/src/demos/<name>.pixels`, read by both checks, so
+  the native and web checks cannot drift apart.
+
+| Slice | Demo (`?demo=`) | What Tom checks on the phone and laptop | Pixels checked |
+|---|---|---|---|
+| S1 | `hello` | A dark panel with padding and a sentence of Geist text, centred in a light page | Panel fill, page fill, ink in the text box |
+| S2 | `counter` | A button whose count goes up on each click or tap, and highlights under the mouse | Button fill; after an injected click, the count text's ink differs |
+| S3 | `boxes` | Cards with rounded corners, 1 px and 4 px borders, a shadow, and three button styles | Border colour on each side, fill inside a radius, shadow darkening below a card |
+| S4 | `shell` | The touche shell: 44 px top bar, canvas region and side panel, which rearranges at the phone breakpoint | Bar, canvas and panel fills at the region centres, at 390 and 1280 px wide |
+| S5 | `panel` | A touche-style panel made of nested components, each with its own CSS, and a rule that does not leak between them | The child's fill unchanged by the parent's same-named class |
+| S6 | `text` | A paragraph with `strong`, `em` and `code`, a heading, and a span that counts its own taps | Ink in each line box; `code` background behind its text |
+| S7 | `stress` | 1,000 elements, a counter that ticks every frame, and the update time printed in the demo | The counter's ink changes between two captures |
+| S8 | `toasts` | Buttons that raise toasts above the shell; a toast stays until dismissed | Toast fill over the canvas region |
+| S9 | `scroll` | A 200-row list that scrolls inside its region, by wheel and by finger | Row fill at the top before and after an injected scroll |
+| S10 | `images` | A list of thumbnails decoded from bundled PNGs | Pixels inside a thumbnail match the source image |
 
 Deferred out of F2c, each refused when used, naming where it comes:
 opacity layers and `filter` (F3, with the canvas compositing work),
@@ -397,14 +444,15 @@ slice showed.
   components. Recommendation: (a) in S5, with S1 to S4 using global
   sheets only, since touche has no components yet. Who owns the
   compiler change: me, or the compiler's owner?
-- **D2 Web page.** The web package (`vapors-web-demo`) runs the image
-  app, and the page contract checks it. (a) The page picks its app from
-  the query string (`?app=image`), the contract script loads both, and
-  the elements app is the default. (b) A second web package, with
-  `cargo xtask web` and `[web] package` taking a list. Recommendation:
-  (a), which needs no factory change. `cargo xtask screenshot` has the
-  same issue (`[screenshot] package = "vapors-platform"`): the elements
-  example lives in `vapors-app`, so that setting needs a list or moves.
+- **D2 Web page.** Settled by Tom's direction to treat the web as a
+  first-class proof surface (see "Demos"). There is one web package
+  with `?demo=` pages, served at `/vapors/`. One question remains.
+  `cargo xtask screenshot` runs examples of `[screenshot] package =
+  "vapors-platform"`, but the demos' native example lives in
+  `vapors-app`. Options: (a) make that setting a list, which is a
+  factory change shared with touche's xtask; (b) point it at
+  `vapors-app` and move the two platform examples there.
+  Recommendation: (a).
 - **D3 Checkbox.** It is in brief item 1. Recommendation: F4 with the
   other inputs, unless a touche slice before F4 needs it.
 - **D4 Taffy 0.15.0**, six days old, over 0.14. Recommendation as
