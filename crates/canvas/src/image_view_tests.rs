@@ -2,7 +2,7 @@
 
 use super::*;
 
-fn view() -> ImageView {
+pub(super) fn view() -> ImageView {
     let image = RgbaImage {
         size: Size {
             width: 200,
@@ -43,6 +43,41 @@ fn scroll_zooms_about_the_pointer() {
     let after = view.transform().image_point([100.0, 200.0]);
     assert!((after[0] - under_pointer[0]).abs() < 1e-4);
     assert!((after[1] - under_pointer[1]).abs() < 1e-4);
+}
+
+#[test]
+fn scroll_before_any_pointer_move_zooms_about_the_view_centre() {
+    // Given: winit's wheel event carries no position, and no pointer has moved
+    let mut view = view();
+    let under_centre = view.transform().image_point([200.0, 200.0]);
+
+    // When
+    view.event(&Event::Scroll { steps: 1.0 });
+
+    // Then
+    let after = view.transform().image_point([200.0, 200.0]);
+    assert!(
+        (after[0] - under_centre[0]).abs() < 1e-4,
+        "{after:?} vs {under_centre:?}"
+    );
+    assert!(
+        (after[1] - under_centre[1]).abs() < 1e-4,
+        "{after:?} vs {under_centre:?}"
+    );
+}
+
+#[test]
+fn a_drag_does_not_pan_on_the_first_pointer_position() {
+    // Given: the button goes down before any pointer position is known
+    let mut view = view();
+    let before = view.transform().translate;
+    view.event(&Event::PrimaryButton { pressed: true });
+
+    // When
+    view.event(&Event::PointerMoved { x: 300.0, y: 300.0 });
+
+    // Then
+    assert_eq!(view.transform().translate, before);
 }
 
 #[test]

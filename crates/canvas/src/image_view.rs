@@ -30,7 +30,8 @@ pub struct ImageView {
     pub(crate) uploaded: Option<Uploaded>,
     pub(crate) viewport: Size,
     transform: Transform,
-    pointer: [f32; 2],
+    /// The last pointer position; `None` until the pointer first moves.
+    pointer: Option<[f32; 2]>,
     dragging: bool,
     pub(crate) background: Color,
 }
@@ -59,7 +60,7 @@ impl ImageView {
                 scale: 1.0,
                 translate: [0.0, 0.0],
             },
-            pointer: [0.0, 0.0],
+            pointer: None,
             dragging: false,
             background,
         }
@@ -136,8 +137,9 @@ impl ImageView {
                 self.fit();
             }
             Event::PointerMoved { x, y } => self.pointer_moved([*x, *y]),
+            Event::PointerLeft => self.pointer = None,
             Event::PrimaryButton { pressed } => self.dragging = *pressed,
-            Event::Scroll { steps } => self.zoom(self.pointer, ZOOM_STEP.powf(*steps)),
+            Event::Scroll { steps } => self.zoom(self.scroll_anchor(), ZOOM_STEP.powf(*steps)),
             Event::Pinch { x, y, factor } => self.zoom([*x, *y], *factor),
             Event::Pan { dx, dy } => self.pan(*dx, *dy),
             Event::DoubleTap { .. } => self.toggle_fit(),
@@ -150,10 +152,16 @@ impl ImageView {
     }
 
     fn pointer_moved(&mut self, to: [f32; 2]) {
-        if self.dragging {
-            self.pan(to[0] - self.pointer[0], to[1] - self.pointer[1]);
+        if let (true, Some(from)) = (self.dragging, self.pointer) {
+            self.pan(to[0] - from[0], to[1] - from[1]);
         }
-        self.pointer = to;
+        self.pointer = Some(to);
+    }
+
+    /// The pointer, or the view centre when no pointer position is known:
+    /// winit's wheel event carries no position of its own.
+    fn scroll_anchor(&self) -> [f32; 2] {
+        self.pointer.unwrap_or_else(|| self.centre())
     }
 
     fn key(&mut self, text: &str) {
@@ -178,3 +186,7 @@ impl ImageView {
 #[cfg(test)]
 #[path = "image_view_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "image_view_pointer_tests.rs"]
+mod pointer_tests;
