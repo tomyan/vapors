@@ -15,6 +15,12 @@ env:
   RUSTFLAGS: -D warnings
   NEXTEST_PROFILE: ci
 
+# bash -eo pipefail for every run step (`shell: bash`; with no shell CI
+# runs `bash -e`), as `cargo xtask gate` runs them, which it checks.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   ci:
     name: ci
