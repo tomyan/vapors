@@ -5,7 +5,7 @@ mod support;
 
 use support::{document, element, text};
 use vapors_elements::Viewport;
-use vapors_scene::{Color, Item, Quad, Rect};
+use vapors_scene::{Color, Item, Rect};
 
 #[test]
 fn a_background_is_a_quad_with_edges_snapped_to_device_pixels() {
@@ -26,11 +26,17 @@ fn a_background_is_a_quad_with_edges_snapped_to_device_pixels() {
         .expect("updates");
 
     // Then: 4.875 rounds up to 5, 20.625 up to 21, 3 stays
-    let quad = Quad {
-        rect: Rect::new(5.0, 0.0, 21.0, 3.0),
-        background: Color::from_rgba8(255, 0, 0, 255),
+    let [Item::Quad(quad)] = painted.scene().items() else {
+        panic!("one quad, got {:?}", painted.scene().items());
     };
-    assert_eq!(painted.scene().items(), [Item::Quad(quad)]);
+    assert_eq!(
+        (quad.rect, quad.background),
+        (
+            Rect::new(5.0, 0.0, 21.0, 3.0),
+            Color::from_rgba8(255, 0, 0, 255)
+        )
+    );
+    assert_eq!(quad.border, [0.0; 4]);
 }
 
 #[test]

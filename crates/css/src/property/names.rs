@@ -27,9 +27,6 @@ pub static IGNORED_VENDOR_PROPERTIES: &[(&str, &str)] = &[
 pub(super) fn unsupported_shorthand_hint(name: &str) -> Option<&'static str> {
     Some(match name {
         "font" => "write font-size, font-family, font-weight, font-style and line-height",
-        "border-top" | "border-right" | "border-bottom" | "border-left" => {
-            "write border-top-width, border-top-style and border-top-color (and so on per side)"
-        }
         "background" => "write background-color",
         "outline" | "place-items" | "place-content" | "grid-area" | "grid-template" | "grid" => {
             "write the longhands the table lists"

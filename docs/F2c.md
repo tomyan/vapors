@@ -500,6 +500,37 @@ differs from the plan.
   screenshot natively (by the example) and on the web (synthetic
   pointer events on the canvas).
 
+### S3
+
+- **Borders, radii, shadows.** Solid borders with a width and colour per
+  side (`dashed`, `dotted`, `double` refused); widths snapped to device
+  pixels as Blink snaps them (under one device pixel is one, otherwise
+  floored), and laid out by Taffy. Circular corner radii in px; a %
+  radius is refused, since it makes elliptical corners on a box that is
+  not square (`9999px` makes a pill). Outer `box-shadow` lists with
+  offset, blur and spread; `inset` refused. The quad shader draws a
+  box's background under its border with coverage from the signed
+  distance to the rounded edges; a corner join between two border
+  colours is split on the diagonal, where Skia blends it. Shadows are
+  a closed-form blurred rounded rectangle (Evan Wallace's method),
+  not drawn under the box.
+- **CSS.** vapors-css gains the per-side shorthands `border-top`,
+  `border-right`, `border-bottom`, `border-left`, which it refused.
+- **Cursor.** `Platform::set_cursor`; the document's cursor is the
+  hovered element's `cursor` (`auto` is the arrow until text selection
+  in F4, where a browser shows the text cursor over text).
+- **Button and hr.** A vapors button style (1px grey border, 3px radii,
+  a light fill), not Chromium's native look. `hr` is supported, drawn
+  with a solid grey border where Chromium's is `inset`; its box is the
+  same.
+- **Paint against Chromium.** `crates/elements-corpus/tests/gpu_paint.rs`
+  draws each paint fixture with vapors and with headless Chromium at 1x
+  and 2x and compares the pixels: where Chromium's 3x3 neighbourhood is
+  one colour, ours must be within 2; elsewhere within 96, with at most
+  0.5% of pixels off by more than 2. Measured on `paint_boxes`: no flat
+  pixel off, the worst edge pixel off by 86 (a corner join), 0.275% off
+  at 1x and 0.151% at 2x. The composites are uploaded by CI's gpu job.
+
 ## Decisions (2026-10-23)
 
 - **D1 Scoping.** A compiler change in S5: `mount` registers its

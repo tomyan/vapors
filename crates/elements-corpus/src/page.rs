@@ -62,6 +62,7 @@ pub fn html(source: &Source) -> String {
 @font-face {{ font-family: "Geist"; src: url("Geist-wght.ttf"); font-weight: 100 900; }}
 @font-face {{ font-family: "Geist Mono"; src: url("GeistMono-wght.ttf"); font-weight: 100 900; }}
 html {{ font-family: Geist; }}
+#{BOXES_ID} {{ display: none; }}
 </style>
 <style>{style}</style>
 </head><body>{template}<script>

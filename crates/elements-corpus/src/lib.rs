@@ -48,8 +48,10 @@ macro_rules! fixtures {
 
 fixtures![
     block_margins::BlockMargins,
+    borders::Borders,
     centred_panel::CentredPanel,
     flex_row::FlexRow,
     hello_box::HelloBox,
+    paint_boxes::PaintBoxes,
     text_wrap::TextWrap,
 ];

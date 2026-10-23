@@ -25,11 +25,11 @@ const SUPPORTED: &[&str] = &[
     "blockquote",
     "figure",
     "figcaption",
+    "hr",
 ];
 
 /// Where each unimplemented tag arrives.
 const LATER: &[(&str, &[&str])] = &[
-    ("F2c S3", &["hr"]),
     (
         "F2c S6",
         &[

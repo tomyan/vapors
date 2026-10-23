@@ -33,11 +33,27 @@ pub static SHORTHANDS: &[(&str, &[&str])] = &[
         ],
     ),
     (
+        "border-bottom",
+        &[
+            "border-bottom-width",
+            "border-bottom-style",
+            "border-bottom-color",
+        ],
+    ),
+    (
         "border-color",
         &[
             "border-top-color",
             "border-right-color",
             "border-bottom-color",
+            "border-left-color",
+        ],
+    ),
+    (
+        "border-left",
+        &[
+            "border-left-width",
+            "border-left-style",
             "border-left-color",
         ],
     ),
@@ -51,6 +67,14 @@ pub static SHORTHANDS: &[(&str, &[&str])] = &[
         ],
     ),
     (
+        "border-right",
+        &[
+            "border-right-width",
+            "border-right-style",
+            "border-right-color",
+        ],
+    ),
+    (
         "border-style",
         &[
             "border-top-style",
@@ -58,6 +82,10 @@ pub static SHORTHANDS: &[(&str, &[&str])] = &[
             "border-bottom-style",
             "border-left-style",
         ],
+    ),
+    (
+        "border-top",
+        &["border-top-width", "border-top-style", "border-top-color"],
     ),
     (
         "border-width",

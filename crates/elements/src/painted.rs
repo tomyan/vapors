@@ -8,6 +8,7 @@ use vapors_scene::{Color, Scene, TextId};
 use vapors_text::Layout;
 
 use crate::layout::BoxRect;
+use crate::style::Cursor;
 
 /// The canvas colour, the scene, the text runs it names, each element's
 /// border box, and the elements a pointer can hit.
@@ -19,6 +20,8 @@ pub struct Painted {
     /// Elements with a box, `visibility: visible` and `pointer-events:
     /// auto`, in painting order: a later one is drawn over an earlier.
     pub(crate) hits: Vec<(NodeId, BoxRect)>,
+    /// The cursor over each element in `hits`.
+    pub(crate) cursors: HashMap<NodeId, Cursor>,
 }
 
 impl Painted {
@@ -48,6 +51,15 @@ impl Painted {
     #[must_use]
     pub fn border_box(&self, node: NodeId) -> Option<BoxRect> {
         self.rects.get(&node).copied()
+    }
+
+    /// The cursor over `point`: the one of the element it hits, the
+    /// default arrow where it hits none.
+    #[must_use]
+    pub fn cursor(&self, point: [f32; 2]) -> Cursor {
+        self.hit(point)
+            .and_then(|node| self.cursors.get(&node).copied())
+            .unwrap_or(Cursor::Default)
     }
 
     /// The topmost element under `point` (CSS pixels) that takes the

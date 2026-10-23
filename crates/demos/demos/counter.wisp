@@ -22,6 +22,9 @@ button {
   font-size: 15px;
   background-color: #171b1f;
   color: #e4e8ec;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
 }
 button:hover { background-color: #2a3036; }
 button:active { background-color: #3a7bd5; }

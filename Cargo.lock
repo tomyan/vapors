@@ -2560,11 +2560,16 @@ name = "vapors-elements-corpus"
 version = "0.0.0"
 dependencies = [
  "serde_json",
+ "vapors-app",
  "vapors-compiler",
  "vapors-dom",
  "vapors-elements",
+ "vapors-gpu-harness",
+ "vapors-renderer",
+ "vapors-scene",
  "vapors-signals",
  "vapors-text",
+ "wgpu",
 ]
 
 [[package]]

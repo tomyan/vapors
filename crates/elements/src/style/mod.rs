@@ -4,6 +4,8 @@
 
 mod box_align;
 mod box_style;
+mod cursor;
+mod decoration;
 mod honoured;
 mod text_style;
 mod used;
@@ -18,8 +20,10 @@ use crate::css_element::ElementRef;
 use crate::error::ElementError;
 
 pub(crate) use box_style::box_style;
+pub use cursor::{ALL_CURSORS, Cursor};
+pub(crate) use decoration::BoxShadow;
 pub(crate) use text_style::TextStyle;
-pub(crate) use used::{Used, used};
+pub(crate) use used::{Context, Used, used};
 pub(crate) use values::{Refusal, Styles as ElementStyles};
 
 const UA_SHEET: &str = include_str!("ua.css");

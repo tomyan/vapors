@@ -107,13 +107,15 @@ impl Handler {
         )
     }
 
-    /// Asks the window for a frame if the app asked for one while it
-    /// handled the events just delivered.
+    /// Carries out what the app asked for while it handled the events
+    /// just delivered: a frame, and a cursor.
     fn redraw_if_asked(&self) {
-        if self.platform.take_redraw_request()
-            && let Some(window) = &self.window
-        {
+        let Some(window) = &self.window else { return };
+        if self.platform.take_redraw_request() {
             window.request_redraw();
+        }
+        if let Some(cursor) = self.platform.take_cursor() {
+            crate::cursor::apply(window, cursor);
         }
     }
 

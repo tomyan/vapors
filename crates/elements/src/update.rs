@@ -13,7 +13,7 @@ use crate::error::ElementError;
 use crate::layout::{build, lay_out};
 use crate::paint::{PaintInput, paint};
 use crate::painted::Painted;
-use crate::style::{ElementStyles, Refusal, Used, initial_style, used};
+use crate::style::{Context, ElementStyles, Refusal, Used, initial_style, used};
 
 /// What the window or canvas gives the document each frame.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -84,7 +84,12 @@ impl Document {
                 .is_some_and(|parent: &Used| parent.layout.display == taffy::Display::Flex);
             let own = styles.of(node);
             let parent = self.parent(node).map(|parent| styles.of(parent));
-            match used(ElementStyles { own, parent }, &initial, flex_item) {
+            let context = Context {
+                initial: &initial,
+                flex_item,
+                scale: viewport.scale,
+            };
+            match used(ElementStyles { own, parent }, &context) {
                 Ok(style) => drop(out.insert(node, style)),
                 Err(refusals) => errors.extend(self.unhonoured(node, refusals)),
             }

@@ -41,7 +41,6 @@ fn known_but_unsupported_shorthands_are_refused_by_name() {
     // Given: review item 18.
     for (decl, hint) in [
         ("font: 12px serif", "font-size"),
-        ("border-top: 1px solid", "border-top-width"),
         ("background: red", "background-color"),
     ] {
         let err = refusal(&format!("a {{ {decl}; }}"));

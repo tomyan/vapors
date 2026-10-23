@@ -44,7 +44,7 @@ fn a_deferred_property_off_its_initial_value_is_refused() {
     let mut doc = document();
     let body = doc.body();
     element(&mut doc, body, "div", "card");
-    doc.add_stylesheet("app.css", ".card { box-shadow: 0 1px 2px black; }")
+    doc.add_stylesheet("app.css", ".card { transform: translate(1px, 2px); }")
         .expect("parses");
 
     // When
@@ -55,8 +55,8 @@ fn a_deferred_property_off_its_initial_value_is_refused() {
     let error = &errors[0];
     assert!(
         error.contains("<div class=\"card\">")
-            && error.contains("box-shadow")
-            && error.contains("F2c S3"),
+            && error.contains("transform")
+            && error.contains("after F2c"),
         "{error}"
     );
 }

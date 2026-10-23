@@ -1,0 +1,13 @@
+# The boxes demo at 640x400 CSS px at 1x. The card is at x 30..204,
+# y 108..222 with a shadow below; the four-colour box at x 228..408,
+# y 108..228; the buttons sit at y about 256..292.
+pixel 4 4 #e9ecef          page, top left
+pixel 100 205 #ffffff      the card's fill, below its text
+pixel 318 109 #d32f2f      the four-colour box: top border, red
+pixel 406 170 #388e3c      right border, green
+pixel 318 226 #1976d2      bottom border, blue
+pixel 229 170 #fbc02d      left border, yellow
+pixel 300 180 #ffffff      inside it, white
+pixel 186 260 #3a7bd5      the primary button's fill
+pixel 184 273 #2f63ad      its 1px border
+ink 60 222 180 236 #e9ecef the card's shadow darkens the page below it

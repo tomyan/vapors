@@ -7,6 +7,7 @@
 
 mod attributes;
 mod clock;
+mod cursor;
 mod device_lost;
 mod error;
 mod event;
@@ -31,6 +32,7 @@ mod web;
 mod webgpu;
 mod window;
 
+pub use cursor::Cursor;
 pub use device_lost::{DeviceLost, Lost};
 pub use error::PlatformError;
 pub use event::{Event, TouchPhase};

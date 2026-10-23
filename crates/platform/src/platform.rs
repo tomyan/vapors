@@ -3,7 +3,11 @@
 //! same code runs where the answer is a promise (the web) and where it is
 //! a blocking dialog on another thread (native).
 
+use std::cell::Cell;
+
 use winit::event_loop::EventLoopProxy;
+
+use crate::Cursor;
 
 use crate::PlatformError;
 use crate::device_lost::{DeviceLost, Lost};
@@ -18,6 +22,7 @@ pub struct Platform {
     proxy: Option<EventLoopProxy<Message>>,
     lost: DeviceLost,
     redraw: RedrawFlag,
+    cursor: Cell<Option<Cursor>>,
 }
 
 impl Platform {
@@ -38,6 +43,7 @@ impl Platform {
             proxy: None,
             lost: DeviceLost::default(),
             redraw: RedrawFlag::default(),
+            cursor: Cell::new(None),
         }
     }
 
@@ -52,6 +58,17 @@ impl Platform {
     /// The loop reads it after each event; a test may too.
     pub fn take_redraw_request(&self) -> bool {
         self.redraw.take()
+    }
+
+    /// Show `cursor` over the window, from the end of the event being
+    /// handled; the last call in an event wins.
+    pub fn set_cursor(&self, cursor: Cursor) {
+        self.cursor.set(Some(cursor));
+    }
+
+    /// The cursor asked for since the last call; clears it.
+    pub(crate) fn take_cursor(&self) -> Option<Cursor> {
+        self.cursor.take()
     }
 
     /// The state the window's device is watched into.

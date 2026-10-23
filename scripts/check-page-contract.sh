@@ -147,7 +147,7 @@ prepare() {
 }
 
 # The demos whose screenshots are held to crates/demos/demos/<name>.pixels.
-demos="hello counter"
+demos="hello counter boxes"
 
 # clicker <demo>: a script that makes the demo's .pixels clicks on the
 # canvas as a mouse would (move, press, release, pointer id 1; a move has no
