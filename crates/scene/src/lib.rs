@@ -3,7 +3,9 @@
 //! can be asserted on in tests without a device.
 
 mod color;
+mod display;
 mod transform;
 
 pub use color::Color;
+pub use display::{Batch, Item, Quad, Rect, Scene, TextId};
 pub use transform::{Size, Transform};

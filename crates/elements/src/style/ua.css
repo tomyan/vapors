@@ -1,0 +1,27 @@
+/* The user-agent sheet: the HTML specification's rendering section
+   (https://html.spec.whatwg.org/multipage/rendering.html) for the
+   elements vapors-elements implements, with Chromium's values. Fonts:
+   Geist is the face vapors bundles (docs/text.md). */
+
+html, body, div, p, h1, h2, h3, h4, h5, h6, section, header, footer,
+main, nav, aside, article, blockquote, figure, figcaption {
+  display: block;
+}
+
+html { font-family: Geist; }
+
+body { margin: 8px; }
+
+p { margin-top: 1em; margin-bottom: 1em; }
+
+blockquote, figure {
+  margin-top: 1em; margin-bottom: 1em; margin-left: 40px; margin-right: 40px;
+}
+
+h1, h2, h3, h4, h5, h6 { font-weight: bold; }
+h1 { font-size: 2em; margin-top: 0.67em; margin-bottom: 0.67em; }
+h2 { font-size: 1.5em; margin-top: 0.83em; margin-bottom: 0.83em; }
+h3 { font-size: 1.17em; margin-top: 1em; margin-bottom: 1em; }
+h4 { margin-top: 1.33em; margin-bottom: 1.33em; }
+h5 { font-size: 0.83em; margin-top: 1.67em; margin-bottom: 1.67em; }
+h6 { font-size: 0.67em; margin-top: 2.33em; margin-bottom: 2.33em; }

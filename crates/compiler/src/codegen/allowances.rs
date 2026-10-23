@@ -8,7 +8,9 @@
 //! `too_many_lines` is about its length, which follows the template's
 //! size. Neither can hide another lint. A type-aware generator would
 //! retire the first four; building each template node in its own
-//! function would retire `too_many_lines`.
+//! function would retire `too_many_lines`. Generated node names need no
+//! allowance: their counters share one width per component, so clippy's
+//! `similar_names` never sees two that differ by an inserted digit.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Allowance {

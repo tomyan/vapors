@@ -1,0 +1,12 @@
+{"viewport": [640,313],
+"boxes": [
+{"height":96,"tag":"html","width":640,"x":0,"y":0},
+{"height":80,"tag":"body","width":624,"x":8,"y":8},
+{"height":48,"tag":"div","width":624,"x":8,"y":8},
+{"height":30,"tag":"div","width":50,"x":12,"y":12},
+{"height":20,"tag":"div","width":392,"x":72,"y":12},
+{"height":40,"tag":"div","width":154,"x":474,"y":12},
+{"height":22,"tag":"div","width":624,"x":8,"y":66},
+{"height":10,"tag":"div","width":374.390625,"x":132.796875,"y":66},
+{"height":12,"tag":"div","width":100,"x":270,"y":76}
+]}

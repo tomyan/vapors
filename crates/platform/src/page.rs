@@ -33,9 +33,42 @@ pub fn element_for(report: Report, page_has_error_element: bool) -> &'static str
     }
 }
 
+/// The value of `name` in a query string such as `?demo=hello&x=1`:
+/// `None` when the name is absent, and the empty string for `?demo` or
+/// `?demo=`. Values are taken as written; `+` and `%` escapes are not
+/// decoded, so a value that needs them is refused by the caller's own
+/// check rather than read wrongly here.
+#[must_use]
+pub fn query_value(search: &str, name: &str) -> Option<String> {
+    search
+        .trim_start_matches('?')
+        .split('&')
+        .map(|pair| pair.split_once('=').unwrap_or((pair, "")))
+        .find(|(key, _)| *key == name)
+        .map(|(_, value)| value.to_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_query_value_is_found_by_name_among_others() {
+        // Given
+        let search = "?x=1&demo=hello&y";
+
+        // When
+        let (demo, y, absent) = (
+            query_value(search, "demo"),
+            query_value(search, "y"),
+            query_value(search, "z"),
+        );
+
+        // Then
+        assert_eq!(demo.as_deref(), Some("hello"));
+        assert_eq!(y.as_deref(), Some(""));
+        assert_eq!(absent, None);
+    }
 
     #[test]
     fn an_error_goes_to_the_error_element_only_when_the_page_has_one() {

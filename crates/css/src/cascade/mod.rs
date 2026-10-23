@@ -52,11 +52,14 @@ pub(crate) struct CascadeRule {
     pub(crate) conditions: Conditions,
     /// Position in the combined source order.
     pub(crate) order: usize,
+    /// Which sheet it came from: 0 for the first added to the cascade.
+    pub(crate) sheet: usize,
 }
 
 /// Stylesheets by origin, ready to compute styles.
 pub struct Cascade {
     rules: Vec<CascadeRule>,
+    sheets: usize,
     keyframes: Vec<Keyframes>,
     buckets: buckets::Buckets,
 }
@@ -73,6 +76,7 @@ impl Cascade {
     pub fn new() -> Self {
         Self {
             rules: Vec::new(),
+            sheets: 0,
             keyframes: Vec::new(),
             buckets: buckets::Buckets::default(),
         }
@@ -98,10 +102,12 @@ impl Cascade {
             self.rules.push(CascadeRule {
                 origin,
                 order: self.rules.len(),
+                sheet: self.sheets,
                 rule,
                 conditions,
             });
         }
+        self.sheets += 1;
         self.keyframes.extend(sheet.keyframes);
         self
     }

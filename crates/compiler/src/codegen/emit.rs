@@ -48,6 +48,10 @@ pub(crate) struct Emitter<'a> {
     lines: Vec<String>,
     depth: usize,
     counter: usize,
+    /// Digits in every node name's counter, so that no two names differ
+    /// by an inserted digit (`text3`, `text13`), which clippy's
+    /// `similar_names` reports; see `generate`.
+    width: usize,
     scopes: Vec<Vec<String>>,
     generated: HashSet<String>,
     loop_bindings: Vec<(String, usize)>,
@@ -61,6 +65,7 @@ impl<'a> Emitter<'a> {
             lines: Vec::new(),
             depth: 0,
             counter: 0,
+            width: 1,
             scopes: Vec::new(),
             generated: HashSet::new(),
             loop_bindings: Vec::new(),
@@ -89,9 +94,20 @@ impl<'a> Emitter<'a> {
         })
     }
 
+    /// Numbers names with `width` digits, zero-padded.
+    pub fn with_width(mut self, width: usize) -> Self {
+        self.width = width;
+        self
+    }
+
+    /// How many names `fresh` has made.
+    pub fn names_made(&self) -> usize {
+        self.counter
+    }
+
     /// A fresh variable name with the given stem.
     pub fn fresh(&mut self, stem: &str) -> String {
-        let name = format!("{stem}{}", self.counter);
+        let name = format!("{stem}{:0width$}", self.counter, width = self.width);
         self.counter += 1;
         self.reserve(&name);
         name

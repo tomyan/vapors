@@ -124,7 +124,7 @@ fn block_layout(system: &mut FontSystem, block: &Block, scheme: &Scheme, scale: 
     let style = Style {
         weight: block.weight,
         tabular_figures: block.tabular_figures,
-        line_height: block.line_height,
+        line_height: crate::LineHeight::FontSizeRelative(block.line_height),
         color: scheme.ink,
         ..Style::new(block.family, block.size)
     };

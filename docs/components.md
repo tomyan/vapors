@@ -263,7 +263,11 @@ statement first, so the allowance never covers code the user wrote.
 Lints in the user's script and expressions are still reported. Two
 allowances sit on `mount_before` because they judge the function
 itself: its length, which follows the template's size, and an empty
-props struct taken by value. The list and the reasons are in
+props struct taken by value. Generated node names need none: each is
+a stem and a counter, and the counters share one width per component
+(`text03` and `text13` in a template of more than ten names), so
+clippy's `similar_names` never sees two that differ by an inserted
+digit. The list and the reasons are in
 `crates/compiler/src/codegen/allowances.rs`.
 
 ## Deferred

@@ -38,3 +38,17 @@ pub use gestures::Gestures;
 pub use platform::Platform;
 pub use report::{report_error, report_status};
 pub use window::{App, Frame, Next, WindowOptions, run};
+
+/// The value of `name` in the page URL's query string (`?demo=hello`).
+/// Natively there is no URL, so it is always `None`; a native app takes
+/// the same choice from its command line.
+#[must_use]
+pub fn query_parameter(name: &str) -> Option<String> {
+    #[cfg(target_family = "wasm")]
+    return page::query_value(&web::search(), name);
+    #[cfg(not(target_family = "wasm"))]
+    {
+        let _ = name;
+        None
+    }
+}

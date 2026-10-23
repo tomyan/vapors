@@ -13,6 +13,7 @@ use std::time::Duration;
 use crate::config::Config;
 use crate::deadline::{Finished, run_with_deadline};
 use crate::pixels::{centre_pixel, parse_rgb};
+use crate::screenshot_package;
 use crate::xvfb::Xvfb;
 
 /// How long the example may take from launch to writing its PNG.
@@ -26,15 +27,14 @@ pub struct Target {
     pub is_binary: bool,
 }
 
-/// Run `target` from the package named in `.config/factory.toml`, save its
+/// Run `target` from the package in `[screenshot] packages` that has it, save its
 /// first frame to `out`, and when `expect` is given fail unless the centre
 /// pixel is that colour.
 pub fn run(target: &Target, out: &Path, expect: Option<&str>, example_args: &[String]) -> ExitCode {
-    let package =
-        match Config::load().and_then(|c| c.require("screenshot.package").map(str::to_owned)) {
-            Ok(package) => package,
-            Err(error) => return fail(&error.to_string()),
-        };
+    let package = match package_for(target) {
+        Ok(package) => package,
+        Err(message) => return fail(&message),
+    };
     let expected = match expect.map(parse_rgb) {
         Some(Err(message)) => return fail(&message),
         Some(Ok(rgb)) => Some(rgb),
@@ -50,6 +50,12 @@ pub fn run(target: &Target, out: &Path, expect: Option<&str>, example_args: &[St
         return fail(&message);
     }
     report(out, expected)
+}
+
+/// The listed package that has `target`; see `screenshot_package`.
+fn package_for(target: &Target) -> Result<String, String> {
+    let listed = screenshot_package::packages(&Config::load().map_err(|e| e.to_string())?)?;
+    screenshot_package::choose(&listed, &screenshot_package::workspace_metadata()?, target)
 }
 
 fn run_example(

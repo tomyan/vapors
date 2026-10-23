@@ -1,0 +1,182 @@
+//! What vapors-elements does with each property of vapors-css's table.
+//! One entry per longhand; a test holds this table and the CSS table
+//! together, so a new CSS property fails until it is decided here.
+//! A deferred property whose computed value is not its initial value
+//! is refused: it would otherwise be parsed, cascaded and silently
+//! ignored.
+
+use vapors_css::cascade::ComputedStyle;
+use vapors_css::property::PropertyId;
+
+use super::values::{Refusal, Styles, later};
+
+/// What the tree does with a property.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Treatment {
+    /// Read by layout, text or paint (`box_style`, `text_style`, `paint`).
+    Read,
+    /// Has no effect while another property is at a value this slice
+    /// requires; the reason names it.
+    Inert(&'static str),
+    /// Not implemented; arrives in the named slice.
+    Deferred(&'static str),
+}
+
+use Treatment::{Deferred, Inert, Read};
+
+const BORDER_INERT: Treatment =
+    Inert("has no effect while border-*-style is none, which F2c S1 requires");
+
+/// Every longhand, sorted by name, with its treatment.
+pub(crate) const TABLE: &[(&str, Treatment)] = &[
+    ("align-content", Read),
+    ("align-items", Read),
+    ("align-self", Read),
+    ("animation-delay", Deferred("a slice after F2c")),
+    ("animation-direction", Deferred("a slice after F2c")),
+    ("animation-duration", Deferred("a slice after F2c")),
+    ("animation-fill-mode", Deferred("a slice after F2c")),
+    ("animation-iteration-count", Deferred("a slice after F2c")),
+    ("animation-name", Deferred("a slice after F2c")),
+    ("animation-play-state", Deferred("a slice after F2c")),
+    ("animation-timing-function", Deferred("a slice after F2c")),
+    ("aspect-ratio", Read),
+    ("background-color", Read),
+    ("border-bottom-color", BORDER_INERT),
+    ("border-bottom-left-radius", Deferred("F2c S3")),
+    ("border-bottom-right-radius", Deferred("F2c S3")),
+    ("border-bottom-style", Deferred("F2c S3")),
+    ("border-bottom-width", BORDER_INERT),
+    ("border-left-color", BORDER_INERT),
+    ("border-left-style", Deferred("F2c S3")),
+    ("border-left-width", BORDER_INERT),
+    ("border-right-color", BORDER_INERT),
+    ("border-right-style", Deferred("F2c S3")),
+    ("border-right-width", BORDER_INERT),
+    ("border-top-color", BORDER_INERT),
+    ("border-top-left-radius", Deferred("F2c S3")),
+    ("border-top-right-radius", Deferred("F2c S3")),
+    ("border-top-style", Deferred("F2c S3")),
+    ("border-top-width", BORDER_INERT),
+    (
+        "bottom",
+        Inert("has no effect while position is static, which F2c S1 requires"),
+    ),
+    ("box-shadow", Deferred("F2c S3")),
+    ("box-sizing", Read),
+    ("color", Read),
+    ("column-gap", Read),
+    (
+        "container-name",
+        Deferred("no slice yet: @container needs layout-time restyle"),
+    ),
+    (
+        "container-type",
+        Deferred("no slice yet: @container needs layout-time restyle"),
+    ),
+    ("cursor", Deferred("F2c S2")),
+    ("display", Read),
+    ("filter", Deferred("F3")),
+    ("flex-basis", Read),
+    ("flex-direction", Read),
+    ("flex-grow", Read),
+    ("flex-shrink", Read),
+    ("flex-wrap", Read),
+    ("font-family", Read),
+    ("font-feature-settings", Deferred("F2c S6")),
+    ("font-size", Read),
+    ("font-style", Deferred("F2c S6")),
+    ("font-variation-settings", Deferred("F2c S6")),
+    ("font-weight", Read),
+    ("grid-auto-columns", Deferred("F2c S4")),
+    ("grid-auto-flow", Deferred("F2c S4")),
+    ("grid-auto-rows", Deferred("F2c S4")),
+    ("grid-column-end", Deferred("F2c S4")),
+    ("grid-column-start", Deferred("F2c S4")),
+    ("grid-row-end", Deferred("F2c S4")),
+    ("grid-row-start", Deferred("F2c S4")),
+    ("grid-template-columns", Deferred("F2c S4")),
+    ("grid-template-rows", Deferred("F2c S4")),
+    ("height", Read),
+    ("justify-content", Read),
+    ("justify-items", Deferred("F2c S4")),
+    ("justify-self", Deferred("F2c S4")),
+    (
+        "left",
+        Inert("has no effect while position is static, which F2c S1 requires"),
+    ),
+    ("letter-spacing", Deferred("F2c S6")),
+    ("line-height", Read),
+    ("margin-bottom", Read),
+    ("margin-left", Read),
+    ("margin-right", Read),
+    ("margin-top", Read),
+    ("max-height", Read),
+    ("max-width", Read),
+    ("min-height", Read),
+    ("min-width", Read),
+    ("opacity", Deferred("F3")),
+    ("overflow-x", Deferred("F2c S8")),
+    ("overflow-y", Deferred("F2c S8")),
+    ("padding-bottom", Read),
+    ("padding-left", Read),
+    ("padding-right", Read),
+    ("padding-top", Read),
+    ("position", Deferred("F2c S8")),
+    (
+        "right",
+        Inert("has no effect while position is static, which F2c S1 requires"),
+    ),
+    ("row-gap", Read),
+    ("text-align", Deferred("F2c S6")),
+    ("text-decoration", Deferred("F2c S6")),
+    (
+        "top",
+        Inert("has no effect while position is static, which F2c S1 requires"),
+    ),
+    ("transform", Deferred("a slice after F2c")),
+    ("transition-delay", Deferred("a slice after F2c")),
+    ("transition-duration", Deferred("a slice after F2c")),
+    ("transition-property", Deferred("a slice after F2c")),
+    ("transition-timing-function", Deferred("a slice after F2c")),
+    ("user-select", Deferred("F4")),
+    ("visibility", Deferred("F2c S2")),
+    ("white-space", Read),
+    ("width", Read),
+    ("z-index", Deferred("F2c S8")),
+];
+
+/// The deferred properties of `styles.own` that are not at their
+/// initial value in `initial`, each reported at the element that
+/// declared it.
+pub(crate) fn check_honoured(styles: Styles<'_>, initial: &ComputedStyle) -> Vec<Refusal> {
+    TABLE
+        .iter()
+        .filter_map(|(name, treatment)| match treatment {
+            Deferred(slice) => deferred_in_use(styles, initial, name, slice),
+            Read | Inert(_) => None,
+        })
+        .collect()
+}
+
+fn deferred_in_use(
+    styles: Styles<'_>,
+    initial: &ComputedStyle,
+    name: &'static str,
+    slice: &str,
+) -> Option<Refusal> {
+    let id = PropertyId::from_name(name)
+        .unwrap_or_else(|| panic!("`{name}` is not in vapors-css's table"));
+    if styles.own.get(id) == initial.get(id) {
+        return None;
+    }
+    let reason = format!(
+        "is not implemented by vapors-elements yet: it {}",
+        later(slice)
+    );
+    styles.refusal(name, reason)
+}
+
+#[cfg(test)]
+#[path = "honoured_tests.rs"]
+mod tests;

@@ -1,0 +1,25 @@
+[package]
+name = "vapors-app"
+description = "Runs a vapors-elements Document in a window or on the web canvas: the scene painter (quads and text, in order) and the platform App."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+wgpu.workspace = true
+vapors-scene.workspace = true
+vapors-renderer.workspace = true
+vapors-text.workspace = true
+vapors-platform.workspace = true
+vapors-elements.workspace = true
+
+[dev-dependencies]
+png.workspace = true
+vapors-demos.workspace = true
+vapors-pixels.workspace = true
+vapors-gpu-harness.workspace = true
+
+[lints]
+workspace = true

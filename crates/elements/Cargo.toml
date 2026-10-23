@@ -1,0 +1,22 @@
+[package]
+name = "vapors-elements"
+description = "The element tree: implements Dom over HTML elements with CSS styles, Taffy layout, hit testing and paint to a scene."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+vapors-dom.workspace = true
+vapors-css.workspace = true
+vapors-scene.workspace = true
+vapors-text.workspace = true
+taffy.workspace = true
+
+[dev-dependencies]
+vapors-signals.workspace = true
+vapors-compiler-examples.workspace = true
+
+[lints]
+workspace = true

@@ -2,8 +2,10 @@
 # The page contract on the built web demo, in headless Chrome: an error
 # lands in #error when the page has one and in #status when it has not;
 # a status line never lands in #error; a lost GPU device is reported in
-# #error with the fix. Five copies of the built page, each checked; any
-# mismatch fails naming the case.
+# #error with the fix; the demos (?demo=) draw, an unknown demo is an
+# error, the page works one directory down (/vapors/), and the hello
+# demo's screenshot holds its pixel checks. Eight cases and two
+# screenshots on copies of the built page; any mismatch fails naming it.
 #
 # Usage: scripts/check-page-contract.sh target/web <new or empty dir>
 # after `cargo xtask web`. CI runs it in the `web` job. Needs python3
@@ -113,6 +115,14 @@ prepare() {
   page no-webgpu "$nogpu" ""
   page no-webgpu-no-error-element "$nogpu" "" 's#<p id="error"[^>]*></p>##'
   page device-lost "$lose" "!error.hidden"
+  # The F2c demos (?demo=<name>), a demo name the page does not have,
+  # and the page served one directory down, as the tailnet serves it
+  # at /vapors/: its script and wasm load from beside it.
+  page hello "" "$adapter"
+  page hello-shot "$frames" "(Number(document.body.dataset.frames) || 0) >= 3"
+  page unknown-demo "" "!error.hidden"
+  page subpath "" "$adapter"
+  ln -s . "$work/vapors"
   grep -q '<p id="error"' "$work/as-built.html" || { echo "$web/index.html: no <p id=\"error\">" >&2; exit 1; }
 }
 
@@ -165,7 +175,14 @@ dump() {
   env -u DBUS_SESSION_BUS_ADDRESS timeout 60 "$chrome" --headless=new --no-sandbox \
     --disable-gpu-sandbox --use-angle=swiftshader --enable-unsafe-webgpu \
     --enable-features=Vulkan,WebGPU --window-size=640,400 --enable-logging=stderr --v=0 \
-    --virtual-time-budget=8000 --dump-dom "http://127.0.0.1:$port/$1.html" 2>"$work/$1.log"
+    --virtual-time-budget=8000 --dump-dom "$(url "$@")" 2>"$work/$1.log"
+}
+
+# url <page> [query] [directory]: where a copy is served; a query such
+# as ?demo=hello picks the demo, and vapors/ loads it one directory
+# down, as the tailnet serves the page at /vapors/.
+url() {
+  echo "http://127.0.0.1:$port/${3:-}$1.html${2:-}"
 }
 
 # The page as Chromium draws it, as $work/<page>.png, after the page's
@@ -174,7 +191,7 @@ shoot() {
   env -u DBUS_SESSION_BUS_ADDRESS timeout 60 "$chrome" --headless=new --no-sandbox \
     --disable-gpu-sandbox --use-angle=swiftshader --enable-unsafe-webgpu \
     --enable-features=Vulkan,WebGPU --window-size=640,400 --enable-logging=stderr --v=0 \
-    --virtual-time-budget=8000 --screenshot="$work/$1.png" "http://127.0.0.1:$port/$1.html" 2>"$work/$1.log"
+    --virtual-time-budget=8000 --screenshot="$work/$1.png" "$(url "$@")" 2>"$work/$1.log"
 }
 
 # The r,g,b of the centre pixel of a PNG (8-bit RGB or RGBA, not
@@ -218,10 +235,10 @@ console() {
   grep -iE 'gpu|dawn|vulkan|swiftshader|angle' "$work/$1.log" | grep -v CONSOLE | tail -15 | sed 's#^#    #'
 }
 
-# check <page> <#status pattern> <#error: absent | hidden | pattern>
+# check <page> <#status pattern> <#error: absent | hidden | pattern> [query] [directory]
 check() {
   started=$(date +%s)
-  dom=$(dump "$1") || { fail "$1: $chrome exited non-zero or passed 60 s"; console "$1"; return; }
+  dom=$(dump "$1" "${4:-}" "${5:-}") || { fail "$1: $chrome exited non-zero or passed 60 s"; console "$1"; return; }
   took=$(( $(date +%s) - started ))
   status=$(printf '%s' "$dom" | grep -o '<p id="status">[^<]*</p>' | sed 's#<[^>]*>##g')
   error_tag=$(printf '%s' "$dom" | grep -o '<p id="error"[^>]*>[^<]*</p>' || true)
@@ -248,6 +265,13 @@ echo "browser: $chrome ($version)"
 VK_DRIVER_FILES=$(vulkan_driver "$chrome" "$version")
 export VK_DRIVER_FILES
 echo "vulkan driver: $VK_DRIVER_FILES (for $version)"
+# The demos' pixel checker, built before the server starts so its
+# compile does not count against any page's deadline.
+check_pixels=${CHECK_PIXELS:-}
+if [ -z "$check_pixels" ]; then
+  cargo build -q -p vapors-pixels --bin check_pixels || { echo "cannot build check_pixels; reproduce: cargo build -p vapors-pixels --bin check_pixels" >&2; exit 1; }
+  check_pixels="cargo run -q -p vapors-pixels --bin check_pixels --"
+fi
 prepare
 serve
 check as-built '^adapter: ' hidden
@@ -259,7 +283,7 @@ check as-built '^adapter: ' hidden
 # device is lost at the first frame; with lavapipe alone it composites
 # white (see vulkan_driver).
 presented=none
-if shoot as-built-shot; then
+if shoot as-built-shot '?demo=image'; then
   presented=$(centre_pixel "$work/as-built-shot.png") || presented="unreadable: $presented"
 fi
 echo "as-built-shot: the screenshot's centre is [$presented]"
@@ -274,5 +298,15 @@ check no-open-button '^adapter: ' 'touch screens cannot open files'
 check no-webgpu '^starting$' '^no WebGPU adapter'
 check no-webgpu-no-error-element '^no WebGPU adapter' absent
 check device-lost '^adapter: ' '^the GPU device was lost \(Destroyed: .*\); fix: reload the page$'
+check hello '^adapter: ' hidden '?demo=hello'
+check unknown-demo '^starting$' '^no demo is called `nope`' '?demo=nope'
+check subpath '^adapter: ' hidden '' vapors/
+# The hello demo as Chromium shows the canvas, held to the same
+# demos/hello.pixels as the native screenshot, by the same code.
+if shoot hello-shot '?demo=hello'; then
+  $check_pixels crates/demos/demos/hello.pixels "$work/hello-shot.png" || { fail "hello-shot: the canvas fails demos/hello.pixels; $work/hello-shot.png"; console hello-shot; }
+else
+  fail "hello-shot: $chrome exited non-zero or passed 60 s"; console hello-shot
+fi
 [ "$failed" = 0 ] || { echo "the page contract does not hold; reproduce: cargo xtask web && $0 target/web \$(mktemp -d)" >&2; exit 1; }
-echo "ok   the page contract holds in all five cases"
+echo "ok   the page contract holds in all eight cases and both screenshots"

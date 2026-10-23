@@ -2266,6 +2266,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "taffy"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c8480887e8803986d96a7173729565520d4bbb721ad6b7ad6941a22897207aa"
+dependencies = [
+ "serde",
+ "slotmap",
+ "smallvec",
+]
+
+[[package]]
 name = "tempfile"
 version = "3.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2455,6 +2466,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
+name = "vapors-app"
+version = "0.0.0"
+dependencies = [
+ "png",
+ "vapors-demos",
+ "vapors-elements",
+ "vapors-gpu-harness",
+ "vapors-pixels",
+ "vapors-platform",
+ "vapors-renderer",
+ "vapors-scene",
+ "vapors-text",
+ "wgpu",
+]
+
+[[package]]
 name = "vapors-canvas"
 version = "0.0.0"
 dependencies = [
@@ -2495,10 +2522,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "vapors-demos"
+version = "0.0.0"
+dependencies = [
+ "vapors-compiler",
+ "vapors-dom",
+ "vapors-elements",
+ "vapors-pixels",
+ "vapors-signals",
+ "vapors-text",
+]
+
+[[package]]
 name = "vapors-dom"
 version = "0.0.0"
 dependencies = [
  "vapors-signals",
+]
+
+[[package]]
+name = "vapors-elements"
+version = "0.0.0"
+dependencies = [
+ "taffy",
+ "vapors-compiler-examples",
+ "vapors-css",
+ "vapors-dom",
+ "vapors-scene",
+ "vapors-signals",
+ "vapors-text",
+]
+
+[[package]]
+name = "vapors-elements-corpus"
+version = "0.0.0"
+dependencies = [
+ "serde_json",
+ "vapors-compiler",
+ "vapors-dom",
+ "vapors-elements",
+ "vapors-signals",
+ "vapors-text",
 ]
 
 [[package]]
@@ -2516,6 +2580,13 @@ dependencies = [
  "vapors-gpu",
  "vapors-renderer",
  "wgpu",
+]
+
+[[package]]
+name = "vapors-pixels"
+version = "0.0.0"
+dependencies = [
+ "png",
 ]
 
 [[package]]
@@ -2579,7 +2650,9 @@ dependencies = [
 name = "vapors-web-demo"
 version = "0.0.0"
 dependencies = [
+ "vapors-app",
  "vapors-canvas",
+ "vapors-demos",
  "vapors-platform",
  "vapors-scene",
 ]

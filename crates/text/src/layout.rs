@@ -38,11 +38,11 @@ impl Layout {
         options: &LayoutOptions,
     ) -> Self {
         let mut builder = system.ranged_builder(text, options.scale);
-        for property in base.properties() {
+        for property in base.properties(options.scale) {
             builder.push_default(property);
         }
         for span in spans {
-            for property in span.style.properties() {
+            for property in span.style.properties(options.scale) {
                 builder.push(property, span.range.clone());
             }
         }
