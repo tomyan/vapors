@@ -59,6 +59,12 @@ cargo xtask web          # trunk build --release into target/web; prints the siz
 cargo xtask wasm         # the CI lint: clippy for wasm32-unknown-unknown
 ```
 
+The build uses a relative public URL (`--public-url ./`), so the page
+loads its script and wasm from beside itself and can be served at `/`
+or under a path such as `/vapors/`. With trunk's default of `/` the
+page under `/vapors/` asks the server root for them and stays at
+`starting`.
+
 `cargo xtask ci` runs `wasm` between `clippy` and `unit`. The package is
 `web.package` in `.config/factory.toml`. Trunk downloads `wasm-opt` on
 the first release build.

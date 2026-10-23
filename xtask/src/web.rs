@@ -1,6 +1,7 @@
 //! `cargo xtask web`: build the web package with trunk into `target/web`
 //! and say where it went and how big it is.
 
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::time::Duration;
@@ -38,10 +39,7 @@ fn build() -> Result<String, String> {
         .map_err(|e| format!("no current directory: {e}"))?
         .join(DIST);
     let mut command = Command::new("trunk");
-    command
-        .args(["build", "--release", "--dist"])
-        .arg(&dist)
-        .current_dir(&crate_dir);
+    command.args(build_args(&dist)).current_dir(&crate_dir);
     match run_with_deadline(command, BUILD_DEADLINE)? {
         Finished::Exited { success: true, .. } => Ok(format!("{DIST} {}", size_of(&dist)?)),
         Finished::Exited { output, .. } => Err(format!(
@@ -53,6 +51,22 @@ fn build() -> Result<String, String> {
             BUILD_DEADLINE.as_secs()
         )),
     }
+}
+
+/// trunk's arguments for a release build into `dist`. The public URL is
+/// relative (`./`), so the page loads its script and wasm from beside
+/// itself and works at `/` and under a path such as `/vapors/`; trunk's
+/// default `/` loads them from the server root, and under `/vapors/` the
+/// page stays at `starting` (checked by hand on 2026-10-23, trunk 0.22.0,
+/// Chromium 155, with scripts/check-page-contract.sh serving the page
+/// one directory down).
+pub fn build_args(dist: &Path) -> Vec<OsString> {
+    let mut args: Vec<OsString> = ["build", "--release", "--public-url", "./", "--dist"]
+        .into_iter()
+        .map(OsString::from)
+        .collect();
+    args.push(dist.into());
+    args
 }
 
 /// `web.package` from `.config/factory.toml`.
@@ -101,4 +115,26 @@ fn size_of(dir: &Path) -> Result<String, String> {
         }
     }
     Ok(format!("{}K ({files} files)", bytes.div_ceil(1024)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_release_build_uses_a_relative_public_url_so_a_subpath_serves_it() {
+        // Given
+        let dist = Path::new("/w/target/web");
+
+        // When
+        let args = build_args(dist);
+
+        // Then
+        let at = args
+            .iter()
+            .position(|a| a == "--public-url")
+            .expect("a public URL");
+        assert_eq!(args[at + 1], "./");
+        assert_eq!(args.last().map(OsString::as_os_str), Some(dist.as_os_str()));
+    }
 }

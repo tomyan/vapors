@@ -15,6 +15,7 @@ mod gpu_info;
 mod pixels;
 mod report;
 mod screenshot;
+mod screenshot_package;
 mod serve;
 mod setup;
 mod steps;
@@ -64,7 +65,7 @@ enum Command {
     GpuInfo,
     /// Run a windowed example under Xvfb and save its frame as a PNG.
     Screenshot {
-        /// Example (or, with --bin, binary) of the package named in .config/factory.toml.
+        /// Example (or, with --bin, binary) of a package in `[screenshot] packages`.
         example: String,
         /// Run a binary of that package instead of an example.
         #[arg(long)]
