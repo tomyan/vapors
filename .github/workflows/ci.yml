@@ -19,21 +19,22 @@ jobs:
   ci:
     name: ci
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    # About 2.5x the worst of the 37 runs to 2026-10-23: 1907 s in run
-    # 39803408769, an apt cache miss. With a cache hit it took 85 s
-    # (run 39932437148).
-    timeout-minutes: 80
+    # About 2.5x (the job's worst without its apt step in the 37 runs to
+    # 2026-10-23, 185 s in run 39807737788, plus that step's worst with
+    # the cache, 13 s in run 39932437148). The uncached 1811 s install in
+    # run 39803408769 is excluded: it is the slow mirror the cache avoids.
+    timeout-minutes: 9
     env:
       # A CJK system font is installed below, so the system-font fallback
       # test must find one; it fails loudly rather than passing by luck.
       VAPORS_SYSTEM_FONTS: 1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Step timeout: about 2.5x the worst of the 37 runs: 1811 s in run
-      # 39803408769. A cache miss, as after a runner image update, can
-      # take that long again; a hit took 13 s (run 39932437148).
+      # Step timeout: about 2.5x its worst with the cache, 13 s in run
+      # 39932437148, rounded up to a minute. A miss from a slow mirror,
+      # as after a runner image update, fails here; rerun to fill the cache.
       - name: install a CJK system font for the fallback test
-        timeout-minutes: 76
+        timeout-minutes: 1
         uses: ./.github/actions/apt-install
         with:
           packages: fonts-noto-cjk
@@ -64,8 +65,8 @@ jobs:
   web:
     name: web
     runs-on: ubuntu-24.04
-    # About 2.5x the worst of the 37 runs to 2026-10-23 without an apt
-    # step, which this job no longer has (#27): 69 s in run 39805979396.
+    # About 2.5x the job's worst without an apt step, which it no longer
+    # has (#27), in the 37 runs to 2026-10-23: 69 s in run 39805979396.
     # With the Rust cache it took 47 s (run 39930654120).
     timeout-minutes: 3
     steps:
@@ -92,19 +93,21 @@ jobs:
   gpu:
     name: gpu
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    # About 2.5x the worst of the 37 runs to 2026-10-23: 1819 s in run
-    # 39801264114, an apt cache miss. With a cache hit it took 113 s
-    # (run 39930654120).
-    timeout-minutes: 76
+    # About 2.5x (the job's worst without its apt step in the 37 runs to
+    # 2026-10-23, 199 s in run 39802585212, plus that step's worst with
+    # the cache, 16 s in run 39930654120). The uncached 1812 s install in
+    # run 39801264114 is excluded: it is the slow mirror the cache avoids.
+    timeout-minutes: 9
     env:
       # lavapipe is the CI reference adapter; the tier fails if it is not the one found.
       VAPORS_GPU_ADAPTER: llvmpipe
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Step timeout: about 2.5x the worst of the 37 runs: 1812 s in run
-      # 39801264114; a hit took 16 s (run 39930654120).
+      # Step timeout: about 2.5x its worst with the cache, 16 s in run
+      # 39930654120, rounded up to a minute. A miss from a slow mirror
+      # fails here; rerun to fill the cache.
       - name: install lavapipe
-        timeout-minutes: 76
+        timeout-minutes: 1
         uses: ./.github/actions/apt-install
         with:
           packages: mesa-vulkan-drivers vulkan-tools
@@ -136,18 +139,20 @@ jobs:
   window:
     name: window
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    # About 2.5x the worst of the 37 runs to 2026-10-23: 780 s in run
-    # 39803145234, an apt cache miss. With a cache hit it took 49 s
-    # (run 39930654120).
-    timeout-minutes: 33
+    # About 2.5x (the job's worst without its apt step in the 37 runs to
+    # 2026-10-23, 103 s in run 39807737788, plus that step's worst with
+    # the cache, 13 s in run 39932437148). The uncached 733 s install in
+    # run 39803145234 is excluded: it is the slow mirror the cache avoids.
+    timeout-minutes: 5
     env:
       VAPORS_GPU_ADAPTER: llvmpipe
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Step timeout: about 2.5x the worst of the 37 runs: 733 s in run
-      # 39803145234; a hit took 13 s (run 39932437148).
+      # Step timeout: about 2.5x its worst with the cache, 13 s in run
+      # 39932437148, rounded up to a minute. A miss from a slow mirror
+      # fails here; rerun to fill the cache.
       - name: install lavapipe, Xvfb and winit's X11 libraries
-        timeout-minutes: 31
+        timeout-minutes: 1
         uses: ./.github/actions/apt-install
         with:
           packages: mesa-vulkan-drivers xvfb libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev
