@@ -10,8 +10,8 @@ use std::path::PathBuf;
 
 use vapors_gpu_harness::gpu;
 use vapors_text::comparison::{
-    Chromium, FONT_FILES, INK_BAND, PAGE_HEIGHT, PAGE_WIDTH, SCHEMES, body_measure_rect, html,
-    ink_within_band, mean_ink, render_page,
+    Chromium, FONT_FILES, INK_BAND, PAGE_HEIGHT, PAGE_WIDTH, SCALES, SCHEMES, body_measure_rect,
+    html, ink_within_band, mean_ink, render_page,
 };
 use vapors_text::{BlendParams, FontSystem};
 
@@ -30,7 +30,7 @@ fn gpu_body_paragraph_ink_is_within_the_band_of_chromiums_at_1x_and_2x() {
     let chromium = Chromium::find().unwrap_or_else(|e| panic!("{e}"));
     let background = SCHEMES[0].background.to_rgba8();
 
-    for scale in [1, 2] {
+    for scale in SCALES {
         // When: both render at this scale
         let ours = render_page(
             &gpu.device,

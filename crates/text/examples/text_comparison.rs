@@ -14,14 +14,11 @@ mod native {
     use std::path::{Path, PathBuf};
 
     use vapors_text::comparison::{
-        Chromium, FONT_FILES, INK_BAND, PAGE_HEIGHT, PAGE_WIDTH, Rgba, SCHEMES, block_rect, blocks,
-        body_measure_rect, compose, html, ink_within_band, mean_ink, render_labels, render_page,
-        row_width, write_png,
+        Chromium, FONT_FILES, INK_BAND, PAGE_HEIGHT, PAGE_WIDTH, Rgba, SCALES, SCHEMES, block_rect,
+        blocks, body_measure_rect, compose, html, ink_within_band, mean_ink, render_labels,
+        render_page, row_width, write_png,
     };
     use vapors_text::{BlendParams, FontSystem};
-
-    /// The scales rendered: 1x with light hinting, 2x with none.
-    const SCALES: [u32; 2] = [1, 2];
 
     pub fn run(out: &Path) -> Result<(), String> {
         std::fs::create_dir_all(out)

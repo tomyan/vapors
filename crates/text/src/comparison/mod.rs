@@ -28,6 +28,6 @@ pub use page::{render_labels, render_page};
 #[cfg(not(target_family = "wasm"))]
 pub use png_file::{read_png, write_png};
 pub use spec::{
-    Block, MEASURED_BLOCK, PAGE_HEIGHT, PAGE_WIDTH, SCHEMES, Scheme, block_rect, blocks,
+    Block, MEASURED_BLOCK, PAGE_HEIGHT, PAGE_WIDTH, SCALES, SCHEMES, Scheme, block_rect, blocks,
     body_measure_rect,
 };

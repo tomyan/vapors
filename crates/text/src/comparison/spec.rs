@@ -15,6 +15,10 @@ pub const PADDING: u32 = 24;
 pub const PAGE_WIDTH: u32 = PANEL_WIDTH * 2;
 /// Page height; the last block's bottom plus padding.
 pub const PAGE_HEIGHT: u32 = 580;
+/// The scales rendered: 1x with light hinting, 2x with none. The test
+/// screenshots once per scale, which bounds its time (see
+/// `chromium_process`).
+pub const SCALES: [u32; 2] = [1, 2];
 
 /// Ink and background of one panel.
 #[derive(Clone, Copy, Debug, PartialEq)]
