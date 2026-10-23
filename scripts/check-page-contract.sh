@@ -269,8 +269,8 @@ echo "vulkan driver: $VK_DRIVER_FILES (for $version)"
 # compile does not count against any page's deadline.
 check_pixels=${CHECK_PIXELS:-}
 if [ -z "$check_pixels" ]; then
-  cargo build -q -p vapors-demos --bin check_pixels || { echo "cannot build check_pixels; reproduce: cargo build -p vapors-demos --bin check_pixels" >&2; exit 1; }
-  check_pixels="cargo run -q -p vapors-demos --bin check_pixels --"
+  cargo build -q -p vapors-pixels --bin check_pixels || { echo "cannot build check_pixels; reproduce: cargo build -p vapors-pixels --bin check_pixels" >&2; exit 1; }
+  check_pixels="cargo run -q -p vapors-pixels --bin check_pixels --"
 fi
 prepare
 serve
@@ -304,7 +304,7 @@ check subpath '^adapter: ' hidden '' vapors/
 # The hello demo as Chromium shows the canvas, held to the same
 # demos/hello.pixels as the native screenshot, by the same code.
 if shoot hello-shot '?demo=hello'; then
-  $check_pixels hello "$work/hello-shot.png" || { fail "hello-shot: the canvas fails demos/hello.pixels; $work/hello-shot.png"; console hello-shot; }
+  $check_pixels crates/demos/demos/hello.pixels "$work/hello-shot.png" || { fail "hello-shot: the canvas fails demos/hello.pixels; $work/hello-shot.png"; console hello-shot; }
 else
   fail "hello-shot: $chrome exited non-zero or passed 60 s"; console hello-shot
 fi

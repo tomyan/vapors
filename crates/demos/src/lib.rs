@@ -14,7 +14,7 @@ use vapors_text::FontSystem;
 
 include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
-pub mod pixels;
+pub use vapors_pixels as pixels;
 
 /// Mounts a demo's component into `parent`.
 pub type Mount = fn(&Rc<RefCell<Document>>, NodeId);
@@ -92,4 +92,16 @@ pub fn document(demo: &Demo) -> Result<Rc<RefCell<Document>>, String> {
     let body = document.borrow().body();
     (demo.mount)(&document, body);
     Ok(document)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn every_demos_pixels_file_parses() {
+        for demo in super::all() {
+            if let Some(text) = demo.pixels {
+                vapors_pixels::parse(demo.name, text).expect("parses");
+            }
+        }
+    }
 }

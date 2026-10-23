@@ -30,6 +30,7 @@ vapors-elements = { path = "crates/elements" }
 vapors-app = { path = "crates/app" }
 vapors-elements-corpus = { path = "crates/elements-corpus" }
 vapors-demos = { path = "crates/demos" }
+vapors-pixels = { path = "crates/pixels" }
 vapors-compiler-examples = { path = "crates/compiler-examples" }
 # Pinned exactly: layout results are pinned by the Chromium geometry
 # corpus (docs/F2c.md), and a Taffy bump is a deliberate change checked

@@ -2473,6 +2473,7 @@ dependencies = [
  "vapors-demos",
  "vapors-elements",
  "vapors-gpu-harness",
+ "vapors-pixels",
  "vapors-platform",
  "vapors-renderer",
  "vapors-scene",
@@ -2524,10 +2525,10 @@ dependencies = [
 name = "vapors-demos"
 version = "0.0.0"
 dependencies = [
- "png",
  "vapors-compiler",
  "vapors-dom",
  "vapors-elements",
+ "vapors-pixels",
  "vapors-signals",
  "vapors-text",
 ]
@@ -2579,6 +2580,13 @@ dependencies = [
  "vapors-gpu",
  "vapors-renderer",
  "wgpu",
+]
+
+[[package]]
+name = "vapors-pixels"
+version = "0.0.0"
+dependencies = [
+ "png",
 ]
 
 [[package]]

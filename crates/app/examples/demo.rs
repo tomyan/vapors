@@ -15,7 +15,7 @@ use std::process::ExitCode;
 use std::rc::Rc;
 
 use vapors_app::ElementsApp;
-use vapors_demos::pixels::{Image, failures, parse};
+use vapors_pixels::{Image, failures, parse};
 use vapors_platform::{App, Event, Frame, Next, Platform, WindowOptions, run};
 
 fn main() -> ExitCode {

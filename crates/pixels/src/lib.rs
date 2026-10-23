@@ -1,7 +1,9 @@
 //! Pixel checks for a demo's screenshot. One file per demo,
-//! `demos/<name>.pixels`, read by the native screenshot (the demo
-//! example) and the web screenshot (the page-contract script, through
-//! the `check_pixels` binary), so the two cannot drift apart.
+//! `crates/demos/demos/<name>.pixels`, read by the native screenshot
+//! (the demo example) and the web screenshot (the page-contract script,
+//! through the `check_pixels` binary), so the two cannot drift apart.
+//! This crate depends on `png` alone, so the web job builds the binary
+//! in seconds.
 //!
 //! ```text
 //! pixel X Y #rrggbb            exact, within 1 per channel
@@ -153,5 +155,5 @@ fn hex(rgb: [u8; 3]) -> String {
 }
 
 #[cfg(test)]
-#[path = "pixels_tests.rs"]
+#[path = "lib_tests.rs"]
 mod tests;

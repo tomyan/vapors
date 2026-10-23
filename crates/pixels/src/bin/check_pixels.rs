@@ -1,10 +1,10 @@
-//! `check_pixels <demo> <screenshot.png> [scale]`: the demo's pixel
-//! checks on a screenshot taken elsewhere, the web page's in particular.
-//! Prints each failure and exits 1 when any check fails.
+//! `check_pixels <file.pixels> <screenshot.png> [scale]`: a demo's
+//! pixel checks on a screenshot taken elsewhere, the web page's in
+//! particular. Prints each failure and exits 1 when any check fails.
 
 use std::process::ExitCode;
 
-use vapors_demos::pixels::{Image, failures, parse};
+use vapors_pixels::{Image, failures, parse};
 
 fn main() -> ExitCode {
     match run() {
@@ -12,7 +12,7 @@ fn main() -> ExitCode {
         Err(message) => {
             eprintln!("FAIL check_pixels: {message}");
             eprintln!(
-                "     reproduce: cargo run -p vapors-demos --bin check_pixels -- <demo> <png> [scale]"
+                "     reproduce: cargo run -p vapors-pixels --bin check_pixels -- <file.pixels> <png> [scale]"
             );
             ExitCode::FAILURE
         }
@@ -21,19 +21,16 @@ fn main() -> ExitCode {
 
 fn run() -> Result<(), String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let [name, png, rest @ ..] = args.as_slice() else {
-        return Err("usage: check_pixels <demo> <screenshot.png> [scale]".to_owned());
+    let [pixels, png, rest @ ..] = args.as_slice() else {
+        return Err("usage: check_pixels <file.pixels> <screenshot.png> [scale]".to_owned());
     };
     let scale: f32 = rest
         .first()
         .map_or(Ok(1.0), |s| s.parse())
         .map_err(|_| "the scale is not a number".to_owned())?;
-    let demo = vapors_demos::find(name)?;
-    let checks = parse(
-        name,
-        demo.pixels
-            .ok_or(format!("demo `{name}` has no .pixels file"))?,
-    )?;
+    let text = std::fs::read_to_string(pixels).map_err(|e| format!("{pixels}: {e}"))?;
+    let name = pixels.trim_end_matches(".pixels");
+    let checks = parse(name, &text)?;
     let (width, height, rgba) = read_png(png)?;
     let found = failures(
         &checks,

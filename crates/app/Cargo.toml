@@ -18,6 +18,7 @@ vapors-elements.workspace = true
 [dev-dependencies]
 png.workspace = true
 vapors-demos.workspace = true
+vapors-pixels.workspace = true
 vapors-gpu-harness.workspace = true
 
 [lints]

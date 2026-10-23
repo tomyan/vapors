@@ -112,12 +112,3 @@ fn a_pixel_outside_the_image_fails() {
     // Then
     assert!(found[0].contains("outside the image"), "{found:?}");
 }
-
-#[test]
-fn every_demos_pixels_file_parses() {
-    for demo in crate::all() {
-        if let Some(text) = demo.pixels {
-            parse(demo.name, text).expect("parses");
-        }
-    }
-}

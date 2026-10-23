@@ -3,9 +3,9 @@
 //! native window's and the web page's screenshots are held to.
 
 use vapors_app::ScenePainter;
-use vapors_demos::pixels::{Image, failures, parse};
 use vapors_elements::Viewport;
 use vapors_gpu_harness::{gpu, read_rgba8};
+use vapors_pixels::{Image, failures, parse};
 use vapors_renderer::{Target, clear};
 use vapors_scene::{Color, Size};
 
