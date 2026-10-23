@@ -5,6 +5,9 @@ use std::sync::Arc;
 use winit::window::Window;
 
 use crate::PlatformError;
+use crate::device_lost::DeviceLost;
+use crate::window::Message;
+use winit::event_loop::EventLoopProxy;
 
 /// A window's GPU resources.
 pub struct Gpu {
@@ -37,7 +40,13 @@ impl Gpu {
     /// When no adapter can present to the window, the adapter offers less
     /// than the default for a raised limit, the device cannot be opened,
     /// or the surface offers no 8-bit non-sRGB format.
-    pub async fn for_window(window: &Arc<Window>) -> Result<Self, PlatformError> {
+    /// The device is watched into `lost` as soon as it exists, and its
+    /// loss sends [`Message::DeviceLost`] through `proxy`.
+    pub async fn for_window(
+        window: &Arc<Window>,
+        lost: &DeviceLost,
+        proxy: EventLoopProxy<Message>,
+    ) -> Result<Self, PlatformError> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: BACKENDS,
             ..wgpu::InstanceDescriptor::new_without_display_handle()
@@ -55,6 +64,7 @@ impl Gpu {
             })
             .await
             .map_err(|e| PlatformError::Device(e.to_string()))?;
+        lost.watch(&device, crate::tasks::lost_waker(proxy));
         let size = window.inner_size();
         let config = configuration(&surface, &adapter, size.width.max(1), size.height.max(1))?;
         surface.configure(&device, &config);

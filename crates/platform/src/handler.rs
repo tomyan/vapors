@@ -3,18 +3,18 @@
 
 use std::sync::Arc;
 
-use winit::application::ApplicationHandler;
-use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
-use winit::window::{Window, WindowId};
+use winit::window::Window;
 
 use crate::PlatformError;
+use crate::device_lost::stop_for;
 use crate::event::Event;
 use crate::input::Input;
 use crate::platform::Platform;
 use crate::surface::Gpu;
+use crate::surface_texture::acquire;
 use crate::tasks;
-use crate::window::{App, Frame, Message, Next, WindowOptions};
+use crate::window::{App, Frame, Next, WindowOptions};
 
 pub struct Handler {
     options: WindowOptions,
@@ -27,6 +27,8 @@ pub struct Handler {
     /// Redraws in a row that produced no texture; see [`acquire`].
     missed: u32,
     error: Option<PlatformError>,
+    /// Set when a lost device stopped the loop; see `stop_if_lost`.
+    stopped_for_loss: bool,
 }
 
 /// Consecutive redraws without a texture before giving up: a second at
@@ -47,6 +49,7 @@ impl Handler {
             presented: 0,
             missed: 0,
             error: None,
+            stopped_for_loss: false,
         }
     }
 
@@ -62,7 +65,11 @@ impl Handler {
             .create_window(attributes)
             .map_err(|e| PlatformError::Windowing(e.to_string()))?;
         let window = Arc::new(window);
-        tasks::start_gpu(Arc::clone(&window), self.platform.proxy());
+        tasks::start_gpu(
+            Arc::clone(&window),
+            self.platform.proxy(),
+            self.platform.lost_state(),
+        );
         self.window = Some(window);
         Ok(())
     }
@@ -89,13 +96,43 @@ impl Handler {
         }
     }
 
+    /// A lost device stops the loop before the next frame: no GPU call is
+    /// made on it again, and the loss is reported with the fix.
+    fn lost_stop(&self) -> Option<PlatformError> {
+        let target = crate::device_lost::Target::this_build();
+        stop_for(
+            self.platform.device_lost(),
+            target,
+            crate::report::app_name(),
+        )
+    }
+
     fn fail(&mut self, event_loop: &ActiveEventLoop, error: PlatformError) {
         crate::report::fatal(&error);
         self.error = Some(error);
         event_loop.exit();
     }
 
+    /// Stop the loop with the loss's error, if the device is lost: the
+    /// GPU is dropped so nothing calls it again, and the loss is
+    /// reported once however many paths see it. True when stopped.
+    fn stop_if_lost(&mut self, event_loop: &ActiveEventLoop) -> bool {
+        if self.stopped_for_loss {
+            return true;
+        }
+        let Some(error) = self.lost_stop() else {
+            return false;
+        };
+        self.stopped_for_loss = true;
+        self.gpu = None;
+        self.fail(event_loop, error);
+        true
+    }
+
     fn redraw(&mut self, event_loop: &ActiveEventLoop) {
+        if self.stop_if_lost(event_loop) {
+            return;
+        }
         let (Some(window), Some(gpu)) = (&self.window, self.gpu.as_mut()) else {
             return;
         };
@@ -131,62 +168,5 @@ impl Handler {
     }
 }
 
-/// The next surface texture, or the name of the outcome that gave none,
-/// after reconfiguring where that helps and asking for another redraw.
-fn acquire(window: &Window, gpu: &mut Gpu) -> Result<wgpu::SurfaceTexture, &'static str> {
-    use wgpu::CurrentSurfaceTexture as Outcome;
-
-    let outcome = match gpu.surface.get_current_texture() {
-        Outcome::Success(t) | Outcome::Suboptimal(t) => return Ok(t),
-        Outcome::Timeout => "Timeout",
-        Outcome::Occluded => "Occluded",
-        Outcome::Outdated => "Outdated",
-        Outcome::Lost => "Lost",
-        Outcome::Validation => "Validation",
-    };
-    if !matches!(outcome, "Timeout" | "Occluded") {
-        let size = window.inner_size();
-        gpu.resize(size.width, size.height);
-    }
-    window.request_redraw();
-    Err(outcome)
-}
-
-impl ApplicationHandler<Message> for Handler {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if self.window.is_none()
-            && let Err(error) = self.open(event_loop)
-        {
-            self.fail(event_loop, error);
-        }
-    }
-
-    fn user_event(&mut self, event_loop: &ActiveEventLoop, message: Message) {
-        match message {
-            Message::GpuReady(Ok(gpu)) => self.gpu_ready(gpu),
-            Message::GpuReady(Err(error)) => self.fail(event_loop, error),
-            Message::FileChosen { name, bytes } => self
-                .app
-                .event(Event::FileOpened { name, bytes }, &self.platform),
-            Message::OpenRequested => self.app.event(Event::OpenRequested, &self.platform),
-        }
-    }
-
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
-        if let WindowEvent::CloseRequested = event {
-            event_loop.exit();
-            return;
-        }
-        if let WindowEvent::Resized(size) = event
-            && let Some(gpu) = self.gpu.as_mut()
-        {
-            gpu.resize(size.width, size.height);
-        }
-        for app_event in self.input.translate(&event) {
-            self.app.event(app_event, &self.platform);
-        }
-        if let WindowEvent::RedrawRequested = event {
-            self.redraw(event_loop);
-        }
-    }
-}
+#[path = "handler_events.rs"]
+mod events;

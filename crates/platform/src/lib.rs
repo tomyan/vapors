@@ -7,6 +7,7 @@
 
 mod attributes;
 mod clock;
+mod device_lost;
 mod error;
 mod event;
 mod file_kind;
@@ -22,12 +23,14 @@ mod picker_web;
 mod platform;
 mod report;
 mod surface;
+mod surface_texture;
 mod tasks;
 #[cfg(target_family = "wasm")]
 mod web;
 mod webgpu;
 mod window;
 
+pub use device_lost::{DeviceLost, Lost};
 pub use error::PlatformError;
 pub use event::{Event, TouchPhase};
 pub use file_kind::FileKind;

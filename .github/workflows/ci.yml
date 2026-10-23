@@ -61,6 +61,11 @@ jobs:
       - uses: cargo-bins/cargo-binstall@main
       - name: install pinned tools
         run: cargo xtask setup --ci
+      # Chromium's WebGPU (SwiftShader) presents the canvas through Vulkan;
+      # without a driver the device is lost at the first frame (run
+      # 39929758159). lavapipe, as in the gpu job.
+      - name: install lavapipe for Chromium's Vulkan
+        run: sudo apt-get update -q && sudo apt-get install -y -q mesa-vulkan-drivers
       - name: build the web demo with trunk
         run: cargo xtask web
       # The runner image ships google-chrome; the script picks $CHROME,
