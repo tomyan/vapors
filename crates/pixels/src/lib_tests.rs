@@ -15,7 +15,7 @@ fn both_shapes_parse_and_comments_are_skipped() {
     let text = "# heading\npixel 1 2 #0a0b0c   where\n\nink 0 0 4 5 #ffffff box\n";
 
     // When
-    let checks = parse("demo", text).expect("parses").checks;
+    let checks = parse("demo", text).expect("parses").remove(0).checks;
 
     // Then
     assert_eq!(
@@ -119,9 +119,51 @@ fn clicks_are_kept_in_file_order_apart_from_the_checks() {
     let text = "click 3 4\npixel 1 2 #000000\nclick 5 6\n";
 
     // When
-    let spec = parse("demo", text).expect("parses");
+    let spec = parse("demo", text).expect("parses").remove(0);
 
     // Then
     assert_eq!(spec.clicks, [[3, 4], [5, 6]]);
     assert_eq!(spec.checks.len(), 1);
+}
+
+#[test]
+fn an_at_line_starts_a_section_for_another_viewport() {
+    // Given
+    let text = "pixel 1 1 #000000\nat 412x800\nclick 2 2\npixel 3 3 #ffffff\n";
+
+    // When
+    let specs = parse("demo", text).expect("parses");
+
+    // Then
+    assert_eq!(specs.len(), 2);
+    assert_eq!(
+        (specs[0].viewport, specs[0].checks.len()),
+        (DEFAULT_VIEWPORT, 1)
+    );
+    assert_eq!(
+        (
+            specs[1].viewport,
+            specs[1].clicks.clone(),
+            specs[1].checks.len()
+        ),
+        ([412, 800], vec![[2, 2]], 1)
+    );
+    assert!(section(&specs, [412, 800]).is_ok());
+    assert!(
+        section(&specs, [100, 100])
+            .expect_err("none")
+            .contains("640x400, 412x800")
+    );
+}
+
+#[test]
+fn two_sections_for_one_viewport_are_refused() {
+    // Given
+    let text = "at 412x800\nat 412x800\n";
+
+    // When
+    let error = parse("demo", text).expect_err("refused");
+
+    // Then
+    assert!(error.contains("a second section for 412x800"), "{error}");
 }

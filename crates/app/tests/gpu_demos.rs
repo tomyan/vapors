@@ -1,44 +1,40 @@
-//! GPU tier: each demo, updated at the page's 640x400 and painted
-//! offscreen, passes its own `.pixels` checks: the same checks the
-//! native window's and the web page's screenshots are held to.
+//! GPU tier: each demo, updated at the viewport of each section of its
+//! `.pixels` file (640x400, the size of the native window and the web
+//! page's screenshot, and any `at WxH` section, such as a phone's
+//! width) and painted offscreen, passes that section's checks.
 
 use vapors_app::ScenePainter;
 use vapors_elements::Viewport;
 use vapors_gpu_harness::{gpu, read_rgba8};
-use vapors_pixels::{Image, failures, parse};
+use vapors_pixels::{Image, Spec, failures, parse};
 use vapors_renderer::{Target, clear};
 use vapors_scene::{Color, Size};
 
-const WIDTH: u32 = 640;
-const HEIGHT: u32 = 400;
-
-/// The demo after its `.pixels` clicks, painted offscreen.
-fn render(name: &str, clicks: &[[u32; 2]]) -> Vec<u8> {
+/// The demo at `spec`'s viewport after its clicks, painted offscreen.
+fn render(name: &str, spec: &Spec) -> Vec<u8> {
     let demo = vapors_demos::find(name).expect("a demo");
     let shared = vapors_demos::document(&demo).expect("its style parses");
+    let [width, height] = spec.viewport;
+    #[allow(clippy::cast_precision_loss)] // viewports are small
     let viewport = Viewport {
-        width: 640.0,
-        height: 400.0,
+        width: width as f32,
+        height: height as f32,
         scale: 1.0,
     };
-    shared
-        .borrow_mut()
-        .update(viewport)
-        .unwrap_or_else(|errors| panic!("{name} was refused: {errors:#?}"));
-    for click in clicks {
+    if let Err(errors) = shared.borrow_mut().update(viewport) {
+        panic!("{name} at {width}x{height} was refused: {errors:#?}");
+    }
+    for click in &spec.clicks {
         vapors_demos::click(&shared, *click);
     }
     let mut document = shared.borrow_mut();
     let painted = document
         .update(viewport)
-        .unwrap_or_else(|errors| panic!("{name} was refused: {errors:#?}"));
+        .unwrap_or_else(|errors| panic!("{name} at {width}x{height} was refused: {errors:#?}"));
     let gpu = gpu();
-    let texture = clear(&gpu.device, &gpu.queue, WIDTH, HEIGHT, Color::default());
+    let texture = clear(&gpu.device, &gpu.queue, width, height, Color::default());
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    let size = Size {
-        width: WIDTH,
-        height: HEIGHT,
-    };
+    let size = Size { width, height };
     let target = Target {
         device: &gpu.device,
         queue: &gpu.queue,
@@ -52,7 +48,7 @@ fn render(name: &str, clicks: &[[u32; 2]]) -> Vec<u8> {
 }
 
 #[test]
-fn gpu_every_demo_passes_its_pixel_checks_offscreen() {
+fn gpu_every_demo_passes_its_pixel_checks_offscreen_at_every_viewport() {
     let checked = vapors_demos::all()
         .iter()
         .filter(|demo| demo.pixels.is_some())
@@ -61,26 +57,30 @@ fn gpu_every_demo_passes_its_pixel_checks_offscreen() {
         checked > 0,
         "no demo has a .pixels file: nothing would be checked"
     );
+    let mut failed = Vec::new();
     for demo in vapors_demos::all() {
-        // Given
         let Some(text) = demo.pixels else { continue };
-        let spec = parse(demo.name, text).expect("parses");
+        for spec in parse(demo.name, text).expect("parses") {
+            // When
+            let rgba = render(demo.name, &spec);
 
-        // When
-        let rgba = render(demo.name, &spec.clicks);
-
-        // Then
-        let image = Image {
-            width: WIDTH,
-            height: HEIGHT,
-            scale: 1.0,
-            rgba: &rgba,
-        };
-        assert_eq!(
-            failures(&spec.checks, &image),
-            Vec::<String>::new(),
-            "{}",
-            demo.name
-        );
+            // Then
+            let [width, height] = spec.viewport;
+            let image = Image {
+                width,
+                height,
+                scale: 1.0,
+                rgba: &rgba,
+            };
+            let found = failures(&spec.checks, &image);
+            if !found.is_empty() {
+                failed.push(format!(
+                    "{} at {width}x{height}: {}",
+                    demo.name,
+                    found.join("; ")
+                ));
+            }
+        }
     }
+    assert_eq!(failed, Vec::<String>::new());
 }

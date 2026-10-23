@@ -15,7 +15,7 @@ body {
   background-color: #e9ecef;
   font-size: 14px;
 }
-.cards { display: flex; gap: 24px; }
+.cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 24px; }
 .card {
   width: 150px;
   height: 90px;
@@ -41,7 +41,7 @@ body {
   border: 2px solid #171b1f;
   border-radius: 16px;
 }
-.buttons { display: flex; gap: 12px; }
+.buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
 button { cursor: pointer; font-size: 14px; padding: 8px 16px; }
 .primary { background-color: #3a7bd5; color: #ffffff; border: 1px solid #2f63ad; border-radius: 6px; }
 .primary:hover { background-color: #2f6cc2; }

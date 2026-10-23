@@ -1,13 +1,15 @@
 //! `check_pixels <file.pixels> <screenshot.png> [scale]`: a demo's
 //! pixel checks on a screenshot taken elsewhere, the web page's in
 //! particular. Prints each failure and exits 1 when any check fails.
-//! `check_pixels --clicks <file.pixels>` prints the file's clicks, one
+//! The section checked is the one for the screenshot's size divided by
+//! the scale. `check_pixels --clicks <file.pixels>` prints the 640x400
+//! section's clicks, one
 //! `X Y` per line, for the page-contract script to make before its
 //! screenshot.
 
 use std::process::ExitCode;
 
-use vapors_pixels::{Image, failures, parse};
+use vapors_pixels::{DEFAULT_VIEWPORT, Image, failures, parse, section};
 
 fn main() -> ExitCode {
     match run() {
@@ -38,8 +40,17 @@ fn run() -> Result<(), String> {
         .map_err(|_| "the scale is not a number".to_owned())?;
     let text = std::fs::read_to_string(pixels).map_err(|e| format!("{pixels}: {e}"))?;
     let name = pixels.trim_end_matches(".pixels");
-    let checks = parse(name, &text)?.checks;
     let (width, height, rgba) = read_png(png)?;
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::cast_precision_loss
+    )]
+    let viewport = [
+        (width as f32 / scale) as u32,
+        (height as f32 / scale) as u32,
+    ];
+    let checks = section(&parse(name, &text)?, viewport)?.checks.clone();
     let found = failures(
         &checks,
         &Image {
@@ -92,7 +103,8 @@ fn read_png(path: &str) -> Result<(u32, u32, Vec<u8>), String> {
 
 fn print_clicks(pixels: &str) -> Result<(), String> {
     let text = std::fs::read_to_string(pixels).map_err(|e| format!("{pixels}: {e}"))?;
-    for [x, y] in parse(pixels.trim_end_matches(".pixels"), &text)?.clicks {
+    let specs = parse(pixels.trim_end_matches(".pixels"), &text)?;
+    for [x, y] in section(&specs, DEFAULT_VIEWPORT)?.clicks.clone() {
         println!("{x} {y}");
     }
     Ok(())
