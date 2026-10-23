@@ -70,6 +70,13 @@ prepare() {
   lose='<script>var request = GPUAdapter.prototype.requestDevice; GPUAdapter.prototype.requestDevice = function () { return request.apply(this, arguments).then(function (device) { setTimeout(function () { Window.prototype.requestAnimationFrame = window.requestAnimationFrame = function () { return 0; }; }, 500); setTimeout(function () { device.destroy(); }, 1000); return device; }); };</script>'
   adapter='status.textContent.indexOf("adapter: ") === 0'
   page as-built "" "$adapter"
+  # The screenshot's own copy, held until the canvas has presented:
+  # wgpu calls the canvas context's getCurrentTexture once per frame,
+  # counted on <body> as data-frames; at the third call the first two
+  # frames have presented. Without its own page and hold the screenshot
+  # was taken before any frame (vapors main, white centre, after #25).
+  frames='<script>var current = GPUCanvasContext.prototype.getCurrentTexture; GPUCanvasContext.prototype.getCurrentTexture = function () { if (document.body) { document.body.dataset.frames = String((Number(document.body.dataset.frames) || 0) + 1); } return current.apply(this, arguments); };</script>'
+  page as-built-shot "$frames" "(Number(document.body.dataset.frames) || 0) >= 3"
   page no-open-button "" "!error.hidden && $adapter" 's#<button id="open">Open</button>##'
   page no-webgpu "$nogpu" ""
   page no-webgpu-no-error-element "$nogpu" "" 's#<p id="error"[^>]*></p>##'
@@ -129,12 +136,13 @@ dump() {
     --virtual-time-budget=8000 --dump-dom "http://127.0.0.1:$port/$1.html" 2>"$work/$1.log"
 }
 
-# The page as Chromium draws it, as a PNG, after the same hold.
+# The page as Chromium draws it, as $work/<page>.png, after the page's
+# own hold; its stderr in $work/<page>.log.
 shoot() {
   env -u DBUS_SESSION_BUS_ADDRESS timeout 60 "$chrome" --headless=new --no-sandbox \
     --disable-gpu-sandbox --use-angle=swiftshader --enable-unsafe-webgpu \
-    --enable-features=Vulkan,WebGPU --window-size=640,400 \
-    --virtual-time-budget=8000 --screenshot="$work/$1.png" "http://127.0.0.1:$port/$1.html" 2>/dev/null
+    --enable-features=Vulkan,WebGPU --window-size=640,400 --enable-logging=stderr --v=0 \
+    --virtual-time-budget=8000 --screenshot="$work/$1.png" "http://127.0.0.1:$port/$1.html" 2>"$work/$1.log"
 }
 
 # The r,g,b of the centre pixel of a PNG (8-bit RGB or RGBA, not
@@ -214,11 +222,14 @@ check as-built '^adapter: ' hidden
 # (docs/web.md), as the native screenshot asserts. A dead canvas (no
 # Vulkan, run 39929758159) is not.
 presented=none
-if shoot as-built; then
-  presented=$(centre_pixel "$work/as-built.png") || presented="unreadable: $presented"
+if shoot as-built-shot; then
+  presented=$(centre_pixel "$work/as-built-shot.png") || presented="unreadable: $presented"
 fi
-echo "as-built: the screenshot's centre is [$presented]"
-[ "$presented" = "128,128,128" ] || fail "as-built: the canvas did not present the gradient (centre [$presented], wanted 128,128,128); $work/as-built.png"
+echo "as-built-shot: the screenshot's centre is [$presented]"
+if [ "$presented" != "128,128,128" ]; then
+  fail "as-built-shot: the canvas did not present the gradient (centre [$presented], wanted 128,128,128); $work/as-built-shot.png"
+  echo "  as-built-shot: the page's last console lines:"; console as-built-shot
+fi
 if grep -q 'vkCreateInstance() failed' "$work/as-built.log"; then
   fail "Chromium has no Vulkan driver, so SwiftShader's WebGPU cannot present; fix: install mesa-vulkan-drivers (lavapipe)"
 fi
