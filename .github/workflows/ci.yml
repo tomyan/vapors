@@ -125,12 +125,12 @@ jobs:
         run: cargo xtask setup --ci
       # Diagnostic, not for merge: Chrome's launch times on a fresh runner,
       # before any other Chrome launch in this job.
-      - name: Chrome cold-start probe
-        run: scripts/chrome-cold-probe.sh "$PWD/target/probe/out"
+      - name: Chrome cold-start probe, fontconfig's cache built first
+        run: scripts/chrome-cold-probe.sh "$PWD/target/probe/out" --fc-list
       - name: Chrome hang probe
         run: |
-          cargo run -q -p vapors-text --example text_comparison -- --out target/probe || echo "the example failed; probing the page it wrote"
-          scripts/chrome-hang-probe.sh "$PWD/target/probe/text_comparison.html" "$PWD/target/probe/out" 20
+          VAPORS_CHROMIUM=/bin/true cargo run -q -p vapors-text --example text_comparison -- --out target/probe || echo "the page is written; no Chrome ran"
+          scripts/chrome-hang-probe.sh "$PWD/target/probe/text_comparison.html" "$PWD/target/probe/out" 3
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
