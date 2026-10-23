@@ -90,9 +90,12 @@ fn wait_or_kill(child: &mut Child, deadline: Duration) -> Result<ExitStatus, Str
             return Ok(status);
         }
         if started.elapsed() > deadline {
-            kill_group(child);
+            let group = match kill_group(child) {
+                Ok(()) => "killed with its process group".to_owned(),
+                Err(why) => format!("its process group could not be killed ({why})"),
+            };
             return Err(format!(
-                "did not finish within {}s; killed with its process group",
+                "did not finish within {}s; {group}",
                 deadline.as_secs()
             ));
         }
@@ -102,12 +105,26 @@ fn wait_or_kill(child: &mut Child, deadline: Duration) -> Result<ExitStatus, Str
 
 /// SIGKILL to the child's process group (`spawn` makes it the leader),
 /// then reap it, so no zombie is left.
-fn kill_group(child: &mut Child) {
-    let _ = std::process::Command::new("kill")
-        .args(["-KILL", &format!("-{}", child.id())])
-        .status();
+///
+/// The group survived on the runner once (run 39997553338, job
+/// 120564930866: "stderr still open 2s after the end") with
+/// `kill -KILL -<pid>`; `--` before a negative id is procps's documented
+/// form, and the kill's own failure is now returned to be reported.
+fn kill_group(child: &mut Child) -> Result<(), String> {
+    let group = format!("-{}", child.id());
+    let killed = std::process::Command::new("kill")
+        .args(["-s", "KILL", "--", &group])
+        .output();
     let _ = child.kill();
     let _ = child.wait();
+    match killed {
+        Ok(out) if out.status.success() => Ok(()),
+        Ok(out) => Err(format!(
+            "kill -s KILL -- {group}: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        )),
+        Err(e) => Err(format!("kill: {e}")),
+    }
 }
 
 pub(crate) fn read_all(mut stream: impl std::io::Read) -> String {
