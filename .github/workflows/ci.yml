@@ -54,6 +54,10 @@ jobs:
       - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
         run: cargo xtask setup --ci
+      # Advisories, bans, licences and sources by deny.toml; it fetches the
+      # advisory database every run and fails if it cannot.
+      - name: dependencies (cargo-deny)
+        run: cargo xtask deny
       - name: lint, wasm lint and unit
         run: cargo xtask lint && cargo xtask wasm && cargo xtask test --tier unit
       - name: build timings

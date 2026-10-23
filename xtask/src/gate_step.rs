@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use serde_yaml::Value;
+use serde_json::Value;
 
 use crate::gate_action::substitute;
 

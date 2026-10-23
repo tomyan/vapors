@@ -1,0 +1,55 @@
+# cargo-deny's policy, checked by `cargo xtask deny` (a step of
+# `cargo xtask ci`, and of CI). Every exception names its reason and what
+# retires it.
+
+[graph]
+all-features = true
+
+[advisories]
+# The advisory database is fetched on every run; a fetch that fails fails
+# the check (xtask never passes --disable-fetch).
+# Nothing is ignored. RUSTSEC-2026-0192 (ttf-parser) was retired by
+# winit's `wayland-csd-adwaita-notitle` feature, and RUSTSEC-2024-0449
+# (unsafe-libyaml) by moving xtask's gate from serde_yaml to yaml-rust2.
+ignore = []
+# A yanked version was withdrawn by its author; using one fails.
+yanked = "deny"
+
+[licenses]
+# Permissive licences only: vapors is built into touche, which is sold,
+# and none of these asks for its source. Each is the licence of at least one dependency today.
+allow = [
+    "MIT",                            # most of the ecosystem
+    "Apache-2.0",                     # most of the ecosystem
+    "Apache-2.0 WITH LLVM-exception", # rustix, linux-raw-sys, wasi: Apache with the LLVM linking exception
+    "BSD-2-Clause",                   # zerocopy, arrayref
+    "BSD-3-Clause",                   # tiny-skia, num_enum, moxcms, subtle
+    "ISC",                            # rustls, ring, libloading
+    "Zlib",                           # bytemuck, miniz_oxide, raw-window-handle
+    "0BSD",                           # adler2
+    "Unicode-3.0",                    # the ICU data crates and unicode-ident
+    "Unlicense",                      # memchr, aho-corasick, walkdir (also MIT)
+]
+confidence-threshold = 0.93
+# An allowed licence no dependency uses fails, so the list cannot go stale.
+unused-allowed-license = "deny"
+
+[licenses.private]
+# This workspace's own crates are not published (`publish = false`, which
+# also lets them depend on each other by path) and carry no licence.
+ignore = true
+
+[bans]
+# Two versions of a crate is a warning, not a failure: all of today's are
+# transitive splits in the ecosystem (bitflags 1 and 2, windows-sys,
+# objc2, syn 2 and 3, ...), none from a dependency we name twice. A new
+# one shows in the output for review.
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+# crates.io only; the vapors crates are path dependencies, which this
+# section does not govern.
+unknown-registry = "deny"
+unknown-git = "deny"

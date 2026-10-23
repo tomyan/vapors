@@ -120,6 +120,9 @@ fn is_failure_line(line: &str) -> bool {
         || line == "Caused by:"
         || line.starts_with("Diff in")
         || line.starts_with("could not start")
+        // cargo-deny's advisory: which one, and its fix.
+        || line.starts_with("├ ID:")
+        || line.starts_with("├ Solution:")
 }
 
 /// nextest's line for a test killed by a signal (`SIGSEGV [ 0.01s]`,
