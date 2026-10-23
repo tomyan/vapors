@@ -129,10 +129,13 @@ dump() {
     --virtual-time-budget=8000 --dump-dom "http://127.0.0.1:$port/$1.html" 2>"$work/$1.log"
 }
 
-# What the page said last: its console lines from Chromium's log.
+# What the page said last, and what Chromium said about the GPU: its
+# console lines and its GPU, Dawn and Vulkan lines from Chromium's log.
 console() {
   grep 'CONSOLE' "$work/$1.log" | tail -10 | sed 's#^#    #'
   grep -q 'CONSOLE' "$work/$1.log" || echo "    (no console lines in $work/$1.log)"
+  echo "  $1: Chromium's GPU lines:"
+  grep -iE 'gpu|dawn|vulkan|swiftshader|angle' "$work/$1.log" | grep -v CONSOLE | tail -15 | sed 's#^#    #'
 }
 
 # check <page> <#status pattern> <#error: absent | hidden | pattern>
