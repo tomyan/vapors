@@ -10,7 +10,7 @@ use super::inline::InlineRun;
 /// The size of `run`: its width is the widest line, its height the sum
 /// of its lines.
 pub(crate) fn measure_text(
-    fonts: &mut FontSystem,
+    (fonts, cache): (&mut FontSystem, &mut super::TextCache),
     scale: f32,
     run: &InlineRun,
     known: Size<Option<f32>>,
@@ -21,7 +21,7 @@ pub(crate) fn measure_text(
         AvailableSpace::MinContent => Some(0.0),
         AvailableSpace::MaxContent => None,
     });
-    let layout = text_layout(fonts, scale, run, width);
+    let layout = cache.layout(fonts, scale, run, width);
     Size {
         width: known.width.unwrap_or(layout.width() / scale),
         height: known.height.unwrap_or(layout.height() / scale),

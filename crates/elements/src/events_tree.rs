@@ -38,6 +38,7 @@ impl Document {
                     element.states.without(flag)
                 };
                 self.changed = true;
+                self.mark_flag(node, flag);
             }
         }
     }

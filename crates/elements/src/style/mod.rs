@@ -6,11 +6,13 @@ mod box_align;
 mod box_style;
 mod cursor;
 mod decoration;
+mod features;
 mod grid_style;
 mod honoured;
 mod inline;
 mod scope;
 mod sizes;
+mod styles;
 mod text_style;
 mod used;
 mod values;
@@ -19,14 +21,14 @@ use vapors_css::cascade::{Cascade, ComputedStyle, Environment};
 
 use vapors_dom::NodeId;
 
-use crate::arena::{Arena, index_of};
+use crate::arena::Arena;
 use crate::css_element::ElementRef;
 use crate::error::ElementError;
 
 pub(crate) use box_style::box_style;
 pub use cursor::{ALL_CURSORS, Cursor};
 pub(crate) use decoration::BoxShadow;
-#[cfg(test)]
+pub(crate) use styles::Styles;
 pub(crate) use text_style::Face;
 pub(crate) use text_style::TextStyle;
 pub(crate) use used::{Context, Used, used};
@@ -41,6 +43,8 @@ const NESTED_GLOBAL: &str = ":global() leaves a top-level compound unscoped; ins
 /// component scopes added, and the scoped styles that did not parse.
 pub(crate) struct Sheets {
     cascade: Cascade,
+    /// What the selectors use that widens a restyle.
+    pub(crate) features: features::Features,
     names: Vec<String>,
     /// Each scope added, with the style it was added with.
     scopes: std::collections::HashMap<String, String>,
@@ -56,6 +60,7 @@ impl Sheets {
             )
         });
         Self {
+            features: features::Features::default().with(&ua),
             cascade: Cascade::new().user_agent(ua),
             names: vec!["ua.css".to_owned()],
             scopes: std::collections::HashMap::new(),
@@ -75,6 +80,7 @@ impl Sheets {
                 ":global() only means something in a component's <style>, where the rest is scoped; in this sheet every rule is already global, so write the selector without it",
             )));
         }
+        self.features = self.features.with(&sheet);
         self.cascade = std::mem::take(&mut self.cascade).author(sheet);
         self.names.push(name.to_owned());
         Ok(())
@@ -108,8 +114,18 @@ impl Sheets {
                 .refused
                 .push(refuse(vapors_css::Error::new(position, NESTED_GLOBAL)));
         }
-        self.cascade = std::mem::take(&mut self.cascade).author(scope::scoped(sheet, scope));
+        let sheet = scope::scoped(sheet, scope);
+        self.features = self.features.with(&sheet);
+        self.cascade = std::mem::take(&mut self.cascade).author(sheet);
         self.names.push(scope.to_owned());
+    }
+
+    /// Which elements a flip of `flag` restyles, as the sheets use it.
+    pub(crate) fn restyle_scope(
+        &self,
+        flag: vapors_css::tree::States,
+    ) -> vapors_css::cascade::RestyleScope {
+        self.cascade.restyle_scope_of_selectors(flag)
     }
 
     /// The scoped styles that did not parse.
@@ -117,26 +133,20 @@ impl Sheets {
         &self.refused
     }
 
-    /// The computed style of every element under `root`, by slot.
-    pub(crate) fn compute(
+    /// The computed style of `node`, whose parent's is `parent`.
+    pub(crate) fn compute_element(
         &self,
         arena: &Arena,
-        root: NodeId,
+        node: NodeId,
+        parent: Option<&ComputedStyle>,
         env: &Environment,
-    ) -> Result<Styles, ElementError> {
-        let computed = self
-            .cascade
-            .compute_tree(&ElementRef::new(arena, root), env)
+    ) -> Result<ComputedStyle, ElementError> {
+        self.cascade
+            .compute(&ElementRef::new(arena, node), parent, env)
             .map_err(|error| ElementError::Css {
                 sheet: self.names.join(" or "),
                 error,
-            })?;
-        let mut styles = Styles(Vec::new());
-        styles.0.resize_with(arena.capacity(), || None);
-        for (element, style) in computed {
-            styles.0[index_of(element.id) as usize] = Some(style);
-        }
-        Ok(styles)
+            })
     }
 }
 
@@ -150,25 +160,6 @@ impl Sheets {
         self.names
             .get(index)
             .map_or("an unnamed sheet", String::as_str)
-    }
-}
-
-/// Computed styles by slot; `None` for text nodes and detached nodes.
-pub(crate) struct Styles(Vec<Option<ComputedStyle>>);
-
-impl Styles {
-    /// The element's style.
-    ///
-    /// # Panics
-    /// When `node` was not under the root when styles were computed: the
-    /// caller walked a different tree from the one styled.
-    pub(crate) fn of(&self, node: NodeId) -> &ComputedStyle {
-        self.0
-            .get(index_of(node) as usize)
-            .and_then(Option::as_ref)
-            .unwrap_or_else(|| {
-                panic!("{node:?} has no computed style; it was not in the styled tree")
-            })
     }
 }
 

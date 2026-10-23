@@ -19,6 +19,7 @@ impl Dom for Document {
 
     fn add_style(&mut self, scope: &str, css: &str) {
         self.changed = true;
+        self.dirty.everything();
         self.sheets.add_scoped(scope, css);
     }
 
@@ -31,10 +32,16 @@ impl Dom for Document {
         self.element_mut(node, "set_attribute")
             .attributes
             .insert(name.to_owned(), value.to_owned());
+        self.mark_changed(node);
     }
 
     fn set_text(&mut self, node: NodeId, text: &str) {
         self.changed = true;
+        if self.sheets.features.empty
+            && let Some(parent) = self.parent(node)
+        {
+            self.dirty.subtree(parent);
+        }
         match &mut self.arena.get_mut(node, "set_text").kind {
             Kind::Text(current) => text.clone_into(current),
             Kind::Element(element) => panic!(
@@ -52,13 +59,18 @@ impl Dom for Document {
     }
 
     fn append(&mut self, parent: NodeId, child: NodeId) {
-        self.changed = true;
-        self.arena.place("append", parent, child, None);
+        self.insert_before(parent, child, None);
     }
 
+    /// Also marks what the move restyles: the child, and both parents'
+    /// children where the sheets make siblings matter.
     fn insert_before(&mut self, parent: NodeId, child: NodeId, before: Option<NodeId>) {
         self.changed = true;
+        if let Some(old) = self.parent(child) {
+            self.mark_children_changed(old, None);
+        }
         self.arena.place("insert_before", parent, child, before);
+        self.mark_children_changed(parent, Some(child));
     }
 
     /// Detaches the node and frees it with its subtree: its id and its
@@ -70,6 +82,9 @@ impl Dom for Document {
             if node == self.root() { "html" } else { "body" }
         );
         self.changed = true;
+        if let Some(parent) = self.parent(node) {
+            self.mark_children_changed(parent, None);
+        }
         self.arena.detach(node);
         self.arena.free_subtree(node);
     }

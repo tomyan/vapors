@@ -26,14 +26,15 @@ pub(crate) struct Calcs {
 }
 
 impl Calcs {
-    /// Adds the calcs in `style`, the computed style of `element`,
-    /// keyed by the address Taffy is given.
-    pub(crate) fn add(&mut self, style: &ComputedStyle, element: &str) {
+    /// Adds the calcs in `style`, keyed by the address Taffy is given;
+    /// `element` describes the element they were computed for, called
+    /// only when there is one.
+    pub(crate) fn add(&mut self, style: &ComputedStyle, element: impl Fn() -> String) {
         for (property, value) in style.iter() {
             if let Value::Calc(calc) = value {
                 let entry = Entry {
                     calc: calc.clone(),
-                    element: element.to_owned(),
+                    element: element(),
                     property: property.name(),
                 };
                 self.by_handle.insert(handle(calc), entry);

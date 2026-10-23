@@ -705,6 +705,75 @@ differs from the plan.
   390x800. With spans out of the hit list, the span stays white and the
   check fails.
 
+### S7
+
+- **What is kept between updates:**
+  - each element's computed and used style, and the initial style
+    (`restyle.rs`, `restyle_pass.rs`);
+  - each Parley layout, keyed by its run and width
+    (`layout/text_cache.rs`);
+  - each box's Taffy cache and layout (`layout/keep.rs`).
+
+  An update restyles what the changes since the last one marked; the
+  table above gives the scopes.
+  - A pointer flag on a subject compound restyles the element alone
+    (`Cascade::restyle_scope_of_selectors`, new in vapors-css). Its
+    children are restyled only when its computed style changed, which
+    covers what they inherit.
+  - Layout is kept by diffing the rebuilt box tree against the last
+    one, not by marks. A box keeps its cache only when it and its whole
+    subtree are unchanged, at the same scale.
+- **Counted tests:**
+  - `elements_restyled`, `text_layouts_built` and `boxes_laid_out` are
+    pinned per kind of change (`incremental_*.rs`), each proven by
+    breaking its rule.
+  - After five kinds of change, every element's box equals a fresh
+    document's given the same changes.
+  - A seeded randomized differential test (`incremental_random.rs`)
+    makes 40 random changes per seed: classes, attributes,
+    `display: none` by the style attribute, text, insert, move, remove,
+    hover, press, resize, and sheets and scoped styles added. Its CSS
+    uses inherited properties, `var()`, `+` and `~`, `:nth-child`,
+    `:last-child`, `:empty`, an ancestor attribute, `:hover` on a
+    non-subject compound, `@media`, and calc with %, em and vw.
+    - After every change, each settled frame's boxes, computed styles
+      and display list must equal those of an update from scratch
+      (`Document::forget_kept`).
+    - CI runs 6 seeds; `VAPORS_INCREMENTAL_SEEDS` runs more and
+      `VAPORS_INCREMENTAL_SEED` one. 200 pass.
+    - Six broken scope rules each fail it.
+- **The 1,000-element measurement** (`update_time`, release, CPU only).
+  Setup: 1,001 elements, one counter text changed per update.
+  Machine: this box's i5-10500T, with a load average of 9 to 20 from
+  the other agents. Median update time:
+
+  | Point | Median |
+  |---|---|
+  | Before S7 | about 60 ms |
+  | Styles kept | 4.4 to 5.6 ms |
+  | Layout kept as well | 2.6 to 3.1 ms, p95 2.9 to 3.9 ms |
+
+  The remaining time is whole-tree walks: the tree check, the `style`
+  attribute check, the box build and diff, and paint.
+- **What those numbers say about the phone.** They show which phases
+  scale with the tree, and that keeping work removes them on the CPU
+  vapors runs on here. They do not give the phone's time:
+  - the Pixel 9 Pro's cores differ;
+  - the web build is wasm, usually slower than native;
+  - this box's load inflates and scatters them.
+
+  The `stress` demo prints each frame's measured update time, so the
+  phone's number comes from opening `?demo=stress` on the phone. Under
+  headless Chromium's virtual time, the page contract's screenshot
+  shows 0.00 ms: its clock does not advance during an update.
+- **Demo.** `stress`: 1,000 elements under a counter that ticks every
+  frame, through `ElementsApp::with_per_frame`, a hook called before
+  each update with the last one's duration.
+  - `?demo=stress&ticks=N` stops it after N frames, so the page
+    contract's headless page goes idle.
+  - `gpu_stress.rs` checks that the counter's ink changes between two
+    frames.
+
 ## Decisions (2026-10-23)
 
 - **D1 Scoping.** A compiler change in S5: `mount` registers its
@@ -732,3 +801,10 @@ differs from the plan.
 - **D6 `br` and `a` in F2d (2026-10-23).** Forced line breaks and links
   are the first item after F2c: touche's chat panel and About page need
   them. Until then they are refused, naming F2d.
+- **D7 Hover after layout settles a frame later (2026-10-24).** An
+  update that moves content under a still pointer notices the new
+  hover after painting. It sets the flags and asks for another frame,
+  which restyles; the hover style shows one frame later. Chromium also
+  re-hovers after layout. The randomized differential test compares
+  settled frames, updating until no change is pending, and fails if
+  that takes more than three updates.

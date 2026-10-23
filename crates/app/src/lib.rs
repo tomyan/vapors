@@ -9,5 +9,5 @@ mod elements_app;
 mod painter;
 mod pointer;
 
-pub use elements_app::{ElementsApp, Failure};
+pub use elements_app::{ElementsApp, Failure, PerFrame};
 pub use painter::ScenePainter;

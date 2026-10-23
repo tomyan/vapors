@@ -33,6 +33,7 @@ mod web;
 mod webgpu;
 mod window;
 
+pub use clock::Instant;
 pub use cursor::Cursor;
 pub use device_lost::{DeviceLost, Lost};
 pub use error::PlatformError;

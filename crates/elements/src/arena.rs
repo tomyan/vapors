@@ -62,11 +62,6 @@ impl Arena {
             .is_some_and(|slot| slot.generation == generation_of(node) && slot.node.is_some())
     }
 
-    /// One past the highest slot index: the size of per-node side tables.
-    pub(crate) fn capacity(&self) -> usize {
-        self.slots.len()
-    }
-
     fn slot_of(&self, node: NodeId, call: &str) -> (usize, u32) {
         assert!(
             self.contains(node),
