@@ -50,19 +50,21 @@ pub fn boxes(chromium: &Chromium, work: &Path, name: &str) -> Result<Value, Stri
     let dom = chromium
         .dump_dom(&page, source.viewport[0], source.viewport[1])
         .map_err(|e| format!("{name}: {e}"))?;
-    let boxes: Value =
+    let page: Value =
         serde_json::from_str(&boxes_from_dom(&dom).map_err(|e| format!("{name}: {e}"))?)
             .map_err(|e| format!("{name}: the page's boxes are not JSON: {e}"))?;
-    check_viewport(name, &boxes, source.viewport[0])?;
-    Ok(serde_json::json!({ "viewport": source.viewport, "boxes": boxes }))
+    check_viewport(name, &page, source.viewport[0])?;
+    Ok(page)
 }
 
 /// Chromium's window has a minimum width (500 px headless, 155 here):
-/// a narrower fixture gets a wider page than it asked for.
-fn check_viewport(name: &str, boxes: &Value, width: u32) -> Result<(), String> {
-    let html = boxes[0]["width"]
+/// a narrower fixture gets a wider page than it asked for. The height
+/// is whatever the page measured: headless `--dump-dom` gives a 640x400
+/// window a 313 px tall viewport, and the corpus lays out at that.
+fn check_viewport(name: &str, page: &Value, width: u32) -> Result<(), String> {
+    let html = page["viewport"][0]
         .as_f64()
-        .ok_or(format!("{name}: the first box has no width"))?;
+        .ok_or(format!("{name}: the page wrote no viewport width"))?;
     if (html - f64::from(width)).abs() < 0.001 {
         return Ok(());
     }

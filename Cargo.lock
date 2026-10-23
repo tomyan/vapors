@@ -2506,6 +2506,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "vapors-demos"
+version = "0.0.0"
+dependencies = [
+ "png",
+ "vapors-compiler",
+ "vapors-dom",
+ "vapors-elements",
+ "vapors-signals",
+]
+
+[[package]]
 name = "vapors-dom"
 version = "0.0.0"
 dependencies = [

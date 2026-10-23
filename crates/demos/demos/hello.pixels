@@ -1,0 +1,8 @@
+# The pixels a hello screenshot is checked against: 640x400 CSS px at
+# 1x, as the native window and the page-contract browser draw it.
+# `pixel X Y #rrggbb` is exact within 1 per channel; `ink X0 Y0 X1 Y1
+# #rrggbb` needs at least one pixel in the box that is not that colour.
+pixel 4 4 #e9ecef          page background, top left
+pixel 636 396 #e9ecef      page background, bottom right
+pixel 320 120 #171b1f      panel, between the heading and the paragraph's top margin
+ink 120 110 520 290 #171b1f the panel holds drawn text

@@ -25,13 +25,15 @@ pub struct BoxRect {
     pub height: f32,
 }
 
-/// Lays `boxes` out in a viewport `width` CSS pixels wide, and returns
-/// them with each box's border box, in box order.
+/// Lays `boxes` out in a viewport of `size` CSS pixels, which is the
+/// initial containing block: the root's percentages resolve against it,
+/// and an `auto` height is still its content's. Returns the boxes with
+/// each one's border box, in box order.
 pub(crate) fn lay_out(
     boxes: Vec<LayoutBox>,
     fonts: &mut FontSystem,
     scale: f32,
-    width: f32,
+    size: (f32, f32),
 ) -> (Vec<LayoutBox>, Vec<BoxRect>) {
     let mut tree = BoxTree {
         boxes,
@@ -39,8 +41,8 @@ pub(crate) fn lay_out(
         scale,
     };
     let available = Size {
-        width: AvailableSpace::Definite(width),
-        height: AvailableSpace::MaxContent,
+        width: AvailableSpace::Definite(size.0),
+        height: AvailableSpace::Definite(size.1),
     };
     compute_root_layout(&mut tree, NodeId::from(0usize), available);
     let mut rects = vec![

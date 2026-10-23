@@ -1,0 +1,21 @@
+[package]
+name = "vapors-demos"
+description = "One demo component per F2c slice, shown on the web page (?demo=<name>) and in a native window, each with the pixels its screenshots are checked against."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+vapors-dom.workspace = true
+vapors-signals.workspace = true
+vapors-elements.workspace = true
+png.workspace = true
+
+[build-dependencies]
+vapors-compiler.workspace = true
+
+[lints]
+workspace = true

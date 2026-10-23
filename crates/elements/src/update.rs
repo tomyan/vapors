@@ -38,7 +38,12 @@ impl Document {
         self.painted = None;
         let used = self.used_styles(viewport)?;
         let boxes = build(&self.arena, &used, self.root());
-        let (boxes, rects) = lay_out(boxes, &mut self.fonts, viewport.scale, viewport.width);
+        let (boxes, rects) = lay_out(
+            boxes,
+            &mut self.fonts,
+            viewport.scale,
+            (viewport.width, viewport.height),
+        );
         let mut input = PaintInput {
             used: &used,
             root: self.root(),

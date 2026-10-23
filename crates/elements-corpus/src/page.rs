@@ -74,7 +74,7 @@ document.fonts.ready.then(() => {{
   }}
   const out = document.createElement("pre");
   out.id = "{BOXES_ID}";
-  out.textContent = JSON.stringify(boxes);
+  out.textContent = JSON.stringify({{ viewport: [innerWidth, innerHeight], boxes }});
   document.documentElement.append(out);
 }});
 </script></body></html>
@@ -84,7 +84,8 @@ document.fonts.ready.then(() => {{
     )
 }
 
-/// The boxes JSON from a dumped DOM.
+/// The page's JSON from a dumped DOM: `{"viewport": [w, h], "boxes": [..]}`,
+/// the viewport as the page measured it (`innerWidth`, `innerHeight`).
 ///
 /// # Errors
 /// When the page never wrote its boxes (a script error, or fonts that

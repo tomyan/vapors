@@ -48,6 +48,7 @@ macro_rules! fixtures {
 
 fixtures![
     block_margins::BlockMargins,
+    centred_panel::CentredPanel,
     flex_row::FlexRow,
     hello_box::HelloBox,
     text_wrap::TextWrap,
