@@ -117,7 +117,9 @@ fn pseudo<E: Element>(p: &PseudoClass, e: &E) -> bool {
         PseudoClass::Empty => e.is_empty(),
         PseudoClass::Root => e.parent().is_none(),
         PseudoClass::Not(list) => !list.iter().any(|s| matches(s, e)),
-        PseudoClass::Is(list) | PseudoClass::Where(list) => list.iter().any(|s| matches(s, e)),
+        PseudoClass::Is(list) | PseudoClass::Where(list) | PseudoClass::Global(list) => {
+            list.iter().any(|s| matches(s, e))
+        }
         PseudoClass::Has(list) => list.iter().any(|r| structural::has(r, e)),
         other => structural::positional(other, e),
     }

@@ -4,9 +4,10 @@
 //! The subject compound requires it as an attribute selector, so a
 //! scoped rule gains one attribute's specificity; every other compound,
 //! and every compound inside `:is()`, `:not()`, `:where()` and `:has()`,
-//! requires it inside `:where()`, which adds none. This is Svelte 5's
-//! rule.
+//! requires it inside `:where()`, which adds none. A compound holding
+//! `:global(...)` is left unscoped. These are Svelte 5's rules.
 
+use vapors_css::Position;
 use vapors_css::ast::Stylesheet;
 use vapors_css::selector::{
     AttributeOperator, AttributeSelector, Compound, PseudoClass, RelativeSelector, Selector,
@@ -26,6 +27,9 @@ pub(crate) fn scoped(mut sheet: Stylesheet, scope: &str) -> Stylesheet {
 fn scope_selector(selector: &mut Selector, scope: &str, counted: bool) {
     let last = selector.compounds.len().saturating_sub(1);
     for (index, compound) in selector.compounds.iter_mut().enumerate() {
+        if is_global(compound) {
+            continue;
+        }
         scope_nested(compound, scope);
         if counted && index == last {
             compound.attributes.push(in_scope(scope));
@@ -53,6 +57,23 @@ fn scope_nested(compound: &mut Compound, scope: &str) {
             _ => {}
         }
     }
+}
+
+fn is_global(compound: &Compound) -> bool {
+    compound
+        .pseudo_classes
+        .iter()
+        .any(|pseudo| matches!(pseudo, PseudoClass::Global(_)))
+}
+
+/// Where the first rule using `:global()` starts, for refusing it in a
+/// sheet that is not a component's: there is no scope to leave.
+pub(crate) fn first_global(sheet: &Stylesheet) -> Option<Position> {
+    sheet
+        .rules
+        .iter()
+        .find(|rule| rule.selector.compounds.iter().any(is_global))
+        .map(|rule| rule.position)
 }
 
 fn in_scope(scope: &str) -> AttributeSelector {

@@ -57,10 +57,17 @@ impl Sheets {
     }
 
     pub(crate) fn add_author(&mut self, name: &str, text: &str) -> Result<(), ElementError> {
-        let sheet = vapors_css::parse(text).map_err(|error| ElementError::Css {
+        let refuse = |error| ElementError::Css {
             sheet: name.to_owned(),
             error,
-        })?;
+        };
+        let sheet = vapors_css::parse(text).map_err(refuse)?;
+        if let Some(position) = scope::first_global(&sheet) {
+            return Err(refuse(vapors_css::Error::new(
+                position,
+                ":global() only means something in a component's <style>, where the rest is scoped; in this sheet every rule is already global, so write the selector without it",
+            )));
+        }
         self.cascade = std::mem::take(&mut self.cascade).author(sheet);
         self.names.push(name.to_owned());
         Ok(())
