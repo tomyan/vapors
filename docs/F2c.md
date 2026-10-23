@@ -602,6 +602,50 @@ differs from the plan.
 - **Not in S4.** `position` and its alignment grammar stay with S8;
   `order` is not in vapors-css's table.
 
+### S5
+
+- **Scoped styles (D1).** A component with a `<style>` generates
+  `SCOPE`, `concat!(env!("CARGO_PKG_NAME"), "/", <path>)`, where the
+  path is the file's under the compiled directory's parent
+  (`demos/panel.wisp`). `mount_before` calls `Dom::add_style(SCOPE,
+  STYLE)`, and each element it creates gets
+  `set_attribute(el, SCOPE_ATTRIBUTE, SCOPE)` (`data-wisp`, defined once
+  in vapors-dom). The Document adds a scope's sheet once. Each of its
+  selectors requires the scope:
+  - The subject compound requires it as an attribute selector, so a
+    scoped rule gains one attribute of specificity.
+  - Every other compound, and the compounds inside `:is`, `:not`,
+    `:where` and `:has`, require it inside `:where()`, which adds none.
+    This is Svelte 5's rule.
+
+  A scoped sheet that does not parse is refused by every update, naming
+  its scope. The generated output changed: the compiler snapshot and
+  the counter's HTML now carry the scope.
+- **`:global(...)`.** vapors-css parses it like `:is()`. In a scoped
+  style, the compound holding it is left unscoped, so a component
+  writes `:global(body) { ... }`. In a sheet added with
+  `add_stylesheet` it is refused, naming the line. The demos style
+  `html` and `body` this way, and `vapors_demos::document` no longer
+  adds a global sheet.
+- **Global builds.** `compile_dir_global` compiles components whose
+  `STYLE` the app adds as a sheet, with nothing scoped. The layout
+  corpus uses it, so its CSS means what Chromium reads. A scoped copy
+  would be one attribute more specific than the same rule in Chromium.
+- **The `style` attribute.** vapors-css reads an element's `style`
+  attribute as author declarations above any selector's specificity
+  (Cascade 4 section 6.2). An important sheet declaration still beats a
+  normal inline one. The Document parses every `style` attribute before
+  styling. An attribute that does not parse is refused, naming the
+  element, line and column. A refused value from one is located as
+  `style attribute:line:column`.
+- **Demo.** `panel`: a panel and three `PanelRow` children, each with its
+  own CSS. Both use a `.title` class, and the panel's `.panel .title`
+  (red) is more specific than a row's `.title` (green dots). The pixel
+  checks hold the dots green at 640x400 and 390x800. With the subject
+  compound left unscoped, the dots turn red.
+- **Not in S5.** `@keyframes` names stay global; `:global { ... }` blocks
+  and `:global` inside `:is()` are not supported.
+
 ## Decisions (2026-10-23)
 
 - **D1 Scoping.** A compiler change in S5: `mount` registers its

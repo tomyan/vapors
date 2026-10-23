@@ -89,6 +89,13 @@ pub fn all() -> Vec<Demo> {
             },
         },
         Demo {
+            name: "panel",
+            pixels: Some(include_str!("../demos/panel.pixels")),
+            mount: |dom, parent| {
+                std::mem::forget(panel::Panel::mount(dom, parent, panel::PanelProps {}));
+            },
+        },
+        Demo {
             name: INDEX,
             pixels: None,
             mount: |dom, parent| {

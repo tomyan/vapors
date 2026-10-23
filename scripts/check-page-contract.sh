@@ -162,7 +162,7 @@ prepare() {
 }
 
 # The demos whose screenshots are held to crates/demos/demos/<name>.pixels.
-demos="hello counter boxes shell"
+demos="hello counter boxes shell panel"
 # The window shoot uses: 640x400, but for a demo section's screenshot.
 size=640,400
 

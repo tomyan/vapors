@@ -1,0 +1,19 @@
+# The panel demo at 640x400 CSS px at 1x: a 306 px panel centred on the
+# page at x 167..473, y 110..291; its title bar at y 123..157; three rows
+# at y 166..197, 206..237 and 246..277, each with a 12 px dot at x
+# 188..199. The panel's `.panel .title` is red and more specific than a
+# row's `.title`; scoped, it does not reach the rows' dots, which stay
+# green (proven by leaving the subject compound unscoped in
+# vapors-elements' style/scope.rs: the dots turn red).
+pixel 4 4 #e9ecef          page, top left
+pixel 167 200 #c7ccd1      the panel's 1px left border
+pixel 440 140 #d32f2f      the panel's title: red
+pixel 194 181 #2e7d32      the first row's dot: green, not the panel's red
+pixel 194 221 #2e7d32      the second row's dot
+pixel 194 261 #2e7d32      the third row's dot
+pixel 440 181 #f1f3f5      the first row's fill
+
+# A phone's width: the panel fits, centred at x 42..348, about 200 px lower.
+at 390x800
+pixel 69 381 #2e7d32       the first row's dot
+pixel 315 340 #d32f2f      the panel's title
