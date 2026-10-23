@@ -15,7 +15,7 @@ fn both_shapes_parse_and_comments_are_skipped() {
     let text = "# heading\npixel 1 2 #0a0b0c   where\n\nink 0 0 4 5 #ffffff box\n";
 
     // When
-    let checks = parse("demo", text).expect("parses");
+    let checks = parse("demo", text).expect("parses").checks;
 
     // Then
     assert_eq!(
@@ -111,4 +111,17 @@ fn a_pixel_outside_the_image_fails() {
 
     // Then
     assert!(found[0].contains("outside the image"), "{found:?}");
+}
+
+#[test]
+fn clicks_are_kept_in_file_order_apart_from_the_checks() {
+    // Given
+    let text = "click 3 4\npixel 1 2 #000000\nclick 5 6\n";
+
+    // When
+    let spec = parse("demo", text).expect("parses");
+
+    // Then
+    assert_eq!(spec.clicks, [[3, 4], [5, 6]]);
+    assert_eq!(spec.checks.len(), 1);
 }

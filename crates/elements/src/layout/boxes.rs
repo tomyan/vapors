@@ -18,8 +18,13 @@ use crate::style::{TextStyle, Used};
 pub(crate) enum Content {
     /// An element's box; its children are boxes too.
     Element(NodeId),
-    /// An anonymous box holding collapsed text in its parent's style.
-    Text { text: String, style: TextStyle },
+    /// An anonymous box holding collapsed text in its parent's style;
+    /// `visible` is the parent's `visibility`.
+    Text {
+        text: String,
+        style: TextStyle,
+        visible: bool,
+    },
 }
 
 /// One box: its content, Taffy style, children, and Taffy's results.
@@ -67,18 +72,18 @@ fn add_element(
         match &arena.get(child, "build").kind {
             Kind::Text(text) => run.push_str(text),
             Kind::Element(_) => {
-                add_text(&mut run, style.text, index, boxes);
+                add_text(&mut run, style, index, boxes);
                 if let Some(child_box) = add_element(arena, used, child, boxes) {
                     boxes[index].children.push(child_box);
                 }
             }
         }
     }
-    add_text(&mut run, style.text, index, boxes);
+    add_text(&mut run, style, index, boxes);
     Some(index)
 }
 
-fn add_text(run: &mut String, style: TextStyle, parent: usize, boxes: &mut Vec<LayoutBox>) {
+fn add_text(run: &mut String, parent_style: &Used, parent: usize, boxes: &mut Vec<LayoutBox>) {
     let text = collapse(run);
     run.clear();
     if text.is_empty() {
@@ -89,7 +94,12 @@ fn add_text(run: &mut String, style: TextStyle, parent: usize, boxes: &mut Vec<L
         display: Display::Block,
         ..Style::default()
     };
-    boxes.push(LayoutBox::new(Content::Text { text, style }, box_style));
+    let content = Content::Text {
+        text,
+        style: parent_style.text,
+        visible: parent_style.visible,
+    };
+    boxes.push(LayoutBox::new(content, box_style));
     boxes[parent].children.push(index);
 }
 

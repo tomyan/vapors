@@ -39,25 +39,6 @@ fn a_removed_element_is_no_longer_refused() {
 }
 
 #[test]
-fn a_listener_is_refused_until_events_are_fired() {
-    // Given
-    let mut doc = document();
-    let body = doc.body();
-    let div = element(&mut doc, body, "div", "panel");
-    doc.listen(div, "click", Box::new(|_: &mut Event| {}));
-
-    // When
-    let errors = refusals(&mut doc);
-
-    // Then
-    assert_eq!(errors.len(), 1, "{errors:?}");
-    assert!(
-        errors[0].contains("<div class=\"panel\">: onclick") && errors[0].contains("F2c S2"),
-        "{errors:?}"
-    );
-}
-
-#[test]
 fn a_deferred_property_off_its_initial_value_is_refused() {
     // Given
     let mut doc = document();
@@ -186,5 +167,26 @@ fn a_style_attribute_is_refused_naming_the_element_and_the_slice() {
     assert!(
         error.contains("<div class=\"panel\">: a `style` attribute") && error.contains("F2c S5"),
         "{error}"
+    );
+}
+
+#[test]
+fn a_listener_for_an_event_the_tree_never_fires_is_refused() {
+    // Given
+    let mut doc = document();
+    let body = doc.body();
+    let div = element(&mut doc, body, "div", "panel");
+    doc.listen(div, "click", Box::new(|_: &mut Event| {}));
+    doc.listen(div, "mouseover", Box::new(|_: &mut Event| {}));
+
+    // When
+    let errors = refusals(&mut doc);
+
+    // Then
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(
+        errors[0].contains("<div class=\"panel\">: onmouseover")
+            && errors[0].contains("never fires"),
+        "{errors:?}"
     );
 }

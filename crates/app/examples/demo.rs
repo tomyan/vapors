@@ -6,8 +6,9 @@
 //! ```
 //!
 //! With `--screenshot <png>` (which `cargo xtask screenshot` adds) it
-//! saves the second frame, checks it against the demo's `.pixels`, and
-//! exits 1 when a check fails or the document was refused.
+//! makes the demo's `.pixels` clicks after the first frame, saves the
+//! second, checks it against the `.pixels`, and exits 1 when a check
+//! fails or the document was refused.
 
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -15,7 +16,8 @@ use std::process::ExitCode;
 use std::rc::Rc;
 
 use vapors_app::ElementsApp;
-use vapors_pixels::{Image, failures, parse};
+use vapors_elements::Document;
+use vapors_pixels::{Image, Spec, failures, parse};
 use vapors_platform::{App, Event, Frame, Next, Platform, WindowOptions, run};
 
 fn main() -> ExitCode {
@@ -35,9 +37,11 @@ fn start() -> Result<(), String> {
         .filter(|a| !a.starts_with("--"))
         .ok_or("usage: demo <name> [--screenshot <png>]")?;
     let demo = vapors_demos::find(name)?;
-    let app = ElementsApp::new(vapors_demos::document(&demo)?);
+    let document = vapors_demos::document(&demo)?;
+    let app = ElementsApp::new(Rc::clone(&document));
     let failure = app.failure();
-    let shot = Shot::new(app, flag_value(&args, "--screenshot"), demo.pixels);
+    let spec = parse(name, demo.pixels.unwrap_or_default())?;
+    let shot = Shot::new(app, document, flag_value(&args, "--screenshot"), spec);
     let result = shot.result.clone();
     let options = WindowOptions {
         app_name: "demo".into(),
@@ -59,20 +63,28 @@ fn flag_value(args: &[String], flag: &str) -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
-/// The app, and on its second frame the screenshot and its checks.
+/// The app; after its first frame, the `.pixels` clicks; on the next,
+/// the screenshot and its checks.
 struct Shot {
     app: ElementsApp,
+    document: Rc<RefCell<Document>>,
     path: Option<PathBuf>,
-    pixels: Option<&'static str>,
+    spec: Spec,
     result: Rc<RefCell<Option<Result<(), String>>>>,
 }
 
 impl Shot {
-    fn new(app: ElementsApp, path: Option<PathBuf>, pixels: Option<&'static str>) -> Self {
+    fn new(
+        app: ElementsApp,
+        document: Rc<RefCell<Document>>,
+        path: Option<PathBuf>,
+        spec: Spec,
+    ) -> Self {
         Self {
             app,
+            document,
             path,
-            pixels,
+            spec,
             result: Rc::default(),
         }
     }
@@ -86,9 +98,6 @@ impl Shot {
             path.display(),
             frame.adapter.get_info().name
         );
-        let Some(text) = self.pixels else {
-            return Ok(());
-        };
         #[allow(clippy::cast_possible_truncation)] // a display scale
         let image = Image {
             width,
@@ -96,7 +105,7 @@ impl Shot {
             scale: frame.scale_factor as f32,
             rgba: &rgba,
         };
-        let found = failures(&parse("demo", text)?, &image);
+        let found = failures(&self.spec.checks, &image);
         if found.is_empty() {
             return Ok(());
         }
@@ -113,17 +122,24 @@ impl App for Shot {
         self.app.event(event, platform);
     }
 
+    /// The app's own answer, so a change that asks for no frame is not
+    /// hidden: after the first frame the clicks are made and the app
+    /// says whether they changed anything; the screenshot is the frame
+    /// that follows (or the first, when there are no clicks).
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
-        if self.app.frame(frame) == Next::Exit {
+        let next = self.app.frame(frame);
+        let Some(path) = &self.path else { return next };
+        if next == Next::Exit {
             return Next::Exit;
         }
-        match &self.path {
-            Some(path) if frame.index >= 1 => {
-                *self.result.borrow_mut() = Some(self.check(frame, path));
-                Next::Exit
+        if frame.index == 0 && !self.spec.clicks.is_empty() {
+            for point in &self.spec.clicks {
+                vapors_demos::click(&self.document, *point);
             }
-            _ => Next::Continue,
+            return self.app.next_after_frame();
         }
+        *self.result.borrow_mut() = Some(self.check(frame, path));
+        Next::Exit
     }
 }
 

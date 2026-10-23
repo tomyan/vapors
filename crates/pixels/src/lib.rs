@@ -6,6 +6,7 @@
 //! in seconds.
 //!
 //! ```text
+//! click X Y                    before the screenshot, click there (in file order)
 //! pixel X Y #rrggbb            exact, within 1 per channel
 //! ink X0 Y0 X1 Y1 #rrggbb      some pixel in the box is not that colour
 //! ```
@@ -35,23 +36,49 @@ pub enum Check {
     },
 }
 
-/// The checks in a `.pixels` file.
-///
-/// # Errors
-/// A line that is not one of the two shapes, naming the line.
-pub fn parse(name: &str, text: &str) -> Result<Vec<Check>, String> {
-    text.lines()
-        .enumerate()
-        .filter(|(_, line)| !line.trim().is_empty() && !line.trim_start().starts_with('#'))
-        .map(|(index, line)| {
-            parse_line(line).map_err(|e| format!("{name}.pixels:{}: {e}: {line}", index + 1))
-        })
-        .collect()
+/// A `.pixels` file: the clicks to make, then the checks to hold.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Spec {
+    /// Points (CSS pixels) to click before the screenshot, in order.
+    pub clicks: Vec<[u32; 2]>,
+    /// What the screenshot must show after them.
+    pub checks: Vec<Check>,
 }
 
-fn parse_line(line: &str) -> Result<Check, String> {
+enum Line {
+    Click([u32; 2]),
+    Check(Check),
+}
+
+/// The clicks and checks in a `.pixels` file.
+///
+/// # Errors
+/// A line that is not one of the three shapes, naming the line.
+pub fn parse(name: &str, text: &str) -> Result<Spec, String> {
+    let mut spec = Spec::default();
+    let lines = text
+        .lines()
+        .enumerate()
+        .filter(|(_, line)| !line.trim().is_empty() && !line.trim_start().starts_with('#'));
+    for (index, line) in lines {
+        match parse_line(line).map_err(|e| format!("{name}.pixels:{}: {e}: {line}", index + 1))? {
+            Line::Click(point) => spec.clicks.push(point),
+            Line::Check(check) => spec.checks.push(check),
+        }
+    }
+    Ok(spec)
+}
+
+fn parse_line(line: &str) -> Result<Line, String> {
     let fields: Vec<&str> = line.split_whitespace().collect();
     match fields.as_slice() {
+        ["click", x, y, ..] => Ok(Line::Click([number(x)?, number(y)?])),
+        _ => parse_check(&fields).map(Line::Check),
+    }
+}
+
+fn parse_check(fields: &[&str]) -> Result<Check, String> {
+    match fields {
         ["pixel", x, y, rgb, ..] => Ok(Check::Pixel {
             x: number(x)?,
             y: number(y)?,
@@ -62,7 +89,9 @@ fn parse_line(line: &str) -> Result<Check, String> {
             to: [number(x1)?, number(y1)?],
             rgb: colour(rgb)?,
         }),
-        _ => Err("expected `pixel X Y #rrggbb` or `ink X0 Y0 X1 Y1 #rrggbb`".to_owned()),
+        _ => {
+            Err("expected `click X Y`, `pixel X Y #rrggbb` or `ink X0 Y0 X1 Y1 #rrggbb`".to_owned())
+        }
     }
 }
 

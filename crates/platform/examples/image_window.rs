@@ -33,8 +33,13 @@ impl App for ImageWindow {
         self.app.event(event, platform);
     }
 
+    /// The app's own answer, except that a screenshot run keeps
+    /// drawing until it has its second frame.
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
-        self.app.frame(frame);
+        let next = self.app.frame(frame);
+        if self.screenshot.is_none() {
+            return next;
+        }
         support::after_first_frame(frame, self.screenshot.as_deref())
     }
 }

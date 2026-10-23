@@ -3,9 +3,9 @@
 # lands in #error when the page has one and in #status when it has not;
 # a status line never lands in #error; a lost GPU device is reported in
 # #error with the fix; the demos (?demo=) draw, an unknown demo is an
-# error, the page works one directory down (/vapors/), and the hello
-# demo's screenshot holds its pixel checks. Eight cases and two
-# screenshots on copies of the built page; any mismatch fails naming it.
+# error, the page works one directory down (/vapors/), and each demo's
+# screenshot, after the clicks its .pixels file lists, holds its pixel
+# checks. Copies of the built page; any mismatch fails naming the case.
 #
 # Usage: scripts/check-page-contract.sh target/web <new or empty dir>
 # after `cargo xtask web`. CI runs it in the `web` job. Needs python3
@@ -103,14 +103,24 @@ prepare() {
   # not a next frame, can report it.
   lose='<script>var request = GPUAdapter.prototype.requestDevice; GPUAdapter.prototype.requestDevice = function () { return request.apply(this, arguments).then(function (device) { setTimeout(function () { Window.prototype.requestAnimationFrame = window.requestAnimationFrame = function () { return 0; }; }, 500); setTimeout(function () { device.destroy(); }, 1000); return device; }); };</script>'
   adapter='status.textContent.indexOf("adapter: ") === 0'
+  full_size='(Number(document.body.dataset.frameHeight) || 0) >= 400'
   page as-built "" "$adapter"
-  # The screenshot's own copy, held until the canvas has presented:
-  # wgpu calls the canvas context's getCurrentTexture once per frame,
-  # counted on <body> as data-frames; at the third call the first two
-  # frames have presented. Without its own page and hold the screenshot
-  # was taken before any frame (vapors main, white centre, after #25).
-  frames='<script>var current = GPUCanvasContext.prototype.getCurrentTexture; GPUCanvasContext.prototype.getCurrentTexture = function () { if (document.body) { document.body.dataset.frames = String((Number(document.body.dataset.frames) || 0) + 1); } return current.apply(this, arguments); };</script>'
-  page as-built-shot "$frames" "(Number(document.body.dataset.frames) || 0) >= 3"
+  # The screenshot's own copy, held until the canvas has drawn at the
+  # screenshot's size: wgpu calls the canvas context's getCurrentTexture
+  # once per frame, counted on <body> as data-frames with the canvas
+  # height then as data-frame-height. Without its own page and hold the
+  # screenshot was taken before any frame (vapors main, white centre,
+  # after #25). Headless Chromium lays the page out 313 px tall while it
+  # loads and resizes it to the 400 px of --window-size only to take the
+  # screenshot, after the hold has ended (here, Chromium 155), so a hold
+  # waiting for a frame at 400 px would never end. The screenshot copies
+  # therefore size the canvas at 640x400 CSS px themselves, and the hold
+  # waits for a frame at that size rather than for a count of frames,
+  # which an app that draws only on change (F2c S2) never reaches. That
+  # a resize is redrawn is the `resize` case's to check.
+  counter='<script>var current = GPUCanvasContext.prototype.getCurrentTexture; GPUCanvasContext.prototype.getCurrentTexture = function () { if (document.body) { document.body.dataset.frames = String((Number(document.body.dataset.frames) || 0) + 1); document.body.dataset.frameHeight = String(this.canvas.height); } return current.apply(this, arguments); };</script>'
+  frames="<style>canvas { width: 640px !important; height: 400px !important; }</style>$counter"
+  page as-built-shot "$frames" "$full_size"
   page no-open-button "" "!error.hidden && $adapter" 's#<button id="open">Open</button>##'
   page no-webgpu "$nogpu" ""
   page no-webgpu-no-error-element "$nogpu" "" 's#<p id="error"[^>]*></p>##'
@@ -119,11 +129,56 @@ prepare() {
   # and the page served one directory down, as the tailnet serves it
   # at /vapors/: its script and wasm load from beside it.
   page hello "" "$adapter"
-  page hello-shot "$frames" "(Number(document.body.dataset.frames) || 0) >= 3"
+  for demo in $demos; do
+    if [ -n "$($check_pixels --clicks "crates/demos/demos/$demo.pixels")" ]; then
+      page "$demo-shot" "$frames$(clicker "$demo")" "$(after_clicks "$demo")"
+    else
+      page "$demo-shot" "$frames" "$full_size"
+    fi
+  done
   page unknown-demo "" "!error.hidden"
+  # The canvas resized by CSS after its first frame, as a window resize
+  # or a rotation does: the page draws only on change, so the hold ends
+  # only if the resize asks for a frame and it is drawn at 300 px.
+  page resize "$counter" "(function () { var f = Number(document.body.dataset.frames) || 0; if (f >= 1 && !window.vaporsResized) { var c = document.getElementById('vapors'); c.style.width = '500px'; c.style.height = '300px'; window.vaporsResized = true; } return (Number(document.body.dataset.frameHeight) || 0) === 300; })()"
   page subpath "" "$adapter"
   ln -s . "$work/vapors"
   grep -q '<p id="error"' "$work/as-built.html" || { echo "$web/index.html: no <p id=\"error\">" >&2; exit 1; }
+}
+
+# The demos whose screenshots are held to crates/demos/demos/<name>.pixels.
+demos="hello counter"
+
+# clicker <demo>: a script that makes the demo's .pixels clicks on the
+# canvas as a mouse would (move, press, release, pointer id 1; a move has no
+# button and lists itself as its coalesced event, which winit reads), in the
+# order the file lists them; check_pixels reads the file, so the native
+# screenshot and this one make the same clicks.
+clicker() {
+  calls=$($check_pixels --clicks "crates/demos/demos/$1.pixels" | while read -r x y; do printf 'vaporsClick(%s, %s); ' "$x" "$y"; done) \
+    || { echo "crates/demos/demos/$1.pixels: check_pixels could not read its clicks" >&2; exit 1; }
+  printf '%s' "<script>function vaporsClick(x, y) { var c = document.getElementById('vapors'); var o = { clientX: x, clientY: y, bubbles: true, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: 0, buttons: 1 }; var move = { clientX: x, clientY: y, bubbles: true, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: -1, buttons: 0 }; move.coalescedEvents = [new PointerEvent('pointermove', move)]; c.dispatchEvent(new PointerEvent('pointermove', move)); c.dispatchEvent(new PointerEvent('pointerdown', o)); o.buttons = 0; c.dispatchEvent(new PointerEvent('pointerup', o)); } function vaporsClicks() { $calls}</script>"
+}
+
+# after_clicks <demo>: the hold condition. The clicks wait for a frame
+# at the screenshot's 400 px (see frames in prepare: a click made on the
+# first, 313 px tall layout lands on another element); the hold then
+# ends once a frame after the clicks has begun, the one they asked for.
+# The page draws only on change, so a click that asks for no frame never
+# ends the hold, and `held` reports the server's timeout.
+after_clicks() {
+  echo "(function () { var f = Number(document.body.dataset.frames) || 0; if ((Number(document.body.dataset.frameHeight) || 0) < 400) return false; if (window.vaporsClickedAt === undefined) { vaporsClicks(); window.vaporsClickedAt = f; } return f > window.vaporsClickedAt; })()"
+}
+
+# held <page>: fails when the server let <page>'s hold go at its 30 s
+# deadline instead of the page's own condition: what the page was
+# waiting for never happened, and a dump or screenshot taken anyway
+# shows the page before it.
+held() {
+  if [ -f "$work/timeouts" ] && grep -qx "$1" "$work/timeouts"; then
+    fail "$1: the page's hold timed out at 30 s; its condition never held (a frame or a status that never came)"
+    return 1
+  fi
 }
 
 # The server answers within 10 s or the check fails (it starts in well
@@ -145,7 +200,9 @@ class Pages(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         if not self.path.startswith('/wait/'):
             return super().do_GET()
-        flag(self.path).wait(30)
+        if not flag(self.path).wait(30):
+            with open('timeouts', 'a') as out:
+                out.write(self.path.split('/', 2)[2] + '\\n')
         self.send_response(204); self.end_headers()
     def do_POST(self):
         flag(self.path).set()
@@ -244,6 +301,7 @@ check() {
   error_tag=$(printf '%s' "$dom" | grep -o '<p id="error"[^>]*>[^<]*</p>' || true)
   error=$(printf '%s' "$error_tag" | sed 's#<[^>]*>##g')
   echo "$1: ${took} s, #status [$status] #error [${error_tag:-absent}]"
+  held "$1" || true
   failed_before=$failed
   printf '%s' "$status" | grep -Eq "$2" || fail "$1: #status is [$status], wanted /$2/"
   case $3 in
@@ -283,7 +341,7 @@ check as-built '^adapter: ' hidden
 # device is lost at the first frame; with lavapipe alone it composites
 # white (see vulkan_driver).
 presented=none
-if shoot as-built-shot '?demo=image'; then
+if shoot as-built-shot '?demo=image' && held as-built-shot; then
   presented=$(centre_pixel "$work/as-built-shot.png") || presented="unreadable: $presented"
 fi
 echo "as-built-shot: the screenshot's centre is [$presented]"
@@ -301,12 +359,16 @@ check device-lost '^adapter: ' '^the GPU device was lost \(Destroyed: .*\); fix:
 check hello '^adapter: ' hidden '?demo=hello'
 check unknown-demo '^starting$' '^no demo is called `nope`' '?demo=nope'
 check subpath '^adapter: ' hidden '' vapors/
-# The hello demo as Chromium shows the canvas, held to the same
-# demos/hello.pixels as the native screenshot, by the same code.
-if shoot hello-shot '?demo=hello'; then
-  $check_pixels crates/demos/demos/hello.pixels "$work/hello-shot.png" || { fail "hello-shot: the canvas fails demos/hello.pixels; $work/hello-shot.png"; console hello-shot; }
-else
-  fail "hello-shot: $chrome exited non-zero or passed 60 s"; console hello-shot
-fi
+check resize '^adapter: ' hidden '?demo=hello'
+# Each demo as Chromium shows the canvas after its clicks, held to the
+# same crates/demos/demos/<name>.pixels as the native screenshot, by the
+# same code.
+for demo in $demos; do
+  if shoot "$demo-shot" "?demo=$demo" && held "$demo-shot"; then
+    $check_pixels "crates/demos/demos/$demo.pixels" "$work/$demo-shot.png" || { fail "$demo-shot: the canvas fails demos/$demo.pixels; $work/$demo-shot.png"; console "$demo-shot"; }
+  else
+    fail "$demo-shot: $chrome exited non-zero or passed 60 s"; console "$demo-shot"
+  fi
+done
 [ "$failed" = 0 ] || { echo "the page contract does not hold; reproduce: cargo xtask web && $0 target/web \$(mktemp -d)" >&2; exit 1; }
-echo "ok   the page contract holds in all eight cases and both screenshots"
+echo "ok   the page contract holds in all nine cases, the gradient screenshot and the screenshots of: $demos"

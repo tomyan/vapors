@@ -21,6 +21,7 @@ mod picker;
 #[cfg(target_family = "wasm")]
 mod picker_web;
 mod platform;
+mod redraw;
 mod report;
 mod surface;
 mod surface_texture;

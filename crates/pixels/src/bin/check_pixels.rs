@@ -1,6 +1,9 @@
 //! `check_pixels <file.pixels> <screenshot.png> [scale]`: a demo's
 //! pixel checks on a screenshot taken elsewhere, the web page's in
 //! particular. Prints each failure and exits 1 when any check fails.
+//! `check_pixels --clicks <file.pixels>` prints the file's clicks, one
+//! `X Y` per line, for the page-contract script to make before its
+//! screenshot.
 
 use std::process::ExitCode;
 
@@ -21,6 +24,11 @@ fn main() -> ExitCode {
 
 fn run() -> Result<(), String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if let [flag, pixels] = args.as_slice()
+        && flag == "--clicks"
+    {
+        return print_clicks(pixels);
+    }
     let [pixels, png, rest @ ..] = args.as_slice() else {
         return Err("usage: check_pixels <file.pixels> <screenshot.png> [scale]".to_owned());
     };
@@ -30,7 +38,7 @@ fn run() -> Result<(), String> {
         .map_err(|_| "the scale is not a number".to_owned())?;
     let text = std::fs::read_to_string(pixels).map_err(|e| format!("{pixels}: {e}"))?;
     let name = pixels.trim_end_matches(".pixels");
-    let checks = parse(name, &text)?;
+    let checks = parse(name, &text)?.checks;
     let (width, height, rgba) = read_png(png)?;
     let found = failures(
         &checks,
@@ -80,4 +88,12 @@ fn read_png(path: &str) -> Result<(u32, u32, Vec<u8>), String> {
         }
     };
     Ok((info.width, info.height, rgba))
+}
+
+fn print_clicks(pixels: &str) -> Result<(), String> {
+    let text = std::fs::read_to_string(pixels).map_err(|e| format!("{pixels}: {e}"))?;
+    for [x, y] in parse(pixels.trim_end_matches(".pixels"), &text)?.clicks {
+        println!("{x} {y}");
+    }
+    Ok(())
 }

@@ -8,7 +8,7 @@ use vapors_text::FontSystem;
 use crate::arena::Arena;
 use crate::error::ElementError;
 use crate::node::{Element, Kind, Node};
-use crate::paint::Painted;
+use crate::painted::Painted;
 use crate::style::Sheets;
 
 /// The element tree a component mounts into. Share it as
@@ -20,6 +20,10 @@ pub struct Document {
     pub(crate) sheets: Sheets,
     pub(crate) fonts: FontSystem,
     pub(crate) painted: Option<Painted>,
+    /// Whether anything shown may have changed since the last
+    /// `take_changed`: a tree, attribute, text or pointer-state change.
+    pub(crate) changed: bool,
+    pub(crate) pointer: crate::events::Pointer,
 }
 
 impl Document {
@@ -38,7 +42,17 @@ impl Document {
             sheets: Sheets::new(),
             fonts,
             painted: None,
+            changed: true,
+            pointer: crate::events::Pointer::default(),
         }
+    }
+
+    /// Whether anything that would change the next update happened since
+    /// the last call: the tree, an attribute, a text, a stylesheet or the
+    /// pointer's hover and active state. An app that redraws on change
+    /// asks this after each event. True for a new document.
+    pub fn take_changed(&mut self) -> bool {
+        std::mem::replace(&mut self.changed, false)
     }
 
     /// The `html` element.
@@ -61,6 +75,7 @@ impl Document {
     /// The CSS crate's refusal, with line and column; the sheet is not
     /// added.
     pub fn add_stylesheet(&mut self, name: &str, text: &str) -> Result<(), ElementError> {
+        self.changed = true;
         self.sheets.add_author(name, text)
     }
 

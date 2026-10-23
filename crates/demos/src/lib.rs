@@ -67,6 +67,18 @@ pub fn all() -> Vec<Demo> {
             },
         },
         Demo {
+            name: "counter",
+            style: counter::STYLE,
+            pixels: Some(include_str!("../demos/counter.pixels")),
+            mount: |dom, parent| {
+                std::mem::forget(counter::Counter::mount(
+                    dom,
+                    parent,
+                    counter::CounterProps {},
+                ));
+            },
+        },
+        Demo {
             name: INDEX,
             style: index::STYLE,
             pixels: None,
@@ -92,6 +104,17 @@ pub fn document(demo: &Demo) -> Result<Rc<RefCell<Document>>, String> {
     let body = document.borrow().body();
     (demo.mount)(&document, body);
     Ok(document)
+}
+
+/// Clicks at `point` (CSS pixels) as a mouse does: moves there,
+/// presses and releases. What a `.pixels` file's `click` lines do
+/// before a screenshot; the pointer stays there, hovering.
+#[allow(clippy::cast_precision_loss)] // screen coordinates are small
+pub fn click(document: &Rc<RefCell<Document>>, point: [u32; 2]) {
+    let point = [point[0] as f32, point[1] as f32];
+    Document::pointer_moved(document, point);
+    Document::pointer_pressed(document, point);
+    Document::pointer_released(document, point);
 }
 
 #[cfg(test)]

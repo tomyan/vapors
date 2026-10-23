@@ -3,6 +3,9 @@
 //! tag or event the tree does not implement yet is accepted here and
 //! refused by `update` while it is in the document (see `check`).
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use vapors_dom::{Dom, Handler, NodeId, PropertyValue};
 
 use crate::document::Document;
@@ -19,12 +22,14 @@ impl Dom for Document {
     }
 
     fn set_attribute(&mut self, node: NodeId, name: &str, value: &str) {
+        self.changed = true;
         self.element_mut(node, "set_attribute")
             .attributes
             .insert(name.to_owned(), value.to_owned());
     }
 
     fn set_text(&mut self, node: NodeId, text: &str) {
+        self.changed = true;
         match &mut self.arena.get_mut(node, "set_text").kind {
             Kind::Text(current) => text.clone_into(current),
             Kind::Element(element) => panic!(
@@ -35,16 +40,19 @@ impl Dom for Document {
     }
 
     fn set_property(&mut self, node: NodeId, name: &str, value: PropertyValue) {
+        self.changed = true;
         self.element_mut(node, "set_property")
             .properties
             .insert(name.to_owned(), value);
     }
 
     fn append(&mut self, parent: NodeId, child: NodeId) {
+        self.changed = true;
         self.arena.place("append", parent, child, None);
     }
 
     fn insert_before(&mut self, parent: NodeId, child: NodeId, before: Option<NodeId>) {
+        self.changed = true;
         self.arena.place("insert_before", parent, child, before);
     }
 
@@ -56,6 +64,7 @@ impl Dom for Document {
             "remove: {node:?} is the document's <{}>, which components mount under and which is never removed",
             if node == self.root() { "html" } else { "body" }
         );
+        self.changed = true;
         self.arena.detach(node);
         self.arena.free_subtree(node);
     }
@@ -63,7 +72,7 @@ impl Dom for Document {
     fn listen(&mut self, node: NodeId, event: &str, handler: Handler) {
         self.element_mut(node, "listen")
             .listeners
-            .push((event.to_owned(), handler));
+            .push((event.to_owned(), Rc::new(RefCell::new(handler))));
     }
 }
 

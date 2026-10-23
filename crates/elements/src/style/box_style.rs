@@ -13,8 +13,11 @@ use vapors_css::value::Value;
 use super::box_align::{align_content, align_items, align_self};
 use super::values::{Amount, Reader, amount, keyword, later, shape, unknown};
 
-/// The Taffy style of the element `reader` reads.
-pub(crate) fn box_style(reader: &mut Reader<'_>) -> Style {
+/// The Taffy style of the element `reader` reads; `flex_item` when its
+/// parent is a flex container, which blockifies it (CSS Display 3,
+/// 2.7): an inline-level display lays out as its block-level twin.
+pub(crate) fn box_style(reader: &mut Reader<'_>, flex_item: bool) -> Style {
+    let display = if flex_item { blockified } else { display };
     let mut style = Style {
         display: reader.read("display", display, Display::Block),
         box_sizing: reader.read("box-sizing", box_sizing, BoxSizing::ContentBox),
@@ -85,6 +88,14 @@ fn display(value: &Value) -> Result<Display, String> {
         "inline" | "inline-block" | "inline-flex" => Err(later("F2c S6")),
         "contents" => Err("`contents` is not scheduled in docs/F2c.md".to_owned()),
         other => Err(unknown(other)),
+    }
+}
+
+fn blockified(value: &Value) -> Result<Display, String> {
+    match keyword(value)? {
+        "inline" | "inline-block" => Ok(Display::Block),
+        "inline-flex" => Ok(Display::Flex),
+        _ => display(value),
     }
 }
 

@@ -1,0 +1,9 @@
+# The counter after one click on its button, at 640x400 CSS px at 1x.
+# The button is laid out at about x 247..393, y 167..210 and the strip
+# at x 200..440, y 226..234. The pointer stays on the button, so it
+# shows its :hover colour.
+click 320 188
+pixel 4 4 #e9ecef          page, top left
+pixel 320 230 #2e7d32      the strip turned green: the click reached the handler
+pixel 256 172 #2a3036      button padding, in its :hover colour
+ink 260 178 380 200 #2a3036 the button's label is drawn

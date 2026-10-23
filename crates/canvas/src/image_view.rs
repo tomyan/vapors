@@ -34,6 +34,9 @@ pub struct ImageView {
     pointer: Option<[f32; 2]>,
     dragging: bool,
     pub(crate) background: Color,
+    /// Bumped by every `set_image`: two images of the same size, fitted
+    /// the same, differ only in this.
+    generation: u64,
 }
 
 impl ImageView {
@@ -63,14 +66,23 @@ impl ImageView {
             pointer: None,
             dragging: false,
             background,
+            generation: 0,
         }
     }
 
     /// Replace what is shown with `image`, fitted.
     pub fn set_image(&mut self, image: RgbaImage) {
+        self.generation += 1;
         self.image = Some(image);
         self.uploaded = None;
         self.fit();
+    }
+
+    /// How many images have been set: it changes whenever the pixels
+    /// shown are replaced, even by an image of the same size.
+    #[must_use]
+    pub fn generation(&self) -> u64 {
+        self.generation
     }
 
     /// True once an image has been set.

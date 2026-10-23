@@ -9,20 +9,49 @@ use crate::PlatformError;
 use crate::device_lost::{DeviceLost, Lost};
 use crate::file_kind::{self, FileKind};
 use crate::picker;
+use crate::redraw::RedrawFlag;
 use crate::window::Message;
 
 /// Given to the app with every event.
 pub struct Platform {
-    proxy: EventLoopProxy<Message>,
+    /// `None` for a detached platform, which has no event loop.
+    proxy: Option<EventLoopProxy<Message>>,
     lost: DeviceLost,
+    redraw: RedrawFlag,
 }
 
 impl Platform {
     pub(crate) fn new(proxy: EventLoopProxy<Message>) -> Self {
         Self {
-            proxy,
+            proxy: Some(proxy),
             lost: DeviceLost::default(),
+            redraw: RedrawFlag::default(),
         }
+    }
+
+    /// A platform with no event loop, to drive an app's `event` in a
+    /// test without a window: its requests are recorded and can be read
+    /// back, and `pick_file` refuses.
+    #[must_use]
+    pub fn detached() -> Self {
+        Self {
+            proxy: None,
+            lost: DeviceLost::default(),
+            redraw: RedrawFlag::default(),
+        }
+    }
+
+    /// Ask for a frame: what an app that returns
+    /// [`Next::Wait`](crate::Next::Wait) calls from `event` when what it
+    /// shows has changed. Several calls before the frame draw it once.
+    pub fn request_redraw(&self) {
+        self.redraw.raise();
+    }
+
+    /// Whether a frame was asked for since the last call; clears it.
+    /// The loop reads it after each event; a test may too.
+    pub fn take_redraw_request(&self) -> bool {
+        self.redraw.take()
     }
 
     /// The state the window's device is watched into.
@@ -42,8 +71,14 @@ impl Platform {
         self.lost.get()
     }
 
+    /// The loop's proxy.
+    ///
+    /// # Panics
+    /// On a detached platform, which the loop is never given.
     pub(crate) fn proxy(&self) -> EventLoopProxy<Message> {
-        self.proxy.clone()
+        self.proxy
+            .clone()
+            .expect("the window's own platform has a proxy; only Platform::detached lacks one")
     }
 
     /// Open the system's file picker for one file of one of `kinds`. The
@@ -55,10 +90,16 @@ impl Platform {
     /// # Errors
     ///
     /// [`PlatformError::Picker`] when `kinds` is empty or a kind has no
-    /// extensions; the picker is not opened.
+    /// extensions, or the platform is detached; the picker is not opened.
     pub fn pick_file(&self, kinds: &[FileKind]) -> Result<(), PlatformError> {
         file_kind::check(kinds)?;
-        picker::open(self.proxy(), kinds.to_vec());
+        let Some(proxy) = &self.proxy else {
+            return Err(PlatformError::Picker(
+                "this platform is detached (Platform::detached), so it has no picker to open"
+                    .to_owned(),
+            ));
+        };
+        picker::open(proxy.clone(), kinds.to_vec());
         Ok(())
     }
 }

@@ -107,6 +107,16 @@ impl Handler {
         )
     }
 
+    /// Asks the window for a frame if the app asked for one while it
+    /// handled the events just delivered.
+    fn redraw_if_asked(&self) {
+        if self.platform.take_redraw_request()
+            && let Some(window) = &self.window
+        {
+            window.request_redraw();
+        }
+    }
+
     fn fail(&mut self, event_loop: &ActiveEventLoop, error: PlatformError) {
         crate::report::fatal(&error);
         self.error = Some(error);
@@ -163,6 +173,7 @@ impl Handler {
         self.presented += 1;
         match next {
             Next::Continue => window.request_redraw(),
+            Next::Wait => {}
             Next::Exit => event_loop.exit(),
         }
     }

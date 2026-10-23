@@ -105,8 +105,19 @@ impl CssElement for ElementRef<'_> {
         })
     }
 
+    /// The pointer's flags, and for a button whether it is enabled:
+    /// `:enabled` and `:disabled` are set on form controls only.
     fn states(&self) -> States {
-        States::NONE
+        let data = self.data();
+        if data.tag != "button" {
+            return data.states;
+        }
+        let control = if data.attributes.contains_key("disabled") {
+            States::DISABLED
+        } else {
+            States::ENABLED
+        };
+        data.states.union(control)
     }
 
     fn container_size(&self) -> Option<(f32, f32)> {

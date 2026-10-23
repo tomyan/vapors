@@ -10,7 +10,8 @@ pub enum ElementError {
     UnsupportedTag(String),
     /// A listener for an event the tree never fires.
     UnfiredEvent(String),
-    /// An attribute the tree does not honour, such as `style`.
+    /// An attribute the tree does not honour (`style`), or a value of one
+    /// it cannot honour (`disabled="false"`).
     UnsupportedAttribute(String),
     /// A stylesheet that does not parse, or a declaration that does not
     /// compute (an unresolved `var()`).
