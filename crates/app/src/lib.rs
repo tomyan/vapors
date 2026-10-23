@@ -6,6 +6,7 @@
 
 mod elements_app;
 mod painter;
+mod pointer;
 
 pub use elements_app::{ElementsApp, Failure};
 pub use painter::ScenePainter;

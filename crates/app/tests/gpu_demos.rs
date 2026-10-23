@@ -12,15 +12,23 @@ use vapors_scene::{Color, Size};
 const WIDTH: u32 = 640;
 const HEIGHT: u32 = 400;
 
-fn render(name: &str) -> Vec<u8> {
+/// The demo after its `.pixels` clicks, painted offscreen.
+fn render(name: &str, clicks: &[[u32; 2]]) -> Vec<u8> {
     let demo = vapors_demos::find(name).expect("a demo");
-    let document = vapors_demos::document(&demo).expect("its style parses");
-    let mut document = document.borrow_mut();
+    let shared = vapors_demos::document(&demo).expect("its style parses");
     let viewport = Viewport {
         width: 640.0,
         height: 400.0,
         scale: 1.0,
     };
+    shared
+        .borrow_mut()
+        .update(viewport)
+        .unwrap_or_else(|errors| panic!("{name} was refused: {errors:#?}"));
+    for click in clicks {
+        vapors_demos::click(&shared, *click);
+    }
+    let mut document = shared.borrow_mut();
     let painted = document
         .update(viewport)
         .unwrap_or_else(|errors| panic!("{name} was refused: {errors:#?}"));
@@ -56,10 +64,10 @@ fn gpu_every_demo_passes_its_pixel_checks_offscreen() {
     for demo in vapors_demos::all() {
         // Given
         let Some(text) = demo.pixels else { continue };
-        let checks = parse(demo.name, text).expect("parses");
+        let spec = parse(demo.name, text).expect("parses");
 
         // When
-        let rgba = render(demo.name);
+        let rgba = render(demo.name, &spec.clicks);
 
         // Then
         let image = Image {
@@ -69,7 +77,7 @@ fn gpu_every_demo_passes_its_pixel_checks_offscreen() {
             rgba: &rgba,
         };
         assert_eq!(
-            failures(&checks, &image),
+            failures(&spec.checks, &image),
             Vec::<String>::new(),
             "{}",
             demo.name

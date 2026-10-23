@@ -6,6 +6,7 @@
 const SUPPORTED: &[&str] = &[
     "html",
     "body",
+    "button",
     "div",
     "p",
     "h1",
@@ -28,7 +29,6 @@ const SUPPORTED: &[&str] = &[
 
 /// Where each unimplemented tag arrives.
 const LATER: &[(&str, &[&str])] = &[
-    ("F2c S2", &["button"]),
     ("F2c S3", &["hr"]),
     (
         "F2c S6",
@@ -66,15 +66,17 @@ pub(crate) fn unsupported(tag: &str) -> Option<String> {
     ))
 }
 
-/// `None` when the tree fires `event`; otherwise why not. No events
-/// are fired before pointer input arrives in F2c S2.
-#[allow(
-    clippy::unnecessary_wraps,
-    reason = "every event is refused until F2c S2 adds the ones the tree fires"
-)]
+/// The events the tree fires (F2c S2).
+pub(crate) const FIRED: &[&str] = &["click", "pointerdown", "pointermove", "pointerup"];
+
+/// `None` when the tree fires `event`; otherwise why not.
 pub(crate) fn unfired(event: &str) -> Option<String> {
+    if FIRED.contains(&event) {
+        return None;
+    }
     Some(format!(
-        "on{event}: vapors-elements fires no events yet; pointer events and click arrive in F2c S2 (docs/F2c.md)"
+        "on{event}: vapors-elements never fires `{event}`; it fires {} (docs/F2c.md), so this listener would never run",
+        FIRED.join(", ")
     ))
 }
 

@@ -3,6 +3,8 @@
 
 #![allow(dead_code)] // each test file uses a subset
 
+pub mod pointer;
+
 use vapors_dom::{Dom, NodeId};
 use vapors_elements::{Document, ElementError, Viewport};
 use vapors_text::FontSystem;

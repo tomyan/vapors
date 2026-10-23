@@ -74,7 +74,10 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
         "container-type",
         Deferred("no slice yet: @container needs layout-time restyle"),
     ),
-    ("cursor", Deferred("F2c S2")),
+    (
+        "cursor",
+        Deferred("F2c S3: the platform has no way to set the cursor yet"),
+    ),
     ("display", Read),
     ("filter", Deferred("F3")),
     ("flex-basis", Read),
@@ -122,6 +125,7 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ("padding-left", Read),
     ("padding-right", Read),
     ("padding-top", Read),
+    ("pointer-events", Read),
     ("position", Deferred("F2c S8")),
     (
         "right",
@@ -140,7 +144,7 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ("transition-property", Deferred("a slice after F2c")),
     ("transition-timing-function", Deferred("a slice after F2c")),
     ("user-select", Deferred("F4")),
-    ("visibility", Deferred("F2c S2")),
+    ("visibility", Read),
     ("white-space", Read),
     ("width", Read),
     ("z-index", Deferred("F2c S8")),

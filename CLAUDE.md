@@ -19,6 +19,10 @@ cargo run -p vapors-app --example demo -- hello
                           an F2c demo in a window (crates/demos)
 cargo xtask screenshot demo target/hello.png -- hello
                           the same under Xvfb, held to demos/hello.pixels
+cargo run -p vapors-app --example idle_fps -- hello|counter|image
+                          frames drawn in 3 s idle, natively (0 when it redraws on change)
+scripts/web-idle-frames.sh target/web <new dir>
+                          the same on the built page in headless Chromium
 cargo run -p vapors-elements-corpus --example layout_oracle [-- --check]
                           Chromium's boxes for the layout fixtures
 bacon                     unit tier on every save

@@ -444,6 +444,57 @@ After each slice the plan is reread. The question is whether the next
 slice is still the most useful one for touche, given what the last
 slice showed.
 
+## As built
+
+### S1 (PR #32)
+
+See the PR; the points above marked "As built in S1" record where it
+differs from the plan.
+
+### S2
+
+- **Redraw on demand.** `Next::Wait` draws again only when the app
+  calls `Platform::request_redraw` while handling an event, or the
+  window is resized or changes scale. `ElementsApp` asks when
+  `Document::take_changed` says the tree, a text, an attribute, a
+  stylesheet or a pointer state changed; the image app asks when its
+  view transform, image or file name changed. Idle frames, measured
+  over 3 s after start-up (native: `idle_fps` under Xvfb on llvmpipe,
+  which presents without vsync; web: headless Chromium 155 with
+  SwiftShader, real time):
+
+  | App | Native before | Native after | Web before | Web after |
+  |---|---|---|---|---|
+  | hello (elements) | 82 (27/s) | 0 | 180 (60/s) | 0 |
+  | image app | 530 (177/s) | 0 | 172 (57/s) | 0 |
+
+  The web "before" numbers were taken with the same page script before
+  `scripts/web-idle-frames.sh` existed; the "after" numbers come from
+  the script.
+- **Pointer input.** `Document::pointer_moved`, `pointer_pressed`,
+  `pointer_released`, `pointer_left` and `tapped` (CSS pixels) hit-test
+  the last update, set `:hover` and `:active`, and dispatch
+  `pointermove`, `pointerdown`, `pointerup` and `click` (on the nearest
+  common ancestor of press and release) with bubbling. A disabled
+  button gets no `click`. `pointer-events` (`auto`, `none`) is a new
+  CSS longhand; `visibility` is read. A touch reaches the document only
+  as its tap, so one tap is one click. `pointerenter`/`pointerleave` are
+  not fired (refused like any unfired event).
+- **Button.** Supported where it is a flex or grid item, which
+  blockifies it; elsewhere it stays inline-block and is refused until
+  S6. `disabled="false"` is refused, since it disables in HTML and the
+  `Dom` cannot remove an attribute until F4. `cursor` moved to S3: the
+  platform has no way to set it yet.
+- **Page contract.** A hold that reached the server's 30 s deadline used
+  to end silently and let the dump or screenshot run anyway; it now
+  fails naming the page. The screenshot copies size the canvas at
+  640x400 themselves and hold on a frame at that size, because headless
+  Chromium lays the page out 313 px tall until it takes the screenshot,
+  and an app that draws on change may not redraw for that late resize.
+  Each demo's `.pixels` file may list `click X Y` lines, made before the
+  screenshot natively (by the example) and on the web (synthetic
+  pointer events on the canvas).
+
 ## Decisions (2026-10-23)
 
 - **D1 Scoping.** A compiler change in S5: `mount` registers its

@@ -49,6 +49,8 @@ pub(super) static SECOND_HALF: &[PropertyDef] = &[
     def("padding-left", false, "0px", PADDING),
     def("padding-right", false, "0px", PADDING),
     def("padding-top", false, "0px", PADDING),
+    // Only the two values HTML content uses; the SVG values are refused.
+    def("pointer-events", true, "auto", "auto | none"),
     def(
         "position",
         false,

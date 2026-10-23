@@ -2470,6 +2470,7 @@ name = "vapors-app"
 version = "0.0.0"
 dependencies = [
  "png",
+ "vapors-canvas",
  "vapors-demos",
  "vapors-elements",
  "vapors-gpu-harness",

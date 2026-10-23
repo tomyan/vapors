@@ -11,7 +11,8 @@ use crate::check::{check_tree, describe, elements, implemented};
 use crate::document::Document;
 use crate::error::ElementError;
 use crate::layout::{build, lay_out};
-use crate::paint::{PaintInput, Painted, paint};
+use crate::paint::{PaintInput, paint};
+use crate::painted::Painted;
 use crate::style::{ElementStyles, Refusal, Used, initial_style, used};
 
 /// What the window or canvas gives the document each frame.
@@ -75,9 +76,13 @@ impl Document {
             if !implemented(&self.arena, node) {
                 continue;
             }
+            let flex_item = self
+                .parent(node)
+                .and_then(|parent| out.get(&parent))
+                .is_some_and(|parent: &Used| parent.layout.display == taffy::Display::Flex);
             let own = styles.of(node);
             let parent = self.parent(node).map(|parent| styles.of(parent));
-            match used(ElementStyles { own, parent }, &initial) {
+            match used(ElementStyles { own, parent }, &initial, flex_item) {
                 Ok(style) => drop(out.insert(node, style)),
                 Err(refusals) => errors.extend(self.unhonoured(node, refusals)),
             }

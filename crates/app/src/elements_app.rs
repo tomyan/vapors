@@ -7,12 +7,13 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use vapors_elements::{Document, ElementError, Viewport};
+use vapors_elements::{Document, ElementError, Point, Viewport};
 use vapors_platform::{App, Event, Frame, Next, Platform, report_error};
 use vapors_renderer::Target;
 use vapors_scene::Size;
 
 use crate::painter::ScenePainter;
+use crate::pointer::{Action, action};
 
 /// Why the app stopped, once it has: shared with whoever ran it.
 #[derive(Clone, Default)]
@@ -35,6 +36,10 @@ pub struct ElementsApp {
     document: Rc<RefCell<Document>>,
     painter: Option<ScenePainter>,
     failure: Failure,
+    /// The last frame's display scale, for input in physical pixels.
+    scale: f32,
+    /// Where the pointer last moved, in CSS pixels.
+    pointer: Point,
 }
 
 impl ElementsApp {
@@ -45,6 +50,8 @@ impl ElementsApp {
             document,
             painter: None,
             failure: Failure::default(),
+            scale: 1.0,
+            pointer: [0.0, 0.0],
         }
     }
 
@@ -64,9 +71,12 @@ impl ElementsApp {
             width: frame.texture.width(),
             height: frame.texture.height(),
         };
+        #[allow(clippy::cast_possible_truncation)] // a display scale
+        let scale = frame.scale_factor as f32;
+        self.scale = scale;
         let mut document = self.document.borrow_mut();
         let painted = document
-            .update(viewport(size, frame.scale_factor))
+            .update(viewport(size, scale))
             .map_err(|errors| refused(&errors))?;
         let view = frame
             .texture
@@ -86,14 +96,37 @@ impl ElementsApp {
     }
 }
 
+impl ElementsApp {
+    fn act(&mut self, action: Action) {
+        let document = &self.document;
+        match action {
+            Action::Move(point) => {
+                self.pointer = point;
+                Document::pointer_moved(document, point);
+            }
+            Action::Press(point) => Document::pointer_pressed(document, point),
+            Action::Release(point) => Document::pointer_released(document, point),
+            Action::Leave => Document::pointer_left(document),
+            Action::Tap(point) => Document::tapped(document, point),
+        }
+    }
+}
+
+/// Draws only when the document changed: an idle document draws no
+/// frames.
 impl App for ElementsApp {
-    /// Pointer input reaches the document in F2c S2; until then events
-    /// change nothing it shows.
-    fn event(&mut self, _event: Event, _platform: &Platform) {}
+    fn event(&mut self, event: Event, platform: &Platform) {
+        if let Some(action) = action(&event, self.scale, self.pointer) {
+            self.act(action);
+        }
+        if self.document.borrow_mut().take_changed() {
+            platform.request_redraw();
+        }
+    }
 
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
         match self.draw(frame) {
-            Ok(()) => Next::Continue,
+            Ok(()) => Next::Wait,
             Err(message) => {
                 report_error(&message);
                 self.failure.set(&message);
@@ -104,8 +137,7 @@ impl App for ElementsApp {
 }
 
 #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)] // window sizes and scales are small
-fn viewport(size: Size, scale: f64) -> Viewport {
-    let scale = scale as f32;
+fn viewport(size: Size, scale: f32) -> Viewport {
     Viewport {
         width: size.width as f32 / scale,
         height: size.height as f32 / scale,

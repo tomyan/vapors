@@ -42,6 +42,12 @@ pub(crate) fn check_tree(arena: &Arena, root: NodeId) -> Vec<ElementError> {
                 describe(arena, node)
             )));
         }
+        if let Some(refusal) = disabled_value(&element.tag, element.attributes.get("disabled")) {
+            errors.push(ElementError::UnsupportedAttribute(format!(
+                "{}: {refusal}",
+                describe(arena, node)
+            )));
+        }
         for (event, _) in &element.listeners {
             if let Some(refusal) = tags::unfired(event) {
                 errors.push(ElementError::UnfiredEvent(format!(
@@ -76,4 +82,17 @@ pub(crate) fn implemented(arena: &Arena, node: NodeId) -> bool {
         .get(node, "implemented")
         .element()
         .is_some_and(|element| tags::unsupported(&element.tag).is_none())
+}
+
+/// A `disabled` attribute disables by being present, as in HTML, so
+/// `disabled="false"` disables too; a `.wisp` that sets it from an
+/// expression would get exactly that. Refused until the tree can remove
+/// an attribute (a `Dom` change, scheduled with the inputs in F4).
+fn disabled_value(tag: &str, value: Option<&String>) -> Option<String> {
+    match value.map(String::as_str) {
+        Some("false") => Some(format!(
+            "<{tag} disabled=\"false\"> is disabled: an HTML boolean attribute disables by being present; leave it out to enable, since the tree cannot remove an attribute until F4"
+        )),
+        _ => None,
+    }
 }
