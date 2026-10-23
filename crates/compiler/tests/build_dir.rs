@@ -185,3 +185,36 @@ fn a_file_named_after_a_rust_keyword_is_refused_naming_the_file() {
         "{errors:?}"
     );
 }
+
+#[test]
+fn a_styled_components_scope_is_its_path_under_the_compiled_directorys_parent() {
+    // Given
+    let (src, out) = dirs("scope_path");
+    write(
+        &src,
+        "panels/card.wisp",
+        "<style>p { color: red; }</style>\n<p>Card</p>",
+    );
+
+    // When
+    compile_dir_into(&src, &out).unwrap_or_else(|errs| panic!("{errs:?}"));
+
+    // Then: the same on every machine, whatever the checkout's path
+    let code = read(&out.join("wisp/panels/card.rs"));
+    assert!(code.contains(r#""/", "src/panels/card.wisp")"#), "{code}");
+}
+
+#[test]
+fn a_file_outside_the_directory_naming_its_scope_is_refused() {
+    // Given
+    let (src, _out) = dirs("scope_outside");
+    write(&src, "card.wisp", COUNTER);
+    let elsewhere = src.parent().expect("parent").join("elsewhere");
+
+    // When
+    let error = vapors_compiler::compile_file_under(&src.join("card.wisp"), &elsewhere)
+        .expect_err("refused");
+
+    // Then
+    assert!(error.to_string().contains("is not under"), "{error}");
+}

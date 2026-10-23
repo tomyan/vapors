@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use super::tree::{Dir, scan};
 use super::{Compiled, modules, path_error};
-use crate::{CompileError, compile_file};
+use crate::{CompileError, compile_file_under};
 
 /// Compiles every `.wisp` under `src` into `out/wisp/` and writes
 /// `out/wisp.rs`.
@@ -24,7 +24,8 @@ pub fn compile_dir_into(src: &Path, out: &Path) -> Result<Compiled, Vec<CompileE
     let generated = out.join("wisp");
     let mut outputs = Vec::new();
     let mut errors = Vec::new();
-    compile_tree(&tree, &generated, &mut outputs, &mut errors);
+    let root = src.parent().unwrap_or(src);
+    compile_tree(&tree, root, &generated, &mut outputs, &mut errors);
     if !errors.is_empty() {
         return Err(errors);
     }
@@ -40,18 +41,19 @@ type Output = (PathBuf, String);
 
 fn compile_tree(
     dir: &Dir,
+    root: &Path,
     target: &Path,
     outputs: &mut Vec<Output>,
     errors: &mut Vec<CompileError>,
 ) {
     for file in &dir.files {
-        match compile_file(&file.path) {
+        match compile_file_under(&file.path, root) {
             Ok(code) => outputs.push((target.join(format!("{}.rs", file.module)), code)),
             Err(err) => errors.push(err),
         }
     }
     for sub in &dir.dirs {
-        compile_tree(sub, &target.join(&sub.module), outputs, errors);
+        compile_tree(sub, root, &target.join(&sub.module), outputs, errors);
     }
 }
 

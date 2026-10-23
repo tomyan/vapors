@@ -15,9 +15,12 @@ pub(crate) fn assemble(component: &Component, info: &ScriptInfo, body: &str) -> 
         .as_ref()
         .map_or("", |section| section.text.as_str());
     let mut file = header(&component.path, style);
+    if component.style.is_some() {
+        file.push_str(&scope_constant(&component.scope));
+    }
     file.push_str(&props_struct(name, info));
     file.push_str(&component_struct(name, info));
-    file.push_str(&mount_methods(name, info, body));
+    file.push_str(&mount_methods(name, info, body, component.style.is_some()));
     file.push_str(&accessors());
     file
 }
@@ -27,12 +30,23 @@ fn header(path: &str, style: &str) -> String {
         "use std::cell::RefCell;
 use std::rc::Rc;
 #[allow(unused_imports)]
-use vapors_dom::{{Dom, Event, NodeId, PropertyValue, Root}};
+use vapors_dom::{{Dom, Event, NodeId, PropertyValue, Root, SCOPE_ATTRIBUTE}};
 #[allow(unused_imports)]
 use vapors_signals::{{Effect, Memo, Owner, Signal}};
 
 /// The `<style>` of `{path}`, resolved at run time by the css crate.
 pub const STYLE: &str = {style:?};
+
+"
+    )
+}
+
+/// The scope the style is added under and each element is tagged with:
+/// the crate and the file, so two crates' `src/panel.wisp` differ.
+fn scope_constant(scope: &str) -> String {
+    format!(
+        "/// The scope [`STYLE`] is added under, set on each element as [`SCOPE_ATTRIBUTE`].
+pub const SCOPE: &str = concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {scope:?});
 
 "
     )
@@ -120,11 +134,16 @@ fn field_lists(info: &ScriptInfo) -> (String, String) {
     )
 }
 
-fn mount_methods(name: &str, info: &ScriptInfo, body: &str) -> String {
+fn mount_methods(name: &str, info: &ScriptInfo, body: &str, styled: bool) -> String {
     let (returned, built) = field_lists(info);
     let allowances = mount_allowances(info);
     let prop_names: Vec<&str> = info.props.iter().map(|prop| prop.name.as_str()).collect();
     let prop_names = prop_names.join(", ");
+    let add_style = if styled {
+        "        dom.borrow_mut().add_style(SCOPE, STYLE);\n"
+    } else {
+        ""
+    };
     let mut statements = String::new();
     for statement in &info.statements {
         let _ = writeln!(statements, "            {statement}");
@@ -139,7 +158,7 @@ fn mount_methods(name: &str, info: &ScriptInfo, body: &str) -> String {
     /// Mounts the component in `parent` before `before` (at the end when `None`).
 {allowances}    pub fn mount_before<D: Dom + 'static>(dom: &Rc<RefCell<D>>, parent: NodeId, before: Option<NodeId>, props: {name}Props) -> Self {{
         let {name}Props {{ {prop_names} }} = props;
-        let owner = Owner::new();
+{add_style}        let owner = Owner::new();
         let {returned} = owner.with(|| {{
 {statements}            let mut roots = Vec::new();
 {body}            {returned}

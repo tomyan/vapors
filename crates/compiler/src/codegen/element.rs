@@ -17,6 +17,11 @@ impl Emitter<'_> {
             element.tag
         ));
         self.attach(&var, place);
+        if self.scoped {
+            self.line(format!(
+                "dom.borrow_mut().set_attribute({var}, SCOPE_ATTRIBUTE, SCOPE);"
+            ));
+        }
         for attribute in element.attributes.iter() {
             self.emit_attribute(element, &var, attribute)?;
         }
