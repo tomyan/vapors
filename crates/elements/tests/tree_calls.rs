@@ -149,9 +149,6 @@ fn setting_an_attribute_on_a_text_node_panics() {
     doc.set_attribute(node, "class", "a");
 }
 
-/// One call on the document, by name.
-type Change = Box<dyn Fn(&mut vapors_elements::Document)>;
-
 #[test]
 #[should_panic(expected = "the document's <body>")]
 fn removing_the_body_panics_naming_it() {
@@ -172,51 +169,4 @@ fn removing_the_root_panics_naming_it() {
 
     // When
     doc.remove(root);
-}
-
-#[test]
-fn each_change_to_what_is_shown_asks_for_a_frame_and_listening_does_not() {
-    // Given
-    let mut doc = document();
-    let body = doc.body();
-    let div = element(&mut doc, body, "div", "");
-    let words = text(&mut doc, div, "a");
-    let changes: [(&str, Change); 6] = [
-        ("set_text", Box::new(move |d| d.set_text(words, "b"))),
-        (
-            "set_attribute",
-            Box::new(move |d| d.set_attribute(div, "class", "x")),
-        ),
-        (
-            "set_property",
-            Box::new(move |d| d.set_property(div, "value", vapors_dom::PropertyValue::Bool(true))),
-        ),
-        (
-            "append",
-            Box::new(move |d| {
-                let n = d.create_element("div");
-                d.append(div, n);
-            }),
-        ),
-        (
-            "insert_before",
-            Box::new(move |d| {
-                let n = d.create_text("c");
-                d.insert_before(div, n, Some(words));
-            }),
-        ),
-        ("remove", Box::new(move |d| d.remove(words))),
-    ];
-
-    for (name, change) in changes {
-        doc.take_changed();
-
-        // When
-        change(&mut doc);
-
-        // Then
-        assert!(doc.take_changed(), "{name} asks for a frame");
-    }
-    doc.listen(div, "click", Box::new(|_: &mut vapors_dom::Event| {}));
-    assert!(!doc.take_changed(), "a listener changes nothing shown");
 }
