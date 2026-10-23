@@ -1,0 +1,117 @@
+---
+source: crates/compiler/tests/codegen_snapshot.rs
+expression: code
+---
+// Generated from `src/counter.wisp` by vapors-compiler; edit the .wisp, not this file.
+
+use std::cell::RefCell;
+use std::rc::Rc;
+#[allow(unused_imports)]
+use vapors_dom::{Dom, Event, NodeId, PropertyValue, Root};
+#[allow(unused_imports)]
+use vapors_signals::{Effect, Memo, Owner, Signal};
+/// The `<style>` of `src/counter.wisp`, resolved at run time by the css crate.
+pub const STYLE: &str = "\nbutton { padding: 4px 8px; }\n";
+/// What a parent passes to [`Counter::mount`]; each prop has a default.
+#[derive(Default)]
+pub struct CounterProps {}
+/// `Counter`: its signals, and what `unmount` removes.
+pub struct Counter {
+    /// `count`, declared in `<script>`.
+    pub count: Signal<i32>,
+    owner: Owner,
+    roots: Vec<Root>,
+}
+impl Counter {
+    /// Mounts the component at the end of `parent`.
+    pub fn mount<D: Dom + 'static>(
+        dom: &Rc<RefCell<D>>,
+        parent: NodeId,
+        props: CounterProps,
+    ) -> Self {
+        Self::mount_before(dom, parent, None, props)
+    }
+    /// Mounts the component in `parent` before `before` (at the end when `None`).
+    #[allow(
+        clippy::too_many_lines,
+        reason = "mount_before builds the whole template, so its length follows the template's size"
+    )]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "every component takes its props struct by value, empty or not, so parents mount them alike"
+    )]
+    pub fn mount_before<D: Dom + 'static>(
+        dom: &Rc<RefCell<D>>,
+        parent: NodeId,
+        before: Option<NodeId>,
+        props: CounterProps,
+    ) -> Self {
+        let CounterProps {} = props;
+        let owner = Owner::new();
+        let (count, roots) = owner
+            .with(|| {
+                let count: Signal<i32> = Signal::named("count", 0);
+                let increment = move || count.update(|n| *n += 1);
+                let mut roots = Vec::new();
+                let button0 = dom.borrow_mut().create_element("button");
+                dom.borrow_mut().insert_before(parent, button0, before);
+                roots.push(Root::Node(button0));
+                {
+                    #[allow(
+                        clippy::clone_on_copy,
+                        reason = "a closure gets a clone of each binding it captures; the compiler cannot see which are Copy"
+                    )]
+                    let increment = increment.clone();
+                    dom.borrow_mut()
+                        .listen(
+                            button0,
+                            "click",
+                            Box::new(move |_event: &mut Event| {
+                                increment();
+                            }),
+                        );
+                }
+                let text1 = dom.borrow_mut().create_text("Clicked ");
+                dom.borrow_mut().append(button0, text1);
+                let count_text2 = dom.borrow_mut().create_text("");
+                dom.borrow_mut().append(button0, count_text2);
+                {
+                    let dom = Rc::clone(dom);
+                    Effect::new(move || {
+                        let shown = &(count.get());
+                        #[allow(
+                            clippy::implicit_clone,
+                            reason = "a text hole or expression attribute shows any Display value through to_string; the compiler cannot see when it is already a String"
+                        )]
+                        let value = shown.to_string();
+                        dom.borrow_mut().set_text(count_text2, &value);
+                    });
+                }
+                let text3 = dom.borrow_mut().create_text(" times");
+                dom.borrow_mut().append(button0, text3);
+                (count, roots)
+            });
+        Counter { count, owner, roots }
+    }
+    /// The top-level nodes now, in order, including those of a block
+    /// or child component at the top level.
+    #[must_use]
+    pub fn roots(&self) -> Vec<NodeId> {
+        vapors_dom::current_nodes(&self.roots)
+    }
+    /// The top-level entries, for a parent that mounts this component
+    /// at its own top level.
+    #[must_use]
+    pub fn root_entries(&self) -> &[Root] {
+        &self.roots
+    }
+    /// Reads the top-level nodes, disposes the signals and effects, and
+    /// removes the nodes.
+    pub fn unmount<D: Dom>(self, dom: &Rc<RefCell<D>>) {
+        let nodes = self.roots();
+        self.owner.dispose();
+        for node in nodes {
+            dom.borrow_mut().remove(node);
+        }
+    }
+}

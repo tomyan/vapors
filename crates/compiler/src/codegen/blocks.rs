@@ -1,0 +1,150 @@
+//! `{if}` and `{for}`: an anchor text node marks the position, and
+//! `vapors_dom::blocks` is handed the condition or the keyed items and
+//! a builder closure for each branch or row.
+
+use super::emit::{Emitter, Place};
+use crate::CompileError;
+use crate::ast::{Expr, IfBlock, Node};
+
+const BUILDER: &str = "move |dom: &Rc<RefCell<D>>, parent: NodeId, before: Option<NodeId>| {";
+
+impl Emitter<'_> {
+    pub fn emit_if(&mut self, block: &IfBlock, place: &Place) -> Result<(), CompileError> {
+        let anchor = self.fresh("if_anchor");
+        self.emit_anchor(&anchor, place);
+        let condition = self.raw(&block.condition)?;
+        let handle = self.open_block_call("conditional", place);
+        self.line(format!("dom, {}, {anchor},", place.parent));
+        let clones = self.clones_for(&[&block.condition])?;
+        self.emit_closure(&clones, &[format!("move || {condition},")]);
+        self.emit_builder(&block.then, BUILDER)?;
+        match &block.otherwise {
+            Some(nodes) => self.emit_builder(nodes, BUILDER)?,
+            None => self.line("|_dom, _parent, _before| Vec::new(),"),
+        }
+        self.close_block_call(handle);
+        Ok(())
+    }
+
+    pub(super) fn emit_anchor(&mut self, anchor: &str, place: &Place) {
+        self.line(format!(
+            "let {anchor} = dom.borrow_mut().create_text(\"\");"
+        ));
+        self.position(anchor, place);
+    }
+
+    /// Starts a call into `vapors_dom::blocks`; among the roots its
+    /// handle is kept, so the block's nodes go with whatever owns them.
+    pub(super) fn open_block_call(&mut self, function: &str, place: &Place) -> Option<String> {
+        let handle = place
+            .roots
+            .then(|| self.fresh(&format!("{function}_block")));
+        match &handle {
+            Some(handle) => self.line(format!("let {handle} = vapors_dom::blocks::{function}(")),
+            None => self.line(format!("vapors_dom::blocks::{function}(")),
+        }
+        self.indent(1);
+        handle
+    }
+
+    pub(super) fn close_block_call(&mut self, handle: Option<String>) {
+        self.dedent(1);
+        self.line(");");
+        if let Some(handle) = handle {
+            self.line(format!("roots.push(Root::Block({handle}));"));
+        }
+    }
+
+    /// A builder closure: the nodes of a branch or row, returned as roots.
+    pub(super) fn emit_builder(
+        &mut self,
+        nodes: &[Node],
+        signature: &str,
+    ) -> Result<(), CompileError> {
+        let clones = self.clones_for(&expressions_in(nodes))?;
+        let wrapped = !clones.is_empty();
+        if wrapped {
+            self.line("{");
+            self.indent(1);
+            self.emit_clones(&clones);
+        }
+        self.line(signature);
+        self.indent(1);
+        self.line("let mut roots = Vec::new();");
+        self.emit_nodes(nodes, &Place::roots())?;
+        self.line("roots");
+        self.dedent(1);
+        self.line("},");
+        if wrapped {
+            self.dedent(1);
+            self.line("}");
+        }
+        Ok(())
+    }
+
+    /// A closure expression, inside a block with its clones when any.
+    pub(super) fn emit_closure(&mut self, clones: &[String], lines: &[String]) {
+        if clones.is_empty() {
+            for line in lines {
+                self.line(line);
+            }
+            return;
+        }
+        self.line("{");
+        self.indent(1);
+        self.emit_clones(clones);
+        for line in lines {
+            self.line(line);
+        }
+        self.dedent(1);
+        self.line("},");
+    }
+}
+
+/// Every expression a subtree reads, for the clones its closure needs.
+fn expressions_in(nodes: &[Node]) -> Vec<&Expr> {
+    let mut found = Vec::new();
+    for node in nodes {
+        collect(node, &mut found);
+    }
+    found
+}
+
+fn collect<'a>(node: &'a Node, found: &mut Vec<&'a Expr>) {
+    match node {
+        Node::Element(element) => {
+            found.extend(element.attributes.iter().filter_map(|a| a.value.expr()));
+            element
+                .children
+                .iter()
+                .for_each(|child| collect(child, found));
+        }
+        Node::Component(tag) => found.extend(tag.attributes.iter().filter_map(|a| a.value.expr())),
+        Node::Text(text) => found.extend(text.parts.iter().filter_map(|part| match part {
+            crate::ast::Part::Expr(expr) => Some(expr),
+            crate::ast::Part::Literal(_) => None,
+        })),
+        Node::If(block) => {
+            found.push(&block.condition);
+            block.then.iter().for_each(|child| collect(child, found));
+            block
+                .otherwise
+                .iter()
+                .flatten()
+                .for_each(|child| collect(child, found));
+        }
+        Node::For(block) => {
+            found.push(&block.iterable);
+            found.extend(block.key.as_ref());
+            block
+                .children
+                .iter()
+                .for_each(|child| collect(child, found));
+        }
+        Node::Snippet(snippet) => snippet
+            .children
+            .iter()
+            .for_each(|child| collect(child, found)),
+        Node::Render(_) => {}
+    }
+}
