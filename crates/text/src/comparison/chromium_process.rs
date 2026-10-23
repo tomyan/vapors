@@ -8,10 +8,13 @@ use std::time::{Duration, Instant};
 use super::chromium::ChromiumError;
 use super::measure::Rgba;
 
-/// Chromium here starts and screenshots a page in about 1 s; a cold CI
-/// runner was measured at under 10 s. 60 s is the ceiling before the run
-/// is declared hung.
-const DEADLINE: Duration = Duration::from_secs(60);
+/// Chromium here starts and screenshots a page in about 0.65 s; a cold
+/// CI runner was measured at under 10 s. 20 s is the ceiling before the
+/// run is declared hung. It must stay low enough that the comparison
+/// test's screenshots time out here, printing Chromium's stderr, before
+/// nextest kills the test: run 39937335978's gpu job lost the stderr
+/// that way at 60 s. The tests assert it against .config/nextest.toml.
+const DEADLINE: Duration = Duration::from_secs(20);
 
 /// Delete an earlier screenshot so a stale image can never be read back.
 pub(crate) fn remove_stale(png: &Path) -> Result<(), ChromiumError> {
@@ -72,3 +75,7 @@ pub(crate) fn on_path(name: &str) -> Option<PathBuf> {
         .map(|dir| dir.join(name))
         .find(|candidate| candidate.is_file())
 }
+
+#[cfg(test)]
+#[path = "chromium_process_tests.rs"]
+mod tests;
