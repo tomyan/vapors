@@ -538,6 +538,15 @@ differs from the plan.
   with a radius, a shadow, a border width or a position changed must
   fail them, at both scales. The composites are uploaded by CI's gpu
   job.
+- **Page controls.** The demo page's own Open button and status line
+  sat over an elements demo's canvas. An elements demo now calls
+  `vapors_platform::hide_page_controls()`. That hides both, and the
+  page then needs no Open button. Errors still show: `#error`, or
+  `#status` when the page has no `#error`, is un-hidden whenever an
+  error is written to it. The page contract checks that no visible
+  element other than `#error` overlaps the canvas of each elements demo
+  and the index. It also checks that only the image demo refuses a page
+  without the Open button.
 - **Radii.** Corner radii that do not fit their box are scaled by one
   factor, the smallest of each side's length over the sum of its two
   radii (Backgrounds 3 §5.5), computed in `paint`; the shader draws each

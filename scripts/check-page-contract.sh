@@ -121,7 +121,10 @@ prepare() {
   counter='<script>var current = GPUCanvasContext.prototype.getCurrentTexture; GPUCanvasContext.prototype.getCurrentTexture = function () { if (document.body) { document.body.dataset.frames = String((Number(document.body.dataset.frames) || 0) + 1); document.body.dataset.frameHeight = String(this.canvas.height); } return current.apply(this, arguments); };</script>'
   frames="<style>canvas { width: 640px !important; height: 400px !important; }</style>$counter"
   page as-built-shot "$frames" "$full_size"
+  # Only the image demo opens files through the page's Open button; an
+  # elements demo hides it and the status line, and needs neither.
   page no-open-button "" "!error.hidden && $adapter" 's#<button id="open">Open</button>##'
+  page no-open-button-elements "" "$adapter" 's#<button id="open">Open</button>##'
   page no-webgpu "$nogpu" ""
   page no-webgpu-no-error-element "$nogpu" "" 's#<p id="error"[^>]*></p>##'
   page device-lost "$lose" "!error.hidden"
@@ -129,6 +132,12 @@ prepare() {
   # and the page served one directory down, as the tailnet serves it
   # at /vapors/: its script and wasm load from beside it.
   page hello "" "$adapter"
+  # No HTML control over an elements demo's canvas: once the adapter line
+  # is written, every visible element on the canvas but #error (failures
+  # stay visible) is listed on <body> as data-overlaps.
+  for demo in $demos index; do
+    page "$demo-overlap" "$overlaps" "(function () { if (status.textContent.indexOf('adapter: ') !== 0) return false; document.body.dataset.overlaps = vaporsOverlaps(); return true; })()"
+  done
   for demo in $demos; do
     if [ -n "$($check_pixels --clicks "crates/demos/demos/$demo.pixels")" ]; then
       page "$demo-shot" "$frames$(clicker "$demo")" "$(after_clicks "$demo")"
@@ -148,6 +157,12 @@ prepare() {
 
 # The demos whose screenshots are held to crates/demos/demos/<name>.pixels.
 demos="hello counter boxes"
+
+# A script defining vaporsOverlaps(): the visible elements whose boxes
+# meet the canvas's, other than the canvas, #error, and what the page
+# copies add (style, script, the hidden hold image), as `tag#id` words,
+# or `none`.
+overlaps='<script>function vaporsOverlaps() { var c = document.getElementById("vapors").getBoundingClientRect(), found = []; document.querySelectorAll("body *").forEach(function (e) { if (e.id === "vapors" || e.id === "error" || e.tagName === "SCRIPT" || e.tagName === "STYLE") return; var r = e.getBoundingClientRect(); if (r.width === 0 || r.height === 0 || getComputedStyle(e).visibility === "hidden") return; if (r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top) found.push(e.tagName.toLowerCase() + (e.id ? "#" + e.id : "")); }); return found.join(" ") || "none"; }</script>'
 
 # clicker <demo>: a script that makes the demo's .pixels clicks on the
 # canvas as a mouse would (move, press, release, pointer id 1; a move has no
@@ -297,7 +312,8 @@ check() {
   started=$(date +%s)
   dom=$(dump "$1" "${4:-}" "${5:-}") || { fail "$1: $chrome exited non-zero or passed 60 s"; console "$1"; return; }
   took=$(( $(date +%s) - started ))
-  status=$(printf '%s' "$dom" | grep -o '<p id="status">[^<]*</p>' | sed 's#<[^>]*>##g')
+  status_tag=$(printf '%s' "$dom" | grep -o '<p id="status"[^>]*>[^<]*</p>' || true)
+  status=$(printf '%s' "$status_tag" | sed 's#<[^>]*>##g')
   error_tag=$(printf '%s' "$dom" | grep -o '<p id="error"[^>]*>[^<]*</p>' || true)
   error=$(printf '%s' "$error_tag" | sed 's#<[^>]*>##g')
   echo "$1: ${took} s, #status [$status] #error [${error_tag:-absent}]"
@@ -305,7 +321,9 @@ check() {
   failed_before=$failed
   printf '%s' "$status" | grep -Eq "$2" || fail "$1: #status is [$status], wanted /$2/"
   case $3 in
-    absent) [ -z "$error_tag" ] || fail "$1: #error exists, wanted none" ;;
+    absent) [ -z "$error_tag" ] || fail "$1: #error exists, wanted none"
+            # Errors go to #status then, so it must be shown.
+            printf '%s' "$status_tag" | grep -q ' hidden' && fail "$1: #status holds the error but is hidden" ;;
     hidden) printf '%s' "$error_tag" | grep -q ' hidden' && [ -z "$error" ] \
               || fail "$1: #error is [$error_tag], wanted hidden and empty" ;;
     *) printf '%s' "$error_tag" | grep -q ' hidden' && fail "$1: #error is still hidden"
@@ -352,7 +370,8 @@ fi
 if grep -q 'vkCreateInstance() failed' "$work/as-built.log"; then
   fail "Chromium has no Vulkan driver, so SwiftShader's WebGPU cannot present; fix: check that $VK_DRIVER_FILES loads (vulkaninfo --summary with VK_DRIVER_FILES set)"
 fi
-check no-open-button '^adapter: ' 'touch screens cannot open files'
+check no-open-button '^adapter: ' 'touch screens cannot open files' '?demo=image'
+check no-open-button-elements '^adapter: ' hidden '?demo=hello'
 check no-webgpu '^starting$' '^no WebGPU adapter'
 check no-webgpu-no-error-element '^no WebGPU adapter' absent
 check device-lost '^adapter: ' '^the GPU device was lost \(Destroyed: .*\); fix: reload the page$'
@@ -360,6 +379,15 @@ check hello '^adapter: ' hidden '?demo=hello'
 check unknown-demo '^starting$' '^no demo is called `nope`' '?demo=nope'
 check subpath '^adapter: ' hidden '' vapors/
 check resize '^adapter: ' hidden '?demo=hello'
+# overlap <demo>: no visible HTML control over the elements demo's canvas.
+overlap() {
+  dom=$(dump "$1-overlap" "?demo=$1") || { fail "$1-overlap: $chrome exited non-zero or passed 60 s"; console "$1-overlap"; return; }
+  held "$1-overlap" || return
+  found=$(printf '%s' "$dom" | grep -o 'data-overlaps="[^"]*"' | sed 's#data-overlaps="\(.*\)"#\1#')
+  echo "$1-overlap: HTML over the canvas: [${found:-not measured}]"
+  [ "$found" = none ] || fail "$1-overlap: [${found:-not measured}] lies over the canvas of an elements demo; hide it (vapors_platform::hide_page_controls) or move it off the canvas"
+}
+for demo in $demos index; do overlap "$demo"; done
 # Each demo as Chromium shows the canvas after its clicks, held to the
 # same crates/demos/demos/<name>.pixels as the native screenshot, by the
 # same code.
@@ -371,4 +399,4 @@ for demo in $demos; do
   fi
 done
 [ "$failed" = 0 ] || { echo "the page contract does not hold; reproduce: cargo xtask web && $0 target/web \$(mktemp -d)" >&2; exit 1; }
-echo "ok   the page contract holds in all nine cases, the gradient screenshot and the screenshots of: $demos"
+echo "ok   the page contract holds in all ten cases, no HTML over the canvas of: $demos index; the gradient screenshot and the screenshots of: $demos"

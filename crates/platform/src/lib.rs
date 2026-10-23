@@ -42,6 +42,16 @@ pub use platform::Platform;
 pub use report::{report_error, report_status};
 pub use window::{App, Frame, Next, WindowOptions, run};
 
+/// Hide the page's own HTML controls drawn over the canvas (the Open
+/// button and the status line), for an app that draws its own; errors
+/// are still shown, and a page without the Open button is not an error.
+/// Call it before [`run`]. Natively there is no page, so it does
+/// nothing.
+pub fn hide_page_controls() {
+    #[cfg(target_family = "wasm")]
+    web::hide_page_controls();
+}
+
 /// The value of `name` in the page URL's query string (`?demo=hello`).
 /// Natively there is no URL, so it is always `None`; a native app takes
 /// the same choice from its command line.
