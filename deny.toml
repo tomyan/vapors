@@ -1,0 +1,63 @@
+# cargo-deny's policy, checked by `cargo xtask deny` (a step of
+# `cargo xtask ci`, and of CI). Every exception names its reason and what
+# retires it.
+
+[graph]
+all-features = true
+
+[advisories]
+# The advisory database is fetched on every run; a fetch that fails fails
+# the check (xtask never passes --disable-fetch).
+ignore = [
+    # ttf-parser is unmaintained, with no fixed release. It is reached only
+    # through winit -> sctk-adwaita -> ab_glyph -> owned_ttf_parser, which
+    # draws the title text of Linux Wayland window decorations from
+    # system fonts: no font we did not install is parsed. Retired by a
+    # winit release that drops sctk-adwaita's ab_glyph, or by winit's
+    # `wayland-csd-adwaita-notitle` feature in vapors (decorations without
+    # title text where the compositor draws none, as on GNOME).
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser via winit's Wayland decoration titles only; system fonts only" },
+    # unsafe-libyaml is unmaintained. It is reached only through
+    # serde_yaml, which xtask's gate uses to read this repository's own
+    # .github/workflows/ci.yml, never input from outside. Retired by moving
+    # the gate's parser to a maintained YAML crate.
+    { id = "RUSTSEC-2024-0449", reason = "unsafe-libyaml via serde_yaml in xtask only; reads our own ci.yml" },
+]
+
+[licenses]
+# Permissive licences only: vapors is built into touche, which is sold,
+# and none of these asks for its source. Each is the licence of at least one dependency today.
+allow = [
+    "MIT",                            # most of the ecosystem
+    "Apache-2.0",                     # most of the ecosystem
+    "Apache-2.0 WITH LLVM-exception", # rustix, linux-raw-sys, wasi: Apache with the LLVM linking exception
+    "BSD-2-Clause",                   # zerocopy, arrayref
+    "BSD-3-Clause",                   # tiny-skia, num_enum, moxcms, subtle
+    "ISC",                            # rustls, ring, libloading
+    "Zlib",                           # bytemuck, miniz_oxide, raw-window-handle
+    "0BSD",                           # adler2
+    "BSL-1.0",                        # ryu
+    "Unicode-3.0",                    # the ICU data crates and unicode-ident
+    "Unlicense",                      # memchr, aho-corasick, walkdir (also MIT)
+]
+confidence-threshold = 0.93
+
+[licenses.private]
+# This workspace's own crates are not published (`publish = false`, which
+# also lets them depend on each other by path) and carry no licence.
+ignore = true
+
+[bans]
+# Two versions of a crate is a warning, not a failure: all of today's are
+# transitive splits in the ecosystem (bitflags 1 and 2, windows-sys,
+# objc2, syn 2 and 3, ...), none from a dependency we name twice. A new
+# one shows in the output for review.
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+# crates.io only; the vapors crates are path dependencies, which this
+# section does not govern.
+unknown-registry = "deny"
+unknown-git = "deny"

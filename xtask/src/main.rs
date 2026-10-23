@@ -114,6 +114,8 @@ enum Command {
     Gate,
     /// Check formatting and lints without running tests.
     Lint,
+    /// Check dependencies with cargo-deny: advisories, bans, licences, sources.
+    Deny,
     /// Run one test tier (default: unit).
     Test {
         /// Which tier to run.
@@ -165,6 +167,7 @@ fn main() -> ExitCode {
         },
         Command::Gate => return gate::run(&reporter),
         Command::Lint => steps::lint(),
+        Command::Deny => steps::deny_check(),
         Command::Test { tier: Tier::Unit } => steps::unit_tests(),
         Command::Test { tier: Tier::Gpu } => steps::gpu_tests(),
     };

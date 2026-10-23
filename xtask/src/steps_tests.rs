@@ -17,6 +17,7 @@ fn ci_runs_fastest_checks_first() {
             "tools",
             "fmt",
             "files",
+            "deny",
             "clippy",
             "wasm",
             "wasm release",
@@ -71,4 +72,18 @@ fn the_wasm_release_step_lints_the_package_as_trunk_builds_it() {
         2,
         "`cargo xtask wasm` runs both"
     );
+}
+
+#[test]
+fn the_deny_step_checks_every_section_within_its_deadline() {
+    // When
+    let step = deny();
+
+    // Then
+    assert_eq!(step.reproduce(), "cargo deny check");
+    assert!(
+        step.deadline.is_some(),
+        "the advisory fetch needs a deadline"
+    );
+    assert!(step.fix.contains("offline"), "{}", step.fix);
 }
