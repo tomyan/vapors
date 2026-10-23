@@ -46,3 +46,33 @@ fn a_scoped_build_of_the_same_component_scopes_it() {
         assert!(code.contains(scoping), "{scoping} missing from {code}");
     }
 }
+
+#[test]
+fn only_the_layout_corpus_builds_its_components_with_global_styles() {
+    // Given: every crate's build script in the workspace
+    let crates = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let mut users = Vec::new();
+    for entry in std::fs::read_dir(&crates).expect("crates dir") {
+        let dir = entry.expect("entry").path();
+        let Ok(text) = std::fs::read_to_string(dir.join("build.rs")) else {
+            continue;
+        };
+
+        // When
+        if text.contains("compile_dir_global") {
+            users.push(
+                dir.file_name()
+                    .expect("name")
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+        }
+    }
+
+    // Then: an app or demo built this way would lose scoping silently
+    assert_eq!(
+        users,
+        ["elements-corpus"],
+        "compile_dir_global is for the layout corpus only, whose CSS must mean what Chromium reads; an app uses compile_dir"
+    );
+}
