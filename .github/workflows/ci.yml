@@ -15,6 +15,12 @@ env:
   RUSTFLAGS: -D warnings
   NEXTEST_PROFILE: ci
 
+# bash -eo pipefail for every run step (`shell: bash`; with no shell CI
+# runs `bash -e`), as `cargo xtask gate` runs them, which it checks.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   ci:
     name: ci
@@ -85,6 +91,9 @@ jobs:
       # canvas composites white (run 39934974057).
       - name: page contract in headless Chrome
         run: scripts/check-page-contract.sh target/web "$(mktemp -d)"
+      # The waker on the page: none idle, one frame per wake.
+      - name: the waker in headless Chrome
+        run: scripts/web-wake-frames.sh target/web "$(mktemp -d)"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: web
@@ -123,7 +132,7 @@ jobs:
       - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
         run: cargo xtask setup --ci
-      # The browser's first launch on a fresh runner took 15.4 to 36.2 s, past
+      # The browser's first launch on a fresh runner took 15.3 to 57.9 s, past
       # the tests' 20 s screenshot deadline, which assumes a warm one; see
       # COLD_START in crates/text/src/comparison/chromium_warm.rs.
       - name: warm headless Chromium
@@ -177,6 +186,9 @@ jobs:
         run: cargo xtask setup --ci
       - name: screenshot of the clear window
         run: cargo xtask screenshot clear_window target/clear_window.png --expect 12,200,34
+      # The waker in a window: none idle, one frame per wake from a thread.
+      - name: the waker in a window
+        run: xvfb-run -a cargo run -p vapors-platform --example wake_window
       - name: screenshot of the gradient fixture, fitted
         run: cargo xtask screenshot image_window target/image_window.png --expect 128,128,128 -- --open crates/platform/examples/fixtures/gradient.png
       # Each F2c demo in a window; the example holds the screenshot to the

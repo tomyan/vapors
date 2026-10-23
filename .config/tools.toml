@@ -8,6 +8,8 @@ cargo-deny = "0.20.2"
 trunk = "0.22.0"
 wasm-bindgen-cli = "0.2.129"
 bacon = "3.26.0"
+# Every build xtask starts compiles through it (xtask/src/sccache.rs).
+sccache = "0.18.0"
 
 [binaries]
 wasm-bindgen-cli = "wasm-bindgen"

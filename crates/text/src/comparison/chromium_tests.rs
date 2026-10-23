@@ -68,14 +68,16 @@ fn a_browser_past_its_deadline_is_killed_with_its_children_and_its_stderr_report
         .screenshot(&dir.join("page.html"), &dir.join("page.png"), 10, 10, 1)
         .expect_err("hung");
 
-    // Then
+    // Then: the 1 s deadline, then naming the browser, whose `--version`
+    // hangs too and is cut off at its own 10 s
     assert!(
-        started.elapsed() < std::time::Duration::from_secs(10),
+        started.elapsed() < std::time::Duration::from_secs(20),
         "{:?}",
         started.elapsed()
     );
     let message = error.to_string();
     assert!(message.contains("did not finish within 1s"), "{message}");
+    assert!(message.contains("version unknown"), "{message}");
     assert!(message.contains("gpu process died"), "{message}");
     let child = std::fs::read_to_string(&child_pid).expect("child pid");
     let alive = std::process::Command::new("kill")
@@ -88,4 +90,23 @@ fn a_browser_past_its_deadline_is_killed_with_its_children_and_its_stderr_report
         child.trim()
     );
     std::fs::remove_dir_all(&dir).expect("cleanup");
+}
+
+#[test]
+fn a_failed_screenshot_names_the_browser_it_launched() {
+    // Given: a "browser" that exits 1 at once
+    let dir = std::env::temp_dir().join(format!("vapors-chromium-named-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("tmp dir");
+    let chromium = Chromium {
+        binary: std::path::PathBuf::from("/bin/false"),
+        deadline: std::time::Duration::from_secs(5),
+    };
+
+    // When
+    let error = chromium
+        .screenshot(&dir.join("page.html"), &dir.join("page.png"), 10, 10, 1)
+        .expect_err("it exits 1");
+
+    // Then
+    assert!(error.to_string().contains("/bin/false"), "{error}");
 }

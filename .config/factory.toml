@@ -24,3 +24,30 @@ max_lines = "220"
 
 # Files not written by hand; left out of the check.
 [files.generated]
+
+# `cargo xtask gate` runs every `run` step of .github/workflows/ci.yml, as
+# CI runs it, except these: the runner's setup, which a worktree already
+# has. Each is an exact line of a step's script, with its reason; a step
+# all of whose lines are listed is not run.
+[gate.setup]
+# The apt-install action's runner-only steps (.github/actions/apt-install):
+# the cache key needs the runner image's variables, and the install runs
+# apt as root. Literal keys ('...') hold lines with double quotes.
+'[ -n "${ImageOS:-}" ] && [ -n "${ImageVersion:-}" ] || { echo "::error::ImageOS or ImageVersion is unset; the apt cache key needs the runner image"; exit 1; }' = "apt cache key: needs the runner image's ImageOS and ImageVersion"
+'echo "key=apt-$ImageOS-$ImageVersion-$(printf %s "$PACKAGES" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"' = "apt cache key: written for actions/cache"
+'archives="$HOME/.cache/apt-archives"' = "apt install: where the cached .debs live on the runner"
+'mkdir -p "$archives/partial"' = "apt install: the cache directory"
+"sudo apt-get update -q" = "apt install: the runner's package lists"
+"# shellcheck disable=SC2086 # the list is split into packages on purpose" = "apt install: a comment line in the step"
+'sudo apt-get install -y -q -o Dir::Cache::Archives="$archives" -o APT::Keep-Downloaded-Packages=true $PACKAGES' = "apt install: as root, keeping the .debs"
+'sudo chown -R "$(id -u):$(id -g)" "$archives"' = "apt install: the .debs back to the runner's user for the cache"
+'echo "$(ls "$archives"/*.deb 2>/dev/null | wc -l) .debs kept for the cache"' = "apt install: how many .debs are cached"
+"rustup toolchain install && rustup show active-toolchain" = "the toolchain, from rust-toolchain.toml"
+"cargo xtask setup --ci" = "the pinned tools, installed once per machine"
+
+[gate.actions]
+"actions/cache" = "restores the apt .debs on the runner; the apt steps are runner setup here"
+"actions/checkout" = "the gate runs in a checkout of this repository"
+"Swatinem/rust-cache" = "a cache of target/; the local target directory is already there"
+"cargo-bins/cargo-binstall" = "installs cargo-binstall, which cargo xtask setup --ci needs; that line is setup"
+"actions/upload-artifact" = "uploads files for people to read; nothing is checked"
