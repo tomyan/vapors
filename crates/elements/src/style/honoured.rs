@@ -126,7 +126,7 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ("visibility", Read),
     ("white-space", Read),
     ("width", Read),
-    ("z-index", Deferred("F2c S8")),
+    ("z-index", Read),
 ];
 
 /// The deferred properties of `styles.own` that are not at their

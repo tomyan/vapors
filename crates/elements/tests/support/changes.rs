@@ -9,36 +9,9 @@ use vapors_dom::{Dom, NodeId};
 use vapors_elements::{Document, Viewport};
 
 use super::document;
+use super::random_css::{CLASSES, CSS};
 use super::tree::{is_inside, text_nodes};
 
-/// Inherited properties, `var()`, `+` and `~`, `:nth-child`,
-/// `:last-child`, `:empty`, an ancestor attribute, `:hover` on a
-/// non-subject compound, `:active`, `@media`, calc with % and em, vw,
-/// and relative and absolute positioning.
-pub const CSS: &str = "
-:root { --pad: 3px; }
-body { margin: 0; font-size: 14px; color: #222222; }
-.row { display: flex; gap: 4px; }
-.box { padding: var(--pad); background-color: #eeeeff; }
-.big { font-size: 1.2em; }
-.box + .box { margin-top: 2px; }
-.box ~ .alt { color: #aa0000; }
-.box:nth-child(odd) { background-color: #ffffee; }
-.box:last-child { border-bottom: 1px solid #333333; }
-.box:empty { height: 6px; }
-[data-on] .box { color: #006600; }
-.row:hover .box { background-color: #ccffcc; }
-.box:active { background-color: #ffcccc; }
-.wide { width: calc(50% - 1em); }
-.vw { width: 30vw; }
-@media (min-width: 500px) { .box { padding: 6px; } }
-.pos { position: relative; top: 2px; left: 1px; }
-.abs { position: absolute; right: 0; top: 0; width: 20px; height: 5px; }
-";
-
-const CLASSES: &[&str] = &[
-    "box", "box big", "box alt", "box wide", "box vw", "box pos", "box abs", "row", "",
-];
 const VIEWPORTS: &[(f32, f32)] = &[(640.0, 400.0), (400.0, 300.0), (700.0, 500.0)];
 
 /// xorshift64: a seed gives the same changes on every machine.

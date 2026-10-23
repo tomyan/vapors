@@ -19,6 +19,7 @@ mod layout;
 mod node;
 mod paint;
 mod paint_inline;
+mod paint_order;
 mod painted;
 mod restyle;
 mod restyle_pass;

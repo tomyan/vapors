@@ -10,6 +10,7 @@ use vapors_text::FontSystem;
 
 use crate::corners;
 use crate::layout::{BoxRect, Content, InlineRun, LayoutBox};
+use crate::paint_order::{Stacking, paint_order};
 use crate::painted::Painted;
 use crate::style::{BoxShadow, Used};
 
@@ -43,8 +44,24 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
             painted.rects.insert(node, rects[index]);
         }
     }
-    paint_box(boxes, rects, 0, input, &mut painted);
+    let stacking = |index: usize| match boxes[index].content {
+        Content::Element(node) => stacking_of(&input.used[&node]),
+        Content::Text(_) => Stacking::default(),
+    };
+    for index in paint_order(boxes, &stacking) {
+        paint_own(boxes, rects, index, input, &mut painted);
+    }
     painted
+}
+
+fn stacking_of(used: &Used) -> Stacking {
+    Stacking {
+        // a z-index is kept only where it applies: on a static box, a
+        // flex or grid item, which then stacks as if positioned
+        positioned: used.layout.position != taffy::Position::Static || used.z_index.is_some(),
+        z: used.z_index,
+        fixed: used.layout.position == taffy::Position::Fixed,
+    }
 }
 
 /// The canvas's colour, as CSS Backgrounds 3 section 2.11.2 gives it:
@@ -61,7 +78,9 @@ fn canvas_background(input: &PaintInput<'_>) -> (Color, Option<NodeId>) {
     (Color::from_rgba8(255, 255, 255, 255), None)
 }
 
-fn paint_box(
+/// One box's own painting: an element's shadows, background and
+/// border, or a run's text; its children are painted in their turn.
+fn paint_own(
     boxes: &[LayoutBox],
     rects: &[BoxRect],
     index: usize,
@@ -71,9 +90,6 @@ fn paint_box(
     match &boxes[index].content {
         Content::Element(node) => paint_element(*node, rects[index], input, out),
         Content::Text(run) => paint_text(run, rects[index], input, out),
-    }
-    for &child in &boxes[index].children {
-        paint_box(boxes, rects, child, input, out);
     }
 }
 

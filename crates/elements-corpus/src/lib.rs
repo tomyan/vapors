@@ -59,6 +59,7 @@ fixtures![
     positioned::Positioned,
     shell::Shell,
     sizing::Sizing,
+    stacking::Stacking,
     text_align::TextAlign,
     text_wrap::TextWrap,
 ];
