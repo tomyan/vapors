@@ -14,16 +14,3 @@ retries = 0
 fail-fast = false
 failure-output = "immediate-final"
 slow-timeout = { period = "30s", terminate-after = 2 }
-
-# Headless Chromium runs one test at a time. Its 20 s screenshot deadline
-# (crates/text/src/comparison/chromium_process.rs) was measured with one
-# Chromium running alone on the runner. Run 40018292931's gpu job started
-# the paint tests together on the runner's 4 vCPUs, and a 1x screenshot
-# passed 20 s. A new test that runs Chromium goes in one of these binaries
-# or in this filter.
-[test-groups]
-chromium = { max-threads = 1 }
-
-[[profile.default.overrides]]
-filter = 'binary_id(vapors-elements-corpus::gpu_paint) | binary_id(vapors-elements-corpus::gpu_paint_rules) | binary_id(vapors-text::gpu_comparison)'
-test-group = 'chromium'
