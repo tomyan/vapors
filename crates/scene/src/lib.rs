@@ -7,5 +7,5 @@ mod display;
 mod transform;
 
 pub use color::Color;
-pub use display::{Batch, Item, Quad, Rect, Scene, TextId};
+pub use display::{Batch, Item, Quad, Rect, Scene, Shadow, TextId};
 pub use transform::{Size, Transform};

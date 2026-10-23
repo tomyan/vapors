@@ -15,10 +15,10 @@ fn pixel(pixels: &[u8], width: usize, x: usize, y: usize) -> [u8; 4] {
 }
 
 fn quad(rect: [f32; 4], rgba: [u8; 4]) -> Quad {
-    Quad {
-        rect: Rect::new(rect[0], rect[1], rect[2], rect[3]),
-        background: Color::from_rgba8(rgba[0], rgba[1], rgba[2], rgba[3]),
-    }
+    Quad::fill(
+        Rect::new(rect[0], rect[1], rect[2], rect[3]),
+        Color::from_rgba8(rgba[0], rgba[1], rgba[2], rgba[3]),
+    )
 }
 
 fn draw(quads: &[Quad], width: u32, height: u32) -> Vec<u8> {

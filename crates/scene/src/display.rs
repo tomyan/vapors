@@ -42,14 +42,58 @@ impl Rect {
     }
 }
 
-/// A filled box: an element's background. Borders and corner radii
-/// join it in F2c S3.
+/// A box: an element's background and solid border, with circular
+/// corner radii. The border is drawn inside `rect`; the background
+/// fills the whole rect, under the border, as CSS's
+/// `background-clip: border-box` paints it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Quad {
-    /// Where, in device pixels.
+    /// Where, in device pixels: the border box.
     pub rect: Rect,
     /// The fill, non-premultiplied.
     pub background: Color,
+    /// Border widths in device pixels: top, right, bottom, left.
+    pub border: [f32; 4],
+    /// Border colours: top, right, bottom, left.
+    pub border_colors: [Color; 4],
+    /// Corner radii of the outer edge in device pixels: top-left,
+    /// top-right, bottom-right, bottom-left.
+    pub radii: [f32; 4],
+}
+
+impl Quad {
+    /// A filled rectangle with no border and square corners.
+    #[must_use]
+    pub fn fill(rect: Rect, background: Color) -> Self {
+        Self {
+            rect,
+            background,
+            border: [0.0; 4],
+            border_colors: [Color::default(); 4],
+            radii: [0.0; 4],
+        }
+    }
+}
+
+/// A box's outer shadow: the shape of `rect` with `radii`, blurred.
+/// The painter draws it outside the box only, as CSS does: what lies
+/// under the box is the box's to paint.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Shadow {
+    /// The shadow's shape before blurring: the border box moved by the
+    /// offset and grown by the spread, in device pixels.
+    pub rect: Rect,
+    /// Its corner radii (the box's, grown by the spread).
+    pub radii: [f32; 4],
+    /// The blur radius in device pixels (CSS's, so the Gaussian's
+    /// standard deviation is half of it).
+    pub blur: f32,
+    /// The colour, non-premultiplied.
+    pub color: Color,
+    /// The box that casts it, which the shadow is not drawn under.
+    pub caster: Rect,
+    /// The caster's corner radii.
+    pub caster_radii: [f32; 4],
 }
 
 /// Names a laid-out text run the painter's owner holds. The scene does
@@ -60,6 +104,8 @@ pub struct TextId(pub u32);
 /// One thing to draw.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Item {
+    /// A box's outer shadow, drawn before the box.
+    Shadow(Shadow),
     /// A filled box.
     Quad(Quad),
     /// A text run, its layout origin at `origin` (device pixels).
@@ -114,6 +160,8 @@ impl Scene {
 /// A run of items one pipeline draws.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Batch<'a> {
+    /// Consecutive shadows.
+    Shadows(Vec<Shadow>),
     /// Consecutive quads.
     Quads(Vec<Quad>),
     /// Consecutive text runs.
@@ -123,12 +171,21 @@ pub enum Batch<'a> {
 impl<'a> Batch<'a> {
     fn of(items: &'a [Item]) -> Self {
         match items[0] {
+            Item::Shadow(_) => Batch::Shadows(
+                items
+                    .iter()
+                    .filter_map(|item| match item {
+                        Item::Shadow(shadow) => Some(*shadow),
+                        _ => None,
+                    })
+                    .collect(),
+            ),
             Item::Quad(_) => Batch::Quads(
                 items
                     .iter()
                     .filter_map(|item| match item {
                         Item::Quad(quad) => Some(*quad),
-                        Item::Text { .. } => None,
+                        _ => None,
                     })
                     .collect(),
             ),
@@ -139,8 +196,9 @@ impl<'a> Batch<'a> {
 
 fn kind(item: &Item) -> u8 {
     match item {
-        Item::Quad(_) => 0,
-        Item::Text { .. } => 1,
+        Item::Shadow(_) => 0,
+        Item::Quad(_) => 1,
+        Item::Text { .. } => 2,
     }
 }
 
