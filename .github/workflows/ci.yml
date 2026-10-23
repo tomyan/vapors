@@ -19,15 +19,27 @@ jobs:
   ci:
     name: ci
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    timeout-minutes: 30 # initial ceiling; docs/budgets.md holds the measured value
+    # About 2.5x the worst of 20 runs before this (1907 s,
+    # scripts/ci-times.sh in touche, 2026-10-23); to be re-derived from
+    # runs with the apt cache (see this PR).
+    timeout-minutes: 80
     env:
       # A CJK system font is installed below, so the system-font fallback
       # test must find one; it fails loudly rather than passing by luck.
       VAPORS_SYSTEM_FONTS: 1
     steps:
       - uses: actions/checkout@v7
+      # Step timeout: about 2.5x the worst apt step in 20 runs before this
+      # (1811 s, scripts/ci-times.sh in touche, 2026-10-23); to be re-derived
+      # from runs with the cache (see this PR).
       - name: install a CJK system font for the fallback test
-        run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk && fc-list :lang=zh | head -1
+        timeout-minutes: 76
+        uses: ./.github/actions/apt-install
+        with:
+          packages: fonts-noto-cjk
+      - name: the CJK font is there
+        run: |
+          fc-list :lang=zh | head -1 | grep . || { echo "::error::no CJK font after the install; fix: check the apt-install step"; exit 1; }
       # rustup reads rust-toolchain.toml: channel, components, targets. One pin.
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
@@ -52,7 +64,10 @@ jobs:
   web:
     name: web
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # About 2.5x the worst of 20 runs before this (69 s,
+    # scripts/ci-times.sh in touche, 2026-10-23); to be re-derived from
+    # runs with the apt cache (see this PR).
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@v7
       - name: install pinned toolchain
@@ -77,14 +92,26 @@ jobs:
   gpu:
     name: gpu
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    timeout-minutes: 30
+    # About 2.5x the worst of 20 runs before this (522 s,
+    # scripts/ci-times.sh in touche, 2026-10-23); to be re-derived from
+    # runs with the apt cache (see this PR).
+    timeout-minutes: 22
     env:
       # lavapipe is the CI reference adapter; the tier fails if it is not the one found.
       VAPORS_GPU_ADAPTER: llvmpipe
     steps:
       - uses: actions/checkout@v7
+      # Step timeout: about 2.5x the worst apt step in 20 runs before this
+      # (387 s, scripts/ci-times.sh in touche, 2026-10-23).
       - name: install lavapipe
-        run: sudo apt-get update -q && sudo apt-get install -y -q mesa-vulkan-drivers vulkan-tools && vulkaninfo --summary | grep -E 'deviceName|driverName'
+        timeout-minutes: 17
+        uses: ./.github/actions/apt-install
+        with:
+          packages: mesa-vulkan-drivers vulkan-tools
+          mesa-major: 25 # 25.2.8 on ubuntu-24.04, 2026-10-23
+      - name: lavapipe is the Vulkan device
+        run: |
+          vulkaninfo --summary | grep -E 'deviceName|driverName'
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
       - uses: Swatinem/rust-cache@v2
@@ -107,13 +134,22 @@ jobs:
   window:
     name: window
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    timeout-minutes: 30
+    # About 2.5x the worst of 20 runs before this (780 s,
+    # scripts/ci-times.sh in touche, 2026-10-23); to be re-derived from
+    # runs with the apt cache (see this PR).
+    timeout-minutes: 33
     env:
       VAPORS_GPU_ADAPTER: llvmpipe
     steps:
       - uses: actions/checkout@v7
+      # Step timeout: about 2.5x the worst apt step in 20 runs before this
+      # (733 s, scripts/ci-times.sh in touche, 2026-10-23).
       - name: install lavapipe, Xvfb and winit's X11 libraries
-        run: sudo apt-get update -q && sudo apt-get install -y -q mesa-vulkan-drivers xvfb libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev
+        timeout-minutes: 31
+        uses: ./.github/actions/apt-install
+        with:
+          packages: mesa-vulkan-drivers xvfb libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev
+          mesa-major: 25 # 25.2.8 on ubuntu-24.04, 2026-10-23
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
       - uses: Swatinem/rust-cache@v2
