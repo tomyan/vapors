@@ -37,6 +37,11 @@ Test deadlines: `.config/nextest.toml`.
 
 ## Rules
 
+- Main changes only by PR merge. The pre-push hook refuses a push to
+  `main`, before its checks, naming the fix. Branch protection refuses it
+  too, but touche has none, and the hook is shared. `ALLOW_PUSH_TO_MAIN=1
+  git push …` lets one through, and the hook prints that it did. Use it
+  only when Tom or the lead asks for a direct push to main.
 - Tests first. A check is proven by breaking what it guards, watching
   it fail, restoring. Say so in the commit.
 - A tier that cannot run fails and names what is missing. Never skip.

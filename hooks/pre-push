@@ -1,8 +1,23 @@
 #!/bin/sh
 # Installed into the repository's hooks directory by `cargo xtask setup`.
-# Runs the fast checks before a push so most failures never reach CI.
-# Bypass with `git push --no-verify`; CI remains the gate.
+# First refuses a push to main: main changes only by PR merge, and
+# touche, a private repository on a free plan, has no branch protection
+# to refuse it. ALLOW_PUSH_TO_MAIN=1 lets one through and is printed;
+# CLAUDE.md says when. Then runs the fast checks before a push so most
+# failures never reach CI. `git push --no-verify` skips this hook,
+# refusal included.
 set -e
+# git gives one line per ref: <local ref> <local sha> <remote ref> <remote sha>.
+while read -r local_ref local_sha remote_ref remote_sha; do
+    [ "$remote_ref" = refs/heads/main ] || continue
+    if [ "${ALLOW_PUSH_TO_MAIN:-}" = 1 ]; then
+        echo "pre-push: pushing $local_ref to main because ALLOW_PUSH_TO_MAIN=1" >&2
+        continue
+    fi
+    echo "pre-push: refused: $local_ref would update main on $1; push your branch; main changes only by PR merge" >&2
+    echo "     reproduce: git push $1 $local_ref:refs/heads/main" >&2
+    exit 1
+done
 # Git hooks run with the caller's PATH, which may lack rustup's bin dir.
 if ! command -v cargo >/dev/null 2>&1; then
     PATH="$HOME/.cargo/bin:$PATH"

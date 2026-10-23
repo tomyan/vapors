@@ -21,6 +21,9 @@ mod gate_step;
 mod gate_steps;
 mod gate_workflow;
 mod gpu_info;
+#[cfg(test)]
+#[path = "hook_tests.rs"]
+mod hook_tests;
 mod pixels;
 mod report;
 mod sccache;
