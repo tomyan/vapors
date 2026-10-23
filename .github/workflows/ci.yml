@@ -20,8 +20,8 @@ jobs:
     name: ci
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
     # About 2.5x the worst of 20 runs before this (1907 s,
-    # scripts/ci-times.sh in touche, 2026-10-23); to be re-derived from
-    # runs with the apt cache (see this PR).
+    # scripts/ci-times.sh in touche, 2026-10-23), which includes apt
+    # cache misses; with a cache hit the job took at most 115 s (PR #24).
     timeout-minutes: 80
     env:
       # A CJK system font is installed below, so the system-font fallback
@@ -30,8 +30,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       # Step timeout: about 2.5x the worst apt step in 20 runs before this
-      # (1811 s, scripts/ci-times.sh in touche, 2026-10-23); to be re-derived
-      # from runs with the cache (see this PR).
+      # (1811 s, scripts/ci-times.sh in touche, 2026-10-23). A cache miss,
+      # as after a runner image update, can take that long again.
       - name: install a CJK system font for the fallback test
         timeout-minutes: 76
         uses: ./.github/actions/apt-install
@@ -65,8 +65,8 @@ jobs:
     name: web
     runs-on: ubuntu-24.04
     # About 2.5x the worst of 20 runs before this (69 s,
-    # scripts/ci-times.sh in touche, 2026-10-23); to be re-derived from
-    # runs with the apt cache (see this PR).
+    # scripts/ci-times.sh in touche, 2026-10-23), which includes apt
+    # cache misses; with a cache hit the job took at most 115 s (PR #24).
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@v7
@@ -93,8 +93,8 @@ jobs:
     name: gpu
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
     # About 2.5x the worst of 20 runs before this (522 s,
-    # scripts/ci-times.sh in touche, 2026-10-23); to be re-derived from
-    # runs with the apt cache (see this PR).
+    # scripts/ci-times.sh in touche, 2026-10-23), which includes apt
+    # cache misses; with a cache hit the job took at most 115 s (PR #24).
     timeout-minutes: 22
     env:
       # lavapipe is the CI reference adapter; the tier fails if it is not the one found.
@@ -135,8 +135,8 @@ jobs:
     name: window
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
     # About 2.5x the worst of 20 runs before this (780 s,
-    # scripts/ci-times.sh in touche, 2026-10-23); to be re-derived from
-    # runs with the apt cache (see this PR).
+    # scripts/ci-times.sh in touche, 2026-10-23), which includes apt
+    # cache misses; with a cache hit the job took at most 115 s (PR #24).
     timeout-minutes: 33
     env:
       VAPORS_GPU_ADAPTER: llvmpipe
