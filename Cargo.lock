@@ -2266,6 +2266,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "taffy"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c8480887e8803986d96a7173729565520d4bbb721ad6b7ad6941a22897207aa"
+dependencies = [
+ "serde",
+ "slotmap",
+ "smallvec",
+]
+
+[[package]]
 name = "tempfile"
 version = "3.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2499,6 +2510,30 @@ name = "vapors-dom"
 version = "0.0.0"
 dependencies = [
  "vapors-signals",
+]
+
+[[package]]
+name = "vapors-elements"
+version = "0.0.0"
+dependencies = [
+ "taffy",
+ "vapors-css",
+ "vapors-dom",
+ "vapors-scene",
+ "vapors-signals",
+ "vapors-text",
+]
+
+[[package]]
+name = "vapors-elements-corpus"
+version = "0.0.0"
+dependencies = [
+ "serde_json",
+ "vapors-compiler",
+ "vapors-dom",
+ "vapors-elements",
+ "vapors-signals",
+ "vapors-text",
 ]
 
 [[package]]

@@ -23,7 +23,7 @@ fn an_empty_scene_has_no_batches() {
     let batches = scene.batches();
 
     // Then
-    assert!(batches.is_empty());
+    assert_eq!(batches, []);
 }
 
 #[test]

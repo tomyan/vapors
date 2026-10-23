@@ -6,9 +6,7 @@ use std::ops::Range;
 use std::borrow::Cow;
 
 use parley::setting::Tag;
-use parley::{
-    FontFamily, FontFeature, FontFeatures, FontVariation, FontVariations, LineHeight, StyleProperty,
-};
+use parley::{FontFamily, FontFeature, FontFeatures, FontVariation, FontVariations, StyleProperty};
 use vapors_scene::Color;
 
 use crate::fonts::{GEIST_FAMILY, GEIST_MONO_FAMILY};
@@ -50,8 +48,8 @@ pub struct Style<'a> {
     pub tabular_figures: bool,
     /// `kern`. Default on.
     pub kerning: bool,
-    /// Line height as a multiple of the font size. Default 1.2.
-    pub line_height: f32,
+    /// Line height. Default 1.2 times the font size.
+    pub line_height: LineHeight,
     /// Ink colour. Default opaque black.
     pub color: Color,
 }
@@ -67,20 +65,21 @@ impl<'a> Style<'a> {
             optical_size: None,
             tabular_figures: false,
             kerning: true,
-            line_height: 1.2,
+            line_height: LineHeight::FontSizeRelative(1.2),
             color: Color::from_rgba8(0, 0, 0, 255),
         }
     }
 
-    /// Parley's properties for this style.
-    pub(crate) fn properties(&self) -> Vec<StyleProperty<'a, Color>> {
+    /// Parley's properties for this style, laid out at `scale` device
+    /// pixels per logical pixel.
+    pub(crate) fn properties(&self, scale: f32) -> Vec<StyleProperty<'a, Color>> {
         vec![
             StyleProperty::FontFamily(FontFamily::named(self.family.name())),
             StyleProperty::FontSize(self.size),
             StyleProperty::FontWeight(parley::FontWeight::new(self.weight)),
             StyleProperty::FontVariations(FontVariations::List(Cow::Owned(self.variations()))),
             StyleProperty::FontFeatures(FontFeatures::List(Cow::Owned(self.features()))),
-            StyleProperty::LineHeight(LineHeight::FontSizeRelative(self.line_height)),
+            StyleProperty::LineHeight(self.line_height.parley(&self.family, self.size, scale)),
             StyleProperty::Brush(self.color),
         ]
     }
@@ -108,4 +107,25 @@ pub struct Span<'a> {
     pub range: Range<usize>,
     /// The style for that range.
     pub style: Style<'a>,
+}
+
+/// The height of a line box, as CSS's `line-height` gives it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum LineHeight {
+    /// `normal`: the font's ascent, descent and line gap.
+    Normal,
+    /// A unitless number: that many times the font size.
+    FontSizeRelative(f32),
+    /// A length, in logical pixels.
+    Px(f32),
+}
+
+impl LineHeight {
+    fn parley(self, family: &Family<'_>, size: f32, scale: f32) -> parley::LineHeight {
+        match self {
+            Self::Normal => crate::line_metrics::normal(family, size, scale),
+            Self::FontSizeRelative(factor) => parley::LineHeight::FontSizeRelative(factor),
+            Self::Px(px) => parley::LineHeight::Absolute(px),
+        }
+    }
 }

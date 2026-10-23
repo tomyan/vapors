@@ -1,0 +1,124 @@
+//! Which tags and events the element tree implements in this slice, and
+//! where the rest arrive. A tag the compiler accepts but the tree does
+//! not implement is an error, never drawn as a `div`.
+
+/// Tags laid out and painted now: block-level containers.
+const SUPPORTED: &[&str] = &[
+    "html",
+    "body",
+    "div",
+    "p",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "section",
+    "header",
+    "footer",
+    "main",
+    "nav",
+    "aside",
+    "article",
+    "blockquote",
+    "figure",
+    "figcaption",
+];
+
+/// Where each unimplemented tag arrives.
+const LATER: &[(&str, &[&str])] = &[
+    ("F2c S2", &["button"]),
+    ("F2c S3", &["hr"]),
+    (
+        "F2c S6",
+        &[
+            "span", "a", "abbr", "b", "br", "code", "del", "em", "i", "kbd", "mark", "s", "samp",
+            "small", "strong", "sub", "sup", "u", "var",
+        ],
+    ),
+    ("F2c S10", &["img"]),
+    ("F3", &["canvas"]),
+    (
+        "F4",
+        &[
+            "input", "textarea", "select", "option", "optgroup", "label", "fieldset", "legend",
+            "ul", "ol", "li", "pre", "table", "caption", "col", "colgroup", "tbody", "thead",
+            "tfoot", "tr", "td", "th", "meter", "progress",
+        ],
+    ),
+    ("F5", &["dialog", "details", "summary"]),
+];
+
+/// `None` when the tree implements `tag`; otherwise why not, with the
+/// slice that brings it.
+pub(crate) fn unsupported(tag: &str) -> Option<String> {
+    if SUPPORTED.contains(&tag) {
+        return None;
+    }
+    let reason = match LATER.iter().find(|(_, tags)| tags.contains(&tag)) {
+        Some((slice, _)) => format!("arrives in {slice} (docs/F2c.md)"),
+        None => "is not scheduled in docs/F2c.md".to_owned(),
+    };
+    Some(format!(
+        "<{tag}> is not implemented by vapors-elements yet: it {reason}; use one of {}",
+        SUPPORTED[2..].join(", ")
+    ))
+}
+
+/// `None` when the tree fires `event`; otherwise why not. No events
+/// are fired before pointer input arrives in F2c S2.
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "every event is refused until F2c S2 adds the ones the tree fires"
+)]
+pub(crate) fn unfired(event: &str) -> Option<String> {
+    Some(format!(
+        "on{event}: vapors-elements fires no events yet; pointer events and click arrive in F2c S2 (docs/F2c.md)"
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_block_container_is_supported() {
+        // Given
+        let tag = "section";
+
+        // When
+        let refusal = unsupported(tag);
+
+        // Then
+        assert_eq!(refusal, None);
+    }
+
+    #[test]
+    fn a_scheduled_tag_is_refused_naming_its_slice() {
+        // Given
+        let tag = "span";
+
+        // When
+        let refusal = unsupported(tag);
+
+        // Then
+        let refusal = refusal.expect("span is refused in S1");
+        assert!(
+            refusal.contains("<span>") && refusal.contains("F2c S6"),
+            "{refusal}"
+        );
+    }
+
+    #[test]
+    fn an_unscheduled_tag_is_refused_saying_so() {
+        // Given
+        let tag = "marquee";
+
+        // When
+        let refusal = unsupported(tag).expect("refused");
+
+        // Then
+        assert!(refusal.contains("not scheduled"), "{refusal}");
+    }
+}

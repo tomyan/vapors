@@ -125,6 +125,40 @@ impl Chromium {
         Ok(image)
     }
 
+    /// The DOM of `html` at `width` by `height` CSS pixels, after its
+    /// scripts and fonts have settled, as `--dump-dom` prints it.
+    ///
+    /// # Errors
+    ///
+    /// [`ChromiumError::Failed`] when it exits non-zero or hangs past the
+    /// deadline.
+    pub fn dump_dom(&self, html: &Path, width: u32, height: u32) -> Result<String, ChromiumError> {
+        let mut child = self
+            .command(width, height, 1)
+            .arg("--dump-dom")
+            .arg(format!("file://{}", html.display()))
+            .stdout(Stdio::piped())
+            .spawn()
+            .map_err(|e| self.cannot_start(&e))?;
+        let stdout = child
+            .stdout
+            .take()
+            .map(|stream| std::thread::spawn(move || read_all(stream)));
+        let stderr = child
+            .stderr
+            .take()
+            .map(|stream| std::thread::spawn(move || read_all(stream)));
+        let status = wait_with_deadline(&mut child)?;
+        let stdout = stdout.and_then(|t| t.join().ok()).unwrap_or_default();
+        let stderr = stderr.and_then(|t| t.join().ok()).unwrap_or_default();
+        if !status.success() {
+            return Err(ChromiumError::Failed(format!(
+                "exited with {status}:\n{stderr}"
+            )));
+        }
+        Ok(stdout)
+    }
+
     fn spawn(
         &self,
         html: &Path,
@@ -133,10 +167,21 @@ impl Chromium {
         height: u32,
         scale: u32,
     ) -> Result<Child, ChromiumError> {
-        // Headless Chromium asks xdg-desktop-portal over the session bus
-        // before its first request; where the portal cannot start, D-Bus
-        // activation waits 120 s. With no session bus address it skips that.
-        Command::new(&self.binary)
+        self.command(width, height, scale)
+            .arg(format!("--screenshot={}", png.display()))
+            .arg(format!("file://{}", html.display()))
+            .stdout(Stdio::null())
+            .spawn()
+            .map_err(|e| self.cannot_start(&e))
+    }
+
+    /// Headless Chromium at a fixed window and scale. It asks
+    /// xdg-desktop-portal over the session bus before its first request;
+    /// where the portal cannot start, D-Bus activation waits 120 s. With
+    /// no session bus address it skips that.
+    fn command(&self, width: u32, height: u32, scale: u32) -> Command {
+        let mut command = Command::new(&self.binary);
+        command
             .env_remove("DBUS_SESSION_BUS_ADDRESS")
             // Its own process group, so the deadline kills what it starts.
             .process_group(0)
@@ -148,15 +193,13 @@ impl Chromium {
                 // Fonts load after first paint; give the page settled time.
                 "--virtual-time-budget=5000",
                 &format!("--window-size={width},{height}"),
-                &format!("--screenshot={}", png.display()),
-                &format!("file://{}", html.display()),
             ])
-            .stdout(Stdio::null())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| {
-                ChromiumError::Failed(format!("cannot start {}: {e}", self.binary.display()))
-            })
+            .stderr(Stdio::piped());
+        command
+    }
+
+    fn cannot_start(&self, error: &std::io::Error) -> ChromiumError {
+        ChromiumError::Failed(format!("cannot start {}: {error}", self.binary.display()))
     }
 }
 

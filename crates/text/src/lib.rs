@@ -15,6 +15,7 @@ pub mod fonts;
 mod layout;
 mod layout_runs;
 mod layout_types;
+mod line_metrics;
 mod pen;
 mod pipeline;
 mod pipeline_gpu;
@@ -33,4 +34,4 @@ pub use pipeline::{BlendParams, TextPipeline};
 pub use raster::{
     Coverage, GlyphRequest, Hinting, RasterError, Rasterizer, SUBPIXEL_STEPS, subpixel_of,
 };
-pub use style::{Family, Span, Style};
+pub use style::{Family, LineHeight, Span, Style};
