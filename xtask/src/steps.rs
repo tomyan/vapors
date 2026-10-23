@@ -24,6 +24,23 @@ fn files() -> Step {
     )
 }
 
+/// cargo-deny's advisories, bans, licences and sources, by deny.toml.
+/// It fetches the advisory database every run and fails when it cannot,
+/// with a database cached or not; xtask never passes --disable-fetch, so
+/// the check is never skipped. A cold fetch and check took 1.2 to 1.4 s
+/// here (2026-10-23); 60 s leaves room for a slow network before the
+/// fetch is declared hung.
+fn deny() -> Step {
+    let mut step = Step::new(
+        "deny",
+        "cargo",
+        &["deny", "check"],
+        "fix the dependency, or record a reasoned exception in deny.toml; if the advisory database could not be fetched (offline), connect and rerun `cargo xtask deny`: it is never skipped",
+    );
+    step.deadline = Some(std::time::Duration::from_secs(60));
+    step
+}
+
 fn fmt() -> Step {
     Step::new(
         "fmt",
@@ -131,6 +148,7 @@ pub fn ci(web_package: &str) -> Vec<Step> {
         tools(),
         fmt(),
         files(),
+        deny(),
         clippy(),
         wasm(web_package),
         wasm_release(web_package),
@@ -142,6 +160,11 @@ pub fn ci(web_package: &str) -> Vec<Step> {
 /// The wasm lints alone, debug and release.
 pub fn wasm_lint(web_package: &str) -> Vec<Step> {
     vec![wasm(web_package), wasm_release(web_package)]
+}
+
+/// cargo-deny alone.
+pub fn deny_check() -> Vec<Step> {
+    vec![deny()]
 }
 
 /// Formatting and lints only.

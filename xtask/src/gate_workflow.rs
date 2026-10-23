@@ -4,7 +4,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde_yaml::Value;
+use serde_json::Value;
 
 /// The workflow keys the gate models.
 pub const WORKFLOW_KEYS: [&str; 6] = ["name", "on", "permissions", "env", "defaults", "jobs"];
@@ -12,12 +12,10 @@ pub const WORKFLOW_KEYS: [&str; 6] = ["name", "on", "permissions", "env", "defau
 /// Refuses a key of `value` not in `allowed`, naming it and `label`.
 pub fn check_keys(value: &Value, allowed: &[&str], label: &str) -> Result<(), String> {
     let map = value
-        .as_mapping()
+        .as_object()
         .ok_or_else(|| format!("{label}: not a mapping"))?;
     for key in map.keys() {
-        let key = key
-            .as_str()
-            .ok_or_else(|| format!("{label}: a key that is not a string"))?;
+        let key = key.as_str();
         if !allowed.contains(&key) {
             return Err(format!(
                 "{label}: `{key}:`, which the gate does not model; fix: drop it or teach the gate"
@@ -34,13 +32,11 @@ pub fn env_of(value: &Value, label: &str) -> Result<BTreeMap<String, String>, St
         return Ok(BTreeMap::new());
     };
     let env = env
-        .as_mapping()
+        .as_object()
         .ok_or_else(|| format!("{label}: `env:` is not a mapping"))?;
     env.iter()
         .map(|(name, value)| {
-            let name = name
-                .as_str()
-                .ok_or_else(|| format!("{label}: an env name that is not a string"))?;
+            let name = name.as_str();
             Ok((name.to_owned(), env_value(value, name, label)?))
         })
         .collect()
@@ -70,11 +66,11 @@ fn env_value(value: &Value, name: &str, label: &str) -> Result<String, String> {
 /// must run in the checkout under `bash` (`defaults.run`, the job's over
 /// the workflow's), as the gate runs them: from the checkout, with
 /// `bash -eo pipefail`, which is what `shell: bash` gives in CI.
-pub fn workspace(doc: &Value, jobs: &serde_yaml::Mapping) -> Result<String, String> {
+pub fn workspace(doc: &Value, jobs: &serde_json::Map<String, Value>) -> Result<String, String> {
     let path = own_checkout_path(doc)?;
     let workflow = run_defaults(doc, "the workflow")?;
     for (name, job) in jobs {
-        let label = name.as_str().unwrap_or("a job");
+        let label = name.as_str();
         check_job_defaults(&run_defaults(job, label)?.over(workflow), label, &path)?;
     }
     let depth = path.split('/').filter(|part| *part != ".").count();
@@ -163,10 +159,10 @@ fn own_checkout_path(doc: &Value) -> Result<String, String> {
 fn own_checkouts(doc: &Value) -> impl Iterator<Item = &Value> {
     let jobs = doc
         .get("jobs")
-        .and_then(Value::as_mapping)
+        .and_then(Value::as_object)
         .into_iter()
         .flatten();
-    jobs.filter_map(|(_, job)| job.get("steps").and_then(Value::as_sequence))
+    jobs.filter_map(|(_, job)| job.get("steps").and_then(Value::as_array))
         .flatten()
         .filter(|step| {
             let uses = step.get("uses").and_then(Value::as_str).unwrap_or_default();

@@ -108,3 +108,19 @@ fn every_line_is_shown_when_none_is_classified() {
         ]
     );
 }
+
+#[test]
+fn a_cargo_deny_advisory_shows_its_id_and_solution() {
+    // Given: cargo-deny's report of a vulnerable dependency
+    let output = "error[vulnerability]: Potential segfault in the time crate\n   ┌─ /w/Cargo.lock:60:1\n   │\n60 │ time 0.1.45 registry+https://github.com/rust-lang/crates.io-index\n   │ ----------------------------------------------------------------- security vulnerability\n   │\n   ├ ID: RUSTSEC-2020-0071\n   ├ Advisory: https://rustsec.org/advisories/RUSTSEC-2020-0071\n   ├ Solution: Upgrade to >=0.2.23 (try `cargo update -p time`)\n";
+
+    // When
+    let lines = lines_to_show(output);
+
+    // Then
+    assert!(lines.contains(&"├ ID: RUSTSEC-2020-0071"), "{lines:?}");
+    assert!(
+        lines.iter().any(|l| l.starts_with("├ Solution:")),
+        "{lines:?}"
+    );
+}

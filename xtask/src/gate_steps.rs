@@ -7,7 +7,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 
-use serde_yaml::Value;
+use serde_json::Value;
 
 use crate::gate_action::{composite, with_inputs_in_env};
 use crate::gate_plan::{PlannedStep, Sources};
