@@ -12,6 +12,7 @@ publish = false
 vapors-dom.workspace = true
 vapors-signals.workspace = true
 vapors-elements.workspace = true
+vapors-text.workspace = true
 png.workspace = true
 
 [build-dependencies]

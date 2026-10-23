@@ -1,10 +1,19 @@
 # The web build
 
 The platform crate runs in a browser with WebGPU. `crates/web-demo` is
-the page that proves it: the image app, the gradient fixture fitted to
-the canvas, pinch or scroll to zoom, drag or one finger to pan, a double
-tap to toggle fit and actual size, `o` or a tap on an empty canvas to
-open a file.
+the page that proves it. `?demo=<name>` picks what it shows:
+
+- no query: the index, a vapors-elements component listing the demos;
+- `?demo=hello` and each later F2c slice's demo (`crates/demos`,
+  docs/F2c.md "Demos"): a `.wisp` component on the canvas;
+- `?demo=image`: the image app, the gradient fixture fitted to the
+  canvas, pinch or scroll to zoom, drag or one finger to pan, a double
+  tap to toggle fit and actual size, `o` or a tap on an empty canvas to
+  open a file.
+
+An unknown name is an error in `#error` listing the demos. The team
+lead serves the build at `/vapors/` on the tailnet, so each demo is
+`https://<host>/vapors/?demo=<name>`.
 
 ## Page contract
 
@@ -39,9 +48,9 @@ The elements the platform looks for, by id (`vapors_platform::page`):
   error.
 
 `scripts/check-page-contract.sh target/web <new or empty dir>`, after
-`cargo xtask web`, loads four copies of the built page in headless
-Chrome and checks each one's `#status` and `#error`; a mismatch fails
-naming the case. CI runs it in the `web` job with the runner's
+`cargo xtask web`, loads copies of the built page in headless Chrome
+and checks each one's `#status` and `#error`; a mismatch fails naming
+the case. CI runs it in the `web` job with the runner's
 `google-chrome`; the browser is `$CHROME`, else `google-chrome`, else
 `chromium`. The cases: the page as built shows the adapter line in
 `#status` and `#error` hidden and empty; without the Open button, the
@@ -50,7 +59,13 @@ the adapter line, whichever the dump catches (the adapter line follows
 real GPU setup, which Chrome's virtual time does not wait for);
 without WebGPU, the `NoWebGpu` error in `#error` and `#status` still
 `starting`; without WebGPU and without `#error`, the error in
-`#status`. Verified on Chromium 155 here on 2026-10-22.
+`#status`. Verified on Chromium 155 here on 2026-10-22. From F2c S1:
+`?demo=hello` draws with `#error` hidden; `?demo=nope` reports the
+unknown demo in `#error`; the page loaded one directory down
+(`/vapors/as-built.html`, as the tailnet serves it) starts; the
+gradient screenshot loads `?demo=image`; and the hello demo's
+screenshot is held to `crates/demos/demos/hello.pixels` by the
+`check_pixels` binary, the same code the native screenshot uses.
 
 ## Build
 

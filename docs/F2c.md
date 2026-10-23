@@ -237,10 +237,12 @@ single render pass. Clips are scissor rects. A rounded clip
 (`overflow: hidden` with `border-radius`) is refused until a slice
 needs it.
 
-`TextPipeline::draw` currently writes its uniform and vertex buffers
-and submits on each call. The painter needs several text runs per
-pass, so S1 changes it to append quads to a per-frame buffer and draw
-ranges of it.
+`TextPipeline::draw` writes its uniform and vertex buffers and
+submits on each call, and so does `QuadPipeline::draw`, once per run
+of quads. As built in S1 the painter keeps that: each batch is its
+own submit, which is correct because writes and submits are ordered
+on the queue. Batching into one pass is deferred to S7, where frame
+time is measured; it changes nothing a screenshot can see.
 
 Redraw: the whole window each frame (brief 4.6). Frames are requested
 on demand from S2: `platform::Next` gains `Wait`, which draws again
@@ -310,26 +312,28 @@ Effects call `set_text`, `set_attribute`, `insert_before` and
   `{if}`/`{for}` operations.
 - Every refusal above has a test that triggers it and checks the
   message.
-- **Geometry against Chromium.** Fixtures are `.wisp` files under
-  `crates/elements/tests/layout/`, each with no script: a `<style>` and
-  static HTML. The same file is valid HTML. `cargo xtask layout-oracle`
-  wraps each fixture in a page with `@font-face` for the bundled
-  fonts, loads it in headless Chromium at the fixture's viewport, waits
-  for `document.fonts.ready`, and writes every element's border box
-  (`getBoundingClientRect`, document order) to `<name>.boxes.json`
-  beside it. The JSON is committed. The unit test compiles the fixture
-  (through `build.rs`), mounts it in a `Document`, lays it out, and
-  compares every box. The tolerance is 1/64 px (Chromium's layout
-  unit) for fixtures without text, and is stated per fixture when text
-  sizes a box. The tolerance and the reason go in the fixture's first
-  line.
-- The oracle is checked in CI. The `gpu` job, which already has
-  Chromium, reruns `layout-oracle` into a fresh directory and fails on
-  any difference from the committed JSON. That catches a fixture
-  edited without regenerating, and a Chromium change. The Chromium
-  process code from `vapors-text`'s comparison (deadline, stderr
-  drain, stale-output removal, the `DBUS_SESSION_BUS_ADDRESS` strip)
-  moves to a shared test-support module rather than being copied.
+- **Geometry against Chromium.** As built in S1: fixtures are `.wisp`
+  files in `crates/elements-corpus/fixtures/`, each with no script: a
+  `<style>` holding a `/* viewport WxH */` comment, and static HTML,
+  so the same file is a page. `cargo run -p vapors-elements-corpus
+  --example layout_oracle` wraps each fixture in a page with
+  `@font-face` for the bundled fonts, loads it in headless Chromium,
+  waits for `document.fonts.ready`, and writes the viewport the page
+  measured and every element's border box (`getBoundingClientRect`,
+  document order) to `<name>.boxes.json` beside it. It is an example
+  rather than an xtask command because xtask is shared byte for byte
+  with touche. The JSON is committed. The test compiles each fixture
+  through `build.rs`, mounts it in a `Document`, lays it out at the
+  recorded viewport, and compares every box within 1/64 px
+  (Chromium's layout unit). A fixture may state a looser
+  `/* tolerance N */` with its reason; none needs one so far, text
+  included.
+- The oracle is checked in CI: the `gpu` job, which has Chrome, runs
+  it with `--check` and fails on any difference from the committed
+  JSON. That catches a fixture edited without regenerating, and a
+  Chrome that lays a fixture out differently. It uses `vapors-text`'s
+  Chromium runner (deadline, stderr drain, the
+  `DBUS_SESSION_BUS_ADDRESS` strip), which gained `dump_dom`.
 
 **GPU tier.**
 
@@ -382,21 +386,25 @@ picks the demo from the query string, `?demo=<name>`. With no query it
 shows an index page listing the demos, itself drawn by vapors from
 S1 on. The image app stays as `?demo=image`, so its existing page
 checks keep running. The team lead serves the build at `/vapors/` on
-the tailnet, so trunk builds with `--public-url /vapors/`. Without that,
-asset URLs start at `/` and the page loads no wasm under a subpath.
+the tailnet. As built, trunk builds with `--public-url ./`, so the
+page loads its script and wasm from beside itself at any path;
+trunk's default `/` loads nothing under a subpath.
 `check-page-contract.sh` gains a case that loads the page under
 `/vapors/` and fails if the wasm does not start.
 
-Each demo is a `.wisp` component in `crates/web-demo/src/demos/`. The
-native example `cargo run -p vapors-app --example demo -- <name>` runs
-the same component in a window.
+Each demo is a `.wisp` component in `crates/demos/demos/` (a library
+crate, so the web page and the native example share it). The native
+example `cargo run -p vapors-app --example demo -- <name>` runs the
+same component in a window.
 
 Every slice adds three checks for its demo:
 
-- **Native screenshot test.** `cargo xtask screenshot` runs the native
-  example under Xvfb and saves the frame. A test in the `gpu` tier
-  reads named pixels from it: a colour inside each styled box, and a
-  colour just outside it. Where a slice has an interaction, the test
+- **Native screenshot test.** `cargo xtask screenshot demo <png> --
+  <name>` runs the native example under Xvfb; the example saves the
+  frame and checks the demo's pixels itself, exiting 1 on a miss. The
+  `gpu` tier also paints every demo offscreen and checks the same
+  pixels: a colour inside each styled box, and a colour just outside
+  it. Where a slice has an interaction, the test
   replays it first: for S2, a synthetic click injected before the
   capture, and it checks the count text changed by its ink.
 - **Web page-contract check.** The demo's URL is a case in
@@ -406,8 +414,9 @@ Every slice adds three checks for its demo:
   headless Chromium (WebGPU through SwiftShader, as the existing
   gradient case does). It checks the same named pixels as the native
   test. The pixel list is one file per demo,
-  `crates/web-demo/src/demos/<name>.pixels`, read by both checks, so
-  the native and web checks cannot drift apart.
+  `crates/demos/demos/<name>.pixels`, read by both checks through the
+  same code (the web check runs the `check_pixels` binary), so the
+  native and web checks cannot drift apart.
 
 | Slice | Demo (`?demo=`) | What Tom checks on the phone and laptop | Pixels checked |
 |---|---|---|---|

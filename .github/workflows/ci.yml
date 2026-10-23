@@ -129,6 +129,11 @@ jobs:
       # runner image ships google-chrome), composite uploaded for eyes.
       - name: text comparison page
         run: cargo run -p vapors-text --example text_comparison -- --out target
+      # The layout corpus's oracle: Chromium's boxes for every fixture must
+      # equal the committed fixtures/*.boxes.json, or a fixture was edited
+      # without rerunning the oracle, or Chrome lays it out differently.
+      - name: layout oracle against the runner's Chrome
+        run: cargo run -p vapors-elements-corpus --example layout_oracle -- --check
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -167,6 +172,10 @@ jobs:
         run: cargo xtask screenshot clear_window target/clear_window.png --expect 12,200,34
       - name: screenshot of the gradient fixture, fitted
         run: cargo xtask screenshot image_window target/image_window.png --expect 128,128,128 -- --open crates/platform/examples/fixtures/gradient.png
+      # Each F2c demo in a window; the example holds the screenshot to the
+      # demo's crates/demos/demos/<name>.pixels and exits 1 on a miss.
+      - name: screenshot of the hello demo (F2c S1)
+        run: cargo xtask screenshot demo target/hello.png --expect 23,27,31 -- hello
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

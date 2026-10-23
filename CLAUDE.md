@@ -15,6 +15,12 @@ cargo xtask wasm          clippy for the web package on wasm32-unknown-unknown
 cargo xtask web           trunk release build of the web package into target/web
 cargo xtask serve         put target/web on the tailnet over https; prints the URL
 cargo xtask test          one tier (default unit)
+cargo run -p vapors-app --example demo -- hello
+                          an F2c demo in a window (crates/demos)
+cargo xtask screenshot demo target/hello.png -- hello
+                          the same under Xvfb, held to demos/hello.pixels
+cargo run -p vapors-elements-corpus --example layout_oracle [-- --check]
+                          Chromium's boxes for the layout fixtures
 bacon                     unit tier on every save
 ```
 

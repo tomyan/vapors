@@ -10,6 +10,7 @@ use std::rc::Rc;
 
 use vapors_dom::NodeId;
 use vapors_elements::Document;
+use vapors_text::FontSystem;
 
 include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
@@ -74,4 +75,21 @@ pub fn all() -> Vec<Demo> {
             },
         },
     ]
+}
+
+/// A document showing `demo`: its style as a global sheet, its
+/// component mounted in `body`, on the platform's fonts (the bundle,
+/// then system fonts natively; the bundle alone on the web).
+///
+/// # Errors
+/// The demo's style does not parse, naming the line.
+pub fn document(demo: &Demo) -> Result<Rc<RefCell<Document>>, String> {
+    let document = Rc::new(RefCell::new(Document::new(FontSystem::new())));
+    document
+        .borrow_mut()
+        .add_stylesheet(&format!("{}.wisp", demo.name), demo.style)
+        .map_err(|error| error.to_string())?;
+    let body = document.borrow().body();
+    (demo.mount)(&document, body);
+    Ok(document)
 }

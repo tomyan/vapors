@@ -5,7 +5,7 @@
 [screenshot]
 # The packages whose examples and binaries `cargo xtask screenshot` runs,
 # comma-separated; a target name must be in exactly one of them.
-packages = "vapors-platform"
+packages = "vapors-platform, vapors-app"
 
 [web]
 # The package `cargo xtask web` builds with trunk and the `wasm` CI step

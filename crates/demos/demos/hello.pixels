@@ -1,8 +1,14 @@
 # The pixels a hello screenshot is checked against: 640x400 CSS px at
-# 1x, as the native window and the page-contract browser draw it.
+# 1x, as the native window and the page-contract browser draw it. The
+# panel is laid out at x 76..564, y 120..280.
 # `pixel X Y #rrggbb` is exact within 1 per channel; `ink X0 Y0 X1 Y1
 # #rrggbb` needs at least one pixel in the box that is not that colour.
-pixel 4 4 #e9ecef          page background, top left
-pixel 636 396 #e9ecef      page background, bottom right
-pixel 320 120 #171b1f      panel, between the heading and the paragraph's top margin
-ink 120 110 520 290 #171b1f the panel holds drawn text
+pixel 4 4 #e9ecef          page, top left
+pixel 636 396 #e9ecef      page, bottom right
+pixel 75 200 #e9ecef       page, just left of the panel
+pixel 76 200 #171b1f       panel, its left column
+pixel 84 128 #171b1f       panel padding, top left
+pixel 563 279 #171b1f      panel, its bottom-right pixel
+pixel 564 279 #e9ecef      page, just right of the panel
+pixel 320 257 #3a7bd5      the note bar under the paragraph
+ink 100 140 540 240 #171b1f the heading and paragraph are drawn

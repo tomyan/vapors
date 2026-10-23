@@ -2466,6 +2466,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
+name = "vapors-app"
+version = "0.0.0"
+dependencies = [
+ "png",
+ "vapors-demos",
+ "vapors-elements",
+ "vapors-gpu-harness",
+ "vapors-platform",
+ "vapors-renderer",
+ "vapors-scene",
+ "vapors-text",
+ "wgpu",
+]
+
+[[package]]
 name = "vapors-canvas"
 version = "0.0.0"
 dependencies = [
@@ -2514,6 +2529,7 @@ dependencies = [
  "vapors-dom",
  "vapors-elements",
  "vapors-signals",
+ "vapors-text",
 ]
 
 [[package]]
@@ -2625,7 +2641,9 @@ dependencies = [
 name = "vapors-web-demo"
 version = "0.0.0"
 dependencies = [
+ "vapors-app",
  "vapors-canvas",
+ "vapors-demos",
  "vapors-platform",
  "vapors-scene",
 ]
