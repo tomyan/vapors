@@ -32,6 +32,7 @@ mod screenshot;
 mod screenshot_package;
 mod serve;
 mod setup;
+mod stamp_page;
 mod step;
 mod steps;
 mod stop;
@@ -40,7 +41,9 @@ mod tailscale;
 mod tools;
 mod trunk;
 mod trunk_process;
+mod twin;
 mod web;
+mod web_version;
 mod xvfb;
 mod xvfb_display;
 
@@ -104,6 +107,9 @@ enum Command {
     },
     /// Serve target/web on the tailnet over https and print the URL.
     Serve,
+    /// trunk's post-build hook: version.json and `?v=<build>` on the
+    /// page's own files in trunk's staging directory.
+    StampPage,
     /// Rebuild the web package on save (trunk serve, debug) behind the tailnet https proxy.
     Dev {
         /// A key for the debug page, as `<provider>=<file>` (anthropic or
@@ -117,6 +123,11 @@ enum Command {
     Lint,
     /// Check dependencies with cargo-deny: advisories, bans, licences, sources.
     Deny,
+    /// Fail naming each file where ./xtask differs from <sibling>/xtask.
+    CheckXtaskTwin {
+        /// The sibling checkout, such as ../vapors.
+        sibling: PathBuf,
+    },
     /// Run one test tier (default: unit).
     Test {
         /// Which tier to run.
@@ -157,6 +168,8 @@ fn main() -> ExitCode {
         }
         Command::Web { debug } => return web::run(debug),
         Command::Serve => return serve::run(),
+        Command::StampPage => return stamp_page::run(),
+        Command::CheckXtaskTwin { sibling } => return twin::run(&sibling),
         Command::Dev { keys } => return dev::run(&reporter, &keys),
         Command::Ci => match web::web_package() {
             Ok(package) => return ci_with_hit_rate(&steps::ci(&package), &reporter),
