@@ -8,7 +8,7 @@
 # Usage: scripts/check-page-contract.sh target/web <new or empty dir>
 # after `cargo xtask web`. CI runs it in the `web` job. Needs python3
 # (the server) and a browser: $CHROME, else google-chrome, else
-# chromium.
+# chromium. Vulkan is the browser's own SwiftShader driver, beside it.
 set -eu
 web=${1:?usage: scripts/check-page-contract.sh target/web <new or empty dir>}
 work=${2:?usage: scripts/check-page-contract.sh target/web <new or empty dir>}
@@ -24,6 +24,21 @@ browser() {
     fi
   done
   echo "no browser: set CHROME, or install google-chrome or chromium" >&2
+  exit 1
+}
+
+# The browser's own SwiftShader Vulkan driver, as the only driver. With
+# lavapipe as the only driver, the compositor cannot read the WebGPU
+# canvas ("Unable to initialize SkSurface") and the screenshot is white:
+# run 39934974057, job 120355716651, and here with VK_DRIVER_FILES set to
+# lavapipe's lvp_icd.json. With the Intel driver also present it passes,
+# so a machine with a hardware driver hides it.
+vulkan_driver() {
+  dir=$(dirname "$(readlink -f "$(command -v "$1")")")
+  for icd in "$dir/vk_swiftshader_icd.json" /usr/lib/chromium/vk_swiftshader_icd.json; do
+    [ -r "$icd" ] && { echo "$icd"; return; }
+  done
+  echo "no vk_swiftshader_icd.json in $dir or /usr/lib/chromium: $1 has no SwiftShader Vulkan driver; fix: install google-chrome or chromium from its package" >&2
   exit 1
 }
 
@@ -209,18 +224,19 @@ check() {
 
 chrome=$(browser)
 echo "browser: $chrome ($("$chrome" --version 2>/dev/null || echo 'version unknown'))"
+VK_DRIVER_FILES=$(vulkan_driver "$chrome")
+export VK_DRIVER_FILES
+echo "vulkan driver: $VK_DRIVER_FILES"
 prepare
 serve
 check as-built '^adapter: ' hidden
-# SwiftShader's WebGPU presents through Chromium's Vulkan; without a
-# Vulkan driver (vkCreateInstance fails) the canvas's swap chain cannot
-# be made and the device is lost at the first frame (the runner, run
-# 39929758159; here with VK_ICD_FILENAMES pointing nowhere).
 # The canvas presented a frame. A WebGPU canvas cannot be read back once
 # presented, so the pixel comes from Chromium's screenshot: the canvas
 # fills the page, and the fitted gradient's centre is 128,128,128
-# (docs/web.md), as the native screenshot asserts. A dead canvas (no
-# Vulkan, run 39929758159) is not.
+# (docs/web.md), as the native screenshot asserts. A dead canvas is not:
+# with no Vulkan driver (vkCreateInstance fails, run 39929758159) the
+# device is lost at the first frame; with lavapipe alone it composites
+# white (see vulkan_driver).
 presented=none
 if shoot as-built-shot; then
   presented=$(centre_pixel "$work/as-built-shot.png") || presented="unreadable: $presented"
@@ -231,7 +247,7 @@ if [ "$presented" != "128,128,128" ]; then
   echo "  as-built-shot: the page's last console lines:"; console as-built-shot
 fi
 if grep -q 'vkCreateInstance() failed' "$work/as-built.log"; then
-  fail "Chromium has no Vulkan driver, so SwiftShader's WebGPU cannot present; fix: install mesa-vulkan-drivers (lavapipe)"
+  fail "Chromium has no Vulkan driver, so SwiftShader's WebGPU cannot present; fix: check that $VK_DRIVER_FILES loads (vulkaninfo --summary with VK_DRIVER_FILES set)"
 fi
 check no-open-button '^adapter: ' 'touch screens cannot open files'
 check no-webgpu '^starting$' '^no WebGPU adapter'
