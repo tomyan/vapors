@@ -72,3 +72,71 @@ fn a_missing_sibling_is_refused_naming_it() {
     // Then
     assert!(refusal.contains("/nonexistent/xtask"), "{refusal}");
 }
+
+#[test]
+fn a_symlink_in_either_tree_is_refused_naming_it() {
+    // Given
+    let ours = tree("link", "a", &[("src/main.rs", "1")]);
+    let theirs = tree("link", "b", &[("src/main.rs", "1")]);
+    std::os::unix::fs::symlink(theirs.join("src/main.rs"), ours.join("src/linked.rs"))
+        .expect("symlink");
+
+    // When
+    let refusal = differences(&ours, &theirs).expect_err("refused");
+
+    // Then
+    assert!(refusal.contains("src/linked.rs"), "{refusal}");
+    assert!(refusal.contains("is a symlink"), "{refusal}");
+}
+
+const PIN: (&str, &str) = (".config/vapors-rev", "abc\n");
+
+#[test]
+fn the_fix_names_this_repositorys_pin_when_it_has_one() {
+    // Given
+    let here = tree("pin-here", "touche", &[PIN]);
+    let sibling = tree("pin-here", "vapors", &[]);
+
+    // When
+    let fix = fix_line(&here, &sibling);
+
+    // Then
+    assert!(fix.contains("in vapors first"), "{fix}");
+    assert!(
+        fix.contains(&format!("{}/.config/vapors-rev", here.display())),
+        "{fix}"
+    );
+}
+
+#[test]
+fn the_fix_names_the_siblings_pin_when_it_has_one() {
+    // Given
+    let here = tree("pin-there", "vapors", &[]);
+    let sibling = tree("pin-there", "touche", &[PIN]);
+
+    // When
+    let fix = fix_line(&here, &sibling);
+
+    // Then
+    assert!(
+        fix.contains(&format!("{}/.config/vapors-rev", sibling.display())),
+        "{fix}"
+    );
+    assert!(!fix.contains(&here.display().to_string()), "{fix}");
+}
+
+#[test]
+fn the_fix_names_no_pin_when_neither_has_one() {
+    // Given
+    let here = tree("pin-none", "a", &[]);
+    let sibling = tree("pin-none", "b", &[]);
+
+    // When
+    let fix = fix_line(&here, &sibling);
+
+    // Then
+    assert!(
+        fix.contains("neither repository has .config/vapors-rev"),
+        "{fix}"
+    );
+}
