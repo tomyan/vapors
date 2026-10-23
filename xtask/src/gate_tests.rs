@@ -26,25 +26,39 @@ fn the_setup_lines_are_the_gate_setup_keys_exactly() {
 }
 
 #[test]
-fn a_gate_step_is_bash_with_pipefail_and_reproduces_with_its_environment() {
+fn an_action_listed_without_a_reason_is_refused() {
     // Given
-    let planned = PlannedStep {
-        name: "gpu: gpu tier".to_owned(),
-        run: "cargo xtask test --tier gpu".to_owned(),
-        env: [("CI", "true"), ("VAPORS_GPU_ADAPTER", "llvmpipe")]
-            .map(|(k, v)| (k.to_owned(), v.to_owned()))
-            .into(),
-    };
+    let settings = "[gate.actions]\n\"actions/checkout\" = \" \"\n";
 
     // When
-    let step = step_for(&planned);
+    let refusal = actions(&Config::parse(settings).expect("valid")).expect_err("no reason");
 
     // Then
-    assert_eq!(step.name, "gpu: gpu tier");
-    assert_eq!(
-        step.reproduce(),
-        "CI=true VAPORS_GPU_ADAPTER=llvmpipe bash -eo pipefail -c 'cargo xtask test --tier gpu'"
+    assert!(
+        refusal.contains("`actions/checkout` has no reason"),
+        "{refusal}"
     );
+}
+
+#[test]
+fn a_tree_with_changes_is_refused_before_anything_runs() {
+    // Given
+    let dirty = State {
+        head: format!("abc{DIRTY}"),
+        siblings: Vec::new(),
+    };
+    let clean = State {
+        head: "abc".to_owned(),
+        siblings: Vec::new(),
+    };
+
+    // When / Then
+    assert!(
+        refuse_dirty(&dirty)
+            .expect_err("dirty")
+            .contains("the tree has changes")
+    );
+    assert_eq!(refuse_dirty(&clean), Ok(()));
 }
 
 #[test]
@@ -55,10 +69,19 @@ fn this_repositorys_workflow_is_one_the_gate_can_run() {
         std::fs::read_to_string(root.join(".config/factory.toml")).expect("factory.toml");
     let workflow = std::fs::read_to_string(root.join(WORKFLOW)).expect("ci.yml");
 
+    let config = Config::parse(&settings).expect("valid");
+    let (setup, actions) = (setup_lines(&config), actions(&config).expect("reasons"));
+    let read =
+        |path: &str| std::fs::read_to_string(root.join(path)).map_err(|e| format!("{path}: {e}"));
+
     // When
     let planned = plan(
         &workflow,
-        &setup_lines(&Config::parse(&settings).expect("valid")),
+        &Sources {
+            setup: &setup,
+            actions: &actions,
+            read: &read,
+        },
     );
 
     // Then

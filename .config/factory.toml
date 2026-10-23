@@ -35,3 +35,12 @@ max_lines = "220"
 "sudo apt-get update -q && sudo apt-get install -y -q mesa-vulkan-drivers xvfb libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev" = "apt: lavapipe, Xvfb and winit's X11 libraries"
 "rustup toolchain install && rustup show active-toolchain" = "the toolchain, from rust-toolchain.toml"
 "cargo xtask setup --ci" = "the pinned tools, installed once per machine"
+
+# Third-party actions ci.yml uses that the gate does not run, each with
+# the reason it need not run locally. A local composite action
+# (`uses: ./...`) is not listed: the gate runs its steps.
+[gate.actions]
+"actions/checkout" = "the gate runs in a checkout of this repository"
+"Swatinem/rust-cache" = "a cache of target/; the local target directory is already there"
+"cargo-bins/cargo-binstall" = "installs cargo-binstall, which cargo xtask setup --ci needs; that line is setup"
+"actions/upload-artifact" = "uploads files for people to read; nothing is checked"

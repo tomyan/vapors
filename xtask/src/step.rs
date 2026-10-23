@@ -1,6 +1,7 @@
 //! One external command the factory runs, and how to reproduce it.
 
 use std::fmt::Write;
+use std::time::Duration;
 
 /// One external command with the advice to print when it fails.
 pub struct Step {
@@ -14,6 +15,10 @@ pub struct Step {
     pub fix: String,
     /// Set in the step's environment, in this order.
     pub env: Vec<(String, String)>,
+    /// Where it runs, relative to the workspace root; there when `None`.
+    pub dir: Option<String>,
+    /// Killed, with its process group, and failed when it runs longer.
+    pub deadline: Option<Duration>,
 }
 
 impl Step {
@@ -24,6 +29,8 @@ impl Step {
             args: args.iter().map(|&a| a.to_owned()).collect(),
             fix: fix.to_owned(),
             env: Vec::new(),
+            dir: None,
+            deadline: None,
         }
     }
 
@@ -31,6 +38,9 @@ impl Step {
     /// argument a shell would split or expand is single-quoted.
     pub fn reproduce(&self) -> String {
         let mut line = String::new();
+        if let Some(dir) = &self.dir {
+            let _ = write!(line, "cd {} && ", shell_word(dir));
+        }
         for (name, value) in &self.env {
             let _ = write!(line, "{name}={} ", shell_word(value));
         }

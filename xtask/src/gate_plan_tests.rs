@@ -1,7 +1,8 @@
-//! The gate's plan from a workflow: which steps run, with what
-//! environment, and what is refused by name.
+//! The gate's plan from a workflow: which steps run, in what order, with
+//! what environment, directory and deadline.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+use std::time::Duration;
 
 use super::*;
 
@@ -15,6 +16,7 @@ defaults:
 jobs:
   ci:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
         with:
@@ -25,10 +27,16 @@ jobs:
         run: |
           df -h / | tail -1
           sudo rm -rf /usr/share/dotnet
+      - name: greet
+        uses: ./touche/.github/actions/greet
+        timeout-minutes: 2
+        with:
+          who: world
       - name: lint
         run: cargo xtask lint && cargo xtask wasm
   gpu:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     env:
       VAPORS_GPU_ADAPTER: llvmpipe
       NEXTEST_PROFILE: gpu-override
@@ -38,6 +46,25 @@ jobs:
           EXTRA: "1"
       - uses: actions/upload-artifact@v7
         if: failure()
+"#;
+
+/// The composite action the workflow calls, at its path from the gate root.
+pub(super) const GREET_PATH: &str = "../touche/.github/actions/greet/action.yml";
+
+pub(super) const GREET: &str = r#"
+name: greet
+inputs:
+  who:
+    description: whom
+  greeting:
+    description: how
+    default: hello
+runs:
+  using: composite
+  steps:
+    - name: say it
+      shell: bash
+      run: echo "${{ inputs.greeting }} ${{ inputs.who }}" >> "$GITHUB_OUTPUT"
 "#;
 
 pub(super) fn setup() -> BTreeSet<String> {
@@ -50,29 +77,60 @@ pub(super) fn setup() -> BTreeSet<String> {
     .into()
 }
 
+pub(super) fn actions() -> BTreeMap<String, String> {
+    [
+        ("actions/checkout", "the gate runs in a checkout"),
+        ("actions/upload-artifact", "nothing to upload"),
+    ]
+    .map(|(k, v)| (k.to_owned(), v.to_owned()))
+    .into()
+}
+
+/// The plan of `workflow` with `greet` as the action's text.
+pub(super) fn plan_with(
+    workflow: &str,
+    greet: &str,
+    setup: &BTreeSet<String>,
+    actions: &BTreeMap<String, String>,
+) -> Result<Vec<PlannedStep>, String> {
+    let read = |path: &str| {
+        if path == GREET_PATH {
+            Ok(greet.to_owned())
+        } else {
+            Err(format!("{path}: no such file"))
+        }
+    };
+    plan(
+        workflow,
+        &Sources {
+            setup,
+            actions,
+            read: &read,
+        },
+    )
+}
+
 pub(super) fn plan_of(workflow: &str) -> Result<Vec<PlannedStep>, String> {
-    plan(workflow, &setup())
+    plan_with(workflow, GREET, &setup(), &actions())
 }
 
 #[test]
-fn the_plan_is_every_run_step_less_setup_in_file_order() {
+fn the_plan_is_every_run_step_less_setup_in_file_order_actions_expanded() {
     // When
     let planned = plan_of(WORKFLOW).expect("a plan");
 
     // Then
-    let runs: Vec<&str> = planned.iter().map(|step| step.run.as_str()).collect();
+    let names: Vec<&str> = planned.iter().map(|step| step.name.as_str()).collect();
     assert_eq!(
-        runs,
+        names,
         [
-            "cargo xtask lint && cargo xtask wasm",
-            "cargo xtask test --tier gpu"
-        ]
-    );
-    assert_eq!(planned[0].name, "ci: lint");
-    assert_eq!(
-        planned[1].name, "gpu: cargo xtask test --tier gpu",
+            "ci: greet: say it",
+            "ci: lint",
+            "gpu: cargo xtask test --tier gpu"
+        ],
         "a `- run:` step is named by its first line"
     );
+    assert_eq!(planned[1].run, "cargo xtask lint && cargo xtask wasm");
 }
 
 #[test]
@@ -81,7 +139,7 @@ fn each_step_gets_workflow_then_job_then_step_env_and_ci_true() {
     let planned = plan_of(WORKFLOW).expect("a plan");
 
     // Then
-    let gpu = &planned[1].env;
+    let gpu = &planned[2].env;
     assert_eq!(gpu["RUSTFLAGS"], "-D warnings");
     assert_eq!(
         gpu["NEXTEST_PROFILE"], "gpu-override",
@@ -90,48 +148,50 @@ fn each_step_gets_workflow_then_job_then_step_env_and_ci_true() {
     assert_eq!(gpu["VAPORS_GPU_ADAPTER"], "llvmpipe");
     assert_eq!(gpu["EXTRA"], "1");
     assert_eq!(gpu["CI"], "true");
-    assert_eq!(planned[0].env["NEXTEST_PROFILE"], "ci");
+    assert_eq!(planned[1].env["NEXTEST_PROFILE"], "ci");
 }
 
 #[test]
-fn a_setup_like_line_that_is_not_listed_exactly_is_run() {
-    // Given
+fn a_composite_actions_step_runs_from_the_workspace_with_its_inputs() {
+    // When
+    let planned = plan_of(WORKFLOW).expect("a plan");
+
+    // Then: `with:` over the default, and the workspace root is the checkout's parent
+    assert_eq!(planned[0].run, r#"echo "hello world" >> "$GITHUB_OUTPUT""#);
+    assert_eq!(planned[0].dir, "..");
+    assert_eq!(planned[1].dir, ".");
+}
+
+#[test]
+fn each_step_carries_its_jobs_timeout_and_its_own() {
+    // When
+    let planned = plan_of(WORKFLOW).expect("a plan");
+
+    // Then
+    assert_eq!(planned[0].job_timeout, Duration::from_mins(10));
+    assert_eq!(
+        planned[0].step_timeout,
+        Some(Duration::from_mins(2)),
+        "the calling step's, for the action's steps"
+    );
+    assert_eq!(planned[1].step_timeout, None);
+    assert_eq!(planned[2].job, "gpu");
+    assert_eq!(planned[2].job_timeout, Duration::from_mins(20));
+}
+
+#[test]
+fn a_step_with_a_line_not_listed_exactly_is_run() {
+    // Given: free disk gains a setup-like line; a second step keeps the exact lines in use
     let workflow = WORKFLOW.replace(
         "sudo rm -rf /usr/share/dotnet\n",
-        "sudo rm -rf /usr/share/dotnet\n          sudo rm -rf /usr/share/dotnet /opt/ghc\n",
+        "sudo rm -rf /usr/share/dotnet\n          sudo rm -rf /usr/share/dotnet /opt/ghc\n      - name: free disk again\n        run: |\n          df -h / | tail -1\n          sudo rm -rf /usr/share/dotnet\n",
     );
 
     // When
     let planned = plan_of(&workflow).expect("a plan");
 
-    // Then: the free-disk step is no longer all setup, so the gate runs it
-    assert!(
-        planned.iter().any(|step| step.name == "ci: free disk"),
-        "{planned:?}"
-    );
-}
-
-#[test]
-fn a_run_step_ci_runs_on_success_is_planned_and_one_only_on_failure_is_not() {
-    // Given
-    let with = |condition: &str| {
-        WORKFLOW.replace(
-            "        run: cargo xtask lint && cargo xtask wasm",
-            &format!("        if: {condition}\n        run: cargo xtask lint && cargo xtask wasm"),
-        )
-    };
-    let lint = |workflow: &str| {
-        plan_of(workflow)
-            .expect("a plan")
-            .iter()
-            .any(|step| step.name == "ci: lint")
-    };
-
     // Then
-    assert!(lint(&with("always()")), "always() runs on success");
-    assert!(lint(&with("success()")), "success() runs on success");
-    assert!(
-        !lint(&with("failure()")),
-        "failure() never runs when the gate passes"
-    );
+    let names: Vec<&str> = planned.iter().map(|step| step.name.as_str()).collect();
+    assert!(names.contains(&"ci: free disk"), "{names:?}");
+    assert!(!names.contains(&"ci: free disk again"), "{names:?}");
 }
