@@ -1,0 +1,56 @@
+# apt packages installed by apt-get itself (as root, with their install
+# scripts), with the downloaded .debs kept in actions/cache, so a cache
+# hit installs without downloading. The key is the runner image
+# ($ImageOS-$ImageVersion) and a hash of the package list: an image
+# update or a list change is a new cache, never a stale one.
+name: apt install, .debs cached
+description: apt-get install with the .debs cached, keyed on the runner image and the package list
+inputs:
+  packages:
+    description: Space-separated apt packages.
+    required: true
+  mesa-major:
+    description: When given, the installed mesa-vulkan-drivers must have this major version; the reference images depend on Mesa.
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: cache key from the runner image and the package list
+      id: key
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
+      run: |
+        [ -n "${ImageOS:-}" ] && [ -n "${ImageVersion:-}" ] || { echo "::error::ImageOS or ImageVersion is unset; the apt cache key needs the runner image"; exit 1; }
+        echo "key=apt-$ImageOS-$ImageVersion-$(printf '%s' "$PACKAGES" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+    - name: restore the .debs
+      id: cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/apt-archives
+        key: ${{ steps.key.outputs.key }}
+    - name: apt-get install (cache hit ${{ steps.cache.outputs.cache-hit }})
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
+      run: |
+        archives="$HOME/.cache/apt-archives"
+        mkdir -p "$archives/partial"
+        sudo apt-get update -q
+        # shellcheck disable=SC2086 # the list is split into packages on purpose
+        sudo apt-get install -y -q -o Dir::Cache::Archives="$archives" -o APT::Keep-Downloaded-Packages=true $PACKAGES
+        sudo chown -R "$(id -u):$(id -g)" "$archives"
+        echo "$(ls "$archives"/*.deb 2>/dev/null | wc -l) .debs kept for the cache"
+    - name: the Mesa the reference images were made with
+      if: inputs.mesa-major != ''
+      shell: bash
+      env:
+        MESA_MAJOR: ${{ inputs.mesa-major }}
+      run: |
+        version=$(dpkg-query -W -f='${Version}' mesa-vulkan-drivers)
+        echo "mesa-vulkan-drivers $version"
+        case "$version" in
+          "$MESA_MAJOR".*) ;;
+          *) echo "::error::mesa-vulkan-drivers is $version, not major $MESA_MAJOR; the reference images depend on Mesa; fix: check the images on the new Mesa, then change mesa-major in ci.yml"; exit 1 ;;
+        esac
