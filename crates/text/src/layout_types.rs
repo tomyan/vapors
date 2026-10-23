@@ -80,6 +80,11 @@ pub struct GlyphRun {
     pub size: f32,
     /// Variation coordinates the run was shaped with.
     pub coords: Vec<NormalizedCoord>,
+    /// How far x moves right per pixel up: [`SYNTHETIC_SLANT`] when the
+    /// run's italic is synthesised, else 0.
+    ///
+    /// [`SYNTHETIC_SLANT`]: crate::SYNTHETIC_SLANT
+    pub skew: f32,
     /// Ink colour.
     pub color: Color,
     /// The glyphs, in visual order.
@@ -103,6 +108,8 @@ pub struct PlacedGlyph<'a> {
     pub size: f32,
     /// Variation coordinates the run was shaped with.
     pub coords: &'a [NormalizedCoord],
+    /// The run's slant (see [`GlyphRun::skew`]).
+    pub skew: f32,
     /// Ink colour.
     pub color: Color,
 }

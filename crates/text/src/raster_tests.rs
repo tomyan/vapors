@@ -26,6 +26,7 @@ fn request(font: &FontData, id: u32, subpixel: u8, hinting: Hinting) -> GlyphReq
         coords: &[],
         subpixel,
         hinting,
+        skew: 0.0,
     }
 }
 

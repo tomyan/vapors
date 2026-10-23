@@ -117,6 +117,7 @@ pub(crate) struct GlyphKey {
     pub(crate) coords: Vec<i16>,
     pub(crate) subpixel: u8,
     pub(crate) hinting: Hinting,
+    pub(crate) skew_bits: u32,
 }
 
 impl GlyphKey {
@@ -128,6 +129,7 @@ impl GlyphKey {
             size_bits: request.size.to_bits(),
             coords: request.coords.iter().map(|c| c.to_bits()).collect(),
             subpixel: request.subpixel,
+            skew_bits: request.skew.to_bits(),
             hinting: request.hinting,
         }
     }

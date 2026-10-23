@@ -15,6 +15,7 @@ fn key(id: u32) -> GlyphKey {
         coords: Vec::new(),
         subpixel: 0,
         hinting: Hinting::None,
+        skew_bits: 0,
     }
 }
 

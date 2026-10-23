@@ -41,6 +41,8 @@ pub struct GlyphRequest<'a> {
     pub subpixel: u8,
     /// Hinting mode.
     pub hinting: Hinting,
+    /// Slant: x moves this many pixels right per pixel up (0 upright).
+    pub skew: f32,
 }
 
 /// A rasterised glyph: 8-bit coverage, placed relative to the glyph

@@ -26,6 +26,8 @@ pub(crate) struct TextStyle {
     pub(crate) letter_spacing: f32,
     /// `text-align`: how a block lines up its inline content.
     pub(crate) align: Align,
+    /// `font-style: italic` or `oblique`.
+    pub(crate) italic: bool,
 }
 
 impl TextStyle {
@@ -40,6 +42,7 @@ impl TextStyle {
             line_height: self.line_height,
             color: self.color,
             letter_spacing: self.letter_spacing,
+            italic: self.italic,
             ..Style::new(family, self.size)
         }
     }
@@ -58,6 +61,7 @@ pub(crate) fn text_style(reader: &mut Reader<'_>) -> TextStyle {
         color: reader.read("color", color, Rgba::default()),
         letter_spacing: reader.read("letter-spacing", letter_spacing, 0.0),
         align: reader.read("text-align", align, Align::Start),
+        italic: reader.read("font-style", italic, false),
     }
 }
 
@@ -128,6 +132,17 @@ pub(super) fn color(value: &Value) -> Result<Rgba, String> {
     match value {
         Value::Color(Color::Rgba(rgba)) => Ok(*rgba),
         _ => Err(shape("a resolved colour")),
+    }
+}
+
+/// `italic` and `oblique` are both drawn italic: the bundled faces have
+/// no italic, so either is the synthesised slant Chromium also draws.
+/// An oblique angle other than the default is refused.
+fn italic(value: &Value) -> Result<bool, String> {
+    match value {
+        Value::Keyword(k) if k == "normal" => Ok(false),
+        Value::Keyword(k) if k == "italic" || k == "oblique" => Ok(true),
+        _ => Err(shape("`normal`, `italic` or `oblique` without an angle")),
     }
 }
 

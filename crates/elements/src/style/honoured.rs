@@ -82,7 +82,7 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ("font-family", Read),
     ("font-feature-settings", Deferred("F2c S6")),
     ("font-size", Read),
-    ("font-style", Deferred("F2c S6")),
+    ("font-style", Read),
     ("font-variation-settings", Deferred("F2c S6")),
     ("font-weight", Read),
     ("grid-auto-columns", Read),

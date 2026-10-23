@@ -105,6 +105,7 @@ impl Layout {
                 advance: g.advance,
                 size: run.size,
                 coords: &run.coords,
+                skew: run.skew,
                 color: run.color,
             })
         })

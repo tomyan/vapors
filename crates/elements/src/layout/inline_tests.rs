@@ -11,6 +11,7 @@ fn style(weight: f32) -> TextStyle {
         color: vapors_scene::Color::default(),
         letter_spacing: 0.0,
         align: vapors_text::Align::Start,
+        italic: false,
     }
 }
 

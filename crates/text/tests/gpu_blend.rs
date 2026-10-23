@@ -104,6 +104,7 @@ fn gpu_gamma_one_and_contrast_zero_is_a_plain_linear_blend_of_coverage() {
             coords: glyph.coords,
             subpixel: 0,
             hinting: Hinting::Light,
+            skew: 0.0,
         })
         .expect("rasterises");
 

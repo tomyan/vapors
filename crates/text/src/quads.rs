@@ -28,6 +28,7 @@ pub(crate) fn quads(
             coords: glyph.coords,
             subpixel,
             hinting,
+            skew: glyph.skew,
         })?;
         if placed.is_empty() {
             continue;

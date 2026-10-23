@@ -17,7 +17,7 @@ code { font-family: "Geist Mono", monospace; background-color: #eceff1; }
 </style>
 
 <div class="column">
-  <p>Curves set from a <strong>neutral sample</strong>, applied as <span class="layer">layers you can turn off</span>.</p>
+  <p>Curves set from a <strong>neutral sample</strong>, applied as <span class="layer">layers you can <em>turn off</em></span>.</p>
   <p class="note">A white point of <code>R 238 G 231 B 222</code> at <b>x 1024 y 768</b>,   with   spaces    collapsed.</p>
   <div>Loose text beside a block<div>The block</div>and after it.</div>
   <p><span>Nested <b>bold <code>mono</code> text</b> in a span</span> that wraps over the end of the line here.</p>

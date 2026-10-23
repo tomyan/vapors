@@ -35,11 +35,13 @@ const SUPPORTED: &[&str] = &[
     "samp",
     "mark",
     "abbr",
+    "em",
+    "i",
+    "var",
 ];
 
 /// Where each unimplemented tag arrives.
 const LATER: &[(&str, &[&str])] = &[
-    ("F2c S6 (with font-style)", &["em", "i", "var"]),
     ("F2c S10", &["img"]),
     ("F3", &["canvas"]),
     (
