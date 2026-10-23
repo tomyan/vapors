@@ -8,8 +8,12 @@ use super::DEADLINE;
 use crate::comparison::SCALES;
 
 /// Rendering both scales on lavapipe, beside the screenshots: 1.3 s
-/// here (the whole test 2.6 s, two screenshots 0.65 s each); 10 s
-/// leaves room for a slower runner.
+/// here (the whole test 2.6 s, two screenshots 0.65 s each). On the
+/// runner the whole example, renders and screenshots together, took
+/// 6.85 s (run 39989880425, gpu job 120538591130, from `Running
+/// target/debug/examples/text_comparison` at 16:51:07.13 to
+/// `composite written` at 16:51:13.98), so the renders took less; 10 s
+/// is about one and a half times that whole.
 const RENDER_ALLOWANCE: Duration = Duration::from_secs(10);
 
 /// Every `slow-timeout = { period = "<n>s", terminate-after = <m> }` in

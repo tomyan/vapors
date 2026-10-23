@@ -3,10 +3,12 @@
 //! size.
 
 use std::fmt;
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::time::Duration;
 
-use super::chromium_process::{check_size, on_path, read_all, remove_stale, wait_with_deadline};
+use super::chromium_process::{DEADLINE, check_size, drain, finish, on_path, remove_stale};
 use super::measure::Rgba;
 use super::png_file::read_png;
 
@@ -49,6 +51,8 @@ impl std::error::Error for ChromiumError {}
 /// A browser binary.
 pub struct Chromium {
     binary: PathBuf,
+    /// How long one screenshot may take before Chromium is killed.
+    deadline: Duration,
 }
 
 impl Chromium {
@@ -61,12 +65,16 @@ impl Chromium {
         if let Some(binary) = std::env::var_os(CHROMIUM_ENV) {
             return Ok(Self {
                 binary: PathBuf::from(binary),
+                deadline: DEADLINE,
             });
         }
         CANDIDATES
             .iter()
             .find_map(|name| on_path(name))
-            .map(|binary| Self { binary })
+            .map(|binary| Self {
+                binary,
+                deadline: DEADLINE,
+            })
             .ok_or(ChromiumError::NotFound)
     }
 
@@ -100,14 +108,13 @@ impl Chromium {
     ) -> Result<Rgba, ChromiumError> {
         remove_stale(png)?;
         let mut child = self.spawn(html, png, width, height, scale)?;
-        // Drained on its own thread so a chatty Chromium cannot fill the
-        // pipe, block, and be reported as hung.
-        let stderr = child
-            .stderr
-            .take()
-            .map(|stream| std::thread::spawn(move || read_all(stream)));
-        let status = wait_with_deadline(&mut child)?;
-        let stderr = stderr.and_then(|t| t.join().ok()).unwrap_or_default();
+        let stderr = drain(
+            child
+                .stderr
+                .take()
+                .ok_or_else(|| ChromiumError::Failed("its stderr was not piped".to_owned()))?,
+        );
+        let (status, stderr) = finish(&mut child, &stderr, self.deadline)?;
         if !status.success() {
             return Err(ChromiumError::Failed(format!(
                 "exited with {status}:\n{stderr}"
@@ -131,6 +138,8 @@ impl Chromium {
         // activation waits 120 s. With no session bus address it skips that.
         Command::new(&self.binary)
             .env_remove("DBUS_SESSION_BUS_ADDRESS")
+            // Its own process group, so the deadline kills what it starts.
+            .process_group(0)
             .args([
                 "--headless=new",
                 "--no-sandbox",
