@@ -7,6 +7,7 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Duration;
 
 use vapors_dom::NodeId;
 use vapors_elements::Document;
@@ -16,8 +17,25 @@ include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
 pub use vapors_pixels as pixels;
 
-/// Mounts a demo's component into `parent`.
-pub type Mount = fn(&Rc<RefCell<Document>>, NodeId);
+mod frames;
+pub use frames::{frame_limit, limited};
+
+/// What a demo that changes itself every frame is called with before
+/// each update: how long the last update took (`None` before the first).
+pub type PerFrame = Box<dyn FnMut(Option<Duration>)>;
+
+/// Mounts a demo's component into `parent`; a demo that changes every
+/// frame returns what to call before each update.
+pub type Mount = fn(&Rc<RefCell<Document>>, NodeId) -> Option<PerFrame>;
+
+/// A demo's document, and what to call before each update if it
+/// changes every frame.
+pub struct Shown {
+    /// The document, its component mounted.
+    pub document: Rc<RefCell<Document>>,
+    /// See [`PerFrame`].
+    pub per_frame: Option<PerFrame>,
+}
 
 /// One demo.
 pub struct Demo {
@@ -61,6 +79,7 @@ pub fn all() -> Vec<Demo> {
             pixels: Some(include_str!("../demos/hello.pixels")),
             mount: |dom, parent| {
                 std::mem::forget(hello::Hello::mount(dom, parent, hello::HelloProps {}));
+                None
             },
         },
         Demo {
@@ -72,6 +91,7 @@ pub fn all() -> Vec<Demo> {
                     parent,
                     counter::CounterProps {},
                 ));
+                None
             },
         },
         Demo {
@@ -79,6 +99,7 @@ pub fn all() -> Vec<Demo> {
             pixels: Some(include_str!("../demos/boxes.pixels")),
             mount: |dom, parent| {
                 std::mem::forget(boxes::Boxes::mount(dom, parent, boxes::BoxesProps {}));
+                None
             },
         },
         Demo {
@@ -86,6 +107,7 @@ pub fn all() -> Vec<Demo> {
             pixels: Some(include_str!("../demos/shell.pixels")),
             mount: |dom, parent| {
                 std::mem::forget(shell::Shell::mount(dom, parent, shell::ShellProps {}));
+                None
             },
         },
         Demo {
@@ -93,6 +115,7 @@ pub fn all() -> Vec<Demo> {
             pixels: Some(include_str!("../demos/panel.pixels")),
             mount: |dom, parent| {
                 std::mem::forget(panel::Panel::mount(dom, parent, panel::PanelProps {}));
+                None
             },
         },
         Demo {
@@ -100,6 +123,18 @@ pub fn all() -> Vec<Demo> {
             pixels: Some(include_str!("../demos/text.pixels")),
             mount: |dom, parent| {
                 std::mem::forget(text::Text::mount(dom, parent, text::TextProps {}));
+                None
+            },
+        },
+        Demo {
+            name: "stress",
+            pixels: Some(include_str!("../demos/stress.pixels")),
+            mount: |dom, parent| {
+                Some(stress_per_frame(stress::Stress::mount(
+                    dom,
+                    parent,
+                    stress::StressProps {},
+                )))
             },
         },
         Demo {
@@ -107,6 +142,7 @@ pub fn all() -> Vec<Demo> {
             pixels: None,
             mount: |dom, parent| {
                 std::mem::forget(index::Index::mount(dom, parent, index::IndexProps {}));
+                None
             },
         },
     ]
@@ -117,11 +153,29 @@ pub fn all() -> Vec<Demo> {
 /// system fonts natively; the bundle alone on the web). A style that
 /// does not parse is refused by the first update, naming the file.
 #[must_use]
-pub fn document(demo: &Demo) -> Rc<RefCell<Document>> {
+pub fn document(demo: &Demo) -> Shown {
     let document = Rc::new(RefCell::new(Document::new(FontSystem::new())));
     let body = document.borrow().body();
-    (demo.mount)(&document, body);
-    document
+    let per_frame = (demo.mount)(&document, body);
+    Shown {
+        document,
+        per_frame,
+    }
+}
+
+/// The stress demo's tick: the counter moves on by one each frame, and
+/// the last update's time is shown in ms. The hook owns the component,
+/// which stays mounted while the hook lives, as every demo's does.
+fn stress_per_frame(stress: stress::Stress) -> PerFrame {
+    Box::new(move |last: Option<Duration>| {
+        let component = &stress;
+        component.tick.update(|n| *n += 1);
+        if let Some(last) = last {
+            component
+                .shown
+                .set(format!("{:.2} ms", last.as_secs_f64() * 1000.0));
+        }
+    })
 }
 
 /// Clicks at `point` (CSS pixels) as a mouse does: moves there,

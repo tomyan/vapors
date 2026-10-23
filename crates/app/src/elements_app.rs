@@ -6,9 +6,10 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Duration;
 
 use vapors_elements::{Cursor, Document, ElementError, Point, Viewport};
-use vapors_platform::{App, Event, Frame, Next, Platform, report_error};
+use vapors_platform::{App, Event, Frame, Instant, Next, Platform, report_error};
 use vapors_renderer::Target;
 use vapors_scene::Size;
 
@@ -42,7 +43,15 @@ pub struct ElementsApp {
     pointer: Point,
     /// The cursor last shown.
     cursor: Cursor,
+    /// Called before each update with the last one's duration.
+    per_frame: Option<PerFrame>,
+    /// How long the last `Document::update` took; `None` before the first.
+    last_update: Option<Duration>,
 }
+
+/// What [`ElementsApp::with_per_frame`] calls before each update, with
+/// how long the last update took (`None` before the first).
+pub type PerFrame = Box<dyn FnMut(Option<Duration>)>;
 
 impl ElementsApp {
     /// Shows `document`.
@@ -55,7 +64,19 @@ impl ElementsApp {
             scale: 1.0,
             pointer: [0.0, 0.0],
             cursor: Cursor::Default,
+            per_frame: None,
+            last_update: None,
         }
+    }
+
+    /// Calls `per_frame`, when there is one, before each update with how
+    /// long the last update took: for a demo that changes the document
+    /// every frame and shows its own update time (`stress`). What it
+    /// changes asks for the next frame, as any change does.
+    #[must_use]
+    pub fn with_per_frame(mut self, per_frame: Option<PerFrame>) -> Self {
+        self.per_frame = per_frame;
+        self
     }
 
     /// Takes input as if the display scale were `scale`, until the first
@@ -85,10 +106,14 @@ impl ElementsApp {
         #[allow(clippy::cast_possible_truncation)] // a display scale
         let scale = frame.scale_factor as f32;
         self.scale = scale;
+        if let Some(per_frame) = &mut self.per_frame {
+            per_frame(self.last_update);
+        }
         let mut document = self.document.borrow_mut();
-        let painted = document
-            .update(viewport(size, scale))
-            .map_err(|errors| refused(&errors))?;
+        let started = Instant::now();
+        let updated = document.update(viewport(size, scale));
+        self.last_update = Some(started.elapsed());
+        let painted = updated.map_err(|errors| refused(&errors))?;
         let view = frame
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());

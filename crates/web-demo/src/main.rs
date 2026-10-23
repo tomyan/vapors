@@ -49,6 +49,15 @@ fn start() -> Result<(), String> {
     let demo = vapors_demos::find(&name)?;
     // An elements demo draws its own controls; the page's would cover them.
     hide_page_controls();
-    let app = ElementsApp::new(vapors_demos::document(&demo));
+    let shown = vapors_demos::document(&demo);
+    // `ticks=N` stops a demo that changes every frame after N frames, so
+    // a headless page goes idle for its screenshot (the page contract).
+    let per_frame = match vapors_demos::frame_limit(query_parameter("ticks").as_deref())? {
+        Some(frames) => shown
+            .per_frame
+            .map(|hook| vapors_demos::limited(hook, frames)),
+        None => shown.per_frame,
+    };
+    let app = ElementsApp::new(shown.document).with_per_frame(per_frame);
     run(options, app).map_err(|e| e.to_string())
 }

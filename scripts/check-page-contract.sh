@@ -124,7 +124,19 @@ prepare() {
 }
 
 # The demos whose screenshots are held to crates/demos/demos/<name>.pixels.
-demos="hello counter boxes shell panel text"
+demos="hello counter boxes shell panel text stress"
+# Demos that change every frame never go idle, and headless Chromium's
+# virtual time then runs hundreds of software-rendered frames past the
+# 60 s deadline; `ticks=5` stops them after five frames.
+animated="stress"
+
+# query <demo>: the page's query string for <demo>.
+query() {
+  case " $animated " in
+    *" $1 "*) echo "?demo=$1&ticks=5" ;;
+    *) echo "?demo=$1" ;;
+  esac
+}
 # The window shoot uses: 640x400, but for a demo section's screenshot.
 size=640,400
 
@@ -365,7 +377,7 @@ check subpath '^adapter: ' hidden '' vapors/
 check resize '^adapter: ' hidden '?demo=hello'
 # overlap <demo>: no visible HTML control over the elements demo's canvas.
 overlap() {
-  dom=$(dump "$1-overlap" "?demo=$1") || { fail "$1-overlap: $chrome exited non-zero or passed 60 s"; console "$1-overlap"; return; }
+  dom=$(dump "$1-overlap" "$(query "$1")") || { fail "$1-overlap: $chrome exited non-zero or passed 60 s"; console "$1-overlap"; return; }
   held "$1-overlap" || return
   found=$(printf '%s' "$dom" | grep -o 'data-overlaps="[^"]*"' | sed 's#data-overlaps="\(.*\)"#\1#')
   echo "$1-overlap: HTML over the canvas: [${found:-not measured}]"
@@ -381,7 +393,7 @@ for demo in $demos; do
   sizes=$(viewports "$demo") || exit 1
   for wh in $sizes; do
     shot="$demo-shot-$wh"; shots="$shots $shot"; size="${wh%x*},${wh#*x}"
-    if shoot "$shot" "?demo=$demo" && held "$shot"; then
+    if shoot "$shot" "$(query "$demo")" && held "$shot"; then
       $check_pixels "crates/demos/demos/$demo.pixels" "$work/$shot.png" || { fail "$shot: the canvas fails demos/$demo.pixels; $work/$shot.png"; console "$shot"; }
     else
       fail "$shot: $chrome exited non-zero or passed 60 s"; console "$shot"

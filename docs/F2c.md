@@ -705,6 +705,62 @@ differs from the plan.
   390x800. With spans out of the hit list, the span stays white and the
   check fails.
 
+### S7
+
+- **What is kept between updates:**
+  - each element's computed and used style, and the initial style
+    (`restyle.rs`, `restyle_pass.rs`);
+  - each Parley layout, keyed by its run and width
+    (`layout/text_cache.rs`);
+  - each box's Taffy cache and layout (`layout/keep.rs`).
+
+  An update restyles what the changes since the last one marked; the
+  table above gives the scopes.
+  - A pointer flag on a subject compound restyles the element alone
+    (`Cascade::restyle_scope_of_selectors`, new in vapors-css). Its
+    children are restyled only when its computed style changed, which
+    covers what they inherit.
+  - Layout is kept by diffing the rebuilt box tree against the last
+    one, not by marks. A box keeps its cache only when it and its whole
+    subtree are unchanged, at the same scale.
+- **Counted tests:**
+  - `elements_restyled`, `text_layouts_built` and `boxes_laid_out` are
+    pinned per kind of change (`incremental_*.rs`), each proven by
+    breaking its rule.
+  - After five kinds of change, every element's box equals a fresh
+    document's given the same changes.
+- **The 1,000-element measurement** (`update_time`, release, CPU only).
+  Setup: 1,001 elements, one counter text changed per update.
+  Machine: this box's i5-10500T, with a load average of 9 to 20 from
+  the other agents. Median update time:
+
+  | Point | Median |
+  |---|---|
+  | Before S7 | about 60 ms |
+  | Styles kept | 4.4 to 5.6 ms |
+  | Layout kept as well | 2.6 to 3.1 ms, p95 2.9 to 3.9 ms |
+
+  The remaining time is whole-tree walks: the tree check, the `style`
+  attribute check, the box build and diff, and paint.
+- **What those numbers say about the phone.** They show which phases
+  scale with the tree, and that keeping work removes them on the CPU
+  vapors runs on here. They do not give the phone's time:
+  - the Pixel 9 Pro's cores differ;
+  - the web build is wasm, usually slower than native;
+  - this box's load inflates and scatters them.
+
+  The `stress` demo prints each frame's measured update time, so the
+  phone's number comes from opening `?demo=stress` on the phone. Under
+  headless Chromium's virtual time, the page contract's screenshot
+  shows 0.00 ms: its clock does not advance during an update.
+- **Demo.** `stress`: 1,000 elements under a counter that ticks every
+  frame, through `ElementsApp::with_per_frame`, a hook called before
+  each update with the last one's duration.
+  - `?demo=stress&ticks=N` stops it after N frames, so the page
+    contract's headless page goes idle.
+  - `gpu_stress.rs` checks that the counter's ink changes between two
+    frames.
+
 ## Decisions (2026-10-23)
 
 - **D1 Scoping.** A compiler change in S5: `mount` registers its
