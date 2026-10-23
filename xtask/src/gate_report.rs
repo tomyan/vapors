@@ -10,6 +10,15 @@ use serde_json::Value;
 /// of this name out when it looks for the last step to start.
 const NAME: &str = "report a timeout";
 
+/// The script the report runs.
+const SCRIPT: &str = ".github/scripts/report-timeout.sh";
+
+/// The report reads its job's steps with the job's token.
+const TOKEN: &str = "${{ github.token }}";
+
+/// One API read takes under a second; one minute bounds the report.
+const REPORT_MINUTES: u64 = 1;
+
 /// Refuses job `job` unless its last step is [`NAME`], `if: cancelled()`, with env
 /// `TIMEOUT_MINUTES` equal to the job's `timeout-minutes`.
 pub fn check_timeout_report(job: &str, timeout: Duration, steps: &[Value]) -> Result<(), String> {
@@ -20,15 +29,41 @@ pub fn check_timeout_report(job: &str, timeout: Duration, steps: &[Value]) -> Re
     if !is_report {
         return Err(format!(
             "{job}: the last step is not the timeout report; fix: end the job with a step \
-             `name: {NAME}`, `if: cancelled()`, env `TIMEOUT_MINUTES: {minutes}`, \
-             run `.github/scripts/report-timeout.sh` (see the other jobs)"
+             `name: {NAME}`, `if: cancelled()`, `timeout-minutes: {REPORT_MINUTES}`, \
+             env `GH_TOKEN: {TOKEN}` and `TIMEOUT_MINUTES: {minutes}`, run `{SCRIPT}` \
+             (see the other jobs)"
         ));
+    }
+    if let Some(step) = last {
+        check_shape(job, step)?;
     }
     check_minutes(
         job,
         minutes,
         last.and_then(|step| step.pointer("/env/TIMEOUT_MINUTES")),
     )
+}
+
+/// The report runs [`SCRIPT`] with [`TOKEN`], by [`REPORT_MINUTES`].
+fn check_shape(job: &str, step: &Value) -> Result<(), String> {
+    let text = |pointer: &str| step.pointer(pointer).and_then(Value::as_str);
+    let wanted = [
+        (text("/run") == Some(SCRIPT), format!("run `{SCRIPT}`")),
+        (
+            text("/env/GH_TOKEN") == Some(TOKEN),
+            format!("env `GH_TOKEN: {TOKEN}`"),
+        ),
+        (
+            step.get("timeout-minutes").and_then(Value::as_u64) == Some(REPORT_MINUTES),
+            format!("`timeout-minutes: {REPORT_MINUTES}`"),
+        ),
+    ];
+    match wanted.into_iter().find(|(holds, _)| !holds) {
+        Some((_, what)) => Err(format!(
+            "{job}: the timeout report must have {what}; fix: write it as the other jobs do"
+        )),
+        None => Ok(()),
+    }
 }
 
 fn check_minutes(job: &str, minutes: u64, reported: Option<&Value>) -> Result<(), String> {

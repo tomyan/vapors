@@ -37,7 +37,9 @@ jobs:
         run: cargo xtask lint && cargo xtask wasm
       - name: report a timeout
         if: cancelled()
+        timeout-minutes: 1
         env:
+          GH_TOKEN: ${{ github.token }}
           TIMEOUT_MINUTES: 10
         run: .github/scripts/report-timeout.sh
   gpu:
@@ -54,7 +56,9 @@ jobs:
         if: failure()
       - name: report a timeout
         if: cancelled()
+        timeout-minutes: 1
         env:
+          GH_TOKEN: ${{ github.token }}
           TIMEOUT_MINUTES: 20
         run: .github/scripts/report-timeout.sh
 "#;

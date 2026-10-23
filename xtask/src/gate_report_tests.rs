@@ -15,7 +15,7 @@ fn steps(yaml: &str) -> Vec<Value> {
 fn report(minutes: &str) -> String {
     format!(
         "- run: cargo xtask test\n\
-         - name: report a timeout\n  if: cancelled()\n  env:\n    TIMEOUT_MINUTES: {minutes}\n  run: .github/scripts/report-timeout.sh\n"
+         - name: report a timeout\n  if: cancelled()\n  timeout-minutes: 1\n  env:\n    GH_TOKEN: ${{{{ github.token }}}}\n    TIMEOUT_MINUTES: {minutes}\n  run: .github/scripts/report-timeout.sh\n"
     )
 }
 
@@ -78,4 +78,37 @@ fn a_report_under_another_name_is_refused_since_the_script_skips_it_by_name() {
 
     // Then
     assert!(refusal.contains("name: report a timeout"), "{refusal}");
+}
+
+#[test]
+fn a_report_that_differs_in_how_it_runs_is_refused_naming_what() {
+    let cases = [
+        (
+            "  run: .github/scripts/report-timeout.sh",
+            "  run: echo timed out",
+            "run `.github/scripts/report-timeout.sh`",
+        ),
+        (
+            "    GH_TOKEN: ${{ github.token }}",
+            "    GH_TOKEN: none",
+            "env `GH_TOKEN: ${{ github.token }}`",
+        ),
+        (
+            "  timeout-minutes: 1",
+            "  timeout-minutes: 3",
+            "`timeout-minutes: 1`",
+        ),
+    ];
+    for (from, to, needle) in cases {
+        // Given
+        let yaml = report("9").replace(from, to);
+        assert_ne!(yaml, report("9"), "{from} is in the report");
+
+        // When
+        let refusal = check_timeout_report("gpu", NINE_MINUTES, &steps(&yaml)).expect_err(needle);
+
+        // Then
+        assert!(refusal.starts_with("gpu: the timeout report"), "{refusal}");
+        assert!(refusal.contains(needle), "{refusal}");
+    }
 }
