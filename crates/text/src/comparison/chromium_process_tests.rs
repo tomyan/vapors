@@ -18,13 +18,14 @@ const RENDER_ALLOWANCE: Duration = Duration::from_secs(10);
 
 /// Every `slow-timeout = { period = "<n>s", terminate-after = <m> }` in
 /// `text`, as the time nextest kills a test; any other shape of a
-/// slow-timeout line, or an override, is refused naming its line.
-/// Comment lines are skipped.
+/// slow-timeout line is refused naming its line. Comment lines are
+/// skipped. A slow-timeout in an override is read like any other, so
+/// an override can neither hide one nor set one this check misses.
 fn kill_times(text: &str, file: &str) -> Vec<Duration> {
     text.lines()
         .enumerate()
         .filter(|(_, line)| !line.trim_start().starts_with('#'))
-        .filter(|(_, line)| line.contains("slow-timeout") || line.contains("overrides"))
+        .filter(|(_, line)| line.contains("slow-timeout"))
         .map(|(index, line)| {
             kill_time(line).unwrap_or_else(|| {
                 panic!(
@@ -81,4 +82,16 @@ fn a_slow_timeout_line_of_another_shape_is_refused() {
         .downcast::<String>()
         .expect("a message");
     assert!(message.starts_with("nextest.toml:2: "), "{message}");
+}
+
+#[test]
+fn a_slow_timeout_in_an_override_is_read_like_any_other() {
+    // Given: an override that puts tests in a group and sets a timeout
+    let text = "[[profile.default.overrides]]\nfilter = 'test(/x/)'\ntest-group = 'chromium'\nslow-timeout = { period = \"10s\", terminate-after = 2 }\n";
+
+    // When
+    let kills = kill_times(text, "nextest.toml");
+
+    // Then
+    assert_eq!(kills, [Duration::from_secs(20)]);
 }
