@@ -129,6 +129,46 @@ dump() {
     --virtual-time-budget=8000 --dump-dom "http://127.0.0.1:$port/$1.html" 2>"$work/$1.log"
 }
 
+# The page as Chromium draws it, as a PNG, after the same hold.
+shoot() {
+  env -u DBUS_SESSION_BUS_ADDRESS timeout 60 "$chrome" --headless=new --no-sandbox \
+    --disable-gpu-sandbox --use-angle=swiftshader --enable-unsafe-webgpu \
+    --enable-features=Vulkan,WebGPU --window-size=640,400 \
+    --virtual-time-budget=8000 --screenshot="$work/$1.png" "http://127.0.0.1:$port/$1.html" 2>/dev/null
+}
+
+# The r,g,b of the centre pixel of a PNG (8-bit RGB or RGBA, not
+# interlaced, as Chromium writes them); anything else is refused by name.
+centre_pixel() {
+  python3 - "$1" <<'PY'
+import struct, sys, zlib
+path = sys.argv[1]
+data = open(path, 'rb').read()
+assert data[:8] == b'\x89PNG\r\n\x1a\n', f'{path}: not a PNG'
+chunks, at = {}, 8
+while at < len(data):
+    length, kind = struct.unpack('>I4s', data[at:at + 8])
+    chunks.setdefault(kind, b'')
+    chunks[kind] += data[at + 8:at + 8 + length]
+    at += 12 + length
+width, height, depth, colour, _, _, interlace = struct.unpack('>IIBBBBB', chunks[b'IHDR'])
+assert depth == 8 and colour in (2, 6) and interlace == 0, f'{path}: depth {depth}, colour type {colour}, interlace {interlace}'
+bpp = 3 if colour == 2 else 4
+raw, stride, rows, previous = zlib.decompress(chunks[b'IDAT']), width * bpp, [], bytearray(width * bpp)
+for row in range(height):
+    kind, line = raw[row * (stride + 1)], bytearray(raw[row * (stride + 1) + 1:(row + 1) * (stride + 1)])
+    for i in range(stride):
+        a, b, c = (line[i - bpp] if i >= bpp else 0), previous[i], (previous[i - bpp] if i >= bpp else 0)
+        p = a + b - c
+        paeth = a if abs(p - a) <= abs(p - b) and abs(p - a) <= abs(p - c) else (b if abs(p - b) <= abs(p - c) else c)
+        line[i] = (line[i] + [0, a, b, (a + b) // 2, paeth][kind]) & 255
+    rows.append(line)
+    previous = line
+x, y = width // 2, height // 2
+print(','.join(str(v) for v in rows[y][x * bpp:x * bpp + 3]))
+PY
+}
+
 # What the page said last, and what Chromium said about the GPU: its
 # console lines and its GPU, Dawn and Vulkan lines from Chromium's log.
 console() {
@@ -168,6 +208,17 @@ check as-built '^adapter: ' hidden
 # Vulkan driver (vkCreateInstance fails) the canvas's swap chain cannot
 # be made and the device is lost at the first frame (the runner, run
 # 39929758159; here with VK_ICD_FILENAMES pointing nowhere).
+# The canvas presented a frame. A WebGPU canvas cannot be read back once
+# presented, so the pixel comes from Chromium's screenshot: the canvas
+# fills the page, and the fitted gradient's centre is 128,128,128
+# (docs/web.md), as the native screenshot asserts. A dead canvas (no
+# Vulkan, run 39929758159) is not.
+presented=none
+if shoot as-built; then
+  presented=$(centre_pixel "$work/as-built.png") || presented="unreadable: $presented"
+fi
+echo "as-built: the screenshot's centre is [$presented]"
+[ "$presented" = "128,128,128" ] || fail "as-built: the canvas did not present the gradient (centre [$presented], wanted 128,128,128); $work/as-built.png"
 if grep -q 'vkCreateInstance() failed' "$work/as-built.log"; then
   fail "Chromium has no Vulkan driver, so SwiftShader's WebGPU cannot present; fix: install mesa-vulkan-drivers (lavapipe)"
 fi
