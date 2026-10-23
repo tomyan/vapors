@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_yaml::Value;
 
-use crate::gate_workflow::{check_defaults, env_of};
+use crate::gate_workflow::{check_defaults, check_setup_used, env_of};
 
 /// One step the gate runs.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,6 +32,7 @@ pub struct PlannedStep {
 pub fn plan(workflow: &str, setup: &BTreeSet<String>) -> Result<Vec<PlannedStep>, String> {
     let doc: Value = serde_yaml::from_str(workflow).map_err(|e| format!("not YAML: {e}"))?;
     check_defaults(&doc)?;
+    check_setup_used(&doc, setup)?;
     let mut base = BTreeMap::from([("CI".to_owned(), "true".to_owned())]);
     base.extend(env_of(&doc, "the workflow")?);
     let jobs = doc
@@ -169,3 +170,7 @@ fn label(job: &str, step: &Value) -> String {
 #[cfg(test)]
 #[path = "gate_plan_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "gate_plan_refusal_tests.rs"]
+mod refusal_tests;

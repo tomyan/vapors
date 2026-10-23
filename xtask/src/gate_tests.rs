@@ -62,8 +62,15 @@ fn this_repositorys_workflow_is_one_the_gate_can_run() {
     );
 
     // Then
-    let planned = planned
-        .unwrap_or_else(|why| panic!("{WORKFLOW}: {why}; fix: make the step one the gate models"));
+    // A refusal names its own fix when it has one; the generic one otherwise.
+    let planned = planned.unwrap_or_else(|why| {
+        let fix = if why.contains("fix:") {
+            ""
+        } else {
+            "; fix: make the step one the gate models"
+        };
+        panic!("{WORKFLOW}: {why}{fix}")
+    });
     assert!(
         planned.iter().all(|step| !step.run.contains("sudo ")),
         "a setup step is planned: {planned:?}"

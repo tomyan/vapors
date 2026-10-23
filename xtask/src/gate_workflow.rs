@@ -82,3 +82,32 @@ fn own_checkout_paths(doc: &Value) -> BTreeSet<&str> {
     })
     .collect()
 }
+
+/// Refuses a `[gate.setup]` line that no run step in `doc` contains: a
+/// stale line would skip a step added later with that text.
+pub fn check_setup_used(doc: &Value, setup: &BTreeSet<String>) -> Result<(), String> {
+    let lines = run_lines(doc);
+    match setup.iter().find(|line| !lines.contains(line.as_str())) {
+        Some(stale) => Err(format!(
+            "[gate.setup] `{stale}` matches no line of a run step in ci.yml; fix: remove it from .config/factory.toml"
+        )),
+        None => Ok(()),
+    }
+}
+
+/// Every trimmed line of every `run` in every job.
+fn run_lines(doc: &Value) -> BTreeSet<&str> {
+    let jobs = doc
+        .get("jobs")
+        .and_then(Value::as_mapping)
+        .into_iter()
+        .flatten();
+    let steps = jobs
+        .filter_map(|(_, job)| job.get("steps").and_then(Value::as_sequence))
+        .flatten();
+    steps
+        .filter_map(|step| step.get("run").and_then(Value::as_str))
+        .flat_map(str::lines)
+        .map(str::trim)
+        .collect()
+}

@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 
 use super::*;
 
-const WORKFLOW: &str = r#"
+pub(super) const WORKFLOW: &str = r#"
 env:
   RUSTFLAGS: -D warnings
   NEXTEST_PROFILE: ci
@@ -40,7 +40,7 @@ jobs:
         if: failure()
 "#;
 
-fn setup() -> BTreeSet<String> {
+pub(super) fn setup() -> BTreeSet<String> {
     [
         "sudo apt-get update -q && sudo apt-get install -y -q libdbus-1-dev",
         "df -h / | tail -1",
@@ -50,7 +50,7 @@ fn setup() -> BTreeSet<String> {
     .into()
 }
 
-fn plan_of(workflow: &str) -> Result<Vec<PlannedStep>, String> {
+pub(super) fn plan_of(workflow: &str) -> Result<Vec<PlannedStep>, String> {
     plan(workflow, &setup())
 }
 
@@ -97,8 +97,8 @@ fn each_step_gets_workflow_then_job_then_step_env_and_ci_true() {
 fn a_setup_like_line_that_is_not_listed_exactly_is_run() {
     // Given
     let workflow = WORKFLOW.replace(
-        "sudo rm -rf /usr/share/dotnet",
-        "sudo rm -rf /usr/share/dotnet /opt/ghc",
+        "sudo rm -rf /usr/share/dotnet\n",
+        "sudo rm -rf /usr/share/dotnet\n          sudo rm -rf /usr/share/dotnet /opt/ghc\n",
     );
 
     // When
@@ -108,80 +108,6 @@ fn a_setup_like_line_that_is_not_listed_exactly_is_run() {
     assert!(
         planned.iter().any(|step| step.name == "ci: free disk"),
         "{planned:?}"
-    );
-}
-
-/// The refusal for `workflow`, which must name `needle`.
-fn refused(workflow: &str, needle: &str) {
-    let refusal = plan_of(workflow).expect_err("refused");
-    assert!(refusal.contains(needle), "wanted `{needle}` in: {refusal}");
-}
-
-#[test]
-fn steps_the_gate_does_not_model_are_refused_naming_job_and_step() {
-    refused(
-        &WORKFLOW.replace(
-            "        run: cargo xtask lint && cargo xtask wasm",
-            "        run: cargo xtask lint\n        shell: bash",
-        ),
-        "ci: lint: `shell:`",
-    );
-    refused(
-        &WORKFLOW.replace(
-            "        run: cargo xtask lint && cargo xtask wasm",
-            "        run: cargo xtask lint\n        working-directory: x",
-        ),
-        "ci: lint: `working-directory:`",
-    );
-    refused(
-        &WORKFLOW.replace(
-            "        run: cargo xtask lint && cargo xtask wasm",
-            "        run: cargo xtask lint\n        if: github.event_name == 'push'",
-        ),
-        "ci: lint: `if: github.event_name == 'push'` on a run step",
-    );
-    refused(
-        &WORKFLOW.replace("        if: failure()", "        if: github.ref == 'main'"),
-        "gpu: actions/upload-artifact@v7: `if: github.ref == 'main'`",
-    );
-    refused(
-        &WORKFLOW.replace(
-            "        run: cargo xtask lint && cargo xtask wasm",
-            "        run: |\n          cargo xtask lint \\\n            --verbose",
-        ),
-        "ci: lint: a `\\` continuation",
-    );
-    refused(
-        &WORKFLOW.replace(
-            "        run: cargo xtask lint && cargo xtask wasm",
-            "        run: echo ${{ github.sha }}",
-        ),
-        "ci: lint: an expression",
-    );
-    refused(
-        &WORKFLOW.replace(
-            "        run: cargo xtask lint && cargo xtask wasm",
-            "        run: [a, b]",
-        ),
-        "ci: lint: `run` is not a string",
-    );
-    refused(
-        &WORKFLOW.replace(
-            "    runs-on: ubuntu-24.04\n    env:",
-            "    runs-on: ubuntu-24.04\n    strategy:\n      matrix:\n        os: [a]\n    env:",
-        ),
-        "gpu: a matrix",
-    );
-}
-
-#[test]
-fn a_working_directory_default_other_than_the_checkout_path_is_refused() {
-    refused(
-        &WORKFLOW.replace(
-            "    working-directory: touche",
-            "    working-directory: elsewhere",
-        ),
-        "defaults.run.working-directory `elsewhere`",
     );
 }
 

@@ -31,7 +31,6 @@ max_lines = "220"
 # all of whose lines are listed is not run.
 [gate.setup]
 "sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk && fc-list :lang=zh | head -1" = "apt: the CJK font for the fallback test, and its check"
-"sudo apt-get update -q && sudo apt-get install -y -q mesa-vulkan-drivers" = "apt: lavapipe for Chromium's Vulkan"
 "sudo apt-get update -q && sudo apt-get install -y -q mesa-vulkan-drivers vulkan-tools && vulkaninfo --summary | grep -E 'deviceName|driverName'" = "apt: lavapipe, and the device it gives"
 "sudo apt-get update -q && sudo apt-get install -y -q mesa-vulkan-drivers xvfb libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev" = "apt: lavapipe, Xvfb and winit's X11 libraries"
 "rustup toolchain install && rustup show active-toolchain" = "the toolchain, from rust-toolchain.toml"
