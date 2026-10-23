@@ -116,3 +116,23 @@ impl Document {
         }
     }
 }
+
+impl Document {
+    /// The computed style the last update kept for `node`, if it is an
+    /// element in the document.
+    #[must_use]
+    pub fn computed_style(&self, node: NodeId) -> Option<&ComputedStyle> {
+        self.kept.as_ref()?.styles.get(node)
+    }
+
+    /// Drops every style, layout and text layout kept between updates,
+    /// so the next update works from scratch: for tests that compare an
+    /// incremental update with a full one.
+    #[doc(hidden)]
+    pub fn forget_kept(&mut self) {
+        self.kept = None;
+        self.boxes = crate::layout::KeptBoxes::default();
+        self.texts = crate::layout::TextCache::default();
+        self.dirty.everything();
+    }
+}

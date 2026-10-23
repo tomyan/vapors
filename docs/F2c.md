@@ -729,6 +729,19 @@ differs from the plan.
     breaking its rule.
   - After five kinds of change, every element's box equals a fresh
     document's given the same changes.
+  - A seeded randomized differential test (`incremental_random.rs`)
+    makes 40 random changes per seed: classes, attributes,
+    `display: none` by the style attribute, text, insert, move, remove,
+    hover, press, resize, and sheets and scoped styles added. Its CSS
+    uses inherited properties, `var()`, `+` and `~`, `:nth-child`,
+    `:last-child`, `:empty`, an ancestor attribute, `:hover` on a
+    non-subject compound, `@media`, and calc with %, em and vw.
+    - After every change, each settled frame's boxes, computed styles
+      and display list must equal those of an update from scratch
+      (`Document::forget_kept`).
+    - CI runs 6 seeds; `VAPORS_INCREMENTAL_SEEDS` runs more and
+      `VAPORS_INCREMENTAL_SEED` one. 200 pass.
+    - Six broken scope rules each fail it.
 - **The 1,000-element measurement** (`update_time`, release, CPU only).
   Setup: 1,001 elements, one counter text changed per update.
   Machine: this box's i5-10500T, with a load average of 9 to 20 from
