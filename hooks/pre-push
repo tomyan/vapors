@@ -8,16 +8,29 @@
 # refusal included.
 set -e
 # git gives one line per ref: <local ref> <local sha> <remote ref> <remote sha>.
-while read -r local_ref local_sha remote_ref remote_sha; do
+# `|| [ -n "$remote_ref" ]` reads a last line that has no newline. No line at
+# all means the hook was not run by git push, and is refused.
+lines=0
+while read -r local_ref local_sha remote_ref remote_sha || [ -n "$remote_ref" ]; do
+    lines=$((lines + 1))
     [ "$remote_ref" = refs/heads/main ] || continue
     if [ "${ALLOW_PUSH_TO_MAIN:-}" = 1 ]; then
         echo "pre-push: pushing $local_ref to main because ALLOW_PUSH_TO_MAIN=1" >&2
         continue
     fi
-    echo "pre-push: refused: $local_ref would update main on $1; push your branch; main changes only by PR merge" >&2
-    echo "     reproduce: git push $1 $local_ref:refs/heads/main" >&2
+    if [ "$local_ref" = "(delete)" ]; then
+        echo "pre-push: refused: this push would delete main on $1; push your branch; main changes only by PR merge" >&2
+        echo "     reproduce: git push $1 --delete main" >&2
+    else
+        echo "pre-push: refused: $local_ref would update main on $1; push your branch; main changes only by PR merge" >&2
+        echo "     reproduce: git push $1 $local_ref:refs/heads/main" >&2
+    fi
     exit 1
 done
+if [ "$lines" = 0 ]; then
+    echo "pre-push: refused: no push lines on stdin, so the refs pushed cannot be checked; fix: run the hook through git push" >&2
+    exit 1
+fi
 # Git hooks run with the caller's PATH, which may lack rustup's bin dir.
 if ! command -v cargo >/dev/null 2>&1; then
     PATH="$HOME/.cargo/bin:$PATH"
