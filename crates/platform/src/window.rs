@@ -97,6 +97,8 @@ pub(crate) enum Message {
     /// platform's state. Sent so the loop stops now, not at the next
     /// frame, which a backgrounded tab may never draw.
     DeviceLost,
+    /// A [`Waker`](crate::Waker) asked for a frame from outside `event`.
+    Wake,
 }
 
 /// Open a window and drive `app` until it returns [`Next::Exit`] or the

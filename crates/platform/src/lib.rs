@@ -27,6 +27,7 @@ mod report;
 mod surface;
 mod surface_texture;
 mod tasks;
+mod waker;
 #[cfg(target_family = "wasm")]
 mod web;
 mod webgpu;
@@ -40,6 +41,7 @@ pub use file_kind::FileKind;
 pub use gestures::Gestures;
 pub use platform::Platform;
 pub use report::{report_error, report_status};
+pub use waker::Waker;
 pub use window::{App, Frame, Next, WindowOptions, run};
 
 /// Hide the page's own HTML controls drawn over the canvas (the Open

@@ -34,6 +34,7 @@ impl ApplicationHandler<Message> for Handler {
             // A wake with no loss recorded cannot happen: the callback
             // records before it wakes. Nothing to do if it ever did.
             Message::DeviceLost => {}
+            Message::Wake => self.platform.request_redraw(),
         }
         self.redraw_if_asked();
     }

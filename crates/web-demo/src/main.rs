@@ -1,9 +1,12 @@
 //! The demos page. `?demo=<name>` picks what it shows: an elements demo
 //! from `vapors-demos` (F2c), or `image`, the image app (F0: the
 //! gradient fixture fitted to the canvas; a tap, click or `o` opens a
-//! file). With no `?demo=` it shows the index, which lists them. The
+//! file), or `wake`, the waker's check (`wake.rs`). With no `?demo=` it
+//! shows the index, which lists them. The
 //! same binary runs natively, which is how `cargo clippy --workspace`
 //! checks it; natively there is no query, so it shows the index.
+
+mod wake;
 
 use vapors_app::ElementsApp;
 use vapors_canvas::{ImageApp, decode_png};
@@ -39,6 +42,9 @@ fn start() -> Result<(), String> {
         let image = decode_png(GRADIENT).map_err(|message| format!("gradient.png: {message}"))?;
         let app = ImageApp::showing("gradient.png", image, BACKGROUND);
         return run(options, app).map_err(|e| e.to_string());
+    }
+    if name == "wake" {
+        return run(options, wake::WakeApp).map_err(|e| e.to_string());
     }
     let demo = vapors_demos::find(&name)?;
     // An elements demo draws its own controls; the page's would cover them.

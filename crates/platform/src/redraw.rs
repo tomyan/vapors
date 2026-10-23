@@ -1,20 +1,22 @@
-//! The app's request for a frame, raised while it handles events and
-//! taken by the loop after them.
+//! The app's request for a frame, raised while it handles events (or by
+//! a detached platform's [`Waker`](crate::Waker)) and taken by the loop
+//! after them.
 
-use std::cell::Cell;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-/// Raised by any number of requests; taken once.
+/// Raised by any number of requests; taken once. Atomic so a detached
+/// platform's waker, which may be on another thread, can raise it.
 #[derive(Default)]
-pub(crate) struct RedrawFlag(Cell<bool>);
+pub(crate) struct RedrawFlag(AtomicBool);
 
 impl RedrawFlag {
     pub(crate) fn raise(&self) {
-        self.0.set(true);
+        self.0.store(true, Ordering::SeqCst);
     }
 
     /// Whether it was raised since the last take; lowers it.
     pub(crate) fn take(&self) -> bool {
-        self.0.replace(false)
+        self.0.swap(false, Ordering::SeqCst)
     }
 }
 

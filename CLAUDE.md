@@ -23,6 +23,10 @@ cargo run -p vapors-app --example idle_fps -- hello|counter|image
                           frames drawn in 3 s idle, natively (0 when it redraws on change)
 scripts/web-idle-frames.sh target/web <new dir>
                           the same on the built page in headless Chromium
+xvfb-run -a cargo run -p vapors-platform --example wake_window
+                          Platform::waker in a window: 0 frames idle, 1 per wake
+scripts/web-wake-frames.sh target/web <new dir>
+                          the same on the built page (?demo=wake)
 cargo run -p vapors-elements-corpus --example layout_oracle [-- --check]
                           Chromium's boxes for the layout fixtures
 bacon                     unit tier on every save
