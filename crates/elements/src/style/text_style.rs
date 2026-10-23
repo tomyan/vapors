@@ -7,7 +7,8 @@ use vapors_text::{Align, Family, LineHeight, Style};
 
 use super::values::{Reader, keyword, later, shape};
 
-/// The faces vapors bundles; the only ones named before F2c S6.
+/// The faces vapors bundles, the only ones named until system fonts by
+/// name arrive (a slice after F2c).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Face {
     Geist,
@@ -96,7 +97,7 @@ fn face(value: &Value) -> Result<Face, String> {
         "geist mono" | "monospace" | "ui-monospace" => Ok(Face::GeistMono),
         _ => Err(format!(
             "names a family vapors does not bundle; use Geist, Geist Mono, sans-serif or monospace until system fonts by name {}",
-            later("F2c S6")
+            later("a slice after F2c")
         )),
     }
 }
@@ -110,7 +111,7 @@ fn weight(value: &Value) -> Result<f32, String> {
         Value::Keyword(k) if k == "bold" => Ok(700.0),
         Value::Keyword(_) => Err(format!(
             "is relative to the parent's weight, which {}",
-            later("F2c S6")
+            later("a slice after F2c")
         )),
         _ => Err(shape("a weight")),
     }
@@ -172,6 +173,6 @@ fn align(value: &Value) -> Result<Align, String> {
 fn white_space(value: &Value) -> Result<(), String> {
     match keyword(value)? {
         "normal" => Ok(()),
-        _ => Err(later("F2c S6")),
+        _ => Err(later("a slice after F2c")),
     }
 }

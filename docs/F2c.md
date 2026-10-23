@@ -646,6 +646,55 @@ differs from the plan.
 - **Not in S5.** `@keyframes` names stay global; `:global { ... }` blocks
   and `:global` inside `:is()` are not supported.
 
+### S6
+
+- **Inline runs.** A block's consecutive inline content (text, and
+  `display: inline` elements, nested) is one inline run: one string,
+  with white space collapsed across element boundaries, and each inline
+  element's byte range and text style. Taffy lays a run out as one
+  anonymous block. Parley lays it out with each element's style over
+  its range.
+- **Inline boxes.** Each inline element has one fragment per line it is
+  on (`Layout::fragments`, without the space a line breaks after).
+  - A fragment is the element's content area, placed as Chromium places
+    it: the line's half-leading over the block's font, the block's
+    ascent, less the element's ascent. Every ascent and descent is
+    rounded to a device pixel.
+  - The fragments' union is the element's border box.
+  - Each fragment takes the pointer, and is filled with the element's
+    background before the text.
+
+  `inline_text.wisp` and `text_align.wisp` match Chromium within
+  0.1 px. Chromium sums advances in 1/64 px, Parley in floats.
+- **Text properties.**
+  - Read now: `font-style` (italic and oblique), `letter-spacing` and
+    `text-align` (left to right only).
+  - The bundled faces have no italic. vapors draws Skia's synthetic
+    slant (`SYNTHETIC_SLANT`, a quarter), as Chromium does.
+  - Deferred to a slice after F2c: `font-feature-settings`,
+    `font-variation-settings`, `text-decoration`, families by name, and
+    `bolder`/`lighter`.
+- **Tags.** `span`, `b`, `strong`, `em`, `i`, `var`, `code`, `kbd`,
+  `samp`, `mark` and `abbr` are implemented.
+  - `small` waits: Chromium resolves `smaller` through a keyword table.
+  - `a`, `br`, `del`, `s`, `sub`, `sup` and `u` are not scheduled.
+  - Generic `monospace` is the bundled Geist Mono, where Chromium uses
+    the system's (DejaVu Sans Mono here).
+  - Chromium's 13 px default for `code` under a `medium` font size is
+    not copied.
+- **Refused, naming the element:**
+  - a block inside an inline element;
+  - a margin, padding or border on an inline element;
+  - an atomic inline (`inline-block`) outside a flex or grid container.
+
+  A grid container now blockifies its children, as a flex container
+  does.
+- **Demo.** `text`: a heading and one paragraph of bold, italic and
+  code that wraps, with a span that counts its own taps and turns
+  yellow once tapped. Its pixel checks click the span at 640x400 and
+  390x800. With spans out of the hit list, the span stays white and the
+  check fails.
+
 ## Decisions (2026-10-23)
 
 - **D1 Scoping.** A compiler change in S5: `mount` registers its
