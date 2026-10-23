@@ -137,7 +137,10 @@ fn pseudo_use(p: &PseudoClass, flag: States) -> Use {
         PseudoClass::Checked => States::CHECKED,
         PseudoClass::Disabled => States::DISABLED,
         PseudoClass::Enabled => States::ENABLED,
-        PseudoClass::Not(list) | PseudoClass::Is(list) | PseudoClass::Where(list) => {
+        PseudoClass::Not(list)
+        | PseudoClass::Is(list)
+        | PseudoClass::Where(list)
+        | PseudoClass::Global(list) => {
             return nested_use(list, flag);
         }
         PseudoClass::Has(list) => {

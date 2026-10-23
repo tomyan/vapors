@@ -51,7 +51,7 @@ fn simple(name: &str, at: Position) -> Result<PseudoClass> {
             ));
         }
         "nth-child" | "nth-last-child" | "nth-of-type" | "nth-last-of-type" | "not" | "is"
-        | "where" | "has" => {
+        | "where" | "has" | "global" => {
             return Err(Error::new(
                 at,
                 format!(":{name} needs an argument in parentheses"),
@@ -92,6 +92,7 @@ fn functional(name: &str, args: &[ComponentValue], at: Position) -> Result<Pseud
         "not" => list().map(PseudoClass::Not),
         "is" => list().map(PseudoClass::Is),
         "where" => list().map(PseudoClass::Where),
+        "global" => list().map(PseudoClass::Global),
         "has" => relative_list(args, at).map(PseudoClass::Has),
         other => Err(Error::new(
             at,

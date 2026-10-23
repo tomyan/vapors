@@ -9,7 +9,7 @@ mod rules;
 pub(crate) mod stream;
 
 use crate::Result;
-use crate::ast::Stylesheet;
+use crate::ast::{Declaration, Stylesheet};
 use crate::token::tokenize;
 
 /// Parse a stylesheet from text.
@@ -21,4 +21,15 @@ pub fn parse(src: &str) -> Result<Stylesheet> {
     let tokens = tokenize(src)?;
     let mut stream = stream::Stream::new(tokens, crate::token::end_position(src));
     rules::stylesheet(&mut stream)
+}
+
+/// Parse a declaration list without braces, as a `style` attribute
+/// holds; positions are within `src`.
+///
+/// # Errors
+/// As [`parse`], for the first declaration refused.
+pub fn parse_inline(src: &str) -> Result<Vec<Declaration>> {
+    let tokens = tokenize(src)?;
+    let mut stream = stream::Stream::new(tokens, crate::token::end_position(src));
+    declarations::list(&mut stream)
 }

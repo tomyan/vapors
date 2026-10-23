@@ -4,8 +4,8 @@ let press = move || pressed.update(|n| *n += 1);
 </script>
 
 <style>
-html, body { height: 100%; }
-body {
+:global(html), :global(body) { height: 100%; }
+:global(body) {
   margin: 0;
   display: flex;
   flex-direction: column;

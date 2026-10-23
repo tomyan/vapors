@@ -5,7 +5,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use vapors_compiler_examples::counter::{Counter, CounterProps};
+use vapors_compiler_examples::counter::{Counter, CounterProps, SCOPE};
 use vapors_dom::NodeId;
 use vapors_dom::recording::{Call, RecordingDom};
 
@@ -16,6 +16,12 @@ fn mounted() -> (Rc<RefCell<RecordingDom>>, Counter, NodeId) {
     let button = counter.roots()[0];
     dom.borrow_mut().clear_calls();
     (dom, counter, button)
+}
+
+/// The button's HTML with `text`, tagged with the counter's scope (its
+/// `<style>` is scoped to it).
+fn button_html(text: &str) -> String {
+    format!("<button data-wisp=\"{SCOPE}\">{text}</button>")
 }
 
 /// The text node that shows the count: the button's second child.
@@ -29,7 +35,7 @@ fn mounting_renders_the_button_with_a_zero_count() {
     let (dom, _counter, _button) = mounted();
 
     // Then
-    assert_eq!(dom.borrow().to_html(), "<button>Clicked 0 times</button>");
+    assert_eq!(dom.borrow().to_html(), button_html("Clicked 0 times"));
 }
 
 #[test]
@@ -42,7 +48,7 @@ fn a_click_increments_the_count_signal() {
 
     // Then
     assert_eq!(counter.count.get(), 1);
-    assert_eq!(dom.borrow().to_html(), "<button>Clicked 1 times</button>");
+    assert_eq!(dom.borrow().to_html(), button_html("Clicked 1 times"));
 }
 
 #[test]

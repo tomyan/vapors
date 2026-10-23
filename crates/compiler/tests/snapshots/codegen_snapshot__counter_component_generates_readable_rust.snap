@@ -7,11 +7,13 @@ expression: code
 use std::cell::RefCell;
 use std::rc::Rc;
 #[allow(unused_imports)]
-use vapors_dom::{Dom, Event, NodeId, PropertyValue, Root};
+use vapors_dom::{Dom, Event, NodeId, PropertyValue, Root, SCOPE_ATTRIBUTE};
 #[allow(unused_imports)]
 use vapors_signals::{Effect, Memo, Owner, Signal};
 /// The `<style>` of `src/counter.wisp`, resolved at run time by the css crate.
 pub const STYLE: &str = "\nbutton { padding: 4px 8px; }\n";
+/// The scope [`STYLE`] is added under, set on each element as [`SCOPE_ATTRIBUTE`].
+pub const SCOPE: &str = concat!(env!("CARGO_PKG_NAME"), "/", "src/counter.wisp");
 /// What a parent passes to [`Counter::mount`]; each prop has a default.
 #[derive(Default)]
 pub struct CounterProps {}
@@ -47,6 +49,7 @@ impl Counter {
         props: CounterProps,
     ) -> Self {
         let CounterProps {} = props;
+        dom.borrow_mut().add_style(SCOPE, STYLE);
         let owner = Owner::new();
         let (count, roots) = owner
             .with(|| {
@@ -56,6 +59,7 @@ impl Counter {
                 let button0 = dom.borrow_mut().create_element("button");
                 dom.borrow_mut().insert_before(parent, button0, before);
                 roots.push(Root::Node(button0));
+                dom.borrow_mut().set_attribute(button0, SCOPE_ATTRIBUTE, SCOPE);
                 {
                     #[allow(
                         clippy::clone_on_copy,

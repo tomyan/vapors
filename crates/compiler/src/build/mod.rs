@@ -23,7 +23,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use crate::CompileError;
-pub use files::compile_dir_into;
+pub use files::{Styles, compile_dir_into, compile_dir_into_styled};
 
 /// What [`compile_dir_into`] produced.
 #[derive(Debug)]
@@ -51,8 +51,19 @@ pub struct BuildScriptReport {
 /// script. On a refusal it prints each as `error: file:line:col: message` and
 /// exits with status 1, which fails the build.
 pub fn compile_dir(src: impl AsRef<Path>) {
-    let src = resolve_src(src.as_ref(), std::env::var_os("CARGO_MANIFEST_DIR"));
-    let report = build_script_report(&src, std::env::var_os("OUT_DIR"));
+    run(src.as_ref(), Styles::Scoped);
+}
+
+/// [`compile_dir`] for components whose `<style>` the app adds as a
+/// global sheet: nothing is scoped. The layout corpus uses it, so its
+/// CSS means what Chromium reads.
+pub fn compile_dir_global(src: impl AsRef<Path>) {
+    run(src.as_ref(), Styles::Global);
+}
+
+fn run(src: &Path, styles: Styles) {
+    let src = resolve_src(src, std::env::var_os("CARGO_MANIFEST_DIR"));
+    let report = styled_report(&src, std::env::var_os("OUT_DIR"), styles);
     for line in &report.stdout {
         println!("{line}");
     }
@@ -77,10 +88,14 @@ pub fn resolve_src(src: &Path, manifest_dir: Option<OsString>) -> PathBuf {
 /// The lines [`compile_dir`] prints, given the value of `OUT_DIR`.
 #[must_use]
 pub fn build_script_report(src: &Path, out_dir: Option<OsString>) -> BuildScriptReport {
+    styled_report(src, out_dir, Styles::Scoped)
+}
+
+fn styled_report(src: &Path, out_dir: Option<OsString>, styles: Styles) -> BuildScriptReport {
     let Some(out_dir) = out_dir else {
         return failed(src, vec![missing_out_dir()]);
     };
-    match compile_dir_into(src, Path::new(&out_dir)) {
+    match compile_dir_into_styled(src, Path::new(&out_dir), styles) {
         Ok(compiled) => BuildScriptReport {
             stdout: rerun_lines(&compiled.inputs),
             stderr: Vec::new(),

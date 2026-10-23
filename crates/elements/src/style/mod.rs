@@ -8,6 +8,7 @@ mod cursor;
 mod decoration;
 mod grid_style;
 mod honoured;
+mod scope;
 mod sizes;
 mod text_style;
 mod used;
@@ -30,10 +31,17 @@ pub(crate) use values::{Refusal, Styles as ElementStyles};
 
 const UA_SHEET: &str = include_str!("ua.css");
 
-/// The stylesheets, in cascade order, and their names for errors.
+/// Why a `:global()` below a selector's top level is refused.
+const NESTED_GLOBAL: &str = ":global() leaves a top-level compound unscoped; inside :is(), :not(), :where() or :has() it would be ignored, so write that selector without it";
+
+/// The stylesheets, in cascade order, and their names for errors; the
+/// component scopes added, and the scoped styles that did not parse.
 pub(crate) struct Sheets {
     cascade: Cascade,
     names: Vec<String>,
+    /// Each scope added, with the style it was added with.
+    scopes: std::collections::HashMap<String, String>,
+    refused: Vec<ElementError>,
 }
 
 impl Sheets {
@@ -47,17 +55,63 @@ impl Sheets {
         Self {
             cascade: Cascade::new().user_agent(ua),
             names: vec!["ua.css".to_owned()],
+            scopes: std::collections::HashMap::new(),
+            refused: Vec::new(),
         }
     }
 
     pub(crate) fn add_author(&mut self, name: &str, text: &str) -> Result<(), ElementError> {
-        let sheet = vapors_css::parse(text).map_err(|error| ElementError::Css {
+        let refuse = |error| ElementError::Css {
             sheet: name.to_owned(),
             error,
-        })?;
+        };
+        let sheet = vapors_css::parse(text).map_err(refuse)?;
+        if let Some(position) = scope::first_global(&sheet) {
+            return Err(refuse(vapors_css::Error::new(
+                position,
+                ":global() only means something in a component's <style>, where the rest is scoped; in this sheet every rule is already global, so write the selector without it",
+            )));
+        }
         self.cascade = std::mem::take(&mut self.cascade).author(sheet);
         self.names.push(name.to_owned());
         Ok(())
+    }
+
+    /// A component's style under its `scope`, added once however often
+    /// it is mounted. One that does not parse is kept as a refusal for
+    /// every update (see [`Sheets::refused`]): `Dom::add_style` returns
+    /// nothing, as the generated code's other calls do.
+    pub(crate) fn add_scoped(&mut self, scope: &str, text: &str) {
+        let refuse = |error| ElementError::Css {
+            sheet: scope.to_owned(),
+            error,
+        };
+        match self.scopes.get(scope) {
+            Some(added) if added == text => return,
+            Some(_) => {
+                return self.refused.push(refuse(vapors_css::Error::new(
+                    vapors_css::Position { line: 1, column: 1 },
+                    format!("scope `{scope}` was already added with another style: two components share a scope; give their files different paths"),
+                )));
+            }
+            None => drop(self.scopes.insert(scope.to_owned(), text.to_owned())),
+        }
+        let sheet = match vapors_css::parse(text) {
+            Ok(sheet) => sheet,
+            Err(error) => return self.refused.push(refuse(error)),
+        };
+        if let Some(position) = scope::first_nested_global(&sheet) {
+            return self
+                .refused
+                .push(refuse(vapors_css::Error::new(position, NESTED_GLOBAL)));
+        }
+        self.cascade = std::mem::take(&mut self.cascade).author(scope::scoped(sheet, scope));
+        self.names.push(scope.to_owned());
+    }
+
+    /// The scoped styles that did not parse.
+    pub(crate) fn refused(&self) -> &[ElementError] {
+        &self.refused
     }
 
     /// The computed style of every element under `root`, by slot.
@@ -87,6 +141,9 @@ impl Sheets {
     /// The name a sheet was added under, by its cascade order (0 is the
     /// user-agent sheet).
     pub(crate) fn name(&self, index: usize) -> &str {
+        if index == vapors_css::cascade::INLINE_SHEET {
+            return "style attribute";
+        }
         self.names
             .get(index)
             .map_or("an unnamed sheet", String::as_str)

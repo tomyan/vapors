@@ -37,7 +37,7 @@ fn start() -> Result<(), String> {
         .filter(|a| !a.starts_with("--"))
         .ok_or("usage: demo <name> [--screenshot <png>]")?;
     let demo = vapors_demos::find(name)?;
-    let document = vapors_demos::document(&demo)?;
+    let document = vapors_demos::document(&demo);
     let app = ElementsApp::new(Rc::clone(&document));
     let failure = app.failure();
     // The window is 640x400, so the default section is the one checked

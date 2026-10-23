@@ -13,6 +13,11 @@ pub struct Component {
     pub name: String,
     /// The file as named to the compiler.
     pub path: String,
+    /// What its `<style>` is scoped by, after the crate's name: the path
+    /// under the compiled directory's parent (`src/panel.wisp`) when built
+    /// by `compile_dir`, else the path as named. `None` when the app adds
+    /// the style as a global sheet (`compile_dir_global`).
+    pub scope: Option<String>,
     /// The file's text, for positioning later refusals.
     pub text: String,
     /// The `<script>` section, if present.

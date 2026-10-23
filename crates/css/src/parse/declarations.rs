@@ -8,6 +8,20 @@ use crate::property;
 use crate::token::{Token, TokenKind};
 use crate::{Error, Result};
 
+/// A bare declaration list, as a `style` attribute holds, to the end
+/// of the stream.
+pub(super) fn list(stream: &mut Stream) -> Result<Vec<Declaration>> {
+    let mut decls = Vec::new();
+    loop {
+        stream.skip_whitespace();
+        match stream.peek() {
+            None => return Ok(decls),
+            Some(TokenKind::Semicolon) => drop(stream.next()),
+            Some(_) => decls.extend(declaration(stream)?),
+        }
+    }
+}
+
 /// `{ declarations }`; the stream sits on the `{`.
 pub(super) fn block(stream: &mut Stream) -> Result<Vec<Declaration>> {
     let open_at = stream.position();
