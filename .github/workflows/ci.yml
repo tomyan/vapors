@@ -123,6 +123,11 @@ jobs:
       - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
         run: cargo xtask setup --ci
+      # The browser's first launch on a fresh runner took 15.4 s, close to
+      # the tests' 20 s screenshot deadline, which assumes a warm one; see
+      # COLD_START in crates/text/src/comparison/chromium_warm.rs.
+      - name: warm headless Chromium
+        run: cargo run -p vapors-text --example warm_chromium
       - name: gpu tier
         run: cargo xtask test --tier gpu
       # The text comparison page: vapors-text beside headless Chrome (the

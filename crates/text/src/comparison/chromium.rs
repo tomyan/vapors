@@ -50,9 +50,9 @@ impl std::error::Error for ChromiumError {}
 
 /// A browser binary.
 pub struct Chromium {
-    binary: PathBuf,
+    pub(super) binary: PathBuf,
     /// How long one screenshot may take before Chromium is killed.
-    deadline: Duration,
+    pub(super) deadline: Duration,
 }
 
 impl Chromium {
