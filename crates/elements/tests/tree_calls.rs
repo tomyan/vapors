@@ -149,6 +149,9 @@ fn setting_an_attribute_on_a_text_node_panics() {
     doc.set_attribute(node, "class", "a");
 }
 
+/// One call on the document, by name.
+type Change = Box<dyn Fn(&mut vapors_elements::Document)>;
+
 #[test]
 #[should_panic(expected = "the document's <body>")]
 fn removing_the_body_panics_naming_it() {
@@ -178,7 +181,7 @@ fn each_change_to_what_is_shown_asks_for_a_frame_and_listening_does_not() {
     let body = doc.body();
     let div = element(&mut doc, body, "div", "");
     let words = text(&mut doc, div, "a");
-    let changes: [(&str, Box<dyn Fn(&mut vapors_elements::Document)>); 6] = [
+    let changes: [(&str, Change); 6] = [
         ("set_text", Box::new(move |d| d.set_text(words, "b"))),
         (
             "set_attribute",
