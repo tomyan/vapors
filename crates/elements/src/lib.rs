@@ -16,6 +16,7 @@ mod html;
 mod layout;
 mod node;
 mod paint;
+mod paint_inline;
 mod painted;
 mod style;
 mod tags;

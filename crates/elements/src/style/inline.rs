@@ -18,6 +18,9 @@ fn inline_keyword(value: &Value) -> Result<bool, String> {
     keyword(value).map(|k| k == "inline")
 }
 
+/// Why a block-level element inside an inline one is refused.
+pub(crate) const BLOCK_IN_INLINE: &str = "is block-level inside an inline element, which splits the inline element around it (CSS 2 section 9.2.1.1); not laid out by vapors-elements yet, not scheduled in docs/F2c.md. Make the outer element a block, or this one inline";
+
 /// Refuses each margin, padding and border side of an inline element
 /// that is not zero, naming it.
 pub(crate) fn refuse_box_edges(reader: &mut Reader<'_>, style: &Style) {

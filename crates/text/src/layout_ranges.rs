@@ -21,29 +21,51 @@ pub struct Fragment {
 }
 
 impl Layout {
-    /// The fragments of the bytes in `range`, top to bottom; none for
-    /// an empty range.
+    /// The fragments of the bytes in `range`, top to bottom: on each
+    /// line, the part of `range` up to the line's end, without the
+    /// collapsible spaces the line breaks after (they take no room, as
+    /// in CSS); none for an empty range.
     #[must_use]
-    #[allow(clippy::cast_possible_truncation)] // Parley's f64 boxes come from f32 positions
     pub fn fragments(&self, range: Range<usize>) -> Vec<Fragment> {
-        if range.is_empty() {
-            return Vec::new();
-        }
-        let inner = self.inner();
-        let selection = Selection::new(
-            Cursor::from_byte_index(inner, range.start, Affinity::Downstream),
-            Cursor::from_byte_index(inner, range.end, Affinity::Upstream),
-        );
-        selection
-            .geometry(inner)
-            .into_iter()
-            .map(|(rect, line)| Fragment {
-                line,
-                x: rect.x0 as f32,
-                width: (rect.x1 - rect.x0) as f32,
+        self.lines()
+            .enumerate()
+            .filter_map(|(line, info)| {
+                let end = trimmed_end(self.text(), info.text_range.clone());
+                let part = range.start.max(info.text_range.start)..range.end.min(end);
+                self.extent(part, line)
             })
             .collect()
     }
+
+    /// The x extent of `part`, all on line `line`.
+    #[allow(clippy::cast_possible_truncation)] // Parley's f64 boxes come from f32 positions
+    fn extent(&self, part: Range<usize>, line: usize) -> Option<Fragment> {
+        if part.is_empty() {
+            return None;
+        }
+        let inner = self.inner();
+        let selection = Selection::new(
+            Cursor::from_byte_index(inner, part.start, Affinity::Downstream),
+            Cursor::from_byte_index(inner, part.end, Affinity::Upstream),
+        );
+        let rects = selection.geometry(inner);
+        let (left, right) = rects
+            .iter()
+            .filter(|(_, on)| *on == line)
+            .fold((f64::MAX, f64::MIN), |(l, r), (rect, _)| {
+                (l.min(rect.x0), r.max(rect.x1))
+            });
+        (left < right).then_some(Fragment {
+            line,
+            x: left as f32,
+            width: (right - left) as f32,
+        })
+    }
+}
+
+/// The end of `line` in `text` without its trailing spaces.
+fn trimmed_end(text: &str, line: Range<usize>) -> usize {
+    line.start + text[line].trim_end_matches(' ').len()
 }
 
 #[cfg(test)]

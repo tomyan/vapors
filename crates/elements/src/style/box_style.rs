@@ -89,12 +89,12 @@ fn paddings(reader: &mut Reader<'_>) -> Rect<LengthPercentage> {
 
 fn display(value: &Value) -> Result<Display, String> {
     match keyword(value)? {
-        "block" => Ok(Display::Block),
+        // An inline element has no box of its own (`style::inline`);
+        // its Taffy display is never read.
+        "block" | "inline" => Ok(Display::Block),
         "flex" => Ok(Display::Flex),
         "none" => Ok(Display::None),
         "grid" => Ok(Display::Grid),
-        // An inline element has no box of its own: `style::inline`.
-        "inline" => Ok(Display::Block),
         "inline-block" | "inline-flex" | "inline-grid" => Err(
             "an atomic inline (inline-block, inline-flex, inline-grid) is laid out only as a flex or grid item; not scheduled in docs/F2c.md otherwise".to_owned(),
         ),

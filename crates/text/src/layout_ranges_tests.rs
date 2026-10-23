@@ -1,6 +1,5 @@
 //! A byte range's fragments: one per line it is on, with its x extent.
 
-use super::*;
 use crate::{Family, FontSystem, Layout, LayoutOptions, Style};
 
 fn laid_out(text: &str, width: Option<f32>) -> Layout {
@@ -64,4 +63,21 @@ fn an_empty_range_has_no_fragments() {
 
     // Then
     assert_eq!(fragments, Vec::new());
+}
+
+#[test]
+fn the_space_a_line_breaks_after_is_not_in_a_fragment() {
+    // Given: "Hello world" broken after "Hello "
+    let layout = laid_out("Hello world", Some(60.0));
+    let hello = laid_out("Hello", None);
+
+    // When
+    let fragments = layout.fragments(0..11);
+
+    // Then: the first line's fragment is as wide as "Hello" alone
+    assert!(
+        (fragments[0].width - hello.width()).abs() < 0.01,
+        "{fragments:?} against {}",
+        hello.width()
+    );
 }

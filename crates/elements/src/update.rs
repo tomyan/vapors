@@ -87,21 +87,21 @@ impl Document {
             if !implemented(&self.arena, node) {
                 continue;
             }
-            let flex_item = self
-                .parent(node)
-                .and_then(|parent| out.get(&parent))
-                .is_some_and(|parent: &Used| {
-                    matches!(
-                        parent.layout.display,
-                        taffy::Display::Flex | taffy::Display::Grid
-                    )
-                });
+            let parent_used: Option<&Used> = self.parent(node).and_then(|parent| out.get(&parent));
+            let flex_item = parent_used.is_some_and(|parent| {
+                matches!(
+                    parent.layout.display,
+                    taffy::Display::Flex | taffy::Display::Grid
+                )
+            });
+            let in_inline = parent_used.is_some_and(|parent| parent.inline);
             let own = styles.of(node);
             calcs.add(own, &describe(&self.arena, node));
             let parent = self.parent(node).map(|parent| styles.of(parent));
             let context = Context {
                 initial: &initial,
                 flex_item,
+                in_inline,
                 scale: viewport.scale,
             };
             match used(ElementStyles { own, parent }, &context) {

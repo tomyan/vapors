@@ -49,6 +49,10 @@ pub struct LineInfo {
     pub text_range: Range<usize>,
     /// Baseline y, unsnapped.
     pub baseline: f32,
+    /// The line box's top, device pixels.
+    pub top: f32,
+    /// The line box's height, device pixels.
+    pub height: f32,
     /// Inked width.
     pub advance: f32,
 }

@@ -35,6 +35,8 @@ pub(crate) struct Context<'a> {
     pub(crate) initial: &'a ComputedStyle,
     /// The parent is a flex or grid container, which blockifies it.
     pub(crate) flex_item: bool,
+    /// The parent is an inline element.
+    pub(crate) in_inline: bool,
     /// Device pixels per CSS pixel, for border widths.
     pub(crate) scale: f32,
 }
@@ -49,6 +51,8 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
     let inline = inline::is_inline(&mut reader, context.flex_item);
     if inline {
         inline::refuse_box_edges(&mut reader, &layout);
+    } else if context.in_inline && layout.display != taffy::Display::None {
+        reader.refuse("display", inline::BLOCK_IN_INLINE.to_owned());
     }
     let result = Used {
         layout,
