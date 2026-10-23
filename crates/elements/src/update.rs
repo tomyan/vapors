@@ -113,14 +113,13 @@ impl Document {
         let alive: std::collections::HashSet<NodeId> = live.iter().copied().collect();
         kept.used.retain(|node, _| alive.contains(node));
         kept.refused.retain(|node, _| alive.contains(node));
+        let kept = self.kept.as_ref().expect("restyle keeps the styles");
         let mut calcs = Calcs::default();
         for &node in &live {
             errors.extend(kept.refused.get(&node).into_iter().flatten().cloned());
             calcs.add(kept.styles.of(node), || describe(&self.arena, node));
-        }
-        for node in elements(&self.arena, self.root()) {
-            if out.get(&node).is_some_and(|style| style.inline) {
-                errors.extend(self.mixed_metrics(node, &out, viewport.scale));
+            if kept.used.get(&node).is_some_and(|style| style.inline) {
+                errors.extend(self.mixed_metrics(node, &kept.used, viewport.scale));
             }
         }
         if errors.is_empty() {
