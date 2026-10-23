@@ -74,7 +74,8 @@ impl LayoutGridContainer for BoxTree<'_> {
     }
 }
 
-/// Positioned boxes are refused until F2c S8, so no box is ever hoisted.
+/// Absolute and fixed boxes are hoisted to their containing block,
+/// whose list `place` reads to position them.
 impl LayoutContainingBlock for BoxTree<'_> {
     type OofItemStyle<'a>
         = &'a Style
@@ -85,12 +86,12 @@ impl LayoutContainingBlock for BoxTree<'_> {
         &self.boxes[usize::from(id)].style
     }
 
-    fn clear_hoisted_children(&mut self, _id: NodeId) {}
+    fn clear_hoisted_children(&mut self, id: NodeId) {
+        self.boxes[usize::from(id)].hoisted.clear();
+    }
 
     fn add_hoisted_children(&mut self, id: NodeId, hoisted: &[NodeId]) {
-        assert!(
-            hoisted.is_empty(),
-            "box {id:?} was given out-of-flow children {hoisted:?}, but position is refused until F2c S8"
-        );
+        let list = &mut self.boxes[usize::from(id)].hoisted;
+        list.extend(hoisted.iter().map(|child| usize::from(*child)));
     }
 }

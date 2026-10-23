@@ -31,6 +31,10 @@ pub(crate) struct LayoutBox {
     pub(crate) children: Vec<usize>,
     pub(crate) cache: Cache,
     pub(crate) layout: Layout,
+    /// The out-of-flow (absolute and fixed) boxes this box is the
+    /// containing block of, as Taffy hoists them; their layouts are
+    /// relative to this box.
+    pub(crate) hoisted: Vec<usize>,
 }
 
 impl LayoutBox {
@@ -41,6 +45,7 @@ impl LayoutBox {
             children: Vec::new(),
             cache: Cache::new(),
             layout: Layout::with_order(0),
+            hoisted: Vec::new(),
         }
     }
 }

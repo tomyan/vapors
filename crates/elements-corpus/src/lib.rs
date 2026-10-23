@@ -56,6 +56,7 @@ fixtures![
     hello_box::HelloBox,
     inline_text::InlineText,
     paint_boxes::PaintBoxes,
+    positioned::Positioned,
     shell::Shell,
     sizing::Sizing,
     text_align::TextAlign,

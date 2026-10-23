@@ -13,8 +13,8 @@ use super::tree::{is_inside, text_nodes};
 
 /// Inherited properties, `var()`, `+` and `~`, `:nth-child`,
 /// `:last-child`, `:empty`, an ancestor attribute, `:hover` on a
-/// non-subject compound, `:active`, `@media`, calc with % and em, and
-/// vw.
+/// non-subject compound, `:active`, `@media`, calc with % and em, vw,
+/// and relative and absolute positioning.
 pub const CSS: &str = "
 :root { --pad: 3px; }
 body { margin: 0; font-size: 14px; color: #222222; }
@@ -32,9 +32,13 @@ body { margin: 0; font-size: 14px; color: #222222; }
 .wide { width: calc(50% - 1em); }
 .vw { width: 30vw; }
 @media (min-width: 500px) { .box { padding: 6px; } }
+.pos { position: relative; top: 2px; left: 1px; }
+.abs { position: absolute; right: 0; top: 0; width: 20px; height: 5px; }
 ";
 
-const CLASSES: &[&str] = &["box", "box big", "box alt", "box wide", "box vw", "row", ""];
+const CLASSES: &[&str] = &[
+    "box", "box big", "box alt", "box wide", "box vw", "box pos", "box abs", "row", "",
+];
 const VIEWPORTS: &[(f32, f32)] = &[(640.0, 400.0), (400.0, 300.0), (700.0, 500.0)];
 
 /// xorshift64: a seed gives the same changes on every machine.

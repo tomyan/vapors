@@ -24,6 +24,12 @@ pub(crate) const BLOCK_IN_INLINE: &str = "is block-level inside an inline elemen
 /// Refuses each margin, padding and border side of an inline element
 /// that is not zero, naming it.
 pub(crate) fn refuse_box_edges(reader: &mut Reader<'_>, style: &Style) {
+    if style.position != taffy::Position::Static {
+        reader.refuse(
+            "position",
+            "is not static on an inline element, which has no box of its own to place yet (a slice after F2c, docs/F2c.md); make the element inline-block in a flex container, or a block".to_owned(),
+        );
+    }
     let zero = LengthPercentage::length(0.0);
     let auto_zero = LengthPercentageAuto::length(0.0);
     let sides = ["top", "right", "bottom", "left"];

@@ -46,6 +46,7 @@ pub(crate) fn box_style(reader: &mut Reader<'_>, flex_item: bool, border: [f32; 
         },
         ..Style::default()
     };
+    super::position::position(reader, &mut style);
     flex(reader, &mut style);
     super::grid_style::grid(reader, &mut style);
     style
