@@ -432,28 +432,21 @@ After each slice the plan is reread. The question is whether the next
 slice is still the most useful one for touche, given what the last
 slice showed.
 
-## Decisions for the team lead
+## Decisions (2026-10-23)
 
-- **D1 Scoping.** (a) Compiler change: `mount` passes the component's
-  style to the `Dom` (`dom.style_scope(STYLE)` returning a scope id)
-  and tags each element it creates with the scope. Each scope's rules
-  then match only elements of that scope, Svelte's rule, with every
-  compound in the selector in scope. It touches `vapors-dom`, the
-  compiler and the snapshots. (b) No scoping: each `STYLE` is added as
-  a global sheet. That is not sumi's behaviour, and rules leak between
-  components. Recommendation: (a) in S5, with S1 to S4 using global
-  sheets only, since touche has no components yet. Who owns the
-  compiler change: me, or the compiler's owner?
-- **D2 Web page.** Settled by Tom's direction to treat the web as a
-  first-class proof surface (see "Demos"). There is one web package
-  with `?demo=` pages, served at `/vapors/`. One question remains.
-  `cargo xtask screenshot` runs examples of `[screenshot] package =
-  "vapors-platform"`, but the demos' native example lives in
-  `vapors-app`. Options: (a) make that setting a list, which is a
-  factory change shared with touche's xtask; (b) point it at
-  `vapors-app` and move the two platform examples there.
-  Recommendation: (a).
-- **D3 Checkbox.** It is in brief item 1. Recommendation: F4 with the
-  other inputs, unless a touche slice before F4 needs it.
-- **D4 Taffy 0.15.0**, six days old, over 0.14. Recommendation as
-  argued above.
+- **D1 Scoping.** A compiler change in S5: `mount` registers its
+  `STYLE` as a scope and tags each element it creates; a scope's rules
+  match only its own elements, with every compound of a selector in
+  scope (Svelte's rule). S1 to S4 use global sheets only. The S5 pull
+  request updates the compiler snapshots and says the generated output
+  changed.
+- **D2 Web page.** One web package with `?demo=` pages, an index page,
+  served at `/vapors/` with a page-contract case for the subpath, and
+  a shared `.pixels` file per demo. `[screenshot] package` becomes a
+  list; xtask stays byte-identical with touche's, so touche's copy
+  needs the same change.
+- **D3 Checkbox.** F4, with the other inputs.
+- **D4 Taffy `=0.15.0`.** The pull request that adds it records what
+  0.15 changed in the areas vapors uses. cargo-deny's advisories check
+  stays on. The Chromium corpus is the regression gate; a layout bug
+  it catches in Taffy is reported before it is worked around.
