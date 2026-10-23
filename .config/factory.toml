@@ -3,8 +3,9 @@
 # Shape: flat tables of `key = "value"`.
 
 [screenshot]
-# The package whose examples and binaries `cargo xtask screenshot` runs.
-package = "vapors-platform"
+# The packages whose examples and binaries `cargo xtask screenshot` runs,
+# comma-separated; a target name must be in exactly one of them.
+packages = "vapors-platform"
 
 [web]
 # The package `cargo xtask web` builds with trunk and the `wasm` CI step
