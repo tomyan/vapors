@@ -6,6 +6,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value;
 
+use crate::gate_expression::{env_text, unauthenticated_note};
+
 /// The workflow keys the gate models.
 pub const WORKFLOW_KEYS: [&str; 6] = ["name", "on", "permissions", "env", "defaults", "jobs"];
 
@@ -25,8 +27,9 @@ pub fn check_keys(value: &Value, allowed: &[&str], label: &str) -> Result<(), St
     Ok(())
 }
 
-/// A mapping's `env:`, as strings; an expression or a non-mapping is
-/// refused.
+/// A mapping's `env:`, as strings. `${{ github.token }}` is the local
+/// `GITHUB_TOKEN`, or left out with a note; any other expression or a
+/// non-mapping is refused.
 pub fn env_of(value: &Value, label: &str) -> Result<BTreeMap<String, String>, String> {
     let Some(env) = value.get("env") else {
         return Ok(BTreeMap::new());
@@ -34,31 +37,29 @@ pub fn env_of(value: &Value, label: &str) -> Result<BTreeMap<String, String>, St
     let env = env
         .as_object()
         .ok_or_else(|| format!("{label}: `env:` is not a mapping"))?;
-    env.iter()
-        .map(|(name, value)| {
-            let name = name.as_str();
-            Ok((name.to_owned(), env_value(value, name, label)?))
-        })
-        .collect()
+    let local_token = std::env::var("GITHUB_TOKEN").ok();
+    let mut values = BTreeMap::new();
+    for (name, value) in env {
+        let text = scalar_text(value, name, label)?;
+        match env_text(&text, name, label, local_token.as_deref())? {
+            Some(text) => {
+                values.insert(name.clone(), text);
+            }
+            None => println!("{}", unauthenticated_note(name, label)),
+        }
+    }
+    Ok(values)
 }
 
-fn env_value(value: &Value, name: &str, label: &str) -> Result<String, String> {
-    let text = match value {
-        Value::String(text) => text.clone(),
-        Value::Number(number) => number.to_string(),
-        Value::Bool(flag) => flag.to_string(),
-        _ => {
-            return Err(format!(
-                "{label}: env {name} is not a string, number or bool"
-            ));
-        }
-    };
-    if text.contains("${{") {
-        return Err(format!(
-            "{label}: env {name} is an expression, which the gate cannot evaluate"
-        ));
+fn scalar_text(value: &Value, name: &str, label: &str) -> Result<String, String> {
+    match value {
+        Value::String(text) => Ok(text.clone()),
+        Value::Number(number) => Ok(number.to_string()),
+        Value::Bool(flag) => Ok(flag.to_string()),
+        _ => Err(format!(
+            "{label}: env {name} is not a string, number or bool"
+        )),
     }
-    Ok(text)
 }
 
 /// The workspace root relative to the gate's root (this checkout): `..`

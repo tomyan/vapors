@@ -142,3 +142,14 @@ fn a_jobs_own_bash_default_is_enough() {
     // When / Then
     assert!(plan_of(&workflow).is_ok(), "{:?}", plan_of(&workflow));
 }
+
+#[test]
+fn a_job_whose_timeout_report_disagrees_with_its_timeout_is_refused() {
+    refused(
+        &WORKFLOW.replace(
+            "          TIMEOUT_MINUTES: 20",
+            "          TIMEOUT_MINUTES: 9",
+        ),
+        "gpu: the timeout report's TIMEOUT_MINUTES is 9, but the job's timeout-minutes is 20",
+    );
+}

@@ -13,6 +13,7 @@ use std::time::Duration;
 
 use serde_json::Value;
 
+use crate::gate_report::check_timeout_report;
 use crate::gate_step::{JOB_KEYS, timeout_of};
 use crate::gate_steps::Planner;
 use crate::gate_workflow::{WORKFLOW_KEYS, check_keys, env_of, workspace};
@@ -87,6 +88,7 @@ fn plan_job(
         .get("steps")
         .and_then(Value::as_array)
         .ok_or_else(|| format!("{name}: no `steps:`"))?;
+    check_timeout_report(name, timeout, steps)?;
     planner.job(name, timeout, &env, steps)
 }
 

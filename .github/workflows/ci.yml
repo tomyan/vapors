@@ -9,6 +9,8 @@ on:
 
 permissions:
   contents: read
+  # Read-only: the timeout report reads its own job's steps.
+  actions: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -53,6 +55,10 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
+        # binstall reads GitHub's API; unauthenticated, it was refused
+        # with 403 (run 40029521532). The token is read-only.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: cargo xtask setup --ci
       # Advisories, bans, licences and sources by deny.toml; it fetches the
       # advisory database every run and fails if it cannot.
@@ -71,6 +77,15 @@ jobs:
             target/cargo-timings/
             target/nextest/ci/junit.xml
           if-no-files-found: ignore
+      # GitHub shows a job that hit its timeout as "cancelled"; this
+      # names the timeout and the step that was running.
+      - name: report a timeout
+        if: cancelled()
+        timeout-minutes: 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TIMEOUT_MINUTES: 9
+        run: .github/scripts/report-timeout.sh
 
   web:
     name: web
@@ -86,6 +101,10 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
+        # binstall reads GitHub's API; unauthenticated, it was refused
+        # with 403 (run 40029521532). The token is read-only.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: cargo xtask setup --ci
       - name: build the web demo with trunk
         run: cargo xtask web
@@ -102,6 +121,15 @@ jobs:
         with:
           name: web
           path: target/web
+      # GitHub shows a job that hit its timeout as "cancelled"; this
+      # names the timeout and the step that was running.
+      - name: report a timeout
+        if: cancelled()
+        timeout-minutes: 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TIMEOUT_MINUTES: 3
+        run: .github/scripts/report-timeout.sh
 
   gpu:
     name: gpu
@@ -135,6 +163,10 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
+        # binstall reads GitHub's API; unauthenticated, it was refused
+        # with 403 (run 40029521532). The token is read-only.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: cargo xtask setup --ci
       # The browser's first launch on a fresh runner took 15.3 to 57.9 s, past
       # the tests' 20 s screenshot deadline, which assumes a warm one; see
@@ -160,6 +192,15 @@ jobs:
             target/text_comparison*.png
             target/tmp/paint_*.png
           if-no-files-found: error
+      # GitHub shows a job that hit its timeout as "cancelled"; this
+      # names the timeout and the step that was running.
+      - name: report a timeout
+        if: cancelled()
+        timeout-minutes: 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TIMEOUT_MINUTES: 9
+        run: .github/scripts/report-timeout.sh
 
   window:
     name: window
@@ -187,6 +228,10 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
+        # binstall reads GitHub's API; unauthenticated, it was refused
+        # with 403 (run 40029521532). The token is read-only.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: cargo xtask setup --ci
       - name: screenshot of the clear window
         run: cargo xtask screenshot clear_window target/clear_window.png --expect 12,200,34
@@ -212,3 +257,12 @@ jobs:
           name: screenshots
           path: target/*.png
           if-no-files-found: ignore
+      # GitHub shows a job that hit its timeout as "cancelled"; this
+      # names the timeout and the step that was running.
+      - name: report a timeout
+        if: cancelled()
+        timeout-minutes: 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TIMEOUT_MINUTES: 5
+        run: .github/scripts/report-timeout.sh
