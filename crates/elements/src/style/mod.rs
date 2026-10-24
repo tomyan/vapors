@@ -30,6 +30,7 @@ use crate::error::ElementError;
 pub(crate) use box_style::box_style;
 pub use cursor::{ALL_CURSORS, Cursor};
 pub(crate) use decoration::BoxShadow;
+pub(crate) use overflow::to_viewport;
 pub(crate) use styles::Styles;
 pub(crate) use text_style::Face;
 pub(crate) use text_style::TextStyle;

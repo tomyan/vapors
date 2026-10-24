@@ -163,6 +163,11 @@ impl Document {
                 )
             }),
             in_inline: parent_used.is_some_and(|p| p.inline),
+            to_viewport: crate::style::to_viewport(
+                node == self.root(),
+                node == self.body(),
+                kept.used.get(&self.root()).is_none_or(|root| !root.clips()),
+            ),
             scale: viewport.scale,
         };
         let styles = ElementStyles {

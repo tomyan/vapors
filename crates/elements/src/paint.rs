@@ -41,6 +41,7 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
         rects: HashMap::new(),
         hits: Vec::new(),
         cursors: HashMap::new(),
+        scroll_chains: crate::scroll::Chains::default(),
     };
     for (index, layout_box) in boxes.iter().enumerate() {
         if let Content::Element(node) = layout_box.content {
@@ -72,11 +73,9 @@ fn clipping(boxes: &[LayoutBox], index: usize, input: &PaintInput<'_>) -> bool {
         return false;
     };
     let clips = |node: NodeId| input.used.get(&node).is_some_and(Used::clips);
-    match node {
-        node if node == input.root => false,
-        node if node == input.body => clips(node) && clips(input.root),
-        node => clips(node),
-    }
+    let to_viewport =
+        crate::style::to_viewport(node == input.root, node == input.body, !clips(input.root));
+    clips(node) && !to_viewport
 }
 
 fn stacking_of(boxes: &[LayoutBox], index: usize, input: &PaintInput<'_>) -> Stacking {
