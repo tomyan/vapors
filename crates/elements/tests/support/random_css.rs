@@ -4,8 +4,8 @@
 /// Inherited properties, `var()`, `+` and `~`, `:nth-child`,
 /// `:last-child`, `:empty`, an ancestor attribute, `:hover` on a
 /// non-subject compound, `:active`, `@media`, calc with % and em, vw,
-/// relative and absolute positioning, and z-index on positioned boxes
-/// and on flex items, and `overflow: hidden`.
+/// relative, absolute and fixed positioning, z-index on positioned
+/// boxes and on flex items, and `overflow: hidden` and `clip`.
 pub const CSS: &str = "
 :root { --pad: 3px; }
 body { margin: 0; font-size: 14px; color: #222222; }
@@ -28,6 +28,8 @@ body { margin: 0; font-size: 14px; color: #222222; }
 .up { z-index: 2; }
 .down { z-index: -1; }
 .cut { overflow: hidden; height: 12px; }
+.fix { position: fixed; right: 4px; bottom: 4px; width: 30px; height: 10px; }
+.trim { overflow: clip; height: 10px; }
 ";
 
 pub const CLASSES: &[&str] = &[
@@ -43,6 +45,9 @@ pub const CLASSES: &[&str] = &[
     "box up",
     "box cut",
     "row cut",
+    "box fix",
+    "box trim",
+    "row trim",
     "row",
     "",
 ];

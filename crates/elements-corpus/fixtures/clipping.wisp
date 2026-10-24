@@ -11,7 +11,7 @@ body { margin: 0; padding: 16px; background-color: #e9ecef; display: flex; flex-
 .frame { width: 100px; height: 80px; background-color: #ffffff; overflow: hidden; }
 .cut { overflow: clip; }
 .wide { width: 160px; height: 30px; margin-top: 10px; background-color: #1976d2; }
-.shadowed { width: 60px; height: 40px; margin: 30px 0 0 60px; background-color: #2e7d32; box-shadow: 8px 8px 0 #171b1f; }
+.shadowed { width: 60px; height: 40px; margin: 30px 0 0 60px; background-color: #2e7d32; box-shadow: 8px 8px 12px #171b1f; }
 .inner { width: 60px; height: 60px; margin: 10px; background-color: #fbc02d; overflow: hidden; }
 .placed { position: relative; }
 .abs { position: absolute; left: 70px; top: 50px; width: 60px; height: 60px; background-color: #d32f2f; }

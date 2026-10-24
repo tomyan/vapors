@@ -72,8 +72,9 @@ fn an_absolute_child_placed_by_the_clipping_box_is_clipped() {
         "position: absolute;",
     );
 
-    // When / Then
+    // When / Then: cut off past the frame, hit inside it
     assert_ne!(hit(&mut doc, [75.0, 10.0]), Some(wide));
+    assert_eq!(hit(&mut doc, [25.0, 10.0]), Some(wide));
 }
 
 #[test]
@@ -147,8 +148,9 @@ fn a_hidden_body_clips_when_the_root_passes_its_own() {
     )
     .expect("parses");
 
-    // When / Then
+    // When / Then: cut off below the body, hit inside it
     assert_ne!(hit(&mut doc, [10.0, 50.0]), Some(tall));
+    assert_eq!(hit(&mut doc, [10.0, 10.0]), Some(tall));
 }
 
 #[test]

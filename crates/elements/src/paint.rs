@@ -50,6 +50,11 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
     let order = paint_order(boxes, &|index| stacking_of(boxes, index, input));
     let clips = crate::clip::clips(boxes, rects, &|index| clipping(boxes, index, input));
     for index in order {
+        // Two forms of one clip, on purpose: hits are cut to it in CSS
+        // pixels, unsnapped, as border boxes are hit unsnapped, so hit
+        // testing follows layout geometry as Chromium's does; the scene
+        // gets it snapped to device pixels, as every painted edge is.
+        // They differ by under a device pixel at an edge.
         input.clip = clips[index];
         let device = clips[index].map(|clip| snapped(clip, input.scale));
         painted.scene.set_clip(device);

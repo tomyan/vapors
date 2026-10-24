@@ -835,7 +835,10 @@ differs from the plan.
 
   Text is not in `clipping`: glyph edges differ from Chromium's by more
   than the paint rules allow. `gpu_text` checks text under a scissor
-  instead.
+  instead. The paint harness takes whole scales only (its scale is a
+  `u32`, and Chromium is shot at that device scale factor), so no
+  fixture is compared at a fractional scale such as 1.5; snapping
+  there is unchecked against Chromium.
 - **Demo.** `toasts`: Save and Export raise toasts into a fixed stack
   (z-index 10) at the bottom right, over the canvas region and above
   the bar (relative, z-index 1, with a shadow). Each toast stays until
