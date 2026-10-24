@@ -65,6 +65,11 @@ fn prepare(config: &Config) -> Result<(Vec<PlannedStep>, State, Pinned, PathBuf)
     let siblings: Pinned = config.entries_under("gate.pinned.").into_iter().collect();
     let before = state(&siblings)?;
     refuse_dirty(&before)?;
+    let twin = config.get(crate::gate_twin::KEY).map(std::path::Path::new);
+    println!(
+        "{}",
+        crate::gate_twin::check(std::path::Path::new("."), twin)?
+    );
     let workflow = std::fs::read_to_string(WORKFLOW)
         .map_err(|e| format!("{WORKFLOW}: {e}; run from the workspace root"))?;
     let (setup, actions) = (setup_lines(config), actions(config)?);
