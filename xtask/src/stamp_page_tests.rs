@@ -49,3 +49,50 @@ fn an_index_naming_no_page_file_is_refused() {
     // Then
     assert!(refused.expect_err("nothing to version").contains("fix:"));
 }
+
+/// A workspace root under the temp dir with `config` as its factory.toml.
+fn root_with(test: &str, config: &str) -> std::path::PathBuf {
+    let root = std::env::temp_dir().join(format!("xtask-stamp-root-{test}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join(".config")).expect("dirs");
+    std::fs::write(root.join(".config/factory.toml"), config).expect("config");
+    root
+}
+
+#[test]
+fn the_workspace_root_is_found_wherever_the_hook_runs() {
+    // Given: tests run in xtask's own directory, as trunk's hook runs in
+    // crates/web; neither holds .config
+
+    // When
+    let root = workspace_root();
+
+    // Then
+    assert!(
+        root.join(".config/factory.toml").is_file(),
+        "{}",
+        root.display()
+    );
+}
+
+#[test]
+fn the_product_is_read_from_the_roots_config() {
+    // Given
+    let root = root_with("named", "[web]\nproduct = \"touche\"\n");
+
+    // When / Then
+    assert_eq!(product(&root), Ok("touche".to_owned()));
+}
+
+#[test]
+fn a_config_without_a_product_is_refused_naming_the_key_and_file() {
+    // Given
+    let root = root_with("unnamed", "[web]\npackage = \"x\"\n");
+
+    // When
+    let refusal = product(&root).expect_err("refused");
+
+    // Then
+    assert!(refusal.contains("[web] product"), "{refusal}");
+    assert!(refusal.contains(&root.display().to_string()), "{refusal}");
+}

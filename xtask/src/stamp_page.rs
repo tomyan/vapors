@@ -51,6 +51,26 @@ pub fn versioned(index: &str, query: &str) -> Result<String, String> {
     Ok(out)
 }
 
+/// The workspace root: xtask's own directory's parent. trunk runs this
+/// hook in the page's crate, not the root, so the current directory
+/// cannot say where .config is.
+fn workspace_root() -> PathBuf {
+    let xtask = Path::new(env!("CARGO_MANIFEST_DIR"));
+    xtask.parent().unwrap_or(xtask).to_path_buf()
+}
+
+/// `[web] product` from the config under `root`.
+fn product(root: &Path) -> Result<String, String> {
+    crate::config::Config::load_from(root)
+        .and_then(|config| config.require("web.product").map(str::to_owned))
+        .map_err(|e| {
+            format!(
+                "{e} (under {}); fix: name the page's product, as its wasm names itself, in `[web] product`",
+                root.display()
+            )
+        })
+}
+
 fn staging() -> Result<PathBuf, String> {
     std::env::var_os("TRUNK_STAGING_DIR").map(PathBuf::from).ok_or_else(|| {
         "TRUNK_STAGING_DIR is unset: stamp-page is trunk's post_build hook (crates/web/Trunk.toml); fix: run `cargo xtask web` or `cargo xtask dev`".to_owned()
@@ -58,13 +78,7 @@ fn staging() -> Result<PathBuf, String> {
 }
 
 fn stamp(dir: &Path) -> Result<String, String> {
-    let product = crate::config::Config::load()
-        .and_then(|config| config.require("web.product").map(str::to_owned))
-        .map_err(|e| {
-            format!(
-                "{e}; fix: name the page's product, as its wasm names itself, in `[web] product`"
-            )
-        })?;
+    let product = product(&workspace_root())?;
     let version = web_version::write(Path::new("."), dir, &product)?;
     let path = dir.join("index.html");
     let index = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
