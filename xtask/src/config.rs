@@ -30,11 +30,22 @@ impl fmt::Display for ConfigError {
 }
 
 impl Config {
-    /// Read the settings file from the workspace root.
+    /// Read the settings file from the workspace root, which is the
+    /// current directory.
     pub fn load() -> Result<Self, ConfigError> {
-        let text = fs::read_to_string(FILE).map_err(|e| ConfigError {
+        Self::load_from(std::path::Path::new("."))
+    }
+
+    /// Read the settings file under `root`, for a command that runs from
+    /// elsewhere (trunk runs its hooks in the page's crate).
+    pub fn load_from(root: &std::path::Path) -> Result<Self, ConfigError> {
+        let path = root.join(FILE);
+        let text = fs::read_to_string(&path).map_err(|e| ConfigError {
             line: 0,
-            reason: format!("could not read it: {e}; run from the workspace root"),
+            reason: format!(
+                "could not read {}: {e}; run from the workspace root",
+                path.display()
+            ),
         })?;
         Self::parse(&text)
     }
