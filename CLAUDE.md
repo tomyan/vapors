@@ -36,6 +36,18 @@ bacon                     unit tier on every save
 Tool versions: `.config/tools.toml`. Toolchain: `rust-toolchain.toml`.
 Test deadlines: `.config/nextest.toml`.
 
+## Builds
+
+Every build xtask starts compiles through sccache: one cache for every
+worktree at `~/.cache/sccache` (50 GB). In CI each runner starts with
+an empty cache (a GitHub Actions cache gave no gain over rust-cache's
+target, #35). xtask refuses to build without it (`cargo xtask setup` installs it).
+Incremental compilation is off for xtask's builds, which sccache needs; a
+plain `cargo build` keeps it. A worktree's `target` lives under
+`~/.cache`, never the `/tmp` tmpfs. When its PR merges, empty it and keep
+the directory:
+`find <target dir> -mindepth 1 -maxdepth 1 -exec rm -rf {} +`.
+
 ## Rules
 
 - Main changes only by PR merge. The pre-push hook refuses a push to
