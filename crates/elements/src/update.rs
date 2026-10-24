@@ -8,7 +8,7 @@ use vapors_dom::NodeId;
 use crate::check::{check_tree, describe, elements, style_attribute_refusals};
 use crate::document::Document;
 use crate::error::ElementError;
-use crate::layout::{Calcs, build, lay_out};
+use crate::layout::{Calcs, build, lay_out, placed};
 use crate::paint::{PaintInput, paint};
 use crate::painted::Painted;
 use crate::style::Refusal;
@@ -47,7 +47,7 @@ impl Document {
         let boxes = build(&self.arena, used, root);
         let size = (viewport.width, viewport.height);
         let texts = (&mut self.fonts, &mut self.texts);
-        let (boxes, rects, laid_out) = lay_out(
+        let (boxes, laid_out) = lay_out(
             boxes,
             texts,
             (&self.boxes, &|node| kept.may_keep_layout(node)),
@@ -56,6 +56,12 @@ impl Document {
             &calcs,
         )
         .map_err(|failure| vec![ElementError::Layout(failure)])?;
+        let scrolls = |index: usize| match boxes[index].content {
+            crate::layout::Content::Element(node) => used[&node].scrolls(),
+            crate::layout::Content::Text(_) => false,
+        };
+        let offsets = self.scroll.settle(&boxes, &scrolls, viewport.scale);
+        let rects = placed(&boxes, &offsets);
         let mut input = PaintInput {
             used,
             root,
@@ -66,7 +72,8 @@ impl Document {
             scale: viewport.scale,
             clip: None,
         };
-        let painted = paint(&boxes, &rects, &mut input);
+        let mut painted = paint(&boxes, &rects, &mut input);
+        painted.scroll_chains = crate::scroll::Chains::of(&boxes, &scrolls);
         self.boxes.keep(boxes, viewport.scale);
         self.laid_out = laid_out;
         self.rehover_in(&painted);

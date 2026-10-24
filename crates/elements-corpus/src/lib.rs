@@ -58,6 +58,7 @@ fixtures![
     inline_text::InlineText,
     paint_boxes::PaintBoxes,
     positioned::Positioned,
+    scrolling::Scrolling,
     shell::Shell,
     sizing::Sizing,
     stacking::Stacking,

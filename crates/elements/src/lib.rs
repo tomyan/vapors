@@ -6,6 +6,7 @@
 
 mod arena;
 mod bidi;
+mod chain;
 mod check;
 mod clip;
 mod corners;
@@ -24,6 +25,8 @@ mod paint_order;
 mod painted;
 mod restyle;
 mod restyle_pass;
+mod scroll;
+mod scrolling;
 mod style;
 mod tags;
 mod tree;
