@@ -91,7 +91,7 @@ fn build_page(build: &Build) -> Result<String, String> {
             build.trunk_args().join(" "),
             crate_dir.display()
         )),
-        Finished::TimedOut => Err(format!(
+        Finished::TimedOut { .. } => Err(format!(
             "trunk did not finish within {}s",
             BUILD_DEADLINE.as_secs()
         )),

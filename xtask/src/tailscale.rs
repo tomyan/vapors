@@ -77,7 +77,7 @@ pub fn start_serving(tailscale: &Path, target: &Target<'_>) -> Result<(), String
         Finished::Exited { output, .. } => Err(format!(
             "`{line}` failed:\n{output}fix: run that command yourself (sudo may want a password), then the xtask command again"
         )),
-        Finished::TimedOut => Err(format!(
+        Finished::TimedOut { .. } => Err(format!(
             "`{line}` did not finish within {}s",
             TAILSCALE_DEADLINE.as_secs()
         )),
@@ -102,7 +102,7 @@ fn tailscale_status(tailscale: &Path) -> Result<String, String> {
         Finished::Exited { output, .. } => {
             Err(format!("`tailscale status --json` failed:\n{output}"))
         }
-        Finished::TimedOut => Err(format!(
+        Finished::TimedOut { .. } => Err(format!(
             "`tailscale status --json` did not finish within {}s",
             TAILSCALE_DEADLINE.as_secs()
         )),

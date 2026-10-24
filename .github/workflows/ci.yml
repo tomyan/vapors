@@ -9,6 +9,8 @@ on:
 
 permissions:
   contents: read
+  # Read-only: the timeout report reads its own job's steps.
+  actions: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -36,11 +38,12 @@ jobs:
       VAPORS_SYSTEM_FONTS: 1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Step timeout: about 2.5x its worst with the cache, 13 s in run
-      # 39932437148, rounded up to a minute. A miss from a slow mirror,
-      # as after a runner image update, fails here; rerun to fill the cache.
+      # Step timeout: about 2.5x the worst measured, rounded up to a minute.
+      # Over the last 40 runs (2026-10-23): a cache miss took 12 to 35 s
+      # (run 40031283392), a hit 13 s on average and 21 s at worst. One miss
+      # stalled on the mirror past the old 1-minute limit (run 40036716064).
       - name: install a CJK system font for the fallback test
-        timeout-minutes: 1
+        timeout-minutes: 2
         uses: ./.github/actions/apt-install
         with:
           packages: fonts-noto-cjk
@@ -53,6 +56,10 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
+        # binstall reads GitHub's API; unauthenticated, it was refused
+        # with 403 (run 40029521532). The token is read-only.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: cargo xtask setup --ci
       # Advisories, bans, licences and sources by deny.toml; it fetches the
       # advisory database every run and fails if it cannot.
@@ -71,6 +78,15 @@ jobs:
             target/cargo-timings/
             target/nextest/ci/junit.xml
           if-no-files-found: ignore
+      # GitHub shows a job that hit its timeout as "cancelled"; this
+      # names the timeout and the step that was running.
+      - name: report a timeout
+        if: cancelled()
+        timeout-minutes: 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TIMEOUT_MINUTES: 9
+        run: .github/scripts/report-timeout.sh
 
   web:
     name: web
@@ -86,6 +102,10 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
+        # binstall reads GitHub's API; unauthenticated, it was refused
+        # with 403 (run 40029521532). The token is read-only.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: cargo xtask setup --ci
       - name: build the web demo with trunk
         run: cargo xtask web
@@ -102,6 +122,15 @@ jobs:
         with:
           name: web
           path: target/web
+      # GitHub shows a job that hit its timeout as "cancelled"; this
+      # names the timeout and the step that was running.
+      - name: report a timeout
+        if: cancelled()
+        timeout-minutes: 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TIMEOUT_MINUTES: 3
+        run: .github/scripts/report-timeout.sh
 
   gpu:
     name: gpu
@@ -116,11 +145,11 @@ jobs:
       VAPORS_GPU_ADAPTER: llvmpipe
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Step timeout: about 2.5x its worst with the cache, 16 s in run
-      # 39930654120, rounded up to a minute. A miss from a slow mirror
-      # fails here; rerun to fill the cache.
+      # Step timeout: about 2.5x the worst measured, rounded up to a minute.
+      # Over the last 40 runs (2026-10-23): a cache miss took 10 to 11 s,
+      # a hit 14 s on average and 32 s at worst (run 40028433485).
       - name: install lavapipe
-        timeout-minutes: 1
+        timeout-minutes: 2
         uses: ./.github/actions/apt-install
         with:
           packages: mesa-vulkan-drivers vulkan-tools
@@ -135,6 +164,10 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
+        # binstall reads GitHub's API; unauthenticated, it was refused
+        # with 403 (run 40029521532). The token is read-only.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: cargo xtask setup --ci
       # The browser's first launch on a fresh runner took 15.3 to 57.9 s, past
       # the tests' 20 s screenshot deadline, which assumes a warm one; see
@@ -160,6 +193,15 @@ jobs:
             target/text_comparison*.png
             target/tmp/paint_*.png
           if-no-files-found: error
+      # GitHub shows a job that hit its timeout as "cancelled"; this
+      # names the timeout and the step that was running.
+      - name: report a timeout
+        if: cancelled()
+        timeout-minutes: 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TIMEOUT_MINUTES: 9
+        run: .github/scripts/report-timeout.sh
 
   window:
     name: window
@@ -173,11 +215,11 @@ jobs:
       VAPORS_GPU_ADAPTER: llvmpipe
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Step timeout: about 2.5x its worst with the cache, 13 s in run
-      # 39932437148, rounded up to a minute. A miss from a slow mirror
-      # fails here; rerun to fill the cache.
+      # Step timeout: about 2.5x the worst measured, rounded up to a minute.
+      # Over the last 40 runs (2026-10-23): a cache miss took 10 to 52 s
+      # (run 40030067596), a hit 15 s on average and 21 s at worst.
       - name: install lavapipe, Xvfb and winit's X11 libraries
-        timeout-minutes: 1
+        timeout-minutes: 3
         uses: ./.github/actions/apt-install
         with:
           packages: mesa-vulkan-drivers xvfb libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev
@@ -187,6 +229,10 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
+        # binstall reads GitHub's API; unauthenticated, it was refused
+        # with 403 (run 40029521532). The token is read-only.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: cargo xtask setup --ci
       - name: screenshot of the clear window
         run: cargo xtask screenshot clear_window target/clear_window.png --expect 12,200,34
@@ -212,3 +258,12 @@ jobs:
           name: screenshots
           path: target/*.png
           if-no-files-found: ignore
+      # GitHub shows a job that hit its timeout as "cancelled"; this
+      # names the timeout and the step that was running.
+      - name: report a timeout
+        if: cancelled()
+        timeout-minutes: 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TIMEOUT_MINUTES: 5
+        run: .github/scripts/report-timeout.sh

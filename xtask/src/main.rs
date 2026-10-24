@@ -15,10 +15,13 @@ mod files;
 mod files_walk;
 mod gate;
 mod gate_action;
+mod gate_expression;
 mod gate_plan;
+mod gate_report;
 mod gate_run;
 mod gate_step;
 mod gate_steps;
+mod gate_twin;
 mod gate_workflow;
 mod gate_yaml;
 mod gpu_info;
@@ -27,11 +30,16 @@ mod gpu_info;
 mod hook_tests;
 mod pixels;
 mod report;
+#[cfg(test)]
+#[path = "report_timeout_tests.rs"]
+mod report_timeout_tests;
 mod sccache;
 mod screenshot;
 mod screenshot_package;
 mod serve;
 mod setup;
+mod setup_install;
+mod stamp_page;
 mod step;
 mod steps;
 mod stop;
@@ -40,7 +48,9 @@ mod tailscale;
 mod tools;
 mod trunk;
 mod trunk_process;
+mod twin;
 mod web;
+mod web_version;
 mod xvfb;
 mod xvfb_display;
 
@@ -104,6 +114,9 @@ enum Command {
     },
     /// Serve target/web on the tailnet over https and print the URL.
     Serve,
+    /// trunk's post-build hook: version.json and `?v=<build>` on the
+    /// page's own files in trunk's staging directory.
+    StampPage,
     /// Rebuild the web package on save (trunk serve, debug) behind the tailnet https proxy.
     Dev {
         /// A key for the debug page, as `<provider>=<file>` (anthropic or
@@ -117,6 +130,11 @@ enum Command {
     Lint,
     /// Check dependencies with cargo-deny: advisories, bans, licences, sources.
     Deny,
+    /// Fail naming each file where ./xtask differs from <sibling>/xtask.
+    CheckXtaskTwin {
+        /// The sibling checkout, such as ../vapors.
+        sibling: PathBuf,
+    },
     /// Run one test tier (default: unit).
     Test {
         /// Which tier to run.
@@ -157,6 +175,8 @@ fn main() -> ExitCode {
         }
         Command::Web { debug } => return web::run(debug),
         Command::Serve => return serve::run(),
+        Command::StampPage => return stamp_page::run(),
+        Command::CheckXtaskTwin { sibling } => return twin::run(&sibling),
         Command::Dev { keys } => return dev::run(&reporter, &keys),
         Command::Ci => match web::web_package() {
             Ok(package) => return ci_with_hit_rate(&steps::ci(&package), &reporter),
