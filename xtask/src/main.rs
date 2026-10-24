@@ -15,7 +15,9 @@ mod files;
 mod files_walk;
 mod gate;
 mod gate_action;
+mod gate_expression;
 mod gate_plan;
+mod gate_report;
 mod gate_run;
 mod gate_step;
 mod gate_steps;
@@ -28,11 +30,15 @@ mod gpu_info;
 mod hook_tests;
 mod pixels;
 mod report;
+#[cfg(test)]
+#[path = "report_timeout_tests.rs"]
+mod report_timeout_tests;
 mod sccache;
 mod screenshot;
 mod screenshot_package;
 mod serve;
 mod setup;
+mod setup_install;
 mod stamp_page;
 mod step;
 mod steps;

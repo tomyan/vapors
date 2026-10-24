@@ -1,7 +1,9 @@
 //! Running a child process that must finish by a deadline.
 
+use std::collections::VecDeque;
 use std::io::Read;
 use std::process::{Command, Stdio};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -15,7 +17,10 @@ pub enum Finished {
         output: String,
     },
     /// It was killed at the deadline.
-    TimedOut,
+    TimedOut {
+        /// Its combined output up to the kill.
+        output: String,
+    },
 }
 
 const POLL: Duration = Duration::from_millis(50);
@@ -47,66 +52,110 @@ pub fn run_with_deadline(mut command: Command, deadline: Duration) -> Result<Fin
         if started.elapsed() >= deadline {
             let _ = child.kill();
             let _ = child.wait();
-            return Ok(Finished::TimedOut);
+            // Not joined: a grandchild may still hold the pipe open.
+            let output = snapshot(stdout.as_ref(), stderr.as_ref());
+            return Ok(Finished::TimedOut { output });
         }
         thread::sleep(POLL);
     }
 }
 
-fn read_in_background<R: Read + Send + 'static>(mut reader: R) -> thread::JoinHandle<String> {
-    thread::spawn(move || {
-        let mut text = String::new();
-        let _ = reader.read_to_string(&mut text);
-        text
-    })
+/// Each stream keeps its last 64 KiB: enough for any failure's tail
+/// (binstall's longest error is under 2 KiB), bounded for a chatty child.
+pub const KEPT_BYTES: usize = 64 * 1024;
+
+/// How long the readers may take after the child exits. Without a
+/// grandchild holding the pipe they finish within milliseconds.
+pub const JOIN_DEADLINE: Duration = Duration::from_secs(2);
+
+const DROPPED: &str = "[earlier output dropped; the last 64 KiB is kept]\n";
+const STILL_OPEN: &str = "\n[the output pipe was still held open by a child process after the exit; reading stopped after 2 s]\n";
+
+/// The last bytes read, and whether earlier ones were dropped.
+#[derive(Default)]
+struct Ring {
+    bytes: VecDeque<u8>,
+    dropped: bool,
 }
 
-fn join_outputs(
-    stdout: Option<thread::JoinHandle<String>>,
-    stderr: Option<thread::JoinHandle<String>>,
-) -> String {
+impl Ring {
+    fn push(&mut self, chunk: &[u8]) {
+        self.bytes.extend(chunk);
+        let excess = self.bytes.len().saturating_sub(KEPT_BYTES);
+        if excess > 0 {
+            self.bytes.drain(..excess);
+            self.dropped = true;
+        }
+    }
+
+    /// The text, decoded once so no character is split between reads; a
+    /// character the drop cut in half is left out.
+    fn text(&self) -> String {
+        let bytes: Vec<u8> = self.bytes.iter().copied().collect();
+        if !self.dropped {
+            return String::from_utf8_lossy(&bytes).into_owned();
+        }
+        let start = bytes
+            .iter()
+            .position(|b| b & 0xC0 != 0x80)
+            .unwrap_or(bytes.len());
+        format!("{DROPPED}{}", String::from_utf8_lossy(&bytes[start..]))
+    }
+}
+
+/// A reader thread and what it has read so far.
+struct Collected {
+    ring: Arc<Mutex<Ring>>,
+    thread: thread::JoinHandle<()>,
+}
+
+fn read_in_background<R: Read + Send + 'static>(mut reader: R) -> Collected {
+    let ring = Arc::new(Mutex::new(Ring::default()));
+    let sink = Arc::clone(&ring);
+    let thread = thread::spawn(move || {
+        let mut chunk = [0u8; 4096];
+        while let Ok(read) = reader.read(&mut chunk) {
+            if read == 0 {
+                break;
+            }
+            sink.lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push(&chunk[..read]);
+        }
+    });
+    Collected { ring, thread }
+}
+
+/// The child exited: wait for the readers, by [`JOIN_DEADLINE`], then
+/// take what they read, saying so when a pipe was still open.
+fn join_outputs(stdout: Option<Collected>, stderr: Option<Collected>) -> String {
+    let collected: Vec<Collected> = [stdout, stderr].into_iter().flatten().collect();
+    let started = Instant::now();
+    let finished = |all: &[Collected]| all.iter().all(|reader| reader.thread.is_finished());
+    while !finished(&collected) && started.elapsed() < JOIN_DEADLINE {
+        thread::sleep(POLL);
+    }
+    let mut text = snapshot(collected.first(), collected.get(1));
+    if !finished(&collected) {
+        text.push_str(STILL_OPEN);
+    }
+    text
+}
+
+fn snapshot(stdout: Option<&Collected>, stderr: Option<&Collected>) -> String {
     let mut text = String::new();
-    for handle in [stdout, stderr].into_iter().flatten() {
-        text.push_str(&handle.join().unwrap_or_default());
+    for reader in [stdout, stderr].into_iter().flatten() {
+        text.push_str(
+            &reader
+                .ring
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .text(),
+        );
     }
     text
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_quick_command_exits_with_its_output() {
-        // Given
-        let mut command = Command::new("sh");
-        command.args(["-c", "echo hello"]);
-
-        // When
-        let finished = run_with_deadline(command, Duration::from_secs(5)).expect("spawns");
-
-        // Then
-        match finished {
-            Finished::Exited { success, output } => {
-                assert!(success);
-                assert_eq!(output.trim(), "hello");
-            }
-            Finished::TimedOut => panic!("should not time out"),
-        }
-    }
-
-    #[test]
-    fn a_slow_command_is_killed_at_the_deadline() {
-        // Given
-        let mut command = Command::new("sh");
-        command.args(["-c", "sleep 10"]);
-
-        // When
-        let started = Instant::now();
-        let finished = run_with_deadline(command, Duration::from_millis(200)).expect("spawns");
-
-        // Then
-        assert!(matches!(finished, Finished::TimedOut));
-        assert!(started.elapsed() < Duration::from_secs(5));
-    }
-}
+#[path = "deadline_tests.rs"]
+mod tests;

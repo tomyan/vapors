@@ -35,6 +35,13 @@ jobs:
           who: world
       - name: lint
         run: cargo xtask lint && cargo xtask wasm
+      - name: report a timeout
+        if: cancelled()
+        timeout-minutes: 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TIMEOUT_MINUTES: 10
+        run: .github/scripts/report-timeout.sh
   gpu:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -47,6 +54,13 @@ jobs:
           EXTRA: "1"
       - uses: actions/upload-artifact@v7
         if: failure()
+      - name: report a timeout
+        if: cancelled()
+        timeout-minutes: 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TIMEOUT_MINUTES: 20
+        run: .github/scripts/report-timeout.sh
 "#;
 
 /// The composite action the workflow calls, at its path from the gate root.

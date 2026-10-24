@@ -96,7 +96,7 @@ fn run_example(
             Ok(())
         }
         Finished::Exited { output, .. } => Err(format!("`{}` failed:\n{output}", target.name)),
-        Finished::TimedOut => Err(format!(
+        Finished::TimedOut { .. } => Err(format!(
             "`{}` did not finish within {}s; it never wrote its screenshot",
             target.name,
             EXAMPLE_DEADLINE.as_secs()
