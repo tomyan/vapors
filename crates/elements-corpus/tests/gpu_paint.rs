@@ -38,6 +38,7 @@ fn ours(doc: &Document, scale: u32) -> Rgba {
         queue: &gpu.queue,
         view: &view,
         viewport: size,
+        scissor: None,
     };
     let painted = doc.painted().expect("painted");
     ScenePainter::new(&gpu.device, texture.format())

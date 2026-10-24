@@ -11,10 +11,12 @@
 //! can be reused, so a changed calc could compare equal to the old
 //! one. Such an element's box is lent nothing when its style holds a
 //! calc (`may_keep`); an element not restyled keeps the very styles the
-//! handles point into.
+//! handles point into. An absolute or fixed box is never lent: its
+//! containing block lies outside its subtree.
 
 use std::collections::HashMap;
 
+use taffy::Position;
 use vapors_dom::NodeId;
 
 use super::boxes::{Content, LayoutBox};
@@ -112,10 +114,20 @@ impl Lender<'_> {
                 .iter()
                 .zip(&children)
                 .all(|(o, n)| self.old[*o] == self.new[*n]);
-        let keepable = match boxes[at].content {
-            Content::Element(node) => (self.may_keep)(node),
-            Content::Text(_) => true,
-        };
+        // An absolute or fixed box is placed against a containing block
+        // outside its subtree, which may have changed, so it is laid
+        // out again, and with it every ancestor up to that block, which
+        // then hoists it afresh (Taffy calls add_hoisted_children only
+        // for a block it lays out).
+        let in_flow = !matches!(
+            boxes[at].style.position,
+            Position::Absolute | Position::Fixed
+        );
+        let keepable = in_flow
+            && match boxes[at].content {
+                Content::Element(node) => (self.may_keep)(node),
+                Content::Text(_) => true,
+            };
         if !(clean
             && same_children
             && keepable

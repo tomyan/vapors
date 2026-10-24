@@ -73,15 +73,37 @@ pub(crate) fn lay_out(
         };
         tree.boxes.len()
     ];
-    place(&tree.boxes, 0, (0.0, 0.0), &mut rects);
+    let containing = containing_blocks(&tree.boxes);
+    place(&tree.boxes, &containing, 0, (0.0, 0.0), &mut rects);
     match calcs.failure() {
         Some(failure) => Err(failure),
         None => Ok((tree.boxes, rects, tree.laid_out)),
     }
 }
 
-fn place(boxes: &[LayoutBox], index: usize, origin: (f32, f32), rects: &mut [BoxRect]) {
+/// Each out-of-flow box's containing block, by box index.
+pub(crate) fn containing_blocks(boxes: &[LayoutBox]) -> Vec<Option<usize>> {
+    let mut containing = vec![None; boxes.len()];
+    for (index, layout_box) in boxes.iter().enumerate() {
+        for &hoisted in &layout_box.hoisted {
+            containing[hoisted] = Some(index);
+        }
+    }
+    containing
+}
+
+/// Places `index` at `origin` (its parent's corner, or its containing
+/// block's when it is out of flow, which is placed first: an ancestor)
+/// and its children after it.
+fn place(
+    boxes: &[LayoutBox],
+    containing: &[Option<usize>],
+    index: usize,
+    origin: (f32, f32),
+    rects: &mut [BoxRect],
+) {
     let layout = &boxes[index].layout;
+    let origin = containing[index].map_or(origin, |block| (rects[block].x, rects[block].y));
     let (x, y) = (origin.0 + layout.location.x, origin.1 + layout.location.y);
     rects[index] = BoxRect {
         x,
@@ -90,6 +112,6 @@ fn place(boxes: &[LayoutBox], index: usize, origin: (f32, f32), rects: &mut [Box
         height: layout.size.height,
     };
     for &child in &boxes[index].children {
-        place(boxes, child, (x, y), rects);
+        place(boxes, containing, child, (x, y), rects);
     }
 }

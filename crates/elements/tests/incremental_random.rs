@@ -1,8 +1,9 @@
 //! A seeded randomized differential test of incremental updates (F2c
 //! S7 review). Each step makes one random change and updates; then the
 //! document forgets everything kept between updates and updates from
-//! scratch. Every element's border box, computed style and the painted
-//! display list must be the same both ways. CI runs `SEEDS` seeds; set
+//! scratch. Every element's border box, computed style, the painted
+//! display list with each item's clip, and what a grid of points hits
+//! must be the same both ways. CI runs `SEEDS` seeds; set
 //! `VAPORS_INCREMENTAL_SEEDS=<n>` to run more. A failure names the
 //! seed, the step and the change.
 
@@ -16,19 +17,25 @@ use support::viewport;
 use vapors_css::cascade::ComputedStyle;
 use vapors_dom::NodeId;
 use vapors_elements::{BoxRect, Document, Viewport};
-use vapors_scene::Item;
+use vapors_scene::{Item, Rect};
 
 const SEEDS: u64 = 6;
 const STEPS: usize = 40;
 
 /// What is compared: each element's border box and computed style, in
-/// tree order, and the display list with each text run as its text.
+/// tree order; the display list with each text run as its text, and
+/// each item's clip; and the element hit at every `GRID` CSS px.
 #[derive(Debug, PartialEq)]
 struct Snapshot {
     boxes: Vec<(NodeId, Option<BoxRect>)>,
     styles: Vec<Option<ComputedStyle>>,
     items: Vec<String>,
+    clips: Vec<Option<Rect>>,
+    hits: Vec<Option<NodeId>>,
 }
+
+/// The spacing of the hit grid, CSS px.
+const GRID: usize = 10;
 
 /// The settled frame: an update can move content under the pointer,
 /// which it notices after painting (it sets the hover flags and asks
@@ -68,6 +75,8 @@ fn settled(doc: &mut Document, viewport: Viewport) -> Snapshot {
             other => format!("{other:?}"),
         })
         .collect();
+    let clips = painted.scene().clips().to_vec();
+    let hits = grid(viewport).map(|point| painted.hit(point)).collect();
     let styles = nodes
         .iter()
         .map(|n| doc.computed_style(*n).cloned())
@@ -76,7 +85,22 @@ fn settled(doc: &mut Document, viewport: Viewport) -> Snapshot {
         boxes,
         styles,
         items,
+        clips,
+        hits,
     }
+}
+
+/// Points `GRID` CSS px apart over `viewport`.
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)] // viewports are small and whole
+fn grid(viewport: Viewport) -> impl Iterator<Item = [f32; 2]> {
+    let (width, height) = (viewport.width as usize, viewport.height as usize);
+    (0..height)
+        .step_by(GRID)
+        .flat_map(move |y| (0..width).step_by(GRID).map(move |x| [x as f32, y as f32]))
 }
 
 fn run(seed: u64) {

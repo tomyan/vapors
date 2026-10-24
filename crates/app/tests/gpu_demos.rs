@@ -40,6 +40,7 @@ fn render(name: &str, spec: &Spec) -> Vec<u8> {
         queue: &gpu.queue,
         view: &view,
         viewport: size,
+        scissor: None,
     };
     ScenePainter::new(&gpu.device, texture.format())
         .draw(&target, painted)

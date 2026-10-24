@@ -7,6 +7,7 @@
 mod arena;
 mod bidi;
 mod check;
+mod clip;
 mod corners;
 mod css_element;
 mod document;
@@ -19,6 +20,7 @@ mod layout;
 mod node;
 mod paint;
 mod paint_inline;
+mod paint_order;
 mod painted;
 mod restyle;
 mod restyle_pass;

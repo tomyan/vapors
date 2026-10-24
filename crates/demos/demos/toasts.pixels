@@ -1,0 +1,25 @@
+# Toasts after Save, Export and Save, at 640x400 CSS px at 1x. The
+# stack sits 16 px from the bottom right, 260 px wide; toasts are 44 px
+# tall with 8 px between, filling y 236..280, 288..332 and 340..384,
+# x 364..624, over the canvas region. Dismissing is checked in
+# crates/demos/tests/toasts.rs: these clicks are all hit against the
+# frame before them, so none can reach a toast another click raised.
+click 530 21
+click 598 21
+click 530 21
+pixel 4 60 #2b2b2b          canvas region, left of the stack
+pixel 380 220 #2b2b2b       canvas region, above the stack
+pixel 380 258 #f1f3f5       the first toast, over the canvas
+pixel 380 302 #f1f3f5       the second
+pixel 380 362 #f1f3f5       the third
+pixel 366 362 #2e7d32       a toast's left border
+ink 380 345 520 380 #f1f3f5 the third toast's message is drawn
+
+# A phone: the bar's buttons end 8 px from the right as before (Save
+# about x 253..308, Export 316..382); the stack is x 114..374, its one
+# toast y 740..784.
+at 390x800
+click 280 21
+pixel 130 762 #f1f3f5       the toast, over the canvas
+pixel 116 762 #2e7d32       its left border
+pixel 130 720 #2b2b2b       canvas above it

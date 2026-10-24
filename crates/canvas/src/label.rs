@@ -98,6 +98,7 @@ impl LabelDraw {
             queue: frame.queue,
             view: &view,
             viewport,
+            scissor: None,
         };
         self.atlas.begin_frame();
         if let Err(error) = self.text.draw(

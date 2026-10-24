@@ -138,6 +138,14 @@ pub fn all() -> Vec<Demo> {
             },
         },
         Demo {
+            name: "toasts",
+            pixels: Some(include_str!("../demos/toasts.pixels")),
+            mount: |dom, parent| {
+                std::mem::forget(toasts::Toasts::mount(dom, parent, toasts::ToastsProps {}));
+                None
+            },
+        },
+        Demo {
             name: INDEX,
             pixels: None,
             mount: |dom, parent| {

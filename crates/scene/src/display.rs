@@ -117,10 +117,13 @@ pub enum Item {
     },
 }
 
-/// Items in painting order: later items draw over earlier ones.
+/// Items in painting order: later items draw over earlier ones, each
+/// with the clip that was set when it was pushed.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Scene {
     items: Vec<Item>,
+    clips: Vec<Option<Rect>>,
+    clip: Option<Rect>,
 }
 
 impl Scene {
@@ -130,9 +133,17 @@ impl Scene {
         Self::default()
     }
 
-    /// Appends `item`, over everything before it.
+    /// Appends `item`, over everything before it, under the current
+    /// clip.
     pub fn push(&mut self, item: Item) {
         self.items.push(item);
+        self.clips.push(self.clip);
+    }
+
+    /// Clips the items pushed from now on to `clip` (device pixels), or
+    /// lifts the clip with `None`.
+    pub fn set_clip(&mut self, clip: Option<Rect>) {
+        self.clip = clip;
     }
 
     /// The items, first drawn first.
@@ -141,67 +152,9 @@ impl Scene {
         &self.items
     }
 
-    /// Runs of consecutive items of one kind, in order: what a painter
-    /// draws with one pipeline before switching to the next.
+    /// Each item's clip, in the order of [`Scene::items`].
     #[must_use]
-    pub fn batches(&self) -> Vec<Batch<'_>> {
-        let mut batches: Vec<Batch<'_>> = Vec::new();
-        let mut start = 0;
-        for end in 1..=self.items.len() {
-            if end == self.items.len() || kind(&self.items[end]) != kind(&self.items[start]) {
-                batches.push(Batch::of(&self.items[start..end]));
-                start = end;
-            }
-        }
-        batches
+    pub fn clips(&self) -> &[Option<Rect>] {
+        &self.clips
     }
 }
-
-/// A run of items one pipeline draws.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Batch<'a> {
-    /// Consecutive shadows.
-    Shadows(Vec<Shadow>),
-    /// Consecutive quads.
-    Quads(Vec<Quad>),
-    /// Consecutive text runs.
-    Texts(&'a [Item]),
-}
-
-impl<'a> Batch<'a> {
-    fn of(items: &'a [Item]) -> Self {
-        match items[0] {
-            Item::Shadow(_) => Batch::Shadows(
-                items
-                    .iter()
-                    .filter_map(|item| match item {
-                        Item::Shadow(shadow) => Some(*shadow),
-                        _ => None,
-                    })
-                    .collect(),
-            ),
-            Item::Quad(_) => Batch::Quads(
-                items
-                    .iter()
-                    .filter_map(|item| match item {
-                        Item::Quad(quad) => Some(*quad),
-                        _ => None,
-                    })
-                    .collect(),
-            ),
-            Item::Text { .. } => Batch::Texts(items),
-        }
-    }
-}
-
-fn kind(item: &Item) -> u8 {
-    match item {
-        Item::Shadow(_) => 0,
-        Item::Quad(_) => 1,
-        Item::Text { .. } => 2,
-    }
-}
-
-#[cfg(test)]
-#[path = "display_tests.rs"]
-mod tests;

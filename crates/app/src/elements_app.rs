@@ -122,6 +122,7 @@ impl ElementsApp {
             queue: frame.queue,
             view: &view,
             viewport: size,
+            scissor: None,
         };
         let scene_painter = self
             .painter

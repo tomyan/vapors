@@ -15,14 +15,11 @@ use super::values::{Refusal, Styles, later};
 pub(crate) enum Treatment {
     /// Read by layout, text or paint (`box_style`, `text_style`, `paint`).
     Read,
-    /// Has no effect while another property is at a value this slice
-    /// requires; the reason names it.
-    Inert(&'static str),
     /// Not implemented; arrives in the named slice.
     Deferred(&'static str),
 }
 
-use Treatment::{Deferred, Inert, Read};
+use Treatment::{Deferred, Read};
 
 /// Every longhand, sorted by name, with its treatment.
 pub(crate) const TABLE: &[(&str, Treatment)] = &[
@@ -55,10 +52,7 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ("border-top-right-radius", Read),
     ("border-top-style", Read),
     ("border-top-width", Read),
-    (
-        "bottom",
-        Inert("has no effect while position is static, which F2c S1 requires"),
-    ),
+    ("bottom", Read),
     ("box-shadow", Read),
     ("box-sizing", Read),
     ("color", Read),
@@ -98,10 +92,7 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ("justify-content", Read),
     ("justify-items", Read),
     ("justify-self", Read),
-    (
-        "left",
-        Inert("has no effect while position is static, which F2c S1 requires"),
-    ),
+    ("left", Read),
     ("letter-spacing", Read),
     ("line-height", Read),
     ("margin-bottom", Read),
@@ -113,25 +104,19 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ("min-height", Read),
     ("min-width", Read),
     ("opacity", Deferred("F3")),
-    ("overflow-x", Deferred("F2c S8")),
-    ("overflow-y", Deferred("F2c S8")),
+    ("overflow-x", Read),
+    ("overflow-y", Read),
     ("padding-bottom", Read),
     ("padding-left", Read),
     ("padding-right", Read),
     ("padding-top", Read),
     ("pointer-events", Read),
-    ("position", Deferred("F2c S8")),
-    (
-        "right",
-        Inert("has no effect while position is static, which F2c S1 requires"),
-    ),
+    ("position", Read),
+    ("right", Read),
     ("row-gap", Read),
     ("text-align", Read),
     ("text-decoration", Deferred("a slice after F2c")),
-    (
-        "top",
-        Inert("has no effect while position is static, which F2c S1 requires"),
-    ),
+    ("top", Read),
     ("transform", Deferred("a slice after F2c")),
     ("transition-delay", Deferred("a slice after F2c")),
     ("transition-duration", Deferred("a slice after F2c")),
@@ -141,7 +126,7 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ("visibility", Read),
     ("white-space", Read),
     ("width", Read),
-    ("z-index", Deferred("F2c S8")),
+    ("z-index", Read),
 ];
 
 /// The deferred properties of `styles.own` that are not at their
@@ -152,7 +137,7 @@ pub(crate) fn check_honoured(styles: Styles<'_>, initial: &ComputedStyle) -> Vec
         .iter()
         .filter_map(|(name, treatment)| match treatment {
             Deferred(slice) => deferred_in_use(styles, initial, name, slice),
-            Read | Inert(_) => None,
+            Read => None,
         })
         .collect()
 }

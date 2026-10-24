@@ -774,6 +774,84 @@ differs from the plan.
   - `gpu_stress.rs` checks that the counter's ink changes between two
     frames.
 
+### S8
+
+- **Position** (`style/position.rs`): `relative`, `absolute` and
+  `fixed`, with `top`, `right`, `bottom` and `left` in px and %, as
+  Taffy 0.15 takes them.
+  - Taffy places an out-of-flow box against the box that hoists it.
+    `LayoutBox.hoisted` records that box, and `place` takes its corner
+    as the origin. A fixed box is hoisted to the root, which spans the
+    viewport.
+  - `sticky` is refused, naming S9. A non-static position on an inline
+    element is refused: it has no box of its own.
+  - An out-of-flow box never keeps its Taffy cache between updates
+    (`keep.rs`). Seed 3 of the randomized test found the bug that
+    keeping it caused.
+- **Paint order** (`paint_order.rs`): CSS 2 Appendix E, reduced. Each
+  stacking context paints, in this order:
+  1. its root;
+  2. its negative z-index layers;
+  3. its in-flow descendants in tree order;
+  4. its z-index auto and 0 layers in tree order;
+  5. its positive layers.
+
+  The layers are sorted with a stable sort. Hit testing reads the
+  painted order backwards.
+  - A positioned box with z-index auto paints whole in place, and its
+    positioned descendants join the enclosing context. A box with a
+    z-index roots a context, and so does every fixed box.
+  - z-index applies to positioned boxes and to flex and grid items. On
+    any other static box it is ignored, as in CSS.
+  - One difference from CSS: within the in-flow descendants each box
+    paints its background and then its children, where CSS paints every
+    background before any text.
+- **Clips** (`clip.rs`, `style/overflow.rs`): `overflow: hidden` and
+  `clip` cut descendants off at the padding box.
+  - A box takes the clip of its containing block's content: its
+    parent's when in flow, its hoisting box's when absolute, none when
+    fixed.
+  - The root never clips. The body clips only when the root's overflow
+    is not `visible`; otherwise the body's overflow belongs to the
+    viewport (CSS Overflow 3 section 3.3). touche's shell sets
+    `overflow: hidden` on `body`.
+  - Hits are cut to the clip.
+  - Refused: `scroll` and `auto` (S9); axes that differ; a clip with a
+    `border-radius`; overflow on an inline element.
+- **Clips in the renderer.** The scene keeps each item's clip, and a
+  batch ends where the clip changes. `Rect::scissor` rounds the clip to
+  whole pixels inside the target. `Target` and `RenderTarget` gain
+  `scissor`, which the quad, shadow and text pipelines set on their
+  pass. The painter intersects each batch's scissor with the target's
+  own, and skips a batch clipped to nothing.
+- **Checked against Chromium.** These paint fixtures are compared at 1x
+  and 2x:
+  - `positioned` (boxes only);
+  - `stacking`: z-index against tree order, negative z under in-flow
+    boxes, a z-auto box lending its child, a context holding its child
+    below a later sibling;
+  - `clipping`: a wide child, a shadow, nested clips, absolute children
+    placed inside and outside the clip, a bordered clip.
+
+  Text is not in `clipping`: glyph edges differ from Chromium's by more
+  than the paint rules allow. `gpu_text` checks text under a scissor
+  instead. The paint harness takes whole scales only (its scale is a
+  `u32`, and Chromium is shot at that device scale factor), so no
+  fixture is compared at a fractional scale such as 1.5; snapping
+  there is unchecked against Chromium.
+- **Demo.** `toasts`: Save and Export raise toasts into a fixed stack
+  (z-index 10) at the bottom right, over the canvas region and above
+  the bar (relative, z-index 1, with a shadow). Each toast stays until
+  its Dismiss button is pressed.
+  - `toasts.pixels` raises three toasts at 640x400 and one at 390x800,
+    and checks the toast fill over the canvas.
+  - Dismissal is checked in `crates/demos/tests/toasts.rs`, which
+    updates the document after every click.
+  - A `.pixels` file cannot check dismissal. Its clicks are all made
+    before the next frame, and a click is hit against the last painted
+    frame, so a click cannot reach a toast that an earlier click in the
+    same file raised. This is the same frame-later behaviour as D7.
+
 ## Decisions (2026-10-23)
 
 - **D1 Scoping.** A compiler change in S5: `mount` registers its
@@ -808,3 +886,11 @@ differs from the plan.
   re-hovers after layout. The randomized differential test compares
   settled frames, updating until no change is pending, and fails if
   that takes more than three updates.
+- **D8 Clicks in a `.pixels` file stay back to back (2026-10-24).**
+  The format gains no way to wait for a frame between clicks. A check
+  that needs one, such as dismissing a toast that an earlier click
+  raised, is a Rust test that updates the document after each click
+  (`crates/demos/tests/toasts.rs`).
+- **D9 Text clipping is checked in `gpu_text` (2026-10-24).** Glyph
+  edges differ from Chromium's by more than the paint fixtures' rules
+  allow, so the `clipping` fixture has no text; its comment says so.

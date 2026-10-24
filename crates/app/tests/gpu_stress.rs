@@ -30,6 +30,7 @@ fn painted_tick(shown: &vapors_demos::Shown) -> Vec<u8> {
             width: 640,
             height: 400,
         },
+        scissor: None,
     };
     ScenePainter::new(&gpu.device, texture.format())
         .draw(&target, painted)

@@ -4,7 +4,7 @@
 //! size is a uniform. Alpha blends over what the target holds, in
 //! instance order, in one draw and one submit.
 
-use vapors_scene::Size;
+use vapors_scene::{Scissor, Size};
 
 use crate::quads_setup::{bind_group_layout, load_pass, render_pipeline, uniform};
 
@@ -20,6 +20,8 @@ pub struct Target<'a> {
     pub view: &'a wgpu::TextureView,
     /// Size of the view in pixels.
     pub viewport: Size,
+    /// Where drawing may change pixels; `None` for the whole view.
+    pub scissor: Option<Scissor>,
 }
 
 pub(crate) struct Instanced {
@@ -104,6 +106,9 @@ impl Instanced {
             });
         {
             let mut pass = load_pass(&mut encoder, target.view);
+            if let Some(s) = target.scissor {
+                pass.set_scissor_rect(s.x, s.y, s.width, s.height);
+            }
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &bind_group, &[]);
             pass.set_vertex_buffer(0, self.instances.slice(..));

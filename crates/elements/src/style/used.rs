@@ -27,6 +27,9 @@ pub(crate) struct Used {
     pub(crate) takes_pointer: bool,
     /// `display: inline`: its text joins its parent's inline run.
     pub(crate) inline: bool,
+    /// `z-index` where it applies (a positioned box, or a flex or grid
+    /// item), `None` for auto and where it does not.
+    pub(crate) z_index: Option<i32>,
 }
 
 /// What a used style depends on besides the element's computed styles.
@@ -54,7 +57,9 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
     } else if context.in_inline && layout.display != taffy::Display::None {
         reader.refuse("display", inline::BLOCK_IN_INLINE.to_owned());
     }
+    super::overflow::refuse_rounded_clip(&mut reader, &layout, &decoration);
     let result = Used {
+        z_index: applied_z_index(&mut reader, &layout, context.flex_item),
         layout,
         inline,
         text,
@@ -70,5 +75,30 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
         Ok(result)
     } else {
         Err(refusals)
+    }
+}
+
+impl Used {
+    /// `overflow` is `hidden` or `clip`: descendants are cut off at the
+    /// padding box.
+    pub(crate) fn clips(&self) -> bool {
+        self.layout.overflow.x != taffy::Overflow::Visible
+    }
+}
+
+/// CSS 2 9.9.1 gives `z-index` to positioned boxes; CSS Flexbox 4.3
+/// and Grid 9 give it to their items too, positioned or not.
+fn applied_z_index(reader: &mut Reader<'_>, layout: &taffy::Style, item: bool) -> Option<i32> {
+    let z = reader.read("z-index", z_index, None);
+    z.filter(|_| item || layout.position != taffy::Position::Static)
+}
+
+fn z_index(value: &vapors_css::value::Value) -> Result<Option<i32>, String> {
+    match value {
+        vapors_css::value::Value::Keyword(k) if k == "auto" => Ok(None),
+        vapors_css::value::Value::Integer(n) => i32::try_from(*n)
+            .map(Some)
+            .map_err(|_| "is outside the range of a 32-bit integer".to_owned()),
+        _ => Err(super::values::shape("`auto` or an integer")),
     }
 }

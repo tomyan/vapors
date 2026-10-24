@@ -2,7 +2,7 @@
 //! quarter-pixel x step with the baseline snapped to a whole pixel, and
 //! becomes one quad; the atlas page is uploaded when it changed.
 
-use vapors_scene::Size;
+use vapors_scene::{Scissor, Size};
 
 use crate::atlas::{AtlasError, GlyphAtlas};
 use crate::layout::Layout;
@@ -20,6 +20,8 @@ pub struct RenderTarget<'a> {
     pub view: &'a wgpu::TextureView,
     /// Size of the view in pixels.
     pub viewport: Size,
+    /// Where drawing may change pixels; `None` for the whole view.
+    pub scissor: Option<Scissor>,
 }
 
 impl TextPipeline {
@@ -109,6 +111,9 @@ impl TextPipeline {
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
+            if let Some(s) = target.scissor {
+                pass.set_scissor_rect(s.x, s.y, s.width, s.height);
+            }
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &bind_group, &[]);
             pass.set_vertex_buffer(0, vertices.slice(..));

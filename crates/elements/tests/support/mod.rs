@@ -5,6 +5,7 @@
 
 pub mod changes;
 pub mod pointer;
+pub mod random_css;
 pub mod tree;
 
 use vapors_dom::{Dom, NodeId};
