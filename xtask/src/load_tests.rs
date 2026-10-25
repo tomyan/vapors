@@ -12,8 +12,10 @@ fn the_one_minute_load_is_read_from_proc_loadavg() {
 
 #[test]
 fn text_of_another_shape_is_refused_quoting_it() {
-    let refusal = parse("busy\n").expect_err("refused");
-    assert!(refusal.contains("busy"), "{refusal}");
+    for text in ["busy\n", "nan 1 1 1/1 1\n", "inf 1 1 1/1 1\n"] {
+        let refusal = parse(text).expect_err(text);
+        assert!(refusal.contains(text.trim()), "{refusal}");
+    }
 }
 
 #[test]

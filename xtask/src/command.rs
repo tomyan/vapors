@@ -59,9 +59,13 @@ fn spawn(step: &Step) -> Result<Child, String> {
     if let Some(dir) = &step.dir {
         command.current_dir(dir);
     }
-    command
-        .spawn()
-        .map_err(|error| format!("could not start `{}`: {error}", step.program))
+    command.spawn().map_err(|error| {
+        let started = command.get_program().to_string_lossy();
+        format!(
+            "could not start `{started}` for `{}`: {error}",
+            step.program
+        )
+    })
 }
 
 fn finish(mut child: Child, deadline: Option<Duration>) -> (bool, String) {

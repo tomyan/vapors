@@ -11,7 +11,7 @@ pub fn now() -> Result<String, String> {
 /// The first field of `/proc/loadavg`'s text, a decimal number.
 pub fn parse(text: &str) -> Result<String, String> {
     let first = text.split_whitespace().next().unwrap_or_default();
-    if first.parse::<f64>().is_ok() {
+    if first.parse::<f64>().is_ok_and(f64::is_finite) {
         return Ok(first.to_owned());
     }
     Err(format!(

@@ -57,3 +57,11 @@ fn a_released_lock_is_taken_by_the_next_gate() {
     // Then
     assert!(second.is_ok());
 }
+
+#[test]
+fn a_home_that_is_empty_or_relative_is_refused() {
+    for home in ["", "relative/home"] {
+        let refusal = dir_in(Some(home.into())).expect_err(home);
+        assert!(refusal.contains("HOME"), "{refusal}");
+    }
+}
