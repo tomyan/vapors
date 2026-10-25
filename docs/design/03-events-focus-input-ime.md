@@ -114,9 +114,11 @@ user-agent behaviour and an implicit ARIA role (area 5).
 ## Text editing and IME
 
 One editing model for single- and multi-line fields, built on Parley's
-editor (its `PlainEditor` drives cursor movement by grapheme, word and
-line, selection, and IME preedit; vapors adds undo, the clipboard and
-the DOM events). Rules:
+editor (`PlainEditor` and `PlainEditorDriver`, parley 0.12: movement
+and selection by cluster, word, soft line and hard line, insert and
+delete, `set_compose`/`finish_compose` for IME preedit; one style for
+the whole text, which suits a plain-text Composer). vapors adds undo,
+the clipboard, caret painting and the DOM events. Rules:
 
 - Caret and selection are painted by the elements layer in `accent`
   and the selection colour, snapped to device pixels; the caret blinks

@@ -53,12 +53,14 @@ scenario tier against every touché page.
 | Windows | AccessKit UI Automation | Through `accesskit_winit`, which owns the window handle integration |
 | macOS | AccessKit NSAccessibility | The same |
 | Linux | AccessKit AT-SPI | The same; the sign-off reader is Orca |
-| Web | A DOM mirror: a hidden, focusable subtree beside the canvas, one element per a11y node with `role`, `aria-*`, `tabindex` and text, kept in step by the same `TreeUpdate` diff | AccessKit has no web adapter. The mirror is what browsers expose to the platform's reader (TalkBack, VoiceOver, NVDA through the browser). The mirror's elements receive real focus, so a reader's Tab moves the mirror's focus and vapors moves the element tree's focus to match, and back. Bounds are set by `style` so a reader's highlight lands on the canvas pixels |
-| Android native | AccessKit Android, when a native build is scheduled | Not scheduled |
+| Web | A DOM mirror: a hidden, focusable subtree beside the canvas, one element per a11y node with `role`, `aria-*`, `tabindex` and text, kept in step by the same `TreeUpdate` diff | AccessKit lists a web adapter as planned, not available (checked 2026-10-25). The mirror is what browsers expose to the platform's reader (TalkBack, VoiceOver, NVDA through the browser). The mirror's elements receive real focus, so a reader's Tab moves the mirror's focus and vapors moves the element tree's focus to match, and back. Bounds are set by `style` so a reader's highlight lands on the canvas pixels. If AccessKit's web adapter ships first, it replaces the mirror behind the same diff |
+| Android and iOS native | `accesskit_android` and `accesskit_ios`, both available | Not scheduled; touché DESIGN.md's note that AccessKit had no iOS adapter is out of date |
 
 Why AccessKit: it is the one Rust abstraction with maintained adapters
-for the three desktop platforms, used by egui, Bevy, Slint, Xilem and
-Zed's GPUI (macOS). Its tree model (nodes with a role, properties and
+for the three desktop platforms and both phone platforms, used by egui,
+Bevy, Slint, Xilem and Zed's GPUI (macOS). Its own page says the
+adapters do not yet cover rich text or hypertext, or every role and
+property; the mapping table below stays inside what they do. Its tree model (nodes with a role, properties and
 children; incremental updates; actions back) is close to a browser's
 accessibility tree, so the mapping from HTML semantics is a table, not
 a translation. Its text model (`TextSelection`, inline text boxes with

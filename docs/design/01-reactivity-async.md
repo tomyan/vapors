@@ -45,11 +45,13 @@ thumb follows the finger in the same frame, and the readout that
 derives from the engine's render changes when the render lands. Two
 values that must change together derive from one async result.
 
-Svelte's rule is wider: when state read by an `await` changes, every
-update is held until the async work settles, synchronous ones included,
-so a label and the number it describes cannot disagree. SolidJS 2.0's
-transitions have the same effect. Leptos's `Transition` holds only the
-Suspense subtree. vapors takes the narrow rule because touché is an
+Svelte's rule (experimental `await`, 5.36+) is wider: when state read
+by an `await` changes, every reader of that state is held until the
+async work settles, synchronous readers included, so a label and the
+number it describes cannot disagree; updates to unrelated state are not
+held, and a later fast update may show while an earlier slow one is
+still running. SolidJS 2.0's transitions have the same effect. Leptos's
+`Transition` holds only the Suspense subtree. vapors takes the narrow rule because touché is an
 editor: a control under the finger must move at once, and a frame that
 holds the thumb until the GPU renders is the worse inconsistency. The
 cost is that consistency between a synchronous and an asynchronous
@@ -173,6 +175,13 @@ nodes belong to the owner that renders it.
 - **Multi-threaded signals.** Leptos's `reactive_graph` has `Send`
   variants with locks; vapors does not and will not. Off-thread work
   takes owned data in and sends owned data out.
+- **Svelte's `fork()`** (5.42+), which starts expected async work early
+  and later commits or discards it, for preloading on hover. Area 8's
+  query cache gives a `prefetch` for the one use touché has (a route's
+  load); a general fork of the graph is not taken.
+- **Svelte's waterfall warning** (`await_waterfall`, for sequential
+  awaits that could run in parallel) is worth copying as a compiler
+  lint once R4 exists; listed here so it is not forgotten, not designed.
 
 ## Interaction with other areas
 
