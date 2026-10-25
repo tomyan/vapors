@@ -30,6 +30,8 @@ pub(crate) struct Used {
     /// `z-index` where it applies (a positioned box, or a flex or grid
     /// item), `None` for auto and where it does not.
     pub(crate) z_index: Option<i32>,
+    /// How its thumb is drawn, when it scrolls.
+    pub(crate) scrollbar: super::Scrollbar,
 }
 
 /// What a used style depends on besides the element's computed styles.
@@ -64,6 +66,7 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
     super::overflow::refuse_viewport_scroll(&mut reader, &layout, context.to_viewport);
     let result = Used {
         z_index: applied_z_index(&mut reader, &layout, context.flex_item),
+        scrollbar: super::scrollbar::scrollbar(&mut reader),
         layout,
         inline,
         text,

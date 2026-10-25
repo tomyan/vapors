@@ -29,6 +29,7 @@ mod scroll;
 mod scrolling;
 mod style;
 mod tags;
+mod thumb;
 mod tree;
 mod update;
 

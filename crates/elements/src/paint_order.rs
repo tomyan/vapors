@@ -9,6 +9,11 @@
 //! positioned box with a z-index, and every fixed box, roots its own
 //! context. Hit testing reads the same order backwards.
 //!
+//! A scroll container's thumb (F2c S9) paints after its in-flow
+//! content, or, when it roots a stacking context, after the whole
+//! context. A positioned descendant that belongs to an enclosing
+//! context paints later and can cover the thumb.
+//!
 //! Within the in-flow descendants each box paints its own background
 //! and then its children, where CSS paints every background before any
 //! text: the two differ only where a later box's background overlaps
@@ -25,6 +30,17 @@ pub(crate) struct Stacking {
     pub(crate) z: Option<i32>,
     /// `position: fixed`.
     pub(crate) fixed: bool,
+    /// A scroll container, which paints a thumb.
+    pub(crate) scrolls: bool,
+}
+
+/// One step of painting.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Step {
+    /// A box's own painting.
+    Box(usize),
+    /// A scroll container's thumb.
+    Thumb(usize),
 }
 
 impl Stacking {
@@ -33,8 +49,9 @@ impl Stacking {
     }
 }
 
-/// The boxes, box 0 the root, in paint order.
-pub(crate) fn paint_order(boxes: &[LayoutBox], stacking: &dyn Fn(usize) -> Stacking) -> Vec<usize> {
+/// The boxes, box 0 the root, in paint order, with each scroll
+/// container's thumb.
+pub(crate) fn paint_steps(boxes: &[LayoutBox], stacking: &dyn Fn(usize) -> Stacking) -> Vec<Step> {
     let mut walk = Walk {
         boxes,
         stacking,
@@ -47,7 +64,7 @@ pub(crate) fn paint_order(boxes: &[LayoutBox], stacking: &dyn Fn(usize) -> Stack
 struct Walk<'a> {
     boxes: &'a [LayoutBox],
     stacking: &'a dyn Fn(usize) -> Stacking,
-    out: Vec<usize>,
+    out: Vec<Step>,
 }
 
 impl Walk<'_> {
@@ -57,7 +74,7 @@ impl Walk<'_> {
 
     /// A stacking context rooted at `root`.
     fn context(&mut self, root: usize) {
-        self.out.push(root);
+        self.out.push(Step::Box(root));
         let layers = self.layers(root);
         let negative = layers.partition_point(|&layer| self.z(layer) < 0);
         for &layer in &layers[..negative] {
@@ -69,6 +86,7 @@ impl Walk<'_> {
         for &layer in &layers[negative..] {
             self.layer(layer);
         }
+        self.thumb(root);
     }
 
     /// The positioned boxes of the context rooted at `root`, by z-index;
@@ -107,10 +125,7 @@ impl Walk<'_> {
         if (self.stacking)(index).positioned {
             return;
         }
-        self.out.push(index);
-        for child in self.children(index) {
-            self.flow(child);
-        }
+        self.whole(index);
     }
 
     /// A positioned box: its own context, or painted whole in place.
@@ -118,9 +133,21 @@ impl Walk<'_> {
         if (self.stacking)(index).roots_context() {
             return self.context(index);
         }
-        self.out.push(index);
+        self.whole(index);
+    }
+
+    /// `index`, its in-flow descendants, then its thumb if it scrolls.
+    fn whole(&mut self, index: usize) {
+        self.out.push(Step::Box(index));
         for child in self.children(index) {
             self.flow(child);
+        }
+        self.thumb(index);
+    }
+
+    fn thumb(&mut self, index: usize) {
+        if (self.stacking)(index).scrolls {
+            self.out.push(Step::Thumb(index));
         }
     }
 }

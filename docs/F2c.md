@@ -894,3 +894,16 @@ differs from the plan.
 - **D9 Text clipping is checked in `gpu_text` (2026-10-24).** Glyph
   edges differ from Chromium's by more than the paint fixtures' rules
   allow, so the `clipping` fixture has no text; its comment says so.
+- **D10 Overlay scroll thumbs everywhere (2026-10-25).** A scroll
+  container draws only a thumb, over its content at the far edge of
+  its padding box, taking no layout space, on desktop and phone alike.
+  This matches the Chromium oracle, which runs with
+  `--hide-scrollbars`, but not desktop Chromium's 15 px classic gutter.
+  An app styles the thumb with standard CSS, from its own tokens:
+  `scrollbar-color: <thumb> transparent` (a track colour is refused:
+  there is no track) and `scrollbar-width: auto | thin | none` (8, 4
+  and 0 CSS px). touche's Scroll region pattern is
+  `scrollbar-color: var(--line-strong) transparent; scrollbar-width:
+  thin`. Once a finger has touched, thumbs show only while a touch
+  gesture scrolls; a mouse move or wheel shows them again. Thumbs take
+  no pointer: dragging one is not built.

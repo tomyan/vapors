@@ -28,6 +28,13 @@ impl Offsets {
         self.by_node.get(&node).map(|offset| offset.at)
     }
 
+    /// The offset of `node` and how far it can go, if it scrolls.
+    pub(crate) fn state(&self, node: NodeId) -> Option<([f32; 2], [f32; 2])> {
+        self.by_node
+            .get(&node)
+            .map(|offset| (offset.at, offset.max))
+    }
+
     /// Clamps the offsets to the laid-out `boxes`, where `scrolls` says
     /// which box is a scroll container, and returns each box's offset
     /// in CSS pixels rounded to whole device pixels at `scale`.

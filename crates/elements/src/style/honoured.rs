@@ -114,6 +114,8 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ("position", Read),
     ("right", Read),
     ("row-gap", Read),
+    ("scrollbar-color", Read),
+    ("scrollbar-width", Read),
     ("text-align", Read),
     ("text-decoration", Deferred("a slice after F2c")),
     ("top", Read),

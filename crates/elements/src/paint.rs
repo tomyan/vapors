@@ -11,7 +11,7 @@ use vapors_text::FontSystem;
 
 use crate::corners;
 use crate::layout::{BoxRect, Content, InlineRun, LayoutBox};
-use crate::paint_order::{Stacking, paint_order};
+use crate::paint_order::{Stacking, Step, paint_steps};
 use crate::painted::Painted;
 use crate::style::{BoxShadow, Used};
 
@@ -28,6 +28,10 @@ pub(crate) struct PaintInput<'a> {
     pub(crate) scale: f32,
     /// The clip of the box being painted; set by `paint`.
     pub(crate) clip: Option<BoxRect>,
+    /// Each scroll container's offset and range, for its thumbs.
+    pub(crate) scroll: &'a crate::scroll::Offsets,
+    /// Whether thumbs are drawn now (on touch, only while scrolling).
+    pub(crate) thumbs_shown: bool,
 }
 
 /// Paints `boxes` (box 0 the root) at the rects layout gave them.
@@ -48,9 +52,12 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
             painted.rects.insert(node, rects[index]);
         }
     }
-    let order = paint_order(boxes, &|index| stacking_of(boxes, index, input));
-    let clips = crate::clip::clips(boxes, rects, &|index| clipping(boxes, index, input));
-    for index in order {
+    let steps = paint_steps(boxes, &|index| stacking_of(boxes, index, input));
+    let clips = crate::clip::clips(boxes, rects, &|index| {
+        crate::clip::clipping(boxes, index, input)
+    });
+    for step in steps {
+        let (Step::Box(index) | Step::Thumb(index)) = step;
         // Two forms of one clip, on purpose: hits are cut to it in CSS
         // pixels, unsnapped, as border boxes are hit unsnapped, so hit
         // testing follows layout geometry as Chromium's does; the scene
@@ -59,23 +66,12 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
         input.clip = clips[index];
         let device = clips[index].map(|clip| snapped(clip, input.scale));
         painted.scene.set_clip(device);
-        paint_own(boxes, rects, index, input, &mut painted);
+        match step {
+            Step::Box(_) => paint_own(boxes, rects, index, input, &mut painted),
+            Step::Thumb(_) => crate::thumb::paint(&boxes[index], rects[index], input, &mut painted),
+        }
     }
     painted
-}
-
-/// Whether box `index` cuts off its content. The root never does: its
-/// `overflow` is the viewport's. Nor does the body unless the root's
-/// `overflow` is not `visible`; otherwise the body's is the viewport's
-/// (CSS Overflow 3 section 3.3).
-fn clipping(boxes: &[LayoutBox], index: usize, input: &PaintInput<'_>) -> bool {
-    let Content::Element(node) = boxes[index].content else {
-        return false;
-    };
-    let clips = |node: NodeId| input.used.get(&node).is_some_and(Used::clips);
-    let to_viewport =
-        crate::style::to_viewport(node == input.root, node == input.body, !clips(input.root));
-    clips(node) && !to_viewport
 }
 
 fn stacking_of(boxes: &[LayoutBox], index: usize, input: &PaintInput<'_>) -> Stacking {
@@ -89,6 +85,7 @@ fn stacking_of(boxes: &[LayoutBox], index: usize, input: &PaintInput<'_>) -> Sta
         positioned: used.layout.position != taffy::Position::Static || used.z_index.is_some(),
         z: used.z_index,
         fixed: used.layout.position == taffy::Position::Fixed,
+        scrolls: used.scrolls(),
     }
 }
 

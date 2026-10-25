@@ -90,3 +90,25 @@ fn a_pan_without_a_finger_down_scrolls_nothing() {
     assert!(!moved);
     assert_eq!((offset(&doc, inner), offset(&doc, outer)), (0.0, 0.0));
 }
+
+#[test]
+fn thumbs_show_with_a_mouse_and_on_touch_only_while_a_gesture_scrolls() {
+    // Given
+    let (doc, _outer, _inner) = nested();
+    let mut touch = TouchScroll::default();
+    assert!(touch.thumbs_shown(), "a mouse until a finger touches");
+
+    // When / Then: a finger down, not yet scrolling
+    touch.down([10.0, 10.0]);
+    assert!(!touch.thumbs_shown());
+
+    // When / Then: the gesture scrolls, then ends
+    touch.pan(&mut doc.borrow_mut(), [0.0, 10.0]);
+    assert!(touch.thumbs_shown());
+    touch.up();
+    assert!(!touch.thumbs_shown());
+
+    // When / Then: the mouse again
+    touch.mouse();
+    assert!(touch.thumbs_shown());
+}

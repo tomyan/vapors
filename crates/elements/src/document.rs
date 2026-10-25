@@ -36,6 +36,8 @@ pub struct Document {
     pub(crate) laid_out: usize,
     /// Each scroll container's offset.
     pub(crate) scroll: crate::scroll::Offsets,
+    /// Whether scroll thumbs are drawn now.
+    pub(crate) thumbs_shown: bool,
 }
 
 impl Document {
@@ -62,6 +64,7 @@ impl Document {
             boxes: crate::layout::KeptBoxes::default(),
             laid_out: 0,
             scroll: crate::scroll::Offsets::default(),
+            thumbs_shown: true,
         }
     }
 

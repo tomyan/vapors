@@ -71,6 +71,8 @@ impl Document {
             cache: &mut self.texts,
             scale: viewport.scale,
             clip: None,
+            scroll: &self.scroll,
+            thumbs_shown: self.thumbs_shown,
         };
         let mut painted = paint(&boxes, &rects, &mut input);
         painted.scroll_chains = crate::scroll::Chains::of(&boxes, &scrolls);

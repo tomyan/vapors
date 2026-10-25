@@ -50,6 +50,13 @@ impl Document {
         moved
     }
 
+    /// Shows or hides every scroll container's thumbs from the next
+    /// update: a touch app shows them only while a gesture scrolls.
+    pub fn set_thumbs_shown(&mut self, shown: bool) {
+        self.changed |= self.thumbs_shown != shown;
+        self.thumbs_shown = shown;
+    }
+
     /// The scroll offset of `element` (CSS pixels, unrounded) as of the
     /// last update and the scrolls since, or `None` when it is not a
     /// scroll container.

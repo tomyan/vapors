@@ -6,7 +6,11 @@
 //! one, whose containing block is the viewport (box 0, the root, which
 //! never clips).
 
-use crate::layout::{BoxRect, LayoutBox};
+use vapors_dom::NodeId;
+
+use crate::layout::{BoxRect, Content, LayoutBox};
+use crate::paint::PaintInput;
+use crate::style::Used;
 
 /// Each box's clip, CSS pixels, `None` for none; `clipping` says
 /// whether a box cuts off its own content.
@@ -39,7 +43,7 @@ pub(crate) fn within(clip: Option<BoxRect>, rect: BoxRect) -> BoxRect {
     }
 }
 
-fn padding_box(layout_box: &LayoutBox, border_box: BoxRect) -> BoxRect {
+pub(crate) fn padding_box(layout_box: &LayoutBox, border_box: BoxRect) -> BoxRect {
     let border = layout_box.layout.border;
     BoxRect {
         x: border_box.x + border.left,
@@ -47,4 +51,18 @@ fn padding_box(layout_box: &LayoutBox, border_box: BoxRect) -> BoxRect {
         width: (border_box.width - border.left - border.right).max(0.0),
         height: (border_box.height - border.top - border.bottom).max(0.0),
     }
+}
+
+/// Whether box `index` cuts off its content. The root never does: its
+/// `overflow` is the viewport's. Nor does the body unless the root's
+/// `overflow` is not `visible`; otherwise the body's is the viewport's
+/// (CSS Overflow 3 section 3.3).
+pub(crate) fn clipping(boxes: &[LayoutBox], index: usize, input: &PaintInput<'_>) -> bool {
+    let Content::Element(node) = boxes[index].content else {
+        return false;
+    };
+    let clips = |node: NodeId| input.used.get(&node).is_some_and(Used::clips);
+    let to_viewport =
+        crate::style::to_viewport(node == input.root, node == input.body, !clips(input.root));
+    clips(node) && !to_viewport
 }

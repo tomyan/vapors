@@ -14,7 +14,7 @@ use vapors_renderer::Target;
 use vapors_scene::Size;
 
 use crate::painter::ScenePainter;
-use crate::pointer::{Action, action};
+use crate::pointer::action;
 
 /// Why the app stopped, once it has: shared with whoever ran it.
 #[derive(Clone, Default)]
@@ -146,24 +146,6 @@ impl ElementsApp {
             Next::Wait
         }
     }
-
-    fn act(&mut self, action: Action) {
-        let document = &self.document;
-        match action {
-            Action::Move(point) => {
-                self.pointer = point;
-                Document::pointer_moved(document, point);
-            }
-            Action::Press(point) => Document::pointer_pressed(document, point),
-            Action::Release(point) => Document::pointer_released(document, point),
-            Action::Leave => Document::pointer_left(document),
-            Action::Tap(point) => Document::tapped(document, point),
-            Action::Wheel(point, delta) => _ = document.borrow_mut().scroll_by(point, delta),
-            Action::TouchDown(point) => self.touch.down(point),
-            Action::Pan(delta) => _ = self.touch.pan(&mut document.borrow_mut(), delta),
-            Action::TouchUp => self.touch.up(),
-        }
-    }
 }
 
 /// Draws only when the document changed: an idle document draws no
@@ -211,3 +193,6 @@ fn refused(errors: &[ElementError]) -> String {
         lines.join("\n")
     )
 }
+
+#[path = "elements_app_act.rs"]
+mod act;
