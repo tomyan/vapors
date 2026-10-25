@@ -11,7 +11,7 @@ mod transform;
 
 pub use batch::{Batch, Run};
 pub use color::Color;
-pub use display::{Item, Quad, Rect, Scene, Shadow, TextId};
+pub use display::{ImageId, Item, Quad, Rect, Scene, Shadow, TextId};
 pub use image::RgbaImage;
 pub use scissor::Scissor;
 pub use transform::{Size, Transform};

@@ -5,6 +5,7 @@
 
 mod clear;
 mod image;
+mod image_setup;
 mod instanced;
 mod quad;
 mod quads;

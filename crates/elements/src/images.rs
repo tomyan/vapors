@@ -9,11 +9,14 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use vapors_dom::NodeId;
-use vapors_scene::RgbaImage;
+use vapors_scene::{ImageId, Item, RgbaImage};
 
 use crate::arena::Arena;
 use crate::check::describe;
 use crate::error::ElementError;
+use crate::layout::{BoxRect, Content, LayoutBox};
+use crate::paint::PaintInput;
+use crate::painted::Painted;
 use crate::style::Used;
 
 /// The registered images.
@@ -65,6 +68,12 @@ impl Images {
             if used.get(&node).is_some_and(|style| style.inline) {
                 errors.push(inline(arena, node));
             }
+            if used
+                .get(&node)
+                .is_some_and(|style| style.decoration.radii.iter().any(|r| *r > 0.0))
+            {
+                errors.push(rounded(arena, node));
+            }
         }
         errors
     }
@@ -86,9 +95,48 @@ fn unregistered(arena: &Arena, node: NodeId, name: &str) -> ElementError {
     ))
 }
 
+fn rounded(arena: &Arena, node: NodeId) -> ElementError {
+    ElementError::UnsupportedAttribute(format!(
+        "{}: has a border-radius, and an image is not clipped to rounded corners yet (rounded clips are refused until a slice needs them, docs/F2c.md); wrap it in a box with the radius only when that lands, or drop the radius",
+        describe(arena, node)
+    ))
+}
+
 fn inline(arena: &Arena, node: NodeId) -> ElementError {
     ElementError::UnsupportedAttribute(format!(
         "{}: is inline, and an image inside a line of text is inline-block content, which vapors does not lay out yet (a slice after F2c); give it display: block, or put it in a flex or grid container",
         describe(arena, node)
     ))
+}
+
+/// Paints the image `layout_box` shows over its content box (border box
+/// `border_box`, CSS px), when it has one and is visible.
+pub(crate) fn paint(
+    layout_box: &LayoutBox,
+    border_box: BoxRect,
+    input: &PaintInput<'_>,
+    out: &mut Painted,
+) {
+    let (Some(image), &Content::Element(node)) = (&layout_box.image, &layout_box.content) else {
+        return;
+    };
+    if !input.used[&node].visible {
+        return;
+    }
+    let content = content_box(layout_box, border_box);
+    let id = ImageId(u32::try_from(out.images.len()).expect("fewer than 2^32 images"));
+    out.images.push(Rc::clone(image));
+    let rect = crate::paint::snapped(content, input.scale);
+    out.scene.push(Item::Image { image: id, rect });
+}
+
+fn content_box(layout_box: &LayoutBox, border_box: BoxRect) -> BoxRect {
+    let padding = crate::clip::padding_box(layout_box, border_box);
+    let inner = layout_box.layout.padding;
+    BoxRect {
+        x: padding.x + inner.left,
+        y: padding.y + inner.top,
+        width: (padding.width - inner.left - inner.right).max(0.0),
+        height: (padding.height - inner.top - inner.bottom).max(0.0),
+    }
 }

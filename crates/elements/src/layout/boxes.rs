@@ -39,6 +39,8 @@ pub(crate) struct LayoutBox {
     /// layouts need not compare it: it reaches the style as the width
     /// or the aspect ratio wherever it changes the layout.
     pub(crate) natural: Option<[f32; 2]>,
+    /// The image an `img` shows, for paint.
+    pub(crate) image: Option<std::rc::Rc<vapors_scene::RgbaImage>>,
 }
 
 impl LayoutBox {
@@ -51,6 +53,7 @@ impl LayoutBox {
             layout: Layout::with_order(0),
             hoisted: Vec::new(),
             natural: None,
+            image: None,
         }
     }
 
@@ -58,7 +61,14 @@ impl LayoutBox {
     /// one: with no width or height given it takes the natural width, as
     /// a replaced element does rather than stretching, and its aspect
     /// ratio sizes it when one length is given.
-    pub(crate) fn replaced(content: Content, mut style: Style, natural: Option<[f32; 2]>) -> Self {
+    pub(crate) fn replaced(
+        content: Content,
+        mut style: Style,
+        (natural, image): (
+            Option<[f32; 2]>,
+            Option<std::rc::Rc<vapors_scene::RgbaImage>>,
+        ),
+    ) -> Self {
         if let Some([width, height]) = natural {
             if style.size.width.is_auto() && style.size.height.is_auto() {
                 style.size.width = taffy::Dimension::length(width);
@@ -69,6 +79,7 @@ impl LayoutBox {
         }
         Self {
             natural,
+            image,
             ..Self::new(content, style)
         }
     }
@@ -110,7 +121,10 @@ fn add_element(source: &Source<'_>, node: NodeId, boxes: &mut Vec<LayoutBox>) ->
     boxes.push(LayoutBox::replaced(
         Content::Element(node),
         style.layout.clone(),
-        source.images.natural(source.arena, node),
+        (
+            source.images.natural(source.arena, node),
+            source.images.of(source.arena, node).cloned(),
+        ),
     ));
     let mut run = Collector::new(style.text, style.visible);
     for child in source.arena.children(node) {

@@ -4,7 +4,7 @@
 //! drawn.
 
 use vapors_elements::Painted;
-use vapors_renderer::{QuadPipeline, ShadowPipeline, Target, clear_view};
+use vapors_renderer::{ImagePipeline, QuadPipeline, ShadowPipeline, Target, clear_view};
 use vapors_scene::{Item, Rect, Run, Scissor, Size};
 use vapors_text::{AtlasConfig, AtlasError, BlendParams, GlyphAtlas, RenderTarget, TextPipeline};
 
@@ -14,6 +14,8 @@ pub struct ScenePainter {
     quads: QuadPipeline,
     text: TextPipeline,
     atlas: GlyphAtlas,
+    images: ImagePipeline,
+    textures: Textures,
 }
 
 impl ScenePainter {
@@ -26,6 +28,8 @@ impl ScenePainter {
             quads: QuadPipeline::new(device, format),
             text: TextPipeline::new(device, format, &atlas),
             atlas,
+            images: ImagePipeline::new(device, format),
+            textures: Textures::default(),
         }
     }
 
@@ -38,6 +42,7 @@ impl ScenePainter {
     pub fn draw(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), AtlasError> {
         clear_view(target.device, target.queue, target.view, painted.canvas());
         self.atlas.begin_frame();
+        self.textures.begin_frame();
         for batch in painted.scene().batches() {
             let Some(clipped) = clipped(target, batch.clip) else {
                 continue;
@@ -46,8 +51,10 @@ impl ScenePainter {
                 Run::Shadows(shadows) => self.shadows.draw(&clipped, &shadows),
                 Run::Quads(quads) => self.quads.draw(&clipped, &quads),
                 Run::Texts(items) => self.draw_texts(&clipped, painted, items)?,
+                Run::Images(items) => self.textures.draw(&self.images, &clipped, painted, items),
             }
         }
+        self.textures.end_frame();
         Ok(())
     }
 
@@ -114,6 +121,10 @@ fn clipped<'a>(target: &Target<'a>, clip: Option<Rect>) -> Option<Target<'a>> {
     };
     Some(Target { scissor, ..*target })
 }
+
+#[path = "painter_images.rs"]
+mod images;
+use images::Textures;
 
 #[cfg(test)]
 #[path = "painter_tests.rs"]

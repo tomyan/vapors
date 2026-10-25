@@ -46,6 +46,7 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
         hits: Vec::new(),
         cursors: HashMap::new(),
         scroll_chains: crate::scroll_chains::Chains::default(),
+        images: Vec::new(),
     };
     for (index, layout_box) in boxes.iter().enumerate() {
         if let Content::Element(node) = layout_box.content {
@@ -67,7 +68,10 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
         let device = clips[index].map(|clip| snapped(clip, input.scale));
         painted.scene.set_clip(device);
         match step {
-            Step::Box(_) => paint_own(boxes, rects, index, input, &mut painted),
+            Step::Box(_) => {
+                paint_own(boxes, rects, index, input, &mut painted);
+                crate::images::paint(&boxes[index], rects[index], input, &mut painted);
+            }
             Step::Thumb(_) => crate::thumb::paint(&boxes[index], rects[index], input, &mut painted),
         }
     }

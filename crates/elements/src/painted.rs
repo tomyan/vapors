@@ -22,6 +22,8 @@ pub struct Painted {
     pub(crate) hits: Vec<(NodeId, BoxRect)>,
     /// The cursor over each element in `hits`.
     pub(crate) cursors: HashMap<NodeId, Cursor>,
+    /// The images the scene's image items name, by `ImageId`.
+    pub(crate) images: Vec<std::rc::Rc<vapors_scene::RgbaImage>>,
     /// Which scroll containers a scroll over each element tries.
     pub(crate) scroll_chains: crate::scroll_chains::Chains,
 }
@@ -46,6 +48,15 @@ impl Painted {
     #[must_use]
     pub fn text(&self, id: TextId) -> &Layout {
         &self.texts[id.0 as usize]
+    }
+
+    /// The image a scene item names.
+    ///
+    /// # Panics
+    /// When `id` is not from this update's scene.
+    #[must_use]
+    pub fn image(&self, id: vapors_scene::ImageId) -> &std::rc::Rc<vapors_scene::RgbaImage> {
+        &self.images[id.0 as usize]
     }
 
     /// The element's border box in CSS pixels, or `None` when it has no
