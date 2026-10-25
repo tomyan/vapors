@@ -6,6 +6,7 @@ mod calcs;
 mod inline;
 mod keep;
 mod measure;
+mod replaced;
 mod text_cache;
 mod tree;
 

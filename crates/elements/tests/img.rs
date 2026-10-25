@@ -44,7 +44,8 @@ fn size(rect: BoxRect) -> [f32; 2] {
 fn an_image_takes_its_natural_size() {
     // Given
     let (mut doc, img) = img(Some("a.png"), "");
-    doc.register_image("a.png", image(40, 20, [255, 0, 0, 255]));
+    doc.register_image("a.png", image(40, 20, [255, 0, 0, 255]))
+        .expect("registers");
 
     // When / Then
     assert_eq!(size(border_box(&mut doc, img)), [40.0, 20.0]);
@@ -56,7 +57,8 @@ fn one_length_sets_the_other_by_the_aspect_ratio() {
     let (mut wide, wide_img) = img(Some("a.png"), "width: 80px;");
     let (mut tall, tall_img) = img(Some("a.png"), "height: 50px;");
     for doc in [&mut wide, &mut tall] {
-        doc.register_image("a.png", image(40, 20, [255, 0, 0, 255]));
+        doc.register_image("a.png", image(40, 20, [255, 0, 0, 255]))
+            .expect("registers");
     }
 
     // When / Then
@@ -96,12 +98,14 @@ fn an_unregistered_src_is_refused_naming_it() {
 fn registering_an_image_lays_its_imgs_out_again() {
     // Given: laid out with one image, nothing pending
     let (mut doc, img) = img(Some("a.png"), "");
-    doc.register_image("a.png", image(40, 20, [255, 0, 0, 255]));
+    doc.register_image("a.png", image(40, 20, [255, 0, 0, 255]))
+        .expect("registers");
     border_box(&mut doc, img);
     doc.take_changed();
 
     // When: another under the same name
-    doc.register_image("a.png", image(10, 30, [0, 0, 255, 255]));
+    doc.register_image("a.png", image(10, 30, [0, 0, 255, 255]))
+        .expect("registers");
 
     // Then
     assert!(doc.take_changed());
@@ -116,7 +120,8 @@ fn an_inline_img_is_refused_naming_the_fix() {
     let p = element(&mut doc, body, "p", "");
     let img = element(&mut doc, p, "img", "");
     doc.set_attribute(img, "src", "a.png");
-    doc.register_image("a.png", image(4, 4, [0, 0, 0, 255]));
+    doc.register_image("a.png", image(4, 4, [0, 0, 0, 255]))
+        .expect("registers");
 
     // When
     let errors = refusals(&mut doc);
@@ -134,11 +139,13 @@ fn an_inline_img_is_refused_naming_the_fix() {
 fn an_image_of_the_same_shape_but_another_size_lays_out_again() {
     // Given: laid out with a 40 x 20 image
     let (mut doc, img) = img(Some("a.png"), "");
-    doc.register_image("a.png", image(40, 20, [255, 0, 0, 255]));
+    doc.register_image("a.png", image(40, 20, [255, 0, 0, 255]))
+        .expect("registers");
     border_box(&mut doc, img);
 
     // When: 80 x 40, the same aspect ratio
-    doc.register_image("a.png", image(80, 40, [255, 0, 0, 255]));
+    doc.register_image("a.png", image(80, 40, [255, 0, 0, 255]))
+        .expect("registers");
 
     // Then
     assert_eq!(size(border_box(&mut doc, img)), [80.0, 40.0]);

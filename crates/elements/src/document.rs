@@ -82,9 +82,18 @@ impl Document {
     /// Registers `image` under `name` for the `img` elements whose `src`
     /// is `name`, replacing any image of that name; they show it from
     /// the next update.
-    pub fn register_image(&mut self, name: &str, image: vapors_scene::RgbaImage) {
-        self.images.register(name, image);
+    ///
+    /// # Errors
+    /// An image that cannot be drawn, naming it: a side of zero, a side
+    /// over 8192 px, or pixels that do not match its size.
+    pub fn register_image(
+        &mut self,
+        name: &str,
+        image: vapors_scene::RgbaImage,
+    ) -> Result<(), String> {
+        self.images.register(name, image)?;
         self.changed = true;
+        Ok(())
     }
 
     /// The `html` element.

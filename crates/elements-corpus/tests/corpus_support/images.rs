@@ -12,6 +12,7 @@ use vapors_elements_corpus::oracle::image_files;
 pub fn register_fixture_images(doc: &mut Document) {
     for (name, bytes) in image_files().expect("the fixture images") {
         let image = decode_png(&bytes).unwrap_or_else(|e| panic!("fixtures/images/{name}: {e}"));
-        doc.register_image(&name, image);
+        doc.register_image(&name, image)
+            .unwrap_or_else(|e| panic!("fixtures/images/{name}: {e}"));
     }
 }

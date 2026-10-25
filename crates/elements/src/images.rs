@@ -1,9 +1,9 @@
 //! Images registered with a document, by name, and what an `img`
 //! element takes from them (F2c S10): its natural size and aspect ratio
 //! in layout, and its pixels in paint. An `img` whose `src` names no
-//! registered image is refused, naming it; one without `src` is an empty
-//! box, as in HTML. An inline `img` is refused: images inside a line of
-//! text are inline-block content, which is not built.
+//! registered image is refused, naming it, with the rest of an `img`'s
+//! refusals (`img_checks`); one without `src` is an empty box, as in
+//! HTML. An image that cannot be drawn is refused when it is registered.
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -12,12 +12,9 @@ use vapors_dom::NodeId;
 use vapors_scene::{ImageId, Item, RgbaImage};
 
 use crate::arena::Arena;
-use crate::check::describe;
-use crate::error::ElementError;
 use crate::layout::{BoxRect, Content, LayoutBox};
 use crate::paint::PaintInput;
 use crate::painted::Painted;
-use crate::style::Used;
 
 /// The registered images.
 #[derive(Debug, Default)]
@@ -27,8 +24,19 @@ pub(crate) struct Images {
 
 impl Images {
     /// Registers `image` as `name`, replacing any image of that name.
-    pub(crate) fn register(&mut self, name: &str, image: RgbaImage) {
+    ///
+    /// # Errors
+    /// An image that cannot be drawn, naming it: a side of zero, a side
+    /// over [`MAX_SIDE`], or pixels that do not match its size.
+    pub(crate) fn register(&mut self, name: &str, image: RgbaImage) -> Result<(), String> {
+        drawable(name, &image)?;
         self.by_name.insert(name.to_owned(), Rc::new(image));
+        Ok(())
+    }
+
+    /// Whether an image is registered as `name`.
+    pub(crate) fn has(&self, name: &str) -> bool {
+        self.by_name.contains_key(name)
     }
 
     /// The image `node` shows: its `src`'s, when it is an `img` with one.
@@ -48,65 +56,45 @@ impl Images {
         let size = self.of(arena, node).map(|image| image.size);
         Some(size.map_or([0.0, 0.0], |size| [size.width as f32, size.height as f32]))
     }
+}
 
-    /// Every `img` in `nodes` with an unregistered `src`, or laid out
-    /// inline.
-    pub(crate) fn refusals(
-        &self,
-        arena: &Arena,
-        nodes: &[NodeId],
-        used: &HashMap<NodeId, Used>,
-    ) -> Vec<ElementError> {
-        let mut errors = Vec::new();
-        for &node in nodes {
-            let Some(name) = src(arena, node) else {
-                continue;
-            };
-            if !self.by_name.contains_key(name) {
-                errors.push(unregistered(arena, node, name));
-            }
-            if used.get(&node).is_some_and(|style| style.inline) {
-                errors.push(inline(arena, node));
-            }
-            if used
-                .get(&node)
-                .is_some_and(|style| style.decoration.radii.iter().any(|r| *r > 0.0))
-            {
-                errors.push(rounded(arena, node));
-            }
-        }
-        errors
+/// The longest side an image may have: WebGPU's guaranteed
+/// `maxTextureDimension2D`, which every device vapors draws on supports.
+pub(crate) const MAX_SIDE: u32 = 8192;
+
+fn drawable(name: &str, image: &RgbaImage) -> Result<(), String> {
+    let size = image.size;
+    if size.width == 0 || size.height == 0 {
+        return Err(format!(
+            "the image {name:?} is {}x{}: a side of zero cannot be drawn; register an image with pixels",
+            size.width, size.height
+        ));
     }
+    if size.width > MAX_SIDE || size.height > MAX_SIDE {
+        return Err(format!(
+            "the image {name:?} is {}x{}: a side over {MAX_SIDE} px cannot be uploaded on every device; scale it down first",
+            size.width, size.height
+        ));
+    }
+    let wanted = size.width as usize * size.height as usize * 4;
+    if image.rgba.len() != wanted {
+        return Err(format!(
+            "the image {name:?} has {} bytes where {}x{} RGBA takes {wanted} bytes",
+            image.rgba.len(),
+            size.width,
+            size.height
+        ));
+    }
+    Ok(())
 }
 
 /// `node`'s `src`, when it is an `img`.
-fn src(arena: &Arena, node: NodeId) -> Option<&str> {
+pub(crate) fn src(arena: &Arena, node: NodeId) -> Option<&str> {
     let element = arena.get(node, "images").element()?;
     if element.tag != "img" {
         return None;
     }
     element.attributes.get("src").map(String::as_str)
-}
-
-fn unregistered(arena: &Arena, node: NodeId, name: &str) -> ElementError {
-    ElementError::UnsupportedAttribute(format!(
-        "{}: its src {name:?} names no image registered with the document; register it first with Document::register_image({name:?}, image)",
-        describe(arena, node)
-    ))
-}
-
-fn rounded(arena: &Arena, node: NodeId) -> ElementError {
-    ElementError::UnsupportedAttribute(format!(
-        "{}: has a border-radius, and an image is not clipped to rounded corners yet (rounded clips are refused until a slice needs them, docs/F2c.md); wrap it in a box with the radius only when that lands, or drop the radius",
-        describe(arena, node)
-    ))
-}
-
-fn inline(arena: &Arena, node: NodeId) -> ElementError {
-    ElementError::UnsupportedAttribute(format!(
-        "{}: is inline, and an image inside a line of text is inline-block content, which vapors does not lay out yet (a slice after F2c); give it display: block, or put it in a flex or grid container",
-        describe(arena, node)
-    ))
 }
 
 /// Paints the image `layout_box` shows over its content box (border box

@@ -92,9 +92,9 @@ impl BoxTree<'_> {
             |handle, basis| calcs.resolve(handle, basis),
             |known, available| match &node.content {
                 Content::Text(run) => measure_text((fonts, cache), scale, run, known, available),
-                Content::Element(_) => node
-                    .natural
-                    .map_or(taffy::Size::ZERO, |n| replaced(known, n)),
+                Content::Element(_) => node.natural.map_or(taffy::Size::ZERO, |natural| {
+                    super::replaced::measure(&node.style, inputs.parent_size, known, natural)
+                }),
             },
         )
     }
@@ -171,25 +171,3 @@ impl CacheTree for BoxTree<'_> {
 
 #[path = "tree_containers.rs"]
 mod containers;
-
-/// A replaced box's content size: what layout already knows, else the
-/// natural size, a known width or height setting the other by the
-/// natural aspect ratio.
-fn replaced(known: taffy::Size<Option<f32>>, [width, height]: [f32; 2]) -> taffy::Size<f32> {
-    let ratio = |a: f32, b: f32| if b > 0.0 { a / b } else { 0.0 };
-    match (known.width, known.height) {
-        (Some(w), Some(h)) => taffy::Size {
-            width: w,
-            height: h,
-        },
-        (Some(w), None) => taffy::Size {
-            width: w,
-            height: w * ratio(height, width),
-        },
-        (None, Some(h)) => taffy::Size {
-            width: h * ratio(width, height),
-            height: h,
-        },
-        (None, None) => taffy::Size { width, height },
-    }
-}

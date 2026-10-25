@@ -22,7 +22,8 @@ fn shown(css: &str, src: Option<&str>) -> (Document, NodeId) {
     if let Some(src) = src {
         doc.set_attribute(img, "src", src);
     }
-    doc.register_image("a.png", image(40, 20));
+    doc.register_image("a.png", image(40, 20))
+        .expect("registers");
     let css = format!("body {{ margin: 0; }} .pic {{ display: block; {css} }}");
     doc.add_stylesheet("app.css", &css).expect("parses");
     (doc, img)

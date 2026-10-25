@@ -35,9 +35,8 @@ pub(crate) struct LayoutBox {
     /// containing block of, as Taffy hoists them; their layouts are
     /// relative to this box.
     pub(crate) hoisted: Vec<usize>,
-    /// The natural size of the image an `img` shows, CSS px. Kept
-    /// layouts need not compare it: it reaches the style as the width
-    /// or the aspect ratio wherever it changes the layout.
+    /// The natural size of the image an `img` shows, CSS px; a kept
+    /// layout is lent only to a box with the same.
     pub(crate) natural: Option<[f32; 2]>,
     /// The image an `img` shows, for paint.
     pub(crate) image: Option<std::rc::Rc<vapors_scene::RgbaImage>>,
@@ -58,9 +57,8 @@ impl LayoutBox {
     }
 
     /// A box showing an image of `natural` size (CSS px), when it has
-    /// one: with no width or height given it takes the natural width, as
-    /// a replaced element does rather than stretching, and its aspect
-    /// ratio sizes it when one length is given.
+    /// one: a replaced box, which Taffy does not stretch, measured from its
+    /// natural size and its limits (`replaced::size`).
     pub(crate) fn replaced(
         content: Content,
         mut style: Style,
@@ -69,13 +67,8 @@ impl LayoutBox {
             Option<std::rc::Rc<vapors_scene::RgbaImage>>,
         ),
     ) -> Self {
-        if let Some([width, height]) = natural {
-            if style.size.width.is_auto() && style.size.height.is_auto() {
-                style.size.width = taffy::Dimension::length(width);
-            }
-            if height > 0.0 {
-                style.aspect_ratio = Some(width / height);
-            }
+        if natural.is_some() {
+            style.item_is_replaced = true;
         }
         Self {
             natural,

@@ -139,7 +139,12 @@ impl Document {
                 errors.extend(self.mixed_metrics(node, &kept.used, viewport.scale));
             }
         }
-        errors.extend(self.images.refusals(&self.arena, &live, &kept.used));
+        errors.extend(crate::img_checks::refusals(
+            &self.images,
+            &self.arena,
+            &live,
+            &kept.used,
+        ));
         if errors.is_empty() {
             Ok(calcs)
         } else {

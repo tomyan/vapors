@@ -20,7 +20,9 @@ pub(crate) fn register_thumbnails(document: &mut Document) {
     for (name, bytes) in files {
         let image = vapors_canvas::decode_png(bytes)
             .unwrap_or_else(|e| panic!("crates/demos/demos/images/{name}: {e}"));
-        document.register_image(name, image);
+        document
+            .register_image(name, image)
+            .unwrap_or_else(|e| panic!("crates/demos/demos/images/{name}: {e}"));
     }
 }
 
