@@ -40,7 +40,8 @@ pub fn run(step: &Step) -> Outcome {
 /// deadline kills what it started too, with the compilation cache set
 /// (`sccache`), except for sccache's own step.
 fn spawn(step: &Step) -> Result<Child, String> {
-    let mut command = Command::new(&step.program);
+    // Outside the gate, under nice 10 with the job cap (`priority`).
+    let mut command = crate::priority::command(&step.program)?;
     // Every step gets the cache, builds or not, and so every step is
     // refused without sccache: one rule, rather than a list of which
     // steps compile that could fall behind. sccache's own step is the
@@ -58,9 +59,13 @@ fn spawn(step: &Step) -> Result<Child, String> {
     if let Some(dir) = &step.dir {
         command.current_dir(dir);
     }
-    command
-        .spawn()
-        .map_err(|error| format!("could not start `{}`: {error}", step.program))
+    command.spawn().map_err(|error| {
+        let started = command.get_program().to_string_lossy();
+        format!(
+            "could not start `{started}` for `{}`: {error}",
+            step.program
+        )
+    })
 }
 
 fn finish(mut child: Child, deadline: Option<Duration>) -> (bool, String) {
