@@ -1,0 +1,20 @@
+{
+  "tree": [
+    {
+      "depth": 0,
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "RootWebArea"
+    },
+    {
+      "depth": 1,
+      "name": "Hello from a .wisp component, laid out by Taffy and drawn by vapors.",
+      "role": "StaticText"
+    }
+  ],
+  "viewport": [
+    640,
+    400
+  ]
+}

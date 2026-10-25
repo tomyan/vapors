@@ -1,0 +1,43 @@
+{
+  "tree": [
+    {
+      "depth": 0,
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "RootWebArea"
+    },
+    {
+      "depth": 1,
+      "role": "generic"
+    },
+    {
+      "depth": 2,
+      "role": "generic"
+    },
+    {
+      "depth": 2,
+      "role": "generic"
+    },
+    {
+      "depth": 2,
+      "role": "generic"
+    },
+    {
+      "depth": 2,
+      "role": "generic"
+    },
+    {
+      "depth": 1,
+      "role": "generic"
+    },
+    {
+      "depth": 1,
+      "role": "generic"
+    }
+  ],
+  "viewport": [
+    640,
+    400
+  ]
+}

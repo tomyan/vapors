@@ -1,0 +1,37 @@
+{
+  "tree": [
+    {
+      "depth": 0,
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "RootWebArea"
+    },
+    {
+      "depth": 1,
+      "name": "Hello from vapors",
+      "properties": [
+        "level=1"
+      ],
+      "role": "heading"
+    },
+    {
+      "depth": 2,
+      "name": "Hello from vapors",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "paragraph"
+    },
+    {
+      "depth": 2,
+      "name": "This panel is a .wisp component: its CSS cascades through vapors-css, Taffy lays it out, and vapors draws it on the GPU, natively and in this canvas.",
+      "role": "StaticText"
+    }
+  ],
+  "viewport": [
+    640,
+    400
+  ]
+}

@@ -185,6 +185,10 @@ jobs:
       # without rerunning the oracle, or Chrome lays it out differently.
       - name: layout oracle against the runner's Chrome
         run: cargo run -p vapors-elements-corpus --example layout_oracle -- --check
+      # The a11y oracle: Chromium's accessibility tree for every fixture,
+      # read over the DevTools protocol, must match fixtures/*.ax.json.
+      - name: a11y oracle against the runner's Chrome
+        run: cargo run -p vapors-elements-corpus --example ax_oracle -- --check
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

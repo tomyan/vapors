@@ -13,6 +13,8 @@ use vapors_elements::Document;
 
 include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
+pub mod ax;
+pub mod ax_tree;
 pub mod oracle;
 pub mod page;
 pub mod paint_check;

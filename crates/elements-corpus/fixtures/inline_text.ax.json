@@ -1,0 +1,184 @@
+{
+  "tree": [
+    {
+      "depth": 0,
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "RootWebArea"
+    },
+    {
+      "depth": 1,
+      "role": "paragraph"
+    },
+    {
+      "depth": 2,
+      "name": "Curves set from a ",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "role": "strong"
+    },
+    {
+      "depth": 3,
+      "name": "neutral sample",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": ", applied as ",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": "layers you can ",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "role": "emphasis"
+    },
+    {
+      "depth": 3,
+      "name": "turn off",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": ".",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "paragraph"
+    },
+    {
+      "depth": 2,
+      "name": "A white point of ",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "role": "code"
+    },
+    {
+      "depth": 3,
+      "name": "R 238 G 231 B 222",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": " at ",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": "x 1024 y 768",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": ", with spaces collapsed.",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "name": "Loose text beside a block",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "generic"
+    },
+    {
+      "depth": 2,
+      "name": "The block",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "name": "and after it.",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "paragraph"
+    },
+    {
+      "depth": 2,
+      "name": "An empty ",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": "span holds no text.",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "name": "A heading with bolder words",
+      "properties": [
+        "level=3"
+      ],
+      "role": "heading"
+    },
+    {
+      "depth": 2,
+      "name": "A heading with ",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": "bolder",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": " words",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "paragraph"
+    },
+    {
+      "depth": 2,
+      "name": "Nested ",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": "bold ",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "role": "code"
+    },
+    {
+      "depth": 3,
+      "name": "mono",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": " text",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": " in a span",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": " that wraps over the end of the line here.",
+      "role": "StaticText"
+    }
+  ],
+  "viewport": [
+    640,
+    400
+  ]
+}

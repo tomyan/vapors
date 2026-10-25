@@ -1,0 +1,60 @@
+{
+  "tree": [
+    {
+      "depth": 0,
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "RootWebArea"
+    },
+    {
+      "depth": 1,
+      "role": "generic"
+    },
+    {
+      "depth": 2,
+      "name": "two words",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "generic"
+    },
+    {
+      "depth": 2,
+      "name": "some more words here",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "generic"
+    },
+    {
+      "depth": 2,
+      "name": "fits its content",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "generic"
+    },
+    {
+      "depth": 2,
+      "name": "a b",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "generic"
+    },
+    {
+      "depth": 2,
+      "name": "c d e",
+      "role": "StaticText"
+    }
+  ],
+  "viewport": [
+    640,
+    400
+  ]
+}

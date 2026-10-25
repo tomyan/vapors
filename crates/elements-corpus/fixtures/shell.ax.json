@@ -1,0 +1,15 @@
+{
+  "tree": [
+    {
+      "depth": 0,
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "RootWebArea"
+    }
+  ],
+  "viewport": [
+    390,
+    800
+  ]
+}
