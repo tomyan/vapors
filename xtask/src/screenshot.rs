@@ -7,7 +7,7 @@
 //! measure.
 
 use std::path::Path;
-use std::process::{Command, ExitCode};
+use std::process::ExitCode;
 use std::time::Duration;
 
 use crate::config::Config;
@@ -70,7 +70,7 @@ fn run_example(
     } else {
         "--example"
     };
-    let mut command = Command::new("cargo");
+    let mut command = crate::priority::command("cargo")?;
     crate::sccache::apply(&mut command)?;
     command
         .args(["run", "-q", "-p", package, kind, &target.name, "--"])
