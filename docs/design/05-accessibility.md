@@ -120,7 +120,8 @@ and touché's tokens respond through `@media`. Focus is always visible
 - **HTML and ARIA**: implicit roles (HTML-AAM), allowed attributes
   (ARIA in HTML), name computation (accname), the WAI-ARIA Authoring
   Practices for keyboard behaviour; taken as the specification to match.
-- **Flutter web and Google Docs**: the hidden DOM mirror on the web.
+- **Flutter web, Uno Platform's WebAssembly target and Google Docs**:
+  the hidden DOM mirror on the web.
 - **egui and Bevy**: their AccessKit integrations were read for the
   winit adapter's lifecycle (activation on first reader query, so an
   app with no reader pays nothing).

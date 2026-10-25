@@ -100,15 +100,20 @@ one redaction and watching it fail. It runs in CI on both targets.
 
 ## Taken from where
 
-- **rrweb**: the full-snapshot plus incremental-mutation model, input
-  records with timestamps, replay by reconstruction, and the masking
-  options (`maskAllInputs`, `maskTextSelector`, `blockClass`). Differs:
+- **rrweb**: the full-snapshot plus incremental-mutation model with
+  stable node ids, periodic checkouts (`checkoutEveryNth`/`Nms`), input
+  records with timestamps, throttled mouse moves, replay by
+  reconstruction on a frame-clock timer with synchronous seeking, and
+  the masking options (`maskAllInputs`, off by default; `maskTextSelector`;
+  `blockClass` giving a same-size placeholder; no option to block
+  images). Differs:
   vapors records its own tree rather than the DOM, so the mutation
   stream is the incremental update's own dirty list and replay uses the
   real painter; masking is by element tag at the source rather than by
   selector at serialisation, so a component cannot forget it.
-- **Sentry Session Replay and PostHog**: mask all text and inputs by
-  default in release; vapors inverts this for UI strings (recorded) and
+- **Sentry Session Replay** masks all text and inputs and blocks media
+  by default; **PostHog** on the web masks inputs only (passwords
+  always). vapors inverts Sentry's default for UI strings (recorded) and
   makes user content the tagged exception, because UI strings are what
   the review needs and user content is marked by the element.
 - **Chromium's tracing** for per-phase timings.

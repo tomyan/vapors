@@ -146,8 +146,11 @@ Rust 3D crate?** Area 9 T3.
 Area 2 S5.
 - (a) Detect COOP/COEP at load; `offload` uses `SharedArrayBuffer` when
   present and copies otherwise; the choice is reported and recorded.
-- (b) Never; always copy. One path; a 24 MP decode copies 96 MB.
-- Recommendation: (a), built when a measured copy costs a frame.
+  Shared wasm memory needs a nightly toolchain with `build-std` and
+  atomics today, so this is a second build of the web package.
+- (b) Never; always copy. One path, one toolchain; a 24 MP decode copies
+  96 MB.
+- Recommendation: (b) until a measured copy costs a frame, then (a).
 
 **Q16. WPT reftests as paint comparisons?** Area 11 Q2.
 - (a) Yes, with a committed skip list naming why each skipped test is

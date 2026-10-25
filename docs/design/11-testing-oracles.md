@@ -40,9 +40,13 @@ regression pin, and the area documents call it that.
 ## Running web-platform-tests
 
 WPT has two kinds of test. **Reftests** are two pages that must render
-alike (`<link rel="match">`); the oracle runner loads both in Chromium
-and vapors renders the test page, and the three paint rules compare
-vapors' render with Chromium's render of the *reference*. A reftest
+alike (`<link rel="match">`, pixel-exact at 800x600 unless a
+`<meta name=fuzzy>` states a tolerance; `class="reftest-wait"` defers
+the screenshot until the page removes it); the oracle runner loads both
+in Chromium and vapors renders the test page, and the three paint rules
+compare vapors' render with Chromium's render of the *reference*, with
+the test's fuzz added to the rules' tolerance. Reftests need no wpt
+server, which is why they are the first kind taken. A reftest
 whose reference uses features vapors refuses is skipped by name with
 the reason in a committed list, so the skipped set is visible and
 shrinks. **testharness.js** tests assert in JavaScript; the useful ones
@@ -50,7 +54,8 @@ read `getComputedStyle`, `getBoundingClientRect`, event logs or
 `document.activeElement`. These are ported by hand to Rust tests that
 assert the same values, with the WPT path in the test name, and the
 original is run in Chromium by the oracle runner to confirm the
-expected value. Directories in use per area: `css/css-flexbox`,
+expected value (testharness tests load `/resources/testharness.js` from
+the wpt server; the runner serves that one directory itself). Directories in use per area: `css/css-flexbox`,
 `css/css-grid`, `css/css-cascade`, `css/selectors`, `css/css-variables`
 (4); `css/css-transitions`, `css/css-animations` (6);
 `css/css-transforms` (9); `pointerevents`, `uievents`,
