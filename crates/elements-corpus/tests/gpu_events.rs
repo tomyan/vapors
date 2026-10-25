@@ -34,6 +34,10 @@ expect no event click
 ";
 
 fn session(test: &str) -> (vapors_text::comparison::Live, Session) {
+    session_on(test, PAGE)
+}
+
+fn session_on(test: &str, page: &str) -> (vapors_text::comparison::Live, Session) {
     let chromium = Chromium::find().unwrap_or_else(|e| panic!("{e}"));
     let profile = std::env::temp_dir().join(format!("events-{test}-{}", std::process::id()));
     let mut live = chromium
@@ -42,13 +46,7 @@ fn session(test: &str) -> (vapors_text::comparison::Live, Session) {
     let mut session =
         Session::attach(&profile, DEADLINE, &mut || live.alive()).unwrap_or_else(|e| panic!("{e}"));
     session
-        .call("Page.enable", &json!({}), DEADLINE)
-        .unwrap_or_else(|e| panic!("{e}"));
-    session
-        .call("Page.navigate", &json!({ "url": PAGE }), DEADLINE)
-        .unwrap_or_else(|e| panic!("{e}"));
-    session
-        .wait_event("Page.loadEventFired", DEADLINE)
+        .navigate(page, DEADLINE)
         .unwrap_or_else(|e| panic!("{e}"));
     (live, session)
 }
@@ -102,5 +100,43 @@ fn gpu_events_an_expectation_that_does_not_hold_is_refused_naming_its_line() {
     assert!(
         !refusal.contains("page.events:5:"),
         "the checkbox's path names it: {refusal}"
+    );
+}
+
+#[test]
+fn gpu_events_a_scroll_of_the_document_is_logged_at_the_document() {
+    // Given: a page taller than the window, scrolled by the wheel
+    let (_live, mut session) = session_on(
+        "document",
+        "data:text/html,<body style='height:3000px;margin:0'>tall</body>",
+    );
+    let script = parse(
+        "page",
+        "listen scroll wheel\nwheel 100 100 0 200\nexpect event scroll document\n",
+    )
+    .expect("parses");
+
+    // When / Then: named, not thrown on
+    play(&mut session, "page", &script, DEADLINE).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn gpu_events_an_event_after_the_last_step_is_refused() {
+    // Given: a click that sets off an event a tenth of a second later
+    let page = "data:text/html,<button id=b style='width:100px;height:40px' onclick=\"setTimeout(() => document.body.dispatchEvent(new Event('late')), 100)\">x</button>";
+    let (_live, mut session) = session_on("late", page);
+    let script = parse(
+        "page",
+        "listen click late\nclick 50 20\nexpect event click button#b\n",
+    )
+    .expect("parses");
+
+    // When
+    let refusal = play(&mut session, "page", &script, DEADLINE).expect_err("late");
+
+    // Then
+    assert!(
+        refusal.contains("events arrived after the last step"),
+        "{refusal}"
     );
 }

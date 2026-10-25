@@ -83,11 +83,7 @@ pub fn open(
 /// Open `page` and wait for its load event and its fonts.
 fn load(session: &mut Session, page: &Path) -> Result<(), String> {
     let url = format!("file://{}", page.display());
-    let navigated = session.call("Page.navigate", &json!({ "url": url }), DEADLINE)?;
-    if let Some(error) = navigated["errorText"].as_str() {
-        return Err(format!("{url} did not load: {error}"));
-    }
-    session.wait_event("Page.loadEventFired", DEADLINE)?;
+    session.navigate(&url, DEADLINE)?;
     let fonts = json!({ "expression": FONTS_SETTLED, "awaitPromise": true, "returnByValue": true });
     let status = session.call("Runtime.evaluate", &fonts, DEADLINE)?;
     match status["result"]["value"].as_str() {

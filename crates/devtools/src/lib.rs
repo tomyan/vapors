@@ -9,6 +9,7 @@
 //! which needs file descriptors 3 and 4 set in the child: that takes
 //! `unsafe` in Rust, which the workspace forbids, so the port is used.
 
+mod connect;
 mod discover;
 mod session;
 

@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::Value;
 
-use crate::session::left;
+use crate::connect::left;
 
 const POLL: Duration = Duration::from_millis(50);
 

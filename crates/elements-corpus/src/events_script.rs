@@ -16,7 +16,7 @@
 //!
 //! Anything else is refused, naming the file and line.
 
-use crate::events_action::{action, is_action};
+use crate::events_action::{action, exactly, is_action};
 
 /// A parsed script.
 #[derive(Debug, Default)]
@@ -104,20 +104,58 @@ pub fn parse(name: &str, text: &str) -> Result<Script, String> {
         directive(&mut script, line, index + 1)
             .map_err(|why| format!("{name}.events:{}: {why}: {line}", index + 1))?;
     }
+    checked(name, script)
+}
+
+/// A script with steps, each with an expectation: one that checks nothing
+/// would pass whatever Chromium did.
+fn checked(name: &str, script: Script) -> Result<Script, String> {
+    if script.steps.is_empty() {
+        return Err(format!(
+            "{name}.events: no steps; a script plays at least one action"
+        ));
+    }
+    if let Some(step) = script
+        .steps
+        .iter()
+        .find(|s| s.expect.is_empty() && s.action != Action::Frame)
+    {
+        return Err(format!(
+            "{name}.events:{}: a step with no expectation",
+            step.line
+        ));
+    }
     Ok(script)
 }
 
+/// The fields before a note: a note follows two spaces outside quotes.
+fn fields_part(line: &str) -> &str {
+    let mut quoted = false;
+    for (at, c) in line.char_indices() {
+        if c == '"' {
+            quoted = !quoted;
+        }
+        if !quoted && line[at..].starts_with("  ") {
+            return &line[..at];
+        }
+    }
+    line
+}
+
 fn directive(script: &mut Script, line: &str, number: usize) -> Result<(), String> {
-    let (word, rest) = line.split_once(char::is_whitespace).unwrap_or((line, ""));
-    let rest = rest.trim();
+    let line = fields_part(line);
+    let (word, rest) = line.split_once(' ').unwrap_or((line, ""));
+    let fields: Vec<&str> = rest.split(' ').filter(|f| !f.is_empty()).collect();
     match word {
         "at" if script.viewport.is_some() => Err("a second `at`".into()),
-        "at" => at(rest).map(|size| script.viewport = Some(size)),
+        "at" => exactly(word, &fields, 1)
+            .and_then(|()| at(rest))
+            .map(|size| script.viewport = Some(size)),
         "listen" if !script.listen.is_empty() => Err("a second `listen`".into()),
         "listen" => listen(rest).map(|types| script.listen = types),
-        "expect" => expect(script, rest, number),
+        "expect" => expect(script, &fields, number),
         _ if script.listen.is_empty() && is_action(word) => Err("an action before `listen`".into()),
-        _ => action(word, rest).map(|action| {
+        _ => action(word, &fields, rest).map(|action| {
             script.steps.push(Step {
                 action,
                 expect: Vec::new(),
@@ -131,7 +169,8 @@ fn at(rest: &str) -> Result<(u32, u32), String> {
     let size = rest.split_whitespace().next().unwrap_or_default();
     let parsed = size
         .split_once('x')
-        .and_then(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?)));
+        .and_then(|(w, h)| Some((w.parse::<u32>().ok()?, h.parse::<u32>().ok()?)))
+        .filter(|(w, h)| *w > 0 && *h > 0);
     parsed.ok_or_else(|| "`at` takes WxH".to_owned())
 }
 
@@ -143,16 +182,21 @@ fn listen(rest: &str) -> Result<Vec<String>, String> {
     Ok(types)
 }
 
-fn expect(script: &mut Script, rest: &str, number: usize) -> Result<(), String> {
-    let fields: Vec<&str> = rest.split_whitespace().collect();
-    let expectation = match fields.as_slice() {
-        ["event", kind, target, ..] => Expect::Event { kind: (*kind).into(), target: (*target).into() },
-        ["no", "event", kind, ..] if !script.listen.iter().any(|t| t == kind) => {
+fn expect(script: &mut Script, fields: &[&str], number: usize) -> Result<(), String> {
+    let wanted = match fields.first().copied() {
+        Some("event" | "no") => 3,
+        Some("focus" | "focus-visible") => 2,
+        _ => fields.len(),
+    };
+    exactly("expect", fields, wanted)?;
+    let expectation = match fields {
+        ["event", kind, target] => Expect::Event { kind: (*kind).into(), target: (*target).into() },
+        ["no", "event", kind] if !script.listen.iter().any(|t| t == kind) => {
             return Err(format!("`{kind}` is not listened for, so expecting none of it proves nothing"));
         }
-        ["no", "event", kind, ..] => Expect::NoEvent((*kind).into()),
-        ["focus", target, ..] => Expect::Focus((*target).into()),
-        ["focus-visible", target, ..] => Expect::FocusVisible((*target).into()),
+        ["no", "event", kind] => Expect::NoEvent((*kind).into()),
+        ["focus", target] => Expect::Focus((*target).into()),
+        ["focus-visible", target] => Expect::FocusVisible((*target).into()),
         _ => return Err("`expect` takes event <type> <target>, no event <type>, focus <target> or focus-visible <target>".into()),
     };
     let step = script

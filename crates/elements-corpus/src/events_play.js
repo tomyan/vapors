@@ -6,12 +6,17 @@
 (() => {
   const types = __TYPES__;
   const log = [];
-  // tag#id, else the full child-index path from body (impl-f2c, D3).
-  const name = (el) => {
-    if (!el || el === document.body || el === document.documentElement) return el ? el.localName : null;
-    if (el.id) return el.localName + "#" + el.id;
-    const index = Array.prototype.indexOf.call(el.parentElement.children, el) + 1;
-    return name(el.parentElement) + ">" + el.localName + ":nth-child(" + index + ")";
+  // tag#id, else the full child-index path from body (impl-f2c, D3);
+  // the window, the document and an element no longer in it by name.
+  const name = (t) => {
+    if (t === window) return "window";
+    if (t === document) return "document";
+    if (!(t instanceof Element)) return "(" + (t && t.nodeName || String(t)) + ")";
+    if (t === document.documentElement || t === document.body) return t.localName;
+    if (t.id) return t.localName + "#" + t.id;
+    if (!t.parentElement) return "(removed " + t.localName + ")";
+    const index = Array.prototype.indexOf.call(t.parentElement.children, t) + 1;
+    return name(t.parentElement) + ">" + t.localName + ":nth-child(" + index + ")";
   };
   for (const type of types) window.addEventListener(type, (event) => log.push(event), true);
   window.__eventsDrain = () => log.splice(0).map((e) => {
@@ -22,8 +27,8 @@
   });
   window.__eventsFocus = () => {
     const el = document.activeElement;
-    return { focus: name(el), focusVisible: !!el && el !== document.body && el.matches(":focus-visible") };
+    return { focus: el ? name(el) : null, focusVisible: !!el && el !== document.body && el.matches(":focus-visible") };
   };
-  window.__eventsCount = (target) => document.querySelectorAll(target).length;
+  window.__eventsCount = (target) => target === "window" || target === "document" ? 1 : document.querySelectorAll(target).length;
   return true;
 })()

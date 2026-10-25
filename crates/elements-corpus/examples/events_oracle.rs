@@ -37,7 +37,7 @@ fn main() -> ExitCode {
 }
 
 fn run(check: bool) -> Result<(), String> {
-    refuse_orphans(".events.json")?;
+    refuse_orphans(".events.json", ".events")?;
     let trees = trees()?;
     if check {
         checked(&trees)

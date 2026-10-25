@@ -16,7 +16,9 @@ type \"Warm\"                  four keys
 expect event input input#title
 expect no event click
 wheel 200 400 0 120
+expect event wheel div#list
 tap 50 60
+expect focus button#edit
 frame
 ";
 
@@ -101,8 +103,62 @@ fn a_script_of_another_shape_is_refused_naming_its_file_and_line() {
             "listen click\nkey Hyper+a\n",
             "card.events:2: no modifier `Hyper`",
         ),
+        (
+            "listen click\nclick 1 2\nexpect no event click button#save\n",
+            "card.events:3: extra fields",
+        ),
+        (
+            "listen click\nclick 1 2\nexpect event click a#b c#d\n",
+            "card.events:3: extra fields",
+        ),
+        (
+            "listen click\nmove 10 20 30\n",
+            "card.events:2: extra fields",
+        ),
+        (
+            "listen click\nclick NaN 5\n",
+            "card.events:2: `click` takes X Y",
+        ),
+        (
+            "listen click\nclick inf 5\n",
+            "card.events:2: `click` takes X Y",
+        ),
+        ("listen click\nkey Tabb\n", "card.events:2: no key `Tabb`"),
+        ("listen click\nkey tab\n", "card.events:2: no key `tab`"),
+        ("listen click\nkey Shift+\n", "card.events:2: no key ``"),
+        (
+            "listen click\ntype \"\"\n",
+            "card.events:2: `type` takes a quoted text",
+        ),
+        ("at 0x0\n", "card.events:1: `at` takes WxH"),
     ] {
         let refusal = parse("card", text).expect_err(needle);
         assert!(refusal.starts_with(needle), "wanted {needle} in: {refusal}");
     }
+}
+
+#[test]
+fn a_script_with_nothing_to_check_is_refused() {
+    for (text, needle) in [
+        ("", "card.events: no steps"),
+        ("listen click\n", "card.events: no steps"),
+        (
+            "listen click\nclick 1 2\n",
+            "card.events:2: a step with no expectation",
+        ),
+    ] {
+        let refusal = parse("card", text).expect_err(needle);
+        assert!(refusal.starts_with(needle), "wanted {needle} in: {refusal}");
+    }
+}
+
+#[test]
+fn a_note_follows_two_spaces_and_is_not_a_field() {
+    let script = parse(
+        "card",
+        "listen click\nclick 1 2  the Save button, at its centre\nexpect focus a#b  focused\n",
+    )
+    .expect("parses");
+    assert_eq!(script.steps[0].action, Action::Click(1.0, 2.0));
+    assert_eq!(script.steps[0].expect[0].0, Expect::Focus("a#b".into()));
 }

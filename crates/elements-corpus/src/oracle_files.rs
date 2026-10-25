@@ -89,20 +89,21 @@ fn first_difference(committed: &str, chromium: &str) -> Option<(usize, String, S
         .map(|i| (i + 1, at(committed, i), at(chromium, i)))
 }
 
-/// Every `fixtures/*<suffix>` with no `.wisp` beside it, refused.
+/// Every `fixtures/<name><suffix>` with no `<name><source>` beside it,
+/// refused: an answer whose fixture or script was removed.
 ///
 /// # Errors
 /// The first such file, or the directory cannot be read.
-pub fn refuse_orphans(suffix: &str) -> Result<(), String> {
+pub fn refuse_orphans(suffix: &str, source: &str) -> Result<(), String> {
     let dir = fixtures_dir();
     let entries = std::fs::read_dir(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     for entry in entries.filter_map(Result::ok) {
         let file = entry.file_name().to_string_lossy().into_owned();
         if let Some(name) = file.strip_suffix(suffix)
-            && !dir.join(format!("{name}.wisp")).is_file()
+            && !dir.join(format!("{name}{source}")).is_file()
         {
             return Err(format!(
-                "{}: no {name}.wisp beside it; fix: remove it or add the fixture",
+                "{}: no {name}{source} beside it; fix: remove it, or add {name}{source}",
                 dir.join(&file).display()
             ));
         }
