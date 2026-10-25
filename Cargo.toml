@@ -36,6 +36,7 @@ vapors-app = { path = "crates/app" }
 vapors-elements-corpus = { path = "crates/elements-corpus" }
 vapors-demos = { path = "crates/demos" }
 vapors-pixels = { path = "crates/pixels" }
+vapors-devtools = { path = "crates/devtools" }
 vapors-compiler-examples = { path = "crates/compiler-examples" }
 # Pinned exactly: layout results are pinned by the Chromium geometry
 # corpus (docs/F2c.md), and a Taffy bump is a deliberate change checked
@@ -48,6 +49,8 @@ prettyplease = "=0.3.0"
 quote = "=1.0.47"
 proc-macro2 = { version = "=1.0.107", features = ["span-locations"] }
 insta = "=1.49.0"
+# The DevTools protocol is a WebSocket (vapors-devtools); the client only.
+tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
