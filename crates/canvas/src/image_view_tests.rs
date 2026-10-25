@@ -36,7 +36,10 @@ fn scroll_zooms_about_the_pointer() {
     let under_pointer = view.transform().image_point([100.0, 200.0]);
 
     // When
-    view.event(&Event::Scroll { steps: 1.0 });
+    view.event(&Event::Scroll {
+        dx: 0.0,
+        dy: -LINE_PIXELS,
+    });
 
     // Then
     assert!((view.transform().scale - 2.5).abs() < 1e-5);
@@ -52,7 +55,10 @@ fn scroll_before_any_pointer_move_zooms_about_the_view_centre() {
     let under_centre = view.transform().image_point([200.0, 200.0]);
 
     // When
-    view.event(&Event::Scroll { steps: 1.0 });
+    view.event(&Event::Scroll {
+        dx: 0.0,
+        dy: -LINE_PIXELS,
+    });
 
     // Then
     let after = view.transform().image_point([200.0, 200.0]);

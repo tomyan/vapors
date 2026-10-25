@@ -8,6 +8,8 @@
 //! ```text
 //! at WxH                       the lines after it are for a W x H CSS px viewport
 //! click X Y                    before the screenshot, click there (in file order)
+//! wheel X Y DX DY              before the screenshot, scroll there by DX, DY CSS px
+//!                              (signed as the DOM's deltaX, deltaY; in file order)
 //! pixel X Y #rrggbb            exact, within 1 per channel
 //! ink X0 Y0 X1 Y1 #rrggbb      some pixel in the box is not that colour
 //! ```
@@ -21,7 +23,7 @@ mod check;
 mod parse;
 
 pub use check::{Image, failures};
-pub use parse::{Check, DEFAULT_VIEWPORT, Spec, parse, section};
+pub use parse::{Check, DEFAULT_VIEWPORT, Input, Spec, parse, section};
 
 #[cfg(test)]
 #[path = "lib_tests.rs"]

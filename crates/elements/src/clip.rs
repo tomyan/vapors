@@ -6,7 +6,11 @@
 //! one, whose containing block is the viewport (box 0, the root, which
 //! never clips).
 
-use crate::layout::{BoxRect, LayoutBox, containing_blocks};
+use vapors_dom::NodeId;
+
+use crate::layout::{BoxRect, Content, LayoutBox};
+use crate::paint::PaintInput;
+use crate::style::Used;
 
 /// Each box's clip, CSS pixels, `None` for none; `clipping` says
 /// whether a box cuts off its own content.
@@ -15,46 +19,13 @@ pub(crate) fn clips(
     rects: &[BoxRect],
     clipping: &dyn Fn(usize) -> bool,
 ) -> Vec<Option<BoxRect>> {
-    let mut walk = Walk {
-        boxes,
-        rects,
-        clipping,
-        containing: containing_blocks(boxes),
-        own: vec![None; boxes.len()],
-        content: vec![None; boxes.len()],
-    };
-    walk.visit(0, None);
-    walk.own
-}
-
-struct Walk<'a> {
-    boxes: &'a [LayoutBox],
-    rects: &'a [BoxRect],
-    clipping: &'a dyn Fn(usize) -> bool,
-    containing: Vec<Option<usize>>,
-    /// The clip each box is painted under.
-    own: Vec<Option<BoxRect>>,
-    /// The clip each box's content is painted under.
-    content: Vec<Option<BoxRect>>,
-}
-
-impl Walk<'_> {
-    /// Ancestors, and so containing blocks, are visited first.
-    fn visit(&mut self, index: usize, parents: Option<BoxRect>) {
-        let own = self.containing[index].map_or(parents, |block| self.content[block]);
-        self.own[index] = own;
-        self.content[index] = if (self.clipping)(index) {
-            Some(within(
-                own,
-                padding_box(&self.boxes[index], self.rects[index]),
-            ))
+    crate::chain::by_containing_block(boxes, None, &|index, own| {
+        if clipping(index) {
+            Some(within(own, padding_box(&boxes[index], rects[index])))
         } else {
             own
-        };
-        for &child in &self.boxes[index].children {
-            self.visit(child, self.content[index]);
         }
-    }
+    })
 }
 
 /// `rect` cut to `clip`; an empty rect where they do not meet.
@@ -72,7 +43,7 @@ pub(crate) fn within(clip: Option<BoxRect>, rect: BoxRect) -> BoxRect {
     }
 }
 
-fn padding_box(layout_box: &LayoutBox, border_box: BoxRect) -> BoxRect {
+pub(crate) fn padding_box(layout_box: &LayoutBox, border_box: BoxRect) -> BoxRect {
     let border = layout_box.layout.border;
     BoxRect {
         x: border_box.x + border.left,
@@ -80,4 +51,18 @@ fn padding_box(layout_box: &LayoutBox, border_box: BoxRect) -> BoxRect {
         width: (border_box.width - border.left - border.right).max(0.0),
         height: (border_box.height - border.top - border.bottom).max(0.0),
     }
+}
+
+/// Whether box `index` cuts off its content. The root never does: its
+/// `overflow` is the viewport's. Nor does the body unless the root's
+/// `overflow` is not `visible`; otherwise the body's is the viewport's
+/// (CSS Overflow 3 section 3.3).
+pub(crate) fn clipping(boxes: &[LayoutBox], index: usize, input: &PaintInput<'_>) -> bool {
+    let Content::Element(node) = boxes[index].content else {
+        return false;
+    };
+    let clips = |node: NodeId| input.used.get(&node).is_some_and(Used::clips);
+    let to_viewport =
+        crate::style::to_viewport(node == input.root, node == input.body, !clips(input.root));
+    clips(node) && !to_viewport
 }

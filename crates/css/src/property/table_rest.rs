@@ -59,6 +59,8 @@ pub(super) static SECOND_HALF: &[PropertyDef] = &[
     ),
     def("right", false, "auto", INSET),
     def("row-gap", false, "normal", GAP),
+    def("scrollbar-color", true, "auto", "auto | <color> <color>"),
+    def("scrollbar-width", false, "auto", "auto | thin | none"),
     def(
         "text-align",
         true,

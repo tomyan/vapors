@@ -3,6 +3,9 @@
 //! within Chromium's layout unit (1/64 px), or within the tolerance a
 //! fixture with text states in a `/* tolerance N */` comment, with why.
 
+#[path = "corpus_support/scroll.rs"]
+mod scroll;
+
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -87,6 +90,9 @@ fn our_boxes(fixture: &Fixture, viewport: Viewport) -> Vec<(String, BoxRect)> {
     let mut doc = doc.borrow_mut();
     if let Err(errors) = doc.update(viewport) {
         panic!("{}: the update was refused: {errors:#?}", fixture.name);
+    }
+    if scroll::as_the_fixture_says(&mut doc, fixture.name) {
+        doc.update(viewport).expect("updates again");
     }
     let painted = doc.painted().expect("painted");
     doc.elements()

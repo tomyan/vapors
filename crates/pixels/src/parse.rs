@@ -1,4 +1,4 @@
-//! Reading a `.pixels` file: its viewport sections, clicks and checks.
+//! Reading a `.pixels` file: its viewport sections, inputs and checks.
 
 /// One check.
 #[derive(Clone, Debug, PartialEq)]
@@ -23,17 +23,47 @@ pub enum Check {
     },
 }
 
+/// One input made before the screenshot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Input {
+    /// A click at (x, y), CSS pixels.
+    Click([u32; 2]),
+    /// A wheel scroll at `at` by `delta` CSS pixels, signed as the DOM's
+    /// `deltaX` and `deltaY`: positive scrolls right and down.
+    Wheel {
+        /// Where, CSS pixels.
+        at: [u32; 2],
+        /// By how much, CSS pixels.
+        delta: [i32; 2],
+    },
+}
+
+impl Input {
+    /// The input as its `.pixels` line, which `check_pixels --inputs`
+    /// prints for the page-contract script.
+    #[must_use]
+    pub fn line(&self) -> String {
+        match self {
+            Input::Click([x, y]) => format!("click {x} {y}"),
+            Input::Wheel {
+                at: [x, y],
+                delta: [dx, dy],
+            } => format!("wheel {x} {y} {dx} {dy}"),
+        }
+    }
+}
+
 /// The viewport a section with no `at` line is for.
 pub const DEFAULT_VIEWPORT: [u32; 2] = [640, 400];
 
-/// One section of a `.pixels` file: a viewport, the clicks to make, then
+/// One section of a `.pixels` file: a viewport, the inputs to make, then
 /// the checks to hold.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Spec {
     /// The viewport, CSS pixels.
     pub viewport: [u32; 2],
-    /// Points (CSS pixels) to click before the screenshot, in order.
-    pub clicks: Vec<[u32; 2]>,
+    /// Clicks and wheel scrolls to make before the screenshot, in order.
+    pub inputs: Vec<Input>,
     /// What the screenshot must show after them.
     pub checks: Vec<Check>,
 }
@@ -42,7 +72,7 @@ impl Spec {
     fn new(viewport: [u32; 2]) -> Self {
         Self {
             viewport,
-            clicks: Vec::new(),
+            inputs: Vec::new(),
             checks: Vec::new(),
         }
     }
@@ -50,7 +80,7 @@ impl Spec {
 
 enum Line {
     At([u32; 2]),
-    Click([u32; 2]),
+    Input(Input),
     Check(Check),
 }
 
@@ -79,7 +109,7 @@ pub fn parse(name: &str, text: &str) -> Result<Vec<Spec>, String> {
                 }
                 done.push(std::mem::replace(&mut current, Spec::new(viewport)));
             }
-            Line::Click(point) => current.clicks.push(point),
+            Line::Input(input) => current.inputs.push(input),
             Line::Check(check) => current.checks.push(check),
         }
     }
@@ -116,7 +146,11 @@ fn parse_line(line: &str) -> Result<Line, String> {
             let (w, h) = size.split_once('x').ok_or(format!("`{size}` is not WxH"))?;
             Ok(Line::At([number(w)?, number(h)?]))
         }
-        ["click", x, y, ..] => Ok(Line::Click([number(x)?, number(y)?])),
+        ["click", x, y, ..] => Ok(Line::Input(Input::Click([number(x)?, number(y)?]))),
+        ["wheel", x, y, dx, dy, ..] => Ok(Line::Input(Input::Wheel {
+            at: [number(x)?, number(y)?],
+            delta: [delta(dx)?, delta(dy)?],
+        })),
         _ => parse_check(&fields).map(Line::Check),
     }
 }
@@ -134,7 +168,7 @@ fn parse_check(fields: &[&str]) -> Result<Check, String> {
             rgb: colour(rgb)?,
         }),
         _ => {
-            Err("expected `click X Y`, `pixel X Y #rrggbb` or `ink X0 Y0 X1 Y1 #rrggbb`".to_owned())
+            Err("expected `click X Y`, `wheel X Y DX DY`, `pixel X Y #rrggbb` or `ink X0 Y0 X1 Y1 #rrggbb`".to_owned())
         }
     }
 }
@@ -142,6 +176,11 @@ fn parse_check(fields: &[&str]) -> Result<Check, String> {
 fn number(text: &str) -> Result<u32, String> {
     text.parse()
         .map_err(|_| format!("`{text}` is not a whole number of pixels"))
+}
+
+fn delta(text: &str) -> Result<i32, String> {
+    text.parse()
+        .map_err(|_| format!("`{text}` is not a whole number of pixels to scroll"))
 }
 
 fn colour(text: &str) -> Result<[u8; 3], String> {

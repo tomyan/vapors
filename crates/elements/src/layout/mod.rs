@@ -36,8 +36,8 @@ pub struct BoxRect {
 /// initial containing block: the root's percentages resolve against it,
 /// and an `auto` height is still its content's. A box unchanged since
 /// the update `kept` holds takes its cache and layout first. Returns
-/// the boxes with each one's border box, in box order, and how many
-/// times Taffy laid a box out rather than reading its cache.
+/// the boxes and how many times Taffy laid a box out rather than
+/// reading its cache; `placed` gives their border boxes.
 ///
 /// # Errors
 /// A `calc()` that did not resolve (see `Calcs`).
@@ -48,7 +48,7 @@ pub(crate) fn lay_out(
     scale: f32,
     size: (f32, f32),
     calcs: &Calcs,
-) -> Result<(Vec<LayoutBox>, Vec<BoxRect>, usize), String> {
+) -> Result<(Vec<LayoutBox>, usize), String> {
     let (fonts, cache) = texts;
     kept.0.lend(&mut boxes, scale, kept.1);
     let mut tree = BoxTree {
@@ -64,20 +64,9 @@ pub(crate) fn lay_out(
         height: AvailableSpace::Definite(size.1),
     };
     compute_root_layout(&mut tree, NodeId::from(0usize), available);
-    let mut rects = vec![
-        BoxRect {
-            x: 0.0,
-            y: 0.0,
-            width: 0.0,
-            height: 0.0
-        };
-        tree.boxes.len()
-    ];
-    let containing = containing_blocks(&tree.boxes);
-    place(&tree.boxes, &containing, 0, (0.0, 0.0), &mut rects);
     match calcs.failure() {
         Some(failure) => Err(failure),
-        None => Ok((tree.boxes, rects, tree.laid_out)),
+        None => Ok((tree.boxes, tree.laid_out)),
     }
 }
 
@@ -92,26 +81,28 @@ pub(crate) fn containing_blocks(boxes: &[LayoutBox]) -> Vec<Option<usize>> {
     containing
 }
 
-/// Places `index` at `origin` (its parent's corner, or its containing
-/// block's when it is out of flow, which is placed first: an ancestor)
-/// and its children after it.
-fn place(
-    boxes: &[LayoutBox],
-    containing: &[Option<usize>],
-    index: usize,
-    origin: (f32, f32),
-    rects: &mut [BoxRect],
-) {
-    let layout = &boxes[index].layout;
-    let origin = containing[index].map_or(origin, |block| (rects[block].x, rects[block].y));
-    let (x, y) = (origin.0 + layout.location.x, origin.1 + layout.location.y);
-    rects[index] = BoxRect {
-        x,
-        y,
-        width: layout.size.width,
-        height: layout.size.height,
+/// Each box's border box in document coordinates: its place in its
+/// containing block's content, whose origin is that box's corner less
+/// its scroll offset (`offsets`, by box index, in CSS pixels).
+pub(crate) fn placed(boxes: &[LayoutBox], offsets: &[[f32; 2]]) -> Vec<BoxRect> {
+    let corner = |index: usize, origin: (f32, f32)| {
+        let location = boxes[index].layout.location;
+        (origin.0 + location.x, origin.1 + location.y)
     };
-    for &child in &boxes[index].children {
-        place(boxes, containing, child, (x, y), rects);
-    }
+    let origins = crate::chain::by_containing_block(boxes, (0.0, 0.0), &|index, origin| {
+        let (x, y) = corner(index, origin);
+        (x - offsets[index][0], y - offsets[index][1])
+    });
+    (0..boxes.len())
+        .map(|index| {
+            let (x, y) = corner(index, origins[index]);
+            let size = boxes[index].layout.size;
+            BoxRect {
+                x,
+                y,
+                width: size.width,
+                height: size.height,
+            }
+        })
+        .collect()
 }

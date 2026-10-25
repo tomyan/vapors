@@ -18,6 +18,8 @@ pub struct Input {
     size: Option<[f32; 2]>,
     gestures: Gestures,
     started: Instant,
+    /// Physical pixels per CSS pixel, for scroll deltas.
+    scale: f64,
 }
 
 impl Input {
@@ -28,7 +30,13 @@ impl Input {
             size: None,
             gestures: Gestures::new(),
             started: Instant::now(),
+            scale: 1.0,
         }
+    }
+
+    /// The window's physical pixels per CSS pixel, before each event.
+    pub fn set_scale(&mut self, scale: f64) {
+        self.scale = scale;
     }
 
     /// The app events for one winit event, in the order to send them.
@@ -36,7 +44,7 @@ impl Input {
         if let WindowEvent::PinchGesture { delta, .. } = event {
             return self.pinch(*delta).into_iter().collect();
         }
-        let Some(direct) = from_winit(event) else {
+        let Some(direct) = from_winit(event, self.scale) else {
             return Vec::new();
         };
         let gestures = self.track(&direct);
@@ -80,3 +88,7 @@ impl Input {
 #[cfg(test)]
 #[path = "input_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "input_wheel_tests.rs"]
+mod wheel_tests;
