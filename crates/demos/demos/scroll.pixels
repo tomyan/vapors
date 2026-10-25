@@ -1,0 +1,21 @@
+# Two 200-row lists under a 44 px bar, side by side, at 640x400 CSS px
+# at 1x. Rows are 40 px: white for row 0, 2, 4 ..., grey for 1, 3, 5 ...
+# (nth-child(even) is the second row). A wheel of 120 px (one notch)
+# over the left list scrolls it three rows, so its top row is row 3
+# (grey); the right list is not scrolled, so its top row is row 0
+# (white).
+wheel 100 200 0 120
+pixel 200 50 #dde1e5        left list, top row: row 3, grey, after the scroll
+pixel 520 50 #ffffff        right list, top row: row 0, white, not scrolled
+pixel 520 90 #dde1e5        right list, second row: grey
+pixel 4 4 #171b1f           the bar
+ink 310 46 319 398 #dde1e5  the left list's thumb is drawn at its right edge
+
+# A phone: the lists are 195 px wide each; two notches of wheel (240 px,
+# six rows) over the left one. Finger scrolling goes through the same
+# Document::scroll_target and scroll_node_by (touch_scroll.rs tests).
+at 390x800
+wheel 50 300 0 240
+pixel 100 50 #ffffff        left list, top row: row 6, white
+pixel 100 90 #dde1e5        left list, next row: row 7, grey
+pixel 300 90 #dde1e5        right list, second row: grey, not scrolled

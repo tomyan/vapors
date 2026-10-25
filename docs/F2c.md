@@ -440,6 +440,11 @@ transitions on elements, `transform`, inline-block inside text,
 rounded clips, focus and keyboard (F2d), inputs and editing (F4),
 `dialog`/popover (F5), damage tracking.
 
+F2d, in this order (the lead, 2026-10-25): momentum and fling for
+touch scrolling, first, since phone scrolling without them feels
+broken; `br` and `a` (D6); mixed inline metrics (refused since S6);
+then focus and keyboard.
+
 After each slice the plan is reread. The question is whether the next
 slice is still the most useful one for touche, given what the last
 slice showed.
@@ -851,6 +856,47 @@ differs from the plan.
     before the next frame, and a click is hit against the last painted
     frame, so a click cannot reach a toast that an earlier click in the
     same file raised. This is the same frame-later behaviour as D7.
+
+### S9
+
+- **Scroll containers** (`scroll.rs`, `chain.rs`, `scrolling.rs`):
+  `overflow: scroll` and `auto` keep an offset per element on the
+  Document, clamped to the content each update, dropped when the
+  element stops scrolling, applied in whole device pixels.
+  - Which boxes move with a container follows the containing block,
+    by the walk S8's clips use: an absolute box placed by a box outside
+    it does not move, and a fixed box never does.
+  - Taffy 0.15's scrollable overflow leaves out the in-flow children's
+    end margins and the end padding, which Chromium counts; the range
+    is the larger of the two. The `scrolling` layout fixture
+    (`data-scroll="x y"`, applied by the oracle page and the corpus
+    test) showed Taffy 4 px short.
+  - The page itself does not scroll: `scroll` and `auto` on html, or on
+    body while html is visible, are refused.
+- **Input.** `platform::Event::Scroll { dx, dy }` in CSS pixels, signed
+  as the DOM's deltas. A wheel notch is `LINE_PIXELS` = 120, measured:
+  one XTest button-5 press under Xvfb over a headful Chromium 155 page
+  gave `deltaY` 120, `deltaMode` 0 and `scrollY` +120. The image view
+  zooms one step per notch, from `dy`.
+  - A wheel scrolls the innermost container under the pointer that can
+    move that way, else the next one out (`Document::scroll_by`).
+  - A touch gesture keeps the first container it moves, as Chromium
+    latches it (`touch_scroll.rs`); a pan past its end goes nowhere.
+  - touche's pin bump changes one test,
+    `crates/viewer/src/viewer_app_tests.rs:41`:
+    `Event::Scroll { steps: 1.0 }` becomes
+    `Event::Scroll { dx: 0.0, dy: -vapors_platform::LINE_PIXELS }`.
+- **Thumbs** (`thumb.rs`, D10): overlay only, styled by
+  `scrollbar-color` and `scrollbar-width`; on touch, shown only while a
+  gesture scrolls. They take no pointer.
+- **`.pixels` gains `wheel X Y DX DY`**, made by the parser, the native
+  demo example and `gpu_demos` (through `vapors_demos::input`), and by
+  the page contract (a pointer move, then a WheelEvent in pixels on the
+  canvas, through winit and `ElementsApp`).
+- **Demo.** `scroll`: two 200-row lists under a fixed bar; a wheel over
+  the left one moves its top row from row 0 to row 3 (row 6 on the
+  phone), while the right one stays at row 0.
+- **Deferred to F2d:** momentum and fling.
 
 ## Decisions (2026-10-23)
 

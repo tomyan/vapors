@@ -10,7 +10,7 @@ use vapors_pixels::{Image, Spec, failures, parse};
 use vapors_renderer::{Target, clear};
 use vapors_scene::{Color, Size};
 
-/// The demo at `spec`'s viewport after its clicks, painted offscreen.
+/// The demo at `spec`'s viewport after its inputs, painted offscreen.
 fn render(name: &str, spec: &Spec) -> Vec<u8> {
     let demo = vapors_demos::find(name).expect("a demo");
     let shared = vapors_demos::document(&demo).document;
@@ -24,8 +24,8 @@ fn render(name: &str, spec: &Spec) -> Vec<u8> {
     if let Err(errors) = shared.borrow_mut().update(viewport) {
         panic!("{name} at {width}x{height} was refused: {errors:#?}");
     }
-    for click in &spec.clicks {
-        vapors_demos::click(&shared, *click);
+    for input in &spec.inputs {
+        vapors_demos::input(&shared, input);
     }
     let mut document = shared.borrow_mut();
     let painted = document

@@ -6,7 +6,7 @@
 //! ```
 //!
 //! With `--screenshot <png>` (which `cargo xtask screenshot` adds) it
-//! makes the demo's `.pixels` clicks after the first frame, saves the
+//! makes the demo's `.pixels` inputs after the first frame, saves the
 //! second, checks it against the `.pixels`, and exits 1 when a check
 //! fails or the document was refused.
 
@@ -67,7 +67,7 @@ fn flag_value(args: &[String], flag: &str) -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
-/// The app; after its first frame, the `.pixels` clicks; on the next,
+/// The app; after its first frame, the `.pixels` inputs; on the next,
 /// the screenshot and its checks.
 struct Shot {
     app: ElementsApp,
@@ -127,18 +127,19 @@ impl App for Shot {
     }
 
     /// The app's own answer, so a change that asks for no frame is not
-    /// hidden: after the first frame the clicks are made and the app
-    /// says whether they changed anything; the screenshot is the frame
-    /// that follows (or the first, when there are no clicks).
+    /// hidden: after the first frame the inputs (clicks and wheels) are
+    /// made and the app says whether they changed anything; the
+    /// screenshot is the frame that follows (or the first, when there
+    /// are none).
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
         let next = self.app.frame(frame);
         let Some(path) = &self.path else { return next };
         if next == Next::Exit {
             return Next::Exit;
         }
-        if frame.index == 0 && !self.spec.clicks.is_empty() {
-            for point in &self.spec.clicks {
-                vapors_demos::click(&self.document, *point);
+        if frame.index == 0 && !self.spec.inputs.is_empty() {
+            for input in &self.spec.inputs {
+                vapors_demos::input(&self.document, input);
             }
             return self.app.next_after_frame();
         }
