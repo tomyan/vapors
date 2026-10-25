@@ -8,9 +8,10 @@ use serde_json::{Value, json};
 use vapors_devtools::Session;
 use vapors_text::comparison::Chromium;
 
-/// Each call: a cold first launch on a runner took up to 58 s (vapors'
-/// `COLD_START`); calls on a warm browser take milliseconds.
-const DEADLINE: Duration = Duration::from_secs(90);
+/// Attaching and each call: vapors' `COLD_START`, 145 s, about 2.5x the
+/// slowest first launch on a runner (57.9 s); a warm browser answers in
+/// milliseconds.
+const DEADLINE: Duration = Duration::from_secs(145);
 
 const PAGE: &str = "data:text/html,<button id=b onclick=\"document.title='clicked'\">Save</button>\
 <input id=i onkeydown=\"document.title='key '+event.key\">";
@@ -18,10 +19,11 @@ const PAGE: &str = "data:text/html,<button id=b onclick=\"document.title='clicke
 fn session(test: &str) -> (vapors_text::comparison::Live, Session) {
     let chromium = Chromium::find().unwrap_or_else(|e| panic!("{e}"));
     let profile = std::env::temp_dir().join(format!("devtools-{test}-{}", std::process::id()));
-    let live = chromium
+    let mut live = chromium
         .live(&profile, 400, 300, 1)
         .unwrap_or_else(|e| panic!("{e}"));
-    let mut session = Session::attach(live.profile(), DEADLINE).unwrap_or_else(|e| panic!("{e}"));
+    let mut session =
+        Session::attach(&profile, DEADLINE, &mut || live.alive()).unwrap_or_else(|e| panic!("{e}"));
     call(&mut session, "Page.enable", &json!({}));
     call(&mut session, "Page.navigate", &json!({ "url": PAGE }));
     session

@@ -11,8 +11,13 @@ use super::*;
 
 const SHORT: Duration = Duration::from_millis(400);
 
-/// A server that answers its first message with `script(id)`'s frames.
+/// A server that answers its first message with `script(id)`'s frames,
+/// `gap` apart.
 fn server(script: fn(u64) -> Vec<Message>) -> String {
+    server_spaced(script, Duration::ZERO)
+}
+
+fn server_spaced(script: fn(u64) -> Vec<Message>, gap: Duration) -> String {
     let listener = TcpListener::bind("127.0.0.1:0").expect("a port");
     let port = listener.local_addr().expect("address").port();
     thread::spawn(move || {
@@ -25,6 +30,7 @@ fn server(script: fn(u64) -> Vec<Message>) -> String {
             if socket.send(frame).is_err() {
                 return;
             }
+            thread::sleep(gap);
         }
         thread::sleep(Duration::from_secs(2));
     });
@@ -82,8 +88,9 @@ fn a_protocol_error_is_refused_naming_the_method() {
 
 #[test]
 fn a_call_with_no_answer_fails_at_its_deadline_even_with_pings_arriving() {
-    // Given: pings, never the answer
-    let url = server(|_| (0..40).map(|_| Message::Ping(Vec::new().into())).collect());
+    // Given: a ping every 50 ms for 2 s, never the answer
+    let pings = |_| (0..40).map(|_| Message::Ping(Vec::new().into())).collect();
+    let url = server_spaced(pings, Duration::from_millis(50));
     let mut session = Session::connect(&url, SHORT).expect("connects");
 
     // When
@@ -126,4 +133,28 @@ fn an_answer_that_is_not_json_is_refused_quoting_it() {
         .call("Page.enable", &json!({}), SHORT)
         .expect_err("refused");
     assert!(refusal.contains("not json"), "{refusal}");
+}
+
+#[test]
+fn messages_of_a_shape_not_recognised_are_refused_quoting_them() {
+    type Script = fn(u64) -> Vec<Message>;
+    let cases: [(Script, &str); 3] = [
+        (
+            |id| vec![text(&json!({ "id": id }))],
+            "neither result nor error",
+        ),
+        (
+            |_| vec![text(&json!({ "params": {} }))],
+            "neither id nor method",
+        ),
+        (|_| vec![Message::Binary(vec![1, 2].into())], "binary"),
+    ];
+    for (script, needle) in cases {
+        let url = server(script);
+        let mut session = Session::connect(&url, SHORT).expect("connects");
+        let refusal = session
+            .call("Page.enable", &json!({}), SHORT)
+            .expect_err(needle);
+        assert!(refusal.contains(needle), "wanted {needle} in: {refusal}");
+    }
 }
