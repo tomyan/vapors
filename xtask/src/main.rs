@@ -8,6 +8,8 @@ mod ci;
 mod cli;
 mod command;
 mod config;
+mod config_line;
+mod config_schema;
 mod deadline;
 mod dev;
 mod dev_keys;
