@@ -47,6 +47,8 @@ mod sccache;
 mod screenshot;
 mod screenshot_package;
 mod serve;
+mod serve_config;
+mod serve_mount;
 mod setup;
 mod setup_install;
 mod stamp_page;
@@ -94,10 +96,10 @@ fn main() -> ExitCode {
             return screenshot::run(&target, &out, expect.as_deref(), &example_args);
         }
         Command::Web { debug } => return web::run(debug),
-        Command::Serve => return serve::run(),
+        Command::Serve { replace } => return serve::run(replace),
         Command::StampPage => return stamp_page::run(),
         Command::CheckXtaskTwin { sibling } => return twin::run(&sibling),
-        Command::Dev { keys } => return dev::run(&reporter, &keys),
+        Command::Dev { keys, replace } => return dev::run(&reporter, &keys, replace),
         Command::Ci => match web::web_package() {
             Ok(package) => return ci_with_hit_rate(&steps::ci(&package), &reporter),
             Err(message) => return fail("ci", &message),

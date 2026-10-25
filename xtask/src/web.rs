@@ -72,7 +72,7 @@ pub fn run(debug: bool) -> ExitCode {
     }
 }
 
-fn build_page(build: &Build) -> Result<String, String> {
+pub fn build_page(build: &Build) -> Result<String, String> {
     let package = web_package()?;
     let crate_dir = package_dir(&package)?;
     let dist = std::env::current_dir()

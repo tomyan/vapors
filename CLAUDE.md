@@ -14,7 +14,9 @@ cargo xtask deny          cargo-deny by deny.toml: advisories, bans, licences, s
 cargo xtask lint          fmt and clippy only
 cargo xtask wasm          clippy for the web package on wasm32-unknown-unknown
 cargo xtask web           trunk release build of the web package into target/web
-cargo xtask serve         put target/web on the tailnet over https; prints the URL
+cargo xtask serve         the release build of main on the tailnet where [serve] says (from a
+                          clean checkout at origin/main after `cargo xtask web`; [serve] check
+                          first, then a copy under ~/srv); prints the URL
 cargo xtask test          one tier (default unit)
 cargo run -p vapors-app --example demo -- hello
                           an F2c demo in a window (crates/demos)
