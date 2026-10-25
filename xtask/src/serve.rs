@@ -1,16 +1,33 @@
-//! `cargo xtask serve`: put `target/web` on the tailnet over https with
-//! `tailscale serve` and print the URL, so a phone can open it.
+//! `cargo xtask serve`: the release build of main on the tailnet, where
+//! `[serve]` in `.config/factory.toml` says (`serve_config.rs`). From a
+//! checkout it fetches `origin/main`, refuses another commit or a
+//! changed tree (`serve_git.rs`), builds the page itself so the build is
+//! that commit's, runs `[serve] check` on it within its deadline
+//! (`serve_check.rs`; touche's `check_dist` refuses, among the rest, any
+//! file requesting the dev server's keys), publishes a copy under the
+//! home directory (`serve_publish.rs`), and mounts it, refusing to
+//! replace another target unless `--replace` (`serve_mount.rs`).
 
+#[path = "serve_check.rs"]
+mod check;
+#[path = "serve_git.rs"]
+mod git;
+#[path = "serve_publish.rs"]
+mod publish;
+
+use std::path::Path;
 use std::process::ExitCode;
 
-use crate::tailscale::{Target, require_tailscale, served_url, start_serving};
-use crate::web::DIST;
+use crate::config::Config;
+use crate::serve_config::{self, Serve};
+use crate::tailscale::{Target, mount, require_tailscale};
+use crate::web::{Build, DIST, build_page};
 
-/// Serve the dist directory and print its URL.
-pub fn run() -> ExitCode {
-    match serve() {
+/// Serve the release build of main and print its URL.
+pub fn run(replace: bool) -> ExitCode {
+    match serve(replace) {
         Ok(url) => {
-            println!("ok   serve    {url}");
+            println!("ok   serve    {url} (the release build of main)");
             ExitCode::SUCCESS
         }
         Err(message) => {
@@ -21,17 +38,26 @@ pub fn run() -> ExitCode {
     }
 }
 
-fn serve() -> Result<String, String> {
+fn serve(replace: bool) -> Result<String, String> {
     let tailscale = require_tailscale()?;
-    let dist = std::env::current_dir()
-        .map_err(|e| format!("no current directory: {e}"))?
-        .join(DIST);
-    if !dist.join("index.html").is_file() {
-        return Err(format!(
-            "{} has no index.html; run `cargo xtask web` first",
-            dist.display()
-        ));
-    }
-    start_serving(&tailscale, &Target::Directory(&dist))?;
-    served_url(&tailscale)
+    let settings = settings()?;
+    let root = std::env::current_dir().map_err(|e| format!("no current directory: {e}"))?;
+    let here = root.display().to_string();
+    git::fetch_main(&here)?;
+    git::require_main(&here)?;
+    build_page(&Build::of(false))?;
+    check::run_check(&settings.check, settings.check_deadline)?;
+    publish::publish(&root.join(DIST), &settings.dir)?;
+    mount(
+        &tailscale,
+        &Target::Directory(&settings.dir),
+        &settings.mount,
+        replace,
+    )
+}
+
+fn settings() -> Result<Serve, String> {
+    let home = std::env::var_os("HOME").ok_or("HOME is unset; fix: set it")?;
+    let config = Config::load().map_err(|e| e.to_string())?;
+    serve_config::serve(&config, Path::new(&home))
 }

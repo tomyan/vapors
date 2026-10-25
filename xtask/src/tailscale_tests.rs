@@ -1,6 +1,7 @@
 //! The tailscale pieces against canned status text and a PATH of their own.
 
 use super::*;
+use crate::serve_config::Mount;
 
 #[test]
 fn dns_name_comes_from_self_without_the_trailing_dot() {
@@ -87,5 +88,57 @@ fn a_local_port_target_is_the_loopback_url_and_a_directory_its_path() {
     assert_eq!(
         Target::Directory(Path::new("/srv/web")).argument(),
         "/srv/web"
+    );
+}
+
+#[test]
+fn a_target_is_mounted_at_its_port_and_path() {
+    // Given
+    let release = Mount {
+        https: 443,
+        path: "/".into(),
+    };
+    let demo = Mount {
+        https: 443,
+        path: "/vapors/".into(),
+    };
+
+    // When / Then
+    assert_eq!(
+        serve_arguments(&Target::Directory(Path::new("/srv/touche")), &release),
+        [
+            "serve",
+            "--bg",
+            "--https=443",
+            "--set-path=/",
+            "/srv/touche"
+        ]
+    );
+    assert_eq!(
+        serve_arguments(&Target::LocalPort(8080), &demo),
+        [
+            "serve",
+            "--bg",
+            "--https=443",
+            "--set-path=/vapors/",
+            "http://127.0.0.1:8080"
+        ]
+    );
+}
+
+#[test]
+fn a_url_names_the_port_unless_it_is_443_and_ends_with_the_path() {
+    let at = |https, path: &str| Mount {
+        https,
+        path: path.into(),
+    };
+    assert_eq!(url_for("box.ts.net", &at(443, "/")), "https://box.ts.net/");
+    assert_eq!(
+        url_for("box.ts.net", &at(443, "/vapors/")),
+        "https://box.ts.net/vapors/"
+    );
+    assert_eq!(
+        url_for("box.ts.net", &at(8445, "/")),
+        "https://box.ts.net:8445/"
     );
 }

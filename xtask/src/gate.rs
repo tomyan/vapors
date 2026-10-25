@@ -182,7 +182,7 @@ fn checkout(dir: &str) -> Result<String, String> {
 }
 
 /// git in `dir`, its stdout trimmed; hook variables stripped (CLAUDE.md).
-fn git(dir: &str, args: &[&str]) -> Result<String, String> {
+pub(crate) fn git(dir: &str, args: &[&str]) -> Result<String, String> {
     let output = Command::new("git")
         .arg("-C")
         .arg(dir)

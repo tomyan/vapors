@@ -43,3 +43,19 @@ fn an_empty_table_of_an_unknown_name_is_refused_too() {
     let refusal = checked("[webb]\n").expect_err("refused");
     assert!(refusal.contains("[webb]"), "{refusal}");
 }
+
+#[test]
+fn serve_and_the_dev_https_port_are_accepted() {
+    let text = "[serve]\ndir = \"srv/x\"\nhttps = \"443\"\npath = \"/\"\ncheck = \"true\"\ncheck_seconds = \"60\"\n[dev]\nhttps = \"8446\"\n";
+    assert_eq!(checked(text), Ok(()));
+}
+
+#[test]
+fn a_misspelt_serve_key_is_refused_naming_its_line() {
+    // When
+    let refusal = checked("[serve]\ndir = \"srv/x\"\ncheck_secs = \"60\"\n").expect_err("refused");
+
+    // Then
+    assert!(refusal.contains(":3:"), "{refusal}");
+    assert!(refusal.contains("serve.check_secs"), "{refusal}");
+}
