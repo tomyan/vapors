@@ -2,10 +2,10 @@
 //! builds the web package (debug, for speed) and rebuilds it on every
 //! save under the workspace, serving it on a local port with its reload
 //! script injected; `tailscale serve` puts that port on the tailnet over
-//! https, so the page on the phone reloads on save. The previous static
-//! serve is replaced; `cargo xtask serve` puts it back. Ctrl-C stops
-//! trunk (it shares the terminal); the tailscale proxy stays pointed at
-//! the dead port until `cargo xtask serve`. With `--key
+//! https on `[dev] https`, so the page on the phone reloads on save; the
+//! release build keeps its own place (`cargo xtask serve`). Ctrl-C stops
+//! trunk (it shares the terminal); that port's proxy then points at a
+//! dead port until the next `cargo xtask dev`. With `--key
 //! <provider>=<file>`, trunk proxies `/dev/keys.json` to a loopback
 //! server that answers it from those files (`dev_keys_server`), so the
 //! debug page can ask a model without a key typed in.
@@ -20,6 +20,7 @@ use crate::config::Config;
 use crate::dev_keys::{self, DevKey};
 use crate::dev_keys_server::{self, KEYS_PATH};
 use crate::report::Reporter;
+use crate::serve_config;
 use crate::tailscale::{Target, find_in, require_tailscale, served_url, start_serving};
 use crate::trunk::Trunk;
 use crate::web::{package_dir, web_package};
@@ -55,7 +56,9 @@ fn serve(reporter: &Reporter, key_arguments: &[String]) -> Result<(), String> {
     let keys = checked_keys(key_arguments, &providers_for(key_arguments)?)?;
     let trunk = require_trunk()?;
     let tailscale = require_tailscale()?;
-    let port = port_from(&Config::load().map_err(|e| e.to_string())?)?;
+    let config = Config::load().map_err(|e| e.to_string())?;
+    let port = port_from(&config)?;
+    let mount = serve_config::dev(&config)?;
     check_port_free(port)?;
     let package = web_package()?;
     let crate_dir = package_dir(&package)?;
@@ -64,8 +67,8 @@ fn serve(reporter: &Reporter, key_arguments: &[String]) -> Result<(), String> {
     let args = trunk_args(port, &root, keys_port);
     let mut trunk = Trunk::spawn(trunk_command(&trunk, &crate_dir, &args)?)?;
     trunk.wait_until_ready(port, reporter, READY_DEADLINE)?;
-    start_serving(&tailscale, &Target::LocalPort(port))?;
-    announce(&served_url(&tailscale)?, &package, port, &notices);
+    start_serving(&tailscale, &Target::LocalPort(port), &mount)?;
+    announce(&served_url(&tailscale, &mount)?, &package, port, &notices);
     trunk.follow(reporter)
 }
 
@@ -79,7 +82,7 @@ fn announce(url: &str, package: &str, port: u16, notices: &[String]) {
     println!(
         "ok   dev      {url} (trunk debug build of {package} on 127.0.0.1:{port}; reloads on save)"
     );
-    println!("     Ctrl-C stops it; `cargo xtask serve` puts the static build back on the tailnet");
+    println!("     Ctrl-C stops it; the release build stays where `cargo xtask serve` put it");
     for line in notices {
         println!("{line}");
     }

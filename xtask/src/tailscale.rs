@@ -9,6 +9,7 @@ use std::process::Command;
 use std::time::Duration;
 
 use crate::deadline::{Finished, run_with_deadline};
+use crate::serve_config::Mount;
 
 /// How long `tailscale serve --bg` and `tailscale status` may take. Both
 /// returned in under a second on the dev box on 2026-10-22; the margin
@@ -56,22 +57,28 @@ impl Target<'_> {
     }
 }
 
-/// `sudo -n tailscale serve --bg --https=443 <target>`. `sudo -n` never
-/// prompts: when sudo would ask for a password the failure prints the
-/// exact command for the person to run themselves. The previous serve
-/// target, if any, is replaced.
-pub fn start_serving(tailscale: &Path, target: &Target<'_>) -> Result<(), String> {
-    let argument = target.argument();
-    let line = format!(
-        "sudo {} serve --bg --https=443 {argument}",
-        tailscale.display()
-    );
+/// `serve`'s arguments for `target` at `mount`.
+#[must_use]
+pub fn serve_arguments(target: &Target<'_>, mount: &Mount) -> Vec<String> {
+    vec![
+        "serve".into(),
+        "--bg".into(),
+        format!("--https={}", mount.https),
+        format!("--set-path={}", mount.path),
+        target.argument(),
+    ]
+}
+
+/// `sudo -n tailscale serve --bg --https=<port> --set-path=<path>
+/// <target>`. `sudo -n` never prompts: when sudo would ask for a
+/// password the failure prints the exact command for the person to run
+/// themselves. What that mount served before is replaced; other ports
+/// and paths are untouched.
+pub fn start_serving(tailscale: &Path, target: &Target<'_>, mount: &Mount) -> Result<(), String> {
+    let arguments = serve_arguments(target, mount);
+    let line = format!("sudo {} {}", tailscale.display(), arguments.join(" "));
     let mut command = Command::new("sudo");
-    command
-        .arg("-n")
-        .arg(tailscale)
-        .args(["serve", "--bg", "--https=443"])
-        .arg(&argument);
+    command.arg("-n").arg(tailscale).args(&arguments);
     match run_with_deadline(command, TAILSCALE_DEADLINE)? {
         Finished::Exited { success: true, .. } => Ok(()),
         Finished::Exited { output, .. } => Err(format!(
@@ -84,11 +91,19 @@ pub fn start_serving(tailscale: &Path, target: &Target<'_>) -> Result<(), String
     }
 }
 
-/// `https://<Self.DNSName>/` for this machine.
-pub fn served_url(tailscale: &Path) -> Result<String, String> {
+/// This machine's URL for `mount`.
+pub fn served_url(tailscale: &Path, mount: &Mount) -> Result<String, String> {
     let status = tailscale_status(tailscale)?;
-    let name = dns_name(&status)?;
-    Ok(format!("https://{name}/"))
+    Ok(url_for(&dns_name(&status)?, mount))
+}
+
+/// `https://<name><path>`, with the port when it is not 443.
+#[must_use]
+pub fn url_for(name: &str, mount: &Mount) -> String {
+    match mount.https {
+        443 => format!("https://{name}{}", mount.path),
+        port => format!("https://{name}:{port}{}", mount.path),
+    }
 }
 
 fn tailscale_status(tailscale: &Path) -> Result<String, String> {

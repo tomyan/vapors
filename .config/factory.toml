@@ -12,6 +12,20 @@ packages = "vapors-platform, vapors-app"
 # lints for wasm32-unknown-unknown.
 package = "vapors-web-demo"
 
+[serve]
+# Where `cargo xtask serve` puts the release build of main (serve_config.rs):
+# a copy under the home directory, at https `https` and `path` on the
+# tailnet, after `check` (a shell line) passes on target/web. The demo
+# page lives under /vapors/ so touche's page keeps /.
+dir = "srv/vapors-demo"
+https = "443"
+path = "/vapors/"
+check = "scripts/check-page-contract.sh target/web $(mktemp -d)"
+
+[dev]
+# The https port `cargo xtask dev` serves trunk's debug page on, at /.
+https = "8446"
+
 [files]
 # The file-length rule as a check (the `files` step of `lint` and `ci`).
 # The rule says about 200; 220 leaves room for a module doc comment and

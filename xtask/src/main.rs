@@ -47,6 +47,7 @@ mod sccache;
 mod screenshot;
 mod screenshot_package;
 mod serve;
+mod serve_config;
 mod setup;
 mod setup_install;
 mod stamp_page;
