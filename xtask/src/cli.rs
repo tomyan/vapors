@@ -28,6 +28,8 @@ pub enum Command {
     /// Check every pinned tool is installed at its pinned version.
     #[command(hide = true)]
     CheckTools,
+    /// Check a crate in `[imports.<crate>]` is named only where listed (the `imports` step).
+    CheckImports,
     /// Check no crate depends on what `[layers.forbid]` forbids it (the `layers` step).
     CheckLayers,
     /// Check every source file is within `[files] max_lines` (the `files` step).

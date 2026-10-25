@@ -29,6 +29,8 @@ mod gpu_info;
 #[cfg(test)]
 #[path = "hook_tests.rs"]
 mod hook_tests;
+mod imports;
+mod imports_rules;
 mod layers;
 mod layers_graph;
 mod pixels;
@@ -71,6 +73,7 @@ fn main() -> ExitCode {
         Command::CheckTools => return setup::check(),
         Command::CheckFiles => return files::run(),
         Command::CheckLayers => return layers::run(),
+        Command::CheckImports => return imports::run(),
         Command::GpuInfo => return gpu_info::run(),
         Command::Screenshot {
             example,

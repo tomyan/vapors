@@ -18,6 +18,7 @@ fn ci_runs_fastest_checks_first() {
             "fmt",
             "files",
             "layers",
+            "imports",
             "deny",
             "clippy",
             "wasm",
@@ -90,10 +91,10 @@ fn the_deny_step_checks_every_section_within_its_deadline() {
 }
 
 #[test]
-fn lint_checks_layers_after_files_and_before_clippy() {
+fn lint_checks_layers_and_imports_after_files_and_before_clippy() {
     // When
     let names: Vec<String> = lint().into_iter().map(|s| s.name).collect();
 
     // Then
-    assert_eq!(names, ["fmt", "files", "layers", "clippy"]);
+    assert_eq!(names, ["fmt", "files", "layers", "imports", "clippy"]);
 }

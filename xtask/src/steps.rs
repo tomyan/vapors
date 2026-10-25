@@ -25,6 +25,17 @@ fn layers() -> Step {
     )
 }
 
+/// A crate named in `[imports.<crate>]` only where listed;
+/// `cargo xtask check-imports`.
+fn imports() -> Step {
+    Step::new(
+        "imports",
+        "cargo",
+        &["xtask", "check-imports"],
+        "move the call into an allowed module, or list the path under [imports.<crate>] in .config/factory.toml with a reason",
+    )
+}
+
 /// Every source file within `[files] max_lines`; `cargo xtask check-files`.
 fn files() -> Step {
     Step::new(
@@ -160,6 +171,7 @@ pub fn ci(web_package: &str) -> Vec<Step> {
         fmt(),
         files(),
         layers(),
+        imports(),
         deny(),
         clippy(),
         wasm(web_package),
@@ -181,7 +193,7 @@ pub fn deny_check() -> Vec<Step> {
 
 /// Formatting and lints only.
 pub fn lint() -> Vec<Step> {
-    vec![fmt(), files(), layers(), clippy()]
+    vec![fmt(), files(), layers(), imports(), clippy()]
 }
 
 /// The unit tier.

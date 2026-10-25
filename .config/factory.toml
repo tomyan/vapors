@@ -61,3 +61,9 @@ max_lines = "220"
 "Swatinem/rust-cache" = "a cache of target/; the local target directory is already there"
 "cargo-bins/cargo-binstall" = "installs cargo-binstall, which cargo xtask setup --ci needs; that line is setup"
 "actions/upload-artifact" = "uploads files for people to read; nothing is checked"
+
+# web_sys, the browser's API, only in the platform layer; every other
+# crate reaches the browser through vapors-platform
+# (`cargo xtask check-imports`, the `imports` step).
+[imports.web_sys]
+"crates/platform/" = "vapors-platform: the window, input and file picker on the web"
