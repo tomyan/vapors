@@ -65,7 +65,10 @@ Area 1 rule 2; ARCHITECTURE conflict 1.
 
 **Q5. What is the unit of off-thread work?** Area 1 rule 4.
 - (a) A named `#[vapors::offload] fn` with serialisable owned input; the
-  same call natively and on the web.
+  same call natively and on the web. Cancelling a running function on
+  the web without shared memory is `worker.terminate()` and a
+  replacement worker; with shared memory the token is polled, as
+  natively.
 - (b) A closure; works natively, cannot cross a web worker, so the web
   would need a second API.
 - (c) (a) on the web, (b) allowed natively. Two shapes for one idea.

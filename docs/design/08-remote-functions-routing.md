@@ -21,10 +21,10 @@ that knows both sides, so the shapes cannot drift.
 
 ```rust
 #[vapors::query]
-async fn allowance(user: UserId) -> Remote<Allowance> { .. }
+async fn allowance(user: UserId) -> Outcome<Allowance> { .. }
 
 #[vapors::command]
-async fn record_events(batch: EventBatch) -> Remote<Accepted> { .. }
+async fn record_events(batch: EventBatch) -> Outcome<Accepted> { .. }
 ```
 
 | Kind | Semantics | From |
@@ -38,16 +38,18 @@ async fn record_events(batch: EventBatch) -> Remote<Accepted> { .. }
 **Three outcomes, as a type.**
 
 ```rust
-pub enum Remote<T> {
+pub enum Outcome<T> {   // one type with area 7's services
     Resolved(T),
     Absent,                 // the server answered: no such thing (404-shaped)
     Unreachable(Reason),    // no answer: offline, DNS, TLS, timeout, 5xx, a shape the client could not parse
 }
 ```
 
-`Absent` is only ever a server's answer; a client never infers it. A
-component matches on all three; a `<boundary>` receives `Unreachable`
-as a failure with the reason. touché's rule from DESIGN.md ("after
+`Absent` is only ever a server's answer; a client never infers it. An
+`Outcome` is a value: a component matches on all three. Only an explicit
+`outcome.required()?` converts `Unreachable` into the enclosing
+`<boundary>`'s failure, with the reason; nothing converts `Absent`,
+because absence is an answer the component shows. touché's rule from DESIGN.md ("after
 grace, viewing, editing and export stay available while paid features
 pause") is written against `Unreachable`. The same three states are the
 platform services' shape (area 7), so one `match` idiom serves both.
@@ -151,7 +153,7 @@ touché's routes: editor, library, settings. Not needed before accounts.
 
 | Slice | Delivers | touché use |
 |---|---|---|
-| F1 `Remote<T>` and `Transport` moved in | The type, the deadline rule, the stand-in server as a test crate | touché's key-endpoint check and events upload use one shape |
+| F1 remote base | On 7-P3's `Transport` and `Outcome<T>`: the remote deadline rule, the version header, the stand-in server as a test crate | touché's key-endpoint check and events upload use one shape |
 | F2 `#[query]` and `#[command]` | The attribute macro, stubs, handlers, schema validation, version header | `/events` upload as a command; the licence check as a query |
 | F3 batching and `updates` | | The broker's allowance and the turn in one round trip |
 | F4 streaming query | SSE results as `Stream<T>` | The agent's turn through the broker |

@@ -50,7 +50,7 @@ by an `await` changes, every reader of that state is held until the
 async work settles, synchronous readers included, so a label and the
 number it describes cannot disagree; updates to unrelated state are not
 held, and a later fast update may show while an earlier slow one is
-still running. SolidJS 2.0 (release candidate, 2026-10) drops explicit
+still running. SolidJS 2.0 (unreleased; release candidate, 2026-10) drops explicit
 transitions: a derivation may return a promise, a reader keeps showing
 the last resolved value while a newer one is pending, and
 `isPending(() => expr)` reports it; a `Loading` boundary covers first
@@ -80,7 +80,11 @@ future is **dropped** and a new one started; the old result is never
 applied. Dropping a Rust future cancels everything it owns. Work that
 has left the future (a thread, a worker, a GPU submission) cannot be
 dropped, so every off-thread call receives a `Cancel` token that
-observes the drop; the worker checks it between steps and stops. A
+observes the drop; the worker checks it between steps and stops. On the
+web without shared memory a running wasm function cannot observe the
+token (there is no shared cell to read), so cancellation there is
+`worker.terminate()` and a replacement worker from the pool; with shared
+memory the token is an atomic the function polls, as natively. A
 result that arrives for a dropped future is discarded with a debug log
 naming the derivation; it is never a refusal, because it is the
 expected path.
@@ -195,7 +199,9 @@ nodes belong to the owner that renders it.
   input and the update. Rule: futures resolve before the update, so a
   frame never shows a half-applied version.
 - Area 8's remote functions are futures that return the three-state
-  result; a boundary's `failed` receives `Unreachable`.
+  `Outcome<T>` as a value, which a component matches on. Only an
+  explicit `outcome.required()?` turns `Unreachable` into the boundary's
+  `failed`; `Absent` is never converted, since absence is an answer.
 - Area 11 tests async with a stepped clock and a manual executor: a
   test resolves futures by hand and asserts the held values.
 - Area 10 records version open and settle events with their durations,
@@ -206,6 +212,7 @@ nodes belong to the owner that renders it.
 | Part | Oracle |
 |---|---|
 | Synchronous graph | Ported `reactive_graph` tests (done); Svelte 5's `runtime-runes` samples for signals, derived and effects ported where they test ordering (MIT) |
+| Snippets and children | Svelte 5's 56 `runtime-runes/samples/snippet-*` cases (checked 2026-10-25 in `~/projects/svelte`) ported to `RecordingDom`, less those that test HTML-only behaviour, each skip named |
 | Held updates and pending | Svelte's `await` test samples (`runtime-runes/samples/async-*`) ported to `RecordingDom`; each asserts the sequence of DOM writes with futures resolved by hand |
 | Drop to cancel | A test with a future that records whether it was polled after the dependency changed; a worker test with a token that stops a loop and reports the step count |
 | Offload on the web | A wasm test in headless Chromium (the page-contract script) that offloads a sum and gets it back; the same test natively; identical results pinned |

@@ -49,7 +49,7 @@ permission prompt) have none, and the call says which kind it is.
 | Key-value storage | A JSON file under the platform config directory, written atomically | `localStorage` for small values; IndexedDB for anything over a stated size or binary | `Absent` on a missing key; `Unreachable` when the backend fails or the quota is exceeded | Namespaced by app name; touché's profile and keys use it. A value whose shape the caller does not recognise is refused by the caller, naming the key |
 | File storage | The project folder (`document.json`, `tiles/`) | OPFS with the same layout | As above | Area 8's F-remote sync reads the same layout |
 | Key store | `keyring` (OS keychain) | storage with a stated warning: the browser's storage is the key store | `Absent` when no key; `Unreachable` when the keychain daemon is not reachable | Already built in touché R2 as `KeyStore`; moves into vapors with its tests |
-| Network | reqwest with streaming | `fetch` with the body read from its `ReadableStream` | A response, `Absent` for 404 where the caller says absence is a valid answer, `Unreachable` for connection, TLS, timeout, CORS | Already built in touché R3 as `Transport`; moves into vapors under area 8. One timer rule: tokio natively, gloo-timers on the web |
+| Network | reqwest with streaming | `fetch` with the body read from its `ReadableStream` | A response for 2xx; `Absent` for 404; `Unreachable(Status)` for every other 4xx and 5xx, and `Unreachable` for connection, TLS, timeout, CORS and a body that fails its schema | Already built in touché R3 as `Transport`; moves into vapors in P3, and area 8 builds on it. One timer rule: tokio natively, gloo-timers on the web |
 | File pickers | rfd (XDG portal on Linux) | `<input type=file>` with `accept`; the File System Access API where present for save | `Absent` when cancelled; `Unreachable` when no dialog can open | Built; the save picker is new |
 | Share and download | Reveal in file manager | `navigator.share` with files, else a download link | `Absent` when the user dismissed the sheet | touché M4b's Export rules move here |
 | Menus and context menus | muda for the menu bar; in-app context menu | In-app menu bar and context menu drawn by vapors | n/a | Area 3 owns the context menu as a component; this row is the native menu bar only |
@@ -88,7 +88,7 @@ permission prompt) have none, and the call says which kind it is.
 
 | Part | Oracle |
 |---|---|
-| Clipboard on the web | Headless Chromium with `--enable-features=ClipboardAPI` and a granted permission: write then read round trip, image round trip, a read without activation refused with the stated reason |
+| Clipboard on the web | Headless Chromium with `clipboard-read` and `clipboard-write` granted through DevTools' `Browser.grantPermissions`: write then read round trip, image round trip, a read without activation refused with the stated reason |
 | Clipboard natively | Xvfb with `xclip` as the other party (touché's planned native paste slice), one test per direction |
 | Storage | A fake storage that fails on the Nth write, to prove `Unreachable` surfaces; quota exceeded in Chromium through a filled origin |
 | Key store | The fake and, natively, a `keyring` mock backend; the real keychain by hand once per platform |

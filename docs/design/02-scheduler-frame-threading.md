@@ -21,8 +21,10 @@ One frame, on the UI thread, in this order:
    that reads signals is a bug; it only writes computed values. Scene
    animations (area 9) run their bulk tasks here.
 4. **Update.** `Document::update`: restyle, layout, paint to a `Scene`.
-   An update that moves content under a still pointer re-hovers and
-   asks for another frame (F2c D7).
+   An update that moves content under a still pointer notes the new
+   hover target and asks for another frame; the hover change is
+   dispatched in that frame's phase 1 (F2c D7). Transitions start here,
+   in restyle, where a computed value is seen to change (area 6).
 5. **Accessibility.** The AccessKit tree update is diffed from the
    element tree and pushed (area 5).
 6. **Draw.** The painter submits the scene. The frame is presented.
@@ -33,12 +35,14 @@ One frame, on the UI thread, in this order:
 
 Why this order: input before tasks so a click's effects are visible in
 the same frame as a future that resolved just before it; tasks before
-the tick so a resolved future can start a transition that is sampled
-at its first frame; the tick before the update so sampled values are
-laid out, not applied a frame late. Chromium's event loop has the same
+the update so a resolved future's writes are restyled in this frame,
+which is where a transition they cause starts (at its start value; the
+tick samples it from the next frame); the tick before the update so
+sampled values are laid out, not applied a frame late. Chromium's event loop has the same
 shape (input, then tasks and microtasks, then `requestAnimationFrame`
-callbacks, then style and layout, then paint), and the ordering tests
-below can be written against it.
+callbacks, then style and layout, then paint). Chromium confirms only
+the relative order of those four kinds of work, not vapors' phases, and
+the oracle row below says so.
 
 ## Time
 
@@ -90,8 +94,8 @@ loop through `Waker`.
 
 | Work | Where | How it reaches the UI thread |
 |---|---|---|
-| Decode, encode, hashing, measurement maths on the CPU | A thread pool natively (rayon or a fixed pool sized to the cores, decided by measurement); a worker pool on the web | `offload`'s future; the result is a signal write in phase 2 |
-| GPU passes (the engine's render graph) | Submitted from the UI thread on one device (ARCHITECTURE.md); natively the engine may build command buffers on its own thread and hand them over, since wgpu's device is `Send + Sync` there | A "texture N ready for version V" message; the canvas element draws the latest ready texture and never waits |
+| Decode, encode, hashing, measurement maths on the CPU | A thread pool natively (rayon or a fixed pool sized to the cores, decided by measurement); a worker pool on the web, where cancelling a running function is `worker.terminate()` plus a replacement worker unless shared memory is on | `offload`'s future; the result is a signal write in phase 2 |
+| GPU passes (the engine's render graph) | Submitted from the UI thread on one device (ARCHITECTURE.md); natively the engine may build command buffers on its own thread and hand them over, since wgpu's device is `Send + Sync` there | A future on the UI thread that resolves in phase 2 with "texture N for version V"; the canvas element's texture and any readout derived from the render are downstream of that one resolved value (area 1 rule 2), so there is one path, and the UI thread never blocks on the GPU |
 | Network | The platform's transport (tokio natively, `fetch` on the web) | A future |
 | File dialogs, keychain | A platform thread natively; a promise on the web | A future, or the existing event |
 | Font loading | The UI thread today; a worker when the web fallback fetch arrives (F6) | A future that registers the font then asks for a frame |
@@ -150,7 +154,9 @@ frame order.
   exchange components, not references. Bevy's multi-threaded scheduler
   is not taken: the graph is single-threaded by design (area 1).
 - **Render in a worker:** the OffscreenCanvas pattern Chrome documents;
-  Flutter's web renderer runs it; Makepad does not.
+  no shipped Rust UI framework was found doing it, and Flutter web does
+  not by default, so the latency numbers come from vapors' own
+  measurement.
 
 ## Deliberately left out
 
@@ -167,11 +173,11 @@ frame order.
 
 | Part | Oracle |
 |---|---|
-| Phase order | A test that records the order of a handler's write, a resolved future, a transition's first sample and the update, and pins it; the same scenario in Chromium (a click handler, a resolved promise, a `transitionstart`, a `requestAnimationFrame`) recorded through the page-contract script as the reference order |
+| Phase order | A test that records the order of a handler's write, a resolved future, a transition's first sample and the update, and pins it. Chromium gives a partial reference only: the relative order of a click handler, a resolved promise, a `requestAnimationFrame` callback and a style recalculation, recorded through the page-contract script; vapors' own phases have no external oracle and are pinned by the test |
 | Redraw on demand | `idle_fps` and `web-idle-frames.sh` (built): zero frames idle with a pending but unresolved future, and exactly one per resolution |
 | Time | A stepped clock in tests; a transition sampled at the frame time, not the write time, pinned by a test that writes at two wall-clock times in one frame |
 | Budget | `tracing` spans per phase, asserted under a stated ceiling in the `gpu` tier on this machine; the phone's numbers from recordings |
-| Threading | A test that offloads work holding a `Cancel` token and drops the future; the worker's step count is pinned. Compile-time: the graph's types are `!Send`, and a test asserts it with a `static_assertions` negative impl check |
+| Threading | A test that offloads work holding a `Cancel` token and drops the future; natively the worker's step count is pinned, on the web the test asserts the worker was terminated and replaced. Compile-time: the graph's types are `!Send`, and a test asserts it with a `static_assertions` negative impl check |
 | Render in a worker | The page contract loads the page with `?worker=1` and checks the same pixels; input latency across the hop measured and recorded |
 
 ## Slices

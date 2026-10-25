@@ -19,8 +19,11 @@ writing them with its resolution, or the note that it is open.
    One clock per frame, injectable.
 3. **One event dispatch.** Area 3's capture-target-bubble function, used
    by pointer, keyboard, focus, wheel, input, synthetic input from tests
-   and the automation API, accessibility actions (5), replayed
-   recordings (10) and 3D picking (9). A handler cannot tell them apart.
+   and scenario replays (10 C4), accessibility actions (5) and 3D
+   picking (9); the deferred automation API (Q13) will inject here too.
+   A handler cannot tell them apart. Recording replay (10 C3) is the one
+   consumer of input that does not dispatch: it redraws recorded
+   mutations, so dispatching would apply default actions twice.
 4. **One element tree.** `Document` implements `Dom`, `css::Element`,
    Taffy's traits, the hit test, the a11y projection and the recorder's
    source. A scene (9) is a node kind in it, not a second tree.
@@ -67,15 +70,15 @@ writing them with its resolution, or the note that it is open.
 | Pair | How they fit |
 |---|---|
 | 1 async and 2 scheduler | Futures run on the executor in phase 2; a resolved future's writes are applied before the tick and the update, so a frame never shows a half-applied version. Waking is `Waker`, the existing redraw request |
-| 1 async and 6 animation | A held update settles in one batch; the computed-value changes it makes start transitions in the next tick, so an agent edit's controls animate from the settled frame. Animated values never enter the graph |
+| 1 async and 6 animation | A held update settles in one batch; the computed-value changes it makes start transitions in that frame's restyle (phase 4) and are sampled from the next tick, so an agent edit's controls animate from the settled frame. Animated values never enter the graph |
 | 1 async and 8 remote | A `query` result is a signal; a remote call is a future returning `Outcome<T>`; a boundary's `failed` receives `Unreachable` |
 | 1 async and 7 services | Every service call that can wait is a future with a deadline; the three-state type is shared |
 | 2 scheduler and 3 events | Phase 1 dispatches all events since the last frame; coalesced pointer moves are one dispatch per frame with the samples attached |
-| 2 scheduler and 5 a11y | Phase 5 diffs and pushes the tree once per frame; actions arrive as platform events in phase 1 |
+| 2 scheduler and 5 a11y | Phase 5 diffs and pushes the tree once per frame; live announcements are coalesced separately (at most one per second); actions arrive as platform events in phase 1 |
 | 2 scheduler and 9 3D | Scene bulk tasks run in the tick; the scene is drawn in paint order in phase 6 |
 | 2 scheduler and 10 recording | Phase 7 writes the frame's records from the other phases' outputs; timings are the phases' spans |
 | 3 events and 4 layout | Hit testing walks paint order over the last update's boxes; transforms (6, 9) map through the inverse; scroll containers (S9) own touch pans by `touch-action` |
-| 3 events and 5 a11y | A reader's action is dispatched as the equivalent event; focus is one state read by both; `:focus-visible` follows the HTML heuristic |
+| 3 events and 5 a11y | A reader's action is dispatched as the equivalent event; focus is one state read by both, and on the web DOM focus is a projection of it onto the mirror element, which also hosts the IME; `:focus-visible` follows the HTML heuristic |
 | 3 events and 6 animation | A user drag sets a value control's display directly (no transition); a programmatic set animates the display and fires no `input` |
 | 4 layout and 6 animation | A transition on a layout property relayouts per frame; the `honoured` table classifies each property as layout, paint or text, which decides the cost |
 | 4 layout and 9 3D | Transforms do not affect layout; a 3D-transformed element is a layer composited by matrix; a `scene` node is a replaced box with intrinsic size from its props |

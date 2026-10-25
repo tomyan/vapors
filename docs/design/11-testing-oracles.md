@@ -54,8 +54,13 @@ read `getComputedStyle`, `getBoundingClientRect`, event logs or
 `document.activeElement`. These are ported by hand to Rust tests that
 assert the same values, with the WPT path in the test name, and the
 original is run in Chromium by the oracle runner to confirm the
-expected value (testharness tests load `/resources/testharness.js` from
-the wpt server; the runner serves that one directory itself). Directories in use per area: `css/css-flexbox`,
+expected value. testharness tests need a wpt checkout and a server
+whose root is that checkout (they load `/resources/testharness.js` and
+their own helpers by absolute path), so the runner serves a pinned
+checkout; `pointerevents/` and `uievents/` tests drive input through
+testdriver, which needs the wpt runner, so the runner performs those
+actions itself through DevTools (`Input.dispatchMouseEvent` and friends)
+in place of testdriver. Directories in use per area: `css/css-flexbox`,
 `css/css-grid`, `css/css-cascade`, `css/selectors`, `css/css-variables`
 (4); `css/css-transitions`, `css/css-animations` (6);
 `css/css-transforms` (9); `pointerevents`, `uievents`,
@@ -71,7 +76,7 @@ duplicated) drives headless Chromium with the rules in CLAUDE.md
 adds the DevTools protocol over a pipe for what `--dump-dom` cannot
 give: `Input.dispatchMouseEvent`/`dispatchKeyEvent` for event logs and
 focus, `Accessibility.getFullAXTree` for roles and names,
-`Animation.setCurrentTime` (or virtual time) for transitions,
+`Animation.seekAnimations` (or virtual time) for transitions,
 `Emulation.setDeviceMetricsOverride` for scale. Outputs are committed
 JSON beside the fixtures and checked in CI (`--check`), as the layout
 oracle does, so a Chromium that changes its answer is a visible diff.
@@ -101,7 +106,7 @@ in random order with no retries; a flake is a bug with a deadline.
 - A fake AccessKit adapter: records `TreeUpdate`s and sends
   `ActionRequest`s.
 - A fake platform (`Platform::detached`, built) and fake services with
-  scripted answers including `Unavailable` on the Nth call.
+  scripted answers including `Unreachable` on the Nth call.
 - A stand-in server on a second origin for remote functions.
 
 ## Proving a check

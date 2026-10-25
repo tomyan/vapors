@@ -25,7 +25,9 @@ focus, wheel, input and synthetic events alike (ARCHITECTURE.md).
 CSS px of the last update's scale, with `f32` precision kept (no
 rounding for a slider thumb). Each event carries `client` (viewport)
 and `offset` (target's padding box) coordinates; `page` is the same as
-`client` because the document does not scroll (touché's shell rule).
+`client` because in vapors the document root never scrolls: only
+scroll containers do (a framework rule, which touché's shell also
+follows).
 
 ## Pointer
 
@@ -137,8 +139,14 @@ the clipboard, caret painting and the DOM events. Rules:
   EditContext API where present (Chromium), with its
   `textupdate`/`compositionstart`/`compositionend` events and
   `updateControlBounds`/`updateSelectionBounds` for the candidate
-  window; elsewhere a hidden `<textarea>` positioned at the caret. The
-  platform reports which path is in use in the status line once, and
+  window; elsewhere a hidden `<textarea>` positioned at the caret. DOM
+  focus on the web is owned by the a11y mirror (area 5): the mirror
+  element of the vapors-focused node holds it, and for an editable node
+  that element is the EditContext's host (or holds the hidden textarea),
+  so IME and the screen reader agree on one element. `keydown` is
+  listened for on the document, so it arrives whichever element has DOM
+  focus. The platform reports which IME path is in use in the status
+  line once, and
   area 10 records it, because the hidden textarea has known gaps
   (composition in some IMEs, the caret rectangle) that the brief
   accepts for the secondary target.
@@ -155,10 +163,11 @@ the clipboard, caret painting and the DOM events. Rules:
 
 ## Synthetic input
 
-Tests, the recording's replay (area 10) and the automation API inject
-events at the platform layer (`ElementsApp::event`) so they travel the
-same path as real input, including gesture derivation and capture.
-There is no second entry point.
+Tests and scenario replays (area 10 C4) inject events at the platform
+layer (`ElementsApp::event`) so they travel the same path as real
+input, including gesture derivation and capture. There is no second
+entry point. The brief's automation API is deferred (Q13); when it
+arrives it injects here too.
 
 ## Taken from where
 

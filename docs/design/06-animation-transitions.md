@@ -59,6 +59,12 @@ set fires none in a browser either. This is what
 "controls animating" means for a value control, and it needs no app
 code: the card sets `value`, the control animates. A drag by the user
 sets the displayed value directly with no transition, as browsers do.
+The echo rule: a drag writes the bound signal (`bind:value`), whose
+effect writes `value` back to the same input; that write is the value
+the display already shows, and a set equal to the displayed value never
+starts a transition, so the echo cannot fight the finger. The input also
+marks itself as the writer for the duration of the dispatch, so an
+equal-value set inside it is skipped before the comparison.
 
 ### FLIP for reorder
 
@@ -142,9 +148,9 @@ one object at a time, for selection and hover.
 
 | Part | Oracle |
 |---|---|
-| Sampling and timing functions | `vapors-css`'s tests (built), and WPT `css/css-transitions/` and `css/css-animations/` testharness cases that read `getComputedStyle` at times set through the Web Animations API's `currentTime`; ported with a stepped clock. The reversing rule from the specification's worked examples |
+| Sampling and timing functions | `vapors-css`'s tests (built), and WPT `css/css-transitions/` and `css/css-animations/` testharness cases that read `getComputedStyle` at times set through the Web Animations API (`Animation.currentTime` in the page, `Animation.seekAnimations` over DevTools); ported with a stepped clock. The reversing rule from the specification's worked examples |
 | Transition start, end, cancel events | Chromium's event log for the same HTML with a scripted class change (the page-contract runner) |
-| `@starting-style` and leave | Chromium screenshots at fixed times via virtual time budget, compared with the paint rules; computed values at `t` via `Animation.currentTime` |
+| `@starting-style` and leave | Chromium screenshots at fixed times via virtual time budget, compared with the paint rules; computed values at `t` via `Animation.seekAnimations` |
 | FLIP | A keyed reorder test counting one `transform` transition per moved row and none otherwise; Chromium has no FLIP primitive, so the geometry oracle checks the end state only |
 | Value controls animating | A test with a stepped clock: the displayed value at each frame, no `input` or `change` fired; a user drag produces no transition and fires `input` per move |
 | Reduced motion | A test under `Environment { reduced_motion: true }`: durations zero, loops once, the busy line still animating |

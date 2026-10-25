@@ -58,19 +58,19 @@ the touché need; see `ORDER.md` for sequencing against other areas.
 
 | Gap | Pulled by | Slice | Notes |
 |---|---|---|---|
-| `overflow: scroll`/`auto`, scrollbars, scroll offsets in whole device pixels, momentum on touch | The layer stack and history lists | F2c S9 (in flight) | Decisions taken 2026-10-24: `Event::Scroll { dx, dy }` in px; an overlay thumb, shown on touch only while scrolling |
+| `overflow: scroll`/`auto`, scrollbars, scroll offsets in whole device pixels, momentum on touch | The layer stack and history lists | F2c S9 (in flight) | Decisions taken 2026-10-24: `Event::Scroll { dx, dy }` in px; an overlay thumb, shown on touch only while scrolling. Momentum is not in S9: it has no oracle until a transcript is recorded from the Pixel, which is F2d's first step |
 | `img` from a registered image | History thumbnails | F2c S10 | `Document::register_image`; natural size in layout |
 | `transition-*` on elements | Agent edits animating controls; hover and pressed states | Area 6, slice A1 | `vapors-css` already samples transitions; the elements crate has to start, advance and retire them per frame |
-| `opacity` as a layer; `filter: blur()` | Disabled controls, the before/after fade, sheets over the canvas | Area 6, A2 | Needs an offscreen target per layer in the painter |
+| `opacity` as a layer; `filter: blur()` | Disabled controls, the before/after fade, sheets over the canvas | Area 6, A3 | Needs an offscreen target per layer in the painter |
 | `transform` 2D (`translate`, `scale`, `rotate`) | Slider thumbs, FLIP reorder of cards, sheet slide-in | Area 6, A1 | Paint and hit test through the inverse; the layout box is unchanged |
-| `@keyframes` driven animation | Busy indicators, progress line | Area 6, A3 | Sampler exists in `vapors-css` |
+| `@keyframes` driven animation | Busy indicators, progress line | Area 6, A4 | Sampler exists in `vapors-css` |
 | `br`, `a` | The chat panel and About | F2d | Decided D6 |
 | Mixed inline metrics (a real line baseline) | Inline code in chat at a different size | F2d | Today an inline with other metrics is refused |
 | `font-feature-settings` (`tnum`), `font-variation-settings` | Readouts that must not jitter; variable weight | F2d | `vapors-text` honours tabular figures already; the CSS property is not mapped |
 | `text-decoration`, `small`, `sub`/`sup`, `del`/`s`/`u` | Markdown view | F4 | |
 | Right-to-left and bidi | Arabic and Hebrew in chat | F4 or later | Parley supports it; vapors pins Ltr and refuses RTL text today |
 | `@container` | Cards that rearrange with the panel's width | After S9 | Needs a restyle pass after layout, as `docs/css.md` describes |
-| Rounded clips (`overflow: hidden` with `border-radius`) | Thumbnails in rounded cards | S10 or A2 | A clip mask in the quad shader or a stencil |
+| Rounded clips (`overflow: hidden` with `border-radius`) | Thumbnails in rounded cards | S10 or area 6 A3 | A clip mask in the quad shader or a stencil |
 | Elliptical radii, `inset` shadows, `dashed`/`dotted` borders | Nothing in touché | None scheduled | Refused with the reason |
 | `::before`/`::after`, `@layer`, `@import`, `@font-face` | Nothing in touché | None scheduled | Generate the content as an element; fonts are registered through `FontSystem` |
 | Inline-block inside a paragraph (a button in text) | Nothing in touché | None scheduled | Parley inline boxes sized by Taffy |

@@ -34,11 +34,14 @@ a `command` when the user has opted in and the connection allows.
 
 **Replay is the recorder's inverse.** `cargo xtask replay <session>
 --at WxH@scale --frames out/` rebuilds the `Document` from the snapshot
-and mutations, applies the recorded input through the ordinary
-dispatch, and paints each frame offscreen with the real painter, so the
-frames are what the person saw, less the redacted content. Replay
-never runs app code: it replays the tree, not the signals, so it needs
-no model key, no engine and no network. A recorded style sheet hash
+and mutations and paints each frame offscreen with the real painter, so
+the frames are what the person saw, less the redacted content. The
+recorded input is drawn over the frames as a cursor and touch marks; it
+is not dispatched, because the mutations already hold every effect it
+had, and dispatching it again would run default actions (a scroll, a
+toggle) twice. Only a scenario (C4) dispatches input, against a built
+app. Replay never runs app code: it replays the tree, not the signals,
+so it needs no model key, no engine and no network. A recorded style sheet hash
 whose text is not in the build is a refusal naming the hash.
 
 ## Redaction at the source

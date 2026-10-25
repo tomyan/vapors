@@ -43,8 +43,12 @@ container, `SetTextSelection` moves the caret.
 **Loud in debug.** An interactive element with no accessible name is a
 refusal of the update in debug builds and in tests, naming the element
 and its position; in release it is logged once. A `dialog` without
-`aria-labelledby` or `aria-label` likewise. The lint runs in the
-scenario tier against every touché page.
+`aria-labelledby` or `aria-label` likewise. Rollout: A1 ships the check
+as a report (a count in the lint's output and in recordings) so every
+existing demo and touché page can be fixed, and flips to a refusal in
+the slice after, once the demos and touché's pages pass; the report
+stage is the relaxed guard, declared here, retired by that flip. The
+lint runs in the scenario tier against every touché page.
 
 ## Platforms
 
@@ -53,7 +57,7 @@ scenario tier against every touché page.
 | Windows | AccessKit UI Automation | Through `accesskit_winit`, which owns the window handle integration |
 | macOS | AccessKit NSAccessibility | The same |
 | Linux | AccessKit AT-SPI | The same; the sign-off reader is Orca |
-| Web | A DOM mirror: a hidden, focusable subtree beside the canvas, one element per a11y node with `role`, `aria-*`, `tabindex` and text, kept in step by the same `TreeUpdate` diff | AccessKit lists a web adapter as planned, not available (checked 2026-10-25). The mirror is what browsers expose to the platform's reader (TalkBack, VoiceOver, NVDA through the browser). The mirror's elements receive real focus, so a reader's Tab moves the mirror's focus and vapors moves the element tree's focus to match, and back. Bounds are set by `style` so a reader's highlight lands on the canvas pixels. If AccessKit's web adapter ships first, it replaces the mirror behind the same diff |
+| Web | A DOM mirror: a hidden, focusable subtree beside the canvas, one element per a11y node with `role`, `aria-*`, `tabindex` and text, kept in step by the same `TreeUpdate` diff | AccessKit lists a web adapter as planned, not available (checked 2026-10-25). The mirror is what browsers expose to the platform's reader (TalkBack, VoiceOver, NVDA through the browser). The mirror's elements receive real DOM focus, which follows vapors' one focus state: when vapors focuses a node, its mirror element is focused; when a reader or Tab focuses a mirror element, vapors focuses its node. The mirror element of an editable node hosts the EditContext or hidden textarea (area 3), and `keydown` is listened for on the document, so there is one owner of DOM focus and it is a projection of vapors' focus, never a second state. Bounds are set by `style` so a reader's highlight lands on the canvas pixels. If AccessKit's web adapter ships first, it replaces the mirror behind the same diff |
 | Android and iOS native | `accesskit_android` and `accesskit_ios`, both available | Not scheduled; touché DESIGN.md's note that AccessKit had no iOS adapter is out of date |
 
 Why AccessKit: it is the one Rust abstraction with maintained adapters
@@ -101,7 +105,8 @@ it arrives. `aria-live="polite"` on the message element makes it a live
 region; AccessKit has `Live::Polite` and the adapters fire the
 platform's live-region event on text change. The elements layer rate
 limits the announcements: changes within one second are coalesced into
-one update (touché's Feedback pattern asks for at most one per second
+one live announcement (the tree update itself still goes every frame,
+area 2 phase 5; only the announcement is held) (touché's Feedback pattern asks for at most one per second
 for stage changes), and a streaming message announces its new sentence,
 not its new token, by sending the update when a sentence boundary
 arrives or the stream ends.
