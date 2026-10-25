@@ -16,6 +16,11 @@ include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 pub mod ax;
 pub mod ax_tree;
 mod ax_value;
+mod events_action;
+pub mod events_input;
+pub mod events_oracle;
+pub mod events_play;
+pub mod events_script;
 pub mod oracle;
 pub mod oracle_files;
 pub mod page;
@@ -54,6 +59,7 @@ macro_rules! fixtures {
 fixtures![
     block_margins::BlockMargins,
     borders::Borders,
+    buttons::Buttons,
     centred_panel::CentredPanel,
     clipping::Clipping,
     flex_row::FlexRow,
