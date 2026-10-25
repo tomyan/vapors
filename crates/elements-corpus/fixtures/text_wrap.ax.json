@@ -1,0 +1,86 @@
+{
+  "tree": [
+    {
+      "depth": 0,
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "RootWebArea"
+    },
+    {
+      "depth": 1,
+      "name": "Retouching",
+      "properties": [
+        "level=1"
+      ],
+      "role": "heading"
+    },
+    {
+      "depth": 2,
+      "name": "Retouching",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "paragraph"
+    },
+    {
+      "depth": 2,
+      "name": "Curves, levels and a white point set from a neutral sample, applied as layers you can turn off.",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "paragraph"
+    },
+    {
+      "depth": 2,
+      "name": "Each adjustment is a layer with its own mask, and every value the agent sets is shown so you can check it.",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "name": "Readouts",
+      "properties": [
+        "level=3"
+      ],
+      "role": "heading"
+    },
+    {
+      "depth": 2,
+      "name": "Readouts",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "generic"
+    },
+    {
+      "depth": 2,
+      "name": "R 238 G 231 B 222 at x 1024 y 768",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "generic"
+    },
+    {
+      "depth": 2,
+      "name": "Exposure",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "generic"
+    },
+    {
+      "depth": 2,
+      "name": "+0.35 EV",
+      "role": "StaticText"
+    }
+  ],
+  "viewport": [
+    640,
+    400
+  ]
+}

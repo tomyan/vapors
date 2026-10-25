@@ -13,6 +13,7 @@ vapors-dom.workspace = true
 vapors-signals.workspace = true
 vapors-elements.workspace = true
 vapors-text.workspace = true
+vapors-devtools.workspace = true
 serde_json = "=1.0.154"
 
 [dev-dependencies]

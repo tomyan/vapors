@@ -1,0 +1,91 @@
+{
+  "tree": [
+    {
+      "depth": 0,
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "RootWebArea"
+    },
+    {
+      "depth": 1,
+      "role": "paragraph"
+    },
+    {
+      "depth": 2,
+      "name": "A centred line with ",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": "bold words",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": " in it.",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "paragraph"
+    },
+    {
+      "depth": 2,
+      "name": "Aligned to the ",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": "right edge",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": ", over two lines because it is long.",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "paragraph"
+    },
+    {
+      "depth": 2,
+      "name": "Justified text stretches every line but the last to the full width of the column, ",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": "spaces and all",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": ".",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "paragraph"
+    },
+    {
+      "depth": 2,
+      "name": "Letters ",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": "set tighter",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": " inside wider ones.",
+      "role": "StaticText"
+    }
+  ],
+  "viewport": [
+    640,
+    400
+  ]
+}

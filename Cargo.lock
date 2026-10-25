@@ -2692,6 +2692,7 @@ dependencies = [
  "serde_json",
  "vapors-app",
  "vapors-compiler",
+ "vapors-devtools",
  "vapors-dom",
  "vapors-elements",
  "vapors-gpu-harness",
