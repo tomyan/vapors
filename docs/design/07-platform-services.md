@@ -18,12 +18,14 @@ every event, and from scripts through a context the runtime provides.
 Nothing in app code is `cfg(target_family = "wasm")`.
 
 **Every answer is one of three states.** A service call resolves,
-reports absence, or reports that it could not reach the thing. The
-shape is the one touché's `KeyStore` already uses (R2): `Found(value)`,
-`Absent`, `Unavailable(reason)`. A caller that gets `Unavailable` tells
-the user and stops; it never treats it as `Absent`. This is the brief's
-rule "never take something away from the user on the third" and it is
-the same shape area 8 gives remote functions.
+reports absence, or reports that it could not reach the thing. One
+type, `Outcome<T>`: `Resolved(T)`, `Absent`, `Unreachable(Reason)`.
+It is the shape touché's `KeyStore` already uses (R2, where the
+variants are named `Found`, `Absent`, `Unavailable`; they are renamed
+when the type moves into vapors). A caller that gets `Unreachable`
+tells the user and stops; it never treats it as `Absent`. This is the
+rule "never take something away from the user on the third", and area
+8's remote functions return the same type.
 
 **Asynchronous by shape, everywhere.** The web answers through
 promises; native dialogs block another thread. So every service call
@@ -35,7 +37,7 @@ for components.
 
 **Deadlines.** Every wait that is not the user's has a deadline from a
 measurement, named in the code: a clipboard read, a storage
-transaction, a key store lookup. Reaching it is `Unavailable` with the
+transaction, a key store lookup. Reaching it is `Unreachable` with the
 deadline in the message. The user's own waits (a picker open, a
 permission prompt) have none, and the call says which kind it is.
 
@@ -43,18 +45,18 @@ permission prompt) have none, and the call says which kind it is.
 
 | Service | Native | Web | Three states | Notes |
 |---|---|---|---|---|
-| Clipboard | arboard: text and images | `navigator.clipboard` read and write, `ClipboardItem` for images; `paste` events for Ctrl/Cmd+V | `Absent` when empty or no readable type; `Unavailable` when permission is denied or the activation has lapsed | Read needs user activation on the web; the API is `read_text`, `read_image`, `write_text`, `write_image`. Each says which activation it needs, and a call outside one is refused before asking the browser |
-| Key-value storage | A JSON file under the platform config directory, written atomically | `localStorage` for small values; IndexedDB for anything over a stated size or binary | `Absent` on a missing key; `Unavailable` when the backend fails or the quota is exceeded | Namespaced by app name; touché's profile and keys use it. A value whose shape the caller does not recognise is refused by the caller, naming the key |
+| Clipboard | arboard: text and images | `navigator.clipboard` read and write, `ClipboardItem` for images; `paste` events for Ctrl/Cmd+V | `Absent` when empty or no readable type; `Unreachable` when permission is denied or the activation has lapsed | Read needs user activation on the web; the API is `read_text`, `read_image`, `write_text`, `write_image`. Each says which activation it needs, and a call outside one is refused before asking the browser |
+| Key-value storage | A JSON file under the platform config directory, written atomically | `localStorage` for small values; IndexedDB for anything over a stated size or binary | `Absent` on a missing key; `Unreachable` when the backend fails or the quota is exceeded | Namespaced by app name; touché's profile and keys use it. A value whose shape the caller does not recognise is refused by the caller, naming the key |
 | File storage | The project folder (`document.json`, `tiles/`) | OPFS with the same layout | As above | Area 8's F-remote sync reads the same layout |
-| Key store | `keyring` (OS keychain) | storage with a stated warning: the browser's storage is the key store | `Absent` when no key; `Unavailable` when the keychain daemon is not reachable | Already built in touché R2 as `KeyStore`; moves into vapors with its tests |
-| Network | reqwest with streaming | `fetch` with the body read from its `ReadableStream` | A response, `Absent` for 404 where the caller says absence is a valid answer, `Unavailable` for connection, TLS, timeout, CORS | Already built in touché R3 as `Transport`; moves into vapors under area 8. One timer rule: tokio natively, gloo-timers on the web |
-| File pickers | rfd (XDG portal on Linux) | `<input type=file>` with `accept`; the File System Access API where present for save | `Absent` when cancelled; `Unavailable` when no dialog can open | Built; the save picker is new |
+| Key store | `keyring` (OS keychain) | storage with a stated warning: the browser's storage is the key store | `Absent` when no key; `Unreachable` when the keychain daemon is not reachable | Already built in touché R2 as `KeyStore`; moves into vapors with its tests |
+| Network | reqwest with streaming | `fetch` with the body read from its `ReadableStream` | A response, `Absent` for 404 where the caller says absence is a valid answer, `Unreachable` for connection, TLS, timeout, CORS | Already built in touché R3 as `Transport`; moves into vapors under area 8. One timer rule: tokio natively, gloo-timers on the web |
+| File pickers | rfd (XDG portal on Linux) | `<input type=file>` with `accept`; the File System Access API where present for save | `Absent` when cancelled; `Unreachable` when no dialog can open | Built; the save picker is new |
 | Share and download | Reveal in file manager | `navigator.share` with files, else a download link | `Absent` when the user dismissed the sheet | touché M4b's Export rules move here |
 | Menus and context menus | muda for the menu bar; in-app context menu | In-app menu bar and context menu drawn by vapors | n/a | Area 3 owns the context menu as a component; this row is the native menu bar only |
 | Timers | The event loop's timer | `setTimeout`/`requestAnimationFrame` through the frame loop | n/a | Area 2 owns the scheduler; this is the one timer primitive it is built on |
 | System theme and motion preference | winit theme events; `prefers-reduced-motion` has no winit signal, read per OS | `matchMedia` listeners | n/a | Fed into `vapors-css`'s `Environment`; a change restyles |
 | Connectivity | A probe request on demand | `navigator.onLine` plus request outcomes | n/a | touché's indicator (patterns.md) is built on request outcomes; the platform only exposes them |
-| Opening URLs | `open` crate | `window.open` with user activation | `Unavailable` when blocked | Links in chat and About |
+| Opening URLs | `open` crate | `window.open` with user activation | `Unreachable` when blocked | Links in chat and About |
 | Notifications | None scheduled | None scheduled | | |
 
 ## Taken from where
@@ -88,7 +90,7 @@ permission prompt) have none, and the call says which kind it is.
 |---|---|
 | Clipboard on the web | Headless Chromium with `--enable-features=ClipboardAPI` and a granted permission: write then read round trip, image round trip, a read without activation refused with the stated reason |
 | Clipboard natively | Xvfb with `xclip` as the other party (touché's planned native paste slice), one test per direction |
-| Storage | A fake storage that fails on the Nth write, to prove `Unavailable` surfaces; quota exceeded in Chromium through a filled origin |
+| Storage | A fake storage that fails on the Nth write, to prove `Unreachable` surfaces; quota exceeded in Chromium through a filled origin |
 | Key store | The fake and, natively, a `keyring` mock backend; the real keychain by hand once per platform |
 | Network | A stand-in server on a second origin (touché's `check_ask` already has one): a 200, a 404, a connection refused, a slow body past the deadline, each mapped to its state |
 | Pickers | No automated oracle for the native dialog (the portal is a user interaction); the web `<input type=file>` is driven by Chromium's file chooser interception in the page-contract script |

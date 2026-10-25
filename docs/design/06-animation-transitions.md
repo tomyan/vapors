@@ -50,12 +50,12 @@ range and number inputs gain a UA transition on their visual parts and
 on their text (`--vapors-value` as an animatable custom property that
 the readout reads through `counter`-like formatting is not available in
 CSS; instead the input animates its *displayed* value from the previous
-to the new over `transition-duration` and fires `input` once, at the
-end, with the final value). The document's value changes at once; the
-display catches up. This is what "controls animating" means for a
-value control, and it needs no app code: the card sets `value`, the
-control animates. A drag by the user sets the displayed value directly
-with no transition, as browsers do.
+to the new over `transition-duration`). The document's value changes
+at once; the display catches up; no `input` or `change` fires, because
+a programmatic value set fires none in a browser either. This is what
+"controls animating" means for a value control, and it needs no app
+code: the card sets `value`, the control animates. A drag by the user
+sets the displayed value directly with no transition, as browsers do.
 
 ### FLIP for reorder
 
@@ -143,7 +143,7 @@ one object at a time, for selection and hover.
 | Transition start, end, cancel events | Chromium's event log for the same HTML with a scripted class change (the page-contract runner) |
 | `@starting-style` and leave | Chromium screenshots at fixed times via virtual time budget, compared with the paint rules; computed values at `t` via `Animation.currentTime` |
 | FLIP | A keyed reorder test counting one `transform` transition per moved row and none otherwise; Chromium has no FLIP primitive, so the geometry oracle checks the end state only |
-| Value controls animating | A test with a stepped clock: the displayed value at each frame, `input` fired once at the end with the final value; a user drag produces no transition |
+| Value controls animating | A test with a stepped clock: the displayed value at each frame, no `input` or `change` fired; a user drag produces no transition and fires `input` per move |
 | Reduced motion | A test under `Environment { reduced_motion: true }`: durations zero, loops once, the busy line still animating |
 | Performance | The stress demo gains a hundred transitioning elements; frame time per phase recorded (area 2) |
 

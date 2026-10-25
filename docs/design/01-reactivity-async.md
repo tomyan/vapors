@@ -37,20 +37,24 @@ functions (area 8) are futures.
 
 ### 2. Updates are held until consistent
 
-When a signal write makes one or more async derivations recompute, the
-UI keeps showing the old values of **everything that depends on the
-write** until every one of those derivations has settled. Synchronous
-derivations of the same write are held too, so a label and the number
-it describes change together. Writes that touch no async derivation
-apply at once, as today.
+When a signal write makes an async derivation recompute, the UI keeps
+showing the old value of **that derivation and everything downstream
+of it** until it has settled. Synchronous readers of the written
+signal apply at once, as today. So a drag writes `value`, the slider's
+thumb follows the finger in the same frame, and the readout that
+derives from the engine's render changes when the render lands. Two
+values that must change together derive from one async result.
 
-This is Svelte's rule ("the UI stays consistent; pending state is
-shown through `$effect.pending()`"), and SolidJS 2.0's transition
-model has the same effect. Leptos's `Transition` holds only the
-Suspense subtree, not other readers of the same signal; vapors takes
-Svelte's wider rule because touché's readouts, sliders and the canvas
-all describe one document version, and a frame mixing two versions is
-what the brief calls "a frame it knows is wrong".
+Svelte's rule is wider: when state read by an `await` changes, every
+update is held until the async work settles, synchronous ones included,
+so a label and the number it describes cannot disagree. SolidJS 2.0's
+transitions have the same effect. Leptos's `Transition` holds only the
+Suspense subtree. vapors takes the narrow rule because touché is an
+editor: a control under the finger must move at once, and a frame that
+holds the thumb until the GPU renders is the worse inconsistency. The
+cost is that consistency between a synchronous and an asynchronous
+value is the component author's job, by deriving both from the async
+value. This is QUESTIONS.md Q1; the recommendation is the narrow rule.
 
 Mechanism: a write that reaches an async node opens a **pending
 version**. Effects downstream of it are queued, not run. When the last
@@ -81,19 +85,24 @@ The token is what makes the rule hold for work that runs elsewhere.
 ### 4. One off-thread call
 
 ```rust
-let stats = offload(owned_input, |input, cancel| compute(input, &cancel)).await;
+#[vapors::offload]
+fn encode_png(image: RgbaImage, cancel: &Cancel) -> Result<Vec<u8>, EncodeError> { .. }
+
+let bytes = encode_png.run(image).await?;
 ```
 
-`offload` takes owned data (`Send + 'static`) and a function, runs it on
-a thread pool natively and a worker pool on the web, and returns a
-future for the result. App code sees one function on both targets.
-What differs is hidden behind it: natively the closure is sent as is;
-on the web the closure cannot cross to a worker, so the compiler
-registers each `offload` call site as a named entry point in the wasm
-module and the worker receives the input by `postMessage` (structured
-clone) or a `SharedArrayBuffer` when the page has the isolation
-headers. A call whose input is not serialisable for the web is refused
-at compile time on the web target, naming the type.
+An offloaded function is a named, free function taking owned input
+(`Send + 'static`, and `serde` types on the web) and the token. `run`
+sends the input to a thread pool natively, or to a worker pool on the
+web, and returns a future for the result. App code sees one call on
+both targets. The attribute registers the function by name in a table
+the worker's copy of the wasm module also has, so the worker receives
+the name and the input (by structured clone, or in a
+`SharedArrayBuffer` when the page has the isolation headers) and calls
+the function. A closure cannot cross to a web worker, which is why the
+unit is a named function and not a closure; an input type that is not
+serialisable is refused at compile time on the web target, naming the
+type.
 
 GPU work is not offloaded: there is one device (ARCHITECTURE.md) and
 its queue is thread-safe natively but main-thread only on the web.
