@@ -50,8 +50,13 @@ by an `await` changes, every reader of that state is held until the
 async work settles, synchronous readers included, so a label and the
 number it describes cannot disagree; updates to unrelated state are not
 held, and a later fast update may show while an earlier slow one is
-still running. SolidJS 2.0's transitions have the same effect. Leptos's
-`Transition` holds only the Suspense subtree. vapors takes the narrow rule because touché is an
+still running. SolidJS 2.0 (release candidate, 2026-10) drops explicit
+transitions: a derivation may return a promise, a reader keeps showing
+the last resolved value while a newer one is pending, and
+`isPending(() => expr)` reports it; a `Loading` boundary covers first
+readiness only. Leptos's `Transition` holds only the Suspense subtree
+and its `Resource` documents nothing about stale or out-of-order
+responses. vapors takes the narrow rule because touché is an
 editor: a control under the finger must move at once, and a frame that
 holds the thumb until the GPU renders is the worse inconsistency. The
 cost is that consistency between a synchronous and an asynchronous

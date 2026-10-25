@@ -33,6 +33,7 @@ async fn record_events(batch: EventBatch) -> Remote<Accepted> { .. }
 | `command` | Write. Never cached; runs once per call; may name the queries it invalidates so they refresh in the same round trip ("single-flight") | SvelteKit `command` with `updates` |
 | `prerender` | Read whose result is baked into the build | SvelteKit `prerender`; not needed by touché, listed so it is a deliberate omission |
 | `form` | A command bound to a form element with progressive enhancement | Not taken: vapors has no HTML form submission to enhance |
+| live query | A read that keeps delivering values over one connection, reconnecting with backoff and keeping only the latest pending value | SvelteKit `query.live` (an async generator over a shared connection); vapors' streaming query (F4) is the same idea over SSE |
 
 **Three outcomes, as a type.**
 
@@ -104,11 +105,15 @@ touché's routes: editor, library, settings. Not needed before accounts.
 
 ## Taken from where
 
-- **SvelteKit remote functions**: query, batch, command, `updates`
-  single-flight, schema validation of arguments at the boundary, the
-  one-file definition split by the compiler. Differs: no `form`, no
-  `prerender`, Rust types instead of Standard Schema, three-state result
-  type instead of thrown errors, versions in a header.
+- **SvelteKit remote functions** (experimental since 2.27, checked
+  2026-10-25): query, `query.batch` (one macrotask's calls in one
+  request), command, `updates` single-flight (the server opts in with
+  `requested(query, limit)`), schema validation of arguments by Standard
+  Schema with a generic 400 on failure, `*.remote.ts` files split by the
+  build. Differs: no `form`, no `prerender`, no `withOverride`, Rust
+  types with `schemars` instead of Standard Schema, a refusal naming the
+  field instead of a generic 400, a three-state result type instead of
+  thrown errors, versions in a header.
 - **Leptos `#[server]`**: the attribute on an async function, the
   server-only body, the generated client stub and registered handler,
   `ServerFnError` as the error type. Differs: Leptos's error type folds

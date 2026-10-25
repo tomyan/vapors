@@ -97,13 +97,17 @@ loop through `Waker`.
 | Font loading | The UI thread today; a worker when the web fallback fetch arrives (F6) | A future that registers the font then asks for a frame |
 
 **Web: no shared memory by default.** Workers get data by structured
-clone or transferred `ArrayBuffer`s. `SharedArrayBuffer` and
-wasm-bindgen-rayon need the cross-origin isolation headers (COOP and
-COEP), which the tailnet server and a static host can set but a
-third-party embed cannot; touché's page is first-party, so the headers
-are a start-up option checked at load, and `offload` uses shared
-memory when they are present and copies when they are not. The choice
-is reported once in the status line and recorded (area 10).
+clone or transferred `ArrayBuffer`s. Shared wasm memory
+(wasm-bindgen-rayon) needs the cross-origin isolation headers (COOP
+`same-origin`, COEP `require-corp`), which the tailnet server and a
+static host can set but a third-party embed cannot, and as of
+2026-10-25 a nightly toolchain with `build-std`, `+atomics` and
+`+bulk-memory`; wgpu's `fragile-send-sync-non-atomic-wasm` feature is
+off under atomics. The toolchain cost is why the shared path is a
+separate, optional slice. touché's page is first-party, so the headers
+are a start-up option checked at load, and `offload` uses shared memory
+when they are present and the build has it, and copies otherwise. The
+choice is reported once in the status line and recorded (area 10).
 
 ## Render in a worker (web only)
 
@@ -116,10 +120,14 @@ it:
   the canvas to a worker with `transferControlToOffscreen`.
 - The worker runs the whole frame above (graph, tree, scene, GPU) on
   its own `GPUDevice` from `navigator.gpu` in the worker. The device
-  is created where it is used; a `GPUDevice` cannot be transferred or
-  shared between threads, which is why there is one device per
-  thread of GPU work and so, since the whole frame moves, still one
-  device.
+  is created where it is used; a `GPUDevice`, buffer or texture cannot
+  be posted or transferred between threads (gpuweb issue 354, deferred),
+  which is why there is one device per thread of GPU work and so, since
+  the whole frame moves, still one device. Worker WebGPU as of
+  2026-10-25: Chrome 113+ (Linux from 144), Safari 26, Firefox 141+ on
+  Windows and Apple-silicon macOS only; a WebGPU context on a
+  transferred `OffscreenCanvas` has no per-browser compatibility entry
+  and is checked by the page contract before the option is offered.
 - Input events are forwarded as messages with the main thread's
   timestamp; IME and clipboard results likewise. Latency of the hop is
   measured and recorded.

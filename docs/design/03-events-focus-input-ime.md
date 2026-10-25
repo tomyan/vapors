@@ -51,6 +51,13 @@ covers reordering, and file drops arrive from the platform as
 `Event::FileDropped`, dispatched as `drop` on the element under the
 pointer.
 
+winit as of 2026-10-25: 0.30.13 is stable and has touches, no tablet
+tools and no IME on the web; 0.31 (beta 4) folds touch into pointer
+events, adds tablet-tool events and a clipboard API, and changes the
+order of `Ime::Preedit` and `Commit`. The pointer model above is
+0.31's shape, so the move to 0.31 is a mapping change in the platform
+crate, and the web IME path is platform code either way.
+
 ## Keyboard
 
 - `keydown`, `keyup` with `key` (the UI Events `key` value: `"a"`,
