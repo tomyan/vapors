@@ -69,11 +69,25 @@ impl Offsets {
         let Some(offset) = self.by_node.get_mut(&node) else {
             return false;
         };
-        let moved = [0, 1].map(|axis| (offset.at[axis] + delta[axis]).clamp(0.0, offset.max[axis]));
-        // exact: any change at all is a move to show
-        let changed = moved.map(f32::to_bits) != offset.at.map(f32::to_bits);
+        let (moved, changed) = offset.moved_by(delta);
         offset.at = moved;
         changed
+    }
+
+    /// Whether `node` would move by `delta`.
+    pub(crate) fn can_move(&self, node: NodeId, delta: [f32; 2]) -> bool {
+        self.by_node
+            .get(&node)
+            .is_some_and(|offset| offset.moved_by(delta).1)
+    }
+}
+
+impl Offset {
+    /// Where `delta` takes this offset, within its range, and whether
+    /// that is a move at all (exact: any change is one to show).
+    fn moved_by(&self, delta: [f32; 2]) -> ([f32; 2], bool) {
+        let moved = [0, 1].map(|axis| (self.at[axis] + delta[axis]).clamp(0.0, self.max[axis]));
+        (moved, moved.map(f32::to_bits) != self.at.map(f32::to_bits))
     }
 }
 

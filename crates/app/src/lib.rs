@@ -8,6 +8,7 @@ mod cursor;
 mod elements_app;
 mod painter;
 mod pointer;
+mod touch_scroll;
 
 pub use elements_app::{ElementsApp, Failure, PerFrame};
 pub use painter::ScenePainter;

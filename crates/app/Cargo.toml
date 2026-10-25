@@ -13,11 +13,11 @@ wgpu.workspace = true
 vapors-scene.workspace = true
 vapors-renderer.workspace = true
 vapors-text.workspace = true
+vapors-dom.workspace = true
 vapors-platform.workspace = true
 vapors-elements.workspace = true
 
 [dev-dependencies]
-vapors-dom.workspace = true
 png.workspace = true
 vapors-demos.workspace = true
 vapors-pixels.workspace = true

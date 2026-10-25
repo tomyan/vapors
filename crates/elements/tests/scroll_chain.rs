@@ -129,3 +129,31 @@ fn a_fixed_box_does_not_scroll() {
     // When / Then
     assert_eq!(top(&mut doc, child), 5.0);
 }
+
+#[test]
+fn the_target_of_a_scroll_is_the_container_it_would_move() {
+    // Given
+    let (mut doc, outer, inner) = nested();
+
+    // When / Then: the inner one, until it is at its end
+    assert_eq!(doc.scroll_target([10.0, 10.0], [0.0, 25.0]), Some(inner));
+    doc.scroll_by([10.0, 10.0], [0.0, 40.0]);
+    doc.update(VIEWPORT).expect("updates");
+    assert_eq!(doc.scroll_target([10.0, 10.0], [0.0, 25.0]), Some(outer));
+    assert_eq!(doc.scroll_target([10.0, 10.0], [0.0, -1.0]), Some(inner));
+}
+
+#[test]
+fn scrolling_one_container_never_passes_the_scroll_out() {
+    // Given: the inner one at its end
+    let (mut doc, outer, inner) = nested();
+    doc.scroll_node_by(inner, [0.0, 40.0]);
+
+    // When
+    let moved = doc.scroll_node_by(inner, [0.0, 25.0]);
+
+    // Then
+    assert!(!moved);
+    assert_eq!(doc.scroll_offset(inner), Some([0.0, 40.0]));
+    assert_eq!(doc.scroll_offset(outer), Some([0.0, 0.0]));
+}

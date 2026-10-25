@@ -41,6 +41,7 @@ pub struct ElementsApp {
     scale: f32,
     /// Where the pointer last moved, in CSS pixels.
     pointer: Point,
+    touch: crate::touch_scroll::TouchScroll,
     /// The cursor last shown.
     cursor: Cursor,
     /// Called before each update with the last one's duration.
@@ -63,6 +64,7 @@ impl ElementsApp {
             failure: Failure::default(),
             scale: 1.0,
             pointer: [0.0, 0.0],
+            touch: crate::touch_scroll::TouchScroll::default(),
             cursor: Cursor::Default,
             per_frame: None,
             last_update: None,
@@ -156,6 +158,10 @@ impl ElementsApp {
             Action::Release(point) => Document::pointer_released(document, point),
             Action::Leave => Document::pointer_left(document),
             Action::Tap(point) => Document::tapped(document, point),
+            Action::Wheel(point, delta) => _ = document.borrow_mut().scroll_by(point, delta),
+            Action::TouchDown(point) => self.touch.down(point),
+            Action::Pan(delta) => _ = self.touch.pan(&mut document.borrow_mut(), delta),
+            Action::TouchUp => self.touch.up(),
         }
     }
 }

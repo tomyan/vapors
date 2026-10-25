@@ -2,7 +2,7 @@
 //! scroll or pinch zooms about the pointer or the fingers, a drag or a
 //! one-finger pan moves it, a double tap fits it or shows it actual size.
 
-use vapors_platform::Event;
+use vapors_platform::{Event, LINE_PIXELS};
 use vapors_renderer::ImagePipeline;
 use vapors_scene::{Color, Size, Transform};
 
@@ -151,7 +151,10 @@ impl ImageView {
             Event::PointerMoved { x, y } => self.pointer_moved([*x, *y]),
             Event::PointerLeft => self.pointer = None,
             Event::PrimaryButton { pressed } => self.dragging = *pressed,
-            Event::Scroll { steps } => self.zoom(self.scroll_anchor(), ZOOM_STEP.powf(*steps)),
+            // a notch away from the user (one line up) zooms in a step
+            Event::Scroll { dy, .. } => {
+                self.zoom(self.scroll_anchor(), ZOOM_STEP.powf(-dy / LINE_PIXELS));
+            }
             Event::Pinch { x, y, factor } => self.zoom([*x, *y], *factor),
             Event::Pan { dx, dy } => self.pan(*dx, *dy),
             Event::DoubleTap { .. } => self.toggle_fit(),

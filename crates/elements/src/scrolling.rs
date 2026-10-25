@@ -11,16 +11,27 @@ impl Document {
     /// Whether one moved; the next update shows it. Nothing moves before
     /// the first update.
     pub fn scroll_by(&mut self, point: [f32; 2], delta: [f32; 2]) -> bool {
-        let Some(painted) = &self.painted else {
-            return false;
-        };
-        let Some(element) = painted.hit(point) else {
-            return false;
-        };
+        self.scroll_target(point, delta)
+            .is_some_and(|container| self.scroll_node_by(container, delta))
+    }
+
+    /// The scroll container [`Document::scroll_by`] would move: the
+    /// innermost under `point` that can move by `delta`, else the next
+    /// one out. A touch gesture keeps the first one it moves.
+    #[must_use]
+    pub fn scroll_target(&self, point: [f32; 2], delta: [f32; 2]) -> Option<NodeId> {
+        let painted = self.painted.as_ref()?;
+        let element = painted.hit(point)?;
         let chain = painted.scroll_chains.from(element);
-        let moved = chain
+        chain
             .into_iter()
-            .any(|container| self.scroll.scroll(container, delta));
+            .find(|container| self.scroll.can_move(*container, delta))
+    }
+
+    /// Scrolls `container` alone by `delta`, never passing it out;
+    /// whether it moved.
+    pub fn scroll_node_by(&mut self, container: NodeId, delta: [f32; 2]) -> bool {
+        let moved = self.scroll.scroll(container, delta);
         self.changed |= moved;
         moved
     }
