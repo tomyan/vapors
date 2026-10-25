@@ -75,9 +75,6 @@ fn styled(used: &Used) -> Vec<String> {
 /// Percentage min and max sizes and padding, which `layout::replaced`
 /// does not resolve.
 fn percentages(style: &taffy::Style) -> Vec<String> {
-    let percent = |raw: taffy::CompactLength| {
-        raw.tag() == taffy::CompactLength::PERCENT_TAG || raw.is_plain_calc()
-    };
     let limits = [
         ("min-width", style.min_size.width.into_raw()),
         ("min-height", style.min_size.height.into_raw()),
@@ -91,12 +88,18 @@ fn percentages(style: &taffy::Style) -> Vec<String> {
         style.padding.bottom,
     ]
     .map(|side| ("padding", side.into_raw()));
-    limits
+    let named: std::collections::BTreeSet<&str> = limits
         .into_iter()
         .chain(padding)
-        .filter(|(_, raw)| percent(*raw))
-        .map(|(name, _)| format!("has a percentage or calc() {name}, which an img's size does not resolve yet; give it in px"))
-        .collect::<std::collections::BTreeSet<_>>()
+        .filter(|(_, raw)| relative(*raw))
+        .map(|(name, _)| name)
+        .collect();
+    named
         .into_iter()
+        .map(|name| format!("has a percentage or calc() {name}, which an img's size does not resolve yet; give it in px"))
         .collect()
+}
+
+fn relative(raw: taffy::CompactLength) -> bool {
+    raw.tag() == taffy::CompactLength::PERCENT_TAG || raw.is_plain_calc()
 }

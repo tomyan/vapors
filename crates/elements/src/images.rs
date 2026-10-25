@@ -34,6 +34,30 @@ impl Images {
         Ok(())
     }
 
+    /// Drops the image registered as `name`, unless an `img` among
+    /// `nodes` still names it.
+    ///
+    /// # Errors
+    /// No image registered as `name`, or an `img` that still names it,
+    /// naming the first.
+    pub(crate) fn unregister(
+        &mut self,
+        name: &str,
+        arena: &Arena,
+        nodes: &[NodeId],
+    ) -> Result<(), String> {
+        if let Some(&node) = nodes.iter().find(|&&node| src(arena, node) == Some(name)) {
+            let holder = crate::check::describe(arena, node);
+            return Err(format!(
+                "the image {name:?} is still shown by {holder}; remove the img or change its src first"
+            ));
+        }
+        self.by_name
+            .remove(name)
+            .map(drop)
+            .ok_or(format!("no image is registered as {name:?}"))
+    }
+
     /// Whether an image is registered as `name`.
     pub(crate) fn has(&self, name: &str) -> bool {
         self.by_name.contains_key(name)
@@ -63,29 +87,26 @@ impl Images {
 pub(crate) const MAX_SIDE: u32 = 8192;
 
 fn drawable(name: &str, image: &RgbaImage) -> Result<(), String> {
-    let size = image.size;
-    if size.width == 0 || size.height == 0 {
-        return Err(format!(
-            "the image {name:?} is {}x{}: a side of zero cannot be drawn; register an image with pixels",
-            size.width, size.height
-        ));
-    }
-    if size.width > MAX_SIDE || size.height > MAX_SIDE {
-        return Err(format!(
-            "the image {name:?} is {}x{}: a side over {MAX_SIDE} px cannot be uploaded on every device; scale it down first",
-            size.width, size.height
-        ));
-    }
-    let wanted = size.width as usize * size.height as usize * 4;
-    if image.rgba.len() != wanted {
-        return Err(format!(
-            "the image {name:?} has {} bytes where {}x{} RGBA takes {wanted} bytes",
-            image.rgba.len(),
-            size.width,
-            size.height
-        ));
-    }
-    Ok(())
+    let RgbaImage { size, rgba } = image;
+    let (width, height) = (size.width, size.height);
+    let wanted = width as usize * height as usize * 4;
+    let problem = if width == 0 || height == 0 {
+        Some("a side of zero cannot be drawn; register an image with pixels".to_owned())
+    } else if width > MAX_SIDE || height > MAX_SIDE {
+        Some(format!(
+            "a side over {MAX_SIDE} px cannot be uploaded on every device; scale it down first"
+        ))
+    } else if rgba.len() != wanted {
+        Some(format!(
+            "it has {} bytes where RGBA at that size takes {wanted} bytes",
+            rgba.len()
+        ))
+    } else {
+        None
+    };
+    problem.map_or(Ok(()), |problem| {
+        Err(format!("the image {name:?} is {width}x{height}: {problem}"))
+    })
 }
 
 /// `node`'s `src`, when it is an `img`.

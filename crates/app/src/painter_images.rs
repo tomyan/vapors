@@ -4,7 +4,7 @@
 use std::rc::Rc;
 
 use vapors_elements::Painted;
-use vapors_renderer::{ImagePipeline, Target, upload_rgba8};
+use vapors_renderer::{ImagePipeline, Target, upload_rgba8_mipmapped};
 use vapors_scene::{Item, RgbaImage};
 
 /// The images uploaded so far, by the image they hold (compared by
@@ -49,18 +49,22 @@ impl Textures {
             .iter()
             .position(|(held, _, _)| Rc::ptr_eq(held, image));
         let at = found.unwrap_or_else(|| {
-            let size = image.size;
-            let texture = upload_rgba8(
-                target.device,
-                target.queue,
-                size.width,
-                size.height,
-                &image.rgba,
-            );
-            self.uploaded.push((Rc::clone(image), texture, false));
+            self.uploaded
+                .push((Rc::clone(image), upload(target, image), false));
             self.uploaded.len() - 1
         });
         self.uploaded[at].2 = true;
         &self.uploaded[at].1
     }
+}
+
+fn upload(target: &Target<'_>, image: &RgbaImage) -> wgpu::Texture {
+    let size = image.size;
+    upload_rgba8_mipmapped(
+        target.device,
+        target.queue,
+        size.width,
+        size.height,
+        &image.rgba,
+    )
 }

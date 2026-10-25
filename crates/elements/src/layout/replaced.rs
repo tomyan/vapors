@@ -29,27 +29,38 @@ pub(crate) fn measure(
     let edges = edges(style);
     let limits = limits(style, edges);
     let inset = inset(style);
-    let own = |dimension: taffy::Dimension, base: Option<f32>, axis: usize| {
-        let raw = dimension.into_raw();
-        let outer = match raw.tag() {
-            taffy::CompactLength::LENGTH_TAG => Some(raw.value()),
-            taffy::CompactLength::PERCENT_TAG => base.map(|base| base * raw.value()),
-            _ => None,
-        }?;
-        Some(
-            (outer - edges[axis])
-                .max(0.0)
-                .min(limits.max[axis])
-                .max(limits.min[axis]),
-        )
-    };
     let content =
         |outer: Option<f32>, axis: usize| outer.map(|outer| (outer - inset[axis]).max(0.0));
+    let own = |dimension, base, axis| {
+        own(
+            dimension,
+            base,
+            edges[axis],
+            [limits.min[axis], limits.max[axis]],
+        )
+    };
     let known = taffy::Size {
         width: content(known.width, 0).or_else(|| own(style.size.width, parent.width, 0)),
         height: content(known.height, 1).or_else(|| own(style.size.height, parent.height, 1)),
     };
     size(known, natural, limits)
+}
+
+/// A box's own width or height in content px: a length, or a percentage
+/// of `base`, less `edges` and within `[min, max]`; `None` for `auto`.
+fn own(
+    dimension: taffy::Dimension,
+    base: Option<f32>,
+    edges: f32,
+    [min, max]: [f32; 2],
+) -> Option<f32> {
+    let raw = dimension.into_raw();
+    let outer = match raw.tag() {
+        taffy::CompactLength::LENGTH_TAG => Some(raw.value()),
+        taffy::CompactLength::PERCENT_TAG => base.map(|base| base * raw.value()),
+        _ => None,
+    }?;
+    Some((outer - edges).max(0.0).min(max).max(min))
 }
 
 fn length(raw: taffy::CompactLength) -> Option<f32> {

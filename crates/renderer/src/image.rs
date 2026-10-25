@@ -37,17 +37,26 @@ impl ImagePipeline {
             immediate_size: 0,
         });
         let pipeline = render_pipeline(device, &pipeline_layout, &shader, format);
-        let sampler = |label, filter| {
+        let sampler = |label, filter, mipmap_filter| {
             device.create_sampler(&wgpu::SamplerDescriptor {
                 label: Some(label),
                 mag_filter: filter,
                 min_filter: filter,
+                mipmap_filter,
                 ..Default::default()
             })
         };
         let (nearest, smooth) = (
-            sampler("image nearest", wgpu::FilterMode::Nearest),
-            sampler("image smooth", wgpu::FilterMode::Linear),
+            sampler(
+                "image nearest",
+                wgpu::FilterMode::Nearest,
+                wgpu::MipmapFilterMode::Nearest,
+            ),
+            sampler(
+                "image smooth",
+                wgpu::FilterMode::Linear,
+                wgpu::MipmapFilterMode::Linear,
+            ),
         );
         let vertices = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("image quad"),

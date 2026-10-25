@@ -96,6 +96,17 @@ impl Document {
         Ok(())
     }
 
+    /// Drops the image registered as `name`, so its pixels are freed;
+    /// the painter drops its texture after the next frame that does not
+    /// draw it.
+    ///
+    /// # Errors
+    /// No image registered as `name`, or an `img` that still names it.
+    pub fn unregister_image(&mut self, name: &str) -> Result<(), String> {
+        let nodes = crate::check::elements(&self.arena, self.root);
+        self.images.unregister(name, &self.arena, &nodes)
+    }
+
     /// The `html` element.
     #[must_use]
     pub fn root(&self) -> NodeId {

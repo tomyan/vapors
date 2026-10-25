@@ -84,3 +84,23 @@ fn every_img_is_checked_with_or_without_src() {
         );
     }
 }
+
+#[test]
+fn an_image_is_unregistered_only_when_no_img_names_it() {
+    // Given: a.png shown by an img
+    let mut doc = document();
+    let body = doc.body();
+    let img = element(&mut doc, body, "img", "");
+    doc.set_attribute(img, "src", "a.png");
+    doc.register_image("a.png", image(4, 4)).expect("registers");
+
+    // When / Then: refused while the img names it, naming the img
+    let error = doc.unregister_image("a.png").expect_err("refused");
+    assert!(error.contains("a.png") && error.contains("<img"), "{error}");
+
+    // When / Then: once the img is gone, it goes
+    doc.remove(img);
+    assert_eq!(doc.unregister_image("a.png"), Ok(()));
+    let again = doc.unregister_image("a.png").expect_err("refused");
+    assert!(again.contains("no image"), "{again}");
+}
