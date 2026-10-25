@@ -10,6 +10,7 @@ use std::time::Duration;
 
 use crate::deadline::{Finished, run_with_deadline};
 use crate::serve_config::Mount;
+use crate::serve_mount::{refuse_other, served_at};
 
 /// How long `tailscale serve --bg` and `tailscale status` may take. Both
 /// returned in under a second on the dev box on 2026-10-22; the margin
@@ -49,6 +50,15 @@ pub enum Target<'a> {
 }
 
 impl Target<'_> {
+    /// As `tailscale serve status --json` describes a mount of it.
+    #[must_use]
+    pub fn described(&self) -> String {
+        match self {
+            Target::Directory(dir) => format!("Path {}", dir.display()),
+            Target::LocalPort(_) => format!("Proxy {}", self.argument()),
+        }
+    }
+
     fn argument(&self) -> String {
         match self {
             Target::Directory(dir) => dir.display().to_string(),
@@ -79,22 +89,50 @@ pub fn start_serving(tailscale: &Path, target: &Target<'_>, mount: &Mount) -> Re
     let line = format!("sudo {} {}", tailscale.display(), arguments.join(" "));
     let mut command = Command::new("sudo");
     command.arg("-n").arg(tailscale).args(&arguments);
+    output_of(command, &line).map(|_| ()).map_err(|why| {
+        format!("{why}fix: run that command yourself (sudo may want a password), then the xtask command again")
+    })
+}
+
+/// Mount `target` at `mount` and return its URL; refused when another
+/// target is mounted there, unless `replace`.
+///
+/// # Errors
+///
+/// tailscale failed, or the mount holds another target.
+pub fn mount(
+    tailscale: &Path,
+    target: &Target<'_>,
+    mount: &Mount,
+    replace: bool,
+) -> Result<String, String> {
+    let host = dns_name(&tailscale_status(tailscale)?)?;
+    let mut status = Command::new(tailscale);
+    status.args(["serve", "status", "--json"]);
+    let current = served_at(
+        &output_of(status, "tailscale serve status --json")?,
+        &host,
+        mount,
+    )?;
+    refuse_other(current.as_deref(), &target.described(), mount, replace)?;
+    start_serving(tailscale, target, mount)?;
+    Ok(url_for(&host, mount))
+}
+
+/// `command`'s output once it exits 0 within the deadline; otherwise
+/// why not, naming `line`.
+fn output_of(command: Command, line: &str) -> Result<String, String> {
     match run_with_deadline(command, TAILSCALE_DEADLINE)? {
-        Finished::Exited { success: true, .. } => Ok(()),
-        Finished::Exited { output, .. } => Err(format!(
-            "`{line}` failed:\n{output}fix: run that command yourself (sudo may want a password), then the xtask command again"
-        )),
+        Finished::Exited {
+            success: true,
+            output,
+        } => Ok(output),
+        Finished::Exited { output, .. } => Err(format!("`{line}` failed:\n{output}")),
         Finished::TimedOut { .. } => Err(format!(
-            "`{line}` did not finish within {}s",
+            "`{line}` did not finish within {}s; ",
             TAILSCALE_DEADLINE.as_secs()
         )),
     }
-}
-
-/// This machine's URL for `mount`.
-pub fn served_url(tailscale: &Path, mount: &Mount) -> Result<String, String> {
-    let status = tailscale_status(tailscale)?;
-    Ok(url_for(&dns_name(&status)?, mount))
 }
 
 /// `https://<name><path>`, with the port when it is not 443.
@@ -109,19 +147,7 @@ pub fn url_for(name: &str, mount: &Mount) -> String {
 fn tailscale_status(tailscale: &Path) -> Result<String, String> {
     let mut command = Command::new(tailscale);
     command.args(["status", "--json"]);
-    match run_with_deadline(command, TAILSCALE_DEADLINE)? {
-        Finished::Exited {
-            success: true,
-            output,
-        } => Ok(output),
-        Finished::Exited { output, .. } => {
-            Err(format!("`tailscale status --json` failed:\n{output}"))
-        }
-        Finished::TimedOut { .. } => Err(format!(
-            "`tailscale status --json` did not finish within {}s",
-            TAILSCALE_DEADLINE.as_secs()
-        )),
-    }
+    output_of(command, "tailscale status --json")
 }
 
 /// `Self.DNSName` without its trailing dot. `Self` is null when this

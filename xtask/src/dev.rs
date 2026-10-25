@@ -21,7 +21,7 @@ use crate::dev_keys::{self, DevKey};
 use crate::dev_keys_server::{self, KEYS_PATH};
 use crate::report::Reporter;
 use crate::serve_config;
-use crate::tailscale::{Target, find_in, require_tailscale, served_url, start_serving};
+use crate::tailscale::{Target, find_in, mount, require_tailscale};
 use crate::trunk::Trunk;
 use crate::web::{package_dir, web_package};
 
@@ -39,8 +39,8 @@ pub const DEV_DIST: &str = "target/web-dev";
 pub const READY_DEADLINE: Duration = Duration::from_secs(600);
 
 /// Run the loop until trunk exits.
-pub fn run(reporter: &Reporter, key_arguments: &[String]) -> ExitCode {
-    match serve(reporter, key_arguments) {
+pub fn run(reporter: &Reporter, key_arguments: &[String], replace: bool) -> ExitCode {
+    match serve(reporter, key_arguments, replace) {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {
             println!("FAIL dev: {message}");
@@ -52,13 +52,13 @@ pub fn run(reporter: &Reporter, key_arguments: &[String]) -> ExitCode {
 
 /// Every refusal before trunk starts, then the loop. `Trunk` kills its
 /// process group when dropped, so every `?` after the spawn kills it.
-fn serve(reporter: &Reporter, key_arguments: &[String]) -> Result<(), String> {
+fn serve(reporter: &Reporter, key_arguments: &[String], replace: bool) -> Result<(), String> {
     let keys = checked_keys(key_arguments, &providers_for(key_arguments)?)?;
     let trunk = require_trunk()?;
     let tailscale = require_tailscale()?;
     let config = Config::load().map_err(|e| e.to_string())?;
     let port = port_from(&config)?;
-    let mount = serve_config::dev(&config)?;
+    let at = serve_config::dev(&config)?;
     check_port_free(port)?;
     let package = web_package()?;
     let crate_dir = package_dir(&package)?;
@@ -67,8 +67,8 @@ fn serve(reporter: &Reporter, key_arguments: &[String]) -> Result<(), String> {
     let args = trunk_args(port, &root, keys_port);
     let mut trunk = Trunk::spawn(trunk_command(&trunk, &crate_dir, &args)?)?;
     trunk.wait_until_ready(port, reporter, READY_DEADLINE)?;
-    start_serving(&tailscale, &Target::LocalPort(port), &mount)?;
-    announce(&served_url(&tailscale, &mount)?, &package, port, &notices);
+    let url = mount(&tailscale, &Target::LocalPort(port), &at, replace)?;
+    announce(&url, &package, port, &notices);
     trunk.follow(reporter)
 }
 

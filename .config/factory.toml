@@ -15,12 +15,16 @@ package = "vapors-web-demo"
 [serve]
 # Where `cargo xtask serve` puts the release build of main (serve_config.rs):
 # a copy under the home directory, at https `https` and `path` on the
-# tailnet, after `check` (a shell line) passes on target/web. The demo
+# tailnet, after `check` (a shell line, in its own temporary directory,
+# removed after) passes on the build within `check_seconds`. The demo
 # page lives under /vapors/ so touche's page keeps /.
 dir = "srv/vapors-demo"
 https = "443"
 path = "/vapors/"
-check = "scripts/check-page-contract.sh target/web $(mktemp -d)"
+check = "d=$(mktemp -d) && scripts/check-page-contract.sh target/web $d; s=$?; rm -rf $d; exit $s"
+# The page contract took 41 s on the runner (run 40036623884, 2026-10-23);
+# four times that, for a loaded box.
+check_seconds = "180"
 
 [dev]
 # The https port `cargo xtask dev` serves trunk's debug page on, at /.

@@ -61,8 +61,12 @@ pub enum Command {
         #[arg(long)]
         debug: bool,
     },
-    /// Serve target/web on the tailnet over https and print the URL.
-    Serve,
+    /// Build main's page and serve it on the tailnet where [serve] says; print the URL.
+    Serve {
+        /// Replace another target mounted where [serve] says.
+        #[arg(long)]
+        replace: bool,
+    },
     /// trunk's post-build hook: version.json and `?v=<build>` on the
     /// page's own files in trunk's staging directory.
     StampPage,
@@ -72,6 +76,9 @@ pub enum Command {
         /// openai); the file must be mode 600. Repeat for each provider.
         #[arg(long = "key", value_name = "PROVIDER=FILE")]
         keys: Vec<String>,
+        /// Replace another target mounted on [dev] https.
+        #[arg(long)]
+        replace: bool,
     },
     /// Run every step of .github/workflows/ci.yml here, in order, ending `gate: pass <sha>`.
     Gate,
