@@ -1,0 +1,19 @@
+[package]
+name = "vapors-devtools"
+description = "Chromium's DevTools protocol for checks and oracles: find the page of a Chromium started with --remote-debugging-port=0, call methods by deadline, and wait for events."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+serde_json = "=1.0.154"
+tungstenite.workspace = true
+
+[dev-dependencies]
+vapors-text.workspace = true
+
+[lints]
+workspace = true

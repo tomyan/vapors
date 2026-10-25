@@ -110,7 +110,7 @@ fn wait_or_kill(child: &mut Child, deadline: Duration) -> Result<ExitStatus, Str
 /// 120564930866: "stderr still open 2s after the end") with
 /// `kill -KILL -<pid>`; `--` before a negative id is procps's documented
 /// form, and the kill's own failure is now returned to be reported.
-fn kill_group(child: &mut Child) -> Result<(), String> {
+pub(crate) fn kill_group(child: &mut Child) -> Result<(), String> {
     let group = format!("-{}", child.id());
     let killed = std::process::Command::new("kill")
         .args(["-s", "KILL", "--", &group])

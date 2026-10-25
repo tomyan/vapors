@@ -73,13 +73,20 @@ keep their header.
 One Rust crate (`vapors-elements-corpus` today, grown rather than
 duplicated) drives headless Chromium with the rules in CLAUDE.md
 (deadline, stderr drained, `DBUS_SESSION_BUS_ADDRESS` stripped) and
-adds the DevTools protocol over a pipe for what `--dump-dom` cannot
-give: `Input.dispatchMouseEvent`/`dispatchKeyEvent` for event logs and
+adds the DevTools protocol (`vapors-devtools`) for what `--dump-dom`
+cannot give: `Input.dispatchMouseEvent`/`dispatchKeyEvent` for event logs and
 focus, `Accessibility.getFullAXTree` for roles and names,
 `Animation.seekAnimations` (or virtual time) for transitions,
 `Emulation.setDeviceMetricsOverride` for scale. Outputs are committed
 JSON beside the fixtures and checked in CI (`--check`), as the layout
 oracle does, so a Chromium that changes its answer is a visible diff.
+
+The protocol runs over a port, not a pipe (decided 2026-10-25, Q1).
+Chromium's `--remote-debugging-pipe` reads and writes file descriptors 3
+and 4, and setting those in a child takes `unsafe` in Rust, which the
+workspace forbids. Chromium is started with `--remote-debugging-port=0`
+on a profile of its own; `vapors-devtools` reads the port it chose from
+the profile's `DevToolsActivePort` and finds the page in `/json/list`.
 
 ## Tiers
 
