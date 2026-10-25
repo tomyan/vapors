@@ -1,6 +1,9 @@
 //! Shared by the paint tests: fixtures laid out by vapors, rendered by
 //! Chromium, and the regions the rules hold to their budgets.
 
+#[path = "../corpus_support/images.rs"]
+mod images;
+
 use std::cell::RefCell;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
@@ -37,6 +40,7 @@ pub fn laid_out(fixture: &Fixture, scale: u32) -> Rc<RefCell<Document>> {
         .expect("parses");
     let body = doc.borrow().body();
     (fixture.mount)(&doc, body);
+    images::register_fixture_images(&mut doc.borrow_mut());
     #[allow(clippy::cast_precision_loss)]
     let viewport = Viewport {
         width: WIDTH as f32,

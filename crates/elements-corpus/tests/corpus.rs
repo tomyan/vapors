@@ -3,6 +3,8 @@
 //! within Chromium's layout unit (1/64 px), or within the tolerance a
 //! fixture with text states in a `/* tolerance N */` comment, with why.
 
+#[path = "corpus_support/images.rs"]
+mod images;
 #[path = "corpus_support/scroll.rs"]
 mod scroll;
 
@@ -87,6 +89,7 @@ fn our_boxes(fixture: &Fixture, viewport: Viewport) -> Vec<(String, BoxRect)> {
         .expect("the fixture's style parses");
     let body = doc.borrow().body();
     (fixture.mount)(&doc, body);
+    images::register_fixture_images(&mut doc.borrow_mut());
     let mut doc = doc.borrow_mut();
     if let Err(errors) = doc.update(viewport) {
         panic!("{}: the update was refused: {errors:#?}", fixture.name);

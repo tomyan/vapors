@@ -38,6 +38,8 @@ pub struct Document {
     pub(crate) scroll: crate::scroll::Offsets,
     /// Whether scroll thumbs are drawn now.
     pub(crate) thumbs_shown: bool,
+    /// The images `img` elements show, by name.
+    pub(crate) images: crate::images::Images,
 }
 
 impl Document {
@@ -65,6 +67,7 @@ impl Document {
             laid_out: 0,
             scroll: crate::scroll::Offsets::default(),
             thumbs_shown: true,
+            images: crate::images::Images::default(),
         }
     }
 
@@ -74,6 +77,14 @@ impl Document {
     /// asks this after each event. True for a new document.
     pub fn take_changed(&mut self) -> bool {
         std::mem::replace(&mut self.changed, false)
+    }
+
+    /// Registers `image` under `name` for the `img` elements whose `src`
+    /// is `name`, replacing any image of that name; they show it from
+    /// the next update.
+    pub fn register_image(&mut self, name: &str, image: vapors_scene::RgbaImage) {
+        self.images.register(name, image);
+        self.changed = true;
     }
 
     /// The `html` element.

@@ -2691,6 +2691,7 @@ version = "0.0.0"
 dependencies = [
  "serde_json",
  "vapors-app",
+ "vapors-canvas",
  "vapors-compiler",
  "vapors-devtools",
  "vapors-dom",

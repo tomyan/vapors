@@ -9,14 +9,7 @@ use vapors_scene::{Color, Size, Transform};
 /// Factor per scroll step or per `+`/`-` press.
 const ZOOM_STEP: f32 = 1.25;
 
-/// Tightly packed 8-bit RGBA pixels with their size.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct RgbaImage {
-    /// Width and height in pixels.
-    pub size: Size,
-    /// `size.width * size.height * 4` bytes, rows from the top.
-    pub rgba: Vec<u8>,
-}
+pub use vapors_scene::RgbaImage;
 
 /// The image on the GPU, made on the first frame that needs it.
 pub(crate) struct Uploaded {

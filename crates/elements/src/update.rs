@@ -44,7 +44,7 @@ impl Document {
         let (root, body) = (self.root(), self.body());
         let kept = self.kept.as_ref().expect("styled keeps the styles");
         let used = &kept.used;
-        let boxes = build(&self.arena, used, root);
+        let boxes = build(&self.arena, used, &self.images, root);
         let size = (viewport.width, viewport.height);
         let texts = (&mut self.fonts, &mut self.texts);
         let (boxes, laid_out) = lay_out(
@@ -139,6 +139,7 @@ impl Document {
                 errors.extend(self.mixed_metrics(node, &kept.used, viewport.scale));
             }
         }
+        errors.extend(self.images.refusals(&self.arena, &live, &kept.used));
         if errors.is_empty() {
             Ok(calcs)
         } else {

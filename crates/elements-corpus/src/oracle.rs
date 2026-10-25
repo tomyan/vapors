@@ -126,6 +126,41 @@ pub fn write_fonts(work: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// The fixtures' images (`fixtures/images/*.png`), by file name: what an
+/// `img` names in its `src`.
+///
+/// # Errors
+/// When the directory or a file cannot be read.
+pub fn image_files() -> Result<Vec<(String, Vec<u8>)>, String> {
+    let dir = fixtures_dir().join("images");
+    let entries = std::fs::read_dir(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let mut files = Vec::new();
+    for entry in entries {
+        let path = entry.map_err(|e| format!("{}: {e}", dir.display()))?.path();
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or(format!("{}: not a UTF-8 name", path.display()))?;
+        let bytes = std::fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        files.push((name.to_owned(), bytes));
+    }
+    files.sort();
+    Ok(files)
+}
+
+/// Copies the fixtures' images beside the page Chromium loads, where an
+/// `img`'s `src` finds them.
+///
+/// # Errors
+/// When one cannot be read or written.
+pub fn write_images(work: &Path) -> Result<(), String> {
+    for (name, bytes) in image_files()? {
+        let path = work.join(name);
+        std::fs::write(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))?;
+    }
+    Ok(())
+}
+
 /// The corpus file text for `boxes`: one box per line, so a change
 /// reads as a one-line diff.
 #[must_use]

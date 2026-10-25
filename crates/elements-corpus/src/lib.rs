@@ -59,6 +59,7 @@ fixtures![
     flex_row::FlexRow,
     grid_tracks::GridTracks,
     hello_box::HelloBox,
+    images::Images,
     inline_text::InlineText,
     paint_boxes::PaintBoxes,
     positioned::Positioned,

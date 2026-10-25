@@ -2,8 +2,8 @@
 //! where the rest arrive. A tag the compiler accepts but the tree does
 //! not implement is an error, never drawn as a `div`.
 
-/// Tags laid out and painted now: block-level containers, and the
-/// inline elements of F2c S6.
+/// Tags laid out and painted now: block-level containers, the inline
+/// elements of F2c S6, and `img` (S10).
 const SUPPORTED: &[&str] = &[
     "html",
     "body",
@@ -27,6 +27,7 @@ const SUPPORTED: &[&str] = &[
     "figure",
     "figcaption",
     "hr",
+    "img",
     "span",
     "b",
     "strong",
@@ -42,7 +43,6 @@ const SUPPORTED: &[&str] = &[
 
 /// Where each unimplemented tag arrives.
 const LATER: &[(&str, &[&str])] = &[
-    ("F2c S10", &["img"]),
     ("F2d, the first item after F2c", &["br", "a"]),
     ("F3", &["canvas"]),
     (
@@ -105,15 +105,15 @@ mod tests {
     #[test]
     fn a_scheduled_tag_is_refused_naming_its_slice() {
         // Given
-        let tag = "img";
+        let tag = "canvas";
 
         // When
         let refusal = unsupported(tag);
 
         // Then
-        let refusal = refusal.expect("img is refused until S10");
+        let refusal = refusal.expect("canvas is refused until F3");
         assert!(
-            refusal.contains("<img>") && refusal.contains("F2c S10"),
+            refusal.contains("<canvas>") && refusal.contains("F3"),
             "{refusal}"
         );
     }

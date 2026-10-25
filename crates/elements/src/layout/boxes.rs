@@ -35,6 +35,10 @@ pub(crate) struct LayoutBox {
     /// containing block of, as Taffy hoists them; their layouts are
     /// relative to this box.
     pub(crate) hoisted: Vec<usize>,
+    /// The natural size of the image an `img` shows, CSS px. Kept
+    /// layouts need not compare it: it reaches the style as the width
+    /// or the aspect ratio wherever it changes the layout.
+    pub(crate) natural: Option<[f32; 2]>,
 }
 
 impl LayoutBox {
@@ -46,6 +50,26 @@ impl LayoutBox {
             cache: Cache::new(),
             layout: Layout::with_order(0),
             hoisted: Vec::new(),
+            natural: None,
+        }
+    }
+
+    /// A box showing an image of `natural` size (CSS px), when it has
+    /// one: with no width or height given it takes the natural width, as
+    /// a replaced element does rather than stretching, and its aspect
+    /// ratio sizes it when one length is given.
+    pub(crate) fn replaced(content: Content, mut style: Style, natural: Option<[f32; 2]>) -> Self {
+        if let Some([width, height]) = natural {
+            if style.size.width.is_auto() && style.size.height.is_auto() {
+                style.size.width = taffy::Dimension::length(width);
+            }
+            if height > 0.0 {
+                style.aspect_ratio = Some(width / height);
+            }
+        }
+        Self {
+            natural,
+            ..Self::new(content, style)
         }
     }
 }
@@ -54,12 +78,26 @@ impl LayoutBox {
 struct Source<'a> {
     arena: &'a Arena,
     used: &'a HashMap<NodeId, Used>,
+    images: &'a crate::images::Images,
 }
 
 /// Builds the boxes under `root`; box 0 is the root's.
-pub(crate) fn build(arena: &Arena, used: &HashMap<NodeId, Used>, root: NodeId) -> Vec<LayoutBox> {
+pub(crate) fn build(
+    arena: &Arena,
+    used: &HashMap<NodeId, Used>,
+    images: &crate::images::Images,
+    root: NodeId,
+) -> Vec<LayoutBox> {
     let mut boxes = Vec::new();
-    add_element(&Source { arena, used }, root, &mut boxes);
+    add_element(
+        &Source {
+            arena,
+            used,
+            images,
+        },
+        root,
+        &mut boxes,
+    );
     boxes
 }
 
@@ -69,7 +107,11 @@ fn add_element(source: &Source<'_>, node: NodeId, boxes: &mut Vec<LayoutBox>) ->
         return None;
     }
     let index = boxes.len();
-    boxes.push(LayoutBox::new(Content::Element(node), style.layout.clone()));
+    boxes.push(LayoutBox::replaced(
+        Content::Element(node),
+        style.layout.clone(),
+        source.images.natural(source.arena, node),
+    ));
     let mut run = Collector::new(style.text, style.visible);
     for child in source.arena.children(node) {
         match &source.arena.get(child, "build").kind {
