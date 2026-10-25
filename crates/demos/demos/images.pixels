@@ -1,0 +1,17 @@
+# A history list at 640x400 CSS px at 1x. Entries are 49 px tall (8 px
+# padding, a 32 px thumbnail, a 1 px border) under a 44 px bar; each
+# thumbnail is a 96 x 64 image of four flat quadrants drawn at 48 x 32,
+# from x 12, so its quadrants' middles are at x 24 and 48, and y 8 and
+# 24 below its top.
+pixel 24 60 #5b9bd5          first thumbnail, top left: sky
+pixel 48 60 #8cbeeb          first thumbnail, top right
+pixel 24 76 #548235          first thumbnail, bottom left: grass
+pixel 24 109 #ed7d31         second thumbnail, top left: warm
+pixel 48 125 #c55a11         second thumbnail, bottom right
+pixel 48 174 #c8c8c8         third thumbnail, bottom right: mono
+ink 72 52 300 84 #ffffff     the first entry's text is drawn
+
+# A phone: the same list, the same places.
+at 390x800
+pixel 24 60 #5b9bd5          first thumbnail, top left
+pixel 48 174 #c8c8c8         third thumbnail, bottom right

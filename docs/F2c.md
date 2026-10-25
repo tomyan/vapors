@@ -915,6 +915,35 @@ differs from the plan.
   phone), while the right one stays at row 0.
 - **Deferred to F2d:** momentum and fling.
 
+### S10
+
+- **Images** (`images.rs`): `Document::register_image(name, RgbaImage)`
+  registers an image for the `img` elements whose `src` is `name`.
+  `RgbaImage` is in vapors-scene now, re-exported by vapors-canvas.
+  - Refused, naming the fix: a `src` naming no registered image; an
+    inline `img` (an image in a line of text is inline-block content,
+    not built: give it `display: block`, or put it in a flex or grid
+    container); a rounded `img` (no rounded clip yet).
+- **Layout** (the `images` fixture, against Chromium at both sizes): an
+  `img` is a replaced box.
+  - With no width or height it takes its natural width rather than
+    stretching. One length sets the other through the aspect ratio.
+  - Without a `src` it is 0 x 0, and margins do not collapse through
+    it. The first version got both wrong; the fixture showed them.
+- **Paint** (the `image_paint` fixture, against Chromium's pixels at 1x
+  and 2x): the image over the content box, after the `img`'s background
+  and border, under its clip.
+  - `ImagePipeline::draw_rect` stretches a texture over a rect with
+    linear sampling, inside the target's scissor.
+  - The painter uploads each registered image once and keeps it while
+    frames draw it.
+- **Fixture images.** They are in `elements-corpus/fixtures/images/`.
+  The oracle and the paint harness copy them beside their pages, and
+  the corpus tests register them by file name.
+- **Demo.** `images`: a history list with a 48 x 32 thumbnail per turn,
+  from bundled 96 x 64 PNGs; the pixel checks read each quadrant's
+  colour inside the thumbnails.
+
 ## Decisions (2026-10-23)
 
 - **D1 Scoping.** A compiler change in S5: `mount` registers its

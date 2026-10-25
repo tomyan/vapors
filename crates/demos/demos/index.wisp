@@ -16,4 +16,5 @@ h1 { margin-top: 0; font-size: 20px; }
 <div class="demo"><div class="name">?demo=stress</div><div>F2c S7: 1,000 elements, a counter ticking every frame, and how long each update takes</div></div>
 <div class="demo"><div class="name">?demo=toasts</div><div>F2c S8: toasts raised above the shell, each kept until dismissed</div></div>
 <div class="demo"><div class="name">?demo=scroll</div><div>F2c S9: two long lists, each scrolling in its own region by wheel and finger</div></div>
+<div class="demo"><div class="name">?demo=images</div><div>F2c S10: a history list with a thumbnail per turn</div></div>
 <div class="demo"><div class="name">?demo=image</div><div>F0: the image view, pinch and drag</div></div>

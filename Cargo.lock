@@ -2648,6 +2648,7 @@ dependencies = [
 name = "vapors-demos"
 version = "0.0.0"
 dependencies = [
+ "vapors-canvas",
  "vapors-compiler",
  "vapors-dom",
  "vapors-elements",

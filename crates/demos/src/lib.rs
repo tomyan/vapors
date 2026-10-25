@@ -18,6 +18,8 @@ include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 pub use vapors_pixels as pixels;
 
 mod frames;
+mod mounts;
+use mounts::{register_thumbnails, stress_per_frame};
 mod input;
 pub use frames::{frame_limit, limited};
 pub use input::{click, input};
@@ -156,6 +158,15 @@ pub fn all() -> Vec<Demo> {
             },
         },
         Demo {
+            name: "images",
+            pixels: Some(include_str!("../demos/images.pixels")),
+            mount: |dom, parent| {
+                register_thumbnails(&mut dom.borrow_mut());
+                std::mem::forget(images::Images::mount(dom, parent, images::ImagesProps {}));
+                None
+            },
+        },
+        Demo {
             name: INDEX,
             pixels: None,
             mount: |dom, parent| {
@@ -179,21 +190,6 @@ pub fn document(demo: &Demo) -> Shown {
         document,
         per_frame,
     }
-}
-
-/// The stress demo's tick: the counter moves on by one each frame, and
-/// the last update's time is shown in ms. The hook owns the component,
-/// which stays mounted while the hook lives, as every demo's does.
-fn stress_per_frame(stress: stress::Stress) -> PerFrame {
-    Box::new(move |last: Option<Duration>| {
-        let component = &stress;
-        component.tick.update(|n| *n += 1);
-        if let Some(last) = last {
-            component
-                .shown
-                .set(format!("{:.2} ms", last.as_secs_f64() * 1000.0));
-        }
-    })
 }
 
 #[cfg(test)]
