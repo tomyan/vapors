@@ -45,14 +45,17 @@ kept because it is under the threshold.
 An agent turn sets a slider from 0.0 to 0.4. The slider's thumb
 position is a layout property derived from `value`; the value itself is
 app state, so a CSS transition on the thumb's `left` or `transform`
-animates the thumb, and the readout number needs the same. Design: the
-range and number inputs gain a UA transition on their visual parts and
-on their text (`--vapors-value` as an animatable custom property that
-the readout reads through `counter`-like formatting is not available in
-CSS; instead the input animates its *displayed* value from the previous
-to the new over `transition-duration`). The document's value changes
-at once; the display catches up; no `input` or `change` fires, because
-a programmatic value set fires none in a browser either. This is what
+animates the thumb, and the readout number needs the same. Design (Q2,
+decided 2026-10-25): a prefixed property on the input,
+`--vapors-value-transition: 300ms ease`, default `none`, read by the
+range and number inputs. When it is set and the value is set
+programmatically, the input animates its *displayed* value from the
+previous to the new over that duration and curve; with the default the
+display jumps, as a browser's does, so a fixture compared with Chromium
+still matches. Tokens set the property; reduced motion applies to it as
+to any transition. The document's value changes at once; the display
+catches up; no `input` or `change` fires, because a programmatic value
+set fires none in a browser either. This is what
 "controls animating" means for a value control, and it needs no app
 code: the card sets `value`, the control animates. A drag by the user
 sets the displayed value directly with no transition, as browsers do.
@@ -152,7 +155,7 @@ one object at a time, for selection and hover.
 | Slice | Delivers | touché use |
 |---|---|---|
 | A1 transitions | Transitions on paint and layout properties, the tick, events, reversing, `transform` 2D and `opacity` as paint properties (opacity as a group alpha needs A2; A1 animates opacity on leaf elements, which covers controls) | Hover and pressed states ease; a card's highlight when an agent touches it |
-| A2 value controls animate | The displayed value transition on range and number; the thumb's UA transition | Agent edits animate the sliders and readouts |
+| A2 value controls animate | `--vapors-value-transition` on range and number; the displayed value transition | Agent edits animate the sliders and readouts |
 | A3 opacity layers and `filter: blur()` | An offscreen target per group | The before/after fade; a sheet over a blurred canvas |
 | A4 `@keyframes` | Animations, play state, events | The busy progress line, the spinner |
 | A5 FLIP | `animate:flip` on keyed rows | Reordering layer cards |

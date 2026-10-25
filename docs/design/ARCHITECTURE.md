@@ -96,7 +96,7 @@ writing them with its resolution, or the note that it is open.
    engine's render is in flight. Resolved by narrowing the hold to the
    async derivation and its downstream; consistency between a sync and
    an async value is the author's job. Recorded as a deviation from
-   Svelte; QUESTIONS Q1.
+   Svelte; QUESTIONS Q3, decided 2026-10-25.
 2. **Reads after `await` (1).** Svelte tracks them; they make a
    future's restart depend on timing. Resolved: the compiler refuses a
    `.get()` on a known signal after an `await` in a tracked scope.
@@ -158,8 +158,8 @@ writing them with its resolution, or the note that it is open.
 16. **Open: the web IME path.** EditContext is Chromium-only; the hidden
     textarea has known gaps. Not resolvable by design; the platform
     reports which is in use and the recording keeps it, so the gap is
-    measured. QUESTIONS Q9 asks whether Chromium-only IME on the web is
-    acceptable for the MVP.
+    measured. QUESTIONS Q9, decided 2026-10-25: EditContext first, the
+    hidden textarea in a later slice.
 17. **Open: momentum has no oracle (3, 4).** Chromium's curve is
     platform-specific. Held to a stated curve and a recorded transcript
     from the Pixel.

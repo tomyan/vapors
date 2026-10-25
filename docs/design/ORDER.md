@@ -131,8 +131,7 @@ HTML chrome is retired.
 
 - Scrolling (S9) lands before the cards; a stack that cannot scroll is
   not a stack.
-- Q1 and Q2 are answered before step 2 and step 3 respectively; the
-  recommendations are assumed in the row text.
+- Q1 (c) and Q2 (b) were decided on 2026-10-25; the rows assume them.
 - The oracle runner gains DevTools (11-Q1) in step 2, since E1 to E4
   are the first slices whose oracle is an event log.
 - The recorder (10-C1) is early because P0's phone numbers are what

@@ -61,7 +61,8 @@ editor: a control under the finger must move at once, and a frame that
 holds the thumb until the GPU renders is the worse inconsistency. The
 cost is that consistency between a synchronous and an asynchronous
 value is the component author's job, by deriving both from the async
-value. This is QUESTIONS.md Q1; the recommendation is the narrow rule.
+value. This is QUESTIONS.md Q3, decided 2026-10-25 (Tom): the narrow
+rule.
 
 Mechanism: a write that reaches an async node opens a **pending
 version**. Effects downstream of it are queued, not run. When the last
