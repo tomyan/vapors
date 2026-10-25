@@ -2,7 +2,8 @@
 //! each step killed at its deadline. A job's `timeout-minutes` bounds
 //! its steps together, from when its first step starts; a step's own
 //! `timeout-minutes` bounds it alone. Every step gets `GITHUB_OUTPUT`,
-//! a file under target/, as CI gives one.
+//! a file under target/, as CI gives one. Each step's line is followed
+//! by the machine's load at its start and end.
 
 use std::path::Path;
 use std::process::ExitCode;
@@ -26,8 +27,10 @@ pub fn run(planned: &[PlannedStep], output: &Path, reporter: &Reporter) -> ExitC
         job = Some((&planned_step.job, job_started));
         let mut step = step_for(planned_step, output);
         step.deadline = Some(deadline(planned_step, job_started.elapsed()));
+        let load_at_start = crate::load::now();
         let outcome = command::run(&step);
         reporter.step(&step, &outcome);
+        println!("{}", crate::load::line(&load_at_start, &crate::load::now()));
         if !outcome.passed {
             break;
         }

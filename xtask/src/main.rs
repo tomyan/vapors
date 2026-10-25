@@ -19,6 +19,7 @@ mod files_walk;
 mod gate;
 mod gate_action;
 mod gate_expression;
+mod gate_lock;
 mod gate_plan;
 mod gate_report;
 mod gate_run;
@@ -35,7 +36,9 @@ mod imports;
 mod imports_rules;
 mod layers;
 mod layers_graph;
+mod load;
 mod pixels;
+mod priority;
 mod report;
 #[cfg(test)]
 #[path = "report_timeout_tests.rs"]
