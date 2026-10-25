@@ -108,3 +108,67 @@ fn metadata_without_a_resolve_graph_is_refused() {
     // Then
     assert!(refusal.contains("resolve"), "{refusal}");
 }
+
+#[test]
+fn two_versions_of_a_crate_both_count() {
+    // Given: foo 0.1 reaches the forbidden crate; foo 0.2, listed later, does not
+    let metadata = json!({
+        "packages": [
+            { "id": "engine", "name": "engine" },
+            { "id": "foo-0.1", "name": "foo" },
+            { "id": "foo-0.2", "name": "foo" },
+            { "id": "platform", "name": "platform" }
+        ],
+        "resolve": { "nodes": [
+            { "id": "engine", "deps": [{ "pkg": "foo-0.1", "dep_kinds": [{ "kind": null }] }] },
+            { "id": "foo-0.1", "deps": [{ "pkg": "platform", "dep_kinds": [{ "kind": null }] }] },
+            { "id": "foo-0.2", "deps": [] },
+            { "id": "platform", "deps": [] }
+        ] }
+    });
+    let graph = parse(&metadata).expect("graph");
+
+    // When
+    let found = violations(&graph, &[rule("engine", &["platform"])]).expect("checked");
+
+    // Then
+    assert_eq!(
+        found,
+        ["engine depends on platform: engine -> foo -> platform"]
+    );
+}
+
+#[test]
+fn metadata_of_a_shape_not_recognised_is_refused_naming_what_is_missing() {
+    let package = json!([{ "id": "a", "name": "a" }]);
+    let cases = [
+        (
+            json!({ "packages": [{ "id": "a" }], "resolve": { "nodes": [] } }),
+            "name",
+        ),
+        (
+            json!({ "packages": package, "resolve": { "nodes": [{ "id": "b", "deps": [] }] } }),
+            "b",
+        ),
+        (
+            json!({ "packages": package, "resolve": { "nodes": [{ "id": "a" }] } }),
+            "deps",
+        ),
+        (
+            json!({ "packages": package, "resolve": { "nodes": [{ "id": "a", "deps": [{ "dep_kinds": [{ "kind": null }] }] }] } }),
+            "pkg",
+        ),
+        (
+            json!({ "packages": package, "resolve": { "nodes": [{ "id": "a", "deps": [{ "pkg": "a" }] }] } }),
+            "dep_kinds",
+        ),
+        (
+            json!({ "packages": package, "resolve": { "nodes": [{ "id": "a", "deps": [{ "pkg": "a", "dep_kinds": [] }] }] } }),
+            "dep_kinds",
+        ),
+    ];
+    for (metadata, needle) in cases {
+        let refusal = parse(&metadata).expect_err(needle);
+        assert!(refusal.contains(needle), "wanted {needle} in: {refusal}");
+    }
+}

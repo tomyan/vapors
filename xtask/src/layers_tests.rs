@@ -31,3 +31,15 @@ fn a_rule_with_an_empty_name_is_refused_naming_it() {
     assert!(refusal.contains("touche-engine"), "{refusal}");
     assert!(refusal.contains("empty name"), "{refusal}");
 }
+
+#[test]
+fn a_layers_table_of_another_shape_is_refused_naming_it() {
+    for (text, needle) in [
+        ("[layers]\nforbid = \"a\"\n", "[layers]"),
+        ("[layers.allow]\n\"a\" = \"b\"\n", "[layers.allow]"),
+        ("[layers.forbid]\n", "[layers.forbid] is empty"),
+    ] {
+        let refusal = rules(&Config::parse(text).expect("config")).expect_err(text);
+        assert!(refusal.contains(needle), "wanted {needle} in: {refusal}");
+    }
+}

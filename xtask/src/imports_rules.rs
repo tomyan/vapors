@@ -37,20 +37,22 @@ pub fn allowed(path: &str, allow: &BTreeMap<String, String>) -> bool {
 pub fn violations(files: &[(String, String)], rules: &Rules) -> Vec<String> {
     let mut found = Vec::new();
     for (name, allow) in rules {
-        for (path, text) in files {
-            if allowed(path, allow) {
-                continue;
-            }
+        let outside = files.iter().filter(|(path, _)| !allowed(path, allow));
+        for (path, text) in outside {
             if let Some(line) = first_use(text, name) {
-                let paths: Vec<&str> = allow.keys().map(String::as_str).collect();
-                found.push(format!(
-                    "{path}:{line} names {name}, which [imports.{name}] allows only in {}",
-                    paths.join(", ")
-                ));
+                found.push(finding(path, line, name, allow));
             }
         }
     }
     found
+}
+
+fn finding(path: &str, line: usize, name: &str, allow: &BTreeMap<String, String>) -> String {
+    let paths: Vec<&str> = allow.keys().map(String::as_str).collect();
+    format!(
+        "{path}:{line} names {name}, which [imports.{name}] allows only in {}",
+        paths.join(", ")
+    )
 }
 
 #[cfg(test)]

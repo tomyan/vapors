@@ -2,7 +2,7 @@
 //! code reads. Flat tables of `key = "value"`; anything else is refused
 //! with its line number.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fs;
 
@@ -12,6 +12,7 @@ const FILE: &str = ".config/factory.toml";
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Config {
     values: BTreeMap<String, String>,
+    tables: BTreeSet<String>,
 }
 
 /// Why the settings could not be read.
@@ -54,6 +55,7 @@ impl Config {
     pub fn parse(text: &str) -> Result<Self, ConfigError> {
         let mut table: Option<String> = None;
         let mut values = BTreeMap::new();
+        let mut tables = BTreeSet::new();
         let mut lines_of: BTreeMap<String, usize> = BTreeMap::new();
         for (index, raw) in text.lines().enumerate() {
             let line = raw.trim();
@@ -63,6 +65,7 @@ impl Config {
             }
             if let Some(name) = line.strip_prefix('[').and_then(|l| l.strip_suffix(']')) {
                 table = Some(name.trim().to_owned());
+                tables.insert(name.trim().to_owned());
                 continue;
             }
             let Some(table) = &table else {
@@ -81,7 +84,18 @@ impl Config {
             }
             values.insert(full, value);
         }
-        Ok(Self { values })
+        Ok(Self { values, tables })
+    }
+
+    /// Every table header equal to `prefix` or under `prefix.`, empty
+    /// ones included, sorted.
+    pub fn tables_under(&self, prefix: &str) -> Vec<&str> {
+        let under = format!("{prefix}.");
+        self.tables
+            .iter()
+            .filter(|t| *t == prefix || t.starts_with(&under))
+            .map(String::as_str)
+            .collect()
     }
 
     /// The value for `table.key`, if set.

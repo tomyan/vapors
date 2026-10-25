@@ -21,63 +21,108 @@ pub struct Rule {
 }
 
 /// The graph in `metadata`, the output of `cargo metadata --format-version 1`.
+/// Two versions of one crate share its name, and their dependencies are
+/// merged. A field the walk needs that is missing is refused, naming it.
 pub fn parse(metadata: &Value) -> Result<Graph, String> {
-    let names: BTreeMap<&str, &str> = metadata["packages"]
-        .as_array()
-        .ok_or("cargo metadata: no `packages`")?
-        .iter()
-        .filter_map(|p| Some((p["id"].as_str()?, p["name"].as_str()?)))
-        .collect();
+    let names = package_names(metadata)?;
     let nodes = metadata
         .pointer("/resolve/nodes")
         .and_then(Value::as_array)
         .ok_or("cargo metadata: no `resolve` graph")?;
-    let name = |id: &str| names.get(id).map(|n| (*n).to_owned());
-    let mut edges = BTreeMap::new();
+    let mut edges: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for node in nodes {
-        let Some(from) = node["id"].as_str().and_then(name) else {
-            continue;
-        };
-        let deps = node["deps"].as_array().into_iter().flatten();
-        let to = deps
-            .filter(|d| layering(d))
-            .filter_map(|d| d["pkg"].as_str().and_then(name));
-        edges.insert(from, to.collect());
+        let (from, to) = node_edges(node, &names)?;
+        edges.entry(from).or_default().extend(to);
     }
     Ok(Graph { edges })
 }
 
-/// A dependency that ships with the crate: normal or build, not dev.
-fn layering(dep: &Value) -> bool {
-    dep["dep_kinds"]
+fn package_names(metadata: &Value) -> Result<BTreeMap<String, String>, String> {
+    let packages = metadata["packages"]
         .as_array()
-        .into_iter()
-        .flatten()
-        .any(|kind| kind["kind"].as_str() != Some("dev"))
+        .ok_or("cargo metadata: no `packages`")?;
+    packages
+        .iter()
+        .map(|package| {
+            let id = field(package, "id", "a package")?;
+            Ok((id.to_owned(), field(package, "name", id)?.to_owned()))
+        })
+        .collect()
+}
+
+/// A node's crate name and the names of its layering dependencies.
+fn node_edges(
+    node: &Value,
+    names: &BTreeMap<String, String>,
+) -> Result<(String, Vec<String>), String> {
+    let id = field(node, "id", "a resolve node")?;
+    let deps = node["deps"]
+        .as_array()
+        .ok_or_else(|| format!("cargo metadata: node {id} has no `deps`"))?;
+    let mut to = Vec::new();
+    for dep in deps {
+        let pkg = field(dep, "pkg", &format!("a dependency of {id}"))?;
+        if layering(dep, id)? {
+            to.push(name_of(names, pkg)?);
+        }
+    }
+    Ok((name_of(names, id)?, to))
+}
+
+fn field<'a>(value: &'a Value, key: &str, owner: &str) -> Result<&'a str, String> {
+    value[key]
+        .as_str()
+        .ok_or_else(|| format!("cargo metadata: {owner} has no `{key}`"))
+}
+
+fn name_of(names: &BTreeMap<String, String>, id: &str) -> Result<String, String> {
+    names
+        .get(id)
+        .cloned()
+        .ok_or_else(|| format!("cargo metadata: node {id} is not among the packages"))
+}
+
+/// A dependency that ships with the crate: normal or build, not dev.
+fn layering(dep: &Value, owner: &str) -> Result<bool, String> {
+    let kinds = dep["dep_kinds"]
+        .as_array()
+        .filter(|kinds| !kinds.is_empty())
+        .ok_or_else(|| format!("cargo metadata: a dependency of {owner} has no `dep_kinds`"))?;
+    Ok(kinds
+        .iter()
+        .any(|kind| kind["kind"].as_str() != Some("dev")))
 }
 
 /// One line per forbidden crate reached, with the path to it.
 pub fn violations(graph: &Graph, rules: &[Rule]) -> Result<Vec<String>, String> {
     let mut found = Vec::new();
     for rule in rules {
-        for name in std::iter::once(&rule.crate_name).chain(&rule.forbidden) {
-            if !graph.edges.contains_key(name) {
-                return Err(format!(
-                    "[layers.forbid] names {name}, which is not in the dependency graph; fix: use the crate's package name"
-                ));
-            }
-        }
+        check_known(graph, rule)?;
         for forbidden in &rule.forbidden {
             if let Some(path) = path(graph, &rule.crate_name, forbidden) {
+                let path = path.join(" -> ");
                 found.push(format!(
-                    "{} depends on {forbidden}: {}",
-                    rule.crate_name,
-                    path.join(" -> ")
+                    "{} depends on {forbidden}: {path}",
+                    rule.crate_name
                 ));
             }
         }
     }
     Ok(found)
+}
+
+/// Every crate a rule names is in the graph.
+fn check_known(graph: &Graph, rule: &Rule) -> Result<(), String> {
+    let names = std::iter::once(&rule.crate_name).chain(&rule.forbidden);
+    match names
+        .into_iter()
+        .find(|name| !graph.edges.contains_key(*name))
+    {
+        Some(name) => Err(format!(
+            "[layers.forbid] names {name}, which is not in the dependency graph; fix: use the crate's package name"
+        )),
+        None => Ok(()),
+    }
 }
 
 /// The shortest path from `from` to `to`, breadth first.
