@@ -788,7 +788,8 @@ differs from the plan.
     `LayoutBox.hoisted` records that box, and `place` takes its corner
     as the origin. A fixed box is hoisted to the root, which spans the
     viewport.
-  - `sticky` is refused, naming S9. A non-static position on an inline
+  - `sticky` is refused, naming a slice after F2c (S9 built scrolling
+    without it). A non-static position on an inline
     element is refused: it has no box of its own.
   - An out-of-flow box never keeps its Taffy cache between updates
     (`keep.rs`). Seed 3 of the randomized test found the bug that
@@ -880,15 +881,31 @@ differs from the plan.
   zooms one step per notch, from `dy`.
   - A wheel scrolls the innermost container under the pointer that can
     move that way, else the next one out (`Document::scroll_by`).
+  - A burst of wheel events keeps one container while each comes within
+    500 ms of the last (`wheel_scroll.rs`), as Chromium latches it:
+    measured with XTest notches over a list inside a list, the inner
+    one at its end, a notch 0.5 s after the last went nowhere and one
+    0.55 s after scrolled the outer one.
+  - A diagonal delta goes whole to one container, not split by axis:
+    measured, a (40, 30) wheel over a sideways-only list moved it 40
+    and its vertical container not at all; with the list at its end,
+    the container took the 30.
   - A touch gesture keeps the first container it moves, as Chromium
     latches it (`touch_scroll.rs`); a pan past its end goes nowhere.
+    The gesture lasts until the last finger lifts or is cancelled.
   - touche's pin bump changes one test,
     `crates/viewer/src/viewer_app_tests.rs:41`:
     `Event::Scroll { steps: 1.0 }` becomes
     `Event::Scroll { dx: 0.0, dy: -vapors_platform::LINE_PIXELS }`.
 - **Thumbs** (`thumb.rs`, D10): overlay only, styled by
   `scrollbar-color` and `scrollbar-width`; on touch, shown only while a
-  gesture scrolls. They take no pointer.
+  gesture scrolls. They take no pointer. A thumb paints after its
+  container's descendants, positioned ones in an enclosing context
+  included (`thumb_order.rs`): measured, Chromium paints both its
+  classic scrollbar and its overlay thumb over a relative child that
+  runs under them.
+- **A scroll only repaints**: no restyle, no layout, no text layout
+  (`incremental_scroll.rs`).
 - **`.pixels` gains `wheel X Y DX DY`**, made by the parser, the native
   demo example and `gpu_demos` (through `vapors_demos::input`), and by
   the page contract (a pointer move, then a WheelEvent in pixels on the

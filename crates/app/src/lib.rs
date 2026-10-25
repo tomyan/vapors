@@ -8,7 +8,10 @@ mod cursor;
 mod elements_app;
 mod painter;
 mod pointer;
+#[cfg(test)]
+mod scroll_fixture;
 mod touch_scroll;
+mod wheel_scroll;
 
 pub use elements_app::{ElementsApp, Failure, PerFrame};
 pub use painter::ScenePainter;

@@ -11,8 +11,8 @@
 //!
 //! A scroll container's thumb (F2c S9) paints after its in-flow
 //! content, or, when it roots a stacking context, after the whole
-//! context. A positioned descendant that belongs to an enclosing
-//! context paints later and can cover the thumb.
+//! context; then `thumb_order` moves it after any of its positioned
+//! descendants that an enclosing context paints later.
 //!
 //! Within the in-flow descendants each box paints its own background
 //! and then its children, where CSS paints every background before any
@@ -58,7 +58,27 @@ pub(crate) fn paint_steps(boxes: &[LayoutBox], stacking: &dyn Fn(usize) -> Stack
         out: Vec::with_capacity(boxes.len()),
     };
     walk.context(0);
-    walk.out
+    crate::thumb_order::thumbs_after_descendants(&walk.out, boxes)
+}
+
+/// Box `index`'s stacking, from its element's used style.
+pub(crate) fn stacking_of(
+    boxes: &[LayoutBox],
+    index: usize,
+    used: &std::collections::HashMap<vapors_dom::NodeId, crate::style::Used>,
+) -> Stacking {
+    let crate::layout::Content::Element(node) = boxes[index].content else {
+        return Stacking::default();
+    };
+    let used = &used[&node];
+    Stacking {
+        // a z-index is kept only where it applies: on a static box, a
+        // flex or grid item, which then stacks as if positioned
+        positioned: used.layout.position != taffy::Position::Static || used.z_index.is_some(),
+        z: used.z_index,
+        fixed: used.layout.position == taffy::Position::Fixed,
+        scrolls: used.scrolls(),
+    }
 }
 
 struct Walk<'a> {

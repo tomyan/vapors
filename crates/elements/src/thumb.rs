@@ -23,28 +23,24 @@ pub(crate) fn thumbs(padding: BoxRect, at: [f32; 2], max: [f32; 2], width: f32) 
         return Vec::new();
     }
     let corner = |axis: usize| if max[axis] > 0.0 { width + INSET } else { 0.0 };
-    let mut found = Vec::new();
-    if max[1] > 0.0 {
-        let (start, length) = along(padding.y, padding.height, corner(0), at[1], max[1]);
-        let x = padding.x + padding.width - INSET - width;
-        found.push(BoxRect {
-            x,
-            y: start,
-            width,
-            height: length,
-        });
+    let vertical = (max[1] > 0.0).then(|| {
+        let (y, height) = along(padding.y, padding.height, corner(0), at[1], max[1]);
+        rect(padding.x + padding.width - INSET - width, y, width, height)
+    });
+    let horizontal = (max[0] > 0.0).then(|| {
+        let (x, length) = along(padding.x, padding.width, corner(1), at[0], max[0]);
+        rect(x, padding.y + padding.height - INSET - width, length, width)
+    });
+    vertical.into_iter().chain(horizontal).collect()
+}
+
+fn rect(x: f32, y: f32, width: f32, height: f32) -> BoxRect {
+    BoxRect {
+        x,
+        y,
+        width,
+        height,
     }
-    if max[0] > 0.0 {
-        let (start, length) = along(padding.x, padding.width, corner(1), at[0], max[0]);
-        let y = padding.y + padding.height - INSET - width;
-        found.push(BoxRect {
-            x: start,
-            y,
-            width: length,
-            height: width,
-        });
-    }
-    found
 }
 
 /// Paints the thumbs of the scroll container `layout_box` (border box

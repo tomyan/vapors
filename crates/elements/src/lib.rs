@@ -26,10 +26,12 @@ mod painted;
 mod restyle;
 mod restyle_pass;
 mod scroll;
+mod scroll_chains;
 mod scrolling;
 mod style;
 mod tags;
 mod thumb;
+mod thumb_order;
 mod tree;
 mod update;
 

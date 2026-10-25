@@ -1,8 +1,8 @@
 //! `position` and its insets (F2c S8), as Taffy 0.15 takes them: a
 //! static box ignores its insets; a relative one is offset by them; an
 //! absolute one is placed against its nearest positioned ancestor, and
-//! a fixed one against the viewport. `sticky` is refused: it needs the
-//! scroll position (S9).
+//! a fixed one against the viewport. `sticky` is refused: no slice of
+//! F2c builds it.
 
 use taffy::{LengthPercentageAuto, Position, Rect, Style};
 use vapors_css::value::Value;
@@ -28,7 +28,7 @@ fn scheme(value: &Value) -> Result<Position, String> {
         "relative" => Ok(Position::Relative),
         "absolute" => Ok(Position::Absolute),
         "fixed" => Ok(Position::Fixed),
-        "sticky" => Err("is sticky, which needs the scroll position; it arrives with scrolling in F2c S9 (docs/F2c.md)".to_owned()),
+        "sticky" => Err("is sticky, which no slice of F2c builds (docs/F2c.md); it comes in a slice after F2c. Until then use relative, or fixed within the shell".to_owned()),
         other => Err(unknown(other)),
     }
 }

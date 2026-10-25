@@ -42,6 +42,7 @@ pub struct ElementsApp {
     /// Where the pointer last moved, in CSS pixels.
     pointer: Point,
     touch: crate::touch_scroll::TouchScroll,
+    wheel: crate::wheel_scroll::WheelScroll,
     /// The cursor last shown.
     cursor: Cursor,
     /// Called before each update with the last one's duration.
@@ -65,6 +66,7 @@ impl ElementsApp {
             scale: 1.0,
             pointer: [0.0, 0.0],
             touch: crate::touch_scroll::TouchScroll::default(),
+            wheel: crate::wheel_scroll::WheelScroll::default(),
             cursor: Cursor::Default,
             per_frame: None,
             last_update: None,

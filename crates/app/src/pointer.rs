@@ -17,12 +17,13 @@ pub(crate) enum Action {
     Tap(Point),
     /// Scroll by a delta (CSS pixels) at a point.
     Wheel(Point, [f32; 2]),
-    /// A finger went down: a gesture starts there.
-    TouchDown(Point),
+    /// A finger (by id) went down; the first starts a gesture there.
+    TouchDown(u64, Point),
     /// The fingers moved: scroll by this delta (CSS pixels).
     Pan([f32; 2]),
-    /// The last finger lifted or was taken away.
-    TouchUp,
+    /// A finger (by id) lifted or was taken away; the last ends the
+    /// gesture.
+    TouchUp(u64),
 }
 
 /// The action for `event`, given the display `scale` and where the
@@ -39,15 +40,15 @@ pub(crate) fn action(event: &Event, scale: f32, last: Point) -> Option<Action> {
         Event::Scroll { dx, dy } => Some(Action::Wheel(last, [*dx, *dy])),
         // a finger moving right drags the content right: a scroll left
         Event::Pan { dx, dy } => Some(Action::Pan([-dx / scale, -dy / scale])),
-        Event::Touch { phase, x, y, .. } => touch(*phase, css(*x, *y)),
+        Event::Touch { id, phase, x, y } => touch(*id, *phase, css(*x, *y)),
         _ => None,
     }
 }
 
-fn touch(phase: TouchPhase, at: Point) -> Option<Action> {
+fn touch(id: u64, phase: TouchPhase, at: Point) -> Option<Action> {
     match phase {
-        TouchPhase::Started => Some(Action::TouchDown(at)),
-        TouchPhase::Ended | TouchPhase::Cancelled => Some(Action::TouchUp),
+        TouchPhase::Started => Some(Action::TouchDown(id, at)),
+        TouchPhase::Ended | TouchPhase::Cancelled => Some(Action::TouchUp(id)),
         TouchPhase::Moved => None,
     }
 }
@@ -89,6 +90,23 @@ mod tests {
                 Some(Action::Press([4.0, 5.0])),
                 Some(Action::Release([6.0, 7.0]))
             )
+        );
+    }
+
+    #[test]
+    fn a_cancelled_touch_ends_its_finger_as_a_lift_does() {
+        // Given
+        let cancelled = Event::Touch {
+            id: 3,
+            phase: TouchPhase::Cancelled,
+            x: 0.0,
+            y: 0.0,
+        };
+
+        // When / Then
+        assert_eq!(
+            action(&cancelled, 1.0, [0.0, 0.0]),
+            Some(Action::TouchUp(3))
         );
     }
 
@@ -139,8 +157,8 @@ mod tests {
         assert_eq!(
             actions,
             [
-                Action::TouchDown([10.0, 10.0]),
-                Action::TouchUp,
+                Action::TouchDown(1, [10.0, 10.0]),
+                Action::TouchUp(1),
                 Action::Tap([10.0, 10.0])
             ]
         );

@@ -75,7 +75,7 @@ impl Document {
             thumbs_shown: self.thumbs_shown,
         };
         let mut painted = paint(&boxes, &rects, &mut input);
-        painted.scroll_chains = crate::scroll::Chains::of(&boxes, &scrolls);
+        painted.scroll_chains = crate::scroll_chains::Chains::of(&boxes, &scrolls);
         self.boxes.keep(boxes, viewport.scale);
         self.laid_out = laid_out;
         self.rehover_in(&painted);

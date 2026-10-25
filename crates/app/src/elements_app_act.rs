@@ -20,11 +20,13 @@ impl ElementsApp {
             Action::Tap(point) => Document::tapped(document, point),
             Action::Wheel(point, delta) => {
                 self.touch.mouse();
-                document.borrow_mut().scroll_by(point, delta);
+                let now = vapors_platform::Instant::now();
+                self.wheel
+                    .scroll(&mut document.borrow_mut(), point, delta, now);
             }
-            Action::TouchDown(point) => self.touch.down(point),
+            Action::TouchDown(id, point) => self.touch.down(id, point),
             Action::Pan(delta) => _ = self.touch.pan(&mut document.borrow_mut(), delta),
-            Action::TouchUp => self.touch.up(),
+            Action::TouchUp(id) => self.touch.up(id),
         }
         document
             .borrow_mut()

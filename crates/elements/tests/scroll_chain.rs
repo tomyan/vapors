@@ -157,3 +157,40 @@ fn scrolling_one_container_never_passes_the_scroll_out() {
     assert_eq!(doc.scroll_offset(inner), Some([0.0, 40.0]));
     assert_eq!(doc.scroll_offset(outer), Some([0.0, 0.0]));
 }
+
+/// `.outer` (100 px tall, scrolls down) holding `.across` (50 px tall,
+/// scrolls only sideways: 300 px of content in 100).
+fn sideways_in_tall() -> (Document, NodeId, NodeId) {
+    let mut doc = document();
+    let body = doc.body();
+    let outer = element(&mut doc, body, "div", "outer");
+    let across = element(&mut doc, outer, "div", "across");
+    element(&mut doc, across, "div", "wide");
+    element(&mut doc, outer, "div", "tail");
+    doc.add_stylesheet(
+        "app.css",
+        "body { margin: 0; } .outer { width: 100px; height: 100px; overflow: auto; } \
+         .across { height: 50px; overflow: auto; } .wide { width: 300px; height: 50px; } .tail { height: 200px; }",
+    )
+    .expect("parses");
+    doc.update(VIEWPORT).expect("updates");
+    (doc, outer, across)
+}
+
+#[test]
+fn a_diagonal_scroll_goes_whole_to_one_container_as_chromium_does() {
+    // Given: Chromium 155, measured 2026-10-25: a (40, 30) wheel over a
+    // sideways-only list scrolled it 40 right and its vertical
+    // container not at all; with the list at its end, the same wheel
+    // scrolled the container 30 down
+    let (mut doc, outer, across) = sideways_in_tall();
+
+    // When / Then
+    assert!(doc.scroll_by([10.0, 10.0], [40.0, 30.0]));
+    assert_eq!(doc.scroll_offset(across), Some([40.0, 0.0]));
+    assert_eq!(doc.scroll_offset(outer), Some([0.0, 0.0]));
+    doc.scroll_to(across, [200.0, 0.0]);
+    doc.update(VIEWPORT).expect("updates");
+    assert!(doc.scroll_by([10.0, 10.0], [40.0, 30.0]));
+    assert_eq!(doc.scroll_offset(outer), Some([0.0, 30.0]));
+}

@@ -105,16 +105,7 @@ impl Offset {
 fn range(boxes: &[LayoutBox], index: usize) -> [f32; 2] {
     let layout = &boxes[index].layout;
     let (border, padding) = (layout.border, layout.padding);
-    let mut end = [0.0_f32, 0.0_f32];
-    for &child in &boxes[index].children {
-        let child = &boxes[child];
-        if child.style.position == taffy::Position::Absolute {
-            continue;
-        }
-        let at = child.layout;
-        end[0] = end[0].max(at.location.x + at.size.width + at.margin.right - border.left);
-        end[1] = end[1].max(at.location.y + at.size.height + at.margin.bottom - border.top);
-    }
+    let end = content_end(boxes, index);
     let inner = [
         layout.size.width - border.left - border.right,
         layout.size.height - border.top - border.bottom,
@@ -127,49 +118,18 @@ fn range(boxes: &[LayoutBox], index: usize) -> [f32; 2] {
     ]
 }
 
-/// Which scroll container a scroll over an element moves first, and
-/// which one each container passes a scroll it cannot take to: by
-/// containing block, as clips pass (`crate::chain`).
-#[derive(Debug, Default)]
-pub(crate) struct Chains {
-    first: HashMap<NodeId, NodeId>,
-    outer: HashMap<NodeId, NodeId>,
-}
-
-impl Chains {
-    /// The chains of the laid-out `boxes`, where `scrolls` says which
-    /// box is a scroll container.
-    pub(crate) fn of(boxes: &[LayoutBox], scrolls: &dyn Fn(usize) -> bool) -> Self {
-        let node = |index: usize| match boxes[index].content {
-            Content::Element(node) => Some(node),
-            Content::Text(_) => None,
-        };
-        let around = crate::chain::by_containing_block(boxes, None, &|index, own| {
-            if scrolls(index) { node(index) } else { own }
-        });
-        let mut chains = Self::default();
-        for (index, own) in around.into_iter().enumerate() {
-            let Some(element) = node(index) else { continue };
-            let first = if scrolls(index) { Some(element) } else { own };
-            if let Some(first) = first {
-                chains.first.insert(element, first);
-            }
-            if let (true, Some(outer)) = (scrolls(index), own) {
-                chains.outer.insert(element, outer);
-            }
-        }
-        chains
-    }
-
-    /// The scroll containers a scroll over `element` tries, innermost
-    /// first.
-    pub(crate) fn from(&self, element: NodeId) -> Vec<NodeId> {
-        let mut found = Vec::new();
-        let mut next = self.first.get(&element).copied();
-        while let Some(container) = next {
-            found.push(container);
-            next = self.outer.get(&container).copied();
-        }
-        found
-    }
+/// How far box `index`'s in-flow children reach, margins included, from
+/// its padding box's corner.
+fn content_end(boxes: &[LayoutBox], index: usize) -> [f32; 2] {
+    let border = boxes[index].layout.border;
+    let in_flow = boxes[index].children.iter().map(|&child| &boxes[child]);
+    in_flow
+        .filter(|child| child.style.position != taffy::Position::Absolute)
+        .map(|child| child.layout)
+        .fold([0.0_f32, 0.0_f32], |end, at| {
+            [
+                end[0].max(at.location.x + at.size.width + at.margin.right - border.left),
+                end[1].max(at.location.y + at.size.height + at.margin.bottom - border.top),
+            ]
+        })
 }

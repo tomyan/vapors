@@ -11,6 +11,8 @@ use vapors_elements::{Document, Point};
 /// The gesture under way.
 #[derive(Debug, Default)]
 pub(crate) struct TouchScroll {
+    /// The fingers down now, by id.
+    fingers: Vec<u64>,
     down: Option<Point>,
     latched: Option<NodeId>,
     /// A finger touched since the mouse was last used.
@@ -18,14 +20,18 @@ pub(crate) struct TouchScroll {
 }
 
 impl TouchScroll {
-    /// A finger went down at `at` (CSS pixels).
-    pub(crate) fn down(&mut self, at: Point) {
-        if self.down.is_none() {
+    /// Finger `id` went down at `at` (CSS pixels); the first finger
+    /// starts a gesture there.
+    pub(crate) fn down(&mut self, id: u64, at: Point) {
+        if self.fingers.is_empty() {
             *self = Self {
                 down: Some(at),
-                latched: None,
                 touching: true,
+                ..Self::default()
             };
+        }
+        if !self.fingers.contains(&id) {
+            self.fingers.push(id);
         }
     }
 
@@ -40,12 +46,19 @@ impl TouchScroll {
             .is_some_and(|container| document.scroll_node_by(container, delta))
     }
 
-    /// The gesture ended.
-    pub(crate) fn up(&mut self) {
-        *self = Self {
-            touching: self.touching,
-            ..Self::default()
+    /// Finger `id` lifted or was taken away; the gesture ends when no
+    /// finger is left down.
+    pub(crate) fn up(&mut self, id: u64) {
+        let Some(at) = self.fingers.iter().position(|f| *f == id) else {
+            return;
         };
+        self.fingers.remove(at);
+        if self.fingers.is_empty() {
+            *self = Self {
+                touching: self.touching,
+                ..Self::default()
+            };
+        }
     }
 
     /// The mouse moved or scrolled: thumbs show again.

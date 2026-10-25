@@ -11,7 +11,7 @@ use vapors_text::FontSystem;
 
 use crate::corners;
 use crate::layout::{BoxRect, Content, InlineRun, LayoutBox};
-use crate::paint_order::{Stacking, Step, paint_steps};
+use crate::paint_order::{Step, paint_steps, stacking_of};
 use crate::painted::Painted;
 use crate::style::{BoxShadow, Used};
 
@@ -45,14 +45,14 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
         rects: HashMap::new(),
         hits: Vec::new(),
         cursors: HashMap::new(),
-        scroll_chains: crate::scroll::Chains::default(),
+        scroll_chains: crate::scroll_chains::Chains::default(),
     };
     for (index, layout_box) in boxes.iter().enumerate() {
         if let Content::Element(node) = layout_box.content {
             painted.rects.insert(node, rects[index]);
         }
     }
-    let steps = paint_steps(boxes, &|index| stacking_of(boxes, index, input));
+    let steps = paint_steps(boxes, &|index| stacking_of(boxes, index, input.used));
     let clips = crate::clip::clips(boxes, rects, &|index| {
         crate::clip::clipping(boxes, index, input)
     });
@@ -72,21 +72,6 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
         }
     }
     painted
-}
-
-fn stacking_of(boxes: &[LayoutBox], index: usize, input: &PaintInput<'_>) -> Stacking {
-    let Content::Element(node) = boxes[index].content else {
-        return Stacking::default();
-    };
-    let used = &input.used[&node];
-    Stacking {
-        // a z-index is kept only where it applies: on a static box, a
-        // flex or grid item, which then stacks as if positioned
-        positioned: used.layout.position != taffy::Position::Static || used.z_index.is_some(),
-        z: used.z_index,
-        fixed: used.layout.position == taffy::Position::Fixed,
-        scrolls: used.scrolls(),
-    }
 }
 
 /// The canvas's colour, as CSS Backgrounds 3 section 2.11.2 gives it:

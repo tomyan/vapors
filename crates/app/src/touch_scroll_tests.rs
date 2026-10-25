@@ -1,53 +1,13 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use vapors_dom::Dom;
-use vapors_elements::{Document, Viewport};
-use vapors_text::FontSystem;
-
 use super::*;
 
-const VIEWPORT: Viewport = Viewport {
-    width: 200.0,
-    height: 200.0,
-    scale: 1.0,
-};
-
-/// `.outer` (100 px, 200 px of content) holding `.inner` (60 px tall,
-/// 100 px of content) at its top.
-fn nested() -> (Rc<RefCell<Document>>, NodeId, NodeId) {
-    let mut doc = Document::new(FontSystem::bundle_only());
-    let body = doc.body();
-    let element = |doc: &mut Document, parent: NodeId, class: &str| {
-        let node = doc.create_element("div");
-        doc.set_attribute(node, "class", class);
-        doc.append(parent, node);
-        node
-    };
-    let outer = element(&mut doc, body, "outer");
-    let inner = element(&mut doc, outer, "inner");
-    element(&mut doc, inner, "filler");
-    element(&mut doc, outer, "tail");
-    doc.add_stylesheet(
-        "app.css",
-        "body { margin: 0; } .outer { height: 100px; overflow: auto; } \
-         .inner { height: 60px; overflow: auto; } .filler { height: 100px; } .tail { height: 140px; }",
-    )
-    .expect("parses");
-    doc.update(VIEWPORT).expect("updates");
-    (Rc::new(RefCell::new(doc)), outer, inner)
-}
-
-fn offset(doc: &Rc<RefCell<Document>>, node: NodeId) -> f32 {
-    doc.borrow().scroll_offset(node).expect("scrolls")[1]
-}
+use crate::scroll_fixture::{nested, offset};
 
 #[test]
 fn a_gesture_keeps_the_container_it_first_moved() {
     // Given: a finger down on the inner list
     let (doc, outer, inner) = nested();
     let mut touch = TouchScroll::default();
-    touch.down([10.0, 10.0]);
+    touch.down(1, [10.0, 10.0]);
 
     // When: it pans to the inner list's end, then past it
     touch.pan(&mut doc.borrow_mut(), [0.0, 30.0]);
@@ -64,12 +24,12 @@ fn the_next_gesture_finds_its_container_again() {
     // Given: a gesture that left the inner list at its end
     let (doc, outer, inner) = nested();
     let mut touch = TouchScroll::default();
-    touch.down([10.0, 10.0]);
+    touch.down(1, [10.0, 10.0]);
     touch.pan(&mut doc.borrow_mut(), [0.0, 50.0]);
-    touch.up();
+    touch.up(1);
 
     // When: another gesture at the same place
-    touch.down([10.0, 10.0]);
+    touch.down(1, [10.0, 10.0]);
     touch.pan(&mut doc.borrow_mut(), [0.0, 30.0]);
 
     // Then: the outer one takes it
@@ -99,16 +59,54 @@ fn thumbs_show_with_a_mouse_and_on_touch_only_while_a_gesture_scrolls() {
     assert!(touch.thumbs_shown(), "a mouse until a finger touches");
 
     // When / Then: a finger down, not yet scrolling
-    touch.down([10.0, 10.0]);
+    touch.down(1, [10.0, 10.0]);
     assert!(!touch.thumbs_shown());
 
     // When / Then: the gesture scrolls, then ends
     touch.pan(&mut doc.borrow_mut(), [0.0, 10.0]);
     assert!(touch.thumbs_shown());
-    touch.up();
+    touch.up(1);
     assert!(!touch.thumbs_shown());
 
     // When / Then: the mouse again
     touch.mouse();
     assert!(touch.thumbs_shown());
+}
+
+#[test]
+fn a_second_finger_lifting_does_not_end_the_gesture() {
+    // Given: two fingers down, the gesture scrolling the inner list
+    let (doc, _outer, inner) = nested();
+    let mut touch = TouchScroll::default();
+    touch.down(1, [10.0, 10.0]);
+    touch.down(2, [30.0, 10.0]);
+    touch.pan(&mut doc.borrow_mut(), [0.0, 10.0]);
+
+    // When: the second finger lifts, and the first pans on
+    touch.up(2);
+    touch.pan(&mut doc.borrow_mut(), [0.0, 10.0]);
+
+    // Then: still the same gesture, still scrolling
+    assert_eq!(offset(&doc, inner), 20.0);
+    assert!(touch.thumbs_shown());
+
+    // When / Then: the last finger lifting ends it
+    touch.up(1);
+    assert!(!touch.thumbs_shown());
+}
+
+#[test]
+fn a_finger_lifted_twice_or_never_down_ends_nothing() {
+    // Given: one finger down and scrolling
+    let (doc, _outer, inner) = nested();
+    let mut touch = TouchScroll::default();
+    touch.down(1, [10.0, 10.0]);
+    touch.pan(&mut doc.borrow_mut(), [0.0, 10.0]);
+
+    // When: a finger that was never down lifts
+    touch.up(7);
+    touch.pan(&mut doc.borrow_mut(), [0.0, 10.0]);
+
+    // Then
+    assert_eq!(offset(&doc, inner), 20.0);
 }
