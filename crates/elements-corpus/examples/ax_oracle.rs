@@ -8,12 +8,16 @@
 //! ```
 //!
 //! `--check` is what CI runs: a fixture edited without rerunning the
-//! oracle, or a Chromium whose tree differs, fails it.
+//! oracle, or a Chromium whose tree differs, fails it, naming the first
+//! line that differs. Without `--check` every tree is written, or none
+//! when one fails. A `*.ax.json` with no fixture is refused.
 
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use vapors_elements_corpus::ax::{start, tree};
 use vapors_elements_corpus::oracle::{fixture_names, fixtures_dir, write_fonts};
+use vapors_elements_corpus::oracle_files::{Committed, Work, compare, refuse_orphans};
 use vapors_text::comparison::Chromium;
 
 fn main() -> ExitCode {
@@ -22,9 +26,9 @@ fn main() -> ExitCode {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {
             eprintln!("FAIL ax_oracle: {message}");
+            let flag = if check { " -- --check" } else { "" };
             eprintln!(
-                "     reproduce: cargo run -p vapors-elements-corpus --example ax_oracle{}",
-                if check { " -- --check" } else { "" }
+                "     reproduce: cargo run -p vapors-elements-corpus --example ax_oracle{flag}"
             );
             ExitCode::FAILURE
         }
@@ -32,31 +36,56 @@ fn main() -> ExitCode {
 }
 
 fn run(check: bool) -> Result<(), String> {
+    refuse_orphans(".ax.json")?;
+    let trees = trees()?;
+    if check {
+        checked(&trees)
+    } else {
+        written(&trees)
+    }
+}
+
+/// Every fixture's tree as committed text, each beside its path.
+fn trees() -> Result<Vec<(String, PathBuf, String)>, String> {
     let chromium = Chromium::find().map_err(|e| e.to_string())?;
     println!("chromium: {}", chromium.version());
-    let work = std::env::temp_dir().join(format!("vapors-ax-oracle-{}", std::process::id()));
-    std::fs::create_dir_all(&work).map_err(|e| format!("{}: {e}", work.display()))?;
-    write_fonts(&work)?;
-    let (_live, mut session) = start(&chromium, &work)?;
-    let mut differ = Vec::new();
+    let work = Work::new("vapors-ax-oracle")?;
+    write_fonts(work.path())?;
+    let (_live, mut session) = start(&chromium, work.path())?;
+    let mut trees = Vec::new();
     for name in fixture_names()? {
-        let tree = tree(&mut session, &work, &name)?;
+        let tree = tree(&mut session, work.path(), &name)?;
         let text = serde_json::to_string_pretty(&tree).map_err(|e| e.to_string())? + "\n";
-        let path = fixtures_dir().join(format!("{name}.ax.json"));
-        let current = std::fs::read_to_string(&path).unwrap_or_default();
-        if check && current != text {
-            differ.push(name);
-        } else if !check {
-            std::fs::write(&path, &text).map_err(|e| format!("{}: {e}", path.display()))?;
-            println!("wrote {}", path.display());
+        trees.push((
+            name.clone(),
+            fixtures_dir().join(format!("{name}.ax.json")),
+            text,
+        ));
+    }
+    Ok(trees)
+}
+
+fn checked(trees: &[(String, PathBuf, String)]) -> Result<(), String> {
+    let mut reports = Vec::new();
+    for (name, path, text) in trees {
+        let committed = compare(path, text)?;
+        if committed != Committed::Same {
+            reports.push(committed.report(name));
         }
     }
-    let _ = std::fs::remove_dir_all(&work);
-    if differ.is_empty() {
+    if reports.is_empty() {
         return Ok(());
     }
     Err(format!(
-        "Chromium's accessibility trees differ from the committed ones for {}; rerun without --check, review the diff, and commit it",
-        differ.join(", ")
+        "Chromium's accessibility trees differ from the committed ones:\n{}",
+        reports.join("\n")
     ))
+}
+
+fn written(trees: &[(String, PathBuf, String)]) -> Result<(), String> {
+    for (_, path, text) in trees {
+        std::fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))?;
+        println!("wrote {}", path.display());
+    }
+    Ok(())
 }
