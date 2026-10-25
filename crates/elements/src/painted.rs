@@ -22,6 +22,8 @@ pub struct Painted {
     pub(crate) hits: Vec<(NodeId, BoxRect)>,
     /// The cursor over each element in `hits`.
     pub(crate) cursors: HashMap<NodeId, Cursor>,
+    /// Which scroll containers a scroll over each element tries.
+    pub(crate) scroll_chains: crate::scroll_chains::Chains,
 }
 
 impl Painted {

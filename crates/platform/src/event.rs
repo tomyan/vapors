@@ -27,10 +27,15 @@ pub enum Event {
         /// True on press.
         pressed: bool,
     },
-    /// The wheel or trackpad scrolled. Positive `steps` is away from the user.
+    /// The wheel or trackpad scrolled, in CSS pixels (not physical, unlike
+    /// positions), signed as the DOM's `deltaX` and `deltaY`: positive
+    /// scrolls right and down, moving the content left and up. A wheel
+    /// notch is [`LINE_PIXELS`].
     Scroll {
-        /// Scroll amount in notional lines; pixel deltas are converted at 50 px per line.
-        steps: f32,
+        /// Rightward, CSS pixels.
+        dx: f32,
+        /// Downward, CSS pixels.
+        dy: f32,
     },
     /// A key produced this text on press.
     Character(String),
@@ -116,13 +121,17 @@ impl TouchPhase {
     }
 }
 
-/// Lines per pixel for pixel-delta scrolls. A first value; measured later
-/// against a trackpad.
-const PIXELS_PER_LINE: f32 = 50.0;
+/// CSS pixels a wheel notch (a line) scrolls: what Chromium 155 scrolls
+/// on Linux. Measured 2026-10-25 under Xvfb with one `XTest` button 5
+/// press over a headful Chromium page (smooth scrolling off): its wheel
+/// event had `deltaY` 120 and `deltaMode` 0 (pixels), and `scrollY`
+/// moved by 120 per notch.
+pub const LINE_PIXELS: f32 = 120.0;
 
-/// Translate a winit event into ours. `None` for events the app does not get.
+/// Translate a winit event into ours, the window at `scale` physical
+/// pixels per CSS pixel. `None` for events the app does not get.
 #[allow(clippy::cast_possible_truncation)] // positions and deltas are small
-pub fn from_winit(event: &WindowEvent) -> Option<Event> {
+pub fn from_winit(event: &WindowEvent, scale: f64) -> Option<Event> {
     match event {
         WindowEvent::Resized(size) => Some(Event::Resized {
             width: size.width,
@@ -140,12 +149,7 @@ pub fn from_winit(event: &WindowEvent) -> Option<Event> {
         } => Some(Event::PrimaryButton {
             pressed: *state == ElementState::Pressed,
         }),
-        WindowEvent::MouseWheel { delta, .. } => Some(Event::Scroll {
-            steps: match delta {
-                MouseScrollDelta::LineDelta(_, lines) => *lines,
-                MouseScrollDelta::PixelDelta(position) => position.y as f32 / PIXELS_PER_LINE,
-            },
-        }),
+        WindowEvent::MouseWheel { delta, .. } => Some(scroll(*delta, scale)),
         WindowEvent::Touch(touch) => Some(Event::Touch {
             id: touch.id,
             phase: TouchPhase::from_winit(touch.phase),
@@ -158,4 +162,15 @@ pub fn from_winit(event: &WindowEvent) -> Option<Event> {
             .map(|text| Event::Character(text.to_string())),
         _ => None,
     }
+}
+
+/// winit's wheel delta as ours: winit negates the DOM's signs (its web
+/// backend says so, `-event.delta_y()`), so they are negated back.
+#[allow(clippy::cast_possible_truncation)] // deltas are small
+fn scroll(delta: MouseScrollDelta, scale: f64) -> Event {
+    let [dx, dy] = match delta {
+        MouseScrollDelta::LineDelta(x, y) => [x * LINE_PIXELS, y * LINE_PIXELS],
+        MouseScrollDelta::PixelDelta(at) => [(at.x / scale) as f32, (at.y / scale) as f32],
+    };
+    Event::Scroll { dx: -dx, dy: -dy }
 }

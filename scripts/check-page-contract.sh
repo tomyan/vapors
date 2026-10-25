@@ -4,7 +4,7 @@
 # a status line never lands in #error; a lost GPU device is reported in
 # #error with the fix; the demos (?demo=) draw, an unknown demo is an
 # error, the page works one directory down (/vapors/), and each demo's
-# screenshot, after the clicks its .pixels file lists, holds its pixel
+# screenshot, after the inputs its .pixels file lists, holds its pixel
 # checks. Copies of the built page; any mismatch fails naming the case.
 #
 # Usage: scripts/check-page-contract.sh target/web <new or empty dir>
@@ -106,7 +106,7 @@ prepare() {
     sizes=$(viewports "$demo") || exit 1
     for wh in $sizes; do
       w=${wh%x*}; h=${wh#*x}; shot="$demo-shot-$wh"
-      if [ -n "$($check_pixels --clicks "crates/demos/demos/$demo.pixels" "$wh")" ]; then
+      if [ -n "$($check_pixels --inputs "crates/demos/demos/$demo.pixels" "$wh")" ]; then
         page "$shot" "$(frames_at "$w" "$h")$(clicker "$demo" "$wh")" "$(after_clicks "$h")"
       else
         page "$shot" "$(frames_at "$w" "$h")" "(Number(document.body.dataset.frameHeight) || 0) >= $h"
@@ -124,7 +124,7 @@ prepare() {
 }
 
 # The demos whose screenshots are held to crates/demos/demos/<name>.pixels.
-demos="hello counter boxes shell panel text stress toasts"
+demos="hello counter boxes shell panel text stress toasts scroll"
 # Demos that change every frame never go idle, and headless Chromium's
 # virtual time then runs hundreds of software-rendered frames past the
 # 60 s deadline; `ticks=5` stops them after five frames.
@@ -160,15 +160,23 @@ frames_at() {
   printf '%s' "<style>canvas { width: $1px !important; height: $2px !important; }</style>$counter"
 }
 
-# clicker <demo> <WxH>: a script that makes the WxH section's clicks on the
-# canvas as a mouse would (move, press, release, pointer id 1; a move has no
-# button and lists itself as its coalesced event, which winit reads), in the
-# order the file lists them; check_pixels reads the file, so the native
-# screenshot and this one make the same clicks.
+# clicker <demo> <WxH>: a script that makes the WxH section's inputs on
+# the canvas, in the order the file lists them; check_pixels reads the
+# file, so the native screenshot and this one make the same inputs. A
+# click is what a mouse sends (move, press, release, pointer id 1; a move
+# has no button and lists itself as its coalesced event, which winit
+# reads). A wheel moves the pointer there, then sends a WheelEvent in
+# pixels (deltaMode 0), as Chromium sends for a notch on Linux.
 clicker() {
-  calls=$($check_pixels --clicks "crates/demos/demos/$1.pixels" "$2" | while read -r x y; do printf 'vaporsClick(%s, %s); ' "$x" "$y"; done) \
-    || { echo "crates/demos/demos/$1.pixels: check_pixels could not read its clicks" >&2; exit 1; }
-  printf '%s' "<script>function vaporsClick(x, y) { var c = document.getElementById('vapors'); var o = { clientX: x, clientY: y, bubbles: true, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: 0, buttons: 1 }; var move = { clientX: x, clientY: y, bubbles: true, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: -1, buttons: 0 }; move.coalescedEvents = [new PointerEvent('pointermove', move)]; c.dispatchEvent(new PointerEvent('pointermove', move)); c.dispatchEvent(new PointerEvent('pointerdown', o)); o.buttons = 0; c.dispatchEvent(new PointerEvent('pointerup', o)); } function vaporsClicks() { $calls}</script>"
+  calls=$($check_pixels --inputs "crates/demos/demos/$1.pixels" "$2" | while read -r kind x y dx dy; do
+      case $kind in
+        click) printf 'vaporsClick(%s, %s); ' "$x" "$y" ;;
+        wheel) printf 'vaporsWheel(%s, %s, %s, %s); ' "$x" "$y" "$dx" "$dy" ;;
+        *) echo "crates/demos/demos/$1.pixels: an input check_pixels printed is neither click nor wheel: $kind" >&2; exit 1 ;;
+      esac
+    done) \
+    || { echo "crates/demos/demos/$1.pixels: check_pixels could not read its inputs" >&2; exit 1; }
+  printf '%s' "<script>function vaporsMove(c, x, y) { var move = { clientX: x, clientY: y, bubbles: true, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: -1, buttons: 0 }; move.coalescedEvents = [new PointerEvent('pointermove', move)]; c.dispatchEvent(new PointerEvent('pointermove', move)); } function vaporsWheel(x, y, dx, dy) { var c = document.getElementById('vapors'); vaporsMove(c, x, y); c.dispatchEvent(new WheelEvent('wheel', { clientX: x, clientY: y, deltaX: dx, deltaY: dy, deltaMode: 0, bubbles: true, cancelable: true })); } function vaporsClick(x, y) { var c = document.getElementById('vapors'); var o = { clientX: x, clientY: y, bubbles: true, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: 0, buttons: 1 }; var move = { clientX: x, clientY: y, bubbles: true, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: -1, buttons: 0 }; move.coalescedEvents = [new PointerEvent('pointermove', move)]; c.dispatchEvent(new PointerEvent('pointermove', move)); c.dispatchEvent(new PointerEvent('pointerdown', o)); o.buttons = 0; c.dispatchEvent(new PointerEvent('pointerup', o)); } function vaporsClicks() { $calls}</script>"
 }
 
 # after_clicks <h>: the hold condition. The clicks wait for a frame

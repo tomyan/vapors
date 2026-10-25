@@ -34,6 +34,10 @@ pub struct Document {
     pub(crate) boxes: crate::layout::KeptBoxes,
     /// Boxes the last update laid out rather than read from cache.
     pub(crate) laid_out: usize,
+    /// Each scroll container's offset.
+    pub(crate) scroll: crate::scroll::Offsets,
+    /// Whether scroll thumbs are drawn now.
+    pub(crate) thumbs_shown: bool,
 }
 
 impl Document {
@@ -59,12 +63,14 @@ impl Document {
             kept: None,
             boxes: crate::layout::KeptBoxes::default(),
             laid_out: 0,
+            scroll: crate::scroll::Offsets::default(),
+            thumbs_shown: true,
         }
     }
 
     /// Whether anything that would change the next update happened since
-    /// the last call: the tree, an attribute, a text, a stylesheet or the
-    /// pointer's hover and active state. An app that redraws on change
+    /// the last call: the tree, an attribute, a text, a stylesheet, the
+    /// pointer's hover and active state, or a scroll. An app that redraws on change
     /// asks this after each event. True for a new document.
     pub fn take_changed(&mut self) -> bool {
         std::mem::replace(&mut self.changed, false)

@@ -129,6 +129,13 @@ document.fonts.ready
     write({{ error: "fonts did not load: " + failed.map((face) => face.family + " (" + face.status + ")").join(", ") }});
     return;
   }}
+  // A fixture scrolls an element with data-scroll="x y"; Chromium
+  // clamps it to the content, as vapors' Document::scroll_to does.
+  for (const element of document.querySelectorAll("[data-scroll]")) {{
+    const [x, y] = element.dataset.scroll.split(" ").map(Number);
+    element.scrollLeft = x;
+    element.scrollTop = y;
+  }}
   const boxes = [];
   for (const element of document.querySelectorAll("html, body, body *")) {{
     if (element.tagName === "SCRIPT") continue;
