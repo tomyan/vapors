@@ -34,13 +34,13 @@ impl Random {
     }
 }
 
-/// body > 3 rows of up to 3 boxes with text.
+/// body > 3 rows of up to 3 boxes with text; the last row scrolls.
 pub fn page(random: &mut Random) -> Rc<RefCell<Document>> {
     let mut doc = document();
     let body = doc.body();
-    for _ in 0..3 {
+    for class in ["row", "row", "row scroller"] {
         let row = doc.create_element("div");
-        doc.set_attribute(row, "class", "row");
+        doc.set_attribute(row, "class", class);
         doc.append(body, row);
         for index in 0..random.below(4) {
             let cell = doc.create_element("div");
@@ -80,7 +80,7 @@ pub fn change(
         f32::from(u16::try_from(random.below(below)).expect("a few hundred"))
     };
     let point = [coordinate(random, 640), coordinate(random, 400)];
-    match random.below(11) {
+    match random.below(12) {
         0 => {
             let (node, class) = (any(random), random.pick(CLASSES));
             doc.borrow_mut().set_attribute(node, "class", class);
@@ -123,6 +123,21 @@ pub fn change(
             Document::pointer_pressed(doc, point);
             Document::pointer_released(doc, point);
             format!("press and release at {point:?}")
+        }
+        10 => {
+            let delta = [
+                coordinate(random, 60) - 30.0,
+                coordinate(random, 120) - 60.0,
+            ];
+            let scrolled = in_scroll_containers(&doc.borrow(), &nodes);
+            let node = if scrolled.is_empty() {
+                any(random)
+            } else {
+                random.pick(&scrolled)
+            };
+            let point = inside(&doc.borrow(), node).unwrap_or(point);
+            doc.borrow_mut().scroll_by(point, delta);
+            format!("scroll by {delta:?} at {point:?}")
         }
         9 => {
             let (width, height) = random.pick(VIEWPORTS);
@@ -177,4 +192,20 @@ fn move_one(
     let target = random.pick(&targets);
     d.append(target, node);
     format!("move {node:?} into {target:?}")
+}
+
+/// A point inside `node`'s box in the last update, so a scroll there
+/// reaches its scroll containers.
+fn inside(doc: &Document, node: NodeId) -> Option<[f32; 2]> {
+    let rect = doc.painted()?.border_box(node)?;
+    Some([rect.x + rect.width / 2.0, rect.y + rect.height / 2.0])
+}
+
+/// The elements that are scroll containers or inside one.
+fn in_scroll_containers(doc: &Document, nodes: &[NodeId]) -> Vec<NodeId> {
+    let scrolls = |node: NodeId| {
+        std::iter::successors(Some(node), |n| doc.parent(*n))
+            .any(|n| doc.scroll_offset(n).is_some())
+    };
+    nodes.iter().copied().filter(|n| scrolls(*n)).collect()
 }

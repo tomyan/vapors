@@ -30,6 +30,8 @@ pub(crate) struct Used {
     /// `z-index` where it applies (a positioned box, or a flex or grid
     /// item), `None` for auto and where it does not.
     pub(crate) z_index: Option<i32>,
+    /// How its thumb is drawn, when it scrolls.
+    pub(crate) scrollbar: super::Scrollbar,
 }
 
 /// What a used style depends on besides the element's computed styles.
@@ -40,6 +42,9 @@ pub(crate) struct Context<'a> {
     pub(crate) flex_item: bool,
     /// The parent is an inline element.
     pub(crate) in_inline: bool,
+    /// The element's `overflow` belongs to the viewport
+    /// (`overflow::to_viewport`).
+    pub(crate) to_viewport: bool,
     /// Device pixels per CSS pixel, for border widths.
     pub(crate) scale: f32,
 }
@@ -58,8 +63,10 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
         reader.refuse("display", inline::BLOCK_IN_INLINE.to_owned());
     }
     super::overflow::refuse_rounded_clip(&mut reader, &layout, &decoration);
+    super::overflow::refuse_viewport_scroll(&mut reader, &layout, context.to_viewport);
     let result = Used {
         z_index: applied_z_index(&mut reader, &layout, context.flex_item),
+        scrollbar: super::scrollbar::scrollbar(&mut reader),
         layout,
         inline,
         text,
@@ -83,6 +90,11 @@ impl Used {
     /// padding box.
     pub(crate) fn clips(&self) -> bool {
         self.layout.overflow.x != taffy::Overflow::Visible
+    }
+
+    /// `overflow` is `scroll` or `auto`: a scroll container.
+    pub(crate) fn scrolls(&self) -> bool {
+        self.layout.overflow.x == taffy::Overflow::Scroll
     }
 }
 

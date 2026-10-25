@@ -114,16 +114,56 @@ fn a_pixel_outside_the_image_fails() {
 }
 
 #[test]
-fn clicks_are_kept_in_file_order_apart_from_the_checks() {
+fn clicks_and_wheels_are_kept_in_file_order_apart_from_the_checks() {
     // Given
-    let text = "click 3 4\npixel 1 2 #000000\nclick 5 6\n";
+    let text = "click 3 4\npixel 1 2 #000000\nwheel 5 6 0 -120\nclick 7 8\n";
 
     // When
     let spec = parse("demo", text).expect("parses").remove(0);
 
     // Then
-    assert_eq!(spec.clicks, [[3, 4], [5, 6]]);
+    assert_eq!(
+        spec.inputs,
+        [
+            Input::Click([3, 4]),
+            Input::Wheel {
+                at: [5, 6],
+                delta: [0, -120]
+            },
+            Input::Click([7, 8])
+        ]
+    );
     assert_eq!(spec.checks.len(), 1);
+}
+
+#[test]
+fn a_wheel_line_without_its_deltas_is_refused_naming_the_line() {
+    // When
+    let error = parse("demo", "wheel 5 6 0\n").expect_err("refused");
+
+    // Then
+    assert!(
+        error.contains("demo.pixels:1") && error.contains("wheel X Y DX DY"),
+        "{error}"
+    );
+}
+
+#[test]
+fn inputs_print_as_their_lines_for_the_page_script() {
+    // Given
+    let inputs = [
+        Input::Click([3, 4]),
+        Input::Wheel {
+            at: [5, 6],
+            delta: [-2, 120],
+        },
+    ];
+
+    // When
+    let lines: Vec<String> = inputs.iter().map(Input::line).collect();
+
+    // Then
+    assert_eq!(lines, ["click 3 4", "wheel 5 6 -2 120"]);
 }
 
 #[test]
@@ -143,10 +183,10 @@ fn an_at_line_starts_a_section_for_another_viewport() {
     assert_eq!(
         (
             specs[1].viewport,
-            specs[1].clicks.clone(),
+            specs[1].inputs.clone(),
             specs[1].checks.len()
         ),
-        ([412, 800], vec![[2, 2]], 1)
+        ([412, 800], vec![Input::Click([2, 2])], 1)
     );
     assert!(section(&specs, [412, 800]).is_ok());
     assert!(

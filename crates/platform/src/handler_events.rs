@@ -58,6 +58,9 @@ impl ApplicationHandler<Message> for Handler {
         if let WindowEvent::ScaleFactorChanged { .. } = event {
             self.platform.request_redraw();
         }
+        if let Some(window) = &self.window {
+            self.input.set_scale(window.scale_factor());
+        }
         for app_event in self.input.translate(&event) {
             self.app.event(app_event, &self.platform);
         }

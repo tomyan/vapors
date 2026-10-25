@@ -18,21 +18,22 @@ fn tree(parents: &[Option<usize>]) -> Vec<LayoutBox> {
     boxes
 }
 
+/// The boxes alone, thumbs left out.
 fn order(parents: &[Option<usize>], stacking: &[(usize, Stacking)]) -> Vec<usize> {
-    let boxes = tree(parents);
-    paint_order(&boxes, &|index| {
-        stacking
-            .iter()
-            .find(|(i, _)| *i == index)
-            .map_or(Stacking::default(), |(_, s)| *s)
-    })
+    steps(parents, stacking)
+        .into_iter()
+        .filter_map(|step| match step {
+            Step::Box(index) => Some(index),
+            Step::Thumb(_) => None,
+        })
+        .collect()
 }
 
 fn positioned(z: Option<i32>) -> Stacking {
     Stacking {
         positioned: true,
         z,
-        fixed: false,
+        ..Stacking::default()
     }
 }
 
@@ -96,8 +97,8 @@ fn a_fixed_box_roots_a_context_without_a_z_index() {
     // Given: as above, with 1 fixed and z auto
     let fixed = Stacking {
         positioned: true,
-        z: None,
         fixed: true,
+        ..Stacking::default()
     };
     let stacking = [(1, fixed), (2, positioned(Some(-1)))];
 
@@ -106,4 +107,14 @@ fn a_fixed_box_roots_a_context_without_a_z_index() {
 
     // Then
     assert_eq!(found, [0, 4, 1, 2, 3]);
+}
+
+fn steps(parents: &[Option<usize>], stacking: &[(usize, Stacking)]) -> Vec<Step> {
+    let boxes = tree(parents);
+    paint_steps(&boxes, &|index| {
+        stacking
+            .iter()
+            .find(|(i, _)| *i == index)
+            .map_or(Stacking::default(), |(_, s)| *s)
+    })
 }

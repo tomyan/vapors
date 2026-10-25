@@ -18,7 +18,9 @@ include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 pub use vapors_pixels as pixels;
 
 mod frames;
+mod input;
 pub use frames::{frame_limit, limited};
+pub use input::{click, input};
 
 /// What a demo that changes itself every frame is called with before
 /// each update: how long the last update took (`None` before the first).
@@ -146,6 +148,14 @@ pub fn all() -> Vec<Demo> {
             },
         },
         Demo {
+            name: "scroll",
+            pixels: Some(include_str!("../demos/scroll.pixels")),
+            mount: |dom, parent| {
+                std::mem::forget(scroll::Scroll::mount(dom, parent, scroll::ScrollProps {}));
+                None
+            },
+        },
+        Demo {
             name: INDEX,
             pixels: None,
             mount: |dom, parent| {
@@ -184,17 +194,6 @@ fn stress_per_frame(stress: stress::Stress) -> PerFrame {
                 .set(format!("{:.2} ms", last.as_secs_f64() * 1000.0));
         }
     })
-}
-
-/// Clicks at `point` (CSS pixels) as a mouse does: moves there,
-/// presses and releases. What a `.pixels` file's `click` lines do
-/// before a screenshot; the pointer stays there, hovering.
-#[allow(clippy::cast_precision_loss)] // screen coordinates are small
-pub fn click(document: &Rc<RefCell<Document>>, point: [u32; 2]) {
-    let point = [point[0] as f32, point[1] as f32];
-    Document::pointer_moved(document, point);
-    Document::pointer_pressed(document, point);
-    Document::pointer_released(document, point);
 }
 
 #[cfg(test)]

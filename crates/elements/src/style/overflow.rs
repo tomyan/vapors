@@ -1,9 +1,13 @@
-//! `overflow-x` and `overflow-y` (F2c S8): `visible`, and `hidden` and
-//! `clip`, which cut the element's descendants off at its padding box.
-//! `scroll` and `auto` need a scroll position and are refused until F2c
-//! S9. Axes that differ are refused: CSS turns `hidden` beside
-//! `visible` into a scroll container (S9), and a one-axis `clip` is not
-//! built. A clip with rounded corners is refused until a slice needs it.
+//! `overflow-x` and `overflow-y` (F2c S8, S9): `visible`; `hidden` and
+//! `clip`, which cut the element's descendants off at its padding box;
+//! and `scroll` and `auto`, which do that and make it a scroll
+//! container (`crate::scroll`). Axes that differ are refused: CSS turns
+//! `hidden` beside `visible` into a scroll container on one axis, and a
+//! one-axis `clip` is not built. A clip with rounded corners is refused
+//! until a slice needs it. The root's overflow, and the body's when the
+//! root's is `visible`, belong to the viewport (CSS Overflow 3 section
+//! 3.3), which vapors does not scroll: there `scroll` and `auto` are
+//! refused.
 
 use taffy::{Overflow, Point, Style};
 use vapors_css::value::Value;
@@ -34,14 +38,28 @@ pub(crate) fn refuse_rounded_clip(reader: &mut Reader<'_>, style: &Style, decora
     }
 }
 
+/// Whether an element's overflow belongs to the viewport: the root's
+/// always, the body's when the root's is `visible`.
+pub(crate) fn to_viewport(is_root: bool, is_body: bool, root_visible: bool) -> bool {
+    is_root || (is_body && root_visible)
+}
+
+/// Refuses `scroll` and `auto` where they would scroll the viewport.
+pub(crate) fn refuse_viewport_scroll(reader: &mut Reader<'_>, style: &Style, to_viewport: bool) {
+    if to_viewport && style.overflow.x == Overflow::Scroll {
+        reader.refuse(
+            "overflow-x",
+            "scrolls the viewport (html's overflow, or body's while html's is visible), which vapors does not do; give the scrolling content its own element with a height, or set html to overflow: hidden".to_owned(),
+        );
+    }
+}
+
 fn scheme(value: &Value) -> Result<Overflow, String> {
     match keyword(value)? {
         "visible" => Ok(Overflow::Visible),
         "hidden" => Ok(Overflow::Hidden),
         "clip" => Ok(Overflow::Clip),
-        "scroll" | "auto" => {
-            Err("scrolls, which arrives in F2c S9 (docs/F2c.md); use hidden until then".to_owned())
-        }
+        "scroll" | "auto" => Ok(Overflow::Scroll),
         other => Err(unknown(other)),
     }
 }

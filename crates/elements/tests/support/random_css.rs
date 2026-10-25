@@ -5,9 +5,11 @@
 /// `:last-child`, `:empty`, an ancestor attribute, `:hover` on a
 /// non-subject compound, `:active`, `@media`, calc with % and em, vw,
 /// relative, absolute and fixed positioning, z-index on positioned
-/// boxes and on flex items, and `overflow: hidden` and `clip`.
+/// boxes and on flex items, `overflow: hidden` and `clip`, and scroll
+/// containers (html hidden, so body can be one).
 pub const CSS: &str = "
 :root { --pad: 3px; }
+html { overflow: hidden; }
 body { margin: 0; font-size: 14px; color: #222222; }
 .row { display: flex; gap: 4px; }
 .box { padding: var(--pad); background-color: #eeeeff; }
@@ -30,6 +32,7 @@ body { margin: 0; font-size: 14px; color: #222222; }
 .cut { overflow: hidden; height: 12px; }
 .fix { position: fixed; right: 4px; bottom: 4px; width: 30px; height: 10px; }
 .trim { overflow: clip; height: 10px; }
+.scroller { overflow: auto; height: 8px; }
 ";
 
 pub const CLASSES: &[&str] = &[
@@ -48,6 +51,8 @@ pub const CLASSES: &[&str] = &[
     "box fix",
     "box trim",
     "row trim",
+    "box scroller",
+    "row scroller",
     "row",
     "",
 ];

@@ -14,7 +14,7 @@ use vapors_renderer::Target;
 use vapors_scene::Size;
 
 use crate::painter::ScenePainter;
-use crate::pointer::{Action, action};
+use crate::pointer::action;
 
 /// Why the app stopped, once it has: shared with whoever ran it.
 #[derive(Clone, Default)]
@@ -41,6 +41,8 @@ pub struct ElementsApp {
     scale: f32,
     /// Where the pointer last moved, in CSS pixels.
     pointer: Point,
+    touch: crate::touch_scroll::TouchScroll,
+    wheel: crate::wheel_scroll::WheelScroll,
     /// The cursor last shown.
     cursor: Cursor,
     /// Called before each update with the last one's duration.
@@ -63,6 +65,8 @@ impl ElementsApp {
             failure: Failure::default(),
             scale: 1.0,
             pointer: [0.0, 0.0],
+            touch: crate::touch_scroll::TouchScroll::default(),
+            wheel: crate::wheel_scroll::WheelScroll::default(),
             cursor: Cursor::Default,
             per_frame: None,
             last_update: None,
@@ -144,20 +148,6 @@ impl ElementsApp {
             Next::Wait
         }
     }
-
-    fn act(&mut self, action: Action) {
-        let document = &self.document;
-        match action {
-            Action::Move(point) => {
-                self.pointer = point;
-                Document::pointer_moved(document, point);
-            }
-            Action::Press(point) => Document::pointer_pressed(document, point),
-            Action::Release(point) => Document::pointer_released(document, point),
-            Action::Leave => Document::pointer_left(document),
-            Action::Tap(point) => Document::tapped(document, point),
-        }
-    }
 }
 
 /// Draws only when the document changed: an idle document draws no
@@ -205,3 +195,6 @@ fn refused(errors: &[ElementError]) -> String {
         lines.join("\n")
     )
 }
+
+#[path = "elements_app_act.rs"]
+mod act;

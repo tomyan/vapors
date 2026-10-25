@@ -440,6 +440,11 @@ transitions on elements, `transform`, inline-block inside text,
 rounded clips, focus and keyboard (F2d), inputs and editing (F4),
 `dialog`/popover (F5), damage tracking.
 
+F2d, in this order (the lead, 2026-10-25): momentum and fling for
+touch scrolling, first, since phone scrolling without them feels
+broken; `br` and `a` (D6); mixed inline metrics (refused since S6);
+then focus and keyboard.
+
 After each slice the plan is reread. The question is whether the next
 slice is still the most useful one for touche, given what the last
 slice showed.
@@ -783,7 +788,8 @@ differs from the plan.
     `LayoutBox.hoisted` records that box, and `place` takes its corner
     as the origin. A fixed box is hoisted to the root, which spans the
     viewport.
-  - `sticky` is refused, naming S9. A non-static position on an inline
+  - `sticky` is refused, naming a slice after F2c (S9 built scrolling
+    without it). A non-static position on an inline
     element is refused: it has no box of its own.
   - An out-of-flow box never keeps its Taffy cache between updates
     (`keep.rs`). Seed 3 of the randomized test found the bug that
@@ -852,6 +858,63 @@ differs from the plan.
     frame, so a click cannot reach a toast that an earlier click in the
     same file raised. This is the same frame-later behaviour as D7.
 
+### S9
+
+- **Scroll containers** (`scroll.rs`, `chain.rs`, `scrolling.rs`):
+  `overflow: scroll` and `auto` keep an offset per element on the
+  Document, clamped to the content each update, dropped when the
+  element stops scrolling, applied in whole device pixels.
+  - Which boxes move with a container follows the containing block,
+    by the walk S8's clips use: an absolute box placed by a box outside
+    it does not move, and a fixed box never does.
+  - Taffy 0.15's scrollable overflow leaves out the in-flow children's
+    end margins and the end padding, which Chromium counts; the range
+    is the larger of the two. The `scrolling` layout fixture
+    (`data-scroll="x y"`, applied by the oracle page and the corpus
+    test) showed Taffy 4 px short.
+  - The page itself does not scroll: `scroll` and `auto` on html, or on
+    body while html is visible, are refused.
+- **Input.** `platform::Event::Scroll { dx, dy }` in CSS pixels, signed
+  as the DOM's deltas. A wheel notch is `LINE_PIXELS` = 120, measured:
+  one XTest button-5 press under Xvfb over a headful Chromium 155 page
+  gave `deltaY` 120, `deltaMode` 0 and `scrollY` +120. The image view
+  zooms one step per notch, from `dy`.
+  - A wheel scrolls the innermost container under the pointer that can
+    move that way, else the next one out (`Document::scroll_by`).
+  - A burst of wheel events keeps one container while each comes within
+    500 ms of the last (`wheel_scroll.rs`), as Chromium latches it:
+    measured with XTest notches over a list inside a list, the inner
+    one at its end, a notch 0.5 s after the last went nowhere and one
+    0.55 s after scrolled the outer one.
+  - A diagonal delta goes whole to one container, not split by axis:
+    measured, a (40, 30) wheel over a sideways-only list moved it 40
+    and its vertical container not at all; with the list at its end,
+    the container took the 30.
+  - A touch gesture keeps the first container it moves, as Chromium
+    latches it (`touch_scroll.rs`); a pan past its end goes nowhere.
+    The gesture lasts until the last finger lifts or is cancelled.
+  - touche's pin bump changes one test,
+    `crates/viewer/src/viewer_app_tests.rs:41`:
+    `Event::Scroll { steps: 1.0 }` becomes
+    `Event::Scroll { dx: 0.0, dy: -vapors_platform::LINE_PIXELS }`.
+- **Thumbs** (`thumb.rs`, D10): overlay only, styled by
+  `scrollbar-color` and `scrollbar-width`; on touch, shown only while a
+  gesture scrolls. They take no pointer. A thumb paints after its
+  container's descendants, positioned ones in an enclosing context
+  included (`thumb_order.rs`): measured, Chromium paints both its
+  classic scrollbar and its overlay thumb over a relative child that
+  runs under them.
+- **A scroll only repaints**: no restyle, no layout, no text layout
+  (`incremental_scroll.rs`).
+- **`.pixels` gains `wheel X Y DX DY`**, made by the parser, the native
+  demo example and `gpu_demos` (through `vapors_demos::input`), and by
+  the page contract (a pointer move, then a WheelEvent in pixels on the
+  canvas, through winit and `ElementsApp`).
+- **Demo.** `scroll`: two 200-row lists under a fixed bar; a wheel over
+  the left one moves its top row from row 0 to row 3 (row 6 on the
+  phone), while the right one stays at row 0.
+- **Deferred to F2d:** momentum and fling.
+
 ## Decisions (2026-10-23)
 
 - **D1 Scoping.** A compiler change in S5: `mount` registers its
@@ -894,3 +957,16 @@ differs from the plan.
 - **D9 Text clipping is checked in `gpu_text` (2026-10-24).** Glyph
   edges differ from Chromium's by more than the paint fixtures' rules
   allow, so the `clipping` fixture has no text; its comment says so.
+- **D10 Overlay scroll thumbs everywhere (2026-10-25).** A scroll
+  container draws only a thumb, over its content at the far edge of
+  its padding box, taking no layout space, on desktop and phone alike.
+  This matches the Chromium oracle, which runs with
+  `--hide-scrollbars`, but not desktop Chromium's 15 px classic gutter.
+  An app styles the thumb with standard CSS, from its own tokens:
+  `scrollbar-color: <thumb> transparent` (a track colour is refused:
+  there is no track) and `scrollbar-width: auto | thin | none` (8, 4
+  and 0 CSS px). touche's Scroll region pattern is
+  `scrollbar-color: var(--line-strong) transparent; scrollbar-width:
+  thin`. Once a finger has touched, thumbs show only while a touch
+  gesture scrolls; a mouse move or wheel shows them again. Thumbs take
+  no pointer: dragging one is not built.

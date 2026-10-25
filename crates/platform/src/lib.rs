@@ -37,7 +37,7 @@ pub use clock::Instant;
 pub use cursor::Cursor;
 pub use device_lost::{DeviceLost, Lost};
 pub use error::PlatformError;
-pub use event::{Event, TouchPhase};
+pub use event::{Event, LINE_PIXELS, TouchPhase};
 pub use file_kind::FileKind;
 pub use gestures::Gestures;
 pub use platform::Platform;

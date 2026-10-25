@@ -2,9 +2,10 @@
 //! pixel checks on a screenshot taken elsewhere, the web page's in
 //! particular. Prints each failure and exits 1 when any check fails.
 //! The section checked is the one for the screenshot's size divided by
-//! the scale. `check_pixels --clicks <file.pixels> [WxH]` prints the
-//! clicks of the `WxH` section (640x400 without one), one `X Y` per line,
-//! for the page-contract script to make before its screenshot.
+//! the scale. `check_pixels --inputs <file.pixels> [WxH]` prints the
+//! inputs of the `WxH` section (640x400 without one), one `click X Y` or
+//! `wheel X Y DX DY` per line, for the page-contract script to make
+//! before its screenshot.
 //! `check_pixels --viewports <file.pixels>` prints each section's size,
 //! one `W H` per line, for the script to take a screenshot at each.
 
@@ -29,8 +30,8 @@ fn run() -> Result<(), String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.as_slice() {
         [flag, pixels] if flag == "--viewports" => return print_viewports(pixels),
-        [flag, pixels] if flag == "--clicks" => return print_clicks(pixels, DEFAULT_VIEWPORT),
-        [flag, pixels, size] if flag == "--clicks" => return print_clicks(pixels, viewport(size)?),
+        [flag, pixels] if flag == "--inputs" => return print_inputs(pixels, DEFAULT_VIEWPORT),
+        [flag, pixels, size] if flag == "--inputs" => return print_inputs(pixels, viewport(size)?),
         _ => {}
     }
     let [pixels, png, rest @ ..] = args.as_slice() else {
@@ -108,9 +109,9 @@ fn specs(pixels: &str) -> Result<Vec<Spec>, String> {
     parse(pixels.trim_end_matches(".pixels"), &text)
 }
 
-fn print_clicks(pixels: &str, viewport: [u32; 2]) -> Result<(), String> {
-    for [x, y] in section(&specs(pixels)?, viewport)?.clicks.clone() {
-        println!("{x} {y}");
+fn print_inputs(pixels: &str, viewport: [u32; 2]) -> Result<(), String> {
+    for input in &section(&specs(pixels)?, viewport)?.inputs {
+        println!("{}", input.line());
     }
     Ok(())
 }

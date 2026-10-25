@@ -29,7 +29,7 @@ fn a_positioned_inline_element_is_refused_naming_it() {
 }
 
 #[test]
-fn sticky_is_refused_naming_the_scrolling_slice() {
+fn sticky_is_refused_naming_where_it_comes() {
     // Given
     let mut doc = document();
     let body = doc.body();
@@ -44,7 +44,7 @@ fn sticky_is_refused_naming_the_scrolling_slice() {
     assert!(
         errors
             .iter()
-            .any(|e| e.contains("sticky") && e.contains("F2c S9")),
+            .any(|e| e.contains("sticky") && e.contains("a slice after F2c")),
         "{errors:?}"
     );
 }
