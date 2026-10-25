@@ -3,7 +3,8 @@
 //! and trackpad pinches, which need state (the last pointer position and
 //! the fingers down) that lives here.
 
-use winit::event::WindowEvent;
+use winit::event::{ElementState, WindowEvent};
+use winit::keyboard::ModifiersState;
 
 use crate::clock::Instant;
 use crate::event::{Event, from_winit};
@@ -20,6 +21,8 @@ pub struct Input {
     started: Instant,
     /// Physical pixels per CSS pixel, for scroll deltas.
     scale: f64,
+    /// The modifier keys held, for the paste shortcut.
+    modifiers: ModifiersState,
 }
 
 impl Input {
@@ -31,6 +34,7 @@ impl Input {
             gestures: Gestures::new(),
             started: Instant::now(),
             scale: 1.0,
+            modifiers: ModifiersState::empty(),
         }
     }
 
@@ -44,6 +48,9 @@ impl Input {
         if let WindowEvent::PinchGesture { delta, .. } = event {
             return self.pinch(*delta).into_iter().collect();
         }
+        if let Some(keys) = self.keys(event) {
+            return keys;
+        }
         let Some(direct) = from_winit(event, self.scale) else {
             return Vec::new();
         };
@@ -51,6 +58,29 @@ impl Input {
         let mut events = vec![direct];
         events.extend(gestures);
         events
+    }
+
+    /// The modifiers kept, and the paste shortcut as [`Event::Paste`]
+    /// instead of its character; `None` for other events. Desktop only.
+    fn keys(&mut self, event: &WindowEvent) -> Option<Vec<Event>> {
+        match event {
+            WindowEvent::ModifiersChanged(modifiers) => {
+                self.modifiers = modifiers.state();
+                Some(Vec::new())
+            }
+            WindowEvent::KeyboardInput { event: key, .. }
+                if cfg!(not(target_family = "wasm"))
+                    && key.state == ElementState::Pressed
+                    && crate::paste_key::is_paste(
+                        &key.logical_key,
+                        self.modifiers,
+                        cfg!(target_os = "macos"),
+                    ) =>
+            {
+                Some(vec![Event::Paste])
+            }
+            _ => None,
+        }
     }
 
     /// Updates what the gestures need from `event`; any gesture it ends.

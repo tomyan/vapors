@@ -6,6 +6,8 @@
 //! to the app as an [`Event`] and every redraw as a [`Frame`].
 
 mod attributes;
+#[cfg(not(target_family = "wasm"))]
+mod clipboard;
 mod clock;
 mod cursor;
 mod device_lost;
@@ -18,6 +20,7 @@ mod input;
 #[cfg(not(target_family = "wasm"))]
 mod log_forward;
 pub mod page;
+mod paste_key;
 mod picker;
 #[cfg(target_family = "wasm")]
 mod picker_web;
@@ -33,6 +36,8 @@ mod web;
 mod webgpu;
 mod window;
 
+#[cfg(not(target_family = "wasm"))]
+pub use clipboard::{Clipboard, ClipboardImage, SystemClipboard};
 pub use clock::Instant;
 pub use cursor::Cursor;
 pub use device_lost::{DeviceLost, Lost};

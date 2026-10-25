@@ -16,6 +16,8 @@ vapors-gpu.workspace = true
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 pollster.workspace = true
 log = "0.4"
+# The system clipboard's image, for Event::Paste (clipboard.rs).
+arboard = "3.7"
 
 # The system file dialog. On Linux the XDG desktop portal over D-Bus,
 # which rfd drives itself (no GTK to link, no async runtime); native
