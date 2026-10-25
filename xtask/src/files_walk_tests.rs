@@ -165,3 +165,25 @@ fn lines_are_terminators_plus_a_final_unterminated_line() {
     assert_eq!(count_lines(&root.join("e.rs")), Ok(0));
     let _ = std::fs::remove_dir_all(root);
 }
+
+#[test]
+fn every_source_walk_enters_fonts_and_node_modules_but_not_target() {
+    // Given
+    let root = tree("sources");
+    file(&root, "crates/text/fonts/mod.rs", "");
+    file(&root, "web/node_modules/x/lib.rs", "");
+    file(&root, "target/debug/build/out.rs", "");
+
+    // When
+    let found: Vec<String> = all_source_files(&root)
+        .expect("walks")
+        .iter()
+        .map(|p| p.display().to_string())
+        .collect();
+
+    // Then
+    assert_eq!(
+        found,
+        ["crates/text/fonts/mod.rs", "web/node_modules/x/lib.rs"]
+    );
+}

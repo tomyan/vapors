@@ -23,9 +23,23 @@ const SKIPPED_DIRS: [&str; 4] = ["target", ".git", "node_modules", "fonts"];
 /// A message naming a directory that could not be read, or a dangling
 /// symlink, in the same path form as the findings.
 pub fn workspace_files(root: &Path) -> Result<Vec<PathBuf>, String> {
+    files_skipping(root, &SKIPPED_DIRS)
+}
+
+/// Every covered file under `root` except build output and git, fonts
+/// and `node_modules` included: for a check that must see every source.
+///
+/// # Errors
+///
+/// As [`workspace_files`].
+pub fn all_source_files(root: &Path) -> Result<Vec<PathBuf>, String> {
+    files_skipping(root, &["target", ".git"])
+}
+
+fn files_skipping(root: &Path, skip: &[&str]) -> Result<Vec<PathBuf>, String> {
     let mut found = Vec::new();
     let mut visited = BTreeSet::new();
-    walk(root, Path::new(""), &mut found, &mut visited)?;
+    walk(root, Path::new(""), skip, &mut found, &mut visited)?;
     found.sort();
     Ok(found)
 }
@@ -33,6 +47,7 @@ pub fn workspace_files(root: &Path) -> Result<Vec<PathBuf>, String> {
 fn walk(
     root: &Path,
     relative: &Path,
+    skip: &[&str],
     found: &mut Vec<PathBuf>,
     visited: &mut BTreeSet<PathBuf>,
 ) -> Result<(), String> {
@@ -51,7 +66,7 @@ fn walk(
         .collect::<Result<_, _>>()?;
     names.sort();
     for name in names {
-        visit(root, &relative.join(name), found, visited)?;
+        visit(root, &relative.join(name), skip, found, visited)?;
     }
     Ok(())
 }
@@ -61,6 +76,7 @@ fn walk(
 fn visit(
     root: &Path,
     path: &Path,
+    skip: &[&str],
     found: &mut Vec<PathBuf>,
     visited: &mut BTreeSet<PathBuf>,
 ) -> Result<(), String> {
@@ -72,8 +88,8 @@ fn visit(
         )
     })?;
     if metadata.is_dir() {
-        if !skipped(path) {
-            walk(root, path, found, visited)?;
+        if !skipped(path, skip) {
+            walk(root, path, skip, found, visited)?;
         }
     } else if metadata.is_file() && covered(path) {
         found.push(path.to_path_buf());
@@ -90,10 +106,10 @@ fn shown(relative: &Path) -> String {
     }
 }
 
-fn skipped(path: &Path) -> bool {
+fn skipped(path: &Path, skip: &[&str]) -> bool {
     path.file_name()
         .and_then(|n| n.to_str())
-        .is_some_and(|n| SKIPPED_DIRS.contains(&n))
+        .is_some_and(|n| skip.contains(&n))
 }
 
 fn covered(path: &Path) -> bool {

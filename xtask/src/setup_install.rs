@@ -1,7 +1,6 @@
 //! Installing one pinned tool with `cargo binstall`: download only, by a
 //! deadline, and a failure that quotes binstall's own error.
 
-use std::process::Command;
 use std::time::Duration;
 
 use crate::deadline::{Finished, run_with_deadline};
@@ -40,7 +39,7 @@ pub fn before_install(tool: &Tool, found: Option<&str>) -> String {
 pub fn install(tool: &Tool) -> Result<(), String> {
     let spec = format!("{}@{}", tool.crate_name, tool.version);
     // Not through sccache: setup installs sccache, so it cannot need it.
-    let mut command = Command::new("cargo");
+    let mut command = crate::priority::command("cargo")?;
     command.args(binstall_args(&spec));
     let ended = match run_with_deadline(command, DEADLINE)? {
         Finished::Exited {

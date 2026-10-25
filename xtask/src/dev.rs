@@ -196,7 +196,10 @@ pub fn trunk_args(port: u16, root: &Path, keys_port: u16) -> Vec<String> {
 }
 
 fn trunk_command(trunk: &Path, crate_dir: &Path, args: &[String]) -> Result<Command, String> {
-    let mut command = Command::new(trunk);
+    let program = trunk
+        .to_str()
+        .ok_or_else(|| format!("{} is not UTF-8", trunk.display()))?;
+    let mut command = crate::priority::command(program)?;
     crate::sccache::apply(&mut command)?;
     command.args(args).current_dir(crate_dir);
     Ok(command)

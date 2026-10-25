@@ -132,3 +132,18 @@ fn a_single_quoted_key_is_literal_and_may_hold_double_quotes() {
         Some("the apt cache")
     );
 }
+
+#[test]
+fn every_table_header_is_listed_even_an_empty_one() {
+    // Given
+    let config = Config::parse(
+        "[imports.dom_api]\n[imports.js_api]\n\"a/\" = \"why\"\n[web]\npackage = \"p\"\n",
+    )
+    .expect("config");
+
+    // When
+    let tables = config.tables_under("imports");
+
+    // Then
+    assert_eq!(tables, ["imports.dom_api", "imports.js_api"]);
+}

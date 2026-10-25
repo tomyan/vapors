@@ -10,7 +10,8 @@
 //! that must be clean at the commit its pin file names) are read before
 //! and after, and any change, or an unreadable state, fails the gate.
 //! Locally every job runs in this one worktree, one after another; CI
-//! gives each job a fresh runner.
+//! gives each job a fresh runner. One gate runs at a time on the
+//! machine (`gate_lock`).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -28,6 +29,15 @@ pub const WORKFLOW: &str = ".github/workflows/ci.yml";
 
 /// Run the gate.
 pub fn run(reporter: &Reporter) -> ExitCode {
+    crate::priority::enter_gate();
+    let worktree =
+        std::env::current_dir().map_or_else(|_| "?".to_owned(), |d| d.display().to_string());
+    let lock = crate::gate_lock::dir()
+        .and_then(|dir| crate::gate_lock::acquire(&dir, &worktree, crate::gate_lock::WAIT));
+    let _lock = match lock {
+        Ok(held) => held,
+        Err(why) => return refuse(&why),
+    };
     let prepared = Config::load()
         .map_err(|e| e.to_string())
         .and_then(|config| prepare(&config));
