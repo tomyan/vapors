@@ -25,6 +25,12 @@ max_lines = "220"
 # Files not written by hand; left out of the check.
 [files.generated]
 
+# `[layers.forbid]` maps a crate to crates it must never depend on,
+# directly or through others, by normal or build dependencies
+# (`cargo xtask check-layers`, the `layers` step of lint and ci). vapors
+# sets none; touche keeps its document, engine and runtime clear of UI
+# crates.
+
 # `[gate] twin` names a sibling checkout whose xtask must equal this
 # one's (xtask/src/gate_twin.rs). vapors sets none: xtask changes land
 # here first, and touche's gate checks its copy against vapors at its pin.

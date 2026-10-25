@@ -14,6 +14,17 @@ fn tools() -> Step {
     )
 }
 
+/// No crate depends on what its `[layers.forbid]` rule names;
+/// `cargo xtask check-layers`.
+fn layers() -> Step {
+    Step::new(
+        "layers",
+        "cargo",
+        &["xtask", "check-layers"],
+        "remove the dependency the line names, or move the code; the rules are [layers.forbid] in .config/factory.toml",
+    )
+}
+
 /// Every source file within `[files] max_lines`; `cargo xtask check-files`.
 fn files() -> Step {
     Step::new(
@@ -148,6 +159,7 @@ pub fn ci(web_package: &str) -> Vec<Step> {
         tools(),
         fmt(),
         files(),
+        layers(),
         deny(),
         clippy(),
         wasm(web_package),
@@ -169,7 +181,7 @@ pub fn deny_check() -> Vec<Step> {
 
 /// Formatting and lints only.
 pub fn lint() -> Vec<Step> {
-    vec![fmt(), files(), clippy()]
+    vec![fmt(), files(), layers(), clippy()]
 }
 
 /// The unit tier.

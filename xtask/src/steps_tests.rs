@@ -17,6 +17,7 @@ fn ci_runs_fastest_checks_first() {
             "tools",
             "fmt",
             "files",
+            "layers",
             "deny",
             "clippy",
             "wasm",
@@ -86,4 +87,13 @@ fn the_deny_step_checks_every_section_within_its_deadline() {
         "the advisory fetch needs a deadline"
     );
     assert!(step.fix.contains("offline"), "{}", step.fix);
+}
+
+#[test]
+fn lint_checks_layers_after_files_and_before_clippy() {
+    // When
+    let names: Vec<String> = lint().into_iter().map(|s| s.name).collect();
+
+    // Then
+    assert_eq!(names, ["fmt", "files", "layers", "clippy"]);
 }
