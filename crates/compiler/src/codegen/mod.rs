@@ -15,11 +15,13 @@ mod emit;
 mod for_block;
 mod format;
 mod names;
+mod props_index;
 mod script;
 mod script_syntax;
 mod shell;
 mod snippets;
 mod syn_map;
+mod tag_props;
 mod text;
 mod unwrap;
 
@@ -27,16 +29,18 @@ use crate::CompileError;
 use crate::ast::Component;
 use crate::source::Source;
 use emit::{Emitter, Place};
+pub use props_index::PropsIndex;
 
 /// The template emitted with node counters of `width` digits.
 fn emit_template<'a>(
     component: &Component,
     source: &'a Source,
     info: &'a script::ScriptInfo,
-    width: usize,
+    (width, index): (usize, &'a PropsIndex),
 ) -> Result<Emitter<'a>, CompileError> {
     let mut emitter = Emitter::new(source, info)
         .with_width(width)
+        .with_index(index)
         .with_scope(component.style.is_some() && component.scope.is_some());
     emitter.indent(3);
     emitter.emit_nodes(&component.template.children, &Place::roots())?;
@@ -58,12 +62,22 @@ fn digits(n: usize) -> usize {
 /// a signal or prop without a type, a binding that cannot be wired,
 /// or a feature that is deferred (snippets, component children).
 pub fn generate(component: &Component) -> Result<String, CompileError> {
+    generate_with(component, &PropsIndex::default())
+}
+
+/// [`generate`], checking each component tag against the props `index`
+/// holds for the component it names.
+///
+/// # Errors
+/// As [`generate`]; and a tag passing a prop its component does not
+/// declare, when the index holds that component.
+pub fn generate_with(component: &Component, index: &PropsIndex) -> Result<String, CompileError> {
     let source = Source::new(&component.path, &component.text);
     let info = script::analyse(&source, component.script.as_ref())?;
-    let mut emitter = emit_template(component, &source, &info, 1)?;
+    let mut emitter = emit_template(component, &source, &info, (1, index))?;
     let width = digits(emitter.names_made().saturating_sub(1));
     if width > 1 {
-        emitter = emit_template(component, &source, &info, width)?;
+        emitter = emit_template(component, &source, &info, (width, index))?;
     }
     names::check_generated(&source, &emitter.declared(), emitter.generated())?;
     let body = emitter.finish();

@@ -1,11 +1,14 @@
 //! Compiling a scanned tree into memory, then writing the generated
-//! files and `wisp.rs` only when every file compiled.
+//! files and `wisp.rs` only when every file compiled. Every file is
+//! parsed first, so each component tag is checked against the props of
+//! the component it names (`PropsIndex`).
 
 use std::path::{Path, PathBuf};
 
 use super::tree::{Dir, scan};
 use super::{Compiled, modules, path_error};
-use crate::{CompileError, compile_file_global, compile_file_under};
+use crate::ast::Component;
+use crate::{CompileError, PropsIndex, generate_with, parse_file_global, parse_file_under};
 
 /// Whether each component's `<style>` is scoped to its own elements,
 /// or added by the app as a global sheet.
@@ -44,11 +47,27 @@ pub fn compile_dir_into_styled(
         )]);
     }
     let generated = out.join("wisp");
-    let mut outputs = Vec::new();
-    let mut errors = Vec::new();
     let root = (src.parent().unwrap_or(src), styles);
-    compile_tree(&tree, root, &generated, &mut outputs, &mut errors);
+    let mut errors = Vec::new();
+    let mut parsed = Vec::new();
+    parse_tree(&tree, root, &generated, &mut parsed, &mut errors);
+    let mut index = PropsIndex::default();
+    errors.extend(
+        parsed
+            .iter()
+            .filter_map(|(_, component)| index.add(component).err()),
+    );
+    let mut outputs = Vec::new();
+    for (target, component) in &parsed {
+        match generate_with(component, &index) {
+            Ok(code) => outputs.push((target.clone(), code)),
+            Err(err) => errors.push(err),
+        }
+    }
     if !errors.is_empty() {
+        // parse refusals come before generation refusals; report them in
+        // file order, as each file's are
+        errors.sort_by(|a, b| (&a.path, a.line, a.col).cmp(&(&b.path, b.line, b.col)));
         return Err(errors);
     }
     outputs.push((out.join("wisp.rs"), modules::render(&tree, &generated)));
@@ -61,25 +80,26 @@ pub fn compile_dir_into_styled(
 
 type Output = (PathBuf, String);
 
-fn compile_tree(
+/// Every file under `dir`, parsed, beside the path its Rust goes to.
+fn parse_tree(
     dir: &Dir,
     root: (&Path, Styles),
     target: &Path,
-    outputs: &mut Vec<Output>,
+    parsed: &mut Vec<(PathBuf, Component)>,
     errors: &mut Vec<CompileError>,
 ) {
     for file in &dir.files {
-        let compiled = match root {
-            (root, Styles::Scoped) => compile_file_under(&file.path, root),
-            (_, Styles::Global) => compile_file_global(&file.path),
+        let component = match root {
+            (root, Styles::Scoped) => parse_file_under(&file.path, root),
+            (_, Styles::Global) => parse_file_global(&file.path),
         };
-        match compiled {
-            Ok(code) => outputs.push((target.join(format!("{}.rs", file.module)), code)),
+        match component {
+            Ok(component) => parsed.push((target.join(format!("{}.rs", file.module)), component)),
             Err(err) => errors.push(err),
         }
     }
     for sub in &dir.dirs {
-        compile_tree(sub, root, &target.join(&sub.module), outputs, errors);
+        parse_tree(sub, root, &target.join(&sub.module), parsed, errors);
     }
 }
 

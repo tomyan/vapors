@@ -15,6 +15,7 @@ impl Emitter<'_> {
         tag: &ComponentTag,
         place: &Place,
     ) -> Result<(), CompileError> {
+        self.check_props(tag)?;
         let last = tag.name.rsplit("::").next().unwrap_or(&tag.name);
         let var = self.fresh(&last.to_lowercase());
         self.reserve(&format!("{var}_props"));

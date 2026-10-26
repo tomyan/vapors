@@ -36,6 +36,8 @@ pub(crate) struct Emitter<'a> {
     /// The Dom type builder closures take: the component's `D`, or
     /// `dyn Dom` inside a snippet (`vapors_dom::Snippet` says why).
     pub dom_type: &'static str,
+    /// What the components a tag may name declare.
+    pub index: Option<&'a super::PropsIndex>,
 }
 
 impl<'a> Emitter<'a> {
@@ -52,6 +54,7 @@ impl<'a> Emitter<'a> {
             loop_bindings: Vec::new(),
             scoped: false,
             dom_type: "D",
+            index: None,
         }
     }
 
@@ -80,6 +83,12 @@ impl<'a> Emitter<'a> {
     /// Numbers names with `width` digits, zero-padded.
     pub fn with_width(mut self, width: usize) -> Self {
         self.width = width;
+        self
+    }
+
+    /// Checks component tags against `index`.
+    pub fn with_index(mut self, index: &'a super::PropsIndex) -> Self {
+        self.index = Some(index);
         self
     }
 
