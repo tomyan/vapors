@@ -1,5 +1,5 @@
 use super::*;
-use crate::queue_remote::Listed;
+use crate::queue_list::Listed;
 
 fn pr(number: u64, branch: &str, base: &str) -> Listed {
     Listed {
@@ -8,7 +8,7 @@ fn pr(number: u64, branch: &str, base: &str) -> Listed {
         branch: branch.into(),
         base: base.into(),
         draft: false,
-        comments: Vec::new(),
+        fork: false,
     }
 }
 

@@ -49,10 +49,20 @@ mod queue_checks;
 mod queue_comments;
 mod queue_config;
 mod queue_decide;
+#[cfg(test)]
+mod queue_fake;
 mod queue_git;
+mod queue_judge;
+mod queue_list;
+mod queue_lock;
 mod queue_log;
+mod queue_ops;
+mod queue_pass;
 mod queue_pins;
+mod queue_real;
 mod queue_remote;
+mod queue_serve;
+mod queue_state;
 mod report;
 #[cfg(test)]
 #[path = "report_timeout_tests.rs"]

@@ -7,6 +7,9 @@
 //!
 //! The roles are a convention, not a security boundary: every comment
 //! comes from the same GitHub account, and an author could sign one.
+//! Declared limits: a hold is lifted only by editing or deleting its
+//! comment; reviews and review comments are not read, so a clear posted
+//! as a review is not seen.
 
 use crate::gate_pr::{Ended, parse_header};
 use crate::queue_decide::Gate;
@@ -30,13 +33,26 @@ pub fn held(comments: &[String]) -> bool {
     comments.iter().any(|c| last_line(c) == "queue: hold")
 }
 
-/// The sha of the newest review clear, if any.
+/// A review clear: the commit it cleared, and whether the lead signed it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Cleared {
+    /// The cleared commit's full SHA.
+    pub sha: String,
+    /// Signed (lead), not (foreman).
+    pub by_lead: bool,
+}
+
+/// The newest review clear, if any: a full 40-hex SHA and a known signer.
 #[must_use]
-pub fn cleared(comments: &[String]) -> Option<String> {
+pub fn cleared(comments: &[String]) -> Option<Cleared> {
     comments.iter().rev().find_map(|c| {
         let rest = last_line(c).strip_prefix("review: clear ")?;
         let (sha, who) = rest.split_once(' ')?;
-        CLEARED_BY.contains(&who).then(|| sha.to_owned())
+        let full = sha.len() == 40 && sha.chars().all(|c| c.is_ascii_hexdigit());
+        (full && CLEARED_BY.contains(&who)).then(|| Cleared {
+            sha: sha.to_owned(),
+            by_lead: who == "(lead)",
+        })
     })
 }
 

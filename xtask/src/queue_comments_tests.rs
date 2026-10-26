@@ -22,10 +22,17 @@ fn a_comment_ending_queue_hold_holds_the_pr() {
 #[test]
 fn the_newest_review_clear_names_its_sha() {
     let comments = [
-        "review: clear 1111111 (lead)".to_owned(),
-        "Findings fixed.\n\nreview: clear 2222222 (foreman)\n".to_owned(),
+        "review: clear 1111111111111111111111111111111111111111 (lead)".to_owned(),
+        "Findings fixed.\n\nreview: clear 2222222222222222222222222222222222222222 (foreman)\n"
+            .to_owned(),
     ];
-    assert_eq!(cleared(&comments).as_deref(), Some("2222222"));
+    assert_eq!(
+        cleared(&comments),
+        Some(Cleared {
+            sha: "2222222222222222222222222222222222222222".into(),
+            by_lead: false
+        })
+    );
     assert_eq!(cleared(&["## Review of 2222222".to_owned()]), None);
 }
 
@@ -37,16 +44,25 @@ fn a_clear_without_its_reviewer_is_not_a_clear() {
 }
 
 #[test]
-fn only_the_lead_or_foreman_clears_a_pr() {
+fn only_the_lead_or_foreman_clears_a_pr_with_a_full_sha() {
     // A convention, not a security boundary: every comment comes from
     // the same GitHub account.
+    const SHA: &str = "2222222222222222222222222222222222222222";
     assert_eq!(
-        cleared(&["review: clear 2222222 (impl-budgets)".to_owned()]),
+        cleared(&[format!("review: clear {SHA} (impl-budgets)")]),
         None
     );
+    let lead = cleared(&[format!("review: clear {SHA} (lead)")]);
+    assert!(lead.is_some_and(|c| c.by_lead && c.sha == SHA));
     assert_eq!(
-        cleared(&["review: clear 2222222 (lead)".to_owned()]).as_deref(),
-        Some("2222222")
+        cleared(&["review: clear 2222222 (lead)".to_owned()]),
+        None,
+        "a short sha"
+    );
+    assert_eq!(
+        cleared(&["review: clear main (lead)".to_owned()]),
+        None,
+        "not a sha"
     );
 }
 

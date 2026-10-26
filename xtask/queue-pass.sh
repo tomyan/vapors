@@ -6,14 +6,22 @@
 # rebases and gates in its run worktree ([queue] run). Pinned siblings
 # (touche's ../vapors) are moved to their pins first. Extra arguments
 # (--dry-run) go to `cargo xtask queue`.
-set -euo pipefail
+set -Eeuo pipefail
 repo="${1:?usage: queue-pass.sh <repo> [--dry-run]}"
 shift
+# A failure here, before the queue's own log is open, goes to that log
+# too: the foreman reads the log, not the journal.
+log="$HOME/.cache/queue/$repo.log"
+mkdir -p "$(dirname "$log")"
+fail() {
+  echo "$(date -u +%FT%TZ) FAILED queue-pass.sh: $1" | tee -a "$log" >&2
+  exit 1
+}
+trap 'code=$?; fail "line $LINENO: \"$BASH_COMMAND\" exited $code"' ERR
 main="$HOME/.cache/w-queue/$repo-main/$repo"
 git() { env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git "$@"; }
 if [ ! -d "$main/.git" ] && [ ! -f "$main/.git" ]; then
-  echo "FAIL queue-pass: $main is not a worktree; fix: git -C ~/projects/$repo worktree add --detach $main origin/main" >&2
-  exit 1
+  fail "$main is not a worktree; fix: git -C ~/projects/$repo worktree add --detach $main origin/main"
 fi
 cd "$main"
 git fetch -q origin main

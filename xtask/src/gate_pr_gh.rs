@@ -27,21 +27,6 @@ pub fn find(number: Option<u64>) -> Result<Pr, String> {
     parse_pr(&gh(command)?)
 }
 
-/// PR `number` of `repo` (`owner/name`), from anywhere (the queue).
-pub fn find_in(repo: &str, number: u64) -> Result<Pr, String> {
-    let mut command = Command::new("gh");
-    command.args([
-        "pr",
-        "view",
-        &number.to_string(),
-        "--repo",
-        repo,
-        "--json",
-        FIELDS,
-    ]);
-    parse_pr(&gh(command)?)
-}
-
 /// Post `body` to PR `number`, kept first in `target/gate/pr_comment.md`
 /// (made here: a gate refused before its own preflight leaves none).
 pub fn post(number: u64, body: &str) -> Result<(), String> {

@@ -45,22 +45,29 @@ impl QueueConfig {
                 format!("queue.{key} is not set in .config/factory.toml; fix: add it under [queue]")
             })
         };
-        let path = |text: &str| match text.strip_prefix("~/") {
-            Some(rest) => PathBuf::from(home).join(rest),
-            None => PathBuf::from(text),
-        };
-        let merge_on = match required("merge_on")? {
-            "gate" => MergeOn::Gate,
-            "checks" => MergeOn::Checks,
-            other => return Err(format!("queue.merge_on is {other:?}; fix: gate or checks")),
-        };
         Ok(Self {
             repo: required("repo")?.to_owned(),
-            merge_on,
-            run: path(required("run")?),
-            log: path(required("log")?),
-            serve: config.get("queue.serve").map(path),
+            merge_on: merge_on(required("merge_on")?)?,
+            run: at_home(required("run")?, home),
+            log: at_home(required("log")?, home),
+            serve: config.get("queue.serve").map(|dir| at_home(dir, home)),
         })
+    }
+}
+
+/// `text` as a path, a leading `~/` read as `home`.
+fn at_home(text: &str, home: &str) -> PathBuf {
+    match text.strip_prefix("~/") {
+        Some(rest) => PathBuf::from(home).join(rest),
+        None => PathBuf::from(text),
+    }
+}
+
+fn merge_on(text: &str) -> Result<MergeOn, String> {
+    match text {
+        "gate" => Ok(MergeOn::Gate),
+        "checks" => Ok(MergeOn::Checks),
+        other => Err(format!("queue.merge_on is {other:?}; fix: gate or checks")),
     }
 }
 

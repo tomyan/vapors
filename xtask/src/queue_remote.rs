@@ -11,81 +11,10 @@ use crate::deadline::{Finished, run_with_deadline};
 use crate::gate_pr_gh::GH_DEADLINE;
 
 /// git fetch and push's deadline. Measured 2026-10-26 on the dev box: a
-/// fetch of main took 769 to 899 ms over four; 60 s is 67 times that.
+/// fetch of main took 769 to 899 ms over four, and a `--no-verify` push
+/// of a branch to GitHub 1.6 to 1.8 s over three; 60 s is 33 times the
+/// slowest push.
 pub const GIT_REMOTE_DEADLINE: Duration = Duration::from_secs(60);
-
-/// One open PR as gh lists it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Listed {
-    /// Its number.
-    pub number: u64,
-    /// Its head commit.
-    pub head: String,
-    /// Its head branch.
-    pub branch: String,
-    /// The branch it targets.
-    pub base: String,
-    /// Whether it is a draft.
-    pub draft: bool,
-    /// Its comments' bodies, oldest first.
-    pub comments: Vec<String>,
-}
-
-/// gh's `pr list --json` answer, oldest PR first.
-///
-/// # Errors
-///
-/// Not JSON, or a PR missing a field, naming both.
-pub fn parse_list(json: &str) -> Result<Vec<Listed>, String> {
-    let value: serde_json::Value =
-        serde_json::from_str(json).map_err(|e| format!("gh's PR list is not JSON ({e})"))?;
-    let mut prs = value
-        .as_array()
-        .ok_or("gh's PR list is not a list")?
-        .iter()
-        .map(listed)
-        .collect::<Result<Vec<_>, _>>()?;
-    prs.sort_by_key(|pr| pr.number);
-    Ok(prs)
-}
-
-fn listed(pr: &serde_json::Value) -> Result<Listed, String> {
-    let number = pr["number"].as_u64().ok_or("a listed PR has no number")?;
-    let text = |field: &str| {
-        pr[field]
-            .as_str()
-            .map(str::to_owned)
-            .ok_or_else(|| format!("#{number} has no {field} in gh's list"))
-    };
-    let comments = pr["comments"]
-        .as_array()
-        .ok_or_else(|| format!("#{number} has no comments in gh's list"))?;
-    Ok(Listed {
-        number,
-        head: text("headRefOid")?,
-        branch: text("headRefName")?,
-        base: text("baseRefName")?,
-        draft: pr["isDraft"]
-            .as_bool()
-            .ok_or_else(|| format!("#{number} has no isDraft in gh's list"))?,
-        comments: comments
-            .iter()
-            .filter_map(|c| c["body"].as_str().map(str::to_owned))
-            .collect(),
-    })
-}
-
-/// The open PRs of `repo` (`owner/name`), oldest first.
-///
-/// # Errors
-///
-/// gh's refusal, or an answer in another shape.
-pub fn open_prs(repo: &str) -> Result<Vec<Listed>, String> {
-    let fields = "number,headRefOid,headRefName,baseRefName,isDraft,comments";
-    parse_list(&gh(&[
-        "pr", "list", "--repo", repo, "--state", "open", "--limit", "100", "--json", fields,
-    ])?)
-}
 
 /// Squash-merge PR `number` of `repo`, only while its head is `head`.
 ///
@@ -150,18 +79,39 @@ pub fn fetch(dir: &Path, refs: &[&str]) -> Result<(), String> {
     git_remote(dir, &args)
 }
 
-/// Push `new` to `branch`, only if GitHub still has it at `known`.
+/// Push `new` to `branch`, only if GitHub still has it at `known`. The
+/// pre-push hook is skipped (`--no-verify`): it runs lint and the unit
+/// tier, which the gate after the push runs anyway. The one thing it
+/// also guarded, a push to main, is refused here before anything runs.
 ///
 /// # Errors
 ///
-/// git's refusal (the branch moved: the lease failed), or no answer.
+/// `branch` is main; git's refusal (the lease failed), or no answer.
 pub fn push_lease(dir: &Path, branch: &str, known: &str, new: &str) -> Result<(), String> {
-    let lease = format!("--force-with-lease={branch}:{known}");
-    let to = format!("{new}:refs/heads/{branch}");
-    git_remote(dir, &["push", "-q", &lease, "origin", &to])
+    if branch == "main" {
+        return Err("the queue never pushes main; refused before pushing".into());
+    }
+    let args = push_args(branch, known, new);
+    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+    git_remote(dir, &args)
 }
 
-fn gh(args: &[&str]) -> Result<String, String> {
+/// The push's arguments: no hook, a lease on `known`, `new` to `branch`.
+#[must_use]
+pub fn push_args(branch: &str, known: &str, new: &str) -> Vec<String> {
+    ["push", "-q", "--no-verify"]
+        .iter()
+        .map(|a| (*a).to_owned())
+        .chain([
+            format!("--force-with-lease={branch}:{known}"),
+            "origin".into(),
+            format!("{new}:refs/heads/{branch}"),
+        ])
+        .collect()
+}
+
+/// A gh call within `GH_DEADLINE`; its output when it succeeded.
+pub fn gh(args: &[&str]) -> Result<String, String> {
     let mut command = Command::new("gh");
     command.args(args);
     finished(run_with_deadline(command, GH_DEADLINE)?, "gh", GH_DEADLINE)
@@ -191,7 +141,3 @@ fn finished(finished: Finished, what: &str, deadline: Duration) -> Result<String
         Finished::TimedOut { .. } => Err(format!("{what} did not answer within {deadline:?}")),
     }
 }
-
-#[cfg(test)]
-#[path = "queue_remote_tests.rs"]
-mod tests;

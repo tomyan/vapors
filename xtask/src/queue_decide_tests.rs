@@ -11,6 +11,11 @@ fn ready() -> Facts {
         contains_main: true,
         gate: Gate::Passed,
         rebase_clean: true,
+        fork: false,
+        protected: None,
+        cleared_by_lead: false,
+        backed_off: false,
+        checks: false,
     }
 }
 
@@ -106,4 +111,71 @@ fn a_pr_on_main_with_no_gate_for_its_head_is_gated_and_a_failed_gate_is_left() {
         decide(&failed),
         Decision::Skip("#71's gate failed at aaa".into())
     );
+}
+
+#[test]
+fn a_pr_from_a_fork_is_skipped() {
+    let fork = Facts {
+        fork: true,
+        ..ready()
+    };
+    assert_eq!(
+        decide(&fork),
+        Decision::Skip("#71 is from a fork; the queue pushes only to this repository".into())
+    );
+}
+
+#[test]
+fn a_pr_touching_the_factory_merges_only_with_the_lead_s_clear() {
+    let factory = Facts {
+        protected: Some("xtask/src/queue.rs".into()),
+        ..ready()
+    };
+    assert_eq!(
+        decide(&factory),
+        Decision::Skip(
+            "#71 touches xtask/src/queue.rs, so it needs a clear signed (lead), not (foreman)"
+                .into()
+        )
+    );
+    let led = Facts {
+        cleared_by_lead: true,
+        ..factory
+    };
+    assert_eq!(decide(&led), Decision::Merge);
+}
+
+#[test]
+fn running_checks_are_waited_for_and_a_backed_off_gate_is_not_rerun() {
+    let running = Facts {
+        gate: Gate::None,
+        checks: true,
+        ..ready()
+    };
+    assert_eq!(
+        decide(&running),
+        Decision::Skip("#71's checks are running".into())
+    );
+    let backed = Facts {
+        gate: Gate::None,
+        backed_off: true,
+        ..ready()
+    };
+    assert_eq!(
+        decide(&backed),
+        Decision::Skip(
+            "#71's last gate at aaa posted nothing; it is retried after its backoff".into()
+        )
+    );
+}
+
+#[test]
+fn a_checks_pr_behind_main_that_rebases_cleanly_is_updated() {
+    let behind = Facts {
+        contains_main: false,
+        gate: Gate::None,
+        checks: true,
+        ..ready()
+    };
+    assert_eq!(decide(&behind), Decision::Regate);
 }

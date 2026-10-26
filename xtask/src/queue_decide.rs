@@ -52,6 +52,17 @@ pub struct Facts {
     /// Whether `git rebase origin/main` is conflict-free (asked only when
     /// it is behind).
     pub rebase_clean: bool,
+    /// Whether it comes from a fork (gh's isCrossRepository).
+    pub fork: bool,
+    /// The first file it changes under xtask/, .github/ or
+    /// .config/factory.toml, which only the lead may clear.
+    pub protected: Option<String>,
+    /// Whether its clear is signed (lead).
+    pub cleared_by_lead: bool,
+    /// Whether its head's last gate posted nothing within the backoff.
+    pub backed_off: bool,
+    /// Whether it merges on GitHub's checks, not a gate comment.
+    pub checks: bool,
 }
 
 /// What the pass does with a PR.
@@ -68,37 +79,53 @@ pub enum Decision {
 /// The decision for `pr`.
 #[must_use]
 pub fn decide(pr: &Facts) -> Decision {
+    let number = pr.number;
     if let Some(why) = waiting(pr) {
-        return Decision::Skip(format!("#{} {why}", pr.number));
+        return Decision::Skip(format!("#{number} {why}"));
     }
     match (pr.contains_main, pr.gate) {
         (true, Gate::Passed) => Decision::Merge,
-        (true, Gate::Failed) => {
-            Decision::Skip(format!("#{}'s gate failed at {}", pr.number, pr.head))
+        (true, Gate::Failed) => Decision::Skip(format!("#{number}'s gate failed at {}", pr.head)),
+        (true, Gate::None) if pr.checks => {
+            Decision::Skip(format!("#{number}'s checks are running"))
         }
+        (true, Gate::None) if pr.backed_off => Decision::Skip(format!(
+            "#{number}'s last gate at {} posted nothing; it is retried after its backoff",
+            pr.head
+        )),
         (false, _) if !pr.rebase_clean => {
-            Decision::Skip(format!("#{} conflicts with main on rebase", pr.number))
+            Decision::Skip(format!("#{number} conflicts with main on rebase"))
         }
         _ => Decision::Regate,
     }
 }
 
 /// Why the PR is not the queue's to act on yet, if it is not.
-fn waiting(pr: &Facts) -> Option<&'static str> {
-    if pr.held {
-        return Some("is held (queue: hold)");
-    }
-    if pr.draft {
-        return Some("is a draft");
-    }
-    if !pr.base_is_main {
-        return Some("is based on another branch, not main");
-    }
-    match pr.clear {
-        Clear::Missing => Some("has no review clear"),
-        Clear::Changed => Some("changed since review clear"),
-        Clear::Holds => None,
-    }
+fn waiting(pr: &Facts) -> Option<String> {
+    let said = if pr.held {
+        "is held (queue: hold)"
+    } else if pr.draft {
+        "is a draft"
+    } else if pr.fork {
+        "is from a fork; the queue pushes only to this repository"
+    } else if !pr.base_is_main {
+        "is based on another branch, not main"
+    } else {
+        match pr.clear {
+            Clear::Missing => "has no review clear",
+            Clear::Changed => "changed since review clear",
+            Clear::Holds => return protected(pr),
+        }
+    };
+    Some(said.to_owned())
+}
+
+/// A factory change cleared by anyone but the lead.
+fn protected(pr: &Facts) -> Option<String> {
+    let path = pr.protected.as_ref().filter(|_| !pr.cleared_by_lead)?;
+    Some(format!(
+        "touches {path}, so it needs a clear signed (lead), not (foreman)"
+    ))
 }
 
 #[cfg(test)]

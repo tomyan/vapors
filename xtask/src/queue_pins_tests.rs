@@ -14,3 +14,24 @@ fn a_pin_file_with_no_sha_is_refused_naming_it() {
     let refused = pin_in("# only comments\n", ".config/vapors-rev").expect_err("no pin");
     assert!(refused.contains(".config/vapors-rev"), "{refused}");
 }
+
+#[test]
+fn only_the_expected_sibling_is_followed() {
+    let entry = |k: &str, v: &str| std::collections::BTreeMap::from([(k.to_owned(), v.to_owned())]);
+    assert_eq!(
+        allowed(&entry("../vapors", ".config/vapors-rev")).map(|v| v.len()),
+        Ok(1)
+    );
+    assert_eq!(allowed(&std::collections::BTreeMap::new()), Ok(Vec::new()));
+    for (k, v) in [
+        ("../../../../projects/vapors", ".config/vapors-rev"),
+        ("../vapors", "other-rev"),
+        ("../other", ".config/vapors-rev"),
+    ] {
+        let refused = allowed(&entry(k, v)).expect_err(k);
+        assert!(
+            refused.contains(k) && refused.contains("fix: "),
+            "{refused}"
+        );
+    }
+}
