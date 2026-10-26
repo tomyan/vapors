@@ -9,6 +9,7 @@ use syn::spanned::Spanned;
 
 use super::names::{bound_names, check_declared};
 use super::script_syntax::{binding, call_of_new, named, reactive_kind};
+use super::script_uses::{UseName, use_names};
 use super::syn_map::{offset_in, render};
 use crate::CompileError;
 use crate::ast::Section;
@@ -41,6 +42,8 @@ pub(crate) struct ScriptInfo {
     pub statements: Vec<String>,
     /// Every name the script binds, with its position.
     pub declared: Vec<(String, usize)>,
+    /// The names its `use` items bring in.
+    pub uses: Vec<UseName>,
 }
 
 /// Parses and classifies the script.
@@ -84,6 +87,9 @@ fn classify(
     info: &mut ScriptInfo,
 ) -> Result<(), CompileError> {
     let syn::Stmt::Local(local) = stmt else {
+        if let syn::Stmt::Item(syn::Item::Use(item)) = &stmt {
+            info.uses.extend(use_names(item));
+        }
         info.statements.push(render(&stmt));
         return Ok(());
     };
