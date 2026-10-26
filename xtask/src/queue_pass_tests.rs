@@ -20,6 +20,7 @@ pub(super) fn config(merge_on: MergeOn) -> QueueConfig {
         )),
         serve: None,
         targets: Vec::new(),
+        home: PathBuf::from("/home/q"),
     }
 }
 

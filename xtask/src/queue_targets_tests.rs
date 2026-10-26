@@ -1,32 +1,7 @@
-use std::os::unix::fs::symlink;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use super::*;
-
-/// A directory of its own for one test, removed when dropped.
-struct Scratch(PathBuf);
-
-impl Scratch {
-    fn new(name: &str) -> Self {
-        let dir = std::env::temp_dir().join(format!("xtask-targets-{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).expect("scratch");
-        Self(dir)
-    }
-
-    /// `rel` under the scratch directory, created as a directory.
-    fn dir(&self, rel: &str) -> PathBuf {
-        let path = self.0.join(rel);
-        std::fs::create_dir_all(&path).expect("dir");
-        path
-    }
-}
-
-impl Drop for Scratch {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
-    }
-}
+use crate::queue_targets_scratch::Scratch;
 
 #[test]
 fn worktrees_on_a_branch_are_read_from_the_porcelain_list() {
@@ -41,21 +16,18 @@ fn worktrees_on_a_branch_are_read_from_the_porcelain_list() {
         found,
         [PathBuf::from("/w1/touche"), PathBuf::from("/w1b/touche")]
     );
+    assert_eq!(all_worktrees(porcelain).len(), 5);
 }
 
 #[test]
-fn a_worktree_s_target_and_its_sibling_s_are_found_in_their_roots() {
-    // Given: w/touche/target and w/vapors/target link into two roots
+fn a_worktree_s_target_and_its_sibling_repository_s_are_found_in_their_roots() {
+    // Given: w/touche and w/vapors are repositories whose targets link into two roots
     let scratch = Scratch::new("found");
-    let touche_root = scratch.dir("touche-targets");
-    let vapors_root = scratch.dir("vapors-targets");
-    let worktree = scratch.dir("w/touche");
-    symlink(scratch.dir("touche-targets/x"), worktree.join("target")).expect("link");
-    symlink(
-        scratch.dir("vapors-targets/x"),
-        scratch.dir("w/vapors").join("target"),
-    )
-    .expect("link");
+    let (touche_root, vapors_root) = (scratch.dir("touche-targets"), scratch.dir("vapors-targets"));
+    let worktree = scratch.repo("w/touche");
+    scratch.repo("w/vapors");
+    scratch.link("w/touche/target", &scratch.dir("touche-targets/x"));
+    scratch.link("w/vapors/target", &scratch.dir("vapors-targets/x"));
 
     // When
     let mut dirs = target_dirs(&worktree, &[touche_root.clone(), vapors_root.clone()]);
@@ -66,53 +38,80 @@ fn a_worktree_s_target_and_its_sibling_s_are_found_in_their_roots() {
 }
 
 #[test]
-fn a_target_that_is_a_directory_or_links_outside_the_roots_is_left_alone_naming_it() {
-    // Given
+fn a_sibling_that_is_not_a_repository_is_not_scanned() {
+    // Given: w/notes has a target link too, but no .git
+    let scratch = Scratch::new("notrepo");
+    let root = scratch.dir("touche-targets");
+    let worktree = scratch.repo("w/touche");
+    scratch.dir("w/notes");
+    scratch.link("w/notes/target", &scratch.dir("touche-targets/notes"));
+
+    // Then
+    assert_eq!(target_dirs(&worktree, &[root]), []);
+}
+
+#[test]
+fn a_target_reached_through_a_link_to_its_root_resolves_to_the_root() {
+    // Given: the worktree's target names the root by an alias that links to it
+    let scratch = Scratch::new("alias");
+    let root = scratch.dir("touche-targets");
+    let alias = scratch.link("alias", &root);
+    let worktree = scratch.repo("w/touche");
+    scratch.dir("touche-targets/x");
+    scratch.link("w/touche/target", &alias.join("x"));
+
+    // Then
+    assert_eq!(
+        target_dirs(&worktree, std::slice::from_ref(&root)),
+        [Ok(root.join("x"))]
+    );
+}
+
+#[test]
+fn a_target_that_is_not_a_link_to_a_directory_in_a_root_is_left_alone_naming_it() {
+    // Given: a real directory, a link outside the roots, a root child that is
+    // itself a link elsewhere, and a relative link
     let scratch = Scratch::new("alone");
     let root = scratch.dir("touche-targets");
-    let worktree = scratch.dir("w/touche");
-    let real = scratch.dir("w/touche/target");
+    let precious = scratch.dir("precious");
+    let real = scratch.dir(&format!("{}/target", scratch.repo("w/a").display()));
     let elsewhere = scratch.dir("elsewhere/x");
-    symlink(&elsewhere, scratch.dir("w/vapors").join("target")).expect("link");
+    let worktree = scratch.repo("w/b");
+    let outside = scratch.link("w/b/target", &elsewhere);
+    scratch.repo("w/c");
+    let child_link = scratch.link("touche-targets/x", &precious);
+    let hop = scratch.link("w/c/target", &child_link);
+    scratch.repo("w/d");
+    let relative = scratch.link("w/d/target", std::path::Path::new("../../touche-targets/y"));
 
     // When
     let mut dirs = target_dirs(&worktree, &[root]);
     dirs.sort();
 
     // Then
-    let link = scratch.0.join("w/vapors/target");
+    let said = |path: &PathBuf, why: String| Err(format!("{} {why}; left alone", path.display()));
     assert_eq!(
         dirs,
         [
-            Err(format!(
-                "{} is a directory, not a link into a targets root; left alone",
-                real.display()
-            )),
-            Err(format!(
-                "{} links to {}, not a directory in a targets root; left alone",
-                link.display(),
-                elsewhere.display()
-            )),
+            said(
+                &real,
+                "is a directory, not a link into a targets root".into()
+            ),
+            said(
+                &outside,
+                format!(
+                    "links to {}, not a directory directly in a targets root",
+                    elsewhere.display()
+                )
+            ),
+            said(
+                &hop,
+                format!("links to {}, which is itself a link", child_link.display())
+            ),
+            said(
+                &relative,
+                "links to the relative path ../../touche-targets/y".into()
+            ),
         ]
     );
-}
-
-#[test]
-fn emptying_removes_the_contents_keeps_the_directory_and_follows_no_link() {
-    // Given: a target with a file, a directory, and a link to a directory outside it
-    let scratch = Scratch::new("empty");
-    let target = scratch.dir("t/x");
-    let outside = scratch.dir("outside");
-    std::fs::write(outside.join("keep"), "kept").expect("file");
-    std::fs::write(target.join("file"), "gone").expect("file");
-    std::fs::write(scratch.dir("t/x/debug/deps").join("a"), "gone").expect("file");
-    symlink(&outside, target.join("link")).expect("link");
-
-    // When
-    let removed = empty(&target);
-
-    // Then
-    assert_eq!(removed, Ok(3));
-    assert_eq!(std::fs::read_dir(&target).expect("kept").count(), 0);
-    assert!(Path::new(&outside.join("keep")).exists());
 }

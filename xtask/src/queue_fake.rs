@@ -56,6 +56,9 @@ pub struct Fake {
     /// Free bytes on the disk; plenty when none.
     pub free: Option<u64>,
     pub largest: Vec<(u64, PathBuf)>,
+    pub df_fails: Option<String>,
+    /// du's error for its next run only.
+    pub du_fails_once: RefCell<Option<String>>,
     /// The lines `empty_targets` gives.
     pub emptied: Vec<String>,
     pub empty_fails: bool,
@@ -196,10 +199,16 @@ impl Ops for Fake {
     }
     fn free_bytes(&self) -> Result<u64, String> {
         self.note("free".into());
+        if let Some(why) = &self.df_fails {
+            return Err(why.clone());
+        }
         Ok(self.free.unwrap_or(u64::MAX))
     }
     fn largest_targets(&self) -> Result<Vec<(u64, PathBuf)>, String> {
         self.note("largest".into());
+        if let Some(why) = self.du_fails_once.borrow_mut().take() {
+            return Err(why);
+        }
         Ok(self.largest.clone())
     }
     fn serve(&self) -> Result<(), String> {

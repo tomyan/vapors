@@ -71,6 +71,9 @@ mod queue_remote;
 mod queue_serve;
 mod queue_state;
 mod queue_targets;
+mod queue_targets_empty;
+#[cfg(test)]
+mod queue_targets_scratch;
 mod report;
 #[cfg(test)]
 #[path = "report_timeout_tests.rs"]

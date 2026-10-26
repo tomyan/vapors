@@ -74,30 +74,64 @@ pub fn describe(free: u64, largest: &[(u64, PathBuf)]) -> String {
 }
 
 /// Whether the disk has `MIN_FREE` for a gate. When not, it says so once
-/// for PR `number`, naming the largest targets, and the PR waits.
+/// for PR `number`, naming the largest targets, and the PR waits. A df or
+/// du that fails is said too, and the PR waits; the pass goes on. df
+/// reads the run worktree's filesystem, which on the box is the targets
+/// roots' too (both /dev/nvme0n1p2, 2026-10-26): a declared limit.
 ///
 /// # Errors
 ///
-/// df, du or the log failing.
+/// The log failing.
 pub fn room_to_gate(
     ops: &impl Ops,
     log: &Log,
     state: &mut State,
     number: u64,
 ) -> Result<bool, String> {
-    let free = ops.free_bytes()?;
-    if free >= MIN_FREE {
-        return Ok(true);
+    let free = match ops.free_bytes() {
+        Ok(free) => free,
+        Err(why) => {
+            let reason = format!("#{number} is not gated: df failed: {why}");
+            if state.changed(number, &reason) {
+                log.line(&reason)?;
+            }
+            return Ok(false);
+        }
+    };
+    if free < MIN_FREE {
+        say_short(ops, log, state, (number, free))?;
     }
+    Ok(free >= MIN_FREE)
+}
+
+/// Say once per PR that the disk is short, with the largest targets; the
+/// reason is recorded only once both lines are written, so a du that
+/// fails is run again next pass.
+fn say_short(
+    ops: &impl Ops,
+    log: &Log,
+    state: &mut State,
+    (number, free): (u64, u64),
+) -> Result<(), String> {
     let reason = format!(
         "#{number} is not gated: the disk has under {} GB free",
         MIN_FREE / GB
     );
-    if state.changed(number, &reason) {
-        log.line(&reason)?;
-        log.line(&describe(free, &ops.largest_targets()?))?;
+    if state.said_already(number, &reason) {
+        return Ok(());
     }
-    Ok(false)
+    log.line(&reason)?;
+    match ops.largest_targets() {
+        Ok(largest) => {
+            log.line(&describe(free, &largest))?;
+            state.changed(number, &reason);
+            Ok(())
+        }
+        Err(why) => log.line(&format!(
+            "the disk has {} GB free; du failed: {why}; it is tried again next pass",
+            free / GB
+        )),
+    }
 }
 
 /// df's deadline. Measured 2026-10-26: 4 to 13 ms over three, at a load

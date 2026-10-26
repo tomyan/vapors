@@ -119,10 +119,9 @@ impl Ops for Real<'_> {
 
     fn empty_targets(&self, branch: &str) -> Result<Vec<String>, String> {
         let porcelain = git(self.run(), &["worktree", "list", "--porcelain"])?;
-        Ok(crate::queue_targets::empty_on(
-            &porcelain,
-            branch,
-            &self.config.targets,
+        let (roots, home) = (&self.config.targets, &self.config.home);
+        Ok(crate::queue_targets_empty::empty_on(
+            &porcelain, branch, roots, home,
         ))
     }
 

@@ -131,3 +131,49 @@ fn a_failure_to_empty_targets_is_logged_and_the_merge_stands() {
         fake.calls()
     );
 }
+
+#[test]
+fn a_df_failure_is_said_and_the_pass_goes_on() {
+    // Given
+    let fake = Fake {
+        df_fails: Some("df did not answer within 30s".into()),
+        ..short_disk(1)
+    };
+
+    // When
+    let log = run_pass(&fake, MergeOn::Gate, &mut State::default(), false);
+
+    // Then
+    assert!(
+        log.iter()
+            .any(|l| l == "#1 is not gated: df failed: df did not answer within 30s"),
+        "{log:?}"
+    );
+    assert!(fake.called("merge 2 h2"), "{:?}", fake.calls());
+}
+
+#[test]
+fn a_du_failure_is_said_and_du_is_tried_again_next_pass() {
+    // Given: du fails on the first pass only
+    let fake = short_disk(2);
+    *fake.du_fails_once.borrow_mut() = Some("du did not answer within 120s".into());
+    let mut state = State::default();
+
+    // When
+    let first = run_pass(&fake, MergeOn::Gate, &mut state, false);
+    let second = run_pass(&fake, MergeOn::Gate, &mut state, false);
+
+    // Then
+    assert!(fake.called("merge 2 h2"), "{:?}", fake.calls());
+    assert!(
+        first.iter().any(|l| l == "the disk has 10 GB free; du failed: du did not answer within 120s; it is tried again next pass"),
+        "{first:?}"
+    );
+    assert!(
+        second
+            .iter()
+            .any(|l| l
+                .starts_with("the disk has 10 GB free; the largest targets: 62 GB /t/w-desktop;")),
+        "{second:?}"
+    );
+}

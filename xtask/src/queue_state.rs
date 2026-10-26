@@ -83,6 +83,12 @@ impl State {
         self.backoff.get(head).is_some_and(|until| now < *until)
     }
 
+    /// Whether `reason` is the last one noted for PR `number`.
+    #[must_use]
+    pub fn said_already(&self, number: u64, reason: &str) -> bool {
+        self.said.get(&number).is_some_and(|said| said == reason)
+    }
+
     /// Note `reason` for PR `number`; whether it differs from the last.
     pub fn changed(&mut self, number: u64, reason: &str) -> bool {
         self.said.insert(number, reason.to_owned()).as_deref() != Some(reason)
