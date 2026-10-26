@@ -15,6 +15,7 @@ impl Emitter<'_> {
         tag: &ComponentTag,
         place: &Place,
     ) -> Result<(), CompileError> {
+        self.check_props(tag);
         let last = tag.name.rsplit("::").next().unwrap_or(&tag.name);
         let var = self.fresh(&last.to_lowercase());
         self.reserve(&format!("{var}_props"));
@@ -46,10 +47,7 @@ impl Emitter<'_> {
     ) -> Result<Vec<String>, CompileError> {
         let mut fields = Vec::new();
         for attribute in tag.attributes.iter() {
-            let name = attribute
-                .name
-                .strip_prefix("bind:")
-                .unwrap_or(&attribute.name);
+            let name = super::tag_props::prop_name(attribute);
             let value = match &attribute.value {
                 AttrValue::Literal(value) => format!("{value:?}.into()"),
                 AttrValue::Expr(expr) => {
