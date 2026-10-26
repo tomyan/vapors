@@ -10,7 +10,8 @@ use std::time::Duration;
 
 use vapors_elements::{Cursor, Document, ElementError, Point, Viewport};
 use vapors_platform::{App, Event, Frame, Instant, Next, Platform, report_error};
-use vapors_renderer::Target;
+
+use crate::frame::FrameTimes;
 use vapors_scene::Size;
 
 use crate::painter::ScenePainter;
@@ -45,15 +46,23 @@ pub struct ElementsApp {
     wheel: crate::wheel_scroll::WheelScroll,
     /// The cursor last shown.
     cursor: Cursor,
-    /// Called before each update with the last one's duration.
+    /// Called before each update with the last frame's phase times.
     per_frame: Option<PerFrame>,
-    /// How long the last `Document::update` took; `None` before the first.
-    last_update: Option<Duration>,
+    /// Called after each frame with its phase times.
+    frame_times: Option<FrameTimesHook>,
+    /// The last frame's phase times; `None` before the first.
+    last_times: Option<FrameTimes>,
+    /// Time spent handling events since the last frame: the Input phase.
+    input_spent: Duration,
 }
 
 /// What [`ElementsApp::with_per_frame`] calls before each update, with
-/// how long the last update took (`None` before the first).
-pub type PerFrame = Box<dyn FnMut(Option<Duration>)>;
+/// the last frame's time per phase, by name, for the phases that do
+/// work today (input, update, draw); empty before the first frame.
+pub type PerFrame = Box<dyn FnMut(&[(&'static str, Duration)])>;
+
+/// What [`ElementsApp::with_frame_times`] calls after each frame.
+pub type FrameTimesHook = Box<dyn FnMut(&FrameTimes)>;
 
 impl ElementsApp {
     /// Shows `document`.
@@ -69,17 +78,27 @@ impl ElementsApp {
             wheel: crate::wheel_scroll::WheelScroll::default(),
             cursor: Cursor::Default,
             per_frame: None,
-            last_update: None,
+            frame_times: None,
+            last_times: None,
+            input_spent: Duration::ZERO,
         }
     }
 
-    /// Calls `per_frame`, when there is one, before each update with how
-    /// long the last update took: for a demo that changes the document
-    /// every frame and shows its own update time (`stress`). What it
+    /// Calls `per_frame`, when there is one, before each update with the
+    /// last frame's phase times: for a demo that changes the document
+    /// every frame and shows its own frame time (`stress`). What it
     /// changes asks for the next frame, as any change does.
     #[must_use]
     pub fn with_per_frame(mut self, per_frame: Option<PerFrame>) -> Self {
         self.per_frame = per_frame;
+        self
+    }
+
+    /// Calls `frame_times` after each frame with its phase times (2-S1):
+    /// what an app records as its frame numbers (touché's P0).
+    #[must_use]
+    pub fn with_frame_times(mut self, frame_times: FrameTimesHook) -> Self {
+        self.frame_times = Some(frame_times);
         self
     }
 
@@ -95,45 +114,6 @@ impl ElementsApp {
     #[must_use]
     pub fn failure(&self) -> Failure {
         self.failure.clone()
-    }
-
-    /// Updates the document for this frame and paints it into the frame.
-    ///
-    /// # Errors
-    ///
-    /// The update's refusals, or the painter's error, as one report.
-    pub fn draw(&mut self, frame: &Frame<'_>) -> Result<(), String> {
-        let size = Size {
-            width: frame.texture.width(),
-            height: frame.texture.height(),
-        };
-        #[allow(clippy::cast_possible_truncation)] // a display scale
-        let scale = frame.scale_factor as f32;
-        self.scale = scale;
-        if let Some(per_frame) = &mut self.per_frame {
-            per_frame(self.last_update);
-        }
-        let mut document = self.document.borrow_mut();
-        let started = Instant::now();
-        let updated = document.update(viewport(size, scale));
-        self.last_update = Some(started.elapsed());
-        let painted = updated.map_err(|errors| refused(&errors))?;
-        let view = frame
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-        let target = Target {
-            device: frame.device,
-            queue: frame.queue,
-            view: &view,
-            viewport: size,
-            scissor: None,
-        };
-        let scene_painter = self
-            .painter
-            .get_or_insert_with(|| ScenePainter::new(frame.device, frame.texture.format()));
-        scene_painter
-            .draw(&target, painted)
-            .map_err(|error| format!("the document could not be painted: {error}"))
     }
 }
 
@@ -154,7 +134,27 @@ impl ElementsApp {
 /// frames.
 impl App for ElementsApp {
     fn event(&mut self, event: Event, platform: &Platform) {
-        if let Some(action) = action(&event, self.scale, self.pointer) {
+        let started = Instant::now();
+        self.handle(&event, platform);
+        self.input_spent += started.elapsed();
+    }
+
+    fn frame(&mut self, frame: &Frame<'_>) -> Next {
+        match self.run_phases(frame) {
+            Ok(()) => self.next_after_frame(),
+            Err(message) => {
+                report_error(&message);
+                self.failure.set(&message);
+                Next::Exit
+            }
+        }
+    }
+}
+
+impl ElementsApp {
+    /// An event, dispatched as it arrives (design 02, 2-S1).
+    fn handle(&mut self, event: &Event, platform: &Platform) {
+        if let Some(action) = action(event, self.scale, self.pointer) {
             self.act(action);
         }
         if self.document.borrow_mut().take_changed() {
@@ -164,17 +164,6 @@ impl App for ElementsApp {
         if cursor != self.cursor {
             self.cursor = cursor;
             platform.set_cursor(crate::cursor::shown(cursor));
-        }
-    }
-
-    fn frame(&mut self, frame: &Frame<'_>) -> Next {
-        match self.draw(frame) {
-            Ok(()) => self.next_after_frame(),
-            Err(message) => {
-                report_error(&message);
-                self.failure.set(&message);
-                Next::Exit
-            }
         }
     }
 }
@@ -188,6 +177,13 @@ fn viewport(size: Size, scale: f32) -> Viewport {
     }
 }
 
+fn size_of(frame: &Frame<'_>) -> Size {
+    Size {
+        width: frame.texture.width(),
+        height: frame.texture.height(),
+    }
+}
+
 fn refused(errors: &[ElementError]) -> String {
     let lines: Vec<String> = errors.iter().map(|error| format!("  {error}")).collect();
     format!(
@@ -198,3 +194,5 @@ fn refused(errors: &[ElementError]) -> String {
 
 #[path = "elements_app_act.rs"]
 mod act;
+#[path = "elements_app_frame.rs"]
+mod frame_phases;

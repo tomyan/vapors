@@ -32,6 +32,20 @@ pub enum Phase {
 }
 
 impl Phase {
+    /// The phase's name in a line of times: `input`, `update`.
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Phase::Input => "input",
+            Phase::Tasks => "tasks",
+            Phase::Tick => "tick",
+            Phase::Update => "update",
+            Phase::Accessibility => "accessibility",
+            Phase::Draw => "draw",
+            Phase::Record => "record",
+        }
+    }
+
     /// Every phase, in order.
     pub const ALL: [Phase; 7] = [
         Phase::Input,
@@ -46,6 +60,7 @@ impl Phase {
 
 /// What tells the time: the system's, or a test's stepped by hand.
 pub trait Clock {
+    /// The time now.
     fn now(&self) -> Instant;
 }
 
@@ -73,7 +88,9 @@ impl FrameTimes {
 /// A phase that refused, which stopped the frame.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FrameError {
+    /// The phase that refused.
     pub phase: Phase,
+    /// Its refusal.
     pub message: String,
 }
 
@@ -85,13 +102,27 @@ impl fmt::Display for FrameError {
 
 /// The work of each phase; those that are not built yet do nothing.
 pub trait Phases {
+    /// The time event handlers took since the last frame: events are
+    /// dispatched as they arrive, so this is the Input phase's time
+    /// beside what `input` itself takes.
+    fn input_time(&mut self) -> Duration {
+        Duration::ZERO
+    }
+    /// Input work in the frame itself (none yet).
     fn input(&mut self, _now: Instant) {}
+    /// Woken futures (2-S2).
     fn tasks(&mut self, _now: Instant) {}
+    /// Running transitions sampled (2-S3).
     fn tick(&mut self, _now: Instant) {}
+    /// The document's update.
+    ///
     /// # Errors
     /// The update's refusal, which stops the frame.
     fn update(&mut self, now: Instant) -> Result<(), String>;
+    /// The accessibility tree's update (area 5).
     fn accessibility(&mut self, _now: Instant) {}
+    /// The scene drawn.
+    ///
     /// # Errors
     /// The draw's failure, which stops the frame.
     fn draw(&mut self, now: Instant) -> Result<(), String>;
@@ -114,6 +145,9 @@ pub fn run_frame(
         let started = clock.now();
         let result = run_phase(phases, phase, now, &times);
         times.0[phase as usize] = clock.now().saturating_duration_since(started);
+        if phase == Phase::Input {
+            times.0[0] += phases.input_time();
+        }
         result.map_err(|message| FrameError { phase, message })?;
     }
     Ok(times)

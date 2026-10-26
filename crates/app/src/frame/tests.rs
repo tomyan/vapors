@@ -95,8 +95,16 @@ fn a_frame_runs_its_phases_in_order_at_one_time() {
     // Then: design 02's order, each phase given the frame's time
     let ran = phases.ran.into_inner();
     let order: Vec<Phase> = ran.iter().map(|(phase, _)| *phase).collect();
-    use Phase::{Accessibility, Draw, Input, Record, Tasks, Tick, Update};
-    assert_eq!(order, [Input, Tasks, Tick, Update, Accessibility, Draw, Record]);
+    let expected = [
+        Phase::Input,
+        Phase::Tasks,
+        Phase::Tick,
+        Phase::Update,
+        Phase::Accessibility,
+        Phase::Draw,
+        Phase::Record,
+    ];
+    assert_eq!(order, expected);
     assert!(ran.iter().all(|(_, seen)| *seen == now));
 }
 
@@ -153,4 +161,29 @@ fn a_failed_draw_stops_the_frame_before_record() {
             .iter()
             .any(|(phase, _)| *phase == Phase::Record)
     );
+}
+
+#[test]
+fn the_input_phase_holds_the_time_handlers_took_since_the_last_frame() {
+    // Given: handlers that took 5 ms as their events arrived
+    struct Handled(Recorded<'static>);
+    impl Phases for Handled {
+        fn input_time(&mut self) -> Duration {
+            Duration::from_millis(5)
+        }
+        fn update(&mut self, now: Instant) -> Result<(), String> {
+            self.0.update(now)
+        }
+        fn draw(&mut self, now: Instant) -> Result<(), String> {
+            self.0.draw(now)
+        }
+    }
+    let clock: &'static Stepped = Box::leak(Box::new(Stepped::new()));
+    let mut phases = Handled(recorded(clock, None));
+
+    // When
+    let times = run_frame(&mut phases, clock.now(), clock).expect("the frame runs");
+
+    // Then: no input work in the frame itself, so the handlers' time alone
+    assert_eq!(times.of(Phase::Input), Duration::from_millis(5));
 }
