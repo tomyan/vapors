@@ -81,7 +81,12 @@ pub enum Command {
         replace: bool,
     },
     /// Run every step of .github/workflows/ci.yml here, in order, ending `gate: pass <sha>`.
-    Gate,
+    Gate {
+        /// Post the gate's last lines to this pull request (no number:
+        /// the PR whose head is this branch), checking its head is HEAD.
+        #[arg(long, num_args = 0..=1, default_missing_value = "0", value_name = "N")]
+        pr: Option<u64>,
+    },
     /// Check formatting and lints without running tests.
     Lint,
     /// Check dependencies with cargo-deny: advisories, bans, licences, sources.
