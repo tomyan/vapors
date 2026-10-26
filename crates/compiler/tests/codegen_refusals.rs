@@ -86,25 +86,22 @@ fn a_condition_syntax_error_is_positioned_where_the_condition_ends() {
 }
 
 #[test]
-fn snippets_and_render_are_refused_as_deferred() {
+fn named_snippets_and_render_arguments_are_refused_until_r1b() {
     // When
-    let err = refusal("<div>{render footer()}</div>");
+    let named = refusal("<div>{snippet footer()}<b>x</b>{/snippet}</div>");
+    let argument = refusal("<div>{render footer(1)}</div>");
 
     // Then
-    assert_eq!((err.line, err.col), (1, 6), "{err}");
-    assert!(err.message.contains("deferred"), "{err}");
-    let err = refusal("<div>{snippet footer()}<b>x</b>{/snippet}</div>");
-    assert!(err.message.contains("deferred"), "{err}");
-}
-
-#[test]
-fn component_children_are_refused_as_deferred() {
-    // When
-    let err = refusal("<Card><p>body</p></Card>");
-
-    // Then
-    assert_eq!((err.line, err.col), (1, 1), "{err}");
-    assert!(err.message.contains("deferred"), "{err}");
+    assert_eq!((named.line, named.col), (1, 6), "{named}");
+    assert!(
+        named.message.contains("R1b") && named.message.contains("children"),
+        "{named}"
+    );
+    assert_eq!((argument.line, argument.col), (1, 6), "{argument}");
+    assert!(
+        argument.message.contains("R1b") && argument.message.contains("footer()"),
+        "{argument}"
+    );
 }
 
 #[test]

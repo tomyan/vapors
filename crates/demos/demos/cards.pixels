@@ -1,0 +1,16 @@
+# Cards at 640x400 CSS px at 1x: under a 44 px bar, a scroll region of
+# cards, each a title row (y 53..87 for the first) over the children
+# its parent passed (y 87..135): a thumbnail at x 21..69, a line of
+# text, and a button at the right.
+pixel 300 60 #171b1f          the first card's title row
+pixel 300 125 #ffffff         the first card's body, under its children
+pixel 26 100 #5b9bd5          the thumbnail's top-left quadrant: sky
+pixel 64 122 #70ad47          its bottom-right quadrant
+pixel 578 104 #3a7bd5         the Edit button
+pixel 300 140 #e9ecef         between the first and second cards
+ink 80 100 200 120 #ffffff    the slotted text is drawn
+
+# A phone: the same cards, narrower.
+at 390x800
+pixel 200 60 #171b1f          the first card's title row
+pixel 26 100 #5b9bd5          the thumbnail

@@ -18,8 +18,10 @@ include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 pub use vapors_pixels as pixels;
 
 mod frames;
+mod later;
 mod mounts;
-use mounts::{register_thumbnails, stress_per_frame};
+pub use mounts::register_thumbnails;
+use mounts::stress_per_frame;
 mod input;
 pub use frames::{frame_limit, limited};
 pub use input::{click, input};
@@ -141,40 +143,10 @@ pub fn all() -> Vec<Demo> {
                 )))
             },
         },
-        Demo {
-            name: "toasts",
-            pixels: Some(include_str!("../demos/toasts.pixels")),
-            mount: |dom, parent| {
-                std::mem::forget(toasts::Toasts::mount(dom, parent, toasts::ToastsProps {}));
-                None
-            },
-        },
-        Demo {
-            name: "scroll",
-            pixels: Some(include_str!("../demos/scroll.pixels")),
-            mount: |dom, parent| {
-                std::mem::forget(scroll::Scroll::mount(dom, parent, scroll::ScrollProps {}));
-                None
-            },
-        },
-        Demo {
-            name: "images",
-            pixels: Some(include_str!("../demos/images.pixels")),
-            mount: |dom, parent| {
-                register_thumbnails(&mut dom.borrow_mut());
-                std::mem::forget(images::Images::mount(dom, parent, images::ImagesProps {}));
-                None
-            },
-        },
-        Demo {
-            name: INDEX,
-            pixels: None,
-            mount: |dom, parent| {
-                std::mem::forget(index::Index::mount(dom, parent, index::IndexProps {}));
-                None
-            },
-        },
     ]
+    .into_iter()
+    .chain(later::slices())
+    .collect()
 }
 
 /// A document showing `demo`: its component mounted in `body`, which

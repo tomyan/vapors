@@ -18,6 +18,7 @@ mod names;
 mod script;
 mod script_syntax;
 mod shell;
+mod snippets;
 mod syn_map;
 mod text;
 mod unwrap;
