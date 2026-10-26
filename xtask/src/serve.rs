@@ -5,11 +5,12 @@
 //! that commit's, runs `[serve] check` on it within its deadline
 //! (`serve_check.rs`; touche's `check_dist` refuses, among the rest, any
 //! file requesting the dev server's keys), publishes a copy under the
-//! home directory (`serve_publish.rs`), starts static-web-server on it
-//! at 127.0.0.1 (`serve_static.rs`), and mounts that, refusing to replace
-//! another target unless `--replace` (`serve_mount.rs`). Then it fetches
-//! `/` and the wasm through the tailnet URL and fails unless they come
-//! compressed, with their cache headers (`serve_verify.rs`).
+//! home directory (`serve_publish.rs`), and restarts static-web-server on
+//! it at 127.0.0.1 as a user unit (`serve_static.rs`), which must answer
+//! as the port's owner. It checks `/`, every wasm and a script through
+//! the loopback, and only then mounts it, refusing to replace another
+//! target unless `--replace` (`serve_mount.rs`); then checks them again
+//! through the tailnet URL (`serve_verify.rs`).
 
 #[path = "serve_check.rs"]
 mod check;
@@ -56,13 +57,18 @@ fn serve(replace: bool) -> Result<(String, String), String> {
     check::run_check(&settings.check, settings.check_deadline)?;
     publish::publish(&root.join(DIST), &settings.dir)?;
     static_server::start(&settings.dir, settings.port, &home()?)?;
+    let loopback = format!("http://127.0.0.1:{}/", settings.port);
+    verify::verify(&loopback, &settings.dir)
+        .map_err(|why| format!("{why} (on the loopback; nothing was mounted)"))?;
     let url = mount(
         &tailscale,
         &Target::LocalPort(settings.port),
         &settings.mount,
         replace,
     )?;
-    let checked = verify::verify(&url, &settings.dir)?;
+    let checked = verify::verify(&url, &settings.dir).map_err(|why| {
+        format!("{why} (through the tailnet; the mount is live at {url} with this build)")
+    })?;
     Ok((url, checked))
 }
 

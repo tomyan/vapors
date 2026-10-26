@@ -1,98 +1,66 @@
-//! After a publish, the page as a phone gets it: `/` and the page's wasm
-//! fetched through the tailnet URL with `Accept-Encoding: br, gzip`. A
-//! file sent without `Content-Encoding`, or with cache headers other than
-//! the server's, fails the serve.
+//! The page as a browser gets it from `base` (the loopback before the
+//! mount, the tailnet URL after): `/`, every `.wasm` in the copy, and the
+//! first script `index.html` loads, each fetched with `Accept-Encoding:
+//! br, gzip`. Each must answer 200, compressed, with its Content-Type,
+//! `Vary: Accept-Encoding` and the Cache-Control `serve_unit.rs` sets.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
 use crate::deadline::{Finished, run_with_deadline};
+use crate::serve_verify_rules::{Answer, Expect, answer, expect_for, first_script, judge};
 
 /// One fetch's deadline: the 2.8 MB wasm compressed is under 1 MB, which
 /// the box sends itself over the tailnet in well under a second
 /// (2026-10-26); 30 s allows a busy box.
 const FETCH_DEADLINE: Duration = Duration::from_secs(30);
 
-/// What a response's headers said.
-#[derive(Debug, PartialEq, Eq)]
-pub struct Answer {
-    pub status: u16,
-    pub encoding: Option<String>,
-    pub cache: Option<String>,
-}
-
-/// The status line and the two headers, from `curl -D -`'s output.
-pub fn answer(headers: &str) -> Option<Answer> {
-    let mut lines = headers.lines();
-    let status = lines.next()?.split_whitespace().nth(1)?.parse().ok()?;
-    let mut answer = Answer {
-        status,
-        encoding: None,
-        cache: None,
-    };
-    for line in lines {
-        let Some((name, value)) = line.split_once(':') else {
-            continue;
-        };
-        let value = Some(value.trim().to_owned());
-        match name.trim().to_ascii_lowercase().as_str() {
-            "content-encoding" => answer.encoding = value,
-            "cache-control" => answer.cache = value,
-            _ => {}
-        }
-    }
-    Some(answer)
-}
-
-/// `Ok` when the answer is compressed and cached as `cache` says.
+/// Fetch and judge each file of `dir` at `base`, which ends in `/`.
 ///
 /// # Errors
 ///
-/// What differed, naming the URL and the fix.
-pub fn judge(url: &str, answer: &Answer, cache: &str) -> Result<(), String> {
-    if answer.status != 200 {
-        return Err(format!(
-            "{url} answered {}; fix: journalctl --user -u xtask-serve-*",
-            answer.status
-        ));
-    }
-    if !matches!(answer.encoding.as_deref(), Some("br" | "gzip")) {
-        return Err(format!(
-            "{url} came with Content-Encoding {:?}, not br or gzip; fix: check the unit runs with --compression-static and the .br copies exist (cargo xtask web)",
-            answer.encoding
-        ));
-    }
-    if answer.cache.as_deref() != Some(cache) {
-        return Err(format!(
-            "{url} came with Cache-Control {:?}, not {cache:?}; fix: the server's config (serve_static.rs)",
-            answer.cache
-        ));
-    }
-    Ok(())
-}
-
-/// Fetch `/` and the largest wasm under `dir` from `base` and judge both.
-///
-/// # Errors
-///
-/// No wasm published, curl failing, or a file judged wrong.
+/// No wasm or no script to check, curl failing, or a file judged wrong.
 pub fn verify(base: &str, dir: &Path) -> Result<String, String> {
-    let wasm = largest_wasm(dir)?;
-    let name = wasm
-        .strip_prefix(dir)
-        .map_err(|e| e.to_string())?
-        .display()
-        .to_string();
-    let page = base.to_owned();
-    judge(&page, &fetch(&page)?, "no-cache")?;
-    let file = format!("{base}{name}");
-    let got = fetch(&file)?;
-    judge(&file, &got, "public, max-age=31536000, immutable")?;
-    Ok(format!(
-        "{name} sent as {}",
-        got.encoding.unwrap_or_default()
-    ))
+    let mut checked = Vec::new();
+    for (path, expect) in targets(dir)? {
+        let url = format!("{base}{path}");
+        let got = fetch(&url)?;
+        judge(&url, &got, &expect)?;
+        checked.push(format!(
+            "{} as {}",
+            if path.is_empty() { "/" } else { &path },
+            got.encoding.unwrap_or_default()
+        ));
+    }
+    Ok(checked.join(", "))
+}
+
+/// `/`, every wasm, and the first script index.html loads.
+fn targets(dir: &Path) -> Result<Vec<(String, Expect)>, String> {
+    let mut targets = vec![(String::new(), expect_for("index.html"))];
+    let wasm = wasm_under(dir, dir)?;
+    if wasm.is_empty() {
+        return Err(format!(
+            "{} has no .wasm to check; fix: cargo xtask web",
+            dir.display()
+        ));
+    }
+    targets.extend(wasm.into_iter().map(|path| {
+        let expect = expect_for(&path);
+        (path, expect)
+    }));
+    let index = std::fs::read_to_string(dir.join("index.html"))
+        .map_err(|e| format!("{}: {e}", dir.join("index.html").display()))?;
+    let script = first_script(&index).ok_or_else(|| {
+        format!(
+            "{}/index.html loads no relative script to check",
+            dir.display()
+        )
+    })?;
+    let expect = expect_for(script.split('?').next().unwrap_or(&script));
+    targets.push((script, expect));
+    Ok(targets)
 }
 
 fn fetch(url: &str) -> Result<Answer, String> {
@@ -120,19 +88,24 @@ fn fetch(url: &str) -> Result<Answer, String> {
     }
 }
 
-fn largest_wasm(dir: &Path) -> Result<PathBuf, String> {
-    std::fs::read_dir(dir)
-        .map_err(|e| format!("{}: {e}", dir.display()))?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.extension().is_some_and(|e| e == "wasm"))
-        .max_by_key(|path| path.metadata().map_or(0, |m| m.len()))
-        .ok_or_else(|| {
-            format!(
-                "{} has no .wasm to check; fix: cargo xtask web",
-                dir.display()
-            )
-        })
+/// Every `.wasm` under `dir`, at any depth, relative to `root`.
+fn wasm_under(dir: &Path, root: &Path) -> Result<Vec<String>, String> {
+    let mut found = Vec::new();
+    for entry in std::fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))? {
+        let path: PathBuf = entry.map_err(|e| format!("{}: {e}", dir.display()))?.path();
+        if path.is_dir() {
+            found.extend(wasm_under(&path, root)?);
+        } else if path.extension().is_some_and(|e| e == "wasm") {
+            found.push(
+                path.strip_prefix(root)
+                    .map_err(|e| e.to_string())?
+                    .display()
+                    .to_string(),
+            );
+        }
+    }
+    found.sort();
+    Ok(found)
 }
 
 #[cfg(test)]

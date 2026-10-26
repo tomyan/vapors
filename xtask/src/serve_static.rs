@@ -1,94 +1,83 @@
-//! The release page's server: static-web-server on 127.0.0.1 only, as a
-//! user systemd unit, behind `tailscale serve`. It serves the published
-//! copy (a symlink swapped per publish, resolved per request), each file's
-//! brotli or gzip copy by the request's `Accept-Encoding`, and cache
-//! headers: trunk's hashed files are immutable for a year, everything
-//! else (index.html, version.json, the page's `?v=` files) `no-cache`, so
-//! a phone asks again and gets 304 or the new build.
+//! The release page's server: static-web-server, the binary pinned and
+//! verified by hash (`[downloads]`, `download_install.rs`), as a user
+//! systemd unit on 127.0.0.1 behind `tailscale serve` (`serve_unit.rs`).
+//! It serves the copy publish just made, each file's brotli or gzip copy
+//! by the request's `Accept-Encoding`, and cache headers. The unit
+//! starts at boot only with lingering on, so serve refuses without it.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::{Duration, Instant};
 
-/// trunk's hashed names: `<name>-<16 hex>.js` and `<name>-<16 hex>_bg.wasm`.
-const HEX: &str = "[0-9a-f]";
+use crate::download_install::verified;
+use crate::downloads::pinned;
+use crate::serve_listen::wait_for_unit;
+use crate::serve_unit::{Paths, config_text, unit_name, unit_text};
 
-/// How long the unit may take to report active. static-web-server
-/// started in under 50 ms on the dev box (2026-10-26); systemd's restart
-/// adds its own. 10 s is far past both.
-const ACTIVE_DEADLINE: Duration = Duration::from_secs(10);
+/// The tool's name in `[downloads]`.
+const SERVER: &str = "static-web-server";
 
-/// static-web-server's settings for `dir`.
-pub fn config_text() -> String {
-    let hashed = format!("**/*-{}{{_bg.wasm,.js}}", HEX.repeat(16));
-    format!(
-        "[general]\ncache-control-headers = false\ncompression = true\ncompression-static = true\n\n[advanced]\n\n[[advanced.headers]]\nsource = \"**/*\"\n[advanced.headers.headers]\nCache-Control = \"no-cache\"\n\n[[advanced.headers]]\nsource = \"{hashed}\"\n[advanced.headers.headers]\nCache-Control = \"public, max-age=31536000, immutable\"\n"
-    )
-}
-
-/// The unit that runs `server` on `port` for `dir` with `config`.
-pub fn unit_text(server: &Path, dir: &Path, port: u16, config: &Path) -> String {
-    format!(
-        "[Unit]\nDescription=cargo xtask serve: {dir} on 127.0.0.1:{port}\n\n[Service]\nExecStart={server} --host 127.0.0.1 --port {port} --root {dir} --use-relative-root --config-file {config}\nRestart=on-failure\n\n[Install]\nWantedBy=default.target\n",
-        dir = dir.display(),
-        server = server.display(),
-        config = config.display()
-    )
-}
-
-/// The unit's name for `dir`: `xtask-serve-<dir's name>.service`.
-pub fn unit_name(dir: &Path) -> String {
-    let name = dir
-        .file_name()
-        .map_or_else(|| "page".into(), |n| n.to_string_lossy().into_owned());
-    format!("xtask-serve-{name}.service")
-}
-
-/// Write the config and the unit, and (re)start it; `Ok` once active.
+/// Write the config and the unit, (re)start it, and return its name once
+/// it answers on 127.0.0.1:`port` as the port's owner.
 ///
 /// # Errors
 ///
-/// A file unwritten, systemctl failing, or the unit not active within
-/// [`ACTIVE_DEADLINE`], naming the fix.
+/// No lingering, the binary unverified, a path the unit cannot carry,
+/// systemctl failing, or the port not the unit's, naming the fix.
 pub fn start(dir: &Path, port: u16, home: &Path) -> Result<String, String> {
-    let server = located("static-web-server")?;
+    lingering()?;
+    let server = verified(&pinned(SERVER)?, home)?;
+    let copy = std::fs::canonicalize(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let config = PathBuf::from(format!("{}.sws.toml", dir.display()));
+    let paths = Paths {
+        server: &server,
+        dir,
+        copy: &copy,
+        config: &config,
+    };
+    let unit = unit_text(&paths, port)?;
     write(&config, &config_text())?;
     let name = unit_name(dir);
     let units = home.join(".config/systemd/user");
     std::fs::create_dir_all(&units).map_err(|e| format!("{}: {e}", units.display()))?;
-    write(&units.join(&name), &unit_text(&server, dir, port, &config))?;
-    systemctl(&["daemon-reload"])?;
-    systemctl(&["enable", &name])?;
-    systemctl(&["restart", &name])?;
-    active(&name)?;
+    write(&units.join(&name), &unit)?;
+    for args in [
+        vec!["daemon-reload"],
+        vec!["enable", &name],
+        vec!["restart", &name],
+    ] {
+        systemctl(&args)?;
+    }
+    wait_for_unit(&name, port)?;
     Ok(name)
+}
+
+/// A user unit runs at boot, and after logout, only with lingering on.
+fn lingering() -> Result<(), String> {
+    let user = std::env::var("USER").map_err(|_| "USER is unset; fix: set it".to_owned())?;
+    let output = Command::new("loginctl")
+        .args(["show-user", &user, "-p", "Linger", "--value"])
+        .output()
+        .map_err(|e| format!("loginctl: {e}; fix: run where systemd-logind runs"))?;
+    if String::from_utf8_lossy(&output.stdout).trim() == "yes" {
+        return Ok(());
+    }
+    Err(format!(
+        "{user} has no lingering, so the server would stop at logout and not start at boot; fix: loginctl enable-linger {user}"
+    ))
 }
 
 fn write(path: &Path, text: &str) -> Result<(), String> {
     std::fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))
 }
 
-fn located(binary: &str) -> Result<PathBuf, String> {
-    let output = Command::new("sh")
-        .args(["-c", &format!("command -v {binary}")])
-        .output()
-        .map_err(|e| format!("sh: {e}"))?;
-    let path = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-    if path.is_empty() {
-        return Err(format!("{binary} is not on PATH; fix: cargo xtask setup"));
-    }
-    Ok(PathBuf::from(path))
-}
-
-fn systemctl(args: &[&str]) -> Result<String, String> {
+fn systemctl(args: &[&str]) -> Result<(), String> {
     let output = Command::new("systemctl")
         .arg("--user")
         .args(args)
         .output()
-        .map_err(|e| format!("systemctl --user: {e}; fix: run where a user systemd is running (loginctl enable-linger)"))?;
+        .map_err(|e| format!("systemctl --user: {e}; fix: run where a user systemd is running"))?;
     if output.status.success() {
-        return Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned());
+        return Ok(());
     }
     Err(format!(
         "systemctl --user {} failed: {}",
@@ -96,21 +85,3 @@ fn systemctl(args: &[&str]) -> Result<String, String> {
         String::from_utf8_lossy(&output.stderr).trim()
     ))
 }
-
-fn active(name: &str) -> Result<(), String> {
-    let started = Instant::now();
-    while started.elapsed() < ACTIVE_DEADLINE {
-        if systemctl(&["is-active", name]).is_ok_and(|s| s == "active") {
-            return Ok(());
-        }
-        std::thread::sleep(Duration::from_millis(100));
-    }
-    Err(format!(
-        "{name} was not active within {} s; fix: journalctl --user -u {name}",
-        ACTIVE_DEADLINE.as_secs()
-    ))
-}
-
-#[cfg(test)]
-#[path = "serve_static_tests.rs"]
-mod tests;

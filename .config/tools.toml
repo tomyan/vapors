@@ -10,14 +10,19 @@ wasm-bindgen-cli = "0.2.129"
 bacon = "3.26.0"
 # Every build xtask starts compiles through it (xtask/src/sccache.rs).
 sccache = "0.18.0"
-# `cargo xtask serve` runs it behind tailscale serve: the release page
-# with brotli and gzip copies, and its cache headers (serve_static.rs).
-static-web-server = "2.44.1"
 
 [binaries]
 wasm-bindgen-cli = "wasm-bindgen"
 
-[checksums]
-# The x86_64-unknown-linux-gnu release binary binstall installs (taken
-# 2026-10-26 on the dev box): a tool that serves pages is held to it.
-static-web-server = "4b39efe44e995bfb1a19517079046490ccc9b4e9907bf924ec46bef3197be56b"
+[downloads]
+# Fetched from the pinned release asset, never through binstall, and
+# installed to ~/.local/share/factory/bin/static-web-server-2.44.1 only
+# after both hashes match (downloads.rs, download_install.rs). `cargo
+# xtask serve` runs it behind tailscale serve (serve_static.rs).
+# sha256 is the archive's, as the release's own SHA256SUM lists it;
+# binary_sha256 the extracted binary's (both checked 2026-10-26).
+static-web-server.version = "2.44.1"
+static-web-server.url = "https://github.com/static-web-server/static-web-server/releases/download/v2.44.1/static-web-server-v2.44.1-x86_64-unknown-linux-gnu.tar.gz"
+static-web-server.sha256 = "a71fb43143d0964f82417178fa56d8f6ee4b33f49ddde4b2263d97404fdfbbc4"
+static-web-server.member = "static-web-server-v2.44.1-x86_64-unknown-linux-gnu/static-web-server"
+static-web-server.binary_sha256 = "4b39efe44e995bfb1a19517079046490ccc9b4e9907bf924ec46bef3197be56b"
