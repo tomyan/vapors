@@ -21,6 +21,8 @@ pub enum Run<'a> {
     Quads(Vec<Quad>),
     /// Consecutive text runs.
     Texts(&'a [Item]),
+    /// Consecutive images.
+    Images(&'a [Item]),
 }
 
 impl Scene {
@@ -67,6 +69,7 @@ impl<'a> Run<'a> {
                     .collect(),
             ),
             Item::Text { .. } => Run::Texts(items),
+            Item::Image { .. } => Run::Images(items),
         }
     }
 }
@@ -76,6 +79,7 @@ fn kind(item: &Item) -> u8 {
         Item::Shadow(_) => 0,
         Item::Quad(_) => 1,
         Item::Text { .. } => 2,
+        Item::Image { .. } => 3,
     }
 }
 

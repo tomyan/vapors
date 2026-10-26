@@ -132,7 +132,8 @@ impl Lender<'_> {
             && same_children
             && keepable
             && before.style == boxes[at].style
-            && before.content == boxes[at].content)
+            && before.content == boxes[at].content
+            && before.natural == boxes[at].natural)
         {
             return false;
         }

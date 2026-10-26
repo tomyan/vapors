@@ -1,5 +1,5 @@
 use super::*;
-use crate::{Color, TextId};
+use crate::{Color, ImageId, TextId};
 
 fn quad(left: f32) -> Item {
     Item::Quad(Quad::fill(
@@ -45,6 +45,7 @@ fn consecutive_items_of_one_kind_share_a_batch_in_painting_order() {
             Run::Shadows(shadows) => ('s', shadows.len()),
             Run::Quads(quads) => ('q', quads.len()),
             Run::Texts(texts) => ('t', texts.len()),
+            Run::Images(images) => ('i', images.len()),
         })
         .collect();
     assert_eq!(shape, [('q', 2), ('t', 1), ('q', 1), ('t', 2)]);
@@ -108,4 +109,34 @@ fn each_item_keeps_the_clip_it_was_pushed_under() {
 
     // Then
     assert_eq!(clips, [None, Some(clip)]);
+}
+
+fn picture(id: u32) -> Item {
+    Item::Image {
+        image: ImageId(id),
+        rect: Rect::new(0.0, 0.0, 4.0, 4.0),
+    }
+}
+
+#[test]
+fn consecutive_images_share_a_batch_apart_from_other_kinds() {
+    // Given: an image, two images after a quad
+    let mut scene = Scene::new();
+    for item in [picture(0), quad(0.0), picture(1), picture(2)] {
+        scene.push(item);
+    }
+
+    // When
+    let batches = scene.batches();
+
+    // Then
+    let shape: Vec<(char, usize)> = batches
+        .iter()
+        .map(|batch| match &batch.run {
+            Run::Images(images) => ('i', images.len()),
+            Run::Quads(quads) => ('q', quads.len()),
+            other => panic!("unexpected {other:?}"),
+        })
+        .collect();
+    assert_eq!(shape, [('i', 1), ('q', 1), ('i', 2)]);
 }

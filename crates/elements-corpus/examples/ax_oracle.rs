@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use vapors_elements_corpus::ax::{start, tree};
-use vapors_elements_corpus::oracle::{fixture_names, fixtures_dir, write_fonts};
+use vapors_elements_corpus::oracle::{fixture_names, fixtures_dir, write_fonts, write_images};
 use vapors_elements_corpus::oracle_files::{Committed, Work, compare, refuse_orphans};
 use vapors_text::comparison::Chromium;
 
@@ -51,6 +51,7 @@ fn trees() -> Result<Vec<(String, PathBuf, String)>, String> {
     println!("chromium: {}", chromium.version());
     let work = Work::new("vapors-ax-oracle")?;
     write_fonts(work.path())?;
+    write_images(work.path())?;
     let (_live, mut session) = start(&chromium, work.path())?;
     let mut trees = Vec::new();
     for name in fixture_names()? {

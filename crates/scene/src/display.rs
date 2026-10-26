@@ -101,6 +101,11 @@ pub struct Shadow {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct TextId(pub u32);
 
+/// Which image an item draws: an index the painter resolves, as with
+/// [`TextId`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ImageId(pub u32);
+
 /// One thing to draw.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Item {
@@ -108,6 +113,14 @@ pub enum Item {
     Shadow(Shadow),
     /// A filled box.
     Quad(Quad),
+    /// An image stretched over `rect` (device pixels), by the id its
+    /// painter resolves.
+    Image {
+        /// Which image.
+        image: ImageId,
+        /// Where it is drawn.
+        rect: Rect,
+    },
     /// A text run, its layout origin at `origin` (device pixels).
     Text {
         /// Which run.

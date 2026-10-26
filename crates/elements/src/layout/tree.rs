@@ -72,17 +72,29 @@ impl BoxTree<'_> {
     }
 
     fn leaf(&mut self, id: NodeId, inputs: LayoutInput) -> LayoutOutput {
-        let index = usize::from(id);
+        let mut output = self.measured_leaf(id, inputs);
+        // a replaced element is never empty: margins do not collapse
+        // through it, even at 0 x 0, as Chromium lays out an `img`
+        // without a `src`
+        if self.boxes[usize::from(id)].natural.is_some() {
+            output.margins_can_collapse_through = false;
+        }
+        output
+    }
+
+    fn measured_leaf(&mut self, id: NodeId, inputs: LayoutInput) -> LayoutOutput {
         let (fonts, cache, scale, calcs) =
             (&mut *self.fonts, &mut *self.cache, self.scale, self.calcs);
-        let node = &self.boxes[index];
+        let node = &self.boxes[usize::from(id)];
         compute_leaf_layout(
             inputs,
             &node.style,
             |handle, basis| calcs.resolve(handle, basis),
             |known, available| match &node.content {
                 Content::Text(run) => measure_text((fonts, cache), scale, run, known, available),
-                Content::Element(_) => taffy::Size::ZERO,
+                Content::Element(_) => node.natural.map_or(taffy::Size::ZERO, |natural| {
+                    super::replaced::measure(&node.style, inputs.parent_size, known, natural)
+                }),
             },
         )
     }

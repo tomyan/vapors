@@ -35,7 +35,7 @@ fn hover_and_active_restyle_the_chain_under_the_pointer() {
         .iter()
         .filter_map(|item| match item {
             Item::Quad(quad) => Some(quad.background.to_rgba8()),
-            Item::Text { .. } | Item::Shadow(_) => None,
+            Item::Text { .. } | Item::Shadow(_) | Item::Image { .. } => None,
         })
         .collect();
     assert_eq!(
@@ -85,7 +85,7 @@ fn quad_colours(doc: &Rc<RefCell<Document>>) -> Vec<[u8; 4]> {
         .iter()
         .filter_map(|item| match item {
             Item::Quad(quad) => Some(quad.background.to_rgba8()),
-            Item::Text { .. } | Item::Shadow(_) => None,
+            Item::Text { .. } | Item::Shadow(_) | Item::Image { .. } => None,
         })
         .collect()
 }

@@ -915,6 +915,69 @@ differs from the plan.
   phone), while the right one stays at row 0.
 - **Deferred to F2d:** momentum and fling.
 
+### S10
+
+- **Images** (`images.rs`): `Document::register_image(name, RgbaImage)`
+  registers an image for the `img` elements whose `src` is `name`.
+  - `RgbaImage` moved to vapors-scene, and vapors-canvas re-exports it.
+  - An image that cannot be drawn is refused at registration, naming
+    it: a side of zero, a side over 8192 (WebGPU's guaranteed
+    `maxTextureDimension2D`), or pixels that do not match its size.
+  - `Document::unregister_image(name)` frees one. It is refused while an
+    `img` still names it. The painter drops the texture after the next
+    frame that does not draw the image, so a thumbnail scrolled back
+    into view, or registered again, is uploaded again.
+- **What every `img` refuses** (`img_checks.rs`), with a `src` or
+  without:
+  - a `src` naming no registered image;
+  - inline (an image in a line of text is inline-block content, not
+    built: give it `display: block`, or put it in a flex or grid
+    container);
+  - rounded (no rounded clip yet);
+  - percentage or `calc()` min and max sizes and padding;
+  - the `width`, `height` and `srcset` attributes (not read; size an
+    `img` with CSS).
+- **`alt` is deferred to 5-A1,** the accessibility tree. It is neither
+  read nor recorded until then. The a11y slice must give an `img` its
+  name from `alt`, and must decide what to do with an `img` that has
+  none.
+- **Layout** (the `images` fixture, against Chromium at both sizes): an
+  `img` is a Taffy replaced box (`item_is_replaced`: not stretched),
+  sized by its measure (`layout/replaced.rs`): CSS 2.1 section 10.4's
+  min/max table, in content-box px.
+  - The measure resolves the box's own width and height, which Taffy's
+    leaf does not pass it, and takes Taffy's known sizes as border-box
+    sizes.
+  - An author's `aspect-ratio` is left to Taffy. The natural ratio is
+    applied in the measure, because Taffy applied it to the border box
+    and before max-width clamped.
+  - Without a `src` an `img` is 0 x 0, and margins do not collapse
+    through it.
+  - The fixture covers:
+    - natural sizes, one length, both, a percentage, max-width;
+    - no `src`;
+    - flex rows, stretched by `align-items`;
+    - border-box sizing with padding, a width and a max-height;
+    - an author's aspect-ratio;
+    - min and max height;
+    - grid items;
+    - a percentage width in a shrink-to-fit parent.
+- **Paint** (the `image_paint` fixture, against Chromium's pixels at 1x
+  and 2x): the image is drawn over the content box, after the `img`'s
+  background and border, under its clip.
+  - `ImagePipeline::draw_rect` samples linearly across a mip chain
+    (`upload_rgba8_mipmapped`: 2 x 2 box-filtered levels), inside the
+    target's scissor.
+  - The fixture's 1 px stripes, shrunk 3x and 9x, aliased to black and
+    white without mips, where Chromium shows grey 127.
+- **Fixture images.** They are in `elements-corpus/fixtures/images/`.
+  The oracle and the paint harness copy them beside their pages, and
+  the corpus tests register them by file name.
+- **Demo.** `images`: a history list with a 48 x 32 thumbnail per turn,
+  from bundled 96 x 64 PNGs. The pixel checks read each quadrant, and
+  either side of the first thumbnail's quadrant edges, where a
+  half-texel offset blends them.
+
 ## Decisions (2026-10-23)
 
 - **D1 Scoping.** A compiler change in S5: `mount` registers its
