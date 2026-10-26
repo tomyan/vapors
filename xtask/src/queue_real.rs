@@ -3,7 +3,7 @@
 //! action, and the head checked after checkout), `gate --pr` run by the
 //! queue's own binary (main's, never the PR's), and the publish.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -93,8 +93,7 @@ impl Ops for Real<'_> {
     fn gate(&self, number: u64, head: &str) -> Result<Ended, String> {
         self.at(head)?;
         crate::queue_pins::move_siblings(self.run())?;
-        let exe = std::env::current_exe().map_err(|e| format!("the queue's own path: {e}"))?;
-        gate_child(gate_command(&exe, self.run(), number))
+        gate_child(gate_command(self.run(), number)?)
     }
 
     fn checks(&self, number: u64) -> Result<Gate, String> {
@@ -137,13 +136,19 @@ impl Ops for Real<'_> {
 
 /// `<the queue's own binary> gate --pr N`, run in the run worktree: main's
 /// code finds the PR, runs the PR's ci.yml steps, and posts the result.
-#[must_use]
-pub fn gate_command(exe: &PathBuf, run: &Path, number: u64) -> Command {
+/// The binary is this process's own (`current_exe`), never one the PR
+/// builds.
+///
+/// # Errors
+///
+/// This process's path cannot be read.
+pub fn gate_command(run: &Path, number: u64) -> Result<Command, String> {
+    let exe = std::env::current_exe().map_err(|e| format!("the queue's own path: {e}"))?;
     let mut command = Command::new(exe);
     command
         .args(["gate", "--pr", &number.to_string()])
         .current_dir(run);
-    command
+    Ok(command)
 }
 
 /// Run the gate child within `GATE_DEADLINE`; how it ended.
@@ -178,3 +183,7 @@ fn ended(status: std::process::ExitStatus) -> Result<Ended, String> {
         (None, None) => Err("the gate ended with neither a code nor a signal".into()),
     }
 }
+
+#[cfg(test)]
+#[path = "queue_real_tests.rs"]
+mod tests;

@@ -32,3 +32,23 @@ fn the_state_reads_back_from_its_file() {
         Ok(State::default())
     );
 }
+
+#[test]
+fn a_state_file_of_another_shape_is_refused_naming_it() {
+    // Given: valid JSON whose backoff holds a string, not a time
+    let path =
+        std::env::temp_dir().join(format!("xtask-queue-state-bad-{}.json", std::process::id()));
+    std::fs::write(&path, r#"{"backoff":{"aaa":"soon"},"said":{}}"#).expect("written");
+
+    // When
+    let read = State::load(&path);
+    let _ = std::fs::remove_file(&path);
+
+    // Then
+    let why = read.expect_err("refused");
+    assert!(why.contains(&path.display().to_string()), "{why}");
+    assert!(
+        why.contains("not the queue's state (backoff); fix: delete it"),
+        "{why}"
+    );
+}
