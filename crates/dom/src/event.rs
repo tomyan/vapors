@@ -24,6 +24,10 @@ pub struct Pointer {
     pub offset: [f32; 2],
     /// 1 for the mouse; each touch has its own (3-E1b).
     pub id: u32,
+    /// Whether a button or finger is down for this event, so a listener
+    /// may capture the pointer: on `pointerdown` and on `pointermove`
+    /// while pressed.
+    pub pressed: bool,
 }
 
 /// What a listener asked of the pointer's capture.
@@ -93,7 +97,17 @@ impl Event {
     /// to the element whose listener this is, wherever the pointer goes,
     /// until `pointerup`. The web's `this.setPointerCapture(e.pointerId)`
     /// in a listener, with the listener's element standing for `this`.
+    ///
+    /// # Panics
+    /// On an event with no pressed pointer (a `click`, a release, a key),
+    /// as the web's `setPointerCapture` throws `InvalidStateError`: the
+    /// capture would be dropped otherwise, with nothing said.
     pub fn set_pointer_capture(&mut self) {
+        assert!(
+            self.pointer.is_some_and(|pointer| pointer.pressed),
+            "set_pointer_capture in a `{}` listener: there is no pressed pointer to capture; call it from pointerdown, or pointermove while pressed",
+            self.name
+        );
         self.capture = Some(Capture::Set);
     }
 

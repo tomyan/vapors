@@ -119,7 +119,12 @@ fn capture_moving_between_elements_is_lost_by_one_then_got_by_the_other() {
     doc.borrow_mut().listen(
         row,
         "pointermove",
-        Box::new(|e: &mut Event| e.set_pointer_capture()),
+        Box::new(|e: &mut Event| {
+            // only while pressed: capture is refused without a button down
+            if e.pointer().is_some_and(|p| p.pressed) {
+                e.set_pointer_capture();
+            }
+        }),
     );
     let log = Log::default();
     for (node, label) in [(a, "a"), (row, "row")] {

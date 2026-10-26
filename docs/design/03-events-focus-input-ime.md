@@ -51,7 +51,15 @@ with the listener's element as `this`; `release_pointer_capture()`
 likewise. A change takes effect before the pointer's next event, with
 `lostpointercapture` then `gotpointercapture`; `pointerup` releases.
 `Event::client()` and `offset()` (from the target's padding box) are
-CSS px, unrounded. Leaving the window while captured keeps the press.
+CSS px, unrounded (`[0, 0]` on an event that is not a pointer's).
+Leaving the window while captured keeps the press. While captured,
+`:hover` stays on the capturing element and a second `pointerdown` goes
+to it. A capturing element removed from the document gives the pointer
+back, and its `lostpointercapture` goes nowhere (the web fires it on
+the removed element, where nothing can observe it). Asking for capture
+with no pressed pointer (from `click`, a release, `got`/`lostpointercapture`
+or a key) panics, naming the event, as the web throws
+`InvalidStateError` (review-v77).
 Moves are dispatched as they arrive and layout waits for the frame, so
 many moves between frames are one update (`elements_app_drag.rs`).
 
