@@ -5,6 +5,9 @@
 //!
 //! - `at WxH`: the viewport, at most once.
 //! - `listen <type>…`: the event types logged, once, before any action.
+//! - `capture <target>…`: elements that capture the pointer on
+//!   `pointerdown` (`setPointerCapture` in Chromium), at most once.
+//! - Touch: `touch-down X Y`, `touch-move X Y`, `touch-up X Y`, one finger.
 //! - Actions: `click X Y`, `tap X Y`, `press X Y`, `release X Y`,
 //!   `move X Y`, `wheel X Y DX DY` (CSS px, DOM signs), `key <Key>` with
 //!   `+`-joined modifiers (`Shift+Tab`), `type "<text>"`, `frame`.
@@ -25,6 +28,8 @@ pub struct Script {
     pub viewport: Option<(u32, u32)>,
     /// `listen`'s event types.
     pub listen: Vec<String>,
+    /// `capture`'s targets: each captures the pointer on `pointerdown`.
+    pub capture: Vec<String>,
     /// The actions, each with the expectations after it.
     pub steps: Vec<Step>,
 }
@@ -40,55 +45,7 @@ pub struct Step {
     pub line: usize,
 }
 
-/// An input, in CSS px.
-#[derive(Debug, PartialEq)]
-pub enum Action {
-    /// Press and release the left button.
-    Click(f64, f64),
-    /// A touch's start and end.
-    Tap(f64, f64),
-    /// Press the left button.
-    Press(f64, f64),
-    /// Release the left button.
-    Release(f64, f64),
-    /// Move the pointer.
-    Move(f64, f64),
-    /// A wheel turn at x, y by dx, dy.
-    Wheel {
-        /// Where, across.
-        x: f64,
-        /// Where, down.
-        y: f64,
-        /// How far across, positive to the right.
-        dx: f64,
-        /// How far down, positive down.
-        dy: f64,
-    },
-    /// A key, with `+`-joined modifiers.
-    Key(String),
-    /// Text, one key per character.
-    Type(String),
-    /// Wait for the next painted frame.
-    Frame,
-}
-
-/// What must hold after an action.
-#[derive(Debug, PartialEq)]
-pub enum Expect {
-    /// An event of `kind` at `target` was logged.
-    Event {
-        /// The event type.
-        kind: String,
-        /// Where it was dispatched.
-        target: String,
-    },
-    /// No event of this type was logged.
-    NoEvent(String),
-    /// This element has focus.
-    Focus(String),
-    /// This element has focus and matches `:focus-visible`.
-    FocusVisible(String),
-}
+pub use crate::events_steps::{Action, Expect};
 
 /// The script `text` of fixture `name`.
 ///
@@ -153,6 +110,12 @@ fn directive(script: &mut Script, line: &str, number: usize) -> Result<(), Strin
             .map(|size| script.viewport = Some(size)),
         "listen" if !script.listen.is_empty() => Err("a second `listen`".into()),
         "listen" => listen(rest).map(|types| script.listen = types),
+        "capture" if !script.capture.is_empty() => Err("a second `capture`".into()),
+        "capture" if fields.is_empty() => Err("`capture` takes targets".into()),
+        "capture" => {
+            script.capture = fields.iter().map(|f| (*f).to_owned()).collect();
+            Ok(())
+        }
         "expect" => expect(script, &fields, number),
         _ if script.listen.is_empty() && is_action(word) => Err("an action before `listen`".into()),
         _ => action(word, &fields, rest).map(|action| {
@@ -207,6 +170,9 @@ fn expect(script: &mut Script, fields: &[&str], number: usize) -> Result<(), Str
     Ok(())
 }
 
+#[cfg(test)]
+#[path = "events_script_capture_tests.rs"]
+mod capture_tests;
 #[cfg(test)]
 #[path = "events_script_tests.rs"]
 mod tests;

@@ -50,6 +50,9 @@ pub fn calls(action: &Action, pointer: &mut Pointer) -> Vec<(&'static str, Value
         }
         Action::Move(x, y) => vec![moved(*x, *y, pointer.held)],
         Action::Tap(x, y) => tap(*x, *y),
+        Action::TouchDown(x, y) => vec![touch("touchStart", Some((*x, *y)))],
+        Action::TouchMove(x, y) => vec![touch("touchMove", Some((*x, *y)))],
+        Action::TouchUp(..) => vec![touch("touchEnd", None)],
         Action::Wheel { x, y, dx, dy } => {
             vec![(
                 "Input.dispatchMouseEvent",
@@ -77,6 +80,18 @@ fn moved(x: f64, y: f64, held: bool) -> (&'static str, Value) {
     (
         "Input.dispatchMouseEvent",
         json!({ "type": "mouseMoved", "x": x, "y": y, "button": button, "buttons": buttons }),
+    )
+}
+
+/// One finger's touch event: where it is, or none once it lifted.
+fn touch(kind: &str, at: Option<(f64, f64)>) -> (&'static str, Value) {
+    let points: Vec<Value> = at
+        .map(|(x, y)| json!({ "x": x, "y": y }))
+        .into_iter()
+        .collect();
+    (
+        "Input.dispatchTouchEvent",
+        json!({ "type": kind, "touchPoints": points }),
     )
 }
 

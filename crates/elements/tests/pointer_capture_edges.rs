@@ -149,3 +149,22 @@ fn capture_moving_between_elements_is_lost_by_one_then_got_by_the_other() {
         ]
     );
 }
+
+#[test]
+fn an_event_names_its_target_to_listeners_up_the_tree() {
+    // Given: a listener on .row hears a press on .a
+    let (doc, row, a, _b) = setup(PADDED);
+    let heard = std::rc::Rc::new(std::cell::Cell::new(None));
+    let into = std::rc::Rc::clone(&heard);
+    doc.borrow_mut().listen(
+        row,
+        "pointerdown",
+        Box::new(move |e: &mut Event| into.set(e.target())),
+    );
+
+    // When
+    Document::pointer_pressed(&doc, [15.0, 5.0]);
+
+    // Then
+    assert_eq!(heard.get(), Some(a));
+}

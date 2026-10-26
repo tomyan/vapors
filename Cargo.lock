@@ -2864,6 +2864,7 @@ dependencies = [
  "vapors-dom",
  "vapors-elements",
  "vapors-gpu-harness",
+ "vapors-platform",
  "vapors-renderer",
  "vapors-scene",
  "vapors-signals",

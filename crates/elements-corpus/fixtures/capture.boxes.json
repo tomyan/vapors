@@ -1,0 +1,9 @@
+{"viewports": [
+{"viewport": [640,400], "scale": 1,
+"boxes": [
+{"height":80,"tag":"html","width":640,"x":0,"y":0},
+{"height":80,"tag":"body","width":640,"x":0,"y":0},
+{"height":40,"tag":"div","width":100,"x":0,"y":0},
+{"height":40,"tag":"div","width":100,"x":0,"y":40}
+]}
+]}

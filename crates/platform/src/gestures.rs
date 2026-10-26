@@ -20,8 +20,9 @@ use crate::event::{Event, TouchPhase};
 /// A press longer than this is not a tap; it is under Android's 400 ms
 /// long press so a long press never counts.
 const TAP_TIME: Duration = Duration::from_millis(300);
-/// A press that moves further than this is not a tap.
-const TAP_SLOP: f32 = 20.0;
+/// A press that moves further than this is not a tap, and a finger pans
+/// only once it has moved further than this.
+pub const TAP_SLOP: f32 = 20.0;
 /// A second tap starting later than this after the first ended is a new tap.
 const DOUBLE_TAP_TIME: Duration = Duration::from_millis(300);
 /// A second tap further than this from the first is a new tap.

@@ -58,8 +58,12 @@ pub fn play(
         pointer: Pointer::default(),
     };
     let types = serde_json::to_string(&script.listen).map_err(|e| e.to_string())?;
+    let capture = serde_json::to_string(&script.capture).map_err(|e| e.to_string())?;
+    let page_side = PAGE_SIDE
+        .replace("__TYPES__", &types)
+        .replace("__CAPTURE__", &capture);
     player
-        .evaluate(&PAGE_SIDE.replace("__TYPES__", &types), deadline)
+        .evaluate(&page_side, deadline)
         .map_err(|e| format!("{name}.events: {e}"))?;
     let (answers, unmet_lines) = player.steps(name, script)?;
     player
