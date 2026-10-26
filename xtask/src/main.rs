@@ -4,6 +4,9 @@
 //! fact and, on failure, what was expected, what was found, how to fix
 //! it and the exact command that reproduces it.
 
+mod builds;
+mod builds_config;
+mod builds_tree;
 mod ci;
 mod cli;
 mod command;
@@ -97,6 +100,7 @@ fn main() -> ExitCode {
         Command::CheckTools => return setup::check(),
         Command::CheckFiles => return files::run(),
         Command::CheckLayers => return layers::run(),
+        Command::CheckBuilds => return builds::run(),
         Command::CheckImports => return imports::run(),
         Command::GpuInfo => return gpu_info::run(),
         Command::Screenshot {

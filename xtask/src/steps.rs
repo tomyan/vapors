@@ -25,6 +25,17 @@ fn layers() -> Step {
     )
 }
 
+/// No shipped build's tree holds a `[server_only]` crate;
+/// `cargo xtask check-builds`.
+fn builds() -> Step {
+    Step::new(
+        "builds",
+        "cargo",
+        &["xtask", "check-builds"],
+        "remove the dependency the line names, or move the code out of what the build depends on; the lists are [server_only] in .config/factory.toml",
+    )
+}
+
 /// A crate named in `[imports.<crate>]` only where listed;
 /// `cargo xtask check-imports`.
 fn imports() -> Step {
@@ -193,7 +204,7 @@ pub fn deny_check() -> Vec<Step> {
 
 /// Formatting and lints only.
 pub fn lint() -> Vec<Step> {
-    vec![fmt(), files(), layers(), imports(), clippy()]
+    vec![fmt(), files(), layers(), builds(), imports(), clippy()]
 }
 
 /// The unit tier.

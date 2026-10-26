@@ -80,6 +80,18 @@ max_lines = "220"
 "cargo-bins/cargo-binstall" = "installs cargo-binstall, which cargo xtask setup --ci needs; that line is setup"
 "actions/upload-artifact" = "uploads files for people to read; nothing is checked"
 
+# Crates only the SaaS or corp product may use, kept out of each shipped
+# build's dependency tree by `cargo xtask check-builds` (touche's
+# docs/decisions/2026-10-26-product-builds-separate.md). Each build is
+# `<name> = "<package> <target triple, or host>"`. While no crate is
+# listed, none_because says why.
+[server_only]
+none_because = "nothing SaaS- or corp-only exists yet (Tom's goal and the lead's mechanism, 2026-10-26)"
+
+[server_only.builds]
+page = "vapors-web-demo wasm32-unknown-unknown"
+app = "vapors-app host"
+
 # web_sys, the browser's API, only in the platform layer; every other
 # crate reaches the browser through vapors-platform
 # (`cargo xtask check-imports`, the `imports` step).
