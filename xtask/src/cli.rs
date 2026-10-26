@@ -70,6 +70,14 @@ pub enum Command {
     /// trunk's post-build hook: version.json and `?v=<build>` on the
     /// page's own files in trunk's staging directory.
     StampPage,
+    /// Send the walk's frames and facts to a model for the UX checklist's
+    /// judged items (settings: `[ux]` in .config/factory.toml).
+    UxReview {
+        /// Build the request and print its estimated tokens and worst-case
+        /// cost; send nothing.
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Rebuild the web package on save (trunk serve, debug) behind the tailnet https proxy.
     Dev {
         /// A key for the debug page, as `<provider>=<file>` (anthropic or
@@ -81,7 +89,15 @@ pub enum Command {
         replace: bool,
     },
     /// Run every step of .github/workflows/ci.yml here, in order, ending `gate: pass <sha>`.
-    Gate,
+    Gate {
+        /// Post the gate's last lines to this pull request (`--pr` alone:
+        /// the PR whose head is this branch), checking its head is HEAD.
+        #[arg(long, num_args = 0..=1, value_name = "N")]
+        // Allowed: clap's form for a flag whose value may be left out
+        // (`--pr` alone, `--pr N`), so the two cases need no sentinel.
+        #[allow(clippy::option_option)]
+        pr: Option<Option<u64>>,
+    },
     /// Check formatting and lints without running tests.
     Lint,
     /// Check dependencies with cargo-deny: advisories, bans, licences, sources.
