@@ -177,6 +177,16 @@ and alias, with `wisp.rs` included at the crate root; a tag that
 resolves to no component in the directory is not checked, and the build
 prints it as a cargo warning with its file and line (review-v67).
 
+Snippet parameters (R1b, the lead's decision on review-v66 finding 4,
+following Svelte, whose parameters are reactive): a `{render}` passes
+its arguments as a closure (`vapors_dom::Args`), and each parameter is
+a `Memo` of its argument, so a kept keyed row whose item changes
+updates the snippet's nodes in place, without a remount. A parameter
+type is owned, `PartialEq` and `Clone`; `Signal<..>` and `Memo<..>`
+parameters are refused as redundant. Snippets are declared in
+dependency order within their list, so forward references work;
+recursion is refused for now.
+
 ## Deliberately left out
 
 - **Tracking reads after an `await`.** Svelte tracks them; Solid 2 and
