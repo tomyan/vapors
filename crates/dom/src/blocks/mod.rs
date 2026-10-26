@@ -1,8 +1,9 @@
-//! The runtime behind `{if}` and `{for}`: fragments that own their
+//! The runtime behind `{if}`, `{for}` and `{render expr()}`: fragments that own their
 //! signals and effects, built before an anchor node and removed as a
 //! unit.
 
 mod conditional;
+mod dynamic;
 mod keyed;
 mod rows;
 mod sequence;
@@ -15,6 +16,7 @@ use vapors_signals::{Owner, untrack};
 use crate::{Dom, NodeId, Root, current_nodes};
 
 pub use conditional::conditional;
+pub use dynamic::dynamic;
 pub use keyed::keyed;
 
 /// A built branch or row: what it placed at its top level and the

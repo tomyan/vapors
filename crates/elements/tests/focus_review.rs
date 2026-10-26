@@ -175,3 +175,21 @@ fn tab_with_control_alt_or_meta_does_not_move_focus() {
         );
     }
 }
+
+#[test]
+fn a_prevented_pointerdown_does_not_focus() {
+    // Given: Save's pointerdown listener prevents the default, as
+    // Chromium 155 answers (gpu_events_a_prevented_pointerdown_does_not_focus_in_chromium)
+    let page = page();
+    page.doc.borrow_mut().listen(
+        page.save,
+        "pointerdown",
+        Box::new(|e: &mut Event| e.prevent_default()),
+    );
+
+    // When: a press on Save
+    Document::pointer_pressed(&page.doc, [5.0, 5.0]);
+
+    // Then
+    assert_eq!(page.doc.borrow().active_element(), None);
+}
