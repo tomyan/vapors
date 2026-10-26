@@ -6,6 +6,7 @@
 
 mod cursor;
 mod elements_app;
+pub mod frame;
 mod painter;
 mod pointer;
 #[cfg(test)]
