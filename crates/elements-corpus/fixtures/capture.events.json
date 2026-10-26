@@ -1,0 +1,231 @@
+{
+  "steps": [
+    {
+      "action": "Move(50.0, 20.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "div#thumb",
+          "type": "pointermove"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 5
+    },
+    {
+      "action": "Press(50.0, 20.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "div#thumb",
+          "type": "pointerdown"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 7
+    },
+    {
+      "action": "Move(50.0, 60.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "div#thumb",
+          "type": "gotpointercapture"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "div#thumb",
+          "type": "pointermove"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 9
+    },
+    {
+      "action": "Move(300.0, 300.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "div#thumb",
+          "type": "pointermove"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 12
+    },
+    {
+      "action": "Release(300.0, 300.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "div#thumb",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "div#thumb",
+          "type": "lostpointercapture"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "div#thumb",
+          "type": "click"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 14
+    },
+    {
+      "action": "Move(50.0, 60.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "div#track",
+          "type": "pointermove"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 17
+    },
+    {
+      "action": "TouchDown(50.0, 20.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "div#thumb",
+          "type": "pointerdown"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 19
+    },
+    {
+      "action": "TouchMove(50.0, 60.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "div#thumb",
+          "type": "gotpointercapture"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "div#thumb",
+          "type": "pointermove"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "div#thumb",
+          "type": "pointercancel"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "div#thumb",
+          "type": "lostpointercapture"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 21
+    },
+    {
+      "action": "TouchUp(50.0, 60.0)",
+      "events": [],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 23
+    },
+    {
+      "action": "TouchDown(50.0, 60.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "div#track",
+          "type": "pointerdown"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 25
+    },
+    {
+      "action": "TouchMove(50.0, 20.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "div#track",
+          "type": "gotpointercapture"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "div#track",
+          "type": "pointermove"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "div#track",
+          "type": "pointercancel"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "div#track",
+          "type": "lostpointercapture"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 27
+    },
+    {
+      "action": "TouchUp(50.0, 20.0)",
+      "events": [],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 29
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 // The .events player's page side (events_play.rs). __TYPES__ is the
-// script's `listen` list. Each event of those types is kept when it
+// script's `listen` list, __CAPTURE__ its `capture` targets. Each event of those types is kept when it
 // reaches the window in the capture phase, so every one is seen once,
 // whatever stops it later; its fields are read when the log is drained,
 // after it has run, so defaultPrevented is final.
@@ -19,6 +19,14 @@
     return name(t.parentElement) + ">" + t.localName + ":nth-child(" + index + ")";
   };
   for (const type of types) window.addEventListener(type, (event) => log.push(event), true);
+  // `capture`: each target captures the pointer on pointerdown, as a
+  // vapors listener calling set_pointer_capture does; one that names
+  // more or fewer than one element stops the script.
+  for (const target of __CAPTURE__) {
+    const found = document.querySelectorAll(target);
+    if (found.length !== 1) throw new Error("capture " + target + " names " + found.length + " elements, not one");
+    found[0].addEventListener("pointerdown", (e) => e.currentTarget.setPointerCapture(e.pointerId));
+  }
   window.__eventsDrain = () => log.splice(0).map((e) => {
     const entry = { type: e.type, target: name(e.target), bubbles: e.bubbles, defaultPrevented: e.defaultPrevented };
     if ("pointerType" in e && e.pointerType) entry.pointerType = e.pointerType;

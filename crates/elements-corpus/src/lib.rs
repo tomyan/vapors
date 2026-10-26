@@ -21,6 +21,8 @@ pub mod events_input;
 pub mod events_oracle;
 pub mod events_play;
 pub mod events_script;
+pub mod events_steps;
+pub mod events_vapors;
 pub mod oracle;
 pub mod oracle_files;
 pub mod page;
@@ -60,6 +62,7 @@ fixtures![
     block_margins::BlockMargins,
     borders::Borders,
     buttons::Buttons,
+    capture::Capture,
     centred_panel::CentredPanel,
     clipping::Clipping,
     flex_row::FlexRow,

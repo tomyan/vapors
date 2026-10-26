@@ -93,6 +93,7 @@ pub(super) fn dispatch(
     target: NodeId,
     mut event: Event,
 ) -> Vec<(NodeId, Capture)> {
+    event = event.at(target);
     let along = document.borrow().listeners_along(target, event.name());
     let mut asked = Vec::new();
     for (node, listeners) in along {

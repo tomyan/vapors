@@ -1,5 +1,7 @@
 //! The event a listener receives.
 
+use crate::NodeId;
+
 /// An event delivered to a listener. The payload fields are set by
 /// the kind of event: `input` and `change` carry `value`, `change` on
 /// a checkbox carries `checked`.
@@ -12,6 +14,7 @@ pub struct Event {
     default_prevented: bool,
     pointer: Option<Pointer>,
     capture: Option<Capture>,
+    target: Option<NodeId>,
 }
 
 /// Where a pointer event happened, and which pointer: positions in CSS
@@ -81,6 +84,20 @@ impl Event {
     #[must_use]
     pub fn offset(&self) -> [f32; 2] {
         self.pointer.map_or([0.0, 0.0], |pointer| pointer.offset)
+    }
+
+    /// Names the node the event is dispatched to: the dispatcher sets it.
+    #[must_use]
+    pub fn at(mut self, target: NodeId) -> Event {
+        self.target = Some(target);
+        self
+    }
+
+    /// The node the event was dispatched to (the DOM's `target`), which
+    /// stays the same as it bubbles; `None` before dispatch.
+    #[must_use]
+    pub fn target(&self) -> Option<NodeId> {
+        self.target
     }
 
     /// The pointer's data, on a pointer event.

@@ -1,0 +1,30 @@
+# Pointer capture (3-E1). The thumb is x 0..100, y 0..40 and captures on
+# pointerdown; the track is y 40..80 and does not.
+listen pointerdown pointermove pointerup pointercancel gotpointercapture lostpointercapture click
+capture div#thumb
+move 50 20                    over the thumb
+expect event pointermove div#thumb
+press 50 20                   the thumb captures
+expect event pointerdown div#thumb
+move 50 60                    over the track, captured
+expect event gotpointercapture div#thumb
+expect event pointermove div#thumb
+move 300 300                  off both, captured
+expect event pointermove div#thumb
+release 300 300               the capture ends
+expect event pointerup div#thumb
+expect event lostpointercapture div#thumb
+move 50 60                    the track again, not captured
+expect event pointermove div#track
+touch-down 50 20              a finger on the thumb
+expect no event click
+touch-move 50 60              over the track, captured
+expect no event click
+touch-up 50 60
+expect no event click
+touch-down 50 60              a finger on the track: captured without asking
+expect no event click
+touch-move 50 20              over the thumb
+expect no event click
+touch-up 50 20
+expect no event click

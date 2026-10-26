@@ -23,7 +23,18 @@ pub const KEY_NAMES: [&str; 12] = [
 
 pub fn is_action(word: &str) -> bool {
     [
-        "click", "tap", "press", "release", "move", "wheel", "key", "type", "frame",
+        "click",
+        "tap",
+        "press",
+        "release",
+        "move",
+        "wheel",
+        "key",
+        "type",
+        "frame",
+        "touch-down",
+        "touch-move",
+        "touch-up",
     ]
     .contains(&word)
 }
@@ -36,6 +47,9 @@ pub fn action(word: &str, fields: &[&str], rest: &str) -> Result<Action, String>
         "press" => point(word, fields).map(|(x, y)| Action::Press(x, y)),
         "release" => point(word, fields).map(|(x, y)| Action::Release(x, y)),
         "move" => point(word, fields).map(|(x, y)| Action::Move(x, y)),
+        "touch-down" => point(word, fields).map(|(x, y)| Action::TouchDown(x, y)),
+        "touch-move" => point(word, fields).map(|(x, y)| Action::TouchMove(x, y)),
+        "touch-up" => point(word, fields).map(|(x, y)| Action::TouchUp(x, y)),
         "wheel" => wheel(fields),
         "key" => exactly(word, fields, 1).and_then(|()| key(fields[0])),
         "type" => quoted(rest).map(Action::Type),
