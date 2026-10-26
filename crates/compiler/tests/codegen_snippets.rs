@@ -181,3 +181,16 @@ fn a_snippet_named_only_in_an_attribute_is_declared_before_the_one_naming_it() {
     let a = code.find("let a: Snippet<()>").expect("a declared");
     assert!(b < a, "{code}");
 }
+
+#[test]
+fn a_prop_that_is_not_declared_a_snippet_renders_through_the_dynamic_block() {
+    // When: an Option<Snippet> prop, rendered by its plain name
+    let code = generated_with(
+        "#[prop]\nlet maybe: Option<Snippet> = None;",
+        "<p>{render maybe()}</p>",
+    );
+
+    // Then: not `maybe.render(..)`, which rustc would refuse
+    assert_has(&code, "vapors_dom::Renderable::snippet(&(maybe))");
+    assert_lacks(&code, "maybe.render(");
+}

@@ -65,6 +65,22 @@ fn a_render_callee_may_be_any_expression() {
 }
 
 #[test]
+fn a_comment_before_the_callee_does_not_shift_the_arguments() {
+    // When
+    let doc = parse_ok("<div>{render /* c */ foo(1, 2)}</div>");
+
+    // Then
+    let div = element(&doc.children[0]);
+    let Node::Render(render) = &div.children[0] else {
+        panic!("expected a render, got {:?}", div.children[0]);
+    };
+    assert_eq!(
+        (render.name.as_str(), render.args.as_str()),
+        ("foo", "1, 2")
+    );
+}
+
+#[test]
 fn a_render_that_is_not_a_call_is_refused() {
     // When
     let err = common::parse_err("<div>{render footer}</div>");

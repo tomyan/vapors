@@ -39,7 +39,14 @@ impl Parser<'_> {
         };
         let call = syn::parse_str::<syn::ExprCall>(&rest.code).map_err(|_| refuse())?;
         let callee = call.func.span().source_text().ok_or_else(refuse)?;
-        let parens = rest.code[callee.len()..].trim();
+        // the arguments from their parentheses' own span, so nothing
+        // before the callee (a comment) shifts them (review-v73)
+        let parens = call
+            .paren_token
+            .span
+            .join()
+            .source_text()
+            .ok_or_else(refuse)?;
         self.bump(hole.len);
         Ok(Node::Render(Render {
             name: callee,

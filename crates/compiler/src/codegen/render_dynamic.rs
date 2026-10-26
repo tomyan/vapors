@@ -9,12 +9,30 @@ use crate::CompileError;
 use crate::ast::{Expr, Render};
 
 impl Emitter<'_> {
-    /// Whether the callee is a plain name that is not a signal: a
-    /// snippet, prop or binding rendered once, in place.
+    /// Whether the callee is rendered by name, in place: a local
+    /// snippet, a prop declared `Snippet` or `Snippet<..>`, or a plain
+    /// name nothing declares (which `check_render` refuses). Anything
+    /// else, an `Option<Snippet>` prop included, goes through the dynamic
+    /// block, where `Renderable` takes it and rustc checks the type
+    /// (review-v73).
     pub(super) fn renders_by_name(&self, render: &Render) -> bool {
         let name = &render.name;
+        if self.snippets.iter().any(|snippet| &snippet.name == name) {
+            return true;
+        }
+        let declared_snippet = self.script.props.iter().any(|prop| {
+            let ty = prop.ty.trim().trim_start_matches("vapors_dom::");
+            &prop.name == name && (ty == "Snippet" || ty.starts_with("Snippet<"))
+        });
+        // a plain name nothing declares stays here, to be refused by name
         let plain = name.chars().all(|c| c.is_alphanumeric() || c == '_');
-        plain && !self.unwrappable().contains(name)
+        let known = self.unwrappable().contains(name)
+            || self
+                .script
+                .declared
+                .iter()
+                .any(|(declared, _)| declared == name);
+        declared_snippet || (plain && !known)
     }
 
     pub(super) fn emit_dynamic_render(

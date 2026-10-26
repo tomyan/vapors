@@ -128,6 +128,11 @@ the one difference from the brief in this slice.
   identity (clones of one snippet are equal; two built alike are not),
   so create snippets once: one made inside the expression, on every
   read, is rebuilt on every change of what the expression reads.
+  By name, in place, are local snippets and props declared `Snippet` or
+  `Snippet<..>`; anything else, an `Option<Snippet>` prop included,
+  takes the expression route, where rustc checks the type against
+  `Renderable` (in the generated file). `None` always renders nothing,
+  silently: there is no way to say a snippet was expected.
 - **Snippet parameters are reactive.** The render passes its arguments
   as a closure, and each parameter is a `Memo` of its argument, so a
   snippet follows its arguments as they change: a kept `{for}` row whose
