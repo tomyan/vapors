@@ -33,6 +33,7 @@ fn frame_pixels(scale_factor: f64) -> Vec<u8> {
         texture: &texture,
         index: 0,
         scale_factor,
+        now: vapors_platform::Instant::now(),
     });
     read_rgba8(&gpu.device, &gpu.queue, &texture)
 }
