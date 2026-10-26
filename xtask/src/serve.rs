@@ -5,8 +5,11 @@
 //! that commit's, runs `[serve] check` on it within its deadline
 //! (`serve_check.rs`; touche's `check_dist` refuses, among the rest, any
 //! file requesting the dev server's keys), publishes a copy under the
-//! home directory (`serve_publish.rs`), and mounts it, refusing to
-//! replace another target unless `--replace` (`serve_mount.rs`).
+//! home directory (`serve_publish.rs`), starts static-web-server on it
+//! at 127.0.0.1 (`serve_static.rs`), and mounts that, refusing to replace
+//! another target unless `--replace` (`serve_mount.rs`). Then it fetches
+//! `/` and the wasm through the tailnet URL and fails unless they come
+//! compressed, with their cache headers (`serve_verify.rs`).
 
 #[path = "serve_check.rs"]
 mod check;
@@ -14,6 +17,10 @@ mod check;
 mod git;
 #[path = "serve_publish.rs"]
 mod publish;
+#[path = "serve_static.rs"]
+mod static_server;
+#[path = "serve_verify.rs"]
+mod verify;
 
 use std::path::Path;
 use std::process::ExitCode;
@@ -26,8 +33,8 @@ use crate::web::{Build, DIST, build_page};
 /// Serve the release build of main and print its URL.
 pub fn run(replace: bool) -> ExitCode {
     match serve(replace) {
-        Ok(url) => {
-            println!("ok   serve    {url} (the release build of main)");
+        Ok((url, checked)) => {
+            println!("ok   serve    {url} (the release build of main; {checked})");
             ExitCode::SUCCESS
         }
         Err(message) => {
@@ -38,7 +45,7 @@ pub fn run(replace: bool) -> ExitCode {
     }
 }
 
-fn serve(replace: bool) -> Result<String, String> {
+fn serve(replace: bool) -> Result<(String, String), String> {
     let tailscale = require_tailscale()?;
     let settings = settings()?;
     let root = std::env::current_dir().map_err(|e| format!("no current directory: {e}"))?;
@@ -48,12 +55,21 @@ fn serve(replace: bool) -> Result<String, String> {
     build_page(&Build::of(false))?;
     check::run_check(&settings.check, settings.check_deadline)?;
     publish::publish(&root.join(DIST), &settings.dir)?;
-    mount(
+    static_server::start(&settings.dir, settings.port, &home()?)?;
+    let url = mount(
         &tailscale,
-        &Target::Directory(&settings.dir),
+        &Target::LocalPort(settings.port),
         &settings.mount,
         replace,
-    )
+    )?;
+    let checked = verify::verify(&url, &settings.dir)?;
+    Ok((url, checked))
+}
+
+fn home() -> Result<std::path::PathBuf, String> {
+    std::env::var_os("HOME")
+        .map(Into::into)
+        .ok_or_else(|| "HOME is unset; fix: set it".to_owned())
 }
 
 fn settings() -> Result<Serve, String> {

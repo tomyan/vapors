@@ -1,8 +1,10 @@
 //! The pinned tool list in `.config/tools.toml`.
 //!
-//! The file is two flat tables, `[tools]` (crate name to version) and
+//! The file is three flat tables: `[tools]` (crate name to version),
 //! `[binaries]` (crate name to binary name, for crates whose binary is
-//! named differently). Any other shape is refused with the line number.
+//! named differently) and `[checksums]` (crate name to the installed
+//! binary's SHA-256, for a tool that serves pages). Any other shape is
+//! refused with the line number.
 
 use std::fmt;
 
@@ -15,6 +17,8 @@ pub struct Tool {
     pub binary: String,
     /// The exact version required.
     pub version: String,
+    /// The installed binary's SHA-256, lower-case hex, when pinned.
+    pub checksum: Option<String>,
 }
 
 /// Why a tools file could not be read.
@@ -36,6 +40,7 @@ enum Table {
     None,
     Tools,
     Binaries,
+    Checksums,
 }
 
 /// Parse the tools file. Refuses anything that is not a comment, a
@@ -44,6 +49,7 @@ pub fn parse(text: &str) -> Result<Vec<Tool>, ParseError> {
     let mut table = Table::None;
     let mut tools: Vec<Tool> = Vec::new();
     let mut binaries: Vec<(String, String)> = Vec::new();
+    let mut checksums: Vec<(String, String, usize)> = Vec::new();
     for (index, raw) in text.lines().enumerate() {
         let line = raw.trim();
         let number = index + 1;
@@ -53,6 +59,7 @@ pub fn parse(text: &str) -> Result<Vec<Tool>, ParseError> {
         match line {
             "[tools]" => table = Table::Tools,
             "[binaries]" => table = Table::Binaries,
+            "[checksums]" => table = Table::Checksums,
             _ => {
                 let (key, value) = key_value(line, number)?;
                 match table {
@@ -60,12 +67,15 @@ pub fn parse(text: &str) -> Result<Vec<Tool>, ParseError> {
                         binary: key.clone(),
                         crate_name: key,
                         version: value,
+                        checksum: None,
                     }),
                     Table::Binaries => binaries.push((key, value)),
+                    Table::Checksums => checksums.push((key, value, number)),
                     Table::None => {
                         return Err(ParseError {
                             line: number,
-                            reason: "entry before any [tools] or [binaries] header".into(),
+                            reason: "entry before any [tools], [binaries] or [checksums] header"
+                                .into(),
                         });
                     }
                 }
@@ -73,6 +83,7 @@ pub fn parse(text: &str) -> Result<Vec<Tool>, ParseError> {
         }
     }
     apply_binaries(&mut tools, &binaries)?;
+    apply_checksums(&mut tools, checksums)?;
     Ok(tools)
 }
 
@@ -108,6 +119,35 @@ fn apply_binaries(tools: &mut [Tool], binaries: &[(String, String)]) -> Result<(
     }
     Ok(())
 }
+
+fn apply_checksums(
+    tools: &mut [Tool],
+    checksums: Vec<(String, String, usize)>,
+) -> Result<(), ParseError> {
+    for (crate_name, checksum, line) in checksums {
+        if checksum.len() != 64 || !checksum.chars().all(|c| matches!(c, '0'..='9' | 'a'..='f')) {
+            return Err(ParseError {
+                line,
+                reason: format!(
+                    "[checksums] {crate_name} must be 64 lower-case hex digits (a SHA-256)"
+                ),
+            });
+        }
+        let tool = tools
+            .iter_mut()
+            .find(|t| t.crate_name == crate_name)
+            .ok_or_else(|| ParseError {
+                line,
+                reason: format!("[checksums] names `{crate_name}`, which is not in [tools]"),
+            })?;
+        tool.checksum = Some(checksum);
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+#[path = "tools_checksum_tests.rs"]
+mod checksum_tests;
 
 #[cfg(test)]
 mod tests {

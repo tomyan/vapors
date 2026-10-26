@@ -46,6 +46,7 @@ mod lock_owner;
 #[cfg(test)]
 mod lock_scratch;
 mod pixels;
+mod precompress;
 mod priority;
 mod queue;
 mod queue_act;
@@ -84,6 +85,7 @@ mod serve;
 mod serve_config;
 mod serve_mount;
 mod setup;
+mod setup_checksum;
 mod setup_install;
 mod stamp_page;
 mod step;

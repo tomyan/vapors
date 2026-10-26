@@ -5,6 +5,7 @@ fn sccache() -> Tool {
         crate_name: "sccache".into(),
         binary: "sccache".into(),
         version: "0.18.0".into(),
+        checksum: None,
     }
 }
 

@@ -13,10 +13,15 @@ cargo xtask ci            what CI runs: tools, fmt, clippy, wasm, unit, gpu; fas
 cargo xtask deny          cargo-deny by deny.toml: advisories, bans, licences, sources
 cargo xtask lint          fmt and clippy only
 cargo xtask wasm          clippy for the web package on wasm32-unknown-unknown
-cargo xtask web           trunk release build of the web package into target/web
+cargo xtask web           trunk release build of the web package into target/web, with
+                          brotli (.br) and gzip (.gz) copies of its wasm, js, css, html and json
 cargo xtask serve         the release build of main on the tailnet where [serve] says (from a
                           clean checkout at origin/main after `cargo xtask web`; [serve] check
-                          first, then a copy under ~/srv); prints the URL
+                          first, then a copy under ~/srv). Installs and restarts the user unit
+                          xtask-serve-<dir>.service: static-web-server on 127.0.0.1:[serve] port
+                          (compressed copies; hashed files immutable, the rest no-cache), mounted
+                          by tailscale serve; then fetches / and the wasm through the tailnet
+                          URL and fails unless both come compressed; prints the URL
 cargo xtask test          one tier (default unit)
 cargo run -p vapors-app --example demo -- hello
                           an F2c demo in a window (crates/demos)

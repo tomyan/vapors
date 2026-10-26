@@ -42,26 +42,22 @@ pub fn require_tailscale_in(path: Option<&OsStr>) -> Result<PathBuf, String> {
 }
 
 /// What `tailscale serve` puts behind https on the tailnet.
-pub enum Target<'a> {
-    /// A directory of static files.
-    Directory(&'a Path),
+pub enum Target {
     /// A local http server, as `http://127.0.0.1:<port>`.
     LocalPort(u16),
 }
 
-impl Target<'_> {
+impl Target {
     /// As `tailscale serve status --json` describes a mount of it.
     #[must_use]
     pub fn described(&self) -> String {
         match self {
-            Target::Directory(dir) => format!("Path {}", dir.display()),
             Target::LocalPort(_) => format!("Proxy {}", self.argument()),
         }
     }
 
     fn argument(&self) -> String {
         match self {
-            Target::Directory(dir) => dir.display().to_string(),
             Target::LocalPort(port) => format!("http://127.0.0.1:{port}"),
         }
     }
@@ -69,7 +65,7 @@ impl Target<'_> {
 
 /// `serve`'s arguments for `target` at `mount`.
 #[must_use]
-pub fn serve_arguments(target: &Target<'_>, mount: &Mount) -> Vec<String> {
+pub fn serve_arguments(target: &Target, mount: &Mount) -> Vec<String> {
     vec![
         "serve".into(),
         "--bg".into(),
@@ -84,7 +80,7 @@ pub fn serve_arguments(target: &Target<'_>, mount: &Mount) -> Vec<String> {
 /// password the failure prints the exact command for the person to run
 /// themselves. What that mount served before is replaced; other ports
 /// and paths are untouched.
-pub fn start_serving(tailscale: &Path, target: &Target<'_>, mount: &Mount) -> Result<(), String> {
+pub fn start_serving(tailscale: &Path, target: &Target, mount: &Mount) -> Result<(), String> {
     let arguments = serve_arguments(target, mount);
     let line = format!("sudo {} {}", tailscale.display(), arguments.join(" "));
     let mut command = Command::new("sudo");
@@ -102,7 +98,7 @@ pub fn start_serving(tailscale: &Path, target: &Target<'_>, mount: &Mount) -> Re
 /// tailscale failed, or the mount holds another target.
 pub fn mount(
     tailscale: &Path,
-    target: &Target<'_>,
+    target: &Target,
     mount: &Mount,
     replace: bool,
 ) -> Result<String, String> {

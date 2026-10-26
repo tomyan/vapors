@@ -42,7 +42,12 @@ pub fn check() -> ExitCode {
             found => {
                 ok = false;
                 println!("{}", mismatch(tool, found.as_deref()));
+                continue;
             }
+        }
+        if let Err(why) = crate::setup_checksum::verify(tool) {
+            ok = false;
+            println!("FAIL {:<18} {why}", tool.crate_name);
         }
     }
     if ok {
@@ -62,12 +67,14 @@ fn load_tools() -> Result<Vec<Tool>, String> {
 fn ensure(tool: &Tool) -> Result<(), String> {
     match installed_version(tool) {
         Some(version) if version == tool.version => {
+            crate::setup_checksum::verify(tool)?;
             println!("ok   {:<18} {version}", tool.crate_name);
             Ok(())
         }
         found => {
             println!("{}", setup_install::before_install(tool, found.as_deref()));
-            setup_install::install(tool)
+            setup_install::install(tool)?;
+            crate::setup_checksum::verify(tool)
         }
     }
 }
