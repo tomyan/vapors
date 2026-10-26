@@ -43,8 +43,11 @@ impl Document {
     /// gets `pointermove`; while captured, the capturing element does.
     pub fn pointer_moved(document: &Rc<RefCell<Document>>, point: Point) {
         process_pending(document, MOUSE, point);
-        let hit = document.borrow_mut().hover(point);
-        let target = document.borrow().pointer_target(MOUSE, point).or(hit);
+        document.borrow_mut().pointer.position = Some(point);
+        let target = match hover_capturing(document) {
+            Some(capturing) => Some(capturing),
+            None => document.borrow_mut().hover(point),
+        };
         if let Some(target) = target {
             let event = document
                 .borrow()
@@ -71,7 +74,8 @@ impl Document {
     /// ancestors become `:active`, and the target gets `pointerdown`.
     pub fn pointer_pressed(document: &Rc<RefCell<Document>>, point: Point) {
         process_pending(document, MOUSE, point);
-        let target = document.borrow_mut().press(point);
+        let target = document.borrow().pointer_target(MOUSE, point);
+        let target = document.borrow_mut().press(target);
         if let Some(target) = target {
             let event = document
                 .borrow()
@@ -121,10 +125,14 @@ impl Document {
     }
 
     /// The element `point` hits in the last painted update, or `None`
-    /// before the first, or after a refused one.
+    /// before the first, after a refused one, or where the element hit
+    /// has been removed since (review-v77, H1).
     #[must_use]
     pub fn hit(&self, point: Point) -> Option<NodeId> {
-        self.painted.as_ref()?.hit(point)
+        self.painted
+            .as_ref()?
+            .hit(point)
+            .filter(|node| self.contains(*node))
     }
 
     /// After an update: the element under the pointer's last position may
@@ -151,8 +159,9 @@ impl Document {
         target
     }
 
-    fn press(&mut self, point: Point) -> Option<NodeId> {
-        let target = self.hit(point);
+    /// `target`, the capturing element while captured (review-v77, M3),
+    /// becomes the pressed element and `:active` with its ancestors.
+    fn press(&mut self, target: Option<NodeId>) -> Option<NodeId> {
         self.set_flag_chain(States::ACTIVE, target);
         self.pointer.pressed = target;
         target
@@ -180,5 +189,5 @@ mod touch;
 #[path = "events_tree.rs"]
 mod tree;
 
-use capture::{MOUSE, dispatch_pointer, process_pending, release_capture};
+use capture::{MOUSE, dispatch_pointer, hover_capturing, process_pending, release_capture};
 use tree::dispatch;

@@ -51,7 +51,15 @@ with the listener's element as `this`; `release_pointer_capture()`
 likewise. A change takes effect before the pointer's next event, with
 `lostpointercapture` then `gotpointercapture`; `pointerup` releases.
 `Event::client()` and `offset()` (from the target's padding box) are
-CSS px, unrounded. Leaving the window while captured keeps the press.
+CSS px, unrounded (`[0, 0]` on an event that is not a pointer's).
+Leaving the window while captured keeps the press. While captured,
+`:hover` stays on the capturing element and a second `pointerdown` goes
+to it. A capturing element removed from the document gives the pointer
+back, and its `lostpointercapture` goes nowhere (the web fires it on
+the removed element, where nothing can observe it). Asking for capture
+with no pressed pointer (from `click`, a release, `got`/`lostpointercapture`
+or a key) panics, naming the event, as the web throws
+`InvalidStateError` (review-v77).
 Moves are dispatched as they arrive and layout waits for the frame, so
 many moves between frames are one update (`elements_app_drag.rs`).
 
@@ -61,8 +69,10 @@ there, and `pointercancel` ends it. The click is still the platform's
 tap, after the touch's own down and up, so one tap is one click. Until
 3-E4's `touch-action`, ownership is RELAXED (the lead's decision): a
 touch whose `pointerdown` listener called `set_pointer_capture` owns
-its pans, which then do not scroll; otherwise the first pan that moves
-a container cancels the touches no listener owns.
+its pans, which then do not scroll (Chromium cancels it all the same:
+only `touch-action: none` stops that); otherwise the first pan cancels
+the touches no listener owns, whether or not anything scrolls, as
+Chromium does (checked by `fixtures/capture.events`).
 
 Drag of a slider thumb or a curve point: `pointerdown` captures, each
 `pointermove` carries full-precision coordinates to the captured

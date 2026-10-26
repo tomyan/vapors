@@ -22,8 +22,10 @@ const FRAMES: &str =
     "new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => done(true))))";
 
 /// Half a second after the last step, for timers and transitions a step
-/// set off.
-const SETTLE: &str = "new Promise((done) => setTimeout(() => done(true), 500))";
+/// set off. It first sets `window.__eventsSettling`, so a page can act
+/// after the last step's log is taken and be sure of the order.
+const SETTLE: &str =
+    "(window.__eventsSettling = true, new Promise((done) => setTimeout(() => done(true), 500)))";
 
 /// Two frames took 14.7 to 49.6 ms (median 33.4) over 30 waits in
 /// headless Chromium on the dev machine at load 25 (2026-10-25); 5 s is

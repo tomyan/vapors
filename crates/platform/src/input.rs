@@ -4,6 +4,9 @@
 //! the fingers down) that lives here.
 
 use winit::event::WindowEvent;
+use winit::keyboard::ModifiersState;
+
+use crate::paste_key::Press;
 
 use crate::clock::Instant;
 use crate::event::{Event, from_winit};
@@ -20,6 +23,8 @@ pub struct Input {
     started: Instant,
     /// Physical pixels per CSS pixel, for scroll deltas.
     scale: f64,
+    /// The modifier keys held, for the paste shortcut.
+    modifiers: ModifiersState,
 }
 
 impl Input {
@@ -31,6 +36,7 @@ impl Input {
             gestures: Gestures::new(),
             started: Instant::now(),
             scale: 1.0,
+            modifiers: ModifiersState::empty(),
         }
     }
 
@@ -44,6 +50,9 @@ impl Input {
         if let WindowEvent::PinchGesture { delta, .. } = event {
             return self.pinch(*delta).into_iter().collect();
         }
+        if let Some(keys) = self.keys(event) {
+            return keys;
+        }
         let Some(direct) = from_winit(event, self.scale) else {
             return Vec::new();
         };
@@ -51,6 +60,59 @@ impl Input {
         let mut events = vec![direct];
         events.extend(gestures);
         events
+    }
+
+    /// The modifiers kept, and the paste shortcut as [`Event::Paste`]
+    /// instead of its character; `None` for other events. Desktop only.
+    fn keys(&mut self, event: &WindowEvent) -> Option<Vec<Event>> {
+        if cfg!(target_family = "wasm") {
+            return None;
+        }
+        match event {
+            WindowEvent::ModifiersChanged(modifiers) => self.key(Key::Modifiers(modifiers.state())),
+            WindowEvent::Focused(focused) => self.key(Key::Focus(*focused)),
+            WindowEvent::KeyboardInput { event: key, .. } => self.key(Key::Press(Press {
+                state: key.state,
+                repeat: key.repeat,
+                logical: &key.logical_key,
+                physical: key.physical_key,
+                modifiers: self.modifiers,
+            })),
+            _ => None,
+        }
+    }
+
+    /// One keyboard fact: the modifiers change, the window's focus
+    /// changes (focus lost: no modifier is known to be held, as some
+    /// backends send no `ModifiersChanged` then), or a key is pressed
+    /// (a paste, or `None` for its own character).
+    ///
+    /// RELAXED: a paste goes to the app whatever has focus, its
+    /// character swallowed. No element takes typed text yet; F4's text
+    /// inputs retire this, when a focused input takes Ctrl+V first
+    /// (`paste_while_a_text_field_has_focus_goes_to_it`, ignored until
+    /// then).
+    pub(crate) fn key(&mut self, key: Key<'_>) -> Option<Vec<Event>> {
+        match key {
+            Key::Modifiers(modifiers) => {
+                self.modifiers = modifiers;
+                Some(Vec::new())
+            }
+            Key::Focus(focused) => {
+                if !focused {
+                    self.modifiers = ModifiersState::empty();
+                }
+                None
+            }
+            Key::Press(press) => crate::paste_key::is_paste(
+                &Press {
+                    modifiers: self.modifiers,
+                    ..press
+                },
+                cfg!(target_os = "macos"),
+            )
+            .then(|| vec![Event::Paste]),
+        }
     }
 
     /// Updates what the gestures need from `event`; any gesture it ends.
@@ -92,3 +154,15 @@ mod tests;
 #[cfg(test)]
 #[path = "input_wheel_tests.rs"]
 mod wheel_tests;
+
+#[cfg(test)]
+#[path = "input_key_tests.rs"]
+mod key_tests;
+
+/// A keyboard fact [`Input::key`] takes: what `keys` reads from winit,
+/// so the wiring is testable (winit's `KeyEvent` cannot be built).
+pub(crate) enum Key<'a> {
+    Modifiers(ModifiersState),
+    Focus(bool),
+    Press(Press<'a>),
+}

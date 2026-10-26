@@ -52,10 +52,18 @@ impl Document {
             .and_then(|painted| painted.padding_origin(target))
             .unwrap_or([0.0, 0.0]);
         let offset = [point[0] - origin[0], point[1] - origin[1]];
+        // a touch is pressed while it is down; the mouse while its button is
+        let down = if id == MOUSE {
+            self.pointer.pressed.is_some()
+        } else {
+            true
+        };
+        let pressed = matches!(name, "pointerdown" | "pointermove") && down;
         Event::new(name).with_pointer(Pointer {
             client: point,
             offset,
             id,
+            pressed,
         })
     }
 }
@@ -107,7 +115,11 @@ pub(super) fn process_pending(document: &Rc<RefCell<Document>>, id: u32, point: 
             Some(Asked::CaptureTo(node)) => Some(node),
             Some(Asked::Release) => None,
         };
-        (std::mem::replace(&mut captured.capture, gets), gets)
+        let had = std::mem::replace(&mut captured.capture, gets);
+        // an element removed from the document hears nothing: the web
+        // fires on it, where nothing can observe it (review-v77, H1)
+        let present = |node: Option<NodeId>| node.filter(|node| doc.contains(*node));
+        (present(had), present(gets))
     };
     if had == gets {
         return;
@@ -118,4 +130,19 @@ pub(super) fn process_pending(document: &Rc<RefCell<Document>>, id: u32, point: 
             dispatch(document, node, event);
         }
     }
+}
+
+/// While the pointer is captured, `:hover` stays on the capturing
+/// element, as on the web (review-v77, M1); `None` when not captured.
+pub(super) fn hover_capturing(document: &Rc<RefCell<Document>>) -> Option<NodeId> {
+    let mut doc = document.borrow_mut();
+    let capturing = doc
+        .captured(MOUSE)
+        .capture
+        .filter(|node| doc.contains(*node))?;
+    if doc.pointer.hovered != Some(capturing) {
+        doc.set_flag_chain(vapors_css::tree::States::HOVER, Some(capturing));
+        doc.pointer.hovered = Some(capturing);
+    }
+    Some(capturing)
 }

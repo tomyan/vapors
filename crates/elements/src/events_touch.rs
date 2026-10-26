@@ -80,9 +80,9 @@ impl Document {
         captured.explicit && (captured.capture.is_some() || captured.pending.is_some())
     }
 
-    /// A scroll took the touches: each finger down that no listener
+    /// A pan took the touches: each finger down that no listener
     /// captured gets `pointercancel` where it last was. The app calls
-    /// this when a pan moves a container.
+    /// this at a gesture's first pan, as Chromium cancels then.
     pub fn cancel_unowned_touches(document: &Rc<RefCell<Document>>) {
         let touches = document.borrow().pointer.touches.clone();
         for (finger, point) in touches {
