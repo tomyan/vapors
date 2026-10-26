@@ -189,7 +189,15 @@ content.
     view's, so there is one answer to where the image is.
   - **Replacing:** `set_painter` and `set_image` each replace what is
     shown, and bump the generation.
+  - **No clip:** the painter owns the whole viewport. The view and its
+    app draw their overlays (`ImageApp`'s label strip) after it, so
+    those stay on top.
+  - **Failure:** `paint` returns `Result<(), String>`, and
+    `ImageView::draw` returns a failure as `image painter: <why>`.
+    `ImageApp` reports it on the error row. A painter that cannot draw
+    is never a silently blank frame.
 
+## What would break these invariants
 
 Named so a reviewer can check a pull request against them:
 

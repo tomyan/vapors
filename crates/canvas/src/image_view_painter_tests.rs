@@ -24,7 +24,15 @@ impl Drop for Idle {
 }
 
 impl ImagePainter for Idle {
-    fn paint(&mut self, _: &Frame<'_>, _: &wgpu::TextureView, _: Size, _: Transform) {}
+    fn paint(
+        &mut self,
+        _: &Frame<'_>,
+        _: &wgpu::TextureView,
+        _: Size,
+        _: Transform,
+    ) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 const SIZE: Size = Size {

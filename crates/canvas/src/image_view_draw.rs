@@ -4,7 +4,6 @@
 
 use vapors_platform::Frame;
 use vapors_renderer::{ImagePipeline, clear_view, upload_rgba8};
-use vapors_scene::Color;
 
 use crate::ImageView;
 use crate::image_view::Uploaded;
@@ -12,17 +11,23 @@ use crate::image_view_painter::Shown;
 
 impl ImageView {
     /// Clear the frame to the background and draw the image, if any.
-    pub fn draw(&mut self, frame: &Frame<'_>) {
-        clear_frame(frame, self.background);
+    ///
+    /// # Errors
+    ///
+    /// The painter's error, prefixed `image painter: `, when an
+    /// [`crate::ImagePainter`] could not draw; the frame then shows the
+    /// background, or what the painter drew before it failed.
+    pub fn draw(&mut self, frame: &Frame<'_>) -> Result<(), String> {
         let view = frame
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
-        if self.paint(frame, &view) {
-            return;
+        clear_view(frame.device, frame.queue, &view, self.background);
+        if let Some(painted) = self.paint(frame, &view) {
+            return painted.map_err(|why| format!("image painter: {why}"));
         }
         let (viewport, transform) = (self.viewport, self.transform());
         let Some(uploaded) = self.upload(frame) else {
-            return;
+            return Ok(());
         };
         uploaded.pipeline.draw(
             frame.device,
@@ -32,6 +37,7 @@ impl ImageView {
             &uploaded.texture,
             transform,
         );
+        Ok(())
     }
 
     fn upload(&mut self, frame: &Frame<'_>) -> Option<&Uploaded> {
@@ -49,11 +55,4 @@ impl ImageView {
             ),
         }))
     }
-}
-
-fn clear_frame(frame: &Frame<'_>, color: Color) {
-    let view = frame
-        .texture
-        .create_view(&wgpu::TextureViewDescriptor::default());
-    clear_view(frame.device, frame.queue, &view, color);
 }
