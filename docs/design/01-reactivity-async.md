@@ -235,7 +235,7 @@ recursion is refused for now.
 | Part | Oracle |
 |---|---|
 | Synchronous graph | Ported `reactive_graph` tests (done); Svelte 5's `runtime-runes` samples for signals, derived and effects ported where they test ordering (MIT) |
-| Snippets and children | Svelte 5's 56 `runtime-runes/samples/snippet-*` cases (checked 2026-10-25 in `~/projects/svelte`) ported to `RecordingDom`, less those that test HTML-only behaviour, each skip named |
+| Snippets and children | Svelte 5's 54 `runtime-runes/samples/snippet-*` cases (checked 2026-10-26 in `~/projects/svelte`; 56 was a miscount) ported to `RecordingDom`, each skip named. As built (R1c): 14 ported (`compiler-examples/tests/svelte_snippets*.rs`), 40 skipped with the missing feature, 6 of them for rendering a snippet held in a value (`{render expr()}`) |
 | Held updates and pending | Svelte's `await` test samples (`runtime-runes/samples/async-*`) ported to `RecordingDom`; each asserts the sequence of DOM writes with futures resolved by hand |
 | Drop to cancel | A test with a future that records whether it was polled after the dependency changed; a worker test with a token that stops a loop and reports the step count |
 | Offload on the web | A wasm test in headless Chromium (the page-contract script) that offloads a sum and gets it back; the same test natively; identical results pinned |
