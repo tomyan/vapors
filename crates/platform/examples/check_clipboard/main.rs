@@ -1,23 +1,28 @@
 //! The X11 clipboard's image through [`SystemClipboard`], set by `xclip`
 //! as another program would: `xvfb-run -a cargo run -p vapors-platform
 //! --example check_clipboard` (the CI window job runs it). A PNG on the
-//! clipboard reads back as its pixels; text only reads as no image; a
-//! display that cannot be reached reads as unreadable. Exit 1 names
-//! what differed; with no display or no xclip it fails naming the fix.
+//! clipboard reads back as its pixels, and prints how long the read
+//! took; text only reads as no image (pinning the X11 wrong-type case
+//! clipboard.rs matches); bytes that are not a PNG, a selection owner
+//! that stops answering, and a display that cannot be reached read as
+//! unreadable. Exit 1 names what differed; with no display or no xclip
+//! it fails naming the fix. An image over the size limit is a unit test
+//! (`clipboard_tests.rs`): arboard decodes the whole image before it can
+//! be refused.
 
 use std::path::Path;
-use std::process::{Command, ExitCode, Stdio};
+use std::process::{Command, ExitCode};
 use std::time::{Duration, Instant};
 
-use vapors_platform::{Clipboard, ClipboardImage, SystemClipboard};
+mod xclip;
+
+use vapors_platform::{CLIPBOARD_DEADLINE, Clipboard, ClipboardImage, SystemClipboard};
+use xclip::{newest_xclip, signal, xclip};
 
 const REPRODUCE: &str = "xvfb-run -a cargo run -p vapors-platform --example check_clipboard";
 const FIXTURE: &str = "examples/fixtures/gradient.png";
 /// The flag the unreachable-display case runs this program again with.
 const UNREACHABLE: &str = "--read-on-this-display";
-/// xclip forks and serves the selection; its parent exits at once
-/// (under 10 ms here). 5 s is the deadline for it to say it has.
-const XCLIP_DEADLINE: Duration = Duration::from_secs(5);
 
 fn main() -> ExitCode {
     if std::env::args().any(|a| a == UNREACHABLE) {
@@ -45,6 +50,8 @@ fn run() -> Result<Vec<String>, String> {
     Ok(vec![
         png_reads_back()?,
         text_is_no_image()?,
+        corrupt_is_unreadable()?,
+        stopped_owner()?,
         unreachable_display()?,
     ])
 }
@@ -53,13 +60,16 @@ fn png_reads_back() -> Result<String, String> {
     let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join(FIXTURE);
     xclip(&["-t", "image/png", "-i"], Some(&fixture), None)?;
     let (width, height, rgba) = decode(&fixture)?;
-    match SystemClipboard.image() {
+    let started = Instant::now();
+    let image = SystemClipboard.image();
+    let took = started.elapsed().as_millis();
+    match image {
         ClipboardImage::Image {
             width: w,
             height: h,
             rgba: read,
         } if (w, h) == (width, height) && read == rgba => Ok(format!(
-            "a {width}x{height} PNG set by xclip reads back as its pixels"
+            "a {width}x{height} PNG set by xclip reads back as its pixels ({took} ms)"
         )),
         other => Err(format!(
             "the PNG xclip set read as {:?}, not its {width}x{height} pixels",
@@ -75,6 +85,47 @@ fn text_is_no_image() -> Result<String, String> {
         other => Err(format!(
             "text alone read as {:?}, not NoImage",
             short(&other)
+        )),
+    }
+}
+
+fn corrupt_is_unreadable() -> Result<String, String> {
+    xclip(&["-t", "image/png"], None, Some(b"\x89PNG not a png"))?;
+    match SystemClipboard.image() {
+        ClipboardImage::Unreadable(_) => {
+            Ok("bytes offered as a PNG that are not one read as unreadable".to_owned())
+        }
+        other => Err(format!(
+            "a corrupt PNG read as {:?}, not Unreadable",
+            short(&other)
+        )),
+    }
+}
+
+/// xclip's serving child stopped (SIGSTOP): the owner exists and never
+/// answers. Refused within the deadline, then the child is let go.
+fn stopped_owner() -> Result<String, String> {
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join(FIXTURE);
+    xclip(&["-t", "image/png", "-i"], Some(&fixture), None)?;
+    let owner = newest_xclip()?;
+    signal(&owner, "STOP")?;
+    let started = Instant::now();
+    let read = SystemClipboard.image();
+    let took = started.elapsed();
+    signal(&owner, "KILL")?;
+    match read {
+        ClipboardImage::Unreadable(_)
+            if took <= CLIPBOARD_DEADLINE + Duration::from_millis(500) =>
+        {
+            Ok(format!(
+                "an owner that stops answering reads as unreadable, after {} ms",
+                took.as_millis()
+            ))
+        }
+        other => Err(format!(
+            "a stopped owner read as {:?} after {} ms",
+            short(&other),
+            took.as_millis()
         )),
     }
 }
@@ -95,42 +146,6 @@ fn unreachable_display() -> Result<String, String> {
             "on an unreachable display the clipboard read as {said}"
         ))
     }
-}
-
-/// `xclip -selection clipboard <args>`, given a file or bytes on stdin;
-/// refused naming the fix when xclip is missing or does not finish.
-fn xclip(args: &[&str], file: Option<&Path>, stdin: Option<&[u8]>) -> Result<(), String> {
-    let mut command = Command::new("xclip");
-    command.args(["-selection", "clipboard"]).args(args);
-    if let Some(file) = file {
-        command.arg(file);
-    }
-    let mut child = command
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .spawn()
-        .map_err(|e| format!("xclip: {e}; fix: install xclip (apt install xclip)"))?;
-    if let (Some(bytes), Some(mut pipe)) = (stdin, child.stdin.take()) {
-        std::io::Write::write_all(&mut pipe, bytes).map_err(|e| format!("xclip's stdin: {e}"))?;
-    }
-    drop(child.stdin.take());
-    wait(&mut child)
-}
-
-fn wait(child: &mut std::process::Child) -> Result<(), String> {
-    let started = Instant::now();
-    while started.elapsed() < XCLIP_DEADLINE {
-        if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
-            return if status.success() {
-                Ok(())
-            } else {
-                Err(format!("xclip exited {status}"))
-            };
-        }
-        std::thread::sleep(Duration::from_millis(10));
-    }
-    let _ = child.kill();
-    Err(format!("xclip did not finish within {XCLIP_DEADLINE:?}"))
 }
 
 fn decode(path: &Path) -> Result<(u32, u32, Vec<u8>), String> {

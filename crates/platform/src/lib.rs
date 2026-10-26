@@ -37,7 +37,10 @@ mod webgpu;
 mod window;
 
 #[cfg(not(target_family = "wasm"))]
-pub use clipboard::{Clipboard, ClipboardImage, SystemClipboard};
+pub use clipboard::{
+    Clipboard, ClipboardImage, DEADLINE as CLIPBOARD_DEADLINE, MAX_BYTES as CLIPBOARD_MAX_BYTES,
+    SystemClipboard,
+};
 pub use clock::Instant;
 pub use cursor::Cursor;
 pub use device_lost::{DeviceLost, Lost};

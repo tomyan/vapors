@@ -3,7 +3,7 @@
 //! and trackpad pinches, which need state (the last pointer position and
 //! the fingers down) that lives here.
 
-use winit::event::{ElementState, WindowEvent};
+use winit::event::WindowEvent;
 use winit::keyboard::ModifiersState;
 
 use crate::clock::Instant;
@@ -70,10 +70,14 @@ impl Input {
             }
             WindowEvent::KeyboardInput { event: key, .. }
                 if cfg!(not(target_family = "wasm"))
-                    && key.state == ElementState::Pressed
                     && crate::paste_key::is_paste(
-                        &key.logical_key,
-                        self.modifiers,
+                        &crate::paste_key::Press {
+                            state: key.state,
+                            repeat: key.repeat,
+                            logical: &key.logical_key,
+                            physical: key.physical_key,
+                            modifiers: self.modifiers,
+                        },
                         cfg!(target_os = "macos"),
                     ) =>
             {
