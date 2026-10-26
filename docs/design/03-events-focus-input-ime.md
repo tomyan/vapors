@@ -140,6 +140,17 @@ crate, and the web IME path is platform code either way.
   Checked against Chromium by `fixtures/focus.events` (events and focus
   at each step; `focus` and `blur` are not listened for there, as
   Chromium also sends them to the window, which vapors does not have).
+- As built (3-E2b): `:focus-visible` is set when focus arrives after a
+  key (by Tab, or by script after a key) or on a text field, and not
+  after a press, matching Chromium at every step of
+  `fixtures/focus.events`. `outline` (width, style, colour, offset and
+  the shorthand) draws a solid ring outside the border box, after
+  everything else, following rounded corners; `auto` and dashed,
+  dotted and double outlines are refused. Checked against Chromium's
+  pixels by `fixtures/outline_paint`. The UA sheet's ring is vapors'
+  own: `:focus-visible { outline: 2px solid #0060df; outline-offset:
+  1px }` (not Chromium's native `auto` ring); buttons are
+  `box-sizing: border-box`, as Chromium's are.
   `:focus-visible` follows the HTML heuristic: set when focus arrived by
   keyboard or by script after a keyboard interaction, not when it
   arrived by pointer, except on text inputs where it is always set.

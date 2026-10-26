@@ -37,11 +37,13 @@ code, kbd, samp { font-family: monospace; }
 mark { background-color: yellow; color: black; }
 
 /* A vapors button, not Chromium's native one (whose look is the
-   platform's): a light fill, a 1px grey border, small radii.
+   platform's): a light fill, a 1px grey border, small radii. Its size
+   includes its padding and border, as Chromium's buttons do.
    Inline-block, so it is laid out only where it is blockified (a flex
    item; grid arrives in S4) until inline layout arrives (S6). */
 button {
   display: inline-block;
+  box-sizing: border-box;
   padding: 1px 6px;
   border: 1px solid #8f8f9d;
   border-radius: 3px;
@@ -57,3 +59,9 @@ hr {
   margin-bottom: 0.5em;
   border: 1px solid #c0c0c0;
 }
+
+/* The focus ring (3-E2b): vapors' own, a solid 2px ring 1px out in
+   blue, not Chromium's native `auto` ring, which vapors does not draw.
+   It shows where focus arrived by a key (:focus-visible), not by a
+   press. */
+:focus-visible { outline: 2px solid #0060df; outline-offset: 1px; }

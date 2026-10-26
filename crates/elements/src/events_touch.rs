@@ -31,6 +31,7 @@ impl Document {
         let id = touch_id(finger);
         let target = document.borrow().hit(point);
         let mut doc = document.borrow_mut();
+        doc.keyboard = false;
         // `:active` follows the first finger down only (review-v78, M1)
         if doc.pointer.touches.is_empty() {
             doc.set_flag_chain(States::ACTIVE, target);

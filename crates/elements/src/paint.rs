@@ -78,6 +78,7 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
             Step::Thumb(_) => crate::thumb::paint(&boxes[index], rects[index], input, &mut painted),
         }
     }
+    crate::paint_outline::paint_outlines(boxes, rects, &clips, input, &mut painted);
     painted
 }
 

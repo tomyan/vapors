@@ -73,6 +73,7 @@ fixtures![
     image_paint::ImagePaint,
     images::Images,
     inline_text::InlineText,
+    outline_paint::OutlinePaint,
     paint_boxes::PaintBoxes,
     positioned::Positioned,
     scrolling::Scrolling,

@@ -26,6 +26,30 @@ impl Document {
         self.focused.filter(|node| self.contains(*node))
     }
 
+    /// Whether the focused element matches `:focus-visible`: focus that
+    /// arrived after a key (by Tab, or by script after a key), or on a
+    /// text field, as Chromium's heuristic has it; not after a press.
+    #[must_use]
+    pub fn focus_visible(&self) -> bool {
+        self.active_element().is_some_and(|node| {
+            self.arena
+                .get(node, "focus_visible")
+                .element()
+                .is_some_and(|element| element.states.contains(States::FOCUS_VISIBLE))
+        })
+    }
+
+    fn is_text_field(&self, node: NodeId) -> bool {
+        match self.tag(node) {
+            Some("textarea") => true,
+            Some("input") => matches!(
+                self.attribute(node, "type"),
+                None | Some("text" | "search" | "email" | "url" | "password" | "tel" | "number")
+            ),
+            _ => false,
+        }
+    }
+
     /// Moves focus to `node` (`None`: to nothing), firing the focus
     /// events; nothing happens when it already has focus.
     pub fn focus(document: &Rc<RefCell<Document>>, node: Option<NodeId>) {
@@ -37,6 +61,8 @@ impl Document {
             let mut doc = document.borrow_mut();
             doc.focused = node;
             doc.set_flag_on(States::FOCUS, node);
+            let visible = node.filter(|node| doc.keyboard || doc.is_text_field(*node));
+            doc.set_flag_on(States::FOCUS_VISIBLE, visible);
             doc.set_flag_chain(States::FOCUS_WITHIN, node);
         }
         if let Some(had) = had {
@@ -100,8 +126,8 @@ impl Document {
 /// `names` on `node` in order: the first only there (it does not bubble),
 /// the second bubbling.
 fn fire(document: &Rc<RefCell<Document>>, node: NodeId, names: &[&str; 2]) {
-    crate::events::dispatch_here(document, node, Event::new(names[0]));
-    crate::events::dispatch_bubbling(document, node, Event::new(names[1]));
+    crate::events::tree::dispatch_here(document, node, Event::new(names[0]));
+    crate::events::tree::dispatch_bubbling(document, node, Event::new(names[1]));
 }
 
 /// A `tabindex` the tree refuses: a positive one (it orders focus by
