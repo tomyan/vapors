@@ -155,3 +155,29 @@ fn a_parenthesised_callee_is_borrowed_without_doubled_parentheses() {
     assert_has(&code, "vapors_dom::Renderable::snippet(&(if true");
     assert_lacks(&code, "&((");
 }
+
+#[test]
+fn a_local_snippet_passed_as_a_prop_by_name_is_cloned() {
+    // When: passed to a tag, then rendered
+    let code = generated_with(
+        "",
+        "{snippet b()}<i>b</i>{/snippet}<List row={b} />{render b()}",
+    );
+
+    // Then
+    assert_has(&code, "_row = b.clone();");
+}
+
+#[test]
+fn a_snippet_named_only_in_an_attribute_is_declared_before_the_one_naming_it() {
+    // When: `a` passes `b`, written after it, as a prop
+    let code = generated_with(
+        "",
+        "{snippet a()}<List row={b} />{/snippet}{snippet b()}<i>b</i>{/snippet}{render a()}",
+    );
+
+    // Then
+    let b = code.find("let b: Snippet<()>").expect("b declared");
+    let a = code.find("let a: Snippet<()>").expect("a declared");
+    assert!(b < a, "{code}");
+}

@@ -117,7 +117,8 @@ the one difference from the brief in this slice.
   lists inside it, and may be rendered before it is declared or by a
   snippet declared before it. A snippet declared directly inside a
   component tag is the child's prop of that name (a `Snippet<(Type,
-  ...)>`).
+  ...)>`). A local snippet passed by name in an attribute, `<List
+  row={b} />`, is passed as a clone, so `b` can still be rendered.
 - **Rendering an expression:** `{render expr(args)}`, where `expr` is
   anything that yields a `Snippet`, an `Option<Snippet>` (`None`
   renders nothing) or a reference to either: `cards.get(&kind)`,

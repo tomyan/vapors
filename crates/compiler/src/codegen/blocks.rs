@@ -136,8 +136,8 @@ impl Emitter<'_> {
 }
 
 /// Every expression a subtree reads, for the clones its closure needs; a
-/// `{render name()}` reads the snippet `name`.
-fn expressions_in(nodes: &[Node]) -> Vec<Expr> {
+/// `{render name(args)}` reads the snippet `name` and its arguments.
+pub(super) fn expressions_in(nodes: &[Node]) -> Vec<Expr> {
     let mut found = Vec::new();
     for node in nodes {
         collect(node, &mut found);
@@ -197,9 +197,14 @@ fn collect(node: &Node, found: &mut Vec<Expr>) {
             .children
             .iter()
             .for_each(|child| collect(child, found)),
-        Node::Render(render) => found.push(Expr {
-            code: render.name.clone(),
-            offset: render.offset,
-        }),
+        // the snippet's name and its arguments: a builder that renders
+        // it reads both
+        Node::Render(render) => {
+            found.push(Expr {
+                code: render.name.clone(),
+                offset: render.offset,
+            });
+            found.extend(super::snippets::args_tuple(render));
+        }
     }
 }

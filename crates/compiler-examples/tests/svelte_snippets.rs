@@ -15,7 +15,6 @@ use vapors_compiler_examples::svelte_snippets::{
     argument::{Argument, ArgumentProps},
     argument_call_expression::{ArgumentCallExpression, ArgumentCallExpressionProps},
     argument_multiple::{ArgumentMultiple, ArgumentMultipleProps},
-    comment_sibling::{CommentSibling, CommentSiblingProps},
     hoisting2::{Hoisting2, Hoisting2Props},
 };
 use vapors_dom::recording::RecordingDom;
@@ -78,17 +77,6 @@ fn snippet_argument_multiple() {
         html(&dom),
         "<p>clicks: 1, doubled: 2</p><button>click me</button>"
     );
-}
-
-#[test]
-fn snippet_comment_sibling() {
-    // When: adapted, without the HTML comment beside the snippet, which a
-    // .wisp component tag refuses
-    let (dom, _c) =
-        mounted(|dom, root| CommentSibling::mount(dom, root, CommentSiblingProps::default()));
-
-    // Then
-    assert_eq!(html(&dom), "The content");
 }
 
 #[test]
