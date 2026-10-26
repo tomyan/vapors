@@ -16,6 +16,9 @@ impl Emitter<'_> {
     /// `{render name(args)}`: the snippet's nodes at this place, among
     /// the roots when the place is.
     pub fn emit_render(&mut self, render: &Render, place: &Place) -> Result<(), CompileError> {
+        if !self.renders_by_name(render) {
+            return self.emit_dynamic_render(render, place);
+        }
         self.check_render(render)?;
         let args = self.emit_render_args(render)?;
         let call = format!(
