@@ -29,6 +29,7 @@ allow = [
     "0BSD",                           # adler2
     "Unicode-3.0",                    # the ICU data crates and unicode-ident
     "Unlicense",                      # memchr, aho-corasick, walkdir (also MIT)
+    "BSL-1.0",                        # clipboard-win, error-code: arboard's Windows clipboard; permissive, no notice needed in binaries
 ]
 confidence-threshold = 0.93
 # An allowed licence no dependency uses fails, so the list cannot go stale.

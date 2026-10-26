@@ -166,7 +166,16 @@ nodes belong to the owner that renders it. As built (R1a, 2026-10-26): wisp spel
 them `{snippet}` and `{render}`, without Svelte's sigils, as it spells
 `{#if}` as `{if}`; `children` is the default name, declared explicitly
 by the child like any prop, `#[prop] let children: Snippet =
-Snippet::empty();`.
+Snippet::empty();`. `compile_dir` checks each component tag against the props of
+the component it names when that component is in the same directory:
+an attribute, children or a snippet the component does not declare is
+a `.wisp` error at the attribute, the snippet or the tag, naming the
+prop, the component's file and a declaration that compiles (the lead's
+decision on review-v65 finding 3). A tag is resolved by its module path,
+its own (`crate::`, `self::`, `super::`) or through the script's `use`
+and alias, with `wisp.rs` included at the crate root; a tag that
+resolves to no component in the directory is not checked, and the build
+prints it as a cargo warning with its file and line (review-v67).
 
 ## Deliberately left out
 
