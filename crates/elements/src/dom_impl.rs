@@ -85,6 +85,7 @@ impl Dom for Document {
         if let Some(parent) = self.parent(node) {
             self.mark_children_changed(parent, None);
         }
+        self.drop_focus_within(node);
         self.arena.detach(node);
         self.arena.free_subtree(node);
     }

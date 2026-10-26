@@ -142,3 +142,16 @@ fn gpu_events_an_event_after_the_last_step_is_refused() {
         "{refusal}"
     );
 }
+
+#[test]
+fn gpu_events_a_prevented_pointerdown_does_not_focus_in_chromium() {
+    // Given: a button whose pointerdown listener prevents the default.
+    // review-v81 (9) asked whether that stops the press's focus, as
+    // vapors makes it; Chromium 155 answers that it does
+    let page = "data:text/html,<button id=b style='width:100px;height:40px' onpointerdown='event.preventDefault()'>x</button>";
+    let (_live, mut session) = session_on("prevented", page);
+    let script = parse("page", "listen click\nclick 50 20\nexpect focus body\n").expect("parses");
+
+    // When / Then: focus stays on the body
+    play(&mut session, "page", &script, DEADLINE).unwrap_or_else(|e| panic!("{e}"));
+}

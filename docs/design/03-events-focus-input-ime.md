@@ -140,6 +140,17 @@ crate, and the web IME path is platform code either way.
   Checked against Chromium by `fixtures/focus.events` (events and focus
   at each step; `focus` and `blur` are not listened for there, as
   Chromium also sends them to the window, which vapors does not have).
+  Known gaps (review-v81): listeners see a key's `key` but not its
+  modifiers or repeat yet; winit's key names are mapped where they
+  differ from the DOM's only for Space and Super (Meta); "disabled" has
+  two answers, a disabled control itself for focus and a disabled
+  button ancestor for clicks, and `fieldset disabled` neither;
+  `focus` and `blur` listeners that move focus again are not
+  re-checked between the four events; focusability reads the last
+  painted frame, so an element shown since the last update is not yet
+  focusable. A prevented `pointerdown` does not focus, as in Chromium
+  155 (`gpu_events_a_prevented_pointerdown_does_not_focus_in_chromium`);
+  a touch tap does not focus yet.
 - As built (3-E2b): `:focus-visible` is set when focus arrives after a
   key (by Tab, or by script after a key) or on a text field, and not
   after a press, matching Chromium at every step of

@@ -34,7 +34,9 @@ impl Document {
             return;
         }
         match key {
-            "Tab" => {
+            // Control, Alt or Meta with Tab is the browser's or the window
+            // manager's, which Chromium does not navigate on
+            "Tab" if !(modifiers.control || modifiers.alt || modifiers.meta) => {
                 let next = document.borrow().next_in_tab_order(modifiers.shift);
                 Self::focus(document, next);
             }
@@ -48,7 +50,13 @@ impl Document {
     /// down on.
     pub fn key_released(document: &Rc<RefCell<Document>>, key: &str, _modifiers: Modifiers) {
         let target = document.borrow().key_target();
-        let space_on = document.borrow_mut().space_on.take();
+        // only Space's own keyup takes it: a key tapped while Space is
+        // held does not end the press
+        let space_on = if key == " " {
+            document.borrow_mut().space_on.take()
+        } else {
+            None
+        };
         if dispatch_bubbling(document, target, Event::new("keyup").with_key(key)) {
             return;
         }

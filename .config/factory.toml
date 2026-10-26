@@ -85,3 +85,13 @@ max_lines = "220"
 # (`cargo xtask check-imports`, the `imports` step).
 [imports.web_sys]
 "crates/platform/" = "vapors-platform: the window, input and file picker on the web"
+
+# The merge queue (`cargo xtask queue`, a systemd user timer): vapors
+# merges when GitHub's checks are all green and a review clear holds
+# (xtask/src/queue.rs). It rebases and updates in its own worktree,
+# never an agent's, and logs every decision for the foreman.
+[queue]
+repo = "tomyan/vapors"
+merge_on = "checks"
+run = "~/.cache/w-queue/vapors-run/vapors"
+log = "~/.cache/queue/vapors.log"

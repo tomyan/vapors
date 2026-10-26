@@ -19,6 +19,9 @@ pub struct Painted {
     pub(crate) rects: HashMap<NodeId, BoxRect>,
     /// Each element's padding box's top-left, for pointer offsets.
     pub(crate) paddings: HashMap<NodeId, [f32; 2]>,
+    /// The elements drawn: with a box and `visibility: visible` (focus,
+    /// 3-E2a).
+    pub(crate) visible: std::collections::HashSet<NodeId>,
     /// Elements with a box, `visibility: visible` and `pointer-events:
     /// auto`, in painting order: a later one is drawn over an earlier.
     pub(crate) hits: Vec<(NodeId, BoxRect)>,
@@ -66,6 +69,13 @@ impl Painted {
     #[must_use]
     pub fn border_box(&self, node: NodeId) -> Option<BoxRect> {
         self.rects.get(&node).copied()
+    }
+
+    /// Whether the element was drawn: it has a box and is
+    /// `visibility: visible`.
+    #[must_use]
+    pub fn is_visible(&self, node: NodeId) -> bool {
+        self.visible.contains(&node)
     }
 
     /// The element's padding box's top-left in CSS pixels, or `None`
