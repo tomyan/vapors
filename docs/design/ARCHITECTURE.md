@@ -170,7 +170,26 @@ writing them with its resolution, or the note that it is open.
     as Chromium without its compositor flag; recorded as a difference
     from the specification.
 
-## What would break these invariants
+## Seams
+
+Places where an app draws through vapors rather than handing it
+content.
+
+- **`ImagePainter` on `ImageView`** (`crates/canvas/src/image_view_painter.rs`).
+  - **Who it's for:** an app that keeps an image's pixels on the GPU and
+    draws them itself. touché renders a photo's visible region from its
+    own textures and layer stack, and never uploads the pixels to the
+    view.
+  - **What the view keeps:** the image's size, the transform, fit, zoom,
+    pan and the gestures.
+  - **Each frame:** the view clears the frame to its background. It then
+    calls `paint` with the frame, the target, the viewport and the
+    transform it would have drawn pixels with.
+  - **The painter's share:** only the drawing. Placement stays the
+    view's, so there is one answer to where the image is.
+  - **Replacing:** `set_painter` and `set_image` each replace what is
+    shown, and bump the generation.
+
 
 Named so a reviewer can check a pull request against them:
 
