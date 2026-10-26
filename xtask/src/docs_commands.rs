@@ -2,9 +2,10 @@
 //! names must exist. A `cargo xtask <name>` must be an xtask subcommand;
 //! a `cargo run -p <package> --example <name>` an example of that
 //! package; and a `cargo run -p <app> -- <command>` a command in the
-//! app's `--help`, for the app `[docs] app` names. A `cargo run` in
-//! neither shape is refused. Each failure names the file and line, and
-//! the fix.
+//! app's `--help`, for the app `[docs] app` names. Every `cargo run` on
+//! a line is read, and one in neither shape, or naming no package, is
+//! refused. Declared limit: only the command's name is checked, not its
+//! flags or arguments. Each failure names the file and line, and the fix.
 
 /// The app whose command line CLAUDE.md documents, and its commands.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,8 +29,8 @@ pub fn check(
     for (n, line) in text.lines().enumerate() {
         let at = format!("{file}:{}", n + 1);
         problems.extend(xtask_problems(&at, line, xtask));
-        if let Some(run) = line.find("cargo run ").map(|i| &line[i..]) {
-            problems.extend(run_problem(&at, run, app, examples));
+        for (i, _) in line.match_indices("cargo run ") {
+            problems.extend(run_problem(&at, &line[i..], app, examples));
         }
     }
     problems
@@ -58,17 +59,17 @@ fn run_problem(
 ) -> Option<String> {
     let run = run.split('`').next().unwrap_or(run).trim_end();
     let words: Vec<&str> = run.split_whitespace().collect();
-    let package = words
-        .iter()
-        .position(|w| *w == "-p")
-        .and_then(|i| words.get(i + 1))
-        .copied()?;
     let after = |flag: &str| {
         words
             .iter()
             .position(|w| *w == flag)
             .and_then(|i| words.get(i + 1))
             .copied()
+    };
+    let Some(package) = after("-p") else {
+        return Some(format!(
+            "{at}: `{run}` names no package (-p); fix: write it as `cargo run -p <package> …`, or reword the line if it names no command"
+        ));
     };
     if let Some(example) = after("--example") {
         return (!examples(package, example)).then(|| {
@@ -102,6 +103,8 @@ pub fn commands_in_help(help: &str) -> Result<Vec<String>, String> {
     }
     Ok(lines
         .take_while(|l| l.starts_with("  "))
+        // A line indented further continues the description above it.
+        .filter(|l| !l.starts_with("   "))
         .filter_map(|l| l.split_whitespace().next().map(str::to_owned))
         .collect())
 }

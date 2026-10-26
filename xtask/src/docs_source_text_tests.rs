@@ -13,3 +13,9 @@ fn string_literals_joined_by_plus_are_read_as_one() {
     let quote = "needs your own key. You pay the provider, and only it.";
     assert!(found(&pieces(quote), &[source]));
 }
+
+#[test]
+fn a_char_literal_plus_is_not_a_join() {
+    let source = Source::new("zoom.js", "if (c == '+') { x = \"Press '+' to zoom\"; }");
+    assert!(found(&pieces("Press '+' to zoom"), &[source]));
+}

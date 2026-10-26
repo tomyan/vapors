@@ -15,11 +15,13 @@
 //!
 //! Any other State is refused, naming its line.
 
+use crate::docs_plan_state::{Unread, state_claims};
+
 /// The work-item table's header.
 pub const HEADER: &str = "| Id | What | Owner | State | Depends on |";
 
 /// States that claim no PR.
-const PLAIN: [&str; 5] = [
+pub const PLAIN: [&str; 5] = [
     "planned",
     "in progress",
     "parked",
@@ -62,18 +64,35 @@ pub struct Pr {
 }
 
 /// Every claim in `text`'s work-item tables, and each State in no shape.
+#[cfg(test)]
 #[must_use]
 pub fn claims(file: &str, text: &str) -> (Vec<Claim>, Vec<String>) {
+    let (claims, problems, _) = read(file, text);
+    (claims, problems)
+}
+
+/// [`claims`], and a problem when the plan compares nothing: no
+/// work-item table, or tables that name no PR.
+#[must_use]
+pub fn read_plan(file: &str, text: &str) -> (Vec<Claim>, Vec<String>) {
+    let (claims, mut problems, seen_table) = read(file, text);
+    let no_claims = claims.is_empty() && problems.is_empty();
+    problems.extend(nothing_read(file, seen_table, no_claims));
+    (claims, problems)
+}
+
+/// The claims, the problems, and whether a work-item table was seen.
+fn read(file: &str, text: &str) -> (Vec<Claim>, Vec<String>, bool) {
     let (mut claims, mut problems) = (Vec::new(), Vec::new());
-    let mut in_table = false;
+    let (mut in_table, mut seen_table) = (false, false);
     for (n, line) in text.lines().enumerate() {
         let line_no = n + 1;
         if !line.starts_with('|') {
             in_table = false;
             continue;
         }
-        if line.trim() == HEADER {
-            in_table = true;
+        if let Some(header) = header(file, line_no, line, &mut problems) {
+            (in_table, seen_table) = (header, seen_table || header);
             continue;
         }
         let cells: Vec<&str> = line.split('|').map(str::trim).collect();
@@ -82,88 +101,56 @@ pub fn claims(file: &str, text: &str) -> (Vec<Claim>, Vec<String>) {
         }
         let state = cells.get(4).copied().unwrap_or_default();
         match state_claims(state) {
-            Some(found) => claims.extend(found.into_iter().map(|(repo, pr, expect)| Claim { line: line_no, repo, pr, expect })),
-            None => problems.push(format!(
-                "{file}:{line_no}: the State \"{state}\" is in no shape this check reads; fix: write it as the grammar at the top of {file} says"
-            )),
+            Ok(found) => claims.extend(found.into_iter().map(|(repo, pr, expect)| Claim {
+                line: line_no,
+                repo,
+                pr,
+                expect,
+            })),
+            Err(unread) => problems.push(unread_problem(file, line_no, state, &unread)),
         }
     }
-    (claims, problems)
+    (claims, problems, seen_table)
 }
 
-/// A PR a State names: its repository, number and claimed state.
-type Named = (Option<String>, u64, Expect);
-
-/// The PRs a State claims, or `None` for a State in no shape.
-fn state_claims(state: &str) -> Option<Vec<Named>> {
-    if plain(state) {
-        return Some(Vec::new());
+/// For a table's header line: whether it opens a work-item table. A
+/// header with a State column but another shape is refused.
+fn header(file: &str, line_no: usize, line: &str, problems: &mut Vec<String>) -> Option<bool> {
+    if line.trim() == HEADER {
+        return Some(true);
     }
-    if let Some(rest) = state.strip_prefix("merged ") {
-        let listed = rest.split('(').next().unwrap_or(rest);
-        return listed
-            .split(',')
-            .map(|part| reference(part.trim()).map(|(repo, pr)| (repo, pr, Expect::Merged)))
-            .collect();
+    let has_state = line.split('|').map(str::trim).any(|cell| cell == "State");
+    if !has_state {
+        return None;
     }
-    pr_state(state).map(|named| vec![named])
+    problems.push(format!(
+        "{file}:{line_no}: a table with a State column is headed `{}`, not `{HEADER}`; fix: use that header, or move the column out",
+        line.trim()
+    ));
+    Some(false)
 }
 
-/// A plain State, alone or with a note after `, `, `; ` or ` (` that
-/// names no PR (a PR in a note would go unchecked).
-fn plain(state: &str) -> bool {
-    let noted = |plain: &&str| {
-        state.strip_prefix(*plain).is_some_and(|note| {
-            note.is_empty() || [", ", "; ", " ("].iter().any(|sep| note.starts_with(sep))
-        })
-    };
-    PLAIN.iter().any(noted) && !names_pr(state)
-}
-
-fn names_pr(text: &str) -> bool {
-    text.match_indices('#')
-        .any(|(at, _)| text[at + 1..].starts_with(|c: char| c.is_ascii_digit()))
-}
-
-/// `[<repo> ]PR #N …` or `[<repo> ]draft PR #N …`.
-fn pr_state(state: &str) -> Option<Named> {
-    let (repo, rest) = repo_prefix(state, |rest| {
-        rest.starts_with("PR #") || rest.starts_with("draft PR #")
-    });
-    let (rest, draft) = match rest.strip_prefix("draft PR #") {
-        Some(rest) => (rest, true),
-        None => (rest.strip_prefix("PR #")?, false),
-    };
-    let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
-    let after = rest[digits.len()..].trim_start();
-    let expect = if draft || after.starts_with("(draft") {
-        Expect::Draft
-    } else {
-        Expect::Open
-    };
-    Some((repo, digits.parse().ok()?, expect))
-}
-
-/// `[<repo> ]#N`.
-fn reference(part: &str) -> Option<(Option<String>, u64)> {
-    let (repo, rest) = repo_prefix(part, |rest| rest.starts_with('#'));
-    Some((repo, rest.strip_prefix('#')?.parse().ok()?))
-}
-
-/// A leading repository name, a lowercase word other than `draft`,
-/// before what `follows` accepts; the rest of `text`.
-fn repo_prefix(text: &str, follows: impl Fn(&str) -> bool) -> (Option<String>, &str) {
-    let is_name = |word: &str| {
-        word != "draft"
-            && !word.is_empty()
-            && word
-                .chars()
-                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-    };
-    match text.split_once(' ') {
-        Some((word, rest)) if is_name(word) && follows(rest) => (Some(word.to_owned()), rest),
-        _ => (None, text),
+fn unread_problem(file: &str, line_no: usize, state: &str, unread: &Unread) -> String {
+    match unread {
+        Unread::Shape => format!(
+            "{file}:{line_no}: the State \"{state}\" is in no shape this check reads; fix: write it as the grammar at the top of {file} says"
+        ),
+        Unread::Token(pr) => format!(
+            "{file}:{line_no}: the State \"{state}\" names {pr} where this check cannot read its state; fix: write it as PR {pr}, draft PR {pr} or merged {pr}"
+        ),
     }
+}
+
+/// A plan with no work-item table, or none naming a PR, compares nothing.
+fn nothing_read(file: &str, seen_table: bool, no_claims: bool) -> Option<String> {
+    if !seen_table {
+        return Some(format!(
+            "{file}: no table is headed `{HEADER}`; fix: keep the work items in such a table"
+        ));
+    }
+    no_claims.then(|| format!(
+        "{file}: its work-item tables name no PR, so nothing is compared with gh; fix: check that the States are read (the grammar at the top of the file)"
+    ))
 }
 
 /// How a claim's PR is named in a message: `#N`, or `<repo> #N`.

@@ -82,3 +82,36 @@ fn the_app_s_help_lists_its_commands() {
             .contains("Commands:")
     );
 }
+
+#[test]
+fn a_cargo_run_without_a_package_is_refused_and_every_one_on_a_line_is_read() {
+    // Given: prose naming cargo run, one without -p, and two commands on one line
+    let text = "every cargo run in the worktree\n`cargo run --example demo`\n`cargo run -p touche-app -- apply` then `cargo run -p touche-app -- aply`\n";
+
+    // When
+    let problems = check("CLAUDE.md", text, &XTASK, Some(&app()), &examples);
+
+    // Then
+    assert_eq!(problems.len(), 3, "{problems:?}");
+    assert!(
+        problems[0].starts_with("CLAUDE.md:1: `cargo run in the worktree` names no package (-p)"),
+        "{problems:?}"
+    );
+    assert!(
+        problems[1].starts_with("CLAUDE.md:2: `cargo run --example demo` names no package (-p)"),
+        "{problems:?}"
+    );
+    assert!(
+        problems[2].starts_with("CLAUDE.md:3: `touche-app aply` is not a touche-app command"),
+        "{problems:?}"
+    );
+}
+
+#[test]
+fn a_wrapped_command_description_is_not_read_as_a_command() {
+    let help = "Commands:\n  open     Open an image\n           that is big\n  apply    Render a layer\n\nOptions:\n";
+    assert_eq!(
+        commands_in_help(help),
+        Ok(vec!["open".to_owned(), "apply".to_owned()])
+    );
+}

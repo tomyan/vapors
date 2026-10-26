@@ -15,9 +15,11 @@ use crate::docs_patterns::Source;
 use crate::docs_plan::Pr;
 
 /// How long the app's `--help` may take, a build of the app included.
-/// Chosen until measured: a debug build of touche-app from a warm sccache
-/// took about a minute here under load.
-const APP_HELP_DEADLINE: Duration = Duration::from_mins(10);
+/// Measured 2026-10-26: a cold build of touche-app and its `--help`, with
+/// an empty target directory, no sccache, nice 10 and 4 jobs at load 16,
+/// took 104 s; warm, 0.2 s. 8 min is about 4.6 times the cold build and
+/// stays below the ci job's 9 min timeout, so this deadline fires first.
+const APP_HELP_DEADLINE: Duration = Duration::from_mins(8);
 
 /// xtask's subcommand names, hidden ones included.
 #[must_use]

@@ -57,18 +57,23 @@ fn join_at(chars: &[char], at: usize) -> Option<usize> {
     if !quote(chars.get(at)?) {
         return None;
     }
-    let mut next = at + 1;
-    while chars.get(next)?.is_whitespace() {
-        next += 1;
-    }
-    if *chars.get(next)? != '+' {
+    let plus = skip_space(chars, at + 1)?;
+    if *chars.get(plus)? != '+' {
         return None;
     }
-    next += 1;
-    while chars.get(next)?.is_whitespace() {
-        next += 1;
+    let next = skip_space(chars, plus + 1)?;
+    // `'+'` is a char literal, not a join: a join has space beside its `+`.
+    let spaced = plus > at + 1 || next > plus + 1;
+    (spaced && quote(chars.get(next)?)).then_some(next + 1)
+}
+
+/// The first index from `from` that is not whitespace.
+fn skip_space(chars: &[char], from: usize) -> Option<usize> {
+    let mut at = from;
+    while chars.get(at)?.is_whitespace() {
+        at += 1;
     }
-    quote(chars.get(next)?).then_some(next + 1)
+    Some(at)
 }
 
 #[cfg(test)]

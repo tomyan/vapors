@@ -8,7 +8,7 @@ const TABLE: &str = "\
 | R-43 | History | impl-runtime-2 | merged #43 (2026-10-25 17:16Z) | |
 | P0-1..4a | Tokens | impl-runtime-3 | merged #54, #55, #58 | |
 | P0-3c | Tagged layers | impl-runtime-3 | PR #64 (review fixes done at 7650efd; in the queue) | |
-| P1a | Exact reductions | impl-runtime-3 | draft PR #72 on main; rebases onto #73 | ENG-LIMITS |
+| P1a | Exact reductions | impl-runtime-3 | draft PR #72 on main; rebases once ENG-LIMITS merges | ENG-LIMITS |
 | P0-4b | IndexedDB queue | unassigned | planned | P0-4a |
 | X | Something | lead | pending Tom | |
 ";
@@ -140,4 +140,34 @@ fn a_draft_claim_needs_an_open_draft_and_a_merged_claim_a_merge() {
 fn rows_outside_a_work_item_table_are_not_read() {
     let text = "| Track | Order |\n|---|---|\n| Runtime | #43 conversation history |\n";
     assert_eq!(claims("docs/PLAN.md", text), (Vec::new(), Vec::new()));
+}
+
+#[test]
+fn a_table_with_a_state_column_and_another_header_is_refused() {
+    let text = "| Id | What | Owner | State | Depends on | Notes |\n|---|---|---|---|---|---|\n| A | x | y | PR #999 | | |\n";
+    let (_, problems) = claims("docs/PLAN.md", text);
+    assert_eq!(
+        problems,
+        [format!(
+            "docs/PLAN.md:1: a table with a State column is headed `| Id | What | Owner | State | Depends on | Notes |`, not `{HEADER}`; fix: use that header, or move the column out"
+        )]
+    );
+}
+
+#[test]
+fn a_plan_that_names_no_pr_is_refused() {
+    let none = read_plan("docs/PLAN.md", "# Plan\n\nNo tables.\n").1;
+    assert_eq!(
+        none,
+        [format!(
+            "docs/PLAN.md: no table is headed `{HEADER}`; fix: keep the work items in such a table"
+        )]
+    );
+    let planned = format!("{HEADER}\n|---|---|---|---|---|\n| A | x | y | planned | |\n");
+    assert_eq!(
+        read_plan("docs/PLAN.md", &planned).1,
+        [
+            "docs/PLAN.md: its work-item tables name no PR, so nothing is compared with gh; fix: check that the States are read (the grammar at the top of the file)"
+        ]
+    );
 }

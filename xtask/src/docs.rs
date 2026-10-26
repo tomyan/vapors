@@ -10,7 +10,8 @@
 //! - `patterns` with `page`: "double-quoted" text in the patterns file is
 //!   in the page's source under `page`'s directories (`docs_patterns.rs`).
 //!
-//! Each failure names the file and line, and the fix.
+//! Each failure names the file and line, and the fix. Declared limit: a
+//! documented command's flags and arguments are not checked, only its name.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -18,7 +19,7 @@ use std::process::ExitCode;
 
 use crate::config::Config;
 use crate::docs_commands::{App, check, commands_in_help};
-use crate::docs_plan::{Claim, Pr, claims, contradiction, label};
+use crate::docs_plan::{Claim, Pr, contradiction, label, read_plan};
 use crate::docs_sources::{app_help, has_example, page_sources, pr, xtask_commands};
 
 /// The rules, by their `[docs]` key.
@@ -151,7 +152,7 @@ fn plan(
     repo: Option<&str>,
     offline: bool,
 ) -> Result<Vec<String>, Vec<String>> {
-    let (claims, mut problems) = claims(file, text);
+    let (claims, mut problems) = read_plan(file, text);
     if offline {
         return if problems.is_empty() {
             Ok(vec![format!(
@@ -175,3 +176,7 @@ fn plan(
         Err(problems)
     }
 }
+
+#[cfg(test)]
+#[path = "docs_rules_tests.rs"]
+mod tests;

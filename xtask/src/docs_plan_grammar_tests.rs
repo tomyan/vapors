@@ -51,12 +51,7 @@ fn a_plain_state_may_carry_a_note_that_names_no_pr() {
     ] {
         assert_eq!(claimed(state), [], "{state}");
     }
-    for state in [
-        "parked, draft #26 (no commit since 2026-10-23)",
-        "planned, after #74 merges",
-        "planned-ish",
-        "PR (this one)",
-    ] {
+    for state in ["planned, after #74 merges", "planned-ish", "PR (this one)"] {
         let (_, problems) = one_row(state);
         assert_eq!(problems.len(), 1, "{state}: {problems:?}");
     }
@@ -79,4 +74,46 @@ fn a_contradiction_in_another_repository_names_it() {
         said.starts_with("docs/PLAN.md:9: vapors #60 is listed as open, but gh says it is merged"),
         "{said}"
     );
+}
+
+#[test]
+fn every_pr_a_state_names_is_a_claim() {
+    let vapors = |pr, expect| ("vapors".to_owned(), pr, expect);
+    let here = |pr, expect| (String::new(), pr, expect);
+    assert_eq!(
+        claimed("vapors PR #63 (fixes pushed); the disk follow-up is vapors PR #70"),
+        [vapors(63, Expect::Open), vapors(70, Expect::Open)]
+    );
+    assert_eq!(
+        claimed("parked; draft PR #26 (no commit since 2026-10-23)"),
+        [here(26, Expect::Draft)]
+    );
+    assert_eq!(
+        claimed("parked, draft #26 (no commit)"),
+        [here(26, Expect::Draft)]
+    );
+    assert_eq!(claimed("PR #64 (draft)"), [here(64, Expect::Draft)]);
+    assert_eq!(
+        claimed("merged #54, #55 (2026-10-25)"),
+        [here(54, Expect::Merged), here(55, Expect::Merged)]
+    );
+}
+
+#[test]
+fn a_pr_named_where_its_state_cannot_be_read_is_refused_naming_it() {
+    for (state, pr) in [
+        (
+            "draft PR #72 on main; rebases onto #73 when #73 merges",
+            "#73",
+        ),
+        ("merged #12 (superseded by #13)", "#13"),
+        ("planned, after #74 merges", "#74"),
+    ] {
+        let (_, problems) = one_row(state);
+        assert_eq!(problems.len(), 1, "{state}: {problems:?}");
+        assert!(
+            problems[0].contains(&format!("names {pr} where this check cannot read its state; fix: write it as PR {pr}, draft PR {pr} or merged {pr}")),
+            "{problems:?}"
+        );
+    }
 }

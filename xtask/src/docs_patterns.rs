@@ -4,8 +4,13 @@
 //! trimmed of the punctuation that joins a composed message's parts,
 //! must appear in the page's source. Examples go in 'single quotes' or
 //! italics, which the rule leaves alone, as it does code spans and fenced
-//! code. Quotes pair within a paragraph or list item, so a quote may wrap
-//! across lines; one left open is refused, naming the line it opens on.
+//! code; a double quote inside italics is still read. Quotes pair within a
+//! paragraph or list item, so a quote may wrap across lines; one left open
+//! is refused, naming the line it opens on.
+//!
+//! Declared limits: the page's source includes comments and test code, so
+//! an old comment can keep a drifted quote found; and a fixed piece may be
+//! short (`"<n> of <m>"` checks only `of`).
 
 pub use crate::docs_source_text::Source;
 
