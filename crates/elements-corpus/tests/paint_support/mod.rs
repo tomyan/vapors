@@ -1,13 +1,16 @@
 //! Shared by the paint tests: fixtures laid out by vapors, rendered by
 //! Chromium, and the regions the rules hold to their budgets.
 
+#[path = "../corpus_support/images.rs"]
+mod images;
+
 use std::cell::RefCell;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 use std::rc::Rc;
 
 use vapors_elements::{Document, Viewport};
-use vapors_elements_corpus::oracle::{fixtures_dir, write_fonts};
+use vapors_elements_corpus::oracle::{fixtures_dir, write_fonts, write_images};
 use vapors_elements_corpus::page::{html, split};
 use vapors_elements_corpus::paint_check::{Image, Region};
 use vapors_elements_corpus::{Fixture, all};
@@ -37,6 +40,7 @@ pub fn laid_out(fixture: &Fixture, scale: u32) -> Rc<RefCell<Document>> {
         .expect("parses");
     let body = doc.borrow().body();
     (fixture.mount)(&doc, body);
+    images::register_fixture_images(&mut doc.borrow_mut());
     #[allow(clippy::cast_precision_loss)]
     let viewport = Viewport {
         width: WIDTH as f32,
@@ -96,6 +100,7 @@ pub fn chromiums(test: &str, name: &str, scale: u32, changed: &str) -> Rgba {
     let work = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("paint-{test}-{scale}x"));
     std::fs::create_dir_all(&work).expect("work dir");
     write_fonts(&work).expect("fonts");
+    write_images(&work).expect("images");
     let path = fixtures_dir().join(format!("{name}.wisp"));
     let mut source =
         split(name, &std::fs::read_to_string(&path).expect("fixture")).expect("splits");

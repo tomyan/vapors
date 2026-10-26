@@ -14,6 +14,7 @@ vapors-signals.workspace = true
 vapors-elements.workspace = true
 vapors-text.workspace = true
 vapors-pixels.workspace = true
+vapors-canvas.workspace = true
 
 [build-dependencies]
 vapors-compiler.workspace = true

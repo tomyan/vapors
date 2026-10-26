@@ -16,6 +16,8 @@ mod dom_impl;
 mod error;
 mod events;
 mod html;
+mod images;
+mod img_checks;
 mod inline_check;
 mod layout;
 mod node;

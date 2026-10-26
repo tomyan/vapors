@@ -1,17 +1,24 @@
 //! Drawing a texture into a viewport under a [`Transform`]: the canvas
-//! surface for an image. Nearest sampling, so at any zoom the pixel
-//! under a viewport point is exactly one image pixel.
+//! surface for an image, with nearest sampling, so at any zoom the pixel
+//! under a viewport point is exactly one image pixel. And stretched over
+//! a rect inside the target's scissor, sampled smoothly: an `img`.
 
-use vapors_scene::{Size, Transform};
+use vapors_scene::{Rect, Size, Transform};
 
-use crate::quad::{VERTEX_COUNT, VERTEX_SIZE, Vertex, quad_vertices, vertex_bytes};
+use crate::Target;
+use crate::image_setup::{bind_group_layout, render_pipeline};
+
+use crate::quad::{VERTEX_COUNT, VERTEX_SIZE, quad_vertices, vertex_bytes};
 
 /// A pipeline that draws one 2D texture as a quad. Create once per
 /// target format; draw many times.
 pub struct ImagePipeline {
     pipeline: wgpu::RenderPipeline,
     layout: wgpu::BindGroupLayout,
-    sampler: wgpu::Sampler,
+    /// Nearest sampling, for the canvas: one image pixel per pixel.
+    nearest: wgpu::Sampler,
+    /// Linear sampling, for an `img` stretched over its box.
+    smooth: wgpu::Sampler,
     vertices: wgpu::Buffer,
 }
 
@@ -30,12 +37,27 @@ impl ImagePipeline {
             immediate_size: 0,
         });
         let pipeline = render_pipeline(device, &pipeline_layout, &shader, format);
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("image nearest"),
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
-        });
+        let sampler = |label, filter, mipmap_filter| {
+            device.create_sampler(&wgpu::SamplerDescriptor {
+                label: Some(label),
+                mag_filter: filter,
+                min_filter: filter,
+                mipmap_filter,
+                ..Default::default()
+            })
+        };
+        let (nearest, smooth) = (
+            sampler(
+                "image nearest",
+                wgpu::FilterMode::Nearest,
+                wgpu::MipmapFilterMode::Nearest,
+            ),
+            sampler(
+                "image smooth",
+                wgpu::FilterMode::Linear,
+                wgpu::MipmapFilterMode::Linear,
+            ),
+        );
         let vertices = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("image quad"),
             size: VERTEX_SIZE * u64::from(VERTEX_COUNT),
@@ -45,7 +67,8 @@ impl ImagePipeline {
         Self {
             pipeline,
             layout,
-            sampler,
+            nearest,
+            smooth,
             vertices,
         }
     }
@@ -65,38 +88,60 @@ impl ImagePipeline {
             width: texture.width(),
             height: texture.height(),
         };
-        let quad = quad_vertices(transform.image_bounds(image), viewport);
-        queue.write_buffer(&self.vertices, 0, &vertex_bytes(&quad));
-        let bind_group = self.bind_group(device, texture);
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("image"),
-        });
-        {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let at = Target {
+            device,
+            queue,
+            view: target,
+            viewport,
+            scissor: None,
+        };
+        self.quad(&at, texture, transform.image_bounds(image), &self.nearest);
+    }
+
+    /// Draw `texture` stretched over `rect` (device pixels) in `target`,
+    /// sampled smoothly, inside the target's scissor: how an `img` is
+    /// drawn.
+    pub fn draw_rect(&self, target: &Target<'_>, texture: &wgpu::Texture, rect: Rect) {
+        let bounds = [[rect.left, rect.top], [rect.right, rect.bottom]];
+        self.quad(target, texture, bounds, &self.smooth);
+    }
+
+    fn quad(
+        &self,
+        target: &Target<'_>,
+        texture: &wgpu::Texture,
+        bounds: [[f32; 2]; 2],
+        sampler: &wgpu::Sampler,
+    ) {
+        let quad = quad_vertices(bounds, target.viewport);
+        target
+            .queue
+            .write_buffer(&self.vertices, 0, &vertex_bytes(&quad));
+        let bind_group = self.bind_group(target.device, texture, sampler);
+        let mut encoder = target
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("image"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: target,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
             });
+        {
+            let mut pass = crate::quads_setup::load_pass(&mut encoder, target.view);
+            if let Some(s) = target.scissor {
+                pass.set_scissor_rect(s.x, s.y, s.width, s.height);
+            }
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &bind_group, &[]);
             pass.set_vertex_buffer(0, self.vertices.slice(..));
             pass.draw(0..VERTEX_COUNT, 0..1);
         }
-        queue.submit([encoder.finish()]);
+        target.queue.submit([encoder.finish()]);
     }
 
-    fn bind_group(&self, device: &wgpu::Device, texture: &wgpu::Texture) -> wgpu::BindGroup {
+    fn bind_group(
+        &self,
+        device: &wgpu::Device,
+        texture: &wgpu::Texture,
+        sampler: &wgpu::Sampler,
+    ) -> wgpu::BindGroup {
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("image"),
@@ -108,66 +153,9 @@ impl ImagePipeline {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                    resource: wgpu::BindingResource::Sampler(sampler),
                 },
             ],
         })
     }
-}
-
-fn bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("image"),
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                    multisampled: false,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                count: None,
-            },
-        ],
-    })
-}
-
-fn render_pipeline(
-    device: &wgpu::Device,
-    layout: &wgpu::PipelineLayout,
-    shader: &wgpu::ShaderModule,
-    format: wgpu::TextureFormat,
-) -> wgpu::RenderPipeline {
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("image"),
-        layout: Some(layout),
-        vertex: wgpu::VertexState {
-            module: shader,
-            entry_point: Some("vs_main"),
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[Some(Vertex::layout())],
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: shader,
-            entry_point: Some("fs_main"),
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-            targets: &[Some(wgpu::ColorTargetState {
-                format,
-                blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-        }),
-        primitive: wgpu::PrimitiveState::default(),
-        depth_stencil: None,
-        multisample: wgpu::MultisampleState::default(),
-        multiview_mask: None,
-        cache: None,
-    })
 }

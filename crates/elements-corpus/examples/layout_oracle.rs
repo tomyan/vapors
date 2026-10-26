@@ -10,7 +10,9 @@
 
 use std::process::ExitCode;
 
-use vapors_elements_corpus::oracle::{boxes, fixture_names, fixtures_dir, to_text, write_fonts};
+use vapors_elements_corpus::oracle::{
+    boxes, fixture_names, fixtures_dir, to_text, write_fonts, write_images,
+};
 use vapors_text::comparison::Chromium;
 
 fn main() -> ExitCode {
@@ -34,6 +36,7 @@ fn run(check: bool) -> Result<(), String> {
     let work = std::env::temp_dir().join(format!("vapors-layout-oracle-{}", std::process::id()));
     std::fs::create_dir_all(&work).map_err(|e| format!("{}: {e}", work.display()))?;
     write_fonts(&work)?;
+    write_images(&work)?;
     let mut differ = Vec::new();
     for name in fixture_names()? {
         let text = to_text(&boxes(&chromium, &work, &name)?);
