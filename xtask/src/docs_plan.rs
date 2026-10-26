@@ -204,3 +204,7 @@ pub fn contradiction(file: &str, claim: &Claim, pr: &Pr) -> Option<String> {
 #[cfg(test)]
 #[path = "docs_plan_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "docs_plan_grammar_tests.rs"]
+mod grammar_tests;
