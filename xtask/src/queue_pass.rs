@@ -74,17 +74,14 @@ impl<O: Ops> Pass<'_, O> {
         if let Decision::Skip(why) = &judged.decision {
             return self.said(state, pr.number, why);
         }
-        if self.gates(&judged) && !room_to_gate(self.ops, self.log, state, pr.number)? {
+        let gates = judged.decision != Decision::Merge && self.config.merge_on == MergeOn::Gate;
+        if gates && !room_to_gate(self.ops, self.log, state, pr.number)? {
             return Ok(false);
         }
         if !self.fresh(pr, judged.decision == Decision::Merge)? {
             return Ok(false);
         }
         self.carry_out(state, pr, prs, &judged)
-    }
-    /// Whether acting on `judged` runs a gate on this machine.
-    fn gates(&self, judged: &Judged) -> bool {
-        judged.decision != Decision::Merge && self.config.merge_on == MergeOn::Gate
     }
     /// Merge or re-gate `pr` as judged; whether the pass ends. A failure is
     /// said, and the pass moves on unless a gate was started.

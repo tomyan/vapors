@@ -53,6 +53,8 @@ mod queue_decide;
 mod queue_disk;
 #[cfg(test)]
 mod queue_fake;
+#[cfg(test)]
+mod queue_fake_prs;
 mod queue_gate_child;
 mod queue_git;
 #[cfg(test)]
