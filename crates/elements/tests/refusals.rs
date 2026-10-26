@@ -151,12 +151,12 @@ fn a_refused_update_drops_the_previous_result() {
 }
 
 #[test]
-fn listeners_for_the_capture_events_are_taken() {
-    // Given: 3-E1a fires both
+fn listeners_for_the_capture_and_cancel_events_are_taken() {
+    // Given: 3-E1a fires the capture events, 3-E1b pointercancel
     let mut doc = document();
     let body = doc.body();
     let div = element(&mut doc, body, "div", "thumb");
-    for event in ["gotpointercapture", "lostpointercapture"] {
+    for event in ["gotpointercapture", "lostpointercapture", "pointercancel"] {
         doc.listen(div, event, Box::new(|_: &mut Event| {}));
     }
 

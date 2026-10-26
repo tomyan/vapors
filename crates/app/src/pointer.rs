@@ -1,8 +1,9 @@
 //! Platform input as the document's pointer calls: positions from
 //! physical pixels to CSS pixels, the primary button at the last
 //! position the pointer moved to, and a tap as a click. A wheel scrolls
-//! where the pointer is. A touch clicks only as its tap, so one tap is
-//! one click; its down and up bound a gesture whose pans scroll.
+//! where the pointer is. A touch is a pointer of its own (3-E1b) and
+//! clicks only as its tap, so one tap is one click; its down and up
+//! also bound a gesture whose pans scroll.
 
 use vapors_elements::Point;
 use vapors_platform::{Event, TouchPhase};
@@ -19,16 +20,19 @@ pub(crate) enum Action {
     Wheel(Point, [f32; 2]),
     /// A finger (by id) went down; the first starts a gesture there.
     TouchDown(u64, Point),
+    /// A finger (by id) moved to a point.
+    TouchMove(u64, Point),
     /// The fingers moved: scroll by this delta (CSS pixels).
     Pan([f32; 2]),
-    /// A finger (by id) lifted or was taken away; the last ends the
-    /// gesture.
-    TouchUp(u64),
+    /// A finger (by id) lifted at a point; the last ends the gesture.
+    TouchUp(u64, Point),
+    /// The platform took a finger (by id) at a point.
+    TouchCancel(u64, Point),
 }
 
 /// The action for `event`, given the display `scale` and where the
 /// pointer last moved (CSS pixels); `None` for input the document does
-/// not take yet (keys, pinch, a touch's moves).
+/// not take yet (keys, pinch).
 pub(crate) fn action(event: &Event, scale: f32, last: Point) -> Option<Action> {
     let css = |x: f32, y: f32| [x / scale, y / scale];
     match event {
@@ -40,16 +44,17 @@ pub(crate) fn action(event: &Event, scale: f32, last: Point) -> Option<Action> {
         Event::Scroll { dx, dy } => Some(Action::Wheel(last, [*dx, *dy])),
         // a finger moving right drags the content right: a scroll left
         Event::Pan { dx, dy } => Some(Action::Pan([-dx / scale, -dy / scale])),
-        Event::Touch { id, phase, x, y } => touch(*id, *phase, css(*x, *y)),
+        Event::Touch { id, phase, x, y } => Some(touch(*id, *phase, css(*x, *y))),
         _ => None,
     }
 }
 
-fn touch(id: u64, phase: TouchPhase, at: Point) -> Option<Action> {
+fn touch(id: u64, phase: TouchPhase, at: Point) -> Action {
     match phase {
-        TouchPhase::Started => Some(Action::TouchDown(id, at)),
-        TouchPhase::Ended | TouchPhase::Cancelled => Some(Action::TouchUp(id)),
-        TouchPhase::Moved => None,
+        TouchPhase::Started => Action::TouchDown(id, at),
+        TouchPhase::Moved => Action::TouchMove(id, at),
+        TouchPhase::Ended => Action::TouchUp(id, at),
+        TouchPhase::Cancelled => Action::TouchCancel(id, at),
     }
 }
 
@@ -94,7 +99,7 @@ mod tests {
     }
 
     #[test]
-    fn a_cancelled_touch_ends_its_finger_as_a_lift_does() {
+    fn a_cancelled_touch_is_a_cancel_of_its_finger() {
         // Given
         let cancelled = Event::Touch {
             id: 3,
@@ -106,7 +111,7 @@ mod tests {
         // When / Then
         assert_eq!(
             action(&cancelled, 1.0, [0.0, 0.0]),
-            Some(Action::TouchUp(3))
+            Some(Action::TouchCancel(3, [0.0, 0.0]))
         );
     }
 
@@ -129,7 +134,7 @@ mod tests {
     }
 
     #[test]
-    fn a_tap_is_one_click_and_its_raw_touches_are_not_taken() {
+    fn a_tap_is_one_click_after_its_touchs_own_down_and_up() {
         // Given: what the platform sends for one tap
         let events = [
             Event::Touch {
@@ -153,12 +158,12 @@ mod tests {
             .filter_map(|e| action(e, 1.0, [0.0, 0.0]))
             .collect();
 
-        // Then: the touches only bound a gesture; the tap is the click
+        // Then: the touch's down and up, then the tap, which is the click
         assert_eq!(
             actions,
             [
                 Action::TouchDown(1, [10.0, 10.0]),
-                Action::TouchUp(1),
+                Action::TouchUp(1, [10.0, 10.0]),
                 Action::Tap([10.0, 10.0])
             ]
         );

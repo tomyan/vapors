@@ -1,6 +1,6 @@
 //! Scripts of raw touches that are, or are not, taps and double taps.
 
-use super::tests::{Step, check};
+use super::tests::{Step, check, play};
 use crate::event::{Event, TouchPhase};
 
 use TouchPhase::{Cancelled, Ended, Moved, Started};
@@ -101,4 +101,24 @@ fn slow_moved_cancelled_and_two_finger_presses_are_not_taps() {
 
     // When / Then
     check(cases);
+}
+
+#[test]
+fn a_tap_and_a_pan_are_exclusive() {
+    // Given: a wobble inside the slop, and a drag past it (review-v78, H1:
+    // a touch a scroll cancelled must not also click, as in Chromium)
+    let wobble: &[Step] = &[
+        (0, Started, 10.0, 60.0, 0),
+        (0, Moved, 10.0, 50.0, 50),
+        (0, Ended, 10.0, 50.0, 100),
+    ];
+    let drag: &[Step] = &[
+        (0, Started, 10.0, 60.0, 0),
+        (0, Moved, 10.0, 30.0, 50),
+        (0, Ended, 10.0, 30.0, 100),
+    ];
+
+    // When / Then: the wobble taps and pans nothing; the drag pans and does not tap
+    assert_eq!(play(wobble), [Event::Tap { x: 10.0, y: 50.0 }]);
+    assert_eq!(play(drag), [Event::Pan { dx: 0.0, dy: -30.0 }]);
 }
