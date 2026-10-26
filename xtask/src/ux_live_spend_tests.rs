@@ -77,3 +77,21 @@ fn a_response_with_no_usage_counts_at_its_worst_case() {
         spent_today(&dir)
     );
 }
+
+#[test]
+fn a_count_cut_off_after_it_was_sent_counts_at_its_bound() {
+    // Given: the stand-in reads the count request, then closes the socket
+    let dir = report_dir("count-closed");
+    let (url, _seen) = stand_in_many(vec![("close", String::new())]);
+
+    // When
+    let refused = run(&ux(&dir, url), &prepared(&dir), &secret(), None, SHA).expect_err("refused");
+
+    // Then: the count is booked at the estimate's 20,000 tokens at $2
+    assert!(refused.starts_with("curl failed"), "{refused}");
+    assert!(
+        (spent_today(&dir) - 0.04).abs() < 1e-9,
+        "{}",
+        spent_today(&dir)
+    );
+}

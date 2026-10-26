@@ -77,8 +77,9 @@ pub fn input_tokens(answer: &serde_json::Value) -> Result<u64, String> {
 ///
 /// # Errors
 /// The count over the estimate that should bound it, over the input
-/// cap, or making the worst case over the run's cap or the day's.
-pub fn within(ux: &UxConfig, estimate: u64, counted: u64, spent_today: f64) -> Result<f64, String> {
+/// cap, or making the worst case over the run's cap (the day's ceiling
+/// is checked where the request is booked, `ux_spend::book`).
+pub fn within(ux: &UxConfig, estimate: u64, counted: u64) -> Result<f64, String> {
     if counted > estimate {
         return Err(format!(
             "the API counted {counted} input tokens, over the estimate of {estimate} that should bound it; fix: correct ux_estimate.rs or the model's row in ux_models.rs"
@@ -98,7 +99,6 @@ pub fn within(ux: &UxConfig, estimate: u64, counted: u64, spent_today: f64) -> R
             ux.caps.cost_usd
         ));
     }
-    crate::ux_ledger::within_day(spent_today, worst, ux.caps.daily_usd)?;
     Ok(worst)
 }
 

@@ -12,11 +12,11 @@ use serde_json::{Value, json};
 
 use crate::ux_answer::Usage;
 
-/// How long to wait for another review's hold on the ledger: it holds it
-/// from reading the day's spend through its count request (at most
-/// curl's 300 s, `ux_call::DEADLINE`) to its `sent` line, so this is that
-/// deadline plus 30 s.
-pub const LOCK_WAIT: Duration = Duration::from_secs(330);
+/// How long to wait for another review's hold on the ledger. A holder
+/// only reads the day's spend and appends one `sent` line, then lets go:
+/// no request is made under the lock (`ux_spend`). That is milliseconds
+/// of file work, so 30 s is far past it on a loaded box.
+pub const LOCK_WAIT: Duration = Duration::from_secs(30);
 
 /// The ledger held: no other review reads the day's spend until it is
 /// dropped.
@@ -70,7 +70,7 @@ pub fn count(ledger: &Path, entry: &Entry, counted: u64, cost: f64) -> Result<()
     let note = "charged at the input price: the documentation does not say counting is free";
     append(
         ledger,
-        &json!({ "time": entry.time, "sha": entry.sha, "model": entry.model, "kind": "count", "input": counted, "cost": cost, "costNote": note }),
+        &json!({ "time": entry.time, "sha": entry.sha, "model": entry.model, "kind": "count", "id": entry.id, "input": counted, "cost": cost, "costNote": note }),
     )
 }
 

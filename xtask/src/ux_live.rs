@@ -45,7 +45,7 @@ pub fn run(
     sha: &str,
 ) -> Result<Vec<String>, String> {
     let request = request_file(ux, prepared)?;
-    let booked = ux_spend::book(ux, prepared, secret, &request, sha)?;
+    let (booked, counted) = ux_spend::book_review(ux, prepared, secret, &request, sha)?;
     let response = crate::ux_call::post(
         &ux.endpoint,
         secret,
@@ -54,7 +54,7 @@ pub fn run(
         crate::ux_call::DEADLINE,
     )?;
     let usage = ux_answer::usage(&response)?;
-    let cost = ux_spend::settle(ux, &booked, usage)?;
+    let cost = ux_spend::settle(ux, &booked, usage, counted)?;
     let judgements = ux_answer::judgements(&response, prepared)?;
     let date = &ux_ledger::utc(SystemTime::now())[..10];
     let name = format!("{date}-{}-{}", &sha[..7.min(sha.len())], ux.model.name);

@@ -68,8 +68,8 @@ pub(super) fn secret() -> Secret {
 }
 
 pub(super) fn ledger_lines(dir: &Path) -> usize {
-    // The count's line, the sent line, and, once a response came, the
-    // settled line.
+    // The count's booking and its count, the request's booking, and,
+    // once a response came, its settlement.
     std::fs::read_to_string(dir.join(crate::ux_ledger::FILE)).map_or(0, |t| t.lines().count())
 }
 
@@ -94,7 +94,7 @@ fn a_good_answer_writes_the_report_the_scorecard_and_the_spend() {
     let lines = run(&ux(&dir, url), &prepared(&dir), &secret(), None, SHA).expect("reviewed");
 
     // Then: the count's line and the run's
-    assert_eq!(ledger_lines(&dir), 3);
+    assert_eq!(ledger_lines(&dir), 4);
     let card = std::fs::read_to_string(dir.join("scorecard.md")).expect("scorecard");
     assert!(card.contains("| concern | 2 | first-screen |"), "{card}");
     assert!(
@@ -150,7 +150,7 @@ fn a_wrong_answer_is_refused_after_its_spend_is_recorded() {
 
     // Then
     assert!(refused.contains("`first-screen` 0 times"), "{refused}");
-    assert_eq!(ledger_lines(&dir), 3);
+    assert_eq!(ledger_lines(&dir), 4);
 }
 
 #[test]
@@ -167,7 +167,7 @@ fn billed_input_over_the_count_is_refused_after_its_spend_is_recorded() {
         refused.contains("billed 16000 input tokens, over the 15000 the API counted"),
         "{refused}"
     );
-    assert_eq!(ledger_lines(&dir), 3);
+    assert_eq!(ledger_lines(&dir), 4);
 }
 
 #[test]

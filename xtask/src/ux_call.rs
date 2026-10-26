@@ -87,7 +87,10 @@ pub fn post(
     let said = String::from_utf8_lossy(&output.stderr);
     if !output.status.success() {
         let said = secret.guard("curl's error", said.trim())?;
-        return Err(format!("curl failed ({}): {said}", output.status));
+        return Err(forget(
+            response,
+            &format!("curl failed ({}): {said}", output.status),
+        ));
     }
     answer(secret, &String::from_utf8_lossy(&output.stdout), response)
 }
@@ -102,15 +105,22 @@ fn answer(secret: &Secret, status: &str, response: &Path) -> Result<Value, Strin
     };
     if status != "200" {
         let head: String = text.chars().take(600).collect();
-        return Err(format!("the endpoint answered HTTP {status}: {head}"));
+        return Err(forget(
+            response,
+            &format!("the endpoint answered HTTP {status}: {head}"),
+        ));
     }
-    serde_json::from_str(text).map_err(|e| format!("the response is not JSON: {e}"))
+    serde_json::from_str(text)
+        .map_err(|e| forget(response, &format!("the response is not JSON: {e}")))
 }
 
-/// A response the guard refused is deleted, so no file keeps the key.
+/// A failed run's response is deleted, so no file keeps what the guard
+/// refused, or a partial or error body: only a good answer stays. A file
+/// curl never wrote is fine.
 fn forget(response: &Path, why: &str) -> String {
     match std::fs::remove_file(response) {
         Ok(()) => format!("{why}; {} was deleted", response.display()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => why.to_owned(),
         Err(e) => format!(
             "{why}; {} could not be deleted ({e}); fix: delete it by hand",
             response.display()

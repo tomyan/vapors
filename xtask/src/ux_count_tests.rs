@@ -9,7 +9,7 @@ fn ux() -> UxConfig {
 #[test]
 fn a_count_within_every_cap_gives_its_worst_case() {
     // When: 20,000 x $2 + 12,000 x $12, per million
-    let worst = within(&ux(), 30_000, 20_000, 0.0).expect("within");
+    let worst = within(&ux(), 30_000, 20_000).expect("within");
 
     // Then
     assert!((worst - 0.184).abs() < 1e-9, "{worst}");
@@ -17,7 +17,7 @@ fn a_count_within_every_cap_gives_its_worst_case() {
 
 #[test]
 fn a_count_over_the_estimate_is_refused_as_the_estimate_failing() {
-    let refused = within(&ux(), 20_000, 20_001, 0.0).expect_err("refused");
+    let refused = within(&ux(), 20_000, 20_001).expect_err("refused");
     assert!(
         refused.contains("over the estimate of 20000 that should bound it"),
         "{refused}"
@@ -26,17 +26,11 @@ fn a_count_over_the_estimate_is_refused_as_the_estimate_failing() {
 
 #[test]
 fn a_count_over_the_input_cap_is_refused() {
-    let refused = within(&ux(), 90_000, 61_000, 0.0).expect_err("refused");
+    let refused = within(&ux(), 90_000, 61_000).expect_err("refused");
     assert!(
         refused.contains("over ux.max_input_tokens 60000"),
         "{refused}"
     );
-}
-
-#[test]
-fn a_count_that_would_pass_the_day_s_ceiling_is_refused() {
-    let refused = within(&ux(), 30_000, 20_000, 2.90).expect_err("refused");
-    assert!(refused.contains("over ux.daily_cost_usd"), "{refused}");
 }
 
 #[test]

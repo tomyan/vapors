@@ -1,15 +1,16 @@
 //! `spend.jsonl` in the report directory, and the day's spend read from
 //! it. Every line has a time (UTC), a model, a `kind` and a cost:
-//! - `count`: an `input_tokens` request, at the input price, since the
-//!   documentation does not say counting is free;
 //! - `sent`: a request about to be sent, at its worst case, written
 //!   before curl starts, with an `id`;
-//! - `settled`: what that request cost, by its response's usage, with the
-//!   same `id`.
+//! - `count`: what an `input_tokens` request cost, at the input price
+//!   (the documentation does not say counting is free), with its `sent`
+//!   line's `id`;
+//! - `settled`: what a review's request cost, by its response's usage,
+//!   with its `sent` line's `id`.
 //!
-//! A `sent` line with no `settled` line counts at its worst case: a
-//! timeout, a dropped connection or a response with no usage may still
-//! have been billed. Before a review is sent, the day's spend plus its
+//! A `sent` line that no later `count` or `settled` line closes counts
+//! at its worst case: a timeout, a dropped connection or a refused
+//! answer may still have been billed. Before a review is sent, the day's spend plus its
 //! worst case must stay under `ux.daily_cost_usd`. Writing is
 //! `ux_ledger_write`.
 
@@ -64,7 +65,7 @@ pub fn spent_on(ledger: &Path, date: &str) -> Result<f64, String> {
     let lines = parse(ledger, &text)?;
     let settled: Vec<&str> = lines
         .iter()
-        .filter(|l| l.kind == "settled")
+        .filter(|l| l.kind != "sent")
         .filter_map(|l| l.id.as_deref())
         .collect();
     let open =
@@ -105,8 +106,15 @@ fn line(raw: &str) -> Result<Line, String> {
     let text = |key: &str| value[key].as_str().map(str::to_owned);
     let kind = text("kind").filter(|k| ["count", "sent", "settled"].contains(&k.as_str()));
     match (text("time"), kind, value["cost"].as_f64()) {
-        (Some(time), Some(kind), Some(cost)) if kind == "count" || text("id").is_some() => Ok(Line { time, kind, id: text("id"), cost }),
-        _ => Err("a line with no `time`, `cost`, or `kind` of count, sent or settled (and an `id` on the last two)".to_owned()),
+        (Some(time), Some(kind), Some(cost)) if text("id").is_some() => Ok(Line {
+            time,
+            kind,
+            id: text("id"),
+            cost,
+        }),
+        _ => Err(
+            "a line with no `time`, `cost`, `id`, or `kind` of count, sent or settled".to_owned(),
+        ),
     }
 }
 

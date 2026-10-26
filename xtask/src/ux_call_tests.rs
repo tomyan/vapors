@@ -76,6 +76,7 @@ fn a_status_other_than_200_is_refused_with_the_response() {
 
     // Then
     assert!(refused.contains("HTTP 429"), "{refused}");
+    assert!(!response.exists(), "a failed run's response is kept");
     assert!(refused.contains("slow down"), "{refused}");
 }
 

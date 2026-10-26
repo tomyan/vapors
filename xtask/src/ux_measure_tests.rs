@@ -98,7 +98,7 @@ fn a_billed_request_that_differs_from_its_count_is_refused() {
 
     // Then
     assert!(
-        refused.contains("said 110 input tokens, but the same request was billed 140"),
+        refused.contains("billed 140 input tokens, over the 110 the API counted"),
         "{refused}"
     );
 }
@@ -110,4 +110,32 @@ fn a_frame_that_counts_fewer_tokens_than_no_frame_is_refused() {
         refused.contains("4x8 at low counted 9 tokens with the frame, under the 10 without it"),
         "{refused}"
     );
+}
+
+#[test]
+fn a_measurement_the_day_has_no_room_for_sends_no_count() {
+    // Given room for one count's bound (about $0.0003) but not all three
+    // (about $0.0015)
+    let ux = ux("no-room", String::new());
+    let today = &crate::ux_ledger::utc(std::time::SystemTime::now())[..10];
+    std::fs::create_dir_all(&ux.report_dir).expect("made");
+    let line = serde_json::json!({ "time": format!("{today}T00:00:00Z"), "kind": "settled", "id": "earlier", "cost": 2.9995 });
+    std::fs::write(
+        ux.report_dir.join(crate::ux_ledger::FILE),
+        format!("{line}\n"),
+    )
+    .expect("ledger");
+    let (url, seen) = stand_in_many(vec![counted(10)]);
+    let ux = UxConfig {
+        endpoint: url,
+        ..ux
+    };
+    let secret = Secret::new(KEY.to_owned()).expect("guarded");
+
+    // When
+    let refused = crate::ux_measure_run::run(&ux, &secret).expect_err("refused");
+
+    // Then
+    assert!(refused.contains("over ux.daily_cost_usd"), "{refused}");
+    assert!(seen.try_recv().is_err(), "a count was sent");
 }
