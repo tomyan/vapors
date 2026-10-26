@@ -21,56 +21,65 @@ fn prices() -> Prices {
     }
 }
 
-#[test]
-fn text_is_counted_at_three_bytes_a_token_rounded_up() {
-    assert_eq!(text_tokens(0), 0);
-    assert_eq!(text_tokens(7), 3);
+fn model(name: &str) -> &'static Model {
+    crate::ux_models::find(name).expect("listed")
 }
 
 #[test]
-fn the_phone_frame_at_high_detail_takes_the_larger_count() {
-    // Given 412 x 915: two tiles (425) against 13 x 29 = 377 patches,
-    // times 1.2 (453)
+fn text_is_counted_at_one_token_per_byte() {
+    assert_eq!(text_tokens(0), 0);
+    assert_eq!(text_tokens(7), 7);
+}
+
+#[test]
+fn a_tile_model_counts_its_base_and_tiles() {
+    // Given 412 x 915 on gpt-4o-mini: two tiles at 2,833 + 5,667 each
 
     // When
-    let tokens = image_tokens((412, 915), "high");
+    let tokens = image_tokens(model("gpt-4o-mini"), (412, 915), "high");
 
     // Then
-    assert_eq!(tokens, 453);
+    assert_eq!(tokens, 14_167);
 }
 
 #[test]
-fn the_desktop_frame_at_high_detail_takes_the_larger_count() {
-    // Given 1440 x 900: six tiles once the short side is 768 (1105),
-    // against 45 x 29 = 1305 patches, times 1.2 (1566)
+fn a_tile_model_at_low_detail_counts_its_base_alone() {
+    assert_eq!(image_tokens(model("gpt-5"), (1440, 900), "low"), 70);
+}
+
+#[test]
+fn a_patch_model_counts_patches_times_its_multiplier() {
+    // Given 1440 x 900 on gpt-5.6-terra: 45 x 29 = 1,305 patches, times 1.2
 
     // When
-    let tokens = image_tokens((1440, 900), "high");
+    let tokens = image_tokens(model("gpt-5.6-terra"), (1440, 900), "high");
 
     // Then
     assert_eq!(tokens, 1566);
 }
 
 #[test]
-fn a_large_image_at_high_detail_is_held_to_the_patch_budget() {
-    // Given 4000 x 4000 px, 15,625 patches before the budget of 2,500
+fn a_patch_model_holds_a_large_image_to_its_budget() {
+    // Given 4000 x 4000, fitted to 2048: 64 x 64 = 4,096 patches, over 2,500
 
     // When
-    let tokens = image_tokens((4000, 4000), "high");
+    let tokens = image_tokens(model("gpt-5.4"), (4000, 4000), "high");
 
-    // Then: the budget times 1.2, above the 1,445 of 8 tiles
+    // Then: the budget times 1.2
     assert_eq!(tokens, 3000);
 }
 
 #[test]
-fn a_low_detail_image_fits_512_px_before_its_patches_are_counted() {
-    // Given 1440 x 900, fitted to 512 x 320: 16 x 10 patches, times 1.2
+fn a_patch_model_at_low_detail_uses_its_own_fit() {
+    // Given 1440 x 900: gpt-5.6-terra fits it to 512 x 320 (16 x 10
+    // patches); gpt-5.4 keeps it under 2048 (45 x 29) with a 6,144 budget
 
     // When
-    let tokens = image_tokens((1440, 900), "low");
+    let terra = image_tokens(model("gpt-5.6-terra"), (1440, 900), "low");
+    let five_four = image_tokens(model("gpt-5.4"), (1440, 900), "low");
 
     // Then
-    assert_eq!(tokens, 192);
+    assert_eq!((terra, five_four), (192, 1566));
 }
 
 #[test]

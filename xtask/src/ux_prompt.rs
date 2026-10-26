@@ -51,7 +51,8 @@ pub fn measured_present(
             let steps = viewport.facts["steps"]
                 .as_array()
                 .map_or(&[][..], Vec::as_slice);
-            let found = viewport.facts.get(&item.id).is_some()
+            let found = !crate::ux_run::STRUCTURE.contains(&item.id.as_str())
+                && viewport.facts.get(&item.id).is_some()
                 || steps.iter().any(|s| s["facts"].get(&item.id).is_some());
             if !found {
                 return Err(format!(

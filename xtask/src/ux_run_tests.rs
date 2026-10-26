@@ -114,7 +114,30 @@ fn a_step_naming_a_path_outside_its_viewport_is_refused() {
 
     // Then
     assert!(
-        refused.contains("is not a file name beside it"),
+        refused.contains("is not a plain `.png` file name beside it"),
         "{refused}"
     );
+}
+
+#[test]
+fn a_step_file_name_that_is_not_plain_is_refused() {
+    for name in ["..", ".", "", ".png", "frame.jpg", "a\\b.png"] {
+        // Given
+        let run = run_dir("names");
+        let dir = viewport_dir(&run, "phone");
+        let facts = format!(
+            r#"{{"steps": [{{"frame": {}, "text": "01-first-open.txt"}}]}}"#,
+            serde_json::json!(name)
+        );
+        std::fs::write(dir.join("facts.json"), facts).expect("facts");
+
+        // When
+        let refused = read(&run).expect_err(name);
+
+        // Then
+        assert!(
+            refused.contains("is not a plain `.png` file name"),
+            "{name}: {refused}"
+        );
+    }
 }

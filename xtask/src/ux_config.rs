@@ -5,6 +5,7 @@
 use std::path::PathBuf;
 
 use crate::config::Config;
+use crate::ux_models::Model;
 
 /// Per million tokens, in US dollars, and where they were read.
 #[derive(Debug, PartialEq)]
@@ -36,7 +37,8 @@ pub struct UxConfig {
     pub design: Vec<PathBuf>,
     /// Reports, the scorecard and the spend ledger.
     pub report_dir: PathBuf,
-    pub model: String,
+    /// The model, with how it counts image tokens (`ux_models`).
+    pub model: &'static Model,
     /// The Responses API URL.
     pub endpoint: String,
     /// The environment variable holding the API key.
@@ -61,11 +63,11 @@ impl UxConfig {
                 .map_err(|e| e.to_string())
         };
         Ok(Self {
-            run_dir: PathBuf::from(text("run_dir")?),
-            checklist: PathBuf::from(text("checklist")?),
-            design: design(config)?,
+            run_dir: expand(&text("run_dir")?, home)?,
+            checklist: expand(&text("checklist")?, home)?,
+            design: design(config, home)?,
             report_dir: expand(&text("report_dir")?, home)?,
-            model: text("model")?,
+            model: crate::ux_models::find(&text("model")?)?,
             endpoint: endpoint(&text("endpoint")?)?,
             key_env: text("key_env")?,
             reasoning: one_of(
@@ -80,25 +82,28 @@ impl UxConfig {
     }
 }
 
-fn design(config: &Config) -> Result<Vec<PathBuf>, String> {
-    let files: Vec<PathBuf> = config
+fn design(config: &Config, home: Option<&str>) -> Result<Vec<PathBuf>, String> {
+    let files = config
         .entries_under("ux.design.")
         .into_keys()
-        .map(PathBuf::from)
-        .collect();
+        .map(|path| expand(&path, home))
+        .collect::<Result<Vec<_>, _>>()?;
     if files.is_empty() {
         return Err("[ux.design] lists no design files; fix: add `\"design/patterns.md\" = \"<why it is sent>\"`".to_owned());
     }
     Ok(files)
 }
 
+/// `path`, with a leading `~/` made `home`'s.
 fn expand(path: &str, home: Option<&str>) -> Result<PathBuf, String> {
     let Some(rest) = path.strip_prefix("~/") else {
         return Ok(PathBuf::from(path));
     };
-    let home = home.ok_or(
-        "ux.report_dir starts with ~/ but HOME is not set; fix: set HOME or give a full path",
-    )?;
+    let home = home.ok_or_else(|| {
+        format!(
+            "`{path}` in [ux] starts with ~/ but HOME is not set; fix: set HOME or give a full path"
+        )
+    })?;
     Ok(PathBuf::from(home).join(rest))
 }
 

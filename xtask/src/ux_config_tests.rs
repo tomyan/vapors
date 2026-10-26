@@ -152,3 +152,30 @@ fn every_key_the_review_reads_is_one_the_schema_accepts() {
     // Then
     assert_eq!(checked, Ok(()));
 }
+
+#[test]
+fn a_model_with_no_image_row_is_refused_naming_it_and_the_fix() {
+    // When
+    let refused = read(&with("model", "gpt-6.1-sol")).expect_err("refused");
+
+    // Then
+    assert!(
+        refused.contains("ux.model `gpt-6.1-sol` has no image-token row"),
+        "{refused}"
+    );
+    assert!(refused.contains("fix: add its numbers"), "{refused}");
+}
+
+#[test]
+fn every_path_expands_a_leading_home() {
+    // Given
+    let text =
+        with("run_dir", "~/ux").replace("\"design/patterns.md\"", "\"~/design/patterns.md\"");
+
+    // When
+    let ux = read(&text).expect("read");
+
+    // Then
+    assert_eq!(ux.run_dir, PathBuf::from("/home/u/ux"));
+    assert_eq!(ux.design, vec![PathBuf::from("/home/u/design/patterns.md")]);
+}

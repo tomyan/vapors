@@ -83,18 +83,18 @@ fn viewport(dir: &Path) -> Result<Viewport, String> {
 }
 
 fn frame(dir: &Path, viewport: &str, step: &Value) -> Result<Frame, String> {
-    let named = |key: &str| {
+    let named = |key: &str, extension: &str| {
         step[key]
             .as_str()
-            .filter(|f| !f.contains('/'))
+            .filter(|f| plain_name(f, extension))
             .ok_or_else(|| {
                 format!(
-                    "{}/facts.json: a step's `{key}` is not a file name beside it: {step}",
+                    "{}/facts.json: a step's `{key}` is not a plain `{extension}` file name beside it: {step}",
                     dir.display()
                 )
             })
     };
-    let (png_file, text_file) = (named("frame")?, named("text")?);
+    let (png_file, text_file) = (named("frame", ".png")?, named("text", ".txt")?);
     let path = dir.join(png_file);
     let text = std::fs::read_to_string(dir.join(text_file))
         .map_err(|e| format!("{}/{text_file}: {e}", dir.display()))?;
@@ -105,6 +105,17 @@ fn frame(dir: &Path, viewport: &str, step: &Value) -> Result<Frame, String> {
         text,
     })
 }
+
+/// A file name with a stem and `extension`, and no path in it.
+fn plain_name(name: &str, extension: &str) -> bool {
+    name.strip_suffix(extension)
+        .is_some_and(|stem| !stem.is_empty() && !stem.starts_with('.'))
+        && !name.contains(['/', '\\'])
+}
+
+/// The keys of facts.json that are its structure, not facts: a measured
+/// checklist item cannot name one.
+pub const STRUCTURE: [&str; 3] = ["viewport", "size", "steps"];
 
 /// A PNG's width and height, from its header.
 fn size(path: &Path) -> Result<(u32, u32), String> {

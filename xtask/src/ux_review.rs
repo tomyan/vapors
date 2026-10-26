@@ -43,13 +43,22 @@ fn review(dry_run: bool) -> Result<Vec<String>, String> {
     let config = Config::load().map_err(|e| e.to_string())?;
     let ux = UxConfig::from_config(&config, std::env::var("HOME").ok().as_deref())?;
     let prepared = prepare(&ux)?;
+    checked(&ux, &prepared, dry_run)
+}
+
+/// The caps checked and what would be sent, summarised; the live call
+/// is refused, naming the flag, until slice 2 builds it.
+///
+/// # Errors
+/// A cap exceeded, or no `--dry-run`.
+pub fn checked(ux: &UxConfig, prepared: &Prepared, dry_run: bool) -> Result<Vec<String>, String> {
     prepared.estimate.within(&ux.caps, &ux.prices)?;
-    let mut lines = summary(&ux, &prepared);
     if !dry_run {
         return Err(
             "the live review is not built yet (U4 slice 2); fix: pass --dry-run".to_owned(),
         );
     }
+    let mut lines = summary(ux, prepared);
     lines.push("dry run: nothing was sent".to_owned());
     Ok(lines)
 }
@@ -79,7 +88,7 @@ pub fn prepare(ux: &UxConfig) -> Result<Prepared, String> {
     let images = viewports
         .iter()
         .flat_map(|v| &v.frames)
-        .map(|f| image_tokens(f.size, &ux.image_detail))
+        .map(|f| image_tokens(ux.model, f.size, &ux.image_detail))
         .sum();
     let estimate = Estimate {
         text: text_tokens(prompt.len()),
@@ -120,10 +129,14 @@ fn summary(ux: &UxConfig, prepared: &Prepared) -> Vec<String> {
             "worst case ${:.4} of ${:.2} a run, {} at ${}/${} per million ({})",
             estimate.worst_cost(&ux.caps, &ux.prices),
             ux.caps.cost_usd,
-            ux.model,
+            ux.model.name,
             ux.prices.input,
             ux.prices.output,
             ux.prices.source
         ),
     ]
 }
+
+#[cfg(test)]
+#[path = "ux_review_tests.rs"]
+mod tests;

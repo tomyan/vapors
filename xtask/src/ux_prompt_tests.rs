@@ -66,3 +66,19 @@ fn a_measured_item_naming_no_recorded_fact_is_refused_with_its_line() {
         "{refused}"
     );
 }
+
+#[test]
+fn a_measured_item_naming_a_structural_key_is_refused() {
+    // Given
+    let text = format!("{CHECKLIST}- measured steps: The walk has steps.\n");
+    let items = parse("c.md", &text).expect("parsed");
+
+    // When
+    let refused = measured_present("c.md", &items, &[phone()]).expect_err("refused");
+
+    // Then
+    assert!(
+        refused.contains("the measured item `steps` names no fact"),
+        "{refused}"
+    );
+}

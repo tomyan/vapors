@@ -2,7 +2,8 @@
 //! review's items, each `- measured <id>: <text>` or
 //! `- judged <id>: <text>`. A measured item's id names a fact in the
 //! walk's facts.json, filled in by the script; only judged items go to
-//! the model. Any other list item is refused with its line.
+//! the model. A list item of any other shape (nested, `*`, `+` or
+//! numbered) is refused with its line; fenced code is not read.
 
 /// Who answers an item.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -31,11 +32,16 @@ pub struct Item {
 /// names `file` and the line.
 pub fn parse(file: &str, text: &str) -> Result<Vec<Item>, String> {
     let mut items: Vec<Item> = Vec::new();
+    let mut fenced = false;
     for (index, line) in text.lines().enumerate() {
-        let Some(rest) = line.strip_prefix("- ") else {
+        if line.trim_start().starts_with("```") {
+            fenced = !fenced;
+        }
+        if fenced || !list_item(line) {
             continue;
-        };
-        let item = item(rest, index + 1).map_err(|why| format!("{file}:{}: {why}", index + 1))?;
+        }
+        let item =
+            column_item(line, index + 1).map_err(|why| format!("{file}:{}: {why}", index + 1))?;
         if let Some(first) = items.iter().find(|i| i.id == item.id) {
             return Err(format!(
                 "{file}:{}: the id `{}` is already used on line {}",
@@ -50,6 +56,27 @@ pub fn parse(file: &str, text: &str) -> Result<Vec<Item>, String> {
         ));
     }
     Ok(items)
+}
+
+/// A Markdown list item, at any indent: `- `, `* `, `+ ` or `<digits>. `.
+fn list_item(line: &str) -> bool {
+    let start = line.trim_start();
+    let digits = start.chars().take_while(char::is_ascii_digit).count();
+    ["- ", "* ", "+ "]
+        .iter()
+        .any(|mark| start.starts_with(mark))
+        || (digits > 0 && start[digits..].starts_with(". "))
+}
+
+/// An item, which must be `- ` at column 0: a nested, starred or
+/// numbered item is refused rather than left out.
+fn column_item(line: &str, number: usize) -> Result<Item, String> {
+    match line.strip_prefix("- ") {
+        Some(rest) => item(rest, number),
+        None => Err(format!(
+            "a checklist item starts `- ` at column 0, not `{line}`"
+        )),
+    }
 }
 
 fn item(rest: &str, line: usize) -> Result<Item, String> {

@@ -76,3 +76,37 @@ fn a_checklist_with_nothing_to_judge_is_refused() {
     // Then
     assert!(refused.contains("nothing to ask the model"), "{refused}");
 }
+
+#[test]
+fn a_list_item_of_any_other_markdown_shape_is_refused_naming_its_line() {
+    for line in [
+        "* judged a: b",
+        "+ judged a: b",
+        "1. judged a: b",
+        "  - judged a: b",
+    ] {
+        // Given
+        let text = format!("{GOOD}{line}\n");
+
+        // When
+        let refused = parse("c.md", &text).expect_err(line);
+
+        // Then
+        assert!(
+            refused.starts_with("c.md:7: a checklist item starts `- ` at column 0"),
+            "{refused}"
+        );
+    }
+}
+
+#[test]
+fn list_items_in_fenced_code_are_not_read() {
+    // Given
+    let text = format!("{GOOD}```\n- not an item\n```\n");
+
+    // When
+    let items = parse("c.md", &text).expect("parsed");
+
+    // Then
+    assert_eq!(items.len(), 2);
+}

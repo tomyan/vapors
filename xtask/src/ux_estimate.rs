@@ -1,59 +1,55 @@
-//! What a review would cost before it is sent: input tokens estimated
+//! What a review would cost before it is sent: input tokens bounded
 //! from above, and the worst case with every output token used. A run
 //! over either cap is refused before any request.
 
 use crate::ux_config::{Caps, Prices};
+use crate::ux_models::{Fit, Images, Model};
 
-/// Text: one token per 3 bytes, rounded up. English runs near 4 bytes a
-/// token, so this overestimates.
+/// Text: one token per byte. A token covers at least one byte, so this
+/// is an upper bound without the tokenizer.
 pub fn text_tokens(bytes: usize) -> u64 {
-    (bytes as u64).div_ceil(3)
+    bytes as u64
 }
 
-/// One image at `detail`, the larger of `OpenAI`'s two published counts
-/// (developers.openai.com/api/docs/guides/images-vision, read
-/// 2026-10-26), so the estimate is above either:
-/// - tiles: once the image fits 2048 px and its short side is at most
-///   768 px, a base plus a count per 512 px tile; the largest listed
-///   for a current model is 85 and 170 (`gpt-5` is 70 and 140), and
-///   "low" is the base alone;
-/// - patches: one per 32 px square, at most 2,500 at "high", times the
-///   largest listed multiplier for a current model, 1.2; "low" fits the
-///   image within 512 px.
-pub fn image_tokens((width, height): (u32, u32), detail: &str) -> u64 {
-    if detail == "low" {
-        let fit = 512.0 / f64::from(width.max(height));
-        let scale = |n: u32| whole((f64::from(n) * fit.min(1.0)).ceil());
-        return 85_u64.max(patch_tokens(scale(width), scale(height)));
+/// One image of `size` at `detail`, counted with `model`'s row
+/// (`ux_models`).
+pub fn image_tokens(model: &Model, size: (u32, u32), detail: &str) -> u64 {
+    match &model.images {
+        Images::Tiles { base, .. } if detail == "low" => *base,
+        Images::Tiles { base, per_tile } => base + per_tile * tile_count(size),
+        Images::Patches { tenths, low, high } => {
+            let fit = if detail == "low" { low } else { high };
+            (patch_count(size, fit) * tenths).div_ceil(10)
+        }
     }
-    tiles(width, height).max(patch_tokens(width.into(), height.into()))
 }
 
-fn tiles(width: u32, height: u32) -> u64 {
+/// 512 px tiles once the image fits 2048 px and its short side is at
+/// most 768 px.
+fn tile_count((width, height): (u32, u32)) -> u64 {
     let (w, h) = (f64::from(width), f64::from(height));
     let fit = (2048.0 / w.max(h)).min(1.0);
     let (w, h) = (w * fit, h * fit);
     let short = (768.0 / w.min(h)).min(1.0);
-    let tiles = ((w * short) / 512.0).ceil() * ((h * short) / 512.0).ceil();
-    85 + 170 * whole(tiles)
+    whole(((w * short) / 512.0).ceil()) * whole(((h * short) / 512.0).ceil())
 }
 
-/// Patch tokens: the count, at most the 2,500 budget, times 1.2 rounded
-/// up (as tenths, to stay in whole numbers).
-fn patch_tokens(width: u64, height: u64) -> u64 {
-    let patches = (width.div_ceil(32) * height.div_ceil(32)).min(2500);
-    (patches * 12).div_ceil(10)
+/// 32 px patches once the longer side fits `fit.max_side`, at most its
+/// budget: an image over the budget is scaled down to it.
+fn patch_count((width, height): (u32, u32), fit: &Fit) -> u64 {
+    let scale = (f64::from(fit.max_side) / f64::from(width.max(height))).min(1.0);
+    let side = |n: u32| whole((f64::from(n) * scale).ceil());
+    let raw = side(width).div_ceil(32) * side(height).div_ceil(32);
+    fit.budget.map_or(raw, |budget| raw.min(budget))
 }
 
-/// `n`, a non-negative whole number (tiles, or pixels of a scaled
-/// side), as a count.
+/// `n`, a non-negative whole number (tiles per side, or pixels of a
+/// fitted side, at most 65,535), as a count.
 fn whole(n: f64) -> u64 {
-    // Tiles of an image under 2048 px each way are at most 16, and a side
-    // fitted to 512 px at most 512.
     #[allow(
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss,
-        reason = "a small non-negative whole number"
+        reason = "a non-negative whole number under 65,536"
     )]
     let count = n as u64;
     count

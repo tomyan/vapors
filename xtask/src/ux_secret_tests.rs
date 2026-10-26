@@ -8,6 +8,11 @@ fn secret() -> Secret {
     Secret::new(KEY.to_owned()).expect("a key long enough to guard")
 }
 
+/// No window of the key, of any length the guard looks for, is in `said`.
+fn shows_none_of_the_key(said: &str) -> bool {
+    (0..=KEY.len() - RUN).all(|at| !said.contains(&KEY[at..at + RUN]))
+}
+
 #[test]
 fn text_without_the_key_passes_unchanged() {
     // Given
@@ -33,7 +38,7 @@ fn text_holding_the_whole_key_is_refused_naming_the_output_not_the_key() {
     // Then
     assert!(refused.contains("the PR comment"), "{refused}");
     assert!(
-        !refused.contains(&KEY[..RUN]),
+        shows_none_of_the_key(&refused),
         "the refusal leaks the key: {refused}"
     );
 }
@@ -79,6 +84,62 @@ fn a_key_too_short_to_guard_by_runs_is_refused() {
         !refused.contains("sk-short"),
         "the refusal leaks the key: {refused}"
     );
+}
+
+#[test]
+fn an_empty_key_is_refused_as_too_short() {
+    // When
+    let refused = Secret::new(String::new()).expect_err("refused");
+
+    // Then
+    assert!(refused.contains("is 0 characters"), "{refused}");
+}
+
+#[test]
+fn a_key_that_is_not_ascii_is_refused_with_its_own_message() {
+    // When
+    let refused = Secret::new(format!("{KEY}é")).expect_err("refused");
+
+    // Then
+    assert!(refused.contains("not ASCII"), "{refused}");
+    assert!(shows_none_of_the_key(&refused), "{refused}");
+}
+
+#[test]
+fn a_key_broken_by_whitespace_is_refused() {
+    // Given the key wrapped every 10 characters, so no 12 run together
+    let wrapped: Vec<&str> = KEY
+        .as_bytes()
+        .chunks(10)
+        .map(|c| std::str::from_utf8(c).expect("ASCII"))
+        .collect();
+    let text = format!("key: {}", wrapped.join("\n  "));
+
+    // When
+    let refused = secret().guard("the report", &text);
+
+    // Then
+    assert!(refused.is_err());
+}
+
+#[test]
+fn the_key_in_base64_at_every_alignment_is_refused() {
+    for prefix in ["", "u:", "ux:"] {
+        for url_safe in [false, true] {
+            // Given Basic auth's encoding of `<prefix><key>`
+            let mut encoded = crate::ux_base64::encode(format!("{prefix}{KEY}").as_bytes());
+            if url_safe {
+                encoded = encoded.replace('+', "-").replace('/', "_");
+            }
+
+            // When
+            let text = format!("Authorization: Basic {encoded}");
+            let refused = secret().guard("stderr", &text);
+
+            // Then
+            assert!(refused.is_err(), "{prefix:?} url-safe {url_safe}");
+        }
+    }
 }
 
 #[test]
