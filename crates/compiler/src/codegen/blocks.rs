@@ -60,16 +60,36 @@ impl Emitter<'_> {
         nodes: &[Node],
         signature: &str,
     ) -> Result<(), CompileError> {
+        let clones = self.builder_clones(nodes)?;
+        self.emit_builder_with(&clones, nodes, signature, &[])
+    }
+
+    /// The bindings a builder of `nodes` reads, which it takes clones of.
+    pub(super) fn builder_clones(&self, nodes: &[Node]) -> Result<Vec<String>, CompileError> {
         let read = expressions_in(nodes);
-        let clones = self.clones_for(&read.iter().collect::<Vec<_>>())?;
+        self.clones_for(&read.iter().collect::<Vec<_>>())
+    }
+
+    /// A builder closure, inside a block with `clones` when any, its
+    /// body opening with the `prelude` lines.
+    pub(super) fn emit_builder_with(
+        &mut self,
+        clones: &[String],
+        nodes: &[Node],
+        signature: &str,
+        prelude: &[String],
+    ) -> Result<(), CompileError> {
         let wrapped = !clones.is_empty();
         if wrapped {
             self.line("{");
             self.indent(1);
-            self.emit_clones(&clones);
+            self.emit_clones(clones);
         }
         self.line(signature);
         self.indent(1);
+        for line in prelude {
+            self.line(line);
+        }
         self.line("let mut roots = Vec::new();");
         self.emit_nodes(nodes, &Place::roots())?;
         self.line("roots");
@@ -95,8 +115,9 @@ impl Emitter<'_> {
         self.line("{");
         self.indent(1);
         self.emit_clones(clones);
+        // the closure is the block's value; the block takes the comma
         for line in lines {
-            self.line(line);
+            self.line(line.strip_suffix(',').unwrap_or(line));
         }
         self.dedent(1);
         self.line("},");
@@ -115,8 +136,8 @@ impl Emitter<'_> {
 }
 
 /// Every expression a subtree reads, for the clones its closure needs; a
-/// `{render name()}` reads the snippet `name`.
-fn expressions_in(nodes: &[Node]) -> Vec<Expr> {
+/// `{render name(args)}` reads the snippet `name` and its arguments.
+pub(super) fn expressions_in(nodes: &[Node]) -> Vec<Expr> {
     let mut found = Vec::new();
     for node in nodes {
         collect(node, &mut found);
@@ -176,9 +197,14 @@ fn collect(node: &Node, found: &mut Vec<Expr>) {
             .children
             .iter()
             .for_each(|child| collect(child, found)),
-        Node::Render(render) => found.push(Expr {
-            code: render.name.clone(),
-            offset: render.offset,
-        }),
+        // the snippet's name and its arguments: a builder that renders
+        // it reads both
+        Node::Render(render) => {
+            found.push(Expr {
+                code: render.name.clone(),
+                offset: render.offset,
+            });
+            found.extend(super::snippets::args_tuple(render));
+        }
     }
 }

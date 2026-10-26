@@ -21,6 +21,8 @@ mod script;
 mod script_syntax;
 mod script_uses;
 mod shell;
+mod snippet_list;
+mod snippet_params;
 mod snippets;
 mod syn_map;
 mod tag_path;
