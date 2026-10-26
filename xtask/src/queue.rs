@@ -71,7 +71,7 @@ fn worktree(run: &Path) -> Result<(), String> {
 }
 
 /// `<log>.<extension>`, beside the log.
-fn beside(log: &Path, extension: &str) -> PathBuf {
+pub fn beside(log: &Path, extension: &str) -> PathBuf {
     let name = log
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())

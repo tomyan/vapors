@@ -127,7 +127,11 @@ fn as_if_ready(facts: &Facts) -> Facts {
 fn protected(touched: &[String]) -> Option<String> {
     touched
         .iter()
-        .find(|path| PROTECTED.iter().any(|p| path.starts_with(p)))
+        .find(|path| {
+            PROTECTED
+                .iter()
+                .any(|p| path.starts_with(p) || path.as_str() == p.trim_end_matches('/'))
+        })
         .cloned()
 }
 

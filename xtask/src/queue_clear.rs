@@ -25,7 +25,7 @@ use crate::queue_git::{command, failure, git, git_output, piped};
 ///
 /// A commit git cannot read, or git failing other than by a conflict.
 pub fn clear_holds(dir: &Path, main: &str, head: &str, cleared: &str) -> Result<Clear, String> {
-    if let Some(merge) = resolved_merge(dir, main, head)? {
+    if let Some(merge) = resolved_merge(dir, main, head, cleared)? {
         let why = format!("merge {merge} differs from git's own merge of its parents");
         return Ok(Clear::Changed(why));
     }
@@ -68,11 +68,17 @@ fn match_patches(
     Ok(Ok(unmatched))
 }
 
-/// The first merge commit over `main` whose tree is not git's clean merge
-/// of its two parents.
-fn resolved_merge(dir: &Path, main: &str, head: &str) -> Result<Option<String>, String> {
-    let range = format!("{main}..{head}");
-    for merge in git(dir, &["rev-list", "--merges", &range])?.lines() {
+/// The first merge commit over `main`, after `cleared` (the reviewer saw
+/// the merges before it), whose tree is not git's clean merge of its two
+/// parents.
+fn resolved_merge(
+    dir: &Path,
+    main: &str,
+    head: &str,
+    cleared: &str,
+) -> Result<Option<String>, String> {
+    let (range, seen) = (format!("{main}..{head}"), format!("^{cleared}"));
+    for merge in git(dir, &["rev-list", "--merges", &range, &seen])?.lines() {
         if !clean_merge(dir, merge)? {
             return Ok(Some(merge.to_owned()));
         }

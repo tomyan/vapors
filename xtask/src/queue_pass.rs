@@ -78,7 +78,8 @@ impl<O: Ops> Pass<'_, O> {
         }
         self.carry_out(state, pr, prs, &judged)
     }
-    /// Merge or re-gate `pr` as judged; a failure is said and moves on.
+    /// Merge or re-gate `pr` as judged; whether the pass ends. A failure is
+    /// said, and the pass moves on unless a gate was started.
     fn carry_out(
         &self,
         state: &mut State,
@@ -87,16 +88,26 @@ impl<O: Ops> Pass<'_, O> {
         judged: &Judged,
     ) -> Result<bool, String> {
         state.changed(0, "acted");
-        let done = match judged.decision {
-            Decision::Merge => crate::queue_act::merge(self.ops, self.log, pr, prs),
-            _ => {
-                crate::queue_act::regate(self.ops, self.config, self.log, state, pr, judged.behind)
-            }
-        };
-        let failed = done
+        let failed = match judged.decision {
+            Decision::Merge => crate::queue_act::merge(self.ops, self.log, pr, prs)
+                .err()
+                .map(|why| (why, false)),
+            _ => crate::queue_regate::regate(
+                self.ops,
+                self.config,
+                self.log,
+                state,
+                pr,
+                judged.behind,
+            )
             .err()
-            .map(|why| format!("FAILED #{}: {why}", pr.number));
-        failed.map_or(Ok(true), |why| self.said(state, pr.number, &why))
+            .map(crate::queue_regate::Undone::split),
+        };
+        let Some((why, gated)) = failed else {
+            return Ok(true);
+        };
+        self.said(state, pr.number, &format!("FAILED #{}: {why}", pr.number))?;
+        Ok(gated)
     }
 
     /// Log `reason` for PR `number` when it changed; no action was taken.

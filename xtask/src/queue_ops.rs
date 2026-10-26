@@ -8,6 +8,7 @@ use std::time::Duration;
 use crate::gate_pr::Ended;
 use crate::queue_decide::{Clear, Gate};
 use crate::queue_list::Listed;
+use crate::queue_state::State;
 
 /// A PR as it is now, read again just before acting.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -56,10 +57,14 @@ pub trait Ops {
     fn update_branch(&self, number: u64) -> Result<(), String>;
     /// Squash-merge PR `number` at `head`.
     fn merge(&self, number: u64, head: &str) -> Result<(), String>;
-    /// Point PR `number` at main.
-    fn retarget(&self, number: u64) -> Result<(), String>;
-    /// Delete `branch` on GitHub.
-    fn delete_branch(&self, branch: &str) -> Result<(), String>;
+    /// Point PR `number` at main; false when it already was (GitHub
+    /// retargets a stacked PR itself when its base merges).
+    fn retarget(&self, number: u64) -> Result<bool, String>;
+    /// Delete `branch` on GitHub; false when it was already gone (GitHub
+    /// deletes a merged head branch itself here).
+    fn delete_branch(&self, branch: &str) -> Result<bool, String>;
+    /// Save the queue's state now, so a pass killed later keeps it.
+    fn keep(&self, state: &State) -> Result<(), String>;
     /// Re-publish `/`, when the repository has a serve worktree.
     fn serve(&self) -> Result<(), String>;
     /// Wait `duration`.

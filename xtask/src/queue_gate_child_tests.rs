@@ -59,13 +59,40 @@ fn a_gate_past_its_deadline_is_killed_with_everything_it_started() {
 
     // Then
     let why = gated.expect_err("killed");
-    assert_eq!(
-        why,
-        "the gate did not finish within 1s; killed with its process group"
+    assert!(
+        why.starts_with("the gate did not finish within 1s; killed its process groups"),
+        "{why}"
     );
     let grandchild = std::fs::read_to_string(&pid_file).expect("pid written");
     std::thread::sleep(Duration::from_millis(200));
     let survived = alive(grandchild.trim());
     let _ = std::fs::remove_dir_all(&dir);
     assert!(!survived, "the grandchild {grandchild} outlived the kill");
+}
+
+#[test]
+fn a_killed_gate_takes_its_steps_in_their_own_groups_with_it() {
+    // Given: the gate starts a step in a process group of its own, as command.rs does
+    let dir = scratch("steps");
+    let pid_file = dir.join("step.pid");
+    let script = format!("setsid sleep 60 & echo $! > {}; wait", pid_file.display());
+
+    // When
+    let gated = run(
+        shell(&script),
+        Duration::from_secs(1),
+        &dir.join("gate.out"),
+    );
+
+    // Then
+    let why = gated.expect_err("killed");
+    assert!(
+        why.starts_with("the gate did not finish within 1s; killed its process groups"),
+        "{why}"
+    );
+    let step = std::fs::read_to_string(&pid_file).expect("pid written");
+    std::thread::sleep(Duration::from_millis(200));
+    let survived = alive(step.trim());
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(!survived, "the step {step} outlived the kill");
 }

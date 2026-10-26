@@ -14,6 +14,7 @@ use crate::queue_git::git;
 use crate::queue_list::Listed;
 use crate::queue_ops::{Gated, Now, Ops};
 use crate::queue_remote;
+use crate::queue_state::State;
 
 const MAIN: &str = "origin/main";
 
@@ -104,11 +105,15 @@ impl Ops for Real<'_> {
         queue_remote::merge(&self.config.repo, number, head)
     }
 
-    fn retarget(&self, number: u64) -> Result<(), String> {
+    fn retarget(&self, number: u64) -> Result<bool, String> {
         queue_remote::retarget(&self.config.repo, number)
     }
 
-    fn delete_branch(&self, branch: &str) -> Result<(), String> {
+    fn keep(&self, state: &State) -> Result<(), String> {
+        state.save(&crate::queue::beside(&self.config.log, "state.json"))
+    }
+
+    fn delete_branch(&self, branch: &str) -> Result<bool, String> {
         queue_remote::delete_branch(&self.config.repo, branch)
     }
 

@@ -129,3 +129,28 @@ fn main_moving_before_the_merge_stops_it() {
     assert!(!fake.called("merge 1"), "{:?}", fake.calls());
     assert!(log.iter().any(|l| l.contains("main moved")), "{log:?}");
 }
+
+#[test]
+fn what_github_already_did_after_a_merge_is_said_not_redone() {
+    // Given: GitHub retargeted the stacked PR and deleted the merged branch itself
+    let mut stacked = listed(3);
+    stacked.base = "b1".into();
+    let fake = Fake {
+        prs: vec![listed(1), stacked],
+        github_tidied: true,
+        ..two_ready()
+    };
+
+    // When
+    let log = run_pass(&fake, MergeOn::Gate, &mut State::default(), false);
+
+    // Then
+    assert!(
+        log.iter().any(|l| l == "#3 is already based on main"),
+        "{log:?}"
+    );
+    assert!(
+        log.iter().any(|l| l == "branch b1 is already deleted"),
+        "{log:?}"
+    );
+}

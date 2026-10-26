@@ -59,3 +59,27 @@ fn a_gate_that_exits_without_posting_logs_its_last_lines() {
         ]
     );
 }
+
+#[test]
+fn a_gate_that_was_started_ends_the_pass_even_when_it_fails() {
+    // Given: both PRs need a gate, and the first is killed at its deadline
+    let fake = Fake {
+        gate_fails: Some("the gate did not finish within 3600s; killed".into()),
+        ..ungated()
+    };
+    fake.comments.borrow_mut().insert(2, vec![clear("lead")]);
+
+    // When
+    run_pass(&fake, MergeOn::Gate, &mut State::default(), false);
+
+    // Then
+    let calls = fake.calls();
+    assert!(!fake.called("gate 2"), "{calls:?}");
+    let gate = calls.iter().position(|c| c == "gate 1 h1").expect("gated");
+    assert_eq!(
+        calls[gate - 1],
+        "keep",
+        "the state is saved before the gate: {calls:?}"
+    );
+    assert_eq!(calls[gate + 1], "keep", "and after its backoff: {calls:?}");
+}

@@ -41,16 +41,12 @@ pub fn merge(repo: &str, number: u64, head: &str) -> Result<(), String> {
 /// # Errors
 ///
 /// gh's refusal.
-pub fn retarget(repo: &str, number: u64) -> Result<(), String> {
-    gh(&[
-        "api",
-        "-X",
-        "PATCH",
-        &format!("repos/{repo}/pulls/{number}"),
-        "-f",
-        "base=main",
-    ])
-    .map(|_| ())
+pub fn retarget(repo: &str, number: u64) -> Result<bool, String> {
+    let pull = format!("repos/{repo}/pulls/{number}");
+    if gh(&["api", &pull, "--jq", ".base.ref"])?.trim() == "main" {
+        return Ok(false);
+    }
+    gh(&["api", "-X", "PATCH", &pull, "-f", "base=main"]).map(|_| true)
 }
 
 /// Delete `branch` on GitHub.
@@ -58,14 +54,14 @@ pub fn retarget(repo: &str, number: u64) -> Result<(), String> {
 /// # Errors
 ///
 /// gh's refusal.
-pub fn delete_branch(repo: &str, branch: &str) -> Result<(), String> {
-    gh(&[
-        "api",
-        "-X",
-        "DELETE",
-        &format!("repos/{repo}/git/refs/heads/{branch}"),
-    ])
-    .map(|_| ())
+pub fn delete_branch(repo: &str, branch: &str) -> Result<bool, String> {
+    let reference = format!("repos/{repo}/git/refs/heads/{branch}");
+    match gh(&["api", "-X", "DELETE", &reference]) {
+        Ok(_) => Ok(true),
+        // GitHub's answer for a ref that is gone (HTTP 422).
+        Err(why) if why.contains("Reference does not exist") => Ok(false),
+        Err(why) => Err(why),
+    }
 }
 
 /// `git fetch origin <refs>` in `dir`.

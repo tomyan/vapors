@@ -37,7 +37,7 @@ pub fn run(mut command: Command, deadline: Duration, out: &Path) -> Result<Gated
             ended: ended(status)?,
             tail: tail(out)?,
         }),
-        None => Err(kill_group(&mut child, deadline)),
+        None => Err(kill_tree(&mut child, deadline)),
     }
 }
 
@@ -59,19 +59,35 @@ fn wait(child: &mut Child, deadline: Duration) -> Result<Option<ExitStatus>, Str
 /// How often the child is polled; a gate takes minutes.
 const POLL: Duration = Duration::from_millis(200);
 
-/// Kill the child's whole process group (no libc, so by `kill`); what
-/// happened, for the log.
-fn kill_group(child: &mut Child, deadline: Duration) -> String {
-    let group = format!("-{}", child.id());
-    let killed = Command::new("kill").args(["-KILL", "--", &group]).status();
-    let said = match killed {
-        Ok(status) if status.success() => "killed with its process group".to_owned(),
-        other => {
-            let _ = child.kill();
-            format!("its process group could not be killed ({other:?}), so the gate alone was")
+/// Kill the child's process group and the group of each of its
+/// descendants: the gate puts each step in a group of its own
+/// (`command.rs`) and enforced the step's deadline itself, so the steps
+/// must go too. What was killed and what could not be, for the log.
+/// Declared limit: a process started between the scan and the kill is
+/// missed.
+fn kill_tree(child: &mut Child, deadline: Duration) -> String {
+    let mut groups = vec![child.id()];
+    for group in crate::queue_process_tree::descendant_groups(child.id()) {
+        if !groups.contains(&group) {
+            groups.push(group);
         }
-    };
+    }
+    let failed: Vec<String> = groups
+        .iter()
+        .filter_map(|group| crate::command::kill_group_id(*group).err())
+        .collect();
+    let _ = child.kill();
     let _ = child.wait();
+    let listed: Vec<String> = groups.iter().map(u32::to_string).collect();
+    let said = if failed.is_empty() {
+        format!("killed its process groups ({})", listed.join(", "))
+    } else {
+        format!(
+            "killed what it could of its process groups ({}); not killed: {}",
+            listed.join(", "),
+            failed.join("; ")
+        )
+    };
     format!("the gate did not finish within {deadline:?}; {said}")
 }
 

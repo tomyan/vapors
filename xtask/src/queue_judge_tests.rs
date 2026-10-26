@@ -11,6 +11,10 @@ fn a_change_to_the_factory_ci_or_build_settings_is_protected() {
         ".cargo/config.toml",
         "rust-toolchain.toml",
         "deny.toml",
+        "xtask",
+        ".github",
+        ".config",
+        ".cargo",
     ] {
         assert_eq!(
             protected(&[path.to_owned()]),

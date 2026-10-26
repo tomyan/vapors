@@ -68,3 +68,20 @@ fn a_merge_committed_with_its_conflict_markers_breaks_the_clear() {
         format!("merge {head} differs from git's own merge of its parents")
     );
 }
+
+#[test]
+fn a_clear_posted_after_a_resolved_merge_holds_at_that_head() {
+    // Given: the PR resolves a conflict by merging main, and the reviewer clears that head
+    let (repo, _) = lines_repo("cleared-merge");
+    let text = std::fs::read_to_string(repo.0.join("f.txt")).expect("read");
+    commit(&repo.0, "f.txt", &text.replace("line 5\n", "line MAIN\n"));
+    run(&repo.0, &["checkout", "-q", "feature"]);
+    run(
+        &repo.0,
+        &["merge", "-q", "-s", "ours", "main", "-m", "merge main"],
+    );
+    let head = run(&repo.0, &["rev-parse", "HEAD"]);
+
+    // Then
+    assert_eq!(clear_holds(&repo.0, "main", &head, &head), Ok(Clear::Holds));
+}

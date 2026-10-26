@@ -9,6 +9,7 @@ use crate::gate_pr::{Ended, comment};
 use crate::queue_decide::{Clear, Gate};
 use crate::queue_list::Listed;
 use crate::queue_ops::{Gated, Now, Ops};
+use crate::queue_state::State;
 
 /// A full-SHA clear signed `role`.
 pub fn clear(role: &str) -> String {
@@ -49,6 +50,8 @@ pub struct Fake {
     /// A PR that gets `queue: hold` once its comments were read once (a
     /// hold posted between judging and acting).
     pub hold_after_first_read: Option<u64>,
+    /// GitHub already retargeted stacked PRs and deleted merged branches.
+    pub github_tidied: bool,
     pub calls: RefCell<Vec<String>>,
 }
 
@@ -165,12 +168,16 @@ impl Ops for Fake {
             Ok(())
         }
     }
-    fn retarget(&self, number: u64) -> Result<(), String> {
+    fn retarget(&self, number: u64) -> Result<bool, String> {
         self.note(format!("retarget {number}"));
-        Ok(())
+        Ok(!self.github_tidied)
     }
-    fn delete_branch(&self, branch: &str) -> Result<(), String> {
+    fn delete_branch(&self, branch: &str) -> Result<bool, String> {
         self.note(format!("delete {branch}"));
+        Ok(!self.github_tidied)
+    }
+    fn keep(&self, _state: &State) -> Result<(), String> {
+        self.note("keep".into());
         Ok(())
     }
     fn serve(&self) -> Result<(), String> {
