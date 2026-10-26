@@ -231,7 +231,7 @@ jobs:
         timeout-minutes: 3
         uses: ./.github/actions/apt-install
         with:
-          packages: mesa-vulkan-drivers xvfb libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev
+          packages: mesa-vulkan-drivers xvfb xclip libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev
           mesa-major: 25 # 25.2.8 on ubuntu-24.04, 2026-10-23
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
@@ -248,6 +248,11 @@ jobs:
       # The waker in a window: none idle, one frame per wake from a thread.
       - name: the waker in a window
         run: xvfb-run -a cargo run -p vapors-platform --example wake_window
+      # The clipboard's image for Event::Paste: a PNG xclip sets reads
+      # back as its pixels, text alone as no image, an unreachable
+      # display as unreadable.
+      - name: the clipboard's image under Xvfb
+        run: xvfb-run -a cargo run -p vapors-platform --example check_clipboard
       - name: screenshot of the gradient fixture, fitted
         run: cargo xtask screenshot image_window target/image_window.png --expect 128,128,128 -- --open crates/platform/examples/fixtures/gradient.png
       # Each F2c demo in a window; the example holds the screenshot to the
