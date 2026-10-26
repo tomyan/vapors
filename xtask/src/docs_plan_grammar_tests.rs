@@ -117,3 +117,24 @@ fn a_pr_named_where_its_state_cannot_be_read_is_refused_naming_it() {
         );
     }
 }
+
+#[test]
+fn a_cell_that_lists_items_reads_every_pr_in_it() {
+    let vapors = |pr, expect| ("vapors".to_owned(), pr, expect);
+    let here = |pr, expect| (String::new(), pr, expect);
+    assert_eq!(
+        claimed("R1a merged vapors #65 (08:06Z); R1b PR #66, R1c PR #72"),
+        [
+            vapors(65, Expect::Merged),
+            here(66, Expect::Open),
+            here(72, Expect::Open)
+        ]
+    );
+    assert_eq!(
+        claimed("merged vapors #61 (06:57Z); the touche pin bump merged #79 (08:35Z)"),
+        [vapors(61, Expect::Merged), here(79, Expect::Merged)]
+    );
+    for refused in ["done-ish, see #12", "R1a, then something"] {
+        assert_eq!(one_row(refused).1.len(), 1, "{refused}");
+    }
+}

@@ -62,11 +62,11 @@ fn each_state_cell_claims_its_prs() {
 
 #[test]
 fn a_state_cell_in_an_unknown_shape_is_refused_naming_its_line() {
-    let text = "| Id | What | Owner | State | Depends on |\n|---|---|---|---|---|\n| A | x | y | done-ish, see #12 | |\n";
+    let text = "| Id | What | Owner | State | Depends on |\n|---|---|---|---|---|\n| A | x | y | done-ish | |\n";
     let (_, problems) = claims("docs/PLAN.md", text);
     assert_eq!(problems.len(), 1, "{problems:?}");
     assert!(
-        problems[0].starts_with("docs/PLAN.md:3: the State \"done-ish, see #12\" is in no shape"),
+        problems[0].starts_with("docs/PLAN.md:3: the State \"done-ish\" is in no shape"),
         "{problems:?}"
     );
 }
