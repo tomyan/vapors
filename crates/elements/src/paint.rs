@@ -43,6 +43,7 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
         scene: Scene::new(),
         texts: Vec::new(),
         rects: HashMap::new(),
+        paddings: HashMap::new(),
         hits: Vec::new(),
         cursors: HashMap::new(),
         scroll_chains: crate::scroll_chains::Chains::default(),
@@ -51,6 +52,8 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
     for (index, layout_box) in boxes.iter().enumerate() {
         if let Content::Element(node) = layout_box.content {
             painted.rects.insert(node, rects[index]);
+            let padding = crate::clip::padding_box(&boxes[index], rects[index]);
+            painted.paddings.insert(node, [padding.x, padding.y]);
         }
     }
     let steps = paint_steps(boxes, &|index| stacking_of(boxes, index, input.used));

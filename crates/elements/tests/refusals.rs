@@ -151,6 +151,23 @@ fn a_refused_update_drops_the_previous_result() {
 }
 
 #[test]
+fn listeners_for_the_capture_events_are_taken() {
+    // Given: 3-E1a fires both
+    let mut doc = document();
+    let body = doc.body();
+    let div = element(&mut doc, body, "div", "thumb");
+    for event in ["gotpointercapture", "lostpointercapture"] {
+        doc.listen(div, event, Box::new(|_: &mut Event| {}));
+    }
+
+    // When
+    let updated = doc.update(viewport(400.0, 300.0));
+
+    // Then
+    assert!(updated.is_ok(), "{:?}", updated.err());
+}
+
+#[test]
 fn a_listener_for_an_event_the_tree_never_fires_is_refused() {
     // Given
     let mut doc = document();
