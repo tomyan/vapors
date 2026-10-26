@@ -12,7 +12,7 @@ enum Keys {
 }
 
 /// Every table the factory reads.
-const TABLES: [(&str, Keys); 13] = [
+const TABLES: [(&str, Keys); 15] = [
     ("screenshot", Keys::Only(&["packages"])),
     ("web", Keys::Only(&["package", "product"])),
     ("dev", Keys::Only(&["port", "words", "https"])),
@@ -29,6 +29,28 @@ const TABLES: [(&str, Keys); 13] = [
     ("gate.actions", Keys::Any),
     ("gate.pinned", Keys::Any),
     ("layers.forbid", Keys::Any),
+    ("ux", Keys::Only(&UX_KEYS)),
+    ("ux.design", Keys::Any),
+];
+
+/// `[ux]`, read by `ux_config`.
+const UX_KEYS: [&str; 16] = [
+    "run_dir",
+    "checklist",
+    "report_dir",
+    "model",
+    "endpoint",
+    "key_env",
+    "reasoning",
+    "image_detail",
+    "price_input",
+    "price_cached",
+    "price_output",
+    "price_source",
+    "max_input_tokens",
+    "max_output_tokens",
+    "max_cost_usd",
+    "daily_cost_usd",
 ];
 
 /// Tables named by a prefix: `[imports.<crate>]`, any key.
