@@ -7,7 +7,8 @@
 //! - `plan` with `repo`: each work item's State names its PRs as gh sees
 //!   them (`docs_plan.rs`). `--offline` skips only the comparison with gh,
 //!   and says so; a State in no shape still fails.
-//! - `patterns`: quoted UI text is in the page's source.
+//! - `patterns` with `page`: "double-quoted" text in the patterns file is
+//!   in the page's source under `page`'s directories (`docs_patterns.rs`).
 //!
 //! Each failure names the file and line, and the fix.
 
@@ -18,7 +19,7 @@ use std::process::ExitCode;
 use crate::config::Config;
 use crate::docs_commands::{App, check, commands_in_help};
 use crate::docs_plan::{claims, contradiction};
-use crate::docs_sources::{app_help, has_example, pr, xtask_commands};
+use crate::docs_sources::{app_help, has_example, page_sources, pr, xtask_commands};
 
 /// The rules, by their `[docs]` key.
 const RULES: [&str; 3] = ["claude", "plan", "patterns"];
@@ -78,9 +79,25 @@ fn run_rule(
     match rule {
         "claude" => commands(file, &text, config.get("docs.app")),
         "plan" => plan(file, &text, config.get("docs.repo"), offline),
+        "patterns" => patterns(file, &text, config.get("docs.page")),
         _ => Err(vec![format!(
             "[docs] {rule}: this rule is not built yet; fix: excuse it under [docs.not_applying]"
         )]),
+    }
+}
+
+fn patterns(file: &str, text: &str, page: Option<&str>) -> Result<Vec<String>, Vec<String>> {
+    let page = page.ok_or_else(|| {
+        vec!["[docs] patterns needs [docs] page (the page's source directories, space-separated); fix: set it".to_owned()]
+    })?;
+    let sources = page_sources(Path::new("."), page).map_err(|e| vec![e])?;
+    let problems = crate::docs_patterns::check(file, text, &sources, page);
+    if problems.is_empty() {
+        Ok(vec![format!(
+            "patterns: every quote in {file} is in {page}"
+        )])
+    } else {
+        Err(problems)
     }
 }
 

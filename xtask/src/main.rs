@@ -16,6 +16,7 @@ mod dev_keys;
 mod dev_keys_server;
 mod docs;
 mod docs_commands;
+mod docs_patterns;
 mod docs_plan;
 mod docs_sources;
 mod files;

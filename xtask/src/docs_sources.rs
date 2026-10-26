@@ -11,6 +11,7 @@ use std::time::Duration;
 use clap::CommandFactory;
 
 use crate::deadline::{Finished, run_with_deadline};
+use crate::docs_patterns::Source;
 use crate::docs_plan::Pr;
 
 /// How long the app's `--help` may take, a build of the app included.
@@ -114,3 +115,51 @@ pub fn pr(repo: &str, number: u64) -> Result<Pr, String> {
             .ok_or_else(|| format!("gh gave #{number} no isDraft"))?,
     })
 }
+
+/// The extensions of the files the page's text can be in.
+const PAGE_EXTENSIONS: [&str; 6] = ["rs", "html", "js", "mjs", "css", "json"];
+
+/// The page's source files under `dirs` (space-separated, relative to
+/// `root`), outside build output (`target`, `node_modules`) and hidden
+/// directories; each path as written relative to `root`.
+///
+/// # Errors
+///
+/// A directory or file that cannot be read, naming it.
+pub fn page_sources(root: &Path, dirs: &str) -> Result<Vec<Source>, String> {
+    let mut sources = Vec::new();
+    for dir in dirs.split_whitespace() {
+        collect(root, Path::new(dir), &mut sources)
+            .map_err(|e| format!("[docs] page: {dir}: {e}"))?;
+    }
+    Ok(sources)
+}
+
+fn collect(root: &Path, rel: &Path, sources: &mut Vec<Source>) -> Result<(), String> {
+    let named = |e: std::io::Error| format!("{}: {e}", rel.display());
+    for entry in std::fs::read_dir(root.join(rel)).map_err(named)? {
+        let entry = entry.map_err(named)?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let path = rel.join(&name);
+        if entry.file_type().map_err(named)?.is_dir() {
+            if !(name.starts_with('.') || name == "target" || name == "node_modules") {
+                collect(root, &path, sources)?;
+            }
+        } else if is_page_text(&path) {
+            let text = std::fs::read_to_string(root.join(&path))
+                .map_err(|e| format!("{}: {e}", path.display()))?;
+            sources.push(Source::new(&path.to_string_lossy(), &text));
+        }
+    }
+    Ok(())
+}
+
+fn is_page_text(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| PAGE_EXTENSIONS.contains(&e))
+}
+
+#[cfg(test)]
+#[path = "docs_sources_tests.rs"]
+mod tests;
