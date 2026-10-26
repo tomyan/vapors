@@ -17,7 +17,16 @@ pub fn stacked_on(prs: &[Listed], branch: &str) -> Vec<u64> {
         .collect()
 }
 
-/// Merge `pr`, retarget its stacked PRs, delete its branch, publish.
+/// Empty `branch`'s worktree targets now it has merged; a failure is
+/// logged, and the merge stands.
+fn empty_targets(ops: &impl Ops, log: &Log, branch: &str) -> Result<(), String> {
+    match ops.empty_targets(branch) {
+        Ok(lines) => lines.iter().try_for_each(|line| log.line(line)),
+        Err(why) => log.line(&format!("FAILED to empty {branch}'s targets: {why}")),
+    }
+}
+
+/// Merge `pr`, empty its targets, retarget its stacked PRs, delete its branch, publish.
 ///
 /// # Errors
 ///
@@ -25,6 +34,7 @@ pub fn stacked_on(prs: &[Listed], branch: &str) -> Vec<u64> {
 pub fn merge(ops: &impl Ops, log: &Log, pr: &Listed, prs: &[Listed]) -> Result<(), String> {
     ops.merge(pr.number, &pr.head)?;
     log.line(&format!("#{} merged at {}", pr.number, pr.head))?;
+    empty_targets(ops, log, &pr.branch)?;
     if retarget_stack(ops, log, prs, &pr.branch) {
         log.line(&branch_line(&pr.branch, ops.delete_branch(&pr.branch)))?;
     } else {

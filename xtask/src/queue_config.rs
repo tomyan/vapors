@@ -3,7 +3,9 @@
 //! pass for the head; `checks`: GitHub's checks all green), the queue's
 //! own worktree, where it rebases and gates (never an agent's), its log,
 //! and the worktree that publishes `/` after a merge, when there is one.
-//! A leading `~/` is the home directory.
+//! `targets` lists, space-separated, the roots that hold worktrees'
+//! target directories: a merge empties its branch's, and a short disk
+//! names the largest. A leading `~/` is the home directory.
 
 use std::path::PathBuf;
 
@@ -31,6 +33,9 @@ pub struct QueueConfig {
     pub log: PathBuf,
     /// The worktree that re-publishes `/` after a merge.
     pub serve: Option<PathBuf>,
+    /// The roots holding worktrees' target directories
+    /// (`~/.cache/touche-targets`), for emptying and measuring them.
+    pub targets: Vec<PathBuf>,
 }
 
 impl QueueConfig {
@@ -51,6 +56,7 @@ impl QueueConfig {
             run: at_home(required("run")?, home),
             log: at_home(required("log")?, home),
             serve: config.get("queue.serve").map(|dir| at_home(dir, home)),
+            targets: targets(required("targets")?, home)?,
         })
     }
 }
@@ -61,6 +67,20 @@ fn at_home(text: &str, home: &str) -> PathBuf {
         Some(rest) => PathBuf::from(home).join(rest),
         None => PathBuf::from(text),
     }
+}
+
+/// The space-separated roots in `text`, `~/` read as `home`.
+fn targets(text: &str, home: &str) -> Result<Vec<PathBuf>, String> {
+    let roots: Vec<PathBuf> = text
+        .split_whitespace()
+        .map(|root| at_home(root, home))
+        .collect();
+    if roots.is_empty() {
+        return Err(
+            "queue.targets names no directory; fix: list the target roots, space-separated".into(),
+        );
+    }
+    Ok(roots)
 }
 
 fn merge_on(text: &str) -> Result<MergeOn, String> {

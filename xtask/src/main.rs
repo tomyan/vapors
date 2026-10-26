@@ -50,6 +50,7 @@ mod queue_clear;
 mod queue_comments;
 mod queue_config;
 mod queue_decide;
+mod queue_disk;
 #[cfg(test)]
 mod queue_fake;
 mod queue_gate_child;
@@ -69,6 +70,7 @@ mod queue_regate;
 mod queue_remote;
 mod queue_serve;
 mod queue_state;
+mod queue_targets;
 mod report;
 #[cfg(test)]
 #[path = "report_timeout_tests.rs"]

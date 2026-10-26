@@ -11,7 +11,7 @@ fn config(text: &str) -> Result<QueueConfig, String> {
 fn a_queue_table_gives_its_repo_mode_worktree_log_and_serve_dir() {
     // When
     let queue = config(
-        "[queue]\nrepo = \"tomyan/touche\"\nmerge_on = \"gate\"\nrun = \"~/.cache/w-queue/touche-run/touche\"\nlog = \"~/.cache/queue/touche.log\"\nserve = \"~/.cache/w-serve/touche\"\n",
+        "[queue]\nrepo = \"tomyan/touche\"\nmerge_on = \"gate\"\nrun = \"~/.cache/w-queue/touche-run/touche\"\nlog = \"~/.cache/queue/touche.log\"\nserve = \"~/.cache/w-serve/touche\"\ntargets = \"/t\"\n",
     )
     .expect("read");
 
@@ -34,7 +34,7 @@ fn a_queue_table_gives_its_repo_mode_worktree_log_and_serve_dir() {
 
 #[test]
 fn checks_mode_and_no_serve_dir_are_read() {
-    let queue = config("[queue]\nrepo = \"tomyan/vapors\"\nmerge_on = \"checks\"\nrun = \"/q/run\"\nlog = \"/q/log\"\n").expect("read");
+    let queue = config("[queue]\nrepo = \"tomyan/vapors\"\nmerge_on = \"checks\"\nrun = \"/q/run\"\nlog = \"/q/log\"\ntargets = \"/t\"\n").expect("read");
     assert_eq!(queue.merge_on, MergeOn::Checks);
     assert_eq!(queue.serve, None);
 }
@@ -50,5 +50,37 @@ fn a_missing_key_or_an_unknown_mode_is_refused_naming_it() {
     assert!(
         mode.contains("\"vibes\"") && mode.contains("gate or checks"),
         "{mode}"
+    );
+}
+
+const WITHOUT_TARGETS: &str =
+    "[queue]\nrepo = \"a/b\"\nmerge_on = \"gate\"\nrun = \"/q\"\nlog = \"/q/l\"\n";
+
+#[test]
+fn targets_are_space_separated_roots_read_against_home() {
+    // When
+    let queue = config(&format!(
+        "{WITHOUT_TARGETS}targets = \"~/.cache/touche-targets  /t/vapors-targets\"\n"
+    ))
+    .expect("read");
+
+    // Then
+    assert_eq!(
+        queue.targets,
+        [
+            std::path::PathBuf::from("/home/q/.cache/touche-targets"),
+            std::path::PathBuf::from("/t/vapors-targets")
+        ]
+    );
+}
+
+#[test]
+fn missing_or_empty_targets_are_refused_naming_the_key() {
+    let missing = config(WITHOUT_TARGETS).expect_err("missing");
+    assert!(missing.contains("queue.targets is not set"), "{missing}");
+    let empty = config(&format!("{WITHOUT_TARGETS}targets = \" \"\n")).expect_err("empty");
+    assert_eq!(
+        empty,
+        "queue.targets names no directory; fix: list the target roots, space-separated"
     );
 }

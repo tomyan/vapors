@@ -117,6 +117,23 @@ impl Ops for Real<'_> {
         queue_remote::delete_branch(&self.config.repo, branch)
     }
 
+    fn empty_targets(&self, branch: &str) -> Result<Vec<String>, String> {
+        let porcelain = git(self.run(), &["worktree", "list", "--porcelain"])?;
+        Ok(crate::queue_targets::empty_on(
+            &porcelain,
+            branch,
+            &self.config.targets,
+        ))
+    }
+
+    fn free_bytes(&self) -> Result<u64, String> {
+        crate::queue_disk::free_bytes(self.run())
+    }
+
+    fn largest_targets(&self) -> Result<Vec<(u64, std::path::PathBuf)>, String> {
+        crate::queue_disk::largest(&self.config.targets)
+    }
+
     fn serve(&self) -> Result<(), String> {
         self.config
             .serve

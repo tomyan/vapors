@@ -19,6 +19,7 @@ pub(super) fn config(merge_on: MergeOn) -> QueueConfig {
             std::thread::current().id()
         )),
         serve: None,
+        targets: Vec::new(),
     }
 }
 

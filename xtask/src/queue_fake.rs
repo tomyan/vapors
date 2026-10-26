@@ -3,6 +3,7 @@
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, VecDeque};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::gate_pr::{Ended, comment};
@@ -52,6 +53,12 @@ pub struct Fake {
     pub hold_after_first_read: Option<u64>,
     /// GitHub already retargeted stacked PRs and deleted merged branches.
     pub github_tidied: bool,
+    /// Free bytes on the disk; plenty when none.
+    pub free: Option<u64>,
+    pub largest: Vec<(u64, PathBuf)>,
+    /// The lines `empty_targets` gives.
+    pub emptied: Vec<String>,
+    pub empty_fails: bool,
     pub calls: RefCell<Vec<String>>,
 }
 
@@ -179,6 +186,21 @@ impl Ops for Fake {
     fn keep(&self, _state: &State) -> Result<(), String> {
         self.note("keep".into());
         Ok(())
+    }
+    fn empty_targets(&self, branch: &str) -> Result<Vec<String>, String> {
+        self.note(format!("empty {branch}"));
+        if self.empty_fails {
+            return Err("git worktree list refused".into());
+        }
+        Ok(self.emptied.clone())
+    }
+    fn free_bytes(&self) -> Result<u64, String> {
+        self.note("free".into());
+        Ok(self.free.unwrap_or(u64::MAX))
+    }
+    fn largest_targets(&self) -> Result<Vec<(u64, PathBuf)>, String> {
+        self.note("largest".into());
+        Ok(self.largest.clone())
     }
     fn serve(&self) -> Result<(), String> {
         self.note("serve".into());

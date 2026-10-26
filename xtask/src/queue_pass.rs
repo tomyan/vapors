@@ -8,8 +8,9 @@
 use std::time::Duration;
 
 use crate::queue_comments::held;
-use crate::queue_config::QueueConfig;
+use crate::queue_config::{MergeOn, QueueConfig};
 use crate::queue_decide::Decision;
+use crate::queue_disk::room_to_gate;
 use crate::queue_judge::{Judged, judge};
 use crate::queue_list::Listed;
 use crate::queue_log::Log;
@@ -73,10 +74,17 @@ impl<O: Ops> Pass<'_, O> {
         if let Decision::Skip(why) = &judged.decision {
             return self.said(state, pr.number, why);
         }
+        if self.gates(&judged) && !room_to_gate(self.ops, self.log, state, pr.number)? {
+            return Ok(false);
+        }
         if !self.fresh(pr, judged.decision == Decision::Merge)? {
             return Ok(false);
         }
         self.carry_out(state, pr, prs, &judged)
+    }
+    /// Whether acting on `judged` runs a gate on this machine.
+    fn gates(&self, judged: &Judged) -> bool {
+        judged.decision != Decision::Merge && self.config.merge_on == MergeOn::Gate
     }
     /// Merge or re-gate `pr` as judged; whether the pass ends. A failure is
     /// said, and the pass moves on unless a gate was started.
@@ -207,3 +215,7 @@ mod regate_tests;
 #[cfg(test)]
 #[path = "queue_pass_gate_tests.rs"]
 mod gate_tests;
+
+#[cfg(test)]
+#[path = "queue_pass_disk_tests.rs"]
+mod disk_tests;
