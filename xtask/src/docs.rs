@@ -18,7 +18,7 @@ use std::process::ExitCode;
 
 use crate::config::Config;
 use crate::docs_commands::{App, check, commands_in_help};
-use crate::docs_plan::{claims, contradiction};
+use crate::docs_plan::{Claim, Pr, claims, contradiction, label};
 use crate::docs_sources::{app_help, has_example, page_sources, pr, xtask_commands};
 
 /// The rules, by their `[docs]` key.
@@ -123,6 +123,28 @@ fn commands(file: &str, text: &str, app: Option<&str>) -> Result<Vec<String>, Ve
     }
 }
 
+/// Each claim against gh, a PR in another repository looked up under
+/// `repo`'s owner; each PR asked once.
+fn compare(file: &str, claims: &[Claim], repo: &str) -> Vec<String> {
+    let owner = repo.split_once('/').map_or(repo, |(owner, _)| owner);
+    let mut seen: BTreeMap<(String, u64), Result<Pr, String>> = BTreeMap::new();
+    let mut problems = Vec::new();
+    for claim in claims {
+        let full = claim
+            .repo
+            .as_ref()
+            .map_or_else(|| repo.to_owned(), |name| format!("{owner}/{name}"));
+        match seen
+            .entry((full.clone(), claim.pr))
+            .or_insert_with(|| pr(&full, claim.pr))
+        {
+            Ok(found) => problems.extend(contradiction(file, claim, found)),
+            Err(why) => problems.push(format!("{file}:{}: {}: {why}", claim.line, label(claim))),
+        }
+    }
+    problems
+}
+
 fn plan(
     file: &str,
     text: &str,
@@ -143,13 +165,7 @@ fn plan(
     let repo = repo.ok_or_else(|| {
         vec!["[docs] plan needs [docs] repo (owner/name); fix: set it".to_owned()]
     })?;
-    let mut seen: BTreeMap<u64, Result<crate::docs_plan::Pr, String>> = BTreeMap::new();
-    for claim in &claims {
-        match seen.entry(claim.pr).or_insert_with(|| pr(repo, claim.pr)) {
-            Ok(found) => problems.extend(contradiction(file, claim, found)),
-            Err(why) => problems.push(format!("{file}:{}: #{}: {why}", claim.line, claim.pr)),
-        }
-    }
+    problems.extend(compare(file, &claims, repo));
     if problems.is_empty() {
         Ok(vec![format!(
             "plan: {} PR states agree with gh",

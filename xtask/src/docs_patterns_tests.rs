@@ -76,28 +76,34 @@ fn a_quote_with_no_fixed_text_is_refused_naming_its_line() {
 }
 
 #[test]
-fn placeholders_and_ellipses_split_a_quote_into_its_fixed_pieces() {
+fn placeholders_and_ellipses_split_a_quote_into_trimmed_fixed_pieces() {
     assert_eq!(
-        pieces("Voice ended: <why> · <time>… and ...more"),
-        ["Voice ended: ", " · ", " and ", "more"]
+        pieces("Voice ended: <why> · <time>… and ...more; fix: reload."),
+        ["Voice ended", "and", "more; fix: reload"]
     );
 }
 
 #[test]
-fn a_quote_is_found_when_its_pieces_appear_in_order_in_one_source() {
-    // Given
+fn a_composed_message_is_found_when_each_fixed_piece_is_in_some_source() {
+    // Given: a message built from a literal, a variable and a constant in another file
     let sources = vec![
-        Source::new("a.rs", "format!(\"Voice ended: {why} · {time}\")"),
-        Source::new("b.js", "el.textContent = 'touche\\'s turn';"),
-        Source::new("c.rs", "\"second\" then \"first\""),
+        Source::new(
+            "start.js",
+            "said = \"touché could not start: \" + why + \"; \" + FIX;",
+        ),
+        Source::new(
+            "fix.js",
+            "const FIX = 'fix: reload the page, and if it persists clear this site\\'s data';",
+        ),
     ];
 
     // Then
-    assert!(found(&pieces("Voice ended: <why> · <time>"), &sources));
-    assert!(found(&pieces("touche's turn"), &sources));
-    assert!(!found(&pieces("<time> · Voice ended: <why>"), &sources));
-    assert!(!found(&pieces("first<x>second"), &sources));
-    assert!(!found(&pieces("Voice ended: <why>'s turn"), &sources));
+    let quote = "touché could not start: <why>; fix: reload the page, and if it persists clear this site's data";
+    assert!(found(&pieces(quote), &sources));
+    assert!(!found(
+        &pieces("touché could not start: <why>; fix: restart"),
+        &sources
+    ));
 }
 
 #[test]

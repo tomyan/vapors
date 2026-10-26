@@ -1,7 +1,8 @@
 //! The `patterns` rule: text in "double quotes" in the patterns file is
 //! exact UI text, and must be in the page's source. `<name>`, `…` and
-//! `...` stand for variable parts; the fixed pieces between them must
-//! appear in order in one source file. Examples go in 'single quotes' or
+//! `...` stand for variable parts; each fixed piece between them,
+//! trimmed of the punctuation that joins a composed message's parts,
+//! must appear in the page's source. Examples go in 'single quotes' or
 //! italics, which the rule leaves alone, as it does code spans and fenced
 //! code. Quotes pair within a paragraph or list item, so a quote may wrap
 //! across lines; one left open is refused, naming the line it opens on.
@@ -142,9 +143,17 @@ pub fn pieces(quote: &str) -> Vec<String> {
             rest = &rest[c.len_utf8()..];
         }
     }
-    pieces.retain(|piece| !piece.is_empty());
     pieces
+        .iter()
+        .map(|piece| piece.trim_matches(|c: char| c.is_whitespace() || JOINERS.contains(c)))
+        .filter(|piece| !piece.is_empty())
+        .map(str::to_owned)
+        .collect()
 }
+
+/// Punctuation trimmed from the ends of a fixed piece: the page often
+/// joins a message's parts with it in code (`"…: " + why + "; " + FIX`).
+const JOINERS: &str = ";:,.·()[]|-";
 
 /// The length of the placeholder or ellipsis `rest` starts with, or 0.
 fn wildcard_len(rest: &str) -> usize {
@@ -159,23 +168,16 @@ fn wildcard_len(rest: &str) -> usize {
     }
 }
 
-/// Whether one of `sources` holds `pieces` in order.
+/// Whether each of `pieces` is in one of `sources`. The page composes
+/// messages from literals and constants, often in different files, so
+/// neither one file nor the pieces' order is required.
 #[must_use]
 pub fn found(pieces: &[String], sources: &[Source]) -> bool {
-    sources.iter().any(|source| in_order(&source.text, pieces))
-}
-
-fn in_order(text: &str, pieces: &[String]) -> bool {
-    let mut from = 0;
-    pieces
-        .iter()
-        .all(|piece| match text[from..].find(piece.as_str()) {
-            Some(at) => {
-                from += at + piece.len();
-                true
-            }
-            None => false,
-        })
+    pieces.iter().all(|piece| {
+        sources
+            .iter()
+            .any(|source| source.text.contains(piece.as_str()))
+    })
 }
 
 /// Every problem with `file`'s quotes against `sources`, which come from
