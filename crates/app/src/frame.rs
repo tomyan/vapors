@@ -46,6 +46,9 @@ impl Phase {
         }
     }
 
+    /// How many phases there are.
+    pub const COUNT: usize = Phase::ALL.len();
+
     /// Every phase, in order.
     pub const ALL: [Phase; 7] = [
         Phase::Input,
@@ -75,7 +78,7 @@ impl Clock for SystemClock {
 
 /// How long each phase of a frame took.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct FrameTimes([Duration; 7]);
+pub struct FrameTimes([Duration; Phase::COUNT]);
 
 impl FrameTimes {
     /// The time `phase` took.
@@ -141,12 +144,12 @@ pub fn run_frame(
 ) -> Result<FrameTimes, FrameError> {
     let mut times = FrameTimes::default();
     for phase in Phase::ALL {
-        let _span = tracing::trace_span!("frame phase", ?phase).entered();
+        let _span = tracing::trace_span!("frame phase", phase = phase.name()).entered();
         let started = clock.now();
         let result = run_phase(phases, phase, now, &times);
         times.0[phase as usize] = clock.now().saturating_duration_since(started);
         if phase == Phase::Input {
-            times.0[0] += phases.input_time();
+            times.0[Phase::Input as usize] += phases.input_time();
         }
         result.map_err(|message| FrameError { phase, message })?;
     }
@@ -171,6 +174,9 @@ fn run_phase(
     Ok(())
 }
 
+#[cfg(test)]
+#[path = "frame/span_tests.rs"]
+mod span_tests;
 #[cfg(test)]
 #[path = "frame/tests.rs"]
 mod tests;

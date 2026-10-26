@@ -36,14 +36,11 @@ impl Phases for AppFrame<'_, '_> {
 }
 
 impl ElementsApp {
-    /// The Update phase: the per-frame hook, then `Document::update`.
+    /// The Update phase: `Document::update`.
     fn update_document(&mut self, frame: &Frame<'_>) -> Result<(), String> {
         #[allow(clippy::cast_possible_truncation)] // a display scale
         let scale = frame.scale_factor as f32;
         self.scale = scale;
-        if let Some(per_frame) = &mut self.per_frame {
-            per_frame(&shown_times(self.last_times.as_ref()));
-        }
         let size = size_of(frame);
         let mut document = self.document.borrow_mut();
         document
@@ -80,6 +77,11 @@ impl ElementsApp {
     /// Runs the frame's phases, keeping their times and handing them to
     /// the frame-times hook.
     pub(super) fn run_phases(&mut self, frame: &Frame<'_>) -> Result<(), String> {
+        // the app's own per-frame writes run before the frame, so its
+        // phase times hold the frame's work alone (review-v75, M2)
+        if let Some(per_frame) = &mut self.per_frame {
+            per_frame(&shown_times(self.last_times.as_ref()));
+        }
         let mut phases = AppFrame { app: self, frame };
         let times =
             run_frame(&mut phases, frame.now, &SystemClock).map_err(|error| error.to_string())?;
