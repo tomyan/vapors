@@ -63,6 +63,25 @@ or a key) panics, naming the event, as the web throws
 Moves are dispatched as they arrive and layout waits for the frame, so
 many moves between frames are one update (`elements_app_drag.rs`).
 
+As built (3-E1b): finger `n` is pointer `2 + n`, captured by its
+`pointerdown` target without asking; its moves and `pointerup` go
+there, and `pointercancel` ends it. The click is still the platform's
+tap, after the touch's own down and up, so one tap is one click; its
+event carries pointer id 2 whichever finger tapped. A finger pans only
+once it has moved past the tap slop (20 px), so a tap and a pan are
+exclusive, as Chromium's slop makes them (review-v78). Until 3-E4's
+`touch-action`, ownership is RELAXED (the lead's decision): while a
+touch whose `pointerdown` listener called `set_pointer_capture` is
+down, no pan scrolls (Chromium cancels such a touch all the same: only
+`touch-action: none` stops that); otherwise the first pan cancels the
+touches no listener owns, whether or not anything scrolls, as Chromium
+does (checked by `fixtures/capture.events`). `:active` follows the
+first finger down only and clears when it lifts (or when the mouse
+button is released). `Pointer` has no `pointer_type` or `is_primary`
+yet: a listener tells a touch by `id >= 2`. A finger is forgotten when
+it lifts or is cancelled even if its event found no element; nothing
+sends `pointercancel` for window loss yet.
+
 Drag of a slider thumb or a curve point: `pointerdown` captures, each
 `pointermove` carries full-precision coordinates to the captured
 target whether or not the pointer is over it, `pointerup` releases.

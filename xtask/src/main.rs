@@ -20,6 +20,7 @@ mod gate;
 mod gate_action;
 mod gate_expression;
 mod gate_lock;
+mod gate_lock_shared;
 mod gate_plan;
 mod gate_pr;
 mod gate_pr_gh;
@@ -41,8 +42,37 @@ mod imports_rules;
 mod layers;
 mod layers_graph;
 mod load;
+mod lock_owner;
+#[cfg(test)]
+mod lock_scratch;
 mod pixels;
 mod priority;
+mod queue;
+mod queue_act;
+mod queue_checks;
+mod queue_clear;
+mod queue_comments;
+mod queue_config;
+mod queue_decide;
+#[cfg(test)]
+mod queue_fake;
+mod queue_gate_child;
+mod queue_git;
+#[cfg(test)]
+mod queue_git_fixture;
+mod queue_judge;
+mod queue_list;
+mod queue_lock;
+mod queue_log;
+mod queue_ops;
+mod queue_pass;
+mod queue_pins;
+mod queue_process_tree;
+mod queue_real;
+mod queue_regate;
+mod queue_remote;
+mod queue_serve;
+mod queue_state;
 mod report;
 #[cfg(test)]
 #[path = "report_timeout_tests.rs"]
@@ -119,7 +149,7 @@ fn main() -> ExitCode {
         Command::CheckXtaskTwin { sibling } => return twin::run(&sibling),
         Command::Dev { keys, replace } => return dev::run(&reporter, &keys, replace),
         Command::Ci => match web::web_package() {
-            Ok(package) => return ci_with_hit_rate(&steps::ci(&package), &reporter),
+            Ok(package) => return ci_sharing_the_gate_lock(&steps::ci(&package), &reporter),
             Err(message) => return fail("ci", &message),
         },
         Command::Wasm => match web::web_package() {
@@ -128,12 +158,32 @@ fn main() -> ExitCode {
         },
         Command::Gate { pr: None } => return gate::run(&reporter),
         Command::Gate { pr: Some(number) } => return gate_pr_real::run(number),
+        Command::Queue { dry_run } => return queue::run(dry_run),
         Command::Lint => steps::lint(),
         Command::Deny => steps::deny_check(),
         Command::Test { tier: Tier::Unit } => steps::unit_tests(),
         Command::Test { tier: Tier::Gpu } => steps::gpu_tests(),
     };
     ci::run(&steps, &reporter)
+}
+
+/// `cargo xtask ci`, sharing the gate lock so it never runs beside a gate
+/// (`gate_lock_shared.rs`). Relaxed inside a gate's step (`XTASK_GATE=1`):
+/// the gate already holds the lock, and taking a share would wait on the
+/// gate itself. It would retire if no gate step could run `ci`.
+fn ci_sharing_the_gate_lock(steps: &[steps::Step], reporter: &report::Reporter) -> ExitCode {
+    let gate_env = std::env::var(priority::GATE_ENV).ok();
+    if priority::in_gate(false, gate_env.as_deref()) {
+        return ci_with_hit_rate(steps, reporter);
+    }
+    let worktree =
+        std::env::current_dir().map_or_else(|_| "?".to_owned(), |d| d.display().to_string());
+    let shared = gate_lock::dir()
+        .and_then(|dir| gate_lock_shared::acquire_shared(&dir, &worktree, gate_lock::WAIT));
+    match shared {
+        Ok(_shared) => ci_with_hit_rate(steps, reporter),
+        Err(why) => fail("ci", &why),
+    }
 }
 
 /// `cargo xtask ci`, then sccache's hit rate over the run; sccache must
