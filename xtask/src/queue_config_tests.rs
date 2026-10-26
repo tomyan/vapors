@@ -11,7 +11,7 @@ fn config(text: &str) -> Result<QueueConfig, String> {
 fn a_queue_table_gives_its_repo_mode_worktree_log_and_serve_dir() {
     // When
     let queue = config(
-        "[queue]\nrepo = \"tomyan/touche\"\nmerge_on = \"gate\"\nrun = \"~/.cache/w-queue/touche-run/touche\"\nlog = \"~/.cache/queue/touche.log\"\nserve = \"~/.cache/w-serve/touche\"\n",
+        "[queue]\nrepo = \"tomyan/touche\"\nmerge_on = \"gate\"\nrun = \"~/.cache/w-queue/touche-run/touche\"\nlog = \"~/.cache/queue/touche.log\"\nserve = \"~/.cache/w-serve/touche\"\ntargets = \"/tmp\"\n",
     )
     .expect("read");
 
@@ -34,7 +34,7 @@ fn a_queue_table_gives_its_repo_mode_worktree_log_and_serve_dir() {
 
 #[test]
 fn checks_mode_and_no_serve_dir_are_read() {
-    let queue = config("[queue]\nrepo = \"tomyan/vapors\"\nmerge_on = \"checks\"\nrun = \"/q/run\"\nlog = \"/q/log\"\n").expect("read");
+    let queue = config("[queue]\nrepo = \"tomyan/vapors\"\nmerge_on = \"checks\"\nrun = \"/q/run\"\nlog = \"/q/log\"\ntargets = \"/tmp\"\n").expect("read");
     assert_eq!(queue.merge_on, MergeOn::Checks);
     assert_eq!(queue.serve, None);
 }

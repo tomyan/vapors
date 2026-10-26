@@ -3,6 +3,7 @@
 //! `queue_real.rs` holds the real effects: gh, git in the queue's own
 //! worktree, `gate --pr` run by the queue's own binary, the publish.
 
+use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::gate_pr::Ended;
@@ -65,6 +66,14 @@ pub trait Ops {
     fn delete_branch(&self, branch: &str) -> Result<bool, String>;
     /// Save the queue's state now, so a pass killed later keeps it.
     fn keep(&self, state: &State) -> Result<(), String>;
+    /// Empty the target directories of the worktrees on `branch`; a log
+    /// line for each directory emptied or left alone.
+    fn empty_targets(&self, branch: &str) -> Result<Vec<String>, String>;
+    /// The free bytes on the disk the gate builds on.
+    fn free_bytes(&self) -> Result<u64, String>;
+    /// The directories in the targets roots with their sizes, largest
+    /// first.
+    fn largest_targets(&self) -> Result<Vec<(u64, PathBuf)>, String>;
     /// Re-publish `/`, when the repository has a serve worktree.
     fn serve(&self) -> Result<(), String>;
     /// Wait `duration`.

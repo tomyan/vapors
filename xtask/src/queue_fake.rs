@@ -3,6 +3,7 @@
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, VecDeque};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::gate_pr::{Ended, comment};
@@ -11,22 +12,7 @@ use crate::queue_list::Listed;
 use crate::queue_ops::{Gated, Now, Ops};
 use crate::queue_state::State;
 
-/// A full-SHA clear signed `role`.
-pub fn clear(role: &str) -> String {
-    format!("review: clear {} ({role})", "c".repeat(40))
-}
-
-/// A listed PR on main, its branch `b<number>`, head `h<number>`.
-pub fn listed(number: u64) -> Listed {
-    Listed {
-        number,
-        head: format!("h{number}"),
-        branch: format!("b{number}"),
-        base: "main".into(),
-        draft: false,
-        fork: false,
-    }
-}
+pub use crate::queue_fake_prs::{clear, listed};
 
 /// The fake's tables and its record of calls.
 #[derive(Default)]
@@ -52,6 +38,15 @@ pub struct Fake {
     pub hold_after_first_read: Option<u64>,
     /// GitHub already retargeted stacked PRs and deleted merged branches.
     pub github_tidied: bool,
+    /// Free bytes on the disk; plenty when none.
+    pub free: Option<u64>,
+    pub largest: Vec<(u64, PathBuf)>,
+    pub df_fails: Option<String>,
+    /// du's error for its next run only.
+    pub du_fails_once: RefCell<Option<String>>,
+    /// The lines `empty_targets` gives.
+    pub emptied: Vec<String>,
+    pub empty_fails: bool,
     pub calls: RefCell<Vec<String>>,
 }
 
@@ -179,6 +174,27 @@ impl Ops for Fake {
     fn keep(&self, _state: &State) -> Result<(), String> {
         self.note("keep".into());
         Ok(())
+    }
+    fn empty_targets(&self, branch: &str) -> Result<Vec<String>, String> {
+        self.note(format!("empty {branch}"));
+        if self.empty_fails {
+            return Err("git worktree list refused".into());
+        }
+        Ok(self.emptied.clone())
+    }
+    fn free_bytes(&self) -> Result<u64, String> {
+        self.note("free".into());
+        if let Some(why) = &self.df_fails {
+            return Err(why.clone());
+        }
+        Ok(self.free.unwrap_or(u64::MAX))
+    }
+    fn largest_targets(&self) -> Result<Vec<(u64, PathBuf)>, String> {
+        self.note("largest".into());
+        if let Some(why) = self.du_fails_once.borrow_mut().take() {
+            return Err(why);
+        }
+        Ok(self.largest.clone())
     }
     fn serve(&self) -> Result<(), String> {
         self.note("serve".into());

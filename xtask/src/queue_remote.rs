@@ -127,6 +127,15 @@ fn git_remote(dir: &Path, args: &[&str]) -> Result<(), String> {
     .map(|_| ())
 }
 
+/// `command` run within `deadline`; its output when it succeeded.
+///
+/// # Errors
+///
+/// It cannot start, fails, or does not finish in time, naming `what`.
+pub fn within(command: Command, what: &str, deadline: Duration) -> Result<String, String> {
+    finished(run_with_deadline(command, deadline)?, what, deadline)
+}
+
 fn finished(finished: Finished, what: &str, deadline: Duration) -> Result<String, String> {
     match finished {
         Finished::Exited {

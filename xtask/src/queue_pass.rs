@@ -8,8 +8,9 @@
 use std::time::Duration;
 
 use crate::queue_comments::held;
-use crate::queue_config::QueueConfig;
+use crate::queue_config::{MergeOn, QueueConfig};
 use crate::queue_decide::Decision;
+use crate::queue_disk::room_to_gate;
 use crate::queue_judge::{Judged, judge};
 use crate::queue_list::Listed;
 use crate::queue_log::Log;
@@ -72,6 +73,10 @@ impl<O: Ops> Pass<'_, O> {
         };
         if let Decision::Skip(why) = &judged.decision {
             return self.said(state, pr.number, why);
+        }
+        let gates = judged.decision != Decision::Merge && self.config.merge_on == MergeOn::Gate;
+        if gates && !room_to_gate(self.ops, self.log, state, pr.number)? {
+            return Ok(false);
         }
         if !self.fresh(pr, judged.decision == Decision::Merge)? {
             return Ok(false);
@@ -207,3 +212,7 @@ mod regate_tests;
 #[cfg(test)]
 #[path = "queue_pass_gate_tests.rs"]
 mod gate_tests;
+
+#[cfg(test)]
+#[path = "queue_pass_disk_tests.rs"]
+mod disk_tests;

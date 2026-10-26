@@ -33,7 +33,7 @@ const TABLES: [(&str, Keys); 16] = [
     ("ux.design", Keys::Any),
     (
         "queue",
-        Keys::Only(&["repo", "merge_on", "run", "log", "serve"]),
+        Keys::Only(&["repo", "merge_on", "run", "log", "serve", "targets"]),
     ),
 ];
 
