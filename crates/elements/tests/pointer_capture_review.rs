@@ -85,7 +85,7 @@ fn capture_asked_for_in_a_click_listener_is_refused_by_name() {
 
     // When
     let refused = catch_unwind(AssertUnwindSafe(|| {
-        Document::pointer_released(&doc, [5.0, 5.0])
+        Document::pointer_released(&doc, [5.0, 5.0]);
     }));
 
     // Then: as the web throws InvalidStateError
