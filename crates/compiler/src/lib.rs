@@ -16,7 +16,7 @@ mod template;
 
 use std::path::Path;
 
-pub use codegen::generate;
+pub use codegen::{Generated, PropsIndex, generate, generate_checked, generate_with};
 pub use error::CompileError;
 pub use naming::component_name;
 use source::Source;
@@ -82,6 +82,15 @@ pub fn parse_file(path: &Path) -> Result<ast::Component, CompileError> {
 /// # Errors
 /// As [`compile_file`]; and a file not under `root`, naming both.
 pub fn compile_file_under(path: &Path, root: &Path) -> Result<String, CompileError> {
+    generate(&parse_file_under(path, root)?)
+}
+
+/// [`parse_file`] with the component's scope named by its path under
+/// `root`.
+///
+/// # Errors
+/// As [`parse_file`]; and a file not under `root`, naming both.
+pub fn parse_file_under(path: &Path, root: &Path) -> Result<ast::Component, CompileError> {
     let relative = path.strip_prefix(root).map_err(|_| {
         build::path_error(
             path,
@@ -99,7 +108,7 @@ pub fn compile_file_under(path: &Path, root: &Path) -> Result<String, CompileErr
             .collect::<Vec<_>>()
             .join("/"),
     );
-    generate(&component)
+    Ok(component)
 }
 
 /// [`compile_file`] for a component whose `<style>` the app adds as a
@@ -108,9 +117,17 @@ pub fn compile_file_under(path: &Path, root: &Path) -> Result<String, CompileErr
 /// # Errors
 /// As [`compile_file`].
 pub fn compile_file_global(path: &Path) -> Result<String, CompileError> {
+    generate(&parse_file_global(path)?)
+}
+
+/// [`parse_file`] for a component whose `<style>` is a global sheet.
+///
+/// # Errors
+/// As [`parse_file`].
+pub fn parse_file_global(path: &Path) -> Result<ast::Component, CompileError> {
     let mut component = parse_file(path)?;
     component.scope = None;
-    generate(&component)
+    Ok(component)
 }
 
 fn read_source(path: &Path) -> Result<String, CompileError> {

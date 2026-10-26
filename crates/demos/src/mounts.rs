@@ -11,7 +11,7 @@ use crate::{PerFrame, stress};
 ///
 /// # Panics
 /// When a bundled PNG does not decode: a build of this crate is broken.
-pub(crate) fn register_thumbnails(document: &mut Document) {
+pub fn register_thumbnails(document: &mut Document) {
     let files: [(&str, &[u8]); 3] = [
         ("sky.png", include_bytes!("../demos/images/sky.png")),
         ("warm.png", include_bytes!("../demos/images/warm.png")),

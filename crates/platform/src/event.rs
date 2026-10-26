@@ -39,6 +39,10 @@ pub enum Event {
     },
     /// A key produced this text on press.
     Character(String),
+    /// Control+V, or Command+V on macOS: read the clipboard (a
+    /// [`crate::Clipboard`]). Desktop only; a web page has its own paste
+    /// event.
+    Paste,
     /// One finger on a touch screen, raw. Gestures are derived from these
     /// and sent as well.
     Touch {

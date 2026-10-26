@@ -33,6 +33,11 @@ pub(crate) struct Emitter<'a> {
     /// Whether the component has a `<style>`: each element it creates
     /// is then tagged with its scope.
     pub scoped: bool,
+    /// The Dom type builder closures take: the component's `D`, or
+    /// `dyn Dom` inside a snippet (`vapors_dom::Snippet` says why).
+    pub dom_type: &'static str,
+    /// The props check: what the components a tag may name declare.
+    pub tags: super::tag_props::TagCheck<'a>,
 }
 
 impl<'a> Emitter<'a> {
@@ -48,6 +53,8 @@ impl<'a> Emitter<'a> {
             generated: HashSet::new(),
             loop_bindings: Vec::new(),
             scoped: false,
+            dom_type: "D",
+            tags: super::tag_props::TagCheck::default(),
         }
     }
 
@@ -76,6 +83,12 @@ impl<'a> Emitter<'a> {
     /// Numbers names with `width` digits, zero-padded.
     pub fn with_width(mut self, width: usize) -> Self {
         self.width = width;
+        self
+    }
+
+    /// Checks component tags against `index`.
+    pub fn with_index(mut self, index: &'a super::PropsIndex) -> Self {
+        self.tags.index = Some(index);
         self
     }
 
@@ -114,12 +127,9 @@ impl<'a> Emitter<'a> {
             Node::For(block) => self.emit_for(block, place),
             Node::Snippet(snippet) => Err(self.source.error(
                 snippet.offset,
-                "snippets are deferred: {snippet} and {render} parse but do not generate code yet",
+                "named snippets are deferred to 1-R1's second slice (R1b): pass children inside the component tag, rendered with {render children()}",
             )),
-            Node::Render(render) => Err(self.source.error(
-                render.offset,
-                "snippets are deferred: {snippet} and {render} parse but do not generate code yet",
-            )),
+            Node::Render(render) => self.emit_render(render, place),
         }
     }
 
