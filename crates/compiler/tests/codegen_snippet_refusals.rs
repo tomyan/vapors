@@ -43,12 +43,12 @@ fn rendering_a_snippet_nobody_declared_is_refused_naming_the_declaration() {
 fn a_parameter_whose_type_returns_or_takes_a_borrow_in_a_function_type_is_kept() {
     // When: `->` and `&` inside function types are not the parameter's own
     let code = generated(
-        "{snippet s(f: fn() -> i32, g: Box<dyn Fn(&str) -> u32>, n: i32)}<b>{n}</b>{/snippet}{render s(|| 1, Box::new(|s: &str| 1), 2)}",
+        "{snippet s(f: fn() -> i32, g: fn(&str) -> u32, n: i32)}<b>{n}</b>{/snippet}{render s(|| 1, |s: &str| 1, 2)}",
     );
 
     // Then
     assert!(
-        code.contains("Snippet<(fn() -> i32, Box<dyn Fn(&str) -> u32>, i32)>"),
+        code.contains("Snippet<(fn() -> i32, fn(&str) -> u32, i32)>"),
         "{code}"
     );
 }

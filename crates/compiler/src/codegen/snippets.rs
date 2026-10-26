@@ -128,7 +128,7 @@ fn param_memos(params: &[Param]) -> Vec<String> {
 }
 
 /// `(args,)` as an expression at the render, or `None` for no arguments.
-fn args_tuple(render: &Render) -> Option<Expr> {
+pub(super) fn args_tuple(render: &Render) -> Option<Expr> {
     let args = render.args.trim();
     (!args.is_empty()).then(|| Expr {
         code: format!("({args},)"),
