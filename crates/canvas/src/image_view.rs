@@ -161,6 +161,7 @@ impl ImageView {
             Event::Touch { .. }
             | Event::Tap { .. }
             | Event::OpenRequested
+            | Event::Paste
             | Event::FileOpened { .. } => {}
         }
     }

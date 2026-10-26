@@ -122,8 +122,10 @@ fn gpu_events_a_scroll_of_the_document_is_logged_at_the_document() {
 
 #[test]
 fn gpu_events_an_event_after_the_last_step_is_refused() {
-    // Given: a click that sets off an event a tenth of a second later
-    let page = "data:text/html,<button id=b style='width:100px;height:40px' onclick=\"setTimeout(() => document.body.dispatchEvent(new Event('late')), 100)\">x</button>";
+    // Given: a click that sets off an event once the player has taken the
+    // last step's log (`window.__eventsSettling`), so it is always late:
+    // a timer alone landed inside the step on a slow runner (vapors #61)
+    let page = "data:text/html,<button id=b style='width:100px;height:40px' onclick=\"(function wait() { if (window.__eventsSettling) { document.body.dispatchEvent(new Event('late')); } else { setTimeout(wait, 10); } })()\">x</button>";
     let (_live, mut session) = session_on("late", page);
     let script = parse(
         "page",
