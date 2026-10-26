@@ -105,7 +105,6 @@ impl Document {
             self.focused = None;
             self.set_flag_on(States::FOCUS, None);
             self.set_flag_chain(States::FOCUS_WITHIN, None);
-            self.set_flag_on(States::FOCUS_VISIBLE, None);
         }
     }
 

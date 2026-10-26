@@ -57,3 +57,18 @@ fn a_buttons_width_includes_its_padding_and_border() {
     // Then
     assert_eq!(painted.border_box(button).expect("a box").width, 100.0);
 }
+
+#[test]
+fn removing_the_focused_element_takes_its_ring_with_it() {
+    // Given: Save focused by a key, drawing the ring
+    let page = page();
+    tab(&page.doc, false);
+    assert!(ring_drawn(&page.doc));
+
+    // When
+    vapors_dom::Dom::remove(&mut *page.doc.borrow_mut(), page.save);
+
+    // Then
+    assert!(!page.doc.borrow().focus_visible());
+    assert!(!ring_drawn(&page.doc));
+}
