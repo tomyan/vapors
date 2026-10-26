@@ -4,10 +4,43 @@ use std::time::Duration;
 
 use super::*;
 
-fn dir(test: &str) -> std::path::PathBuf {
+/// A test's lock directory, removed when the guard drops: /tmp is a
+/// RAM-backed tmpfs here, and every run left one per test behind.
+struct Scratch(std::path::PathBuf);
+
+impl std::ops::Deref for Scratch {
+    type Target = std::path::Path;
+    fn deref(&self) -> &std::path::Path {
+        &self.0
+    }
+}
+
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+fn dir(test: &str) -> Scratch {
     let dir = std::env::temp_dir().join(format!("xtask-gate-lock-{test}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    dir
+    Scratch(dir)
+}
+
+#[test]
+fn a_test_s_lock_directory_is_removed_when_its_guard_drops() {
+    // Given
+    let dir = dir("scratch");
+    let held = acquire(&dir, "/w/touche", Duration::from_millis(200)).expect("taken");
+    let path = dir.to_path_buf();
+    assert!(path.exists(), "the lock made it");
+
+    // When
+    drop(held);
+    drop(dir);
+
+    // Then
+    assert!(!path.exists(), "{} is left behind", path.display());
 }
 
 #[test]

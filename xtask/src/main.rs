@@ -21,6 +21,10 @@ mod gate_action;
 mod gate_expression;
 mod gate_lock;
 mod gate_plan;
+mod gate_pr;
+mod gate_pr_gh;
+mod gate_pr_real;
+mod gate_pr_text;
 mod gate_report;
 mod gate_run;
 mod gate_step;
@@ -122,7 +126,8 @@ fn main() -> ExitCode {
             Ok(package) => steps::wasm_lint(&package),
             Err(message) => return fail("wasm", &message),
         },
-        Command::Gate => return gate::run(&reporter),
+        Command::Gate { pr: None } => return gate::run(&reporter),
+        Command::Gate { pr: Some(number) } => return gate_pr_real::run(number),
         Command::Lint => steps::lint(),
         Command::Deny => steps::deny_check(),
         Command::Test { tier: Tier::Unit } => steps::unit_tests(),
