@@ -52,19 +52,34 @@ impl Document {
     /// the page, as in Chromium: only a focus trap wraps), and from
     /// `None` the first.
     pub(crate) fn next_in_tab_order(&self, back: bool) -> Option<NodeId> {
-        let mut order: Vec<NodeId> = self
-            .elements()
-            .into_iter()
-            .filter(|node| self.tabbable(*node))
-            .collect();
+        // every element in tree order, so a focused element outside the
+        // Tab order (tabindex -1) still has a place to go on from
+        let mut all = self.elements();
         if back {
-            order.reverse();
+            all.reverse();
         }
-        let after = self
+        let from = self
             .active_element()
-            .and_then(|node| order.iter().position(|n| *n == node));
-        let next = after.map_or(0, |at| at + 1);
-        order.get(next).copied()
+            .and_then(|node| all.iter().position(|n| *n == node))
+            .map_or(0, |at| at + 1);
+        all[from.min(all.len())..]
+            .iter()
+            .copied()
+            .find(|node| self.tabbable(*node))
+    }
+
+    /// When `removed` is, or holds, the focused element: nothing has
+    /// focus, and `:focus` and `:focus-within` clear (review-v81). No
+    /// `blur` fires, as Chromium sends none for a removed element.
+    pub(crate) fn drop_focus_within(&mut self, removed: NodeId) {
+        let Some(focused) = self.active_element() else {
+            return;
+        };
+        if self.chain(focused).contains(&removed) {
+            self.focused = None;
+            self.set_flag_on(States::FOCUS, None);
+            self.set_flag_chain(States::FOCUS_WITHIN, None);
+        }
     }
 
     /// The nearest element holding `node` (or `node`) that a press
@@ -84,11 +99,11 @@ impl Document {
         let named =
             INTERACTIVE.contains(&tag) || (tag == "a" && self.attribute(node, "href").is_some());
         let indexed = matches!(self.attribute(node, "tabindex"), Some("0" | "-1"));
-        let has_box = self
+        let drawn = self
             .painted
             .as_ref()
-            .is_some_and(|painted| painted.border_box(node).is_some());
-        (named || indexed) && has_box && !self.in_disabled_control(node)
+            .is_some_and(|painted| painted.is_visible(node));
+        (named || indexed) && drawn && !self.in_disabled_control(node)
     }
 
     fn in_disabled_control(&self, node: NodeId) -> bool {

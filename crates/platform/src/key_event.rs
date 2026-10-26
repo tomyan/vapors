@@ -28,11 +28,14 @@ pub(crate) fn key_event(
 
 /// The DOM's `KeyboardEvent.key`: winit's named keys are spelled as the
 /// DOM spells them (`ArrowLeft`, `Escape`), except Space, which the DOM
-/// names by its character.
+/// names by its character, and Super, which the DOM calls Meta. Other
+/// differences are not mapped yet (design 03).
 fn dom_name(logical: &Key) -> String {
     match logical {
         Key::Character(text) => text.to_string(),
         Key::Named(NamedKey::Space) => " ".to_owned(),
+        // winit calls the DOM's Meta key Super
+        Key::Named(NamedKey::Super) => "Meta".to_owned(),
         Key::Named(named) => format!("{named:?}"),
         Key::Unidentified(_) | Key::Dead(_) => "Unidentified".to_owned(),
     }

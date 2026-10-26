@@ -21,6 +21,8 @@ fn named_keys_carry_their_dom_names() {
         (NamedKey::Escape, "Escape"),
         (NamedKey::ArrowLeft, "ArrowLeft"),
         (NamedKey::Shift, "Shift"),
+        // winit's names that differ from the DOM's (review-v81, 7)
+        (NamedKey::Super, "Meta"),
     ] {
         let event = key_event(
             &named(key),

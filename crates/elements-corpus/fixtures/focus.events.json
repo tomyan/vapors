@@ -236,18 +236,52 @@
       "line": 23
     },
     {
-      "action": "Click(250.0, 20.0)",
+      "action": "Key(\"Tab\")",
       "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "div#aside",
+          "type": "keydown"
+        },
         {
           "bubbles": true,
           "defaultPrevented": false,
           "target": "div#aside",
           "type": "focusout"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#cancel",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "button#cancel",
+          "type": "keyup"
+        }
+      ],
+      "focus": "button#cancel",
+      "focusVisible": true,
+      "line": 25
+    },
+    {
+      "action": "Click(250.0, 20.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#cancel",
+          "type": "focusout"
         }
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 25
+      "line": 27
     },
     {
       "action": "Key(\"x\")",
@@ -269,7 +303,7 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 28
+      "line": 30
     }
   ]
 }

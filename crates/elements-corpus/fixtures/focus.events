@@ -22,7 +22,9 @@ key Space                     clicks on keyup
 expect event click button#cancel
 click 350 20                  a press on the aside focuses it
 expect focus div#aside
-click 250 20                  Gone is disabled: no click, and focus leaves the aside
+key Tab                       from the aside (tabindex -1), on from its place: Cancel
+expect focus button#cancel
+click 250 20                  Gone is disabled: no click, and focus leaves Cancel
 expect no event click
 expect focus body
 key x                         with nothing focused, keys go to the body

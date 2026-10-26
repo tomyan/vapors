@@ -44,6 +44,7 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
         texts: Vec::new(),
         rects: HashMap::new(),
         paddings: HashMap::new(),
+        visible: std::collections::HashSet::new(),
         hits: Vec::new(),
         cursors: HashMap::new(),
         scroll_chains: crate::scroll_chains::Chains::default(),
@@ -122,6 +123,7 @@ fn paint_element(node: NodeId, rect: BoxRect, input: &PaintInput<'_>, out: &mut 
     if !used.visible {
         return;
     }
+    out.visible.insert(node);
     let border_box = snapped(rect, input.scale);
     let decoration = &used.decoration;
     let radii = corners::fitted(decoration.radii.map(|r| r * input.scale), border_box);
