@@ -15,42 +15,59 @@ use std::rc::Rc;
 
 use crate::{Dom, NodeId, Root};
 
-/// What a snippet builds with: the Dom, the parent and the node to place
-/// before; it returns its top-level entries.
-type Build = dyn Fn(&Rc<RefCell<dyn Dom>>, NodeId, Option<NodeId>) -> Vec<Root>;
+/// A snippet's arguments as the render site reads them: called inside
+/// the snippet's effects, so a snippet follows its arguments as they
+/// change (Svelte's parameters are reactive the same way).
+pub type Args<A> = Rc<dyn Fn() -> A>;
 
-/// A piece of template built where it is rendered.
-#[derive(Clone)]
-pub struct Snippet(Rc<Build>);
+/// What a snippet builds with: the Dom, the parent, the node to place
+/// before and its arguments; it returns its top-level entries.
+type Build<A> = dyn Fn(&Rc<RefCell<dyn Dom>>, NodeId, Option<NodeId>, Args<A>) -> Vec<Root>;
 
-impl Snippet {
+/// A piece of template built where it is rendered, taking arguments of
+/// type `A`: a tuple of its parameters, `()` for none.
+pub struct Snippet<A = ()>(Rc<Build<A>>);
+
+impl<A: 'static> Snippet<A> {
     /// A snippet that builds with `build`.
     pub fn new(
-        build: impl Fn(&Rc<RefCell<dyn Dom>>, NodeId, Option<NodeId>) -> Vec<Root> + 'static,
-    ) -> Snippet {
+        build: impl Fn(&Rc<RefCell<dyn Dom>>, NodeId, Option<NodeId>, Args<A>) -> Vec<Root> + 'static,
+    ) -> Snippet<A> {
         Snippet(Rc::new(build))
     }
 
-    /// The snippet that builds nothing: a `children` prop's default.
+    /// The snippet that builds nothing: a snippet prop's default.
     #[must_use]
-    pub fn empty() -> Snippet {
-        Snippet::new(|_, _, _| Vec::new())
+    pub fn empty() -> Snippet<A> {
+        Snippet::new(|_, _, _, _| Vec::new())
     }
 
     /// Builds the snippet in `parent`, before `before` (at the end when
-    /// `None`); its top-level entries.
-    pub fn render(&self, dom: &impl DynDom, parent: NodeId, before: Option<NodeId>) -> Vec<Root> {
-        (self.0)(&dom.dyn_dom(), parent, before)
+    /// `None`), reading its arguments from `args`; its top-level entries.
+    pub fn render(
+        &self,
+        dom: &impl DynDom,
+        parent: NodeId,
+        before: Option<NodeId>,
+        args: impl Fn() -> A + 'static,
+    ) -> Vec<Root> {
+        (self.0)(&dom.dyn_dom(), parent, before, Rc::new(args))
     }
 }
 
-impl Default for Snippet {
-    fn default() -> Snippet {
+impl<A> Clone for Snippet<A> {
+    fn clone(&self) -> Snippet<A> {
+        Snippet(Rc::clone(&self.0))
+    }
+}
+
+impl<A: 'static> Default for Snippet<A> {
+    fn default() -> Snippet<A> {
         Snippet::empty()
     }
 }
 
-impl fmt::Debug for Snippet {
+impl<A> fmt::Debug for Snippet<A> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("Snippet")
     }

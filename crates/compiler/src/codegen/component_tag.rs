@@ -7,7 +7,7 @@
 use super::allowances::Allowance;
 use super::emit::{Emitter, Place};
 use crate::CompileError;
-use crate::ast::{AttrValue, ComponentTag};
+use crate::ast::{AttrValue, ComponentTag, Node};
 
 impl Emitter<'_> {
     pub fn emit_component(
@@ -20,11 +20,25 @@ impl Emitter<'_> {
         let var = self.fresh(&last.to_lowercase());
         self.reserve(&format!("{var}_props"));
         let mut fields = self.emit_prop_values(tag, &var)?;
+        let outer = self.snippets.len();
+        self.emit_list_snippets(&tag.children)?;
+        for child in &tag.children {
+            if let Node::Snippet(snippet) = child {
+                fields.push(format!("{0}: {0}.clone(),", snippet.name));
+            }
+        }
         // the parser drops whitespace-only text, so `<Card> </Card>`
         // passes no children
-        if !tag.children.is_empty() {
-            fields.push(self.emit_children(&tag.children, &var)?);
+        let rest: Vec<Node> = tag
+            .children
+            .iter()
+            .filter(|child| !matches!(child, Node::Snippet(_)))
+            .cloned()
+            .collect();
+        if !rest.is_empty() {
+            fields.push(self.emit_children(&rest, &var)?);
         }
+        self.snippets.truncate(outer);
         self.line(Allowance::NeedlessUpdate.attribute());
         self.line(format!("let {var}_props = {}Props {{", tag.name));
         self.indent(1);
@@ -53,7 +67,7 @@ impl Emitter<'_> {
                 AttrValue::Expr(expr) => {
                     let local = format!("{var}_{name}");
                     self.reserve(&local);
-                    self.line(format!("let {local} = {};", self.raw(expr)?));
+                    self.line(format!("let {local} = {};", self.prop_value(expr)?));
                     local
                 }
             };
@@ -79,5 +93,19 @@ impl Emitter<'_> {
                 "roots.extend({var}.root_entries().iter().cloned());"
             ));
         }
+    }
+}
+
+impl Emitter<'_> {
+    /// An attribute's value as Rust: a local snippet named alone is
+    /// cloned, so passing it as a prop leaves it for later renders
+    /// (review-v66b); a snippet is an `Rc`, so the clone is cheap.
+    fn prop_value(&self, expr: &crate::ast::Expr) -> Result<String, CompileError> {
+        let code = self.raw(expr)?;
+        let name = code.trim();
+        if self.snippets.iter().any(|snippet| snippet.name == name) {
+            return Ok(format!("{name}.clone()"));
+        }
+        Ok(code)
     }
 }
