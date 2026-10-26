@@ -34,7 +34,7 @@ pub fn empty_on(porcelain: &str, branch: &str, roots: &[PathBuf], home: &Path) -
 
 fn empty_unless_forbidden(dir: &Path, never: &[(PathBuf, &str)]) -> String {
     if let Some(what) = forbidden_as(dir, never) {
-        return format!("refused to empty {}: it is {what}", dir.display());
+        return format!("refused to empty {}: it {what}", dir.display());
     }
     let started = Instant::now();
     match empty(dir) {
@@ -50,19 +50,23 @@ fn empty_unless_forbidden(dir: &Path, never: &[(PathBuf, &str)]) -> String {
     }
 }
 
-/// What `dir` is when it must never be emptied: `/`, or one of `never`
-/// (compared canonically).
+/// Why `dir` must never be emptied: it is `/`, or it is or holds one of
+/// `never` (compared canonically), as a root holding worktrees would.
 #[must_use]
-pub fn forbidden_as<'a>(dir: &Path, never: &[(PathBuf, &'a str)]) -> Option<&'a str> {
+pub fn forbidden_as(dir: &Path, never: &[(PathBuf, &str)]) -> Option<String> {
     if dir == Path::new("/") {
-        return Some("the root directory");
+        return Some("is the root directory".into());
     }
     let canonical = |path: &Path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let dir = canonical(dir);
-    never
-        .iter()
-        .find(|(path, _)| canonical(path) == dir)
-        .map(|(_, what)| *what)
+    never.iter().find_map(|(path, what)| {
+        let path = canonical(path);
+        if path == dir {
+            Some(format!("is {what}"))
+        } else {
+            path.starts_with(&dir).then(|| format!("holds {what}"))
+        }
+    })
 }
 
 /// Remove everything in `dir`, keeping `dir`; how many top-level entries

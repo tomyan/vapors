@@ -166,7 +166,7 @@ fn a_du_failure_is_said_and_du_is_tried_again_next_pass() {
     // Then
     assert!(fake.called("merge 2 h2"), "{:?}", fake.calls());
     assert!(
-        first.iter().any(|l| l == "the disk has 10 GB free; du failed: du did not answer within 120s; it is tried again next pass"),
+        first.iter().any(|l| l == "#1 is not gated: the disk has under 60 GB free (10 GB); du failed: du did not answer within 120s; it is tried again next pass"),
         "{first:?}"
     );
     assert!(
@@ -175,5 +175,28 @@ fn a_du_failure_is_said_and_du_is_tried_again_next_pass() {
             .any(|l| l
                 .starts_with("the disk has 10 GB free; the largest targets: 62 GB /t/w-desktop;")),
         "{second:?}"
+    );
+}
+
+#[test]
+fn a_du_that_keeps_failing_is_said_once() {
+    // Given: du fails on two passes running
+    let fake = short_disk(3);
+    let mut state = State::default();
+    let mut pass = || {
+        *fake.du_fails_once.borrow_mut() = Some("du did not answer within 120s".into());
+        run_pass(&fake, MergeOn::Gate, &mut state, false)
+    };
+
+    // When
+    let first = pass();
+    let second = pass();
+
+    // Then
+    let said = |log: &[String]| log.iter().filter(|l| l.contains("du failed")).count();
+    assert_eq!(
+        (said(&first), said(&second)),
+        (1, 0),
+        "{first:?} {second:?}"
     );
 }

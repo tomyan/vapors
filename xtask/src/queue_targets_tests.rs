@@ -89,7 +89,12 @@ fn a_target_that_is_not_a_link_to_a_directory_in_a_root_is_left_alone_naming_it(
     dirs.sort();
 
     // Then
-    let said = |path: &PathBuf, why: String| Err(format!("{} {why}; left alone", path.display()));
+    let said = |path: &PathBuf, why: String| {
+        Err(format!(
+            "{} {why}; left alone; fix: link it to a directory directly in a targets root, as touche's CLAUDE.md worktree recipe does",
+            path.display()
+        ))
+    };
     assert_eq!(
         dirs,
         [

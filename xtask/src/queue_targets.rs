@@ -74,17 +74,33 @@ fn sibling_targets(worktree: &Path) -> Result<Vec<PathBuf>, String> {
 /// The directory `target` links to, when it qualifies; otherwise why it
 /// is left alone.
 fn in_a_root(target: &Path, roots: &[PathBuf]) -> Result<PathBuf, String> {
-    let alone = |why: String| Err(format!("{} {why}; left alone", target.display()));
     let Ok(link) = std::fs::read_link(target) else {
-        return alone("is a directory, not a link into a targets root".into());
+        let what = if target.is_dir() {
+            "a directory"
+        } else {
+            "a file"
+        };
+        return left_alone(
+            target,
+            &format!("is {what}, not a link into a targets root"),
+        );
     };
     if link.is_relative() {
-        return alone(format!("links to the relative path {}", link.display()));
+        return left_alone(
+            target,
+            &format!("links to the relative path {}", link.display()),
+        );
     }
-    match destination(&link, roots) {
-        Ok(dir) => Ok(dir),
-        Err(why) => alone(format!("links to {}, {why}", link.display())),
-    }
+    destination(&link, roots)
+        .or_else(|why| left_alone(target, &format!("links to {}, {why}", link.display())))
+}
+
+/// `target` is left alone, saying why and how to make it qualify.
+fn left_alone(target: &Path, why: &str) -> Result<PathBuf, String> {
+    Err(format!(
+        "{} {why}; left alone; fix: link it to a directory directly in a targets root, as touche's CLAUDE.md worktree recipe does",
+        target.display()
+    ))
 }
 
 /// `link`'s canonical directory, when it is a real directory directly in

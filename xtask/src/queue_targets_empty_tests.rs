@@ -49,7 +49,7 @@ fn a_root_child_that_links_elsewhere_is_left_alone_and_its_destination_kept() {
     // Then
     assert_eq!(lines.len(), 1, "{lines:?}");
     assert!(
-        lines[0].ends_with("which is itself a link; left alone"),
+        lines[0].contains("which is itself a link; left alone; fix: "),
         "{lines:?}"
     );
     assert!(precious.join("keep").exists());
@@ -90,7 +90,7 @@ fn the_home_directory_or_a_worktree_is_never_emptied() {
 fn the_root_directory_is_never_emptied() {
     assert_eq!(
         forbidden_as(Path::new("/"), &[]),
-        Some("the root directory")
+        Some("is the root directory".to_owned())
     );
 }
 
@@ -120,4 +120,28 @@ fn an_emptied_target_is_logged_with_its_entry_count_and_time() {
         lines.len() == 1 && lines[0].starts_with(&start) && lines[0].ends_with(" s)"),
         "{lines:?}"
     );
+}
+
+#[test]
+fn a_directory_that_holds_a_worktree_is_never_emptied() {
+    // Given: the review's scenario, a root holding worktrees and a target linking to their parent
+    let scratch = Scratch::new("holds");
+    let root = scratch.0.clone();
+    let worktree = scratch.repo("w/touche");
+    let sibling = scratch.repo("w/vapors");
+    scratch.link("w/touche/target", &scratch.0.join("w"));
+    let porcelain = format!("{}\n{}", on(&worktree, "b"), on(&sibling, "c"));
+
+    // When
+    let lines = empty_on(&porcelain, "b", &[root], &scratch.0.join("home"));
+
+    // Then
+    assert_eq!(
+        lines,
+        [format!(
+            "refused to empty {}: it holds a worktree",
+            scratch.0.join("w").display()
+        )]
+    );
+    assert!(worktree.join(".git").exists() && sibling.join(".git").exists());
 }

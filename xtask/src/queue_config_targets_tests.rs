@@ -80,3 +80,35 @@ fn a_root_that_is_not_an_existing_directory_of_its_own_is_refused_naming_it() {
         assert!(why.contains("fix: "), "{root}: {why}");
     }
 }
+
+#[test]
+fn a_root_that_holds_the_run_worktree_or_home_is_refused() {
+    // Given: home under a scratch directory, and the run worktree under home's .cache
+    let scratch = Scratch::new("config-holds");
+    let home = scratch.dir("home");
+    let cache = scratch.dir("home/.cache");
+    scratch.dir("home/.cache/w-queue/run");
+    let text = |root: &str| {
+        format!(
+            "[queue]\nrepo = \"a/b\"\nmerge_on = \"gate\"\nrun = \"~/.cache/w-queue/run\"\nlog = \"/q/l\"\ntargets = \"{root}\"\n"
+        )
+    };
+    let load = |root: &str| {
+        QueueConfig::from(
+            &Config::parse(&text(root)).expect("valid"),
+            &home.display().to_string(),
+        )
+    };
+
+    // Then
+    let holds_run = load(&cache.display().to_string()).expect_err("holds run");
+    assert!(
+        holds_run.contains("holds the queue's run worktree"),
+        "{holds_run}"
+    );
+    let holds_home = load(&scratch.0.display().to_string()).expect_err("holds home");
+    assert!(
+        holds_home.contains("holds the home directory"),
+        "{holds_home}"
+    );
+}

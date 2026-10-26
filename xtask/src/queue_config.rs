@@ -58,7 +58,7 @@ impl QueueConfig {
             run: at_home(required("run")?, home),
             log: at_home(required("log")?, home),
             serve: config.get("queue.serve").map(|dir| at_home(dir, home)),
-            targets: targets(required("targets")?, home)?,
+            targets: targets(required("targets")?, home, &at_home(required("run")?, home))?,
             home: PathBuf::from(home),
         })
     }
@@ -73,64 +73,69 @@ fn at_home(text: &str, home: &str) -> PathBuf {
 }
 
 /// The space-separated roots in `text`, `~/` read as `home`.
-fn targets(text: &str, home: &str) -> Result<Vec<PathBuf>, String> {
+fn targets(text: &str, home: &str, run: &Path) -> Result<Vec<PathBuf>, String> {
     let roots: Vec<&str> = text.split_whitespace().collect();
     if roots.is_empty() {
         return Err(
             "queue.targets names no directory; fix: list the target roots, space-separated".into(),
         );
     }
-    let real_home = Path::new(home)
-        .canonicalize()
-        .unwrap_or_else(|_| PathBuf::from(home));
+    let canonical = |path: &Path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    let never = [
+        (canonical(Path::new("/")), "the root directory"),
+        (canonical(Path::new(home)), "the home directory"),
+        (canonical(run), "the queue's run worktree"),
+    ];
     roots
         .iter()
-        .map(|root| root_dir(root, home, &real_home))
+        .map(|root| root_dir(root, home, &never))
         .collect()
 }
 
 /// A targets root, canonical: absolute, an existing directory, and
 /// neither `/` nor the home directory, which hold more than build output.
-fn root_dir(text: &str, home: &str, real_home: &Path) -> Result<PathBuf, String> {
+fn root_dir(text: &str, home: &str, never: &[(PathBuf, &str)]) -> Result<PathBuf, String> {
     let refused = |why: String| format!("queue.targets: `{text}` {why}");
-    let path = at_home(text, home);
-    if !path.is_absolute() {
-        return Err(refused(
-            "is not an absolute path; fix: write it from / or ~/".into(),
-        ));
-    }
-    let meta = std::fs::metadata(&path).map_err(|e| match e.kind() {
-        std::io::ErrorKind::NotFound => refused(format!(
-            "does not exist; fix: mkdir -p {}, or correct [queue] targets",
-            path.display()
-        )),
-        _ => refused(format!(
-            "cannot be read ({e}); fix: correct [queue] targets"
-        )),
-    })?;
-    if !meta.is_dir() {
-        return Err(refused(
-            "is not a directory; fix: correct [queue] targets".into(),
-        ));
-    }
-    let real = path.canonicalize().map_err(|e| {
-        refused(format!(
-            "cannot be resolved ({e}); fix: correct [queue] targets"
-        ))
-    })?;
-    let whole = if real == Path::new("/") {
-        Some("the root directory")
-    } else if real == real_home {
-        Some("the home directory")
-    } else {
-        None
-    };
-    match whole {
-        Some(what) => Err(refused(format!(
-            "is {what}, which holds more than build output; fix: name a targets root itself, such as ~/.cache/touche-targets"
+    let real = existing_dir(&at_home(text, home)).map_err(refused)?;
+    match whole(&real, never) {
+        Some(why) => Err(refused(format!(
+            "{why}, which holds more than build output; fix: name a targets root itself, such as ~/.cache/touche-targets"
         ))),
         None => Ok(real),
     }
+}
+
+/// `path`, canonical, when it is an absolute path to a directory.
+fn existing_dir(path: &Path) -> Result<PathBuf, String> {
+    if !path.is_absolute() {
+        return Err("is not an absolute path; fix: write it from / or ~/".into());
+    }
+    let meta = std::fs::metadata(path).map_err(|e| match e.kind() {
+        std::io::ErrorKind::NotFound => format!(
+            "does not exist; fix: mkdir -p {}, or correct [queue] targets",
+            path.display()
+        ),
+        _ => format!("cannot be read ({e}); fix: correct [queue] targets"),
+    })?;
+    if !meta.is_dir() {
+        return Err("is not a directory; fix: correct [queue] targets".into());
+    }
+    path.canonicalize()
+        .map_err(|e| format!("cannot be resolved ({e}); fix: correct [queue] targets"))
+}
+
+/// Why `real` is too much to be a root: it is `/` or home, or it holds
+/// home or the run worktree.
+fn whole(real: &Path, never: &[(PathBuf, &str)]) -> Option<String> {
+    never.iter().find_map(|(path, what)| {
+        if path == real {
+            Some(format!("is {what}"))
+        } else if path.starts_with(real) && *what != "the root directory" {
+            Some(format!("holds {what}"))
+        } else {
+            None
+        }
+    })
 }
 
 fn merge_on(text: &str) -> Result<MergeOn, String> {

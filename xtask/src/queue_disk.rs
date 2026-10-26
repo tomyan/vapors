@@ -120,18 +120,34 @@ fn say_short(
     if state.said_already(number, &reason) {
         return Ok(());
     }
-    log.line(&reason)?;
     match ops.largest_targets() {
         Ok(largest) => {
+            log.line(&reason)?;
             log.line(&describe(free, &largest))?;
             state.changed(number, &reason);
             Ok(())
         }
-        Err(why) => log.line(&format!(
-            "the disk has {} GB free; du failed: {why}; it is tried again next pass",
-            free / GB
-        )),
+        Err(why) => say_du_failed(log, state, (number, free), &reason, &why),
     }
+}
+
+/// Say once, while du keeps failing, that it failed; du runs again each
+/// pass, and the largest targets are said once it answers.
+fn say_du_failed(
+    log: &Log,
+    state: &mut State,
+    (number, free): (u64, u64),
+    reason: &str,
+    why: &str,
+) -> Result<(), String> {
+    let failed = format!(
+        "{reason} ({} GB); du failed: {why}; it is tried again next pass",
+        free / GB
+    );
+    if state.changed(number, &failed) {
+        log.line(&failed)?;
+    }
+    Ok(())
 }
 
 /// df's deadline. Measured 2026-10-26: 4 to 13 ms over three, at a load
