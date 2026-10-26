@@ -17,9 +17,9 @@ pub mod recording;
 mod roots;
 mod snippet;
 
-pub use event::{Event, Handler};
+pub use event::{Capture, Event, Handler, Pointer};
 pub use roots::{BlockNodes, Root, current_nodes};
-pub use snippet::{DynDom, Snippet};
+pub use snippet::{Args, DynDom, Snippet};
 
 /// Identifies a node in the tree. The [`Dom`] implementation decides
 /// what the number means.

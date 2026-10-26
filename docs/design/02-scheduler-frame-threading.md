@@ -13,6 +13,11 @@ One frame, on the UI thread, in this order:
 
 1. **Input.** Every platform event since the last frame is dispatched
    (area 3). Handlers write signals; effects run at once, as today.
+   As built (2-S1, the lead's decision): events are dispatched as they
+   arrive, not queued to the frame's start, and this phase's time is
+   the time their handlers took since the last frame. Revisited in
+   3-E1: if a drag's many moves per frame cause more than one update
+   per frame, coalescing moves into that slice.
 2. **Tasks.** The executor polls every future that was woken since the
    last frame, until none is ready. Resolved futures write signals; a
    pending version that settles flushes its queued effects (area 1).
@@ -53,8 +58,11 @@ transitions started in one frame are in step. Tests supply the clock,
 so an animation test steps time by hand and asserts sampled values; no
 test sleeps.
 
-The web's `requestAnimationFrame` timestamp is the frame's time there;
-natively it is `Instant::now()` at the start of the frame. The
+The frame's time is `Instant::now()` at the start of the frame:
+`platform::Frame::now`. On the web that is `performance.now()` then,
+not the `requestAnimationFrame` timestamp, which winit does not expose
+(2-S1, the lead's decision; revisited if 6-A1's transitions show jitter
+on the phone). The
 `stress` demo's measured update time is reported by this clock.
 
 ## Redraw on demand, as built
@@ -184,7 +192,7 @@ frame order.
 
 | Slice | Delivers | touché use |
 |---|---|---|
-| S1 phases and clock | The frame order as a function, `frame.now`, spans per phase, the debug overlay line | The stress demo shows per-phase time; touché's P0 gets frame numbers from the same spans |
+| S1 phases and clock | The frame order as a function, `frame.now`, spans per phase, the debug overlay line. As built: `vapors_app::frame::run_frame` and `Phases`, a `Clock` a test can step, `tracing` spans, `ElementsApp::with_frame_times`, and the stress demo's line of input, update and draw times | The stress demo shows per-phase time; touché's P0 gets frame numbers from the same spans |
 | S2 executor | The task queue, waking through `Waker`, drop to cancel | Area 1's R2 |
 | S3 tick | The animation phase hook | Area 6's A1 |
 | S4 offload | Native pool; web pool with copies | Export encoding and decode off the UI thread on both targets |

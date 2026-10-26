@@ -6,6 +6,7 @@
 
 mod cursor;
 mod elements_app;
+pub mod frame;
 mod painter;
 mod pointer;
 #[cfg(test)]
@@ -13,5 +14,5 @@ mod scroll_fixture;
 mod touch_scroll;
 mod wheel_scroll;
 
-pub use elements_app::{ElementsApp, Failure, PerFrame};
+pub use elements_app::{ElementsApp, Failure, FrameTimesHook, PerFrame};
 pub use painter::ScenePainter;
