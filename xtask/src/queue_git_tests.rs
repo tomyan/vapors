@@ -71,3 +71,16 @@ fn a_rename_lists_both_its_paths_as_changed() {
         ])
     );
 }
+
+#[test]
+fn a_rebase_that_fails_other_than_by_a_conflict_is_refused_with_git_s_reason() {
+    // Given: main names no commit, so the rebase fails before any conflict
+    let (repo, head) = repo("unrebased");
+
+    // When
+    let refused = rebase_clean(&repo.0, "no-such-ref", &head);
+
+    // Then
+    let why = refused.expect_err("refused, not read as a conflict");
+    assert!(why.starts_with("git rebase -q no-such-ref: "), "{why}");
+}

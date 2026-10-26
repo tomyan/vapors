@@ -51,6 +51,14 @@ pub fn try_run(dir: &Path, args: &[&str]) -> bool {
         .success()
 }
 
+/// A repository at `dir` on main, with an identity of its own: the queue's
+/// rebases commit through git's config, and a CI runner has none.
+fn init(dir: &Path) {
+    run(dir, &["init", "-q", "-b", "main"]);
+    run(dir, &["config", "user.name", "t"]);
+    run(dir, &["config", "user.email", "t@t"]);
+}
+
 pub fn commit(dir: &Path, file: &str, text: &str) -> String {
     std::fs::write(dir.join(file), text).expect("file");
     run(dir, &["add", "."]);
@@ -63,7 +71,7 @@ pub fn repo(name: &str) -> (Repo, String) {
     let dir = std::env::temp_dir().join(format!("xtask-queue-git-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("dir");
-    run(&dir, &["init", "-q", "-b", "main"]);
+    init(&dir);
     commit(&dir, "base.txt", "base");
     run(&dir, &["checkout", "-q", "-b", "feature"]);
     commit(&dir, "a.txt", "a");
@@ -77,7 +85,7 @@ pub fn lines_repo(name: &str) -> (Repo, String) {
     let dir = std::env::temp_dir().join(format!("xtask-queue-lines-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("dir");
-    run(&dir, &["init", "-q", "-b", "main"]);
+    init(&dir);
     let lines: Vec<String> = (1..=10).map(|n| format!("line {n}")).collect();
     let text = lines.join("\n") + "\n";
     commit(&dir, "f.txt", &text);

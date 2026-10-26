@@ -27,19 +27,31 @@ pub fn contains(dir: &Path, base: &str, head: &str) -> Result<bool, String> {
 }
 
 /// `head` rebased onto `main` and checked out detached: the new head, or
-/// none when the rebase conflicts (it is then aborted).
+/// none when the rebase stops on a conflict (it is then aborted). Any
+/// other failure is refused with git's reason, never read as a conflict.
 ///
 /// # Errors
 ///
 /// git failing other than by a conflict.
 pub fn rebase_clean(dir: &Path, main: &str, head: &str) -> Result<Option<String>, String> {
     git(dir, &["checkout", "-q", "--detach", head])?;
-    let rebase = git_output(dir, &["rebase", "-q", main])?;
+    let args = ["rebase", "-q", main];
+    let rebase = git_output(dir, &args)?;
     if rebase.status.success() {
         return git(dir, &["rev-parse", "HEAD"]).map(Some);
     }
-    git(dir, &["rebase", "--abort"])?;
-    Ok(None)
+    if conflicted(dir)? {
+        git(dir, &["rebase", "--abort"])?;
+        return Ok(None);
+    }
+    // Not a conflict (no committer identity, an unknown ref): git's reason.
+    let _ = git_output(dir, &["rebase", "--abort"]);
+    Err(failure(&args, &rebase))
+}
+
+/// Whether the worktree holds paths left unmerged by a conflict.
+fn conflicted(dir: &Path) -> Result<bool, String> {
+    Ok(!git(dir, &["diff", "--name-only", "--diff-filter=U"])?.is_empty())
 }
 
 /// The paths `head` changes since it left `base`, a rename listed as
