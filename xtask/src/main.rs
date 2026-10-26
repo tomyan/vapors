@@ -18,6 +18,7 @@ mod docs;
 mod docs_commands;
 mod docs_patterns;
 mod docs_plan;
+mod docs_source_text;
 mod docs_sources;
 mod files;
 mod files_walk;

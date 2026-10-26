@@ -7,42 +7,13 @@
 //! code. Quotes pair within a paragraph or list item, so a quote may wrap
 //! across lines; one left open is refused, naming the line it opens on.
 
+pub use crate::docs_source_text::Source;
+
 /// A quote and the line it opens on.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Quote {
     pub line: usize,
     pub text: String,
-}
-
-/// A source file's text, escapes undone, and its path.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Source {
-    pub path: String,
-    pub text: String,
-}
-
-impl Source {
-    /// `text` from `path`, with the escapes a quote can hide behind undone:
-    /// `\'`, `\"`, a Rust line continuation, and the HTML entities for
-    /// quotes and `&`.
-    #[must_use]
-    pub fn new(path: &str, text: &str) -> Self {
-        let mut text = text
-            .replace("\\'", "'")
-            .replace("\\\"", "\"")
-            .replace("&quot;", "\"")
-            .replace("&#39;", "'")
-            .replace("&apos;", "'")
-            .replace("&amp;", "&");
-        while let Some(at) = text.find("\\\n") {
-            let rest = text[at + 2..].trim_start();
-            text = format!("{}{rest}", &text[..at]);
-        }
-        Self {
-            path: path.to_owned(),
-            text,
-        }
-    }
 }
 
 /// A character of a block and the line it is on.
