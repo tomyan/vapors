@@ -21,6 +21,10 @@ mod gate_action;
 mod gate_expression;
 mod gate_lock;
 mod gate_plan;
+mod gate_pr;
+mod gate_pr_gh;
+mod gate_pr_real;
+mod gate_pr_text;
 mod gate_report;
 mod gate_run;
 mod gate_step;
@@ -61,6 +65,19 @@ mod tools;
 mod trunk;
 mod trunk_process;
 mod twin;
+mod ux_base64;
+mod ux_checklist;
+mod ux_config;
+mod ux_estimate;
+mod ux_models;
+mod ux_prompt;
+mod ux_review;
+mod ux_run;
+#[allow(
+    dead_code,
+    reason = "the live review uses it (U4 slice 2); its tests run now"
+)]
+mod ux_secret;
 mod web;
 mod web_version;
 mod xvfb;
@@ -98,6 +115,7 @@ fn main() -> ExitCode {
         Command::Web { debug } => return web::run(debug),
         Command::Serve { replace } => return serve::run(replace),
         Command::StampPage => return stamp_page::run(),
+        Command::UxReview { dry_run } => return ux_review::run(dry_run),
         Command::CheckXtaskTwin { sibling } => return twin::run(&sibling),
         Command::Dev { keys, replace } => return dev::run(&reporter, &keys, replace),
         Command::Ci => match web::web_package() {
@@ -108,7 +126,8 @@ fn main() -> ExitCode {
             Ok(package) => steps::wasm_lint(&package),
             Err(message) => return fail("wasm", &message),
         },
-        Command::Gate => return gate::run(&reporter),
+        Command::Gate { pr: None } => return gate::run(&reporter),
+        Command::Gate { pr: Some(number) } => return gate_pr_real::run(number),
         Command::Lint => steps::lint(),
         Command::Deny => steps::deny_check(),
         Command::Test { tier: Tier::Unit } => steps::unit_tests(),
