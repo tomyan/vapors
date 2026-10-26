@@ -111,3 +111,12 @@ fn dvorak_follows_the_logical_v_and_cyrillic_the_physical_one() {
         false
     ));
 }
+
+#[test]
+fn the_control_character_ctrl_v_can_produce_pastes_by_the_physical_key() {
+    let control = Key::Character("\u{16}".into());
+    assert!(is_paste(
+        &press(&control, KeyCode::KeyV, ModifiersState::CONTROL),
+        false
+    ));
+}

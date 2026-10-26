@@ -40,7 +40,11 @@ pub fn is_paste(press: &Press<'_>, mac: bool) -> bool {
 
 fn is_v(press: &Press<'_>) -> bool {
     match press.logical {
-        Key::Character(text) if text.is_ascii() => text.eq_ignore_ascii_case("v"),
+        // A Latin letter; a control character ("\u{16}", which Ctrl+V can
+        // produce) or another script falls to the physical key.
+        Key::Character(text) if text.chars().all(|c| c.is_ascii_alphabetic()) => {
+            text.eq_ignore_ascii_case("v")
+        }
         _ => press.physical == PhysicalKey::Code(KeyCode::KeyV),
     }
 }

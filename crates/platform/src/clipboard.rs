@@ -7,16 +7,22 @@
 use std::sync::mpsc;
 use std::time::Duration;
 
-/// The largest image handed on: 1 GiB of RGBA (16384 px square). Larger
-/// is refused before it is copied.
-pub const MAX_BYTES: usize = 1 << 30;
+/// The largest image handed on: 256 MiB of RGBA (8192 px square). It
+/// bounds what is handed on, not what is allocated: arboard decodes the
+/// whole image first, so a far larger one can exhaust memory before
+/// this refuses it. A real bound needs the image's size before the
+/// decode, which arboard does not give.
+pub const MAX_BYTES: usize = 1 << 28;
 
-/// How long a read may take before it is refused. Under Xvfb with
-/// xclip (dev box, 2026-10-26, debug build) a 64x64 PNG read in 3 ms
-/// and a 4096x4096 one (64 MiB) in 516-621 ms. arboard 3.7 gives up on
-/// an owner after 4 s (`LONG_TIMEOUT_DUR`, src/platform/linux/x11.rs)
-/// and then answers `ContentNotAvailable`, as for an empty clipboard, so
-/// this must come first: 3 s, about five times the large read.
+/// How long a read may take before it is refused, with [`MAX_BYTES`]
+/// from the same measurement. Under Xvfb with xclip (dev box,
+/// 2026-10-26, release build, load 27 to 38) an 8192x8192 PNG read in
+/// 218-222 ms when compressible (4 MiB) and 415-467 ms as noise
+/// (256 MiB moved). arboard 3.7 gives up on an X11 owner after 4 s
+/// (`LONG_TIMEOUT_DUR`, src/platform/linux/x11.rs) and then answers
+/// `ContentNotAvailable`, as for an empty clipboard, so this must come
+/// first: 3 s, about 6 times the slowest. Not measured on Wayland,
+/// macOS or Windows.
 pub const DEADLINE: Duration = Duration::from_secs(3);
 
 /// What the clipboard held when asked for an image: three answers, so a
@@ -48,30 +54,80 @@ pub trait Clipboard {
 
 /// The operating system's clipboard.
 #[derive(Debug, Default)]
-pub struct SystemClipboard;
+pub struct SystemClipboard {
+    reader: Reader,
+}
 
 impl Clipboard for SystemClipboard {
     fn image(&mut self) -> ClipboardImage {
-        within(DEADLINE, read)
+        self.reader.read(DEADLINE, read)
     }
 }
 
-/// `read` on a worker thread, refused when it has not answered within
-/// `deadline` (the thread is left to finish on its own).
-pub fn within(deadline: Duration, read: fn() -> ClipboardImage) -> ClipboardImage {
-    let (sender, receiver) = mpsc::channel();
-    std::thread::spawn(move || {
-        let _ = sender.send(read());
-    });
-    receiver.recv_timeout(deadline).unwrap_or_else(|_| {
-        ClipboardImage::Unreadable(format!("timed out after {} ms", deadline.as_millis()))
-    })
+/// One read at a time, each on a worker thread with a deadline. A read
+/// past its deadline is left running (arboard has no cancel; on Wayland
+/// its pipe read has no timeout), and a new read is refused until it
+/// ends, so threads never pile up behind one owner.
+#[derive(Debug, Default)]
+pub struct Reader {
+    pending: Option<mpsc::Receiver<ClipboardImage>>,
+}
+
+impl Reader {
+    /// `read`'s answer within `deadline`, or why there is none.
+    pub fn read(&mut self, deadline: Duration, read: fn() -> ClipboardImage) -> ClipboardImage {
+        if self.still_reading() {
+            return ClipboardImage::Unreadable("a clipboard read is still in progress".to_owned());
+        }
+        let (sender, receiver) = mpsc::channel();
+        let spawned = std::thread::Builder::new()
+            .name("clipboard".to_owned())
+            .spawn(move || {
+                let _ = sender.send(read());
+            });
+        if let Err(error) = spawned {
+            return ClipboardImage::Unreadable(format!(
+                "no thread to read the clipboard on: {error}"
+            ));
+        }
+        self.wait(receiver, deadline)
+    }
+
+    /// Whether an earlier read has not ended; one that has is dropped
+    /// (its answer was for an earlier paste).
+    fn still_reading(&mut self) -> bool {
+        let running = self
+            .pending
+            .as_ref()
+            .is_some_and(|pending| matches!(pending.try_recv(), Err(mpsc::TryRecvError::Empty)));
+        if !running {
+            self.pending = None;
+        }
+        running
+    }
+
+    fn wait(
+        &mut self,
+        receiver: mpsc::Receiver<ClipboardImage>,
+        deadline: Duration,
+    ) -> ClipboardImage {
+        match receiver.recv_timeout(deadline) {
+            Ok(image) => image,
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                self.pending = Some(receiver);
+                ClipboardImage::Unreadable(format!("timed out after {} ms", deadline.as_millis()))
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => ClipboardImage::Unreadable(
+                "the clipboard read failed (its thread panicked)".to_owned(),
+            ),
+        }
+    }
 }
 
 fn read() -> ClipboardImage {
     let image = arboard::Clipboard::new().and_then(|mut clipboard| clipboard.get_image());
     match image {
-        Ok(image) => from_arboard(&image),
+        Ok(image) => from_arboard(image),
         Err(error) if no_image(&error) => ClipboardImage::NoImage,
         Err(error) => ClipboardImage::Unreadable(error.to_string()),
     }
@@ -92,7 +148,7 @@ fn no_image(error: &arboard::Error) -> bool {
 }
 
 /// An image handed on only when its size is usable and its bytes match.
-fn from_arboard(image: &arboard::ImageData<'_>) -> ClipboardImage {
+fn from_arboard(image: arboard::ImageData<'_>) -> ClipboardImage {
     let size = format!("{}x{}", image.width, image.height);
     let expected = image
         .width
@@ -125,7 +181,7 @@ fn from_arboard(image: &arboard::ImageData<'_>) -> ClipboardImage {
     ClipboardImage::Image {
         width,
         height,
-        rgba: image.bytes.to_vec(),
+        rgba: image.bytes.into_owned(),
     }
 }
 

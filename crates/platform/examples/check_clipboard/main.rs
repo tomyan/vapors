@@ -26,7 +26,7 @@ const UNREACHABLE: &str = "--read-on-this-display";
 
 fn main() -> ExitCode {
     if std::env::args().any(|a| a == UNREACHABLE) {
-        println!("{}", short(&SystemClipboard.image()));
+        println!("{}", short(&SystemClipboard::default().image()));
         return ExitCode::SUCCESS;
     }
     match run() {
@@ -61,7 +61,7 @@ fn png_reads_back() -> Result<String, String> {
     xclip(&["-t", "image/png", "-i"], Some(&fixture), None)?;
     let (width, height, rgba) = decode(&fixture)?;
     let started = Instant::now();
-    let image = SystemClipboard.image();
+    let image = SystemClipboard::default().image();
     let took = started.elapsed().as_millis();
     match image {
         ClipboardImage::Image {
@@ -80,7 +80,7 @@ fn png_reads_back() -> Result<String, String> {
 
 fn text_is_no_image() -> Result<String, String> {
     xclip(&["-t", "UTF8_STRING"], None, Some(b"warmer"))?;
-    match SystemClipboard.image() {
+    match SystemClipboard::default().image() {
         ClipboardImage::NoImage => Ok("text alone on the clipboard reads as no image".to_owned()),
         other => Err(format!(
             "text alone read as {:?}, not NoImage",
@@ -91,7 +91,7 @@ fn text_is_no_image() -> Result<String, String> {
 
 fn corrupt_is_unreadable() -> Result<String, String> {
     xclip(&["-t", "image/png"], None, Some(b"\x89PNG not a png"))?;
-    match SystemClipboard.image() {
+    match SystemClipboard::default().image() {
         ClipboardImage::Unreadable(_) => {
             Ok("bytes offered as a PNG that are not one read as unreadable".to_owned())
         }
@@ -110,7 +110,7 @@ fn stopped_owner() -> Result<String, String> {
     let owner = newest_xclip()?;
     signal(&owner, "STOP")?;
     let started = Instant::now();
-    let read = SystemClipboard.image();
+    let read = SystemClipboard::default().image();
     let took = started.elapsed();
     signal(&owner, "KILL")?;
     match read {
