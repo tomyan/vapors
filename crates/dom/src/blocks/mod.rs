@@ -28,7 +28,7 @@ impl Fragment {
     /// Builds under a fresh owner (a child of the current one), with
     /// tracking off so signals read while building do not re-run the
     /// block's effect.
-    pub fn build<D: Dom>(
+    pub fn build<D: Dom + ?Sized>(
         dom: &Rc<RefCell<D>>,
         parent: NodeId,
         before: Option<NodeId>,
@@ -47,7 +47,7 @@ impl Fragment {
 
     /// Reads the nodes, then disposes the owner (stopping the effects,
     /// running cleanups) and removes them.
-    pub fn remove<D: Dom>(self, dom: &Rc<RefCell<D>>) {
+    pub fn remove<D: Dom + ?Sized>(self, dom: &Rc<RefCell<D>>) {
         let nodes = self.nodes();
         self.owner.dispose();
         for node in nodes {

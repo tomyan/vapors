@@ -33,6 +33,9 @@ pub struct Compiled {
     pub inputs: Vec<PathBuf>,
     /// The `wisp.rs` file to `include!`.
     pub modules: PathBuf,
+    /// `file:line:col: ..` for each component tag that names no
+    /// component in the directory, so its props were not checked.
+    pub unchecked: Vec<String>,
 }
 
 /// What a build script prints, and whether it must fail.
@@ -97,7 +100,15 @@ fn styled_report(src: &Path, out_dir: Option<OsString>, styles: Styles) -> Build
     };
     match compile_dir_into_styled(src, Path::new(&out_dir), styles) {
         Ok(compiled) => BuildScriptReport {
-            stdout: rerun_lines(&compiled.inputs),
+            stdout: rerun_lines(&compiled.inputs)
+                .into_iter()
+                .chain(
+                    compiled
+                        .unchecked
+                        .iter()
+                        .map(|note| format!("cargo::warning={note}")),
+                )
+                .collect(),
             stderr: Vec::new(),
             failed: false,
         },

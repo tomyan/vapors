@@ -15,16 +15,16 @@ impl Emitter<'_> {
         tag: &ComponentTag,
         place: &Place,
     ) -> Result<(), CompileError> {
-        if !tag.children.is_empty() {
-            return Err(self.source.error(
-                tag.offset,
-                format!("children of a component tag are deferred (they will become snippets): close `<{}>` with ` />`", tag.name),
-            ));
-        }
+        self.check_props(tag);
         let last = tag.name.rsplit("::").next().unwrap_or(&tag.name);
         let var = self.fresh(&last.to_lowercase());
         self.reserve(&format!("{var}_props"));
-        let fields = self.emit_prop_values(tag, &var)?;
+        let mut fields = self.emit_prop_values(tag, &var)?;
+        // the parser drops whitespace-only text, so `<Card> </Card>`
+        // passes no children
+        if !tag.children.is_empty() {
+            fields.push(self.emit_children(&tag.children, &var)?);
+        }
         self.line(Allowance::NeedlessUpdate.attribute());
         self.line(format!("let {var}_props = {}Props {{", tag.name));
         self.indent(1);
@@ -47,10 +47,7 @@ impl Emitter<'_> {
     ) -> Result<Vec<String>, CompileError> {
         let mut fields = Vec::new();
         for attribute in tag.attributes.iter() {
-            let name = attribute
-                .name
-                .strip_prefix("bind:")
-                .unwrap_or(&attribute.name);
+            let name = super::tag_props::prop_name(attribute);
             let value = match &attribute.value {
                 AttrValue::Literal(value) => format!("{value:?}.into()"),
                 AttrValue::Expr(expr) => {

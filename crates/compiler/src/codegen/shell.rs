@@ -31,7 +31,7 @@ fn header(path: &str, style: &str) -> String {
         "use std::cell::RefCell;
 use std::rc::Rc;
 #[allow(unused_imports)]
-use vapors_dom::{{Dom, Event, NodeId, PropertyValue, Root, SCOPE_ATTRIBUTE}};
+use vapors_dom::{{Dom, DynDom, Event, NodeId, PropertyValue, Root, SCOPE_ATTRIBUTE, Snippet}};
 #[allow(unused_imports)]
 use vapors_signals::{{Effect, Memo, Owner, Signal}};
 
@@ -85,10 +85,16 @@ impl Default for {name}Props {{
 
 const DEFAULTS_AS_WRITTEN: &str =
     "the defaults are the #[prop] initialisers as written in the .wisp";
-/// Lints on `mount_before` that depend on types the compiler cannot see.
+/// Lints on `mount_before` that depend on types the compiler cannot see:
+/// its length, and props it does not consume, which it does not when
+/// there are none or every one is a signal or memo, which are `Copy`.
 fn mount_allowances(info: &ScriptInfo) -> String {
     let mut allowances = format!("    {}\n", Allowance::TooManyLines.attribute());
-    if info.props.is_empty() {
+    let all_copy = info
+        .props
+        .iter()
+        .all(|prop| info.unwrappable.contains(&prop.name));
+    if all_copy {
         let _ = writeln!(
             allowances,
             "    {}",
@@ -152,12 +158,18 @@ fn mount_methods(name: &str, info: &ScriptInfo, body: &str, styled: bool) -> Str
     format!(
         "impl {name} {{
     /// Mounts the component at the end of `parent`.
-    pub fn mount<D: Dom + 'static>(dom: &Rc<RefCell<D>>, parent: NodeId, props: {name}Props) -> Self {{
+    pub fn mount<D: Dom + ?Sized + 'static>(dom: &Rc<RefCell<D>>, parent: NodeId, props: {name}Props) -> Self
+    where
+        Rc<RefCell<D>>: DynDom,
+    {{
         Self::mount_before(dom, parent, None, props)
     }}
 
     /// Mounts the component in `parent` before `before` (at the end when `None`).
-{allowances}    pub fn mount_before<D: Dom + 'static>(dom: &Rc<RefCell<D>>, parent: NodeId, before: Option<NodeId>, props: {name}Props) -> Self {{
+{allowances}    pub fn mount_before<D: Dom + ?Sized + 'static>(dom: &Rc<RefCell<D>>, parent: NodeId, before: Option<NodeId>, props: {name}Props) -> Self
+    where
+        Rc<RefCell<D>>: DynDom,
+    {{
         let {name}Props {{ {prop_names} }} = props;
 {add_style}        let owner = Owner::new();
         let {returned} = owner.with(|| {{
@@ -188,7 +200,7 @@ fn accessors() -> String {
 
     /// Reads the top-level nodes, disposes the signals and effects, and
     /// removes the nodes.
-    pub fn unmount<D: Dom>(self, dom: &Rc<RefCell<D>>) {
+    pub fn unmount<D: Dom + ?Sized>(self, dom: &Rc<RefCell<D>>) {
         let nodes = self.roots();
         self.owner.dispose();
         for node in nodes {

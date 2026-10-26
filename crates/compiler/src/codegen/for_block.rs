@@ -32,9 +32,8 @@ impl Emitter<'_> {
             &clones,
             &[keyed_items(&iterable, &index, &item, key.as_deref())],
         );
-        let signature = format!(
-            "move |dom: &Rc<RefCell<D>>, parent: NodeId, before: Option<NodeId>, {index}: Signal<usize>, {item}: Signal<_>| {{"
-        );
+        let signature =
+            self.builder_signature(&format!(", {index}: Signal<usize>, {item}: Signal<_>"));
         self.push_scope(vec![index.trim_start_matches('_').to_string(), item]);
         let built = self.emit_builder(&block.children, &signature);
         self.pop_scope();

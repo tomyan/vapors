@@ -32,7 +32,7 @@ pub fn keyed<D, K, V, I, R>(
     row: R,
 ) -> BlockNodes
 where
-    D: Dom + 'static,
+    D: Dom + ?Sized + 'static,
     K: Eq + Hash + Clone + Debug + 'static,
     V: PartialEq + Clone + 'static,
     I: Fn() -> Vec<(K, V)> + 'static,
@@ -66,7 +66,7 @@ fn reconcile<D, K, V>(
     row: &impl RowBuilder<D, V>,
 ) -> Vec<Row<K, V>>
 where
-    D: Dom,
+    D: Dom + ?Sized,
     K: Eq + Hash + Clone + 'static,
     V: PartialEq + Clone + 'static,
 {

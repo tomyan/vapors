@@ -26,9 +26,13 @@ fn generate_component_with_signal_field_and_effect() {
     assert_has(&code, "Signal::named(\"count\", 0)");
     assert_has(&code, "count.get()");
     assert_has(&code, "Effect::new(");
-    assert_has(&code, "pub fn mount<D: Dom + 'static>(");
-    assert_has(&code, "pub fn mount_before<D: Dom + 'static>(");
-    assert_has(&code, "pub fn unmount<D: Dom>(self, dom: &Rc<RefCell<D>>)");
+    assert_has(&code, "pub fn mount<D: Dom + ?Sized + 'static>(");
+    assert_has(&code, "pub fn mount_before<D: Dom + ?Sized + 'static>(");
+    assert_has(&code, "Rc<RefCell<D>>: DynDom,");
+    assert_has(
+        &code,
+        "pub fn unmount<D: Dom + ?Sized>(self, dom: &Rc<RefCell<D>>)",
+    );
 }
 
 #[test]

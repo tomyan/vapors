@@ -124,7 +124,7 @@ prepare() {
 }
 
 # The demos whose screenshots are held to crates/demos/demos/<name>.pixels.
-demos="hello counter boxes shell panel text stress toasts scroll images"
+demos="hello counter boxes shell panel text stress toasts scroll images cards"
 # Demos that change every frame never go idle, and headless Chromium's
 # virtual time then runs hundreds of software-rendered frames past the
 # 60 s deadline; `ticks=5` stops them after five frames.
