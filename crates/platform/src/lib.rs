@@ -47,7 +47,7 @@ pub use device_lost::{DeviceLost, Lost};
 pub use error::PlatformError;
 pub use event::{Event, LINE_PIXELS, TouchPhase};
 pub use file_kind::FileKind;
-pub use gestures::Gestures;
+pub use gestures::{Gestures, TAP_SLOP};
 pub use platform::Platform;
 pub use report::{report_error, report_status};
 pub use waker::{LoopClosed, Waker};

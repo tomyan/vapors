@@ -17,6 +17,7 @@ pub mod ax;
 pub mod ax_tree;
 mod ax_value;
 mod events_action;
+pub mod events_compare;
 pub mod events_input;
 pub mod events_oracle;
 pub mod events_play;

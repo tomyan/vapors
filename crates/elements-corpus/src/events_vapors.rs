@@ -10,7 +10,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use serde_json::Value;
 use vapors_dom::{Dom, Event, NodeId};
 use vapors_elements::{Document, Viewport};
 use vapors_text::FontSystem;
@@ -42,59 +41,13 @@ pub fn play(fixture: &Fixture, script: &Script, viewport: Viewport) -> Result<Lo
         );
     }
     let mut log = Log::new();
+    let mut press = Press::default();
     for step in &script.steps {
-        act(&doc, &step.action)
+        act(&doc, &step.action, &mut press)
             .map_err(|why| format!("{}.events:{}: {why}", fixture.name, step.line))?;
         log.push(heard.borrow_mut().drain(..).collect());
     }
     Ok(log)
-}
-
-/// Every step whose log differs from Chromium's `answers`, naming its
-/// line and both logs.
-///
-/// # Errors
-/// The differences, one line each, or answers of another shape.
-pub fn compare(name: &str, ours: &Log, answers: &Value) -> Result<(), String> {
-    let steps = answers["steps"]
-        .as_array()
-        .ok_or_else(|| format!("{name}.events.json: no steps"))?;
-    if steps.len() != ours.len() {
-        return Err(format!(
-            "{name}.events.json: {} steps, the script has {}; rerun the events oracle",
-            steps.len(),
-            ours.len()
-        ));
-    }
-    let differences: Vec<String> = steps
-        .iter()
-        .zip(ours)
-        .filter_map(|(theirs, ours)| differs(name, theirs, ours))
-        .collect();
-    if differences.is_empty() {
-        Ok(())
-    } else {
-        Err(differences.join("\n"))
-    }
-}
-
-fn differs(name: &str, theirs: &Value, ours: &[(String, String)]) -> Option<String> {
-    let chromium: Vec<(String, String)> = theirs["events"]
-        .as_array()?
-        .iter()
-        .map(|e| {
-            (
-                e["type"].as_str().unwrap_or("?").to_owned(),
-                e["target"].as_str().unwrap_or("?").to_owned(),
-            )
-        })
-        .collect();
-    (chromium != ours).then(|| {
-        format!(
-            "{name}.events:{}: Chromium logged {chromium:?}, vapors {ours:?}",
-            theirs["line"]
-        )
-    })
 }
 
 fn mounted(fixture: &Fixture, viewport: Viewport) -> Result<Rc<RefCell<Document>>, String> {
@@ -130,7 +83,17 @@ fn listen(doc: &Rc<RefCell<Document>>, types: &[String], heard: &Shared) {
     }
 }
 
-fn act(doc: &Rc<RefCell<Document>>, action: &Action) -> Result<(), String> {
+/// The platform's tap slop (`vapors_platform::TAP_SLOP`, which this
+/// crate does not depend on; `tests/events_vapors.rs` holds the two
+/// equal): a finger pans only once it has moved further than this from
+/// where it went down, as the platform's `Gestures` sends pans.
+pub const TAP_SLOP: f32 = 20.0;
+
+/// Where the finger went down, while it is still inside the tap slop.
+#[derive(Default)]
+struct Press(Option<[f32; 2]>);
+
+fn act(doc: &Rc<RefCell<Document>>, action: &Action, press: &mut Press) -> Result<(), String> {
     #[allow(clippy::cast_possible_truncation)] // CSS px within a viewport
     let at = |x: f64, y: f64| [x as f32, y as f32];
     match *action {
@@ -141,12 +104,25 @@ fn act(doc: &Rc<RefCell<Document>>, action: &Action) -> Result<(), String> {
         Action::Move(x, y) => Document::pointer_moved(doc, at(x, y)),
         Action::Press(x, y) => Document::pointer_pressed(doc, at(x, y)),
         Action::Release(x, y) => Document::pointer_released(doc, at(x, y)),
-        Action::TouchDown(x, y) => Document::touch_pressed(doc, 0, at(x, y)),
-        // the platform sends a pan with each one-finger move, which the
-        // app hands to `touch_panned`
+        Action::TouchDown(x, y) => {
+            press.0 = Some(at(x, y));
+            Document::touch_pressed(doc, 0, at(x, y));
+        }
         Action::TouchMove(x, y) => {
             Document::touch_moved(doc, 0, at(x, y));
-            Document::touch_panned(doc);
+            if press.left(at(x, y)) {
+                // past the slop the platform pans, which the app hands to
+                // `touch_panned`
+                Document::touch_panned(doc);
+            }
+        }
+        // inside the slop the platform would send a tap, which this
+        // player does not model: refused, not approximated
+        Action::TouchUp(..) if press.0.is_some() => {
+            return Err(
+                "a touch that never left the tap slop is a tap, which is not played on vapors yet"
+                    .into(),
+            );
         }
         Action::TouchUp(x, y) => Document::touch_released(doc, 0, at(x, y)),
         ref other => return Err(format!("{other:?} is not played on vapors yet")),
@@ -175,6 +151,19 @@ fn name(doc: &Document, node: NodeId) -> String {
         .position(|n| *n == node)
         .map_or(0, |i| i + 1);
     format!("{}>{tag}:nth-child({index})", name(doc, parent))
+}
+
+impl Press {
+    /// Whether the finger, now at `at`, has left the tap slop (it stays
+    /// out once it has).
+    fn left(&mut self, at: [f32; 2]) -> bool {
+        let Some(down) = self.0 else { return true };
+        if (at[0] - down[0]).hypot(at[1] - down[1]) <= TAP_SLOP {
+            return false;
+        }
+        self.0 = None;
+        true
+    }
 }
 
 /// The element `target` names: `tag#id` only.
