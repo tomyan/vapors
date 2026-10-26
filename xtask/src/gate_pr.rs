@@ -1,84 +1,160 @@
 //! `cargo xtask gate --pr [N]`: the gate, and its last lines posted to
 //! the pull request it gated, so no person or agent copies them by hand
-//! and a merge queue can act on the comment alone. The PR is N, or the
-//! one whose head is this branch. Before anything runs, its head must be
-//! this checkout's HEAD (the gate itself refuses a dirty tree). The gate
-//! runs as a child (`xtask gate`), its output passed through to the
-//! terminal and kept. After it, the PR's head is read again: if it moved
-//! during the run, nothing is posted, and that is said. The exit code is
-//! the gate's; a post that fails is a failure.
+//! and the merge queue acts on the comment alone. `run_with` holds the
+//! sequence over its effects (`Effects`; the real ones are in
+//! `gate_pr_real.rs`):
+//! 1. find the PR (N, or this branch's), which must be open, with its
+//!    head at this checkout's HEAD;
+//! 2. run the gate;
+//! 3. on exit 0, require its last line to be `gate: pass <the PR's head>`
+//!    (the gate reads HEAD only once it holds the lock, and HEAD can move
+//!    while it waits);
+//! 4. read the PR's head again, and post nothing if it moved;
+//! 5. refuse a body that holds a secret's value;
+//! 6. post it.
+//!
+//! The comment's first line, read back by `parse_header` (the queue's
+//! one parser), names the head and how the gate ended.
 
-use std::io::{BufRead, BufReader};
-use std::process::{Command, ExitCode, Stdio};
+use crate::gate_pr_text::not_posted;
+pub use crate::gate_pr_text::{TAIL_LINES, comment, parse_header, tail};
 
-use crate::gate_pr_gh::{find, post};
-
-/// How many of the gate's last lines the comment carries.
-pub const TAIL_LINES: usize = 30;
-
-/// A pull request: its number and its head commit.
-#[derive(Debug, PartialEq, Eq)]
+/// A pull request: its number, its head commit, and its state.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pr {
     /// The PR's number.
     pub number: u64,
     /// Its head commit's full SHA.
     pub head: String,
+    /// `OPEN`, `CLOSED` or `MERGED`.
+    pub state: String,
 }
 
-/// Run the gate for `pr` (or this branch's PR) and post its tail.
-pub fn run(pr: Option<u64>) -> ExitCode {
-    let pr = match find(pr).and_then(|pr| same_head(&pr, &local_head()?).map(|()| pr)) {
-        Ok(pr) => pr,
-        Err(why) => return refuse(&why),
-    };
-    let (code, output) = match gate_child() {
-        Ok(ran) => ran,
-        Err(why) => return refuse(&why),
-    };
-    match find(Some(pr.number)).and_then(|now| still_gated(&pr, &now.head)) {
-        Ok(()) => posted(&pr, code, &output),
-        Err(why) => refuse(&format!("not posted: {why}")),
+/// How the gate ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Ended {
+    /// It exited with this code.
+    Code(i32),
+    /// A signal killed it (the OOM killer, a stop).
+    Signal(i32),
+}
+
+impl Ended {
+    /// `exit 0`, or `killed by signal 9`: the comment's words.
+    #[must_use]
+    pub fn words(self) -> String {
+        match self {
+            Self::Code(code) => format!("exit {code}"),
+            Self::Signal(signal) => format!("killed by signal {signal}"),
+        }
     }
 }
 
-/// The gate's exit code when the comment was posted, else a failure.
-fn posted(pr: &Pr, code: i32, output: &str) -> ExitCode {
-    let body = comment(&pr.head, pr.number, code, &tail(output, TAIL_LINES));
-    if let Err(why) = post(pr.number, &body) {
-        return refuse(&format!(
-            "the gate's output was not posted to #{}: {why}",
-            pr.number
-        ));
+/// The gate's ending and its output.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Ran {
+    /// How it ended.
+    pub ended: Ended,
+    /// What it printed.
+    pub output: String,
+}
+
+/// What `run_with` does outside itself.
+pub trait Effects {
+    /// PR `number`, or this branch's.
+    fn find(&self, number: Option<u64>) -> Result<Pr, String>;
+    /// This checkout's HEAD.
+    fn local_head(&self) -> Result<String, String>;
+    /// Run the gate.
+    fn gate(&self) -> Result<Ran, String>;
+    /// Post `body` to PR `number`.
+    fn post(&self, number: u64, body: &str) -> Result<(), String>;
+    /// The environment's secret-looking variables: (name, value).
+    fn secrets(&self) -> Vec<(String, String)>;
+}
+
+/// Gate PR `number` (or this branch's) and post its tail; how the gate
+/// ended, once posted.
+///
+/// # Errors
+///
+/// Each refusal of the sequence, said; nothing is posted after one.
+pub fn run_with(effects: &impl Effects, number: Option<u64>) -> Result<Ended, String> {
+    let pr = effects.find(number)?;
+    open(&pr)?;
+    same_head(&pr, &effects.local_head()?)?;
+    let ran = effects.gate()?;
+    if ran.ended == Ended::Code(0) {
+        gated_head(&ran.output, &pr)?;
     }
-    println!("gate --pr: posted to #{}", pr.number);
-    if code == 0 {
-        ExitCode::SUCCESS
-    } else {
-        ExitCode::FAILURE
+    still_gated(&pr, &effects.find(Some(pr.number))?.head)?;
+    let body = comment(
+        &pr.head,
+        pr.number,
+        ran.ended,
+        &tail(&ran.output, TAIL_LINES),
+    );
+    reads_back(&body, &pr, ran.ended)?;
+    no_secrets(&body, &effects.secrets())?;
+    effects
+        .post(pr.number, &body)
+        .map_err(|why| not_posted(&pr, ran.ended, &why))?;
+    Ok(ran.ended)
+}
+
+fn open(pr: &Pr) -> Result<(), String> {
+    if pr.state == "OPEN" {
+        return Ok(());
+    }
+    Err(format!(
+        "#{} is {}, not open; fix: gate an open PR",
+        pr.number, pr.state
+    ))
+}
+
+/// A passing gate's last line names the PR's head.
+fn gated_head(output: &str, pr: &Pr) -> Result<(), String> {
+    let last = output
+        .lines()
+        .rev()
+        .map(str::trim)
+        .find(|l| !l.is_empty())
+        .unwrap_or("");
+    let gated = last.strip_prefix("gate: pass ").unwrap_or(last);
+    if gated == pr.head {
+        return Ok(());
+    }
+    Err(format!(
+        "the gate passed {gated}, not #{}'s head {}; nothing posted; fix: keep HEAD at the PR's head while the gate waits for its lock, then rerun",
+        pr.number, pr.head
+    ))
+}
+
+/// The comment's first line reads back, through the queue's parser, as
+/// the head and ending it was written with.
+fn reads_back(body: &str, pr: &Pr, ended: Ended) -> Result<(), String> {
+    if parse_header(body) == Some((pr.head.clone(), ended)) {
+        return Ok(());
+    }
+    Err(format!(
+        "the comment's first line does not read back as #{}'s head and the gate's ending; this is a bug in gate_pr_text.rs",
+        pr.number
+    ))
+}
+
+fn no_secrets(body: &str, secrets: &[(String, String)]) -> Result<(), String> {
+    match secrets
+        .iter()
+        .find(|(_, value)| value.len() >= 8 && body.contains(value.as_str()))
+    {
+        Some((name, _)) => Err(format!(
+            "the gate's output holds the value of {name}; nothing posted; fix: find the step that printed it"
+        )),
+        None => Ok(()),
     }
 }
 
-fn refuse(why: &str) -> ExitCode {
-    println!("FAIL gate --pr: {why}");
-    ExitCode::FAILURE
-}
-
-/// The last `lines` lines of `output`, joined by newlines.
-#[must_use]
-pub fn tail(output: &str, lines: usize) -> String {
-    let all: Vec<&str> = output.lines().collect();
-    all[all.len().saturating_sub(lines)..].join("\n")
-}
-
-/// The comment: the head, the command and the exit code, then the tail.
-#[must_use]
-pub fn comment(head: &str, pr: u64, code: i32, tail: &str) -> String {
-    format!(
-        "Gate output for {head} (`cargo xtask gate --pr {pr}`, exit {code}):\n\n```\n{tail}\n```\n"
-    )
-}
-
-/// gh's `--json number,headRefOid` for one PR.
+/// gh's `--json number,headRefOid,state` for one PR.
 ///
 /// # Errors
 ///
@@ -86,15 +162,19 @@ pub fn comment(head: &str, pr: u64, code: i32, tail: &str) -> String {
 pub fn parse_pr(json: &str) -> Result<Pr, String> {
     let value: serde_json::Value =
         serde_json::from_str(json).map_err(|e| format!("gh's answer is not JSON ({e}): {json}"))?;
+    let field = |name: &str| {
+        value[name]
+            .as_str()
+            .map(str::to_owned)
+            .ok_or_else(|| format!("gh's answer has no {name}: {json}"))
+    };
     let number = value["number"]
         .as_u64()
         .ok_or_else(|| format!("gh's answer has no number: {json}"))?;
-    let head = value["headRefOid"]
-        .as_str()
-        .ok_or_else(|| format!("gh's answer has no headRefOid: {json}"))?;
     Ok(Pr {
         number,
-        head: head.to_owned(),
+        head: field("headRefOid")?,
+        state: field("state")?,
     })
 }
 
@@ -123,56 +203,15 @@ pub fn still_gated(gated: &Pr, now: &str) -> Result<(), String> {
         return Ok(());
     }
     Err(format!(
-        "#{}'s head moved to {now} during the gate on {}; fix: rerun the gate on the new head",
+        "#{}'s head moved to {now} during the gate on {}; nothing posted; fix: rerun the gate on the new head",
         gated.number, gated.head
     ))
-}
-
-/// `xtask gate` as a child: its exit code, and its output, which also
-/// goes to the terminal as it comes. The gate bounds itself: each job
-/// runs within its `timeout-minutes` (`gate_run`).
-fn gate_child() -> Result<(i32, String), String> {
-    let exe = std::env::current_exe().map_err(|e| format!("this xtask's path: {e}"))?;
-    let mut child = Command::new(exe)
-        .arg("gate")
-        .stdout(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("could not start the gate: {e}"))?;
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or("the gate's output could not be read")?;
-    let mut output = String::new();
-    for line in BufReader::new(stdout).lines() {
-        let line = line.map_err(|e| format!("reading the gate's output: {e}"))?;
-        println!("{line}");
-        output.push_str(&line);
-        output.push('\n');
-    }
-    let status = child
-        .wait()
-        .map_err(|e| format!("waiting for the gate: {e}"))?;
-    Ok((status.code().unwrap_or(1), output))
-}
-
-/// This checkout's HEAD; git must exit 0 (hook variables stripped).
-fn local_head() -> Result<String, String> {
-    let output = Command::new("git")
-        .args(["rev-parse", "HEAD"])
-        .env_remove("GIT_DIR")
-        .env_remove("GIT_WORK_TREE")
-        .env_remove("GIT_INDEX_FILE")
-        .output()
-        .map_err(|e| format!("git: {e}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "git rev-parse HEAD: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
 }
 
 #[cfg(test)]
 #[path = "gate_pr_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "gate_pr_run_tests.rs"]
+mod run_tests;

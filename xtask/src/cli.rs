@@ -82,10 +82,13 @@ pub enum Command {
     },
     /// Run every step of .github/workflows/ci.yml here, in order, ending `gate: pass <sha>`.
     Gate {
-        /// Post the gate's last lines to this pull request (no number:
+        /// Post the gate's last lines to this pull request (`--pr` alone:
         /// the PR whose head is this branch), checking its head is HEAD.
-        #[arg(long, num_args = 0..=1, default_missing_value = "0", value_name = "N")]
-        pr: Option<u64>,
+        #[arg(long, num_args = 0..=1, value_name = "N")]
+        // Allowed: clap's form for a flag whose value may be left out
+        // (`--pr` alone, `--pr N`), so the two cases need no sentinel.
+        #[allow(clippy::option_option)]
+        pr: Option<Option<u64>>,
     },
     /// Check formatting and lints without running tests.
     Lint,
