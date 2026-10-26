@@ -24,7 +24,7 @@ pub fn conditional<D, C, T, E>(
     otherwise: E,
 ) -> BlockNodes
 where
-    D: Dom + 'static,
+    D: Dom + ?Sized + 'static,
     C: Fn() -> bool + 'static,
     T: Fn(&Rc<RefCell<D>>, NodeId, Option<NodeId>) -> Vec<Root> + 'static,
     E: Fn(&Rc<RefCell<D>>, NodeId, Option<NodeId>) -> Vec<Root> + 'static,
@@ -63,7 +63,7 @@ where
 
 /// Removes the branch shown and builds the other, holding no borrow
 /// of the state while either runs.
-fn replace_branch<D: Dom>(
+fn replace_branch<D: Dom + ?Sized>(
     dom: &Rc<RefCell<D>>,
     state: &Shown,
     now: bool,

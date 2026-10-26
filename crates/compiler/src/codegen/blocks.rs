@@ -6,8 +6,6 @@ use super::emit::{Emitter, Place};
 use crate::CompileError;
 use crate::ast::{Expr, IfBlock, Node};
 
-const BUILDER: &str = "move |dom: &Rc<RefCell<D>>, parent: NodeId, before: Option<NodeId>| {";
-
 impl Emitter<'_> {
     pub fn emit_if(&mut self, block: &IfBlock, place: &Place) -> Result<(), CompileError> {
         let anchor = self.fresh("if_anchor");
@@ -17,9 +15,10 @@ impl Emitter<'_> {
         self.line(format!("dom, {}, {anchor},", place.parent));
         let clones = self.clones_for(&[&block.condition])?;
         self.emit_closure(&clones, &[format!("move || {condition},")]);
-        self.emit_builder(&block.then, BUILDER)?;
+        let builder = self.builder_signature("");
+        self.emit_builder(&block.then, &builder)?;
         match &block.otherwise {
-            Some(nodes) => self.emit_builder(nodes, BUILDER)?,
+            Some(nodes) => self.emit_builder(nodes, &builder)?,
             None => self.line("|_dom, _parent, _before| Vec::new(),"),
         }
         self.close_block_call(handle);
@@ -61,7 +60,8 @@ impl Emitter<'_> {
         nodes: &[Node],
         signature: &str,
     ) -> Result<(), CompileError> {
-        let clones = self.clones_for(&expressions_in(nodes))?;
+        let read = expressions_in(nodes);
+        let clones = self.clones_for(&read.iter().collect::<Vec<_>>())?;
         let wrapped = !clones.is_empty();
         if wrapped {
             self.line("{");
@@ -74,10 +74,12 @@ impl Emitter<'_> {
         self.emit_nodes(nodes, &Place::roots())?;
         self.line("roots");
         self.dedent(1);
-        self.line("},");
+        // inside its clones' block the closure is the block's value; the
+        // block, not the closure, is then the argument the comma ends
+        self.line(if wrapped { "}" } else { "}," });
         if wrapped {
             self.dedent(1);
-            self.line("}");
+            self.line("},");
         }
         Ok(())
     }
@@ -101,8 +103,20 @@ impl Emitter<'_> {
     }
 }
 
-/// Every expression a subtree reads, for the clones its closure needs.
-fn expressions_in(nodes: &[Node]) -> Vec<&Expr> {
+/// A builder closure's opening, taking this emitter's Dom type, with
+/// `extra` parameters after the place.
+impl Emitter<'_> {
+    pub(super) fn builder_signature(&self, extra: &str) -> String {
+        format!(
+            "move |dom: &Rc<RefCell<{}>>, parent: NodeId, before: Option<NodeId>{extra}| {{",
+            self.dom_type
+        )
+    }
+}
+
+/// Every expression a subtree reads, for the clones its closure needs; a
+/// `{render name()}` reads the snippet `name`.
+fn expressions_in(nodes: &[Node]) -> Vec<Expr> {
     let mut found = Vec::new();
     for node in nodes {
         collect(node, &mut found);
@@ -110,22 +124,39 @@ fn expressions_in(nodes: &[Node]) -> Vec<&Expr> {
     found
 }
 
-fn collect<'a>(node: &'a Node, found: &mut Vec<&'a Expr>) {
+fn collect(node: &Node, found: &mut Vec<Expr>) {
     match node {
         Node::Element(element) => {
-            found.extend(element.attributes.iter().filter_map(|a| a.value.expr()));
+            found.extend(
+                element
+                    .attributes
+                    .iter()
+                    .filter_map(|a| a.value.expr())
+                    .cloned(),
+            );
             element
                 .children
                 .iter()
                 .for_each(|child| collect(child, found));
         }
-        Node::Component(tag) => found.extend(tag.attributes.iter().filter_map(|a| a.value.expr())),
+        // a tag's children become a snippet closure inside this one,
+        // which is `move`: what they read must be cloned here first, or
+        // a later use of a non-Copy binding finds it moved
+        Node::Component(tag) => {
+            found.extend(
+                tag.attributes
+                    .iter()
+                    .filter_map(|a| a.value.expr())
+                    .cloned(),
+            );
+            tag.children.iter().for_each(|child| collect(child, found));
+        }
         Node::Text(text) => found.extend(text.parts.iter().filter_map(|part| match part {
-            crate::ast::Part::Expr(expr) => Some(expr),
+            crate::ast::Part::Expr(expr) => Some(expr.clone()),
             crate::ast::Part::Literal(_) => None,
         })),
         Node::If(block) => {
-            found.push(&block.condition);
+            found.push(block.condition.clone());
             block.then.iter().for_each(|child| collect(child, found));
             block
                 .otherwise
@@ -134,8 +165,8 @@ fn collect<'a>(node: &'a Node, found: &mut Vec<&'a Expr>) {
                 .for_each(|child| collect(child, found));
         }
         Node::For(block) => {
-            found.push(&block.iterable);
-            found.extend(block.key.as_ref());
+            found.push(block.iterable.clone());
+            found.extend(block.key.clone());
             block
                 .children
                 .iter()
@@ -145,6 +176,9 @@ fn collect<'a>(node: &'a Node, found: &mut Vec<&'a Expr>) {
             .children
             .iter()
             .for_each(|child| collect(child, found)),
-        Node::Render(_) => {}
+        Node::Render(render) => found.push(Expr {
+            code: render.name.clone(),
+            offset: render.offset,
+        }),
     }
 }

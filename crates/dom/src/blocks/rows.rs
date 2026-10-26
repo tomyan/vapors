@@ -21,11 +21,11 @@ pub(super) struct Row<K, V> {
 }
 
 /// A row builder: dom, parent, insert-before, index signal, item signal.
-pub trait RowBuilder<D, V>:
+pub trait RowBuilder<D: ?Sized, V>:
     Fn(&Rc<RefCell<D>>, NodeId, Option<NodeId>, Signal<usize>, Signal<V>) -> Vec<Root>
 {
 }
-impl<D, V, F> RowBuilder<D, V> for F where
+impl<D: ?Sized, V, F> RowBuilder<D, V> for F where
     F: Fn(&Rc<RefCell<D>>, NodeId, Option<NodeId>, Signal<usize>, Signal<V>) -> Vec<Root>
 {
 }
@@ -39,7 +39,7 @@ pub(super) fn row_nodes<K, V>(row: &Row<K, V>) -> Vec<NodeId> {
 
 /// A kept row: its index and item updated, moved before `move_before`
 /// when it is not on the run of rows that stay.
-pub(super) fn reuse<D: Dom, K, V: PartialEq + Clone + 'static>(
+pub(super) fn reuse<D: Dom + ?Sized, K, V: PartialEq + Clone + 'static>(
     dom: &Rc<RefCell<D>>,
     parent: NodeId,
     mut row: Row<K, V>,
@@ -62,7 +62,7 @@ fn update<K, V: PartialEq + Clone + 'static>(row: &mut Row<K, V>, index: usize, 
     }
 }
 
-fn place_before<D: Dom, K, V>(
+fn place_before<D: Dom + ?Sized, K, V>(
     dom: &Rc<RefCell<D>>,
     parent: NodeId,
     row: &Row<K, V>,
@@ -73,7 +73,7 @@ fn place_before<D: Dom, K, V>(
     }
 }
 
-pub(super) fn create<D: Dom, K, V: Clone + 'static>(
+pub(super) fn create<D: Dom + ?Sized, K, V: Clone + 'static>(
     dom: &Rc<RefCell<D>>,
     parent: NodeId,
     before: NodeId,
@@ -98,7 +98,7 @@ pub(super) fn create<D: Dom, K, V: Clone + 'static>(
     }
 }
 
-pub(super) fn remove<D: Dom, K, V: 'static>(dom: &Rc<RefCell<D>>, row: Row<K, V>) {
+pub(super) fn remove<D: Dom + ?Sized, K, V: 'static>(dom: &Rc<RefCell<D>>, row: Row<K, V>) {
     row.fragment.remove(dom);
     dom.borrow_mut().remove(row.marker);
     row.index.dispose();

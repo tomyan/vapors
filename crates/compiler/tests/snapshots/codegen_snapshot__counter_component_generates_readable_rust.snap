@@ -7,7 +7,9 @@ expression: code
 use std::cell::RefCell;
 use std::rc::Rc;
 #[allow(unused_imports)]
-use vapors_dom::{Dom, Event, NodeId, PropertyValue, Root, SCOPE_ATTRIBUTE};
+use vapors_dom::{
+    Dom, DynDom, Event, NodeId, PropertyValue, Root, SCOPE_ATTRIBUTE, Snippet,
+};
 #[allow(unused_imports)]
 use vapors_signals::{Effect, Memo, Owner, Signal};
 /// The `<style>` of `src/counter.wisp`, resolved at run time by the css crate.
@@ -26,11 +28,14 @@ pub struct Counter {
 }
 impl Counter {
     /// Mounts the component at the end of `parent`.
-    pub fn mount<D: Dom + 'static>(
+    pub fn mount<D: Dom + ?Sized + 'static>(
         dom: &Rc<RefCell<D>>,
         parent: NodeId,
         props: CounterProps,
-    ) -> Self {
+    ) -> Self
+    where
+        Rc<RefCell<D>>: DynDom,
+    {
         Self::mount_before(dom, parent, None, props)
     }
     /// Mounts the component in `parent` before `before` (at the end when `None`).
@@ -42,12 +47,15 @@ impl Counter {
         clippy::needless_pass_by_value,
         reason = "every component takes its props struct by value, empty or not, so parents mount them alike"
     )]
-    pub fn mount_before<D: Dom + 'static>(
+    pub fn mount_before<D: Dom + ?Sized + 'static>(
         dom: &Rc<RefCell<D>>,
         parent: NodeId,
         before: Option<NodeId>,
         props: CounterProps,
-    ) -> Self {
+    ) -> Self
+    where
+        Rc<RefCell<D>>: DynDom,
+    {
         let CounterProps {} = props;
         dom.borrow_mut().add_style(SCOPE, STYLE);
         let owner = Owner::new();
@@ -111,7 +119,7 @@ impl Counter {
     }
     /// Reads the top-level nodes, disposes the signals and effects, and
     /// removes the nodes.
-    pub fn unmount<D: Dom>(self, dom: &Rc<RefCell<D>>) {
+    pub fn unmount<D: Dom + ?Sized>(self, dom: &Rc<RefCell<D>>) {
         let nodes = self.roots();
         self.owner.dispose();
         for node in nodes {
