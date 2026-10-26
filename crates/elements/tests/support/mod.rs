@@ -4,6 +4,7 @@
 #![allow(dead_code)] // each test file uses a subset
 
 pub mod changes;
+pub mod focus_page;
 pub mod pointer;
 pub mod random_css;
 pub mod scroll_list;

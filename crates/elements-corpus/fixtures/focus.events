@@ -1,0 +1,31 @@
+# Focus and keys (3-E2a). In a row, 100 px each: Save x 0..100, the
+# note 100..200 (tabindex 0), Gone 200..300 (disabled), the aside
+# 300..400 (tabindex -1), Cancel 400..500.
+# Not `focus` and `blur`: Chromium also sends them to the window when
+# focus leaves the page, and vapors has no window. `focusin` and
+# `focusout` carry the same moves between elements; the order of all four
+# is pinned by vapors-elements' focus tests.
+listen keydown keyup focusin focusout click
+key Tab                       to Save
+expect focus button#save
+key Tab                       to the note
+expect focus div#note
+key Tab                       past Gone and the aside, to Cancel
+expect focus button#cancel
+key Tab                       past the last: focus leaves the page
+expect focus body
+key Shift+Tab                 back from outside: the last, Cancel
+expect focus button#cancel
+key Enter                     clicks on keydown
+expect event click button#cancel
+key Space                     clicks on keyup
+expect event click button#cancel
+click 350 20                  a press on the aside focuses it
+expect focus div#aside
+key Tab                       from the aside (tabindex -1), on from its place: Cancel
+expect focus button#cancel
+click 250 20                  Gone is disabled: no click, and focus leaves Cancel
+expect no event click
+expect focus body
+key x                         with nothing focused, keys go to the body
+expect event keydown body

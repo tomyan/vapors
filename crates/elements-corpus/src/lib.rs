@@ -67,6 +67,7 @@ fixtures![
     centred_panel::CentredPanel,
     clipping::Clipping,
     flex_row::FlexRow,
+    focus::Focus,
     grid_tracks::GridTracks,
     hello_box::HelloBox,
     image_paint::ImagePaint,

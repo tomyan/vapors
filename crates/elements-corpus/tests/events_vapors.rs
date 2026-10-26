@@ -1,7 +1,8 @@
 //! The capture fixture's `.events` script played on vapors, its log
 //! compared step by step with what Chromium logged for the same script
 //! (`fixtures/capture.events.json`, written by the events oracle): the
-//! order and targets of pointer capture's events (3-E1).
+//! order and targets of pointer capture's events (3-E1); and the focus
+//! fixture's keys, Tab order and focus (3-E2a).
 
 use vapors_elements::Viewport;
 use vapors_elements_corpus::events_compare::compare;
@@ -47,7 +48,7 @@ fn an_action_not_played_on_vapors_is_refused_naming_its_line() {
     // Given
     let script = parse(
         "capture",
-        "listen click\nclick 5 5\nexpect event click div#thumb\nkey Tab\nexpect no event click\n",
+        "listen click\nclick 5 5\nexpect event click div#thumb\ntype \"ab\"\nexpect no event click\n",
     )
     .expect("parses");
 
@@ -56,7 +57,7 @@ fn an_action_not_played_on_vapors_is_refused_naming_its_line() {
 
     // Then
     assert!(
-        refusal.contains("capture.events:4:") && refusal.contains("Key"),
+        refusal.contains("capture.events:4:") && refusal.contains("Type"),
         "{refusal}"
     );
 }
@@ -87,4 +88,17 @@ fn a_touch_that_stays_inside_the_slop_is_refused_as_a_tap() {
         refusal.contains("capture.events:6:") && refusal.contains("tap"),
         "{refusal}"
     );
+}
+
+#[test]
+fn the_focus_script_logs_on_vapors_what_chromium_logged() {
+    // Given: Tab order, keys and presses (3-E2a)
+    let script = parse("focus", &read("focus.events")).expect("parses");
+    let answers = serde_json::from_str(&read("focus.events.json")).expect("json");
+
+    // When
+    let ours = play(&fixture("focus"), &script, VIEWPORT).unwrap_or_else(|e| panic!("{e}"));
+
+    // Then: the events and the focus after each step
+    compare("focus", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
 }

@@ -21,9 +21,19 @@ pub fn compare(name: &str, script: &Script, ours: &Log, answers: &Value) -> Resu
     for (theirs, ours) in steps.iter().zip(ours) {
         let line = &theirs["line"];
         let chromium = logged(name, theirs)?;
-        if chromium != *ours {
+        if chromium != ours.events {
             differences.push(format!(
-                "{name}.events:{line}: Chromium logged {chromium:?}, vapors {ours:?}"
+                "{name}.events:{line}: Chromium logged {chromium:?}, vapors {:?}",
+                ours.events
+            ));
+        }
+        let focus = theirs["focus"].as_str().ok_or_else(|| {
+            format!("{name}.events.json: the step at line {line} has no string focus")
+        })?;
+        if focus != ours.focus {
+            differences.push(format!(
+                "{name}.events:{line}: focus is on {focus} in Chromium, {} in vapors",
+                ours.focus
             ));
         }
     }

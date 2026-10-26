@@ -157,6 +157,7 @@ impl ElementsApp {
         if let Some(action) = action(event, self.scale, self.pointer) {
             self.act(action);
         }
+        self.key(event);
         if self.document.borrow_mut().take_changed() {
             platform.request_redraw();
         }

@@ -98,3 +98,31 @@ fn an_event_that_changes_nothing_asks_for_no_frame() {
     // Then
     assert!(!platform.take_redraw_request());
 }
+
+#[test]
+fn a_tab_key_moves_focus_to_the_button_and_enter_clicks_it() {
+    // Given
+    let (doc, clicks) = setup();
+    let mut app = ElementsApp::new(Rc::clone(&doc)).with_scale(2.0);
+    let platform = Platform::detached();
+    let key = |key: &str, pressed| Event::Key {
+        key: key.to_owned(),
+        pressed,
+        repeat: false,
+        modifiers: vapors_platform::Modifiers::default(),
+    };
+
+    // When
+    for event in [
+        key("Tab", true),
+        key("Tab", false),
+        key("Enter", true),
+        key("Enter", false),
+    ] {
+        app.event(event, &platform);
+    }
+
+    // Then
+    assert!(doc.borrow().active_element().is_some());
+    assert_eq!(*clicks.borrow(), 1);
+}
