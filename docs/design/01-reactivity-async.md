@@ -166,7 +166,26 @@ nodes belong to the owner that renders it. As built (R1a, 2026-10-26): wisp spel
 them `{snippet}` and `{render}`, without Svelte's sigils, as it spells
 `{#if}` as `{if}`; `children` is the default name, declared explicitly
 by the child like any prop, `#[prop] let children: Snippet =
-Snippet::empty();`.
+Snippet::empty();`. `compile_dir` checks each component tag against the props of
+the component it names when that component is in the same directory:
+an attribute, children or a snippet the component does not declare is
+a `.wisp` error at the attribute, the snippet or the tag, naming the
+prop, the component's file and a declaration that compiles (the lead's
+decision on review-v65 finding 3). A tag is resolved by its module path,
+its own (`crate::`, `self::`, `super::`) or through the script's `use`
+and alias, with `wisp.rs` included at the crate root; a tag that
+resolves to no component in the directory is not checked, and the build
+prints it as a cargo warning with its file and line (review-v67).
+
+Snippet parameters (R1b, the lead's decision on review-v66 finding 4,
+following Svelte, whose parameters are reactive): a `{render}` passes
+its arguments as a closure (`vapors_dom::Args`), and each parameter is
+a `Memo` of its argument, so a kept keyed row whose item changes
+updates the snippet's nodes in place, without a remount. A parameter
+type is owned, `PartialEq` and `Clone`; `Signal<..>` and `Memo<..>`
+parameters are refused as redundant. Snippets are declared in
+dependency order within their list, so forward references work;
+recursion is refused for now.
 
 ## Deliberately left out
 
@@ -216,7 +235,7 @@ Snippet::empty();`.
 | Part | Oracle |
 |---|---|
 | Synchronous graph | Ported `reactive_graph` tests (done); Svelte 5's `runtime-runes` samples for signals, derived and effects ported where they test ordering (MIT) |
-| Snippets and children | Svelte 5's 56 `runtime-runes/samples/snippet-*` cases (checked 2026-10-25 in `~/projects/svelte`) ported to `RecordingDom`, less those that test HTML-only behaviour, each skip named |
+| Snippets and children | Svelte 5's 54 `runtime-runes/samples/snippet-*` cases (checked 2026-10-26 in `~/projects/svelte`; 56 was a miscount) ported to `RecordingDom`, each skip named. As built (R1c): 14 ported (`compiler-examples/tests/svelte_snippets*.rs`), 40 skipped with the missing feature, 6 of them for rendering a snippet held in a value (`{render expr()}`) |
 | Held updates and pending | Svelte's `await` test samples (`runtime-runes/samples/async-*`) ported to `RecordingDom`; each asserts the sequence of DOM writes with futures resolved by hand |
 | Drop to cancel | A test with a future that records whether it was polled after the dependency changed; a worker test with a token that stops a loop and reports the step count |
 | Offload on the web | A wasm test in headless Chromium (the page-contract script) that offloads a sum and gets it back; the same test natively; identical results pinned |

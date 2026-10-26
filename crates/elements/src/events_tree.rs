@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use vapors_css::tree::States;
-use vapors_dom::{Event, Handler, NodeId};
+use vapors_dom::{Capture, Event, Handler, NodeId};
 
 use crate::document::Document;
 use crate::node::Kind;
@@ -60,33 +60,49 @@ impl Document {
     }
 
     /// The listeners for `name` on each node of `target`'s chain, target
-    /// first, cloned so none is called with the document borrowed.
-    fn listeners_along(&self, target: NodeId, name: &str) -> Vec<Vec<Rc<RefCell<Handler>>>> {
+    /// first, with their node, cloned so none is called with the
+    /// document borrowed.
+    fn listeners_along(
+        &self,
+        target: NodeId,
+        name: &str,
+    ) -> Vec<(NodeId, Vec<Rc<RefCell<Handler>>>)> {
         self.chain(target)
             .into_iter()
             .map(|node| match &self.arena.get(node, "dispatch").kind {
-                Kind::Element(element) => element
-                    .listeners
-                    .iter()
-                    .filter(|(event, _)| event == name)
-                    .map(|(_, handler)| Rc::clone(handler))
-                    .collect(),
-                Kind::Text(_) => Vec::new(),
+                Kind::Element(element) => (
+                    node,
+                    element
+                        .listeners
+                        .iter()
+                        .filter(|(event, _)| event == name)
+                        .map(|(_, handler)| Rc::clone(handler))
+                        .collect(),
+                ),
+                Kind::Text(_) => (node, Vec::new()),
             })
             .collect()
     }
 }
 
 /// Delivers `event` to `target`, then each ancestor, until a listener
-/// stops propagation.
-pub(super) fn dispatch(document: &Rc<RefCell<Document>>, target: NodeId, mut event: Event) {
+/// stops propagation; what listeners asked of the pointer's capture,
+/// with the element each listener is on.
+pub(super) fn dispatch(
+    document: &Rc<RefCell<Document>>,
+    target: NodeId,
+    mut event: Event,
+) -> Vec<(NodeId, Capture)> {
     let along = document.borrow().listeners_along(target, event.name());
-    for listeners in along {
+    let mut asked = Vec::new();
+    for (node, listeners) in along {
         for listener in listeners {
             (listener.borrow_mut())(&mut event);
+            asked.extend(event.take_capture().map(|capture| (node, capture)));
         }
         if event.propagation_stopped() {
-            return;
+            break;
         }
     }
+    asked
 }

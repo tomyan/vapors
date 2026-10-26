@@ -98,6 +98,13 @@ pub enum Command {
         #[allow(clippy::option_option)]
         pr: Option<Option<u64>>,
     },
+    /// One pass of the merge queue (`[queue]`): merge or gate the first
+    /// ready PR, log every decision.
+    Queue {
+        /// Judge and log what would be done, doing none of it.
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Check formatting and lints without running tests.
     Lint,
     /// Check dependencies with cargo-deny: advisories, bans, licences, sources.

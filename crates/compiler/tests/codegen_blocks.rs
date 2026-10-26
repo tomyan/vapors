@@ -103,14 +103,16 @@ fn for_block_uses_keyed_with_index_and_item_signals() {
 
 #[test]
 fn for_without_key_is_keyed_by_index() {
-    // When
-    let code = generated_with(SCRIPT, "{for (i, x) in items.get()}<li>{x.1}</li>{/for}");
+    // When: with the index named, and without
+    let named = generated_with(SCRIPT, "{for (i, x) in items.get()}<li>{x.1}</li>{/for}");
+    let unnamed = generated_with(SCRIPT, "{for x in items.get()}<li>{x.1}</li>{/for}");
 
-    // Then
-    assert_has(
-        &code,
-        ".into_iter().enumerate().map(|(i, x)| (i, x)).collect()",
-    );
+    // Then: the pairs `enumerate` gives, with no identity `map` and no
+    // read of `_index` (clippy pedantic refuses both)
+    for code in [named, unnamed] {
+        assert_has(&code, "(items.get()).into_iter().enumerate().collect()");
+        assert_lacks(&code, "_index)");
+    }
 }
 
 #[test]

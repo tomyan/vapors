@@ -47,6 +47,32 @@ mod lock_owner;
 mod lock_scratch;
 mod pixels;
 mod priority;
+mod queue;
+mod queue_act;
+mod queue_checks;
+mod queue_clear;
+mod queue_comments;
+mod queue_config;
+mod queue_decide;
+#[cfg(test)]
+mod queue_fake;
+mod queue_gate_child;
+mod queue_git;
+#[cfg(test)]
+mod queue_git_fixture;
+mod queue_judge;
+mod queue_list;
+mod queue_lock;
+mod queue_log;
+mod queue_ops;
+mod queue_pass;
+mod queue_pins;
+mod queue_process_tree;
+mod queue_real;
+mod queue_regate;
+mod queue_remote;
+mod queue_serve;
+mod queue_state;
 mod report;
 #[cfg(test)]
 #[path = "report_timeout_tests.rs"]
@@ -132,6 +158,7 @@ fn main() -> ExitCode {
         },
         Command::Gate { pr: None } => return gate::run(&reporter),
         Command::Gate { pr: Some(number) } => return gate_pr_real::run(number),
+        Command::Queue { dry_run } => return queue::run(dry_run),
         Command::Lint => steps::lint(),
         Command::Deny => steps::deny_check(),
         Command::Test { tier: Tier::Unit } => steps::unit_tests(),
