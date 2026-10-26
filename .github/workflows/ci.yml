@@ -65,6 +65,12 @@ jobs:
       # advisory database every run and fails if it cannot.
       - name: dependencies (cargo-deny)
         run: cargo xtask deny
+      # The docs say what the code and GitHub say ([docs] in
+      # .config/factory.toml): the commands CLAUDE.md names exist.
+      - name: docs agree with the code
+        run: cargo xtask check-docs
+        env:
+          GH_TOKEN: ${{ github.token }}
       - name: lint, wasm lint and unit
         run: cargo xtask lint && cargo xtask wasm && cargo xtask test --tier unit
       - name: build timings

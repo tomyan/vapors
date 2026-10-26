@@ -85,3 +85,13 @@ max_lines = "220"
 # (`cargo xtask check-imports`, the `imports` step).
 [imports.web_sys]
 "crates/platform/" = "vapors-platform: the window, input and file picker on the web"
+
+# `cargo xtask check-docs` (a gate step): the docs say what the code and
+# GitHub say (xtask/src/docs.rs). Each rule is set here or excused with
+# its reason, so none is skipped unsaid.
+[docs]
+claude = "CLAUDE.md"
+
+[docs.not_applying]
+patterns = "vapors has no page of its own patterns; design/patterns.md is touche's"
+plan = "vapors' work is planned in touche's docs/PLAN.md, which touche's gate checks"

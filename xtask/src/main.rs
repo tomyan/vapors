@@ -14,6 +14,13 @@ mod deadline;
 mod dev;
 mod dev_keys;
 mod dev_keys_server;
+mod docs;
+mod docs_commands;
+mod docs_patterns;
+mod docs_plan;
+mod docs_plan_state;
+mod docs_source_text;
+mod docs_sources;
 mod files;
 mod files_walk;
 mod gate;
@@ -128,6 +135,7 @@ fn main() -> ExitCode {
         },
         Command::Gate { pr: None } => return gate::run(&reporter),
         Command::Gate { pr: Some(number) } => return gate_pr_real::run(number),
+        Command::CheckDocs { offline } => return docs::run(offline),
         Command::Lint => steps::lint(),
         Command::Deny => steps::deny_check(),
         Command::Test { tier: Tier::Unit } => steps::unit_tests(),

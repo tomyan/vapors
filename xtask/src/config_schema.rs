@@ -12,7 +12,7 @@ enum Keys {
 }
 
 /// Every table the factory reads.
-const TABLES: [(&str, Keys); 15] = [
+const TABLES: [(&str, Keys); 17] = [
     ("screenshot", Keys::Only(&["packages"])),
     ("web", Keys::Only(&["package", "product"])),
     ("dev", Keys::Only(&["port", "words", "https"])),
@@ -31,6 +31,14 @@ const TABLES: [(&str, Keys); 15] = [
     ("layers.forbid", Keys::Any),
     ("ux", Keys::Only(&UX_KEYS)),
     ("ux.design", Keys::Any),
+    (
+        "docs",
+        Keys::Only(&["claude", "app", "plan", "repo", "patterns", "page"]),
+    ),
+    (
+        "docs.not_applying",
+        Keys::Only(&["claude", "plan", "patterns"]),
+    ),
 ];
 
 /// `[ux]`, read by `ux_config`.
