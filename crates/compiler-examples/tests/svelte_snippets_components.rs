@@ -132,8 +132,10 @@ fn snippet_scope() {
 #[test]
 fn snippet_whitespace() {
     // When: adapted, the text is inside a `<div>` (a .wisp has no text at
-    // its top level), and a .wisp's whitespace rule applies: a run with a
-    // newline between two non-text things is dropped, other text is kept
+    // its top level). A pinned golden of the .wisp whitespace rule, which
+    // differs from Svelte's: Svelte collapses each run to one space; a
+    // .wisp drops a run with a newline between two non-text things and
+    // keeps other text as written
     let (dom, _c) = mounted(|dom, root| Whitespace::mount(dom, root, WhitespaceProps::default()));
 
     // Then: Svelte's is `A B C D <pre>Testing\n123          ;\n    456</pre>`
