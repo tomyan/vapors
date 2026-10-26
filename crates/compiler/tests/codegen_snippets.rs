@@ -111,6 +111,52 @@ fn a_snippet_inside_a_component_tag_becomes_its_prop() {
 }
 
 #[test]
+fn rendering_an_expression_rebuilds_through_a_dynamic_block() {
+    // When
+    let code = generated_with(
+        "#[prop]\nlet cards: Vec<Snippet<(i32,)>> = Vec::new();",
+        "<div>{render cards[0](1)}</div>",
+    );
+
+    // Then
+    assert_has(&code, "vapors_dom::blocks::dynamic(");
+    assert_has(
+        &code,
+        "move || vapors_dom::Renderable::snippet(&(cards[0]))",
+    );
+    assert_has(&code, "move || (1,)");
+}
+
+#[test]
+fn rendering_a_signal_holding_a_snippet_reads_the_signal() {
+    // When
+    let code = generated_with(
+        "#[prop]\nlet body: Signal<Snippet> = Signal::new(Snippet::empty());",
+        "{render body()}",
+    );
+
+    // Then
+    assert_has(
+        &code,
+        "move || vapors_dom::Renderable::snippet(&(body.get()))",
+    );
+    assert_has(&code, "roots.push(Root::Block(");
+}
+
+#[test]
+fn a_parenthesised_callee_is_borrowed_without_doubled_parentheses() {
+    // When
+    let code = generated_with(
+        "#[prop]\nlet a: Snippet = Snippet::empty();\n#[prop]\nlet b: Snippet = Snippet::empty();",
+        "{render (if true { a.clone() } else { b.clone() })()}",
+    );
+
+    // Then: clippy's double_parens refuses `&((..))`
+    assert_has(&code, "vapors_dom::Renderable::snippet(&(if true");
+    assert_lacks(&code, "&((");
+}
+
+#[test]
 fn a_local_snippet_passed_as_a_prop_by_name_is_cloned() {
     // When: passed to a tag, then rendered
     let code = generated_with(
@@ -134,4 +180,17 @@ fn a_snippet_named_only_in_an_attribute_is_declared_before_the_one_naming_it() {
     let b = code.find("let b: Snippet<()>").expect("b declared");
     let a = code.find("let a: Snippet<()>").expect("a declared");
     assert!(b < a, "{code}");
+}
+
+#[test]
+fn a_prop_that_is_not_declared_a_snippet_renders_through_the_dynamic_block() {
+    // When: an Option<Snippet> prop, rendered by its plain name
+    let code = generated_with(
+        "#[prop]\nlet maybe: Option<Snippet> = None;",
+        "<p>{render maybe()}</p>",
+    );
+
+    // Then: not `maybe.render(..)`, which rustc would refuse
+    assert_has(&code, "vapors_dom::Renderable::snippet(&(maybe))");
+    assert_lacks(&code, "maybe.render(");
 }

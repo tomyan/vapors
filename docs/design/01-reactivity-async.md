@@ -187,6 +187,12 @@ parameters are refused as redundant. Snippets are declared in
 dependency order within their list, so forward references work;
 recursion is refused for now.
 
+Rendering an expression (R1d, the lead's decision after R1c): a
+`{render}` whose callee is not a plain snippet name is read in an
+effect through `vapors_dom::blocks::dynamic`, which rebuilds when the
+callee yields a different snippet, compared by identity; `None` renders
+nothing.
+
 ## Deliberately left out
 
 - **Tracking reads after an `await`.** Svelte tracks them; Solid 2 and

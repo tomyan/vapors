@@ -17,6 +17,7 @@ mod format;
 mod names;
 mod prop_suggestion;
 mod props_index;
+mod render_dynamic;
 mod script;
 mod script_syntax;
 mod script_uses;
