@@ -17,7 +17,7 @@ pub mod recording;
 mod roots;
 mod snippet;
 
-pub use event::{Event, Handler};
+pub use event::{Capture, Event, Handler, Pointer};
 pub use roots::{BlockNodes, Root, current_nodes};
 pub use snippet::{DynDom, Snippet};
 

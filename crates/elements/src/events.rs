@@ -9,62 +9,96 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use vapors_css::tree::States;
-use vapors_dom::{Event, NodeId};
+use vapors_dom::NodeId;
 
 use crate::document::Document;
 
 /// A point in CSS pixels from the viewport's top-left.
 pub type Point = [f32; 2];
 
+/// A change of capture a listener, or `pointerup`, asked for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Asked {
+    /// To this element.
+    CaptureTo(NodeId),
+    /// To no element.
+    Release,
+}
+
 /// Where the pointer is pressed and what it hovers.
 #[derive(Default)]
 pub(crate) struct Pointer {
     pub(crate) pressed: Option<NodeId>,
     pub(crate) hovered: Option<NodeId>,
+    /// The element capturing the pointer (3-E1a).
+    pub(crate) capture: Option<NodeId>,
+    /// A change of capture asked for, made before the pointer's next
+    /// event.
+    pub(crate) pending: Option<Asked>,
     /// Where the pointer last moved, until it leaves the window.
     pub(crate) position: Option<Point>,
 }
 
 impl Document {
     /// The pointer moved to `point`: `:hover` follows it, and its target
-    /// gets `pointermove`.
+    /// gets `pointermove`; while captured, the capturing element does.
     pub fn pointer_moved(document: &Rc<RefCell<Document>>, point: Point) {
-        let target = document.borrow_mut().hover(point);
+        process_pending(document, point);
+        let hit = document.borrow_mut().hover(point);
+        let target = document.borrow().pointer_target(point).or(hit);
         if let Some(target) = target {
-            dispatch(document, target, Event::new("pointermove"));
+            let event = document
+                .borrow()
+                .pointer_event("pointermove", target, point);
+            dispatch_pointer(document, target, event);
         }
     }
 
     /// The pointer left the window: nothing is hovered, and a press in
     /// progress is abandoned (`:active` clears, no `click` follows),
-    /// since without pointer capture its release is never seen.
+    /// unless the pointer is captured, when its release is still seen.
     pub fn pointer_left(document: &Rc<RefCell<Document>>) {
         let mut doc = document.borrow_mut();
         doc.set_flag_chain(States::HOVER, None);
-        doc.set_flag_chain(States::ACTIVE, None);
-        doc.pointer = Pointer::default();
+        doc.pointer.hovered = None;
+        doc.pointer.position = None;
+        if doc.pointer.capture.is_none() {
+            doc.set_flag_chain(States::ACTIVE, None);
+            doc.pointer.pressed = None;
+        }
     }
 
     /// The primary button went down at `point`: the target and its
     /// ancestors become `:active`, and the target gets `pointerdown`.
     pub fn pointer_pressed(document: &Rc<RefCell<Document>>, point: Point) {
+        process_pending(document, point);
         let target = document.borrow_mut().press(point);
         if let Some(target) = target {
-            dispatch(document, target, Event::new("pointerdown"));
+            let event = document
+                .borrow()
+                .pointer_event("pointerdown", target, point);
+            dispatch_pointer(document, target, event);
         }
     }
 
-    /// The primary button came up at `point`: the target gets
-    /// `pointerup`, `:active` clears, and `click` goes to the nearest
-    /// element holding both the pressed and the released target, as in
-    /// the DOM, unless a disabled button holds it.
+    /// The primary button came up at `point`: the target (the capturing
+    /// element, while captured) gets `pointerup`, the capture ends,
+    /// `:active` clears, and `click` goes to the nearest element holding
+    /// both the pressed and the released target, as in the DOM, unless
+    /// a disabled button holds it.
     pub fn pointer_released(document: &Rc<RefCell<Document>>, point: Point) {
-        let (target, click) = document.borrow_mut().release(point);
+        process_pending(document, point);
+        let target = document.borrow().pointer_target(point);
         if let Some(target) = target {
-            dispatch(document, target, Event::new("pointerup"));
+            let event = document.borrow().pointer_event("pointerup", target, point);
+            dispatch_pointer(document, target, event);
         }
+        release_capture(document);
+        process_pending(document, point);
+        let click = document.borrow_mut().release(target);
         if let Some(click) = click {
-            dispatch(document, click, Event::new("click"));
+            let event = document.borrow().pointer_event("click", click, point);
+            dispatch(document, click, event);
         }
     }
 
@@ -121,8 +155,7 @@ impl Document {
         target
     }
 
-    fn release(&mut self, point: Point) -> (Option<NodeId>, Option<NodeId>) {
-        let target = self.hit(point);
+    fn release(&mut self, target: Option<NodeId>) -> Option<NodeId> {
         self.set_flag_chain(States::ACTIVE, None);
         let pressed = self
             .pointer
@@ -133,11 +166,14 @@ impl Document {
             (Some(pressed), Some(target)) => self.common_ancestor(pressed, target),
             _ => None,
         };
-        (target, click.filter(|node| !self.in_disabled_button(*node)))
+        click.filter(|node| !self.in_disabled_button(*node))
     }
 }
 
+#[path = "events_capture.rs"]
+mod capture;
 #[path = "events_tree.rs"]
 mod tree;
 
+use capture::{dispatch_pointer, process_pending, release_capture};
 use tree::dispatch;
