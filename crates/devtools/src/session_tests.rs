@@ -158,3 +158,35 @@ fn messages_of_a_shape_not_recognised_are_refused_quoting_them() {
         assert!(refusal.contains(needle), "wanted {needle} in: {refusal}");
     }
 }
+
+#[test]
+fn an_event_wait_can_take_only_the_event_that_matches_and_keep_the_others() {
+    // Given: a load for another navigation, then this one's
+    let url = server(|id| {
+        vec![
+            text(&json!({ "id": id, "result": {} })),
+            text(
+                &json!({ "method": "Page.lifecycleEvent", "params": { "name": "load", "loaderId": "OLD" } }),
+            ),
+            text(
+                &json!({ "method": "Page.lifecycleEvent", "params": { "name": "load", "loaderId": "NEW" } }),
+            ),
+        ]
+    });
+    let mut session = Session::connect(&url, SHORT).expect("connects");
+    session
+        .call("Page.enable", &json!({}), SHORT)
+        .expect("answers");
+
+    // When
+    let load = session
+        .wait_event_where("Page.lifecycleEvent", &|p| p["loaderId"] == "NEW", SHORT)
+        .expect("this navigation's load");
+
+    // Then: the other is kept
+    assert_eq!(load["loaderId"], "NEW");
+    let kept = session
+        .wait_event("Page.lifecycleEvent", SHORT)
+        .expect("kept");
+    assert_eq!(kept["loaderId"], "OLD");
+}

@@ -8,7 +8,7 @@
 
 use std::collections::VecDeque;
 use std::io::ErrorKind;
-use std::net::{TcpStream, ToSocketAddrs};
+use std::net::TcpStream;
 use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
@@ -52,9 +52,9 @@ impl Session {
     /// A URL that is not `ws://`, or no connection and handshake by `deadline`.
     pub fn connect(url: &str, deadline: Duration) -> Result<Self, String> {
         let until = Instant::now() + deadline;
-        let stream = tcp(url, deadline)?;
+        let stream = crate::connect::tcp(url, deadline)?;
         stream
-            .set_read_timeout(Some(left(until)?))
+            .set_read_timeout(Some(crate::connect::left(until)?))
             .map_err(|e| e.to_string())?;
         let (socket, _) = tungstenite::client(url, stream)
             .map_err(|e| format!("devtools: the WebSocket to {url}: {e}"))?;
@@ -103,7 +103,22 @@ impl Session {
     /// # Errors
     /// No such event by `deadline`, or a message of another shape.
     pub fn wait_event(&mut self, method: &str, deadline: Duration) -> Result<Value, String> {
-        if let Some(at) = self.events.iter().position(|e| e["method"] == method) {
+        self.wait_event_where(method, &|_| true, deadline)
+    }
+
+    /// The parameters of the next `method` event whose parameters `wanted`
+    /// accepts, kept or arriving, by `deadline`; the others are kept.
+    ///
+    /// # Errors
+    /// No such event by `deadline`, or a message of another shape.
+    pub fn wait_event_where(
+        &mut self,
+        method: &str,
+        wanted: &dyn Fn(&Value) -> bool,
+        deadline: Duration,
+    ) -> Result<Value, String> {
+        let matches = |e: &Value| e["method"] == method && wanted(&e["params"]);
+        if let Some(at) = self.events.iter().position(matches) {
             return Ok(self
                 .events
                 .remove(at)
@@ -111,14 +126,10 @@ impl Session {
                 .unwrap_or_default());
         }
         let until = Instant::now() + deadline;
+        let late = format!("the event {method} did not come within {deadline:?}");
         loop {
-            match self.next_message(
-                until,
-                &format!("the event {method} did not come within {deadline:?}"),
-            )? {
-                Incoming::Event(mut event) if event["method"] == method => {
-                    return Ok(event["params"].take());
-                }
+            match self.next_message(until, &late)? {
+                Incoming::Event(mut event) if matches(&event) => return Ok(event["params"].take()),
                 Incoming::Event(event) => self.events.push_back(event),
                 Incoming::Answer(..) => {}
             }
@@ -180,30 +191,6 @@ fn answer(method: &str, mut message: Value) -> Result<Value, String> {
             "devtools: {method}'s answer has neither result nor error: {message}"
         )),
     }
-}
-
-/// A TCP connection to `url`'s host within `deadline`.
-fn tcp(url: &str, deadline: Duration) -> Result<TcpStream, String> {
-    let host = url
-        .strip_prefix("ws://")
-        .and_then(|rest| rest.split('/').next())
-        .ok_or_else(|| format!("devtools: `{url}` is not a ws:// URL"))?;
-    let address = host
-        .to_socket_addrs()
-        .map_err(|e| format!("devtools: {host}: {e}"))?
-        .next()
-        .ok_or_else(|| format!("devtools: {host} has no address"))?;
-    TcpStream::connect_timeout(&address, deadline)
-        .map_err(|e| format!("devtools: connecting to {host}: {e}"))
-}
-
-/// The time left until `until`, refused when none is.
-pub(crate) fn left(until: Instant) -> Result<Duration, String> {
-    let left = until.saturating_duration_since(Instant::now());
-    if left.is_zero() {
-        return Err("devtools: the deadline passed".to_owned());
-    }
-    Ok(left)
 }
 
 #[cfg(test)]

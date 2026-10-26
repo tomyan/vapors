@@ -1,0 +1,151 @@
+{
+  "steps": [
+    {
+      "action": "Click(50.0, 24.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#save",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#save",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#save",
+          "type": "click"
+        }
+      ],
+      "focus": "button#save",
+      "focusVisible": false,
+      "line": 4
+    },
+    {
+      "action": "Key(\"Tab\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "button#save",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#cancel",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "button#cancel",
+          "type": "keyup"
+        }
+      ],
+      "focus": "button#cancel",
+      "focusVisible": true,
+      "line": 8
+    },
+    {
+      "action": "Key(\"Enter\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "button#cancel",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#cancel",
+          "type": "click"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "button#cancel",
+          "type": "keyup"
+        }
+      ],
+      "focus": "button#cancel",
+      "focusVisible": true,
+      "line": 10
+    },
+    {
+      "action": "Key(\"Space\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": " ",
+          "target": "button#cancel",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": " ",
+          "target": "button#cancel",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#cancel",
+          "type": "click"
+        }
+      ],
+      "focus": "button#cancel",
+      "focusVisible": true,
+      "line": 12
+    },
+    {
+      "action": "Click(250.0, 24.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#delete",
+          "type": "pointerdown"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 14
+    },
+    {
+      "action": "Wheel { x: 100.0, y: 90.0, dx: 0.0, dy: 40.0 }",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "div#list>div:nth-child(3)",
+          "type": "wheel"
+        },
+        {
+          "bubbles": false,
+          "defaultPrevented": false,
+          "target": "div#list",
+          "type": "scroll"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 17
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+# Mouse, keyboard and wheel on buttons.wisp (11-Q1, D3). The bar's
+# buttons: Save at x 8..98, Cancel at x 106..196, Delete at x 204..294.
+listen pointerdown click focusin keydown keyup wheel scroll
+click 50 24                   Save by mouse
+expect event pointerdown button#save
+expect event click button#save
+expect focus button#save
+key Tab                       to Cancel; Tab shows the ring
+expect focus-visible button#cancel
+key Enter                     Enter activates on keydown
+expect event click button#cancel
+key Space                     Space activates on keyup
+expect event click button#cancel
+click 250 24                  Delete is disabled: no click, and focus leaves Cancel
+expect no event click
+expect focus body
+wheel 100 90 0 40             the list scrolls
+expect event wheel div#list>div:nth-child(3)
+expect event scroll div#list

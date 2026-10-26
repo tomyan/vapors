@@ -24,10 +24,8 @@ fn session(test: &str) -> (vapors_text::comparison::Live, Session) {
         .unwrap_or_else(|e| panic!("{e}"));
     let mut session =
         Session::attach(&profile, DEADLINE, &mut || live.alive()).unwrap_or_else(|e| panic!("{e}"));
-    call(&mut session, "Page.enable", &json!({}));
-    call(&mut session, "Page.navigate", &json!({ "url": PAGE }));
     session
-        .wait_event("Page.loadEventFired", DEADLINE)
+        .navigate(PAGE, DEADLINE)
         .unwrap_or_else(|e| panic!("{e}"));
     (live, session)
 }

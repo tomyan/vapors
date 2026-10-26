@@ -89,8 +89,9 @@ fn the_target_list_is_polled_until_a_page_appears() {
 
 #[test]
 fn no_page_by_the_deadline_is_refused_quoting_the_last_list() {
-    let port = targets(vec!["[]"; 40]);
-    let refusal = page_socket(port, SHORT).expect_err("no page");
+    let port = targets(vec!["[]"; 80]);
+    // Long enough for a first read on a loaded machine.
+    let refusal = page_socket(port, SHORT * 4).expect_err("no page");
     assert!(refusal.contains("no page target"), "{refusal}");
     assert!(refusal.contains("[]"), "{refusal}");
 }
