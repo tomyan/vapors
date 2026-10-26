@@ -55,6 +55,15 @@ CSS px, unrounded. Leaving the window while captured keeps the press.
 Moves are dispatched as they arrive and layout waits for the frame, so
 many moves between frames are one update (`elements_app_drag.rs`).
 
+As built (3-E1b): finger `n` is pointer `2 + n`, captured by its
+`pointerdown` target without asking; its moves and `pointerup` go
+there, and `pointercancel` ends it. The click is still the platform's
+tap, after the touch's own down and up, so one tap is one click. Until
+3-E4's `touch-action`, ownership is RELAXED (the lead's decision): a
+touch whose `pointerdown` listener called `set_pointer_capture` owns
+its pans, which then do not scroll; otherwise the first pan that moves
+a container cancels the touches no listener owns.
+
 Drag of a slider thumb or a curve point: `pointerdown` captures, each
 `pointermove` carries full-precision coordinates to the captured
 target whether or not the pointer is over it, `pointerup` releases.

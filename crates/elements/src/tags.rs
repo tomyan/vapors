@@ -72,7 +72,7 @@ pub(crate) fn unsupported(tag: &str) -> Option<String> {
     ))
 }
 
-/// The events the tree fires (F2c S2; capture, 3-E1a).
+/// The events the tree fires (F2c S2; capture, 3-E1a; touches, 3-E1b).
 pub(crate) const FIRED: &[&str] = &[
     "click",
     "pointerdown",
@@ -80,6 +80,7 @@ pub(crate) const FIRED: &[&str] = &[
     "pointerup",
     "gotpointercapture",
     "lostpointercapture",
+    "pointercancel",
 ];
 
 /// `None` when the tree fires `event`; otherwise why not.

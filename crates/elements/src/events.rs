@@ -30,11 +30,10 @@ pub(crate) enum Asked {
 pub(crate) struct Pointer {
     pub(crate) pressed: Option<NodeId>,
     pub(crate) hovered: Option<NodeId>,
-    /// The element capturing the pointer (3-E1a).
-    pub(crate) capture: Option<NodeId>,
-    /// A change of capture asked for, made before the pointer's next
-    /// event.
-    pub(crate) pending: Option<Asked>,
+    /// The fingers down now, with where each last was (3-E1b).
+    pub(crate) touches: Vec<(u64, Point)>,
+    /// Each pointer's capture, by pointer id (the mouse's is `MOUSE`).
+    pub(crate) captures: std::collections::HashMap<u32, capture::Captured>,
     /// Where the pointer last moved, until it leaves the window.
     pub(crate) position: Option<Point>,
 }
@@ -43,14 +42,14 @@ impl Document {
     /// The pointer moved to `point`: `:hover` follows it, and its target
     /// gets `pointermove`; while captured, the capturing element does.
     pub fn pointer_moved(document: &Rc<RefCell<Document>>, point: Point) {
-        process_pending(document, point);
+        process_pending(document, MOUSE, point);
         let hit = document.borrow_mut().hover(point);
-        let target = document.borrow().pointer_target(point).or(hit);
+        let target = document.borrow().pointer_target(MOUSE, point).or(hit);
         if let Some(target) = target {
             let event = document
                 .borrow()
-                .pointer_event("pointermove", target, point);
-            dispatch_pointer(document, target, event);
+                .pointer_event("pointermove", MOUSE, target, point);
+            dispatch_pointer(document, MOUSE, target, event);
         }
     }
 
@@ -62,7 +61,7 @@ impl Document {
         doc.set_flag_chain(States::HOVER, None);
         doc.pointer.hovered = None;
         doc.pointer.position = None;
-        if doc.pointer.capture.is_none() {
+        if doc.captured(MOUSE).capture.is_none() {
             doc.set_flag_chain(States::ACTIVE, None);
             doc.pointer.pressed = None;
         }
@@ -71,13 +70,13 @@ impl Document {
     /// The primary button went down at `point`: the target and its
     /// ancestors become `:active`, and the target gets `pointerdown`.
     pub fn pointer_pressed(document: &Rc<RefCell<Document>>, point: Point) {
-        process_pending(document, point);
+        process_pending(document, MOUSE, point);
         let target = document.borrow_mut().press(point);
         if let Some(target) = target {
             let event = document
                 .borrow()
-                .pointer_event("pointerdown", target, point);
-            dispatch_pointer(document, target, event);
+                .pointer_event("pointerdown", MOUSE, target, point);
+            dispatch_pointer(document, MOUSE, target, event);
         }
     }
 
@@ -87,17 +86,21 @@ impl Document {
     /// both the pressed and the released target, as in the DOM, unless
     /// a disabled button holds it.
     pub fn pointer_released(document: &Rc<RefCell<Document>>, point: Point) {
-        process_pending(document, point);
-        let target = document.borrow().pointer_target(point);
+        process_pending(document, MOUSE, point);
+        let target = document.borrow().pointer_target(MOUSE, point);
         if let Some(target) = target {
-            let event = document.borrow().pointer_event("pointerup", target, point);
-            dispatch_pointer(document, target, event);
+            let event = document
+                .borrow()
+                .pointer_event("pointerup", MOUSE, target, point);
+            dispatch_pointer(document, MOUSE, target, event);
         }
-        release_capture(document);
-        process_pending(document, point);
+        release_capture(document, MOUSE);
+        process_pending(document, MOUSE, point);
         let click = document.borrow_mut().release(target);
         if let Some(click) = click {
-            let event = document.borrow().pointer_event("click", click, point);
+            let event = document
+                .borrow()
+                .pointer_event("click", MOUSE, click, point);
             dispatch(document, click, event);
         }
     }
@@ -172,8 +175,10 @@ impl Document {
 
 #[path = "events_capture.rs"]
 mod capture;
+#[path = "events_touch.rs"]
+mod touch;
 #[path = "events_tree.rs"]
 mod tree;
 
-use capture::{dispatch_pointer, process_pending, release_capture};
+use capture::{MOUSE, dispatch_pointer, process_pending, release_capture};
 use tree::dispatch;
