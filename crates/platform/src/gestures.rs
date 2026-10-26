@@ -102,13 +102,17 @@ impl Gestures {
             return Vec::new();
         };
         let before = std::mem::replace(&mut self.fingers[index].at, at);
-        if let Some(press) = &self.press
-            && press.id == id
-            && distance(press.at, at) > TAP_SLOP
-        {
+        let pressed = self.press.as_ref().filter(|press| press.id == id);
+        // within the tap slop a finger is still a possible tap and pans
+        // nothing; past it the press is dropped and it pans, so a tap
+        // and a pan are exclusive, as Chromium's slop makes them
+        // (review-v78, H1)
+        let within_slop = pressed.is_some_and(|press| distance(press.at, at) <= TAP_SLOP);
+        if pressed.is_some() && !within_slop {
             self.press = None;
         }
         match self.fingers.len() {
+            1 if within_slop => Vec::new(),
             1 => vec![pan(before, at)],
             2 => pinch(self.fingers[1 - index].at, before, at),
             _ => Vec::new(),

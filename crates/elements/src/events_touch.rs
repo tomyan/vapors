@@ -30,8 +30,13 @@ impl Document {
     pub fn touch_pressed(document: &Rc<RefCell<Document>>, finger: u64, point: Point) {
         let id = touch_id(finger);
         let target = document.borrow().hit(point);
-        document.borrow_mut().set_flag_chain(States::ACTIVE, target);
-        document.borrow_mut().pointer.touches.push((finger, point));
+        let mut doc = document.borrow_mut();
+        // `:active` follows the first finger down only (review-v78, M1)
+        if doc.pointer.touches.is_empty() {
+            doc.set_flag_chain(States::ACTIVE, target);
+        }
+        doc.pointer.touches.push((finger, point));
+        drop(doc);
         let Some(target) = target else { return };
         let event = document
             .borrow()
@@ -122,15 +127,26 @@ impl Document {
 
     fn touch_ended(document: &Rc<RefCell<Document>>, finger: u64, point: Point, name: &str) {
         let id = touch_id(finger);
-        if Self::touch_event(document, finger, point, name).is_none() {
-            return;
+        if Self::touch_event(document, finger, point, name).is_some() {
+            release_capture(document, id);
+            process_pending(document, id, point);
         }
-        release_capture(document, id);
-        process_pending(document, id, point);
+        Self::forget_touch(document, finger, id);
+    }
+
+    /// Forgets finger `finger` and its capture, whether or not its last
+    /// event found a target (review-v78, M2); the first finger takes
+    /// `:active` with it.
+    fn forget_touch(document: &Rc<RefCell<Document>>, finger: u64, id: u32) {
         let mut doc = document.borrow_mut();
+        let primary = doc
+            .pointer
+            .touches
+            .first()
+            .is_some_and(|(first, _)| *first == finger);
         doc.pointer.touches.retain(|(down, _)| *down != finger);
         doc.pointer.captures.remove(&id);
-        if doc.pointer.touches.is_empty() && doc.pointer.pressed.is_none() {
+        if primary && doc.pointer.pressed.is_none() {
             doc.set_flag_chain(States::ACTIVE, None);
         }
     }
