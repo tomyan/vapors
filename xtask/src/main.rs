@@ -61,6 +61,7 @@ mod setup_install;
 mod stamp_page;
 mod step;
 mod steps;
+mod steps_checks;
 mod stop;
 mod stream;
 mod tailscale;

@@ -18,6 +18,7 @@ fn ci_runs_fastest_checks_first() {
             "fmt",
             "files",
             "layers",
+            "builds",
             "imports",
             "deny",
             "clippy",
