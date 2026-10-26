@@ -16,7 +16,7 @@ mod template;
 
 use std::path::Path;
 
-pub use codegen::{PropsIndex, generate, generate_with};
+pub use codegen::{Generated, PropsIndex, generate, generate_checked, generate_with};
 pub use error::CompileError;
 pub use naming::component_name;
 use source::Source;
