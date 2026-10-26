@@ -139,14 +139,18 @@ fn collect(node: &Node, found: &mut Vec<Expr>) {
                 .iter()
                 .for_each(|child| collect(child, found));
         }
-        // a tag's children need no clones here: the snippet closure they
-        // become clones what it reads from what this closure captured
-        Node::Component(tag) => found.extend(
-            tag.attributes
-                .iter()
-                .filter_map(|a| a.value.expr())
-                .cloned(),
-        ),
+        // a tag's children become a snippet closure inside this one,
+        // which is `move`: what they read must be cloned here first, or
+        // a later use of a non-Copy binding finds it moved
+        Node::Component(tag) => {
+            found.extend(
+                tag.attributes
+                    .iter()
+                    .filter_map(|a| a.value.expr())
+                    .cloned(),
+            );
+            tag.children.iter().for_each(|child| collect(child, found));
+        }
         Node::Text(text) => found.extend(text.parts.iter().filter_map(|part| match part {
             crate::ast::Part::Expr(expr) => Some(expr.clone()),
             crate::ast::Part::Literal(_) => None,

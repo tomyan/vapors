@@ -85,10 +85,16 @@ impl Default for {name}Props {{
 
 const DEFAULTS_AS_WRITTEN: &str =
     "the defaults are the #[prop] initialisers as written in the .wisp";
-/// Lints on `mount_before` that depend on types the compiler cannot see.
+/// Lints on `mount_before` that depend on types the compiler cannot see:
+/// its length, and props it does not consume, which it does not when
+/// there are none or every one is a signal or memo, which are `Copy`.
 fn mount_allowances(info: &ScriptInfo) -> String {
     let mut allowances = format!("    {}\n", Allowance::TooManyLines.attribute());
-    if info.props.is_empty() {
+    let all_copy = info
+        .props
+        .iter()
+        .all(|prop| info.unwrappable.contains(&prop.name));
+    if all_copy {
         let _ = writeln!(
             allowances,
             "    {}",

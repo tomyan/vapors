@@ -10,6 +10,7 @@ use std::rc::Rc;
 
 use vapors_compiler_examples::card_host::{CardHost, CardHostProps};
 use vapors_dom::recording::RecordingDom;
+use vapors_signals::Signal;
 
 fn mounted() -> (Rc<RefCell<RecordingDom>>, CardHost) {
     let dom = Rc::new(RefCell::new(RecordingDom::new()));
@@ -26,7 +27,7 @@ fn children_render_where_the_child_renders_them() {
     // Then
     assert_eq!(
         dom.borrow().to_html(),
-        "<section><h2>Curves</h2><p>count 0</p><b>static</b><footer>end</footer></section><u>framed 0</u><i>after</i><section><h2>inner</h2><u>framed 0</u><footer>end</footer></section>"
+        "<section><h2>Curves</h2><p>count 0</p><b>static</b><i>0</i><footer>end</footer></section><u>framed 0</u><i>after</i><section><h2>inner</h2><u>framed 0</u><footer>end</footer></section>"
     );
 }
 
@@ -41,7 +42,7 @@ fn a_parent_signal_updates_inside_the_children() {
     // Then
     assert_eq!(
         dom.borrow().to_html(),
-        "<section><h2>Curves</h2><p>count 3</p><em>many</em><b>static</b><footer>end</footer></section><u>framed 3</u><i>after</i><section><h2>inner</h2><u>framed 3</u><footer>end</footer></section>"
+        "<section><h2>Curves</h2><p>count 3</p><em>many</em><b>static</b><i>0</i><footer>end</footer></section><u>framed 3</u><i>after</i><section><h2>inner</h2><u>framed 3</u><footer>end</footer></section>"
     );
 }
 
@@ -55,4 +56,25 @@ fn unmounting_the_parent_removes_the_children_with_the_children_rendered_at_the_
 
     // Then
     assert_eq!(dom.borrow().to_html(), "");
+}
+
+#[test]
+fn after_unmounting_the_childrens_effects_no_longer_run() {
+    // Given: a signal owned outside the host, read inside the card's
+    // children, and the host unmounted
+    let dom = Rc::new(RefCell::new(RecordingDom::new()));
+    let root = dom.borrow().root();
+    let outside = Signal::new(0);
+    let props = CardHostProps { outside };
+    let host = CardHost::mount(&dom, root, props);
+    outside.set(1);
+    assert!(dom.borrow().to_html().contains("<i>1</i>"));
+    host.unmount(&dom);
+    dom.borrow_mut().clear_calls();
+
+    // When
+    outside.set(9);
+
+    // Then: nothing wrote to the Dom
+    assert_eq!(dom.borrow().calls(), []);
 }

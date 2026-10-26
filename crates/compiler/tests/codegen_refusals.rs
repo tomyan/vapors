@@ -105,6 +105,20 @@ fn named_snippets_and_render_arguments_are_refused_until_r1b() {
 }
 
 #[test]
+fn rendering_a_snippet_nobody_declared_is_refused_naming_the_declaration() {
+    // When
+    let err = refusal("<div>{render footer()}</div>");
+
+    // Then
+    assert_eq!((err.line, err.col), (1, 6), "{err}");
+    assert!(
+        err.message
+            .contains("#[prop] let footer: Snippet = Snippet::empty();"),
+        "{err}"
+    );
+}
+
+#[test]
 fn a_hole_reading_nothing_still_compiles_to_a_static_text() {
     // Given: no signals, a hole with a constant
     let code = codegen::generated("<span>{1 + 1}</span>");

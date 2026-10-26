@@ -16,6 +16,18 @@ impl Emitter<'_> {
                 format!("snippet arguments are deferred to 1-R1's second slice (R1b): render `{}()` without them", render.name),
             ));
         }
+        let declared = self.script.bindings.contains(&render.name)
+            || self
+                .script
+                .props
+                .iter()
+                .any(|prop| prop.name == render.name);
+        if !declared {
+            return Err(self.source.error(
+                render.offset,
+                format!("`{{render {0}()}}`: nothing named `{0}` is declared; declare it as a prop, `#[prop] let {0}: Snippet = Snippet::empty();`", render.name),
+            ));
+        }
         let call = format!(
             "{}.render(dom, {}, {})",
             render.name,
