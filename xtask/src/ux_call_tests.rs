@@ -126,3 +126,21 @@ fn a_connection_that_fails_is_refused_with_curl_s_reason() {
     // Then
     assert!(refused.starts_with("curl failed"), "{refused}");
 }
+
+#[test]
+fn curl_echoing_the_key_in_its_error_is_refused_and_leaves_no_response() {
+    // Given an endpoint whose host is the key, which curl's error names
+    let (body, response) = files("stderr");
+    let url = format!("http://{KEY}.invalid/v1/responses");
+
+    // When
+    let refused =
+        post(&url, &secret(), &body, &response, Duration::from_secs(10)).expect_err("refused");
+
+    // Then
+    assert!(
+        refused.contains("curl's error would hold part of the API key"),
+        "{refused}"
+    );
+    assert!(!response.exists(), "a response file is left");
+}

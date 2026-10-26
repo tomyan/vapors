@@ -137,3 +137,39 @@ fn a_run_that_would_pass_the_daily_ceiling_is_refused_with_the_day_s_total() {
     );
     assert_eq!(within_day(2.70, 0.29, 3.00), Ok(()));
 }
+
+#[test]
+fn an_old_count_line_with_no_id_reads_as_a_closed_count_at_its_cost() {
+    // Given a count line as 14d6800 wrote it, before counts were booked
+    let path = ledger("old-count");
+    std::fs::create_dir_all(path.parent().expect("a directory")).expect("made");
+    let old = r#"{"time": "2026-10-26T08:03:13Z", "sha": "measure-image-cost", "model": "gpt-6.1-sol", "kind": "count", "input": 17, "cost": 0.25}"#;
+    std::fs::write(&path, format!("{old}\n")).expect("written");
+
+    // When
+    let spent = spent_on(&path, "2026-10-26").expect("read");
+
+    // Then
+    assert!((spent - 0.25).abs() < 1e-9, "{spent}");
+}
+
+#[test]
+fn a_sent_or_settled_line_with_no_id_is_refused_naming_the_fix() {
+    // Given
+    let path = ledger("no-id");
+    std::fs::create_dir_all(path.parent().expect("a directory")).expect("made");
+    std::fs::write(
+        &path,
+        "{\"time\": \"2026-10-26T01:00:00Z\", \"kind\": \"settled\", \"cost\": 0.1}\n",
+    )
+    .expect("written");
+
+    // When
+    let refused = spent_on(&path, "2026-10-26").expect_err("refused");
+
+    // Then
+    assert!(
+        refused.contains("spend.jsonl:1: a `settled` line with no `id`; fix:"),
+        "{refused}"
+    );
+}

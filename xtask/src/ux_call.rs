@@ -86,7 +86,10 @@ pub fn post(
         .map_err(|e| format!("waiting for curl: {e}"))?;
     let said = String::from_utf8_lossy(&output.stderr);
     if !output.status.success() {
-        let said = secret.guard("curl's error", said.trim())?;
+        let said = match secret.guard("curl's error", said.trim()) {
+            Ok(said) => said,
+            Err(why) => return Err(forget(response, &why)),
+        };
         return Err(forget(
             response,
             &format!("curl failed ({}): {said}", output.status),

@@ -45,7 +45,11 @@ pub fn run(ux: &UxConfig, secret: &Secret) -> Result<Vec<String>, String> {
     let billed = check_billing(ux, secret, frame, smallest)?;
     let when = now();
     keep(ux, &when, &counts, billed)?;
-    let name = ux.model.name;
+    Ok(said(ux.model.name, &counts, billed, &when))
+}
+
+/// What a measurement prints: each count, the billed check, the row.
+fn said(name: &str, counts: &[Count], billed: u64, when: &str) -> Vec<String> {
     let mut lines: Vec<String> = counts
         .iter()
         .map(|c| {
@@ -64,11 +68,8 @@ pub fn run(ux: &UxConfig, secret: &Secret) -> Result<Vec<String>, String> {
     lines.push(format!(
         "one billed request used {billed} input tokens, as counted"
     ));
-    lines.push(format!(
-        "add to ux_models.rs: {}",
-        row(name, &counts, &when)
-    ));
-    Ok(lines)
+    lines.push(format!("add to ux_models.rs: {}", row(name, counts, when)));
+    lines
 }
 
 /// What each count asks: none for the body without a frame, then each

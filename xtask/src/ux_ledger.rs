@@ -105,16 +105,18 @@ fn line(raw: &str) -> Result<Line, String> {
     let value: Value = serde_json::from_str(raw).map_err(|e| format!("not a ledger line: {e}"))?;
     let text = |key: &str| value[key].as_str().map(str::to_owned);
     let kind = text("kind").filter(|k| ["count", "sent", "settled"].contains(&k.as_str()));
+    let id = text("id");
     match (text("time"), kind, value["cost"].as_f64()) {
-        (Some(time), Some(kind), Some(cost)) if text("id").is_some() => Ok(Line {
-            time,
-            kind,
-            id: text("id"),
-            cost,
-        }),
-        _ => Err(
-            "a line with no `time`, `cost`, `id`, or `kind` of count, sent or settled".to_owned(),
-        ),
+        (Some(time), Some(kind), Some(cost)) if id.is_some() => Ok(Line { time, kind, id, cost }),
+        // A `count` line with no `id` was written by 14d6800, before counts
+        // were booked: a count that happened, at its cost, with no booking
+        // to close. Accepted as that. Retire this arm when no ledger holds
+        // such a line.
+        (Some(time), Some(kind), Some(cost)) if kind == "count" => Ok(Line { time, kind, id, cost }),
+        (Some(_), Some(kind), Some(_)) => Err(format!(
+            "a `{kind}` line with no `id`; fix: a `{kind}` line needs the `id` of its booking, so find the run that wrote it"
+        )),
+        _ => Err("a line with no `time`, `cost`, or `kind` of count, sent or settled; fix: see which run wrote it".to_owned()),
     }
 }
 
