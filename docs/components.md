@@ -118,6 +118,15 @@ the one difference from the brief in this slice.
   snippet declared before it. A snippet declared directly inside a
   component tag is the child's prop of that name (a `Snippet<(Type,
   ...)>`).
+- **Rendering an expression:** `{render expr(args)}`, where `expr` is
+  anything that yields a `Snippet`, an `Option<Snippet>` (`None`
+  renders nothing) or a reference to either: `cards.get(&kind)`,
+  `(if a { x.clone() } else { y.clone() })`, or the name of a signal or
+  memo holding one. It is read in an effect, and the snippet shown is
+  rebuilt when `expr` yields a different snippet. Snippets compare by
+  identity (clones of one snippet are equal; two built alike are not),
+  so create snippets once: one made inside the expression, on every
+  read, is rebuilt on every change of what the expression reads.
 - **Snippet parameters are reactive.** The render passes its arguments
   as a closure, and each parameter is a `Memo` of its argument, so a
   snippet follows its arguments as they change: a kept `{for}` row whose

@@ -1,10 +1,11 @@
 //! `{snippet name(params)}...{/snippet}` and `{render name(args)}`.
-//! Parsed as in sumi; code generation for them is deferred.
 
 use super::Parser;
 use super::children::Closer;
 use super::control_flow::after_keyword;
 use super::holes::Hole;
+use syn::spanned::Spanned;
+
 use crate::CompileError;
 use crate::ast::{Node, Render, Snippet};
 
@@ -25,11 +26,23 @@ impl Parser<'_> {
         }))
     }
 
+    /// `{render callee(args)}`: the callee is a snippet's name or any
+    /// expression that yields one; it is everything before the last
+    /// call's arguments, as Rust parses the call.
     pub fn parse_render(&mut self, hole: &Hole) -> Result<Node, CompileError> {
-        let (name, parens) = self.name_and_parens(hole, "render")?;
+        let rest = after_keyword(hole, "render");
+        let refuse = || {
+            self.error(
+                hole.offset,
+                "`{render}` needs a call: `{render name()}`, or `{render expr()}` for an expression that yields a snippet",
+            )
+        };
+        let call = syn::parse_str::<syn::ExprCall>(&rest.code).map_err(|_| refuse())?;
+        let callee = call.func.span().source_text().ok_or_else(refuse)?;
+        let parens = rest.code[callee.len()..].trim();
         self.bump(hole.len);
         Ok(Node::Render(Render {
-            name,
+            name: callee,
             args: parens[1..parens.len() - 1].trim().to_string(),
             offset: hole.offset,
         }))

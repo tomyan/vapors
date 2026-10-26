@@ -38,6 +38,42 @@ fn parse_render_snippet() {
 }
 
 #[test]
+fn a_render_callee_may_be_any_expression() {
+    // When: a method call, an index, a parenthesised if
+    let doc = parse_ok(
+        "<div>{render cards.get(&kind)(n, \"(\")}{render map[\"a(\"]()}{render (if a { x } else { y })()}</div>",
+    );
+
+    // Then: the callee is everything before the last call's arguments
+    let div = element(&doc.children[0]);
+    let renders: Vec<(&str, &str)> = div
+        .children
+        .iter()
+        .map(|node| match node {
+            Node::Render(render) => (render.name.as_str(), render.args.as_str()),
+            other => panic!("expected a render, got {other:?}"),
+        })
+        .collect();
+    assert_eq!(
+        renders,
+        [
+            ("cards.get(&kind)", "n, \"(\""),
+            ("map[\"a(\"]", ""),
+            ("(if a { x } else { y })", ""),
+        ]
+    );
+}
+
+#[test]
+fn a_render_that_is_not_a_call_is_refused() {
+    // When
+    let err = common::parse_err("<div>{render footer}</div>");
+
+    // Then
+    assert!(err.message.contains("{render name()}"), "{err}");
+}
+
+#[test]
 fn unclosed_snippet_is_refused_by_name() {
     // When
     let err = common::parse_err("<div>{snippet item()}<span>x</span></div>");
