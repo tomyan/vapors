@@ -7,7 +7,7 @@
 use std::fs::{File, OpenOptions, TryLockError};
 use std::path::{Path, PathBuf};
 use std::thread;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 /// The lock file's name.
 pub const LOCK: &str = "gate.lock";
@@ -75,13 +75,13 @@ pub fn dir_in(home: Option<std::ffi::OsString>) -> Result<PathBuf, String> {
 pub fn acquire(dir: &Path, worktree: &str, wait: Duration) -> Result<Held, String> {
     let started = Instant::now();
     let turn = open(dir, TURN)?;
-    wait_for(dir, (&turn, Mode::Exclusive), (started, wait), "gate")?;
+    wait_for(dir, (&turn, TURN, Mode::Exclusive), (started, wait), "gate")?;
     let file = open(dir, LOCK)?;
-    wait_for(dir, (&file, Mode::Exclusive), (started, wait), "gate")?;
+    wait_for(dir, (&file, LOCK, Mode::Exclusive), (started, wait), "gate")?;
     taken(dir, file, turn, worktree)
 }
 
-/// Wait until `file` is locked in `mode`, saying whom it waits for each
+/// Wait until `file` (`name` in `dir`) is locked in `mode`, saying whom it waits for each
 /// minute, until `wait` from `started` has passed.
 ///
 /// # Errors
@@ -89,12 +89,12 @@ pub fn acquire(dir: &Path, worktree: &str, wait: Duration) -> Result<Held, Strin
 /// The deadline passed, naming who holds the lock, or the lock failed.
 pub fn wait_for(
     dir: &Path,
-    (file, mode): (&File, Mode),
+    (file, name, mode): (&File, &str, Mode),
     (started, wait): (Instant, Duration),
     who: &str,
 ) -> Result<(), String> {
     let mut said: Option<Instant> = None;
-    while !try_take(file, dir, mode)? {
+    while !try_take(file, &dir.join(name), mode)? {
         if started.elapsed() >= wait {
             return Err(format!(
                 "the gate lock is still {} after {wait:?}; fix: wait for it, or stop it",
@@ -127,7 +127,7 @@ pub fn open(dir: &Path, name: &str) -> Result<File, String> {
 }
 
 /// Whether the lock was free and is now taken.
-fn try_take(file: &File, dir: &Path, mode: Mode) -> Result<bool, String> {
+fn try_take(file: &File, path: &Path, mode: Mode) -> Result<bool, String> {
     let tried = match mode {
         Mode::Exclusive => file.try_lock(),
         Mode::Shared => file.try_lock_shared(),
@@ -135,17 +135,14 @@ fn try_take(file: &File, dir: &Path, mode: Mode) -> Result<bool, String> {
     match tried {
         Ok(()) => Ok(true),
         Err(TryLockError::WouldBlock) => Ok(false),
-        Err(TryLockError::Error(e)) => Err(format!("{}: {e}", dir.join(LOCK).display())),
+        Err(TryLockError::Error(e)) => Err(format!("{}: {e}", path.display())),
     }
 }
 
 /// Record who holds the lock, written whole: to a temporary file, then
 /// renamed over `gate.holder`, so a waiter never reads half of it.
 fn taken(dir: &Path, file: File, turn: File, worktree: &str) -> Result<Held, String> {
-    let since = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs());
-    let text = format!("pid {} in {worktree} since {since}\n", std::process::id());
+    let text = crate::lock_owner::line(worktree);
     let (path, temporary) = (
         dir.join(HOLDER),
         dir.join(format!("{HOLDER}.{}", std::process::id())),
@@ -171,18 +168,21 @@ fn holder(dir: &Path) -> String {
 }
 
 fn gate_holder(dir: &Path) -> Option<String> {
-    let text = std::fs::read_to_string(dir.join(HOLDER)).ok()?;
-    let line = text.trim();
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs());
-    match line
-        .rsplit_once(" since ")
-        .and_then(|(who, at)| Some((who, at.parse::<u64>().ok()?)))
-    {
-        Some((who, at)) => Some(format!("{who} for {} s", now.saturating_sub(at))),
-        None => Some(format!("{} saying `{line}`", dir.join(HOLDER).display())),
+    let path = dir.join(HOLDER);
+    let text = std::fs::read_to_string(&path).ok()?;
+    let Some(owner) = crate::lock_owner::Owner::parse(&text) else {
+        return Some(format!("{} saying `{}`", path.display(), text.trim()));
+    };
+    if !owner.live() {
+        // A gate killed before its drop; its lock went with it.
+        let _ = std::fs::remove_file(&path);
+        return None;
     }
+    let (pid, worktree) = (owner.pid, &owner.worktree);
+    Some(format!(
+        "pid {pid} in {worktree} for {} s",
+        owner.held_for()
+    ))
 }
 
 #[cfg(test)]

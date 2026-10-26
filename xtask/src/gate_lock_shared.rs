@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use crate::gate_lock::{LOCK, Mode, TURN, open, wait_for};
+use crate::lock_owner::Owner;
 
 /// A ci run's share of the gate lock; dropping it frees it.
 #[derive(Debug)]
@@ -36,12 +37,13 @@ impl Drop for Shared {
 pub fn acquire_shared(dir: &Path, worktree: &str, wait: Duration) -> Result<Shared, String> {
     let started = Instant::now();
     let turn = open(dir, TURN)?;
-    wait_for(dir, (&turn, Mode::Exclusive), (started, wait), "ci")?;
+    wait_for(dir, (&turn, TURN, Mode::Exclusive), (started, wait), "ci")?;
     let file = open(dir, LOCK)?;
-    wait_for(dir, (&file, Mode::Shared), (started, wait), "ci")?;
+    wait_for(dir, (&file, LOCK, Mode::Shared), (started, wait), "ci")?;
     drop(turn);
     let marker = dir.join(format!("{MARKER}{}", std::process::id()));
-    std::fs::write(&marker, worktree).map_err(|e| format!("{}: {e}", marker.display()))?;
+    let line = crate::lock_owner::line(worktree);
+    std::fs::write(&marker, line).map_err(|e| format!("{}: {e}", marker.display()))?;
     Ok(Shared {
         _file: file,
         marker,
@@ -52,8 +54,8 @@ pub fn acquire_shared(dir: &Path, worktree: &str, wait: Duration) -> Result<Shar
 const MARKER: &str = "ci.";
 
 /// Each ci run holding the lock, by its live marker: `ci in <worktree>
-/// (pid N)`. A marker whose process has gone (killed before its drop) is
-/// left out.
+/// (pid N) for S s`. A marker whose process has gone (killed before its
+/// drop), or whose pid a later process reuses, is left out.
 #[must_use]
 pub fn ci_holders(dir: &Path) -> Vec<String> {
     let Ok(entries) = std::fs::read_dir(dir) else {
@@ -68,13 +70,16 @@ pub fn ci_holders(dir: &Path) -> Vec<String> {
 }
 
 fn live_marker(path: &Path) -> Option<String> {
-    let name = path.file_name()?.to_str()?;
-    let pid = name.strip_prefix(MARKER)?;
-    if !Path::new("/proc").join(pid).exists() {
-        return None;
-    }
-    let worktree = std::fs::read_to_string(path).ok()?;
-    Some(format!("ci in {} (pid {pid})", worktree.trim()))
+    path.file_name()?.to_str()?.strip_prefix(MARKER)?;
+    let owner = Owner::parse(&std::fs::read_to_string(path).ok()?)?;
+    owner.live().then(|| {
+        format!(
+            "ci in {} (pid {}) for {} s",
+            owner.worktree,
+            owner.pid,
+            owner.held_for()
+        )
+    })
 }
 
 #[cfg(test)]

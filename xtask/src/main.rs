@@ -42,6 +42,7 @@ mod imports_rules;
 mod layers;
 mod layers_graph;
 mod load;
+mod lock_owner;
 #[cfg(test)]
 mod lock_scratch;
 mod pixels;
