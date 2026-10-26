@@ -70,6 +70,14 @@ pub enum Command {
     /// trunk's post-build hook: version.json and `?v=<build>` on the
     /// page's own files in trunk's staging directory.
     StampPage,
+    /// Send the walk's frames and facts to a model for the UX checklist's
+    /// judged items (settings: `[ux]` in .config/factory.toml).
+    UxReview {
+        /// Build the request and print its estimated tokens and worst-case
+        /// cost; send nothing.
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Rebuild the web package on save (trunk serve, debug) behind the tailnet https proxy.
     Dev {
         /// A key for the debug page, as `<provider>=<file>` (anthropic or
