@@ -9,6 +9,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use vapors_compiler_examples::param_places::{ParamPlaces, ParamPlacesProps};
 use vapors_compiler_examples::param_reads::{ParamReads, ParamReadsProps};
 use vapors_compiler_examples::readout_rows::{ReadoutRows, ReadoutRowsProps};
 use vapors_dom::recording::{Call, RecordingDom};
@@ -61,4 +62,29 @@ fn a_string_parameter_reads_in_every_place_and_follows_its_argument() {
         dom.borrow().to_html(),
         "<b>abcd</b><i>abcd</i><u>abcd</u><s>abcd</s>"
     );
+}
+
+#[test]
+fn a_parameter_read_in_a_for_an_attribute_and_an_if_updates_in_place() {
+    // Given: `show(n)` and `show(3)`, from src/param_places.wisp
+    let dom = recording();
+    let root = dom.borrow().root();
+    let n = Signal::new(1);
+    let _places = ParamPlaces::mount(&dom, root, ParamPlacesProps { n });
+    dom.borrow_mut().clear_calls();
+
+    // When
+    n.set(2);
+
+    // Then: the first render follows `n`, its <p> kept; the second, at 3, is untouched
+    assert_eq!(
+        dom.borrow().to_html(),
+        "<p title=\"2\"><i>0</i><i>1</i><b>many</b></p><p title=\"3\"><i>0</i><i>1</i><i>2</i><b>many</b></p>"
+    );
+    let created_p = dom
+        .borrow()
+        .calls()
+        .iter()
+        .any(|call| matches!(call, Call::CreateElement { tag, .. } if tag == "p"));
+    assert!(!created_p, "{:?}", dom.borrow().calls());
 }

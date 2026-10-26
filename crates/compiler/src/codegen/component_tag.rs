@@ -67,7 +67,7 @@ impl Emitter<'_> {
                 AttrValue::Expr(expr) => {
                     let local = format!("{var}_{name}");
                     self.reserve(&local);
-                    self.line(format!("let {local} = {};", self.raw(expr)?));
+                    self.line(format!("let {local} = {};", self.prop_value(expr)?));
                     local
                 }
             };
@@ -93,5 +93,19 @@ impl Emitter<'_> {
                 "roots.extend({var}.root_entries().iter().cloned());"
             ));
         }
+    }
+}
+
+impl Emitter<'_> {
+    /// An attribute's value as Rust: a local snippet named alone is
+    /// cloned, so passing it as a prop leaves it for later renders
+    /// (review-v66b); a snippet is an `Rc`, so the clone is cheap.
+    fn prop_value(&self, expr: &crate::ast::Expr) -> Result<String, CompileError> {
+        let code = self.raw(expr)?;
+        let name = code.trim();
+        if self.snippets.iter().any(|snippet| snippet.name == name) {
+            return Ok(format!("{name}.clone()"));
+        }
+        Ok(code)
     }
 }

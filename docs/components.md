@@ -117,7 +117,8 @@ the one difference from the brief in this slice.
   lists inside it, and may be rendered before it is declared or by a
   snippet declared before it. A snippet declared directly inside a
   component tag is the child's prop of that name (a `Snippet<(Type,
-  ...)>`).
+  ...)>`). A local snippet passed by name in an attribute, `<List
+  row={b} />`, is passed as a clone, so `b` can still be rendered.
 - **Snippet parameters are reactive.** The render passes its arguments
   as a closure, and each parameter is a `Memo` of its argument, so a
   snippet follows its arguments as they change: a kept `{for}` row whose

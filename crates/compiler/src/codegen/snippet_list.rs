@@ -157,26 +157,15 @@ fn visit<'s>(
     Ok(())
 }
 
-/// Every name a `{render}` under `nodes` renders.
+/// Every name `nodes` read: in a `{render}`, its arguments, an
+/// attribute or a hole, so a snippet named only in an attribute (passed
+/// as a prop) still orders its declaration (review-v66b, finding 3).
 fn renders_in(nodes: &[Node]) -> HashSet<String> {
-    let mut names = HashSet::new();
-    for node in nodes {
-        match node {
-            Node::Render(render) => {
-                names.insert(render.name.clone());
-            }
-            Node::Element(element) => names.extend(renders_in(&element.children)),
-            Node::Component(tag) => names.extend(renders_in(&tag.children)),
-            Node::If(block) => {
-                names.extend(renders_in(&block.then));
-                names.extend(renders_in(block.otherwise.as_deref().unwrap_or(&[])));
-            }
-            Node::For(block) => names.extend(renders_in(&block.children)),
-            Node::Snippet(snippet) => names.extend(renders_in(&snippet.children)),
-            Node::Text(_) => {}
-        }
-    }
-    names
+    super::blocks::expressions_in(nodes)
+        .iter()
+        .filter_map(|expr| syn::parse_str::<syn::Expr>(&expr.code).ok())
+        .flat_map(|expr| super::unwrap::identifiers(&expr))
+        .collect()
 }
 
 /// How many arguments a render passes.
