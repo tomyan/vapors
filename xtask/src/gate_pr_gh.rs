@@ -30,7 +30,15 @@ pub fn find(number: Option<u64>) -> Result<Pr, String> {
 /// PR `number` of `repo` (`owner/name`), from anywhere (the queue).
 pub fn find_in(repo: &str, number: u64) -> Result<Pr, String> {
     let mut command = Command::new("gh");
-    command.args(["pr", "view", &number.to_string(), "--repo", repo, "--json", FIELDS]);
+    command.args([
+        "pr",
+        "view",
+        &number.to_string(),
+        "--repo",
+        repo,
+        "--json",
+        FIELDS,
+    ]);
     parse_pr(&gh(command)?)
 }
 

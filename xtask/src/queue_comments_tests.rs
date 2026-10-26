@@ -37,6 +37,20 @@ fn a_clear_without_its_reviewer_is_not_a_clear() {
 }
 
 #[test]
+fn only_the_lead_or_foreman_clears_a_pr() {
+    // A convention, not a security boundary: every comment comes from
+    // the same GitHub account.
+    assert_eq!(
+        cleared(&["review: clear 2222222 (impl-budgets)".to_owned()]),
+        None
+    );
+    assert_eq!(
+        cleared(&["review: clear 2222222 (lead)".to_owned()]).as_deref(),
+        Some("2222222")
+    );
+}
+
+#[test]
 fn the_newest_gate_comment_for_the_head_decides_its_gate() {
     let passed = gate_comment(HEAD, 0, &format!("gate: pass {HEAD}"));
     let failed = gate_comment(HEAD, 1, "FAIL   3/24 steps");
@@ -52,11 +66,7 @@ fn the_newest_gate_comment_for_the_head_decides_its_gate() {
 }
 
 #[test]
-fn a_gate_comment_whose_pass_line_names_another_sha_is_not_a_pass() {
-    let wrong = gate_comment(
-        HEAD,
-        0,
-        "gate: pass 0000000000000000000000000000000000000000",
-    );
-    assert_eq!(gate(&[wrong], HEAD), Gate::Failed);
+fn a_gate_killed_by_a_signal_at_the_head_failed() {
+    let killed = crate::gate_pr::comment(HEAD, 71, crate::gate_pr::Ended::Signal(9), "ok   ci");
+    assert_eq!(gate(&[killed], HEAD), Gate::Failed);
 }

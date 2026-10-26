@@ -10,6 +10,7 @@
 
 use std::path::Path;
 use std::process::ExitCode;
+use std::time::Duration;
 
 use crate::config::Config;
 use crate::queue_comments::{cleared, gate, held};
@@ -60,6 +61,9 @@ fn pass(config: &QueueConfig, log: &Log, dry_run: bool) -> Result<(), String> {
             continue;
         }
         match judged {
+            Ok((Decision::Merge | Decision::Regate, _)) if !current(config, log, pr)? => {
+                return Ok(());
+            }
             Ok((Decision::Merge, _)) => return crate::queue_act::merge(config, log, pr, &prs),
             Ok((Decision::Regate, behind)) => {
                 return crate::queue_act::regate(config, log, pr, behind);
@@ -69,6 +73,35 @@ fn pass(config: &QueueConfig, log: &Log, dry_run: bool) -> Result<(), String> {
         }
     }
     log.line(&format!("pass over {} open PRs: nothing to do", prs.len()))
+}
+
+/// How long to wait before reading a PR's head again when GitHub's
+/// answers disagree. Seen 2026-10-26: after a push, `gh pr view` gave the
+/// old head for one or two 3 s retries, about 6 s; 10 s is over that.
+const HEAD_RECHECK: Duration = Duration::from_secs(10);
+
+/// Whether `pr`'s head, read again just before acting, is the one judged.
+/// A mismatch is read once more after `HEAD_RECHECK`; both are logged,
+/// and a head that still differs ends the pass (the next one relists).
+fn current(config: &QueueConfig, log: &Log, pr: &Listed) -> Result<bool, String> {
+    let now = crate::gate_pr_gh::find_in(&config.repo, pr.number)?.head;
+    if now == pr.head {
+        return Ok(true);
+    }
+    log.line(&format!(
+        "#{} was listed at {} but reads {now}; reading again in {HEAD_RECHECK:?}",
+        pr.number, pr.head
+    ))?;
+    std::thread::sleep(HEAD_RECHECK);
+    let again = crate::gate_pr_gh::find_in(&config.repo, pr.number)?.head;
+    let same = again == pr.head;
+    let said = if same {
+        "matches the judged head"
+    } else {
+        "still differs; the next pass judges it again"
+    };
+    log.line(&format!("#{} reads {again}: {said}", pr.number))?;
+    Ok(same)
 }
 
 /// What a dry run logs for PR `number`.

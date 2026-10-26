@@ -1,9 +1,14 @@
 //! What a PR's comments say to the merge queue: held (a comment whose
 //! last line is `queue: hold`), the newest review clear (last line
-//! `review: clear <sha> (<who>)`), and the gate of the current head (the
-//! newest `Gate output for <head>` comment, from `gate --pr`, passing only
-//! with a line `gate: pass <head>`).
+//! `review: clear <sha> (lead)` or `(foreman)`), and the gate of the
+//! current head: the newest `gate --pr` comment for it, read only through
+//! `gate_pr::parse_header`, the one parser of those comments (`gate --pr`
+//! posts exit 0 only for a gate that passed that head).
+//!
+//! The roles are a convention, not a security boundary: every comment
+//! comes from the same GitHub account, and an author could sign one.
 
+use crate::gate_pr::{Ended, parse_header};
 use crate::queue_decide::Gate;
 
 /// The last line with text in it.
@@ -15,6 +20,9 @@ fn last_line(comment: &str) -> &str {
         .find(|l| !l.is_empty())
         .unwrap_or("")
 }
+
+/// Who may clear a PR, as the clear's last word.
+const CLEARED_BY: [&str; 2] = ["(lead)", "(foreman)"];
 
 /// Whether a comment holds the PR.
 #[must_use]
@@ -28,19 +36,21 @@ pub fn cleared(comments: &[String]) -> Option<String> {
     comments.iter().rev().find_map(|c| {
         let rest = last_line(c).strip_prefix("review: clear ")?;
         let (sha, who) = rest.split_once(' ')?;
-        let named = who.starts_with('(') && who.ends_with(')') && who.len() > 2;
-        named.then(|| sha.to_owned())
+        CLEARED_BY.contains(&who).then(|| sha.to_owned())
     })
 }
 
 /// The gate of `head`, from the newest gate comment for it.
 #[must_use]
 pub fn gate(comments: &[String], head: &str) -> Gate {
-    let opening = format!("Gate output for {head} ");
-    let pass = format!("gate: pass {head}");
-    match comments.iter().rev().find(|c| c.starts_with(&opening)) {
+    let for_head = comments
+        .iter()
+        .rev()
+        .filter_map(|c| parse_header(c))
+        .find(|(sha, _)| sha == head);
+    match for_head {
         None => Gate::None,
-        Some(c) if c.lines().any(|l| l.trim() == pass) => Gate::Passed,
+        Some((_, Ended::Code(0))) => Gate::Passed,
         Some(_) => Gate::Failed,
     }
 }
