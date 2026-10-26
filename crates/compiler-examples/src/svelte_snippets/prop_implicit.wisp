@@ -2,4 +2,4 @@
 use super::counter::{Counter, CounterProps};
 </script>
 
-<Counter>{snippet foo(n: i32)}<p>clicks: {n}</p>{/snippet}</Counter>
+<Counter>{snippet clicks(n: i32)}<p>clicks: {n}</p>{/snippet}</Counter>

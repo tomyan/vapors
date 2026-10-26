@@ -1,6 +1,6 @@
 <script>
 #[prop]
-let foo: Snippet = Snippet::empty();
+let shown: Snippet = Snippet::empty();
 </script>
 
-{render foo()}
+{render shown()}

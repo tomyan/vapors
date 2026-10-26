@@ -5,6 +5,8 @@
 #[path = "svelte/mount.rs"]
 mod mount;
 
+use std::fmt::Write;
+
 use mount::{element, html, mounted};
 use vapors_compiler_examples::svelte_snippets::{
     deconflict::{Deconflict, DeconflictProps},
@@ -23,9 +25,10 @@ const CLICKS_1: &str = "<p>clicks: 1</p><button>click me</button>";
 
 /// `<p style="color: {color}">n</p>` for each n.
 fn paragraphs(color: &str, numbers: std::ops::RangeInclusive<i32>) -> String {
-    numbers
-        .map(|n| format!("<p style=\"color: {color}\">{n}</p>"))
-        .collect()
+    numbers.fold(String::new(), |mut html, n| {
+        let _ = write!(html, "<p style=\"color: {color}\">{n}</p>");
+        html
+    })
 }
 
 #[test]
@@ -119,10 +122,10 @@ fn snippet_scope() {
     let (dom, _c) = mounted(|dom, root| Scope::mount(dom, root, ScopeProps::default()));
 
     // Then
-    let expected: String = "Svelte"
-        .chars()
-        .map(|c| format!("<p>{c}</p><a href=\"#\">{c}</a>"))
-        .collect();
+    let expected = "Svelte".chars().fold(String::new(), |mut html, c| {
+        let _ = write!(html, "<p>{c}</p><a href=\"#\">{c}</a>");
+        html
+    });
     assert_eq!(html(&dom), expected);
 }
 

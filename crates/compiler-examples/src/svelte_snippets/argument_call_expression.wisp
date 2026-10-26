@@ -8,5 +8,5 @@ let invoked = move |el: (String, String)| {
 };
 </script>
 
-{snippet foo(a: (String, String))}{a.get().0} {a.get().1}{/snippet}
-{render foo(invoked(el))}
+{snippet pair(a: (String, String))}{a.get().0} {a.get().1}{/snippet}
+{render pair(invoked(el))}

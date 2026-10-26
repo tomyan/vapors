@@ -149,8 +149,7 @@ fn keyed_items(iterable: &str, index: &str, item: &str, key: Option<&str>) -> St
         Some(key) => format!(
             "move || ({iterable}).into_iter().enumerate().map(|({index}, {item})| (({key}), {item})).collect(),"
         ),
-        None => format!(
-            "move || ({iterable}).into_iter().enumerate().map(|({index}, {item})| ({index}, {item})).collect(),"
-        ),
+        // `enumerate`'s pairs are already `(index, item)`
+        None => format!("move || ({iterable}).into_iter().enumerate().collect(),"),
     }
 }

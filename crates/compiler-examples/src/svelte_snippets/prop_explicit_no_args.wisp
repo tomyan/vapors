@@ -2,5 +2,5 @@
 use super::no_args::{NoArgs, NoArgsProps};
 </script>
 
-{snippet foo()}<p>foo</p>{/snippet}
-<NoArgs foo={foo.clone()} />
+{snippet shown()}<p>foo</p>{/snippet}
+<NoArgs shown={shown.clone()} />
