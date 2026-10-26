@@ -107,3 +107,27 @@ fn a_captured_touch_owns_its_pans() {
     assert_eq!(doc.borrow().scroll_offset(list).expect("scrolls")[1], 0.0);
     assert_eq!(*log.borrow(), ["thumb pointermove"; 3]);
 }
+
+#[test]
+fn a_pan_cancels_an_uncaptured_touch_even_when_nothing_scrolls() {
+    // Given: a list already at its end, so a pan up moves nothing
+    let (doc, list, log) = list();
+    doc.borrow_mut().scroll_node_by(list, [0.0, 200.0]);
+    let mut app = ElementsApp::new(Rc::clone(&doc)).with_scale(1.0);
+    let platform = Platform::detached();
+
+    // When: a finger on the item pans the list further down
+    app.event(
+        Event::Touch {
+            id: 1,
+            phase: TouchPhase::Started,
+            x: 10.0,
+            y: 60.0,
+        },
+        &platform,
+    );
+    app.event(Event::Pan { dx: 0.0, dy: -10.0 }, &platform);
+
+    // Then: as Chromium does, the pan takes the touch (capture.events)
+    assert_eq!(*log.borrow(), ["item pointercancel"]);
+}

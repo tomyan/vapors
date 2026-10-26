@@ -61,8 +61,10 @@ there, and `pointercancel` ends it. The click is still the platform's
 tap, after the touch's own down and up, so one tap is one click. Until
 3-E4's `touch-action`, ownership is RELAXED (the lead's decision): a
 touch whose `pointerdown` listener called `set_pointer_capture` owns
-its pans, which then do not scroll; otherwise the first pan that moves
-a container cancels the touches no listener owns.
+its pans, which then do not scroll (Chromium cancels it all the same:
+only `touch-action: none` stops that); otherwise the first pan cancels
+the touches no listener owns, whether or not anything scrolls, as
+Chromium does (checked by `fixtures/capture.events`).
 
 Drag of a slider thumb or a curve point: `pointerdown` captures, each
 `pointermove` carries full-precision coordinates to the captured
