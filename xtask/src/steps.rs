@@ -4,6 +4,7 @@
 //! show within the first minute.
 
 pub use crate::step::Step;
+use crate::steps_checks::{builds, files, imports, layers};
 
 fn tools() -> Step {
     Step::new(
@@ -11,38 +12,6 @@ fn tools() -> Step {
         "cargo",
         &["xtask", "check-tools"],
         "run `cargo xtask setup`",
-    )
-}
-
-/// No crate depends on what its `[layers.forbid]` rule names;
-/// `cargo xtask check-layers`.
-fn layers() -> Step {
-    Step::new(
-        "layers",
-        "cargo",
-        &["xtask", "check-layers"],
-        "remove the dependency the line names, or move the code; the rules are [layers.forbid] in .config/factory.toml",
-    )
-}
-
-/// A crate named in `[imports.<crate>]` only where listed;
-/// `cargo xtask check-imports`.
-fn imports() -> Step {
-    Step::new(
-        "imports",
-        "cargo",
-        &["xtask", "check-imports"],
-        "move the call into an allowed module, or list the path under [imports.<crate>] in .config/factory.toml with a reason",
-    )
-}
-
-/// Every source file within `[files] max_lines`; `cargo xtask check-files`.
-fn files() -> Step {
-    Step::new(
-        "files",
-        "cargo",
-        &["xtask", "check-files"],
-        "split the file, or allow it in .config/factory.toml under [files.allow] with a reason",
     )
 }
 
@@ -171,6 +140,7 @@ pub fn ci(web_package: &str) -> Vec<Step> {
         fmt(),
         files(),
         layers(),
+        builds(),
         imports(),
         deny(),
         clippy(),
@@ -193,7 +163,7 @@ pub fn deny_check() -> Vec<Step> {
 
 /// Formatting and lints only.
 pub fn lint() -> Vec<Step> {
-    vec![fmt(), files(), layers(), imports(), clippy()]
+    vec![fmt(), files(), layers(), builds(), imports(), clippy()]
 }
 
 /// The unit tier.

@@ -32,6 +32,8 @@ pub enum Command {
     CheckImports,
     /// Check no crate depends on what `[layers.forbid]` forbids it (the `layers` step).
     CheckLayers,
+    /// Check no shipped build's dependency tree holds a `[server_only]` crate (the `builds` step).
+    CheckBuilds,
     /// Check every source file is within `[files] max_lines` (the `files` step).
     #[command(hide = true)]
     CheckFiles,
