@@ -72,7 +72,8 @@ pub(crate) fn unsupported(tag: &str) -> Option<String> {
     ))
 }
 
-/// The events the tree fires (F2c S2; capture, 3-E1a; touches, 3-E1b).
+/// The events the tree fires (F2c S2; capture, 3-E1a; touches, 3-E1b;
+/// keys and focus, 3-E2a).
 pub(crate) const FIRED: &[&str] = &[
     "click",
     "pointerdown",
@@ -81,6 +82,12 @@ pub(crate) const FIRED: &[&str] = &[
     "gotpointercapture",
     "lostpointercapture",
     "pointercancel",
+    "keydown",
+    "keyup",
+    "focus",
+    "blur",
+    "focusin",
+    "focusout",
 ];
 
 /// `None` when the tree fires `event`; otherwise why not.

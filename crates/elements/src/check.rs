@@ -78,6 +78,9 @@ fn attribute_refusals(
         &element.tag,
         element.attributes.get("disabled"),
     ));
+    found.extend(crate::focus::tabindex_refusal(
+        element.attributes.get("tabindex"),
+    ));
     found
         .into_iter()
         .map(|refusal| {

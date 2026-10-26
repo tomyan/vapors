@@ -69,14 +69,16 @@ impl Document {
 }
 
 /// Dispatches pointer `id`'s event and keeps what its listeners asked
-/// of the capture, for the pointer's next event.
+/// of the capture, for the pointer's next event; whether a listener
+/// prevented its default action.
 pub(super) fn dispatch_pointer(
     document: &Rc<RefCell<Document>>,
     id: u32,
     target: NodeId,
     event: Event,
-) {
-    for (node, asked) in dispatch(document, target, event) {
+) -> bool {
+    let (event, asked) = super::tree::deliver(document, target, event, true);
+    for (node, asked) in asked {
         let mut doc = document.borrow_mut();
         let captured = doc.pointer.captures.entry(id).or_default();
         captured.pending = Some(match asked {
@@ -85,6 +87,7 @@ pub(super) fn dispatch_pointer(
         });
         captured.explicit = asked == Capture::Set;
     }
+    event.default_prevented()
 }
 
 /// Asks for pointer `id`'s capture to go to `asked`, unless a listener

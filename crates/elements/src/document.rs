@@ -24,6 +24,10 @@ pub struct Document {
     /// `take_changed`: a tree, attribute, text or pointer-state change.
     pub(crate) changed: bool,
     pub(crate) pointer: crate::events::Pointer,
+    /// The focused element (3-E2a); `None` when the body has focus.
+    pub(crate) focused: Option<NodeId>,
+    /// Where Space went down, for its click on keyup.
+    pub(crate) space_on: Option<NodeId>,
     /// Parley layouts kept between updates.
     pub(crate) texts: crate::layout::TextCache,
     /// What changed since the last update, for restyle.
@@ -60,6 +64,8 @@ impl Document {
             painted: None,
             changed: true,
             pointer: crate::events::Pointer::default(),
+            focused: None,
+            space_on: None,
             texts: crate::layout::TextCache::default(),
             dirty: crate::restyle::Dirty::default(),
             kept: None,

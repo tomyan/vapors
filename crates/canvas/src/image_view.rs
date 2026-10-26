@@ -159,6 +159,7 @@ impl ImageView {
             Event::DoubleTap { .. } => self.toggle_fit(),
             Event::Character(text) => self.key(text),
             Event::Touch { .. }
+            | Event::Key { .. }
             | Event::Tap { .. }
             | Event::OpenRequested
             | Event::Paste

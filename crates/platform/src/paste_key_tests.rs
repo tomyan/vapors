@@ -10,6 +10,7 @@ fn press(logical: &Key, physical: KeyCode, modifiers: ModifiersState) -> Press<'
         logical,
         physical: PhysicalKey::Code(physical),
         modifiers,
+        text: None,
     }
 }
 

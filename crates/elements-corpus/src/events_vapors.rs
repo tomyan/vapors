@@ -17,8 +17,18 @@ use vapors_text::FontSystem;
 use crate::Fixture;
 use crate::events_script::{Action, Script};
 
-/// Each step's events as (type, target).
-pub type Log = Vec<Vec<(String, String)>>;
+/// What vapors did at each step.
+pub type Log = Vec<Logged>;
+
+/// One step's events as (type, target), and the element focused after
+/// it, named as the Chromium player names it (`body` for none).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Logged {
+    /// The events, in order.
+    pub events: Vec<(String, String)>,
+    /// The focused element.
+    pub focus: String,
+}
 
 type Shared = Rc<RefCell<Vec<(String, String)>>>;
 
@@ -45,7 +55,15 @@ pub fn play(fixture: &Fixture, script: &Script, viewport: Viewport) -> Result<Lo
     for step in &script.steps {
         act(&doc, &step.action, &mut press)
             .map_err(|why| format!("{}.events:{}: {why}", fixture.name, step.line))?;
-        log.push(heard.borrow_mut().drain(..).collect());
+        let focus = {
+            let doc = doc.borrow();
+            doc.active_element()
+                .map_or_else(|| "body".to_owned(), |node| name(&doc, node))
+        };
+        log.push(Logged {
+            events: heard.borrow_mut().drain(..).collect(),
+            focus,
+        });
     }
     Ok(log)
 }
@@ -100,6 +118,11 @@ fn act(doc: &Rc<RefCell<Document>>, action: &Action, press: &mut Press) -> Resul
         Action::Click(x, y) => {
             Document::pointer_pressed(doc, at(x, y));
             Document::pointer_released(doc, at(x, y));
+        }
+        Action::Key(ref combination) => {
+            let (key, modifiers) = key_of(combination);
+            Document::key_pressed(doc, &key, modifiers);
+            Document::key_released(doc, &key, modifiers);
         }
         Action::Move(x, y) => Document::pointer_moved(doc, at(x, y)),
         Action::Press(x, y) => Document::pointer_pressed(doc, at(x, y)),
@@ -164,6 +187,24 @@ impl Press {
         self.0 = None;
         true
     }
+}
+
+/// A script's `key` (`Shift+Tab`, `Space`, `x`) as the DOM's key and the
+/// modifiers held, as the Chromium player sends it.
+fn key_of(combination: &str) -> (String, vapors_elements::Modifiers) {
+    let parts: Vec<&str> = combination.split('+').collect();
+    let (held, key) = parts.split_at(parts.len() - 1);
+    let modifiers = vapors_elements::Modifiers {
+        shift: held.contains(&"Shift"),
+        control: held.contains(&"Control"),
+        alt: held.contains(&"Alt"),
+        meta: held.contains(&"Meta"),
+    };
+    let key = match key[0] {
+        "Space" => " ".to_owned(),
+        other => other.to_owned(),
+    };
+    (key, modifiers)
 }
 
 /// The element `target` names: `tag#id` only.

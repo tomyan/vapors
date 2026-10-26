@@ -22,6 +22,8 @@ pub struct Press<'a> {
     pub physical: PhysicalKey,
     /// The modifier keys held.
     pub modifiers: ModifiersState,
+    /// The text the press produces, if any.
+    pub text: Option<&'a str>,
 }
 
 /// Whether `press` is a paste on a platform whose shortcut modifier is

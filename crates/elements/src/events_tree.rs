@@ -25,6 +25,18 @@ impl Document {
     /// other element, marking the document changed when any flag moved.
     pub(crate) fn set_flag_chain(&mut self, flag: States, target: Option<NodeId>) {
         let chain = target.map(|node| self.chain(node)).unwrap_or_default();
+        self.set_flag_only(flag, &chain);
+    }
+
+    /// Sets `flag` on `target` alone and clears it on every other element
+    /// (`:focus`, which its ancestors do not share).
+    pub(crate) fn set_flag_on(&mut self, flag: States, target: Option<NodeId>) {
+        self.set_flag_only(flag, &target.into_iter().collect::<Vec<_>>());
+    }
+
+    /// Sets `flag` on the elements of `chain` and clears it on every
+    /// other, marking the document changed when any flag moved.
+    fn set_flag_only(&mut self, flag: States, chain: &[NodeId]) {
         for node in self.elements() {
             let Kind::Element(element) = &mut self.arena.get_mut(node, "set_flag_chain").kind
             else {
@@ -91,10 +103,25 @@ impl Document {
 pub(super) fn dispatch(
     document: &Rc<RefCell<Document>>,
     target: NodeId,
-    mut event: Event,
+    event: Event,
 ) -> Vec<(NodeId, Capture)> {
+    deliver(document, target, event, true).1
+}
+
+/// Delivers `event` to `target`, and when it `bubbles` to each ancestor
+/// until a listener stops propagation; the event as the listeners left
+/// it, and what they asked of the pointer's capture.
+pub(super) fn deliver(
+    document: &Rc<RefCell<Document>>,
+    target: NodeId,
+    mut event: Event,
+    bubbles: bool,
+) -> (Event, Vec<(NodeId, Capture)>) {
     event = event.at(target);
-    let along = document.borrow().listeners_along(target, event.name());
+    let mut along = document.borrow().listeners_along(target, event.name());
+    if !bubbles {
+        along.truncate(1);
+    }
     let mut asked = Vec::new();
     for (node, listeners) in along {
         for listener in listeners {
@@ -105,5 +132,5 @@ pub(super) fn dispatch(
             break;
         }
     }
-    asked
+    (event, asked)
 }

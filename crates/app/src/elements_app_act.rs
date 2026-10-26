@@ -55,3 +55,29 @@ impl ElementsApp {
         }
     }
 }
+
+impl ElementsApp {
+    /// A key going down or up, to the document's focused element (3-E2a).
+    pub(super) fn key(&mut self, event: &vapors_platform::Event) {
+        let vapors_platform::Event::Key {
+            key,
+            pressed,
+            modifiers,
+            ..
+        } = event
+        else {
+            return;
+        };
+        let modifiers = vapors_elements::Modifiers {
+            shift: modifiers.shift,
+            control: modifiers.control,
+            alt: modifiers.alt,
+            meta: modifiers.meta,
+        };
+        if *pressed {
+            Document::key_pressed(&self.document, key, modifiers);
+        } else {
+            Document::key_released(&self.document, key, modifiers);
+        }
+    }
+}

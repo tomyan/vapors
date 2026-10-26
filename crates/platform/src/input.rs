@@ -11,6 +11,7 @@ use crate::paste_key::Press;
 use crate::clock::Instant;
 use crate::event::{Event, from_winit};
 use crate::gestures::Gestures;
+use crate::key_event::key_event;
 
 /// Stateful translation of winit events for one window.
 pub struct Input {
@@ -62,12 +63,9 @@ impl Input {
         events
     }
 
-    /// The modifiers kept, and the paste shortcut as [`Event::Paste`]
-    /// instead of its character; `None` for other events. Desktop only.
+    /// The modifiers kept, and each key press as its [`Event::Key`] then
+    /// its paste or character; `None` for other events.
     fn keys(&mut self, event: &WindowEvent) -> Option<Vec<Event>> {
-        if cfg!(target_family = "wasm") {
-            return None;
-        }
         match event {
             WindowEvent::ModifiersChanged(modifiers) => self.key(Key::Modifiers(modifiers.state())),
             WindowEvent::Focused(focused) => self.key(Key::Focus(*focused)),
@@ -77,6 +75,7 @@ impl Input {
                 logical: &key.logical_key,
                 physical: key.physical_key,
                 modifiers: self.modifiers,
+                text: key.text.as_deref(),
             })),
             _ => None,
         }
@@ -104,14 +103,10 @@ impl Input {
                 }
                 None
             }
-            Key::Press(press) => crate::paste_key::is_paste(
-                &Press {
-                    modifiers: self.modifiers,
-                    ..press
-                },
-                cfg!(target_os = "macos"),
-            )
-            .then(|| vec![Event::Paste]),
+            Key::Press(press) => Some(pressed(&Press {
+                modifiers: self.modifiers,
+                ..press
+            })),
         }
     }
 
@@ -159,10 +154,34 @@ mod wheel_tests;
 #[path = "input_key_tests.rs"]
 mod key_tests;
 
+#[cfg(test)]
+#[path = "key_event_tests.rs"]
+mod key_event_tests;
+
 /// A keyboard fact [`Input::key`] takes: what `keys` reads from winit,
 /// so the wiring is testable (winit's `KeyEvent` cannot be built).
 pub(crate) enum Key<'a> {
     Modifiers(ModifiersState),
     Focus(bool),
     Press(Press<'a>),
+}
+
+/// A key going down or up: its [`Event::Key`], then a paste in place
+/// of its text (desktop only: the web page handles paste), or its
+/// text as [`Event::Character`] on a press.
+fn pressed(press: &Press<'_>) -> Vec<Event> {
+    let mut events = vec![key_event(
+        press.logical,
+        press.state,
+        press.repeat,
+        press.modifiers,
+    )];
+    let paste = !cfg!(target_family = "wasm")
+        && crate::paste_key::is_paste(press, cfg!(target_os = "macos"));
+    if paste {
+        events.push(Event::Paste);
+    } else if press.state == winit::event::ElementState::Pressed {
+        events.extend(press.text.map(|text| Event::Character(text.to_owned())));
+    }
+    events
 }

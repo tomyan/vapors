@@ -1,0 +1,71 @@
+{
+  "tree": [
+    {
+      "depth": 0,
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "RootWebArea"
+    },
+    {
+      "depth": 1,
+      "name": "Save",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Save",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "generic"
+    },
+    {
+      "depth": 1,
+      "name": "Gone",
+      "properties": [
+        "disabled=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Gone",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "generic"
+    },
+    {
+      "depth": 1,
+      "name": "Cancel",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Cancel",
+      "role": "StaticText"
+    }
+  ],
+  "viewport": [
+    640,
+    400
+  ]
+}

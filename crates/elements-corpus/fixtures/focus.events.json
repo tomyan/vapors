@@ -1,0 +1,275 @@
+{
+  "steps": [
+    {
+      "action": "Key(\"Tab\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "body",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#save",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "button#save",
+          "type": "keyup"
+        }
+      ],
+      "focus": "button#save",
+      "focusVisible": true,
+      "line": 9
+    },
+    {
+      "action": "Key(\"Tab\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "button#save",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#save",
+          "type": "focusout"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "div#note",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "div#note",
+          "type": "keyup"
+        }
+      ],
+      "focus": "div#note",
+      "focusVisible": true,
+      "line": 11
+    },
+    {
+      "action": "Key(\"Tab\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "div#note",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "div#note",
+          "type": "focusout"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#cancel",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "button#cancel",
+          "type": "keyup"
+        }
+      ],
+      "focus": "button#cancel",
+      "focusVisible": true,
+      "line": 13
+    },
+    {
+      "action": "Key(\"Tab\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "button#cancel",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#cancel",
+          "type": "focusout"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "body",
+          "type": "keyup"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 15
+    },
+    {
+      "action": "Key(\"Shift+Tab\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "body",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#cancel",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "button#cancel",
+          "type": "keyup"
+        }
+      ],
+      "focus": "button#cancel",
+      "focusVisible": true,
+      "line": 17
+    },
+    {
+      "action": "Key(\"Enter\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "button#cancel",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#cancel",
+          "type": "click"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "button#cancel",
+          "type": "keyup"
+        }
+      ],
+      "focus": "button#cancel",
+      "focusVisible": true,
+      "line": 19
+    },
+    {
+      "action": "Key(\"Space\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": " ",
+          "target": "button#cancel",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": " ",
+          "target": "button#cancel",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#cancel",
+          "type": "click"
+        }
+      ],
+      "focus": "button#cancel",
+      "focusVisible": true,
+      "line": 21
+    },
+    {
+      "action": "Click(350.0, 20.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#cancel",
+          "type": "focusout"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "div#aside",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "div#aside",
+          "type": "click"
+        }
+      ],
+      "focus": "div#aside",
+      "focusVisible": false,
+      "line": 23
+    },
+    {
+      "action": "Click(250.0, 20.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "div#aside",
+          "type": "focusout"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 25
+    },
+    {
+      "action": "Key(\"x\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "x",
+          "target": "body",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "x",
+          "target": "body",
+          "type": "keyup"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 28
+    }
+  ]
+}

@@ -76,11 +76,16 @@ impl Document {
         process_pending(document, MOUSE, point);
         let target = document.borrow().pointer_target(MOUSE, point);
         let target = document.borrow_mut().press(target);
-        if let Some(target) = target {
+        let prevented = target.is_some_and(|target| {
             let event = document
                 .borrow()
                 .pointer_event("pointerdown", MOUSE, target, point);
-            dispatch_pointer(document, MOUSE, target, event);
+            dispatch_pointer(document, MOUSE, target, event)
+        });
+        // a press focuses what it is on, or blurs, unless prevented (3-E2a)
+        if !prevented {
+            let focusable = target.and_then(|target| document.borrow().focusable_holding(target));
+            Self::focus(document, focusable);
         }
     }
 
@@ -191,3 +196,24 @@ mod tree;
 
 use capture::{MOUSE, dispatch_pointer, hover_capturing, process_pending, release_capture};
 use tree::dispatch;
+
+/// `event` at `node` only: an event that does not bubble (`focus`).
+pub(crate) fn dispatch_here(
+    document: &Rc<RefCell<Document>>,
+    node: NodeId,
+    event: vapors_dom::Event,
+) {
+    tree::deliver(document, node, event, false);
+}
+
+/// `event` at `node` and up its ancestors; whether a listener prevented
+/// its default action.
+pub(crate) fn dispatch_bubbling(
+    document: &Rc<RefCell<Document>>,
+    node: NodeId,
+    event: vapors_dom::Event,
+) -> bool {
+    tree::deliver(document, node, event, true)
+        .0
+        .default_prevented()
+}

@@ -129,6 +129,17 @@ crate, and the web IME path is platform code either way.
 - `focus`, `blur` (not bubbling), `focusin`, `focusout` (bubbling), in
   the UI Events order.
 - `:focus` is set on the element; `:focus-within` on its ancestors.
+- As built (3-E2a): `Document::active_element`, `focus`, `key_pressed`
+  and `key_released`; the platform sends `Event::Key` (the DOM's `key`
+  with the modifiers held; no `code` yet) before a press's `Character`.
+  Tab past the last focusable element leaves the page (nothing has
+  focus), as in Chromium, rather than wrapping. A press focuses the
+  nearest focusable element, or blurs, unless `pointerdown` is
+  prevented. `blur`, `focusout`, `focus`, `focusin` fire in Chromium's
+  order. A positive or non-integer `tabindex` is refused by name.
+  Checked against Chromium by `fixtures/focus.events` (events and focus
+  at each step; `focus` and `blur` are not listened for there, as
+  Chromium also sends them to the window, which vapors does not have).
   `:focus-visible` follows the HTML heuristic: set when focus arrived by
   keyboard or by script after a keyboard interaction, not when it
   arrived by pointer, except on text inputs where it is always set.

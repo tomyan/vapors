@@ -37,6 +37,19 @@ pub enum Event {
         /// Downward, CSS pixels.
         dy: f32,
     },
+    /// A key went down or up (3-E2a). Sent before the key's
+    /// [`Event::Character`], as the DOM's `keydown` comes before its text.
+    Key {
+        /// The key as the DOM names it: the layout's character (`"a"`),
+        /// or a named key's DOM name (`"Tab"`, `"Enter"`, `" "` for Space).
+        key: String,
+        /// True when it went down.
+        pressed: bool,
+        /// An auto-repeat of a held key.
+        repeat: bool,
+        /// The modifier keys held.
+        modifiers: Modifiers,
+    },
     /// A key produced this text on press.
     Character(String),
     /// Control+V, or Command+V on macOS: read the clipboard (a
@@ -177,4 +190,18 @@ fn scroll(delta: MouseScrollDelta, scale: f64) -> Event {
         MouseScrollDelta::PixelDelta(at) => [(at.x / scale) as f32, (at.y / scale) as f32],
     };
     Event::Scroll { dx: -dx, dy: -dy }
+}
+
+/// The modifier keys held with a key.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[allow(clippy::struct_excessive_bools)] // the DOM's shiftKey, ctrlKey, altKey and metaKey, one each
+pub struct Modifiers {
+    /// Shift.
+    pub shift: bool,
+    /// Control.
+    pub control: bool,
+    /// Alt (Option on macOS).
+    pub alt: bool,
+    /// Meta: Command on macOS, the Windows or Super key elsewhere.
+    pub meta: bool,
 }
