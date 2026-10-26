@@ -105,3 +105,42 @@ fn a_capturing_element_removed_mid_drag_gives_the_pointer_back() {
     // Then
     assert_eq!(*log.borrow(), ["b pointermove"]);
 }
+
+#[test]
+fn capture_moving_between_elements_is_lost_by_one_then_got_by_the_other() {
+    // Given: .a captures on pointerdown; .row takes it on the first move,
+    // as the move bubbles from .a
+    let (doc, row, a, _b) = setup(PADDED);
+    doc.borrow_mut().listen(
+        a,
+        "pointerdown",
+        Box::new(|e: &mut Event| e.set_pointer_capture()),
+    );
+    doc.borrow_mut().listen(
+        row,
+        "pointermove",
+        Box::new(|e: &mut Event| e.set_pointer_capture()),
+    );
+    let log = Log::default();
+    for (node, label) in [(a, "a"), (row, "row")] {
+        record(&doc, node, "lostpointercapture", label, &log);
+        record(&doc, node, "gotpointercapture", label, &log);
+    }
+    Document::pointer_moved(&doc, [15.0, 5.0]);
+    Document::pointer_pressed(&doc, [15.0, 5.0]);
+    Document::pointer_moved(&doc, [15.0, 6.0]);
+    log.borrow_mut().clear();
+
+    // When
+    Document::pointer_moved(&doc, [15.0, 7.0]);
+
+    // Then: both bubble, as in the DOM, so .row also hears .a's loss
+    assert_eq!(
+        *log.borrow(),
+        [
+            "a lostpointercapture",
+            "row lostpointercapture",
+            "row gotpointercapture"
+        ]
+    );
+}
