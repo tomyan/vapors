@@ -4,7 +4,10 @@
 //! paths are bound read-only: the current copy (at the served path), the
 //! config and the verified binary. `cargo xtask serve` restarts the unit
 //! after every publish, so the bound copy is always the one just
-//! published.
+//! published. `ProtectHome=tmpfs` with those binds, not
+//! `ProtectHome=read-only`: read-only would still let the server read
+//! the whole home directory (keys, other checkouts); the lead chose this
+//! over read-only on 2026-10-26.
 
 use std::path::Path;
 
@@ -38,7 +41,7 @@ pub fn unit_text(paths: &Paths<'_>, port: u16) -> Result<String, String> {
         [paths.server, paths.dir, paths.copy, paths.config].map(plain);
     let (server, dir, copy, config) = (server?, dir?, copy?, config?);
     Ok(format!(
-        "[Unit]\nDescription=cargo xtask serve: {dir} on 127.0.0.1:{port}\n\n[Service]\nExecStart=\"{server}\" --host 127.0.0.1 --port {port} --root \"{dir}\" --config-file \"{config}\"\nRestart=on-failure\nNoNewPrivileges=yes\nProtectSystem=strict\nProtectHome=tmpfs\nPrivateTmp=yes\nBindReadOnlyPaths={copy}:{dir} {config} {server}\n\n[Install]\nWantedBy=default.target\n"
+        "[Unit]\nDescription=cargo xtask serve: {dir} on 127.0.0.1:{port}\n\n[Service]\n# The home directory is an empty tmpfs (ProtectHome=tmpfs): only the\n# copy, its config and this binary are bound in, read-only.\nExecStart=\"{server}\" --host 127.0.0.1 --port {port} --root \"{dir}\" --config-file \"{config}\"\nRestart=on-failure\nNoNewPrivileges=yes\nProtectSystem=strict\nProtectHome=tmpfs\nPrivateTmp=yes\nBindReadOnlyPaths={copy}:{dir} {config} {server}\n\n[Install]\nWantedBy=default.target\n"
     ))
 }
 
