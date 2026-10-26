@@ -15,9 +15,14 @@ use std::rc::Rc;
 
 use crate::{Dom, NodeId, Root};
 
+/// A snippet's arguments as the render site reads them: called inside
+/// the snippet's effects, so a snippet follows its arguments as they
+/// change (Svelte's parameters are reactive the same way).
+pub type Args<A> = Rc<dyn Fn() -> A>;
+
 /// What a snippet builds with: the Dom, the parent, the node to place
 /// before and its arguments; it returns its top-level entries.
-type Build<A> = dyn Fn(&Rc<RefCell<dyn Dom>>, NodeId, Option<NodeId>, A) -> Vec<Root>;
+type Build<A> = dyn Fn(&Rc<RefCell<dyn Dom>>, NodeId, Option<NodeId>, Args<A>) -> Vec<Root>;
 
 /// A piece of template built where it is rendered, taking arguments of
 /// type `A`: a tuple of its parameters, `()` for none.
@@ -26,7 +31,7 @@ pub struct Snippet<A = ()>(Rc<Build<A>>);
 impl<A: 'static> Snippet<A> {
     /// A snippet that builds with `build`.
     pub fn new(
-        build: impl Fn(&Rc<RefCell<dyn Dom>>, NodeId, Option<NodeId>, A) -> Vec<Root> + 'static,
+        build: impl Fn(&Rc<RefCell<dyn Dom>>, NodeId, Option<NodeId>, Args<A>) -> Vec<Root> + 'static,
     ) -> Snippet<A> {
         Snippet(Rc::new(build))
     }
@@ -37,16 +42,16 @@ impl<A: 'static> Snippet<A> {
         Snippet::new(|_, _, _, _| Vec::new())
     }
 
-    /// Builds the snippet with `args` in `parent`, before `before` (at
-    /// the end when `None`); its top-level entries.
+    /// Builds the snippet in `parent`, before `before` (at the end when
+    /// `None`), reading its arguments from `args`; its top-level entries.
     pub fn render(
         &self,
         dom: &impl DynDom,
         parent: NodeId,
         before: Option<NodeId>,
-        args: A,
+        args: impl Fn() -> A + 'static,
     ) -> Vec<Root> {
-        (self.0)(&dom.dyn_dom(), parent, before, args)
+        (self.0)(&dom.dyn_dom(), parent, before, Rc::new(args))
     }
 }
 

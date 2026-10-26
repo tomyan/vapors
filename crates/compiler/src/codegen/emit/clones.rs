@@ -23,7 +23,7 @@ impl Emitter<'_> {
             .script
             .bindings
             .iter()
-            .chain(&self.snippets)
+            .chain(self.snippets.iter().map(|snippet| &snippet.name))
             .filter(|name| mentioned.contains(*name) && !loop_names.contains(name))
             .cloned()
             .collect();

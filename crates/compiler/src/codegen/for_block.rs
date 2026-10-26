@@ -23,7 +23,7 @@ impl Emitter<'_> {
         let signature =
             self.builder_signature(&format!(", {index}: Signal<usize>, {item}: Signal<_>"));
         self.push_scope(row_scope);
-        let built = self.emit_builder_with(&[], &block.children, &signature);
+        let built = self.emit_builder_with(&[], &block.children, &signature, &[]);
         self.pop_scope();
         built?;
         self.close_keyed_call(call);

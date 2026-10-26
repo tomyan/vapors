@@ -20,22 +20,25 @@ impl Emitter<'_> {
         let var = self.fresh(&last.to_lowercase());
         self.reserve(&format!("{var}_props"));
         let mut fields = self.emit_prop_values(tag, &var)?;
-        let (snippets, rest): (Vec<&Node>, Vec<&Node>) = tag
-            .children
-            .iter()
-            .partition(|child| matches!(child, Node::Snippet(_)));
-        for snippet in snippets {
-            if let Node::Snippet(snippet) = snippet {
-                self.emit_snippet(snippet)?;
+        let outer = self.snippets.len();
+        self.emit_list_snippets(&tag.children)?;
+        for child in &tag.children {
+            if let Node::Snippet(snippet) = child {
                 fields.push(format!("{0}: {0}.clone(),", snippet.name));
             }
         }
         // the parser drops whitespace-only text, so `<Card> </Card>`
         // passes no children
+        let rest: Vec<Node> = tag
+            .children
+            .iter()
+            .filter(|child| !matches!(child, Node::Snippet(_)))
+            .cloned()
+            .collect();
         if !rest.is_empty() {
-            let rest: Vec<Node> = rest.into_iter().cloned().collect();
             fields.push(self.emit_children(&rest, &var)?);
         }
+        self.snippets.truncate(outer);
         self.line(Allowance::NeedlessUpdate.attribute());
         self.line(format!("let {var}_props = {}Props {{", tag.name));
         self.indent(1);

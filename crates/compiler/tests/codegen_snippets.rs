@@ -38,7 +38,7 @@ fn render_builds_the_snippet_in_place() {
     // Then
     assert_has(
         &code,
-        "roots.extend(children.render(dom, parent, before, ()));",
+        "roots.extend(children.render(dom, parent, before, || ()));",
     );
     assert_has(&code, "let _ = children.render(dom, div");
 }
@@ -48,16 +48,42 @@ fn a_snippet_declares_a_typed_local_built_against_dyn_dom() {
     // When
     let code = generated_with(
         "",
-        "{snippet row(name: String, at: Signal<u32>)}<b>{name}{at}</b>{/snippet}",
+        "{snippet row(name: String, at: u32)}<b>{name}{at}</b>{/snippet}",
     );
 
-    // Then: the tuple of its parameter types; a Signal parameter reads as its value
+    // Then: the tuple of its parameter types, read through its arguments
+    assert_has(&code, "let row: Snippet<(String, u32)> = Snippet::new(");
+    assert_has(&code, "snippet_args: vapors_dom::Args<(String, u32)>");
+}
+
+#[test]
+fn each_parameter_is_a_memo_of_its_argument_read_as_its_value() {
+    // When
+    let code = generated_with(
+        "",
+        "{snippet row(name: String, at: u32)}<b>{at}</b>{/snippet}",
+    );
+
+    // Then
+    assert_has(&code, "let at = Memo::new({");
+    assert_has(&code, "move || snippet_args().1");
+    assert_has(&code, "at.get()");
+}
+
+#[test]
+fn render_arguments_are_a_closure_so_the_snippet_reads_them_as_they_change() {
+    // When
+    let code = generated_with(
+        "let tick: Signal<u32> = Signal::new(0);",
+        "{snippet row(at: u32)}<b>{at}</b>{/snippet}{render row(tick)}",
+    );
+
+    // Then
+    assert_has(&code, "move || (tick.get(),)");
     assert_has(
         &code,
-        "let row: Snippet<(String, Signal<u32>,)> = Snippet::new(",
+        "roots.extend(row.render(dom, parent, before, render_args",
     );
-    assert_has(&code, "(name, at,): (String, Signal<u32>,)");
-    assert_has(&code, "at.get()");
 }
 
 #[test]

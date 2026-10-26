@@ -40,7 +40,7 @@ pub(crate) struct Emitter<'a> {
     pub index: Option<&'a super::PropsIndex>,
     /// The snippets declared so far: a closure that reads one gets a
     /// clone of it, as of a script binding.
-    pub snippets: Vec<String>,
+    pub snippets: Vec<super::snippet_list::LocalSnippet>,
 }
 
 impl<'a> Emitter<'a> {
@@ -115,20 +115,17 @@ impl<'a> Emitter<'a> {
         name
     }
 
-    /// A list's snippets first, so a `{render}` may come before the
-    /// snippet it renders, as in Svelte; then the rest in order.
+    /// A list's snippets first (`snippet_list`), then the rest in order.
     pub fn emit_nodes(&mut self, nodes: &[Node], place: &Place) -> Result<(), CompileError> {
-        for node in nodes {
-            if let Node::Snippet(snippet) = node {
-                self.emit_snippet(snippet)?;
-            }
-        }
+        let outer = self.snippets.len();
+        self.emit_list_snippets(nodes)?;
         for node in nodes
             .iter()
             .filter(|node| !matches!(node, Node::Snippet(_)))
         {
             self.emit_node(node, place)?;
         }
+        self.snippets.truncate(outer);
         Ok(())
     }
 

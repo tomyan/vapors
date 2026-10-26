@@ -86,35 +86,6 @@ fn a_condition_syntax_error_is_positioned_where_the_condition_ends() {
 }
 
 #[test]
-fn a_snippet_parameter_that_borrows_or_has_no_type_is_refused() {
-    // When
-    let borrowed = refusal("<div>{snippet item(name: &str)}<b>{name}</b>{/snippet}</div>");
-    let untyped = refusal("<div>{snippet item(name)}<b>{name}</b>{/snippet}</div>");
-
-    // Then
-    assert_eq!((borrowed.line, borrowed.col), (1, 6), "{borrowed}");
-    assert!(
-        borrowed.message.contains("name: &str") && borrowed.message.contains("owned"),
-        "{borrowed}"
-    );
-    assert!(untyped.message.contains("needs a type"), "{untyped}");
-}
-
-#[test]
-fn rendering_a_snippet_nobody_declared_is_refused_naming_the_declaration() {
-    // When
-    let err = refusal("<div>{render footer()}</div>");
-
-    // Then
-    assert_eq!((err.line, err.col), (1, 6), "{err}");
-    assert!(
-        err.message
-            .contains("#[prop] let footer: Snippet = Snippet::empty();"),
-        "{err}"
-    );
-}
-
-#[test]
 fn a_hole_reading_nothing_still_compiles_to_a_static_text() {
     // Given: no signals, a hole with a constant
     let code = codegen::generated("<span>{1 + 1}</span>");

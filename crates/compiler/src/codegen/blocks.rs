@@ -61,7 +61,7 @@ impl Emitter<'_> {
         signature: &str,
     ) -> Result<(), CompileError> {
         let clones = self.builder_clones(nodes)?;
-        self.emit_builder_with(&clones, nodes, signature)
+        self.emit_builder_with(&clones, nodes, signature, &[])
     }
 
     /// The bindings a builder of `nodes` reads, which it takes clones of.
@@ -70,12 +70,14 @@ impl Emitter<'_> {
         self.clones_for(&read.iter().collect::<Vec<_>>())
     }
 
-    /// A builder closure, inside a block with `clones` when any.
+    /// A builder closure, inside a block with `clones` when any, its
+    /// body opening with the `prelude` lines.
     pub(super) fn emit_builder_with(
         &mut self,
         clones: &[String],
         nodes: &[Node],
         signature: &str,
+        prelude: &[String],
     ) -> Result<(), CompileError> {
         let wrapped = !clones.is_empty();
         if wrapped {
@@ -85,6 +87,9 @@ impl Emitter<'_> {
         }
         self.line(signature);
         self.indent(1);
+        for line in prelude {
+            self.line(line);
+        }
         self.line("let mut roots = Vec::new();");
         self.emit_nodes(nodes, &Place::roots())?;
         self.line("roots");

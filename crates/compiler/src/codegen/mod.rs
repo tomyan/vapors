@@ -19,6 +19,8 @@ mod props_index;
 mod script;
 mod script_syntax;
 mod shell;
+mod snippet_list;
+mod snippet_params;
 mod snippets;
 mod syn_map;
 mod tag_props;
