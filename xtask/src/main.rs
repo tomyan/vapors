@@ -43,6 +43,16 @@ mod layers_graph;
 mod load;
 mod pixels;
 mod priority;
+mod queue;
+mod queue_act;
+mod queue_checks;
+mod queue_comments;
+mod queue_config;
+mod queue_decide;
+mod queue_git;
+mod queue_log;
+mod queue_pins;
+mod queue_remote;
 mod report;
 #[cfg(test)]
 #[path = "report_timeout_tests.rs"]
@@ -128,6 +138,7 @@ fn main() -> ExitCode {
         },
         Command::Gate { pr: None } => return gate::run(&reporter),
         Command::Gate { pr: Some(number) } => return gate_pr_real::run(number),
+        Command::Queue { dry_run } => return queue::run(dry_run),
         Command::Lint => steps::lint(),
         Command::Deny => steps::deny_check(),
         Command::Test { tier: Tier::Unit } => steps::unit_tests(),
