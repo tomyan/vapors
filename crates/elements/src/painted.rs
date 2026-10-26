@@ -17,6 +17,8 @@ pub struct Painted {
     pub(crate) scene: Scene,
     pub(crate) texts: Vec<std::rc::Rc<Layout>>,
     pub(crate) rects: HashMap<NodeId, BoxRect>,
+    /// Each element's padding box's top-left, for pointer offsets.
+    pub(crate) paddings: HashMap<NodeId, [f32; 2]>,
     /// Elements with a box, `visibility: visible` and `pointer-events:
     /// auto`, in painting order: a later one is drawn over an earlier.
     pub(crate) hits: Vec<(NodeId, BoxRect)>,
@@ -64,6 +66,13 @@ impl Painted {
     #[must_use]
     pub fn border_box(&self, node: NodeId) -> Option<BoxRect> {
         self.rects.get(&node).copied()
+    }
+
+    /// The element's padding box's top-left in CSS pixels, or `None`
+    /// when it has no box.
+    #[must_use]
+    pub fn padding_origin(&self, node: NodeId) -> Option<[f32; 2]> {
+        self.paddings.get(&node).copied()
     }
 
     /// The cursor over `point`: the one of the element it hits, the

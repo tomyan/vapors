@@ -142,6 +142,7 @@ impl Handler {
     }
 
     fn redraw(&mut self, event_loop: &ActiveEventLoop) {
+        let now = crate::Instant::now();
         if self.stop_if_lost(event_loop) {
             return;
         }
@@ -169,6 +170,7 @@ impl Handler {
             texture: &surface_texture.texture,
             index: self.presented,
             scale_factor: window.scale_factor(),
+            now,
         };
         let next = self.app.frame(&frame);
         gpu.queue.present(surface_texture);

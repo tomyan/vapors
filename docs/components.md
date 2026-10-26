@@ -105,6 +105,30 @@ the one difference from the brief in this slice.
   same name with `Props` appended must name its props struct, so a
   plain tag needs a `use` in the script. Attributes become props, and unset props take their
   defaults. `bind:value={s}` on a component passes the signal itself.
+- **Children:** markup inside a component tag is the child's
+  `children` prop, a `Snippet`. The child declares it, `#[prop] let
+  children: Snippet = Snippet::empty();`, and places it with
+  `{render children()}`. A tag passing a prop its component does not
+  declare, children included, is refused when the component is in the
+  same directory.
+- **Snippets:** `{snippet name(param: Type, ...)} .. {/snippet}`
+  declares a piece of template, and `{render name(args)}` builds it in
+  place. A snippet is visible in the list it is declared in and in the
+  lists inside it, and may be rendered before it is declared or by a
+  snippet declared before it. A snippet declared directly inside a
+  component tag is the child's prop of that name (a `Snippet<(Type,
+  ...)>`). A local snippet passed by name in an attribute, `<List
+  row={b} />`, is passed as a clone, so `b` can still be rendered.
+- **Snippet parameters are reactive.** The render passes its arguments
+  as a closure, and each parameter is a `Memo` of its argument, so a
+  snippet follows its arguments as they change: a kept `{for}` row whose
+  item changes updates its snippet in place. A parameter reads as its
+  value in a hole and in a render's arguments, and as the memo in
+  attributes and conditions (`name.get()`), as a loop binding does. A
+  parameter type must be owned (`String`, not `&str`), `PartialEq` and
+  `Clone`; a `Signal<..>` or `Memo<..>` parameter is refused, since the
+  parameter is reactive already. Recursion, direct or through another
+  snippet, is refused for now.
 
 ## Reactive rules
 
@@ -173,7 +197,7 @@ The compiler refuses:
 - a signal or memo with no type annotation; a `#[prop]` with no type,
   no default, or a pattern in place of a single name;
 - a script, prop or loop binding named `dom`, `parent`, `before`,
-  `props`, `owner`, `roots` or `event`, which the generated code uses,
+  `props`, `owner`, `roots`, `event` or `snippet_args`, which the generated code uses,
   or named like a node the generated code creates for this template
   (`p0`, `button3`); and a raw identifier such as `r#gen`;
 - an unknown character reference, and a Rust if-expression in a hole;
@@ -181,8 +205,12 @@ The compiler refuses:
   `value` or `checked`, or together with a handler for the same event;
 - a `data-wisp` attribute, which is reserved for the style scope (see
   "Scoped styles");
-- deferred features: `{snippet}`/`{render}`, which parse but do not
-  generate code, and children inside a component tag.
+- snippets: a parameter without a type, with a pattern for a name,
+  that borrows, that is a `Signal<..>` or `Memo<..>`, or that has the
+  name of a script binding (both lines named); two snippets of one name
+  in a list; a snippet that renders itself; a `{render}` of nothing
+  declared where it is, or with a different number of arguments from
+  the snippet's parameters.
 
 To check one file without a build, run:
 
@@ -337,7 +365,5 @@ For example, in a component whose scope is `app/src/panel.wisp`:
   implements `Dom` over the real element tree, with layout and paint.
 - **Accessibility (F2d).** Implicit roles, ARIA attributes and the
   AccessKit tree are not generated or checked.
-- **In the compiler:** snippets and `{render}` parse but are refused at
-  code generation. Children inside a component tag are refused; they
-  will become snippets. Props passed to a child are not reactive unless
-  they are `Signal`s. There is no hot reload, LSP or inspector yet.
+- **In the compiler:** recursive snippets. Props passed to a child are
+  not reactive unless they are `Signal`s. There is no hot reload, LSP or inspector yet.
