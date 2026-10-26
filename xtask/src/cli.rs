@@ -98,6 +98,13 @@ pub enum Command {
         #[allow(clippy::option_option)]
         pr: Option<Option<u64>>,
     },
+    /// Check the docs against the code and GitHub (`[docs]`): commands
+    /// CLAUDE.md names, PR states in the plan, quoted UI text.
+    CheckDocs {
+        /// Do not ask gh for PR states; say they were not compared.
+        #[arg(long)]
+        offline: bool,
+    },
     /// Check formatting and lints without running tests.
     Lint,
     /// Check dependencies with cargo-deny: advisories, bans, licences, sources.
