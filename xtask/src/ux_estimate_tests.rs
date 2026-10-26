@@ -36,7 +36,7 @@ fn a_tile_model_counts_its_base_and_tiles() {
     // Given 412 x 915 on gpt-4o-mini: two tiles at 2,833 + 5,667 each
 
     // When
-    let tokens = image_tokens(model("gpt-4o-mini"), (412, 915), "high");
+    let tokens = image_tokens(model("gpt-4o-mini"), (412, 915), "high").expect("counted");
 
     // Then
     assert_eq!(tokens, 14_167);
@@ -44,7 +44,10 @@ fn a_tile_model_counts_its_base_and_tiles() {
 
 #[test]
 fn a_tile_model_at_low_detail_counts_its_base_alone() {
-    assert_eq!(image_tokens(model("gpt-5"), (1440, 900), "low"), 70);
+    assert_eq!(
+        image_tokens(model("gpt-5"), (1440, 900), "low").expect("counted"),
+        70
+    );
 }
 
 #[test]
@@ -52,7 +55,7 @@ fn a_patch_model_counts_patches_times_its_multiplier() {
     // Given 1440 x 900 on gpt-5.6-terra: 45 x 29 = 1,305 patches, times 1.2
 
     // When
-    let tokens = image_tokens(model("gpt-5.6-terra"), (1440, 900), "high");
+    let tokens = image_tokens(model("gpt-5.6-terra"), (1440, 900), "high").expect("counted");
 
     // Then
     assert_eq!(tokens, 1566);
@@ -63,7 +66,7 @@ fn a_patch_model_holds_a_large_image_to_its_budget() {
     // Given 4000 x 4000, fitted to 2048: 64 x 64 = 4,096 patches, over 2,500
 
     // When
-    let tokens = image_tokens(model("gpt-5.4"), (4000, 4000), "high");
+    let tokens = image_tokens(model("gpt-5.4"), (4000, 4000), "high").expect("counted");
 
     // Then: the budget times 1.2
     assert_eq!(tokens, 3000);
@@ -75,8 +78,8 @@ fn a_patch_model_at_low_detail_uses_its_own_fit() {
     // patches); gpt-5.4 keeps it under 2048 (45 x 29) with a 6,144 budget
 
     // When
-    let terra = image_tokens(model("gpt-5.6-terra"), (1440, 900), "low");
-    let five_four = image_tokens(model("gpt-5.4"), (1440, 900), "low");
+    let terra = image_tokens(model("gpt-5.6-terra"), (1440, 900), "low").expect("counted");
+    let five_four = image_tokens(model("gpt-5.4"), (1440, 900), "low").expect("counted");
 
     // Then
     assert_eq!((terra, five_four), (192, 1566));
@@ -134,4 +137,35 @@ fn a_worst_case_over_the_run_cap_is_refused() {
         refused.contains("could cost $0.1500, over ux.max_cost_usd $0.10"),
         "{refused}"
     );
+}
+
+const MEASURED: Model = Model {
+    name: "measured-model",
+    images: Images::Measured {
+        sizes: &[crate::ux_models::Measured {
+            size: (412, 915),
+            low: 120,
+            high: 600,
+        }],
+        source: "test",
+    },
+};
+
+#[test]
+fn a_measured_model_gives_the_bound_for_a_measured_size() {
+    assert_eq!(image_tokens(&MEASURED, (412, 915), "high"), Ok(600));
+    assert_eq!(image_tokens(&MEASURED, (412, 915), "low"), Ok(120));
+}
+
+#[test]
+fn a_measured_model_refuses_a_size_it_was_not_measured_at() {
+    // When
+    let refused = image_tokens(&MEASURED, (1440, 900), "high").expect_err("refused");
+
+    // Then
+    assert!(
+        refused.contains("measured-model has no measured image count for 1440x900"),
+        "{refused}"
+    );
+    assert!(refused.contains("--measure-image-cost"), "{refused}");
 }

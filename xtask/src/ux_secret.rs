@@ -40,6 +40,12 @@ impl Secret {
         Ok(Self { key, needles })
     }
 
+    /// The request header that carries the key, for curl's stdin only
+    /// (`ux_call`), so the key is never in a command line.
+    pub fn header(&self) -> String {
+        format!("Authorization: Bearer {}\n", self.key)
+    }
+
     /// `text`, when it holds no run of the key, as written, with its
     /// whitespace removed, or in base64; `output` names where it was going.
     ///

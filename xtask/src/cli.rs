@@ -77,6 +77,13 @@ pub enum Command {
         /// cost; send nothing.
         #[arg(long)]
         dry_run: bool,
+        /// Also post the report as a comment on this pull request.
+        #[arg(long)]
+        pr: Option<u32>,
+        /// Count `ux.model`'s input tokens for each frame size, low and
+        /// high detail, and print its row for `ux_models`.
+        #[arg(long, conflicts_with_all = ["dry_run", "pr"])]
+        measure_image_cost: bool,
     },
     /// Rebuild the web package on save (trunk serve, debug) behind the tailnet https proxy.
     Dev {

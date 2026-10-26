@@ -13,15 +13,27 @@ pub fn text_tokens(bytes: usize) -> u64 {
 
 /// One image of `size` at `detail`, counted with `model`'s row
 /// (`ux_models`).
-pub fn image_tokens(model: &Model, size: (u32, u32), detail: &str) -> u64 {
-    match &model.images {
+///
+/// # Errors
+/// A measured model with no count for `size`, naming the fix.
+pub fn image_tokens(model: &Model, size: (u32, u32), detail: &str) -> Result<u64, String> {
+    Ok(match &model.images {
         Images::Tiles { base, .. } if detail == "low" => *base,
         Images::Tiles { base, per_tile } => base + per_tile * tile_count(size),
         Images::Patches { tenths, low, high } => {
             let fit = if detail == "low" { low } else { high };
             (patch_count(size, fit) * tenths).div_ceil(10)
         }
-    }
+        Images::Measured { sizes, .. } => {
+            let row = sizes.iter().find(|m| m.size == size).ok_or_else(|| {
+                format!(
+                    "{} has no measured image count for {}x{}; fix: cargo xtask ux-review --measure-image-cost, and add the row it prints",
+                    model.name, size.0, size.1
+                )
+            })?;
+            if detail == "low" { row.low } else { row.high }
+        }
+    })
 }
 
 /// 512 px tiles once the image fits 2048 px and its short side is at
