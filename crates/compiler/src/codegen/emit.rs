@@ -1,7 +1,8 @@
 //! The emitter: lines of Rust for the template, fresh variable names,
-//! the scope of names that auto-unwrap, and the clones a `move`
+//! the scope of names that auto-unwrap; `clones` has the clones a `move`
 //! closure needs of the script's plain bindings.
 
+mod clones;
 mod declared;
 mod place;
 
@@ -9,10 +10,9 @@ pub(crate) use place::Place;
 
 use std::collections::HashSet;
 
-use super::allowances::Allowance;
 use super::script::ScriptInfo;
 use super::syn_map::parse_expr;
-use super::unwrap::{identifiers, unwrap_signals};
+use super::unwrap::unwrap_signals;
 use crate::CompileError;
 use crate::ast::{Expr, Node};
 use crate::source::Source;
@@ -195,33 +195,5 @@ impl<'a> Emitter<'a> {
     pub fn raw(&self, expr: &Expr) -> Result<String, CompileError> {
         parse_expr(self.source, expr)?;
         Ok(expr.code.clone())
-    }
-
-    /// The script's plain bindings an expression mentions; a `move`
-    /// closure that reads them gets a clone of each first.
-    pub fn clones_for(&self, exprs: &[&Expr]) -> Result<Vec<String>, CompileError> {
-        let mut mentioned = HashSet::new();
-        for expr in exprs {
-            mentioned.extend(identifiers(&parse_expr(self.source, expr)?));
-        }
-        let loop_names: HashSet<&String> = self.scopes.iter().flatten().collect();
-        let mut clones: Vec<String> = self
-            .script
-            .bindings
-            .iter()
-            .chain(&self.snippets)
-            .filter(|name| mentioned.contains(*name) && !loop_names.contains(name))
-            .cloned()
-            .collect();
-        clones.sort();
-        Ok(clones)
-    }
-
-    /// `let name = name.clone();` for each clone.
-    pub fn emit_clones(&mut self, clones: &[String]) {
-        for name in clones {
-            self.line(Allowance::CloneOnCopy.attribute());
-            self.line(format!("let {name} = {name}.clone();"));
-        }
     }
 }
