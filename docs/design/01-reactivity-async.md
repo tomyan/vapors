@@ -162,7 +162,11 @@ parse already and are refused at code generation. This design makes
 them the first slice: a snippet compiles to a closure that builds its
 nodes through `Dom`, a `children` snippet is the default one, and a
 component renders a snippet with `{@render children()}`. A snippet's
-nodes belong to the owner that renders it.
+nodes belong to the owner that renders it. As built (R1a, 2026-10-26): wisp spells
+them `{snippet}` and `{render}`, without Svelte's sigils, as it spells
+`{#if}` as `{if}`; `children` is the default name, declared explicitly
+by the child like any prop, `#[prop] let children: Snippet =
+Snippet::empty();`.
 
 ## Deliberately left out
 

@@ -190,3 +190,16 @@ fn roots_is_must_use() {
     // Then
     assert_has(&code, "#[must_use]\npub fn roots(&self) -> Vec<NodeId>");
 }
+
+#[test]
+fn props_that_are_all_signals_are_taken_by_value_with_the_reason() {
+    // When: the only prop is a signal, which is Copy, so mount does not
+    // consume its props
+    let code = generated_with(
+        "#[prop]\nlet outside: Signal<i32> = Signal::new(0);",
+        "<div>{outside}</div>",
+    );
+
+    // Then
+    assert_has(&code, "#[allow(clippy::needless_pass_by_value");
+}
