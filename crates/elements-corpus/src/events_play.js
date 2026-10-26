@@ -19,6 +19,10 @@
     return name(t.parentElement) + ">" + t.localName + ":nth-child(" + index + ")";
   };
   for (const type of types) window.addEventListener(type, (event) => log.push(event), true);
+  // Set by the player's settle once the last step's log is taken
+  // (events_play.rs, SETTLE); false at each injection, so a page that
+  // waits for it acts after the last step of this play only.
+  window.__eventsSettling = false;
   window.__eventsDrain = () => log.splice(0).map((e) => {
     const entry = { type: e.type, target: name(e.target), bubbles: e.bubbles, defaultPrevented: e.defaultPrevented };
     if ("pointerType" in e && e.pointerType) entry.pointerType = e.pointerType;

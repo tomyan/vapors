@@ -86,39 +86,6 @@ fn a_condition_syntax_error_is_positioned_where_the_condition_ends() {
 }
 
 #[test]
-fn named_snippets_and_render_arguments_are_refused_until_r1b() {
-    // When
-    let named = refusal("<div>{snippet footer()}<b>x</b>{/snippet}</div>");
-    let argument = refusal("<div>{render footer(1)}</div>");
-
-    // Then
-    assert_eq!((named.line, named.col), (1, 6), "{named}");
-    assert!(
-        named.message.contains("R1b") && named.message.contains("children"),
-        "{named}"
-    );
-    assert_eq!((argument.line, argument.col), (1, 6), "{argument}");
-    assert!(
-        argument.message.contains("R1b") && argument.message.contains("footer()"),
-        "{argument}"
-    );
-}
-
-#[test]
-fn rendering_a_snippet_nobody_declared_is_refused_naming_the_declaration() {
-    // When
-    let err = refusal("<div>{render footer()}</div>");
-
-    // Then
-    assert_eq!((err.line, err.col), (1, 6), "{err}");
-    assert!(
-        err.message
-            .contains("#[prop] let footer: Snippet = Snippet::empty();"),
-        "{err}"
-    );
-}
-
-#[test]
 fn a_hole_reading_nothing_still_compiles_to_a_static_text() {
     // Given: no signals, a hole with a constant
     let code = codegen::generated("<span>{1 + 1}</span>");

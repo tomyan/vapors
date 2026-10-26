@@ -19,6 +19,10 @@ const RESERVED: &[(&str, &str)] = &[
     ("owner", "the owner of the component's signals and effects"),
     ("roots", "the component's top-level nodes"),
     ("event", "the event a bind: listener receives"),
+    (
+        "snippet_args",
+        "the arguments a snippet reads its parameters from",
+    ),
 ];
 
 /// Every name a pattern binds, in order.

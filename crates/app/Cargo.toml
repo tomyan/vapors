@@ -16,6 +16,7 @@ vapors-text.workspace = true
 vapors-dom.workspace = true
 vapors-platform.workspace = true
 vapors-elements.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
 png.workspace = true

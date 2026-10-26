@@ -6,6 +6,8 @@ use vapors_platform::{Event, LINE_PIXELS};
 use vapors_renderer::ImagePipeline;
 use vapors_scene::{Color, Size, Transform};
 
+use crate::image_view_painter::Shown;
+
 /// Factor per scroll step or per `+`/`-` press.
 const ZOOM_STEP: f32 = 1.25;
 
@@ -19,7 +21,7 @@ pub(crate) struct Uploaded {
 
 /// An image placed in a viewport under a user-steered transform.
 pub struct ImageView {
-    pub(crate) image: Option<RgbaImage>,
+    pub(crate) shown: Option<Shown>,
     pub(crate) uploaded: Option<Uploaded>,
     pub(crate) viewport: Size,
     transform: Transform,
@@ -27,7 +29,7 @@ pub struct ImageView {
     pointer: Option<[f32; 2]>,
     dragging: bool,
     pub(crate) background: Color,
-    /// Bumped by every `set_image`: two images of the same size, fitted
+    /// Bumped by every `set_image` and `set_painter`: two images of the same size, fitted
     /// the same, differ only in this.
     generation: u64,
 }
@@ -46,7 +48,7 @@ impl ImageView {
     #[must_use]
     pub fn empty(background: Color) -> Self {
         Self {
-            image: None,
+            shown: None,
             uploaded: None,
             viewport: Size {
                 width: 1,
@@ -65,8 +67,12 @@ impl ImageView {
 
     /// Replace what is shown with `image`, fitted.
     pub fn set_image(&mut self, image: RgbaImage) {
+        self.replace(Shown::Pixels(image));
+    }
+
+    pub(crate) fn replace(&mut self, shown: Shown) {
         self.generation += 1;
-        self.image = Some(image);
+        self.shown = Some(shown);
         self.uploaded = None;
         self.fit();
     }
@@ -81,11 +87,11 @@ impl ImageView {
     /// True once an image has been set.
     #[must_use]
     pub fn has_image(&self) -> bool {
-        self.image.is_some()
+        self.shown.is_some()
     }
 
     fn image_size(&self) -> Option<Size> {
-        self.image.as_ref().map(|image| image.size)
+        self.shown.as_ref().map(Shown::size)
     }
 
     /// The current placement of the image in the viewport.
@@ -155,6 +161,7 @@ impl ImageView {
             Event::Touch { .. }
             | Event::Tap { .. }
             | Event::OpenRequested
+            | Event::Paste
             | Event::FileOpened { .. } => {}
         }
     }

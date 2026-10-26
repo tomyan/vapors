@@ -27,8 +27,9 @@ pub use frames::{frame_limit, limited};
 pub use input::{click, input};
 
 /// What a demo that changes itself every frame is called with before
-/// each update: how long the last update took (`None` before the first).
-pub type PerFrame = Box<dyn FnMut(Option<Duration>)>;
+/// each update: the last frame's time per phase, by name (empty before
+/// the first frame).
+pub type PerFrame = Box<dyn FnMut(&[(&'static str, Duration)])>;
 
 /// Mounts a demo's component into `parent`; a demo that changes every
 /// frame returns what to call before each update.
