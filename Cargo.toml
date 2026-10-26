@@ -47,6 +47,7 @@ taffy = { version = "=0.15.0", default-features = false, features = ["std", "fle
 syn = { version = "=3.0.9", features = ["full", "visit", "visit-mut", "printing", "extra-traits", "parsing"] }
 prettyplease = "=0.3.0"
 quote = "=1.0.47"
+tracing = { version = "=0.1.44", default-features = false, features = ["std"] }
 proc-macro2 = { version = "=1.0.107", features = ["span-locations"] }
 insta = "=1.49.0"
 # The DevTools protocol is a WebSocket (vapors-devtools); the client only.
