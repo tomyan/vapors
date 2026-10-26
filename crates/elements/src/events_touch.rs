@@ -92,6 +92,23 @@ impl Document {
         }
     }
 
+    /// A pan of the fingers down: whether it may scroll. While a finger
+    /// is owned by a listener's capture it may not; otherwise the pan
+    /// takes the touches, each getting `pointercancel`, whether or not
+    /// anything scrolls, as Chromium does (`fixtures/capture.events`).
+    ///
+    /// RELAXED (3-E1b, the lead's decision, 2026-10-26): ownership by
+    /// `set_pointer_capture` stands in for `touch-action: none`, which
+    /// vapors does not have; Chromium cancels an owned touch too. 3-E4's
+    /// `touch-action` retires it.
+    pub fn touch_panned(document: &Rc<RefCell<Document>>) -> bool {
+        if document.borrow().any_touch_owned() {
+            return false;
+        }
+        Self::cancel_unowned_touches(document);
+        true
+    }
+
     /// Whether any finger down now is owned by a listener's capture.
     #[must_use]
     pub fn any_touch_owned(&self) -> bool {

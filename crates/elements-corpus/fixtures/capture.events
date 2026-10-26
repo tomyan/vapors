@@ -1,5 +1,10 @@
 # Pointer capture (3-E1). The thumb is x 0..100, y 0..40 and captures on
 # pointerdown; the track is y 40..80 and does not.
+#
+# Touch on the thumb is left out until 3-E4: Chromium cancels it at the
+# first pan, as touch-action is auto, while vapors' RELAXED rule lets a
+# capturing listener own the touch (touch-action: none, which vapors
+# does not have yet).
 listen pointerdown pointermove pointerup pointercancel gotpointercapture lostpointercapture click
 capture div#thumb
 move 50 20                    over the thumb
@@ -11,20 +16,17 @@ expect event gotpointercapture div#thumb
 expect event pointermove div#thumb
 move 300 300                  off both, captured
 expect event pointermove div#thumb
-release 300 300               the capture ends
+release 300 300               the capture ends; the click is the thumb's
 expect event pointerup div#thumb
 expect event lostpointercapture div#thumb
+expect event click div#thumb
 move 50 60                    the track again, not captured
 expect event pointermove div#track
-touch-down 50 20              a finger on the thumb
-expect no event click
-touch-move 50 60              over the track, captured
-expect no event click
-touch-up 50 60
-expect no event click
-touch-down 50 60              a finger on the track: captured without asking
-expect no event click
-touch-move 50 20              over the thumb
-expect no event click
-touch-up 50 20
-expect no event click
+touch-down 50 60              a finger on the track
+expect event pointerdown div#track
+touch-move 50 20              captured without asking, then the pan takes it
+expect event gotpointercapture div#track
+expect event pointercancel div#track
+expect event lostpointercapture div#track
+touch-up 50 20                cancelled: no pointerup
+expect no event pointerup

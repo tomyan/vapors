@@ -142,7 +142,12 @@ fn act(doc: &Rc<RefCell<Document>>, action: &Action) -> Result<(), String> {
         Action::Press(x, y) => Document::pointer_pressed(doc, at(x, y)),
         Action::Release(x, y) => Document::pointer_released(doc, at(x, y)),
         Action::TouchDown(x, y) => Document::touch_pressed(doc, 0, at(x, y)),
-        Action::TouchMove(x, y) => Document::touch_moved(doc, 0, at(x, y)),
+        // the platform sends a pan with each one-finger move, which the
+        // app hands to `touch_panned`
+        Action::TouchMove(x, y) => {
+            Document::touch_moved(doc, 0, at(x, y));
+            Document::touch_panned(doc);
+        }
         Action::TouchUp(x, y) => Document::touch_released(doc, 0, at(x, y)),
         ref other => return Err(format!("{other:?} is not played on vapors yet")),
     }

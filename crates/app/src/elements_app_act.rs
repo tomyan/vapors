@@ -46,23 +46,12 @@ impl ElementsApp {
 }
 
 impl ElementsApp {
-    /// A pan scrolls unless a listener owns a touch, and the first pan
-    /// cancels the touches no listener owns, whether or not anything
-    /// scrolls, as Chromium does with `touch-action: auto`
-    /// (`fixtures/capture.events`).
-    ///
-    /// RELAXED (3-E1b, the lead's decision, 2026-10-26): a touch whose
-    /// `pointerdown` listener called `set_pointer_capture` owns its pans,
-    /// standing in for `touch-action: none`, which vapors does not have.
-    /// Chromium cancels that touch too (the thumb in capture.events,
-    /// left out of the oracle's comparison for this reason). 3-E4's
-    /// `touch-action` retires this rule.
+    /// A pan scrolls when the document lets it (`Document::touch_panned`,
+    /// which holds the RELAXED ownership rule and cancels the touches).
     fn pan(&mut self, delta: [f32; 2]) {
         let document = &self.document;
-        if document.borrow().any_touch_owned() {
-            return;
+        if Document::touch_panned(document) {
+            self.touch.pan(&mut document.borrow_mut(), delta);
         }
-        Document::cancel_unowned_touches(document);
-        self.touch.pan(&mut document.borrow_mut(), delta);
     }
 }
