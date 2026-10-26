@@ -28,7 +28,11 @@ pub struct Modifiers {
 impl Document {
     /// `key` went down: `keydown`, then its default action.
     pub fn key_pressed(document: &Rc<RefCell<Document>>, key: &str, modifiers: Modifiers) {
-        document.borrow_mut().keyboard = true;
+        // a modifier alone is not a keyboard interaction for
+        // :focus-visible, as in Chromium (review-v82)
+        if !matches!(key, "Shift" | "Control" | "Alt" | "Meta") {
+            document.borrow_mut().keyboard = true;
+        }
         let target = document.borrow().key_target();
         if dispatch_bubbling(document, target, Event::new("keydown").with_key(key)) {
             return;

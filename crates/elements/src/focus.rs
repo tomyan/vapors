@@ -42,10 +42,16 @@ impl Document {
     fn is_text_field(&self, node: NodeId) -> bool {
         match self.tag(node) {
             Some("textarea") => true,
-            Some("input") => matches!(
-                self.attribute(node, "type"),
-                None | Some("text" | "search" | "email" | "url" | "password" | "tel" | "number")
-            ),
+            Some("input") => {
+                // HTML attribute values compare case-insensitively
+                let kind = self.attribute(node, "type").map(str::to_ascii_lowercase);
+                matches!(
+                    kind.as_deref(),
+                    None | Some(
+                        "text" | "search" | "email" | "url" | "password" | "tel" | "number"
+                    )
+                )
+            }
             _ => false,
         }
     }

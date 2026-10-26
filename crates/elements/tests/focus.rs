@@ -162,3 +162,17 @@ fn focus_from_a_key_is_visible_and_from_a_press_is_not() {
     Document::focus(&page.doc, Some(page.save));
     assert!(page.doc.borrow().focus_visible(), "script after a key");
 }
+
+#[test]
+fn a_modifier_alone_is_not_a_keyboard_interaction() {
+    // Given: focus from a press, then Shift alone
+    let page = page();
+    Document::pointer_pressed(&page.doc, [5.0, 30.0]);
+    Document::key_pressed(&page.doc, "Shift", vapors_elements::Modifiers::default());
+
+    // When: script moves focus
+    Document::focus(&page.doc, Some(page.save));
+
+    // Then: no ring, as a modifier alone does not count
+    assert!(!page.doc.borrow().focus_visible());
+}

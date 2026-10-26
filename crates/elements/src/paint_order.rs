@@ -20,19 +20,7 @@
 //! an earlier box's text.
 
 use super::layout::LayoutBox;
-
-/// What paint order needs to know of a box.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct Stacking {
-    /// `position` is not static.
-    pub(crate) positioned: bool,
-    /// `z-index`, `None` for auto.
-    pub(crate) z: Option<i32>,
-    /// `position: fixed`.
-    pub(crate) fixed: bool,
-    /// A scroll container, which paints a thumb.
-    pub(crate) scrolls: bool,
-}
+pub(crate) use super::stacking::{Stacking, stacking_of};
 
 /// One step of painting.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,50 +29,45 @@ pub(crate) enum Step {
     Box(usize),
     /// A scroll container's thumb.
     Thumb(usize),
-}
-
-impl Stacking {
-    fn roots_context(self) -> bool {
-        self.positioned && (self.z.is_some() || self.fixed)
-    }
+    /// A box's outline (3-E2b): last within its stacking context, as
+    /// CSS 2 Appendix E paints outlines.
+    Outline(usize),
 }
 
 /// The boxes, box 0 the root, in paint order, with each scroll
 /// container's thumb.
+#[cfg(test)]
 pub(crate) fn paint_steps(boxes: &[LayoutBox], stacking: &dyn Fn(usize) -> Stacking) -> Vec<Step> {
+    steps(boxes, stacking, false)
+}
+
+/// [`paint_steps`] with each stacking context's outlines after it: what
+/// the painter walks.
+pub(crate) fn paint_steps_with_outlines(
+    boxes: &[LayoutBox],
+    stacking: &dyn Fn(usize) -> Stacking,
+) -> Vec<Step> {
+    steps(boxes, stacking, true)
+}
+
+fn steps(boxes: &[LayoutBox], stacking: &dyn Fn(usize) -> Stacking, outlines: bool) -> Vec<Step> {
     let mut walk = Walk {
         boxes,
         stacking,
         out: Vec::with_capacity(boxes.len()),
+        outlines: outlines.then(Vec::new),
     };
     walk.context(0);
     crate::thumb_order::thumbs_after_descendants(&walk.out, boxes)
-}
-
-/// Box `index`'s stacking, from its element's used style.
-pub(crate) fn stacking_of(
-    boxes: &[LayoutBox],
-    index: usize,
-    used: &std::collections::HashMap<vapors_dom::NodeId, crate::style::Used>,
-) -> Stacking {
-    let crate::layout::Content::Element(node) = boxes[index].content else {
-        return Stacking::default();
-    };
-    let used = &used[&node];
-    Stacking {
-        // a z-index is kept only where it applies: on a static box, a
-        // flex or grid item, which then stacks as if positioned
-        positioned: used.layout.position != taffy::Position::Static || used.z_index.is_some(),
-        z: used.z_index,
-        fixed: used.layout.position == taffy::Position::Fixed,
-        scrolls: used.scrolls(),
-    }
 }
 
 struct Walk<'a> {
     boxes: &'a [LayoutBox],
     stacking: &'a dyn Fn(usize) -> Stacking,
     out: Vec<Step>,
+    /// When outlines are wanted: the boxes painted so far in each open
+    /// stacking context, innermost last.
+    outlines: Option<Vec<Vec<usize>>>,
 }
 
 impl Walk<'_> {
@@ -94,7 +77,10 @@ impl Walk<'_> {
 
     /// A stacking context rooted at `root`.
     fn context(&mut self, root: usize) {
-        self.out.push(Step::Box(root));
+        if let Some(frames) = &mut self.outlines {
+            frames.push(Vec::new());
+        }
+        self.boxed(root);
         let layers = self.layers(root);
         let negative = layers.partition_point(|&layer| self.z(layer) < 0);
         for &layer in &layers[..negative] {
@@ -103,10 +89,28 @@ impl Walk<'_> {
         for child in self.children(root) {
             self.flow(child);
         }
+        // outlines with their own layer, before the positioned layers
+        // above it, as Blink paints them (review-v82)
+        self.flush_outlines();
         for &layer in &layers[negative..] {
             self.layer(layer);
         }
         self.thumb(root);
+    }
+
+    /// The open frame's outlines, closing it.
+    fn flush_outlines(&mut self) {
+        if let Some(frame) = self.outlines.as_mut().and_then(Vec::pop) {
+            self.out.extend(frame.into_iter().map(Step::Outline));
+        }
+    }
+
+    /// `index`'s own painting, kept for its context's outlines.
+    fn boxed(&mut self, index: usize) {
+        self.out.push(Step::Box(index));
+        if let Some(frame) = self.outlines.as_mut().and_then(|frames| frames.last_mut()) {
+            frame.push(index);
+        }
     }
 
     /// The positioned boxes of the context rooted at `root`, by z-index;
@@ -153,12 +157,18 @@ impl Walk<'_> {
         if (self.stacking)(index).roots_context() {
             return self.context(index);
         }
+        // a positioned box with z-index auto is a layer of its own for
+        // its outlines, though not a stacking context
+        if let Some(frames) = &mut self.outlines {
+            frames.push(Vec::new());
+        }
         self.whole(index);
+        self.flush_outlines();
     }
 
     /// `index`, its in-flow descendants, then its thumb if it scrolls.
     fn whole(&mut self, index: usize) {
-        self.out.push(Step::Box(index));
+        self.boxed(index);
         for child in self.children(index) {
             self.flow(child);
         }

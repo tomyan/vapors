@@ -152,11 +152,14 @@ crate, and the web IME path is platform code either way.
   155 (`gpu_events_a_prevented_pointerdown_does_not_focus_in_chromium`);
   a touch tap does not focus yet.
 - As built (3-E2b): `:focus-visible` is set when focus arrives after a
-  key (by Tab, or by script after a key) or on a text field, and not
+  key other than a modifier alone (by Tab, or by script after a key) or
+  on a text field, and not
   after a press, matching Chromium at every step of
   `fixtures/focus.events`. `outline` (width, style, colour, offset and
-  the shorthand) draws a solid ring outside the border box, after
-  everything else, following rounded corners; `auto` and dashed,
+  the shorthand) draws a solid ring outside the border box, painted
+  with its own layer (after its normal-flow content, before the
+  positioned layers above it, as Blink paints it), following rounded
+  corners, clamped at zero for a negative offset; `auto` and dashed,
   dotted and double outlines are refused. Checked against Chromium's
   pixels by `fixtures/outline_paint`. The UA sheet's ring is vapors'
   own: `:focus-visible { outline: 2px solid #0060df; outline-offset:

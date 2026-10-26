@@ -78,9 +78,9 @@ fn no_outline_by_default_and_none_draws_nothing() {
 }
 
 #[test]
-fn an_auto_or_dashed_outline_is_refused() {
+fn an_auto_dashed_dotted_or_double_outline_is_refused() {
     // Given
-    for style in ["auto", "dashed"] {
+    for style in ["auto", "dashed", "dotted", "double"] {
         let mut doc = document();
         let body = doc.body();
         element(&mut doc, body, "div", "box");
@@ -98,4 +98,93 @@ fn an_auto_or_dashed_outline_is_refused() {
             "{errors:?}"
         );
     }
+}
+
+#[test]
+fn a_negative_offset_never_inverts_the_ring_or_its_corners() {
+    // Given: rounded boxes whose outline is pulled 8px inside: at 10x10
+    // the ring would turn inside out; at 40x40 it stays upright but its
+    // 3px corners would go to -3
+    let mut rings = Vec::new();
+    for size in [10, 40] {
+        rings.extend(items(&format!("body {{ margin: 0; }} .box {{ width: {size}px; height: {size}px; border-radius: 3px; outline: 2px solid red; outline-offset: -8px; }}")));
+    }
+    assert!(!rings.is_empty(), "the 40px box draws its ring");
+
+    // Then: either no ring, or one with an upright rect and corners of zero or more
+    for item in &rings {
+        if let Item::Quad(ring) = item
+            && ring.border_colors[0].to_rgba8() == [255, 0, 0, 255]
+        {
+            assert!(
+                ring.rect.left <= ring.rect.right && ring.rect.top <= ring.rect.bottom,
+                "{ring:?}"
+            );
+            assert!(ring.radii.iter().all(|r| *r >= 0.0), "{ring:?}");
+        }
+    }
+}
+
+#[test]
+fn an_overlay_above_paints_over_an_outline_below() {
+    // Given: an outlined box, and a later positioned box with z-index 1
+    // over it
+    let items = items(
+        "body { margin: 0; } .box { width: 40px; height: 40px; outline: 4px solid red; } .after { position: absolute; left: 0; top: 0; width: 60px; height: 60px; z-index: 1; background-color: blue; }",
+    );
+
+    // Then: the ring is painted before the overlay, as Chromium paints an
+    // outline last within its own stacking context, not the page
+    let at = |rgba: [u8; 4], border: bool| {
+        items.iter().position(|item| match item {
+            Item::Quad(q) if border => q.border_colors[0].to_rgba8() == rgba && q.border[0] > 0.0,
+            Item::Quad(q) => q.background.to_rgba8() == rgba,
+            _ => false,
+        })
+    };
+    let (ring, overlay) = (at([255, 0, 0, 255], true), at([0, 0, 255, 255], false));
+    assert!(
+        ring.is_some() && overlay.is_some() && ring < overlay,
+        "{items:?}"
+    );
+}
+
+#[test]
+fn an_overflow_hidden_ancestor_clips_a_childs_outline_but_not_its_own() {
+    // Given: a clipping parent with an outline, holding an outlined child
+    let mut doc = document();
+    let body = doc.body();
+    let parent = element(&mut doc, body, "div", "parent");
+    element(&mut doc, parent, "div", "child");
+    doc.add_stylesheet(
+        "app.css",
+        "body { margin: 20px; } .parent { width: 50px; height: 50px; overflow: hidden; outline: 2px solid red; } .child { width: 20px; height: 20px; outline: 3px solid blue; }",
+    )
+    .expect("parses");
+
+    // When
+    let painted = doc.update(viewport(200.0, 100.0)).expect("updates");
+    let scene = painted.scene();
+
+    // Then: the child's ring is under the parent's clip; the parent's is not
+    let clip_of = |rgba: [u8; 4]| {
+        scene
+            .items()
+            .iter()
+            .enumerate()
+            .find_map(|(i, item)| match item {
+                Item::Quad(q) if q.border_colors[0].to_rgba8() == rgba && q.border[0] > 0.0 => {
+                    Some(scene.clips()[i])
+                }
+                _ => None,
+            })
+    };
+    assert!(
+        clip_of([0, 0, 255, 255]).flatten().is_some(),
+        "the child's ring is clipped"
+    );
+    assert!(
+        clip_of([255, 0, 0, 255]).flatten().is_none(),
+        "the parent's own ring is not"
+    );
 }

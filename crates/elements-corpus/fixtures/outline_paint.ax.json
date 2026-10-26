@@ -6,6 +6,10 @@
         "focusable=true"
       ],
       "role": "RootWebArea"
+    },
+    {
+      "depth": 1,
+      "role": "generic"
     }
   ],
   "viewport": [

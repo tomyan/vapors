@@ -60,8 +60,10 @@ hr {
   border: 1px solid #c0c0c0;
 }
 
-/* The focus ring (3-E2b): vapors' own, a solid 2px ring 1px out in
-   blue, not Chromium's native `auto` ring, which vapors does not draw.
-   It shows where focus arrived by a key (:focus-visible), not by a
-   press. */
+/* The focus ring (3-E2b): vapors' default, a solid 2px ring 1px out
+   in blue, not Chromium's native `auto` ring, which vapors does not
+   draw. An app overrides it with its own :focus-visible rule (touché's
+   from its accent token). It shows where focus arrived by a key
+   (:focus-visible), not by a press. Inline elements get no ring until
+   inline elements have element boxes of their own (S6). */
 :focus-visible { outline: 2px solid #0060df; outline-offset: 1px; }

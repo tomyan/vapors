@@ -33,6 +33,7 @@ mod restyle_pass;
 mod scroll;
 mod scroll_chains;
 mod scrolling;
+mod stacking;
 mod style;
 mod tags;
 mod thumb;
