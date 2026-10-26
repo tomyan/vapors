@@ -49,11 +49,11 @@ fn gpu_the_stress_counters_ink_changes_from_one_frame_to_the_next() {
     let demo = vapors_demos::find("stress").expect("the stress demo");
     let mut shown = vapors_demos::document(&demo);
     let mut per_frame = shown.per_frame.take().expect("stress changes every frame");
-    per_frame(None);
+    per_frame(&[]);
     let first = painted_tick(&shown);
 
     // When
-    per_frame(Some(std::time::Duration::from_millis(1)));
+    per_frame(&[("update", std::time::Duration::from_millis(1))]);
     let second = painted_tick(&shown);
 
     // Then

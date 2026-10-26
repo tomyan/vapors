@@ -43,6 +43,10 @@ pub struct Frame<'a> {
     /// Device pixels per logical pixel: the window's scale factor, the
     /// page's `devicePixelRatio` on the web. 2.0 on a high-density display.
     pub scale_factor: f64,
+    /// The frame's time, read once as it starts and given to every phase
+    /// (design 02). On the web it is `performance.now()` then, not the
+    /// `requestAnimationFrame` timestamp, which winit does not expose.
+    pub now: crate::Instant,
 }
 
 impl Frame<'_> {
