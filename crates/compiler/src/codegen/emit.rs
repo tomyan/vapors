@@ -36,6 +36,9 @@ pub(crate) struct Emitter<'a> {
     /// The Dom type builder closures take: the component's `D`, or
     /// `dyn Dom` inside a snippet (`vapors_dom::Snippet` says why).
     pub dom_type: &'static str,
+    /// The snippets declared so far: a closure that reads one gets a
+    /// clone of it, as of a script binding.
+    pub snippets: Vec<String>,
 }
 
 impl<'a> Emitter<'a> {
@@ -52,6 +55,7 @@ impl<'a> Emitter<'a> {
             loop_bindings: Vec::new(),
             scoped: false,
             dom_type: "D",
+            snippets: Vec::new(),
         }
     }
 
@@ -102,8 +106,18 @@ impl<'a> Emitter<'a> {
         name
     }
 
+    /// A list's snippets first, so a `{render}` may come before the
+    /// snippet it renders, as in Svelte; then the rest in order.
     pub fn emit_nodes(&mut self, nodes: &[Node], place: &Place) -> Result<(), CompileError> {
         for node in nodes {
+            if let Node::Snippet(snippet) = node {
+                self.emit_snippet(snippet)?;
+            }
+        }
+        for node in nodes
+            .iter()
+            .filter(|node| !matches!(node, Node::Snippet(_)))
+        {
             self.emit_node(node, place)?;
         }
         Ok(())
@@ -116,10 +130,7 @@ impl<'a> Emitter<'a> {
             Node::Text(text) => self.emit_text(text, place),
             Node::If(block) => self.emit_if(block, place),
             Node::For(block) => self.emit_for(block, place),
-            Node::Snippet(snippet) => Err(self.source.error(
-                snippet.offset,
-                "named snippets are deferred to 1-R1's second slice (R1b): pass children inside the component tag, rendered with {render children()}",
-            )),
+            Node::Snippet(snippet) => self.emit_snippet(snippet),
             Node::Render(render) => self.emit_render(render, place),
         }
     }
@@ -189,6 +200,7 @@ impl<'a> Emitter<'a> {
             .script
             .bindings
             .iter()
+            .chain(&self.snippets)
             .filter(|name| mentioned.contains(*name) && !loop_names.contains(name))
             .cloned()
             .collect();

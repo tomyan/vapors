@@ -95,8 +95,9 @@ impl Emitter<'_> {
         self.line("{");
         self.indent(1);
         self.emit_clones(clones);
+        // the closure is the block's value; the block takes the comma
         for line in lines {
-            self.line(line);
+            self.line(line.strip_suffix(',').unwrap_or(line));
         }
         self.dedent(1);
         self.line("},");
