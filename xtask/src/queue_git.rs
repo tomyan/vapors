@@ -6,7 +6,7 @@
 //! disk; fetching and pushing, which go over the network, have their
 //! deadline in `queue_remote.rs`.
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
@@ -30,8 +30,13 @@ pub fn contains(dir: &Path, base: &str, head: &str) -> Result<bool, String> {
     }
 }
 
-/// Whether the clear of `cleared` still describes `head`: the commits
-/// each has over `main` are the same patches.
+/// Whether the clear of `cleared` still describes `head`. Each commit of
+/// `head` over `main` must be the same patch as one of `cleared`'s, and
+/// each of `cleared`'s left over must already be in `main` (a parent PR
+/// squashed into it). Patches are compared without context (`-U0`), so
+/// main changing lines near a hunk keeps the clear; `git patch-id`
+/// ignores line numbers and whitespace, so a change of indentation
+/// alone keeps it too (a declared limit).
 ///
 /// # Errors
 ///
@@ -39,11 +44,35 @@ pub fn contains(dir: &Path, base: &str, head: &str) -> Result<bool, String> {
 pub fn clear_holds(dir: &Path, main: &str, head: &str, cleared: &str) -> Result<Clear, String> {
     let now = patch_ids(dir, main, head)?;
     let then = patch_ids(dir, main, cleared)?;
-    Ok(if now == then {
-        Clear::Holds
-    } else {
-        Clear::Changed
-    })
+    if now.keys().any(|id| !then.contains_key(id)) {
+        return Ok(Clear::Changed);
+    }
+    for (id, commit) in &then {
+        if !now.contains_key(id) && !in_main(dir, main, commit)? {
+            return Ok(Clear::Changed);
+        }
+    }
+    Ok(Clear::Holds)
+}
+
+/// Whether `main` already holds `commit`'s change: its diff applies in
+/// reverse to main's tree (in a scratch index, touching no worktree).
+fn in_main(dir: &Path, main: &str, commit: &str) -> Result<bool, String> {
+    let index = std::env::temp_dir().join(format!("xtask-queue-index-{}", std::process::id()));
+    let index_text = index.display().to_string();
+    let read = command(dir, &["read-tree", main])
+        .env("GIT_INDEX_FILE", &index_text)
+        .output();
+    read.map_err(|e| format!("git read-tree: {e}"))?;
+    let diff = git(dir, &["show", "--format=", "--binary", commit])?;
+    let applied = piped(
+        dir,
+        &["apply", "--check", "--reverse", "--cached"],
+        &diff,
+        Some(&index_text),
+    );
+    let _ = std::fs::remove_file(&index);
+    applied.map(|output| output.status.success())
 }
 
 /// `head` rebased onto `main` and checked out detached: the new head, or
@@ -62,38 +91,51 @@ pub fn rebase_clean(dir: &Path, main: &str, head: &str) -> Result<Option<String>
     Ok(None)
 }
 
-/// Each commit's patch id over `base..tip`.
-fn patch_ids(dir: &Path, base: &str, tip: &str) -> Result<BTreeSet<String>, String> {
+/// Each commit's patch id over `base..tip`, to its commit.
+fn patch_ids(dir: &Path, base: &str, tip: &str) -> Result<BTreeMap<String, String>, String> {
     let range = format!("{base}..{tip}");
-    git(dir, &["rev-list", &range])?
-        .lines()
-        .map(|commit| patch_id(dir, commit))
-        .filter(|id| !matches!(id, Ok(id) if id.is_empty()))
-        .collect()
+    let mut ids = BTreeMap::new();
+    for commit in git(dir, &["rev-list", &range])?.lines() {
+        let id = patch_id(dir, commit)?;
+        if !id.is_empty() {
+            ids.insert(id, commit.to_owned());
+        }
+    }
+    Ok(ids)
 }
 
-/// `commit`'s patch id; empty for a commit with no diff.
+/// `commit`'s patch id, without context; empty for a commit with no diff.
 fn patch_id(dir: &Path, commit: &str) -> Result<String, String> {
-    let diff = git(dir, &["show", "--format=", commit])?;
-    let mut child = command(dir, &["patch-id", "--stable"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("git patch-id: {e}"))?;
-    let mut stdin = child.stdin.take().ok_or("git patch-id's input")?;
-    stdin
-        .write_all(diff.as_bytes())
-        .map_err(|e| format!("git patch-id: {e}"))?;
-    drop(stdin);
-    let output = child
-        .wait_with_output()
-        .map_err(|e| format!("git patch-id: {e}"))?;
+    let diff = git(dir, &["show", "--format=", "-U0", commit])?;
+    let output = piped(dir, &["patch-id", "--stable"], &diff, None)?;
     let text = String::from_utf8_lossy(&output.stdout);
     Ok(text
         .split_whitespace()
         .next()
         .unwrap_or_default()
         .to_owned())
+}
+
+/// git in `dir` with `input` on its stdin, `GIT_INDEX_FILE` as `index`.
+fn piped(dir: &Path, args: &[&str], input: &str, index: Option<&str>) -> Result<Output, String> {
+    let mut command = command(dir, args);
+    if let Some(index) = index {
+        command.env("GIT_INDEX_FILE", index);
+    }
+    let mut child = command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("git {}: {e}", args.join(" ")))?;
+    let mut stdin = child.stdin.take().ok_or("git's input")?;
+    stdin
+        .write_all(input.as_bytes())
+        .map_err(|e| format!("git {}: {e}", args.join(" ")))?;
+    drop(stdin);
+    child
+        .wait_with_output()
+        .map_err(|e| format!("git {}: {e}", args.join(" ")))
 }
 
 /// git in `dir`, its stdout trimmed; it must exit 0.
