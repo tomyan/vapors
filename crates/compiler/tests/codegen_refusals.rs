@@ -86,22 +86,18 @@ fn a_condition_syntax_error_is_positioned_where_the_condition_ends() {
 }
 
 #[test]
-fn named_snippets_and_render_arguments_are_refused_until_r1b() {
+fn a_snippet_parameter_that_borrows_or_has_no_type_is_refused() {
     // When
-    let named = refusal("<div>{snippet footer()}<b>x</b>{/snippet}</div>");
-    let argument = refusal("<div>{render footer(1)}</div>");
+    let borrowed = refusal("<div>{snippet item(name: &str)}<b>{name}</b>{/snippet}</div>");
+    let untyped = refusal("<div>{snippet item(name)}<b>{name}</b>{/snippet}</div>");
 
     // Then
-    assert_eq!((named.line, named.col), (1, 6), "{named}");
+    assert_eq!((borrowed.line, borrowed.col), (1, 6), "{borrowed}");
     assert!(
-        named.message.contains("R1b") && named.message.contains("children"),
-        "{named}"
+        borrowed.message.contains("name: &str") && borrowed.message.contains("owned"),
+        "{borrowed}"
     );
-    assert_eq!((argument.line, argument.col), (1, 6), "{argument}");
-    assert!(
-        argument.message.contains("R1b") && argument.message.contains("footer()"),
-        "{argument}"
-    );
+    assert!(untyped.message.contains("needs a type"), "{untyped}");
 }
 
 #[test]
