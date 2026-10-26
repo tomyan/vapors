@@ -46,12 +46,14 @@ fn locked_pass(config: &QueueConfig, log: &Log, dry_run: bool) -> Result<(), Str
     if let Some(dir) = config.log.parent() {
         std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     }
-    rotate(&config.log, &today())?;
     let _held = crate::queue_lock::take(&beside(&config.log, "lock"))?;
+    rotate(&config.log, &today())?;
     worktree(&config.run)?;
     let state_file = beside(&config.log, "state.json");
     let mut state = State::load(&state_file)?;
-    let passed = crate::queue_pass::pass(&Real { config }, config, log, &mut state, dry_run);
+    let real = Real { config };
+    let passed = crate::queue_pass::pass(&real, config, log, &mut state, dry_run);
+    state.prune(crate::queue_ops::Ops::now_secs(&real));
     state.save(&state_file)?;
     passed
 }

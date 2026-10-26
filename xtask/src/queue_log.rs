@@ -67,21 +67,33 @@ fn file_name(log: &std::path::Path) -> String {
 }
 
 /// Rotated logs dated more than `KEEP_DAYS` before `today`, deleted.
+/// The day a rotated log's name ends with (`<log>.YYYY-MM-DD`); none
+/// for any other file beside the log, such as its state or lock.
+fn rotated_day<'a>(name: &'a str, prefix: &str) -> Option<&'a str> {
+    let day = name.strip_prefix(prefix)?;
+    let shaped = day.len() == 10
+        && day.char_indices().all(|(at, c)| {
+            if at == 4 || at == 7 {
+                c == '-'
+            } else {
+                c.is_ascii_digit()
+            }
+        });
+    shaped.then_some(day)
+}
+
 fn delete_old(log: &std::path::Path, today: &str) -> Result<(), String> {
     let Some(dir) = log.parent() else {
         return Ok(());
     };
     let prefix = format!("{}.", file_name(log));
     let oldest = days_before(today, KEEP_DAYS).ok_or_else(|| format!("{today} is not a date"))?;
-    for entry in std::fs::read_dir(dir)
-        .map_err(|e| format!("{}: {e}", dir.display()))?
-        .flatten()
-    {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        let dated = name.strip_prefix(&prefix).filter(|d| d.len() == 10);
-        if dated.is_some_and(|day| day < oldest.as_str()) {
-            std::fs::remove_file(entry.path())
-                .map_err(|e| format!("{}: {e}", entry.path().display()))?;
+    let named = |e: std::io::Error| format!("{}: {e}", dir.display());
+    for entry in std::fs::read_dir(dir).map_err(named)? {
+        let path = entry.map_err(named)?.path();
+        let name = file_name(&path);
+        if rotated_day(&name, &prefix).is_some_and(|day| day < oldest.as_str()) {
+            std::fs::remove_file(&path).map_err(|e| format!("{}: {e}", path.display()))?;
         }
     }
     Ok(())

@@ -5,15 +5,16 @@
 //! gate, a missing or outdated review clear) is left for an agent.
 
 /// Whether the PR's review clear (`review: clear <sha> (<who>)`) still
-/// describes it: the same patch-id set as the cleared commit had.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// describes it (`queue_clear.rs`).
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Clear {
     /// No clear posted.
     Missing,
     /// Cleared, and every commit since is the same patch.
     Holds,
-    /// Cleared, but a commit changed since (a fix, a conflict resolution).
-    Changed,
+    /// Cleared, but a commit changed since (a fix, a conflict
+    /// resolution); why, naming the commit.
+    Changed(String),
 }
 
 /// The gate's comment for the PR's current head.
@@ -111,9 +112,9 @@ fn waiting(pr: &Facts) -> Option<String> {
     } else if !pr.base_is_main {
         "is based on another branch, not main"
     } else {
-        match pr.clear {
+        match &pr.clear {
             Clear::Missing => "has no review clear",
-            Clear::Changed => "changed since review clear",
+            Clear::Changed(why) => return Some(format!("changed since review clear: {why}")),
             Clear::Holds => return protected(pr),
         }
     };

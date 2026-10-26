@@ -78,7 +78,7 @@ pub fn open_prs(repo: &str) -> Result<Vec<Listed>, String> {
     let prs = parse_list(&gh(&args)?)?;
     if prs.len() >= LIST_LIMIT {
         return Err(format!(
-            "gh listed {LIST_LIMIT} open PRs, its limit, so the list may be partial; fix: raise LIST_LIMIT in queue_remote.rs"
+            "gh listed {LIST_LIMIT} open PRs, its limit, so the list may be partial; fix: raise LIST_LIMIT in queue_list.rs"
         ));
     }
     Ok(prs)

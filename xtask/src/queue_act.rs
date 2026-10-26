@@ -14,7 +14,7 @@ use crate::queue_config::{MergeOn, QueueConfig};
 use crate::queue_decide::Gate;
 use crate::queue_list::Listed;
 use crate::queue_log::Log;
-use crate::queue_ops::Ops;
+use crate::queue_ops::{Gated, Ops};
 use crate::queue_state::State;
 
 /// How long GitHub may take to report a pushed head. Seen 2026-10-26:
@@ -87,42 +87,64 @@ pub fn regate(
     behind: bool,
 ) -> Result<(), String> {
     if config.merge_on == MergeOn::Checks {
-        ops.update_branch(pr.number)?;
-        return log.line(&format!(
-            "#{} updated from main; its checks rerun",
-            pr.number
-        ));
+        return update(ops, log, pr.number);
     }
     let head = if behind {
         rebased(ops, log, pr)?
     } else {
         pr.head.clone()
     };
-    let ended = ops.gate(pr.number, &head)?;
+    let gated = gate_or_back_off(ops, state, pr.number, &head)?;
     log.line(&format!(
         "#{} gated at {head}: {}",
         pr.number,
-        ended.words()
+        gated.ended.words()
     ))?;
-    back_off_if_silent(ops, log, state, pr.number, &head)
+    back_off_if_silent(ops, log, state, (pr.number, &head), &gated.tail)
 }
 
 /// A gate that posted nothing for `head` backs it off for 30 min, so it
 /// does not take the gate slot every pass.
+/// Checks mode: GitHub merges main into PR `number`, and its checks rerun.
+fn update(ops: &impl Ops, log: &Log, number: u64) -> Result<(), String> {
+    ops.update_branch(number)?;
+    log.line(&format!("#{number} updated from main; its checks rerun"))
+}
+
+/// Gate `head`; a gate that errs (killed at its deadline, or never
+/// started) backs `head` off as one that posts nothing does.
+fn gate_or_back_off(
+    ops: &impl Ops,
+    state: &mut State,
+    number: u64,
+    head: &str,
+) -> Result<Gated, String> {
+    ops.gate(number, head).map_err(|why| {
+        state.back_off(head, ops.now_secs());
+        format!("{why}; {head} backed off for 30 min")
+    })
+}
+
+/// Back off a head whose gate posted nothing, logging the gate's last
+/// lines, which say why.
 fn back_off_if_silent(
     ops: &impl Ops,
     log: &Log,
     state: &mut State,
-    number: u64,
-    head: &str,
+    (number, head): (u64, &str),
+    tail: &str,
 ) -> Result<(), String> {
     if gate(&ops.comments(number)?, head) != Gate::None {
         return Ok(());
     }
     state.back_off(head, ops.now_secs());
-    log.line(&format!(
-        "#{number}'s gate posted nothing at {head}; backed off for 30 min"
-    ))
+    let said = format!("#{number}'s gate posted nothing at {head}; backed off for 30 min");
+    if tail.is_empty() {
+        return log.line(&said);
+    }
+    log.line(&format!("{said}; its last lines:"))?;
+    tail.lines()
+        .try_for_each(|line| log.line(&format!("  {line}")))
 }
 
 fn rebased(ops: &impl Ops, log: &Log, pr: &Listed) -> Result<String, String> {

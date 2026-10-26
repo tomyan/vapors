@@ -45,17 +45,10 @@ impl State {
             )
         };
         let value: Value = serde_json::from_str(text).map_err(|e| refused(&e.to_string()))?;
-        let backoff = entries(&value["backoff"], serde_json::Value::as_u64, |k| {
-            Some(k.to_owned())
+        Ok(Self {
+            backoff: backoff_of(&value).ok_or_else(|| refused("backoff"))?,
+            said: said_of(&value).ok_or_else(|| refused("said"))?,
         })
-        .ok_or_else(|| refused("backoff"))?;
-        let said = entries(
-            &value["said"],
-            |v| v.as_str().map(str::to_owned),
-            |k| k.parse().ok(),
-        )
-        .ok_or_else(|| refused("said"))?;
-        Ok(Self { backoff, said })
     }
 
     /// Write the state to `path`.
@@ -76,6 +69,12 @@ impl State {
     /// Skip `head` for `BACKOFF_SECS` from `now`.
     pub fn back_off(&mut self, head: &str, now: u64) {
         self.backoff.insert(head.to_owned(), now + BACKOFF_SECS);
+    }
+
+    /// Drop the backoffs that have ended by `now`, so the file does not
+    /// grow by one head per silent gate for the life of the queue.
+    pub fn prune(&mut self, now: u64) {
+        self.backoff.retain(|_, until| now < *until);
     }
 
     /// Whether `head` is still backed off at `now`.
@@ -103,6 +102,20 @@ fn entries<K: Ord, V>(
         .iter()
         .map(|(k, v)| Some((key(k)?, read(v)?)))
         .collect()
+}
+
+/// The state's backoffs: head to the second it ends.
+fn backoff_of(value: &Value) -> Option<BTreeMap<String, u64>> {
+    entries(&value["backoff"], Value::as_u64, |k| Some(k.to_owned()))
+}
+
+/// The state's last reasons said: PR to reason.
+fn said_of(value: &Value) -> Option<BTreeMap<u64, String>> {
+    entries(
+        &value["said"],
+        |v| v.as_str().map(str::to_owned),
+        |k| k.parse().ok(),
+    )
 }
 
 #[cfg(test)]

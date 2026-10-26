@@ -39,6 +39,9 @@ fn a_log_from_an_earlier_day_is_rotated_and_old_ones_deleted() {
     std::fs::write(&log, "2026-10-20T10:00:00Z a line\n").expect("log");
     std::fs::write(dir.join("touche.log.2026-10-01"), "old").expect("old");
     std::fs::write(dir.join("touche.log.2026-10-18"), "recent").expect("recent");
+    // and files beside it whose 10-character suffix is not a date
+    std::fs::write(dir.join("touche.log.0000000000"), "kept").expect("kept");
+    std::fs::write(dir.join("touche.log.state.json"), "{}").expect("state");
 
     // When: rotated on 2026-10-22
     rotate(&log, "2026-10-22").expect("rotated");
@@ -51,7 +54,15 @@ fn a_log_from_an_earlier_day_is_rotated_and_old_ones_deleted() {
         .collect();
     names.sort();
     let _ = std::fs::remove_dir_all(&dir);
-    assert_eq!(names, ["touche.log.2026-10-18", "touche.log.2026-10-20"]);
+    assert_eq!(
+        names,
+        [
+            "touche.log.0000000000",
+            "touche.log.2026-10-18",
+            "touche.log.2026-10-20",
+            "touche.log.state.json"
+        ]
+    );
 }
 
 #[test]

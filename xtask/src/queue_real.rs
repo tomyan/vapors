@@ -4,23 +4,18 @@
 //! queue's own binary (main's, never the PR's), and the publish.
 
 use std::path::Path;
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::process::Command;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::gate_pr::Ended;
 use crate::queue_config::QueueConfig;
 use crate::queue_decide::{Clear, Gate};
+use crate::queue_gate_child::GATE_DEADLINE;
 use crate::queue_git::git;
 use crate::queue_list::Listed;
-use crate::queue_ops::{Now, Ops};
+use crate::queue_ops::{Gated, Now, Ops};
 use crate::queue_remote;
 
 const MAIN: &str = "origin/main";
-
-/// How long a gate run by the queue may take: the gate lock's 40 min
-/// wait (`gate_lock::WAIT`) and a touche gate's measured 4.5 to 8 min,
-/// with room. Killed at the deadline, and the kill is logged.
-const GATE_DEADLINE: Duration = Duration::from_mins(60);
 
 /// The real effects, for the repository `config` names.
 pub struct Real<'a> {
@@ -70,15 +65,11 @@ impl Ops for Real<'_> {
     }
 
     fn clear_holds(&self, head: &str, cleared: &str) -> Result<Clear, String> {
-        crate::queue_git::clear_holds(self.run(), MAIN, head, cleared)
+        crate::queue_clear::clear_holds(self.run(), MAIN, head, cleared)
     }
 
     fn touched(&self, head: &str) -> Result<Vec<String>, String> {
-        let range = format!("{MAIN}...{head}");
-        Ok(git(self.run(), &["diff", "--name-only", &range])?
-            .lines()
-            .map(str::to_owned)
-            .collect())
+        crate::queue_git::changed_paths(self.run(), MAIN, head)
     }
 
     fn rebased(&self, head: &str) -> Result<Option<String>, String> {
@@ -90,10 +81,15 @@ impl Ops for Real<'_> {
         queue_remote::push_lease(self.run(), branch, known, new)
     }
 
-    fn gate(&self, number: u64, head: &str) -> Result<Ended, String> {
+    fn gate(&self, number: u64, head: &str) -> Result<Gated, String> {
         self.at(head)?;
         crate::queue_pins::move_siblings(self.run())?;
-        gate_child(gate_command(self.run(), number)?)
+        let out = format!("{}.gate.out", self.config.log.display());
+        crate::queue_gate_child::run(
+            gate_command(self.run(), number)?,
+            GATE_DEADLINE,
+            Path::new(&out),
+        )
     }
 
     fn checks(&self, number: u64) -> Result<Gate, String> {
@@ -149,39 +145,6 @@ pub fn gate_command(run: &Path, number: u64) -> Result<Command, String> {
         .args(["gate", "--pr", &number.to_string()])
         .current_dir(run);
     Ok(command)
-}
-
-/// Run the gate child within `GATE_DEADLINE`; how it ended.
-fn gate_child(mut command: Command) -> Result<Ended, String> {
-    let mut child = command
-        .stdin(Stdio::null())
-        .spawn()
-        .map_err(|e| format!("could not start the gate: {e}"))?;
-    let started = Instant::now();
-    while started.elapsed() <= GATE_DEADLINE {
-        if let Some(status) = child
-            .try_wait()
-            .map_err(|e| format!("waiting for the gate: {e}"))?
-        {
-            return ended(status);
-        }
-        std::thread::sleep(Duration::from_secs(1));
-    }
-    let _ = child.kill();
-    let _ = child.wait();
-    Err(format!(
-        "the gate did not finish within {GATE_DEADLINE:?}; killed"
-    ))
-}
-
-/// An exit status as a code or the signal that ended it.
-fn ended(status: std::process::ExitStatus) -> Result<Ended, String> {
-    use std::os::unix::process::ExitStatusExt;
-    match (status.code(), status.signal()) {
-        (Some(code), _) => Ok(Ended::Code(code)),
-        (None, Some(signal)) => Ok(Ended::Signal(signal)),
-        (None, None) => Err("the gate ended with neither a code nor a signal".into()),
-    }
 }
 
 #[cfg(test)]

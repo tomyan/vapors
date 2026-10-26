@@ -60,7 +60,7 @@ fn a_pr_without_a_holding_review_clear_is_left_for_an_agent() {
         ..ready()
     };
     let changed = Facts {
-        clear: Clear::Changed,
+        clear: Clear::Changed("abc is not a patch the clear covers".into()),
         ..ready()
     };
     assert_eq!(
@@ -69,7 +69,9 @@ fn a_pr_without_a_holding_review_clear_is_left_for_an_agent() {
     );
     assert_eq!(
         decide(&changed),
-        Decision::Skip("#71 changed since review clear".into())
+        Decision::Skip(
+            "#71 changed since review clear: abc is not a patch the clear covers".into()
+        )
     );
 }
 

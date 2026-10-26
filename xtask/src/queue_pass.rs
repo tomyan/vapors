@@ -68,13 +68,7 @@ impl<O: Ops> Pass<'_, O> {
     ) -> Result<bool, String> {
         let judged = match judged {
             Ok(judged) => judged,
-            Err(why) => {
-                return self.said(
-                    state,
-                    pr.number,
-                    &format!("#{} could not be judged: {why}", pr.number),
-                );
-            }
+            Err(why) => return self.said(state, pr.number, &unjudged(pr.number, &why)),
         };
         if let Decision::Skip(why) = &judged.decision {
             return self.said(state, pr.number, why);
@@ -186,6 +180,11 @@ fn dry(number: u64, judged: &Result<Judged, String>) -> String {
     }
 }
 
+/// The log's line for a PR that could not be judged.
+fn unjudged(number: u64, why: &str) -> String {
+    format!("#{number} could not be judged: {why}")
+}
+
 #[cfg(test)]
 #[path = "queue_pass_tests.rs"]
 mod tests;
@@ -193,3 +192,7 @@ mod tests;
 #[cfg(test)]
 #[path = "queue_pass_regate_tests.rs"]
 mod regate_tests;
+
+#[cfg(test)]
+#[path = "queue_pass_gate_tests.rs"]
+mod gate_tests;

@@ -8,7 +8,7 @@ use std::time::Duration;
 use crate::gate_pr::{Ended, comment};
 use crate::queue_decide::{Clear, Gate};
 use crate::queue_list::Listed;
-use crate::queue_ops::{Now, Ops};
+use crate::queue_ops::{Gated, Now, Ops};
 
 /// A full-SHA clear signed `role`.
 pub fn clear(role: &str) -> String {
@@ -40,6 +40,10 @@ pub struct Fake {
     pub rebased: Option<String>,
     /// Whether a gate posts its pass for the head it ran on.
     pub gate_posts: bool,
+    /// The gate's error (killed at its deadline, could not start).
+    pub gate_fails: Option<String>,
+    pub gate_exit: i32,
+    pub gate_tail: String,
     pub merge_fails: Vec<u64>,
     pub checks: BTreeMap<u64, Gate>,
     /// A PR that gets `queue: hold` once its comments were read once (a
@@ -127,7 +131,11 @@ impl Ops for Fake {
         self.note(format!("push {branch} {known} {new}"));
         Ok(())
     }
-    fn gate(&self, number: u64, head: &str) -> Result<Ended, String> {
+    fn gate(&self, number: u64, head: &str) -> Result<Gated, String> {
+        if let Some(why) = &self.gate_fails {
+            self.note(format!("gate {number} {head}"));
+            return Err(why.clone());
+        }
         self.note(format!("gate {number} {head}"));
         if self.gate_posts {
             let body = comment(head, number, Ended::Code(0), &format!("gate: pass {head}"));
@@ -137,7 +145,10 @@ impl Ops for Fake {
                 .or_default()
                 .push(body);
         }
-        Ok(Ended::Code(0))
+        Ok(Gated {
+            ended: Ended::Code(self.gate_exit),
+            tail: self.gate_tail.clone(),
+        })
     }
     fn checks(&self, number: u64) -> Result<Gate, String> {
         Ok(self.checks.get(&number).copied().unwrap_or(Gate::Passed))

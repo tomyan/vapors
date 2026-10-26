@@ -46,12 +46,16 @@ mod priority;
 mod queue;
 mod queue_act;
 mod queue_checks;
+mod queue_clear;
 mod queue_comments;
 mod queue_config;
 mod queue_decide;
 #[cfg(test)]
 mod queue_fake;
+mod queue_gate_child;
 mod queue_git;
+#[cfg(test)]
+mod queue_git_fixture;
 mod queue_judge;
 mod queue_list;
 mod queue_lock;

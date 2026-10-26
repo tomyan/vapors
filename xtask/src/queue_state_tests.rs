@@ -52,3 +52,18 @@ fn a_state_file_of_another_shape_is_refused_naming_it() {
         "{why}"
     );
 }
+
+#[test]
+fn an_expired_backoff_is_pruned() {
+    // Given
+    let mut state = State::default();
+    state.back_off("old", 1_000);
+    state.back_off("new", 5_000);
+
+    // When
+    state.prune(1_000 + BACKOFF_SECS);
+
+    // Then
+    assert!(!state.backoff.contains_key("old"));
+    assert!(state.backed_off("new", 5_000));
+}

@@ -20,6 +20,14 @@ pub struct Now {
     pub draft: bool,
 }
 
+/// How a gate run by the queue ended, and the last lines it printed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Gated {
+    pub ended: Ended,
+    /// Its last lines of output, to say why when it posted nothing.
+    pub tail: String,
+}
+
 /// The queue's effects.
 pub trait Ops {
     /// The open PRs, oldest first (refused at the list's limit).
@@ -41,7 +49,7 @@ pub trait Ops {
     /// Push `new` to `branch` with a lease on `known`.
     fn push(&self, branch: &str, known: &str, new: &str) -> Result<(), String>;
     /// Run `gate --pr number` at `head`, by the queue's own binary.
-    fn gate(&self, number: u64, head: &str) -> Result<Ended, String>;
+    fn gate(&self, number: u64, head: &str) -> Result<Gated, String>;
     /// PR `number`'s checks as a gate.
     fn checks(&self, number: u64) -> Result<Gate, String>;
     /// Ask GitHub to merge main into PR `number`.

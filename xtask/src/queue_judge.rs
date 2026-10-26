@@ -10,9 +10,21 @@ use crate::queue_list::Listed;
 use crate::queue_ops::Ops;
 use crate::queue_state::State;
 
-/// Paths only the lead may clear: the factory, CI and its settings (the
-/// queue's own units and script are under xtask/).
-pub const PROTECTED: [&str; 3] = ["xtask/", ".github/", ".config/factory.toml"];
+/// Paths only the lead may clear: the factory (the queue's own units and
+/// script are under xtask/), CI, the factory's settings and pins, and
+/// what decides how `cargo xtask` builds and runs (the alias and build
+/// settings in .cargo/, the toolchain, cargo-deny's policy). A declared
+/// limit: the root Cargo.toml's workspace members can also change what
+/// builds, and a change to it merges on a foreman's clear; reviewers
+/// read it as a factory change.
+pub const PROTECTED: [&str; 6] = [
+    "xtask/",
+    ".github/",
+    ".config/",
+    ".cargo/",
+    "rust-toolchain.toml",
+    "deny.toml",
+];
 
 /// A PR's decision, and whether it is behind main.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -90,11 +102,7 @@ fn cheap_facts(
         base_is_main: pr.base == "main",
         draft: pr.draft,
         held: held(comments),
-        clear: if clear.is_some() {
-            Clear::Holds
-        } else {
-            Clear::Missing
-        },
+        clear: clear.map_or(Clear::Missing, |_| Clear::Holds),
         contains_main: true,
         gate: Gate::None,
         rebase_clean: true,
@@ -122,3 +130,7 @@ fn protected(touched: &[String]) -> Option<String> {
         .find(|path| PROTECTED.iter().any(|p| path.starts_with(p)))
         .cloned()
 }
+
+#[cfg(test)]
+#[path = "queue_judge_tests.rs"]
+mod tests;
