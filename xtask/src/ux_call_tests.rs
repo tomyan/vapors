@@ -55,6 +55,10 @@ fn the_key_is_in_none_of_curl_s_arguments() {
             .all(|a| secret().guard("an argument", a).is_ok())
     );
     assert!(arguments.contains(&"@-".to_owned()));
+    assert_eq!(
+        arguments[0], "-q",
+        "curl reads ~/.curlrc unless -q comes first"
+    );
 }
 
 #[test]
@@ -94,6 +98,8 @@ fn a_response_echoing_the_key_is_refused_without_showing_it() {
         "{refused}"
     );
     assert!(!refused.contains(&KEY[KEY.len() - 12..]), "{refused}");
+    assert!(!response.exists(), "the response file keeps the key");
+    assert!(refused.contains("was deleted"), "{refused}");
 }
 
 #[test]

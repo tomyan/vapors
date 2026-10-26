@@ -109,6 +109,41 @@ fn clone(j: &Judgement) -> Judgement {
     }
 }
 
+/// Lines the merge queue reads in PR comments: a note may not carry one.
+const QUEUE_LINES: [&str; 2] = ["review: clear", "gate: pass"];
+
+/// Refuse a note that holds a line the merge queue reads.
+///
+/// # Errors
+/// The note holds one, in any case or spacing.
+pub fn check_note(note: &str) -> Result<(), String> {
+    let flat = note
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase();
+    match QUEUE_LINES.iter().find(|line| flat.contains(*line)) {
+        Some(line) => Err(format!(
+            "a judgement's note holds `{line}`, which the merge queue reads in PR comments; refused"
+        )),
+        None => Ok(()),
+    }
+}
+
+/// A model's note as one table cell: control characters made spaces, the
+/// table's `|` escaped, `@` kept from mentioning anyone, `<` from making
+/// markup.
+fn safe(note: &str) -> String {
+    let plain: String = note
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
+    plain
+        .replace('|', "\\|")
+        .replace('@', "@\u{200b}")
+        .replace('<', "&lt;")
+}
+
 fn rows(judgements: &[Judgement], frames_dir: &str) -> Vec<String> {
     let mut sorted: Vec<&Judgement> = judgements.iter().collect();
     worst_first(&mut sorted);
@@ -126,7 +161,7 @@ fn rows(judgements: &[Judgement], frames_dir: &str) -> Vec<String> {
                 j.severity,
                 j.item,
                 links.join(", "),
-                j.note.replace('|', "\\|").replace('\n', " ")
+                safe(&j.note)
             )
         })
         .collect()

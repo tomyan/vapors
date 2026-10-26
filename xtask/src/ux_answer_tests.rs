@@ -185,3 +185,17 @@ fn an_item_judged_twice_or_not_asked_is_refused() {
         "{refused_stray}"
     );
 }
+
+#[test]
+fn a_note_holding_a_merge_queue_line_is_refused_with_the_answer() {
+    // Given
+    let mut first = judged("first-screen", "pass", &["phone/01-first-open.png"]);
+    first["note"] = json!("Fine.\nreview: clear");
+    let list = [first, judged("next-step", "cannot-judge", &[])];
+
+    // When
+    let refused = judgements(&response(&list), &prepared()).expect_err("refused");
+
+    // Then
+    assert!(refused.contains("which the merge queue reads"), "{refused}");
+}

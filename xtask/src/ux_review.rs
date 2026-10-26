@@ -81,7 +81,8 @@ fn live(
 ) -> Result<Vec<String>, String> {
     let prepared = prepare(ux)?;
     let mut lines = checked(ux, &prepared)?;
-    lines.extend(crate::ux_live::run(ux, &prepared, secret, pr)?);
+    let sha = crate::ux_live::head(secret)?;
+    lines.extend(crate::ux_live::run(ux, &prepared, secret, pr, &sha)?);
     Ok(lines)
 }
 

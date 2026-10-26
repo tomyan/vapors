@@ -51,9 +51,26 @@ pub fn exact(ux: &UxConfig, secret: &Secret, request: &Path) -> Result<u64, Stri
         &answer_file,
         crate::ux_call::DEADLINE,
     )?;
+    input_tokens(&answer)
+}
+
+/// The count in an `input_tokens` answer, refused unless it is one, of
+/// at least one token: a count of 0 would pin nothing.
+///
+/// # Errors
+/// Another object, or no positive `input_tokens`.
+pub fn input_tokens(answer: &serde_json::Value) -> Result<u64, String> {
+    if answer["object"] != "response.input_tokens" {
+        return Err(format!(
+            "the count's answer is not a `response.input_tokens`: {answer}"
+        ));
+    }
     answer["input_tokens"]
         .as_u64()
-        .ok_or_else(|| format!("the count has no `input_tokens`: {answer}"))
+        .filter(|n| *n > 0)
+        .ok_or_else(|| {
+            format!("the count's `input_tokens` is not a positive whole number: {answer}")
+        })
 }
 
 /// The caps checked against the exact count.

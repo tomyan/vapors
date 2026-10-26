@@ -73,6 +73,7 @@ mod ux_config;
 mod ux_count;
 mod ux_estimate;
 mod ux_ledger;
+mod ux_ledger_write;
 mod ux_live;
 mod ux_measure;
 mod ux_measure_run;
@@ -83,6 +84,7 @@ mod ux_request;
 mod ux_review;
 mod ux_run;
 mod ux_secret;
+mod ux_spend;
 #[cfg(test)]
 mod ux_stub_tests;
 mod web;

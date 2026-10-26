@@ -22,6 +22,8 @@ pub const DEADLINE: Duration = Duration::from_secs(300);
 pub fn arguments(endpoint: &str, body: &Path, response: &Path, deadline: Duration) -> Vec<String> {
     let path = |p: &Path| p.display().to_string();
     vec![
+        // -q first: a ~/.curlrc (with --verbose or --trace) is not read.
+        "-q".into(),
         "--silent".into(),
         "--show-error".into(),
         "--connect-timeout".into(),
@@ -63,7 +65,9 @@ pub fn post(
         }
         _ => {}
     }
-    let mut child = Command::new("curl")
+    let mut curl = Command::new("curl");
+    secret.unset_in(&mut curl);
+    let mut child = curl
         .args(arguments(endpoint, body, response, deadline))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -92,12 +96,26 @@ pub fn post(
 fn answer(secret: &Secret, status: &str, response: &Path) -> Result<Value, String> {
     let text =
         std::fs::read_to_string(response).map_err(|e| format!("{}: {e}", response.display()))?;
-    let text = secret.guard("the response", &text)?;
+    let text = match secret.guard("the response", &text) {
+        Ok(text) => text,
+        Err(why) => return Err(forget(response, &why)),
+    };
     if status != "200" {
         let head: String = text.chars().take(600).collect();
         return Err(format!("the endpoint answered HTTP {status}: {head}"));
     }
     serde_json::from_str(text).map_err(|e| format!("the response is not JSON: {e}"))
+}
+
+/// A response the guard refused is deleted, so no file keeps the key.
+fn forget(response: &Path, why: &str) -> String {
+    match std::fs::remove_file(response) {
+        Ok(()) => format!("{why}; {} was deleted", response.display()),
+        Err(e) => format!(
+            "{why}; {} could not be deleted ({e}); fix: delete it by hand",
+            response.display()
+        ),
+    }
 }
 
 #[cfg(test)]

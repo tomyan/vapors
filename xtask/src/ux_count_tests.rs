@@ -48,3 +48,21 @@ fn the_count_endpoint_is_beside_the_responses_endpoint() {
         "https://api.openai.com/v1/responses/input_tokens"
     );
 }
+
+#[test]
+fn a_count_of_zero_or_of_another_object_is_refused() {
+    let zero = serde_json::json!({ "object": "response.input_tokens", "input_tokens": 0 });
+    let other = serde_json::json!({ "object": "response", "input_tokens": 10 });
+    assert!(
+        input_tokens(&zero)
+            .expect_err("zero")
+            .contains("not a positive whole number")
+    );
+    assert!(
+        input_tokens(&other)
+            .expect_err("other")
+            .contains("not a `response.input_tokens`")
+    );
+    let good = serde_json::json!({ "object": "response.input_tokens", "input_tokens": 26_924 });
+    assert_eq!(input_tokens(&good), Ok(26_924));
+}

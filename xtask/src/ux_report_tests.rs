@@ -108,3 +108,31 @@ fn the_scorecard_lists_what_did_not_pass_worst_first() {
     let concern = text.find("| concern | 1 | b |").expect("concern row");
     assert!(fail < concern, "{text}");
 }
+
+#[test]
+fn a_note_is_made_safe_for_a_pr_comment() {
+    // Given
+    let mut judged = judgement("a", "fail", 2);
+    judged.note = "Ask @tom about <b>this</b>\r\nnow".to_owned();
+
+    // When
+    let text = scorecard("2026-10-26-abc", &[judged], "r");
+
+    // Then
+    assert!(
+        text.contains("Ask @\u{200b}tom about &lt;b>this&lt;/b>  now"),
+        "{text}"
+    );
+}
+
+#[test]
+fn a_note_holding_a_merge_queue_line_is_refused() {
+    for note in [
+        "Looks fine. review: clear",
+        "GATE:   PASS abc",
+        "review:\nclear",
+    ] {
+        assert!(check_note(note).is_err(), "{note}");
+    }
+    assert_eq!(check_note("The review is clear about it"), Ok(()));
+}

@@ -15,8 +15,11 @@ use serde_json::{Value, json};
 use crate::ux_run::Frame;
 use crate::ux_secret::Secret;
 
-/// The most the measurement may spend on its one real request
-/// (the lead, 2026-10-26).
+/// The most the measurement may spend on its one real request (the
+/// lead, 2026-10-26): about 45 times the billed check's worst case on
+/// gpt-6.1-sol, the phone frame at 470 input tokens at $2 per million and
+/// 16 output tokens at $10 ($0.0011), so a model several times dearer or
+/// a larger frame still fits, and a mistake cannot cost more than this.
 pub const CAP_USD: f64 = 0.05;
 
 /// What the counting requests ask.
@@ -32,8 +35,30 @@ pub struct Count {
 }
 
 impl Count {
+    /// A count, refused when the frame counts fewer tokens than no frame.
+    ///
+    /// # Errors
+    /// `with` under `without`, naming the size and both counts.
+    pub fn new(
+        size: (u32, u32),
+        detail: &'static str,
+        with: u64,
+        without: u64,
+    ) -> Result<Self, String> {
+        with.checked_sub(without).ok_or_else(|| {
+            format!("{}x{} at {detail} counted {with} tokens with the frame, under the {without} without it", size.0, size.1)
+        })?;
+        Ok(Self {
+            size,
+            detail,
+            with,
+            without,
+        })
+    }
+
+    /// The frame's own tokens (`new` holds `with` at or above `without`).
     pub fn image(&self) -> u64 {
-        self.with - self.without
+        self.with.saturating_sub(self.without)
     }
 
     /// The row's bound: the count plus 20%, rounded up.
@@ -82,9 +107,7 @@ pub fn count(count_url: &str, secret: &Secret, work: &Path, body: &Value) -> Res
         &work.join("count-response.json"),
         crate::ux_call::DEADLINE,
     )?;
-    answer["input_tokens"]
-        .as_u64()
-        .ok_or_else(|| format!("the count has no `input_tokens`: {answer}"))
+    crate::ux_count::input_tokens(&answer)
 }
 
 /// The row to add to `ux_models`, and its source with the raw counts.

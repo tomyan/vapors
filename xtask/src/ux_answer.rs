@@ -180,12 +180,14 @@ fn judgement(value: &Value, frames: &[&str]) -> Result<Judgement, String> {
             "a judgement with the verdict `{verdict}` cites no frame: {value}"
         ));
     }
+    let note = text("note")?;
+    crate::ux_report::check_note(&note)?;
     Ok(Judgement {
         item: text("item")?,
         verdict,
         severity,
         frames: cited,
-        note: text("note")?,
+        note,
     })
 }
 

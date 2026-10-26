@@ -102,3 +102,12 @@ fn a_billed_request_that_differs_from_its_count_is_refused() {
         "{refused}"
     );
 }
+
+#[test]
+fn a_frame_that_counts_fewer_tokens_than_no_frame_is_refused() {
+    let refused = Count::new((4, 8), "low", 9, 10).expect_err("refused");
+    assert!(
+        refused.contains("4x8 at low counted 9 tokens with the frame, under the 10 without it"),
+        "{refused}"
+    );
+}

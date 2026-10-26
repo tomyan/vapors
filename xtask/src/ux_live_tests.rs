@@ -2,7 +2,7 @@
 //! before the answer is judged, and nothing is sent past the day's
 //! ceiling.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde_json::json;
 
@@ -14,15 +14,16 @@ use crate::ux_stub_tests::stand_in_many;
 
 const KEY: &str = "sk-test-0123456789abcdefghijklmnopqrstuv";
 const FRAME: &str = "phone/01-first-open.png";
+pub(super) const SHA: &str = "61bfd4e945860b03ba3f2b419406c88bb8434cf8";
 
-fn report_dir(test: &str) -> PathBuf {
+pub(super) fn report_dir(test: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("xtask-ux-live-{test}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("made");
     dir
 }
 
-fn prepared(dir: &Path) -> Prepared {
+pub(super) fn prepared(dir: &Path) -> Prepared {
     let path = dir.join("frame.png");
     std::fs::write(&path, b"png bytes").expect("written");
     Prepared {
@@ -45,14 +46,14 @@ fn prepared(dir: &Path) -> Prepared {
     }
 }
 
-fn ux(dir: &Path, endpoint: String) -> UxConfig {
+pub(super) fn ux(dir: &Path, endpoint: String) -> UxConfig {
     let mut ux = crate::ux_review::tests::ux();
     ux.report_dir = dir.to_path_buf();
     ux.endpoint = endpoint;
     ux
 }
 
-fn response(item: &str, input: u64) -> String {
+pub(super) fn response(item: &str, input: u64) -> String {
     let answer = json!({ "judgements": [{ "item": item, "verdict": "concern", "severity": 2, "frames": [FRAME], "note": "Unclear." }] });
     json!({
         "status": "completed",
@@ -62,22 +63,24 @@ fn response(item: &str, input: u64) -> String {
     .to_string()
 }
 
-fn secret() -> Secret {
+pub(super) fn secret() -> Secret {
     Secret::new(KEY.to_owned()).expect("guarded")
 }
 
-fn ledger_lines(dir: &Path) -> usize {
+pub(super) fn ledger_lines(dir: &Path) -> usize {
+    // The count's line, the sent line, and, once a response came, the
+    // settled line.
     std::fs::read_to_string(dir.join(crate::ux_ledger::FILE)).map_or(0, |t| t.lines().count())
 }
 
-fn counted(n: u64) -> (&'static str, String) {
+pub(super) fn counted(n: u64) -> (&'static str, String) {
     (
         "200 OK",
         format!(r#"{{"object": "response.input_tokens", "input_tokens": {n}}}"#),
     )
 }
 
-fn answered(item: &str, input: u64) -> (&'static str, String) {
+pub(super) fn answered(item: &str, input: u64) -> (&'static str, String) {
     ("200 OK", response(item, input))
 }
 
@@ -88,33 +91,16 @@ fn a_good_answer_writes_the_report_the_scorecard_and_the_spend() {
     let (url, _seen) = stand_in_many(vec![counted(15_000), answered("first-screen", 15_000)]);
 
     // When
-    let lines = run(&ux(&dir, url), &prepared(&dir), &secret(), None).expect("reviewed");
+    let lines = run(&ux(&dir, url), &prepared(&dir), &secret(), None, SHA).expect("reviewed");
 
     // Then: the count's line and the run's
-    assert_eq!(ledger_lines(&dir), 2);
+    assert_eq!(ledger_lines(&dir), 3);
     let card = std::fs::read_to_string(dir.join("scorecard.md")).expect("scorecard");
     assert!(card.contains("| concern | 2 | first-screen |"), "{card}");
     assert!(
         lines[0].contains("15000 input and 500 output tokens"),
         "{lines:?}"
     );
-}
-
-#[test]
-fn the_count_is_recorded_with_its_cost_unknown_and_adds_nothing_to_the_day() {
-    // Given
-    let dir = report_dir("count-line");
-    let (url, _seen) = stand_in_many(vec![counted(15_000), answered("first-screen", 15_000)]);
-
-    // When
-    run(&ux(&dir, url), &prepared(&dir), &secret(), None).expect("reviewed");
-
-    // Then
-    let ledger = std::fs::read_to_string(dir.join(crate::ux_ledger::FILE)).expect("ledger");
-    let count: serde_json::Value =
-        serde_json::from_str(ledger.lines().next().expect("line")).expect("json");
-    assert_eq!(count["costNote"], crate::ux_ledger::COUNT_COST);
-    assert!(count["cost"].is_null());
 }
 
 #[test]
@@ -127,7 +113,7 @@ fn a_count_that_fails_refuses_the_run_without_sending_it() {
     ]);
 
     // When
-    let refused = run(&ux(&dir, url), &prepared(&dir), &secret(), None).expect_err("refused");
+    let refused = run(&ux(&dir, url), &prepared(&dir), &secret(), None, SHA).expect_err("refused");
 
     // Then
     assert!(refused.contains("HTTP 500"), "{refused}");
@@ -142,7 +128,7 @@ fn a_count_over_the_estimate_refuses_the_run_without_sending_it() {
     let (url, seen) = stand_in_many(vec![counted(25_000), answered("first-screen", 15_000)]);
 
     // When
-    let refused = run(&ux(&dir, url), &prepared(&dir), &secret(), None).expect_err("refused");
+    let refused = run(&ux(&dir, url), &prepared(&dir), &secret(), None, SHA).expect_err("refused");
 
     // Then
     assert!(
@@ -160,11 +146,11 @@ fn a_wrong_answer_is_refused_after_its_spend_is_recorded() {
     let (url, _seen) = stand_in_many(vec![counted(15_000), answered("colour", 15_000)]);
 
     // When
-    let refused = run(&ux(&dir, url), &prepared(&dir), &secret(), None).expect_err("refused");
+    let refused = run(&ux(&dir, url), &prepared(&dir), &secret(), None, SHA).expect_err("refused");
 
     // Then
     assert!(refused.contains("`first-screen` 0 times"), "{refused}");
-    assert_eq!(ledger_lines(&dir), 2);
+    assert_eq!(ledger_lines(&dir), 3);
 }
 
 #[test]
@@ -174,14 +160,14 @@ fn billed_input_over_the_count_is_refused_after_its_spend_is_recorded() {
     let (url, _seen) = stand_in_many(vec![counted(15_000), answered("first-screen", 16_000)]);
 
     // When
-    let refused = run(&ux(&dir, url), &prepared(&dir), &secret(), None).expect_err("refused");
+    let refused = run(&ux(&dir, url), &prepared(&dir), &secret(), None, SHA).expect_err("refused");
 
     // Then
     assert!(
         refused.contains("billed 16000 input tokens, over the 15000 the API counted"),
         "{refused}"
     );
-    assert_eq!(ledger_lines(&dir), 2);
+    assert_eq!(ledger_lines(&dir), 3);
 }
 
 #[test]
@@ -189,12 +175,12 @@ fn nothing_is_counted_or_sent_once_the_day_s_spend_would_pass_the_ceiling() {
     // Given today's runs at $2.95, and a worst case of $0.18
     let dir = report_dir("ceiling");
     let today = &crate::ux_ledger::utc(SystemTime::now())[..10];
-    let line = json!({ "time": format!("{today}T00:00:00Z"), "cost": 2.95 });
+    let line = json!({ "time": format!("{today}T00:00:00Z"), "kind": "settled", "id": "earlier", "cost": 2.95 });
     std::fs::write(dir.join(crate::ux_ledger::FILE), format!("{line}\n")).expect("ledger");
     let (url, seen) = stand_in_many(vec![counted(15_000)]);
 
     // When
-    let refused = run(&ux(&dir, url), &prepared(&dir), &secret(), None).expect_err("refused");
+    let refused = run(&ux(&dir, url), &prepared(&dir), &secret(), None, SHA).expect_err("refused");
 
     // Then
     assert!(

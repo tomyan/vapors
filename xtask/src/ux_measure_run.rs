@@ -1,9 +1,9 @@
-//! The order of a measurement: count without a frame, count each frame
-//! size at low and high detail, check the smallest count against one
-//! billed request held under [`CAP_USD`], record its spend, and keep the
-//! raw counts.
-
-use std::path::Path;
+//! The order of a measurement, under the ledger's lock: count without a
+//! frame, count each frame size at low and high detail (each count
+//! charged at the input price), then book the smallest count's billed
+//! check as `sent` under [`CAP_USD`] and the day's ceiling. The lock goes
+//! before the billed request; its usage settles the booking. The raw
+//! counts are kept.
 
 use serde_json::json;
 
@@ -11,7 +11,8 @@ use crate::ux_answer::usage;
 use crate::ux_config::UxConfig;
 use crate::ux_count::count_url;
 use crate::ux_estimate::dollars;
-use crate::ux_ledger::{self, Run};
+use crate::ux_ledger;
+use crate::ux_ledger_write::{self as write, Entry, LOCK_WAIT, hold};
 use crate::ux_measure::{CAP_USD, Count, body, count, distinct, now, row};
 use crate::ux_run::Frame;
 use crate::ux_secret::Secret;
@@ -24,32 +25,9 @@ use crate::ux_secret::Secret;
 pub fn run(ux: &UxConfig, secret: &Secret) -> Result<Vec<String>, String> {
     let viewports = crate::ux_run::read(&ux.run_dir)?;
     let frames: Vec<&Frame> = viewports.iter().flat_map(|v| &v.frames).collect();
-    let work = ux.report_dir.join("work");
-    std::fs::create_dir_all(&work).map_err(|e| format!("{}: {e}", work.display()))?;
-    let (url, name) = (count_url(ux), ux.model.name);
-    let ledger = ux.report_dir.join(ux_ledger::FILE);
-    let counted = |request: &serde_json::Value| -> Result<u64, String> {
-        let n = count(&url, secret, &work, request)?;
-        ux_ledger::record_count(&ledger, &now(), "measure-image-cost", name, n)?;
-        Ok(n)
-    };
-    let without = counted(&body(name, None)?)?;
-    let mut counts = Vec::new();
-    for size in distinct(frames.iter().map(|f| f.size)) {
-        let frame = frames
-            .iter()
-            .find(|f| f.size == size)
-            .ok_or("a size with no frame")?;
-        for detail in ["low", "high"] {
-            let with = counted(&body(name, Some((frame, detail)))?)?;
-            counts.push(Count {
-                size,
-                detail,
-                with,
-                without,
-            });
-        }
-    }
+    let held = hold(&ux.report_dir, LOCK_WAIT)?;
+    let spent = ux_ledger::spent_on(&ux.report_dir.join(ux_ledger::FILE), &now()[..10])?;
+    let (counts, charged) = count_all(ux, secret, &frames)?;
     let smallest = counts
         .iter()
         .min_by_key(|c| c.with)
@@ -58,9 +36,10 @@ pub fn run(ux: &UxConfig, secret: &Secret) -> Result<Vec<String>, String> {
         .iter()
         .find(|f| f.size == smallest.size)
         .ok_or("a size with no frame")?;
-    let billed = check_billing(ux, secret, &work, frame, smallest)?;
+    let billed = check_billing(ux, secret, frame, smallest, spent + charged, held)?;
     let when = now();
     keep(ux, &when, &counts, billed)?;
+    let name = ux.model.name;
     let mut lines: Vec<String> = counts
         .iter()
         .map(|c| {
@@ -86,14 +65,66 @@ pub fn run(ux: &UxConfig, secret: &Secret) -> Result<Vec<String>, String> {
     Ok(lines)
 }
 
-/// Send the smallest count's request for real, held under [`CAP_USD`]
-/// and the day's ceiling; its billed input must equal the count.
+/// Every count, each charged in the ledger at the input price; returns
+/// the counts and what they were charged.
+fn count_all(
+    ux: &UxConfig,
+    secret: &Secret,
+    frames: &[&Frame],
+) -> Result<(Vec<Count>, f64), String> {
+    let work = work_dir(ux)?;
+    let (url, name) = (count_url(ux), ux.model.name);
+    let ledger = ux.report_dir.join(ux_ledger::FILE);
+    let mut charged = 0.0;
+    let mut counted = |request: &serde_json::Value| -> Result<u64, String> {
+        let n = count(&url, secret, &work, request)?;
+        let time = now();
+        let cost = dollars(n, ux.prices.input);
+        write::count(
+            &ledger,
+            &Entry {
+                time: &time,
+                sha: "measure-image-cost",
+                model: name,
+                id: "",
+            },
+            n,
+            cost,
+        )?;
+        charged += cost;
+        Ok(n)
+    };
+    let without = counted(&body(name, None)?)?;
+    let mut counts = Vec::new();
+    for size in distinct(frames.iter().map(|f| f.size)) {
+        let frame = frames
+            .iter()
+            .find(|f| f.size == size)
+            .ok_or("a size with no frame")?;
+        for detail in ["low", "high"] {
+            let with = counted(&body(name, Some((frame, detail)))?)?;
+            counts.push(Count::new(size, detail, with, without)?);
+        }
+    }
+    Ok((counts, charged))
+}
+
+fn work_dir(ux: &UxConfig) -> Result<std::path::PathBuf, String> {
+    let work = ux.report_dir.join("work");
+    std::fs::create_dir_all(&work).map_err(|e| format!("{}: {e}", work.display()))?;
+    Ok(work)
+}
+
+/// Send the smallest count's request for real: booked as `sent` under
+/// [`CAP_USD`] and the day's ceiling while the ledger is `held`, then
+/// settled by its usage, which must equal the count.
 fn check_billing(
     ux: &UxConfig,
     secret: &Secret,
-    work: &Path,
     frame: &Frame,
     counted: &Count,
+    spent: f64,
+    held: crate::ux_ledger_write::Held,
 ) -> Result<u64, String> {
     let worst = dollars(counted.with, ux.prices.input) + dollars(16, ux.prices.output);
     if worst > CAP_USD {
@@ -101,34 +132,21 @@ fn check_billing(
             "the billed check could cost ${worst:.4}, over the measurement's ${CAP_USD:.2}; fix: measure a smaller frame"
         ));
     }
-    let time = now();
+    ux_ledger::within_day(spent, worst, ux.caps.daily_usd)?;
     let ledger = ux.report_dir.join(ux_ledger::FILE);
-    ux_ledger::within_day(
-        ux_ledger::spent_on(&ledger, &time[..10])?,
-        worst,
-        ux.caps.daily_usd,
-    )?;
-    let mut request = body(ux.model.name, Some((frame, counted.detail)))?;
-    request["max_output_tokens"] = json!(16);
-    request["store"] = json!(false);
-    let file = work.join("billed.json");
-    std::fs::write(&file, request.to_string()).map_err(|e| format!("{}: {e}", file.display()))?;
-    let response = crate::ux_call::post(
-        &ux.endpoint,
-        secret,
-        &file,
-        &work.join("billed-response.json"),
-        crate::ux_call::DEADLINE,
-    )?;
-    let used = usage(&response)?;
-    let run = Run {
+    let time = now();
+    let id = format!("{time}-{}", std::process::id());
+    let entry = Entry {
         time: &time,
         sha: "measure-image-cost",
         model: ux.model.name,
-        usage: used,
-        cost: used.cost(&ux.prices),
+        id: &id,
     };
-    ux_ledger::record(&ledger, &run)?;
+    write::sent(&ledger, &entry, worst)?;
+    drop(held);
+    let response = billed_request(ux, secret, frame, counted.detail)?;
+    let used = usage(&response)?;
+    write::settled(&ledger, &entry, used, used.cost(&ux.prices))?;
     if used.input != counted.with {
         return Err(format!(
             "the count endpoint said {} input tokens, but the same request was billed {}; the counts are not what is billed",
@@ -136,6 +154,27 @@ fn check_billing(
         ));
     }
     Ok(used.input)
+}
+
+fn billed_request(
+    ux: &UxConfig,
+    secret: &Secret,
+    frame: &Frame,
+    detail: &str,
+) -> Result<serde_json::Value, String> {
+    let work = work_dir(ux)?;
+    let mut request = body(ux.model.name, Some((frame, detail)))?;
+    request["max_output_tokens"] = json!(16);
+    request["store"] = json!(false);
+    let file = work.join("billed.json");
+    std::fs::write(&file, request.to_string()).map_err(|e| format!("{}: {e}", file.display()))?;
+    crate::ux_call::post(
+        &ux.endpoint,
+        secret,
+        &file,
+        &work.join("billed-response.json"),
+        crate::ux_call::DEADLINE,
+    )
 }
 
 /// The raw counts, kept beside the reports.

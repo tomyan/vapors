@@ -50,6 +50,10 @@ fn answer_one(stream: std::net::TcpStream, status: &str, reply: &str) -> (String
     }
     let mut body = vec![0; length];
     reader.read_exact(&mut body).expect("body");
+    if status == "close" {
+        // The request was read; the socket closes with no answer.
+        return (auth, String::from_utf8(body).expect("utf-8"));
+    }
     let answer = format!(
         "HTTP/1.1 {status}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{reply}",
         reply.len()
