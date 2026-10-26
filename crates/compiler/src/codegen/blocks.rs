@@ -60,13 +60,28 @@ impl Emitter<'_> {
         nodes: &[Node],
         signature: &str,
     ) -> Result<(), CompileError> {
+        let clones = self.builder_clones(nodes)?;
+        self.emit_builder_with(&clones, nodes, signature)
+    }
+
+    /// The bindings a builder of `nodes` reads, which it takes clones of.
+    pub(super) fn builder_clones(&self, nodes: &[Node]) -> Result<Vec<String>, CompileError> {
         let read = expressions_in(nodes);
-        let clones = self.clones_for(&read.iter().collect::<Vec<_>>())?;
+        self.clones_for(&read.iter().collect::<Vec<_>>())
+    }
+
+    /// A builder closure, inside a block with `clones` when any.
+    pub(super) fn emit_builder_with(
+        &mut self,
+        clones: &[String],
+        nodes: &[Node],
+        signature: &str,
+    ) -> Result<(), CompileError> {
         let wrapped = !clones.is_empty();
         if wrapped {
             self.line("{");
             self.indent(1);
-            self.emit_clones(&clones);
+            self.emit_clones(clones);
         }
         self.line(signature);
         self.indent(1);
