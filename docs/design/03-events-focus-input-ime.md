@@ -44,6 +44,25 @@ follows).
 | Wheel | `wheel` with `delta_x`, `delta_y` in px (Chromium's Linux line factor measured, F2c S9 decision), `ctrl` for pinch on a trackpad where the platform reports it that way; the default action scrolls the innermost scrollable ancestor, or zooms the canvas element when it says so | UI Events; S9 |
 | Gestures | The platform's `Pinch`, `Pan` and `Tap` remain for the canvas element, which claims touches inside it (`touch-action: none`); elsewhere a touch pan scrolls the one container it started in for the whole gesture (lead's answer to impl-f2c, 2026-10-25) | The CSS `touch-action` model |
 
+As built (3-E1a, 2026-10-26): a listener has no element handle, so
+`event.set_pointer_capture()` captures to the element whose listener
+called it, which is the web's `this.setPointerCapture(e.pointerId)`
+with the listener's element as `this`; `release_pointer_capture()`
+likewise. A change takes effect before the pointer's next event, with
+`lostpointercapture` then `gotpointercapture`; `pointerup` releases.
+`Event::client()` and `offset()` (from the target's padding box) are
+CSS px, unrounded (`[0, 0]` on an event that is not a pointer's).
+Leaving the window while captured keeps the press. While captured,
+`:hover` stays on the capturing element and a second `pointerdown` goes
+to it. A capturing element removed from the document gives the pointer
+back, and its `lostpointercapture` goes nowhere (the web fires it on
+the removed element, where nothing can observe it). Asking for capture
+with no pressed pointer (from `click`, a release, `got`/`lostpointercapture`
+or a key) panics, naming the event, as the web throws
+`InvalidStateError` (review-v77).
+Moves are dispatched as they arrive and layout waits for the frame, so
+many moves between frames are one update (`elements_app_drag.rs`).
+
 Drag of a slider thumb or a curve point: `pointerdown` captures, each
 `pointermove` carries full-precision coordinates to the captured
 target whether or not the pointer is over it, `pointerup` releases.
