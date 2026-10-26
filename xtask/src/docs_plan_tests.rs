@@ -149,7 +149,7 @@ fn a_table_with_a_state_column_and_another_header_is_refused() {
     assert_eq!(
         problems,
         [format!(
-            "docs/PLAN.md:1: a table with a State column is headed `| Id | What | Owner | State | Depends on | Notes |`, not `{HEADER}`; fix: use that header, or move the column out"
+            "docs/PLAN.md:1: a work-item table is headed `| Id | What | Owner | State | Depends on | Notes |`, not `{HEADER}`; fix: use that header, or rename the columns so it is not a work-item table"
         )]
     );
 }
@@ -170,4 +170,24 @@ fn a_plan_that_names_no_pr_is_refused() {
             "docs/PLAN.md: its work-item tables name no PR, so nothing is compared with gh; fix: check that the States are read (the grammar at the top of the file)"
         ]
     );
+}
+
+#[test]
+fn a_work_item_table_under_another_header_is_refused_whatever_the_column_is_called() {
+    let text = format!(
+        "{HEADER}\n|---|---|---|---|---|\n| A | x | y | PR #1 | |\n\n| Id | What | Owner | Status | Depends on |\n|---|---|---|---|---|\n| B | x | y | PR #999 | |\n"
+    );
+    let (_, problems) = claims("docs/PLAN.md", &text);
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(problems[0].starts_with("docs/PLAN.md:5: a work-item table is headed `| Id | What | Owner | Status | Depends on |`"), "{problems:?}");
+}
+
+#[test]
+fn a_row_indented_by_spaces_is_read() {
+    let text = format!(
+        "{HEADER}\n|---|---|---|---|---|\n | G | x | y | PR #999 | |\n| H | x | y | PR #998 | |\n"
+    );
+    let (found, problems) = claims("docs/PLAN.md", &text);
+    assert_eq!(problems, Vec::<String>::new());
+    assert_eq!(found.iter().map(|c| c.pr).collect::<Vec<_>>(), [999, 998]);
 }

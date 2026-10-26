@@ -73,7 +73,9 @@ fn classify(
     let before: Vec<&str> = state[..at].split_whitespace().collect();
     let back = |n: usize| before.len().checked_sub(n + 1).map(|i| before[i]);
     let after = state[at + 1 + len..].trim_start();
+    let negated = |n: usize| matches!(back(n), Some("not" | "never"));
     match back(0) {
+        Some("PR") if misplaced_draft(&before) => Err(Unread::Token(format!("#{pr}"))),
         Some("PR") => {
             let drafted = back(1) == Some("draft");
             let repo = back(if drafted { 2 } else { 1 });
@@ -85,13 +87,27 @@ fn classify(
             Ok((repo_named(repo), pr, expect))
         }
         Some("draft") => Ok((repo_named(back(1)), pr, Expect::Draft)),
-        Some("merged") => Ok((None, pr, Expect::Merged)),
-        Some(repo) if back(1) == Some("merged") && is_repo(repo) => {
+        Some("merged") if !negated(1) => Ok((None, pr, Expect::Merged)),
+        Some(repo) if back(1) == Some("merged") && !negated(2) && is_repo(repo) => {
             Ok((Some(repo.to_owned()), pr, Expect::Merged))
         }
         _ if list_end.is_some_and(|end| at < end) => Ok((repo_named(back(0)), pr, Expect::Merged)),
         _ => Err(Unread::Token(format!("#{pr}"))),
     }
+}
+
+/// Whether the clause before a `PR` (since the last `,` or `;`) has a
+/// `draft` that is not directly before it, as in `draft vapors PR #N`.
+fn misplaced_draft(before: &[&str]) -> bool {
+    let clause_start = before
+        .iter()
+        .rposition(|w| w.ends_with([',', ';']))
+        .map_or(0, |i| i + 1);
+    let clause = &before[clause_start..before.len() - 1];
+    clause
+        .iter()
+        .enumerate()
+        .any(|(i, w)| *w == "draft" && i + 1 != clause.len())
 }
 
 fn repo_named(word: Option<&str>) -> Option<String> {

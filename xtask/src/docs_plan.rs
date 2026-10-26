@@ -87,7 +87,7 @@ fn read(file: &str, text: &str) -> (Vec<Claim>, Vec<String>, bool) {
     let (mut in_table, mut seen_table) = (false, false);
     for (n, line) in text.lines().enumerate() {
         let line_no = n + 1;
-        if !line.starts_with('|') {
+        if !line.trim_start().starts_with('|') {
             in_table = false;
             continue;
         }
@@ -115,16 +115,23 @@ fn read(file: &str, text: &str) -> (Vec<Claim>, Vec<String>, bool) {
 
 /// For a table's header line: whether it opens a work-item table. A
 /// header with a State column but another shape is refused.
+/// Column names that mark a work-item table, however its header differs
+/// (a State column renamed Status would otherwise go unread).
+const WORK_ITEM_COLUMNS: [&str; 5] = ["Id", "Owner", "State", "Status", "Depends on"];
+
 fn header(file: &str, line_no: usize, line: &str, problems: &mut Vec<String>) -> Option<bool> {
     if line.trim() == HEADER {
         return Some(true);
     }
-    let has_state = line.split('|').map(str::trim).any(|cell| cell == "State");
-    if !has_state {
+    let work_item = line
+        .split('|')
+        .map(str::trim)
+        .any(|cell| WORK_ITEM_COLUMNS.contains(&cell));
+    if !work_item {
         return None;
     }
     problems.push(format!(
-        "{file}:{line_no}: a table with a State column is headed `{}`, not `{HEADER}`; fix: use that header, or move the column out",
+        "{file}:{line_no}: a work-item table is headed `{}`, not `{HEADER}`; fix: use that header, or rename the columns so it is not a work-item table",
         line.trim()
     ));
     Some(false)

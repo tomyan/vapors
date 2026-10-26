@@ -138,3 +138,21 @@ fn a_cell_that_lists_items_reads_every_pr_in_it() {
         assert_eq!(one_row(refused).1.len(), 1, "{refused}");
     }
 }
+
+#[test]
+fn a_misplaced_draft_or_a_negated_merge_is_refused() {
+    for (state, pr) in [
+        ("draft vapors PR #70", "#70"),
+        ("not merged #79", "#79"),
+        ("parked; never merged vapors #5", "#5"),
+    ] {
+        let (_, problems) = one_row(state);
+        assert_eq!(problems.len(), 1, "{state}: {problems:?}");
+        assert!(
+            problems[0].contains(&format!(
+                "names {pr} where this check cannot read its state"
+            )),
+            "{problems:?}"
+        );
+    }
+}
