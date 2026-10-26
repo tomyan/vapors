@@ -30,6 +30,15 @@ pub fn compare(name: &str, script: &Script, ours: &Log, answers: &Value) -> Resu
         let focus = theirs["focus"].as_str().ok_or_else(|| {
             format!("{name}.events.json: the step at line {line} has no string focus")
         })?;
+        let visible = theirs["focusVisible"].as_bool().ok_or_else(|| {
+            format!("{name}.events.json: the step at line {line} has no boolean focusVisible")
+        })?;
+        if visible != ours.focus_visible {
+            differences.push(format!(
+                "{name}.events:{line}: :focus-visible is {visible} in Chromium, {} in vapors",
+                ours.focus_visible
+            ));
+        }
         if focus != ours.focus {
             differences.push(format!(
                 "{name}.events:{line}: focus is on {focus} in Chromium, {} in vapors",

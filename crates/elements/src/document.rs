@@ -28,6 +28,9 @@ pub struct Document {
     pub(crate) focused: Option<NodeId>,
     /// Where Space went down, for its click on keyup.
     pub(crate) space_on: Option<NodeId>,
+    /// Whether the last input was a key rather than a press (3-E2b):
+    /// focus that arrives then matches `:focus-visible`.
+    pub(crate) keyboard: bool,
     /// Parley layouts kept between updates.
     pub(crate) texts: crate::layout::TextCache,
     /// What changed since the last update, for restyle.
@@ -66,6 +69,7 @@ impl Document {
             pointer: crate::events::Pointer::default(),
             focused: None,
             space_on: None,
+            keyboard: false,
             texts: crate::layout::TextCache::default(),
             dirty: crate::restyle::Dirty::default(),
             kept: None,

@@ -111,7 +111,7 @@ pub(super) fn dispatch(
 /// Delivers `event` to `target`, and when it `bubbles` to each ancestor
 /// until a listener stops propagation; the event as the listeners left
 /// it, and what they asked of the pointer's capture.
-pub(super) fn deliver(
+pub(crate) fn deliver(
     document: &Rc<RefCell<Document>>,
     target: NodeId,
     mut event: Event,
@@ -133,4 +133,19 @@ pub(super) fn deliver(
         }
     }
     (event, asked)
+}
+
+/// `event` at `node` only: an event that does not bubble (`focus`).
+pub(crate) fn dispatch_here(document: &Rc<RefCell<Document>>, node: NodeId, event: Event) {
+    deliver(document, node, event, false);
+}
+
+/// `event` at `node` and up its ancestors; whether a listener prevented
+/// its default action.
+pub(crate) fn dispatch_bubbling(
+    document: &Rc<RefCell<Document>>,
+    node: NodeId,
+    event: Event,
+) -> bool {
+    deliver(document, node, event, true).0.default_prevented()
 }

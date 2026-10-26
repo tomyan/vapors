@@ -11,7 +11,7 @@ use vapors_text::FontSystem;
 
 use crate::corners;
 use crate::layout::{BoxRect, Content, InlineRun, LayoutBox};
-use crate::paint_order::{Step, paint_steps, stacking_of};
+use crate::paint_order::{Step, paint_steps_with_outlines, stacking_of};
 use crate::painted::Painted;
 use crate::style::{BoxShadow, Used};
 
@@ -57,12 +57,12 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
             painted.paddings.insert(node, [padding.x, padding.y]);
         }
     }
-    let steps = paint_steps(boxes, &|index| stacking_of(boxes, index, input.used));
+    let steps = paint_steps_with_outlines(boxes, &|index| stacking_of(boxes, index, input.used));
     let clips = crate::clip::clips(boxes, rects, &|index| {
         crate::clip::clipping(boxes, index, input)
     });
     for step in steps {
-        let (Step::Box(index) | Step::Thumb(index)) = step;
+        let (Step::Box(index) | Step::Thumb(index) | Step::Outline(index)) = step;
         // Two forms of one clip, on purpose: hits are cut to it in CSS
         // pixels, unsnapped, as border boxes are hit unsnapped, so hit
         // testing follows layout geometry as Chromium's does; the scene
@@ -77,6 +77,12 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
                 crate::images::paint(&boxes[index], rects[index], input, &mut painted);
             }
             Step::Thumb(_) => crate::thumb::paint(&boxes[index], rects[index], input, &mut painted),
+            Step::Outline(_) => crate::paint_outline::paint_outline(
+                &boxes[index],
+                rects[index],
+                input,
+                &mut painted,
+            ),
         }
     }
     painted

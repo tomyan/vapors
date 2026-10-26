@@ -139,3 +139,40 @@ fn focus_and_focus_within_style_the_focused_element_and_its_ancestors() {
         "{colours:?}"
     );
 }
+
+#[test]
+fn focus_from_a_key_is_visible_and_from_a_press_is_not() {
+    // Given
+    let page = page();
+
+    // When / Then: Tab to the first button
+    tab(&page.doc, false);
+    assert!(page.doc.borrow().focus_visible(), "after Tab");
+
+    // a press on the note box focuses it without the ring
+    Document::pointer_pressed(&page.doc, [5.0, 30.0]);
+    Document::pointer_released(&page.doc, [5.0, 30.0]);
+    assert_eq!(page.doc.borrow().active_element(), Some(page.note));
+    assert!(!page.doc.borrow().focus_visible(), "after a press");
+
+    // focus moved by script after the press: still no ring; after a key: the ring
+    Document::focus(&page.doc, Some(page.cancel));
+    assert!(!page.doc.borrow().focus_visible(), "script after a press");
+    Document::key_pressed(&page.doc, "x", vapors_elements::Modifiers::default());
+    Document::focus(&page.doc, Some(page.save));
+    assert!(page.doc.borrow().focus_visible(), "script after a key");
+}
+
+#[test]
+fn a_modifier_alone_is_not_a_keyboard_interaction() {
+    // Given: focus from a press, then Shift alone
+    let page = page();
+    Document::pointer_pressed(&page.doc, [5.0, 30.0]);
+    Document::key_pressed(&page.doc, "Shift", vapors_elements::Modifiers::default());
+
+    // When: script moves focus
+    Document::focus(&page.doc, Some(page.save));
+
+    // Then: no ring, as a modifier alone does not count
+    assert!(!page.doc.borrow().focus_visible());
+}

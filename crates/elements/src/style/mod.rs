@@ -10,6 +10,7 @@ mod features;
 mod grid_style;
 mod honoured;
 mod inline;
+pub(crate) mod outline;
 mod overflow;
 mod position;
 mod scope;

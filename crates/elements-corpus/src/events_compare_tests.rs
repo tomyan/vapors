@@ -13,11 +13,12 @@ fn ours() -> Log {
     vec![Logged {
         events: vec![("click".to_owned(), "div#a".to_owned())],
         focus: "body".to_owned(),
+        focus_visible: false,
     }]
 }
 
 fn recorded(events: &serde_json::Value) -> serde_json::Value {
-    json!({ "steps": [{ "line": 2, "action": "Click(5.0, 5.0)", "events": events, "focus": "body" }] })
+    json!({ "steps": [{ "line": 2, "action": "Click(5.0, 5.0)", "events": events, "focus": "body", "focusVisible": false }] })
 }
 
 #[test]
@@ -95,6 +96,23 @@ fn a_different_focus_is_a_difference() {
     // Then
     assert!(
         refused.contains("focus is on button#a in Chromium, body in vapors"),
+        "{refused}"
+    );
+}
+
+#[test]
+fn a_different_focus_visible_is_a_difference() {
+    // Given: Chromium shows the ring, vapors does not
+    let script = parse("x", SCRIPT).expect("parses");
+    let mut answers = recorded(&json!([{ "type": "click", "target": "div#a" }]));
+    answers["steps"][0]["focusVisible"] = json!(true);
+
+    // When
+    let refused = compare("x", &script, &ours(), &answers).expect_err("differs");
+
+    // Then
+    assert!(
+        refused.contains(":focus-visible is true in Chromium, false in vapors"),
         "{refused}"
     );
 }

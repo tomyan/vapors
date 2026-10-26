@@ -74,6 +74,7 @@ impl Document {
     /// ancestors become `:active`, and the target gets `pointerdown`.
     pub fn pointer_pressed(document: &Rc<RefCell<Document>>, point: Point) {
         process_pending(document, MOUSE, point);
+        document.borrow_mut().keyboard = false;
         let target = document.borrow().pointer_target(MOUSE, point);
         let target = document.borrow_mut().press(target);
         let prevented = target.is_some_and(|target| {
@@ -192,28 +193,7 @@ mod capture;
 #[path = "events_touch.rs"]
 mod touch;
 #[path = "events_tree.rs"]
-mod tree;
+pub(crate) mod tree;
 
 use capture::{MOUSE, dispatch_pointer, hover_capturing, process_pending, release_capture};
 use tree::dispatch;
-
-/// `event` at `node` only: an event that does not bubble (`focus`).
-pub(crate) fn dispatch_here(
-    document: &Rc<RefCell<Document>>,
-    node: NodeId,
-    event: vapors_dom::Event,
-) {
-    tree::deliver(document, node, event, false);
-}
-
-/// `event` at `node` and up its ancestors; whether a listener prevented
-/// its default action.
-pub(crate) fn dispatch_bubbling(
-    document: &Rc<RefCell<Document>>,
-    node: NodeId,
-    event: vapors_dom::Event,
-) -> bool {
-    tree::deliver(document, node, event, true)
-        .0
-        .default_prevented()
-}
