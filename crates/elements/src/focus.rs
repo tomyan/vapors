@@ -63,13 +63,23 @@ impl Document {
         if had == node {
             return;
         }
+        // a number field commits as focus leaves it, before its blur,
+        // as Chromium fires its change (3-E3c)
+        if let Some(had) = had {
+            crate::number_input::commit(document, had);
+        }
         {
             let mut doc = document.borrow_mut();
             doc.focused = node;
+            doc.selected_all = None;
             doc.set_flag_on(States::FOCUS, node);
             let visible = node.filter(|node| doc.keyboard || doc.is_text_field(*node));
             doc.set_flag_on(States::FOCUS_VISIBLE, visible);
             doc.set_flag_chain(States::FOCUS_WITHIN, node);
+            if let Some(node) = node {
+                let keyboard = doc.keyboard;
+                doc.number_focused(node, keyboard);
+            }
         }
         if let Some(had) = had {
             fire(document, had, &["blur", "focusout"]);

@@ -44,7 +44,17 @@ impl Document {
         let (root, body) = (self.root(), self.body());
         let kept = self.kept.as_ref().expect("styled keeps the styles");
         let used = &kept.used;
-        let boxes = build(&self.arena, used, &self.images, root);
+        let number_focus = self.active_element().map(|node| {
+            let selected = self.selected_all == Some(node);
+            (node, crate::layout::NumberFocus { selected })
+        });
+        let source = crate::layout::Source {
+            arena: &self.arena,
+            used,
+            images: &self.images,
+            number_focus,
+        };
+        let boxes = build(&source, root);
         let size = (viewport.width, viewport.height);
         let texts = (&mut self.fonts, &mut self.texts);
         let (boxes, laid_out) = lay_out(

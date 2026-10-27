@@ -78,6 +78,7 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
                 crate::images::paint(&boxes[index], rects[index], input, &mut painted);
                 crate::range_paint::paint(&boxes[index], rects[index], input, &mut painted);
                 crate::checkbox_paint::paint(&boxes[index], rects[index], input, &mut painted);
+                crate::number_paint::paint(boxes, rects, index, input, &mut painted);
             }
             Step::Thumb(_) => crate::thumb::paint(&boxes[index], rects[index], input, &mut painted),
             Step::Outline(_) => crate::paint_outline::paint_outline(

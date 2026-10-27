@@ -57,8 +57,13 @@ impl ElementsApp {
 }
 
 impl ElementsApp {
-    /// A key going down or up, to the document's focused element (3-E2a).
+    /// A key going down or up, to the document's focused element
+    /// (3-E2a); the text a key produced, to a focused field (3-E3c).
     pub(super) fn key(&mut self, event: &vapors_platform::Event) {
+        if let vapors_platform::Event::Character(text) = event {
+            Document::character_typed(&self.document, text);
+            return;
+        }
         let vapors_platform::Event::Key {
             key,
             pressed,

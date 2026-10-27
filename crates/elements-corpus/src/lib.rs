@@ -75,6 +75,7 @@ fixtures![
     image_paint::ImagePaint,
     images::Images,
     inline_text::InlineText,
+    number::Number,
     outline_paint::OutlinePaint,
     paint_boxes::PaintBoxes,
     positioned::Positioned,

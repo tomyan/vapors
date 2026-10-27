@@ -185,7 +185,7 @@ user-agent behaviour and an implicit ARIA role (area 5).
 |---|---|---|---|---|
 | `button` | Press shows `:active`; `click` on release over the common ancestor | Enter and Space activate (Space on keyup, as browsers do) | `click` | Built, plus keyboard |
 | `input type=range` | Press anywhere on the track sets the value and captures; drag changes it; `step` snaps | Arrow keys by `step`, Page keys by a tenth of the range, Home and End; Shift for ten steps | `input` on every change, `change` on release | Scrub to change, `value_as_number`. The thumb and track are UA parts styled through prefixed custom properties the UA sheet reads (`--vapors-thumb-size`, `--vapors-thumb-color`, `--vapors-track-height`, `--vapors-track-color`), so tokens apply; `::part()` comes later (Q1, decided 2026-10-25) |
-| `input type=number` | Click focuses; drag on the field scrubs when `data-scrub` says so (touché's readout behaviour) | Digits, arrows by `step`, Enter commits | `input`, `change` | A value outside `min`..`max` is clamped on commit and the field says so through `:invalid` |
+| `input type=number` | Click focuses; drag on the field scrubs when `data-scrub` says so (touché's readout behaviour) | Digits, arrows by `step`, Enter commits | `input`, `change` | A value outside `min`..`max` is `:invalid` while typed and clamped on commit |
 | `input type=checkbox`, `type=radio`, `switch` role | Click toggles | Space toggles; arrows move within a radio group | `input`, `change` with `checked` | `bind:checked` exists |
 | `select` | Opens a listbox popover (area 3 owns the popover primitive) | Arrows, type-ahead, Enter, Escape | `change` | Deferred until touché has one; the model choice uses it |
 | `input type=text`, `textarea` | Click places the caret; drag selects; double click selects a word | The editing model below | `beforeinput`, `input`, `change`, `selectionchange` | |
@@ -265,6 +265,42 @@ a flex item it stretches across the line as Chromium's does
 replaced box. Checked step by step against Chromium by
 `fixtures/checkbox.events` with `expect checked`. Not built: `radio`,
 `indeterminate`, `label` association (`label` is not an element yet).
+
+As built (3-E3c, 2026-10-27): `input type=number`, the least editing
+that takes a typed exact value before E6's editor. Its text is the
+`value` property once set (a number written, or a text as typed), else
+the `value` attribute; the DOM's `value` is the text when it is a
+valid floating-point number, else empty, and `valueAsNumber` NaN then.
+The caret is always at the end: typed characters a number takes
+(digits, signs, the point, `e`; Chromium drops the rest) go there, or
+replace the whole text when it is selected; focus by keyboard selects
+it, as Chromium does, and a click does not; Backspace deletes the last
+character; `input` fires with each edit. Enter and blur commit: a
+number outside `min`..`max` is clamped into it and text that is no
+number reverts to the last committed number (vapors' own rule:
+Chromium keeps the text), so `change` always carries a number, and
+fires only when the commit differs from the last; the blur's `change`
+comes before its `focusout`, as Chromium orders it. ArrowUp and
+ArrowDown step by `step` (1 for `any`), Shift by ten, each with `input`
+and `change`. `:invalid` while the text is no number or out of range
+(a step mismatch is not flagged). `bind:value` on a number field
+updates on `change`, so the app's `Signal<f64>` never takes NaN
+mid-typing. With `data-scrub`, a drag along the field steps the number
+by one `step` per 2 CSS px (`data-scrub="4"`: per 4 px), `input` per
+step and `change` at the release; the press still focuses; a finger
+decides at its first move whether it scrubs or scrolls, as a range's
+does. The field's text is laid out as its content (its height is its
+line, a blank field keeps it with a no-break space); the caret (1 px,
+the text's colour) and selection (the ring's blue at a third) are
+painted by `number_paint.rs`; a field needs a width of its own, since
+Chromium's default (185 x 24 px at 14 px, from its font and spin
+button) is not modelled: `width: auto` is refused naming the fix. The
+`Character` platform event reaches `Document::character_typed`.
+Checked step by step against Chromium by `fixtures/number.events`
+(typing, Backspace, a dropped letter, Enter, arrows, Tab's selection,
+blur by a click). Not built: caret movement and selection by pointer
+or Home/End (E6), the spin buttons, `step` mismatch as `:invalid`,
+a locale's decimal separator.
 
 ## Text editing and IME
 

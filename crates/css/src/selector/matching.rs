@@ -114,6 +114,7 @@ fn pseudo<E: Element>(p: &PseudoClass, e: &E) -> bool {
         PseudoClass::Checked => e.states().contains(States::CHECKED),
         PseudoClass::Disabled => e.states().contains(States::DISABLED),
         PseudoClass::Enabled => e.states().contains(States::ENABLED),
+        PseudoClass::Invalid => e.states().contains(States::INVALID),
         PseudoClass::Empty => e.is_empty(),
         PseudoClass::Root => e.parent().is_none(),
         PseudoClass::Not(list) => !list.iter().any(|s| matches(s, e)),

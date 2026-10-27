@@ -44,6 +44,14 @@ pub(crate) struct LayoutBox {
     pub(crate) range: Option<crate::range::Range>,
     /// Whether an `input type=checkbox` is checked, for paint (3-E3b).
     pub(crate) checked: Option<bool>,
+    /// A focused `input type=number`'s selection, for paint (3-E3c).
+    pub(crate) number_focus: Option<NumberFocus>,
+}
+
+/// A focused number field: whether its text is selected whole.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct NumberFocus {
+    pub(crate) selected: bool,
 }
 
 impl LayoutBox {
@@ -59,6 +67,7 @@ impl LayoutBox {
             image: None,
             range: None,
             checked: None,
+            number_focus: None,
         }
     }
 
@@ -87,30 +96,19 @@ impl LayoutBox {
     }
 }
 
-/// What building reads: the tree and each element's used style.
-struct Source<'a> {
-    arena: &'a Arena,
-    used: &'a HashMap<NodeId, Used>,
-    images: &'a crate::images::Images,
+/// What building reads: the tree, each element's used style, the
+/// images, and the focused number field with its selection.
+pub(crate) struct Source<'a> {
+    pub(crate) arena: &'a Arena,
+    pub(crate) used: &'a HashMap<NodeId, Used>,
+    pub(crate) images: &'a crate::images::Images,
+    pub(crate) number_focus: Option<(NodeId, NumberFocus)>,
 }
 
 /// Builds the boxes under `root`; box 0 is the root's.
-pub(crate) fn build(
-    arena: &Arena,
-    used: &HashMap<NodeId, Used>,
-    images: &crate::images::Images,
-    root: NodeId,
-) -> Vec<LayoutBox> {
+pub(crate) fn build(source: &Source<'_>, root: NodeId) -> Vec<LayoutBox> {
     let mut boxes = Vec::new();
-    add_element(
-        &Source {
-            arena,
-            used,
-            images,
-        },
-        root,
-        &mut boxes,
-    );
+    add_element(source, root, &mut boxes);
     boxes
 }
 
@@ -139,8 +137,27 @@ fn add_element(source: &Source<'_>, node: NodeId, boxes: &mut Vec<LayoutBox>) ->
     );
     replaced.range = range;
     replaced.checked = checked;
+    let field = source
+        .arena
+        .get(node, "build")
+        .element()
+        .filter(|e| e.tag == "input" && crate::check::is_type(e, "number"))
+        .map(|e| crate::number::Field::of(&e.attributes, &e.properties));
+    replaced.number_focus = source
+        .number_focus
+        .filter(|(focused, _)| *focused == node && field.is_some())
+        .map(|(_, focus)| focus);
     boxes.push(replaced);
     let mut run = Collector::new(style.text, style.visible);
+    // a number field's text is its run; a blank one keeps its line
+    // with a no-break space, which paints nothing (3-E3c)
+    if let Some(field) = field {
+        run.push_text(if field.text.is_empty() {
+            "\u{a0}"
+        } else {
+            &field.text
+        });
+    }
     for child in source.arena.children(node) {
         match &source.arena.get(child, "build").kind {
             Kind::Text(text) => run.push_text(text),

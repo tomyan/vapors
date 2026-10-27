@@ -73,6 +73,7 @@ impl Features {
                 | PseudoClass::Checked
                 | PseudoClass::Disabled
                 | PseudoClass::Enabled
+                | PseudoClass::Invalid
                 | PseudoClass::Root => {}
             }
         }

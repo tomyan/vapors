@@ -139,7 +139,7 @@ pub(crate) fn written(value: f64) -> String {
 
 /// A valid floating-point number as HTML parses one (no spaces, no
 /// leading `+`, no `inf` or `nan`), else `None`.
-fn parse(text: &str) -> Option<f64> {
+pub(crate) fn parse(text: &str) -> Option<f64> {
     let digits = text.strip_prefix('-').unwrap_or(text);
     let shaped = !digits.is_empty()
         && digits.starts_with(|c: char| c.is_ascii_digit() || c == '.')

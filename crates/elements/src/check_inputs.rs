@@ -36,7 +36,7 @@ pub(crate) fn is_type(element: &Element, kind: &str) -> bool {
 const INPUT_TYPES: &[(&str, Option<&str>)] = &[
     ("range", None),
     ("checkbox", None),
-    ("number", Some("3-E3c")),
+    ("number", None),
     ("text", Some("3-E6, text editing")),
 ];
 

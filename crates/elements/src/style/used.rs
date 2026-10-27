@@ -37,6 +37,7 @@ pub(crate) struct Used {
 }
 
 /// What a used style depends on besides the element's computed styles.
+#[allow(clippy::struct_excessive_bools)] // four independent facts about the element's place
 pub(crate) struct Context<'a> {
     /// Every property at its initial value.
     pub(crate) initial: &'a ComputedStyle,
@@ -49,6 +50,9 @@ pub(crate) struct Context<'a> {
     pub(crate) to_viewport: bool,
     /// Device pixels per CSS pixel, for border widths.
     pub(crate) scale: f32,
+    /// The element is an `input type=number`, which needs a width of
+    /// its own (3-E3c).
+    pub(crate) number_field: bool,
 }
 
 /// The used style of an element whose computed styles (its own and its
@@ -63,6 +67,16 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
         inline::refuse_box_edges(&mut reader, &layout);
     } else if context.in_inline && layout.display != taffy::Display::None {
         reader.refuse("display", inline::BLOCK_IN_INLINE.to_owned());
+    }
+    // pushed directly: `Reader::refuse` leaves an undeclared value to
+    // its declarer, and `auto` here is nobody's declaration
+    if context.number_field && layout.size.width == taffy::Dimension::auto() {
+        reader.refusals.push(Refusal {
+            property: "width",
+            value: "auto".to_owned(),
+            reason: "is `auto` on a number field; vapors does not model Chromium's default width (its font and spin button), so give it a width, such as `width: 6em`".to_owned(),
+            declared: None,
+        });
     }
     super::overflow::refuse_rounded_clip(&mut reader, &layout, &decoration);
     super::overflow::refuse_viewport_scroll(&mut reader, &layout, context.to_viewport);

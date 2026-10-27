@@ -35,6 +35,17 @@ pub(super) fn act(
             Document::key_pressed(doc, &key, modifiers);
             Document::key_released(doc, &key, modifiers);
         }
+        // each character as the platform sends it: the key down, its
+        // text, the key up
+        Action::Type(ref text) => {
+            for c in text.chars() {
+                let key = c.to_string();
+                let none = vapors_elements::Modifiers::default();
+                Document::key_pressed(doc, &key, none);
+                Document::character_typed(doc, &key);
+                Document::key_released(doc, &key, none);
+            }
+        }
         Action::Move(x, y) => Document::pointer_moved(doc, at(x, y)),
         Action::Press(x, y) => Document::pointer_pressed(doc, at(x, y)),
         Action::Release(x, y) => Document::pointer_released(doc, at(x, y)),

@@ -51,14 +51,17 @@ impl Dom for Document {
         }
     }
 
-    /// `checked` restyles for `:checked` (3-E3b).
+    /// `checked` restyles for `:checked` (3-E3b); `value` for a number
+    /// field's `:invalid` (3-E3c).
     fn set_property(&mut self, node: NodeId, name: &str, value: PropertyValue) {
         self.changed = true;
         self.element_mut(node, "set_property")
             .properties
             .insert(name.to_owned(), value);
-        if name == "checked" {
-            self.mark_flag(node, vapors_css::tree::States::CHECKED);
+        match name {
+            "checked" => self.mark_flag(node, vapors_css::tree::States::CHECKED),
+            "value" => self.mark_flag(node, vapors_css::tree::States::INVALID),
+            _ => {}
         }
     }
 

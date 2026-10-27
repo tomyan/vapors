@@ -42,7 +42,7 @@ container's laid-out size. Implement it on your tree as a cheap handle;
 `tree::Node` is the reference implementation, with O(1) parent, first
 child and sibling links and O(n) `children()`. State flags
 (`:hover`, `:focus`, `:focus-visible`, `:focus-within`, `:active`,
-`:checked`, `:disabled`, `:enabled`) are set by the tree layer; the
+`:checked`, `:disabled`, `:enabled`, `:invalid`) are set by the tree layer; the
 engine infers none from another, so whoever moves focus also sets
 `FOCUS_WITHIN` on the ancestors, and `ENABLED` is set only on form
 controls that are not disabled.

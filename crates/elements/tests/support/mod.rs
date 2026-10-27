@@ -6,6 +6,7 @@
 pub mod changes;
 pub mod checkbox_page;
 pub mod focus_page;
+pub mod number_page;
 pub mod pointer;
 pub mod random_css;
 pub mod range_page;

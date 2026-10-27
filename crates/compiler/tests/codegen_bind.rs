@@ -54,15 +54,20 @@ fn bind_value_on_a_range_binds_a_number() {
 }
 
 #[test]
-fn bind_value_on_a_number_input_binds_a_number_too() {
+fn bind_value_on_a_number_input_binds_a_number_on_change() {
     // When
     let code = generated_with(
         "let n: Signal<f64> = Signal::new(0.0);",
         "<input type=\"Number\" bind:value={n} />",
     );
 
-    // Then
+    // Then: a number field's text is a number only once committed
+    assert_has(
+        &code,
+        "listen(input0, \"change\", Box::new(move |event: &mut Event|",
+    );
     assert_has(&code, "n.set(event.value_as_number().expect(");
+    assert_lacks(&code, "listen(input0, \"input\"");
 }
 
 #[test]
