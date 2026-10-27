@@ -13,9 +13,32 @@ use std::path::{Path, PathBuf};
 /// again.
 const COMPRESSED: [&str; 7] = ["wasm", "js", "css", "html", "json", "webmanifest", "svg"];
 
-/// brotli's best quality and a 4 MiB window (its largest without the
-/// large-window extension browsers do not read).
-const BROTLI_QUALITY: u32 = 11;
+/// brotli quality 9: the highest quality that leaves the `web` job well
+/// inside its 3-minute limit on GitHub's runner, which compresses about
+/// 4-5x slower than the dev box (lead, 2026-10-27). Quality 11 put the
+/// job past the limit: the trunk step went from 32 s to 74-96 s, all of
+/// it compression, 42-64 s on the runner for the 12 s measured here.
+/// Quality 10 saves only about 28% of that; 9 is about 8x faster than
+/// 11. Measured 2026-10-27 on the dev box (i5-10500T, niced, `brotli`
+/// 9.1.0, window 22), the wasm of each page alone; the other files add
+/// under 0.2 s at any quality:
+///
+/// | quality | vapors demo wasm, 7,261,627 B | touche page wasm, 2,875,921 B |
+/// |---------|-------------------------------|-------------------------------|
+/// | 9       |  1.55 s   3,405,449 B         | 0.36 s   859,189 B            |
+/// | 10      |  8.68 s   3,174,260 B         | 3.05 s   784,325 B            |
+/// | 11      | 12.04 s   3,062,894 B         | 4.97 s   757,768 B            |
+/// | gzip 9  |  0.48 s   3,896,795 B         | 0.21 s 1,041,805 B            |
+///
+/// Qualities 5 to 8 took 0.15 to 1.2 s and were 1 to 2.5% larger than 9.
+/// The page wasm at 9 is 839 KiB, within touche's 900 KiB budget
+/// (`dist_transfer.rs`). Raising the quality is a change with a new
+/// measurement against the `web` job's limit.
+const BROTLI_QUALITY: u32 = 9;
+
+/// A 4 MiB window (lgwin 22). The RFC's largest, 24, was within noise
+/// on the same measurement: at quality 9, the same size and time on the
+/// demo wasm; identical on the page wasm, which fits in 4 MiB.
 const BROTLI_WINDOW: u32 = 22;
 
 /// What one file became.
