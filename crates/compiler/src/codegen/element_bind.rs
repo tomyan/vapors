@@ -8,6 +8,15 @@ use crate::ast::{AttrValue, Attribute, Element};
 
 const BIND_CONTROLS: &[&str] = &["input", "select", "textarea"];
 
+/// Whether `element` is an `input` whose literal `type` is `number`.
+fn is_number_field(element: &Element) -> bool {
+    element.tag == "input"
+        && element
+            .attributes
+            .get("type")
+            .is_some_and(|t| matches!(t, AttrValue::Literal(k) if k.eq_ignore_ascii_case("number")))
+}
+
 impl Emitter<'_> {
     pub(super) fn emit_binding(
         &mut self,
@@ -17,9 +26,13 @@ impl Emitter<'_> {
         attribute: &Attribute,
     ) -> Result<(), CompileError> {
         let (event, read, wrap) = match property {
-            "value" if self.numeric_input(element, attribute)? => {
-                ("input", "number", "PropertyValue::Number")
-            }
+            // a number field's text is a number only once committed
+            // (Enter, blur, a step), so its binding takes `change`
+            "value" if self.numeric_input(element, attribute)? => (
+                if is_number_field(element) { "change" } else { "input" },
+                "number",
+                "PropertyValue::Number",
+            ),
             "value" => ("input", "event.value().to_string()", "PropertyValue::Text"),
             "checked" => ("change", "checked", "PropertyValue::Bool"),
             _ => return Err(self.source.error(attribute.offset, format!(

@@ -96,8 +96,9 @@ the one difference from the brief in this slice.
   `change` for `select` and `checked`) sets the signal. On an `input`
   whose `type` is `range` or `number` the value is a number
   (`Signal<f64>`, `event.value_as_number()`), elsewhere text, so the
-  `type` is written as a literal. A binding plus a handler for the
-  same event is refused.
+  `type` is written as a literal; a number field's binding updates on
+  `change` (Enter, blur, a step), since its text is a number only once
+  committed. A binding plus a handler for the same event is refused.
 - **Conditionals:** `{if cond} .. {else} .. {/if}`. There is no
   `{else if}`. Nest an `{if}` inside the `{else}` instead.
 - **Loops:** `{for (i, x) in expr key=expr} .. {/for}` or

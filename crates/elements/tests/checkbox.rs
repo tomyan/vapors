@@ -1,9 +1,9 @@
 //! A checkbox (3-E3b): a click flips it before the click's listeners
 //! and fires `input` and `change` with `checked` after them; a
-//! prevented click flips it back; Space toggles on keyup
-//! and Enter does not; a prevented click leaves it; a disabled one
-//! takes nothing; `:checked` follows, by click or by property. The
-//! order against Chromium is pinned by the corpus's `checkbox.events`.
+//! prevented click flips it back; Space toggles on keyup and Enter
+//! does not; a disabled one takes nothing; `:checked` follows, by
+//! click or by property. The order against Chromium is pinned by the
+//! corpus's `checkbox.events`.
 
 mod support;
 

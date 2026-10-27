@@ -107,7 +107,8 @@ impl CssElement for ElementRef<'_> {
 
     /// The pointer's flags, and for a button or an input whether it is
     /// enabled (`:enabled` and `:disabled` are set on form controls
-    /// only), and for a checkbox whether it is checked.
+    /// only), for a checkbox whether it is checked, and for a number
+    /// field whether it is invalid.
     fn states(&self) -> States {
         let data = self.data();
         if !matches!(data.tag.as_str(), "button" | "input") {
@@ -122,7 +123,12 @@ impl CssElement for ElementRef<'_> {
             Some(true) => States::CHECKED,
             Some(false) | None => States::NONE,
         };
-        data.states.union(control).union(checked)
+        let invalid = if crate::number::invalid_of(data) {
+            States::INVALID
+        } else {
+            States::NONE
+        };
+        data.states.union(control).union(checked).union(invalid)
     }
 
     fn container_size(&self) -> Option<(f32, f32)> {

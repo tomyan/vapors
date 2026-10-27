@@ -1,0 +1,53 @@
+# A number field by mouse and keys (3-E3c). `amount` is x 0..100, y 0..24,
+# 0..1000 by 1 at 20; `off` is x 200..300 and disabled; the button is x
+# 300..380. Values stay inside the range: vapors clamps a typed value on
+# commit and Chromium does not, so that case is pinned by vapors' own
+# tests, not here.
+listen pointerdown pointerup click input change keydown keyup focusin focusout
+click 50 12                   a click focuses amount; a text field always shows the ring
+expect event click input#amount
+expect focus-visible input#amount
+expect value input#amount 20
+type "5"                      typed after the caret, at the end: 205
+expect event input input#amount
+expect value input#amount 205
+key Backspace                 back to 20
+expect event input input#amount
+expect value input#amount 20
+type "a"                      a letter is not typed into a number field
+expect no event input
+expect value input#amount 20
+key Backspace                 2
+expect value input#amount 2
+type "7"                      27
+expect value input#amount 27
+key Enter                     commits: change
+expect event change input#amount
+expect value input#amount 27
+key Enter                     committed already: no change
+expect no event change
+key ArrowUp                   a step, with input and change
+expect event input input#amount
+expect event change input#amount
+expect value input#amount 28
+key ArrowDown
+expect value input#amount 27
+key Tab                       on to plain; the value was committed by the arrow, so no change
+expect no event change
+expect focus-visible input#plain
+key Shift+Tab                 back by keyboard: the text is selected whole
+expect focus-visible input#amount
+type "9"                      replaces it: 9
+expect event input input#amount
+expect value input#amount 9
+click 340 12                  the button: amount blurs and commits
+expect event focusout input#amount
+expect event change input#amount
+expect focus button#after
+expect value input#amount 9
+click 250 12                  off is disabled: no click, no focus
+expect event pointerdown input#off
+expect no event click
+expect focus body
+key ArrowUp                   with nothing focused, nothing steps
+expect no event input

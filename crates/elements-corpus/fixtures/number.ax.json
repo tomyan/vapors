@@ -1,0 +1,97 @@
+{
+  "tree": [
+    {
+      "depth": 0,
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "RootWebArea"
+    },
+    {
+      "depth": 1,
+      "properties": [
+        "editable=plaintext",
+        "focusable=true",
+        "invalid=false",
+        "required=false",
+        "settable=true",
+        "valuemax=1000",
+        "valuemin=0",
+        "valuetext=20"
+      ],
+      "role": "spinbutton",
+      "value": "20"
+    },
+    {
+      "depth": 2,
+      "properties": [
+        "editable=plaintext"
+      ],
+      "role": "generic"
+    },
+    {
+      "depth": 3,
+      "name": "20",
+      "properties": [
+        "editable=plaintext"
+      ],
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "properties": [
+        "editable=plaintext",
+        "focusable=true",
+        "invalid=false",
+        "required=false",
+        "settable=true",
+        "valuemax=0",
+        "valuemin=0",
+        "valuetext="
+      ],
+      "role": "spinbutton"
+    },
+    {
+      "depth": 2,
+      "properties": [
+        "editable=plaintext"
+      ],
+      "role": "generic"
+    },
+    {
+      "depth": 1,
+      "properties": [
+        "disabled=true",
+        "editable=plaintext",
+        "invalid=false",
+        "required=false",
+        "valuemax=0",
+        "valuemin=0",
+        "valuetext="
+      ],
+      "role": "spinbutton"
+    },
+    {
+      "depth": 2,
+      "role": "generic"
+    },
+    {
+      "depth": 1,
+      "name": "After",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "After",
+      "role": "StaticText"
+    }
+  ],
+  "viewport": [
+    640,
+    400
+  ]
+}

@@ -50,7 +50,7 @@ fn an_action_not_played_on_vapors_is_refused_naming_its_line() {
     // Given
     let script = parse(
         "capture",
-        "listen click\nclick 5 5\nexpect event click div#thumb\ntype \"ab\"\nexpect no event click\n",
+        "listen click\nclick 5 5\nexpect event click div#thumb\ntap 5 5\nexpect no event click\n",
     )
     .expect("parses");
 
@@ -59,7 +59,7 @@ fn an_action_not_played_on_vapors_is_refused_naming_its_line() {
 
     // Then
     assert!(
-        refusal.contains("capture.events:4:") && refusal.contains("Type"),
+        refusal.contains("capture.events:4:") && refusal.contains("Tap"),
         "{refusal}"
     );
 }
@@ -116,6 +116,19 @@ fn the_checkbox_script_logs_on_vapors_what_chromium_logged() {
 
     // Then: the events, the focus and each checkbox's state after each step
     compare("checkbox", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn the_number_script_logs_on_vapors_what_chromium_logged() {
+    // Given: a number field typed into, stepped and committed (3-E3c)
+    let script = parse("number", &read("number.events")).expect("parses");
+    let answers = serde_json::from_str(&read("number.events.json")).expect("json");
+
+    // When
+    let ours = play(&fixture("number"), &script, VIEWPORT).unwrap_or_else(|e| panic!("{e}"));
+
+    // Then: the events, the focus and the field's value after each step
+    compare("number", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
 }
 
 #[test]

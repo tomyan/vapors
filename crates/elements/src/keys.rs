@@ -59,6 +59,11 @@ impl Document {
         key: &str,
         modifiers: Modifiers,
     ) {
+        if matches!(key, "Backspace" | "Enter" | "ArrowUp" | "ArrowDown")
+            && document.borrow().number_field(target).is_some()
+        {
+            crate::number_input::key(document, target, key, modifiers);
+        }
         match key {
             // Control, Alt or Meta with Tab is the browser's or the window
             // manager's, which Chromium does not navigate on

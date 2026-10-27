@@ -36,7 +36,7 @@ pub(crate) fn is_type(element: &Element, kind: &str) -> bool {
 const INPUT_TYPES: &[(&str, Option<&str>)] = &[
     ("range", None),
     ("checkbox", None),
-    ("number", Some("3-E3c")),
+    ("number", None),
     ("text", Some("3-E6, text editing")),
 ];
 
@@ -46,7 +46,26 @@ pub(crate) fn input_refusal(element: &Element) -> Option<String> {
     if element.tag != "input" {
         return None;
     }
-    input_type_refusal(element).or_else(|| value_property_refusal(element))
+    input_type_refusal(element)
+        .or_else(|| value_property_refusal(element))
+        .or_else(|| scrub_refusal(element))
+}
+
+/// `data-scrub` is a number field's: empty for the default px per
+/// step, or a positive number of px; anything else is refused naming
+/// the shape, as is the attribute on another input.
+fn scrub_refusal(element: &Element) -> Option<String> {
+    let value = element.attributes.get("data-scrub")?;
+    if !is_type(element, "number") {
+        return Some("has data-scrub, which only a number field scrubs by; a range is dragged directly, so remove it".to_owned());
+    }
+    let shaped = value.is_empty()
+        || value
+            .parse::<f32>()
+            .is_ok_and(|px| px > 0.0 && px.is_finite());
+    (!shaped).then(|| format!(
+        "data-scrub=\"{value}\" is not a number of px per step; write a positive number, such as data-scrub=\"4\", or leave it empty for 2"
+    ))
 }
 
 fn input_type_refusal(element: &Element) -> Option<String> {

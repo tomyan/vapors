@@ -74,6 +74,21 @@ input[type=checkbox] {
   background-color: #ffffff;
 }
 
+/* A number field (3-E3c): Chromium's padding, with a vapors look (a
+   1px grey border, white, square: a rounded clip is refused); its text
+   is laid out as its content, so its height is its line, and text
+   past its width is clipped; it needs a `width` of its own (Chromium's
+   default width comes from its font and spin button, which vapors does
+   not model), so one sized by `flex: 1` or a grid track alone is
+   refused too. Its caret and selection are painted by number_paint.rs. */
+input[type=number] {
+  box-sizing: border-box;
+  padding: 1px 2px;
+  border: 1px solid #8f8f9d;
+  background-color: #ffffff;
+  overflow: hidden;
+}
+
 /* Chromium draws an hr's 1px border `inset` (two greys); vapors draws
    solid borders, so it is one grey. The box is the same 2px tall. */
 hr {

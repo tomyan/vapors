@@ -56,6 +56,7 @@ impl Document {
         ask_unless_asked(document, id, Asked::CaptureTo(target));
         if !prevented {
             crate::range_drag::pressed(document, id, target, point);
+            crate::number_scrub::pressed(document, id, target, point);
         }
     }
 
@@ -64,6 +65,7 @@ impl Document {
     pub fn touch_moved(document: &Rc<RefCell<Document>>, finger: u64, point: Point) {
         if Self::touch_event(document, finger, point, "pointermove").is_some() {
             crate::range_drag::moved(document, touch_id(finger), point);
+            crate::number_scrub::moved(document, touch_id(finger), point);
         }
     }
 
@@ -180,8 +182,14 @@ impl Document {
         // until its lift, which still fires the change (3-E3a's oracle);
         // one the platform took ends it with nothing, since no lift comes
         match how {
-            Ended::Lifted => crate::range_drag::released(document, id),
-            Ended::Taken => crate::range_drag::dropped(document, id),
+            Ended::Lifted => {
+                crate::range_drag::released(document, id);
+                crate::number_scrub::released(document, id);
+            }
+            Ended::Taken => {
+                crate::range_drag::dropped(document, id);
+                crate::number_scrub::dropped(document, id);
+            }
             Ended::Panned => {}
         }
     }

@@ -21,17 +21,25 @@ const COARSE_STEPS: f64 = 10.0;
 
 impl Document {
     /// A control's value as the DOM's `value` string: a range's number
-    /// written; `None` for an element that is not a control with a
-    /// value.
+    /// written, a number field's text when it is a number (else empty);
+    /// `None` for an element that is not a control with a value.
     #[must_use]
     pub fn value(&self, node: NodeId) -> Option<String> {
-        self.range(node).map(|range| written(range.value))
+        self.range(node)
+            .map(|range| written(range.value))
+            .or_else(|| self.number_field(node).map(|field| field.value()))
     }
 
-    /// A range's value as a number; `None` for another element.
+    /// A range's value as a number, or a number field's when its text
+    /// is one; `None` for a field whose text is no number (where the
+    /// DOM's `valueAsNumber` would answer NaN) and for an element that
+    /// is not a control, which [`Document::value`] tells apart (`Some`
+    /// for every control).
     #[must_use]
     pub fn value_as_number(&self, node: NodeId) -> Option<f64> {
-        self.range(node).map(|range| range.value)
+        self.range(node)
+            .map(|range| range.value)
+            .or_else(|| self.number_field(node)?.number())
     }
 
     /// The range `node` is, when it is an `input type=range`.

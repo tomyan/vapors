@@ -63,19 +63,33 @@ impl Document {
         if had == node {
             return;
         }
-        {
-            let mut doc = document.borrow_mut();
-            doc.focused = node;
-            doc.set_flag_on(States::FOCUS, node);
-            let visible = node.filter(|node| doc.keyboard || doc.is_text_field(*node));
-            doc.set_flag_on(States::FOCUS_VISIBLE, visible);
-            doc.set_flag_chain(States::FOCUS_WITHIN, node);
+        // a number field commits as focus leaves it, before its blur,
+        // as Chromium fires its change (3-E3c)
+        if let Some(had) = had {
+            crate::number_input::commit(document, had);
         }
+        document.borrow_mut().take_focus(node);
         if let Some(had) = had {
             fire(document, had, &["blur", "focusout"]);
         }
         if let Some(node) = node {
             fire(document, node, &["focus", "focusin"]);
+        }
+    }
+
+    /// `node` takes focus: the flags move, and a number field notes
+    /// what it will commit against and selects its text on keyboard
+    /// focus.
+    fn take_focus(&mut self, node: Option<NodeId>) {
+        self.focused = node;
+        self.selected_all = None;
+        self.set_flag_on(States::FOCUS, node);
+        let visible = node.filter(|node| self.keyboard || self.is_text_field(*node));
+        self.set_flag_on(States::FOCUS_VISIBLE, visible);
+        self.set_flag_chain(States::FOCUS_WITHIN, node);
+        if let Some(node) = node {
+            let keyboard = self.keyboard;
+            self.number_focused(node, keyboard);
         }
     }
 

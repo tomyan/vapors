@@ -38,6 +38,8 @@ pub(crate) struct Pointer {
     pub(crate) position: Option<Point>,
     /// Each pointer's drag of a range, by pointer id (3-E3a).
     pub(crate) drags: std::collections::HashMap<u32, crate::range_drag::Drag>,
+    /// Each pointer's scrub of a number field, by pointer id (3-E3c).
+    pub(crate) scrubs: std::collections::HashMap<u32, crate::number_scrub::Scrub>,
 }
 
 impl Document {
@@ -57,6 +59,7 @@ impl Document {
             dispatch_pointer(document, MOUSE, target, event);
         }
         crate::range_drag::moved(document, MOUSE, point);
+        crate::number_scrub::moved(document, MOUSE, point);
     }
 
     /// The pointer left the window: nothing is hovered, and a press in
@@ -90,6 +93,7 @@ impl Document {
         // Chromium orders `input` before `focusin` (3-E3a)
         if let (false, Some(target)) = (prevented, target) {
             crate::range_drag::pressed(document, MOUSE, target, point);
+            crate::number_scrub::pressed(document, MOUSE, target, point);
         }
         // a press focuses what it is on, or blurs, unless prevented (3-E2a)
         if !prevented {
@@ -114,6 +118,7 @@ impl Document {
             dispatch_pointer(document, MOUSE, target, event);
         }
         crate::range_drag::released(document, MOUSE);
+        crate::number_scrub::released(document, MOUSE);
         release_capture(document, MOUSE);
         process_pending(document, MOUSE, point);
         let click = document.borrow_mut().release(target);
