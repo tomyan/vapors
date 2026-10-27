@@ -140,6 +140,19 @@ pub(crate) fn deliver(
     (event, asked)
 }
 
+/// `click` on `target`, bubbling, with its default action around it:
+/// a checkbox flips before the listeners run and fires `input` and
+/// `change` after them, unless one prevented the click (`checkbox`);
+/// other elements have none yet (a label's and a link's come with
+/// them).
+pub(crate) fn dispatch_click(document: &Rc<RefCell<Document>>, target: NodeId, event: Event) {
+    let was = crate::checkbox::before_click(document, target);
+    let (event, _) = deliver(document, target, event, true);
+    if let Some(was) = was {
+        crate::checkbox::after_click(document, target, was, event.default_prevented());
+    }
+}
+
 /// `event` at `node` only: an event that does not bubble (`focus`).
 pub(crate) fn dispatch_here(document: &Rc<RefCell<Document>>, node: NodeId, event: Event) {
     deliver(document, node, event, false);

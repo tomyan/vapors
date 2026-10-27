@@ -2,6 +2,7 @@
   "steps": [
     {
       "action": "Click(100.0, 10.0)",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -68,6 +69,7 @@
     },
     {
       "action": "Press(100.0, 10.0)",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -88,6 +90,7 @@
     },
     {
       "action": "Move(150.0, 10.0)",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -121,6 +124,7 @@
     },
     {
       "action": "Move(400.0, 300.0)",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -147,6 +151,7 @@
     },
     {
       "action": "Release(400.0, 300.0)",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -187,6 +192,7 @@
     },
     {
       "action": "Key(\"ArrowLeft\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -219,6 +225,7 @@
     },
     {
       "action": "Key(\"ArrowDown\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -251,6 +258,7 @@
     },
     {
       "action": "Key(\"ArrowRight\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -283,6 +291,7 @@
     },
     {
       "action": "Key(\"ArrowUp\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -315,6 +324,7 @@
     },
     {
       "action": "Key(\"PageDown\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -347,6 +357,7 @@
     },
     {
       "action": "Key(\"PageUp\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -379,6 +390,7 @@
     },
     {
       "action": "Key(\"Home\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -411,6 +423,7 @@
     },
     {
       "action": "Key(\"End\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -443,6 +456,7 @@
     },
     {
       "action": "Key(\"Tab\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -469,6 +483,7 @@
     },
     {
       "action": "Key(\"ArrowRight\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -501,6 +516,7 @@
     },
     {
       "action": "Click(433.0, 10.0)",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -528,6 +544,7 @@
     },
     {
       "action": "TouchDown(100.0, 10.0)",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -554,6 +571,7 @@
     },
     {
       "action": "TouchMove(150.0, 10.0)",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -587,6 +605,7 @@
     },
     {
       "action": "TouchUp(150.0, 10.0)",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -620,6 +639,7 @@
     },
     {
       "action": "TouchDown(100.0, 10.0)",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -646,6 +666,7 @@
     },
     {
       "action": "TouchMove(100.0, 60.0)",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -687,6 +708,7 @@
     },
     {
       "action": "TouchUp(100.0, 60.0)",
+      "checked": {},
       "events": [
         {
           "bubbles": true,

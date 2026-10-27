@@ -62,4 +62,11 @@ pub enum Expect {
         /// Its value, as the DOM's `value` string.
         value: String,
     },
+    /// This checkbox is checked, or not (3-E3b).
+    Checked {
+        /// The checkbox.
+        target: String,
+        /// Whether it is checked.
+        checked: bool,
+    },
 }

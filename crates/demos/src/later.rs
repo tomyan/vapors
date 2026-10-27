@@ -2,7 +2,7 @@
 //! which is last.
 
 use crate::mounts::register_thumbnails;
-use crate::{Demo, INDEX, cards, images, index, scroll, slider, toasts};
+use crate::{Demo, INDEX, cards, checkbox, images, index, scroll, slider, toasts};
 
 /// Their demos, in slice order.
 pub(crate) fn slices() -> Vec<Demo> {
@@ -46,6 +46,18 @@ pub(crate) fn slices() -> Vec<Demo> {
             pixels: Some(include_str!("../demos/slider.pixels")),
             mount: |dom, parent| {
                 std::mem::forget(slider::Slider::mount(dom, parent, slider::SliderProps {}));
+                None
+            },
+        },
+        Demo {
+            name: "checkbox",
+            pixels: Some(include_str!("../demos/checkbox.pixels")),
+            mount: |dom, parent| {
+                std::mem::forget(checkbox::Checkbox::mount(
+                    dom,
+                    parent,
+                    checkbox::CheckboxProps {},
+                ));
                 None
             },
         },

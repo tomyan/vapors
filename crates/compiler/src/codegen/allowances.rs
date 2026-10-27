@@ -6,9 +6,9 @@
 //! judge the function itself: `needless_pass_by_value` is about its
 //! `props` parameter, which no script code can touch, and
 //! `too_many_lines` is about its length, which follows the template's
-//! size; a third, `missing_panics_doc`, when a numeric binding's
-//! listener expects the number its control's own event always carries
-//! (a missing one is a bug in the tree, said loudly). None can hide
+//! size; a third, `missing_panics_doc`, when a numeric or checked
+//! binding's listener expects what its control's own event always
+//! carries (a missing one is a bug in the tree, said loudly). None can hide
 //! another lint. A type-aware generator would
 //! retire the first four; building each template node in its own
 //! function would retire `too_many_lines`. Generated node names need no
@@ -50,7 +50,7 @@ impl Allowance {
                 "a text hole or expression attribute shows any Display value through to_string; the compiler cannot see when it is already a String"
             }
             Allowance::MissingPanicsDoc => {
-                "a numeric binding's listener expects the number its control's own input or change event always carries; a missing one is a bug in the tree"
+                "a numeric or checked binding's listener expects what its control's own input or change event always carries; a missing one is a bug in the tree"
             }
             Allowance::NeedlessPassByValue => {
                 "every component takes its props struct by value, empty or not, so parents mount them alike"
@@ -88,7 +88,8 @@ pub(crate) fn shown_text(expr: &str) -> [String; 3] {
 /// expectation a numeric binding's listener makes (`element_bind`).
 pub(crate) fn mount_allowances(info: &ScriptInfo, body: &str) -> String {
     let mut allowances = format!("    {}\n", Allowance::TooManyLines.attribute());
-    if body.contains("event.value_as_number().expect(") {
+    if body.contains("event.value_as_number().expect(") || body.contains("event.checked().expect(")
+    {
         let _ = writeln!(
             allowances,
             "    {}",

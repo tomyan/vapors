@@ -51,11 +51,15 @@ impl Dom for Document {
         }
     }
 
+    /// `checked` restyles for `:checked` (3-E3b).
     fn set_property(&mut self, node: NodeId, name: &str, value: PropertyValue) {
         self.changed = true;
         self.element_mut(node, "set_property")
             .properties
             .insert(name.to_owned(), value);
+        if name == "checked" {
+            self.mark_flag(node, vapors_css::tree::States::CHECKED);
+        }
     }
 
     fn append(&mut self, parent: NodeId, child: NodeId) {

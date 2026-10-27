@@ -15,8 +15,9 @@
 //!   `expect event <type> <target>`, `expect no event <type>` (a type
 //!   that is listened for), `expect focus <target>`,
 //!   `expect focus-visible <target>`, `expect value <target> <text>` (a
-//!   control's `value`, which has no spaces). A target is `tag#id`,
-//!   else the full child-index path from body.
+//!   control's `value`, which has no spaces), `expect checked <target>
+//!   true|false`. A target is `tag#id`, else the full child-index path
+//!   from body.
 //!
 //! Anything else is refused, naming the file and line.
 
@@ -53,14 +54,28 @@ impl Script {
     /// and each once: every step records each one's value.
     #[must_use]
     pub fn value_targets(&self) -> Vec<String> {
+        self.targets(|expect| match expect {
+            Expect::Value { target, .. } => Some(target),
+            _ => None,
+        })
+    }
+
+    /// The checkboxes whose `checked` the script expects somewhere,
+    /// sorted and each once: every step records each one's state.
+    #[must_use]
+    pub fn checked_targets(&self) -> Vec<String> {
+        self.targets(|expect| match expect {
+            Expect::Checked { target, .. } => Some(target),
+            _ => None,
+        })
+    }
+
+    fn targets(&self, pick: fn(&Expect) -> Option<&String>) -> Vec<String> {
         let mut targets: Vec<String> = self
             .steps
             .iter()
             .flat_map(|step| step.expect.iter())
-            .filter_map(|(expect, _)| match expect {
-                Expect::Value { target, .. } => Some(target.clone()),
-                _ => None,
-            })
+            .filter_map(|(expect, _)| pick(expect).cloned())
             .collect();
         targets.sort();
         targets.dedup();
@@ -168,7 +183,7 @@ fn listen(rest: &str) -> Result<Vec<String>, String> {
 
 fn expect(script: &mut Script, fields: &[&str], number: usize) -> Result<(), String> {
     let wanted = match fields.first().copied() {
-        Some("event" | "no" | "value") => 3,
+        Some("event" | "no" | "value" | "checked") => 3,
         Some("focus" | "focus-visible") => 2,
         _ => fields.len(),
     };
@@ -182,7 +197,9 @@ fn expect(script: &mut Script, fields: &[&str], number: usize) -> Result<(), Str
         ["focus", target] => Expect::Focus((*target).into()),
         ["focus-visible", target] => Expect::FocusVisible((*target).into()),
         ["value", target, value] => Expect::Value { target: (*target).into(), value: (*value).into() },
-        _ => return Err("`expect` takes event <type> <target>, no event <type>, focus <target>, focus-visible <target> or value <target> <text>".into()),
+        ["checked", target, state @ ("true" | "false")] => Expect::Checked { target: (*target).into(), checked: *state == "true" },
+        ["checked", _, state] => return Err(format!("`expect checked` takes true or false, not `{state}`")),
+        _ => return Err("`expect` takes event <type> <target>, no event <type>, focus <target>, focus-visible <target>, value <target> <text> or checked <target> true|false".into()),
     };
     let step = script
         .steps

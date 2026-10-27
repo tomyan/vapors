@@ -66,6 +66,7 @@ fixtures![
     buttons::Buttons,
     capture::Capture,
     centred_panel::CentredPanel,
+    checkbox::Checkbox,
     clipping::Clipping,
     flex_row::FlexRow,
     focus::Focus,

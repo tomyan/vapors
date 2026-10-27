@@ -106,7 +106,7 @@ fn input_carries_the_value_and_change_carries_checked() {
     let root = dom.borrow().root();
     let input = dom.borrow_mut().create_element("input");
     dom.borrow_mut().append(root, input);
-    let seen = Rc::new(RefCell::new((String::new(), false)));
+    let seen = Rc::new(RefCell::new((String::new(), None)));
     {
         let seen = Rc::clone(&seen);
         dom.borrow_mut().listen(
@@ -129,7 +129,7 @@ fn input_carries_the_value_and_change_carries_checked() {
     RecordingDom::change(&dom, input, true);
 
     // Then
-    assert_eq!(*seen.borrow(), ("typed".to_string(), true));
+    assert_eq!(*seen.borrow(), ("typed".to_string(), Some(true)));
     assert_eq!(
         dom.borrow().property(input, "value"),
         Some(PropertyValue::Text("typed".into()))

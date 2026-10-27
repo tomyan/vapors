@@ -33,6 +33,8 @@ pub struct Logged {
     pub focus_visible: bool,
     /// Each value target's value, in the script's sorted order.
     pub values: Vec<(String, String)>,
+    /// Each checked target's state, in the script's sorted order.
+    pub checked: Vec<(String, bool)>,
 }
 
 type Shared = Rc<RefCell<Vec<(String, String)>>>;
@@ -69,11 +71,14 @@ pub fn play(fixture: &Fixture, script: &Script, viewport: Viewport) -> Result<Lo
         };
         let values = values(&doc.borrow(), &script.value_targets())
             .map_err(|why| format!("{}.events:{}: {why}", fixture.name, step.line))?;
+        let checked = checked(&doc.borrow(), &script.checked_targets())
+            .map_err(|why| format!("{}.events:{}: {why}", fixture.name, step.line))?;
         log.push(Logged {
             events: heard.borrow_mut().drain(..).collect(),
             focus,
             focus_visible,
             values,
+            checked,
         });
     }
     Ok(log)
@@ -91,6 +96,22 @@ fn values(doc: &Document, targets: &[String]) -> Result<Vec<(String, String)>, S
                 .value(node)
                 .ok_or_else(|| format!("value {target} is not a control with a value"))?;
             Ok((target.clone(), value))
+        })
+        .collect()
+}
+
+/// Each target's checked state: a target that names no element, or
+/// one that is not a checkbox, is refused.
+fn checked(doc: &Document, targets: &[String]) -> Result<Vec<(String, bool)>, String> {
+    targets
+        .iter()
+        .map(|target| {
+            let node =
+                find(doc, target).ok_or_else(|| format!("checked {target} names no element"))?;
+            let checked = doc
+                .checked(node)
+                .ok_or_else(|| format!("checked {target} is not a checkbox"))?;
+            Ok((target.clone(), checked))
         })
         .collect()
 }

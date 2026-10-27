@@ -78,7 +78,7 @@ fn edges(style: &Style) -> [f32; 2] {
 }
 
 /// Padding and border on each axis.
-fn inset(style: &Style) -> [f32; 2] {
+pub(super) fn inset(style: &Style) -> [f32; 2] {
     let side = |a: taffy::LengthPercentage, b: taffy::LengthPercentage| {
         length(a.into_raw()).unwrap_or(0.0) + length(b.into_raw()).unwrap_or(0.0)
     };

@@ -34,12 +34,14 @@ const SETTLE: &str =
 const FRAME_DEADLINE: Duration = Duration::from_secs(5);
 
 /// A script being played: the page's session, the call deadline, the
-/// pointer's held button, and the controls whose values each step reads.
+/// pointer's held button, and the controls whose values and checked
+/// states each step reads, as JSON lists.
 struct Player<'a> {
     session: &'a mut Session,
     deadline: Duration,
     pointer: Pointer,
     values: String,
+    checked: String,
 }
 
 /// Each step's answers, or every expectation that did not hold, as
@@ -55,11 +57,13 @@ pub fn play(
     deadline: Duration,
 ) -> Result<Value, String> {
     let values = serde_json::to_string(&script.value_targets()).map_err(|e| e.to_string())?;
+    let checked = serde_json::to_string(&script.checked_targets()).map_err(|e| e.to_string())?;
     let mut player = Player {
         session,
         deadline,
         pointer: Pointer::default(),
         values,
+        checked,
     };
     let types = serde_json::to_string(&script.listen).map_err(|e| e.to_string())?;
     let capture = serde_json::to_string(&script.capture).map_err(|e| e.to_string())?;
@@ -111,8 +115,12 @@ impl Player<'_> {
             &format!("window.__eventsValues({})", self.values),
             self.deadline,
         )?;
+        let checked = self.evaluate(
+            &format!("window.__eventsChecked({})", self.checked),
+            self.deadline,
+        )?;
         Ok(
-            json!({ "line": step.line, "action": format!("{:?}", step.action), "events": events, "focus": focus["focus"], "focusVisible": focus["focusVisible"], "values": values }),
+            json!({ "line": step.line, "action": format!("{:?}", step.action), "events": events, "focus": focus["focus"], "focusVisible": focus["focusVisible"], "values": values, "checked": checked }),
         )
     }
 
@@ -136,7 +144,8 @@ impl Player<'_> {
         if let Expect::Event { target, .. }
         | Expect::Focus(target)
         | Expect::FocusVisible(target)
-        | Expect::Value { target, .. } = expect
+        | Expect::Value { target, .. }
+        | Expect::Checked { target, .. } = expect
         {
             let selector = serde_json::to_string(target).map_err(|e| e.to_string())?;
             let count =

@@ -121,7 +121,7 @@ impl Document {
             let event = document
                 .borrow()
                 .pointer_event("click", MOUSE, click, point);
-            dispatch(document, click, event);
+            crate::events::tree::dispatch_click(document, click, event);
         }
     }
 
@@ -206,4 +206,3 @@ mod touch;
 pub(crate) mod tree;
 
 use capture::{MOUSE, dispatch_pointer, hover_capturing, process_pending, release_capture};
-use tree::dispatch;

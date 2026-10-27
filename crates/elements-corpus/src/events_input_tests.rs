@@ -35,6 +35,29 @@ fn a_value_expectation_holds_against_the_recorded_value() {
 }
 
 #[test]
+fn a_checked_expectation_holds_against_the_recorded_state() {
+    // Given
+    let expect = Expect::Checked {
+        target: "input#a".into(),
+        checked: true,
+    };
+    let same = json!({ "events": [], "focus": "body", "checked": { "input#a": true } });
+    let other = json!({ "events": [], "focus": "body", "checked": { "input#a": false } });
+    let missing = json!({ "events": [], "focus": "body" });
+
+    // Then
+    assert_eq!(unmet(&expect, &same), None);
+    assert_eq!(
+        unmet(&expect, &other),
+        Some("input#a is checked false, not true".to_owned())
+    );
+    assert_eq!(
+        unmet(&expect, &missing),
+        Some("input#a is checked (not recorded), not true".to_owned())
+    );
+}
+
+#[test]
 fn a_click_is_a_left_press_and_release_at_the_point() {
     let calls = calls_fresh(&Action::Click(12.0, 34.0));
     assert_eq!(calls.len(), 2);

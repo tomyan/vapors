@@ -2,6 +2,7 @@
   "steps": [
     {
       "action": "Key(\"Tab\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -31,6 +32,7 @@
     },
     {
       "action": "Key(\"Tab\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -66,6 +68,7 @@
     },
     {
       "action": "Key(\"Tab\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -101,6 +104,7 @@
     },
     {
       "action": "Key(\"Tab\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -130,6 +134,7 @@
     },
     {
       "action": "Key(\"Shift+Tab\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -159,6 +164,7 @@
     },
     {
       "action": "Key(\"Enter\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -188,6 +194,7 @@
     },
     {
       "action": "Key(\"Space\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -217,6 +224,7 @@
     },
     {
       "action": "Click(350.0, 20.0)",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -245,6 +253,7 @@
     },
     {
       "action": "Key(\"Tab\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -280,6 +289,7 @@
     },
     {
       "action": "Click(250.0, 20.0)",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -295,6 +305,7 @@
     },
     {
       "action": "Key(\"x\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,

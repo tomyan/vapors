@@ -1,0 +1,35 @@
+# A checkbox by mouse and keys (3-E3b). `visible` is at x 4..17, y 3..16
+# (13 px with margins 3px 3px 3px 4px), `hidden` at x 61..74 and checked,
+# `off` at x 118..131 and disabled.
+listen pointerdown pointerup click input change keydown keyup focusin
+click 10 10                   a click toggles on, with input and change after the click
+expect event pointerdown input#visible
+expect event pointerup input#visible
+expect event click input#visible
+expect event input input#visible
+expect event change input#visible
+expect focus input#visible
+expect checked input#visible true
+click 10 10                   and off again
+expect event change input#visible
+expect checked input#visible false
+key Space                     Space toggles on keyup
+expect event keydown input#visible
+expect event keyup input#visible
+expect event click input#visible
+expect event change input#visible
+expect checked input#visible true
+key Enter                     Enter does nothing to a checkbox
+expect no event click
+expect checked input#visible true
+key Tab                       to the checked one
+expect focus-visible input#hidden
+expect checked input#hidden true
+key Space
+expect checked input#hidden false
+click 124 10                  off is disabled: no click, no focus, no change
+expect event pointerdown input#off
+expect no event click
+expect no event change
+expect focus body
+expect checked input#off false

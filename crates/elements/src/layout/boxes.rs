@@ -42,6 +42,8 @@ pub(crate) struct LayoutBox {
     pub(crate) image: Option<std::rc::Rc<vapors_scene::RgbaImage>>,
     /// The numbers of an `input type=range`, for paint (3-E3a).
     pub(crate) range: Option<crate::range::Range>,
+    /// Whether an `input type=checkbox` is checked, for paint (3-E3b).
+    pub(crate) checked: Option<bool>,
 }
 
 impl LayoutBox {
@@ -56,12 +58,15 @@ impl LayoutBox {
             natural: None,
             image: None,
             range: None,
+            checked: None,
         }
     }
 
     /// A box showing an image of `natural` size (CSS px), when it has
     /// one: a replaced box, which Taffy does not stretch, measured from its
-    /// natural size and its limits (`replaced::size`).
+    /// natural size and its limits (`replaced::size`). A checkbox has a
+    /// natural size too but is not replaced: as a flex item it stretches
+    /// across the line, as Chromium lays one out (`fixtures/checkbox`).
     pub(crate) fn replaced(
         content: Content,
         mut style: Style,
@@ -69,8 +74,9 @@ impl LayoutBox {
             Option<[f32; 2]>,
             Option<std::rc::Rc<vapors_scene::RgbaImage>>,
         ),
+        stretches: bool,
     ) -> Self {
-        if natural.is_some() {
+        if natural.is_some() && !stretches {
             style.item_is_replaced = true;
         }
         Self {
@@ -115,16 +121,24 @@ fn add_element(source: &Source<'_>, node: NodeId, boxes: &mut Vec<LayoutBox>) ->
     }
     let index = boxes.len();
     let range = crate::range::of_element(source.arena, node);
+    let checked = source
+        .arena
+        .get(node, "build")
+        .element()
+        .and_then(crate::checkbox::checked_of);
     let natural = source
         .images
         .natural(source.arena, node)
-        .or(range.map(|_| crate::range::NATURAL_SIZE));
+        .or(range.map(|_| crate::range::NATURAL_SIZE))
+        .or(checked.map(|_| crate::checkbox::NATURAL_SIZE));
     let mut replaced = LayoutBox::replaced(
         Content::Element(node),
         style.layout.clone(),
         (natural, source.images.of(source.arena, node).cloned()),
+        checked.is_some(),
     );
     replaced.range = range;
+    replaced.checked = checked;
     boxes.push(replaced);
     let mut run = Collector::new(style.text, style.visible);
     for child in source.arena.children(node) {

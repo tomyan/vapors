@@ -20,6 +20,8 @@ pub(crate) const THUMB_COLOR: &str = "--vapors-thumb-color";
 pub(crate) const TRACK_HEIGHT: &str = "--vapors-track-height";
 /// The track's colour.
 pub(crate) const TRACK_COLOR: &str = "--vapors-track-color";
+/// A checkbox's mark's colour (3-E3b).
+pub(crate) const MARK_COLOR: &str = "--vapors-mark-color";
 
 /// How a range's thumb and track are drawn.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -28,19 +30,24 @@ pub(crate) struct Parts {
     pub(crate) thumb_color: Rgba,
     pub(crate) track_height: f32,
     pub(crate) track_color: Rgba,
+    pub(crate) mark_color: Rgba,
 }
 
-/// The user-agent parts: a 16 px thumb in the focus ring's blue
-/// (#0060df) on a 4 px grey (#d0d0d7) track; the thumb's size is
-/// Chromium's, so a press lands on the same value in both.
+/// The focus ring's blue, #0060df.
+const BLUE: Rgba = Rgba {
+    r: 0.0,
+    g: 96.0 / 255.0,
+    b: 223.0 / 255.0,
+    a: 1.0,
+};
+
+/// The user-agent parts: a 16 px thumb in the focus ring's blue on a
+/// 4 px grey (#d0d0d7) track (the thumb's size is Chromium's, so a
+/// press lands on the same value in both), and a checkbox's mark in
+/// the same blue.
 pub(crate) const DEFAULT: Parts = Parts {
     thumb_size: 16.0,
-    thumb_color: Rgba {
-        r: 0.0,
-        g: 96.0 / 255.0,
-        b: 223.0 / 255.0,
-        a: 1.0,
-    },
+    thumb_color: BLUE,
     track_height: 4.0,
     track_color: Rgba {
         r: 208.0 / 255.0,
@@ -48,6 +55,7 @@ pub(crate) const DEFAULT: Parts = Parts {
         b: 215.0 / 255.0,
         a: 1.0,
     },
+    mark_color: BLUE,
 };
 
 /// The parts `styles` give, each custom property read where it is
@@ -65,6 +73,9 @@ pub(crate) fn parts(styles: Styles<'_>, refusals: &mut Vec<Refusal>) -> Parts {
     }
     if let Some(color) = read(styles, TRACK_COLOR, rgba, refusals) {
         parts.track_color = color;
+    }
+    if let Some(color) = read(styles, MARK_COLOR, rgba, refusals) {
+        parts.mark_color = color;
     }
     parts
 }

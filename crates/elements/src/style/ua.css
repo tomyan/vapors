@@ -61,6 +61,19 @@ button {
 input { display: inline-block; }
 input[type=range] { margin: 2px; }
 
+/* A checkbox (3-E3b): Chromium's margins, and its 13 x 13 px size
+   from checkbox.rs (a size of its own, so a flex row stretches it as
+   Chromium does), with a vapors look (a 1px grey border, a small
+   radius, white), not the platform's; its mark when checked is drawn in
+   --vapors-mark-color (style/parts.rs), inset a quarter of the box. */
+input[type=checkbox] {
+  box-sizing: border-box;
+  margin: 3px 3px 3px 4px;
+  border: 1px solid #8f8f9d;
+  border-radius: 2px;
+  background-color: #ffffff;
+}
+
 /* Chromium draws an hr's 1px border `inset` (two greys); vapors draws
    solid borders, so it is one grey. The box is the same 2px tall. */
 hr {

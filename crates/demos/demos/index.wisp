@@ -19,4 +19,5 @@ h1 { margin-top: 0; font-size: 20px; }
 <div class="demo"><div class="name">?demo=images</div><div>F2c S10: a history list with a thumbnail per turn</div></div>
 <div class="demo"><div class="name">?demo=cards</div><div>1-R1: cards whose contents their parent passes as children</div></div>
 <div class="demo"><div class="name">?demo=slider</div><div>3-E3a: a range input bound to a signal, dragged and stepped by key</div></div>
+<div class="demo"><div class="name">?demo=checkbox</div><div>3-E3b: checkboxes bound to signals, toggled by click or Space</div></div>
 <div class="demo"><div class="name">?demo=image</div><div>F0: the image view, pinch and drag</div></div>
