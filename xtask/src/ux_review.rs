@@ -2,7 +2,8 @@
 //! and the judged items of the UX checklist, sent to a model for the
 //! items no script can measure (docs/ux-signal.md in touche). Settings
 //! are `[ux]` in factory.toml. `--dry-run` builds the request and prints
-//! its estimated tokens and worst-case cost, and sends nothing.
+//! its estimated tokens and worst-case cost, and sends nothing; without
+//! it the review is sent (`ux_live`), and `--pr <n>` posts the report.
 
 use std::process::ExitCode;
 
@@ -15,8 +16,13 @@ use crate::ux_run::{self, Viewport};
 const REPRODUCE: &str = "cargo xtask ux-review --dry-run";
 
 /// Run the review; `dry_run` stops before anything is sent.
-pub fn run(dry_run: bool) -> ExitCode {
-    match review(dry_run) {
+pub fn run(dry_run: bool, pr: Option<u32>, measure: bool) -> ExitCode {
+    let result = if measure {
+        measure_image_cost()
+    } else {
+        review(dry_run, pr)
+    };
+    match result {
         Ok(lines) => {
             for line in lines {
                 println!("ok   ux-review: {line}");
@@ -39,28 +45,54 @@ pub struct Prepared {
     pub estimate: Estimate,
 }
 
-fn review(dry_run: bool) -> Result<Vec<String>, String> {
+/// A live review's key is read first, so a missing key fails before
+/// any work; once it is read, what is printed passes the key guard.
+fn review(dry_run: bool, pr: Option<u32>) -> Result<Vec<String>, String> {
     let config = Config::load().map_err(|e| e.to_string())?;
     let ux = UxConfig::from_config(&config, std::env::var("HOME").ok().as_deref())?;
-    let prepared = prepare(&ux)?;
-    checked(&ux, &prepared, dry_run)
+    if dry_run {
+        let prepared = prepare(&ux)?;
+        let mut lines = checked(&ux, &prepared)?;
+        lines.push("dry run: nothing was sent".to_owned());
+        return Ok(lines);
+    }
+    let secret = crate::ux_live::key(&ux)?;
+    let guarded = |text: String| secret.guard("stdout", &text).map(str::to_owned);
+    let lines =
+        live(&ux, &secret, pr).map_err(|why| guarded(why).unwrap_or_else(|refused| refused))?;
+    lines.into_iter().map(guarded).collect()
 }
 
-/// The caps checked and what would be sent, summarised; the live call
-/// is refused, naming the flag, until slice 2 builds it.
+/// `--measure-image-cost`: the model's image counts, through the guard.
+fn measure_image_cost() -> Result<Vec<String>, String> {
+    let config = Config::load().map_err(|e| e.to_string())?;
+    let ux = UxConfig::for_measuring(&config, std::env::var("HOME").ok().as_deref())?;
+    let secret = crate::ux_live::key(&ux)?;
+    let guarded = |text: String| secret.guard("stdout", &text).map(str::to_owned);
+    let lines = crate::ux_measure_run::run(&ux, &secret)
+        .map_err(|why| guarded(why).unwrap_or_else(|refused| refused))?;
+    lines.into_iter().map(guarded).collect()
+}
+
+fn live(
+    ux: &UxConfig,
+    secret: &crate::ux_secret::Secret,
+    pr: Option<u32>,
+) -> Result<Vec<String>, String> {
+    let prepared = prepare(ux)?;
+    let mut lines = checked(ux, &prepared)?;
+    let sha = crate::ux_live::head(secret)?;
+    lines.extend(crate::ux_live::run(ux, &prepared, secret, pr, &sha)?);
+    Ok(lines)
+}
+
+/// The caps checked, and what would be sent, summarised.
 ///
 /// # Errors
-/// A cap exceeded, or no `--dry-run`.
-pub fn checked(ux: &UxConfig, prepared: &Prepared, dry_run: bool) -> Result<Vec<String>, String> {
+/// A cap exceeded.
+pub fn checked(ux: &UxConfig, prepared: &Prepared) -> Result<Vec<String>, String> {
     prepared.estimate.within(&ux.caps, &ux.prices)?;
-    if !dry_run {
-        return Err(
-            "the live review is not built yet (U4 slice 2); fix: pass --dry-run".to_owned(),
-        );
-    }
-    let mut lines = summary(ux, prepared);
-    lines.push("dry run: nothing was sent".to_owned());
-    Ok(lines)
+    Ok(summary(ux, prepared))
 }
 
 /// Read the checklist, the run and the design files, and build the
@@ -89,17 +121,16 @@ pub fn prepare(ux: &UxConfig) -> Result<Prepared, String> {
         .iter()
         .flat_map(|v| &v.frames)
         .map(|f| image_tokens(ux.model, f.size, &ux.image_detail))
-        .sum();
-    let estimate = Estimate {
-        text: text_tokens(prompt.len()),
-        images,
-    };
-    Ok(Prepared {
+        .sum::<Result<u64, String>>()?;
+    let mut prepared = Prepared {
         items,
         viewports,
         prompt,
-        estimate,
-    })
+        estimate: Estimate { text: 0, images },
+    };
+    let schema = crate::ux_request::schema(&prepared).to_string();
+    prepared.estimate.text = text_tokens(prepared.prompt.len() + schema.len());
+    Ok(prepared)
 }
 
 fn summary(ux: &UxConfig, prepared: &Prepared) -> Vec<String> {
@@ -139,4 +170,4 @@ fn summary(ux: &UxConfig, prepared: &Prepared) -> Vec<String> {
 
 #[cfg(test)]
 #[path = "ux_review_tests.rs"]
-mod tests;
+pub mod tests;

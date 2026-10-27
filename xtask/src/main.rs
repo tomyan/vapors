@@ -101,19 +101,28 @@ mod tools;
 mod trunk;
 mod trunk_process;
 mod twin;
+mod ux_answer;
 mod ux_base64;
+mod ux_call;
 mod ux_checklist;
 mod ux_config;
+mod ux_count;
 mod ux_estimate;
+mod ux_ledger;
+mod ux_ledger_write;
+mod ux_live;
+mod ux_measure;
+mod ux_measure_run;
 mod ux_models;
 mod ux_prompt;
+mod ux_report;
+mod ux_request;
 mod ux_review;
 mod ux_run;
-#[allow(
-    dead_code,
-    reason = "the live review uses it (U4 slice 2); its tests run now"
-)]
 mod ux_secret;
+mod ux_spend;
+#[cfg(test)]
+mod ux_stub_tests;
 mod web;
 mod web_version;
 mod xvfb;
@@ -151,7 +160,11 @@ fn main() -> ExitCode {
         Command::Web { debug } => return web::run(debug),
         Command::Serve { replace } => return serve::run(replace),
         Command::StampPage => return stamp_page::run(),
-        Command::UxReview { dry_run } => return ux_review::run(dry_run),
+        Command::UxReview {
+            dry_run,
+            pr,
+            measure_image_cost,
+        } => return ux_review::run(dry_run, pr, measure_image_cost),
         Command::CheckXtaskTwin { sibling } => return twin::run(&sibling),
         Command::Dev { keys, replace } => return dev::run(&reporter, &keys, replace),
         Command::Ci => match web::web_package() {

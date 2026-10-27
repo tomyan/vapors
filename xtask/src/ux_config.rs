@@ -26,6 +26,23 @@ pub struct Caps {
     pub daily_usd: f64,
 }
 
+/// Whether a model must have a row in `ux_models`.
+#[derive(Clone, Copy)]
+enum Rows {
+    Required,
+    Measuring,
+}
+
+impl Rows {
+    fn resolve(self, name: &str) -> Result<&'static Model, String> {
+        match (crate::ux_models::find(name), self) {
+            (Ok(model), _) => Ok(model),
+            (Err(_), Rows::Measuring) => Ok(crate::ux_models::unmeasured(name)),
+            (Err(why), Rows::Required) => Err(why),
+        }
+    }
+}
+
 /// The review's settings.
 #[derive(Debug, PartialEq)]
 pub struct UxConfig {
@@ -56,6 +73,19 @@ impl UxConfig {
     /// A missing key, a number that is not positive and finite, a price
     /// source with no date, or a value outside its listed choices.
     pub fn from_config(config: &Config, home: Option<&str>) -> Result<Self, String> {
+        Self::read(config, home, Rows::Required)
+    }
+
+    /// As [`UxConfig::from_config`], but a model with no row is taken as
+    /// not yet measured, for `--measure-image-cost` alone.
+    ///
+    /// # Errors
+    /// As [`UxConfig::from_config`], save the missing row.
+    pub fn for_measuring(config: &Config, home: Option<&str>) -> Result<Self, String> {
+        Self::read(config, home, Rows::Measuring)
+    }
+
+    fn read(config: &Config, home: Option<&str>, rows: Rows) -> Result<Self, String> {
         let text = |key: &str| {
             config
                 .require(&format!("ux.{key}"))
@@ -67,7 +97,7 @@ impl UxConfig {
             checklist: expand(&text("checklist")?, home)?,
             design: design(config, home)?,
             report_dir: expand(&text("report_dir")?, home)?,
-            model: crate::ux_models::find(&text("model")?)?,
+            model: rows.resolve(&text("model")?)?,
             endpoint: endpoint(&text("endpoint")?)?,
             key_env: text("key_env")?,
             reasoning: one_of(
