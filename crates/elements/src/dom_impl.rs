@@ -27,6 +27,9 @@ impl Dom for Document {
         self.arena.insert(Node::new(Kind::Text(text.to_owned())))
     }
 
+    /// The restyle it marks covers `:invalid` following a number
+    /// field's `min`, `max` or `step` (3-E3c), which
+    /// `invalid_follows_a_max_narrowed_under_the_value` pins.
     fn set_attribute(&mut self, node: NodeId, name: &str, value: &str) {
         self.changed = true;
         self.element_mut(node, "set_attribute")
@@ -95,6 +98,12 @@ impl Dom for Document {
         self.drop_focus_within(node);
         self.arena.detach(node);
         self.arena.free_subtree(node);
+        // a number field's editing state goes with it (3-E3c)
+        self.committed
+            .retain(|field, _| self.arena.contains(*field));
+        self.selected_all = self
+            .selected_all
+            .filter(|field| self.arena.contains(*field));
     }
 
     fn listen(&mut self, node: NodeId, event: &str, handler: Handler) {

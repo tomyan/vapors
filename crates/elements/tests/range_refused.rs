@@ -134,6 +134,33 @@ fn a_checked_property_that_is_not_a_boolean_is_refused() {
 }
 
 #[test]
+fn a_data_scrub_of_another_shape_or_on_a_range_is_refused() {
+    for (kind, scrub, needle) in [
+        ("number", "fast", "not a number of px"),
+        ("number", "0", "not a number of px"),
+        ("number", "-4", "not a number of px"),
+        ("number", "2px", "not a number of px"),
+        ("range", "", "only a number field scrubs"),
+    ] {
+        // Given
+        let mut doc = document();
+        let body = doc.body();
+        let input = element(&mut doc, body, "input", "");
+        doc.set_attribute(input, "type", kind);
+        doc.set_attribute(input, "data-scrub", scrub);
+        doc.add_stylesheet("w.css", "input { width: 100px; }")
+            .expect("parses");
+
+        // When
+        let errors = refusals(&mut doc);
+
+        // Then
+        assert_eq!(errors.len(), 1, "{kind} {scrub:?}: {errors:?}");
+        assert!(errors[0].contains(needle), "{kind} {scrub:?}: {errors:?}");
+    }
+}
+
+#[test]
 fn a_boolean_value_property_is_refused() {
     // Given
     let mut doc = document();

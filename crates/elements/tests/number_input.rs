@@ -38,10 +38,12 @@ fn text_that_is_no_number_has_an_empty_value_and_no_number_until_committed() {
     // When: "20e" is no number; Enter reverts it to the committed 20
     type_text(&page, "e");
     let while_editing = value(&page, page.amount);
+    let as_number = page.doc.borrow().value_as_number(page.amount);
     key(&page, "Enter");
 
-    // Then
+    // Then: a control with no number, not NaN
     assert_eq!(while_editing, "");
+    assert_eq!(as_number, None);
     assert_eq!(value(&page, page.amount), "20");
     assert_eq!(
         *page.log.borrow(),
@@ -168,38 +170,4 @@ fn a_value_property_sets_the_text_and_fires_nothing() {
     // Then
     assert_eq!(value(&page, page.amount), "42.5");
     assert!(page.log.borrow().is_empty());
-}
-
-#[test]
-fn invalid_matches_while_the_text_is_no_number_or_out_of_range() {
-    // Given: an :invalid rule
-    let page = page();
-    page.doc
-        .borrow_mut()
-        .add_stylesheet(
-            "invalid.css",
-            "input:invalid { background-color: #ff0000; }",
-        )
-        .expect("parses");
-    let red = |page: &support::number_page::Page| {
-        let mut doc = page.doc.borrow_mut();
-        let painted = doc
-            .update(support::viewport(400.0, 100.0))
-            .expect("updates");
-        // :invalid rule's quad: the field's box at the top, red
-        painted.scene().items().iter().any(|item| {
-            matches!(item, vapors_scene::Item::Quad(q) if q.rect.top == 0.0 && q.background == vapors_scene::Color::from_rgba8(255, 0, 0, 255))
-        })
-    };
-    click(&page, [50.0, 12.0]);
-
-    // When / Then
-    assert!(!red(&page));
-    type_text(&page, "5");
-    assert!(red(&page), "205 is over 100");
-    key(&page, "Backspace");
-    type_text(&page, "e");
-    assert!(red(&page), "20e is no number");
-    key(&page, "Enter");
-    assert!(!red(&page), "reverted to 20");
 }

@@ -30,15 +30,16 @@ impl Document {
             .or_else(|| self.number_field(node).map(|field| field.value()))
     }
 
-    /// A range's value as a number, or a number field's (NaN when its
-    /// text is no number, as the DOM's `valueAsNumber`); `None` for
-    /// another element.
+    /// A range's value as a number, or a number field's when its text
+    /// is one; `None` for a field whose text is no number (where the
+    /// DOM's `valueAsNumber` would answer NaN) and for an element that
+    /// is not a control, which [`Document::value`] tells apart (`Some`
+    /// for every control).
     #[must_use]
     pub fn value_as_number(&self, node: NodeId) -> Option<f64> {
-        self.range(node).map(|range| range.value).or_else(|| {
-            self.number_field(node)
-                .map(|field| field.number().unwrap_or(f64::NAN))
-        })
+        self.range(node)
+            .map(|range| range.value)
+            .or_else(|| self.number_field(node)?.number())
     }
 
     /// The range `node` is, when it is an `input type=range`.

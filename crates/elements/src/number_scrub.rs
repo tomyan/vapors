@@ -42,6 +42,7 @@ impl Document {
         if self.is_disabled_control(node) {
             return None;
         }
+        // a value of another shape is refused by `check_inputs`
         let value = self.attribute(node, "data-scrub")?;
         if value.is_empty() {
             return Some(DEFAULT_PX_PER_STEP);
@@ -59,7 +60,9 @@ pub(crate) fn pressed(document: &Rc<RefCell<Document>>, id: u32, node: NodeId, p
     ) else {
         return;
     };
-    let base = field.number().unwrap_or_else(|| field.clamped(0.0));
+    // from the last committed number when the text is none, as a key
+    // step counts (review-v84, S5)
+    let base = document.borrow().number_base(node, &field);
     let direction = if id == crate::events::capture::MOUSE {
         Direction::Along
     } else {
@@ -104,7 +107,12 @@ fn step_to(document: &Rc<RefCell<Document>>, id: u32, scrub: Scrub, steps: f64) 
     let Some(field) = document.borrow().number_field(scrub.node) else {
         return;
     };
-    let value = field.clamped(scrub.base + steps * field.step.unwrap_or(1.0));
+    let step = field.step.unwrap_or(1.0);
+    let value = field.clamped(crate::range::aligned(
+        scrub.base + steps * step,
+        Some(step),
+        scrub.base,
+    ));
     let changed = document
         .borrow_mut()
         .set_number_text(scrub.node, written(value));

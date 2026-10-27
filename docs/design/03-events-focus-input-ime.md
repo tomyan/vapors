@@ -281,15 +281,30 @@ number reverts to the last committed number (vapors' own rule:
 Chromium keeps the text), so `change` always carries a number, and
 fires only when the commit differs from the last; the blur's `change`
 comes before its `focusout`, as Chromium orders it. ArrowUp and
-ArrowDown step by `step` (1 for `any`), Shift by ten, each with `input`
-and `change`. `:invalid` while the text is no number or out of range
-(a step mismatch is not flagged). `bind:value` on a number field
-updates on `change`, so the app's `Signal<f64>` never takes NaN
-mid-typing. With `data-scrub`, a drag along the field steps the number
+ArrowDown step by `step` (1 for `any`), in decimal (a step of 0.1 from
+0.2 is 0.3, as Chromium's `AlignValueForStep` keeps it), each with
+`input` and `change`; Shift by ten, vapors' own (Chromium steps by
+one), pinned by `tests/number_input.rs`. `:invalid` while the text is
+no number or out of range (a step mismatch is not flagged), following
+a later `min`, `max` or `step` too.
+
+Two differences from the web, decided with the lead (2026-10-27):
+(1) `bind:value` on a number field updates on `change`, not `input` as
+Svelte's and the web's bindings do, so the app's `Signal<f64>` never
+takes NaN mid-typing; pinned by `codegen_bind.rs:
+bind_value_on_a_number_input_binds_a_number_on_change`. (2) On commit
+a number outside `min`..`max` is clamped into it and text that is no
+number, an emptied field included, reverts to the last committed
+number, where Chromium keeps the text (and `""`) and matches `:invalid`
+after the commit too; pinned by `tests/number_input.rs:
+enter_commits_an_out_of_range_number_clamped_with_one_change`,
+`text_that_is_no_number_has_an_empty_value_and_no_number_until_committed`
+and `invalid_matches_while_the_text_is_no_number_or_out_of_range`. With `data-scrub`, a drag along the field steps the number
 by one `step` per 2 CSS px (`data-scrub="4"`: per 4 px), `input` per
-step and `change` at the release; the press still focuses; a finger
-decides at its first move whether it scrubs or scrolls, as a range's
-does. The field's text is laid out as its content (its height is its
+step and `change` at the release, counting from the text's number or
+the last committed one; the press still focuses; a finger decides at
+its first move whether it scrubs or scrolls, as a range's does; a
+`data-scrub` of another shape, or on another input, is refused. The field's text is laid out as its content (its height is its
 line, a blank field keeps it with a no-break space); the caret (1 px,
 the text's colour) and selection (the ring's blue at a third) are
 painted by `number_paint.rs`; a field needs a width of its own, since

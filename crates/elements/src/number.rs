@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 
 use vapors_dom::PropertyValue;
 
-use crate::range::{parse, written};
+use crate::range::{aligned, parse, written};
 
 /// A number field's numbers and text.
 #[derive(Clone, Debug, PartialEq)]
@@ -33,19 +33,11 @@ impl Field {
         properties: &BTreeMap<String, PropertyValue>,
     ) -> Self {
         let number = |name: &str| attributes.get(name).and_then(|text| parse(text));
-        let text = match properties.get("value") {
-            Some(PropertyValue::Number(n)) if n.is_finite() => written(*n),
-            Some(PropertyValue::Text(text)) => text.clone(),
-            // NaN is no value, as the DOM's valueAsNumber = NaN empties
-            // the value; a Bool is refused by `check`
-            Some(PropertyValue::Number(_) | PropertyValue::Bool(_)) => String::new(),
-            None => attributes.get("value").cloned().unwrap_or_default(),
-        };
         Self {
             min: number("min"),
             max: number("max"),
             step: step_of(attributes.get("step").map(String::as_str)),
-            text,
+            text: text_of(attributes, properties),
         }
     }
 
@@ -95,7 +87,22 @@ impl Field {
     /// 1 for `step="any"`.
     pub(crate) fn stepped(&self, steps: f64, fallback: f64) -> f64 {
         let from = self.number().unwrap_or(fallback);
-        self.clamped(from + steps * self.step.unwrap_or(1.0))
+        let step = self.step.unwrap_or(1.0);
+        self.clamped(aligned(from + steps * step, Some(step), from))
+    }
+}
+
+/// The text shown: the `value` property once set, else the attribute.
+fn text_of(
+    attributes: &BTreeMap<String, String>,
+    properties: &BTreeMap<String, PropertyValue>,
+) -> String {
+    match properties.get("value") {
+        Some(PropertyValue::Number(n)) if n.is_finite() => written(*n),
+        Some(PropertyValue::Text(text)) => text.clone(),
+        // a non-finite number and a Bool are refused by `check`
+        Some(PropertyValue::Number(_) | PropertyValue::Bool(_)) => String::new(),
+        None => attributes.get("value").cloned().unwrap_or_default(),
     }
 }
 

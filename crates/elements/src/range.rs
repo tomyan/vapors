@@ -81,14 +81,14 @@ impl Range {
             return clamped;
         };
         let rounded = self.base + ((clamped - self.base) / step).round() * step;
-        if rounded > self.max {
+        let on_step = if rounded > self.max {
             self.base + ((clamped - self.base) / step).floor() * step
         } else if rounded < self.min {
             self.base + ((clamped - self.base) / step).ceil() * step
         } else {
             rounded
-        }
-        .clamp(self.min, self.max)
+        };
+        aligned(on_step, Some(step), self.base).clamp(self.min, self.max)
     }
 
     /// The default value: the middle of the range.
@@ -127,6 +127,28 @@ impl Range {
         let sign = if up { 1.0 } else { -1.0 };
         self.snapped(self.value + sign * big)
     }
+}
+
+/// `value` rounded to the decimal places of `step` and `from` (the
+/// number it was stepped from), so a step of 0.1 from 0.2 is 0.3 and
+/// not f64's 0.30000000000000004, as Chromium's `AlignValueForStep`
+/// keeps a stepped value in decimal; `None` for `step="any"` leaves it.
+pub(crate) fn aligned(value: f64, step: Option<f64>, from: f64) -> f64 {
+    let Some(step) = step else {
+        return value;
+    };
+    let places = decimals(step).max(decimals(from));
+    let scale = 10f64.powi(places);
+    (value * scale).round() / scale
+}
+
+/// The digits after the point in `n`'s shortest decimal, at most 15.
+fn decimals(n: f64) -> i32 {
+    let text = written(n);
+    let places = text
+        .split_once('.')
+        .map_or(0, |(_, fraction)| fraction.len());
+    i32::try_from(places.min(15)).unwrap_or(15)
 }
 
 /// The value as the DOM's `value` string: the shortest decimal that

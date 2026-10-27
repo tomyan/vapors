@@ -38,7 +38,21 @@ pub(crate) fn paint(
         return;
     }
     let (text_rect, text_width) = text_extent(boxes, rects, index, input);
-    let rect = if focus.selected {
+    let rect = mark_rect(focus.selected, text_rect, text_width);
+    let color = if focus.selected {
+        SELECTION
+    } else {
+        used.text.color
+    };
+    if rect.height > 0.0 {
+        out.scene
+            .push(Item::Quad(Quad::fill(snapped(rect, input.scale), color)));
+    }
+}
+
+/// The selection over the text, or the caret after it.
+fn mark_rect(selected: bool, text_rect: BoxRect, text_width: f32) -> BoxRect {
+    if selected {
         BoxRect {
             width: text_width,
             ..text_rect
@@ -49,15 +63,6 @@ pub(crate) fn paint(
             width: 1.0,
             ..text_rect
         }
-    };
-    let color = if focus.selected {
-        SELECTION
-    } else {
-        used.text.color
-    };
-    if rect.height > 0.0 {
-        out.scene
-            .push(Item::Quad(Quad::fill(snapped(rect, input.scale), color)));
     }
 }
 

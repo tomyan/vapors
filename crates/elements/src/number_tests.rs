@@ -72,6 +72,11 @@ fn stepping_moves_by_the_step_from_the_text_or_the_fallback_clamped() {
     assert_eq!(near_top.stepped(1.0, 0.0), 10.0);
     assert_eq!(near_top.stepped(-10.0, 0.0), 4.5);
     assert_eq!(blank.stepped(2.0, 3.0), 4.0, "from the fallback");
+    assert_eq!(
+        field(&[("step", "0.1"), ("value", "0.2")]).stepped(1.0, 0.0),
+        0.3,
+        "in decimal, not f64 noise"
+    );
     assert_eq!(super::step_of(Some("any")), None);
     assert_eq!(super::step_of(Some("-1")), Some(1.0));
 }

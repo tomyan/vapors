@@ -145,6 +145,27 @@ fn a_fraction_of_the_track_maps_to_a_snapped_value_and_back() {
 }
 
 #[test]
+fn a_fractional_step_snaps_in_decimal_not_in_f64_noise() {
+    // Given: 0..1 by 0.1 at 0.2
+    let range = range(&[
+        ("min", "0"),
+        ("max", "1"),
+        ("step", "0.1"),
+        ("value", "0.2"),
+    ]);
+
+    // Then
+    assert_eq!(range.stepped(1.0), 0.3);
+    assert_eq!(written(range.stepped(1.0)), "0.3");
+    assert_eq!(super::aligned(0.1 + 0.2, Some(0.1), 0.2), 0.3);
+    assert_eq!(
+        super::aligned(0.1 + 0.2, None, 0.2),
+        0.1 + 0.2,
+        "step=any leaves it"
+    );
+}
+
+#[test]
 fn the_value_is_written_as_the_dom_writes_it() {
     assert_eq!(written(50.0), "50");
     assert_eq!(written(12.5), "12.5");

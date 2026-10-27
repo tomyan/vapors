@@ -50,6 +50,14 @@ impl Document {
             .unwrap_or_else(|| field.clamped(0.0))
     }
 
+    /// The number a step or scrub counts from: the text's, else the
+    /// last committed.
+    pub(crate) fn number_base(&self, node: NodeId, field: &Field) -> f64 {
+        field
+            .number()
+            .unwrap_or_else(|| self.last_committed(node, field))
+    }
+
     /// A number field the user can edit: focused and not disabled.
     fn editable_number(&self, node: NodeId) -> Option<Field> {
         if self.is_disabled_control(node) {
