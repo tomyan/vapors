@@ -22,6 +22,9 @@ pub fn run(ci: bool) -> ExitCode {
             return fail(&message);
         }
     }
+    if let Err(message) = ensure_downloads() {
+        return fail(&message);
+    }
     if !ci && let Err(message) = install_hook() {
         return fail(&message);
     }
@@ -45,6 +48,10 @@ pub fn check() -> ExitCode {
             }
         }
     }
+    if let Err(why) = check_downloads() {
+        ok = false;
+        println!("FAIL {why}");
+    }
     if ok {
         ExitCode::SUCCESS
     } else {
@@ -57,6 +64,42 @@ fn load_tools() -> Result<Vec<Tool>, String> {
     let text = fs::read_to_string(TOOLS_FILE)
         .map_err(|e| format!("could not read {TOOLS_FILE}: {e}; run from the workspace root"))?;
     tools::parse(&text).map_err(|e| e.to_string())
+}
+
+/// `[downloads]`, each fetched and verified unless already verified.
+fn ensure_downloads() -> Result<(), String> {
+    let home = home()?;
+    for download in load_downloads()? {
+        let path = crate::download_install::ensure(&download, &home)?;
+        println!(
+            "ok   {:<18} {} at {} (SHA-256 verified)",
+            download.name,
+            download.version,
+            path.display()
+        );
+    }
+    Ok(())
+}
+
+/// `[downloads]`, each installed and matching its pinned hash; never run.
+fn check_downloads() -> Result<(), String> {
+    let home = home()?;
+    for download in load_downloads()? {
+        crate::download_install::verified(&download, &home)?;
+    }
+    Ok(())
+}
+
+fn load_downloads() -> Result<Vec<crate::downloads::Download>, String> {
+    let text = fs::read_to_string(TOOLS_FILE)
+        .map_err(|e| format!("could not read {TOOLS_FILE}: {e}; run from the workspace root"))?;
+    crate::downloads::parse(&text).map_err(|e| e.to_string())
+}
+
+fn home() -> Result<PathBuf, String> {
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .ok_or_else(|| "HOME is unset; fix: set it".to_owned())
 }
 
 fn ensure(tool: &Tool) -> Result<(), String> {

@@ -85,7 +85,12 @@ pub fn build_page(build: &Build) -> Result<String, String> {
         .arg(&dist)
         .current_dir(&crate_dir);
     match run_with_deadline(command, BUILD_DEADLINE)? {
-        Finished::Exited { success: true, .. } => Ok(format!("{} {}", build.dist, size_of(&dist)?)),
+        Finished::Exited { success: true, .. } => Ok(format!(
+            "{} {}{}",
+            build.dist,
+            size_of(&dist)?,
+            compressed(build, &dist)?
+        )),
         Finished::Exited { output, .. } => Err(format!(
             "`trunk {}` in {} failed:\n{output}",
             build.trunk_args().join(" "),
@@ -99,6 +104,25 @@ pub fn build_page(build: &Build) -> Result<String, String> {
 }
 
 /// `web.package` from `.config/factory.toml`.
+/// The release page precompressed for `cargo xtask serve`; the debug
+/// page is served by trunk, which does not read the copies.
+fn compressed(build: &Build, dist: &Path) -> Result<String, String> {
+    if build.debug {
+        return Ok(String::new());
+    }
+    let done = crate::precompress::precompress(dist)?;
+    let largest = done.iter().max_by_key(|c| c.bytes);
+    Ok(largest.map_or_else(String::new, |c| {
+        format!(
+            "; {} files precompressed, the largest {} KiB as {} KiB brotli, {} KiB gzip",
+            done.len(),
+            c.bytes >> 10,
+            c.brotli >> 10,
+            c.gzip >> 10
+        )
+    }))
+}
+
 pub fn web_package() -> Result<String, String> {
     Config::load()
         .and_then(|c| c.require("web.package").map(str::to_owned))

@@ -17,6 +17,10 @@ serde_json = { version = "=1.0.154", features = ["preserve_order"] }
 # parser change is a deliberate bump. Maintained, pure Rust (serde_yaml,
 # archived, pulled in unsafe-libyaml, RUSTSEC-2024-0449).
 yaml-rust2 = { version = "=0.13.0", default-features = false }
+# Precompressing the release page for `cargo xtask serve` (precompress.rs):
+# brotli and gzip copies beside each file, served by static-web-server.
+brotli = { version = "9.1.0", default-features = false, features = ["std"] }
+flate2 = "1.1.10"
 
 [lints]
 workspace = true

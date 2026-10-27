@@ -8,15 +8,24 @@ the factory plan in `~/projects/touche/FACTORY.md`.
 
 ```
 cargo xtask --help        every factory command
-cargo xtask setup         install pinned tools and the pre-push hook
+cargo xtask setup         install pinned tools ([downloads] fetched and verified by hash) and the pre-push hook
 cargo xtask ci            what CI runs: tools, fmt, clippy, wasm, unit, gpu; fastest first
 cargo xtask deny          cargo-deny by deny.toml: advisories, bans, licences, sources
 cargo xtask lint          fmt and clippy only
 cargo xtask wasm          clippy for the web package on wasm32-unknown-unknown
-cargo xtask web           trunk release build of the web package into target/web
+cargo xtask web           trunk release build of the web package into target/web, with
+                          brotli (.br) and gzip (.gz) copies of its wasm, js, css, html and json
 cargo xtask serve         the release build of main on the tailnet where [serve] says (from a
                           clean checkout at origin/main after `cargo xtask web`; [serve] check
-                          first, then a copy under ~/srv); prints the URL
+                          first, then a copy under ~/srv). Restarts the user unit
+                          xtask-serve-<dir>.service: the hash-verified static-web-server
+                          ([downloads] in tools.toml) on 127.0.0.1:[serve] port, sandboxed
+                          (the copy, its config and the binary bound read-only, the rest of
+                          the home directory empty), compressed copies, hashed files immutable,
+                          the rest no-cache. It must own the port; /, every wasm and a script
+                          must come compressed with their types over the loopback before
+                          tailscale serve mounts it, and again through the tailnet URL after.
+                          Needs lingering (loginctl enable-linger); prints the URL
 cargo xtask test          one tier (default unit)
 cargo run -p vapors-app --example demo -- hello
                           an F2c demo in a window (crates/demos)

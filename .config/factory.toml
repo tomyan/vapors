@@ -25,6 +25,9 @@ check = "d=$(mktemp -d) && scripts/check-page-contract.sh target/web $d; s=$?; r
 # The page contract took 41 s on the runner (run 40036623884, 2026-10-23);
 # four times that, for a loaded box.
 check_seconds = "180"
+# The loopback port static-web-server serves the copy on, behind the
+# mount (serve_static.rs); touche's is 8790.
+port = "8791"
 
 [dev]
 # The https port `cargo xtask dev` serves trunk's debug page on, at /.

@@ -82,13 +82,9 @@ fn a_missing_tailscale_is_refused_with_where_to_get_it() {
 }
 
 #[test]
-fn a_local_port_target_is_the_loopback_url_and_a_directory_its_path() {
+fn a_local_port_target_is_the_loopback_url() {
     // When / Then
     assert_eq!(Target::LocalPort(8080).argument(), "http://127.0.0.1:8080");
-    assert_eq!(
-        Target::Directory(Path::new("/srv/web")).argument(),
-        "/srv/web"
-    );
 }
 
 #[test]
@@ -105,13 +101,13 @@ fn a_target_is_mounted_at_its_port_and_path() {
 
     // When / Then
     assert_eq!(
-        serve_arguments(&Target::Directory(Path::new("/srv/touche")), &release),
+        serve_arguments(&Target::LocalPort(8790), &release),
         [
             "serve",
             "--bg",
             "--https=443",
             "--set-path=/",
-            "/srv/touche"
+            "http://127.0.0.1:8790"
         ]
     );
     assert_eq!(

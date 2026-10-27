@@ -18,7 +18,7 @@ const TABLES: [(&str, Keys); 16] = [
     ("dev", Keys::Only(&["port", "words", "https"])),
     (
         "serve",
-        Keys::Only(&["dir", "https", "path", "check", "check_seconds"]),
+        Keys::Only(&["dir", "https", "path", "check", "check_seconds", "port"]),
     ),
     ("files", Keys::Only(&["max_lines"])),
     ("build", Keys::Only(&["jobs"])),
