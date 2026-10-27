@@ -61,6 +61,26 @@ fn a_value_that_differs_is_reported_and_one_not_recorded_asks_for_a_rerun() {
 }
 
 #[test]
+fn a_value_the_vapors_log_lacks_is_refused_not_passed() {
+    // Given: the script expects a value, vapors recorded none
+    let script = parse("x", "listen input\nkey End\nexpect value input#a 50\n").expect("parses");
+    let ours = vec![Logged {
+        focus: "body".to_owned(),
+        ..Logged::default()
+    }];
+    let answers = json!({ "steps": [{ "line": 2, "action": "Key(\"End\")", "events": [], "focus": "body", "focusVisible": false, "values": { "input#a": "50" } }] });
+
+    // When
+    let refused = compare("x", &script, &ours, &answers).expect_err("refused");
+
+    // Then
+    assert!(
+        refused.contains("x.events:2: vapors' log has no value for input#a"),
+        "{refused}"
+    );
+}
+
+#[test]
 fn a_step_whose_events_are_not_a_list_is_refused_naming_its_line() {
     // Given
     let script = parse("x", SCRIPT).expect("parses");
