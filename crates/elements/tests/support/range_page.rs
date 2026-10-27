@@ -64,6 +64,7 @@ fn build(attributes: &[(&str, &str)], second: &[(&str, &str)]) -> Page {
                     e.name(),
                     e.value(),
                     e.value_as_number()
+                        .expect("a range's event carries its number")
                 ));
             }),
         );

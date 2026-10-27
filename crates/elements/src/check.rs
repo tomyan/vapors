@@ -199,15 +199,17 @@ fn input_type_refusal(element: &crate::node::Element) -> Option<String> {
     ))
 }
 
-/// A boolean `value` is no value at all, so it is refused; a number
-/// that is NaN or infinite is a value the DOM also takes
-/// (`valueAsNumber = NaN` empties the value), so it reads as no value
-/// and the range takes its default, as in a browser.
+/// A boolean `value` is no value at all, and a number that is NaN or
+/// infinite is one a signal computed wrongly (the DOM would empty the
+/// value and say nothing); both are refused naming the fix.
 fn value_property_refusal(element: &crate::node::Element) -> Option<String> {
     match element.properties.get("value") {
         Some(vapors_dom::PropertyValue::Bool(_)) => Some(
             "its `value` property is a boolean; an input's value is a number or a text (set_property with PropertyValue::Number or Text)".to_owned(),
         ),
+        Some(vapors_dom::PropertyValue::Number(n)) if !n.is_finite() => Some(format!(
+            "its `value` property is {n}, which is not a number an input can hold; the signal bound to it computed a non-finite value, so fix the computation"
+        )),
         _ => None,
     }
 }

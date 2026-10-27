@@ -42,7 +42,11 @@ fn bind_value_on_a_range_binds_a_number() {
 
     // Then: the input event's number sets the signal, and the signal's
     // number sets the property
-    assert_has(&code, "level.set(event.value_as_number());");
+    assert_has(
+        &code,
+        "level.set(event.value_as_number().expect(\"the input's input carries its number\"));",
+    );
+    assert_has(&code, "#[allow(clippy::missing_panics_doc");
     assert_has(
         &code,
         "set_property(input0, \"value\", PropertyValue::Number(level.get()))",
@@ -58,7 +62,7 @@ fn bind_value_on_a_number_input_binds_a_number_too() {
     );
 
     // Then
-    assert_has(&code, "n.set(event.value_as_number());");
+    assert_has(&code, "n.set(event.value_as_number().expect(");
 }
 
 #[test]

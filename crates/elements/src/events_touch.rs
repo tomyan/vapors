@@ -19,6 +19,17 @@ use super::tree::dispatch;
 use super::{Asked, Point};
 use crate::document::Document;
 
+/// How a touch ended.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Ended {
+    /// The finger lifted.
+    Lifted,
+    /// The platform took it: nothing more comes for it.
+    Taken,
+    /// A pan took it: its lift still comes.
+    Panned,
+}
+
 /// Finger `finger`'s pointer id.
 fn touch_id(finger: u64) -> u32 {
     TOUCHES + u32::try_from(finger).unwrap_or(u32::MAX - TOUCHES)
@@ -60,13 +71,15 @@ impl Document {
     /// Finger `finger` lifted at `point`: `pointerup`, and the capture
     /// ends.
     pub fn touch_released(document: &Rc<RefCell<Document>>, finger: u64, point: Point) {
-        Self::touch_ended(document, finger, point, "pointerup");
+        Self::touch_ended(document, finger, point, Ended::Lifted);
     }
 
-    /// Finger `finger` was taken by the platform or a scroll:
-    /// `pointercancel`, and the capture ends.
+    /// Finger `finger` was taken by the platform (a palm, a system
+    /// gesture): `pointercancel`, the capture ends, and so does a range
+    /// it dragged, without `change`, as Chromium fires none on
+    /// `touchcancel`; no lift follows (review-v84, N1).
     pub fn touch_cancelled(document: &Rc<RefCell<Document>>, finger: u64, point: Point) {
-        Self::touch_ended(document, finger, point, "pointercancel");
+        Self::touch_ended(document, finger, point, Ended::Taken);
     }
 
     /// The platform's tap at `point`, after the touch's own down and up:
@@ -92,13 +105,16 @@ impl Document {
     }
 
     /// A pan took the touches: each finger down that no listener
-    /// captured gets `pointercancel` where it last was. The app calls
-    /// this at a gesture's first pan, as Chromium cancels then.
+    /// captured gets `pointercancel` where it last was; a range such a
+    /// finger dragged keeps its drag until the finger lifts, as
+    /// Chromium's slider fires its `change` on `touchend` after the
+    /// cancel. The app calls this at a gesture's first pan, as Chromium
+    /// cancels then.
     pub fn cancel_unowned_touches(document: &Rc<RefCell<Document>>) {
         let touches = document.borrow().pointer.touches.clone();
         for (finger, point) in touches {
             if !document.borrow().touch_owned(finger) {
-                Self::touch_cancelled(document, finger, point);
+                Self::touch_ended(document, finger, point, Ended::Panned);
             }
         }
     }
@@ -148,8 +164,12 @@ impl Document {
         Some(())
     }
 
-    fn touch_ended(document: &Rc<RefCell<Document>>, finger: u64, point: Point, name: &str) {
+    fn touch_ended(document: &Rc<RefCell<Document>>, finger: u64, point: Point, how: Ended) {
         let id = touch_id(finger);
+        let name = match how {
+            Ended::Lifted => "pointerup",
+            Ended::Taken | Ended::Panned => "pointercancel",
+        };
         if Self::touch_event(document, finger, point, name).is_some() {
             release_capture(document, id);
             process_pending(document, id, point);
@@ -157,10 +177,13 @@ impl Document {
         Self::forget_touch(document, finger, id);
         // a finger's drag of a range ends at its lift, with `change`
         // after the capture's `lostpointercapture`, as Chromium's slider
-        // fires it on touchend; a cancelled touch keeps its drag until
-        // its lift, which still fires the change (3-E3a's oracle)
-        if name == "pointerup" {
-            crate::range_drag::released(document, id);
+        // fires it on touchend; a touch the pan took keeps its drag
+        // until its lift, which still fires the change (3-E3a's oracle);
+        // one the platform took ends it with nothing, since no lift comes
+        match how {
+            Ended::Lifted => crate::range_drag::released(document, id),
+            Ended::Taken => crate::range_drag::dropped(document, id),
+            Ended::Panned => {}
         }
     }
 

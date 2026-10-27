@@ -171,7 +171,9 @@ fn min_or_value_base(attributes: &BTreeMap<String, String>) -> f64 {
 }
 
 /// A `value` property as a number: a number as it is, a text parsed
-/// as HTML parses a value, `None` for a text that is not a number.
+/// as HTML parses a value, `None` for a text that is not a number (a
+/// non-finite number and a boolean are refused by `check` before any
+/// update reads them).
 fn property_number(value: &PropertyValue) -> Option<f64> {
     match value {
         PropertyValue::Number(n) if n.is_finite() => Some(*n),

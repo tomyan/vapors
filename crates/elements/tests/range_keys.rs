@@ -123,5 +123,5 @@ fn a_value_is_none_for_an_element_that_is_not_a_control() {
 
     // Then
     assert_eq!(page.doc.borrow().value(body), None);
-    assert!(Event::new("click").value_as_number().is_nan());
+    assert_eq!(Event::new("click").value_as_number(), None);
 }

@@ -165,6 +165,40 @@ fn a_finger_moved_across_the_range_is_the_pans_and_slides_no_more() {
 }
 
 #[test]
+fn a_finger_moved_as_far_along_as_across_slides_as_chromium_has_it() {
+    // Given
+    let page = page();
+
+    // When: 30 px along and 30 px down
+    Document::touch_pressed(&page.doc, 0, [100.0, 10.0]);
+    Document::touch_moved(&page.doc, 0, [130.0, 40.0]);
+
+    // Then: owned, and the value followed the x
+    assert!(page.doc.borrow().touch_owned(0));
+    assert_eq!(value(&page, page.level), "66");
+}
+
+#[test]
+fn a_finger_the_platform_takes_ends_its_drag_with_nothing() {
+    // Given: finger 0 dragging along, then taken by the platform
+    let page = page();
+    Document::touch_pressed(&page.doc, 0, [100.0, 10.0]);
+    Document::touch_moved(&page.doc, 0, [150.0, 10.0]);
+    Document::touch_cancelled(&page.doc, 0, [150.0, 10.0]);
+    let after_cancel = page.log.borrow().len();
+
+    // When: the platform reports finger 0 again, off the range, moving
+    Document::touch_pressed(&page.doc, 0, [50.0, 80.0]);
+    Document::touch_moved(&page.doc, 0, [190.0, 80.0]);
+    Document::touch_released(&page.doc, 0, [190.0, 80.0]);
+
+    // Then: no change at the cancel, and the old drag moved nothing
+    assert_eq!(after_cancel, 2, "{:?}", page.log.borrow());
+    assert_eq!(*page.log.borrow(), ["input 50 50", "input 77 77"]);
+    assert_eq!(value(&page, page.level), "77");
+}
+
+#[test]
 fn a_finger_drags_a_range_too() {
     // Given
     let page = page();

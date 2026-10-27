@@ -73,13 +73,12 @@ impl Event {
         self
     }
 
-    /// The control's value as a number, the DOM's `valueAsNumber`: NaN
-    /// when the event carries none (an event that is not a range or
-    /// number input's `input` or `change`), as the DOM answers for a
-    /// control with no numeric value.
+    /// The control's value as a number, on a range or number input's
+    /// `input` or `change`; `None` on an event that carries none (where
+    /// the DOM's `valueAsNumber` would answer NaN).
     #[must_use]
-    pub fn value_as_number(&self) -> f64 {
-        self.value_number.unwrap_or(f64::NAN)
+    pub fn value_as_number(&self) -> Option<f64> {
+        self.value_number
     }
 
     /// Attaches the `checked` payload.

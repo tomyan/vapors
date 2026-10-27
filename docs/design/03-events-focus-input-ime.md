@@ -210,12 +210,15 @@ press's, after `pointerup` and before `lostpointercapture`. A finger
 takes the value where it lands and decides at its first move, as
 Chromium's `SliderContainerElement` does: moved further along the
 range than across it, the range owns the touch (the RELAXED rule's
-ownership, so no pan takes it); further across, the touch is the
-pan's and the range takes no more of its moves. A finger's drag ends
-at its lift, with `change` after `lostpointercapture` (the mouse's
-comes before it) and even after the pan's `pointercancel`, as
-Chromium's slider fires it on touchend. Each pointer drags on its
-own, so two fingers on two ranges drag both. Arrow keys step by one step (`step="any"`: a
+ownership, so no pan takes it; equal counts as along, as Chromium's
+`GetDirection` has it); further across, the touch is the pan's and the
+range takes no more of its moves. A finger's drag ends at its lift,
+with `change` after `lostpointercapture` (the mouse's comes before it)
+and even after the pan's `pointercancel`, as Chromium's slider fires it
+on touchend; a finger the platform takes (`touch_cancelled`: a palm, a
+system gesture) ends its drag with nothing, as Chromium fires no
+`change` on `touchcancel`. Each pointer drags on its own, so two
+fingers on two ranges drag both. Arrow keys step by one step (`step="any"`: a
 hundredth of the range), Page keys by a tenth of the range or one
 step when larger, Home and End to the ends, each with `input` then
 `change`; these match Chromium step by step

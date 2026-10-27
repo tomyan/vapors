@@ -30,7 +30,7 @@ pub(crate) struct Drag {
 
 /// Which way a drag goes.
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum Direction {
+pub(crate) enum Direction {
     /// Along the range: every move sets the value (the mouse always).
     Along,
     /// A finger that has not moved yet, from where it went down.
@@ -94,20 +94,20 @@ pub(crate) fn moved(document: &Rc<RefCell<Document>>, id: u32, point: Point) {
 }
 
 /// A finger's direction once it has moved to `point`: along the range
-/// when it moved further across the page than down it, across when
-/// further down, undecided while equal or unmoved, as Chromium's
-/// `GetDirection` has it.
-fn decided(direction: Direction, point: Point) -> Direction {
+/// when it moved at least as far across the page as down it, across
+/// when further down, undecided while unmoved, as Chromium's
+/// `GetDirection` has it (equal is along there too).
+pub(crate) fn decided(direction: Direction, point: Point) -> Direction {
     let Direction::Undecided(from) = direction else {
         return direction;
     };
     let (dx, dy) = ((point[0] - from[0]).abs(), (point[1] - from[1]).abs());
-    if dx > dy {
-        Direction::Along
-    } else if dy > dx {
-        Direction::Across
-    } else {
+    if dx == 0.0 && dy == 0.0 {
         direction
+    } else if dx >= dy {
+        Direction::Along
+    } else {
+        Direction::Across
     }
 }
 
@@ -123,6 +123,12 @@ pub(crate) fn released(document: &Rc<RefCell<Document>>, id: u32) {
     if document.borrow().contains(drag.node) && now != Some(drag.before) {
         fire(document, drag.node, "change");
     }
+}
+
+/// Pointer `id` was taken by the platform: its drag ends with nothing,
+/// as Chromium fires no `change` on `touchcancel`.
+pub(crate) fn dropped(document: &Rc<RefCell<Document>>, id: u32) {
+    document.borrow_mut().pointer.drags.remove(&id);
 }
 
 fn set_from_point(document: &Rc<RefCell<Document>>, node: NodeId, point: Point) {

@@ -97,6 +97,28 @@ fn a_disabled_false_on_an_input_is_refused_as_on_a_button() {
 }
 
 #[test]
+fn a_non_finite_value_property_is_refused_naming_the_signal() {
+    for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        // Given
+        let mut doc = document();
+        let body = doc.body();
+        let input = element(&mut doc, body, "input", "");
+        doc.set_attribute(input, "type", "range");
+        doc.set_property(input, "value", PropertyValue::Number(bad));
+
+        // When
+        let errors = refusals(&mut doc);
+
+        // Then
+        assert_eq!(errors.len(), 1, "{bad}: {errors:?}");
+        assert!(
+            errors[0].contains("not a number an input can hold") && errors[0].contains("signal"),
+            "{bad}: {errors:?}"
+        );
+    }
+}
+
+#[test]
 fn a_boolean_value_property_is_refused() {
     // Given
     let mut doc = document();
