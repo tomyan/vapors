@@ -29,6 +29,7 @@ mod paint_order;
 mod paint_outline;
 mod painted;
 mod range;
+mod range_drag;
 mod range_input;
 mod range_paint;
 mod restyle;

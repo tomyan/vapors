@@ -52,6 +52,31 @@ fn a_key_at_the_end_of_the_range_changes_nothing_and_fires_nothing() {
 }
 
 #[test]
+fn a_range_disabled_while_focused_takes_no_key() {
+    // Given: focused, then disabled and updated
+    let page = page();
+    key(&page, "Tab");
+    page.doc
+        .borrow_mut()
+        .set_attribute(page.level, "disabled", "");
+    page.doc
+        .borrow_mut()
+        .update(vapors_elements::Viewport {
+            width: 400.0,
+            height: 100.0,
+            scale: 1.0,
+        })
+        .expect("updates");
+
+    // When
+    key(&page, "ArrowRight");
+
+    // Then
+    assert_eq!(value(&page, page.level), "20");
+    assert!(page.log.borrow().is_empty());
+}
+
+#[test]
 fn a_prevented_keydown_does_not_step() {
     // Given
     let page = page();

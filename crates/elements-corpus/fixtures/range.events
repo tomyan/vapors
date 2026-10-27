@@ -4,7 +4,7 @@
 #
 # Shift with an arrow is left out: vapors steps by ten then (the
 # 2026-10-27 direct-tools decision), Chromium by one.
-listen pointerdown pointermove pointerup gotpointercapture lostpointercapture click input change keydown focusin
+listen pointerdown pointermove pointerup pointercancel gotpointercapture lostpointercapture click input change keydown focusin
 click 100 10                  the middle of level: 50, pressed and released
 expect event pointerdown input#level
 expect event input input#level
@@ -52,3 +52,21 @@ click 433 10                  off is disabled: no value, no focus
 expect no event input
 expect focus body
 expect value input#off 50
+touch-down 100 10             a finger on level takes the value where it lands
+expect event pointerdown input#level
+expect event input input#level
+expect value input#level 50
+touch-move 150 10             sideways, past the tap slop: it slides, owned by the range
+expect event input input#level
+expect value input#level 77
+touch-up 150 10               the drag ends with the change
+expect event pointerup input#level
+expect event change input#level
+touch-down 100 10             a finger again, 50
+expect event input input#level
+touch-move 100 60             down the page, past the slop: a scroll, so the pan cancels the touch
+expect event pointercancel input#level
+expect no event input
+expect value input#level 50
+touch-up 100 60               cancelled: no pointerup
+expect no event pointerup

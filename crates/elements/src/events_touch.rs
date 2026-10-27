@@ -45,7 +45,7 @@ impl Document {
         let prevented = dispatch_pointer(document, id, target, event);
         ask_unless_asked(document, id, Asked::CaptureTo(target));
         if !prevented {
-            crate::range_input::pressed(document, id, target, point);
+            crate::range_drag::pressed(document, id, target, point);
         }
     }
 
@@ -53,7 +53,7 @@ impl Document {
     /// `pointermove`, and a range it drags takes the value there.
     pub fn touch_moved(document: &Rc<RefCell<Document>>, finger: u64, point: Point) {
         if Self::touch_event(document, finger, point, "pointermove").is_some() {
-            crate::range_input::moved(document, touch_id(finger), point);
+            crate::range_drag::moved(document, touch_id(finger), point);
         }
     }
 
@@ -151,11 +151,17 @@ impl Document {
     fn touch_ended(document: &Rc<RefCell<Document>>, finger: u64, point: Point, name: &str) {
         let id = touch_id(finger);
         if Self::touch_event(document, finger, point, name).is_some() {
-            crate::range_input::released(document, id);
             release_capture(document, id);
             process_pending(document, id, point);
         }
         Self::forget_touch(document, finger, id);
+        // a finger's drag of a range ends at its lift, with `change`
+        // after the capture's `lostpointercapture`, as Chromium's slider
+        // fires it on touchend; a cancelled touch keeps its drag until
+        // its lift, which still fires the change (3-E3a's oracle)
+        if name == "pointerup" {
+            crate::range_drag::released(document, id);
+        }
     }
 
     /// Forgets finger `finger` and its capture, whether or not its last

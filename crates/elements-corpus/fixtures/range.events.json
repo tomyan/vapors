@@ -525,6 +525,184 @@
         "input#off": "50",
         "input#plain": "51"
       }
+    },
+    {
+      "action": "TouchDown(100.0, 10.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "input#level",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "input"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 55,
+      "values": {
+        "input#level": "50",
+        "input#off": "50",
+        "input#plain": "51"
+      }
+    },
+    {
+      "action": "TouchMove(150.0, 10.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "input#level",
+          "type": "gotpointercapture"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "input#level",
+          "type": "pointermove"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "input"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 59,
+      "values": {
+        "input#level": "77",
+        "input#off": "50",
+        "input#plain": "51"
+      }
+    },
+    {
+      "action": "TouchUp(150.0, 10.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "input#level",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "input#level",
+          "type": "lostpointercapture"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "change"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 62,
+      "values": {
+        "input#level": "77",
+        "input#off": "50",
+        "input#plain": "51"
+      }
+    },
+    {
+      "action": "TouchDown(100.0, 10.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "input#level",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "input"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 65,
+      "values": {
+        "input#level": "50",
+        "input#off": "50",
+        "input#plain": "51"
+      }
+    },
+    {
+      "action": "TouchMove(100.0, 60.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "input#level",
+          "type": "gotpointercapture"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "input#level",
+          "type": "pointermove"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "input#level",
+          "type": "pointercancel"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "input#level",
+          "type": "lostpointercapture"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 67,
+      "values": {
+        "input#level": "50",
+        "input#off": "50",
+        "input#plain": "51"
+      }
+    },
+    {
+      "action": "TouchUp(100.0, 60.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "change"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 71,
+      "values": {
+        "input#level": "50",
+        "input#off": "50",
+        "input#plain": "51"
+      }
     }
   ]
 }

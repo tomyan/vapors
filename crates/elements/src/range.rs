@@ -48,26 +48,28 @@ impl Range {
         attributes: &BTreeMap<String, String>,
         properties: &BTreeMap<String, PropertyValue>,
     ) -> Self {
-        let number = |name: &str| attributes.get(name).and_then(|text| parse(text));
-        let min = number("min").unwrap_or(0.0);
-        let max = number("max").unwrap_or(100.0).max(min);
-        let step = step_of(attributes.get("step").map(String::as_str));
-        let base = min_or_value_base(attributes);
-        let mut range = Self {
-            min,
-            max,
-            step,
-            base,
-            value: 0.0,
-        };
+        let mut range = Self::bounds(attributes);
         // a value property set, even to a text that is no number, is
         // the live value: the attribute is only the initial one
         let given = match properties.get("value") {
             Some(property) => property_number(property),
-            None => number("value"),
+            None => attributes.get("value").and_then(|text| parse(text)),
         };
         range.value = range.snapped(given.unwrap_or_else(|| range.middle()));
         range
+    }
+
+    /// The range's `min`, `max`, `step` and base, before its value.
+    fn bounds(attributes: &BTreeMap<String, String>) -> Self {
+        let number = |name: &str| attributes.get(name).and_then(|text| parse(text));
+        let min = number("min").unwrap_or(0.0);
+        Self {
+            min,
+            max: number("max").unwrap_or(100.0).max(min),
+            step: step_of(attributes.get("step").map(String::as_str)),
+            base: min_or_value_base(attributes),
+            value: 0.0,
+        }
     }
 
     /// `candidate` clamped into the range and snapped to the nearest
@@ -128,7 +130,9 @@ impl Range {
 }
 
 /// The value as the DOM's `value` string: the shortest decimal that
-/// reads back as the number, which is what Rust prints too.
+/// reads back as the number, as Rust prints it. JavaScript writes
+/// numbers of 1e21 and over, and under 1e-6, with an exponent where
+/// Rust writes the digits; no range's oracle reaches either.
 pub(crate) fn written(value: f64) -> String {
     format!("{value}")
 }

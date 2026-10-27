@@ -36,8 +36,8 @@ pub(crate) struct Pointer {
     pub(crate) captures: std::collections::HashMap<u32, capture::Captured>,
     /// Where the pointer last moved, until it leaves the window.
     pub(crate) position: Option<Point>,
-    /// The range being dragged (3-E3a).
-    pub(crate) scrub: Option<crate::range_input::Scrub>,
+    /// Each pointer's drag of a range, by pointer id (3-E3a).
+    pub(crate) drags: std::collections::HashMap<u32, crate::range_drag::Drag>,
 }
 
 impl Document {
@@ -56,7 +56,7 @@ impl Document {
                 .pointer_event("pointermove", MOUSE, target, point);
             dispatch_pointer(document, MOUSE, target, event);
         }
-        crate::range_input::moved(document, MOUSE, point);
+        crate::range_drag::moved(document, MOUSE, point);
     }
 
     /// The pointer left the window: nothing is hovered, and a press in
@@ -89,7 +89,7 @@ impl Document {
         // a range takes the value at the press before focus moves, as
         // Chromium orders `input` before `focusin` (3-E3a)
         if let (false, Some(target)) = (prevented, target) {
-            crate::range_input::pressed(document, MOUSE, target, point);
+            crate::range_drag::pressed(document, MOUSE, target, point);
         }
         // a press focuses what it is on, or blurs, unless prevented (3-E2a)
         if !prevented {
@@ -113,7 +113,7 @@ impl Document {
                 .pointer_event("pointerup", MOUSE, target, point);
             dispatch_pointer(document, MOUSE, target, event);
         }
-        crate::range_input::released(document, MOUSE);
+        crate::range_drag::released(document, MOUSE);
         release_capture(document, MOUSE);
         process_pending(document, MOUSE, point);
         let click = document.borrow_mut().release(target);

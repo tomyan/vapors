@@ -6,7 +6,7 @@
 
 mod support;
 
-use support::range_page::{key, page, value};
+use support::range_page::{key, page, page_with_second, value};
 use vapors_dom::{Dom, Event};
 use vapors_elements::Document;
 
@@ -117,6 +117,51 @@ fn a_press_focuses_the_range_without_the_ring_and_a_key_then_shows_it() {
     assert_eq!(page.doc.borrow().active_element(), Some(page.level));
     assert!(!after_press, "a press shows no ring");
     assert!(page.doc.borrow().focus_visible(), "a key does");
+}
+
+#[test]
+fn two_fingers_drag_two_ranges_each_on_its_own() {
+    // Given: a second live range below the first
+    let page = page_with_second();
+
+    // When: finger 0 drags `level`, finger 1 presses `second` meanwhile,
+    // then each lifts
+    Document::touch_pressed(&page.doc, 0, [100.0, 10.0]);
+    Document::touch_moved(&page.doc, 0, [150.0, 10.0]);
+    Document::touch_pressed(&page.doc, 1, [50.0, 30.0]);
+    Document::touch_moved(&page.doc, 0, [190.0, 10.0]);
+    Document::touch_released(&page.doc, 0, [190.0, 10.0]);
+    Document::touch_released(&page.doc, 1, [50.0, 30.0]);
+
+    // Then: `level` kept following finger 0 and changed once at its end,
+    // and the second range took finger 1's press
+    assert_eq!(
+        *page.log.borrow(),
+        ["input 50 50", "input 77 77", "input 99 99", "change 99 99"]
+    );
+    assert_eq!(value(&page, page.off), "23");
+}
+
+#[test]
+fn a_finger_moved_across_the_range_is_the_pans_and_slides_no_more() {
+    // Given
+    let page = page();
+
+    // When: down at 50, then more down the page than along, then lifted
+    Document::touch_pressed(&page.doc, 0, [100.0, 10.0]);
+    Document::touch_moved(&page.doc, 0, [110.0, 40.0]);
+    let owned = page.doc.borrow().touch_owned(0);
+    let may_scroll = Document::touch_panned(&page.doc);
+    let before_lift = page.log.borrow().len();
+    Document::touch_released(&page.doc, 0, [110.0, 40.0]);
+
+    // Then: not owned, so the pan scrolls and cancels the touch; the
+    // sideways 10 px did not move the value, and the change from 20 to
+    // 50 fires at the lift, not at the cancel
+    assert!(!owned && may_scroll);
+    assert_eq!(before_lift, 1);
+    assert_eq!(*page.log.borrow(), ["input 50 50", "change 50 50"]);
+    assert_eq!(value(&page, page.level), "50");
 }
 
 #[test]

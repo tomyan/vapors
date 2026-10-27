@@ -30,20 +30,35 @@ pub struct Modifiers {
 impl Document {
     /// `key` went down: `keydown`, then its default action.
     pub fn key_pressed(document: &Rc<RefCell<Document>>, key: &str, modifiers: Modifiers) {
-        // a modifier alone is not a keyboard interaction for
-        // :focus-visible, as in Chromium (review-v82); any other key
-        // shows the ring on the focused element, as Chromium does when
-        // a key is pressed after a press focused it (3-E3a's oracle)
-        if !matches!(key, "Shift" | "Control" | "Alt" | "Meta") {
-            let mut doc = document.borrow_mut();
-            doc.keyboard = true;
-            let active = doc.active_element();
-            doc.set_flag_on(States::FOCUS_VISIBLE, active);
-        }
+        document.borrow_mut().keyboard_interaction(key);
         let target = document.borrow().key_target();
         if dispatch_bubbling(document, target, Event::new("keydown").with_key(key)) {
             return;
         }
+        Self::key_default(document, target, key, modifiers);
+    }
+
+    /// A key other than a modifier alone is a keyboard interaction for
+    /// `:focus-visible`, as in Chromium (review-v82): focus arriving
+    /// next shows the ring, and so does the focused element now, as
+    /// Chromium does when a key is pressed after a press focused it
+    /// (3-E3a's oracle).
+    fn keyboard_interaction(&mut self, key: &str) {
+        if matches!(key, "Shift" | "Control" | "Alt" | "Meta") {
+            return;
+        }
+        self.keyboard = true;
+        let active = self.active_element();
+        self.set_flag_on(States::FOCUS_VISIBLE, active);
+    }
+
+    /// A key's default action on `target`, after an unprevented keydown.
+    fn key_default(
+        document: &Rc<RefCell<Document>>,
+        target: NodeId,
+        key: &str,
+        modifiers: Modifiers,
+    ) {
         match key {
             // Control, Alt or Meta with Tab is the browser's or the window
             // manager's, which Chromium does not navigate on

@@ -206,16 +206,23 @@ attribute. A press takes the value where the thumb's centre would be
 (half a thumb in at either end, as Chromium maps it) before focus
 moves, captures the pointer to the input and drags; `input` fires on
 each change, `change` at the release when the value differs from the
-press's, after `pointerup` and before `lostpointercapture`; a finger
-is owned by the range while it drags (the RELAXED rule's ownership),
-so no pan takes it. Arrow keys step by one step (`step="any"`: a
+press's, after `pointerup` and before `lostpointercapture`. A finger
+takes the value where it lands and decides at its first move, as
+Chromium's `SliderContainerElement` does: moved further along the
+range than across it, the range owns the touch (the RELAXED rule's
+ownership, so no pan takes it); further across, the touch is the
+pan's and the range takes no more of its moves. A finger's drag ends
+at its lift, with `change` after `lostpointercapture` (the mouse's
+comes before it) and even after the pan's `pointercancel`, as
+Chromium's slider fires it on touchend. Each pointer drags on its
+own, so two fingers on two ranges drag both. Arrow keys step by one step (`step="any"`: a
 hundredth of the range), Page keys by a tenth of the range or one
 step when larger, Home and End to the ends, each with `input` then
 `change`; these match Chromium step by step
 (`fixtures/range.events`, with `expect value` checking each range's
 `value` after every step). Shift with an arrow steps by ten steps,
 vapors' own default action (`2026-10-27-direct-tools-first`, 3):
-Chromium steps by one, so it is pinned by `tests/range_input.rs`, not
+Chromium steps by one, so it is pinned by `tests/range_keys.rs`, not
 the oracle. A key pressed while an element is focused sets
 `:focus-visible` on it, as Chromium does after a press focused it. A
 disabled range gets its `pointerdown` and `pointerup` and no click, no

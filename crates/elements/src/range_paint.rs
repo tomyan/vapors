@@ -9,6 +9,7 @@ use vapors_scene::{Item, Quad};
 use crate::layout::{BoxRect, Content, LayoutBox};
 use crate::paint::{PaintInput, snapped};
 use crate::painted::Painted;
+use crate::style::Parts;
 
 /// Where a range's thumb runs: its content box's left and width, and
 /// the thumb's diameter, CSS px.
@@ -44,23 +45,37 @@ pub(crate) fn paint(
     if !used.visible {
         return;
     }
-    let middle = content.y + content.height / 2.0;
-    let track = BoxRect {
+    push_round(
+        out,
+        track_rect(content, parts),
+        parts.track_color,
+        input.scale,
+    );
+    let thumb = thumb_rect(content, parts, range.fraction());
+    push_round(out, thumb, parts.thumb_color, input.scale);
+}
+
+/// The track across the content box, centred vertically.
+fn track_rect(content: BoxRect, parts: Parts) -> BoxRect {
+    BoxRect {
         x: content.x,
-        y: middle - parts.track_height / 2.0,
+        y: content.y + (content.height - parts.track_height) / 2.0,
         width: content.width,
         height: parts.track_height,
-    };
-    push_round(out, track, parts.track_color, input.scale);
-    #[allow(clippy::cast_possible_truncation)] // a fraction in 0..=1
-    let along = range.fraction() as f32 * (content.width - parts.thumb_size).max(0.0);
-    let thumb = BoxRect {
+    }
+}
+
+/// The thumb, its centre `fraction` of the way from half a thumb in at
+/// the left to half a thumb in at the right.
+#[allow(clippy::cast_possible_truncation)] // a fraction in 0..=1
+fn thumb_rect(content: BoxRect, parts: Parts, fraction: f64) -> BoxRect {
+    let along = fraction as f32 * (content.width - parts.thumb_size).max(0.0);
+    BoxRect {
         x: content.x + along,
-        y: middle - parts.thumb_size / 2.0,
+        y: content.y + (content.height - parts.thumb_size) / 2.0,
         width: parts.thumb_size,
         height: parts.thumb_size,
-    };
-    push_round(out, thumb, parts.thumb_color, input.scale);
+    }
 }
 
 /// A filled rect with fully rounded ends, snapped to device pixels.

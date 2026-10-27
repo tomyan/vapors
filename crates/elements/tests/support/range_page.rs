@@ -21,7 +21,7 @@ pub struct Page {
     pub doc: Rc<RefCell<Document>>,
     /// y 0..20, 0..100 by 1 at 20.
     pub level: NodeId,
-    /// y 20..40, disabled.
+    /// y 20..40, disabled (or live, from `page_with_second`).
     pub off: NodeId,
     pub log: Log,
 }
@@ -31,12 +31,24 @@ pub fn page() -> Page {
     page_with(&[("min", "0"), ("max", "100"), ("step", "1"), ("value", "20")])
 }
 
+/// The page with a second live range in place of the disabled one.
+pub fn page_with_second() -> Page {
+    build(
+        &[("min", "0"), ("max", "100"), ("step", "1"), ("value", "20")],
+        &[],
+    )
+}
+
 /// The page with `level`'s attributes as given.
 pub fn page_with(attributes: &[(&str, &str)]) -> Page {
+    build(attributes, &[("disabled", "")])
+}
+
+fn build(attributes: &[(&str, &str)], second: &[(&str, &str)]) -> Page {
     let mut doc = document();
     let body = doc.body();
     let level = range(&mut doc, body, attributes);
-    let off = range(&mut doc, body, &[("disabled", "")]);
+    let off = range(&mut doc, body, second);
     doc.add_stylesheet("app.css", SHEET).expect("parses");
     doc.update(viewport(400.0, 100.0)).expect("updates");
     let doc = Rc::new(RefCell::new(doc));

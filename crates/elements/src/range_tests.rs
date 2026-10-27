@@ -84,6 +84,7 @@ fn the_step_base_is_min_else_the_value_attribute_else_zero() {
 
 #[test]
 fn step_any_or_an_unusable_step_reads_as_none_or_the_default() {
+    // Given / When: each step attribute read; Then
     assert_eq!(range(&[("step", "any")]).step, None);
     assert_eq!(range(&[("step", "ANY")]).step, None);
     assert_eq!(range(&[("step", "0")]).step, Some(1.0));

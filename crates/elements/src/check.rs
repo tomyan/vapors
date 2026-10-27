@@ -170,31 +170,40 @@ const INPUT_TYPES: &[(&str, Option<&str>)] = &[
     ("text", Some("3-E6, text editing")),
 ];
 
-/// An `input` of a type not built yet, naming the slice; and a `value`
-/// property of a shape no input's value takes.
+/// An `input` of a type not built yet, naming the slice; else a
+/// `value` property of a shape no input's value takes.
 fn input_refusal(element: &crate::node::Element) -> Option<String> {
     if element.tag != "input" {
         return None;
     }
-    let built = INPUT_TYPES
+    input_type_refusal(element).or_else(|| value_property_refusal(element))
+}
+
+fn input_type_refusal(element: &crate::node::Element) -> Option<String> {
+    let slice = INPUT_TYPES
         .iter()
         .find(|(kind, _)| is_type(element, kind))
-        .map_or(Some("no slice yet"), |(_, slice)| *slice);
-    if let Some(slice) = built {
-        let kind = element
-            .attributes
-            .get("type")
-            .map_or("text", String::as_str);
-        return Some(format!(
-            "<input type=\"{kind}\"> is not implemented by vapors-elements yet: it arrives in {slice} (docs/design/03-events-focus-input-ime.md); the types built are {}",
-            INPUT_TYPES
-                .iter()
-                .filter(|(_, s)| s.is_none())
-                .map(|(k, _)| *k)
-                .collect::<Vec<_>>()
-                .join(", ")
-        ));
-    }
+        .map_or(Some("no slice yet"), |(_, slice)| *slice)?;
+    let kind = element
+        .attributes
+        .get("type")
+        .map_or("text", String::as_str);
+    let built: Vec<&str> = INPUT_TYPES
+        .iter()
+        .filter(|(_, s)| s.is_none())
+        .map(|(k, _)| *k)
+        .collect();
+    Some(format!(
+        "<input type=\"{kind}\"> is not implemented by vapors-elements yet: it arrives in {slice} (docs/design/03-events-focus-input-ime.md); the types built are {}",
+        built.join(", ")
+    ))
+}
+
+/// A boolean `value` is no value at all, so it is refused; a number
+/// that is NaN or infinite is a value the DOM also takes
+/// (`valueAsNumber = NaN` empties the value), so it reads as no value
+/// and the range takes its default, as in a browser.
+fn value_property_refusal(element: &crate::node::Element) -> Option<String> {
     match element.properties.get("value") {
         Some(vapors_dom::PropertyValue::Bool(_)) => Some(
             "its `value` property is a boolean; an input's value is a number or a text (set_property with PropertyValue::Number or Text)".to_owned(),
