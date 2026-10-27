@@ -117,6 +117,9 @@ impl Emitter<'_> {
         attribute: &Attribute,
     ) -> Result<(), CompileError> {
         let (event, read, wrap) = match property {
+            "value" if self.numeric_input(element, attribute)? => {
+                ("input", "event.value_as_number()", "PropertyValue::Number")
+            }
             "value" => ("input", "event.value().to_string()", "PropertyValue::Text"),
             "checked" => ("change", "event.checked()", "PropertyValue::Bool"),
             _ => return Err(self.source.error(attribute.offset, format!(
@@ -146,6 +149,30 @@ impl Emitter<'_> {
             "dom.borrow_mut().listen({var}, {event:?}, Box::new(move |event: &mut Event| {{ {signal}.set({read}); }}));"
         ));
         Ok(())
+    }
+
+    /// Whether `element` is an `input` whose value binds as a number: a
+    /// `type` of `range` or `number` (3-E3), written as a literal, since
+    /// the binding's type is decided here.
+    fn numeric_input(
+        &self,
+        element: &Element,
+        attribute: &Attribute,
+    ) -> Result<bool, CompileError> {
+        if element.tag != "input" {
+            return Ok(false);
+        }
+        match element.attributes.get("type") {
+            Some(AttrValue::Literal(kind)) => Ok(matches!(
+                kind.to_ascii_lowercase().as_str(),
+                "range" | "number"
+            )),
+            Some(AttrValue::Expr(_)) => Err(self.source.error(
+                attribute.offset,
+                "`bind:value` on an input whose `type` is an expression: a range or number input binds its value as a number (Signal<f64>) and a text input as text (Signal<String>), so write type as a literal, such as type=\"range\"".to_owned(),
+            )),
+            None => Ok(false),
+        }
     }
 
     fn refuse_bind_conflicts(

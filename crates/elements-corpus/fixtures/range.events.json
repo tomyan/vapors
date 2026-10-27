@@ -1,0 +1,530 @@
+{
+  "steps": [
+    {
+      "action": "Click(100.0, 10.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#level",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#level",
+          "type": "gotpointercapture"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#level",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#level",
+          "type": "lostpointercapture"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#level",
+          "type": "click"
+        }
+      ],
+      "focus": "input#level",
+      "focusVisible": false,
+      "line": 8,
+      "values": {
+        "input#level": "50",
+        "input#off": "50",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Press(100.0, 10.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#level",
+          "type": "pointerdown"
+        }
+      ],
+      "focus": "input#level",
+      "focusVisible": false,
+      "line": 15,
+      "values": {
+        "input#level": "50",
+        "input#off": "50",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Move(150.0, 10.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#level",
+          "type": "gotpointercapture"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#level",
+          "type": "pointermove"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "input"
+        }
+      ],
+      "focus": "input#level",
+      "focusVisible": false,
+      "line": 17,
+      "values": {
+        "input#level": "77",
+        "input#off": "50",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Move(400.0, 300.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#level",
+          "type": "pointermove"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "input"
+        }
+      ],
+      "focus": "input#level",
+      "focusVisible": false,
+      "line": 21,
+      "values": {
+        "input#level": "100",
+        "input#off": "50",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Release(400.0, 300.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#level",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#level",
+          "type": "lostpointercapture"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#level",
+          "type": "click"
+        }
+      ],
+      "focus": "input#level",
+      "focusVisible": false,
+      "line": 24,
+      "values": {
+        "input#level": "100",
+        "input#off": "50",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"ArrowLeft\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowLeft",
+          "target": "input#level",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "change"
+        }
+      ],
+      "focus": "input#level",
+      "focusVisible": true,
+      "line": 28,
+      "values": {
+        "input#level": "99",
+        "input#off": "50",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"ArrowDown\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowDown",
+          "target": "input#level",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "change"
+        }
+      ],
+      "focus": "input#level",
+      "focusVisible": true,
+      "line": 33,
+      "values": {
+        "input#level": "98",
+        "input#off": "50",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"ArrowRight\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowRight",
+          "target": "input#level",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "change"
+        }
+      ],
+      "focus": "input#level",
+      "focusVisible": true,
+      "line": 35,
+      "values": {
+        "input#level": "99",
+        "input#off": "50",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"ArrowUp\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowUp",
+          "target": "input#level",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "change"
+        }
+      ],
+      "focus": "input#level",
+      "focusVisible": true,
+      "line": 37,
+      "values": {
+        "input#level": "100",
+        "input#off": "50",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"PageDown\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "PageDown",
+          "target": "input#level",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "change"
+        }
+      ],
+      "focus": "input#level",
+      "focusVisible": true,
+      "line": 39,
+      "values": {
+        "input#level": "90",
+        "input#off": "50",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"PageUp\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "PageUp",
+          "target": "input#level",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "change"
+        }
+      ],
+      "focus": "input#level",
+      "focusVisible": true,
+      "line": 41,
+      "values": {
+        "input#level": "100",
+        "input#off": "50",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"Home\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Home",
+          "target": "input#level",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "change"
+        }
+      ],
+      "focus": "input#level",
+      "focusVisible": true,
+      "line": 43,
+      "values": {
+        "input#level": "0",
+        "input#off": "50",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"End\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "End",
+          "target": "input#level",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#level",
+          "type": "change"
+        }
+      ],
+      "focus": "input#level",
+      "focusVisible": true,
+      "line": 45,
+      "values": {
+        "input#level": "100",
+        "input#off": "50",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"Tab\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#level",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "focusin"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 47,
+      "values": {
+        "input#level": "100",
+        "input#off": "50",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"ArrowRight\")",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowRight",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "change"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 49,
+      "values": {
+        "input#level": "100",
+        "input#off": "50",
+        "input#plain": "51"
+      }
+    },
+    {
+      "action": "Click(433.0, 10.0)",
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#off",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#off",
+          "type": "pointerup"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 51,
+      "values": {
+        "input#level": "100",
+        "input#off": "50",
+        "input#plain": "51"
+      }
+    }
+  ]
+}

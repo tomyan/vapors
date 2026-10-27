@@ -40,6 +40,8 @@ pub(crate) struct LayoutBox {
     pub(crate) natural: Option<[f32; 2]>,
     /// The image an `img` shows, for paint.
     pub(crate) image: Option<std::rc::Rc<vapors_scene::RgbaImage>>,
+    /// The numbers of an `input type=range`, for paint (3-E3a).
+    pub(crate) range: Option<crate::range::Range>,
 }
 
 impl LayoutBox {
@@ -53,6 +55,7 @@ impl LayoutBox {
             hoisted: Vec::new(),
             natural: None,
             image: None,
+            range: None,
         }
     }
 
@@ -111,14 +114,18 @@ fn add_element(source: &Source<'_>, node: NodeId, boxes: &mut Vec<LayoutBox>) ->
         return None;
     }
     let index = boxes.len();
-    boxes.push(LayoutBox::replaced(
+    let range = crate::range::of_element(source.arena, node);
+    let natural = source
+        .images
+        .natural(source.arena, node)
+        .or(range.map(|_| crate::range::NATURAL_SIZE));
+    let mut replaced = LayoutBox::replaced(
         Content::Element(node),
         style.layout.clone(),
-        (
-            source.images.natural(source.arena, node),
-            source.images.of(source.arena, node).cloned(),
-        ),
-    ));
+        (natural, source.images.of(source.arena, node).cloned()),
+    );
+    replaced.range = range;
+    boxes.push(replaced);
     let mut run = Collector::new(style.text, style.visible);
     for child in source.arena.children(node) {
         match &source.arena.get(child, "build").kind {

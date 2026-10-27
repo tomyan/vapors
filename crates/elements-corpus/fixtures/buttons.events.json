@@ -26,7 +26,8 @@
       ],
       "focus": "button#save",
       "focusVisible": false,
-      "line": 4
+      "line": 4,
+      "values": {}
     },
     {
       "action": "Key(\"Tab\")",
@@ -54,7 +55,8 @@
       ],
       "focus": "button#cancel",
       "focusVisible": true,
-      "line": 8
+      "line": 8,
+      "values": {}
     },
     {
       "action": "Key(\"Enter\")",
@@ -82,7 +84,8 @@
       ],
       "focus": "button#cancel",
       "focusVisible": true,
-      "line": 10
+      "line": 10,
+      "values": {}
     },
     {
       "action": "Key(\"Space\")",
@@ -110,7 +113,8 @@
       ],
       "focus": "button#cancel",
       "focusVisible": true,
-      "line": 12
+      "line": 12,
+      "values": {}
     },
     {
       "action": "Click(250.0, 24.0)",
@@ -125,7 +129,8 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 14
+      "line": 14,
+      "values": {}
     },
     {
       "action": "Wheel { x: 100.0, y: 90.0, dx: 0.0, dy: 40.0 }",
@@ -145,7 +150,8 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 17
+      "line": 17,
+      "values": {}
     }
   ]
 }

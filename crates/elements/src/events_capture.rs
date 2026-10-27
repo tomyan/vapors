@@ -92,7 +92,7 @@ pub(super) fn dispatch_pointer(
 
 /// Asks for pointer `id`'s capture to go to `asked`, unless a listener
 /// already asked for something (a touch's implicit capture yields to it).
-pub(super) fn ask_unless_asked(document: &Rc<RefCell<Document>>, id: u32, asked: Asked) {
+pub(crate) fn ask_unless_asked(document: &Rc<RefCell<Document>>, id: u32, asked: Asked) {
     let mut doc = document.borrow_mut();
     let captured = doc.pointer.captures.entry(id).or_default();
     captured.pending.get_or_insert(asked);

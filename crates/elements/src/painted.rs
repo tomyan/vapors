@@ -31,6 +31,8 @@ pub struct Painted {
     pub(crate) images: Vec<std::rc::Rc<vapors_scene::RgbaImage>>,
     /// Which scroll containers a scroll over each element tries.
     pub(crate) scroll_chains: crate::scroll_chains::Chains,
+    /// Each range input's track, for the pointer (3-E3a).
+    pub(crate) ranges: HashMap<NodeId, crate::range_paint::Track>,
 }
 
 impl Painted {

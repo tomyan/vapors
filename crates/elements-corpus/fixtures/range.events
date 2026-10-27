@@ -1,0 +1,54 @@
+# A range by mouse and keys (3-E3a). `level` is x 0..200, y 0..20, 0..100
+# by 1 at 20, with a 16 px thumb: a point x maps to (x - 8) / 184 of the
+# range. `off` is disabled, at x 333..533.
+#
+# Shift with an arrow is left out: vapors steps by ten then (the
+# 2026-10-27 direct-tools decision), Chromium by one.
+listen pointerdown pointermove pointerup gotpointercapture lostpointercapture click input change keydown focusin
+click 100 10                  the middle of level: 50, pressed and released
+expect event pointerdown input#level
+expect event input input#level
+expect event change input#level
+expect event click input#level
+expect focus input#level
+expect value input#level 50
+press 100 10                  a drag begins where the thumb is
+expect event pointerdown input#level
+move 150 10                   dragged right: 77
+expect event pointermove input#level
+expect event input input#level
+expect value input#level 77
+move 400 300                  off the input, still dragging: the end
+expect event input input#level
+expect value input#level 100
+release 400 300               the drag ends with the change
+expect event pointerup input#level
+expect event change input#level
+expect value input#level 100
+key ArrowLeft                 one step down, with input and change
+expect event keydown input#level
+expect event input input#level
+expect event change input#level
+expect value input#level 99
+key ArrowDown
+expect value input#level 98
+key ArrowRight
+expect value input#level 99
+key ArrowUp
+expect value input#level 100
+key PageDown                  a tenth of the range
+expect value input#level 90
+key PageUp
+expect value input#level 100
+key Home
+expect value input#level 0
+key End
+expect value input#level 100
+key Tab                       on to the next range
+expect focus-visible input#plain
+key ArrowRight                plain: 0..100 at 50
+expect value input#plain 51
+click 433 10                  off is disabled: no value, no focus
+expect no event input
+expect focus body
+expect value input#off 50

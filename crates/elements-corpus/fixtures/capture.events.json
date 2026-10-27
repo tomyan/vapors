@@ -13,7 +13,8 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 10
+      "line": 10,
+      "values": {}
     },
     {
       "action": "Press(50.0, 20.0)",
@@ -28,7 +29,8 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 12
+      "line": 12,
+      "values": {}
     },
     {
       "action": "Move(50.0, 60.0)",
@@ -50,7 +52,8 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 14
+      "line": 14,
+      "values": {}
     },
     {
       "action": "Move(300.0, 300.0)",
@@ -65,7 +68,8 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 17
+      "line": 17,
+      "values": {}
     },
     {
       "action": "Release(300.0, 300.0)",
@@ -94,7 +98,8 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 19
+      "line": 19,
+      "values": {}
     },
     {
       "action": "Move(50.0, 60.0)",
@@ -109,7 +114,8 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 23
+      "line": 23,
+      "values": {}
     },
     {
       "action": "TouchDown(50.0, 60.0)",
@@ -124,7 +130,8 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 25
+      "line": 25,
+      "values": {}
     },
     {
       "action": "TouchMove(50.0, 20.0)",
@@ -160,14 +167,16 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 27
+      "line": 27,
+      "values": {}
     },
     {
       "action": "TouchUp(50.0, 20.0)",
       "events": [],
       "focus": "body",
       "focusVisible": false,
-      "line": 31
+      "line": 31,
+      "values": {}
     }
   ]
 }

@@ -53,6 +53,18 @@ pub(crate) fn padding_box(layout_box: &LayoutBox, border_box: BoxRect) -> BoxRec
     }
 }
 
+/// The content box of `layout_box`, whose border box is `border_box`.
+pub(crate) fn content_box(layout_box: &LayoutBox, border_box: BoxRect) -> BoxRect {
+    let padding = padding_box(layout_box, border_box);
+    let inner = layout_box.layout.padding;
+    BoxRect {
+        x: padding.x + inner.left,
+        y: padding.y + inner.top,
+        width: (padding.width - inner.left - inner.right).max(0.0),
+        height: (padding.height - inner.top - inner.bottom).max(0.0),
+    }
+}
+
 /// Whether box `index` cuts off its content. The root never does: its
 /// `overflow` is the viewport's. Nor does the body unless the root's
 /// `overflow` is not `visible`; otherwise the body's is the viewport's

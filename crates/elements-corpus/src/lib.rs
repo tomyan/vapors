@@ -23,6 +23,7 @@ pub mod events_oracle;
 pub mod events_play;
 pub mod events_script;
 pub mod events_steps;
+mod events_unmet;
 pub mod events_vapors;
 pub mod oracle;
 pub mod oracle_files;
@@ -76,6 +77,7 @@ fixtures![
     outline_paint::OutlinePaint,
     paint_boxes::PaintBoxes,
     positioned::Positioned,
+    range::Range,
     scrolling::Scrolling,
     shell::Shell,
     sizing::Sizing,

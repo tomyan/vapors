@@ -1,11 +1,13 @@
 //! Keys (3-E2a): `keydown` and `keyup` go to the focused element, else
 //! the body. Unless a listener prevents it, Tab and Shift+Tab move focus
 //! (on keydown), Enter clicks a focused button on keydown and Space on
-//! keyup, as browsers do.
+//! keyup, as browsers do, and the arrow, Page, Home and End keys step a
+//! focused range (3-E3a, `range_input`).
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use vapors_css::tree::States;
 use vapors_dom::{Event, NodeId};
 
 use crate::document::Document;
@@ -29,9 +31,14 @@ impl Document {
     /// `key` went down: `keydown`, then its default action.
     pub fn key_pressed(document: &Rc<RefCell<Document>>, key: &str, modifiers: Modifiers) {
         // a modifier alone is not a keyboard interaction for
-        // :focus-visible, as in Chromium (review-v82)
+        // :focus-visible, as in Chromium (review-v82); any other key
+        // shows the ring on the focused element, as Chromium does when
+        // a key is pressed after a press focused it (3-E3a's oracle)
         if !matches!(key, "Shift" | "Control" | "Alt" | "Meta") {
-            document.borrow_mut().keyboard = true;
+            let mut doc = document.borrow_mut();
+            doc.keyboard = true;
+            let active = doc.active_element();
+            doc.set_flag_on(States::FOCUS_VISIBLE, active);
         }
         let target = document.borrow().key_target();
         if dispatch_bubbling(document, target, Event::new("keydown").with_key(key)) {
@@ -46,6 +53,10 @@ impl Document {
             }
             "Enter" => Self::activate(document, target),
             " " => document.borrow_mut().space_on = Some(target),
+            "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown" | "PageUp" | "PageDown"
+            | "Home" | "End" => {
+                crate::range_input::key(document, target, key, modifiers);
+            }
             _ => {}
         }
     }

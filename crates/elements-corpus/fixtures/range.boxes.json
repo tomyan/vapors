@@ -1,0 +1,11 @@
+{"viewports": [
+{"viewport": [640,400], "scale": 1,
+"boxes": [
+{"height":20,"tag":"html","width":640,"x":0,"y":0},
+{"height":20,"tag":"body","width":640,"x":0,"y":0},
+{"height":20,"tag":"input","width":200,"x":0,"y":0},
+{"height":16,"tag":"input","width":129,"x":202,"y":2},
+{"height":20,"tag":"input","width":200,"x":333,"y":0},
+{"height":20,"tag":"button","width":80,"x":533,"y":0}
+]}
+]}

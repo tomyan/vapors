@@ -12,6 +12,29 @@ fn calls_fresh(action: &Action) -> Vec<(&'static str, serde_json::Value)> {
 use crate::events_script::{Action, Expect};
 
 #[test]
+fn a_value_expectation_holds_against_the_recorded_value() {
+    // Given
+    let expect = Expect::Value {
+        target: "input#a".into(),
+        value: "50".into(),
+    };
+    let same = json!({ "events": [], "focus": "body", "values": { "input#a": "50" } });
+    let other = json!({ "events": [], "focus": "body", "values": { "input#a": "7" } });
+    let missing = json!({ "events": [], "focus": "body" });
+
+    // Then
+    assert_eq!(unmet(&expect, &same), None);
+    assert_eq!(
+        unmet(&expect, &other),
+        Some("input#a has value \"7\", not \"50\"".to_owned())
+    );
+    assert_eq!(
+        unmet(&expect, &missing),
+        Some("input#a has value \"(not recorded)\", not \"50\"".to_owned())
+    );
+}
+
+#[test]
 fn a_click_is_a_left_press_and_release_at_the_point() {
     let calls = calls_fresh(&Action::Click(12.0, 34.0));
     assert_eq!(calls.len(), 2);

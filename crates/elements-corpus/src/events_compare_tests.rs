@@ -14,6 +14,7 @@ fn ours() -> Log {
         events: vec![("click".to_owned(), "div#a".to_owned())],
         focus: "body".to_owned(),
         focus_visible: false,
+        values: Vec::new(),
     }]
 }
 
@@ -29,6 +30,34 @@ fn a_matching_recording_compares_equal() {
 
     // Then
     assert_eq!(compare("x", &script, &ours(), &answers), Ok(()));
+}
+
+#[test]
+fn a_value_that_differs_is_reported_and_one_not_recorded_asks_for_a_rerun() {
+    // Given: vapors says 50, Chromium 7, then a recording without values
+    let script = parse("x", "listen input\nkey End\nexpect value input#a 50\n").expect("parses");
+    let ours = vec![Logged {
+        values: vec![("input#a".to_owned(), "50".to_owned())],
+        focus: "body".to_owned(),
+        ..Logged::default()
+    }];
+    let step = |values: serde_json::Value| json!({ "steps": [{ "line": 2, "action": "Key(\"End\")", "events": [], "focus": "body", "focusVisible": false, "values": values }] });
+
+    // When
+    let differs =
+        compare("x", &script, &ours, &step(json!({ "input#a": "7" }))).expect_err("differs");
+    let missing = compare("x", &script, &ours, &step(json!({}))).expect_err("missing");
+
+    // Then
+    assert!(
+        differs.contains("x.events:2: input#a has value \"7\" in Chromium, \"50\" in vapors"),
+        "{differs}"
+    );
+    assert!(missing.contains("rerun the events oracle"), "{missing}");
+    assert_eq!(
+        compare("x", &script, &ours, &step(json!({ "input#a": "50" }))),
+        Ok(())
+    );
 }
 
 #[test]

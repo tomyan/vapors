@@ -32,6 +32,8 @@ pub(crate) struct Used {
     pub(crate) z_index: Option<i32>,
     /// How its thumb is drawn, when it scrolls.
     pub(crate) scrollbar: super::Scrollbar,
+    /// How its track and thumb are drawn, when it is a range (3-E3a).
+    pub(crate) parts: super::Parts,
 }
 
 /// What a used style depends on besides the element's computed styles.
@@ -64,7 +66,8 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
     }
     super::overflow::refuse_rounded_clip(&mut reader, &layout, &decoration);
     super::overflow::refuse_viewport_scroll(&mut reader, &layout, context.to_viewport);
-    let result = Used {
+    let mut result = Used {
+        parts: super::parts::DEFAULT,
         z_index: applied_z_index(&mut reader, &layout, context.flex_item),
         scrollbar: super::scrollbar::scrollbar(&mut reader),
         layout,
@@ -78,6 +81,8 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
     };
     let mut refusals = check_honoured(styles, context.initial);
     refusals.extend(reader.refusals);
+    let parts = super::parts::parts(styles, &mut refusals);
+    result.parts = parts;
     if refusals.is_empty() {
         Ok(result)
     } else {

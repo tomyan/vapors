@@ -42,14 +42,19 @@ impl Document {
         let event = document
             .borrow()
             .pointer_event("pointerdown", id, target, point);
-        dispatch_pointer(document, id, target, event);
+        let prevented = dispatch_pointer(document, id, target, event);
         ask_unless_asked(document, id, Asked::CaptureTo(target));
+        if !prevented {
+            crate::range_input::pressed(document, id, target, point);
+        }
     }
 
     /// Finger `finger` moved to `point`: its capturing element gets
-    /// `pointermove`.
+    /// `pointermove`, and a range it drags takes the value there.
     pub fn touch_moved(document: &Rc<RefCell<Document>>, finger: u64, point: Point) {
-        Self::touch_event(document, finger, point, "pointermove");
+        if Self::touch_event(document, finger, point, "pointermove").is_some() {
+            crate::range_input::moved(document, touch_id(finger), point);
+        }
     }
 
     /// Finger `finger` lifted at `point`: `pointerup`, and the capture
@@ -146,6 +151,7 @@ impl Document {
     fn touch_ended(document: &Rc<RefCell<Document>>, finger: u64, point: Point, name: &str) {
         let id = touch_id(finger);
         if Self::touch_event(document, finger, point, name).is_some() {
+            crate::range_input::released(document, id);
             release_capture(document, id);
             process_pending(document, id, point);
         }

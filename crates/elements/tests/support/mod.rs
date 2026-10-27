@@ -7,6 +7,7 @@ pub mod changes;
 pub mod focus_page;
 pub mod pointer;
 pub mod random_css;
+pub mod range_page;
 pub mod scroll_list;
 pub mod tree;
 

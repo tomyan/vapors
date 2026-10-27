@@ -43,5 +43,16 @@
     return { focus: el ? name(el) : null, focusVisible: !!el && el !== document.body && el.matches(":focus-visible") };
   };
   window.__eventsCount = (target) => target === "window" || target === "document" ? 1 : document.querySelectorAll(target).length;
+  // Each named control's value; a target that is not one element
+  // stops the script, as a vapors player with no such element would.
+  window.__eventsValues = (targets) => {
+    const values = {};
+    for (const target of targets) {
+      const found = document.querySelectorAll(target);
+      if (found.length !== 1) throw new Error("value " + target + " names " + found.length + " elements, not one");
+      values[target] = found[0].value;
+    }
+    return values;
+  };
   return true;
 })()

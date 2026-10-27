@@ -6,12 +6,14 @@ use crate::events_script::Action;
 const MODIFIERS: [&str; 4] = ["Shift", "Control", "Alt", "Meta"];
 
 /// Keys a script may name besides a single printable character.
-pub const KEY_NAMES: [&str; 12] = [
+pub const KEY_NAMES: [&str; 14] = [
     "Backspace",
     "Tab",
     "Enter",
     "Escape",
     "Space",
+    "PageUp",
+    "PageDown",
     "End",
     "Home",
     "ArrowLeft",

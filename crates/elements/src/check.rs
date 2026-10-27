@@ -81,6 +81,7 @@ fn attribute_refusals(
     found.extend(crate::focus::tabindex_refusal(
         element.attributes.get("tabindex"),
     ));
+    found.extend(input_refusal(element));
     found
         .into_iter()
         .map(|refusal| {
@@ -136,17 +137,68 @@ pub(crate) fn implemented(arena: &Arena, node: NodeId) -> bool {
 /// A `disabled` attribute disables by being present, as in HTML, so
 /// `disabled="false"` disables too; a `.wisp` that sets it from an
 /// expression would get exactly that. Refused where `disabled` has an
-/// effect, which in F2c is a button (elsewhere HTML ignores it), until
-/// the tree can remove an attribute (a `Dom` change, with the inputs in
-/// F4).
+/// effect, a button or an input (elsewhere HTML ignores it), until the
+/// tree can remove an attribute (a `Dom` change).
 fn disabled_value(tag: &str, value: Option<&String>) -> Option<String> {
-    if tag != "button" {
+    if !matches!(tag, "button" | "input") {
         return None;
     }
     match value.map(String::as_str) {
         Some("false") => Some(format!(
-            "<{tag} disabled=\"false\"> is disabled: an HTML boolean attribute disables by being present; leave it out to enable, since the tree cannot remove an attribute until F4"
+            "<{tag} disabled=\"false\"> is disabled: an HTML boolean attribute disables by being present; leave it out to enable, since the tree cannot remove an attribute yet"
         )),
+        _ => None,
+    }
+}
+
+/// Whether `element`'s `type` attribute is `kind`, compared as HTML
+/// compares it (ASCII case-insensitively); an `input` without one is
+/// `text`.
+pub(crate) fn is_type(element: &crate::node::Element, kind: &str) -> bool {
+    element
+        .attributes
+        .get("type")
+        .map_or("text", String::as_str)
+        .eq_ignore_ascii_case(kind)
+}
+
+/// The input types built and where the rest arrive (3-E3).
+const INPUT_TYPES: &[(&str, Option<&str>)] = &[
+    ("range", None),
+    ("checkbox", Some("3-E3b")),
+    ("number", Some("3-E3c")),
+    ("text", Some("3-E6, text editing")),
+];
+
+/// An `input` of a type not built yet, naming the slice; and a `value`
+/// property of a shape no input's value takes.
+fn input_refusal(element: &crate::node::Element) -> Option<String> {
+    if element.tag != "input" {
+        return None;
+    }
+    let built = INPUT_TYPES
+        .iter()
+        .find(|(kind, _)| is_type(element, kind))
+        .map_or(Some("no slice yet"), |(_, slice)| *slice);
+    if let Some(slice) = built {
+        let kind = element
+            .attributes
+            .get("type")
+            .map_or("text", String::as_str);
+        return Some(format!(
+            "<input type=\"{kind}\"> is not implemented by vapors-elements yet: it arrives in {slice} (docs/design/03-events-focus-input-ime.md); the types built are {}",
+            INPUT_TYPES
+                .iter()
+                .filter(|(_, s)| s.is_none())
+                .map(|(k, _)| *k)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+    match element.properties.get("value") {
+        Some(vapors_dom::PropertyValue::Bool(_)) => Some(
+            "its `value` property is a boolean; an input's value is a number or a text (set_property with PropertyValue::Number or Text)".to_owned(),
+        ),
         _ => None,
     }
 }
