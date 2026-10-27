@@ -7,8 +7,6 @@ use super::emit::{Emitter, Place};
 use crate::CompileError;
 use crate::ast::{AttrValue, Attribute, Element, Expr};
 
-const BIND_CONTROLS: &[&str] = &["input", "select", "textarea"];
-
 impl Emitter<'_> {
     pub fn emit_element(&mut self, element: &Element, place: &Place) -> Result<(), CompileError> {
         let var = self.fresh(&element.tag);
@@ -107,67 +105,6 @@ impl Emitter<'_> {
             Some(0) => Ok(format!("move |_event: &mut Event| {{ {code}(); }}")),
             _ => Ok(code),
         }
-    }
-
-    fn emit_binding(
-        &mut self,
-        element: &Element,
-        var: &str,
-        property: &str,
-        attribute: &Attribute,
-    ) -> Result<(), CompileError> {
-        let (event, read, wrap) = match property {
-            "value" => ("input", "event.value().to_string()", "PropertyValue::Text"),
-            "checked" => ("change", "event.checked()", "PropertyValue::Bool"),
-            _ => return Err(self.source.error(attribute.offset, format!(
-                "`bind:{property}` is not a binding: elements bind `bind:value` (input, textarea, select) or `bind:checked` (checkbox, radio)"
-            ))),
-        };
-        let event = if element.tag == "select" {
-            "change"
-        } else {
-            event
-        };
-        self.refuse_bind_conflicts(element, attribute, event)?;
-        let AttrValue::Expr(signal) = &attribute.value else {
-            return Err(self.source.error(
-                attribute.offset,
-                format!("`bind:{property}` takes a signal: write bind:{property}={{name}}"),
-            ));
-        };
-        let signal = self.raw(signal)?;
-        self.emit_effect(
-            &[],
-            &[format!(
-                "dom.borrow_mut().set_property({var}, {property:?}, {wrap}({signal}.get()));"
-            )],
-        );
-        self.line(format!(
-            "dom.borrow_mut().listen({var}, {event:?}, Box::new(move |event: &mut Event| {{ {signal}.set({read}); }}));"
-        ));
-        Ok(())
-    }
-
-    fn refuse_bind_conflicts(
-        &self,
-        element: &Element,
-        attribute: &Attribute,
-        event: &str,
-    ) -> Result<(), CompileError> {
-        if !BIND_CONTROLS.contains(&element.tag.as_str()) {
-            return Err(self.source.error(attribute.offset, format!(
-                "`{}` binds a form control's value: use it on input, textarea or select, not <{}>",
-                attribute.name, element.tag
-            )));
-        }
-        let handler = format!("on{event}");
-        if element.attributes.get(&handler).is_some() {
-            return Err(self.source.error(attribute.offset, format!(
-                "`{}` already listens for `{event}`; it cannot be combined with `{handler}`: keep one, and write the other's work inside it",
-                attribute.name
-            )));
-        }
-        Ok(())
     }
 
     /// A statement, inside a block with the clones when there are any.

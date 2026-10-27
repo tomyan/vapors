@@ -3,7 +3,7 @@
 
 use std::fmt::Write;
 
-use super::allowances::Allowance;
+use super::allowances::mount_allowances;
 use super::script::ScriptInfo;
 use crate::ast::Component;
 
@@ -85,24 +85,6 @@ impl Default for {name}Props {{
 
 const DEFAULTS_AS_WRITTEN: &str =
     "the defaults are the #[prop] initialisers as written in the .wisp";
-/// Lints on `mount_before` that depend on types the compiler cannot see:
-/// its length, and props it does not consume, which it does not when
-/// there are none or every one is a signal or memo, which are `Copy`.
-fn mount_allowances(info: &ScriptInfo) -> String {
-    let mut allowances = format!("    {}\n", Allowance::TooManyLines.attribute());
-    let all_copy = info
-        .props
-        .iter()
-        .all(|prop| info.unwrappable.contains(&prop.name));
-    if all_copy {
-        let _ = writeln!(
-            allowances,
-            "    {}",
-            Allowance::NeedlessPassByValue.attribute()
-        );
-    }
-    allowances
-}
 
 fn component_struct(name: &str, info: &ScriptInfo) -> String {
     let mut fields = String::new();
@@ -143,7 +125,7 @@ fn field_lists(info: &ScriptInfo) -> (String, String) {
 
 fn mount_methods(name: &str, info: &ScriptInfo, body: &str, styled: bool) -> String {
     let (returned, built) = field_lists(info);
-    let allowances = mount_allowances(info);
+    let allowances = mount_allowances(info, body);
     let prop_names: Vec<&str> = info.props.iter().map(|prop| prop.name.as_str()).collect();
     let prop_names = prop_names.join(", ");
     let add_style = if styled {

@@ -3,12 +3,14 @@
 use crate::NodeId;
 
 /// An event delivered to a listener. The payload fields are set by
-/// the kind of event: `input` and `change` carry `value`, `change` on
-/// a checkbox carries `checked`.
+/// the kind of event: `input` and `change` carry `value`, and on a
+/// range or number input the value as a number too; `change` on a
+/// checkbox carries `checked`.
 #[derive(Debug, Clone, Default)]
 pub struct Event {
     name: String,
     value: Option<String>,
+    value_number: Option<f64>,
     checked: Option<bool>,
     propagation_stopped: bool,
     default_prevented: bool,
@@ -61,6 +63,22 @@ impl Event {
     pub fn with_value(mut self, value: &str) -> Event {
         self.value = Some(value.to_string());
         self
+    }
+
+    /// Attaches the value as a number, on an `input` or `change` from a
+    /// range or number input.
+    #[must_use]
+    pub fn with_value_number(mut self, value: f64) -> Event {
+        self.value_number = Some(value);
+        self
+    }
+
+    /// The control's value as a number, on a range or number input's
+    /// `input` or `change`; `None` on an event that carries none (where
+    /// the DOM's `valueAsNumber` would answer NaN).
+    #[must_use]
+    pub fn value_as_number(&self) -> Option<f64> {
+        self.value_number
     }
 
     /// Attaches the `checked` payload.

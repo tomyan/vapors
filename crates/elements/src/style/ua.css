@@ -51,6 +51,16 @@ button {
   color: #000000;
 }
 
+/* A range input (3-E3a): a replaced box of Chromium's default size
+   (129 x 16 px) with Chromium's 2px margin; its track and thumb are
+   drawn from the --vapors-thumb-size, --vapors-thumb-color,
+   --vapors-track-height and --vapors-track-color custom properties,
+   whose user-agent values are in style/parts.rs so an ancestor's
+   declaration (an app's tokens) inherits over them. Inline-block, laid
+   out where it is blockified, as a button is. */
+input { display: inline-block; }
+input[type=range] { margin: 2px; }
+
 /* Chromium draws an hr's 1px border `inset` (two greys); vapors draws
    solid borders, so it is one grey. The box is the same 2px tall. */
 hr {

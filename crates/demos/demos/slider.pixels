@@ -1,0 +1,13 @@
+# The slider after one click on its track, at 640x400 CSS px at 1x. The
+# card is at x 160..480, y 168..232; the range at x 180..380, y 188..212,
+# so its track runs y 198..202 and its 16 px thumb's centre from x 188
+# to 372. A click at x 340 is (340 - 188) / 184 of 0..100: 83, so the
+# thumb moves from x 253.6..269.6 (40) to 332.7..348.7 and the readout
+# at x 380..440 says 83.
+click 340 200
+pixel 4 4 #e9ecef          page, top left
+pixel 300 190 #ffffff      the card, above the track
+pixel 340 200 #3a7bd5      the thumb, where the click landed
+pixel 261 200 #c7ccd1      the track where the thumb was
+pixel 190 200 #c7ccd1      the track's left end
+ink 380 190 440 210 #ffffff the readout is drawn

@@ -135,10 +135,11 @@ impl Document {
             .painted
             .as_ref()
             .is_some_and(|painted| painted.is_visible(node));
-        (named || indexed) && drawn && !self.in_disabled_control(node)
+        (named || indexed) && drawn && !self.is_disabled_control(node)
     }
 
-    fn in_disabled_control(&self, node: NodeId) -> bool {
+    /// Whether `node` is a form control with a `disabled` attribute.
+    pub(crate) fn is_disabled_control(&self, node: NodeId) -> bool {
         self.tag(node).is_some_and(|tag| INTERACTIVE.contains(&tag))
             && self.attribute(node, "disabled").is_some()
     }

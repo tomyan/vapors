@@ -68,4 +68,11 @@ impl Node {
             Kind::Text(_) => None,
         }
     }
+
+    pub(crate) fn element_mut(&mut self) -> Option<&mut Element> {
+        match &mut self.kind {
+            Kind::Element(element) => Some(element),
+            Kind::Text(_) => None,
+        }
+    }
 }

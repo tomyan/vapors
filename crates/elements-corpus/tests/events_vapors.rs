@@ -1,8 +1,9 @@
 //! The capture fixture's `.events` script played on vapors, its log
 //! compared step by step with what Chromium logged for the same script
 //! (`fixtures/capture.events.json`, written by the events oracle): the
-//! order and targets of pointer capture's events (3-E1); and the focus
-//! fixture's keys, Tab order and focus (3-E2a).
+//! order and targets of pointer capture's events (3-E1); the focus
+//! fixture's keys, Tab order and focus (3-E2a); and the range fixture's
+//! presses, drags, keys and values (3-E3a).
 
 use vapors_elements::Viewport;
 use vapors_elements_corpus::events_compare::compare;
@@ -88,6 +89,19 @@ fn a_touch_that_stays_inside_the_slop_is_refused_as_a_tap() {
         refusal.contains("capture.events:6:") && refusal.contains("tap"),
         "{refusal}"
     );
+}
+
+#[test]
+fn the_range_script_logs_on_vapors_what_chromium_logged() {
+    // Given: a range pressed, dragged and stepped by key (3-E3a)
+    let script = parse("range", &read("range.events")).expect("parses");
+    let answers = serde_json::from_str(&read("range.events.json")).expect("json");
+
+    // When
+    let ours = play(&fixture("range"), &script, VIEWPORT).unwrap_or_else(|e| panic!("{e}"));
+
+    // Then: the events, the focus and each range's value after each step
+    compare("range", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
 }
 
 #[test]

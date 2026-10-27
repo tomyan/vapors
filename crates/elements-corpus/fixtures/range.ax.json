@@ -1,0 +1,70 @@
+{
+  "tree": [
+    {
+      "depth": 0,
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "RootWebArea"
+    },
+    {
+      "depth": 1,
+      "properties": [
+        "focusable=true",
+        "invalid=false",
+        "orientation=horizontal",
+        "settable=true",
+        "valuemax=100",
+        "valuemin=0",
+        "valuetext=20"
+      ],
+      "role": "slider",
+      "value": "20"
+    },
+    {
+      "depth": 1,
+      "properties": [
+        "focusable=true",
+        "invalid=false",
+        "orientation=horizontal",
+        "settable=true",
+        "valuemax=100",
+        "valuemin=0",
+        "valuetext=50"
+      ],
+      "role": "slider",
+      "value": "50"
+    },
+    {
+      "depth": 1,
+      "properties": [
+        "disabled=true",
+        "invalid=false",
+        "orientation=horizontal",
+        "valuemax=100",
+        "valuemin=0",
+        "valuetext=50"
+      ],
+      "role": "slider",
+      "value": "50"
+    },
+    {
+      "depth": 1,
+      "name": "After",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "After",
+      "role": "StaticText"
+    }
+  ],
+  "viewport": [
+    640,
+    400
+  ]
+}

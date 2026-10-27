@@ -36,6 +36,8 @@ pub(crate) struct Pointer {
     pub(crate) captures: std::collections::HashMap<u32, capture::Captured>,
     /// Where the pointer last moved, until it leaves the window.
     pub(crate) position: Option<Point>,
+    /// Each pointer's drag of a range, by pointer id (3-E3a).
+    pub(crate) drags: std::collections::HashMap<u32, crate::range_drag::Drag>,
 }
 
 impl Document {
@@ -54,6 +56,7 @@ impl Document {
                 .pointer_event("pointermove", MOUSE, target, point);
             dispatch_pointer(document, MOUSE, target, event);
         }
+        crate::range_drag::moved(document, MOUSE, point);
     }
 
     /// The pointer left the window: nothing is hovered, and a press in
@@ -83,6 +86,11 @@ impl Document {
                 .pointer_event("pointerdown", MOUSE, target, point);
             dispatch_pointer(document, MOUSE, target, event)
         });
+        // a range takes the value at the press before focus moves, as
+        // Chromium orders `input` before `focusin` (3-E3a)
+        if let (false, Some(target)) = (prevented, target) {
+            crate::range_drag::pressed(document, MOUSE, target, point);
+        }
         // a press focuses what it is on, or blurs, unless prevented (3-E2a)
         if !prevented {
             let focusable = target.and_then(|target| document.borrow().focusable_holding(target));
@@ -91,10 +99,11 @@ impl Document {
     }
 
     /// The primary button came up at `point`: the target (the capturing
-    /// element, while captured) gets `pointerup`, the capture ends,
-    /// `:active` clears, and `click` goes to the nearest element holding
-    /// both the pressed and the released target, as in the DOM, unless
-    /// a disabled button holds it.
+    /// element, while captured) gets `pointerup`, a dragged range's
+    /// `change` fires, the capture ends, `:active` clears, and `click`
+    /// goes to the nearest element holding both the pressed and the
+    /// released target, as in the DOM, unless a disabled control holds
+    /// it.
     pub fn pointer_released(document: &Rc<RefCell<Document>>, point: Point) {
         process_pending(document, MOUSE, point);
         let target = document.borrow().pointer_target(MOUSE, point);
@@ -104,6 +113,7 @@ impl Document {
                 .pointer_event("pointerup", MOUSE, target, point);
             dispatch_pointer(document, MOUSE, target, event);
         }
+        crate::range_drag::released(document, MOUSE);
         release_capture(document, MOUSE);
         process_pending(document, MOUSE, point);
         let click = document.borrow_mut().release(target);
@@ -189,7 +199,7 @@ impl Document {
 }
 
 #[path = "events_capture.rs"]
-mod capture;
+pub(crate) mod capture;
 #[path = "events_touch.rs"]
 mod touch;
 #[path = "events_tree.rs"]

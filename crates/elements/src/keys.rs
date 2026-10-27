@@ -1,11 +1,13 @@
 //! Keys (3-E2a): `keydown` and `keyup` go to the focused element, else
 //! the body. Unless a listener prevents it, Tab and Shift+Tab move focus
 //! (on keydown), Enter clicks a focused button on keydown and Space on
-//! keyup, as browsers do.
+//! keyup, as browsers do, and the arrow, Page, Home and End keys step a
+//! focused range (3-E3a, `range_input`).
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use vapors_css::tree::States;
 use vapors_dom::{Event, NodeId};
 
 use crate::document::Document;
@@ -28,15 +30,35 @@ pub struct Modifiers {
 impl Document {
     /// `key` went down: `keydown`, then its default action.
     pub fn key_pressed(document: &Rc<RefCell<Document>>, key: &str, modifiers: Modifiers) {
-        // a modifier alone is not a keyboard interaction for
-        // :focus-visible, as in Chromium (review-v82)
-        if !matches!(key, "Shift" | "Control" | "Alt" | "Meta") {
-            document.borrow_mut().keyboard = true;
-        }
+        document.borrow_mut().keyboard_interaction(key);
         let target = document.borrow().key_target();
         if dispatch_bubbling(document, target, Event::new("keydown").with_key(key)) {
             return;
         }
+        Self::key_default(document, target, key, modifiers);
+    }
+
+    /// A key other than a modifier alone is a keyboard interaction for
+    /// `:focus-visible`, as in Chromium (review-v82): focus arriving
+    /// next shows the ring, and so does the focused element now, as
+    /// Chromium does when a key is pressed after a press focused it
+    /// (3-E3a's oracle).
+    fn keyboard_interaction(&mut self, key: &str) {
+        if matches!(key, "Shift" | "Control" | "Alt" | "Meta") {
+            return;
+        }
+        self.keyboard = true;
+        let active = self.active_element();
+        self.set_flag_on(States::FOCUS_VISIBLE, active);
+    }
+
+    /// A key's default action on `target`, after an unprevented keydown.
+    fn key_default(
+        document: &Rc<RefCell<Document>>,
+        target: NodeId,
+        key: &str,
+        modifiers: Modifiers,
+    ) {
         match key {
             // Control, Alt or Meta with Tab is the browser's or the window
             // manager's, which Chromium does not navigate on
@@ -46,6 +68,10 @@ impl Document {
             }
             "Enter" => Self::activate(document, target),
             " " => document.borrow_mut().space_on = Some(target),
+            "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown" | "PageUp" | "PageDown"
+            | "Home" | "End" => {
+                crate::range_input::key(document, target, key, modifiers);
+            }
             _ => {}
         }
     }

@@ -184,7 +184,7 @@ user-agent behaviour and an implicit ARIA role (area 5).
 | Element | Pointer | Keyboard | Events | Notes |
 |---|---|---|---|---|
 | `button` | Press shows `:active`; `click` on release over the common ancestor | Enter and Space activate (Space on keyup, as browsers do) | `click` | Built, plus keyboard |
-| `input type=range` | Press anywhere on the track sets the value and captures; drag changes it; `step` snaps | Arrow keys by `step`, Page keys by ten steps, Home and End; Shift for ten steps | `input` on every change, `change` on release | Scrub to change, `value_as_number`. The thumb and track are UA parts styled through prefixed custom properties the UA sheet reads (`--vapors-thumb-size`, `--vapors-thumb-color`, `--vapors-track-height`, `--vapors-track-color`), so tokens apply; `::part()` comes later (Q1, decided 2026-10-25) |
+| `input type=range` | Press anywhere on the track sets the value and captures; drag changes it; `step` snaps | Arrow keys by `step`, Page keys by a tenth of the range, Home and End; Shift for ten steps | `input` on every change, `change` on release | Scrub to change, `value_as_number`. The thumb and track are UA parts styled through prefixed custom properties the UA sheet reads (`--vapors-thumb-size`, `--vapors-thumb-color`, `--vapors-track-height`, `--vapors-track-color`), so tokens apply; `::part()` comes later (Q1, decided 2026-10-25) |
 | `input type=number` | Click focuses; drag on the field scrubs when `data-scrub` says so (touché's readout behaviour) | Digits, arrows by `step`, Enter commits | `input`, `change` | A value outside `min`..`max` is clamped on commit and the field says so through `:invalid` |
 | `input type=checkbox`, `type=radio`, `switch` role | Click toggles | Space toggles; arrows move within a radio group | `input`, `change` with `checked` | `bind:checked` exists |
 | `select` | Opens a listbox popover (area 3 owns the popover primitive) | Arrows, type-ahead, Enter, Escape | `change` | Deferred until touché has one; the model choice uses it |
@@ -193,6 +193,53 @@ user-agent behaviour and an implicit ARIA role (area 5).
 | `details`/`summary` | Toggles | Enter, Space | `toggle` | For collapsible cards |
 | `dialog` | `show_modal()` traps focus, `inert` elsewhere, Escape closes | | `close`, `cancel` | F5 |
 | `popover` attribute | Light dismiss on outside click or Escape | | `toggle` | F5 |
+
+As built (3-E3a, 2026-10-27): `input type=range` is an element; the
+other input types are refused naming their slice (checkbox E3b,
+number E3c, text E6). Its numbers follow HTML's sanitization (`min` 0,
+`max` 100, `step` 1, `any` for none, the step base `min` else the
+`value` attribute; the value clamped and snapped, the middle without
+one); the live value is the `value` property once set (`bind:value`
+on a range or number input binds a `Signal<f64>` through
+`PropertyValue::Number` and `Event::value_as_number()`), else the
+attribute. A press takes the value where the thumb's centre would be
+(half a thumb in at either end, as Chromium maps it) before focus
+moves, captures the pointer to the input and drags; `input` fires on
+each change, `change` at the release when the value differs from the
+press's, after `pointerup` and before `lostpointercapture`. A finger
+takes the value where it lands and decides at its first move, as
+Chromium's `SliderContainerElement` does: moved further along the
+range than across it, the range owns the touch (the RELAXED rule's
+ownership, so no pan takes it; equal counts as along, as Chromium's
+`GetDirection` has it); further across, the touch is the pan's and the
+range takes no more of its moves. A finger's drag ends at its lift,
+with `change` after `lostpointercapture` (the mouse's comes before it)
+and even after the pan's `pointercancel`, as Chromium's slider fires it
+on touchend; a finger the platform takes (`touch_cancelled`: a palm, a
+system gesture) ends its drag with nothing, as Chromium fires no
+`change` on `touchcancel`. Each pointer drags on its own, so two
+fingers on two ranges drag both. Arrow keys step by one step (`step="any"`: a
+hundredth of the range), Page keys by a tenth of the range or one
+step when larger, Home and End to the ends, each with `input` then
+`change`; these match Chromium step by step
+(`fixtures/range.events`, with `expect value` checking each range's
+`value` after every step). Shift with an arrow steps by ten steps,
+vapors' own default action (`2026-10-27-direct-tools-first`, 3):
+Chromium steps by one, so it is pinned by `tests/range_keys.rs`, not
+the oracle. A key pressed while an element is focused sets
+`:focus-visible` on it, as Chromium does after a press focused it. A
+disabled range gets its `pointerdown` and `pointerup` and no click, no
+focus and no value, as Chromium. The parts are read from the four
+custom properties wherever they are set (an ancestor's, so tokens,
+inherit; the user-agent values are in `style/parts.rs`, not the UA
+sheet, so an inherited declaration wins); a value of another shape is
+refused where it is declared. The look differs from Chromium's native
+slider on purpose (Q1), so the fixture is not paint-compared; the
+`slider` demo's `.pixels` pins vapors' own. Without a size a range is
+Chromium's 129 x 16 px with its 2 px margin (`fixtures/range.boxes.json`).
+Not built: `data-scrub` (E3c), `:invalid`, a vertical range, `list`
+tick marks, and `pointercancel` for window loss ends a drag without
+`change`.
 
 ## Text editing and IME
 

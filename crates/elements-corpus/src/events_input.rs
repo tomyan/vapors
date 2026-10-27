@@ -1,10 +1,11 @@
-//! An `.events` action as `DevTools` `Input` calls, and an expectation
-//! checked against what Chromium logged after it. `frame` makes no Input
-//! call: the player waits for two animation frames instead.
+//! An `.events` action as `DevTools` `Input` calls (an expectation is
+//! checked against what Chromium logged by `events_unmet`). `frame`
+//! makes no Input call: the player waits for two animation frames
+//! instead.
 
 use serde_json::{Value, json};
 
-use crate::events_script::{Action, Expect};
+use crate::events_script::Action;
 
 /// `Input` modifier bits, by the names `key` takes.
 const MODIFIER_BITS: [(&str, u8); 4] = [("Alt", 1), ("Control", 2), ("Meta", 4), ("Shift", 8)];
@@ -12,12 +13,14 @@ const MODIFIER_BITS: [(&str, u8); 4] = [("Alt", 1), ("Control", 2), ("Meta", 4),
 /// Named keys: what Chromium calls each, its `code`, and its Windows
 /// virtual key code, which Chromium needs to act on it (Tab to move
 /// focus); Enter types a carriage return, which activates a button.
-const NAMED_KEYS: [(&str, &str, &str, u8); 12] = [
+const NAMED_KEYS: [(&str, &str, &str, u8); 14] = [
     ("Backspace", "Backspace", "Backspace", 8),
     ("Tab", "Tab", "Tab", 9),
     ("Enter", "Enter", "Enter", 13),
     ("Escape", "Escape", "Escape", 27),
     ("Space", " ", "Space", 32),
+    ("PageUp", "PageUp", "PageUp", 33),
+    ("PageDown", "PageDown", "PageDown", 34),
     ("End", "End", "End", 35),
     ("Home", "Home", "Home", 36),
     ("ArrowLeft", "ArrowLeft", "ArrowLeft", 37),
@@ -170,48 +173,7 @@ fn character(name: &str, bits: u8) -> Value {
     fields
 }
 
-/// Why `expect` does not hold for a step's `answer`, or `None` when it does.
-#[must_use]
-pub fn unmet(expect: &Expect, answer: &Value) -> Option<String> {
-    let events = answer["events"].as_array().cloned().unwrap_or_default();
-    let focus = answer["focus"].as_str().unwrap_or("(nothing)");
-    match expect {
-        Expect::Event { kind, target } => {
-            let found = events
-                .iter()
-                .any(|e| e["type"] == kind.as_str() && e["target"] == target.as_str());
-            (!found).then(|| format!("no {kind} at {target}; logged: [{}]", logged(&events)))
-        }
-        Expect::NoEvent(kind) => {
-            let found = events.iter().any(|e| e["type"] == kind.as_str());
-            found.then(|| format!("a {kind} was logged: [{}]", logged(&events)))
-        }
-        Expect::Focus(target) => {
-            (focus != target).then(|| format!("focus is on {focus}, not {target}"))
-        }
-        Expect::FocusVisible(target) => focus_visible(target, focus, &answer["focusVisible"]),
-    }
-}
-
-fn focus_visible(target: &str, focus: &str, visible: &Value) -> Option<String> {
-    let shown = focus == target && *visible == true;
-    (!shown).then(|| {
-        format!(
-            "{target} does not show focus-visible; focus is on {focus}, focus-visible {visible}"
-        )
-    })
-}
-
-fn logged(events: &[Value]) -> String {
-    let each = events.iter().map(|e| {
-        format!(
-            "{} at {}",
-            e["type"].as_str().unwrap_or("?"),
-            e["target"].as_str().unwrap_or("?")
-        )
-    });
-    each.collect::<Vec<_>>().join(", ")
-}
+pub use crate::events_unmet::unmet;
 
 #[cfg(test)]
 #[path = "events_input_tests.rs"]

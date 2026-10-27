@@ -11,6 +11,7 @@ mod allowances;
 mod blocks;
 mod component_tag;
 mod element;
+mod element_bind;
 mod emit;
 mod for_block;
 mod format;

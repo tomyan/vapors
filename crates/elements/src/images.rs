@@ -132,20 +132,9 @@ pub(crate) fn paint(
     if !input.used[&node].visible {
         return;
     }
-    let content = content_box(layout_box, border_box);
+    let content = crate::clip::content_box(layout_box, border_box);
     let id = ImageId(u32::try_from(out.images.len()).expect("fewer than 2^32 images"));
     out.images.push(Rc::clone(image));
     let rect = crate::paint::snapped(content, input.scale);
     out.scene.push(Item::Image { image: id, rect });
-}
-
-fn content_box(layout_box: &LayoutBox, border_box: BoxRect) -> BoxRect {
-    let padding = crate::clip::padding_box(layout_box, border_box);
-    let inner = layout_box.layout.padding;
-    BoxRect {
-        x: padding.x + inner.left,
-        y: padding.y + inner.top,
-        width: (padding.width - inner.left - inner.right).max(0.0),
-        height: (padding.height - inner.top - inner.bottom).max(0.0),
-    }
 }

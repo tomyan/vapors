@@ -61,13 +61,18 @@ impl Document {
         self.chain(a).into_iter().find(|node| of_b.contains(node))
     }
 
-    /// Whether `node` is, or is inside, a `<button disabled>`.
+    /// Whether `node` is, or is inside, a `<button disabled>`, or is an
+    /// `<input disabled>`: neither is clicked (3-E3a: Chromium sends a
+    /// disabled input its `pointerdown` and `pointerup`, not the click).
     pub(crate) fn in_disabled_button(&self, node: NodeId) -> bool {
         self.chain(node).into_iter().any(|n| {
             self.arena
                 .get(n, "in_disabled_button")
                 .element()
-                .is_some_and(|e| e.tag == "button" && e.attributes.contains_key("disabled"))
+                .is_some_and(|e| {
+                    matches!(e.tag.as_str(), "button" | "input")
+                        && e.attributes.contains_key("disabled")
+                })
         })
     }
 

@@ -14,8 +14,9 @@
 //! - After an action, what must hold once it is done:
 //!   `expect event <type> <target>`, `expect no event <type>` (a type
 //!   that is listened for), `expect focus <target>`,
-//!   `expect focus-visible <target>`. A target is `tag#id`, else the
-//!   full child-index path from body.
+//!   `expect focus-visible <target>`, `expect value <target> <text>` (a
+//!   control's `value`, which has no spaces). A target is `tag#id`,
+//!   else the full child-index path from body.
 //!
 //! Anything else is refused, naming the file and line.
 
@@ -46,6 +47,26 @@ pub struct Step {
 }
 
 pub use crate::events_steps::{Action, Expect};
+
+impl Script {
+    /// The controls whose `value` the script expects somewhere, sorted
+    /// and each once: every step records each one's value.
+    #[must_use]
+    pub fn value_targets(&self) -> Vec<String> {
+        let mut targets: Vec<String> = self
+            .steps
+            .iter()
+            .flat_map(|step| step.expect.iter())
+            .filter_map(|(expect, _)| match expect {
+                Expect::Value { target, .. } => Some(target.clone()),
+                _ => None,
+            })
+            .collect();
+        targets.sort();
+        targets.dedup();
+        targets
+    }
+}
 
 /// The script `text` of fixture `name`.
 ///
@@ -147,7 +168,7 @@ fn listen(rest: &str) -> Result<Vec<String>, String> {
 
 fn expect(script: &mut Script, fields: &[&str], number: usize) -> Result<(), String> {
     let wanted = match fields.first().copied() {
-        Some("event" | "no") => 3,
+        Some("event" | "no" | "value") => 3,
         Some("focus" | "focus-visible") => 2,
         _ => fields.len(),
     };
@@ -160,7 +181,8 @@ fn expect(script: &mut Script, fields: &[&str], number: usize) -> Result<(), Str
         ["no", "event", kind] => Expect::NoEvent((*kind).into()),
         ["focus", target] => Expect::Focus((*target).into()),
         ["focus-visible", target] => Expect::FocusVisible((*target).into()),
-        _ => return Err("`expect` takes event <type> <target>, no event <type>, focus <target> or focus-visible <target>".into()),
+        ["value", target, value] => Expect::Value { target: (*target).into(), value: (*value).into() },
+        _ => return Err("`expect` takes event <type> <target>, no event <type>, focus <target>, focus-visible <target> or value <target> <text>".into()),
     };
     let step = script
         .steps

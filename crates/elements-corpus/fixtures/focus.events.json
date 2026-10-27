@@ -26,7 +26,8 @@
       ],
       "focus": "button#save",
       "focusVisible": true,
-      "line": 9
+      "line": 9,
+      "values": {}
     },
     {
       "action": "Key(\"Tab\")",
@@ -60,7 +61,8 @@
       ],
       "focus": "div#note",
       "focusVisible": true,
-      "line": 11
+      "line": 11,
+      "values": {}
     },
     {
       "action": "Key(\"Tab\")",
@@ -94,7 +96,8 @@
       ],
       "focus": "button#cancel",
       "focusVisible": true,
-      "line": 13
+      "line": 13,
+      "values": {}
     },
     {
       "action": "Key(\"Tab\")",
@@ -122,7 +125,8 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 15
+      "line": 15,
+      "values": {}
     },
     {
       "action": "Key(\"Shift+Tab\")",
@@ -150,7 +154,8 @@
       ],
       "focus": "button#cancel",
       "focusVisible": true,
-      "line": 17
+      "line": 17,
+      "values": {}
     },
     {
       "action": "Key(\"Enter\")",
@@ -178,7 +183,8 @@
       ],
       "focus": "button#cancel",
       "focusVisible": true,
-      "line": 19
+      "line": 19,
+      "values": {}
     },
     {
       "action": "Key(\"Space\")",
@@ -206,7 +212,8 @@
       ],
       "focus": "button#cancel",
       "focusVisible": true,
-      "line": 21
+      "line": 21,
+      "values": {}
     },
     {
       "action": "Click(350.0, 20.0)",
@@ -233,7 +240,8 @@
       ],
       "focus": "div#aside",
       "focusVisible": false,
-      "line": 23
+      "line": 23,
+      "values": {}
     },
     {
       "action": "Key(\"Tab\")",
@@ -267,7 +275,8 @@
       ],
       "focus": "button#cancel",
       "focusVisible": true,
-      "line": 25
+      "line": 25,
+      "values": {}
     },
     {
       "action": "Click(250.0, 20.0)",
@@ -281,7 +290,8 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 27
+      "line": 27,
+      "values": {}
     },
     {
       "action": "Key(\"x\")",
@@ -303,7 +313,8 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 30
+      "line": 30,
+      "values": {}
     }
   ]
 }

@@ -3,11 +3,13 @@
 //! not implement is an error, never drawn as a `div`.
 
 /// Tags laid out and painted now: block-level containers, the inline
-/// elements of F2c S6, and `img` (S10).
+/// elements of F2c S6, `img` (S10) and `input` (3-E3; `check` refuses
+/// the types not built yet).
 const SUPPORTED: &[&str] = &[
     "html",
     "body",
     "button",
+    "input",
     "div",
     "p",
     "h1",
@@ -48,9 +50,9 @@ const LATER: &[(&str, &[&str])] = &[
     (
         "F4",
         &[
-            "input", "textarea", "select", "option", "optgroup", "label", "fieldset", "legend",
-            "ul", "ol", "li", "pre", "table", "caption", "col", "colgroup", "tbody", "thead",
-            "tfoot", "tr", "td", "th", "meter", "progress",
+            "textarea", "select", "option", "optgroup", "label", "fieldset", "legend", "ul", "ol",
+            "li", "pre", "table", "caption", "col", "colgroup", "tbody", "thead", "tfoot", "tr",
+            "td", "th", "meter", "progress",
         ],
     ),
     ("F5", &["dialog", "details", "summary"]),
@@ -73,7 +75,7 @@ pub(crate) fn unsupported(tag: &str) -> Option<String> {
 }
 
 /// The events the tree fires (F2c S2; capture, 3-E1a; touches, 3-E1b;
-/// keys and focus, 3-E2a).
+/// keys and focus, 3-E2a; a range's value, 3-E3a).
 pub(crate) const FIRED: &[&str] = &[
     "click",
     "pointerdown",
@@ -88,6 +90,8 @@ pub(crate) const FIRED: &[&str] = &[
     "blur",
     "focusin",
     "focusout",
+    "input",
+    "change",
 ];
 
 /// `None` when the tree fires `event`; otherwise why not.

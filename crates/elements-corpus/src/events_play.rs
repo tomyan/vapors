@@ -1,6 +1,7 @@
 //! Playing an `.events` script in a page Chromium has loaded: each action
 //! through `Input`, then the events logged since the previous step, the
-//! focused element and whether it matches `:focus-visible`. Each step's
+//! focused element, whether it matches `:focus-visible`, and the value
+//! of each control the script expects a value of. Each step's
 //! answer is recorded; each expectation is checked against it, and an
 //! expectation whose target names more or fewer than one element is
 //! refused. Events that arrive after the last step are refused: one that
@@ -32,12 +33,13 @@ const SETTLE: &str =
 /// a stalled page, not a slow one.
 const FRAME_DEADLINE: Duration = Duration::from_secs(5);
 
-/// A script being played: the page's session, the call deadline, and
-/// the pointer's held button.
+/// A script being played: the page's session, the call deadline, the
+/// pointer's held button, and the controls whose values each step reads.
 struct Player<'a> {
     session: &'a mut Session,
     deadline: Duration,
     pointer: Pointer,
+    values: String,
 }
 
 /// Each step's answers, or every expectation that did not hold, as
@@ -52,10 +54,12 @@ pub fn play(
     script: &Script,
     deadline: Duration,
 ) -> Result<Value, String> {
+    let values = serde_json::to_string(&script.value_targets()).map_err(|e| e.to_string())?;
     let mut player = Player {
         session,
         deadline,
         pointer: Pointer::default(),
+        values,
     };
     let types = serde_json::to_string(&script.listen).map_err(|e| e.to_string())?;
     let capture = serde_json::to_string(&script.capture).map_err(|e| e.to_string())?;
@@ -103,8 +107,12 @@ impl Player<'_> {
         self.evaluate(FRAMES, FRAME_DEADLINE)?;
         let events = self.evaluate("window.__eventsDrain()", self.deadline)?;
         let focus = self.evaluate("window.__eventsFocus()", self.deadline)?;
+        let values = self.evaluate(
+            &format!("window.__eventsValues({})", self.values),
+            self.deadline,
+        )?;
         Ok(
-            json!({ "line": step.line, "action": format!("{:?}", step.action), "events": events, "focus": focus["focus"], "focusVisible": focus["focusVisible"] }),
+            json!({ "line": step.line, "action": format!("{:?}", step.action), "events": events, "focus": focus["focus"], "focusVisible": focus["focusVisible"], "values": values }),
         )
     }
 
@@ -125,8 +133,10 @@ impl Player<'_> {
 
     /// Why `expect` does not hold, refusing a target that is not one element.
     fn check(&mut self, expect: &Expect, answer: &Value) -> Result<Option<String>, String> {
-        if let Expect::Event { target, .. } | Expect::Focus(target) | Expect::FocusVisible(target) =
-            expect
+        if let Expect::Event { target, .. }
+        | Expect::Focus(target)
+        | Expect::FocusVisible(target)
+        | Expect::Value { target, .. } = expect
         {
             let selector = serde_json::to_string(target).map_err(|e| e.to_string())?;
             let count =

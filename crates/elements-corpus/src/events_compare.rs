@@ -1,7 +1,8 @@
 //! vapors' log of an `.events` script compared with Chromium's recording
 //! of it (`<name>.events.json`), step by step: the recording must be of
 //! this script (each step's line and action), of a shape this reads,
-//! and log the same events at the same targets in the same order.
+//! log the same events at the same targets in the same order, and
+//! agree on focus and on each named control's value.
 
 use serde_json::Value;
 
@@ -44,6 +45,26 @@ pub fn compare(name: &str, script: &Script, ours: &Log, answers: &Value) -> Resu
                 "{name}.events:{line}: focus is on {focus} in Chromium, {} in vapors",
                 ours.focus
             ));
+        }
+        // the script's targets drive the comparison, so a log that
+        // recorded none is refused rather than compared with nothing
+        for target in &script.value_targets() {
+            let chromium = theirs["values"][target].as_str().ok_or_else(|| {
+                format!("{name}.events.json: the step at line {line} has no string value for {target}; rerun the events oracle")
+            })?;
+            let value = ours
+                .values
+                .iter()
+                .find(|(t, _)| t == target)
+                .map(|(_, v)| v.as_str())
+                .ok_or_else(|| {
+                    format!("{name}.events:{line}: vapors' log has no value for {target}")
+                })?;
+            if chromium != value {
+                differences.push(format!(
+                    "{name}.events:{line}: {target} has value {chromium:?} in Chromium, {value:?} in vapors"
+                ));
+            }
         }
     }
     if differences.is_empty() {

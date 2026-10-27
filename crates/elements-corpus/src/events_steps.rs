@@ -55,4 +55,11 @@ pub enum Expect {
     Focus(String),
     /// This element has focus and matches `:focus-visible`.
     FocusVisible(String),
+    /// This control's `value` is this text (3-E3).
+    Value {
+        /// The control.
+        target: String,
+        /// Its value, as the DOM's `value` string.
+        value: String,
+    },
 }

@@ -31,6 +31,7 @@ expect focus-visible input#title
 type \"Wa\"
 expect event input input#title
 expect no event click
+expect value input#title Wa
 ";
 
 fn session(test: &str) -> (vapors_text::comparison::Live, Session) {

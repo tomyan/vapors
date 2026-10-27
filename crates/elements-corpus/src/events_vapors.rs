@@ -20,8 +20,9 @@ use crate::events_script::Script;
 /// What vapors did at each step.
 pub type Log = Vec<Logged>;
 
-/// One step's events as (type, target), and the element focused after
-/// it, named as the Chromium player names it (`body` for none).
+/// One step's events as (type, target), the element focused after it,
+/// named as the Chromium player names it (`body` for none), and the
+/// value of each control the script expects a value of.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Logged {
     /// The events, in order.
@@ -30,6 +31,8 @@ pub struct Logged {
     pub focus: String,
     /// Whether it matches `:focus-visible`.
     pub focus_visible: bool,
+    /// Each value target's value, in the script's sorted order.
+    pub values: Vec<(String, String)>,
 }
 
 type Shared = Rc<RefCell<Vec<(String, String)>>>;
@@ -64,13 +67,32 @@ pub fn play(fixture: &Fixture, script: &Script, viewport: Viewport) -> Result<Lo
                 .map_or_else(|| "body".to_owned(), |node| name(&doc, node));
             (focus, doc.focus_visible())
         };
+        let values = values(&doc.borrow(), &script.value_targets())
+            .map_err(|why| format!("{}.events:{}: {why}", fixture.name, step.line))?;
         log.push(Logged {
             events: heard.borrow_mut().drain(..).collect(),
             focus,
             focus_visible,
+            values,
         });
     }
     Ok(log)
+}
+
+/// Each target's value: a target that names no element, or one that is
+/// not a control with a value, is refused.
+fn values(doc: &Document, targets: &[String]) -> Result<Vec<(String, String)>, String> {
+    targets
+        .iter()
+        .map(|target| {
+            let node =
+                find(doc, target).ok_or_else(|| format!("value {target} names no element"))?;
+            let value = doc
+                .value(node)
+                .ok_or_else(|| format!("value {target} is not a control with a value"))?;
+            Ok((target.clone(), value))
+        })
+        .collect()
 }
 
 fn mounted(fixture: &Fixture, viewport: Viewport) -> Result<Rc<RefCell<Document>>, String> {

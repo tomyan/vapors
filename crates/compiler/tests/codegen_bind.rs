@@ -30,6 +30,57 @@ fn bind_value_on_text_input() {
 }
 
 #[test]
+fn bind_value_on_a_range_binds_a_number() {
+    // Given
+    let script = "let level: Signal<f64> = Signal::new(20.0);";
+
+    // When
+    let code = generated_with(
+        script,
+        "<input type=\"range\" min=\"0\" max=\"100\" bind:value={level} />",
+    );
+
+    // Then: the input event's number sets the signal, and the signal's
+    // number sets the property
+    assert_has(
+        &code,
+        "level.set(event.value_as_number().expect(\"the input's input carries its number\"));",
+    );
+    assert_has(&code, "#[allow(clippy::missing_panics_doc");
+    assert_has(
+        &code,
+        "set_property(input0, \"value\", PropertyValue::Number(level.get()))",
+    );
+}
+
+#[test]
+fn bind_value_on_a_number_input_binds_a_number_too() {
+    // When
+    let code = generated_with(
+        "let n: Signal<f64> = Signal::new(0.0);",
+        "<input type=\"Number\" bind:value={n} />",
+    );
+
+    // Then
+    assert_has(&code, "n.set(event.value_as_number().expect(");
+}
+
+#[test]
+fn bind_value_with_a_type_expression_is_refused_naming_the_fix() {
+    // When
+    let err = refusal(&format!(
+        "<script>\n{SCRIPT}\nlet kind = \"range\";\n</script>\n<input type={{kind}} bind:value={{name}} />"
+    ));
+
+    // Then
+    assert!(
+        err.message.contains("type as a literal") && err.message.contains("Signal<f64>"),
+        "{err}"
+    );
+    assert_eq!((err.line, err.col), (6, 20), "{err}");
+}
+
+#[test]
 fn bind_checked_on_checkbox() {
     // When
     let code = generated_with(SCRIPT, "<input type=\"checkbox\" bind:checked={on} />");
