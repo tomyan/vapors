@@ -15,13 +15,14 @@ const COMPRESSED: [&str; 7] = ["wasm", "js", "css", "html", "json", "webmanifest
 
 /// brotli quality 9: the highest quality that leaves the `web` job well
 /// inside its 3-minute limit on GitHub's runner, which compresses about
-/// 4-5x slower than the dev box (lead, 2026-10-27). Quality 11 put the
-/// job past the limit: the trunk step went from 32 s to 74-96 s, all of
-/// it compression, 42-64 s on the runner for the 12 s measured here.
-/// Quality 10 saves only about 28% of that; 9 is about 8x faster than
-/// 11. Measured 2026-10-27 on the dev box (i5-10500T, niced, `brotli`
-/// 9.1.0, window 22), the wasm of each page alone; the other files add
-/// under 0.2 s at any quality:
+/// 3.5 to 5x slower than the dev box (lead, 2026-10-27). Quality 11 put
+/// the job past the limit: the trunk step went from 32 s to 74-96 s, all
+/// of it compression, 42-64 s on the runner for the 12 s measured here
+/// (3.5 to 5.3x), and the job took 3:09. Quality 10 saves only about 28%
+/// of that; 9 is about 8x faster than 11, and the job at 8136e64 passed
+/// in 2:31. Measured 2026-10-27 on the dev box (i5-10500T, niced,
+/// `brotli` 9.1.0, window 22), the wasm of each page alone; the other
+/// files add under 0.2 s at any quality:
 ///
 /// | quality | vapors demo wasm, 7,261,627 B | touche page wasm, 2,875,921 B |
 /// |---------|-------------------------------|-------------------------------|
@@ -30,7 +31,8 @@ const COMPRESSED: [&str; 7] = ["wasm", "js", "css", "html", "json", "webmanifest
 /// | 11      | 12.04 s   3,062,894 B         | 4.97 s   757,768 B            |
 /// | gzip 9  |  0.48 s   3,896,795 B         | 0.21 s 1,041,805 B            |
 ///
-/// Qualities 5 to 8 took 0.15 to 1.2 s and were 1 to 2.5% larger than 9.
+/// Qualities 5 to 8 took 0.15 to 1.2 s and were 0.5 to 3.3% larger than
+/// 9 (8: 0.9% on the demo wasm, 0.5% on the page wasm; 5: 2.4% and 3.3%).
 /// The page wasm at 9 is 839 KiB, within touche's 900 KiB budget
 /// (`dist_transfer.rs`). Raising the quality is a change with a new
 /// measurement against the `web` job's limit.
