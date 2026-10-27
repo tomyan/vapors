@@ -1,0 +1,286 @@
+{
+  "steps": [
+    {
+      "action": "Click(10.0, 10.0)",
+      "checked": {
+        "input#hidden": true,
+        "input#off": false,
+        "input#visible": true
+      },
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#visible",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#visible",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#visible",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#visible",
+          "type": "click"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#visible",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#visible",
+          "type": "change"
+        }
+      ],
+      "focus": "input#visible",
+      "focusVisible": false,
+      "line": 5,
+      "values": {}
+    },
+    {
+      "action": "Click(10.0, 10.0)",
+      "checked": {
+        "input#hidden": true,
+        "input#off": false,
+        "input#visible": false
+      },
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#visible",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#visible",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#visible",
+          "type": "click"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#visible",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#visible",
+          "type": "change"
+        }
+      ],
+      "focus": "input#visible",
+      "focusVisible": false,
+      "line": 13,
+      "values": {}
+    },
+    {
+      "action": "Key(\"Space\")",
+      "checked": {
+        "input#hidden": true,
+        "input#off": false,
+        "input#visible": true
+      },
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": " ",
+          "target": "input#visible",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": " ",
+          "target": "input#visible",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#visible",
+          "type": "click"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#visible",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#visible",
+          "type": "change"
+        }
+      ],
+      "focus": "input#visible",
+      "focusVisible": true,
+      "line": 16,
+      "values": {}
+    },
+    {
+      "action": "Key(\"Enter\")",
+      "checked": {
+        "input#hidden": true,
+        "input#off": false,
+        "input#visible": true
+      },
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#visible",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#visible",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#visible",
+      "focusVisible": true,
+      "line": 22,
+      "values": {}
+    },
+    {
+      "action": "Key(\"Tab\")",
+      "checked": {
+        "input#hidden": true,
+        "input#off": false,
+        "input#visible": true
+      },
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#visible",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#hidden",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#hidden",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#hidden",
+      "focusVisible": true,
+      "line": 25,
+      "values": {}
+    },
+    {
+      "action": "Key(\"Space\")",
+      "checked": {
+        "input#hidden": false,
+        "input#off": false,
+        "input#visible": true
+      },
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": " ",
+          "target": "input#hidden",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": " ",
+          "target": "input#hidden",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#hidden",
+          "type": "click"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#hidden",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#hidden",
+          "type": "change"
+        }
+      ],
+      "focus": "input#hidden",
+      "focusVisible": true,
+      "line": 28,
+      "values": {}
+    },
+    {
+      "action": "Click(124.0, 10.0)",
+      "checked": {
+        "input#hidden": false,
+        "input#off": false,
+        "input#visible": true
+      },
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#off",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#off",
+          "type": "pointerup"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 30,
+      "values": {}
+    }
+  ]
+}

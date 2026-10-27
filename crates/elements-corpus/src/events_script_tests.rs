@@ -94,6 +94,35 @@ fn a_value_expectation_names_the_control_and_its_value() {
 }
 
 #[test]
+fn a_checked_expectation_takes_true_or_false() {
+    // When
+    let script = parse(
+        "c",
+        "listen click\nclick 5 5\nexpect checked input#b true\nexpect checked input#a false\n",
+    )
+    .expect("parses");
+    let refused =
+        parse("c", "listen click\nclick 5 5\nexpect checked input#b yes\n").expect_err("refused");
+
+    // Then
+    assert_eq!(
+        script.steps[0].expect[0],
+        (
+            Expect::Checked {
+                target: "input#b".into(),
+                checked: true
+            },
+            3
+        )
+    );
+    assert_eq!(script.checked_targets(), ["input#a", "input#b"]);
+    assert!(
+        refused.contains("c.events:3:") && refused.contains("true or false"),
+        "{refused}"
+    );
+}
+
+#[test]
 fn a_script_of_another_shape_is_refused_naming_its_file_and_line() {
     for (text, needle) in [
         (

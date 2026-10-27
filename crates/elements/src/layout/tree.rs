@@ -93,10 +93,33 @@ impl BoxTree<'_> {
             |known, available| match &node.content {
                 Content::Text(run) => measure_text((fonts, cache), scale, run, known, available),
                 Content::Element(_) => node.natural.map_or(taffy::Size::ZERO, |natural| {
-                    super::replaced::measure(&node.style, inputs.parent_size, known, natural)
+                    if node.style.item_is_replaced {
+                        super::replaced::measure(&node.style, inputs.parent_size, known, natural)
+                    } else {
+                        control_size(&node.style, known, natural)
+                    }
                 }),
             },
         )
+    }
+}
+
+/// The content size of a control with a natural size that is not a
+/// replaced box (a checkbox): each axis what layout already knows
+/// (a border-box size, less its padding and border), else the natural
+/// size; no aspect ratio, so a stretched checkbox keeps its width.
+fn control_size(
+    style: &taffy::Style,
+    known: taffy::Size<Option<f32>>,
+    natural: [f32; 2],
+) -> taffy::Size<f32> {
+    let inset = super::replaced::inset(style);
+    let content = |outer: Option<f32>, axis: usize| {
+        outer.map_or(natural[axis], |outer| (outer - inset[axis]).max(0.0))
+    };
+    taffy::Size {
+        width: content(known.width, 0),
+        height: content(known.height, 1),
     }
 }
 

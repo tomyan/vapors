@@ -15,7 +15,6 @@ use vapors_css::tree::States;
 use super::capture::{
     TOUCHES, ask_unless_asked, dispatch_pointer, process_pending, release_capture,
 };
-use super::tree::dispatch;
 use super::{Asked, Point};
 use crate::document::Document;
 
@@ -93,7 +92,7 @@ impl Document {
             let event = document
                 .borrow()
                 .pointer_event("click", touch_id(0), target, point);
-            dispatch(document, target, event);
+            crate::checkbox::click(document, target, event);
         }
     }
 

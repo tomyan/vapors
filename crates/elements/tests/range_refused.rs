@@ -18,7 +18,6 @@ fn document() -> vapors_elements::Document {
 #[test]
 fn an_input_of_a_type_not_built_yet_is_refused_naming_its_slice() {
     for (kind, slice) in [
-        (Some("checkbox"), "3-E3b"),
         (Some("number"), "3-E3c"),
         (Some("text"), "3-E6"),
         (None, "3-E6"),
@@ -116,6 +115,23 @@ fn a_non_finite_value_property_is_refused_naming_the_signal() {
             "{bad}: {errors:?}"
         );
     }
+}
+
+#[test]
+fn a_checked_property_that_is_not_a_boolean_is_refused() {
+    // Given
+    let mut doc = document();
+    let body = doc.body();
+    let input = element(&mut doc, body, "input", "");
+    doc.set_attribute(input, "type", "checkbox");
+    doc.set_property(input, "checked", PropertyValue::Text("yes".into()));
+
+    // When
+    let errors = refusals(&mut doc);
+
+    // Then
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(errors[0].contains("`checked` property"), "{errors:?}");
 }
 
 #[test]

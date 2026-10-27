@@ -66,7 +66,7 @@ impl Document {
                 let next = document.borrow().next_in_tab_order(modifiers.shift);
                 Self::focus(document, next);
             }
-            "Enter" => Self::activate(document, target),
+            "Enter" => Self::activate(document, target, &["button"]),
             " " => document.borrow_mut().space_on = Some(target),
             "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown" | "PageUp" | "PageDown"
             | "Home" | "End" => {
@@ -91,7 +91,7 @@ impl Document {
             return;
         }
         if key == " " && space_on == Some(target) {
-            Self::activate(document, target);
+            Self::activate(document, target, &["button", "checkbox"]);
         }
     }
 
@@ -100,12 +100,20 @@ impl Document {
         self.active_element().unwrap_or_else(|| self.body())
     }
 
-    /// A focused button's click, unless it is disabled.
-    fn activate(document: &Rc<RefCell<Document>>, target: NodeId) {
-        let button = document.borrow().tag(target) == Some("button")
-            && !document.borrow().in_disabled_button(target);
-        if button {
-            dispatch_bubbling(document, target, Event::new("click"));
+    /// A focused control's click, when it is one of `kinds` (`button`,
+    /// or `checkbox` for Space, which Enter does not click, as in
+    /// Chromium) and not disabled; a checkbox then toggles.
+    fn activate(document: &Rc<RefCell<Document>>, target: NodeId, kinds: &[&str]) {
+        let doc = document.borrow();
+        let kind = match doc.tag(target) {
+            Some("button") => "button",
+            Some("input") if doc.checked(target).is_some() => "checkbox",
+            _ => return,
+        };
+        if !kinds.contains(&kind) || doc.in_disabled_button(target) {
+            return;
         }
+        drop(doc);
+        crate::checkbox::click(document, target, Event::new("click"));
     }
 }

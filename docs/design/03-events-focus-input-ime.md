@@ -241,6 +241,26 @@ Not built: `data-scrub` (E3c), `:invalid`, a vertical range, `list`
 tick marks, and `pointercancel` for window loss ends a drag without
 `change`.
 
+As built (3-E3b, 2026-10-27): `input type=checkbox`. Checked by its
+`checked` property once set (`bind:checked`, a `Signal<bool>`), else
+its `checked` attribute; `Document::checked`. A click toggles it after
+the click's listeners ran, unless one prevented it, then `input` and
+`change` fire carrying `checked`, in Chromium's order (pointerdown,
+focusin, pointerup, click, input, change); Space clicks it on keyup,
+Enter does nothing; a disabled one gets its pointerdown and pointerup
+and no click, focus or change. `:checked` follows the state, by click
+or by property (`set_property` marks the restyle). The box is the
+element's own (the UA sheet: a 1 px grey border, a 2 px radius, white,
+Chromium's `3px 3px 3px 4px` margins), styled as any element; the mark
+when checked is a rounded square in `--vapors-mark-color` inset a
+quarter of the content box (no path primitive yet: F3 brings paths,
+and a check glyph can replace it then). Without a size it is Chromium's
+13 x 13 px, and as a flex item it stretches across the line as
+Chromium's does (`fixtures/checkbox.boxes.json`), so it is a measured
+leaf, not a replaced box. Checked step by step against Chromium by
+`fixtures/checkbox.events` with `expect checked`. Not built: `radio`,
+`indeterminate`, `label` association (`label` is not an element yet).
+
 ## Text editing and IME
 
 One editing model for single- and multi-line fields, built on Parley's

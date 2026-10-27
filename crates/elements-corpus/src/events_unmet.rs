@@ -32,6 +32,15 @@ pub fn unmet(expect: &Expect, answer: &Value) -> Option<String> {
                 .unwrap_or("(not recorded)");
             (found != value).then(|| format!("{target} has value {found:?}, not {value:?}"))
         }
+        Expect::Checked { target, checked } => {
+            let found = answer["checked"][target].as_bool();
+            (found != Some(*checked)).then(|| {
+                format!(
+                    "{target} is checked {}, not {checked}",
+                    found.map_or("(not recorded)".to_owned(), |c| c.to_string())
+                )
+            })
+        }
     }
 }
 

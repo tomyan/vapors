@@ -2,7 +2,8 @@
 //! of it (`<name>.events.json`), step by step: the recording must be of
 //! this script (each step's line and action), of a shape this reads,
 //! log the same events at the same targets in the same order, and
-//! agree on focus and on each named control's value.
+//! agree on focus, on each named control's value and on each named
+//! checkbox's state.
 
 use serde_json::Value;
 
@@ -63,6 +64,24 @@ pub fn compare(name: &str, script: &Script, ours: &Log, answers: &Value) -> Resu
             if chromium != value {
                 differences.push(format!(
                     "{name}.events:{line}: {target} has value {chromium:?} in Chromium, {value:?} in vapors"
+                ));
+            }
+        }
+        for target in &script.checked_targets() {
+            let chromium = theirs["checked"][target].as_bool().ok_or_else(|| {
+                format!("{name}.events.json: the step at line {line} has no boolean checked for {target}; rerun the events oracle")
+            })?;
+            let checked = ours
+                .checked
+                .iter()
+                .find(|(t, _)| t == target)
+                .map(|(_, c)| *c)
+                .ok_or_else(|| {
+                    format!("{name}.events:{line}: vapors' log has no checked state for {target}")
+                })?;
+            if chromium != checked {
+                differences.push(format!(
+                    "{name}.events:{line}: {target} is checked {chromium} in Chromium, {checked} in vapors"
                 ));
             }
         }

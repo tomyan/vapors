@@ -2,8 +2,9 @@
 //! compared step by step with what Chromium logged for the same script
 //! (`fixtures/capture.events.json`, written by the events oracle): the
 //! order and targets of pointer capture's events (3-E1); the focus
-//! fixture's keys, Tab order and focus (3-E2a); and the range fixture's
-//! presses, drags, keys and values (3-E3a).
+//! fixture's keys, Tab order and focus (3-E2a); the range fixture's
+//! presses, drags, keys and values (3-E3a); and the checkbox fixture's
+//! clicks, Space and states (3-E3b).
 
 use vapors_elements::Viewport;
 use vapors_elements_corpus::events_compare::compare;
@@ -102,6 +103,19 @@ fn the_range_script_logs_on_vapors_what_chromium_logged() {
 
     // Then: the events, the focus and each range's value after each step
     compare("range", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn the_checkbox_script_logs_on_vapors_what_chromium_logged() {
+    // Given: checkboxes clicked, toggled by Space, one disabled (3-E3b)
+    let script = parse("checkbox", &read("checkbox.events")).expect("parses");
+    let answers = serde_json::from_str(&read("checkbox.events.json")).expect("json");
+
+    // When
+    let ours = play(&fixture("checkbox"), &script, VIEWPORT).unwrap_or_else(|e| panic!("{e}"));
+
+    // Then: the events, the focus and each checkbox's state after each step
+    compare("checkbox", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
 }
 
 #[test]
