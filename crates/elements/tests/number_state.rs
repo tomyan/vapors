@@ -1,7 +1,8 @@
 //! A number field's state (3-E3c): `:invalid` while its text is no
 //! number or out of range, following a later `max`; its editing state
 //! going with it when removed; a scrub counting from the last committed
-//! number when the text is none; a fractional step written in decimal.
+//! number when the text is none; fractional steps, by key and by
+//! scrub, written in decimal.
 
 mod support;
 
@@ -76,7 +77,7 @@ fn a_scrub_that_starts_on_text_that_is_no_number_counts_from_the_last_committed(
 }
 
 #[test]
-fn a_fractional_step_writes_decimal_text_not_f64_noise() {
+fn three_fractional_steps_by_key_write_decimal_text_not_f64_noise() {
     // Given: 0..1 by 0.1 at 0.2
     let page = page_with(&[
         ("min", "0"),
@@ -86,14 +87,54 @@ fn a_fractional_step_writes_decimal_text_not_f64_noise() {
     ]);
     click(&page, [50.0, 12.0]);
 
-    // When
-    key(&page, "ArrowUp");
+    // When: three ArrowUps, each reading the text the last wrote
+    for _ in 0..3 {
+        key(&page, "ArrowUp");
+    }
 
-    // Then
-    assert_eq!(value(&page, page.amount), "0.3");
+    // Then: 0.3, 0.4, 0.5, never 0.30000000000000004
+    assert_eq!(value(&page, page.amount), "0.5");
     assert_eq!(
         *page.log.borrow(),
-        ["amount input \"0.3\" 0.3", "amount change \"0.3\" 0.3"]
+        [
+            "amount input \"0.3\" 0.3",
+            "amount change \"0.3\" 0.3",
+            "amount input \"0.4\" 0.4",
+            "amount change \"0.4\" 0.4",
+            "amount input \"0.5\" 0.5",
+            "amount change \"0.5\" 0.5"
+        ]
+    );
+}
+
+#[test]
+fn three_fractional_steps_by_scrub_write_decimal_text_not_f64_noise() {
+    // Given: `amount` with data-scrub="4", 0..1 by 0.1 at 0.2
+    let page = page_with(&[
+        ("min", "0"),
+        ("max", "1"),
+        ("step", "0.1"),
+        ("value", "0.2"),
+        ("data-scrub", "4"),
+    ]);
+
+    // When: dragged 12 px right in three moves, three steps
+    Document::pointer_pressed(&page.doc, [50.0, 12.0]);
+    for x in [54.0, 58.0, 62.0] {
+        Document::pointer_moved(&page.doc, [x, 12.0]);
+    }
+    Document::pointer_released(&page.doc, [62.0, 12.0]);
+
+    // Then
+    assert_eq!(value(&page, page.amount), "0.5");
+    assert_eq!(
+        *page.log.borrow(),
+        [
+            "amount input \"0.3\" 0.3",
+            "amount input \"0.4\" 0.4",
+            "amount input \"0.5\" 0.5",
+            "amount change \"0.5\" 0.5"
+        ]
     );
 }
 
