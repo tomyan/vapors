@@ -121,7 +121,7 @@ impl Document {
             let event = document
                 .borrow()
                 .pointer_event("click", MOUSE, click, point);
-            crate::checkbox::click(document, click, event);
+            crate::events::tree::dispatch_click(document, click, event);
         }
     }
 

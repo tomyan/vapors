@@ -184,10 +184,11 @@ impl Event {
         self.value.as_deref().unwrap_or_default()
     }
 
-    /// The control's checked state, or `false` when the event carries none.
+    /// The control's checked state, on a checkbox's `input` or `change`;
+    /// `None` on an event that carries none.
     #[must_use]
-    pub fn checked(&self) -> bool {
-        self.checked.unwrap_or(false)
+    pub fn checked(&self) -> Option<bool> {
+        self.checked
     }
 
     /// Keeps the event from listeners further up the tree.

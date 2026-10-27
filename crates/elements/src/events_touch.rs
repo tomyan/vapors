@@ -92,7 +92,7 @@ impl Document {
             let event = document
                 .borrow()
                 .pointer_event("click", touch_id(0), target, point);
-            crate::checkbox::click(document, target, event);
+            crate::events::tree::dispatch_click(document, target, event);
         }
     }
 

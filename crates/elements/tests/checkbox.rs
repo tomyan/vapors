@@ -1,5 +1,6 @@
-//! A checkbox (3-E3b): a click toggles it after the click's listeners,
-//! firing `input` and `change` with `checked`; Space toggles on keyup
+//! A checkbox (3-E3b): a click flips it before the click's listeners
+//! and fires `input` and `change` with `checked` after them; a
+//! prevented click flips it back; Space toggles on keyup
 //! and Enter does not; a prevented click leaves it; a disabled one
 //! takes nothing; `:checked` follows, by click or by property. The
 //! order against Chromium is pinned by the corpus's `checkbox.events`.
@@ -40,7 +41,7 @@ fn a_click_toggles_and_fires_input_then_change_with_the_new_state() {
 }
 
 #[test]
-fn the_toggle_happens_after_the_clicks_listeners_and_a_prevented_click_leaves_it() {
+fn the_flip_happens_before_the_clicks_listeners_and_a_prevented_click_flips_it_back() {
     // Given: a click listener that sees the state and prevents the second click
     let page = page();
     let seen = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
@@ -62,10 +63,16 @@ fn the_toggle_happens_after_the_clicks_listeners_and_a_prevented_click_leaves_it
     click(&page, [5.0, 5.0]);
     click(&page, [5.0, 5.0]);
 
-    // Then: the listener saw the old state each time; the second stayed
-    assert_eq!(*seen.borrow(), [Some(false), Some(true)]);
+    // Then: the listener saw the new state each time, as on the web
+    // (HTML's legacy pre-activation); the prevented second flipped back
+    assert_eq!(*seen.borrow(), [Some(true), Some(false)]);
     assert!(checked(&page, page.visible));
     assert_eq!(page.log.borrow().len(), 2, "{:?}", page.log.borrow());
+    assert_eq!(
+        page.doc.borrow().checked(page.visible),
+        Some(true),
+        "flipped back after the prevented click"
+    );
 }
 
 #[test]
@@ -147,4 +154,5 @@ fn checked_is_none_for_an_element_that_is_not_a_checkbox() {
 
     // Then
     assert_eq!(page.doc.borrow().checked(body), None);
+    assert_eq!(Event::new("click").checked(), None);
 }

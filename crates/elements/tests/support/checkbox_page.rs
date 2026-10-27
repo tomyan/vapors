@@ -44,8 +44,9 @@ pub fn page() -> Page {
                 node,
                 name,
                 Box::new(move |e: &mut Event| {
+                    let state = e.checked().expect("a checkbox's event carries its state");
                     into.borrow_mut()
-                        .push(format!("{label} {} {}", e.name(), e.checked()));
+                        .push(format!("{label} {} {state}", e.name()));
                 }),
             );
         }

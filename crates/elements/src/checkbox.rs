@@ -1,9 +1,11 @@
 //! A checkbox (3-E3b): `input type=checkbox`, checked by its `checked`
 //! property once set (by a listener's signal or by the user), else by
-//! its `checked` attribute. A click toggles it after the click's
-//! listeners ran, unless one prevented it, then `input` and `change`
-//! fire carrying `checked`, as Chromium orders them; Space clicks it on
-//! keyup, as a button. `:checked` follows the state.
+//! its `checked` attribute. A click flips it before the click's
+//! listeners run, as HTML's legacy pre-activation behaviour has it (so
+//! a listener reads the new state), flips it back if one prevents the
+//! click, and otherwise fires `input` and `change` carrying `checked`,
+//! as Chromium orders them; Space clicks it on keyup, as a button.
+//! `:checked` follows the state.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -12,7 +14,7 @@ use vapors_css::tree::States;
 use vapors_dom::{Event, NodeId, PropertyValue};
 
 use crate::document::Document;
-use crate::events::tree::{deliver, dispatch_bubbling};
+use crate::events::tree::dispatch_bubbling;
 use crate::node::Element;
 
 /// The content size a checkbox is laid out at without one of its own,
@@ -70,18 +72,35 @@ impl Document {
     }
 }
 
-/// `click` on `target`, bubbling, then its default action: a live
-/// checkbox toggles and fires `input` then `change`, unless a listener
-/// prevented the click.
-pub(crate) fn click(document: &Rc<RefCell<Document>>, target: NodeId, event: Event) {
-    let (event, _) = deliver(document, target, event, true);
-    // a listener may have removed the target (a toast's dismiss button)
-    let live = document.borrow().contains(target) && document.borrow().live_checkbox(target);
-    if event.default_prevented() || !live {
+/// A click's pre-activation on `target`: a live checkbox flips, and
+/// the state it had is returned for `after_click`; `None` for another
+/// element.
+pub(crate) fn before_click(document: &Rc<RefCell<Document>>, target: NodeId) -> Option<bool> {
+    let mut doc = document.borrow_mut();
+    if !doc.live_checkbox(target) {
+        return None;
+    }
+    let was = doc.checked(target)?;
+    doc.set_checked(target, !was);
+    Some(was)
+}
+
+/// A click's activation on `target`, which `before_click` flipped from
+/// `was`: flipped back when a listener prevented the click, else
+/// `input` then `change` with the new state.
+pub(crate) fn after_click(
+    document: &Rc<RefCell<Document>>,
+    target: NodeId,
+    was: bool,
+    prevented: bool,
+) {
+    if !document.borrow().contains(target) {
         return;
     }
-    let was = document.borrow().checked(target).unwrap_or(false);
-    document.borrow_mut().set_checked(target, !was);
+    if prevented {
+        document.borrow_mut().set_checked(target, was);
+        return;
+    }
     for name in ["input", "change"] {
         dispatch_bubbling(document, target, Event::new(name).with_checked(!was));
     }

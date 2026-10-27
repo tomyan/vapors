@@ -90,7 +90,11 @@ fn bind_checked_on_checkbox() {
         &code,
         "listen(input0, \"change\", Box::new(move |event: &mut Event|",
     );
-    assert_has(&code, "on.set(event.checked());");
+    assert_has(
+        &code,
+        "on.set(event.checked().expect(\"the input's change carries its state\"));",
+    );
+    assert_has(&code, "#[allow(clippy::missing_panics_doc");
     assert_has(
         &code,
         "set_property(input0, \"checked\", PropertyValue::Bool(on.get()))",

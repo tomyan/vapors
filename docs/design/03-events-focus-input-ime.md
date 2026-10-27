@@ -243,10 +243,13 @@ tick marks, and `pointercancel` for window loss ends a drag without
 
 As built (3-E3b, 2026-10-27): `input type=checkbox`. Checked by its
 `checked` property once set (`bind:checked`, a `Signal<bool>`), else
-its `checked` attribute; `Document::checked`. A click toggles it after
-the click's listeners ran, unless one prevented it, then `input` and
-`change` fire carrying `checked`, in Chromium's order (pointerdown,
-focusin, pointerup, click, input, change); Space clicks it on keyup,
+its `checked` attribute; `Document::checked`. A click flips it before
+the click's listeners run, as HTML's legacy pre-activation behaviour
+has it (a listener reads the new state, as on the web), flips it back
+when a listener prevents the click, and otherwise fires `input` and
+`change` carrying `checked` (`Event::checked()`, `Some` on those
+events only), in Chromium's order (pointerdown, focusin, pointerup,
+click, input, change); Space clicks it on keyup,
 Enter does nothing; a disabled one gets its pointerdown and pointerup
 and no click, focus or change. `:checked` follows the state, by click
 or by property (`set_property` marks the restyle). The box is the
@@ -255,9 +258,11 @@ Chromium's `3px 3px 3px 4px` margins), styled as any element; the mark
 when checked is a rounded square in `--vapors-mark-color` inset a
 quarter of the content box (no path primitive yet: F3 brings paths,
 and a check glyph can replace it then). Without a size it is Chromium's
-13 x 13 px, and as a flex item it stretches across the line as
-Chromium's does (`fixtures/checkbox.boxes.json`), so it is a measured
-leaf, not a replaced box. Checked step by step against Chromium by
+13 x 13 px (its content 11 px plus the UA sheet's 1 px border, so an
+app that sets `border: 0` gets 11 px where Chromium stays 13), and as
+a flex item it stretches across the line as Chromium's does
+(`fixtures/checkbox.boxes.json`), so it is a measured leaf, not a
+replaced box. Checked step by step against Chromium by
 `fixtures/checkbox.events` with `expect checked`. Not built: `radio`,
 `indeterminate`, `label` association (`label` is not an element yet).
 

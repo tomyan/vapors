@@ -21,7 +21,7 @@ impl Emitter<'_> {
                 ("input", "number", "PropertyValue::Number")
             }
             "value" => ("input", "event.value().to_string()", "PropertyValue::Text"),
-            "checked" => ("change", "event.checked()", "PropertyValue::Bool"),
+            "checked" => ("change", "checked", "PropertyValue::Bool"),
             _ => return Err(self.source.error(attribute.offset, format!(
                 "`bind:{property}` is not a binding: elements bind `bind:value` (input, textarea, select) or `bind:checked` (checkbox, radio)"
             ))),
@@ -45,16 +45,19 @@ impl Emitter<'_> {
                 "dom.borrow_mut().set_property({var}, {property:?}, {wrap}({signal}.get()));"
             )],
         );
-        // a numeric binding takes the event's number, which the range's
-        // and number field's own events always carry; another event
-        // without one is a bug in the tree, and panics naming it
-        let set = if read == "number" {
-            format!(
+        // a numeric or checked binding takes what the control's own event
+        // always carries; an event without it is a bug in the tree, and
+        // panics naming it
+        let set = match read {
+            "number" => format!(
                 "{signal}.set(event.value_as_number().expect(\"the {}'s {event} carries its number\"));",
                 element.tag
-            )
-        } else {
-            format!("{signal}.set({read});")
+            ),
+            "checked" => format!(
+                "{signal}.set(event.checked().expect(\"the {}'s {event} carries its state\"));",
+                element.tag
+            ),
+            _ => format!("{signal}.set({read});"),
         };
         self.line(format!(
             "dom.borrow_mut().listen({var}, {event:?}, Box::new(move |event: &mut Event| {{ {set} }}));"

@@ -114,6 +114,6 @@ impl Document {
             return;
         }
         drop(doc);
-        crate::checkbox::click(document, target, Event::new("click"));
+        crate::events::tree::dispatch_click(document, target, Event::new("click"));
     }
 }
