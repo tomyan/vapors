@@ -41,7 +41,7 @@ vapors-compiler-examples = { path = "crates/compiler-examples" }
 # Pinned exactly: layout results are pinned by the Chromium geometry
 # corpus (docs/F2c.md), and a Taffy bump is a deliberate change checked
 # against it. Only the algorithms vapors uses: no TaffyTree, no floats.
-taffy = { version = "=0.15.0", default-features = false, features = ["std", "flexbox", "grid", "block_layout", "calc", "content_size"] }
+taffy = { version = "=0.15.1", default-features = false, features = ["std", "flexbox", "grid", "block_layout", "calc", "content_size"] }
 # Pinned exactly: the compiler's output is formatted by prettyplease and
 # must parse with the same syn; a drift changes generated code and snapshots.
 syn = { version = "=3.0.9", features = ["full", "visit", "visit-mut", "printing", "extra-traits", "parsing"] }
