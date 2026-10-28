@@ -54,7 +54,7 @@ jobs:
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
+      - uses: cargo-bins/cargo-binstall@81df5c23b0dc775b009efdfc9895c5965b7a4e40 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
         # binstall reads GitHub's API; unauthenticated, it was refused
         # with 403 (run 40029521532). The token is read-only.
@@ -100,7 +100,7 @@ jobs:
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
+      - uses: cargo-bins/cargo-binstall@81df5c23b0dc775b009efdfc9895c5965b7a4e40 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
         # binstall reads GitHub's API; unauthenticated, it was refused
         # with 403 (run 40029521532). The token is read-only.
@@ -162,7 +162,7 @@ jobs:
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
+      - uses: cargo-bins/cargo-binstall@81df5c23b0dc775b009efdfc9895c5965b7a4e40 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
         # binstall reads GitHub's API; unauthenticated, it was refused
         # with 403 (run 40029521532). The token is read-only.
@@ -236,7 +236,7 @@ jobs:
       - name: install pinned toolchain
         run: rustup toolchain install && rustup show active-toolchain
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      - uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0, main on 2026-10-23
+      - uses: cargo-bins/cargo-binstall@81df5c23b0dc775b009efdfc9895c5965b7a4e40 # v1.26.0, main on 2026-10-23
       - name: install pinned tools
         # binstall reads GitHub's API; unauthenticated, it was refused
         # with 403 (run 40029521532). The token is read-only.
