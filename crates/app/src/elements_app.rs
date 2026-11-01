@@ -43,9 +43,6 @@ pub struct ElementsApp {
     /// The clipboard a paste into a text field reads (E6b).
     #[cfg(not(target_family = "wasm"))]
     clipboard: Box<dyn vapors_platform::Clipboard>,
-    /// The clipboard reads pastes started, answered off the loop.
-    #[cfg(not(target_family = "wasm"))]
-    pastes: paste::Pastes,
     /// Called before each update with the last frame's phase times.
     per_frame: Option<PerFrame>,
     /// Called after each frame with its phase times.
@@ -77,8 +74,6 @@ impl ElementsApp {
             input: DocumentInput::new(),
             #[cfg(not(target_family = "wasm"))]
             clipboard: Box::new(vapors_platform::SystemClipboard::default()),
-            #[cfg(not(target_family = "wasm"))]
-            pastes: paste::Pastes::default(),
             per_frame: None,
             frame_times: None,
             last_times: None,

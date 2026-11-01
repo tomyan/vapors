@@ -30,6 +30,9 @@ pub struct DocumentInput {
     cursor: Option<Cursor>,
     /// Which side each press and touch went to, until it ends.
     held: route::Held,
+    /// The clipboard reads pastes started, answered off the loop.
+    #[cfg(not(target_family = "wasm"))]
+    pastes: paste::Pastes,
 }
 
 /// What an event did to the document.
@@ -87,6 +90,8 @@ impl DocumentInput {
             wheel: crate::wheel_scroll::WheelScroll::default(),
             cursor: Some(Cursor::Default),
             held: route::Held::default(),
+            #[cfg(not(target_family = "wasm"))]
+            pastes: paste::Pastes::default(),
         }
     }
 
@@ -187,6 +192,9 @@ mod act;
 #[path = "document_input_keys.rs"]
 mod keys;
 use keys::key;
+#[cfg(not(target_family = "wasm"))]
+#[path = "document_input_paste.rs"]
+mod paste;
 #[path = "document_input_route.rs"]
 mod route;
 pub use route::Route;

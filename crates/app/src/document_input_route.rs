@@ -17,7 +17,9 @@
 //!   it began; a key the document then does not use
 //!   ([`InputOutcome::unused_key`](super::InputOutcome::unused_key)) is
 //!   the host's, so its shortcuts work while a slider has focus and the
-//!   slider's arrows still move it.
+//!   slider's arrows still move it;
+//! - a paste goes to the document while one of its text fields has focus
+//!   ([`DocumentInput::paste`]), else to the host.
 //!
 //! A hit is [`Document::hit`]: an element with `pointer-events: auto`.
 //! `pointer-events` is inherited, so a document whose `html` and `body`
@@ -159,9 +161,11 @@ impl Held {
 }
 
 /// A key or typed text: the document's while one of its elements has
-/// focus. Any other placeless event is the host's.
+/// focus; a paste, while one of its text fields has. Any other
+/// placeless event is the host's.
 fn by_focus(document: &Document, event: &Event) -> Route {
     match event {
+        Event::Paste if document.text_field_focused() => Route::Document,
         Event::Key { .. } | Event::Character(_) if document.active_element().is_some() => {
             Route::Document
         }
