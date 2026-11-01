@@ -111,9 +111,10 @@ fn named_keys_in_a_focused_text_field_are_the_apps() {
     }
 }
 
-/// A focused text field takes typing, its moves, its undo (Control+Z,
-/// vapors #92) and its paste (Control+V); a Control key it has no
-/// binding for is the app's.
+/// A focused text field takes typing, its moves and its undo
+/// (Control+Z, vapors #92); a Control key it has no binding for is the
+/// app's. Its paste shortcut is decided where the paste is made
+/// (`vapors_platform::paste_shortcut`), in vapors-app's `DocumentInput`.
 #[test]
 fn a_focused_text_field_uses_a_typing_key_and_not_an_unbound_control_key() {
     // Given

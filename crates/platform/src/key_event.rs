@@ -47,7 +47,8 @@ fn dom_name(logical: &Key) -> String {
 /// DOM spells them (`KeyH`, `Digit1`, `ShiftLeft`), except Super, which
 /// the DOM calls Meta. A key with no known place is `Unidentified`
 /// followed by the platform's own code, so two such keys held at once
-/// stay apart.
+/// stay apart natively. On the web winit gives every such key the same
+/// `NativeKeyCode::Unidentified`, so two held at once share one route.
 fn dom_code(physical: PhysicalKey) -> String {
     match physical {
         PhysicalKey::Code(KeyCode::SuperLeft) => "MetaLeft".to_owned(),

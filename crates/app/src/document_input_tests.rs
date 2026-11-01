@@ -3,10 +3,14 @@ use std::rc::Rc;
 
 use vapors_dom::{Dom, Event as DomEvent};
 use vapors_elements::{Document, Viewport};
-use vapors_platform::{Cursor as Shown, Event};
+use vapors_platform::{Cursor as Shown, Event, Platform};
 use vapors_text::FontSystem;
 
 use super::{DocumentInput, Unplaced};
+
+fn platform() -> Platform {
+    Platform::detached()
+}
 
 /// A 100x20 CSS-pixel button at the top left with a pointer cursor,
 /// updated at `scale`, and a count of its clicks.
@@ -49,7 +53,9 @@ fn an_event_lands_at_the_scale_of_the_documents_last_update() {
 
     // When
     let at = input.at(&document.borrow(), &moved(40.0, 20.0));
-    input.handle(&document, &moved(40.0, 20.0)).expect("placed");
+    input
+        .give(&document, &moved(40.0, 20.0), &platform())
+        .expect("placed");
 
     // Then: a button lands where the pointer last moved
     assert_eq!(at, Ok(Some([20.0, 10.0])));
@@ -66,25 +72,29 @@ fn a_press_and_release_on_the_button_clicks_it() {
     // Given
     let (document, clicks) = button_at(2.0);
     let mut input = DocumentInput::new();
-    input.handle(&document, &moved(40.0, 20.0)).expect("placed");
+    input
+        .give(&document, &moved(40.0, 20.0), &platform())
+        .expect("placed");
 
     // When
     input
-        .handle(
+        .give(
             &document,
             &Event::PrimaryButton {
                 pressed: true,
                 clicks: std::num::NonZeroU32::MIN,
             },
+            &platform(),
         )
         .expect("placed");
     input
-        .handle(
+        .give(
             &document,
             &Event::PrimaryButton {
                 pressed: false,
                 clicks: std::num::NonZeroU32::MIN,
             },
+            &platform(),
         )
         .expect("placed");
 
@@ -99,10 +109,14 @@ fn the_cursor_is_reported_once_on_a_change_and_not_on_each_move() {
     let mut input = DocumentInput::new();
 
     // When
-    let onto = input.handle(&document, &moved(40.0, 20.0)).expect("placed");
-    let along = input.handle(&document, &moved(60.0, 20.0)).expect("placed");
+    let onto = input
+        .give(&document, &moved(40.0, 20.0), &platform())
+        .expect("placed");
+    let along = input
+        .give(&document, &moved(60.0, 20.0), &platform())
+        .expect("placed");
     let off = input
-        .handle(&document, &moved(300.0, 150.0))
+        .give(&document, &moved(300.0, 150.0), &platform())
         .expect("placed");
 
     // Then
@@ -117,13 +131,13 @@ fn after_the_host_shows_its_own_cursor_the_documents_is_reported_again() {
     let (document, _) = button_at(2.0);
     let mut input = DocumentInput::new();
     input
-        .handle(&document, &moved(300.0, 150.0))
+        .give(&document, &moved(300.0, 150.0), &platform())
         .expect("placed");
     input.forget_cursor();
 
     // When: still over nothing of the document's
     let back = input
-        .handle(&document, &moved(310.0, 150.0))
+        .give(&document, &moved(310.0, 150.0), &platform())
         .expect("placed");
 
     // Then
@@ -139,11 +153,11 @@ fn input_before_the_first_update_or_at_a_zero_scale_is_refused() {
 
     // Then
     assert_eq!(
-        input.handle(&never, &moved(1.0, 1.0)),
+        input.give(&never, &moved(1.0, 1.0), &platform()),
         Err(Unplaced::NotUpdated)
     );
     assert_eq!(
-        input.handle(&zero, &moved(1.0, 1.0)),
+        input.give(&zero, &moved(1.0, 1.0), &platform()),
         Err(Unplaced::Scale(0.0))
     );
 }
@@ -175,8 +189,8 @@ fn a_key_reaches_a_document_never_updated_and_a_pointer_event_is_still_refused()
 
     // When
     let routed = input.route(&document, &key);
-    let given = input.handle(&document, &key);
-    let pointer = input.handle(&document, &moved(1.0, 1.0));
+    let given = input.give(&document, &key, &platform());
+    let pointer = input.give(&document, &moved(1.0, 1.0), &platform());
 
     // Then
     assert_eq!(routed, Ok(super::Route::Document));

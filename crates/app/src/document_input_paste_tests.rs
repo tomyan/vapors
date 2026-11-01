@@ -68,26 +68,26 @@ fn control_v_in_a_focused_card_field_pastes_there_and_leaves_the_host_nothing() 
     // Given
     let (doc, field) = card();
     Document::focus(&doc, Some(field));
-    let mut input = DocumentInput::new();
     let reads = Rc::new(RefCell::new(0));
-    let mut clipboard = Glow(Rc::clone(&reads));
+    let mut input = DocumentInput::new().with_clipboard(Box::new(Glow(Rc::clone(&reads))));
     let platform = Platform::detached();
 
-    // When: the host routes Control+V, then the platform's paste
-    let key_route = input.route(&doc, &control_v()).expect("placed");
-    let key = input.handle(&doc, &control_v()).expect("placed");
-    let paste_route = input.route(&doc, &Event::Paste).expect("placed");
-    let taken = input.paste(&doc, &mut clipboard, &platform);
+    // When: the host gives Control+V, then the platform's paste
+    let key = input.give(&doc, &control_v(), &platform).expect("placed");
+    let paste = input.give(&doc, &Event::Paste, &platform).expect("placed");
     input.deliver_pastes(&doc);
 
     // Then
-    assert_eq!((key_route, key.unused_key), (Route::Document, false));
     assert_eq!(
-        paste_route,
+        key.route,
+        Route::Document,
+        "the field's paste, not the host's"
+    );
+    assert_eq!(
+        paste.route,
         Route::Document,
         "the host's image paste would run"
     );
-    assert!(taken);
     assert_eq!(doc.borrow().value(field).as_deref(), Some("Glow"));
     assert_eq!(*reads.borrow(), 1);
 }
@@ -96,16 +96,15 @@ fn control_v_in_a_focused_card_field_pastes_there_and_leaves_the_host_nothing() 
 fn with_no_card_field_focused_the_paste_is_the_hosts_and_nothing_is_read() {
     // Given
     let (doc, _) = card();
-    let mut input = DocumentInput::new();
     let reads = Rc::new(RefCell::new(0));
-    let mut clipboard = Glow(Rc::clone(&reads));
+    let mut input = DocumentInput::new().with_clipboard(Box::new(Glow(Rc::clone(&reads))));
 
     // When
-    let route = input.route(&doc, &Event::Paste).expect("placed");
-    let taken = input.paste(&doc, &mut clipboard, &Platform::detached());
+    let paste = input
+        .give(&doc, &Event::Paste, &Platform::detached())
+        .expect("placed");
 
     // Then
-    assert_eq!(route, Route::Host);
-    assert!(!taken);
+    assert_eq!(paste.route, Route::Host);
     assert_eq!(*reads.borrow(), 0);
 }

@@ -6,11 +6,11 @@ use std::rc::Rc;
 
 use vapors_dom::{Dom, NodeId};
 use vapors_elements::{Document, Viewport};
-use vapors_platform::{Event, Modifiers};
+use vapors_platform::{Event, Modifiers, Platform};
 use vapors_text::FontSystem;
 
 use super::Route;
-use crate::{DocumentInput, InputOutcome};
+use crate::{DocumentInput, Given};
 
 pub(super) const VIEWPORT: Viewport = Viewport {
     width: 200.0,
@@ -48,17 +48,18 @@ pub(super) fn card() -> (Rc<RefCell<Document>>, NodeId, NodeId) {
     (Rc::new(RefCell::new(doc)), button, range)
 }
 
-/// Route `event` and give the document what is its; its outcome then.
+/// `event` given as a host gives it, then the document updated: who it
+/// was for in the end, and what it did.
 pub(super) fn give(
     input: &mut DocumentInput,
     doc: &Rc<RefCell<Document>>,
     event: &Event,
-) -> (Route, Option<InputOutcome>) {
-    let route = input.route(doc, event).expect("placed");
-    let outcome = matches!(route, Route::Document | Route::Both)
-        .then(|| input.handle(doc, event).expect("placed"));
+) -> (Route, Given) {
+    let given = input
+        .give(doc, event, &Platform::detached())
+        .expect("placed");
     doc.borrow_mut().update(VIEWPORT).expect("updates");
-    (route, outcome)
+    (given.route, given)
 }
 
 pub(super) fn click(input: &mut DocumentInput, doc: &Rc<RefCell<Document>>, x: f32, y: f32) {
@@ -127,23 +128,17 @@ fn with_the_slider_focused_its_arrow_moves_it_and_an_unbound_key_reaches_the_hos
     Document::focus(&doc, Some(range));
 
     // When
-    let (arrow_route, arrow) = give(&mut input, &doc, &key("ArrowRight", Modifiers::default()));
+    let (arrow_route, _) = give(&mut input, &doc, &key("ArrowRight", Modifiers::default()));
     let control = Modifiers {
         control: true,
         ..Modifiers::default()
     };
-    let (undo_route, undo) = give(&mut input, &doc, &key("z", control));
+    let (undo_route, _) = give(&mut input, &doc, &key("z", control));
 
     // Then
-    assert_eq!(arrow_route, Route::Document);
-    assert_eq!(arrow.map(|o| o.unused_key), Some(false));
+    assert_eq!(arrow_route, Route::Document, "the slider used it");
     assert_eq!(doc.borrow().value(range).as_deref(), Some("6"));
-    assert_eq!(undo_route, Route::Document);
-    assert_eq!(
-        undo.map(|o| o.unused_key),
-        Some(true),
-        "Control+Z is the host's"
-    );
+    assert_eq!(undo_route, Route::Both, "Control+Z is the host's too");
 }
 
 #[test]
@@ -164,9 +159,9 @@ fn typing_minus_one_into_a_focused_number_field_leaves_the_host_no_key() {
     // When: "-" then "1", each a key-down and its text
     let mut host_keys = Vec::new();
     for typed in ["-", "1"] {
-        let (route, outcome) = give(&mut input, &doc, &key(typed, Modifiers::default()));
+        let (route, _) = give(&mut input, &doc, &key(typed, Modifiers::default()));
         give(&mut input, &doc, &Event::Character(typed.into()));
-        if route == Route::Host || outcome.is_some_and(|o| o.unused_key) {
+        if matches!(route, Route::Host | Route::Both) {
             host_keys.push(typed);
         }
     }

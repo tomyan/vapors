@@ -112,9 +112,6 @@ pub(crate) fn key(
         "z" | "Z" | "y" | "Y" if modifiers.control => {
             crate::text_undo::history_key(document, node, key, shift);
         }
-        // the field's paste: its text arrives as the platform's paste,
-        // not as a character
-        "v" | "V" if modifiers.control || modifiers.meta => {}
         _ => {
             return moved(document, node, key, shift, word)
                 || crate::keys::types_text(key, modifiers);

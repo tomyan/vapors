@@ -1,4 +1,5 @@
-//! Which of a document and the app drawing under it an event is for,
+//! Which of a document and the app drawing under it an event is for
+//! ([`DocumentInput::give`] answers it in [`Given::route`](super::Given::route)),
 //! when the app shows the document over its own drawing (touché's card
 //! over the photo). The rules, held here so every host keeps them:
 //! - every move and the pointer leaving go to the document, so its
@@ -14,12 +15,12 @@
 //! - keys and typed text go to the document while one of its elements
 //!   has focus, and a key's up goes where its down went (as a press's
 //!   release does), so a key held across a focus change still ends where
-//!   it began; a key the document then does not use
-//!   ([`InputOutcome::unused_key`](super::InputOutcome::unused_key)) is
-//!   the host's, so its shortcuts work while a slider has focus and the
-//!   slider's arrows still move it;
+//!   it began; a key-down the document then does not use is
+//!   [`Route::Both`], as are its repeats and its up, so the host's
+//!   shortcuts work while a slider has focus and the slider's arrows
+//!   still move it;
 //! - a paste goes to the document while one of its text fields has focus
-//!   ([`DocumentInput::paste`]), else to the host.
+//!   (`document_input_paste.rs`), else to the host.
 //!
 //! A hit is [`Document::hit`]: an element with `pointer-events: auto`.
 //! `pointer-events` is inherited, so a document whose `html` and `body`
@@ -40,14 +41,14 @@ use crate::pointer::Action;
 /// Who an event is for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Route {
-    /// Give it to the document ([`DocumentInput::handle`]).
+    /// The document's alone: [`DocumentInput::give`] gave it.
     Document,
-    /// The app drawing under the document takes it.
+    /// The app drawing under the document takes it; the document did
+    /// not have it.
     Host,
-    /// Both: give it to the document and take it too. A key's repeats
-    /// and its up, after the document had its down and did not use it,
-    /// as a browser gives the focused element the key's up and also
-    /// bubbles it to the page.
+    /// Both: the document had it, and the host takes it too. A key-down
+    /// the document did not use, its repeats and its up, as a browser
+    /// gives the focused element a key and also bubbles it to the page.
     Both,
 }
 
@@ -64,13 +65,14 @@ pub(super) struct Held {
 }
 
 impl DocumentInput {
-    /// Who `event` is for, by the rules above. Call it for every event,
-    /// in order, before giving the document those routed to it.
+    /// Who `event` is for, by the rules above, before the document has
+    /// it: [`DocumentInput::give`] asks, then turns a key the document
+    /// did not use into [`Route::Both`].
     ///
     /// # Errors
     ///
     /// [`Unplaced`] when the document's last update gives no usable scale.
-    pub fn route(
+    pub(crate) fn route(
         &mut self,
         document: &Rc<RefCell<Document>>,
         event: &Event,
@@ -124,8 +126,8 @@ impl DocumentInput {
 
 impl Held {
     /// A key's route: a fresh key-down by focus, held by its code until
-    /// its key-up; an auto-repeat and the key-up where the key-down went. Typed text
-    /// and other placeless events by focus.
+    /// its key-up; an auto-repeat and the key-up where the key-down
+    /// went. Typed text and other placeless events by focus.
     fn key(&mut self, document: &Document, event: &Event) -> Route {
         let Event::Key {
             code,

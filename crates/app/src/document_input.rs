@@ -2,9 +2,12 @@
 //! CSS pixels at the scale of the document's last update, the pointer,
 //! touch gestures and their scrolling, the wheel, keys and typed text,
 //! then whether the document changed and the cursor to show.
-//! [`ElementsApp`](crate::ElementsApp) gives every event to one. An app
-//! that draws a document over its own drawing asks [`DocumentInput::route`]
-//! which of the two each event is for (`document_input_route.rs`).
+//! An app that draws a document over its own drawing gives every event to
+//! [`DocumentInput::give`], which routes it (`document_input_route.rs`),
+//! gives the document what is its, a paste included
+//! (`document_input_paste.rs`), and says who the event was for in the end.
+//! [`ElementsApp`](crate::ElementsApp), whose document is the whole window,
+//! gives it everything.
 //!
 //! Single-threaded, as `Document`'s own event calls are: it takes the
 //! document as `Rc<RefCell<Document>>` (touché
@@ -12,11 +15,10 @@
 //! That would retire if `vapors-elements` took events by `&mut Document`.
 
 use std::cell::RefCell;
-use std::fmt;
 use std::rc::Rc;
 
 use vapors_elements::{Cursor, Document, Point};
-use vapors_platform::{Cursor as Shown, Event};
+use vapors_platform::{Event, Platform};
 
 use crate::pointer::{Action, action};
 
@@ -30,49 +32,11 @@ pub struct DocumentInput {
     cursor: Option<Cursor>,
     /// Which side each press and touch went to, until it ends.
     held: route::Held,
-    /// The clipboard reads pastes started, answered off the loop.
+    /// The clipboard a paste into a text field reads, and the reads
+    /// started, answered off the loop.
     #[cfg(not(target_family = "wasm"))]
     pastes: paste::Pastes,
 }
-
-/// What an event did to the document.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct InputOutcome {
-    /// The document changed: draw a frame.
-    pub changed: bool,
-    /// The cursor to show, when it is not the one last reported.
-    pub cursor: Option<Shown>,
-    /// A key went down that the document did not use (no listener
-    /// prevented it, no control took it): the host's to act on.
-    pub unused_key: bool,
-}
-
-/// Why an event could not be placed in the document.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Unplaced {
-    /// The document has not been updated, so nothing is on screen and
-    /// no position can be converted.
-    NotUpdated,
-    /// The last update's scale is zero, negative or not a number.
-    Scale(f32),
-}
-
-impl fmt::Display for Unplaced {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::NotUpdated => write!(
-                f,
-                "the document has not been updated, so input has nowhere to land"
-            ),
-            Self::Scale(scale) => write!(
-                f,
-                "the document was updated at scale {scale}, which is not a positive number; pass the display's device pixels per CSS pixel in its Viewport"
-            ),
-        }
-    }
-}
-
-impl std::error::Error for Unplaced {}
 
 impl Default for DocumentInput {
     fn default() -> Self {
@@ -113,35 +77,69 @@ impl DocumentInput {
         self.cursor = None;
     }
 
-    /// Give `event` to `document`.
+    /// Route `event` (`document_input_route.rs`), give the document what
+    /// is its, and say who the event was for in the end: the host acts on
+    /// it exactly when [`Given::route`] is [`Route::Host`] or
+    /// [`Route::Both`]. A paste routed to the document is read from the
+    /// clipboard here (native only; see `document_input_paste.rs`).
     ///
     /// # Errors
     ///
     /// [`Unplaced`], and the event is not given, when it is a pointer
     /// event and the document's last update gives no usable scale. A key
     /// or typed text needs no scale and is always given.
-    pub fn handle(
+    pub fn give(
         &mut self,
         document: &Rc<RefCell<Document>>,
         event: &Event,
-    ) -> Result<InputOutcome, Unplaced> {
+        platform: &Platform,
+    ) -> Result<Given, Unplaced> {
+        #[cfg(not(target_family = "wasm"))]
+        self.deliver_pastes(document);
+        let route = self.route(document, event)?;
+        if route == Route::Host {
+            return Ok(Given {
+                route,
+                changed: false,
+                cursor: None,
+            });
+        }
+        let handled = self.handle(document, event, platform)?;
+        let left = route == Route::Document && handled.unused_key;
+        Ok(Given {
+            route: if left { Route::Both } else { route },
+            changed: handled.changed,
+            cursor: handled.cursor,
+        })
+    }
+
+    /// Hand `event` to `document`, whatever its route: `ElementsApp`'s
+    /// document is the whole window.
+    pub(crate) fn handle(
+        &mut self,
+        document: &Rc<RefCell<Document>>,
+        event: &Event,
+        platform: &Platform,
+    ) -> Result<Handled, Unplaced> {
         let action = self.action(&document.borrow(), event)?;
         if let Some(action) = action {
             self.act(document, action);
         }
-        let unused_key = key(document, event) == Some(false);
+        let unused_key = key(document, event) == Some(false)
+            && !keys::field_paste_key(&document.borrow(), event);
         if let (true, Event::Key { code, .. }) = (unused_key, event) {
             // the document had its down and left it to the host: its
             // repeats and its up go to both
             self.held.keys.insert(code.clone(), Route::Both);
         }
+        self.paste_if(document, event, platform);
         let changed = document.borrow_mut().take_changed();
         let cursor = document.borrow().cursor(self.pointer);
         let shown = (Some(cursor) != self.cursor).then(|| {
             self.cursor = Some(cursor);
             crate::cursor::shown(cursor)
         });
-        Ok(InputOutcome {
+        Ok(Handled {
             changed,
             cursor: shown,
             unused_key,
@@ -195,9 +193,20 @@ use keys::key;
 #[cfg(not(target_family = "wasm"))]
 #[path = "document_input_paste.rs"]
 mod paste;
+#[cfg(target_family = "wasm")]
+impl DocumentInput {
+    /// On the web the platform sends no `Event::Paste`: RELAXED, see
+    /// `document_input_paste.rs`.
+    #[allow(clippy::unused_self)] // the native paste's signature, so `handle` is one code path
+    fn paste_if(&mut self, _: &Rc<RefCell<Document>>, _: &Event, _: &Platform) {}
+}
 #[path = "document_input_route.rs"]
 mod route;
 pub use route::Route;
+#[path = "document_input_types.rs"]
+mod types;
+pub(crate) use types::Handled;
+pub use types::{Given, Unplaced};
 
 #[cfg(test)]
 #[path = "document_input_tests.rs"]

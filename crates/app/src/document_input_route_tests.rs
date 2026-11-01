@@ -65,11 +65,13 @@ fn card() -> Card {
     }
 }
 
-/// Route `event` as a host would, giving the document what is its.
+/// `event` given as a host gives it: who it was for in the end.
 fn give(input: &mut DocumentInput, card: &Card, event: &Event) -> Route {
-    let route = input.route(&card.doc, event).expect("placed");
+    let route = input
+        .give(&card.doc, event, &vapors_platform::Platform::detached())
+        .expect("placed")
+        .route;
     if matches!(route, Route::Document | Route::Both) {
-        input.handle(&card.doc, event).expect("placed");
         card.doc
             .borrow_mut()
             .update(Viewport {

@@ -121,3 +121,35 @@ fn the_control_character_ctrl_v_can_produce_pastes_by_the_physical_key() {
         false
     ));
 }
+
+#[test]
+fn the_shortcut_as_the_dom_names_it_is_the_platforms_by_the_v_place() {
+    // Given
+    use crate::event::Modifiers;
+    use crate::paste_key::paste_shortcut;
+    let control = Modifiers {
+        control: true,
+        ..Modifiers::default()
+    };
+    let command = Modifiers {
+        meta: true,
+        ..Modifiers::default()
+    };
+
+    // Then: Control off macOS, Command on it; a Cyrillic layout by its place
+    assert!(paste_shortcut("v", "KeyV", control, false, false));
+    assert!(paste_shortcut("м", "KeyV", control, false, false));
+    assert!(paste_shortcut("v", "KeyV", command, false, true));
+    assert!(
+        !paste_shortcut("v", "KeyV", command, false, false),
+        "Meta+V off macOS"
+    );
+    assert!(
+        !paste_shortcut("v", "KeyV", control, false, true),
+        "Control+V on macOS"
+    );
+    assert!(
+        !paste_shortcut("v", "KeyV", control, true, false),
+        "a repeat"
+    );
+}
