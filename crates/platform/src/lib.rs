@@ -8,6 +8,10 @@
 mod attributes;
 #[cfg(not(target_family = "wasm"))]
 mod clipboard;
+#[cfg(not(target_family = "wasm"))]
+mod clipboard_reader;
+#[cfg(not(target_family = "wasm"))]
+mod clipboard_text;
 mod clock;
 mod cursor;
 mod device_lost;
@@ -39,8 +43,8 @@ mod window;
 
 #[cfg(not(target_family = "wasm"))]
 pub use clipboard::{
-    Clipboard, ClipboardImage, DEADLINE as CLIPBOARD_DEADLINE, MAX_BYTES as CLIPBOARD_MAX_BYTES,
-    SystemClipboard,
+    Clipboard, ClipboardImage, ClipboardText, DEADLINE as CLIPBOARD_DEADLINE,
+    MAX_BYTES as CLIPBOARD_MAX_BYTES, SystemClipboard,
 };
 pub use clock::Instant;
 pub use cursor::Cursor;

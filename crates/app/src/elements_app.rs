@@ -46,6 +46,9 @@ pub struct ElementsApp {
     wheel: crate::wheel_scroll::WheelScroll,
     /// The presses in a row, for double clicks.
     clicks: crate::clicks::Clicks,
+    /// The clipboard a paste into a text field reads (E6b).
+    #[cfg(not(target_family = "wasm"))]
+    clipboard: Box<dyn vapors_platform::Clipboard>,
     /// The cursor last shown.
     cursor: Cursor,
     /// Called before each update with the last frame's phase times.
@@ -79,6 +82,8 @@ impl ElementsApp {
             touch: crate::touch_scroll::TouchScroll::default(),
             wheel: crate::wheel_scroll::WheelScroll::default(),
             clicks: crate::clicks::Clicks::default(),
+            #[cfg(not(target_family = "wasm"))]
+            clipboard: Box::new(vapors_platform::SystemClipboard::default()),
             cursor: Cursor::Default,
             per_frame: None,
             frame_times: None,
@@ -161,6 +166,10 @@ impl ElementsApp {
             self.act(action);
         }
         self.key(event);
+        #[cfg(not(target_family = "wasm"))]
+        if matches!(event, Event::Paste) {
+            self.paste();
+        }
         if self.document.borrow_mut().take_changed() {
             platform.request_redraw();
         }
@@ -200,3 +209,6 @@ fn refused(errors: &[ElementError]) -> String {
 mod act;
 #[path = "elements_app_frame.rs"]
 mod frame_phases;
+#[cfg(not(target_family = "wasm"))]
+#[path = "elements_app_paste.rs"]
+mod paste;

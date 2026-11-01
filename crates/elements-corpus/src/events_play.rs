@@ -117,7 +117,10 @@ impl Player<'_> {
     /// Perform one step and read its answer.
     fn act(&mut self, step: &Step) -> Result<Value, String> {
         for (method, params) in calls(&step.action, &mut self.pointer) {
-            self.session.call(method, &params, self.deadline)?;
+            let result = self.session.call(method, &params, self.deadline)?;
+            if let Some(exception) = result.get("exceptionDetails") {
+                return Err(format!("{method} threw: {exception}"));
+            }
             self.evaluate(TASK, FRAME_DEADLINE)?;
         }
         self.evaluate(FRAMES, FRAME_DEADLINE)?;

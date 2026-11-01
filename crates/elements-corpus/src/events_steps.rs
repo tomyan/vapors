@@ -38,6 +38,8 @@ pub enum Action {
     Key(String),
     /// Text, one key per character.
     Type(String),
+    /// Put text on the clipboard, for a following Control+V.
+    Clipboard(String),
     /// Wait for the next painted frame.
     Frame,
 }

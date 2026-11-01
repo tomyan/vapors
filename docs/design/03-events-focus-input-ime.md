@@ -356,10 +356,31 @@ release, as Chromium waits to see whether the press drags the text.
 Checked by `fixtures/words.events`, whose field sets its font and
 border, which Chromium's field does not take from the page. Not built:
 `detail` and `dblclick`, dragging by word or line after a double or
-triple click, dragging selected text,
-paste and undo (E6b), IME (E6c), `beforeinput`, `placeholder`,
-`maxlength`, scrolling a long text to the caret, the blinking caret
-(area 6), vertical selection in a `textarea`.
+triple click, dragging selected text, IME, `beforeinput`,
+`placeholder`, `maxlength`, scrolling a long text to the caret, the
+blinking caret (area 6), vertical selection in a `textarea`.
+
+As built (E6b, 2026-11-01): a field's own undo and paste. Each field
+keeps an undo stack, grouped as Chromium groups a field's edits: a run
+of typing is one step, a run of Backspace (or of Delete) another,
+typing after a deletion joins it and a deletion after typing does not,
+a paste is a step alone, and anything that moves the selection other
+than an edit ends the run. Control+Z undoes to the text and selection
+before the step, Control+Shift+Z and Control+Y redo to those after it,
+each with `input` and a `selectionchange` even where the caret was; a
+new edit drops what could be redone; a signal setting the text drops
+the stack. A paste (`Document::text_pasted`) fires `paste` on the
+focused field, bubbling, and a listener that prevents its default
+keeps the text out; else it replaces the selection, each line break a
+space. On the desktop the platform sends `Event::Paste` whatever has
+focus, and `ElementsApp` hands it to a focused text field first,
+reading the clipboard's text (`Clipboard::text`, three answers, a
+deadline); with none focused the clipboard is not read. Checked by
+`fixtures/undo.events`, whose `clipboard` step writes Chromium's
+clipboard. Chromium's undo stack is the page's, not the field's: an
+undo in one field after edits in another differs, and is not compared.
+Not built: copy and cut, the web page's paste (with the web input
+path), Command for Control on macOS, `beforeinput`'s `historyUndo`.
 
 ## Text editing and IME
 

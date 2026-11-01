@@ -35,6 +35,7 @@ pub fn is_action(word: &str) -> bool {
         "wheel",
         "key",
         "type",
+        "clipboard",
         "frame",
         "touch-down",
         "touch-move",
@@ -58,7 +59,8 @@ pub fn action(word: &str, fields: &[&str], rest: &str) -> Result<Action, String>
         "touch-up" => point(word, fields).map(|(x, y)| Action::TouchUp(x, y)),
         "wheel" => wheel(fields),
         "key" => exactly(word, fields, 1).and_then(|()| key(fields[0])),
-        "type" => quoted(rest).map(Action::Type),
+        "type" => quoted(word, rest).map(Action::Type),
+        "clipboard" => quoted(word, rest).map(|text| Action::Clipboard(text.replace("\\n", "\n"))),
         "frame" => exactly(word, fields, 0).map(|()| Action::Frame),
         _ => Err(format!("no directive `{word}`")),
     }
@@ -124,8 +126,8 @@ fn key(combination: &str) -> Result<Action, String> {
 }
 
 /// A quoted, non-empty text.
-fn quoted(rest: &str) -> Result<String, String> {
-    let refused = || "`type` takes a quoted text".to_owned();
+fn quoted(word: &str, rest: &str) -> Result<String, String> {
+    let refused = || format!("`{word}` takes a quoted text");
     let (text, after) = rest
         .strip_prefix('"')
         .and_then(|r| r.split_once('"'))
@@ -134,7 +136,9 @@ fn quoted(rest: &str) -> Result<String, String> {
         return Err(refused());
     }
     if !after.is_empty() && !after.starts_with("  ") {
-        return Err("extra fields after `type`; a note follows two spaces".into());
+        return Err(format!(
+            "extra fields after `{word}`; a note follows two spaces"
+        ));
     }
     Ok(text.to_owned())
 }

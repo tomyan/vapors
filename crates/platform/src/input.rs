@@ -86,11 +86,9 @@ impl Input {
     /// backends send no `ModifiersChanged` then), or a key is pressed
     /// (a paste, or `None` for its own character).
     ///
-    /// RELAXED: a paste goes to the app whatever has focus, its
-    /// character swallowed. No element takes typed text yet; F4's text
-    /// inputs retire this, when a focused input takes Ctrl+V first
-    /// (`paste_while_a_text_field_has_focus_goes_to_it`, ignored until
-    /// then).
+    /// A paste goes to the app whatever has focus, its character
+    /// swallowed: focus lives in the app's document, so the app hands
+    /// it to a focused text field first (`ElementsApp`, E6b).
     pub(crate) fn key(&mut self, key: Key<'_>) -> Option<Vec<Event>> {
         match key {
             Key::Modifiers(modifiers) => {

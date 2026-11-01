@@ -17,6 +17,7 @@ use vapors_dom::{Event, NodeId};
 use crate::document::Document;
 use crate::events::tree::dispatch_bubbling;
 use crate::keys::Modifiers;
+use crate::text_history::EditKind;
 
 /// The driver a field's editing calls take.
 type Driver<'a> = vapors_text::parley::PlainEditorDriver<'a, vapors_scene::Color>;
@@ -39,6 +40,7 @@ impl Document {
         let Document { fonts, editors, .. } = self;
         let editor = editors.get_mut(&node).expect("made above");
         editor.committed = editor.plain.text().to_string();
+        editor.history.close();
         if keyboard {
             fonts.editor_driver(&mut editor.plain).select_all();
         }
@@ -46,9 +48,16 @@ impl Document {
         self.changed = true;
     }
 
+    /// Runs `act`, which moves the selection but edits nothing, on the
+    /// field's editor: the open undo step closes.
+    pub(crate) fn drive(&mut self, node: NodeId, act: impl FnOnce(&mut Driver<'_>)) {
+        self.editor(node).history.close();
+        self.drive_editor(node, act);
+    }
+
     /// Runs `act` on the field's editor through a driver, and marks the
     /// selection as moved.
-    pub(crate) fn drive(&mut self, node: NodeId, act: impl FnOnce(&mut Driver<'_>)) {
+    pub(crate) fn drive_editor(&mut self, node: NodeId, act: impl FnOnce(&mut Driver<'_>)) {
         self.editor(node);
         let Document { fonts, editors, .. } = self;
         let editor = editors.get_mut(&node).expect("made above");
@@ -66,7 +75,9 @@ pub(crate) fn typed(document: &Rc<RefCell<Document>>, node: NodeId, text: &str) 
     }
     document
         .borrow_mut()
-        .drive(node, |driver| driver.insert_or_replace_selection(text));
+        .edit(node, EditKind::Insert, |driver| {
+            driver.insert_or_replace_selection(text);
+        });
     edited(document, node);
 }
 
@@ -79,17 +90,27 @@ pub(crate) fn key(document: &Rc<RefCell<Document>>, node: NodeId, key: &str, mod
     match key {
         "Enter" => commit(document, node),
         "Backspace" | "Delete" => {
-            document.borrow_mut().drive(node, |d| match (key, word) {
-                ("Backspace", false) => d.backdelete(),
-                ("Backspace", true) => d.backdelete_word(),
-                (_, false) => d.delete(),
-                (_, true) => d.delete_word(),
-            });
+            let kind = if key == "Backspace" {
+                EditKind::DeleteBackward
+            } else {
+                EditKind::DeleteForward
+            };
+            document
+                .borrow_mut()
+                .edit(node, kind, |d| match (key, word) {
+                    ("Backspace", false) => d.backdelete(),
+                    ("Backspace", true) => d.backdelete_word(),
+                    (_, false) => d.delete(),
+                    (_, true) => d.delete_word(),
+                });
             edited(document, node);
         }
         // the method path is not general over the driver's lifetime
         #[allow(clippy::redundant_closure_for_method_calls)]
         "a" | "A" if modifiers.control => document.borrow_mut().drive(node, |d| d.select_all()),
+        "z" | "Z" | "y" | "Y" if modifiers.control => {
+            crate::text_undo::history_key(document, node, key, shift);
+        }
         _ => moved(document, node, key, shift, word),
     }
 }
@@ -135,7 +156,7 @@ pub(crate) fn commit(document: &Rc<RefCell<Document>>, node: NodeId) {
 }
 
 /// After an edit: the property takes the text and `input` fires.
-fn edited(document: &Rc<RefCell<Document>>, node: NodeId) {
+pub(crate) fn edited(document: &Rc<RefCell<Document>>, node: NodeId) {
     if document.borrow_mut().text_from_editor(node) {
         fire(document, node, "input");
     }

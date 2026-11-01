@@ -1,0 +1,56 @@
+# Undo, redo and paste in a text field (E6b). `name` is x 0..240,
+# y 0..24, holding "Warm"; a click at x 200 puts the caret at its end.
+listen input keydown keyup paste selectionchange
+click 200 12                  the caret after "Warm"
+expect selection input#name 4 4
+type "th"                     a run of typing
+expect value input#name Warmth
+key ArrowLeft                 a moved caret ends the run
+expect selection input#name 5 5
+type "x"
+expect value input#name Warmtxh
+key Control+z                 "x" alone, the caret where it was typed
+expect event input input#name
+expect value input#name Warmth
+expect selection input#name 5 5
+key Control+z                 then "th"
+expect value input#name Warm
+expect selection input#name 4 4
+key Control+z                 the first text is not a step
+expect no event input
+expect value input#name Warm
+key Control+Shift+Z           redo: the text and caret after the step
+expect value input#name Warmth
+expect selection input#name 6 6
+key Control+y                 redo too
+expect value input#name Warmtxh
+key End
+expect selection input#name 7 7
+type "ab"
+expect value input#name Warmtxhab
+key Backspace                 a deletion after typing is a new step
+expect value input#name Warmtxha
+type "c"                      typing after a deletion joins it
+expect value input#name Warmtxhac
+key Control+z
+expect value input#name Warmtxhab
+expect selection input#name 9 9
+clipboard "Cool"
+key Control+a
+expect selection input#name 0 9
+key Control+v                 a paste replaces the selection
+expect event paste input#name
+expect value input#name Cool
+expect selection input#name 4 4
+type "s"
+expect value input#name Cools
+key Control+z                 typing after a paste is a step of its own
+expect value input#name Cool
+key Control+z                 and so is the paste: the selection back
+expect value input#name Warmtxhab
+expect selection input#name 0 9
+clipboard "a\nb"
+key End
+expect selection input#name 9 9
+key Control+v                 a line break pasted is a space: "Warmtxhaba b"
+expect selection input#name 12 12

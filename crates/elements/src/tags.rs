@@ -94,6 +94,7 @@ pub(crate) const FIRED: &[&str] = &[
     "input",
     "change",
     "selectionchange",
+    "paste",
 ];
 
 /// `None` when the tree fires `event`; otherwise why not.

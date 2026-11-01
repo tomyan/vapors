@@ -3,9 +3,9 @@
 //! key on a Latin layout (Dvorak's V is where it says), else the
 //! physical V key (on a Cyrillic layout the logical key is "м").
 //!
-//! The press becomes `Event::Paste` in place of its `Character`: no
-//! element takes typed text yet (text inputs are F4); when one does, a
-//! focused input takes Ctrl+V first, decided where focus lives.
+//! The press becomes `Event::Paste` in place of its `Character`; the
+//! app, where focus lives, gives it to a focused text field first
+//! (`ElementsApp`, E6b).
 
 use winit::event::ElementState;
 use winit::keyboard::{Key, KeyCode, ModifiersState, PhysicalKey};

@@ -66,6 +66,10 @@ pub fn calls(action: &Action, pointer: &mut Pointer) -> Vec<(&'static str, Value
             .flat_map(|c| key_calls(&c.to_string()))
             .collect(),
         Action::Frame => Vec::new(),
+        Action::Clipboard(text) => vec![(
+            "Runtime.evaluate",
+            json!({ "expression": format!("navigator.clipboard.writeText({})", json!(text)), "awaitPromise": true, "userGesture": true }),
+        )],
     }
 }
 
