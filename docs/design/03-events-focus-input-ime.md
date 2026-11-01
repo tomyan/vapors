@@ -391,6 +391,36 @@ undo in one field after edits in another differs, and is not compared.
 Not built: copy and cut, the web page's paste (with the web input
 path), Command for Control on macOS, `beforeinput`'s `historyUndo`.
 
+As built (E6, the web's text input, 2026-11-01): a hidden `<textarea>`
+mirrors the focused text field, chosen over EditContext because one
+path serves Chrome, Safari, Firefox and Android's keyboards, doc 03
+needs it as the fallback anyway, and headless Chromium drives it with
+`Input.insertText` and `Input.imeSetComposition`; EditContext can
+follow as Chromium's path. The app sets the field
+(`Platform::set_text_field`: text, UTF-16 selection, caret area) after
+each event and frame when it changed; the textarea takes it, moves to
+the caret (transparent, 16 px so a phone does not zoom, no pointer
+events) and takes DOM focus when the app handles the press or tap,
+so that a phone may open its keyboard, which needs focus inside the
+user's gesture (not checked headless). Its `input` and composition events come back as
+`Event::TextEdited` (its whole state, and the text it was made
+against); the field takes the difference, composing text included,
+underlined, with `input`, and refuses an edit made against a text it
+no longer holds, reporting it and setting the field again. Its keys
+come back as `Event::Key`; it acts itself only on printable
+characters, any key while an IME composes, and Control or Command with
+C, V or X, and every other key's default is prevented, so the field's
+own keys (arrows, Backspace, Enter, Tab, undo) act. Its `paste` comes
+back as `Event::PastedText`, through `Document::text_pasted`. Checked
+by `scripts/web-text-input.sh`: typed text, a composition and its
+commit, Backspace, an arrow, a composition in the middle and Shift+Home
+on Chromium's own `<input>` and on the built page's field demo, the
+text and selection equal after each. Not checked headless: a real
+phone keyboard (Gboard's autocorrect and its Backspace on composed
+words), the keyboard opening on a tap, the candidate window's place.
+Not built: EditContext, copy and cut, the a11y mirror's ownership of
+the textarea (area 5).
+
 ## Text editing and IME
 
 One editing model for single- and multi-line fields, built on Parley's
@@ -421,9 +451,12 @@ the clipboard, caret painting and the DOM events. Rules:
   area 10 records it, because the hidden textarea has known gaps
   (composition in some IMEs, the caret rectangle) that the brief
   accepts for the secondary target.
-- Preedit text is shown inline with an underline and is not in the
-  value until commit; `beforeinput` is not fired for preedit changes
-  (as in browsers), `compositionupdate` is.
+- Preedit text is shown inline with an underline and is in the value
+  while it composes, with `input` per update, as Chromium's own
+  `<input>` holds it (the lead's decision, 2026-11-01: the web follows
+  the browser, and native winit IME matches it, so the two agree; the
+  launcher's list filters as you compose). `beforeinput` is not fired
+  for preedit changes (as in browsers), `compositionupdate` is.
 - Clipboard through area 7: `paste` carries text and images; the
   Composer's image paste is an event with `files`.
 - Undo inside a field is its own stack, separate from the app's

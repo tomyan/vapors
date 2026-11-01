@@ -9,7 +9,8 @@ use winit::keyboard::ModifiersState;
 use crate::paste_key::Press;
 
 use crate::clock::Instant;
-use crate::event::{Event, from_winit};
+use crate::event::Event;
+use crate::event_winit::from_winit;
 use crate::gestures::Gestures;
 use crate::key_event::key_event;
 

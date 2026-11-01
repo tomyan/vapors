@@ -81,6 +81,10 @@ pub trait App {
     fn event(&mut self, event: Event, platform: &Platform);
     /// Draw this frame.
     fn frame(&mut self, frame: &Frame<'_>) -> Next;
+    /// The frame just drawn is presented: what the app asks for that
+    /// depends on the frame's layout, such as the focused text field's
+    /// caret area ([`Platform::set_text_field`]), goes here.
+    fn drawn(&mut self, _platform: &Platform) {}
 }
 
 /// What the platform's own background work sends into the event loop.
@@ -103,6 +107,9 @@ pub(crate) enum Message {
     DeviceLost,
     /// A [`Waker`](crate::Waker) asked for a frame from outside `event`.
     Wake,
+    /// Input from the page's own elements (the web's text input).
+    #[cfg_attr(not(target_family = "wasm"), allow(dead_code))] // only the web has them
+    Input(Event),
 }
 
 /// Open a window and drive `app` until it returns [`Next::Exit`] or the

@@ -37,7 +37,10 @@ js-sys = "0.3.106"
 console_error_panic_hook = "0.1.7"
 web-sys = { version = "0.3.106", features = [
     "Blob",
+    "ClipboardEvent",
+    "CompositionEvent",
     "console",
+    "DataTransfer",
     "Document",
     "Element",
     "Event",
@@ -47,6 +50,8 @@ web-sys = { version = "0.3.106", features = [
     "HtmlCanvasElement",
     "HtmlElement",
     "HtmlInputElement",
+    "HtmlTextAreaElement",
+    "KeyboardEvent",
     "Location",
     "Node",
     "Window",

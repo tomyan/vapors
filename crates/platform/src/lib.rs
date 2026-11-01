@@ -17,6 +17,7 @@ mod cursor;
 mod device_lost;
 mod error;
 mod event;
+mod event_winit;
 mod file_kind;
 mod gestures;
 mod handler;
@@ -35,6 +36,10 @@ mod report;
 mod surface;
 mod surface_texture;
 mod tasks;
+#[cfg(target_family = "wasm")]
+mod text_bridge_web;
+mod text_field;
+mod text_keys;
 mod waker;
 #[cfg(target_family = "wasm")]
 mod web;
@@ -55,6 +60,7 @@ pub use file_kind::FileKind;
 pub use gestures::{Gestures, TAP_SLOP};
 pub use platform::Platform;
 pub use report::{report_error, report_status};
+pub use text_field::TextField;
 pub use waker::{LoopClosed, Waker};
 pub use window::{App, Frame, Next, WindowOptions, run};
 

@@ -8,11 +8,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use vapors_elements::{Cursor, Document, ElementError, Point, Viewport};
+use vapors_elements::{Cursor, Document, Point};
 use vapors_platform::{App, Event, Frame, Instant, Next, Platform, report_error};
 
 use crate::frame::FrameTimes;
-use vapors_scene::Size;
 
 use crate::painter::ScenePainter;
 use crate::pointer::action;
@@ -49,6 +48,11 @@ pub struct ElementsApp {
     /// The clipboard a paste into a text field reads (E6b).
     #[cfg(not(target_family = "wasm"))]
     clipboard: Box<dyn vapors_platform::Clipboard>,
+    /// The text field last set for the platform; `None` before the
+    /// first, or when it must be set again.
+    // set to no field (`Some(None)`) differs from never set (`None`)
+    #[allow(clippy::option_option)]
+    mirrored: Option<Option<vapors_platform::TextField>>,
     /// The cursor last shown.
     cursor: Cursor,
     /// Called before each update with the last frame's phase times.
@@ -84,6 +88,7 @@ impl ElementsApp {
             clicks: crate::clicks::Clicks::default(),
             #[cfg(not(target_family = "wasm"))]
             clipboard: Box::new(vapors_platform::SystemClipboard::default()),
+            mirrored: None,
             cursor: Cursor::Default,
             per_frame: None,
             frame_times: None,
@@ -157,6 +162,10 @@ impl App for ElementsApp {
             }
         }
     }
+
+    fn drawn(&mut self, platform: &Platform) {
+        self.mirror_text_field(platform);
+    }
 }
 
 impl ElementsApp {
@@ -166,6 +175,7 @@ impl ElementsApp {
             self.act(action);
         }
         self.key(event);
+        self.text_event(event);
         #[cfg(not(target_family = "wasm"))]
         if matches!(event, Event::Paste) {
             self.paste();
@@ -173,36 +183,13 @@ impl ElementsApp {
         if self.document.borrow_mut().take_changed() {
             platform.request_redraw();
         }
+        self.mirror_text_field(platform);
         let cursor = self.document.borrow().cursor(self.pointer);
         if cursor != self.cursor {
             self.cursor = cursor;
             platform.set_cursor(crate::cursor::shown(cursor));
         }
     }
-}
-
-#[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)] // window sizes and scales are small
-fn viewport(size: Size, scale: f32) -> Viewport {
-    Viewport {
-        width: size.width as f32 / scale,
-        height: size.height as f32 / scale,
-        scale,
-    }
-}
-
-fn size_of(frame: &Frame<'_>) -> Size {
-    Size {
-        width: frame.texture.width(),
-        height: frame.texture.height(),
-    }
-}
-
-fn refused(errors: &[ElementError]) -> String {
-    let lines: Vec<String> = errors.iter().map(|error| format!("  {error}")).collect();
-    format!(
-        "the document was refused, so nothing is drawn:\n{}",
-        lines.join("\n")
-    )
 }
 
 #[path = "elements_app_act.rs"]
@@ -212,3 +199,5 @@ mod frame_phases;
 #[cfg(not(target_family = "wasm"))]
 #[path = "elements_app_paste.rs"]
 mod paste;
+#[path = "elements_app_text.rs"]
+mod text;

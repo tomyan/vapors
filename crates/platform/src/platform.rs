@@ -3,12 +3,12 @@
 //! same code runs where the answer is a promise (the web) and where it is
 //! a blocking dialog on another thread (native).
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::sync::Arc;
 
 use winit::event_loop::EventLoopProxy;
 
-use crate::Cursor;
+use crate::{Cursor, TextField};
 
 use crate::PlatformError;
 use crate::device_lost::{DeviceLost, Lost};
@@ -25,6 +25,10 @@ pub struct Platform {
     lost: DeviceLost,
     redraw: Arc<RedrawFlag>,
     cursor: Cell<Option<Cursor>>,
+    /// The focused text field the app last set, until the loop takes it.
+    // set to no field (`Some(None)`) differs from not set (`None`)
+    #[allow(clippy::option_option)]
+    text_field: RefCell<Option<Option<TextField>>>,
 }
 
 impl Platform {
@@ -45,6 +49,7 @@ impl Platform {
             lost: DeviceLost::default(),
             redraw: Arc::default(),
             cursor: Cell::new(None),
+            text_field: RefCell::new(None),
         }
     }
 
@@ -85,6 +90,23 @@ impl Platform {
     /// The cursor asked for since the last call; clears it.
     pub(crate) fn take_cursor(&self) -> Option<Cursor> {
         self.cursor.take()
+    }
+
+    /// The focused text field, for the platform's text input to mirror
+    /// (the web page's hidden textarea), or `None` when no text field
+    /// has focus. Set it after each event and frame; only a change is
+    /// carried out.
+    pub fn set_text_field(&self, field: Option<TextField>) {
+        *self.text_field.borrow_mut() = Some(field);
+    }
+
+    /// The text field set since the last take, if any: what the loop
+    /// mirrors, and a detached platform's tests read.
+    #[must_use]
+    // set to no field (`Some(None)`) differs from not set (`None`)
+    #[allow(clippy::option_option)]
+    pub fn take_text_field(&self) -> Option<Option<TextField>> {
+        self.text_field.borrow_mut().take()
     }
 
     /// The state the window's device is watched into.
