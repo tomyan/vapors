@@ -1,41 +1,50 @@
 //! `bind:this` (`src/refs.wisp`): an element's node in a signal while it
-//! is mounted, inside `{if}` and `{for}` too, and `None` once it is not.
+//! is mounted, set once the element is built, and `None` once it is
+//! not; the signal never holds a removed node. Rows: `bind_this_rows.rs`.
+
+#[path = "support/refs.rs"]
+mod refs;
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use vapors_compiler_examples::refs::{Refs, RefsProps};
-use vapors_dom::recording::{Call, RecordingDom};
-use vapors_signals::Signal;
-
-fn mounted(names: &[&str]) -> (Rc<RefCell<RecordingDom>>, Refs, Signal<Vec<String>>) {
-    let dom = Rc::new(RefCell::new(RecordingDom::new()));
-    let root = dom.borrow().root();
-    let names = Signal::new(names.iter().map(|n| (*n).to_owned()).collect());
-    let refs = Refs::mount(&dom, root, RefsProps { names });
-    (dom, refs, names)
-}
-
-/// The elements created with `tag`, in order.
-fn created(dom: &Rc<RefCell<RecordingDom>>, tag: &str) -> Vec<vapors_dom::NodeId> {
-    dom.borrow()
-        .calls()
-        .iter()
-        .filter_map(|call| match call {
-            Call::CreateElement { node, tag: made } if made == tag => Some(*node),
-            _ => None,
-        })
-        .collect()
-}
+use refs::{created, mounted, mounted_with_top};
+use vapors_signals::{Effect, Signal};
 
 #[test]
 fn a_mounted_element_is_in_its_signal() {
-    // When
-    let (dom, refs, _) = mounted(&["a"]);
+    // Given
+    let (dom, top) = (refs::new_dom(), Signal::new(None));
 
-    // Then: the p, and the row's i
+    // When
+    let (refs, _) = mounted_with_top(&dom, &["a"], top);
+
+    // Then
     assert_eq!(refs.first.get(), Some(created(&dom, "p")[0]));
-    assert_eq!(refs.row.get(), Some(created(&dom, "i")[0]));
+    assert_eq!(top.get(), Some(created(&dom, "div")[0]));
+}
+
+#[test]
+fn the_signal_is_set_once_the_element_has_its_children() {
+    // Given: an effect that counts the bound div's children when set
+    let top = Signal::new(None);
+    let seen = Rc::new(RefCell::new(Vec::new()));
+    let (into, tree) = (Rc::clone(&seen), refs::new_dom());
+    let reader = Rc::clone(&tree);
+    let _effect = Effect::new(move || {
+        if let Some(node) = top.get() {
+            into.borrow_mut().push(reader.borrow().children(node).len());
+        }
+    });
+
+    // When: no batch runs at the top level, so the effect runs on the set
+    let _refs = mounted_with_top(&tree, &["a"], top);
+
+    // Then: it saw every child the div has now
+    let div = created(&tree, "div")[0];
+    let children = tree.borrow().children(div).len();
+    assert!(children > 0);
+    assert_eq!(*seen.borrow(), [children]);
 }
 
 #[test]
@@ -51,21 +60,27 @@ fn an_element_its_if_removes_leaves_none() {
 }
 
 #[test]
-fn a_removed_row_leaves_none_and_a_row_still_there_keeps_its_node() {
-    // Given: one row, then a second; the signal holds the newest
-    let (dom, refs, names) = mounted(&["a"]);
-    names.set(vec!["a".into(), "b".into()]);
-    let b = created(&dom, "i")[1];
-    assert_eq!(refs.row.get(), Some(b));
+fn an_effect_on_the_signal_never_sees_a_removed_node() {
+    // Given: an effect that checks each node it sees is in the div
+    let (dom, refs, _) = mounted(&[]);
+    let div = created(&dom, "div")[0];
+    let stale = Rc::new(RefCell::new(Vec::new()));
+    let (into, reader, first) = (Rc::clone(&stale), Rc::clone(&dom), refs.first);
+    let _effect = Effect::new(move || {
+        if let Some(node) = first.get()
+            && !reader.borrow().children(div).contains(&node)
+        {
+            into.borrow_mut().push(node);
+        }
+    });
 
-    // When: the first row goes; then the second
-    names.set(vec!["b".into()]);
-    let after_a = refs.row.get();
-    names.set(Vec::new());
+    // When: the p goes, and comes back
+    refs.shown.set(false);
+    refs.shown.set(true);
 
-    // Then: removing a did not clear b's node; removing b did
-    assert_eq!(after_a, Some(b));
-    assert_eq!(refs.row.get(), None);
+    // Then
+    assert!(stale.borrow().is_empty(), "{stale:?}");
+    assert_eq!(refs.first.get(), Some(created(&dom, "p")[1]));
 }
 
 #[test]

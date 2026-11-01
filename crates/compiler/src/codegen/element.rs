@@ -20,10 +20,17 @@ impl Emitter<'_> {
                 "dom.borrow_mut().set_attribute({var}, SCOPE_ATTRIBUTE, SCOPE);"
             ));
         }
-        for attribute in element.attributes.iter() {
+        let (this, rest): (Vec<&Attribute>, Vec<&Attribute>) = element
+            .attributes
+            .iter()
+            .partition(|attribute| attribute.name == "bind:this");
+        for attribute in rest {
             self.emit_attribute(element, &var, attribute)?;
         }
-        self.emit_nodes(&element.children, &Place::child_of(&var))
+        self.emit_nodes(&element.children, &Place::child_of(&var))?;
+        // once the element is whole, so what reads the signal sees it built
+        this.into_iter()
+            .try_for_each(|attribute| self.emit_bind_this(&var, attribute))
     }
 
     fn emit_attribute(
