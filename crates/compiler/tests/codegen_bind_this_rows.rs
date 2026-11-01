@@ -70,5 +70,9 @@ fn the_keys_clone_is_allowed_for_a_copy_key() {
 
     // Then: the allowance comes right before the binding
     assert_has(&code, "#[allow(clippy::clone_on_copy");
+    assert_has(
+        &code,
+        "a row's key is cloned into the map and kept for the cleanup",
+    );
     assert!(at(&code, "#[allow(clippy::clone_on_copy") < at(&code, "let key = i.get_untracked();"));
 }
