@@ -62,7 +62,10 @@ pub(super) fn act(
             });
         }
         Action::Move(x, y) => Document::pointer_moved(doc, at(x, y)),
-        Action::Press(x, y) => Document::pointer_pressed(doc, at(x, y)),
+        Action::Press(x, y) => {
+            Document::pointer_pressed(doc, at(x, y));
+            Document::pointer_clicks(doc, std::num::NonZeroU32::MIN);
+        }
         Action::Release(x, y) => Document::pointer_released(doc, at(x, y)),
         Action::TouchDown(x, y) => {
             press.0 = Some(at(x, y));
@@ -115,7 +118,12 @@ fn key(
 /// as the app's `Clicks` counts presses close in time and place.
 fn clicks(doc: &Rc<RefCell<Document>>, at: [f32; 2], count: u32) {
     for nth in (1..=count).filter_map(std::num::NonZeroU32::new) {
-        sent(doc, |doc| Document::pointer_pressed_clicks(doc, at, nth));
+        // the press and its count, as one mousePressed is pointerdown
+        // then mousedown in Chromium
+        sent(doc, |doc| {
+            Document::pointer_pressed(doc, at);
+            Document::pointer_clicks(doc, nth);
+        });
         sent(doc, |doc| Document::pointer_released(doc, at));
     }
 }

@@ -43,8 +43,6 @@ pub struct ElementsApp {
     pointer: Point,
     touch: crate::touch_scroll::TouchScroll,
     wheel: crate::wheel_scroll::WheelScroll,
-    /// The presses in a row, for double clicks.
-    clicks: crate::clicks::Clicks,
     /// The clipboard a paste into a text field reads (E6b).
     #[cfg(not(target_family = "wasm"))]
     clipboard: Box<dyn vapors_platform::Clipboard>,
@@ -85,7 +83,6 @@ impl ElementsApp {
             pointer: [0.0, 0.0],
             touch: crate::touch_scroll::TouchScroll::default(),
             wheel: crate::wheel_scroll::WheelScroll::default(),
-            clicks: crate::clicks::Clicks::default(),
             #[cfg(not(target_family = "wasm"))]
             clipboard: Box::new(vapors_platform::SystemClipboard::default()),
             mirrored: None,

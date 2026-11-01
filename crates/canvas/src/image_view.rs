@@ -165,6 +165,7 @@ impl ImageView {
             | Event::Paste
             | Event::TextEdited { .. }
             | Event::PastedText(_)
+            | Event::ClickCount(_)
             | Event::FileOpened { .. } => {}
         }
     }

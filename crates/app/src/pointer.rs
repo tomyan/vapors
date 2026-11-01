@@ -14,6 +14,8 @@ pub(crate) enum Action {
     Move(Point),
     Press(Point),
     Release(Point),
+    /// The press just delivered is this many in a row.
+    Clicks(std::num::NonZeroU32),
     Leave,
     Tap(Point),
     /// Scroll by a delta (CSS pixels) at a point.
@@ -39,6 +41,7 @@ pub(crate) fn action(event: &Event, scale: f32, last: Point) -> Option<Action> {
         Event::PointerMoved { x, y } => Some(Action::Move(css(*x, *y))),
         Event::PrimaryButton { pressed: true } => Some(Action::Press(last)),
         Event::PrimaryButton { pressed: false } => Some(Action::Release(last)),
+        Event::ClickCount(clicks) => Some(Action::Clicks(*clicks)),
         Event::PointerLeft => Some(Action::Leave),
         Event::Tap { x, y } => Some(Action::Tap(css(*x, *y))),
         Event::Scroll { dx, dy } => Some(Action::Wheel(last, [*dx, *dy])),

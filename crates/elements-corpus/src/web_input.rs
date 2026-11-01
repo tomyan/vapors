@@ -22,9 +22,10 @@ pub const DEADLINE: Duration = Duration::from_secs(145);
 /// The field's state after a step: text, selection start and end.
 pub type State = (String, u64, u64);
 
-/// What each step is called, and its calls.
+/// What each step is called, and its calls; `text_at` is a point (CSS
+/// px) on the field's first letter, for the double click.
 #[must_use]
-pub fn steps() -> Vec<(&'static str, Vec<(&'static str, Value)>)> {
+pub fn steps(text_at: (f64, f64)) -> Vec<(&'static str, Vec<(&'static str, Value)>)> {
     let compose = |text: &str| {
         let at = text.encode_utf16().count();
         vec![(
@@ -45,17 +46,29 @@ pub fn steps() -> Vec<(&'static str, Vec<(&'static str, Value)>)> {
         ("committed as x", insert("x")),
         ("Shift+Home", key("Shift+Home")),
         ("typed over the selection", insert("A")),
+        ("double click on the word", double_click(text_at)),
     ]
 }
 
+/// Two presses and releases at `(x, y)`, the second counted 2, as the
+/// events oracle sends a `double-click`.
+fn double_click(at: (f64, f64)) -> Vec<(&'static str, Value)> {
+    calls(&Action::Clicks(at.0, at.1, 2), &mut Pointer::default())
+}
+
 /// Plays every step on the page open in `session`, reading the field
-/// with `read` (an expression for `[text, start, end]`) after each.
+/// with `read` (an expression for `[text, start, end]`) after each;
+/// `text_at` is a point on the field's first letter.
 ///
 /// # Errors
 /// A call that fails, or a read of another shape.
-pub fn play(session: &mut Session, read: &str) -> Result<Vec<(String, State)>, String> {
+pub fn play(
+    session: &mut Session,
+    read: &str,
+    text_at: (f64, f64),
+) -> Result<Vec<(String, State)>, String> {
     let mut states = Vec::new();
-    for (name, step) in steps() {
+    for (name, step) in steps(text_at) {
         for (method, params) in step {
             session.call(method, &params, DEADLINE)?;
         }

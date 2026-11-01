@@ -53,6 +53,7 @@ web-sys = { version = "0.3.106", features = [
     "HtmlTextAreaElement",
     "KeyboardEvent",
     "Location",
+    "Navigator",
     "Node",
     "Window",
 ] }
