@@ -179,7 +179,7 @@ fn a_clipboard_step_takes_quoted_text_and_needs_no_expectation() {
 
     // Then
     assert_eq!(script.steps[0].action, Action::Clipboard("a\nb".into()));
-    assert!(script.steps[0].expect.is_empty());
+    assert_eq!(script.steps[0].expect, Vec::new());
     assert!(
         bare.contains("p.events:2:") && bare.contains("`clipboard` takes a quoted text"),
         "{bare}"
