@@ -63,9 +63,9 @@ pub fn play(fixture: &Fixture, script: &Script, viewport: Viewport) -> Result<Lo
         );
     }
     let mut log = Log::new();
-    let mut press = Press::default();
+    let mut held = Held::default();
     for step in &script.steps {
-        act(&doc, &step.action, &mut press)
+        act(&doc, &step.action, &mut held)
             .map_err(|why| format!("{}.events:{}: {why}", fixture.name, step.line))?;
         let (focus, focus_visible) = {
             let doc = doc.borrow();
@@ -168,7 +168,7 @@ fn listen(doc: &Rc<RefCell<Document>>, types: &[String], heard: &Shared) {
 }
 
 pub use act::TAP_SLOP;
-use act::{Press, act};
+use act::{Held, act};
 
 /// `tag#id`, else the child-index path from body, as the Chromium player
 /// names a target.

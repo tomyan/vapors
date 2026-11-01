@@ -17,6 +17,7 @@ use vapors_dom::{Event, NodeId};
 use crate::document::Document;
 use crate::events::tree::dispatch_bubbling;
 use crate::keys::Modifiers;
+use crate::text_history::EditKind;
 
 /// The driver a field's editing calls take.
 type Driver<'a> = vapors_text::parley::PlainEditorDriver<'a, vapors_scene::Color>;
@@ -39,6 +40,7 @@ impl Document {
         let Document { fonts, editors, .. } = self;
         let editor = editors.get_mut(&node).expect("made above");
         editor.committed = editor.plain.text().to_string();
+        editor.history.close();
         // Chromium fires one as focus arrives, even where the caret was
         editor.reported = None;
         if keyboard {
@@ -48,9 +50,16 @@ impl Document {
         self.changed = true;
     }
 
+    /// Runs `act`, which moves the selection but edits nothing, on the
+    /// field's editor: the open undo step closes.
+    pub(crate) fn drive(&mut self, node: NodeId, act: impl FnOnce(&mut Driver<'_>)) {
+        self.editor(node).history.close();
+        self.drive_editor(node, act);
+    }
+
     /// Runs `act` on the field's editor through a driver, and marks the
     /// selection as moved.
-    pub(crate) fn drive(&mut self, node: NodeId, act: impl FnOnce(&mut Driver<'_>)) {
+    pub(crate) fn drive_editor(&mut self, node: NodeId, act: impl FnOnce(&mut Driver<'_>)) {
         self.editor(node);
         let Document { fonts, editors, .. } = self;
         let editor = editors.get_mut(&node).expect("made above");
@@ -68,7 +77,9 @@ pub(crate) fn typed(document: &Rc<RefCell<Document>>, node: NodeId, text: &str) 
     }
     document
         .borrow_mut()
-        .drive(node, |driver| driver.insert_or_replace_selection(text));
+        .edit(node, EditKind::Insert, |driver| {
+            driver.insert_or_replace_selection(text);
+        });
     edited(document, node);
 }
 
@@ -81,14 +92,18 @@ pub(crate) fn key(document: &Rc<RefCell<Document>>, node: NodeId, key: &str, mod
     match key {
         "Enter" => commit(document, node),
         "Backspace" | "Delete" => {
+            let kind = deletion_kind(&document.borrow(), node, key == "Backspace", word);
             document
                 .borrow_mut()
-                .drive(node, |d| deleted(d, key == "Backspace", word));
+                .edit(node, kind, |d| deleted(d, key == "Backspace", word));
             edited(document, node);
         }
         // the method path is not general over the driver's lifetime
         #[allow(clippy::redundant_closure_for_method_calls)]
         "a" | "A" if modifiers.control => document.borrow_mut().drive(node, |d| d.select_all()),
+        "z" | "Z" | "y" | "Y" if modifiers.control => {
+            crate::text_undo::history_key(document, node, key, shift);
+        }
         _ => moved(document, node, key, shift, word),
     }
 }
@@ -153,7 +168,7 @@ pub(crate) fn commit(document: &Rc<RefCell<Document>>, node: NodeId) {
 }
 
 /// After an edit: the property takes the text and `input` fires.
-fn edited(document: &Rc<RefCell<Document>>, node: NodeId) {
+pub(crate) fn edited(document: &Rc<RefCell<Document>>, node: NodeId) {
     if document.borrow_mut().text_from_editor(node) {
         fire(document, node, "input");
     }
@@ -167,41 +182,17 @@ fn fire(document: &Rc<RefCell<Document>>, node: NodeId, name: &str) {
     dispatch_bubbling(document, node, Event::new(name).with_value(&value));
 }
 
-impl Document {
-    /// Fires the `selectionchange` each text field owes whose selection
-    /// moved since the last one, as Chromium fires one per task: the
-    /// app calls this before each update, the vapors player after each event.
-    pub fn settle_selection(document: &Rc<RefCell<Document>>) {
-        let owed: Vec<NodeId> = document
-            .borrow_mut()
-            .editors
-            .iter_mut()
-            .filter_map(|(node, editor)| std::mem::take(&mut editor.pending).then_some(*node))
-            .collect();
-        for node in owed {
-            if document.borrow_mut().selection_moved(node) {
-                dispatch_bubbling(document, node, Event::new("selectionchange"));
-            }
-        }
-    }
-}
-
-impl Document {
-    /// Whether `node`'s selection moved since the last `selectionchange`,
-    /// noting it as reported: not for a field a listener removed, or one
-    /// that is no longer a text field.
-    fn selection_moved(&mut self, node: NodeId) -> bool {
-        if !self.contains(node) {
-            return false;
-        }
-        let Some(now) = self.selection(node) else {
-            return false;
-        };
-        let Some(editor) = self.editors.get_mut(&node) else {
-            return false;
-        };
-        let moved = editor.reported != Some(now);
-        editor.reported = Some(now);
-        moved
+/// How a Backspace (`back`) or Delete groups: a word deletion only
+/// when `word` deletes from a collapsed selection, as `deleted` does.
+fn deletion_kind(document: &Document, node: NodeId, back: bool, word: bool) -> EditKind {
+    let word = word
+        && document
+            .selection(node)
+            .is_some_and(|(start, end)| start == end);
+    match (back, word) {
+        (true, false) => EditKind::DeleteBackward,
+        (false, false) => EditKind::DeleteForward,
+        (true, true) => EditKind::DeleteWordBackward,
+        (false, true) => EditKind::DeleteWordForward,
     }
 }

@@ -89,5 +89,6 @@ fixtures![
     text::Text,
     text_align::TextAlign,
     text_wrap::TextWrap,
+    undo::Undo,
     words::Words,
 ];
