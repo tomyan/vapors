@@ -2842,6 +2842,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "vapors-components"
+version = "0.0.0"
+dependencies = [
+ "vapors-compiler",
+ "vapors-dom",
+ "vapors-signals",
+]
+
+[[package]]
 name = "vapors-css"
 version = "0.0.0"
 dependencies = [
@@ -2898,6 +2907,7 @@ dependencies = [
  "vapors-app",
  "vapors-canvas",
  "vapors-compiler",
+ "vapors-components",
  "vapors-devtools",
  "vapors-dom",
  "vapors-elements",

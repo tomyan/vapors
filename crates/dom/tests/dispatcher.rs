@@ -109,3 +109,24 @@ fn a_listener_may_dispatch_again_and_the_inner_dispatch_finishes_inside_it() {
         ]
     );
 }
+
+#[test]
+#[should_panic(expected = "declares only")]
+fn emit_panics_on_a_refusal_naming_it() {
+    // Given
+    let (dom, _, option, _) = tree();
+    let events = Dispatcher::new(dom.dyn_dom(), &["optionchoose"]);
+
+    // When: a name not declared, which only a bug in the component sends
+    let _ = events.emit(option, Event::new("optionchose"));
+}
+
+#[test]
+fn emit_answers_as_dispatch_when_it_runs() {
+    // Given
+    let (dom, _, option, _) = tree();
+    let events = Dispatcher::new(dom.dyn_dom(), &["optionchoose"]);
+
+    // Then
+    assert!(events.emit(option, Event::new("optionchoose")));
+}

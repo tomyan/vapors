@@ -192,3 +192,19 @@ fn a_field_that_stops_being_a_text_field_fires_no_selectionchange() {
     // Then
     assert!(page.log.borrow().is_empty(), "{:?}", page.log.borrow());
 }
+
+#[test]
+fn a_value_set_by_a_signal_puts_the_caret_at_its_end() {
+    // Given: the caret at the start of "Warm"
+    let page = page();
+    click(&page, [4.0, 12.0]);
+    assert_eq!(selection(&page, page.name), (0, 0));
+
+    // When: a signal sets a longer text, as Chromium's `value =` does
+    page.doc
+        .borrow_mut()
+        .set_property(page.name, "value", PropertyValue::Text("Alabama".into()));
+
+    // Then
+    assert_eq!(selection(&page, page.name), (7, 7));
+}

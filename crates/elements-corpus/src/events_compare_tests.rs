@@ -17,6 +17,7 @@ fn ours() -> Log {
         values: Vec::new(),
         checked: Vec::new(),
         selections: Vec::new(),
+        ax: None,
     }]
 }
 

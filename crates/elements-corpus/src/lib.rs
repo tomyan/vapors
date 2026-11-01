@@ -14,11 +14,13 @@ use vapors_elements::Document;
 include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
 pub mod ax;
+pub mod ax_projection;
 pub mod ax_tree;
 mod ax_value;
 mod events_action;
 pub mod events_compare;
 mod events_expect;
+mod events_fields;
 pub mod events_input;
 pub mod events_oracle;
 pub mod events_play;
@@ -70,6 +72,7 @@ fixtures![
     centred_panel::CentredPanel,
     checkbox::Checkbox,
     clipping::Clipping,
+    combobox::Combobox,
     flex_row::FlexRow,
     focus::Focus,
     grid_tracks::GridTracks,
