@@ -83,3 +83,21 @@ fn a_hash_map_signal_in_a_for_row_is_refused() {
     .to_string();
     assert!(why.contains("Signal<BTreeMap<K, NodeId>>"), "{why}");
 }
+
+#[test]
+fn a_path_qualified_signal_of_the_wrong_shape_is_still_refused() {
+    let why = refusal(
+        "<script>\nlet one: vapors_signals::Signal<Option<String>> = Signal::new(None);\n</script>\n<p bind:this={one}>x</p>",
+    )
+    .to_string();
+    assert!(why.contains("Signal<Option<NodeId>>"), "{why}");
+}
+
+#[test]
+fn a_for_name_that_shadows_a_script_binding_is_refused_naming_both() {
+    let why = refused(
+        "<ul>{for rows in names.get() key=rows.clone()}<li bind:this={rows}>x</li>{/for}</ul>",
+    );
+    assert!(why.contains("`rows`") && why.contains("shadows"), "{why}");
+    assert!(why.contains("counter.wisp:"), "{why}");
+}
