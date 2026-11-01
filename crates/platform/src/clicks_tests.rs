@@ -31,7 +31,7 @@ fn presses_soon_after_and_near_the_last_count_up() {
 #[test]
 fn a_press_later_than_the_interval_starts_again() {
     // Given: a millisecond past the interval
-    let late = u64::try_from(FALLBACK.0.as_millis()).expect("small") + 1;
+    let late = u64::try_from(fallback().0.as_millis()).expect("small") + 1;
 
     // Then
     assert_eq!(counts(&[([10.0, 10.0], 0), ([10.0, 10.0], late)]), [1, 1]);
@@ -40,7 +40,7 @@ fn a_press_later_than_the_interval_starts_again() {
 #[test]
 fn a_press_further_than_the_distance_starts_again() {
     // Given: each a pixel past the distance across, then down
-    let past = 10.0 + FALLBACK.1 + 1.0;
+    let past = 10.0 + fallback().1 + 1.0;
 
     // Then
     assert_eq!(
@@ -52,5 +52,27 @@ fn a_press_further_than_the_distance_starts_again() {
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
 #[test]
 fn linux_falls_back_to_gtks_defaults() {
-    assert_eq!(FALLBACK, (Duration::from_millis(400), 5.0));
+    assert_eq!(fallback(), (Duration::from_millis(400), 5.0));
+}
+
+#[test]
+fn a_browsers_platform_picks_its_fallback() {
+    for (platform, fallback) in [
+        ("Windows", WINDOWS),
+        ("macOS", MACOS),
+        (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15",
+            MACOS,
+        ),
+        (
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
+            MACOS,
+        ),
+        ("Linux", GTK),
+        ("Android", GTK),
+        ("Chrome OS", GTK),
+        ("", GTK),
+    ] {
+        assert_eq!(by_platform(platform), fallback, "{platform:?}");
+    }
 }
