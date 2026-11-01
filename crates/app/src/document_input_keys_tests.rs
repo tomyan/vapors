@@ -6,13 +6,13 @@ use std::rc::Rc;
 
 use vapors_dom::{Dom, NodeId};
 use vapors_elements::{Document, Viewport};
-use vapors_platform::{Event, Modifiers};
+use vapors_platform::{Event, Modifiers, Platform};
 use vapors_text::FontSystem;
 
 use super::Route;
-use crate::{DocumentInput, InputOutcome};
+use crate::{DocumentInput, Given};
 
-const VIEWPORT: Viewport = Viewport {
+pub(super) const VIEWPORT: Viewport = Viewport {
     width: 200.0,
     height: 100.0,
     scale: 1.0,
@@ -20,7 +20,7 @@ const VIEWPORT: Viewport = Viewport {
 
 /// A card at the top left, 120x40, holding a 40x20 button and an 80x20
 /// range 0..10 at 5, over a body that lets the pointer through.
-fn card() -> (Rc<RefCell<Document>>, NodeId, NodeId) {
+pub(super) fn card() -> (Rc<RefCell<Document>>, NodeId, NodeId) {
     let mut doc = Document::new(FontSystem::bundle_only());
     doc.add_stylesheet(
         "card.css",
@@ -48,19 +48,21 @@ fn card() -> (Rc<RefCell<Document>>, NodeId, NodeId) {
     (Rc::new(RefCell::new(doc)), button, range)
 }
 
-/// Route `event` and give the document what is its; its outcome then.
-fn give(
+/// `event` given as a host gives it, then the document updated: who it
+/// was for in the end, and what it did.
+pub(super) fn give(
     input: &mut DocumentInput,
     doc: &Rc<RefCell<Document>>,
     event: &Event,
-) -> (Route, Option<InputOutcome>) {
-    let route = input.route(doc, event).expect("placed");
-    let outcome = (route == Route::Document).then(|| input.handle(doc, event).expect("placed"));
+) -> (Route, Given) {
+    let given = input
+        .give(doc, event, &Platform::detached())
+        .expect("placed");
     doc.borrow_mut().update(VIEWPORT).expect("updates");
-    (route, outcome)
+    (given.route, given)
 }
 
-fn click(input: &mut DocumentInput, doc: &Rc<RefCell<Document>>, x: f32, y: f32) {
+pub(super) fn click(input: &mut DocumentInput, doc: &Rc<RefCell<Document>>, x: f32, y: f32) {
     give(input, doc, &Event::PointerMoved { x, y });
     give(
         input,
@@ -80,9 +82,21 @@ fn click(input: &mut DocumentInput, doc: &Rc<RefCell<Document>>, x: f32, y: f32)
     );
 }
 
+/// The DOM `code` of a key on a US layout, for the keys these tests use.
+fn code_of(name: &str) -> String {
+    match name {
+        " " => "Space".into(),
+        "-" => "Minus".into(),
+        n if n.len() == 1 && n.chars().all(|c| c.is_ascii_digit()) => format!("Digit{n}"),
+        n if n.len() == 1 => format!("Key{}", n.to_ascii_uppercase()),
+        n => n.into(),
+    }
+}
+
 fn key(name: &str, modifiers: Modifiers) -> Event {
     Event::Key {
         key: name.into(),
+        code: code_of(name),
         pressed: true,
         repeat: false,
         modifiers,
@@ -114,68 +128,17 @@ fn with_the_slider_focused_its_arrow_moves_it_and_an_unbound_key_reaches_the_hos
     Document::focus(&doc, Some(range));
 
     // When
-    let (arrow_route, arrow) = give(&mut input, &doc, &key("ArrowRight", Modifiers::default()));
+    let (arrow_route, _) = give(&mut input, &doc, &key("ArrowRight", Modifiers::default()));
     let control = Modifiers {
         control: true,
         ..Modifiers::default()
     };
-    let (undo_route, undo) = give(&mut input, &doc, &key("z", control));
+    let (undo_route, _) = give(&mut input, &doc, &key("z", control));
 
     // Then
-    assert_eq!(arrow_route, Route::Document);
-    assert_eq!(arrow.map(|o| o.unused_key), Some(false));
+    assert_eq!(arrow_route, Route::Document, "the slider used it");
     assert_eq!(doc.borrow().value(range).as_deref(), Some("6"));
-    assert_eq!(undo_route, Route::Document);
-    assert_eq!(
-        undo.map(|o| o.unused_key),
-        Some(true),
-        "Control+Z is the host's"
-    );
-}
-
-#[test]
-fn space_unused_by_the_focused_slider_reaches_the_host_down_and_up() {
-    // Given
-    let (doc, _, range) = card();
-    let mut input = DocumentInput::new();
-    Document::focus(&doc, Some(range));
-    let space = |pressed| Event::Key {
-        key: " ".into(),
-        pressed,
-        repeat: false,
-        modifiers: Modifiers::default(),
-    };
-
-    // When
-    let (down_route, down) = give(&mut input, &doc, &space(true));
-    let (up_route, _) = give(&mut input, &doc, &space(false));
-
-    // Then: the slider leaves Space to the host, and its up follows
-    assert_eq!(down_route, Route::Document);
-    assert_eq!(down.map(|o| o.unused_key), Some(true));
-    assert_eq!(up_route, Route::Host);
-}
-
-#[test]
-fn a_keys_up_goes_where_its_down_went_though_a_click_focused_the_card_meanwhile() {
-    // Given: H held with nothing focused, so the host has it
-    let (doc, button, _) = card();
-    let mut input = DocumentInput::new();
-    let h = |pressed| Event::Key {
-        key: "h".into(),
-        pressed,
-        repeat: false,
-        modifiers: Modifiers::default(),
-    };
-    let (down_route, _) = give(&mut input, &doc, &h(true));
-
-    // When: a click focuses the card's button, then H comes up
-    click(&mut input, &doc, 20.0, 10.0);
-    let (up_route, _) = give(&mut input, &doc, &h(false));
-
-    // Then
-    assert_eq!(doc.borrow().active_element(), Some(button));
-    assert_eq!((down_route, up_route), (Route::Host, Route::Host));
+    assert_eq!(undo_route, Route::Both, "Control+Z is the host's too");
 }
 
 #[test]
@@ -196,9 +159,9 @@ fn typing_minus_one_into_a_focused_number_field_leaves_the_host_no_key() {
     // When: "-" then "1", each a key-down and its text
     let mut host_keys = Vec::new();
     for typed in ["-", "1"] {
-        let (route, outcome) = give(&mut input, &doc, &key(typed, Modifiers::default()));
+        let (route, _) = give(&mut input, &doc, &key(typed, Modifiers::default()));
         give(&mut input, &doc, &Event::Character(typed.into()));
-        if route == Route::Host || outcome.is_some_and(|o| o.unused_key) {
+        if matches!(route, Route::Host | Route::Both) {
             host_keys.push(typed);
         }
     }
