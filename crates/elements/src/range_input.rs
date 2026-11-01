@@ -96,20 +96,27 @@ impl Document {
 
 /// `key` went down on `node`: a live range steps its value, with
 /// `input` and `change` when it moved.
-pub(crate) fn key(document: &Rc<RefCell<Document>>, node: NodeId, key: &str, modifiers: Modifiers) {
+pub(crate) fn key(
+    document: &Rc<RefCell<Document>>,
+    node: NodeId,
+    key: &str,
+    modifiers: Modifiers,
+) -> bool {
     let doc = document.borrow();
     let (Some(range), true) = (doc.range(node), doc.live_range(node)) else {
-        return;
+        return false;
     };
     drop(doc);
     let steps = if modifiers.shift { COARSE_STEPS } else { 1.0 };
     let Some(value) = stepped(&range, key, steps) else {
-        return;
+        return false;
     };
     if document.borrow_mut().set_range_value(node, value) {
         fire(document, node, "input");
         fire(document, node, "change");
     }
+    // a step at the end of the range moves nothing but is still the range's
+    true
 }
 
 /// The value `key` moves `range` to, or `None` for a key that does not.

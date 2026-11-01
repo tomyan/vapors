@@ -98,6 +98,20 @@ fn check_needs(job: &Value, name: &str, earlier: &BTreeSet<&str>) -> Result<(), 
     Ok(())
 }
 
+/// The one job condition the gate models: `${{ !cancelled() }}`, which
+/// runs a job after a job it needs failed. The gate stops at its first
+/// failure and never cancels, so it reaches the job only when every
+/// earlier one passed, and runs it then, as CI does.
+fn check_job_if(job: &Value, name: &str) -> Result<(), String> {
+    match job.get("if").map(Value::as_str) {
+        None | Some(Some("${{ !cancelled() }}")) => Ok(()),
+        Some(condition) => Err(format!(
+            "{name}: `if: {}`, which the gate cannot evaluate; fix: use `if: ${{{{ !cancelled() }}}}` or none",
+            condition.unwrap_or("?")
+        )),
+    }
+}
+
 fn plan_job(
     planner: &mut Planner<'_>,
     name: &str,
@@ -105,6 +119,7 @@ fn plan_job(
     base: &BTreeMap<String, String>,
 ) -> Result<Vec<PlannedStep>, String> {
     check_keys(job, &JOB_KEYS, name)?;
+    check_job_if(job, name)?;
     let timeout = timeout_of(job, name)?.ok_or_else(|| {
         format!("{name}: no `timeout-minutes:`; fix: give the job one from measured times")
     })?;
@@ -129,3 +144,7 @@ mod refusal_tests;
 #[cfg(test)]
 #[path = "gate_plan_action_tests.rs"]
 mod action_tests;
+
+#[cfg(test)]
+#[path = "gate_plan_job_if_tests.rs"]
+mod job_if_tests;

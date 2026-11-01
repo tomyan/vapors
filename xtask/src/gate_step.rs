@@ -26,9 +26,10 @@ pub const WORKFLOW_STEP_KEYS: [&str; 8] = [
 pub const ACTION_STEP_KEYS: [&str; 8] = ["name", "id", "uses", "with", "run", "env", "if", "shell"];
 
 /// The keys of a job the gate models.
-pub const JOB_KEYS: [&str; 7] = [
+pub const JOB_KEYS: [&str; 8] = [
     "name",
     "needs",
+    "if",
     "runs-on",
     "timeout-minutes",
     "env",

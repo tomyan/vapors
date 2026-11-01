@@ -1,6 +1,6 @@
 //! The web page's text input checked against Chromium's own `<input>`
 //! (E6): the same `DevTools` input calls (typed text, an IME's
-//! composition and its commit, keys) played on a plain `<input>` and on
+//! composition and its commit, keys, a double click, a paste) played on a plain `<input>` and on
 //! the built page's `field` demo, and the text and selection after each
 //! compared. Chromium's are the `<input>`'s own; vapors' are what the
 //! page's hidden textarea last took from the app's field
@@ -47,7 +47,20 @@ pub fn steps(text_at: (f64, f64)) -> Vec<(&'static str, Vec<(&'static str, Value
         ("Shift+Home", key("Shift+Home")),
         ("typed over the selection", insert("A")),
         ("double click on the word", double_click(text_at)),
+        ("pasted a\\nb\\n over the word", paste("a\nb\n")),
     ]
+}
+
+/// `text` written to the clipboard, then Control+V, as the events
+/// oracle's `clipboard` step and key do: Chromium's `<input>` pastes it
+/// itself, the page's textarea through its `paste` listener.
+fn paste(text: &str) -> Vec<(&'static str, Value)> {
+    let mut calls_made = calls(&Action::Clipboard(text.to_owned()), &mut Pointer::default());
+    calls_made.extend(calls(
+        &Action::Key("Control+v".to_owned()),
+        &mut Pointer::default(),
+    ));
+    calls_made
 }
 
 /// Two presses and releases at `(x, y)`, the second counted 2, as the

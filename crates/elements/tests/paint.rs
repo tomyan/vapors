@@ -96,7 +96,39 @@ fn the_bodys_background_becomes_the_canvas_when_the_roots_is_transparent() {
 
     // Then: the canvas takes it, and body paints no quad of its own
     assert_eq!(painted.canvas(), Color::from_rgba8(0xe9, 0xec, 0xef, 255));
+    assert_eq!(
+        painted.canvas_from(),
+        Some(vapors_elements::CanvasFrom::Body)
+    );
     assert_eq!(painted.scene().items(), []);
+}
+
+#[test]
+fn the_roots_background_becomes_the_canvas_and_says_it_came_from_html() {
+    // Given
+    let mut doc = document();
+    doc.add_stylesheet(
+        "app.css",
+        "html { background-color: #1c1c1c; } body { background-color: #e9ecef; }",
+    )
+    .expect("parses");
+
+    // When
+    let painted = doc
+        .update(Viewport {
+            width: 100.0,
+            height: 50.0,
+            scale: 2.0,
+        })
+        .expect("updates");
+
+    // Then
+    assert_eq!(
+        painted.canvas_from(),
+        Some(vapors_elements::CanvasFrom::Root)
+    );
+    assert_eq!(painted.canvas(), Color::from_rgba8(0x1c, 0x1c, 0x1c, 255));
+    assert!((painted.scale() - 2.0).abs() < f32::EPSILON);
 }
 
 #[test]
@@ -115,6 +147,7 @@ fn the_canvas_is_white_when_neither_root_nor_body_has_a_background() {
 
     // Then
     assert_eq!(painted.canvas(), Color::from_rgba8(255, 255, 255, 255));
+    assert_eq!(painted.canvas_from(), None);
 }
 
 #[test]
