@@ -21,13 +21,21 @@ const COARSE_STEPS: f64 = 10.0;
 
 impl Document {
     /// A control's value as the DOM's `value` string: a range's number
-    /// written, a number field's text when it is a number (else empty);
-    /// `None` for an element that is not a control with a value.
+    /// written, a number field's text when it is a number (else empty),
+    /// a text field's text; `None` for an element that is not a control
+    /// with a value.
     #[must_use]
     pub fn value(&self, node: NodeId) -> Option<String> {
         self.range(node)
             .map(|range| written(range.value))
             .or_else(|| self.number_field(node).map(|field| field.value()))
+            .or_else(|| {
+                self.arena
+                    .get(node, "value")
+                    .element()
+                    .filter(|e| crate::text_field::is_text_input(e))
+                    .map(crate::text_field::text_of)
+            })
     }
 
     /// A range's value as a number, or a number field's when its text

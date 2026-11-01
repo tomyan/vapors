@@ -42,17 +42,19 @@ impl Document {
         self.texts.begin();
         let calcs = self.styled(viewport)?;
         let (root, body) = (self.root(), self.body());
-        let kept = self.kept.as_ref().expect("styled keeps the styles");
-        let used = &kept.used;
         let number_focus = self.active_element().map(|node| {
             let selected = self.selected_all == Some(node);
             (node, crate::layout::NumberFocus { selected })
         });
+        let text_marks = self.focused_text_marks();
+        let kept = self.kept.as_ref().expect("styled keeps the styles");
+        let used = &kept.used;
         let source = crate::layout::Source {
             arena: &self.arena,
             used,
             images: &self.images,
             number_focus,
+            text_marks,
         };
         let boxes = build(&source, root);
         let size = (viewport.width, viewport.height);

@@ -1,0 +1,94 @@
+# A text field by mouse and keys (E6a). `name` is x 0..160, y 0..24,
+# holding "Warm" in 14 px Geist (about 38 px wide from x 3); `off` is
+# x 320..480 and disabled; the button is x 480..560.
+listen pointerdown pointerup pointercancel click input change keydown keyup focusin focusout selectionchange
+click 120 12                  a click right of the text puts the caret at its end
+expect event click input#name
+expect focus-visible input#name
+expect selection input#name 4 4
+type "th"                     typed at the caret: Warmth
+expect event input input#name
+expect value input#name Warmth
+expect selection input#name 6 6
+key ArrowLeft                 the caret moves left
+expect selection input#name 5 5
+key Shift+ArrowLeft           Shift extends the selection left
+expect selection input#name 4 5
+key Shift+Home                to the start
+expect selection input#name 0 5
+type "C"                      replaces the selection: Ch
+expect value input#name Ch
+expect selection input#name 1 1
+key End
+expect selection input#name 2 2
+key Backspace                 C
+expect value input#name C
+key Home
+expect selection input#name 0 0
+key Delete                    empties it
+expect value input#name ""
+expect selection input#name 0 0
+type "Cool"
+expect value input#name Cool
+key Enter                     commits: change
+expect event change input#name
+key Enter                     committed already: no change
+expect no event change
+key Tab                       on to plain
+expect focus-visible input#plain
+expect selection input#plain 0 0
+key Shift+Tab                 back by keyboard: the text is selected whole
+expect focus-visible input#name
+expect selection input#name 0 4
+key ArrowRight                collapses the selection to its end
+expect selection input#name 4 4
+click 4 12                    a click at the start puts the caret before the text
+expect selection input#name 0 0
+type "A-"                     A-Cool
+expect value input#name A-Cool
+click 520 12                  the button: name blurs and commits
+expect event change input#name
+expect focus button#after
+click 400 12                  off is disabled: no click, no focus, no caret
+expect event pointerdown input#off
+expect event selectionchange input#off
+expect no event click
+expect focus body
+expect selection input#off 0 0
+click 300 12                  plain, empty: Control's word keys, as Linux Chromium has them
+expect focus input#plain
+type "A-Cool day"
+expect value input#plain "A-Cool day"
+key Control+ArrowLeft         to the start of "day"
+expect selection input#plain 7 7
+key Control+ArrowLeft         to the start of "Cool"
+expect selection input#plain 2 2
+key Control+ArrowLeft         to the hyphen
+expect selection input#plain 1 1
+key Control+ArrowRight        to the end of the hyphen
+expect selection input#plain 2 2
+key Control+Delete            to the end of the word: "Cool" goes, its space stays
+expect value input#plain "A- day"
+key End
+expect selection input#plain 6 6
+key Control+Backspace         to the start of the word
+expect value input#plain "A- "
+key Control+Backspace         the space and the hyphen, as far as Control+ArrowLeft goes
+expect value input#plain A
+key Control+Backspace
+expect value input#plain ""
+type "ab"
+expect value input#plain ab
+key Control+a
+expect selection input#plain 0 2
+touch-down 100 12             a finger down on name: no focus, no caret yet
+expect event pointerdown input#name
+expect focus input#plain
+expect selection input#name 2 2
+touch-move 100 80             a drag pans: cancelled, nothing selected
+expect event pointercancel input#name
+touch-up 100 80
+expect selection input#name 2 2
+tap 40 12                     a tap focuses name and places the caret there
+expect focus input#name
+expect selection input#name 5 5

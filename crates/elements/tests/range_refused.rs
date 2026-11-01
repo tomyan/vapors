@@ -18,9 +18,8 @@ fn document() -> vapors_elements::Document {
 #[test]
 fn an_input_of_a_type_not_built_yet_is_refused_naming_its_slice() {
     for (kind, slice) in [
-        (Some("text"), "3-E6"),
-        (None, "3-E6"),
         (Some("date"), "no slice yet"),
+        (Some("search"), "no slice yet"),
     ] {
         // Given
         let mut doc = document();

@@ -3,6 +3,7 @@
 //! its event handlers took since the last frame is the Input phase's.
 
 use std::time::Duration;
+use vapors_elements::Document;
 
 use vapors_platform::{Frame, Instant};
 
@@ -27,6 +28,9 @@ impl Phases for AppFrame<'_, '_> {
     }
 
     fn update(&mut self, _now: Instant) -> Result<(), String> {
+        // the selectionchange each text field owes, once per frame, as
+        // Chromium fires one per task (E6a)
+        Document::settle_selection(&self.app.document);
         self.app.update_document(self.frame)
     }
 

@@ -69,4 +69,15 @@ pub enum Expect {
         /// Whether it is checked.
         checked: bool,
     },
+    /// This text field's selection runs from `start` to `end`, in UTF-16
+    /// code units as the DOM's `selectionStart` and `selectionEnd`
+    /// count them; equal for a caret (E6a).
+    Selection {
+        /// The field.
+        target: String,
+        /// `selectionStart`.
+        start: usize,
+        /// `selectionEnd`.
+        end: usize,
+    },
 }
