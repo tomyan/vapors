@@ -37,3 +37,22 @@ pub(super) fn key(document: &Rc<RefCell<Document>>, event: &Event) -> Option<boo
         None
     }
 }
+
+/// Whether `event` is the paste shortcut going down while one of the
+/// document's text fields has focus: the field's paste, which follows as
+/// `Event::Paste`, so the key is used. The platform's own rule decides
+/// (`vapors_platform::paste_shortcut`), so the key and the paste agree.
+pub(super) fn field_paste_key(document: &Document, event: &Event) -> bool {
+    let Event::Key {
+        key,
+        code,
+        pressed: true,
+        repeat,
+        modifiers,
+    } = event
+    else {
+        return false;
+    };
+    vapors_platform::paste_shortcut(key, code, *modifiers, *repeat, cfg!(target_os = "macos"))
+        && document.text_field_focused()
+}

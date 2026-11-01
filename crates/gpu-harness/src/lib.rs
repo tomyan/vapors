@@ -4,8 +4,21 @@
 //! `vapors-gpu` rule: `VAPORS_GPU_ADAPTER` names it when set, otherwise
 //! the first hardware adapter, otherwise the first software one. A tier
 //! that cannot run fails. It never skips.
+//!
+//! The tiers split on the test's name: the gpu tier runs `gpu_*`, the
+//! unit tier the rest. xtask's unit tier sets [`TIER_ENV`] to
+//! [`REFUSED_TIER`], and [`gpu()`] refuses there, so a GPU test without
+//! the prefix fails on a machine with a GPU too, not only on a runner
+//! without one. Only [`gpu()`] is guarded: a test that opens its own
+//! `wgpu::Instance`, as `vapors-platform`'s `surface.rs` does for a
+//! window, is not. Calling [`allowed_in`] there would extend the guard.
 
 pub use vapors_renderer::read_rgba8;
+
+/// Set by xtask's unit tier (`steps_tiers.rs`).
+pub const TIER_ENV: &str = "VAPORS_TEST_TIER";
+/// The value of [`TIER_ENV`] in which [`gpu()`] refuses.
+pub const REFUSED_TIER: &str = "unit";
 
 /// The adapter this process is testing on, with its device and queue.
 pub struct Gpu {
@@ -22,11 +35,16 @@ pub struct Gpu {
 ///
 /// # Panics
 ///
+/// In the unit tier, naming the fix.
+///
 /// When no adapter matches, with a message listing the adapters that
 /// were found and how to fix it. A panic is the right failure here: the
 /// caller is a test, and the message is the report.
 #[must_use]
 pub fn gpu() -> Gpu {
+    if let Err(refusal) = allowed_in(std::env::var(TIER_ENV).ok().as_deref()) {
+        panic!("{refusal}");
+    }
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends: wgpu::Backends::PRIMARY,
         ..wgpu::InstanceDescriptor::new_without_display_handle()
@@ -53,3 +71,24 @@ pub fn gpu() -> Gpu {
         queue,
     }
 }
+
+/// Refuse the unit tier; any other tier, or none (a test run directly
+/// with `cargo nextest run`), may open a GPU.
+///
+/// # Errors
+///
+/// `tier` is `unit`, with a message naming the fix.
+pub fn allowed_in(tier: Option<&str>) -> Result<(), String> {
+    if tier != Some(REFUSED_TIER) {
+        return Ok(());
+    }
+    Err(format!(
+        "a test opened the GPU in the unit tier ({TIER_ENV}={REFUSED_TIER}); the gpu tier runs \
+         test functions named gpu_*, so on a runner without a GPU this test fails. \
+         Fix: rename the test function to gpu_<name>, then run `cargo xtask test --tier gpu`"
+    ))
+}
+
+#[cfg(test)]
+#[path = "tier_tests.rs"]
+mod tests;

@@ -44,8 +44,10 @@ fn field() -> (Rc<RefCell<Document>>, Rc<RefCell<u32>>) {
 }
 
 fn key(app: &mut ElementsApp, platform: &Platform, key: &str, pressed: bool) {
+    // the named keys this test presses are each one key: code is the name
     let event = Event::Key {
         key: key.to_owned(),
+        code: key.to_owned(),
         pressed,
         repeat: false,
         modifiers: Modifiers::default(),
