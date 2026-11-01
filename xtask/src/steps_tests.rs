@@ -98,3 +98,19 @@ fn lint_checks_layers_and_imports_after_files_and_before_clippy() {
     // Then
     assert_eq!(names, ["fmt", "files", "layers", "imports", "clippy"]);
 }
+
+// gpu_harness::gpu() refuses this tier, so a GPU test without the gpu_
+// prefix fails here on a machine with a GPU, as it would on a runner.
+#[test]
+fn the_unit_tier_tells_its_tests_it_is_the_unit_tier() {
+    // When
+    let step = unit();
+
+    // Then
+    assert!(
+        step.env
+            .contains(&("VAPORS_TEST_TIER".to_owned(), "unit".to_owned())),
+        "{:?}",
+        step.env
+    );
+}
