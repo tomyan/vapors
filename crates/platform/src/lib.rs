@@ -58,7 +58,7 @@ pub use file_kind::FileKind;
 pub use gestures::{Gestures, TAP_SLOP};
 pub use paste_key::paste_shortcut;
 pub use platform::Platform;
-pub use report::{report_error, report_status};
+pub use report::{report_error, report_startup, report_status};
 pub use surface::pick_format;
 pub use waker::{LoopClosed, Waker};
 pub use window::{App, Frame, Next, WindowOptions, run};

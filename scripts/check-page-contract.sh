@@ -1,7 +1,8 @@
 #!/bin/sh
 # The page contract on the built web demo, in headless Chrome: an error
 # lands in #error when the page has one and in #status when it has not;
-# a status line never lands in #error; a lost GPU device is reported in
+# a status line never lands in #error; the GPU's start-up line lands in
+# #adapter when the page has one, leaving #status as the page left it; a lost GPU device is reported in
 # #error with the fix; the demos (?demo=) draw, an unknown demo is an
 # error, the page works one directory down (/vapors/), and each demo's
 # screenshot, after the inputs its .pixels file lists, holds its pixel
@@ -119,6 +120,9 @@ prepare() {
   # only if the resize asks for a frame and it is drawn at 300 px.
   page resize "$counter" "(function () { var f = Number(document.body.dataset.frames) || 0; if (f >= 1 && !window.vaporsResized) { var c = document.getElementById('vapors'); c.style.width = '500px'; c.style.height = '300px'; window.vaporsResized = true; } return (Number(document.body.dataset.frameHeight) || 0) === 300; })()"
   page subpath "" "$adapter"
+  # A page with its own #adapter: the start-up line goes there and
+  # #status keeps what the page wrote ("starting").
+  page adapter-element "" 'document.getElementById("adapter").textContent.indexOf("adapter: ") === 0' 's#<p id="status">starting</p>#<p id="status">starting</p><p id="adapter"></p>#'
   ln -s . "$work/vapors"
   grep -q '<p id="error"' "$work/as-built.html" || { echo "$web/index.html: no <p id=\"error\">" >&2; exit 1; }
 }
@@ -383,6 +387,10 @@ check hello '^adapter: ' hidden '?demo=hello'
 check unknown-demo '^starting$' '^no demo is called `nope`' '?demo=nope'
 check subpath '^adapter: ' hidden '' vapors/
 check resize '^adapter: ' hidden '?demo=hello'
+check adapter-element '^starting$' hidden '?demo=hello'
+adapter_line=$(printf '%s' "$dom" | grep -o '<p id="adapter">[^<]*</p>' | sed 's#<[^>]*>##g' || true)
+echo "adapter-element: #adapter [$adapter_line]"
+printf '%s' "$adapter_line" | grep -q '^adapter: ' || fail "adapter-element: #adapter is [$adapter_line], wanted the start-up line"
 # overlap <demo>: no visible HTML control over the elements demo's canvas.
 overlap() {
   dom=$(dump "$1-overlap" "$(query "$1")") || { fail "$1-overlap: $chrome exited non-zero or passed 60 s"; console "$1-overlap"; return; }
@@ -409,4 +417,4 @@ for demo in $demos; do
   done
 done
 [ "$failed" = 0 ] || { echo "the page contract does not hold; reproduce: cargo xtask web && $0 target/web \$(mktemp -d)" >&2; exit 1; }
-echo "ok   the page contract holds in all ten cases, no HTML over the canvas of: $demos index; the gradient screenshot and the screenshots:$shots"
+echo "ok   the page contract holds in all eleven cases, no HTML over the canvas of: $demos index; the gradient screenshot and the screenshots:$shots"
