@@ -8,6 +8,7 @@
 
 use std::fmt::Write as _;
 
+use super::allowances::Allowance;
 use super::emit::Emitter;
 use super::syn_map::parse_expr;
 use super::unwrap::identifiers;
@@ -78,6 +79,9 @@ impl Emitter<'_> {
             )));
         };
         let key = self.row_key_expr(key, row)?;
+        // the cleanup keeps its own key, and the compiler cannot see a
+        // Copy key
+        self.line(Allowance::CloneOnCopy.attribute());
         self.line(format!(
             "{{ let this = {signal}; let key = {key}; this.update(|nodes| {{ nodes.insert(key.clone(), {var}); }}); vapors_signals::on_cleanup(move || {{ if this.try_with_untracked(|nodes| nodes.get(&key) == Some(&{var})) == Ok(true) {{ this.update(|nodes| {{ nodes.remove(&key); }}); }} }}); }}"
         ));

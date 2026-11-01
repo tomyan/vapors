@@ -5,7 +5,7 @@
 #[path = "common/codegen.rs"]
 mod codegen;
 
-use codegen::{assert_has, generated_with};
+use codegen::{assert_has, at, generated_with};
 
 const SCRIPT: &str = "let names: Signal<Vec<String>> = Signal::new(Vec::new());\nlet rows: Signal<BTreeMap<String, NodeId>> = Signal::new(BTreeMap::new());";
 
@@ -58,4 +58,17 @@ fn a_key_from_the_index_reads_the_index() {
         &code,
         "let key = { let i = i.get_untracked(); i.to_string() };",
     );
+}
+
+#[test]
+fn the_keys_clone_is_allowed_for_a_copy_key() {
+    // When: a usize key, which clippy's clone_on_copy would refuse
+    let code = generated_with(
+        "let names: Signal<Vec<String>> = Signal::new(Vec::new());\nlet rows: Signal<std::collections::BTreeMap<usize, NodeId>> = Signal::new(std::collections::BTreeMap::new());",
+        "<ul>{for (i, name) in names.get() key=i}<li bind:this={rows}>{name}</li>{/for}</ul>",
+    );
+
+    // Then: the allowance comes right before the binding
+    assert_has(&code, "#[allow(clippy::clone_on_copy");
+    assert!(at(&code, "#[allow(clippy::clone_on_copy") < at(&code, "let key = i.get_untracked();"));
 }
