@@ -79,7 +79,7 @@ impl Document {
     /// The listeners for `name` on each node of `target`'s chain, target
     /// first, with their node, cloned so none is called with the
     /// document borrowed.
-    fn listeners_along(
+    pub(crate) fn listeners_chain(
         &self,
         target: NodeId,
         name: &str,
@@ -123,7 +123,7 @@ pub(crate) fn deliver(
     bubbles: bool,
 ) -> (Event, Vec<(NodeId, Capture)>) {
     event = event.at(target);
-    let mut along = document.borrow().listeners_along(target, event.name());
+    let mut along = document.borrow().listeners_chain(target, event.name());
     if !bubbles {
         along.truncate(1);
     }

@@ -31,7 +31,7 @@ fn header(path: &str, style: &str) -> String {
         "use std::cell::RefCell;
 use std::rc::Rc;
 #[allow(unused_imports)]
-use vapors_dom::{{Dom, DynDom, Event, NodeId, PropertyValue, Root, SCOPE_ATTRIBUTE, Snippet}};
+use vapors_dom::{{Dispatcher, Dom, DynDom, Event, NodeId, PropertyValue, Root, SCOPE_ATTRIBUTE, Snippet}};
 #[allow(unused_imports)]
 use vapors_signals::{{Effect, Memo, Owner, Signal}};
 

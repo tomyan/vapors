@@ -12,11 +12,13 @@
 //! what to create, move, update or remove.
 
 pub mod blocks;
+mod dispatcher;
 mod event;
 pub mod recording;
 mod roots;
 mod snippet;
 
+pub use dispatcher::{DispatchRefused, Dispatcher, Listeners};
 pub use event::{Capture, Event, Handler, Pointer};
 pub use roots::{BlockNodes, Root, current_nodes};
 pub use snippet::{Args, DynDom, Renderable, Snippet};
@@ -41,8 +43,9 @@ pub enum PropertyValue {
 /// to the scope its `<style>` was added under (see [`Dom::add_style`]).
 pub const SCOPE_ATTRIBUTE: &str = "data-wisp";
 
-/// The tree a component mounts into.
-pub trait Dom {
+/// The tree a component mounts into; its listeners are reachable for a
+/// component's own events ([`Dispatcher`]).
+pub trait Dom: Listeners {
     /// Creates an element with the given tag, attached nowhere yet.
     fn create_element(&mut self, tag: &str) -> NodeId;
     /// Creates a text node, attached nowhere yet.
@@ -68,4 +71,8 @@ pub trait Dom {
     /// only those elements. Each mount calls it; a scope already added
     /// is not added again.
     fn add_style(&mut self, scope: &str, css: &str);
+    /// Names events a component dispatches itself ([`Dispatcher`]), so a
+    /// tree that refuses listeners for events it never fires takes
+    /// listeners for these.
+    fn declare_events(&mut self, names: &[&str]);
 }

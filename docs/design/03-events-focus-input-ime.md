@@ -400,6 +400,33 @@ the clipboard, caret painting and the DOM events. Rules:
   elements is a range over the inline runs, copy serialises the text
   with newlines at block boundaries.
 
+## A component's own events
+
+As built (the listbox slice's first part, 2026-11-01): a component
+dispatches events of its own, such as a combobox's `comboboxopen`,
+with `#[dispatcher(comboboxopen, optionchoose)] let events;` in its
+script. The compiler makes it a `vapors_dom::Dispatcher` for those
+names, which declares them to the tree at mount: the elements document
+refuses a listener for an event it never fires, unless a component
+declares it. `events.dispatch(node, Event::new("optionchoose"))` runs
+the listeners on `node` and then its ancestors at once, as the DOM's
+`dispatchEvent` does, and answers `Ok(true)` unless a listener
+prevented the default, so the component runs its default action only
+then. It is refused, not dropped: for a name not declared, and when the
+tree is borrowed (from inside a `Dom` call), since a listener may use
+the tree.
+
+Taken from the DOM: synchronous, bubbling, cancelable, the return
+value of `dispatchEvent`, delivered to listeners on elements, so an app
+listens with `on<name>` on any ancestor. Differs from the DOM: no
+capture phase and no `CustomEvent.detail` yet (the target and the
+component's bound signals carry the data); names are declared. Differs
+from Svelte: Svelte 4's `createEventDispatcher` sends a component event
+to its parent's `on:` handler only, not bubbling through the DOM and
+not cancelable unless asked, and Svelte 5 replaced it with callback
+props; vapors' events are DOM events on the component's elements,
+which is what the APG's patterns and their default actions need.
+
 ## Synthetic input
 
 Tests and scenario replays (area 10 C4) inject events at the platform

@@ -53,6 +53,8 @@ pub enum Call {
         node: NodeId,
         event: String,
     },
+    /// `declare_events`: the names a component dispatches itself.
+    DeclareEvents(Vec<String>),
     AddStyle {
         scope: String,
         css: String,

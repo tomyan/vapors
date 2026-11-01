@@ -90,6 +90,12 @@ impl Dom for RecordingDom {
         });
     }
 
+    fn declare_events(&mut self, names: &[&str]) {
+        self.calls.push(Call::DeclareEvents(
+            names.iter().map(|name| (*name).to_owned()).collect(),
+        ));
+    }
+
     fn add_style(&mut self, scope: &str, css: &str) {
         self.calls.push(Call::AddStyle {
             scope: scope.into(),

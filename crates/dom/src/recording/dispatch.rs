@@ -32,8 +32,10 @@ impl RecordingDom {
         Self::dispatch(dom, target, event);
     }
 
-    /// Delivers `event` to `target` and its ancestors.
-    pub fn dispatch(dom: &Rc<RefCell<Self>>, target: NodeId, mut event: Event) {
+    /// Delivers `event` to `target` and its ancestors, with `target` as
+    /// its target, as the elements document does.
+    pub fn dispatch(dom: &Rc<RefCell<Self>>, target: NodeId, event: Event) {
+        let mut event = event.at(target);
         let path = dom.borrow().path_to_root(target);
         for node in path {
             let listeners = dom
@@ -73,5 +75,25 @@ impl RecordingDom {
             Some(PropertyValue::Text(text)) => text,
             _ => String::new(),
         }
+    }
+}
+
+impl crate::Listeners for RecordingDom {
+    fn listeners_along(
+        &self,
+        target: NodeId,
+        name: &str,
+    ) -> Vec<(NodeId, Vec<Rc<RefCell<crate::Handler>>>)> {
+        self.path_to_root(target)
+            .into_iter()
+            .map(|node| {
+                let listeners = self
+                    .listeners
+                    .get(&(node, name.to_owned()))
+                    .cloned()
+                    .unwrap_or_default();
+                (node, listeners)
+            })
+            .collect()
     }
 }

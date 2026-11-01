@@ -17,6 +17,11 @@ impl Dom for Document {
             .insert(Node::new(Kind::Element(Element::new(tag))))
     }
 
+    fn declare_events(&mut self, names: &[&str]) {
+        self.declared_events
+            .extend(names.iter().map(|name| (*name).to_owned()));
+    }
+
     fn add_style(&mut self, scope: &str, css: &str) {
         self.changed = true;
         self.dirty.everything();
@@ -130,5 +135,18 @@ impl Document {
                 panic!("{call}: {node:?} is a text node ({text:?}), not an element")
             }
         }
+    }
+}
+
+impl vapors_dom::Listeners for Document {
+    fn listeners_along(
+        &self,
+        target: NodeId,
+        name: &str,
+    ) -> Vec<(
+        NodeId,
+        Vec<std::rc::Rc<std::cell::RefCell<vapors_dom::Handler>>>,
+    )> {
+        self.listeners_chain(target, name)
     }
 }

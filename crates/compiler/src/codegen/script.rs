@@ -98,6 +98,13 @@ fn classify(
         check_declared(source, &name, offset)?;
         info.declared.push((name, offset));
     }
+    if let Some(attr) = local
+        .attrs
+        .iter()
+        .find(|attr| attr.path().is_ident("dispatcher"))
+    {
+        return super::script_dispatcher::classify_dispatcher(source, offset, attr, &local, info);
+    }
     let is_prop = local.attrs.iter().any(|attr| attr.path().is_ident("prop"));
     let (name, ty) = binding(&local.pat);
     let init = local.init.as_ref().map(|init| (*init.expr).clone());
