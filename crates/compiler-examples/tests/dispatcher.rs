@@ -71,7 +71,7 @@ fn reported(message: &str) {
 #[test]
 fn a_refused_pick_is_reported_and_not_acted_on() {
     // Given: a listener releases pointer capture, which `pick` cannot carry
-    set_error_report(reported);
+    set_error_report("reported", reported);
     let (dom, picker, heard) = mounted(Event::release_pointer_capture);
 
     // When

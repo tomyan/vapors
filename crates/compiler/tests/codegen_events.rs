@@ -118,3 +118,33 @@ fn the_event_name_is_the_attribute_name_after_on() {
         "listen(input0, \"input\", Box::new(move |event: &mut Event| vapors_dom::handle(event, &typed)))",
     );
 }
+
+#[test]
+fn a_handler_that_assigns_to_what_it_captures_is_refused_naming_it() {
+    // Given: a script closure, and one written inline, each changing `n`
+    let cases = [
+        "<script>\nlet mut n = 0;\nlet bump = move || n += 1;\n</script>\n<button onclick={bump}>+</button>",
+        "<script>\nlet mut n = 0;\n</script>\n<button onclick={move |_event| { n = 1; }}>+</button>",
+        "<script>\nlet mut n = (0, 0);\nlet bump = move |_event: &mut Event| { let r = &mut n.0; *r = 1; };\n</script>\n<button onclick={bump}>+</button>",
+    ];
+    for case in cases {
+        // When
+        let why = refusal(case).to_string();
+
+        // Then
+        assert!(why.contains("assigns to `n`, which it captures"), "{why}");
+        assert!(why.contains("keep `n` in a signal"), "{why}");
+    }
+}
+
+#[test]
+fn a_handler_that_assigns_only_to_its_own_bindings_is_taken() {
+    // When: `total` is the handler's own, and `count` changes through a signal
+    let code = generated_with(
+        "let count: Signal<i32> = Signal::new(0);\nlet bump = move || { let mut total = 0; total += 1; count.set(total); };",
+        "<button onclick={bump}>+</button>",
+    );
+
+    // Then
+    assert_has(&code, "vapors_dom::handle_without_event(&bump)");
+}

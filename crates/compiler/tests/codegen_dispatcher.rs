@@ -21,7 +21,11 @@ fn a_dispatcher_declares_its_events_and_reaches_handlers() {
         "let events = Dispatcher::new(dom.dyn_dom(), &[\"optionchoose\", \"comboboxdismiss\"]);",
     );
     // the type lists them, and mount declares them first
-    assert_has(&code, "vec![\"optionchoose\", \"comboboxdismiss\"]");
+    assert_has(
+        &code,
+        "events.extend([\"optionchoose\", \"comboboxdismiss\"]);",
+    );
+    assert_has(&code, "if seen.insert(std::any::type_name::<Self>()) {");
     assert_has(&code, "dom.borrow_mut().declare_events(&Self::events());");
 }
 

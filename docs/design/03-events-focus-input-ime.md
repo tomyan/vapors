@@ -479,7 +479,15 @@ except by its own bug; it panics with the refusal. A listener returns
 goes to the platform's error report (`report_error`, which the page
 shows), which the app installs with `vapors_dom::set_error_report`.
 With none installed (a test without an app) it panics with the
-message.
+message. A thread has one report: installing a report under another
+name panics, naming both, so `ElementsApp::new` after a test's own
+report refuses rather than taking its errors; the same name again is
+kept.
+
+A component type's `events()` lists its own names, then each child
+type's, through `events_into`, which skips a type already listed: a
+component that uses itself, directly or through another, is listed
+once and its mount ends.
 
 Taken from the DOM: synchronous, bubbling, cancelable, the return
 value of `dispatchEvent`, delivered to listeners on elements, so an app
