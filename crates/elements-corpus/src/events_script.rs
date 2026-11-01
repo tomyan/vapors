@@ -16,7 +16,7 @@
 //!   `expect event <type> <target>`, `expect no event <type>` (a type
 //!   that is listened for), `expect focus <target>`,
 //!   `expect focus-visible <target>`, `expect value <target> <text>` (a
-//!   control's `value`, which has no spaces; `""` for an empty one),
+//!   control's `value`; quoted when empty or holding spaces, `"a b"`),
 //!   `expect checked <target>
 //!   true|false`, `expect selection <target> <start> <end>` (a text
 //!   field's selection, UTF-16 units). A target is `tag#id`, else the
@@ -70,16 +70,6 @@ impl Script {
     pub fn checked_targets(&self) -> Vec<String> {
         self.targets(|expect| match expect {
             Expect::Checked { target, .. } => Some(target),
-            _ => None,
-        })
-    }
-
-    /// The text fields whose selection the script expects somewhere,
-    /// sorted and each once: every step records each one's.
-    #[must_use]
-    pub fn selection_targets(&self) -> Vec<String> {
-        self.targets(|expect| match expect {
-            Expect::Selection { target, .. } => Some(target),
             _ => None,
         })
     }
@@ -166,7 +156,7 @@ fn directive(script: &mut Script, line: &str, number: usize) -> Result<(), Strin
             script.capture = fields.iter().map(|f| (*f).to_owned()).collect();
             Ok(())
         }
-        "expect" => expect(script, &fields, number),
+        "expect" => expect(script, rest, &fields, number),
         _ if script.listen.is_empty() && is_action(word) => Err("an action before `listen`".into()),
         _ => action(word, &fields, rest).map(|action| {
             script.steps.push(Step {

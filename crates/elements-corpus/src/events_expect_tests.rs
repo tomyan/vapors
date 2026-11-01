@@ -95,11 +95,35 @@ fn a_selection_expectation_takes_a_start_at_most_its_end() {
             3
         )
     );
-    assert_eq!(script.selection_targets(), ["input#a", "input#b"]);
     for refused in [backwards, words] {
         assert!(
             refused.contains("t.events:3:") && refused.contains("start at most end"),
             "{refused}"
         );
     }
+}
+
+#[test]
+fn a_quoted_value_may_hold_spaces_and_an_unclosed_one_is_refused() {
+    // When
+    let script =
+        parse("v", "listen input\nkey End\nexpect value input#a \"a b\"\n").expect("parses");
+    let unclosed =
+        parse("v", "listen input\nkey End\nexpect value input#a \"a b\n").expect_err("refused");
+
+    // Then
+    assert_eq!(
+        script.steps[0].expect[0],
+        (
+            Expect::Value {
+                target: "input#a".into(),
+                value: "a b".into()
+            },
+            3
+        )
+    );
+    assert!(
+        unclosed.contains("v.events:3:") && unclosed.contains("one quoted text"),
+        "{unclosed}"
+    );
 }

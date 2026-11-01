@@ -46,13 +46,18 @@
           4,
           4
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": "Warm"
+        "input#name": "Warm",
+        "input#plain": ""
       }
     },
     {
@@ -120,13 +125,18 @@
           6,
           6
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": "Warmth"
+        "input#name": "Warmth",
+        "input#plain": ""
       }
     },
     {
@@ -162,13 +172,18 @@
           5,
           5
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": "Warmth"
+        "input#name": "Warmth",
+        "input#plain": ""
       }
     },
     {
@@ -204,13 +219,18 @@
           4,
           5
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": "Warmth"
+        "input#name": "Warmth",
+        "input#plain": ""
       }
     },
     {
@@ -246,13 +266,18 @@
           0,
           5
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": "Warmth"
+        "input#name": "Warmth",
+        "input#plain": ""
       }
     },
     {
@@ -294,13 +319,18 @@
           1,
           1
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": "Ch"
+        "input#name": "Ch",
+        "input#plain": ""
       }
     },
     {
@@ -336,13 +366,18 @@
           2,
           2
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": "Ch"
+        "input#name": "Ch",
+        "input#plain": ""
       }
     },
     {
@@ -384,13 +419,18 @@
           1,
           1
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": "C"
+        "input#name": "C",
+        "input#plain": ""
       }
     },
     {
@@ -426,13 +466,18 @@
           0,
           0
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": "C"
+        "input#name": "C",
+        "input#plain": ""
       }
     },
     {
@@ -468,13 +513,18 @@
           0,
           0
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": ""
+        "input#name": "",
+        "input#plain": ""
       }
     },
     {
@@ -594,13 +644,18 @@
           4,
           4
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": "Cool"
+        "input#name": "Cool",
+        "input#plain": ""
       }
     },
     {
@@ -636,13 +691,18 @@
           4,
           4
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": "Cool"
+        "input#name": "Cool",
+        "input#plain": ""
       }
     },
     {
@@ -672,13 +732,18 @@
           4,
           4
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": "Cool"
+        "input#name": "Cool",
+        "input#plain": ""
       }
     },
     {
@@ -726,13 +791,18 @@
           4,
           4
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": "Cool"
+        "input#name": "Cool",
+        "input#plain": ""
       }
     },
     {
@@ -780,13 +850,18 @@
           0,
           4
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": "Cool"
+        "input#name": "Cool",
+        "input#plain": ""
       }
     },
     {
@@ -822,13 +897,18 @@
           4,
           4
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": "Cool"
+        "input#name": "Cool",
+        "input#plain": ""
       }
     },
     {
@@ -871,13 +951,18 @@
           0,
           0
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": "Cool"
+        "input#name": "Cool",
+        "input#plain": ""
       }
     },
     {
@@ -945,13 +1030,18 @@
           2,
           2
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": "A-Cool"
+        "input#name": "A-Cool",
+        "input#plain": ""
       }
     },
     {
@@ -1006,13 +1096,18 @@
           2,
           2
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": "A-Cool"
+        "input#name": "A-Cool",
+        "input#plain": ""
       }
     },
     {
@@ -1054,13 +1149,1098 @@
           2,
           2
         ],
+        "input#off": [
+          0,
+          0
+        ],
         "input#plain": [
           0,
           0
         ]
       },
       "values": {
-        "input#name": "A-Cool"
+        "input#name": "A-Cool",
+        "input#plain": ""
+      }
+    },
+    {
+      "action": "Click(300.0, 12.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#plain",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#plain",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#plain",
+          "type": "click"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 58,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#off": [
+          0,
+          0
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool",
+        "input#plain": ""
+      }
+    },
+    {
+      "action": "Type(\"A-Cool day\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "A",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "A",
+          "target": "input#plain",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "-",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "-",
+          "target": "input#plain",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "C",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "C",
+          "target": "input#plain",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "o",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "o",
+          "target": "input#plain",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "o",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "o",
+          "target": "input#plain",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "l",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "l",
+          "target": "input#plain",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": " ",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": " ",
+          "target": "input#plain",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "d",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "d",
+          "target": "input#plain",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#plain",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "y",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "y",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 60,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#off": [
+          0,
+          0
+        ],
+        "input#plain": [
+          10,
+          10
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool",
+        "input#plain": "A-Cool day"
+      }
+    },
+    {
+      "action": "Key(\"Control+ArrowLeft\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowLeft",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowLeft",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 62,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#off": [
+          0,
+          0
+        ],
+        "input#plain": [
+          7,
+          7
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool",
+        "input#plain": "A-Cool day"
+      }
+    },
+    {
+      "action": "Key(\"Control+ArrowLeft\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowLeft",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowLeft",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 64,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#off": [
+          0,
+          0
+        ],
+        "input#plain": [
+          2,
+          2
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool",
+        "input#plain": "A-Cool day"
+      }
+    },
+    {
+      "action": "Key(\"Control+ArrowLeft\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowLeft",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowLeft",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 66,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#off": [
+          0,
+          0
+        ],
+        "input#plain": [
+          1,
+          1
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool",
+        "input#plain": "A-Cool day"
+      }
+    },
+    {
+      "action": "Key(\"Control+ArrowRight\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowRight",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowRight",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 68,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#off": [
+          0,
+          0
+        ],
+        "input#plain": [
+          2,
+          2
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool",
+        "input#plain": "A-Cool day"
+      }
+    },
+    {
+      "action": "Key(\"Control+Delete\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Delete",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Delete",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 70,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#off": [
+          0,
+          0
+        ],
+        "input#plain": [
+          2,
+          2
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool",
+        "input#plain": "A- day"
+      }
+    },
+    {
+      "action": "Key(\"End\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "End",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "End",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 72,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#off": [
+          0,
+          0
+        ],
+        "input#plain": [
+          6,
+          6
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool",
+        "input#plain": "A- day"
+      }
+    },
+    {
+      "action": "Key(\"Control+Backspace\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 74,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#off": [
+          0,
+          0
+        ],
+        "input#plain": [
+          3,
+          3
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool",
+        "input#plain": "A- "
+      }
+    },
+    {
+      "action": "Key(\"Control+Backspace\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 76,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#off": [
+          0,
+          0
+        ],
+        "input#plain": [
+          1,
+          1
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool",
+        "input#plain": "A"
+      }
+    },
+    {
+      "action": "Key(\"Control+Backspace\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 78,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#off": [
+          0,
+          0
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool",
+        "input#plain": ""
+      }
+    },
+    {
+      "action": "Type(\"ab\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#plain",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "b",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "b",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 80,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#off": [
+          0,
+          0
+        ],
+        "input#plain": [
+          2,
+          2
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool",
+        "input#plain": "ab"
+      }
+    },
+    {
+      "action": "Key(\"Control+a\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 82,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#off": [
+          0,
+          0
+        ],
+        "input#plain": [
+          0,
+          2
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool",
+        "input#plain": "ab"
+      }
+    },
+    {
+      "action": "TouchDown(100.0, 12.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "input#name",
+          "type": "pointerdown"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 84,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#off": [
+          0,
+          0
+        ],
+        "input#plain": [
+          0,
+          2
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool",
+        "input#plain": "ab"
+      }
+    },
+    {
+      "action": "TouchMove(100.0, 80.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "input#name",
+          "type": "pointercancel"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 88,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#off": [
+          0,
+          0
+        ],
+        "input#plain": [
+          0,
+          2
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool",
+        "input#plain": "ab"
+      }
+    },
+    {
+      "action": "TouchUp(100.0, 80.0)",
+      "checked": {},
+      "events": [],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 90,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#off": [
+          0,
+          0
+        ],
+        "input#plain": [
+          0,
+          2
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool",
+        "input#plain": "ab"
+      }
+    },
+    {
+      "action": "Tap(40.0, 12.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "input#name",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "input#name",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "focusout"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "input#name",
+          "type": "click"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 92,
+      "selections": {
+        "input#name": [
+          5,
+          5
+        ],
+        "input#off": [
+          0,
+          0
+        ],
+        "input#plain": [
+          0,
+          2
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool",
+        "input#plain": "ab"
       }
     }
   ]

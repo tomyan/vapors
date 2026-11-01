@@ -78,8 +78,7 @@ pub fn play(fixture: &Fixture, script: &Script, viewport: Viewport) -> Result<Lo
             .map_err(|why| format!("{}.events:{}: {why}", fixture.name, step.line))?;
         let checked = checked(&doc.borrow(), &script.checked_targets())
             .map_err(|why| format!("{}.events:{}: {why}", fixture.name, step.line))?;
-        let selections = selections(&doc.borrow(), &script.selection_targets())
-            .map_err(|why| format!("{}.events:{}: {why}", fixture.name, step.line))?;
+        let selections = selections(&doc.borrow());
         log.push(Logged {
             events: heard.borrow_mut().drain(..).collect(),
             focus,
@@ -108,20 +107,15 @@ fn values(doc: &Document, targets: &[String]) -> Result<Vec<(String, String)>, S
         .collect()
 }
 
-/// Each target's selection: a target that names no element, or one
-/// that is not a text field, is refused.
-fn selections(doc: &Document, targets: &[String]) -> Result<Vec<(String, Selection)>, String> {
-    targets
-        .iter()
-        .map(|target| {
-            let node =
-                find(doc, target).ok_or_else(|| format!("selection {target} names no element"))?;
-            let selection = doc
-                .selection(node)
-                .ok_or_else(|| format!("selection {target} is not a text field"))?;
-            Ok((target.clone(), selection))
-        })
-        .collect()
+/// Every text field's selection, by name, sorted by name.
+fn selections(doc: &Document) -> Vec<(String, Selection)> {
+    let mut all: Vec<(String, Selection)> = doc
+        .elements()
+        .into_iter()
+        .filter_map(|node| Some((name(doc, node), doc.selection(node)?)))
+        .collect();
+    all.sort();
+    all
 }
 
 /// Each target's checked state: a target that names no element, or

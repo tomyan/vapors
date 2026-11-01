@@ -50,7 +50,7 @@ pub(crate) struct LayoutBox {
     /// paint keeps for the pointer.
     pub(crate) text_field: bool,
     /// A focused text field's caret and selection, for paint.
-    pub(crate) text_marks: Option<crate::text_field::TextMarks>,
+    pub(crate) text_marks: Option<crate::text_marks::TextMarks>,
 }
 
 /// A focused number field: whether its text is selected whole.
@@ -111,7 +111,7 @@ pub(crate) struct Source<'a> {
     pub(crate) images: &'a crate::images::Images,
     pub(crate) number_focus: Option<(NodeId, NumberFocus)>,
     /// The focused text field's marks (E6a).
-    pub(crate) text_marks: Option<(NodeId, crate::text_field::TextMarks)>,
+    pub(crate) text_marks: Option<(NodeId, crate::text_marks::TextMarks)>,
 }
 
 /// Builds the boxes under `root`; box 0 is the root's.

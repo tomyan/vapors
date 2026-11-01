@@ -46,6 +46,15 @@ pub(super) fn act(
                 sent(doc, |doc| Document::key_released(doc, &key, none));
             }
         }
+        // the touch's down and up, then the tap the platform's gestures
+        // send for a still, quick touch
+        Action::Tap(x, y) => {
+            sent(doc, |doc| Document::touch_pressed(doc, 0, at(x, y)));
+            sent(doc, |doc| {
+                Document::touch_released(doc, 0, at(x, y));
+                Document::touch_tapped(doc, at(x, y));
+            });
+        }
         Action::Move(x, y) => Document::pointer_moved(doc, at(x, y)),
         Action::Press(x, y) => Document::pointer_pressed(doc, at(x, y)),
         Action::Release(x, y) => Document::pointer_released(doc, at(x, y)),
