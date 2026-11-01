@@ -122,6 +122,15 @@ impl RecordingDom {
         self.record(node).children.clone()
     }
 
+    /// An attribute set on an element.
+    #[must_use]
+    pub fn attribute(&self, node: NodeId, name: &str) -> Option<String> {
+        match &self.record(node).kind {
+            Kind::Element { attributes, .. } => attributes.get(name).cloned(),
+            Kind::Text(_) => None,
+        }
+    }
+
     /// A property set on an element.
     #[must_use]
     pub fn property(&self, node: NodeId, name: &str) -> Option<PropertyValue> {

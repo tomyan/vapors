@@ -148,6 +148,20 @@ fn the_text_script_logs_on_vapors_what_chromium_logged() {
 }
 
 #[test]
+fn the_combobox_script_projects_on_vapors_as_on_apgs_example() {
+    // Given: vapors' combobox component, keyed as APG's own example was
+    // in Chromium (apg/, see apg/NOTICE.md)
+    let script = parse("combobox", &read("combobox.events")).expect("parses");
+    let answers = serde_json::from_str(&read("combobox.events.json")).expect("json");
+
+    // When
+    let ours = play(&fixture("combobox"), &script, VIEWPORT).unwrap_or_else(|e| panic!("{e}"));
+
+    // Then: the projection, focus, values and selections after each key
+    compare("combobox", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
 fn the_words_script_logs_on_vapors_what_chromium_logged() {
     // Given: double and triple clicks in a text field (E6a)
     let script = parse("words", &read("words.events")).expect("parses");

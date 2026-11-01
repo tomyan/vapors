@@ -167,3 +167,47 @@ fn every_text_field_is_compared_not_only_those_the_script_names() {
         "{differs}"
     );
 }
+
+#[test]
+fn a_projection_that_differs_is_reported() {
+    // Given: Chromium's combobox is expanded, vapors' is not
+    let script = parse(
+        "x",
+        "project combobox\nlisten keydown\nkey ArrowDown\nexpect focus body\n",
+    )
+    .expect("parses");
+    let ours = vec![Logged {
+        focus: "body".to_owned(),
+        ax: Some(
+            json!([{ "role": "combobox", "name": "State", "properties": ["expanded=false"] }]),
+        ),
+        ..Logged::default()
+    }];
+    let step = |ax: serde_json::Value| json!({ "steps": [{ "line": 3, "action": "Key(\"ArrowDown\")", "events": [], "focus": "body", "focusVisible": false, "selections": {}, "ax": ax }] });
+
+    // When
+    let differs = compare(
+        "x",
+        &script,
+        &ours,
+        &step(json!([{ "role": "combobox", "name": "State", "properties": ["expanded=true"] }])),
+    )
+    .expect_err("differs");
+
+    // Then
+    assert!(
+        differs.contains("x.events:3: the a11y projection is"),
+        "{differs}"
+    );
+    assert_eq!(
+        compare(
+            "x",
+            &script,
+            &ours,
+            &step(
+                json!([{ "role": "combobox", "name": "State", "properties": ["expanded=false"] }])
+            )
+        ),
+        Ok(())
+    );
+}

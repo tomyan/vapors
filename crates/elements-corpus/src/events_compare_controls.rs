@@ -22,6 +22,19 @@ impl Step<'_> {
         Ok(differences)
     }
 
+    /// The a11y projections, when the script asks for them (`project`):
+    /// equal, or one line naming both.
+    pub(super) fn projection(&self, ours: &Logged) -> Option<String> {
+        let ours = ours.ax.as_ref()?;
+        let theirs = &self.theirs["ax"];
+        (theirs != ours).then(|| {
+            format!(
+                "{}.events:{}: the a11y projection is {theirs} in Chromium, {ours} in vapors",
+                self.name, self.line
+            )
+        })
+    }
+
     fn value(&self, target: &str, ours: &Logged) -> Result<Option<String>, String> {
         let chromium = self.recorded("values", target, Value::as_str, "string value")?;
         let vapors = self.ours(&ours.values, target, "value")?;
