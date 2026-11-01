@@ -40,6 +40,7 @@ fn click_field(app: &mut ElementsApp, platform: &Platform) {
     for event in [
         Event::PointerMoved { x: 150.0, y: 10.0 },
         Event::PrimaryButton { pressed: true },
+        Event::ClickCount(std::num::NonZeroU32::MIN),
         Event::PrimaryButton { pressed: false },
     ] {
         app.event(event, platform);
@@ -148,6 +149,7 @@ fn leaving_the_field_unsets_it() {
     for event in [
         Event::PointerMoved { x: 150.0, y: 80.0 },
         Event::PrimaryButton { pressed: true },
+        Event::ClickCount(std::num::NonZeroU32::MIN),
         Event::PrimaryButton { pressed: false },
     ] {
         app.event(event, &platform);

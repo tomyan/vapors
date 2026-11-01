@@ -52,6 +52,7 @@ fn a_press_and_release_in_physical_pixels_click_the_button_at_2x() {
     for event in [
         Event::PointerMoved { x: 150.0, y: 10.0 },
         Event::PrimaryButton { pressed: true },
+        Event::ClickCount(std::num::NonZeroU32::MIN),
         Event::PrimaryButton { pressed: false },
     ] {
         app.event(event, &platform);
@@ -76,6 +77,7 @@ fn a_press_outside_the_button_at_2x_clicks_nothing() {
     for event in [
         Event::PointerMoved { x: 250.0, y: 10.0 },
         Event::PrimaryButton { pressed: true },
+        Event::ClickCount(std::num::NonZeroU32::MIN),
         Event::PrimaryButton { pressed: false },
     ] {
         app.event(event, &platform);

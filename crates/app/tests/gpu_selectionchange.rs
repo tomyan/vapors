@@ -75,6 +75,7 @@ fn gpu_two_caret_moves_between_frames_fire_one_selectionchange() {
     for event in [
         Event::PointerMoved { x: 60.0, y: 10.0 },
         Event::PrimaryButton { pressed: true },
+        Event::ClickCount(std::num::NonZeroU32::MIN),
         Event::PrimaryButton { pressed: false },
     ] {
         app.event(event, &platform);

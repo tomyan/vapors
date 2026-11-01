@@ -25,6 +25,10 @@ pub enum Event {
         /// True on press.
         pressed: bool,
     },
+    /// The press of the primary button just sent is this many in a row
+    /// (two is a double click): the web page's `mousedown` `detail`, else
+    /// counted by the platform (`clicks`). It follows the press.
+    ClickCount(std::num::NonZeroU32),
     /// The wheel or trackpad scrolled, in CSS pixels (not physical, unlike
     /// positions), signed as the DOM's `deltaX` and `deltaY`: positive
     /// scrolls right and down, moving the content left and up. A wheel

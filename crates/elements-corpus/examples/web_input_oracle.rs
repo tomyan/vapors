@@ -27,6 +27,10 @@ const MIRROR: &str = "(() => { const t = document.querySelector('textarea'); con
 /// is right of "Warm", so the caret goes to its end.
 const FIELD_AT: (f64, f64) = (370.0, 200.0);
 
+/// A point on the field's first letter: its text starts at x 263, past
+/// its 1 px border and 2 px padding.
+const FIELD_TEXT_AT: (f64, f64) = (266.0, 200.0);
+
 /// The first frame and the field's mirror: 1.03 to 1.07 s in three runs
 /// on the dev box with a warm Chrome (2026-11-01); 60 s allows for a
 /// cold runner, whose Chrome took up to 57.9 s to its first page.
@@ -65,10 +69,18 @@ fn run(profile: &Path, origin: &str) -> Result<(), String> {
     session.call("Emulation.setDeviceMetricsOverride", &metrics, DEADLINE)?;
     session.navigate(&format!("{origin}/input.html"), DEADLINE)?;
     evaluate(&mut session, "i.focus(), i.setSelectionRange(4, 4), true")?;
-    let chromium = play(&mut session, INPUT)?;
+    let rect = evaluate(
+        &mut session,
+        "(() => { const r = i.getBoundingClientRect(); return [r.left + 6, r.top + r.height / 2]; })()",
+    )?;
+    let input_text = (
+        rect[0].as_f64().unwrap_or(0.0),
+        rect[1].as_f64().unwrap_or(0.0),
+    );
+    let chromium = play(&mut session, INPUT, input_text)?;
     session.navigate(&format!("{origin}/index.html?demo=field"), DEADLINE)?;
     click_field(&mut session)?;
-    let vapors = play(&mut session, MIRROR)?;
+    let vapors = play(&mut session, MIRROR, FIELD_TEXT_AT)?;
     let differ = differences(&chromium, &vapors);
     if differ.is_empty() {
         Ok(())
