@@ -37,6 +37,9 @@ pub struct Logged {
     pub checked: Vec<(String, bool)>,
     /// Each selection target's selection, in the script's sorted order.
     pub selections: Vec<(String, Selection)>,
+    /// The a11y projection to `project`'s roles, in the oracle's shape
+    /// (`ax_projection`); `None` without `project`.
+    pub ax: Option<serde_json::Value>,
 }
 
 /// A text field's selection, start then end, in UTF-16 units.
@@ -62,10 +65,19 @@ pub fn play(fixture: &Fixture, script: &Script, viewport: Viewport) -> Result<Lo
             Box::new(|e: &mut Event| e.set_pointer_capture()),
         );
     }
+    for target in &script.cancel {
+        let node = find(&doc.borrow(), target)
+            .ok_or_else(|| format!("{}.events: cancel {target} names no element", fixture.name))?;
+        doc.borrow_mut().listen(
+            node,
+            "pointerdown",
+            Box::new(|e: &mut Event| e.prevent_default()),
+        );
+    }
     let mut log = Log::new();
-    let mut press = Press::default();
+    let mut held = Held::default();
     for step in &script.steps {
-        act(&doc, &step.action, &mut press)
+        act(&doc, &step.action, &mut held)
             .map_err(|why| format!("{}.events:{}: {why}", fixture.name, step.line))?;
         let (focus, focus_visible) = {
             let doc = doc.borrow();
@@ -79,6 +91,8 @@ pub fn play(fixture: &Fixture, script: &Script, viewport: Viewport) -> Result<Lo
         let checked = checked(&doc.borrow(), &script.checked_targets())
             .map_err(|why| format!("{}.events:{}: {why}", fixture.name, step.line))?;
         let selections = selections(&doc.borrow());
+        let ax = projection(&doc.borrow(), &script.project)
+            .map_err(|why| format!("{}.events:{}: {why}", fixture.name, step.line))?;
         log.push(Logged {
             events: heard.borrow_mut().drain(..).collect(),
             focus,
@@ -86,52 +100,10 @@ pub fn play(fixture: &Fixture, script: &Script, viewport: Viewport) -> Result<Lo
             values,
             checked,
             selections,
+            ax,
         });
     }
     Ok(log)
-}
-
-/// Each target's value: a target that names no element, or one that is
-/// not a control with a value, is refused.
-fn values(doc: &Document, targets: &[String]) -> Result<Vec<(String, String)>, String> {
-    targets
-        .iter()
-        .map(|target| {
-            let node =
-                find(doc, target).ok_or_else(|| format!("value {target} names no element"))?;
-            let value = doc
-                .value(node)
-                .ok_or_else(|| format!("value {target} is not a control with a value"))?;
-            Ok((target.clone(), value))
-        })
-        .collect()
-}
-
-/// Every text field's selection, by name, sorted by name.
-fn selections(doc: &Document) -> Vec<(String, Selection)> {
-    let mut all: Vec<(String, Selection)> = doc
-        .elements()
-        .into_iter()
-        .filter_map(|node| Some((name(doc, node), doc.selection(node)?)))
-        .collect();
-    all.sort();
-    all
-}
-
-/// Each target's checked state: a target that names no element, or
-/// one that is not a checkbox, is refused.
-fn checked(doc: &Document, targets: &[String]) -> Result<Vec<(String, bool)>, String> {
-    targets
-        .iter()
-        .map(|target| {
-            let node =
-                find(doc, target).ok_or_else(|| format!("checked {target} names no element"))?;
-            let checked = doc
-                .checked(node)
-                .ok_or_else(|| format!("checked {target} is not a checkbox"))?;
-            Ok((target.clone(), checked))
-        })
-        .collect()
 }
 
 fn mounted(fixture: &Fixture, viewport: Viewport) -> Result<Rc<RefCell<Document>>, String> {
@@ -168,7 +140,7 @@ fn listen(doc: &Rc<RefCell<Document>>, types: &[String], heard: &Shared) {
 }
 
 pub use act::TAP_SLOP;
-use act::{Press, act};
+use act::{Held, act};
 
 /// `tag#id`, else the child-index path from body, as the Chromium player
 /// names a target.
@@ -203,3 +175,7 @@ fn find(doc: &Document, target: &str) -> Option<NodeId> {
 
 #[path = "events_vapors_act.rs"]
 mod act;
+
+#[path = "events_vapors_read.rs"]
+mod read;
+use read::{checked, projection, selections, values};

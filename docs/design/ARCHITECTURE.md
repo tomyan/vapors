@@ -67,7 +67,10 @@ writing them with its resolution, or the note that it is open.
 11. **Semantics come from the tree, not the app.** Roles and names (5),
     redaction tags (10), default actions (3) and animation of value
     controls (6) are properties of elements, so a component author
-    cannot omit them by accident, and a missing one is loud.
+    cannot omit them by accident, and a missing one is loud. Patterns
+    with behaviour (the APG's combobox) ship as components in
+    `vapors-components` (3), written in `.wisp` over `vapors-dom`, owning
+    their state as signals.
 
 ## How the areas fit together
 

@@ -322,8 +322,8 @@ type is one), the editing model's first half, on Parley 0.12's
 `PlainEditor`: one editor per field, made when the field is first
 pressed or focused, given the field's text style whenever it changes
 so its geometry is the painted text's. The text is the `value` property,
-written on every edit and read back when a signal sets it (the
-selection clamped). A press puts the caret where it lands; on a
+written on every edit and read back when a signal sets it (the caret
+then at its end, as Chromium's `value =` puts it). A press puts the caret where it lands; on a
 disabled field it leaves the selection where it was and fires
 `selectionchange`, as Chromium does; a drag extends the selection under
 capture; focus by keyboard selects the text whole. By touch, a tap
@@ -387,10 +387,50 @@ Chromium selects the "." alone; "3.5" and "don't" agree. A press inside
 the selection moves the caret after its `click`, so a `click` listener
 reads the selection held, as in Chromium. Not built: `detail` and
 `dblclick`, dragging by word or line after a double or
-triple click, dragging selected text,
-paste and undo (E6b), IME (E6c), `beforeinput`, `placeholder`,
-`maxlength`, scrolling a long text to the caret, the blinking caret
-(area 6), vertical selection in a `textarea`.
+triple click, dragging selected text, IME, `beforeinput`,
+`placeholder`, `maxlength`, scrolling a long text to the caret, the
+blinking caret (area 6), vertical selection in a `textarea`.
+
+As built (E6b, 2026-11-01): a field's own undo and paste. Each field
+keeps an undo stack, grouped as Chromium 155 groups a field's edits:
+
+- a run of typing is one step;
+- a run of Backspace is one step, and a Delete joins it; a run of
+  Delete is one step, and a Backspace does not join it;
+- a word deletion (Control+Backspace, Control+Delete) always starts a
+  step, which Backspaces or Deletes in its direction and typing then
+  join;
+- typing after a deletion joins it, and a deletion after typing does
+  not;
+- a paste is a step alone, and anything that moves the selection other
+  than an edit ends the run.
+
+Control+Z undoes to the text and selection before the step,
+Control+Shift+Z and Control+Y redo to those after it, each with
+`input`, and with a `selectionchange` when the selection differs or
+the text changes before the caret (which moves it in the DOM even
+where it ends where it was), as Chromium fires. A new edit drops
+what could be redone; a signal setting the text drops the stack. A
+field keeps at most 1000 steps, the oldest going first, as Blink's
+`kMaximumUndoStackDepth`.
+
+A paste (`Document::text_pasted`) fires `paste` on the focused field,
+bubbling, carrying the text as copied (`Event::value`, as
+`clipboardData.getData("text")`); a listener that prevents its default
+keeps the text out. Else it replaces the selection, its trailing line
+breaks dropped and each other a space. On the desktop the platform
+sends `Event::Paste` whatever has focus, and `ElementsApp` hands it to
+a focused text field first. The clipboard is read off the event loop
+(`Clipboard::read_text`): the answer, or why there is none once the
+deadline passes (`CLIPBOARD_DEADLINE`, 3 s, reported with
+`report_error`), wakes the loop, and the next frame pastes it into the
+field it was read for, or reports that the field lost focus. With no
+text field focused the clipboard is not read. Checked by
+`fixtures/undo.events`, whose `clipboard` step writes Chromium's
+clipboard. Chromium's undo stack is the page's, not the field's: an
+undo in one field after edits in another differs, and is not compared.
+Not built: copy and cut, the web page's paste (with the web input
+path), Command for Control on macOS, `beforeinput`'s `historyUndo`.
 
 ## Text editing and IME
 
@@ -502,6 +542,60 @@ to its parent's `on:` handler only, not bubbling through the DOM and
 not cancelable unless asked, and Svelte 5 replaced it with callback
 props; vapors' events are DOM events on the component's elements,
 which is what the APG's patterns and their default actions need.
+
+## Library components: the combobox
+
+As built (the listbox slice, 2026-11-01): vapors ships components in
+`vapors-components`, written in `.wisp` and compiled by its `build.rs`;
+they depend only on `vapors-dom` and `vapors-signals` (the layers check
+holds this), so any `Dom` mounts them, and an app uses one by its path,
+`<vapors_components::combobox::Combobox ... />`. A component owns its
+behaviour's state as signals and renders the aria attributes from them,
+so there is one owner and the data flow stays reactive; each default
+action follows a cancelable, bubbling event (`Dispatcher`).
+
+`Combobox` is the WAI-ARIA APG's "Editable Combobox With List
+Autocomplete" example's keyboard behaviour: a text field (role
+`combobox`, `aria-controls`, `aria-expanded`, `aria-activedescendant`)
+and a listbox of options (`aria-selected` on the active one), shown
+while expanded. ArrowDown and ArrowUp on a closed list fire
+`comboboxopen` and, unless cancelled, open it on the first (last)
+option; on an open list they move the active option, wrapping, as the
+APG example's do. Home and End move the caret, the field's own, and
+leave no option active: a typing field keeps them (the lead's decision,
+2026-11-01, over the select-only pattern's first and last option).
+Enter with an option active fires `optionchoose` at the option and,
+unless cancelled, the field takes its text and the list closes; with
+none active, the list closes. Escape fires `comboboxdismiss` and,
+unless cancelled, closes an open list or clears the field. When the
+app's options change, an active option no longer at its place is
+cleared, with `aria-activedescendant`, as the example resets it while
+filtering. A refused dispatch, or a choice that cannot be resolved (an
+active option with no element), is the key listener's `Err`, which goes
+to the app's error report; it is never taken for a cancel. Props:
+`options`, `value`, `expanded`, `active` (bindable), `id`, `label`,
+`list_label`; `id` defaults to one no other combobox has
+(`vapors_components::unique_id`), so two on their defaults never share
+the ids `aria-controls` and `aria-activedescendant` name. Checked by `fixtures/combobox.events`, played in Chromium
+on APG's own example (`fixtures/apg/`, copied with its W3C licence
+notice) and on vapors with the component: after every key, the
+projection of the combobox, listbox and options (role, name,
+`expanded`, `controls`, `activedescendant`, `selected`, `focused`;
+5-A1's first slice, `Document::ax_projection`), focus, values and
+selections are equal. A fixture whose script plays on another page
+(`page`) is compared by that script alone, not laid out.
+
+Differs from the APG example: typing and filtering the options are the
+app's (it sets `options`), so the example's autocomplete-on-typing is
+not the component's; the example's arrow button, clicks on options and
+closing on blur are not built; the events are vapors' own (the example
+has none); Alt+ArrowDown, which in the example opens the list with no
+option active, is a plain ArrowDown here; Enter with no option active
+closes the list without a cancelable event. The DOM has no combobox element; this is the pattern, as the
+APG writes it.
+
+A tap whose `pointerdown` a listener cancelled still clicks, but moves
+neither focus nor a caret, as in Chromium (`fixtures/focus.events`).
 
 ## Synthetic input
 

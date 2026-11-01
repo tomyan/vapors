@@ -70,5 +70,22 @@ fn the_keys_clone_is_allowed_for_a_copy_key() {
 
     // Then: the allowance comes right before the binding
     assert_has(&code, "#[allow(clippy::clone_on_copy");
+    assert_has(
+        &code,
+        "a row's key is cloned into the map and kept for the cleanup",
+    );
     assert!(at(&code, "#[allow(clippy::clone_on_copy") < at(&code, "let key = i.get_untracked();"));
+}
+
+#[test]
+fn signals_declared_with_a_path_are_taken_by_their_last_segments() {
+    // When: the map and the single node, each type written with its path
+    let code = generated_with(
+        "let names: Signal<Vec<String>> = Signal::new(Vec::new());\nlet rows: vapors_signals::Signal<std::collections::BTreeMap<String, vapors_dom::NodeId>> = Signal::new(std::collections::BTreeMap::new());\nlet one: vapors_signals::Signal<std::option::Option<vapors_dom::NodeId>> = Signal::new(None);",
+        "<ul bind:this={one}>{for name in names.get() key=name.clone()}<li bind:this={rows}>{name}</li>{/for}</ul>",
+    );
+
+    // Then
+    assert_has(&code, "nodes.insert(key.clone(), li2);");
+    assert_has(&code, "this.set(Some(ul0));");
 }

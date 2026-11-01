@@ -4,6 +4,7 @@
 //! needs a GPU device. The plan and what each slice adds:
 //! `docs/F2c.md`.
 
+mod a11y_projection;
 mod arena;
 mod bidi;
 mod chain;
@@ -48,10 +49,14 @@ mod stacking;
 mod style;
 mod tags;
 mod text_field;
+mod text_history;
 mod text_input;
 mod text_marks;
 mod text_paint;
+mod text_paste;
 mod text_pointer;
+mod text_selectionchange;
+mod text_undo;
 mod text_word;
 mod thumb;
 mod thumb_order;
@@ -59,11 +64,12 @@ mod tree;
 mod typing;
 mod update;
 
+pub use a11y_projection::AxNode;
 pub use document::Document;
 pub use error::ElementError;
 pub use events::Point;
 pub use keys::Modifiers;
 pub use layout::BoxRect;
-pub use painted::Painted;
+pub use painted::{CanvasFrom, Painted};
 pub use style::{ALL_CURSORS, Cursor};
 pub use update::Viewport;

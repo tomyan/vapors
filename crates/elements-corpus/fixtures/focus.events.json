@@ -27,7 +27,7 @@
       ],
       "focus": "button#save",
       "focusVisible": true,
-      "line": 9,
+      "line": 10,
       "selections": {},
       "values": {}
     },
@@ -64,7 +64,7 @@
       ],
       "focus": "div#note",
       "focusVisible": true,
-      "line": 11,
+      "line": 12,
       "selections": {},
       "values": {}
     },
@@ -101,7 +101,7 @@
       ],
       "focus": "button#cancel",
       "focusVisible": true,
-      "line": 13,
+      "line": 14,
       "selections": {},
       "values": {}
     },
@@ -132,7 +132,7 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 15,
+      "line": 16,
       "selections": {},
       "values": {}
     },
@@ -163,7 +163,7 @@
       ],
       "focus": "button#cancel",
       "focusVisible": true,
-      "line": 17,
+      "line": 18,
       "selections": {},
       "values": {}
     },
@@ -194,7 +194,7 @@
       ],
       "focus": "button#cancel",
       "focusVisible": true,
-      "line": 19,
+      "line": 20,
       "selections": {},
       "values": {}
     },
@@ -225,7 +225,7 @@
       ],
       "focus": "button#cancel",
       "focusVisible": true,
-      "line": 21,
+      "line": 22,
       "selections": {},
       "values": {}
     },
@@ -233,6 +233,13 @@
       "action": "Click(350.0, 20.0)",
       "checked": {},
       "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "div#aside",
+          "type": "pointerdown"
+        },
         {
           "bubbles": true,
           "defaultPrevented": false,
@@ -255,7 +262,7 @@
       ],
       "focus": "div#aside",
       "focusVisible": false,
-      "line": 23,
+      "line": 24,
       "selections": {},
       "values": {}
     },
@@ -292,7 +299,7 @@
       ],
       "focus": "button#cancel",
       "focusVisible": true,
-      "line": 25,
+      "line": 26,
       "selections": {},
       "values": {}
     },
@@ -303,13 +310,20 @@
         {
           "bubbles": true,
           "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#gone",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
           "target": "button#cancel",
           "type": "focusout"
         }
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 27,
+      "line": 28,
       "selections": {},
       "values": {}
     },
@@ -334,7 +348,63 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 30,
+      "line": 31,
+      "selections": {},
+      "values": {}
+    },
+    {
+      "action": "Tap(50.0, 20.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "button#save",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#save",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "button#save",
+          "type": "click"
+        }
+      ],
+      "focus": "button#save",
+      "focusVisible": false,
+      "line": 33,
+      "selections": {},
+      "values": {}
+    },
+    {
+      "action": "Tap(450.0, 20.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": true,
+          "pointerType": "touch",
+          "target": "button#cancel",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "touch",
+          "target": "button#cancel",
+          "type": "click"
+        }
+      ],
+      "focus": "button#save",
+      "focusVisible": false,
+      "line": 36,
       "selections": {},
       "values": {}
     }

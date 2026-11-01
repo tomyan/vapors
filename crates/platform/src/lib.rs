@@ -11,6 +11,10 @@ mod clicks;
 mod clicks_web;
 #[cfg(not(target_family = "wasm"))]
 mod clipboard;
+#[cfg(not(target_family = "wasm"))]
+mod clipboard_reader;
+#[cfg(not(target_family = "wasm"))]
+mod clipboard_text;
 mod clock;
 mod cursor;
 mod device_lost;
@@ -42,8 +46,8 @@ mod window;
 
 #[cfg(not(target_family = "wasm"))]
 pub use clipboard::{
-    Clipboard, ClipboardImage, DEADLINE as CLIPBOARD_DEADLINE, MAX_BYTES as CLIPBOARD_MAX_BYTES,
-    SystemClipboard,
+    Clipboard, ClipboardDone, ClipboardImage, ClipboardText, DEADLINE as CLIPBOARD_DEADLINE,
+    MAX_BYTES as CLIPBOARD_MAX_BYTES, SystemClipboard,
 };
 pub use clock::Instant;
 pub use cursor::Cursor;
@@ -52,8 +56,10 @@ pub use error::PlatformError;
 pub use event::{Event, LINE_PIXELS, Modifiers, TouchPhase};
 pub use file_kind::FileKind;
 pub use gestures::{Gestures, TAP_SLOP};
+pub use paste_key::paste_shortcut;
 pub use platform::Platform;
 pub use report::{report_error, report_status};
+pub use surface::pick_format;
 pub use waker::{LoopClosed, Waker};
 pub use window::{App, Frame, Next, WindowOptions, run};
 

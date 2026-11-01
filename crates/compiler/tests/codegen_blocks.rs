@@ -106,10 +106,14 @@ fn for_without_key_is_keyed_by_index() {
     // When: with the index named, and without
     let named = generated_with(SCRIPT, "{for (i, x) in items.get()}<li>{x.1}</li>{/for}");
     let unnamed = generated_with(SCRIPT, "{for x in items.get()}<li>{x.1}</li>{/for}");
+    let by_index = generated_with(
+        SCRIPT,
+        "{for (i, x) in items.get() key=i}<li>{x.1}</li>{/for}",
+    );
 
     // Then: the pairs `enumerate` gives, with no identity `map` and no
-    // read of `_index` (clippy pedantic refuses both)
-    for code in [named, unnamed] {
+    // read of `_index` (clippy pedantic refuses both), also for `key=i`
+    for code in [named, unnamed, by_index] {
         assert_has(&code, "(items.get()).into_iter().enumerate().collect()");
         assert_lacks(&code, "_index)");
     }

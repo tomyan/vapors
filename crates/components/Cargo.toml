@@ -1,0 +1,19 @@
+[package]
+name = "vapors-components"
+description = "Components vapors ships, written in .wisp and compiled by build.rs: the ARIA patterns' behaviour as signals, aria attributes and cancelable events."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+vapors-dom.workspace = true
+vapors-signals.workspace = true
+
+[build-dependencies]
+vapors-compiler.workspace = true
+
+[lints]
+workspace = true
