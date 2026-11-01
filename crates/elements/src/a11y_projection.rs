@@ -9,6 +9,17 @@
 //! Roles are `role`'s first token, else implicit for a text field and a
 //! button (`label`, `ul` and `li` arrive in F4); names are `aria-label`,
 //! `aria-labelledby`, or the content of an option or button.
+//!
+//! RELAXED, this slice's limits: rendered means no `display: none` on
+//! the node or an ancestor, from the last update's styles. A node made
+//! or restyled since that update is judged by what it had then (one
+//! made since counts as rendered), and `visibility: hidden` and the
+//! `hidden` attribute are not read. The events oracle reads it after
+//! each step's update, where it is exact. 5-A1's projection, which
+//! refuses a document with changes not yet updated and reads every
+//! rule that hides a node from the tree, retires this.
+
+use std::collections::HashMap;
 
 use vapors_dom::NodeId;
 
@@ -25,11 +36,15 @@ pub struct AxNode {
     pub properties: Vec<String>,
 }
 
+/// Each element id, to its first element in document order.
+type Ids = HashMap<String, NodeId>;
+
 /// Roles whose name is their content.
 const NAMED_BY_CONTENT: [&str; 2] = ["option", "button"];
 
 impl Document {
-    /// The projection to `roles`, from the last update's styles.
+    /// The projection to `roles`, from the last update's styles (the
+    /// module's RELAXED note says what that leaves out).
     ///
     /// # Errors
     /// The document has not been updated, so what is rendered is unknown.
@@ -37,26 +52,34 @@ impl Document {
         if self.kept.is_none() {
             return Err("the a11y projection needs an update first, for what is rendered".into());
         }
-        Ok(self
-            .elements()
+        let elements = self.elements();
+        // each id once, so a lookup is not a scan: the first in document
+        // order wins, as `getElementById`
+        let mut ids = HashMap::new();
+        for node in &elements {
+            if let Some(id) = self.attribute(*node, "id") {
+                ids.entry(id.to_owned()).or_insert(*node);
+            }
+        }
+        Ok(elements
             .into_iter()
             .filter(|node| self.rendered(*node))
             .filter_map(|node| {
                 let role = self.ax_role(node)?;
                 roles
                     .contains(&role.as_str())
-                    .then(|| self.ax_node(node, role))
+                    .then(|| self.ax_node(node, role, &ids))
             })
             .collect())
     }
 
-    fn ax_node(&self, node: NodeId, role: String) -> AxNode {
+    fn ax_node(&self, node: NodeId, role: String, ids: &Ids) -> AxNode {
         let mut properties = Vec::new();
         for (attribute, property) in [
             ("aria-activedescendant", "activedescendant"),
             ("aria-controls", "controls"),
         ] {
-            if let Some(related) = self.related(node, attribute) {
+            if let Some(related) = self.related(node, attribute, ids) {
                 properties.push(format!("{property}={related}"));
             }
         }
@@ -71,7 +94,7 @@ impl Document {
         }
         properties.sort();
         AxNode {
-            name: self.ax_name(node, &role),
+            name: self.ax_name(node, &role, ids),
             role,
             properties,
         }
@@ -95,24 +118,24 @@ impl Document {
 
     /// The related node `attribute` names, as role and name, when it is
     /// rendered.
-    fn related(&self, node: NodeId, attribute: &str) -> Option<String> {
-        let target = self.by_id(self.attribute(node, attribute)?)?;
+    fn related(&self, node: NodeId, attribute: &str, ids: &Ids) -> Option<String> {
+        let target = *ids.get(self.attribute(node, attribute)?)?;
         if !self.rendered(target) {
             return None;
         }
         let role = self.ax_role(target)?;
-        let name = self.ax_name(target, &role);
+        let name = self.ax_name(target, &role, ids);
         Some(format!("{role} \"{name}\""))
     }
 
-    fn ax_name(&self, node: NodeId, role: &str) -> String {
+    fn ax_name(&self, node: NodeId, role: &str, ids: &Ids) -> String {
         if let Some(label) = self.attribute(node, "aria-label") {
             return label.trim().to_owned();
         }
-        if let Some(ids) = self.attribute(node, "aria-labelledby") {
-            let parts: Vec<String> = ids
+        if let Some(labels) = self.attribute(node, "aria-labelledby") {
+            let parts: Vec<String> = labels
                 .split_whitespace()
-                .filter_map(|id| self.by_id(id))
+                .filter_map(|id| ids.get(id).copied())
                 .map(|n| self.content(n))
                 .collect();
             return parts.join(" ");
@@ -121,13 +144,6 @@ impl Document {
             return self.content(node);
         }
         String::new()
-    }
-
-    /// The element with `id`.
-    fn by_id(&self, id: &str) -> Option<NodeId> {
-        self.elements()
-            .into_iter()
-            .find(|n| self.attribute(*n, "id") == Some(id))
     }
 
     /// `node`'s text content, whitespace collapsed.

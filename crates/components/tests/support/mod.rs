@@ -17,6 +17,7 @@ pub struct Mounted {
     pub value: Signal<String>,
     pub expanded: Signal<bool>,
     pub active: Signal<Option<usize>>,
+    pub options: Signal<Vec<String>>,
 }
 
 pub fn mounted() -> Mounted {
@@ -48,6 +49,7 @@ pub fn mounted() -> Mounted {
         value,
         expanded,
         active,
+        options,
     }
 }
 

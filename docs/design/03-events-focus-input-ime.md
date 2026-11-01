@@ -527,9 +527,16 @@ leave no option active: a typing field keeps them (the lead's decision,
 Enter with an option active fires `optionchoose` at the option and,
 unless cancelled, the field takes its text and the list closes; with
 none active, the list closes. Escape fires `comboboxdismiss` and,
-unless cancelled, closes an open list or clears the field. Props:
+unless cancelled, closes an open list or clears the field. When the
+app's options change, an active option no longer at its place is
+cleared, with `aria-activedescendant`, as the example resets it while
+filtering. A refused dispatch, or a choice that cannot be resolved (an
+active option with no element), is the key listener's `Err`, which goes
+to the app's error report; it is never taken for a cancel. Props:
 `options`, `value`, `expanded`, `active` (bindable), `id`, `label`,
-`list_label`. Checked by `fixtures/combobox.events`, played in Chromium
+`list_label`; `id` defaults to one no other combobox has
+(`vapors_components::unique_id`), so two on their defaults never share
+the ids `aria-controls` and `aria-activedescendant` name. Checked by `fixtures/combobox.events`, played in Chromium
 on APG's own example (`fixtures/apg/`, copied with its W3C licence
 notice) and on vapors with the component: after every key, the
 projection of the combobox, listbox and options (role, name,
@@ -542,7 +549,9 @@ Differs from the APG example: typing and filtering the options are the
 app's (it sets `options`), so the example's autocomplete-on-typing is
 not the component's; the example's arrow button, clicks on options and
 closing on blur are not built; the events are vapors' own (the example
-has none). The DOM has no combobox element; this is the pattern, as the
+has none); Alt+ArrowDown, which in the example opens the list with no
+option active, is a plain ArrowDown here; Enter with no option active
+closes the list without a cancelable event. The DOM has no combobox element; this is the pattern, as the
 APG writes it.
 
 A tap whose `pointerdown` a listener cancelled still clicks, but moves

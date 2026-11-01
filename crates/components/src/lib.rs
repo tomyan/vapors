@@ -6,3 +6,14 @@
 //! `<vapors_components::combobox::Combobox ... />`.
 
 include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
+
+/// `prefix` and a number no other call on this process has had: a
+/// component's default id, so two left on their defaults never share
+/// one (`aria-controls` and `aria-activedescendant` find the first id in
+/// the document).
+#[must_use]
+pub fn unique_id(prefix: &str) -> String {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    format!("{prefix}-{n}")
+}

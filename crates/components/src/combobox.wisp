@@ -11,6 +11,10 @@
 // - Enter with an option active fires `optionchoose` at the option;
 //   unless cancelled, the field takes its text and the list closes. With
 //   none active, the list closes.
+// - When the app's options change, an active option no longer at its
+//   place is cleared, as APG's example resets it while filtering.
+// A dispatch that is refused, or a choice that cannot be resolved, is
+// the key listener's `Err`, which goes to the app's error report.
 // - Escape fires `comboboxdismiss` at the field; unless cancelled, an
 //   open list closes, and on a closed one the field is cleared.
 // Typing and filtering the options are the app's (it sets `options`).
@@ -24,7 +28,7 @@ let expanded: Signal<bool> = Signal::new(false);
 #[prop]
 let active: Signal<Option<usize>> = Signal::new(None);
 #[prop]
-let id: String = String::from("combobox");
+let id: String = crate::unique_id("combobox");
 #[prop]
 let label: String = String::new();
 #[prop]
@@ -46,59 +50,104 @@ let active_id = {
 // Each option row's node, under the row's key (its index).
 let option_nodes: Signal<std::collections::BTreeMap<usize, NodeId>> = Signal::new(std::collections::BTreeMap::new());
 
-let keys = move |event: &mut Event| {
-    let count = options.with_untracked(Vec::len);
-    let key = event.key().to_owned();
-    match key.as_str() {
+// The field's node; only an unmounted combobox has none.
+let field_node = move || {
+    field
+        .get_untracked()
+        .ok_or_else(|| "the combobox's field is not mounted".to_owned())
+};
+// Fires `name` at `node`: whether no listener cancelled it.
+let fire = move |node: NodeId, name: &str| events.dispatch(node, Event::new(name)).map_err(|refused| refused.to_string());
+
+// An active option the new options no longer hold at its place goes.
+let shown_options = std::rc::Rc::new(std::cell::RefCell::new(options.get_untracked()));
+Effect::new(move || {
+    let now = options.get();
+    let was = shown_options.replace(now.clone());
+    if active.get_untracked().is_some_and(|at| was.get(at) != now.get(at)) {
+        active.set(None);
+    }
+});
+
+// `field_node` holds only a signal, so it is Copy; `fire` holds the
+// dispatcher, so each handler takes its own.
+let arrow = {
+let fire = fire.clone();
+move |down: bool| -> Result<(), String> {
+        let count = options.with_untracked(Vec::len);
+        if count == 0 {
+            return Ok(());
+        }
+        if expanded.get_untracked() {
+            let next = match (active.get_untracked(), down) {
+                (Some(at), true) => (at + 1) % count,
+                (Some(at), false) => (at + count - 1) % count,
+                (None, true) => 0,
+                (None, false) => count - 1,
+            };
+            active.set(Some(next));
+        } else if fire(field_node()?, "comboboxopen")? {
+            expanded.set(true);
+            active.set(Some(if down { 0 } else { count - 1 }));
+        }
+        Ok(())
+}
+};
+
+let enter = {
+let fire = fire.clone();
+move || -> Result<(), String> {
+        if let Some(at) = active.get_untracked() {
+            let node = option_nodes
+                .with_untracked(|nodes| nodes.get(&at).copied())
+                .ok_or_else(|| format!("the active option {at} has no element"))?;
+            if !fire(node, "optionchoose")? {
+                return Ok(());
+            }
+            let text = options
+                .with_untracked(|all| all.get(at).cloned())
+                .ok_or_else(|| format!("the active option {at} is not among the options"))?;
+            value.set(text);
+        }
+        expanded.set(false);
+        active.set(None);
+        Ok(())
+}
+};
+
+let escape = move || -> Result<(), String> {
+    if !fire(field_node()?, "comboboxdismiss")? {
+        return Ok(());
+    }
+    if expanded.get_untracked() {
+        expanded.set(false);
+        active.set(None);
+    } else {
+        value.set(String::new());
+    }
+    Ok(())
+};
+
+let keys = move |event: &mut Event| -> Result<(), String> {
+    match event.key() {
         "ArrowDown" | "ArrowUp" => {
             event.prevent_default();
-            let down = key == "ArrowDown";
-            if count == 0 {
-                return;
-            }
-            if expanded.get_untracked() {
-                let next = match (active.get_untracked(), down) {
-                    (Some(at), true) => (at + 1) % count,
-                    (Some(at), false) => (at + count - 1) % count,
-                    (None, true) => 0,
-                    (None, false) => count - 1,
-                };
-                active.set(Some(next));
-            } else if field.get_untracked().is_some_and(|node| events.emit(node, Event::new("comboboxopen"))) {
-                expanded.set(true);
-                active.set(Some(if down { 0 } else { count - 1 }));
-            }
+            let down = event.key() == "ArrowDown";
+            arrow(down)
         }
-        "Home" | "End" => active.set(None),
+        "Home" | "End" => {
+            active.set(None);
+            Ok(())
+        }
         "Enter" => {
             event.prevent_default();
-            if let Some(at) = active.get_untracked() {
-                let chosen = option_nodes
-                    .with_untracked(|nodes| nodes.get(&at).copied())
-                    .is_some_and(|node| events.emit(node, Event::new("optionchoose")));
-                if !chosen {
-                    return;
-                }
-                if let Some(text) = options.with_untracked(|all| all.get(at).cloned()) {
-                    value.set(text);
-                }
-            }
-            expanded.set(false);
-            active.set(None);
+            enter()
         }
         "Escape" => {
             event.prevent_default();
-            if !field.get_untracked().is_some_and(|node| events.emit(node, Event::new("comboboxdismiss"))) {
-                return;
-            }
-            if expanded.get_untracked() {
-                expanded.set(false);
-                active.set(None);
-            } else {
-                value.set(String::new());
-            }
+            escape()
         }
-        _ => {}
+        _ => Ok(()),
     }
 };
 </script>
