@@ -2,11 +2,12 @@
 # The page contract on the built web demo, in headless Chrome: an error
 # lands in #error when the page has one and in #status when it has not;
 # a status line never lands in #error; the GPU's start-up line lands in
-# #adapter when the page has one, leaving #status as the page left it; a lost GPU device is reported in
-# #error with the fix; the demos (?demo=) draw, an unknown demo is an
-# error, the page works one directory down (/vapors/), and each demo's
-# screenshot, after the inputs its .pixels file lists, holds its pixel
-# checks. Copies of the built page; any mismatch fails naming the case.
+# #adapter when the page has one, leaving #status as the page left it; a
+# lost GPU device is reported in #error with the fix; the demos (?demo=)
+# draw, an unknown demo is an error, the page works one directory down
+# (/vapors/), and each demo's screenshot, after the inputs its .pixels
+# file lists, holds its pixel checks. Copies of the built page; any
+# mismatch fails naming the case.
 #
 # Usage: scripts/check-page-contract.sh target/web <new or empty dir>
 # after `cargo xtask web`. CI runs it in the `web` job. Needs python3
