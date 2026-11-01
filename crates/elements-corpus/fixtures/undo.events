@@ -54,3 +54,65 @@ key End
 expect selection input#name 9 9
 key Control+v                 a line break pasted is a space: "Warmtxhaba b"
 expect selection input#name 12 12
+expect value input#name "Warmtxhaba b"
+clipboard "ab\n"
+key Control+a
+expect selection input#name 0 12
+key Control+v                 a trailing line break pasted is dropped
+expect value input#name ab
+expect selection input#name 2 2
+key Control+a
+expect selection input#name 0 2
+type "Warm tones here"
+expect value input#name "Warm tones here"
+key End                       word deletions are each a step
+expect selection input#name 15 15
+key Control+Backspace
+expect value input#name "Warm tones "
+key Control+Backspace
+expect value input#name "Warm "
+key Control+z
+expect value input#name "Warm tones "
+key Control+z
+expect value input#name "Warm tones here"
+key End
+expect selection input#name 15 15
+key Backspace                 a word deletion after Backspace is a step
+expect value input#name "Warm tones her"
+key Control+Backspace
+expect value input#name "Warm tones "
+key Control+z
+expect value input#name "Warm tones her"
+key Control+z
+expect value input#name "Warm tones here"
+key Home
+expect selection input#name 0 0
+key Delete                    a word deletion after Delete is a step
+expect value input#name "arm tones here"
+key Control+Delete
+expect value input#name " tones here"
+key Control+z
+expect value input#name "arm tones here"
+key Control+z
+expect value input#name "Warm tones here"
+key Home
+expect selection input#name 0 0
+key ArrowRight
+expect selection input#name 1 1
+key ArrowRight
+expect selection input#name 2 2
+key Backspace                 a Delete joins an open Backspace run
+expect value input#name "Wrm tones here"
+key Delete
+expect value input#name "Wm tones here"
+key Control+z
+expect value input#name "Warm tones here"
+expect selection input#name 2 2
+key Home
+expect selection input#name 0 0
+key Control+Delete            Delete joins a word deletion forward
+expect value input#name " tones here"
+key Delete
+expect value input#name "tones here"
+key Control+z
+expect value input#name "Warm tones here"

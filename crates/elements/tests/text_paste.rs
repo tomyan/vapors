@@ -1,6 +1,7 @@
 //! Pasted text in a text field (E6b): `paste` fires on the field first
 //! and a listener may cancel it; else the text replaces the selection
-//! with `input`, as its own undo step, a line break a space. With no
+//! with `input`, as its own undo step, a line break a space and
+//! trailing line breaks dropped; the `paste` event carries the text. With no
 //! text field focused the paste is not the document's, and the app has
 //! it.
 
@@ -27,7 +28,7 @@ fn a_paste_replaces_the_selection_after_its_paste_event() {
     assert!(taken);
     assert_eq!(value(&page, page.name), "Cool");
     assert_eq!(selection(&page, page.name), (4, 4));
-    assert_eq!(*page.log.borrow(), ["paste \"\"", "input \"Cool\""]);
+    assert_eq!(*page.log.borrow(), ["paste \"Cool\"", "input \"Cool\""]);
 }
 
 #[test]
@@ -129,4 +130,53 @@ fn each_line_break_in_a_paste_is_a_space() {
 
     // Then
     assert_eq!(value(&page, page.name), "Warma b c d");
+}
+
+#[test]
+fn a_paste_listener_reads_the_text_as_it_was_copied() {
+    // Given: a listener that keeps what it is handed, and cancels
+    let page = page();
+    click(&page, [120.0, 12.0]);
+    let handed = Rc::new(RefCell::new(None));
+    let into = Rc::clone(&handed);
+    page.doc.borrow_mut().listen(
+        page.name,
+        "paste",
+        Box::new(move |e: &mut Event| {
+            *into.borrow_mut() = Some(e.value().to_owned());
+            e.prevent_default();
+        }),
+    );
+
+    // When
+    Document::text_pasted(&page.doc, "a\nb\n");
+
+    // Then: the clipboard's text, line breaks and all (clipboardData)
+    assert_eq!(handed.borrow().as_deref(), Some("a\nb\n"));
+    assert_eq!(value(&page, page.name), "Warm");
+}
+
+#[test]
+fn trailing_line_breaks_are_dropped_and_the_rest_are_spaces() {
+    // Given: Chromium 155's answers (review-v92's probes)
+    let cases = [
+        ("ab\n", "ab"),
+        ("ab\r\n", "ab"),
+        ("ab\n\n", "ab"),
+        (" \n", " "),
+        ("\nab", " ab"),
+        ("a\n \nb", "a   b"),
+        ("a\r\nb", "a b"),
+    ];
+    for (pasted, shown) in cases {
+        // Given: the field's text selected whole
+        let page = page();
+        support::text_page::key(&page, "Tab");
+
+        // When
+        Document::text_pasted(&page.doc, pasted);
+
+        // Then
+        assert_eq!(value(&page, page.name), shown, "{pasted:?}");
+    }
 }

@@ -92,11 +92,7 @@ pub(crate) fn key(document: &Rc<RefCell<Document>>, node: NodeId, key: &str, mod
     match key {
         "Enter" => commit(document, node),
         "Backspace" | "Delete" => {
-            let kind = if key == "Backspace" {
-                EditKind::DeleteBackward
-            } else {
-                EditKind::DeleteForward
-            };
+            let kind = deletion_kind(&document.borrow(), node, key == "Backspace", word);
             document
                 .borrow_mut()
                 .edit(node, kind, |d| deleted(d, key == "Backspace", word));
@@ -184,4 +180,19 @@ fn fire(document: &Rc<RefCell<Document>>, node: NodeId, name: &str) {
         return;
     };
     dispatch_bubbling(document, node, Event::new(name).with_value(&value));
+}
+
+/// How a Backspace (`back`) or Delete groups: a word deletion only
+/// when `word` deletes from a collapsed selection, as `deleted` does.
+fn deletion_kind(document: &Document, node: NodeId, back: bool, word: bool) -> EditKind {
+    let word = word
+        && document
+            .selection(node)
+            .is_some_and(|(start, end)| start == end);
+    match (back, word) {
+        (true, false) => EditKind::DeleteBackward,
+        (false, false) => EditKind::DeleteForward,
+        (true, true) => EditKind::DeleteWordBackward,
+        (false, true) => EditKind::DeleteWordForward,
+    }
 }
