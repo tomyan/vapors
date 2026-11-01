@@ -26,8 +26,7 @@ pub struct Input {
     scale: f64,
     /// The modifier keys held, for the paste shortcut.
     modifiers: ModifiersState,
-    /// The presses in a row (native; the web page counts its own).
-    #[cfg(not(target_family = "wasm"))]
+    /// The presses in a row.
     clicks: crate::clicks::Clicks,
 }
 
@@ -41,7 +40,6 @@ impl Input {
             started: Instant::now(),
             scale: 1.0,
             modifiers: ModifiersState::empty(),
-            #[cfg(not(target_family = "wasm"))]
             clicks: crate::clicks::Clicks::default(),
         }
     }
@@ -124,7 +122,6 @@ impl Input {
                 let now = self.started.elapsed();
                 return self.gestures.touch(*id, *phase, *x, *y, now);
             }
-            #[cfg(not(target_family = "wasm"))]
             Event::PrimaryButton { pressed: true } => return vec![self.click_count()],
             _ => {}
         }
@@ -132,9 +129,12 @@ impl Input {
     }
 
     /// The press just received as the nth in a row, at the pointer (CSS
-    /// px), stamped now: winit gives events no timestamp, and this is
-    /// as soon as the platform has the press.
-    #[cfg(not(target_family = "wasm"))]
+    /// px), stamped now.
+    ///
+    /// RELAXED: winit 0.30 gives events no timestamp, so a press is
+    /// stamped when winit hands it over; presses queued behind a slow
+    /// frame are stamped together and can count as a row. Retired when
+    /// winit exposes event times.
     #[allow(clippy::cast_possible_truncation)] // a display scale
     fn click_count(&mut self) -> Event {
         let scale = self.scale as f32;

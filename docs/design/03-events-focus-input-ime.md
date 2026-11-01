@@ -357,15 +357,20 @@ from run to run. Clicks in a row (E6a, the second pull request): the
 platform sends `Event::ClickCount` after each press of the primary
 button, and the document places the caret, selects a word or the whole
 text on it (`Document::pointer_clicks`), as Chromium does on
-`mousedown`, after `pointerdown`. On the web the count is the browser's
-own, `mousedown`'s `detail` (winit presses from `pointerdown`, whose
-`detail` is 0). Natively the platform counts, stamping each press when
-it receives it from winit (whose events carry no timestamp), with
-fallbacks for the system's interval and distance: GTK's defaults on
-Linux (400 ms, 5 px, as Linux Chromium reads), Windows' (500 ms, 4 px),
-macOS's (500 ms; no distance setting, so 4 px). No build compiles a
-reader for the systems' own settings yet; a CI target that does
-retires the fallbacks. A double click
+`mousedown`, after `pointerdown`. The platform counts on every
+target, the web included: winit cancels `pointerdown` (so the canvas
+selects no text), which in Chromium suppresses `mousedown` and with it
+the browser's own count (probed, Chromium 155: `pointerdown`'s `detail`
+is 0, and only `click` and `dblclick` carry the count, after release).
+The interval and distance are stated fallbacks: GTK's defaults on Linux
+(400 ms, 5 px, as Linux Chromium reads), Windows' (500 ms, 4 px),
+macOS's (500 ms; no distance setting, so 4 px); on the web, the one the
+browser's platform names (`navigator.userAgentData`, else the user
+agent). No build compiles a reader for the systems' own settings yet;
+a CI target that does retires the fallbacks. RELAXED: winit 0.30 gives
+events no timestamp, so a press is stamped when winit hands it to the
+platform, and presses queued behind a slow frame are stamped together;
+retired when winit exposes event times. A double click
 selects the word after the caret position nearest the point, as
 Chromium does (just past a word, the space after it; past the text,
 the last word), a triple click the whole text, neither starting a
