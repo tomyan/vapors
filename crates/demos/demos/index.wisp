@@ -21,4 +21,5 @@ h1 { margin-top: 0; font-size: 20px; }
 <div class="demo"><div class="name">?demo=slider</div><div>3-E3a: a range input bound to a signal, dragged and stepped by key</div></div>
 <div class="demo"><div class="name">?demo=checkbox</div><div>3-E3b: checkboxes bound to signals, toggled by click or Space</div></div>
 <div class="demo"><div class="name">?demo=number</div><div>3-E3c: number fields, one typed into and one scrubbed, bound to signals</div></div>
+<div class="demo"><div class="name">?demo=field</div><div>E6a: a text field bound to a signal, with a caret, a selection and word moves</div></div>
 <div class="demo"><div class="name">?demo=image</div><div>F0: the image view, pinch and drag</div></div>

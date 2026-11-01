@@ -32,6 +32,12 @@ pub fn unmet(expect: &Expect, answer: &Value) -> Option<String> {
                 .unwrap_or("(not recorded)");
             (found != value).then(|| format!("{target} has value {found:?}, not {value:?}"))
         }
+        Expect::Selection { target, start, end } => {
+            // exactly the pair: a third number or a missing one is unmet
+            let found = &answer["selections"][target];
+            (*found != serde_json::json!([start, end]))
+                .then(|| format!("{target} has selection {found}, not {start}..{end}"))
+        }
         Expect::Checked { target, checked } => {
             let found = answer["checked"][target].as_bool();
             (found != Some(*checked)).then(|| {

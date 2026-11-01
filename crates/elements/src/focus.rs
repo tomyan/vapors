@@ -63,10 +63,11 @@ impl Document {
         if had == node {
             return;
         }
-        // a number field commits as focus leaves it, before its blur,
-        // as Chromium fires its change (3-E3c)
+        // a number or text field commits as focus leaves it, before its
+        // blur, as Chromium fires its change (3-E3c, E6a)
         if let Some(had) = had {
             crate::number_input::commit(document, had);
+            crate::text_input::commit(document, had);
         }
         document.borrow_mut().take_focus(node);
         if let Some(had) = had {
@@ -90,6 +91,7 @@ impl Document {
         if let Some(node) = node {
             let keyboard = self.keyboard;
             self.number_focused(node, keyboard);
+            self.text_focused(node, keyboard);
         }
     }
 

@@ -90,6 +90,17 @@ impl FontSystem {
     }
 }
 
+impl FontSystem {
+    /// A driver for `editor` over this system's fonts and layout
+    /// context, for the editing calls that need a layout (E6a).
+    pub fn editor_driver<'a>(
+        &'a mut self,
+        editor: &'a mut parley::PlainEditor<Color>,
+    ) -> parley::PlainEditorDriver<'a, Color> {
+        editor.driver(&mut self.fonts, &mut self.layouts)
+    }
+}
+
 impl Default for FontSystem {
     fn default() -> Self {
         Self::new()

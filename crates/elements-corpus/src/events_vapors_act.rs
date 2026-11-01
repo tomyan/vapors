@@ -27,13 +27,13 @@ pub(super) fn act(
     let at = |x: f64, y: f64| [x as f32, y as f32];
     match *action {
         Action::Click(x, y) => {
-            Document::pointer_pressed(doc, at(x, y));
-            Document::pointer_released(doc, at(x, y));
+            sent(doc, |doc| Document::pointer_pressed(doc, at(x, y)));
+            sent(doc, |doc| Document::pointer_released(doc, at(x, y)));
         }
         Action::Key(ref combination) => {
             let (key, modifiers) = key_of(combination);
-            Document::key_pressed(doc, &key, modifiers);
-            Document::key_released(doc, &key, modifiers);
+            sent(doc, |doc| Document::key_pressed(doc, &key, modifiers));
+            sent(doc, |doc| Document::key_released(doc, &key, modifiers));
         }
         // each character as the platform sends it: the key down, its
         // text, the key up
@@ -41,10 +41,21 @@ pub(super) fn act(
             for c in text.chars() {
                 let key = c.to_string();
                 let none = vapors_elements::Modifiers::default();
-                Document::key_pressed(doc, &key, none);
-                Document::character_typed(doc, &key);
-                Document::key_released(doc, &key, none);
+                sent(doc, |doc| {
+                    Document::key_pressed(doc, &key, none);
+                    Document::character_typed(doc, &key);
+                });
+                sent(doc, |doc| Document::key_released(doc, &key, none));
             }
+        }
+        // the touch's down and up, then the tap the platform's gestures
+        // send for a still, quick touch
+        Action::Tap(x, y) => {
+            sent(doc, |doc| Document::touch_pressed(doc, 0, at(x, y)));
+            sent(doc, |doc| {
+                Document::touch_released(doc, 0, at(x, y));
+                Document::touch_tapped(doc, at(x, y));
+            });
         }
         Action::Move(x, y) => Document::pointer_moved(doc, at(x, y)),
         Action::Press(x, y) => Document::pointer_pressed(doc, at(x, y)),
@@ -72,7 +83,16 @@ pub(super) fn act(
         Action::TouchUp(x, y) => Document::touch_released(doc, 0, at(x, y)),
         ref other => return Err(format!("{other:?} is not played on vapors yet")),
     }
+    Document::settle_selection(doc);
     Ok(())
+}
+
+/// Sends one platform event, then settles the selection, as the
+/// Chromium player waits a task after each input call and Chromium
+/// fires the `selectionchange` it queued then (E6a).
+fn sent(doc: &Rc<RefCell<Document>>, event: impl FnOnce(&Rc<RefCell<Document>>)) {
+    event(doc);
+    Document::settle_selection(doc);
 }
 
 impl Press {
