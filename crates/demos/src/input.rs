@@ -16,6 +16,7 @@ pub fn click(document: &Rc<RefCell<Document>>, point: [u32; 2]) {
     let point = [point[0] as f32, point[1] as f32];
     Document::pointer_moved(document, point);
     Document::pointer_pressed(document, point);
+    Document::pointer_clicks(document, std::num::NonZeroU32::MIN);
     Document::pointer_released(document, point);
 }
 

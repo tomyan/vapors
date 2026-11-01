@@ -103,6 +103,9 @@ pub(crate) enum Message {
     DeviceLost,
     /// A [`Waker`](crate::Waker) asked for a frame from outside `event`.
     Wake,
+    /// Input from the page's own listeners (the web's click count).
+    #[cfg_attr(not(target_family = "wasm"), allow(dead_code))] // only the web has them
+    Input(Event),
 }
 
 /// Open a window and drive `app` until it returns [`Next::Exit`] or the
@@ -151,6 +154,7 @@ pub fn run(options: WindowOptions, app: impl App + 'static) -> Result<(), Platfo
         .map_err(|e| PlatformError::Windowing(e.to_string()))?;
     let platform = Platform::new(event_loop.create_proxy());
     crate::web::wire_open_button(platform.proxy());
+    crate::web_clicks::wire(platform.proxy())?;
     let handler = Handler::new(options, Box::new(app), platform);
     event_loop.spawn_app(handler);
     Ok(())

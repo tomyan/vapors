@@ -7,6 +7,8 @@
 
 mod attributes;
 #[cfg(not(target_family = "wasm"))]
+mod clicks;
+#[cfg(not(target_family = "wasm"))]
 mod clipboard;
 #[cfg(not(target_family = "wasm"))]
 mod clipboard_reader;
@@ -38,6 +40,8 @@ mod tasks;
 mod waker;
 #[cfg(target_family = "wasm")]
 mod web;
+#[cfg(target_family = "wasm")]
+mod web_clicks;
 mod webgpu;
 mod window;
 

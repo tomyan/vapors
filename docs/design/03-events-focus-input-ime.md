@@ -354,17 +354,31 @@ field's selection after every step; the Chromium player waits a task after each 
 and the vapors player settles after each event, because Chromium's
 queued `selectionchange` otherwise lands before or after the next key
 from run to run. Clicks in a row (E6a, the second pull request): the
-app counts a press within 500 ms and 4 CSS px of the last as one more
-(Windows' defaults; the system's own setting is not read yet) and
-passes the count to `Document::pointer_pressed_clicks`. A double click
+platform sends `Event::ClickCount` after each press of the primary
+button, and the document places the caret, selects a word or the whole
+text on it (`Document::pointer_clicks`), as Chromium does on
+`mousedown`, after `pointerdown`. On the web the count is the browser's
+own, `mousedown`'s `detail` (winit presses from `pointerdown`, whose
+`detail` is 0). Natively the platform counts, stamping each press when
+it receives it from winit (whose events carry no timestamp), with
+fallbacks for the system's interval and distance: GTK's defaults on
+Linux (400 ms, 5 px, as Linux Chromium reads), Windows' (500 ms, 4 px),
+macOS's (500 ms; no distance setting, so 4 px). No build compiles a
+reader for the systems' own settings yet; a CI target that does
+retires the fallbacks. A double click
 selects the word after the caret position nearest the point, as
 Chromium does (just past a word, the space after it; past the text,
 the last word), a triple click the whole text, neither starting a
 drag. A press inside a selection, ends included, places the caret on
 release, as Chromium waits to see whether the press drags the text.
 Checked by `fixtures/words.events`, whose field sets its font and
-border, which Chromium's field does not take from the page. Not built:
-`detail` and `dblclick`, dragging by word or line after a double or
+border, which Chromium's field does not take from the page. A known
+difference: words are Parley's (UAX 29), which keep a "." between
+letters inside a word, so a double click in "e.g." selects "e.g" where
+Chromium selects the "." alone; "3.5" and "don't" agree. A press inside
+the selection moves the caret after its `click`, so a `click` listener
+reads the selection held, as in Chromium. Not built: `detail` and
+`dblclick`, dragging by word or line after a double or
 triple click, dragging selected text, IME, `beforeinput`,
 `placeholder`, `maxlength`, scrolling a long text to the caret, the
 blinking caret (area 6), vertical selection in a `textarea`.

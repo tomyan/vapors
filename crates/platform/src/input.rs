@@ -26,6 +26,9 @@ pub struct Input {
     scale: f64,
     /// The modifier keys held, for the paste shortcut.
     modifiers: ModifiersState,
+    /// The presses in a row (native; the web page counts its own).
+    #[cfg(not(target_family = "wasm"))]
+    clicks: crate::clicks::Clicks,
 }
 
 impl Input {
@@ -38,6 +41,8 @@ impl Input {
             started: Instant::now(),
             scale: 1.0,
             modifiers: ModifiersState::empty(),
+            #[cfg(not(target_family = "wasm"))]
+            clicks: crate::clicks::Clicks::default(),
         }
     }
 
@@ -119,9 +124,22 @@ impl Input {
                 let now = self.started.elapsed();
                 return self.gestures.touch(*id, *phase, *x, *y, now);
             }
+            #[cfg(not(target_family = "wasm"))]
+            Event::PrimaryButton { pressed: true } => return vec![self.click_count()],
             _ => {}
         }
         Vec::new()
+    }
+
+    /// The press just received as the nth in a row, at the pointer (CSS
+    /// px), stamped now: winit gives events no timestamp, and this is
+    /// as soon as the platform has the press.
+    #[cfg(not(target_family = "wasm"))]
+    #[allow(clippy::cast_possible_truncation)] // a display scale
+    fn click_count(&mut self) -> Event {
+        let scale = self.scale as f32;
+        let [x, y] = self.pointer.unwrap_or_default();
+        Event::ClickCount(self.clicks.pressed([x / scale, y / scale], Instant::now()))
     }
 
     /// A trackpad pinch, anchored at the pointer, else at the window's
@@ -143,6 +161,10 @@ impl Input {
 #[cfg(test)]
 #[path = "input_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "input_click_tests.rs"]
+mod click_tests;
 
 #[cfg(test)]
 #[path = "input_wheel_tests.rs"]

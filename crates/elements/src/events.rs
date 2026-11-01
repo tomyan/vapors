@@ -41,6 +41,9 @@ pub(crate) struct Pointer {
     pub(crate) drags: std::collections::HashMap<u32, crate::range_drag::Drag>,
     /// Each pointer's scrub of a number field, by pointer id (3-E3c).
     pub(crate) scrubs: std::collections::HashMap<u32, crate::number_scrub::Scrub>,
+    /// The mouse press waiting for its click count: its target and
+    /// point (E6a).
+    pub(crate) counting: Option<(NodeId, Point)>,
     /// Each pointer's press on a text field, by pointer id (E6a).
     pub(crate) text_presses: std::collections::HashMap<u32, crate::text_pointer::TextPress>,
 }
@@ -80,21 +83,12 @@ impl Document {
         }
     }
 
-    /// The primary button went down at `point`, the first press in a
-    /// row: see [`Document::pointer_pressed_clicks`].
+    /// The primary button went down at `point`: the target and its
+    /// ancestors become `:active`, the target gets `pointerdown`, and
+    /// focus moves. What the press does in a text field waits for its
+    /// click count ([`Document::pointer_clicks`]), as Chromium places the
+    /// caret on `mousedown`, after `pointerdown`.
     pub fn pointer_pressed(document: &Rc<RefCell<Document>>, point: Point) {
-        Self::pointer_pressed_clicks(document, point, NonZeroU32::MIN);
-    }
-
-    /// The primary button went down at `point`, the `clicks`th press in
-    /// a row as the platform counts them (two is a double click): the
-    /// target and its ancestors become `:active`, and the target gets
-    /// `pointerdown`.
-    pub fn pointer_pressed_clicks(
-        document: &Rc<RefCell<Document>>,
-        point: Point,
-        clicks: NonZeroU32,
-    ) {
         process_pending(document, MOUSE, point);
         document.borrow_mut().keyboard = false;
         let target = document.borrow().pointer_target(MOUSE, point);
@@ -116,9 +110,17 @@ impl Document {
             let focusable = target.and_then(|target| document.borrow().focusable_holding(target));
             Self::focus(document, focusable);
         }
-        // a text field's caret lands where the press did, after focus
-        // so keyboard focus's selection does not override it (E6a)
-        if let (false, Some(target)) = (prevented, target) {
+        document.borrow_mut().pointer.counting = target.filter(|_| !prevented).map(|t| (t, point));
+    }
+
+    /// The press just delivered is the `clicks`th in a row, as the
+    /// platform counts it (the web page's `mousedown` `detail`): a text
+    /// field it pressed takes its caret, a word or its whole text. A
+    /// count with no press waiting (a touch's compatibility `mousedown`)
+    /// does nothing.
+    pub fn pointer_clicks(document: &Rc<RefCell<Document>>, clicks: NonZeroU32) {
+        let counting = document.borrow_mut().pointer.counting.take();
+        if let Some((target, point)) = counting {
             crate::text_pointer::pressed(document, MOUSE, target, point, clicks);
         }
     }
@@ -140,7 +142,6 @@ impl Document {
         }
         crate::range_drag::released(document, MOUSE);
         crate::number_scrub::released(document, MOUSE);
-        crate::text_pointer::released(document, MOUSE);
         release_capture(document, MOUSE);
         process_pending(document, MOUSE, point);
         let click = document.borrow_mut().release(target);
@@ -150,11 +151,15 @@ impl Document {
                 .pointer_event("click", MOUSE, click, point);
             crate::events::tree::dispatch_click(document, click, event);
         }
+        // a press held inside a text field's selection moves the caret
+        // after `click`, as Chromium does (review-v91, S1)
+        crate::text_pointer::released(document, MOUSE);
     }
 
     /// A tap at `point`: a press and a release there, which is a click.
     pub fn tapped(document: &Rc<RefCell<Document>>, point: Point) {
         Self::pointer_pressed(document, point);
+        Self::pointer_clicks(document, NonZeroU32::MIN);
         Self::pointer_released(document, point);
     }
 
