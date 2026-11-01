@@ -68,7 +68,7 @@ fn card() -> Card {
 /// Route `event` as a host would, giving the document what is its.
 fn give(input: &mut DocumentInput, card: &Card, event: &Event) -> Route {
     let route = input.route(&card.doc, event).expect("placed");
-    if route == Route::Document {
+    if matches!(route, Route::Document | Route::Both) {
         input.handle(&card.doc, event).expect("placed");
         card.doc
             .borrow_mut()
@@ -190,6 +190,7 @@ fn keys_and_typed_text_follow_the_documents_focus() {
     let mut input = DocumentInput::new();
     let tab = Event::Key {
         key: "Tab".into(),
+        code: "Tab".into(),
         pressed: true,
         repeat: false,
         modifiers: Modifiers::default(),

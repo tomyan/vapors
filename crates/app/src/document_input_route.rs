@@ -42,13 +42,20 @@ pub enum Route {
     Document,
     /// The app drawing under the document takes it.
     Host,
+    /// Both: give it to the document and take it too. A key's repeats
+    /// and its up, after the document had its down and did not use it,
+    /// as a browser gives the focused element the key's up and also
+    /// bubbles it to the page.
+    Both,
 }
 
 /// The routes held while a press or touch lasts.
 #[derive(Default)]
 pub(super) struct Held {
     mouse: Option<Route>,
-    /// Each key held down, by its DOM name, and where its down went.
+    /// Each key held down, by its place on the keyboard (its DOM `code`,
+    /// which Shift does not change as it does `key`), and where its down
+    /// went.
     pub(super) keys: HashMap<String, Route>,
     touches: HashMap<u64, Route>,
     gesture: Option<Route>,
@@ -114,12 +121,12 @@ impl DocumentInput {
 }
 
 impl Held {
-    /// A key's route: a fresh key-down by focus, held until its key-up;
-    /// an auto-repeat and the key-up where the key-down went. Typed text
+    /// A key's route: a fresh key-down by focus, held by its code until
+    /// its key-up; an auto-repeat and the key-up where the key-down went. Typed text
     /// and other placeless events by focus.
     fn key(&mut self, document: &Document, event: &Event) -> Route {
         let Event::Key {
-            key,
+            code,
             pressed,
             repeat,
             ..
@@ -130,13 +137,13 @@ impl Held {
         let held = if *pressed && !*repeat {
             None
         } else if *pressed {
-            self.keys.get(key).copied()
+            self.keys.get(code).copied()
         } else {
-            self.keys.remove(key)
+            self.keys.remove(code)
         };
         let route = held.unwrap_or_else(|| by_focus(document, event));
         if *pressed {
-            self.keys.insert(key.clone(), route);
+            self.keys.insert(code.clone(), route);
         }
         route
     }
@@ -169,3 +176,7 @@ mod tests;
 #[cfg(test)]
 #[path = "document_input_keys_tests.rs"]
 mod key_tests;
+
+#[cfg(test)]
+#[path = "document_input_held_keys_tests.rs"]
+mod held_key_tests;

@@ -125,9 +125,10 @@ impl DocumentInput {
             self.act(document, action);
         }
         let unused_key = key(document, event) == Some(false);
-        if let (true, Event::Key { key, .. }) = (unused_key, event) {
-            // the document left it to the host: so are its repeats and its up
-            self.held.keys.insert(key.clone(), Route::Host);
+        if let (true, Event::Key { code, .. }) = (unused_key, event) {
+            // the document had its down and left it to the host: its
+            // repeats and its up go to both
+            self.held.keys.insert(code.clone(), Route::Both);
         }
         let changed = document.borrow_mut().take_changed();
         let cursor = document.borrow().cursor(self.pointer);

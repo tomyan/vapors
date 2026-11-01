@@ -167,6 +167,7 @@ fn a_key_reaches_a_document_never_updated_and_a_pointer_event_is_still_refused()
     let mut input = DocumentInput::new();
     let key = Event::Key {
         key: "z".into(),
+        code: "KeyZ".into(),
         pressed: true,
         repeat: false,
         modifiers: vapors_platform::Modifiers::default(),
