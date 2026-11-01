@@ -153,3 +153,31 @@ fn the_shortcut_as_the_dom_names_it_is_the_platforms_by_the_v_place() {
         "a repeat"
     );
 }
+
+#[test]
+fn a_named_or_dead_key_at_the_v_place_is_v_by_its_place() {
+    // Given
+    use crate::event::Modifiers;
+    use crate::paste_key::paste_shortcut;
+    let control = Modifiers {
+        control: true,
+        ..Modifiers::default()
+    };
+
+    // Then: not a letter, so the key at the V place decides
+    assert!(paste_shortcut(
+        "Unidentified",
+        "KeyV",
+        control,
+        false,
+        false
+    ));
+    assert!(paste_shortcut("Dead", "KeyV", control, false, false));
+    assert!(!paste_shortcut(
+        "Unidentified",
+        "KeyB",
+        control,
+        false,
+        false
+    ));
+}
