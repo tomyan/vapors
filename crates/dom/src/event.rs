@@ -45,9 +45,6 @@ pub enum Capture {
     Release,
 }
 
-/// A listener: boxed so the tree can store it.
-pub type Handler = Box<dyn FnMut(&mut Event)>;
-
 impl Event {
     /// An event of the given kind with no payload.
     #[must_use]

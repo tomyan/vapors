@@ -1,11 +1,9 @@
 //! A [`Dom`] for tests: records every call and keeps the tree so a
 //! test can read it back as HTML and dispatch events into it.
 
-use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
-use std::rc::Rc;
 
-use crate::{Handler, NodeId, PropertyValue};
+use crate::{NodeId, PropertyValue};
 
 mod dispatch;
 mod dom_impl;
@@ -83,7 +81,9 @@ struct Record {
 pub struct RecordingDom {
     calls: Vec<Call>,
     nodes: Vec<Record>,
-    listeners: HashMap<(NodeId, String), Vec<Rc<RefCell<Handler>>>>,
+    listeners: HashMap<(NodeId, String), Vec<crate::Listener>>,
+    /// Nodes `remove` took out, with their subtrees: not in the tree.
+    removed: std::collections::HashSet<NodeId>,
 }
 
 impl RecordingDom {
@@ -151,6 +151,14 @@ impl RecordingDom {
         self.nodes
             .get_mut(usize::try_from(node.0).expect("ids are indices"))
             .unwrap_or_else(|| panic!("{node:?} was never created by this RecordingDom"))
+    }
+
+    /// Marks `node` and its subtree as removed: not in the tree.
+    fn mark_removed(&mut self, node: NodeId) {
+        self.removed.insert(node);
+        for child in self.record(node).children.clone() {
+            self.mark_removed(child);
+        }
     }
 
     fn detach(&mut self, node: NodeId) {

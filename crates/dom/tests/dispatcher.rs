@@ -1,7 +1,6 @@
 //! A component's own events (`Dispatcher`): dispatched at a node and up
 //! through its ancestors at once, as the DOM's `dispatchEvent`, answering
-//! whether no listener cancelled it; refused, not dropped, when it cannot
-//! run.
+//! whether no listener cancelled it. Refusals: `dispatcher_refusals.rs`.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -9,35 +8,9 @@ use std::rc::Rc;
 use vapors_dom::recording::RecordingDom;
 use vapors_dom::{Dispatcher, Dom, DynDom, Event};
 
-/// The tree, the list, the option in it, and the log of who heard.
-type Tree = (
-    Rc<RefCell<RecordingDom>>,
-    vapors_dom::NodeId,
-    vapors_dom::NodeId,
-    Rc<RefCell<Vec<String>>>,
-);
-
-/// A list holding one option, and a log of who heard what.
-fn tree() -> Tree {
-    let dom = Rc::new(RefCell::new(RecordingDom::new()));
-    let log = Rc::new(RefCell::new(Vec::new()));
-    let (list, option) = {
-        let mut d = dom.borrow_mut();
-        let list = d.create_element("div");
-        let option = d.create_element("div");
-        d.append(list, option);
-        (list, option)
-    };
-    for (node, who) in [(option, "option"), (list, "list")] {
-        let into = Rc::clone(&log);
-        dom.borrow_mut().listen(
-            node,
-            "optionchoose",
-            Box::new(move |_: &mut Event| into.borrow_mut().push(who.to_owned())),
-        );
-    }
-    (dom, list, option, log)
-}
+#[path = "support/dispatch_tree.rs"]
+mod dispatch_tree;
+use dispatch_tree::tree;
 
 #[test]
 fn an_event_reaches_its_node_then_its_ancestors_and_answers_not_cancelled() {
@@ -72,32 +45,6 @@ fn a_listener_that_prevents_the_default_cancels_it() {
 }
 
 #[test]
-fn a_dispatch_while_the_dom_is_borrowed_is_refused() {
-    // Given
-    let (dom, _, option, log) = tree();
-    let events = Dispatcher::new(dom.dyn_dom(), &["optionchoose"]);
-
-    // When: held mutably, then shared
-    let held = dom.borrow_mut();
-    let while_mut = events.dispatch(option, Event::new("optionchoose"));
-    drop(held);
-    let shared = dom.borrow();
-    let while_shared = events.dispatch(option, Event::new("optionchoose"));
-    drop(shared);
-
-    // Then: refused both times, and nobody heard it
-    for refused in [while_mut, while_shared] {
-        assert!(
-            refused
-                .expect_err("refused")
-                .to_string()
-                .contains("borrowed")
-        );
-    }
-    assert!(log.borrow().is_empty());
-}
-
-#[test]
 fn a_listener_may_use_the_dom_during_a_dispatch() {
     // Given: the option's listener reads the tree
     let (dom, _, option, _) = tree();
@@ -119,20 +66,46 @@ fn a_listener_may_use_the_dom_during_a_dispatch() {
 }
 
 #[test]
-fn an_event_the_dispatcher_did_not_declare_is_refused() {
-    // Given
-    let (dom, _, option, log) = tree();
+fn a_listener_may_dispatch_again_and_the_inner_dispatch_finishes_inside_it() {
+    // Given: a list whose `optionchoose` listener, hearing it from the
+    // first option, dispatches it again at a second option
+    let dom = Rc::new(RefCell::new(RecordingDom::new()));
+    let (list, first, second) = {
+        let mut d = dom.borrow_mut();
+        let list = d.create_element("div");
+        let first = d.create_element("div");
+        let second = d.create_element("div");
+        d.append(list, first);
+        d.append(list, second);
+        (list, first, second)
+    };
     let events = Dispatcher::new(dom.dyn_dom(), &["optionchoose"]);
+    let log = Rc::new(RefCell::new(Vec::new()));
+    let (into, again) = (Rc::clone(&log), events.clone());
+    dom.borrow_mut().listen(
+        list,
+        "optionchoose",
+        Box::new(move |e: &mut Event| {
+            into.borrow_mut()
+                .push(format!("list heard {:?}", e.target()));
+            if e.target() == Some(first) {
+                let inner = again.dispatch(second, Event::new("optionchoose"));
+                into.borrow_mut().push(format!("inner {inner:?}"));
+            }
+        }),
+    );
 
     // When
-    let refused = events.dispatch(option, Event::new("optionchose"));
+    let outer = events.dispatch(first, Event::new("optionchoose"));
 
-    // Then
-    assert!(
-        refused
-            .expect_err("refused")
-            .to_string()
-            .contains("declares only")
+    // Then: the inner dispatch ran to completion inside the outer listener
+    assert_eq!(outer, Ok(true));
+    assert_eq!(
+        *log.borrow(),
+        [
+            format!("list heard {:?}", Some(first)),
+            format!("list heard {:?}", Some(second)),
+            "inner Ok(true)".to_owned(),
+        ]
     );
-    assert!(log.borrow().is_empty());
 }

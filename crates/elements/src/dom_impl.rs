@@ -3,9 +3,6 @@
 //! tag or event the tree does not implement yet is accepted here and
 //! refused by `update` while it is in the document (see `check`).
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use vapors_dom::{Dom, Handler, NodeId, PropertyValue};
 
 use crate::document::Document;
@@ -123,7 +120,7 @@ impl Dom for Document {
     fn listen(&mut self, node: NodeId, event: &str, handler: Handler) {
         self.element_mut(node, "listen")
             .listeners
-            .push((event.to_owned(), Rc::new(RefCell::new(handler))));
+            .push((event.to_owned(), std::rc::Rc::from(handler)));
     }
 }
 
@@ -143,10 +140,8 @@ impl vapors_dom::Listeners for Document {
         &self,
         target: NodeId,
         name: &str,
-    ) -> Vec<(
-        NodeId,
-        Vec<std::rc::Rc<std::cell::RefCell<vapors_dom::Handler>>>,
-    )> {
-        self.listeners_chain(target, name)
+    ) -> Option<Vec<(NodeId, Vec<vapors_dom::Listener>)>> {
+        self.contains(target)
+            .then(|| self.listeners_chain(target, name))
     }
 }

@@ -38,6 +38,17 @@ pub(super) fn classify_dispatcher(
         .ok_or_else(|| {
             refuse("#[dispatcher(…)] names the events the component dispatches, as identifiers")
         })?;
+    if !info.events.is_empty() {
+        return Err(refuse(
+            "a second #[dispatcher]: one names every event the component dispatches",
+        ));
+    }
+    if local.attrs.len() > 1 {
+        return Err(refuse(
+            "#[dispatcher] stands alone on its `let`, with no other attribute",
+        ));
+    }
+    info.events = names.iter().map(ToString::to_string).collect();
     let quoted: Vec<String> = names
         .iter()
         .map(|n| format!("{:?}", n.to_string()))

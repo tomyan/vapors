@@ -2,16 +2,12 @@
 #[dispatcher(pick)]
 let events;
 let picked: Signal<bool> = Signal::new(false);
-let refused: Signal<Option<String>> = Signal::new(None);
-let choose = move |event: &mut Event| {
+let choose = move |event: &mut Event| -> Result<(), vapors_dom::DispatchRefused> {
     let Some(target) = event.target() else {
-        refused.set(Some("a click with no target".to_owned()));
-        return;
+        return Ok(());
     };
-    match events.dispatch(target, Event::new("pick")) {
-        Ok(went) => picked.set(went),
-        Err(why) => refused.set(Some(why.to_string())),
-    }
+    picked.set(events.dispatch(target, Event::new("pick"))?);
+    Ok(())
 };
 </script>
 

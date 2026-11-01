@@ -58,6 +58,7 @@ impl Counter {
     {
         let CounterProps {} = props;
         dom.borrow_mut().add_style(SCOPE, STYLE);
+        dom.borrow_mut().declare_events(&Self::events());
         let owner = Owner::new();
         let (count, roots) = owner
             .with(|| {
@@ -78,9 +79,9 @@ impl Counter {
                         .listen(
                             button0,
                             "click",
-                            Box::new(move |_event: &mut Event| {
-                                increment();
-                            }),
+                            Box::new(move |_event: &mut Event| vapors_dom::handle_without_event(
+                                &increment,
+                            )),
                         );
                 }
                 let text1 = dom.borrow_mut().create_text("Clicked ");
@@ -104,6 +105,13 @@ impl Counter {
                 (count, roots)
             });
         Counter { count, owner, roots }
+    }
+    /// The events this component type dispatches itself, its child
+    /// components' included, which `mount` declares to the tree.
+    #[must_use]
+    pub fn events() -> Vec<&'static str> {
+        let events: Vec<&'static str> = vec![];
+        events
     }
     /// The top-level nodes now, in order, including those of a block
     /// or child component at the top level.

@@ -24,6 +24,8 @@ fn a_listener_dispatches_its_own_event_and_reads_its_cancel() {
     let body = doc.body();
     let outer = element(&mut doc, body, "div", "");
     let button = element(&mut doc, outer, "button", "");
+    // what mounting a component that dispatches it declares
+    doc.declare_events(&["optionchoose"]);
     doc.listen(
         outer,
         "optionchoose",
@@ -49,4 +51,25 @@ fn a_listener_dispatches_its_own_event_and_reads_its_cancel() {
 
     // Then: it ran inside the click, and the box cancelled it
     assert_eq!(*answer.borrow(), Some(Ok(false)));
+}
+
+#[test]
+fn a_dispatch_at_a_removed_node_is_refused_naming_it() {
+    // Given: a button, removed after its dispatcher was made
+    let mut doc = document();
+    let body = doc.body();
+    let button = element(&mut doc, body, "button", "");
+    let doc = Rc::new(RefCell::new(doc));
+    let events = Dispatcher::new(doc.dyn_dom(), &["optionchoose"]);
+    doc.borrow_mut().remove(button);
+
+    // When
+    let refused = events.dispatch(button, Event::new("optionchoose"));
+
+    // Then
+    let why = refused.expect_err("refused").to_string();
+    assert!(
+        why.contains("not in the tree") && why.contains(&format!("{button:?}")),
+        "{why}"
+    );
 }
