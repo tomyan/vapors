@@ -41,6 +41,9 @@ pub(crate) struct Emitter<'a> {
     /// The snippets declared so far: a closure that reads one gets a
     /// clone of it, as of a script binding.
     pub snippets: Vec<super::snippet_list::LocalSnippet>,
+    /// The `{for}` rows being built, outermost first: `bind:this` binds
+    /// under the row's key.
+    pub row_keys: Vec<super::element_bind_this::RowKey>,
 }
 
 impl<'a> Emitter<'a> {
@@ -59,6 +62,7 @@ impl<'a> Emitter<'a> {
             dom_type: "D",
             tags: super::tag_props::TagCheck::default(),
             snippets: Vec::new(),
+            row_keys: Vec::new(),
         }
     }
 

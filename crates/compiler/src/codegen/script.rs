@@ -34,6 +34,8 @@ pub(crate) struct ScriptInfo {
     pub props: Vec<Prop>,
     /// Closure bindings and how many parameters each takes.
     pub handlers: HashMap<String, usize>,
+    /// Handlers that assign to a binding they capture, and the binding.
+    pub assigning: HashMap<String, String>,
     /// Names that read as `name.get()` in text holes.
     pub unwrappable: Vec<String>,
     /// Other bindings: cloned into each closure that reads them.
@@ -44,6 +46,8 @@ pub(crate) struct ScriptInfo {
     pub declared: Vec<(String, usize)>,
     /// The names its `use` items bring in.
     pub uses: Vec<UseName>,
+    /// The events its `#[dispatcher(…)]` declares.
+    pub events: Vec<String>,
 }
 
 /// Parses and classifies the script.
@@ -98,6 +102,13 @@ fn classify(
         check_declared(source, &name, offset)?;
         info.declared.push((name, offset));
     }
+    if let Some(attr) = local
+        .attrs
+        .iter()
+        .find(|attr| attr.path().is_ident("dispatcher"))
+    {
+        return super::script_dispatcher::classify_dispatcher(source, offset, attr, &local, info);
+    }
     let is_prop = local.attrs.iter().any(|attr| attr.path().is_ident("prop"));
     let (name, ty) = binding(&local.pat);
     let init = local.init.as_ref().map(|init| (*init.expr).clone());
@@ -134,6 +145,9 @@ fn classify_plain(name: Option<String>, init: Option<&syn::Expr>, info: &mut Scr
     };
     if let Some(syn::Expr::Closure(closure)) = init {
         info.handlers.insert(name.clone(), closure.inputs.len());
+        if let Some(captured) = super::handler_capture::assigned_capture(closure) {
+            info.assigning.insert(name.clone(), captured);
+        }
     }
     info.bindings.push(name);
 }

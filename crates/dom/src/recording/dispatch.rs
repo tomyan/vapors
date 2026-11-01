@@ -32,23 +32,18 @@ impl RecordingDom {
         Self::dispatch(dom, target, event);
     }
 
-    /// Delivers `event` to `target` and its ancestors.
-    pub fn dispatch(dom: &Rc<RefCell<Self>>, target: NodeId, mut event: Event) {
-        let path = dom.borrow().path_to_root(target);
-        for node in path {
-            let listeners = dom
-                .borrow()
-                .listeners
-                .get(&(node, event.name().to_string()))
-                .cloned()
-                .unwrap_or_default();
-            for listener in listeners {
-                (listener.borrow_mut())(&mut event);
-            }
-            if event.propagation_stopped() {
-                return;
-            }
-        }
+    /// Delivers `event` to `target` and its ancestors, with `target` as
+    /// its target, as the elements document does.
+    ///
+    /// # Panics
+    /// When `target` was removed: a test dispatching there is wrong.
+    pub fn dispatch(dom: &Rc<RefCell<Self>>, target: NodeId, event: Event) {
+        let along = crate::Listeners::listeners_along(&*dom.borrow(), target, event.name())
+            .unwrap_or_else(|| {
+                panic!("{target:?} was removed; a test dispatches only into the tree")
+            });
+        let mut event = event.at(target);
+        crate::run_along(along, &mut event, |_, _| {});
     }
 
     fn path_to_root(&self, node: NodeId) -> Vec<NodeId> {
@@ -73,5 +68,30 @@ impl RecordingDom {
             Some(PropertyValue::Text(text)) => text,
             _ => String::new(),
         }
+    }
+}
+
+impl crate::Listeners for RecordingDom {
+    fn listeners_along(
+        &self,
+        target: NodeId,
+        name: &str,
+    ) -> Option<Vec<(NodeId, Vec<crate::Listener>)>> {
+        if self.removed.contains(&target) {
+            return None;
+        }
+        Some(
+            self.path_to_root(target)
+                .into_iter()
+                .map(|node| {
+                    let listeners = self
+                        .listeners
+                        .get(&(node, name.to_owned()))
+                        .cloned()
+                        .unwrap_or_default();
+                    (node, listeners)
+                })
+                .collect(),
+        )
     }
 }

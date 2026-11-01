@@ -2,6 +2,7 @@
 //! that lists `(key, item)` pairs, and a row builder, handed to
 //! `vapors_dom::blocks::keyed` with the block's position for refusals.
 
+use super::element_bind_this::RowKey;
 use super::emit::{Emitter, Place};
 use crate::CompileError;
 use crate::ast::ForBlock;
@@ -23,7 +24,13 @@ impl Emitter<'_> {
         let signature =
             self.builder_signature(&format!(", {index}: Signal<usize>, {item}: Signal<_>"));
         self.push_scope(row_scope);
+        self.row_keys.push(RowKey {
+            index: index.clone(),
+            item: item.clone(),
+            key: block.key.clone(),
+        });
         let built = self.emit_builder_with(&[], &block.children, &signature, &[]);
+        self.row_keys.pop();
         self.pop_scope();
         built?;
         self.close_keyed_call(call);
