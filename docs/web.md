@@ -22,9 +22,14 @@ The elements the platform looks for, by id (`vapors_platform::page`):
 - `<canvas id="vapors">`, sized by CSS. The platform attaches to it and
   reports its size in physical pixels; a page without it fails with a
   Windowing error naming the id.
-- `<p id="status">`, optional. `report_status` writes there: the adapter
-  line once the GPU is ready, and what was opened. Each line replaces
-  the last.
+- `<p id="status">`, optional. `report_status` writes there, such as
+  what was opened. Each line replaces the last. The GPU's start-up line
+  (`adapter: <name>; max texture <n> px, max buffer <n> MiB`) goes there
+  too when the page has no `#adapter`.
+- `<p id="adapter">`, optional. `report_startup` writes the GPU's
+  start-up line there once the GPU is ready. A page that keeps its own
+  lines in `#status` provides it: without it the start-up line replaces
+  whatever `#status` held when the GPU became ready.
 - `<p id="error" hidden>`, optional. `report_error` writes there and
   removes the `hidden` attribute, so a page can tell an error from a
   status line by the element rather than by console text. Errors come
@@ -146,7 +151,7 @@ the `#status` and `#error` elements show the bare text.
 The window device asks for the default limits with `max_buffer_size`,
 `max_texture_dimension_2d` and `max_storage_buffer_binding_size` raised
 to what the adapter reports, so a large photo's texture and readback fit;
-`Frame::limits()` says what was granted, and the adapter status line
+`Frame::limits()` says what was granted, and the start-up line
 states the texture and buffer ceilings. The GPU test harness opens its
 device the same way. An adapter below the default for any of the three
 is refused by name.

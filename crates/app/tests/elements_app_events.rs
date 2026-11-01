@@ -117,8 +117,10 @@ fn a_tab_key_moves_focus_to_the_button_and_enter_clicks_it() {
     let (doc, clicks) = setup();
     let mut app = ElementsApp::new(Rc::clone(&doc));
     let platform = Platform::detached();
+    // Tab and Enter are each one key, so their code is their name
     let key = |key: &str, pressed| Event::Key {
         key: key.to_owned(),
+        code: key.to_owned(),
         pressed,
         repeat: false,
         modifiers: vapors_platform::Modifiers::default(),

@@ -40,12 +40,6 @@ pub struct ElementsApp {
     failure: Failure,
     /// Input given to the document, at its last update's scale.
     input: DocumentInput,
-    /// The clipboard a paste into a text field reads (E6b).
-    #[cfg(not(target_family = "wasm"))]
-    clipboard: Box<dyn vapors_platform::Clipboard>,
-    /// The clipboard reads pastes started, answered off the loop.
-    #[cfg(not(target_family = "wasm"))]
-    pastes: paste::Pastes,
     /// Called before each update with the last frame's phase times.
     per_frame: Option<PerFrame>,
     /// Called after each frame with its phase times.
@@ -75,10 +69,6 @@ impl ElementsApp {
             painter: None,
             failure: Failure::default(),
             input: DocumentInput::new(),
-            #[cfg(not(target_family = "wasm"))]
-            clipboard: Box::new(vapors_platform::SystemClipboard::default()),
-            #[cfg(not(target_family = "wasm"))]
-            pastes: paste::Pastes::default(),
             per_frame: None,
             frame_times: None,
             last_times: None,
@@ -150,7 +140,7 @@ impl App for ElementsApp {
 impl ElementsApp {
     /// An event, dispatched as it arrives (design 02, 2-S1).
     fn handle(&mut self, event: &Event, platform: &Platform) {
-        match self.input.handle(&self.document, event) {
+        match self.input.handle(&self.document, event, platform) {
             Ok(outcome) => {
                 if outcome.changed {
                     platform.request_redraw();
@@ -166,10 +156,6 @@ impl ElementsApp {
                 report_error(&unplaced.to_string());
                 self.failure.set(&unplaced.to_string());
             }
-        }
-        #[cfg(not(target_family = "wasm"))]
-        if matches!(event, Event::Paste) {
-            self.paste(platform);
         }
     }
 }
