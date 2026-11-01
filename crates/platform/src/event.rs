@@ -26,6 +26,10 @@ pub enum Event {
     PrimaryButton {
         /// True on press.
         pressed: bool,
+        /// The press's count in a row (two is a double click), counted by
+        /// the platform (`clicks`) and carried on the press, so nothing
+        /// waits for it; a release carries its press's.
+        clicks: std::num::NonZeroU32,
     },
     /// The wheel or trackpad scrolled, in CSS pixels (not physical, unlike
     /// positions), signed as the DOM's `deltaX` and `deltaY`: positive
@@ -165,6 +169,8 @@ pub fn from_winit(event: &WindowEvent, scale: f64) -> Option<Event> {
             ..
         } => Some(Event::PrimaryButton {
             pressed: *state == ElementState::Pressed,
+            // counted by `Input`, which knows the last press
+            clicks: std::num::NonZeroU32::MIN,
         }),
         WindowEvent::MouseWheel { delta, .. } => Some(scroll(*delta, scale)),
         WindowEvent::Touch(touch) => Some(Event::Touch {

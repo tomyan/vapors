@@ -116,7 +116,7 @@ pub fn type_text(page: &Page, text: &str) {
 }
 
 pub fn click(page: &Page, point: [f32; 2]) {
-    Document::pointer_pressed(&page.doc, point);
+    Document::pointer_pressed_clicks(&page.doc, point, std::num::NonZeroU32::MIN);
     Document::pointer_released(&page.doc, point);
 }
 

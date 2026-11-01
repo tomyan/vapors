@@ -65,7 +65,11 @@ impl ImageApp {
         match event {
             Event::Character(text) => text == "o",
             Event::OpenRequested => true,
-            Event::Tap { .. } | Event::PrimaryButton { pressed: false } => !self.view.has_image(),
+            Event::Tap { .. }
+            | Event::PrimaryButton {
+                pressed: false,
+                clicks: std::num::NonZeroU32::MIN,
+            } => !self.view.has_image(),
             _ => false,
         }
     }
