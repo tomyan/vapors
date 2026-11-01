@@ -58,7 +58,7 @@ fn a_drag_selects_from_the_press_to_the_pointer() {
     let page = page();
 
     // When: pressed before W, dragged past r
-    Document::pointer_pressed(&page.doc, [4.0, 12.0]);
+    Document::pointer_pressed_clicks(&page.doc, [4.0, 12.0], std::num::NonZeroU32::MIN);
     Document::pointer_moved(&page.doc, [30.0, 12.0]);
     Document::pointer_released(&page.doc, [30.0, 12.0]);
 

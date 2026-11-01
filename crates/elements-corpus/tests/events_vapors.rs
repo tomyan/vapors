@@ -5,7 +5,8 @@
 //! fixture's keys, Tab order and focus (3-E2a); the range fixture's
 //! presses, drags, keys and values (3-E3a); the checkbox fixture's
 //! clicks, Space and states (3-E3b); and the text fixture's caret,
-//! selection, typing and commits (E6a).
+//! selection, typing and commits, and the words fixture's double and
+//! triple clicks (E6a).
 
 use vapors_elements::Viewport;
 use vapors_elements_corpus::events_compare::compare;
@@ -158,6 +159,19 @@ fn the_combobox_script_projects_on_vapors_as_on_apgs_example() {
 
     // Then: the projection, focus, values and selections after each key
     compare("combobox", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn the_words_script_logs_on_vapors_what_chromium_logged() {
+    // Given: double and triple clicks in a text field (E6a)
+    let script = parse("words", &read("words.events")).expect("parses");
+    let answers = serde_json::from_str(&read("words.events.json")).expect("json");
+
+    // When
+    let ours = play(&fixture("words"), &script, VIEWPORT).unwrap_or_else(|e| panic!("{e}"));
+
+    // Then: the events and the selection after each step
+    compare("words", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
 }
 
 #[test]

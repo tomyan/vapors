@@ -26,6 +26,8 @@ pub const KEY_NAMES: [&str; 14] = [
 pub fn is_action(word: &str) -> bool {
     [
         "click",
+        "double-click",
+        "triple-click",
         "tap",
         "press",
         "release",
@@ -45,6 +47,8 @@ pub fn is_action(word: &str) -> bool {
 pub fn action(word: &str, fields: &[&str], rest: &str) -> Result<Action, String> {
     match word {
         "click" => point(word, fields).map(|(x, y)| Action::Click(x, y)),
+        "double-click" => point(word, fields).map(|(x, y)| Action::Clicks(x, y, 2)),
+        "triple-click" => point(word, fields).map(|(x, y)| Action::Clicks(x, y, 3)),
         "tap" => point(word, fields).map(|(x, y)| Action::Tap(x, y)),
         "press" => point(word, fields).map(|(x, y)| Action::Press(x, y)),
         "release" => point(word, fields).map(|(x, y)| Action::Release(x, y)),

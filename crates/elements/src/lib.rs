@@ -53,6 +53,7 @@ mod text_input;
 mod text_marks;
 mod text_paint;
 mod text_pointer;
+mod text_word;
 mod thumb;
 mod thumb_order;
 mod tree;

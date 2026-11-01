@@ -92,4 +92,5 @@ fixtures![
     text::Text,
     text_align::TextAlign,
     text_wrap::TextWrap,
+    words::Words,
 ];

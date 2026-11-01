@@ -353,8 +353,41 @@ by step against Chromium 155 by `fixtures/text.events`, every text
 field's selection after every step; the Chromium player waits a task after each input call,
 and the vapors player settles after each event, because Chromium's
 queued `selectionchange` otherwise lands before or after the next key
-from run to run. Not built: double-click word selection and `detail`
-(the next E6a pull request),
+from run to run. Clicks in a row (E6a, the second pull request): the
+platform counts each press of the primary button and carries the count
+on the press itself (`Event::PrimaryButton`'s `clicks`, a release its
+press's), so nothing waits for a count that may not come; the document
+places the caret, selects a word or the whole text with the press
+(`Document::pointer_pressed_clicks`), as Chromium does on `mousedown`.
+A press with no known pointer position starts a new row. The platform counts on every
+target, the web included: winit cancels `pointerdown` (so the canvas
+selects no text), which in Chromium suppresses `mousedown` and with it
+the browser's own count (probed, Chromium 155: `pointerdown`'s `detail`
+is 0, and only `click` and `dblclick` carry the count, after release).
+The interval and distance are stated fallbacks: GTK's defaults on Linux
+(400 ms, 5 px, as Linux Chromium reads), Windows' (500 ms, 4 px),
+macOS's (500 ms; no distance setting, so 4 px), Android's double-tap
+timeout (300 ms, with GTK's 5 px); on the web, the one the
+browser's platform names (`navigator.userAgentData`, else the user
+agent). No build compiles a reader for the systems' own settings yet;
+a CI target that does retires the fallbacks. RELAXED: winit 0.30 gives
+events no timestamp, so a press is stamped when winit hands it to the
+platform, and presses queued behind a slow frame are stamped together;
+retired when winit exposes event times. A double click
+selects the word after the caret position nearest the point, as
+Chromium does (just past a word, the space after it; past the text,
+the last word), a triple click the whole text, neither starting a
+drag. A press inside a selection, ends included, places the caret on
+release, as Chromium waits to see whether the press drags the text.
+Checked by `fixtures/words.events`, whose field sets its font and
+border, which Chromium's field does not take from the page. A known
+difference: words are Parley's (UAX 29), which keep a "." between
+letters inside a word, so a double click in "e.g." selects "e.g" where
+Chromium selects the "." alone; "3.5" and "don't" agree. A press inside
+the selection moves the caret after its `click`, so a `click` listener
+reads the selection held, as in Chromium. Not built: `detail` and
+`dblclick`, dragging by word or line after a double or
+triple click, dragging selected text,
 paste and undo (E6b), IME (E6c), `beforeinput`, `placeholder`,
 `maxlength`, scrolling a long text to the caret, the blinking caret
 (area 6), vertical selection in a `textarea`.
