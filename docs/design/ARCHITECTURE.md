@@ -21,7 +21,9 @@ writing them with its resolution, or the note that it is open.
    by pointer, keyboard, focus, wheel, input, synthetic input from tests
    and scenario replays (10 C4), accessibility actions (5) and 3D
    picking (9); the deferred automation API (Q13) will inject here too.
-   A handler cannot tell them apart. Recording replay (10 C3) is the one
+   A handler cannot tell them apart. A component's own events (3,
+   `Dispatcher`, a script's `#[dispatcher]`) are delivered along the same
+   chain at once, as `dispatchEvent`. Recording replay (10 C3) is the one
    consumer of input that does not dispatch: it redraws recorded
    mutations, so dispatching would apply default actions twice.
 4. **One element tree.** `Document` implements `Dom`, `css::Element`,

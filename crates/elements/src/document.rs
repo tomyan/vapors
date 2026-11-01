@@ -34,6 +34,9 @@ pub struct Document {
     pub(crate) committed: std::collections::HashMap<NodeId, f64>,
     /// Each text field's editor (E6a).
     pub(crate) editors: crate::text_field::Editors,
+    /// The events components dispatch themselves (`declare_events`),
+    /// whose listeners the tree takes though it never fires them.
+    pub(crate) declared_events: std::collections::BTreeSet<String>,
     /// Whether the last input was a key rather than a press (3-E2b):
     /// focus that arrives then matches `:focus-visible`.
     pub(crate) keyboard: bool,
@@ -78,6 +81,7 @@ impl Document {
             selected_all: None,
             committed: std::collections::HashMap::new(),
             editors: crate::text_field::Editors::new(),
+            declared_events: std::collections::BTreeSet::new(),
             keyboard: false,
             texts: crate::layout::TextCache::default(),
             dirty: crate::restyle::Dirty::default(),

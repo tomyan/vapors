@@ -17,6 +17,8 @@ vapors-compiler.workspace = true
 
 [dev-dependencies]
 vapors-compiler.workspace = true
+vapors-elements.workspace = true
+vapors-text.workspace = true
 
 [lints]
 workspace = true

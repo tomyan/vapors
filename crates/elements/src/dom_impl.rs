@@ -3,9 +3,6 @@
 //! tag or event the tree does not implement yet is accepted here and
 //! refused by `update` while it is in the document (see `check`).
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use vapors_dom::{Dom, Handler, NodeId, PropertyValue};
 
 use crate::document::Document;
@@ -15,6 +12,11 @@ impl Dom for Document {
     fn create_element(&mut self, tag: &str) -> NodeId {
         self.arena
             .insert(Node::new(Kind::Element(Element::new(tag))))
+    }
+
+    fn declare_events(&mut self, names: &[&str]) {
+        self.declared_events
+            .extend(names.iter().map(|name| (*name).to_owned()));
     }
 
     fn add_style(&mut self, scope: &str, css: &str) {
@@ -118,7 +120,7 @@ impl Dom for Document {
     fn listen(&mut self, node: NodeId, event: &str, handler: Handler) {
         self.element_mut(node, "listen")
             .listeners
-            .push((event.to_owned(), Rc::new(RefCell::new(handler))));
+            .push((event.to_owned(), std::rc::Rc::from(handler)));
     }
 }
 
@@ -130,5 +132,16 @@ impl Document {
                 panic!("{call}: {node:?} is a text node ({text:?}), not an element")
             }
         }
+    }
+}
+
+impl vapors_dom::Listeners for Document {
+    fn listeners_along(
+        &self,
+        target: NodeId,
+        name: &str,
+    ) -> Option<Vec<(NodeId, Vec<vapors_dom::Listener>)>> {
+        self.contains(target)
+            .then(|| self.listeners_chain(target, name))
     }
 }

@@ -68,6 +68,8 @@ impl ElementsApp {
     /// Shows `document`.
     #[must_use]
     pub fn new(document: Rc<RefCell<Document>>) -> Self {
+        // a listener's `Err` (`vapors_dom::ListenerResult`) is shown
+        vapors_dom::set_error_report("vapors_platform::report_error", report_error);
         Self {
             document,
             painter: None,
