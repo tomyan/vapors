@@ -55,7 +55,7 @@ mod window;
 
 #[cfg(not(target_family = "wasm"))]
 pub use clipboard::{
-    Clipboard, ClipboardImage, ClipboardText, DEADLINE as CLIPBOARD_DEADLINE,
+    Clipboard, ClipboardDone, ClipboardImage, ClipboardText, DEADLINE as CLIPBOARD_DEADLINE,
     MAX_BYTES as CLIPBOARD_MAX_BYTES, SystemClipboard,
 };
 pub use clock::Instant;

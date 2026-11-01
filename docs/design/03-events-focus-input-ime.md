@@ -392,21 +392,39 @@ triple click, dragging selected text, IME, `beforeinput`,
 blinking caret (area 6), vertical selection in a `textarea`.
 
 As built (E6b, 2026-11-01): a field's own undo and paste. Each field
-keeps an undo stack, grouped as Chromium groups a field's edits: a run
-of typing is one step, a run of Backspace (or of Delete) another,
-typing after a deletion joins it and a deletion after typing does not,
-a paste is a step alone, and anything that moves the selection other
-than an edit ends the run. Control+Z undoes to the text and selection
-before the step, Control+Shift+Z and Control+Y redo to those after it,
-each with `input` and a `selectionchange` even where the caret was; a
-new edit drops what could be redone; a signal setting the text drops
-the stack. A paste (`Document::text_pasted`) fires `paste` on the
-focused field, bubbling, and a listener that prevents its default
-keeps the text out; else it replaces the selection, each line break a
-space. On the desktop the platform sends `Event::Paste` whatever has
-focus, and `ElementsApp` hands it to a focused text field first,
-reading the clipboard's text (`Clipboard::text`, three answers, a
-deadline); with none focused the clipboard is not read. Checked by
+keeps an undo stack, grouped as Chromium 155 groups a field's edits:
+
+- a run of typing is one step;
+- a run of Backspace is one step, and a Delete joins it; a run of
+  Delete is one step, and a Backspace does not join it;
+- a word deletion (Control+Backspace, Control+Delete) always starts a
+  step, which Backspaces or Deletes in its direction and typing then
+  join;
+- typing after a deletion joins it, and a deletion after typing does
+  not;
+- a paste is a step alone, and anything that moves the selection other
+  than an edit ends the run.
+
+Control+Z undoes to the text and selection before the step,
+Control+Shift+Z and Control+Y redo to those after it, each with
+`input` and a `selectionchange` even where the caret was, except a
+caret at the start, which Chromium leaves unreported. A new edit drops
+what could be redone; a signal setting the text drops the stack. A
+field keeps at most 1000 steps, the oldest going first, as Blink's
+`kMaximumUndoStackDepth`.
+
+A paste (`Document::text_pasted`) fires `paste` on the focused field,
+bubbling, carrying the text as copied (`Event::value`, as
+`clipboardData.getData("text")`); a listener that prevents its default
+keeps the text out. Else it replaces the selection, its trailing line
+breaks dropped and each other a space. On the desktop the platform
+sends `Event::Paste` whatever has focus, and `ElementsApp` hands it to
+a focused text field first. The clipboard is read off the event loop
+(`Clipboard::read_text`): the answer, or why there is none once the
+deadline passes (`CLIPBOARD_DEADLINE`, 3 s, reported with
+`report_error`), wakes the loop, and the next frame pastes it into the
+field it was read for, or reports that the field lost focus. With no
+text field focused the clipboard is not read. Checked by
 `fixtures/undo.events`, whose `clipboard` step writes Chromium's
 clipboard. Chromium's undo stack is the page's, not the field's: an
 undo in one field after edits in another differs, and is not compared.
