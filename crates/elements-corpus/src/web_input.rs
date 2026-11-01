@@ -1,6 +1,7 @@
 //! The web page's text input checked against Chromium's own `<input>`
 //! (E6): the same `DevTools` input calls (typed text, an IME's
-//! composition and its commit, keys, a double click, a paste) played on a plain `<input>` and on
+//! composition and its commit, keys, a double click, a paste, and keys
+//! after leaving the field by Tab and by a click) played on a plain `<input>` and on
 //! the built page's `field` demo, and the text and selection after each
 //! compared. Chromium's are the `<input>`'s own; vapors' are what the
 //! page's hidden textarea last took from the app's field
@@ -48,7 +49,20 @@ pub fn steps(text_at: (f64, f64)) -> Vec<(&'static str, Vec<(&'static str, Value
         ("typed over the selection", insert("A")),
         ("double click on the word", double_click(text_at)),
         ("pasted a\\nb\\n over the word", paste("a\nb\n")),
+        ("Tab out of the field", key("Tab")),
+        ("Shift+Tab back in, selecting it whole", key("Shift+Tab")),
+        ("End", key("End")),
+        ("a click outside the field", click(OUTSIDE)),
+        ("Tab back in, selecting it whole", key("Tab")),
     ]
+}
+
+/// A point on the page outside the field, on both pages (640x400).
+const OUTSIDE: (f64, f64) = (600.0, 380.0);
+
+/// One press and release at `(x, y)`.
+fn click(at: (f64, f64)) -> Vec<(&'static str, Value)> {
+    calls(&Action::Click(at.0, at.1), &mut Pointer::default())
 }
 
 /// `text` written to the clipboard, then Control+V, as the events

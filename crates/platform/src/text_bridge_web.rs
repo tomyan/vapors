@@ -32,6 +32,8 @@ struct Shared {
 /// The textarea and its listeners, for the page's life.
 pub(crate) struct TextBridge {
     textarea: HtmlTextAreaElement,
+    /// Where keys go once no field has focus: winit hears them there.
+    canvas: web_sys::HtmlCanvasElement,
     shared: Rc<Shared>,
 }
 
@@ -60,18 +62,27 @@ impl TextBridge {
             .map_err(|e| fail(&format!("{e:?}")))?;
         let bridge = Self {
             textarea,
+            canvas: crate::web::canvas()?,
             shared: Rc::default(),
         };
         bridge.listen(proxy)?;
         Ok(bridge)
     }
 
-    /// Mirrors `field`, or blurs the textarea when none has focus.
+    /// Mirrors `field`; with none, hides the textarea and, if it held
+    /// DOM focus, gives it to the canvas: a blur would leave it on
+    /// `<body>`, and winit hears keys only on the canvas, so the key after
+    /// a Tab or a click out of the field would reach nothing.
     pub(crate) fn mirror(&self, field: Option<&TextField>) {
         let Some(field) = field else {
             self.shared.focused.set(false);
             drop(self.textarea.set_attribute("style", HIDDEN));
-            drop(self.textarea.blur());
+            let active = web_sys::window()
+                .and_then(|window| window.document())
+                .and_then(|document| document.active_element());
+            if active.is_some_and(|active| active == **self.textarea) {
+                drop(self.canvas.focus());
+            }
             return;
         };
         let [x, y, width, height] = field.area;

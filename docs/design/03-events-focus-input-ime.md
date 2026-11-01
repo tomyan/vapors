@@ -457,10 +457,13 @@ with no clipboard data, a `getData` that fails, a listener the page
 refuses, and a paste that arrives with no field focused are each
 reported, never dropped. A press on the canvas takes DOM focus from the
 textarea; while a field is mirrored it goes back in the same press, so
-the keys and pastes after it reach the field. Checked by
+the keys and pastes after it reach the field. When the field loses
+focus (Tab, a click elsewhere) while the textarea holds DOM focus, the
+canvas takes it, not `<body>`, since winit hears keys on the canvas. Checked by
 `scripts/web-text-input.sh`: typed text, a composition and its commit,
 Backspace, an arrow, a composition in the middle, Shift+Home, a double
-click and a paste of "a\nb\n" (#92's line breaks: "a b") on
+click, a paste of "a\nb\n" (#92's line breaks: "a b"), and keys
+after leaving the field by Tab and by a click, on
 Chromium's own `<input>` and on the built page's field demo, the text
 and selection equal after each. Not checked headless: a real
 phone keyboard (Gboard's autocorrect and its Backspace on composed
