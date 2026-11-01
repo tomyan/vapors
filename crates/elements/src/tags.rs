@@ -94,6 +94,7 @@ pub(crate) const FIRED: &[&str] = &[
     "input",
     "change",
     "selectionchange",
+    "paste",
 ];
 
 /// `None` when the tree fires `event`; otherwise why not.
@@ -102,7 +103,7 @@ pub(crate) fn unfired(event: &str) -> Option<String> {
         return None;
     }
     Some(format!(
-        "on{event}: vapors-elements never fires `{event}`; it fires {} (docs/F2c.md), so this listener would never run",
+        "on{event}: vapors-elements never fires `{event}` and no component declares it (a Dispatcher's events); it fires {} (docs/F2c.md), so this listener would never run",
         FIRED.join(", ")
     ))
 }

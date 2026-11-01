@@ -11,7 +11,9 @@
 //! - Actions: `click X Y`, `double-click X Y`, `triple-click X Y`,
 //!   `tap X Y`, `press X Y`, `release X Y`, `move X Y`,
 //!   `wheel X Y DX DY` (CSS px, DOM signs), `key <Key>` with
-//!   `+`-joined modifiers (`Shift+Tab`), `type "<text>"`, `frame`.
+//!   `+`-joined modifiers (`Shift+Tab`), `type "<text>"`, `frame`;
+//!   `clipboard "<text>"` (`\n` a line break) sets the text a following
+//!   `key Control+v` pastes, and needs no expectation.
 //! - After an action, what must hold once it is done:
 //!   `expect event <type> <target>`, `expect no event <type>` (a type
 //!   that is listened for), `expect focus <target>`,
@@ -115,7 +117,7 @@ fn checked(name: &str, script: Script) -> Result<Script, String> {
     if let Some(step) = script
         .steps
         .iter()
-        .find(|s| s.expect.is_empty() && s.action != Action::Frame)
+        .find(|s| s.expect.is_empty() && !matches!(s.action, Action::Frame | Action::Clipboard(_)))
     {
         return Err(format!(
             "{name}.events:{}: a step with no expectation",

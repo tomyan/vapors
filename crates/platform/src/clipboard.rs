@@ -1,11 +1,14 @@
-//! The system clipboard's image, for an app's paste on the desktop. The
+//! The system clipboard's image and text, for a paste on the desktop. The
 //! web page reads its clipboard itself (a `paste` event or
 //! `navigator.clipboard.read()`), so this is native only. An app depends
 //! on [`Clipboard`]; [`SystemClipboard`] is the operating system's,
 //! through `arboard` (X11, and Wayland's data-control protocol).
 
-use std::sync::mpsc;
 use std::time::Duration;
+
+pub use crate::clipboard_reader::Done as ClipboardDone;
+use crate::clipboard_reader::{Answer, Reader};
+pub use crate::clipboard_text::ClipboardText;
 
 /// The largest image handed on: 256 MiB of RGBA (8192 px square). It
 /// bounds what is handed on, not what is allocated: arboard decodes the
@@ -45,82 +48,40 @@ pub enum ClipboardImage {
     Unreadable(String),
 }
 
-/// A clipboard an app can read an image from.
+/// A clipboard an app can read an image or text from.
 pub trait Clipboard {
     /// The image on the clipboard now. May block for up to its deadline
     /// ([`DEADLINE`] for [`SystemClipboard`]); call it off the frame loop.
     fn image(&mut self) -> ClipboardImage;
+
+    /// Reads the text on the clipboard now, for a paste into a text
+    /// field, without blocking: `done` gets it on another thread, or why
+    /// there is none once the deadline ([`DEADLINE`] for
+    /// [`SystemClipboard`]) passes, so the event loop never waits.
+    fn read_text(&mut self, done: ClipboardDone<ClipboardText>);
 }
 
 /// The operating system's clipboard.
 #[derive(Debug, Default)]
 pub struct SystemClipboard {
     reader: Reader,
+    text_reader: Reader,
 }
 
 impl Clipboard for SystemClipboard {
     fn image(&mut self) -> ClipboardImage {
         self.reader.read(DEADLINE, read)
     }
+
+    fn read_text(&mut self, done: ClipboardDone<ClipboardText>) {
+        self.text_reader
+            .start(DEADLINE, crate::clipboard_text::read, done);
+    }
 }
 
-/// One read at a time, each on a worker thread with a deadline. A read
-/// past its deadline is left running (arboard has no cancel; on Wayland
-/// its pipe read has no timeout), and a new read is refused until it
-/// ends, so threads never pile up behind one owner.
-#[derive(Debug, Default)]
-pub struct Reader {
-    pending: Option<mpsc::Receiver<ClipboardImage>>,
-}
-
-impl Reader {
-    /// `read`'s answer within `deadline`, or why there is none.
-    pub fn read(&mut self, deadline: Duration, read: fn() -> ClipboardImage) -> ClipboardImage {
-        if self.still_reading() {
-            return ClipboardImage::Unreadable("a clipboard read is still in progress".to_owned());
-        }
-        let (sender, receiver) = mpsc::channel();
-        let spawned = std::thread::Builder::new()
-            .name("clipboard".to_owned())
-            .spawn(move || {
-                let _ = sender.send(read());
-            });
-        if let Err(error) = spawned {
-            return ClipboardImage::Unreadable(format!(
-                "no thread to read the clipboard on: {error}"
-            ));
-        }
-        self.wait(receiver, deadline)
-    }
-
-    /// Whether an earlier read has not ended; one that has is dropped
-    /// (its answer was for an earlier paste).
-    fn still_reading(&mut self) -> bool {
-        let running = self
-            .pending
-            .as_ref()
-            .is_some_and(|pending| matches!(pending.try_recv(), Err(mpsc::TryRecvError::Empty)));
-        if !running {
-            self.pending = None;
-        }
-        running
-    }
-
-    fn wait(
-        &mut self,
-        receiver: mpsc::Receiver<ClipboardImage>,
-        deadline: Duration,
-    ) -> ClipboardImage {
-        match receiver.recv_timeout(deadline) {
-            Ok(image) => image,
-            Err(mpsc::RecvTimeoutError::Timeout) => {
-                self.pending = Some(receiver);
-                ClipboardImage::Unreadable(format!("timed out after {} ms", deadline.as_millis()))
-            }
-            Err(mpsc::RecvTimeoutError::Disconnected) => ClipboardImage::Unreadable(
-                "the clipboard read failed (its thread panicked)".to_owned(),
-            ),
-        }
+impl Answer for ClipboardImage {
+    fn unreadable(why: String) -> Self {
+        ClipboardImage::Unreadable(why)
     }
 }
 

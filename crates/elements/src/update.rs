@@ -126,7 +126,7 @@ impl Document {
     /// Restyles what changed and checks the tree; the calcs layout
     /// will ask for, collected from the kept computed styles.
     fn styled(&mut self, viewport: Viewport) -> Result<Calcs, Vec<ElementError>> {
-        let mut errors = check_tree(&self.arena, self.root());
+        let mut errors = check_tree(&self.arena, self.root(), &self.declared_events);
         errors.extend_from_slice(self.sheets.refused());
         let unparsed = style_attribute_refusals(&self.arena, self.root());
         if !unparsed.is_empty() {
