@@ -30,7 +30,11 @@ pub(crate) fn elements(arena: &Arena, root: NodeId) -> Vec<NodeId> {
 }
 
 /// The refusals for tags and listeners under `root`.
-pub(crate) fn check_tree(arena: &Arena, root: NodeId) -> Vec<ElementError> {
+pub(crate) fn check_tree(
+    arena: &Arena,
+    root: NodeId,
+    declared: &std::collections::BTreeSet<String>,
+) -> Vec<ElementError> {
     let mut errors = Vec::new();
     for node in elements(arena, root) {
         let Kind::Element(element) = &arena.get(node, "check").kind else {
@@ -42,7 +46,7 @@ pub(crate) fn check_tree(arena: &Arena, root: NodeId) -> Vec<ElementError> {
         errors.extend(attribute_refusals(arena, node, element));
         errors.extend(right_to_left_text(arena, node));
         for (event, _) in &element.listeners {
-            if let Some(refusal) = tags::unfired(event) {
+            if let Some(refusal) = tags::unfired(event).filter(|_| !declared.contains(event)) {
                 errors.push(ElementError::UnfiredEvent(format!(
                     "{}: {refusal}",
                     describe(arena, node)
