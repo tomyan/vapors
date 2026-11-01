@@ -344,8 +344,19 @@ by step against Chromium 155 by `fixtures/text.events` with `expect
 selection`; the Chromium player waits a task after each input call,
 and the vapors player settles after each event, because Chromium's
 queued `selectionchange` otherwise lands before or after the next key
-from run to run. Not built: double-click word selection and `detail`
-(the next E6a pull request),
+from run to run. Clicks in a row (E6a, the second pull request): the
+app counts a press within 500 ms and 4 CSS px of the last as one more
+(Windows' defaults; the system's own setting is not read yet) and
+passes the count to `Document::pointer_pressed_clicks`. A double click
+selects the word after the caret position nearest the point, as
+Chromium does (just past a word, the space after it; past the text,
+the last word), a triple click the whole text, neither starting a
+drag. A press inside a selection, ends included, places the caret on
+release, as Chromium waits to see whether the press drags the text.
+Checked by `fixtures/words.events`, whose field sets its font and
+border, which Chromium's field does not take from the page. Not built:
+`detail` and `dblclick`, dragging by word or line after a double or
+triple click, dragging selected text,
 paste and undo (E6b), IME (E6c), `beforeinput`, `placeholder`,
 `maxlength`, scrolling a long text to the caret, the blinking caret
 (area 6), vertical selection in a `textarea`.

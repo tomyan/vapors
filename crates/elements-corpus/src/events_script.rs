@@ -8,8 +8,9 @@
 //! - `capture <target>…`: elements that capture the pointer on
 //!   `pointerdown` (`setPointerCapture` in Chromium), at most once.
 //! - Touch: `touch-down X Y`, `touch-move X Y`, `touch-up X Y`, one finger.
-//! - Actions: `click X Y`, `tap X Y`, `press X Y`, `release X Y`,
-//!   `move X Y`, `wheel X Y DX DY` (CSS px, DOM signs), `key <Key>` with
+//! - Actions: `click X Y`, `double-click X Y`, `triple-click X Y`,
+//!   `tap X Y`, `press X Y`, `release X Y`, `move X Y`,
+//!   `wheel X Y DX DY` (CSS px, DOM signs), `key <Key>` with
 //!   `+`-joined modifiers (`Shift+Tab`), `type "<text>"`, `frame`.
 //! - After an action, what must hold once it is done:
 //!   `expect event <type> <target>`, `expect no event <type>` (a type

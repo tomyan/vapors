@@ -51,6 +51,7 @@ mod text_field;
 mod text_input;
 mod text_paint;
 mod text_pointer;
+mod text_word;
 mod thumb;
 mod thumb_order;
 mod tree;

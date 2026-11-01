@@ -6,6 +6,7 @@
 //! write signals whose effects change the tree.
 
 use std::cell::RefCell;
+use std::num::NonZeroU32;
 use std::rc::Rc;
 
 use vapors_css::tree::States;
@@ -40,8 +41,8 @@ pub(crate) struct Pointer {
     pub(crate) drags: std::collections::HashMap<u32, crate::range_drag::Drag>,
     /// Each pointer's scrub of a number field, by pointer id (3-E3c).
     pub(crate) scrubs: std::collections::HashMap<u32, crate::number_scrub::Scrub>,
-    /// Each pointer's drag over a text field's text, by pointer id (E6a).
-    pub(crate) text_drags: std::collections::HashMap<u32, NodeId>,
+    /// Each pointer's press on a text field, by pointer id (E6a).
+    pub(crate) text_presses: std::collections::HashMap<u32, crate::text_pointer::TextPress>,
 }
 
 impl Document {
@@ -79,9 +80,21 @@ impl Document {
         }
     }
 
-    /// The primary button went down at `point`: the target and its
-    /// ancestors become `:active`, and the target gets `pointerdown`.
+    /// The primary button went down at `point`, the first press in a
+    /// row: see [`Document::pointer_pressed_clicks`].
     pub fn pointer_pressed(document: &Rc<RefCell<Document>>, point: Point) {
+        Self::pointer_pressed_clicks(document, point, NonZeroU32::MIN);
+    }
+
+    /// The primary button went down at `point`, the `clicks`th press in
+    /// a row as the platform counts them (two is a double click): the
+    /// target and its ancestors become `:active`, and the target gets
+    /// `pointerdown`.
+    pub fn pointer_pressed_clicks(
+        document: &Rc<RefCell<Document>>,
+        point: Point,
+        clicks: NonZeroU32,
+    ) {
         process_pending(document, MOUSE, point);
         document.borrow_mut().keyboard = false;
         let target = document.borrow().pointer_target(MOUSE, point);
@@ -106,7 +119,7 @@ impl Document {
         // a text field's caret lands where the press did, after focus
         // so keyboard focus's selection does not override it (E6a)
         if let (false, Some(target)) = (prevented, target) {
-            crate::text_pointer::pressed(document, MOUSE, target, point);
+            crate::text_pointer::pressed(document, MOUSE, target, point, clicks);
         }
     }
 

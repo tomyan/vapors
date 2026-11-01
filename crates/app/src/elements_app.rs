@@ -44,6 +44,8 @@ pub struct ElementsApp {
     pointer: Point,
     touch: crate::touch_scroll::TouchScroll,
     wheel: crate::wheel_scroll::WheelScroll,
+    /// The presses in a row, for double clicks.
+    clicks: crate::clicks::Clicks,
     /// The cursor last shown.
     cursor: Cursor,
     /// Called before each update with the last frame's phase times.
@@ -76,6 +78,7 @@ impl ElementsApp {
             pointer: [0.0, 0.0],
             touch: crate::touch_scroll::TouchScroll::default(),
             wheel: crate::wheel_scroll::WheelScroll::default(),
+            clicks: crate::clicks::Clicks::default(),
             cursor: Cursor::Default,
             per_frame: None,
             frame_times: None,

@@ -1,0 +1,22 @@
+# Clicks in a row in a text field (E6a). `name` is x 0..240, y 0..24,
+# holding "Warm tones here" in 14 px Geist from x 3. A double click
+# selects the word after the caret position nearest the point, as
+# Chromium does: in Chromium x 36 to 42 select the space after "Warm",
+# x 44 "tones".
+listen pointerdown pointerup click input selectionchange
+double-click 60 12            a double click on "tones" selects the word
+expect event click input#name
+expect selection input#name 5 10
+type "hues"                   typed over the word: Warm hues here
+expect event input input#name
+expect selection input#name 9 9
+double-click 15 12            "Warm"
+expect selection input#name 0 4
+double-click 39 12            the space after "Warm": the space alone
+expect selection input#name 4 5
+triple-click 60 12            the whole text
+expect selection input#name 0 14
+click 200 12                  a click in the selection: the caret placed on release
+expect selection input#name 14 14
+double-click 200 12           past the end: the last word
+expect selection input#name 10 14

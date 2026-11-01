@@ -57,7 +57,7 @@ impl Document {
         if !prevented {
             crate::range_drag::pressed(document, id, target, point);
             crate::number_scrub::pressed(document, id, target, point);
-            crate::text_pointer::pressed(document, id, target, point);
+            crate::text_pointer::pressed(document, id, target, point, std::num::NonZeroU32::MIN);
         }
     }
 
@@ -192,7 +192,7 @@ impl Document {
             Ended::Taken => {
                 crate::range_drag::dropped(document, id);
                 crate::number_scrub::dropped(document, id);
-                crate::text_pointer::released(document, id);
+                crate::text_pointer::dropped(document, id);
             }
             Ended::Panned => {}
         }
