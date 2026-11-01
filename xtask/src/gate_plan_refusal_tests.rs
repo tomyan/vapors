@@ -60,7 +60,7 @@ fn step_keys_and_scripts_the_gate_does_not_model_are_refused_naming_job_and_step
 fn job_keys_the_gate_does_not_model_are_refused_naming_the_job() {
     let gpu = "    timeout-minutes: 20\n";
     for (key, needle) in [
-        ("    needs: ci\n", "gpu: `needs:`"),
+        ("    needs: window\n", "gpu: `needs: window`"),
         (
             "    strategy:\n      matrix:\n        os: [a]\n",
             "gpu: `strategy:`",
@@ -152,4 +152,26 @@ fn a_job_whose_timeout_report_disagrees_with_its_timeout_is_refused() {
         ),
         "gpu: the timeout report's TIMEOUT_MINUTES is 9, but the job's timeout-minutes is 20",
     );
+}
+
+#[test]
+fn a_job_that_needs_a_later_job_is_refused_as_the_gate_runs_in_file_order() {
+    refused(
+        &WORKFLOW.replace(
+            "    timeout-minutes: 10\n",
+            "    timeout-minutes: 10\n    needs: gpu\n",
+        ),
+        "ci: `needs: gpu`",
+    );
+}
+
+#[test]
+fn a_job_that_needs_an_earlier_job_is_planned() {
+    for needs in ["    needs: ci\n", "    needs: [ci]\n"] {
+        let workflow = WORKFLOW.replace(
+            "    timeout-minutes: 20\n",
+            &format!("    timeout-minutes: 20\n{needs}"),
+        );
+        assert!(plan_of(&workflow).is_ok(), "{needs}");
+    }
 }

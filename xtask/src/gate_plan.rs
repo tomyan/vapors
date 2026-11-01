@@ -64,12 +64,38 @@ pub fn plan(workflow: &str, sources: &Sources<'_>) -> Result<Vec<PlannedStep>, S
     let mut base = BTreeMap::from([("CI".to_owned(), "true".to_owned())]);
     base.extend(env_of(&doc, "the workflow")?);
     let mut steps = Vec::new();
+    let mut earlier = BTreeSet::new();
     for (name, job) in jobs {
         let name = name.as_str();
+        check_needs(job, name, &earlier)?;
         steps.extend(plan_job(&mut planner, name, job, &base)?);
+        earlier.insert(name);
     }
     planner.check_all_used()?;
     Ok(steps)
+}
+
+/// A job's `needs:` (a name or a list) must name jobs earlier in the
+/// file: the gate runs jobs in file order in one worktree, so an earlier
+/// job's work (target/web for the gpu job) is there; a later or unknown
+/// one is refused, naming it.
+fn check_needs(job: &Value, name: &str, earlier: &BTreeSet<&str>) -> Result<(), String> {
+    let needs: Vec<&Value> = match job.get("needs") {
+        None => return Ok(()),
+        Some(Value::Array(list)) => list.iter().collect(),
+        Some(one) => vec![one],
+    };
+    for need in needs {
+        let need = need
+            .as_str()
+            .ok_or_else(|| format!("{name}: `needs:` is not a job name or a list of them"))?;
+        if !earlier.contains(need) {
+            return Err(format!(
+                "{name}: `needs: {need}`, which is not a job earlier in the file; the gate runs jobs in file order; fix: move {need} before {name}"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn plan_job(
