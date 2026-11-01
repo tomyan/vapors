@@ -13,9 +13,13 @@
 //! RELAXED on the web: the browser has its own paste event and the
 //! platform sends no `Event::Paste`, so a card's text field is not
 //! pasted into on the web, and a web host's own paste (touché's
-//! `drop.js`) must not paste an image while a card field has focus. It
-//! retires when touché wires its textarea paste path (#94) to card
-//! fields, through `Document::text_pasted`.
+//! `drop.js`) must not paste an image while a card field has focus. A
+//! web host asks first: `give(&Event::Paste, ..)` answers
+//! [`Route::Document`](super::Route::Document) while a field has focus
+//! (it reads no clipboard on the web), as does
+//! `Document::text_field_focused()`. It retires when touché wires its
+//! textarea paste path (#94) to card fields, through
+//! `Document::text_pasted`.
 
 use std::cell::RefCell;
 use std::rc::Rc;

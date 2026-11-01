@@ -81,12 +81,13 @@ pub fn paste_shortcut(
 }
 
 fn is_v(key: &str, code: &str) -> bool {
-    // A Latin letter; a control character ("\u{16}", which Ctrl+V can
-    // produce) or another script falls to the physical key.
-    if !key.is_empty() && key.chars().all(|c| c.is_ascii_alphabetic()) {
-        key.eq_ignore_ascii_case("v")
-    } else {
-        code == "KeyV"
+    // A single Latin letter; a control character ("\u{16}", which Ctrl+V
+    // can produce), another script, or a named or dead key
+    // ("Unidentified", "Dead") falls to the physical key.
+    let mut chars = key.chars();
+    match (chars.next(), chars.next()) {
+        (Some(c), None) if c.is_ascii_alphabetic() => c.eq_ignore_ascii_case(&'v'),
+        _ => code == "KeyV",
     }
 }
 
