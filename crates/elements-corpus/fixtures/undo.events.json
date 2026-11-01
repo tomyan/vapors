@@ -965,6 +965,1549 @@
       "values": {
         "input#name": "Warmtxhaba b"
       }
+    },
+    {
+      "action": "Clipboard(\"ab\\n\")",
+      "checked": {},
+      "events": [],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 58,
+      "selections": {
+        "input#name": [
+          12,
+          12
+        ]
+      },
+      "values": {
+        "input#name": "Warmtxhaba b"
+      }
+    },
+    {
+      "action": "Key(\"Control+a\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 59,
+      "selections": {
+        "input#name": [
+          0,
+          12
+        ]
+      },
+      "values": {
+        "input#name": "Warmtxhaba b"
+      }
+    },
+    {
+      "action": "Key(\"Control+v\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "v",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "paste"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "v",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 61,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ]
+      },
+      "values": {
+        "input#name": "ab"
+      }
+    },
+    {
+      "action": "Key(\"Control+a\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 64,
+      "selections": {
+        "input#name": [
+          0,
+          2
+        ]
+      },
+      "values": {
+        "input#name": "ab"
+      }
+    },
+    {
+      "action": "Type(\"Warm tones here\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "W",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "W",
+          "target": "input#name",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#name",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "r",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "r",
+          "target": "input#name",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "m",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "m",
+          "target": "input#name",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": " ",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": " ",
+          "target": "input#name",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "t",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "t",
+          "target": "input#name",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "o",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "o",
+          "target": "input#name",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "n",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "n",
+          "target": "input#name",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "e",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "e",
+          "target": "input#name",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "s",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "s",
+          "target": "input#name",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": " ",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": " ",
+          "target": "input#name",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "h",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "h",
+          "target": "input#name",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "e",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "e",
+          "target": "input#name",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "r",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "r",
+          "target": "input#name",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "e",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "e",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 66,
+      "selections": {
+        "input#name": [
+          15,
+          15
+        ]
+      },
+      "values": {
+        "input#name": "Warm tones here"
+      }
+    },
+    {
+      "action": "Key(\"End\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "End",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "End",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 68,
+      "selections": {
+        "input#name": [
+          15,
+          15
+        ]
+      },
+      "values": {
+        "input#name": "Warm tones here"
+      }
+    },
+    {
+      "action": "Key(\"Control+Backspace\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 70,
+      "selections": {
+        "input#name": [
+          11,
+          11
+        ]
+      },
+      "values": {
+        "input#name": "Warm tones "
+      }
+    },
+    {
+      "action": "Key(\"Control+Backspace\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 72,
+      "selections": {
+        "input#name": [
+          5,
+          5
+        ]
+      },
+      "values": {
+        "input#name": "Warm "
+      }
+    },
+    {
+      "action": "Key(\"Control+z\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "z",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "z",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 74,
+      "selections": {
+        "input#name": [
+          11,
+          11
+        ]
+      },
+      "values": {
+        "input#name": "Warm tones "
+      }
+    },
+    {
+      "action": "Key(\"Control+z\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "z",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "z",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 76,
+      "selections": {
+        "input#name": [
+          15,
+          15
+        ]
+      },
+      "values": {
+        "input#name": "Warm tones here"
+      }
+    },
+    {
+      "action": "Key(\"End\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "End",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "End",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 78,
+      "selections": {
+        "input#name": [
+          15,
+          15
+        ]
+      },
+      "values": {
+        "input#name": "Warm tones here"
+      }
+    },
+    {
+      "action": "Key(\"Backspace\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 80,
+      "selections": {
+        "input#name": [
+          14,
+          14
+        ]
+      },
+      "values": {
+        "input#name": "Warm tones her"
+      }
+    },
+    {
+      "action": "Key(\"Control+Backspace\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 82,
+      "selections": {
+        "input#name": [
+          11,
+          11
+        ]
+      },
+      "values": {
+        "input#name": "Warm tones "
+      }
+    },
+    {
+      "action": "Key(\"Control+z\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "z",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "z",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 84,
+      "selections": {
+        "input#name": [
+          14,
+          14
+        ]
+      },
+      "values": {
+        "input#name": "Warm tones her"
+      }
+    },
+    {
+      "action": "Key(\"Control+z\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "z",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "z",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 86,
+      "selections": {
+        "input#name": [
+          15,
+          15
+        ]
+      },
+      "values": {
+        "input#name": "Warm tones here"
+      }
+    },
+    {
+      "action": "Key(\"Home\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Home",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Home",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 88,
+      "selections": {
+        "input#name": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "Warm tones here"
+      }
+    },
+    {
+      "action": "Key(\"Delete\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Delete",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Delete",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 90,
+      "selections": {
+        "input#name": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "arm tones here"
+      }
+    },
+    {
+      "action": "Key(\"Control+Delete\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Delete",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Delete",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 92,
+      "selections": {
+        "input#name": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": " tones here"
+      }
+    },
+    {
+      "action": "Key(\"Control+z\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "z",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "z",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 94,
+      "selections": {
+        "input#name": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "arm tones here"
+      }
+    },
+    {
+      "action": "Key(\"Control+z\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "z",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "z",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 96,
+      "selections": {
+        "input#name": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "Warm tones here"
+      }
+    },
+    {
+      "action": "Key(\"Home\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Home",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Home",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 98,
+      "selections": {
+        "input#name": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "Warm tones here"
+      }
+    },
+    {
+      "action": "Key(\"ArrowRight\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowRight",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowRight",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 100,
+      "selections": {
+        "input#name": [
+          1,
+          1
+        ]
+      },
+      "values": {
+        "input#name": "Warm tones here"
+      }
+    },
+    {
+      "action": "Key(\"ArrowRight\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowRight",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowRight",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 102,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ]
+      },
+      "values": {
+        "input#name": "Warm tones here"
+      }
+    },
+    {
+      "action": "Key(\"Backspace\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 104,
+      "selections": {
+        "input#name": [
+          1,
+          1
+        ]
+      },
+      "values": {
+        "input#name": "Wrm tones here"
+      }
+    },
+    {
+      "action": "Key(\"Delete\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Delete",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Delete",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 106,
+      "selections": {
+        "input#name": [
+          1,
+          1
+        ]
+      },
+      "values": {
+        "input#name": "Wm tones here"
+      }
+    },
+    {
+      "action": "Key(\"Control+z\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "z",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "z",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 108,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ]
+      },
+      "values": {
+        "input#name": "Warm tones here"
+      }
+    },
+    {
+      "action": "Key(\"Home\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Home",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Home",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 111,
+      "selections": {
+        "input#name": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "Warm tones here"
+      }
+    },
+    {
+      "action": "Key(\"Control+Delete\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Delete",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Delete",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 113,
+      "selections": {
+        "input#name": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": " tones here"
+      }
+    },
+    {
+      "action": "Key(\"Delete\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Delete",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Delete",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 115,
+      "selections": {
+        "input#name": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "tones here"
+      }
+    },
+    {
+      "action": "Key(\"Control+z\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "z",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "z",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 117,
+      "selections": {
+        "input#name": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "Warm tones here"
+      }
     }
   ]
 }

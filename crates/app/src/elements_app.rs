@@ -51,6 +51,9 @@ pub struct ElementsApp {
     // set to no field (`Some(None)`) differs from never set (`None`)
     #[allow(clippy::option_option)]
     mirrored: Option<Option<vapors_platform::TextField>>,
+    /// The clipboard reads pastes started, answered off the loop.
+    #[cfg(not(target_family = "wasm"))]
+    pastes: paste::Pastes,
     /// The cursor last shown.
     cursor: Cursor,
     /// Called before each update with the last frame's phase times.
@@ -86,6 +89,8 @@ impl ElementsApp {
             #[cfg(not(target_family = "wasm"))]
             clipboard: Box::new(vapors_platform::SystemClipboard::default()),
             mirrored: None,
+            #[cfg(not(target_family = "wasm"))]
+            pastes: paste::Pastes::default(),
             cursor: Cursor::Default,
             per_frame: None,
             frame_times: None,
@@ -150,6 +155,8 @@ impl App for ElementsApp {
     }
 
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
+        #[cfg(not(target_family = "wasm"))]
+        self.deliver_pastes();
         match self.run_phases(frame) {
             Ok(()) => self.next_after_frame(),
             Err(message) => {
@@ -175,7 +182,7 @@ impl ElementsApp {
         self.text_event(event);
         #[cfg(not(target_family = "wasm"))]
         if matches!(event, Event::Paste) {
-            self.paste();
+            self.paste(platform);
         }
         if self.document.borrow_mut().take_changed() {
             platform.request_redraw();

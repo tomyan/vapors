@@ -1,8 +1,10 @@
 //! Pasted text into the focused text field (E6b), as Chromium pastes:
 //! `paste` fires on the field first, bubbling, and a listener that
 //! prevents its default keeps the text out; else the text replaces the
-//! selection with `input`, as an undo step of its own, each line break
-//! a space, as Chromium pastes into a one-line field. The platform
+//! selection with `input`, as an undo step of its own, its trailing line
+//! breaks dropped and each other a space, as Chromium pastes into a
+//! one-line field. The `paste` event carries the text as copied
+//! (`Event::value`, as `clipboardData.getData("text")`). The platform
 //! sends a paste whatever has focus; the app hands it here first, and
 //! has it itself when no live text field is focused.
 
@@ -32,7 +34,7 @@ impl Document {
         let Some(node) = focused.filter(|node| document.borrow().live_text(*node)) else {
             return false;
         };
-        if dispatch_bubbling(document, node, Event::new("paste")) {
+        if dispatch_bubbling(document, node, Event::new("paste").with_value(text)) {
             return true;
         }
         let line = one_line(text);
@@ -44,7 +46,10 @@ impl Document {
     }
 }
 
-/// `text` on one line: each line break (CR LF, CR or LF) a space.
+/// `text` on one line: its trailing line breaks (CR LF, CR or LF)
+/// dropped, and each other a space.
 fn one_line(text: &str) -> String {
-    text.replace("\r\n", " ").replace(['\r', '\n'], " ")
+    text.trim_end_matches(['\r', '\n'])
+        .replace("\r\n", " ")
+        .replace(['\r', '\n'], " ")
 }

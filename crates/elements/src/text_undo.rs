@@ -37,13 +37,18 @@ impl Document {
     }
 
     /// Puts the field back to `to`: its text, then its selection, which
-    /// owes a `selectionchange` even where it was, as Chromium sets it.
+    /// owes a `selectionchange` even where it was, as Chromium sets it;
+    /// but not a caret at the start, which the new text leaves in place
+    /// in Chromium too (`undo.events`).
     fn restore(&mut self, node: NodeId, (text, selection): Snapshot) {
+        let at_start = selection == (0..0);
         self.drive_editor(node, |d| {
             d.editor.set_text(&text);
             d.select_byte_range(selection.start, selection.end);
         });
-        self.editor(node).reported = None;
+        if !at_start {
+            self.editor(node).reported = None;
+        }
     }
 }
 

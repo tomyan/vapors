@@ -6,6 +6,7 @@
 
 use std::time::Duration;
 
+pub use crate::clipboard_reader::Done as ClipboardDone;
 use crate::clipboard_reader::{Answer, Reader};
 pub use crate::clipboard_text::ClipboardText;
 
@@ -53,16 +54,18 @@ pub trait Clipboard {
     /// ([`DEADLINE`] for [`SystemClipboard`]); call it off the frame loop.
     fn image(&mut self) -> ClipboardImage;
 
-    /// The text on the clipboard now, for a paste into a text field. May
-    /// block for up to its deadline, as [`Clipboard::image`].
-    fn text(&mut self) -> ClipboardText;
+    /// Reads the text on the clipboard now, for a paste into a text
+    /// field, without blocking: `done` gets it on another thread, or why
+    /// there is none once the deadline ([`DEADLINE`] for
+    /// [`SystemClipboard`]) passes, so the event loop never waits.
+    fn read_text(&mut self, done: ClipboardDone<ClipboardText>);
 }
 
 /// The operating system's clipboard.
 #[derive(Debug, Default)]
 pub struct SystemClipboard {
-    reader: Reader<ClipboardImage>,
-    text_reader: Reader<ClipboardText>,
+    reader: Reader,
+    text_reader: Reader,
 }
 
 impl Clipboard for SystemClipboard {
@@ -70,8 +73,9 @@ impl Clipboard for SystemClipboard {
         self.reader.read(DEADLINE, read)
     }
 
-    fn text(&mut self) -> ClipboardText {
-        self.text_reader.read(DEADLINE, crate::clipboard_text::read)
+    fn read_text(&mut self, done: ClipboardDone<ClipboardText>) {
+        self.text_reader
+            .start(DEADLINE, crate::clipboard_text::read, done);
     }
 }
 
