@@ -162,3 +162,26 @@ fn a_note_follows_two_spaces_and_is_not_a_field() {
     assert_eq!(script.steps[0].action, Action::Click(1.0, 2.0));
     assert_eq!(script.steps[0].expect[0].0, Expect::Focus("a#b".into()));
 }
+
+#[test]
+fn a_clipboard_step_takes_quoted_text_and_needs_no_expectation() {
+    // When
+    let script = parse(
+        "p",
+        "listen paste\nclipboard \"a\\nb\"\nkey Control+v\nexpect event paste input#a\n",
+    )
+    .expect("parses");
+    let bare = parse(
+        "p",
+        "listen paste\nclipboard a\nkey Control+v\nexpect event paste input#a\n",
+    )
+    .expect_err("refused");
+
+    // Then
+    assert_eq!(script.steps[0].action, Action::Clipboard("a\nb".into()));
+    assert_eq!(script.steps[0].expect, Vec::new());
+    assert!(
+        bare.contains("p.events:2:") && bare.contains("`clipboard` takes a quoted text"),
+        "{bare}"
+    );
+}

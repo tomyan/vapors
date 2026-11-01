@@ -1,7 +1,7 @@
 //! The text tests' page: a 160 x 24 px text field at the top left
 //! holding "Warm" in 14 px Geist, a second empty one below it, a
-//! disabled one below that, and a log of `input`, `change` and
-//! `selectionchange` with the value.
+//! disabled one below that, and a log of `input`, `change`,
+//! `selectionchange` and `paste` with the value.
 
 #![allow(dead_code)] // each test file uses a subset
 
@@ -38,7 +38,7 @@ pub fn page() -> Page {
     doc.update(viewport(400.0, 100.0)).expect("updates");
     let doc = Rc::new(RefCell::new(doc));
     let log = Log::default();
-    for kind in ["input", "change", "selectionchange"] {
+    for kind in ["input", "change", "selectionchange", "paste"] {
         let into = Rc::clone(&log);
         doc.borrow_mut().listen(
             name,
