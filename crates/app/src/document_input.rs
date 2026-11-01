@@ -125,6 +125,10 @@ impl DocumentInput {
             self.act(document, action);
         }
         let unused_key = key(document, event) == Some(false);
+        if let (true, Event::Key { key, .. }) = (unused_key, event) {
+            // the document left it to the host: so are its repeats and its up
+            self.held.keys.insert(key.clone(), Route::Host);
+        }
         let changed = document.borrow_mut().take_changed();
         let cursor = document.borrow().cursor(self.pointer);
         let shown = (Some(cursor) != self.cursor).then(|| {
@@ -177,39 +181,11 @@ fn point_of(action: Action) -> Option<Point> {
     }
 }
 
-/// A key going down or up, to the document's focused element (3-E2a);
-/// the text a key produced, to a focused field (3-E3c). For a key going
-/// down, whether the document used it.
-fn key(document: &Rc<RefCell<Document>>, event: &Event) -> Option<bool> {
-    if let Event::Character(text) = event {
-        Document::character_typed(document, text);
-        return None;
-    }
-    let Event::Key {
-        key,
-        pressed,
-        modifiers,
-        ..
-    } = event
-    else {
-        return None;
-    };
-    let modifiers = vapors_elements::Modifiers {
-        shift: modifiers.shift,
-        control: modifiers.control,
-        alt: modifiers.alt,
-        meta: modifiers.meta,
-    };
-    if *pressed {
-        Some(Document::key_pressed(document, key, modifiers))
-    } else {
-        Document::key_released(document, key, modifiers);
-        None
-    }
-}
-
 #[path = "document_input_act.rs"]
 mod act;
+#[path = "document_input_keys.rs"]
+mod keys;
+use keys::key;
 #[path = "document_input_route.rs"]
 mod route;
 pub use route::Route;

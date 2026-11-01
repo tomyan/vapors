@@ -27,6 +27,16 @@ pub struct Modifiers {
     pub meta: bool,
 }
 
+/// Whether `key` types text into a field: a single printable character
+/// with neither Control nor Meta (its text then arrives as a character).
+/// Named keys (F1 to F12, Escape, Tab, `PageUp`) do not, so a field leaves
+/// them to the app.
+pub(crate) fn types_text(key: &str, modifiers: Modifiers) -> bool {
+    let mut chars = key.chars();
+    let single = matches!((chars.next(), chars.next()), (Some(c), None) if !c.is_control());
+    single && !modifiers.control && !modifiers.meta
+}
+
 impl Document {
     /// `key` went down: `keydown`, then its default action. Whether the
     /// document used it: a listener prevented its default, or a control
@@ -65,9 +75,7 @@ impl Document {
         modifiers: Modifiers,
     ) -> bool {
         let mut used = false;
-        if matches!(key, "Backspace" | "Enter" | "ArrowUp" | "ArrowDown")
-            && document.borrow().number_field(target).is_some()
-        {
+        if document.borrow().number_field(target).is_some() {
             used |= crate::number_input::key(document, target, key, modifiers);
         }
         if document.borrow().is_text_input(target) {

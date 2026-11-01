@@ -118,3 +118,78 @@ fn with_the_slider_focused_its_arrow_moves_it_and_an_unbound_key_reaches_the_hos
         "Control+Z is the host's"
     );
 }
+
+#[test]
+fn space_unused_by_the_focused_slider_reaches_the_host_down_and_up() {
+    // Given
+    let (doc, _, range) = card();
+    let mut input = DocumentInput::new();
+    Document::focus(&doc, Some(range));
+    let space = |pressed| Event::Key {
+        key: " ".into(),
+        pressed,
+        repeat: false,
+        modifiers: Modifiers::default(),
+    };
+
+    // When
+    let (down_route, down) = give(&mut input, &doc, &space(true));
+    let (up_route, _) = give(&mut input, &doc, &space(false));
+
+    // Then: the slider leaves Space to the host, and its up follows
+    assert_eq!(down_route, Route::Document);
+    assert_eq!(down.map(|o| o.unused_key), Some(true));
+    assert_eq!(up_route, Route::Host);
+}
+
+#[test]
+fn a_keys_up_goes_where_its_down_went_though_a_click_focused_the_card_meanwhile() {
+    // Given: H held with nothing focused, so the host has it
+    let (doc, button, _) = card();
+    let mut input = DocumentInput::new();
+    let h = |pressed| Event::Key {
+        key: "h".into(),
+        pressed,
+        repeat: false,
+        modifiers: Modifiers::default(),
+    };
+    let (down_route, _) = give(&mut input, &doc, &h(true));
+
+    // When: a click focuses the card's button, then H comes up
+    click(&mut input, &doc, 20.0, 10.0);
+    let (up_route, _) = give(&mut input, &doc, &h(false));
+
+    // Then
+    assert_eq!(doc.borrow().active_element(), Some(button));
+    assert_eq!((down_route, up_route), (Route::Host, Route::Host));
+}
+
+#[test]
+fn typing_minus_one_into_a_focused_number_field_leaves_the_host_no_key() {
+    // Given: a number field on the card, focused
+    let mut doc = Document::new(FontSystem::bundle_only());
+    doc.add_stylesheet("card.css", "body { display: flex; } input { width: 6em; }")
+        .expect("parses");
+    let body = doc.body();
+    let field = doc.create_element("input");
+    doc.set_attribute(field, "type", "number");
+    doc.append(body, field);
+    doc.update(VIEWPORT).expect("updates");
+    let doc = Rc::new(RefCell::new(doc));
+    Document::focus(&doc, Some(field));
+    let mut input = DocumentInput::new();
+
+    // When: "-" then "1", each a key-down and its text
+    let mut host_keys = Vec::new();
+    for typed in ["-", "1"] {
+        let (route, outcome) = give(&mut input, &doc, &key(typed, Modifiers::default()));
+        give(&mut input, &doc, &Event::Character(typed.into()));
+        if route == Route::Host || outcome.is_some_and(|o| o.unused_key) {
+            host_keys.push(typed);
+        }
+    }
+
+    // Then
+    assert_eq!(host_keys, Vec::<&str>::new());
+    assert_eq!(doc.borrow().value(field).as_deref(), Some("-1"));
+}

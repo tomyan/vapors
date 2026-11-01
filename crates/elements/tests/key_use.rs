@@ -72,19 +72,54 @@ fn a_prevented_keydown_is_used() {
 /// Control+Y in a field (undo, redo) inside `text_input::key`'s match,
 /// whose arms all report the key used: whichever of #92 and this lands
 /// second adds Control+Z as used here.
-#[test]
-fn a_focused_text_field_uses_a_typing_key_and_not_an_unbound_control_key() {
-    // Given
+/// A focused `<input type=…>` of `kind`, laid out.
+fn focused_field(kind: &str) -> Rc<RefCell<Document>> {
     let mut doc = document();
     doc.add_stylesheet("app.css", "body { display: flex; } input { width: 6em; }")
         .expect("parses");
     let body = doc.body();
     let field = doc.create_element("input");
-    doc.set_attribute(field, "type", "text");
+    doc.set_attribute(field, "type", kind);
     doc.append(body, field);
     doc.update(viewport(200.0, 100.0)).expect("updates");
     let doc = Rc::new(RefCell::new(doc));
     Document::focus(&doc, Some(field));
+    doc
+}
+
+#[test]
+fn a_focused_number_field_uses_the_keys_it_types_and_not_control_z() {
+    // Given
+    let doc = focused_field("number");
+
+    // Then
+    for key in ["1", "-", ".", "e"] {
+        assert!(
+            Document::key_pressed(&doc, key, Modifiers::default()),
+            "{key}"
+        );
+    }
+    assert!(!Document::key_pressed(&doc, "z", control()));
+}
+
+#[test]
+fn named_keys_in_a_focused_text_field_are_the_apps() {
+    // Given
+    let doc = focused_field("text");
+
+    // Then
+    for key in ["F1", "F12", "Escape"] {
+        assert!(
+            !Document::key_pressed(&doc, key, Modifiers::default()),
+            "{key}"
+        );
+    }
+}
+
+#[test]
+fn a_focused_text_field_uses_a_typing_key_and_not_an_unbound_control_key() {
+    // Given
+    let doc = focused_field("text");
 
     // Then
     assert!(Document::key_pressed(&doc, "e", Modifiers::default()));

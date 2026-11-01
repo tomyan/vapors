@@ -73,9 +73,9 @@ pub(crate) fn typed(document: &Rc<RefCell<Document>>, node: NodeId, text: &str) 
 }
 
 /// `key` went down on `node`, a focused text field.
-/// Whether the field took the key: its editing keys and moves, and any
-/// key without Control or Meta, which types (its text arrives as a
-/// character) or is the field's; not Tab or Escape.
+/// Whether the field took the key: its editing keys and moves, and a key
+/// that types text (`keys::types_text`); a named key such as F1 or
+/// Escape is the app's.
 pub(crate) fn key(
     document: &Rc<RefCell<Document>>,
     node: NodeId,
@@ -98,8 +98,8 @@ pub(crate) fn key(
         #[allow(clippy::redundant_closure_for_method_calls)]
         "a" | "A" if modifiers.control => document.borrow_mut().drive(node, |d| d.select_all()),
         _ => {
-            let typing = !modifiers.control && !modifiers.meta && !matches!(key, "Tab" | "Escape");
-            return moved(document, node, key, shift, word) || typing;
+            return moved(document, node, key, shift, word)
+                || crate::keys::types_text(key, modifiers);
         }
     }
     true

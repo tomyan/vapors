@@ -147,7 +147,9 @@ pub(crate) fn key(
             let steps = if modifiers.shift { COARSE_STEPS } else { 1.0 };
             step(document, node, &field, sign * steps);
         }
-        _ => return false,
+        // the field's typing (digits, a sign, a point, an exponent) arrives
+        // as a character; a stray letter is still the field's, not a shortcut
+        _ => return crate::keys::types_text(key, modifiers),
     }
     true
 }

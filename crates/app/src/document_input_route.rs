@@ -12,7 +12,9 @@
 //! - a pan goes where its gesture's first touch-down went;
 //! - a tap and the wheel go by hit at their own position;
 //! - keys and typed text go to the document while one of its elements
-//!   has focus; a key the document then does not use
+//!   has focus, and a key's up goes where its down went (as a press's
+//!   release does), so a key held across a focus change still ends where
+//!   it began; a key the document then does not use
 //!   ([`InputOutcome::unused_key`](super::InputOutcome::unused_key)) is
 //!   the host's, so its shortcuts work while a slider has focus and the
 //!   slider's arrows still move it.
@@ -46,6 +48,8 @@ pub enum Route {
 #[derive(Default)]
 pub(super) struct Held {
     mouse: Option<Route>,
+    /// Each key held down, by its DOM name, and where its down went.
+    pub(super) keys: HashMap<String, Route>,
     touches: HashMap<u64, Route>,
     gesture: Option<Route>,
 }
@@ -79,7 +83,7 @@ impl DocumentInput {
 
     fn routed(&mut self, document: &Document, event: &Event) -> Result<Route, Unplaced> {
         let Some(action) = self.action(document, event)? else {
-            return Ok(by_focus(document, event));
+            return Ok(self.held.key(document, event));
         };
         if let Action::Move(point) = action {
             // The press after it is routed where the pointer now is.
@@ -110,6 +114,33 @@ impl DocumentInput {
 }
 
 impl Held {
+    /// A key's route: a fresh key-down by focus, held until its key-up;
+    /// an auto-repeat and the key-up where the key-down went. Typed text
+    /// and other placeless events by focus.
+    fn key(&mut self, document: &Document, event: &Event) -> Route {
+        let Event::Key {
+            key,
+            pressed,
+            repeat,
+            ..
+        } = event
+        else {
+            return by_focus(document, event);
+        };
+        let held = if *pressed && !*repeat {
+            None
+        } else if *pressed {
+            self.keys.get(key).copied()
+        } else {
+            self.keys.remove(key)
+        };
+        let route = held.unwrap_or_else(|| by_focus(document, event));
+        if *pressed {
+            self.keys.insert(key.clone(), route);
+        }
+        route
+    }
+
     /// A finger down: the first of a gesture sets where its pans go.
     fn touch_down(&mut self, id: u64, route: Route) -> Route {
         if self.touches.is_empty() {
