@@ -79,9 +79,7 @@ impl Emitter<'_> {
             )));
         };
         let key = self.row_key_expr(key, row)?;
-        // the cleanup keeps its own key, and the compiler cannot see a
-        // Copy key
-        self.line(Allowance::CloneOnCopy.attribute());
+        self.line(Allowance::CloneOnCopyKey.attribute());
         self.line(format!(
             "{{ let this = {signal}; let key = {key}; this.update(|nodes| {{ nodes.insert(key.clone(), {var}); }}); vapors_signals::on_cleanup(move || {{ if this.try_with_untracked(|nodes| nodes.get(&key) == Some(&{var})) == Ok(true) {{ this.update(|nodes| {{ nodes.remove(&key); }}); }} }}); }}"
         ));
@@ -109,17 +107,21 @@ impl Emitter<'_> {
         Ok(format!("{{ {reads}{code} }}"))
     }
 
-    /// A script signal or prop of the wrong shape for where it is bound
-    /// is refused here, naming the shape; other expressions are left to
-    /// rustc.
+    /// Refuses anything but a script signal or prop, by its name, of the
+    /// shape for where it is bound: the compiler knows those types, and
+    /// an expression's type only rustc would, in the generated file.
     fn check_bind_this_type(
         &self,
         expr: &Expr,
         attribute: &Attribute,
         in_row: bool,
     ) -> Result<(), CompileError> {
-        let Some(ty) = self.declared_type(&self.raw(expr)?) else {
-            return Ok(());
+        let code = self.raw(expr)?;
+        let shape = if in_row { KEYED } else { SINGLE };
+        let Some(ty) = self.declared_type(&code) else {
+            return Err(self.source.error(attribute.offset, format!(
+                "`bind:this={{{code}}}`: bind:this takes a `{shape}` the script or a prop declares, by its name"
+            )));
         };
         let (wanted, fits, why) = if in_row {
             (

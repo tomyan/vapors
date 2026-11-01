@@ -208,11 +208,14 @@ is evaluated once, and the set and the clear both act on that value.
 - In a `{for}` row it is a `Signal<BTreeMap<K, NodeId>>` (written with
   its path, `std::collections::BTreeMap`, since a field's type is
   outside the script), and the row's node is kept under the row's
-  `key=`. When the row is removed, its key is removed, unless the key
+  `key=`; only a `BTreeMap` is taken, so the key type must be `Ord`
+  (a `HashMap` is refused, as is any other shape). When the row is
+  removed, its key is removed, unless the key
   holds another node by then. A row reused for a new item keeps its
   key, so its entry stays right. A `{for}` without `key=`, a nested
-  `{for}`, and a script signal or prop of the other shape are refused,
-  naming the shape.
+  `{for}`, a script signal or prop of the other shape, and an
+  expression that is not a script signal or prop by its name are
+  refused, naming the shape.
 - The owner is disposed before its nodes are removed (`Fragment::remove`
   and `unmount` call `dispose` first), so an effect on the signal never
   sees a removed node.
