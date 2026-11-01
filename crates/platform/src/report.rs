@@ -2,7 +2,8 @@
 //! other failures go to stderr, status lines to stdout. Web: `run` has
 //! returned by the time most things happen, so failures go to the console
 //! and to the page's `error` element, or its `status` element when it has
-//! no `error` element; status lines go to `status` only (`page.rs`).
+//! no `error` element; status lines go to `status` only, and the GPU's
+//! start-up line to `adapter`, or `status` without one (`page.rs`).
 
 use std::sync::OnceLock;
 
@@ -57,6 +58,13 @@ pub fn report_status(text: &str) {
     println!("{}: {text}", prefix());
 }
 
+/// The GPU's start-up line: stdout natively, like a status line; on the
+/// web the `adapter` element, or `status` when the page has none.
+#[cfg(not(target_family = "wasm"))]
+pub fn report_startup(text: &str) {
+    report_status(text);
+}
+
 /// A failure that does not end the app: say so where the user can see.
 #[cfg(target_family = "wasm")]
 pub fn report_error(message: &str) {
@@ -77,6 +85,13 @@ pub fn fatal(error: &PlatformError) {
 #[cfg(target_family = "wasm")]
 pub fn report_status(text: &str) {
     crate::web::write_report(crate::page::Report::Status, text);
+}
+
+/// The GPU's start-up line: stdout natively, like a status line; on the
+/// web the `adapter` element, or `status` when the page has none.
+#[cfg(target_family = "wasm")]
+pub fn report_startup(text: &str) {
+    crate::web::write_report(crate::page::Report::Startup, text);
 }
 
 #[cfg(test)]

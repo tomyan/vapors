@@ -6,7 +6,7 @@ use web_sys::{Element, HtmlCanvasElement, HtmlElement};
 use winit::event_loop::EventLoopProxy;
 
 use crate::PlatformError;
-use crate::page::{ERROR_ID, PAGE_CONTROL_IDS, Report, element_for, shows_target};
+use crate::page::{PAGE_CONTROL_IDS, Report, element_for, shows_target};
 use crate::window::Message;
 
 use crate::page::{CANVAS_ID, OPEN_ID};
@@ -77,7 +77,7 @@ pub fn canvas() -> Result<HtmlCanvasElement, PlatformError> {
 /// the page has it; an error element is also shown (its `hidden`
 /// attribute removed).
 pub fn write_report(report: Report, text: &str) {
-    let id = element_for(report, element(ERROR_ID).is_some());
+    let id = element_for(report, |id| element(id).is_some());
     let Some(target) = element(id) else {
         return;
     };
