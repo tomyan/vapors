@@ -66,9 +66,14 @@ fn app(doc: &Rc<RefCell<Document>>, text: ClipboardText) -> (ElementsApp, Rc<Ref
 fn click_field(app: &mut ElementsApp, platform: &Platform) {
     for event in [
         Event::PointerMoved { x: 150.0, y: 10.0 },
-        Event::PrimaryButton { pressed: true },
-        Event::ClickCount(std::num::NonZeroU32::MIN),
-        Event::PrimaryButton { pressed: false },
+        Event::PrimaryButton {
+            pressed: true,
+            clicks: std::num::NonZeroU32::MIN,
+        },
+        Event::PrimaryButton {
+            pressed: false,
+            clicks: std::num::NonZeroU32::MIN,
+        },
     ] {
         app.event(event, platform);
     }

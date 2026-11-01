@@ -13,7 +13,7 @@ fn counts(presses: &[([f32; 2], u64)]) -> Vec<u32> {
         .iter()
         .map(|(at, ms)| {
             clicks
-                .pressed(*at, start + Duration::from_millis(*ms))
+                .pressed(Some(*at), start + Duration::from_millis(*ms))
                 .get()
         })
         .collect()
@@ -69,7 +69,11 @@ fn a_browsers_platform_picks_its_fallback() {
             MACOS,
         ),
         ("Linux", GTK),
-        ("Android", GTK),
+        ("Android", ANDROID),
+        (
+            "Mozilla/5.0 (Linux; Android 16; Pixel 9 Pro) AppleWebKit/537.36",
+            ANDROID,
+        ),
         ("Chrome OS", GTK),
         ("", GTK),
     ] {

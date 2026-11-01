@@ -354,17 +354,20 @@ field's selection after every step; the Chromium player waits a task after each 
 and the vapors player settles after each event, because Chromium's
 queued `selectionchange` otherwise lands before or after the next key
 from run to run. Clicks in a row (E6a, the second pull request): the
-platform sends `Event::ClickCount` after each press of the primary
-button, and the document places the caret, selects a word or the whole
-text on it (`Document::pointer_clicks`), as Chromium does on
-`mousedown`, after `pointerdown`. The platform counts on every
+platform counts each press of the primary button and carries the count
+on the press itself (`Event::PrimaryButton`'s `clicks`, a release its
+press's), so nothing waits for a count that may not come; the document
+places the caret, selects a word or the whole text with the press
+(`Document::pointer_pressed_clicks`), as Chromium does on `mousedown`.
+A press with no known pointer position starts a new row. The platform counts on every
 target, the web included: winit cancels `pointerdown` (so the canvas
 selects no text), which in Chromium suppresses `mousedown` and with it
 the browser's own count (probed, Chromium 155: `pointerdown`'s `detail`
 is 0, and only `click` and `dblclick` carry the count, after release).
 The interval and distance are stated fallbacks: GTK's defaults on Linux
 (400 ms, 5 px, as Linux Chromium reads), Windows' (500 ms, 4 px),
-macOS's (500 ms; no distance setting, so 4 px); on the web, the one the
+macOS's (500 ms; no distance setting, so 4 px), Android's double-tap
+timeout (300 ms, with GTK's 5 px); on the web, the one the
 browser's platform names (`navigator.userAgentData`, else the user
 agent). No build compiles a reader for the systems' own settings yet;
 a CI target that does retires the fallbacks. RELAXED: winit 0.30 gives
