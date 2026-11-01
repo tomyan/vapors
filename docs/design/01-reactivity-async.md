@@ -215,7 +215,10 @@ is evaluated once, and the set and the clear both act on that value.
   key, so its entry stays right. A `{for}` without `key=`, a nested
   `{for}`, a script signal or prop of the other shape, and an
   expression that is not a script signal or prop by its name are
-  refused, naming the shape.
+  refused, naming the shape. Types are matched by each path's last
+  segment, so `vapors_signals::Signal<Option<vapors_dom::NodeId>>` is
+  taken as written. A `{for}` name that shadows the script's binding of
+  the same name is refused where `bind:this` names it, naming both.
 - The owner is disposed before its nodes are removed (`Fragment::remove`
   and `unmount` call `dispose` first), so an effect on the signal never
   sees a removed node.

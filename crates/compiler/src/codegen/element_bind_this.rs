@@ -9,6 +9,7 @@
 use std::fmt::Write as _;
 
 use super::allowances::Allowance;
+use super::bind_this_shape::{is_keyed, is_single};
 use super::emit::Emitter;
 use super::syn_map::parse_expr;
 use super::unwrap::identifiers;
@@ -117,6 +118,7 @@ impl Emitter<'_> {
         in_row: bool,
     ) -> Result<(), CompileError> {
         let code = self.raw(expr)?;
+        self.refuse_shadowed(&code, attribute)?;
         let shape = if in_row { KEYED } else { SINGLE };
         let Some(ty) = self.declared_type(&code) else {
             return Err(self.source.error(attribute.offset, format!(
@@ -145,6 +147,25 @@ impl Emitter<'_> {
         ))
     }
 
+    /// Refuses a loop name over a script binding of the same name: the
+    /// check would read the script's type, the generated code the loop's.
+    fn refuse_shadowed(&self, code: &str, attribute: &Attribute) -> Result<(), CompileError> {
+        let name = code.trim();
+        let script = self
+            .script
+            .declared
+            .iter()
+            .find(|(declared, _)| declared == name);
+        let Some((_, at)) = script.filter(|_| self.is_loop_name(name)) else {
+            return Ok(());
+        };
+        Err(self.source.error(attribute.offset, format!(
+            "`bind:this={{{name}}}`: `{name}` here is the `{{for}}`'s, which shadows the script's `{name}` at {}:{}; bind:this takes the script's signal: rename the loop's",
+            self.source.path,
+            self.source.describe(*at)
+        )))
+    }
+
     /// The type a script signal or prop named `name` is declared with,
     /// without whitespace.
     fn declared_type(&self, name: &str) -> Option<String> {
@@ -156,12 +177,4 @@ impl Emitter<'_> {
             .find(|(declared, _)| declared.as_str() == name.trim())
             .map(|(_, ty)| ty.chars().filter(|c| !c.is_whitespace()).collect())
     }
-}
-
-fn is_single(ty: &str) -> bool {
-    ty.starts_with("Signal<Option<") && ty.ends_with("NodeId>>")
-}
-
-fn is_keyed(ty: &str) -> bool {
-    ty.starts_with("Signal<") && ty.contains("BTreeMap<") && ty.ends_with("NodeId>>")
 }
