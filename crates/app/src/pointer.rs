@@ -12,7 +12,8 @@ use vapors_platform::{Event, TouchPhase};
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum Action {
     Move(Point),
-    Press(Point),
+    /// A press of the primary button, with its count in a row.
+    Press(Point, std::num::NonZeroU32),
     Release(Point),
     Leave,
     Tap(Point),
@@ -37,8 +38,11 @@ pub(crate) fn action(event: &Event, scale: f32, last: Point) -> Option<Action> {
     let css = |x: f32, y: f32| [x / scale, y / scale];
     match event {
         Event::PointerMoved { x, y } => Some(Action::Move(css(*x, *y))),
-        Event::PrimaryButton { pressed: true } => Some(Action::Press(last)),
-        Event::PrimaryButton { pressed: false } => Some(Action::Release(last)),
+        Event::PrimaryButton {
+            pressed: true,
+            clicks,
+        } => Some(Action::Press(last, *clicks)),
+        Event::PrimaryButton { pressed: false, .. } => Some(Action::Release(last)),
         Event::PointerLeft => Some(Action::Leave),
         Event::Tap { x, y } => Some(Action::Tap(css(*x, *y))),
         Event::Scroll { dx, dy } => Some(Action::Wheel(last, [*dx, *dy])),
@@ -78,8 +82,14 @@ mod tests {
     fn the_button_acts_where_the_pointer_last_moved() {
         // Given
         let (press, release) = (
-            Event::PrimaryButton { pressed: true },
-            Event::PrimaryButton { pressed: false },
+            Event::PrimaryButton {
+                pressed: true,
+                clicks: std::num::NonZeroU32::MIN,
+            },
+            Event::PrimaryButton {
+                pressed: false,
+                clicks: std::num::NonZeroU32::MIN,
+            },
         );
 
         // When
@@ -92,7 +102,7 @@ mod tests {
         assert_eq!(
             found,
             (
-                Some(Action::Press([4.0, 5.0])),
+                Some(Action::Press([4.0, 5.0], std::num::NonZeroU32::MIN)),
                 Some(Action::Release([6.0, 7.0]))
             )
         );

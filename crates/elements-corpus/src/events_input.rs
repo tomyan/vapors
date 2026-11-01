@@ -39,10 +39,8 @@ pub struct Pointer {
 /// The `Input` calls that perform `action`, in order.
 pub fn calls(action: &Action, pointer: &mut Pointer) -> Vec<(&'static str, Value)> {
     match action {
-        Action::Click(x, y) => vec![
-            mouse("mousePressed", *x, *y),
-            mouse("mouseReleased", *x, *y),
-        ],
+        Action::Click(x, y) => clicks(*x, *y, 1),
+        Action::Clicks(x, y, count) => clicks(*x, *y, *count),
         Action::Press(x, y) => {
             pointer.held = true;
             vec![mouse("mousePressed", *x, *y)]
@@ -68,13 +66,34 @@ pub fn calls(action: &Action, pointer: &mut Pointer) -> Vec<(&'static str, Value
             .flat_map(|c| key_calls(&c.to_string()))
             .collect(),
         Action::Frame => Vec::new(),
+        Action::Clipboard(text) => vec![(
+            "Runtime.evaluate",
+            json!({ "expression": format!("navigator.clipboard.writeText({})", json!(text)), "awaitPromise": true, "userGesture": true }),
+        )],
     }
 }
 
+/// `count` presses and releases at one point, each counting one more.
+fn clicks(x: f64, y: f64, count: u32) -> Vec<(&'static str, Value)> {
+    (1..=count)
+        .flat_map(|nth| {
+            [
+                mouse_nth("mousePressed", x, y, nth),
+                mouse_nth("mouseReleased", x, y, nth),
+            ]
+        })
+        .collect()
+}
+
 fn mouse(kind: &str, x: f64, y: f64) -> (&'static str, Value) {
+    mouse_nth(kind, x, y, 1)
+}
+
+/// A left button event, the `nth` click in a row.
+fn mouse_nth(kind: &str, x: f64, y: f64, nth: u32) -> (&'static str, Value) {
     (
         "Input.dispatchMouseEvent",
-        json!({ "type": kind, "x": x, "y": y, "button": "left", "clickCount": 1 }),
+        json!({ "type": kind, "x": x, "y": y, "button": "left", "clickCount": nth }),
     )
 }
 
@@ -178,3 +197,7 @@ pub use crate::events_unmet::unmet;
 #[cfg(test)]
 #[path = "events_input_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "events_input_click_tests.rs"]
+mod click_tests;

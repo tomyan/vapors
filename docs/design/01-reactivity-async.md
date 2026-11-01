@@ -193,6 +193,45 @@ effect through `vapors_dom::blocks::dynamic`, which rebuilds when the
 callee yields a different snippet, compared by identity; `None` renders
 nothing.
 
+## Element references
+
+As built (the listbox slice's second part, 2026-11-01):
+`bind:this={signal}` on an element puts its node into a signal once
+the element is built, with its later attributes and its children, so
+an effect that runs on the set sees the whole element. The expression
+is evaluated once, and the set and the clear both act on that value.
+
+- Outside `{for}` the signal is a `Signal<Option<NodeId>>`. It is set
+  to `None` when the owner the element was mounted under (the
+  component or the `{if}` branch) is disposed, unless the signal holds
+  another node by then, or was disposed with it (the component's own).
+- In a `{for}` row it is a `Signal<BTreeMap<K, NodeId>>` (written with
+  its path, `std::collections::BTreeMap`, since a field's type is
+  outside the script), and the row's node is kept under the row's
+  `key=`. When the row is removed, its key is removed, unless the key
+  holds another node by then. A row reused for a new item keeps its
+  key, so its entry stays right. A `{for}` without `key=`, a nested
+  `{for}`, and a script signal or prop of the other shape are refused,
+  naming the shape.
+- The owner is disposed before its nodes are removed (`Fragment::remove`
+  and `unmount` call `dispose` first), so an effect on the signal never
+  sees a removed node.
+- On a component tag `bind:this` is refused: a component has no single
+  node. The component binds an element inside it, and the signal is
+  passed to it as a prop.
+
+A script uses the node with the tree's calls, such as
+`Dispatcher::dispatch` (doc 03, "A component's own events").
+
+Taken from Svelte's `bind:this`: set once the element is mounted,
+cleared on destroy, with the per-item form inside `{#each}`. Differs
+from Svelte: the value is a `NodeId`, not an element object (the
+tree's calls take node ids), and inside `{#each}` Svelte binds into an
+array entry (`bind:this={items[i]}`) while vapors keys a map by the
+row's key. The DOM has no binding; a query (`querySelector`) is the
+nearest, and vapors has none on purpose: a reference is declared where
+the element is.
+
 ## Deliberately left out
 
 - **Tracking reads after an `await`.** Svelte tracks them; Solid 2 and

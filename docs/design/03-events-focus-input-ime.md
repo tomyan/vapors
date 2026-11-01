@@ -353,11 +353,84 @@ by step against Chromium 155 by `fixtures/text.events`, every text
 field's selection after every step; the Chromium player waits a task after each input call,
 and the vapors player settles after each event, because Chromium's
 queued `selectionchange` otherwise lands before or after the next key
-from run to run. Not built: double-click word selection and `detail`
-(the next E6a pull request),
-paste and undo (E6b), IME (E6c), `beforeinput`, `placeholder`,
-`maxlength`, scrolling a long text to the caret, the blinking caret
-(area 6), vertical selection in a `textarea`.
+from run to run. Clicks in a row (E6a, the second pull request): the
+platform counts each press of the primary button and carries the count
+on the press itself (`Event::PrimaryButton`'s `clicks`, a release its
+press's), so nothing waits for a count that may not come; the document
+places the caret, selects a word or the whole text with the press
+(`Document::pointer_pressed_clicks`), as Chromium does on `mousedown`.
+A press with no known pointer position starts a new row. The platform counts on every
+target, the web included: winit cancels `pointerdown` (so the canvas
+selects no text), which in Chromium suppresses `mousedown` and with it
+the browser's own count (probed, Chromium 155: `pointerdown`'s `detail`
+is 0, and only `click` and `dblclick` carry the count, after release).
+The interval and distance are stated fallbacks: GTK's defaults on Linux
+(400 ms, 5 px, as Linux Chromium reads), Windows' (500 ms, 4 px),
+macOS's (500 ms; no distance setting, so 4 px), Android's double-tap
+timeout (300 ms, with GTK's 5 px); on the web, the one the
+browser's platform names (`navigator.userAgentData`, else the user
+agent). No build compiles a reader for the systems' own settings yet;
+a CI target that does retires the fallbacks. RELAXED: winit 0.30 gives
+events no timestamp, so a press is stamped when winit hands it to the
+platform, and presses queued behind a slow frame are stamped together;
+retired when winit exposes event times. A double click
+selects the word after the caret position nearest the point, as
+Chromium does (just past a word, the space after it; past the text,
+the last word), a triple click the whole text, neither starting a
+drag. A press inside a selection, ends included, places the caret on
+release, as Chromium waits to see whether the press drags the text.
+Checked by `fixtures/words.events`, whose field sets its font and
+border, which Chromium's field does not take from the page. A known
+difference: words are Parley's (UAX 29), which keep a "." between
+letters inside a word, so a double click in "e.g." selects "e.g" where
+Chromium selects the "." alone; "3.5" and "don't" agree. A press inside
+the selection moves the caret after its `click`, so a `click` listener
+reads the selection held, as in Chromium. Not built: `detail` and
+`dblclick`, dragging by word or line after a double or
+triple click, dragging selected text, IME, `beforeinput`,
+`placeholder`, `maxlength`, scrolling a long text to the caret, the
+blinking caret (area 6), vertical selection in a `textarea`.
+
+As built (E6b, 2026-11-01): a field's own undo and paste. Each field
+keeps an undo stack, grouped as Chromium 155 groups a field's edits:
+
+- a run of typing is one step;
+- a run of Backspace is one step, and a Delete joins it; a run of
+  Delete is one step, and a Backspace does not join it;
+- a word deletion (Control+Backspace, Control+Delete) always starts a
+  step, which Backspaces or Deletes in its direction and typing then
+  join;
+- typing after a deletion joins it, and a deletion after typing does
+  not;
+- a paste is a step alone, and anything that moves the selection other
+  than an edit ends the run.
+
+Control+Z undoes to the text and selection before the step,
+Control+Shift+Z and Control+Y redo to those after it, each with
+`input`, and with a `selectionchange` when the selection differs or
+the text changes before the caret (which moves it in the DOM even
+where it ends where it was), as Chromium fires. A new edit drops
+what could be redone; a signal setting the text drops the stack. A
+field keeps at most 1000 steps, the oldest going first, as Blink's
+`kMaximumUndoStackDepth`.
+
+A paste (`Document::text_pasted`) fires `paste` on the focused field,
+bubbling, carrying the text as copied (`Event::value`, as
+`clipboardData.getData("text")`); a listener that prevents its default
+keeps the text out. Else it replaces the selection, its trailing line
+breaks dropped and each other a space. On the desktop the platform
+sends `Event::Paste` whatever has focus, and `ElementsApp` hands it to
+a focused text field first. The clipboard is read off the event loop
+(`Clipboard::read_text`): the answer, or why there is none once the
+deadline passes (`CLIPBOARD_DEADLINE`, 3 s, reported with
+`report_error`), wakes the loop, and the next frame pastes it into the
+field it was read for, or reports that the field lost focus. With no
+text field focused the clipboard is not read. Checked by
+`fixtures/undo.events`, whose `clipboard` step writes Chromium's
+clipboard. Chromium's undo stack is the page's, not the field's: an
+undo in one field after edits in another differs, and is not compared.
+Not built: copy and cut, the web page's paste (with the web input
+path), Command for Control on macOS, `beforeinput`'s `historyUndo`.
 
 ## Text editing and IME
 
@@ -399,6 +472,76 @@ the clipboard, caret painting and the DOM events. Rules:
 - `user-select` for read-only text (agent replies): selection across
   elements is a range over the inline runs, copy serialises the text
   with newlines at block boundaries.
+
+## A component's own events
+
+As built (the listbox slice's first part, 2026-11-01): a component
+dispatches events of its own, such as a combobox's `comboboxopen`,
+with `#[dispatcher(comboboxopen, optionchoose)] let events;` in its
+script. The compiler makes it a `vapors_dom::Dispatcher` for those
+names. A script has at most one `#[dispatcher]`, and nothing else is
+attached to that `let`; the compiler refuses either.
+
+Names are declared per component type: the compiler generates
+`events()` for each component, its own names and those of every
+component its template uses, and declares them to the tree when the
+component mounts, before its children. The elements document refuses
+a listener for an event it never fires unless it is declared, so an
+ancestor's `onoptionchoose` is accepted before the combobox inside an
+`{if}` has mounted.
+
+`events.dispatch(node, Event::new("optionchoose"))` runs the
+listeners on `node` and then its ancestors at once, as the DOM's
+`dispatchEvent` does, and answers `Ok(true)` unless a listener
+prevented the default, so the component runs its default action only
+then. The listener lists for the whole path are taken at the start,
+before any listener runs: a listener added or removed during the
+dispatch takes effect from the next one. A listener may dispatch again (re-entry),
+since listeners are `Rc<dyn Fn>` and none is borrowed while it runs.
+`Rc` assumes one thread, as every vapors tree is today; a tree shared
+between threads would need `Arc` and a lock, and that change retires
+the assumption.
+
+A dispatch is refused, not dropped, with `DispatchRefused` naming the
+event and node:
+
+- before any listener runs: a name the dispatcher does not declare, a
+  node no longer in the tree (removed), or the tree borrowed (from
+  inside a `Dom` call). `cancelled()` is `None`.
+- after every listener ran: a listener that asked for pointer capture,
+  which only a pointer event carries. The message says how many
+  listeners it was dispatched to, and `cancelled()` keeps their
+  answer.
+
+`events.emit(..)` is `dispatch` for a component that cannot be refused
+except by its own bug; it panics with the refusal. A listener returns
+`()` or `Result<(), E>` with `E: Display`, so it may use `?`; an `Err`
+goes to the platform's error report (`report_error`, which the page
+shows), which the app installs with `vapors_dom::set_error_report`.
+With none installed (a test without an app) it panics with the
+message. A thread has one report: installing a report under another
+name panics, naming both, so `ElementsApp::new` after a test's own
+report refuses rather than taking its errors; the same name again is
+kept.
+
+A component type's `events()` lists its own names, then each child
+type's, through `events_into`, which skips a type already listed: a
+component that uses itself, directly or through another, is listed
+once and its mount ends.
+
+Taken from the DOM: synchronous, bubbling, cancelable, the return
+value of `dispatchEvent`, delivered to listeners on elements, so an app
+listens with `on<name>` on any ancestor. Differs from the DOM: no
+capture phase and no `CustomEvent.detail` yet (the target and the
+component's bound signals carry the data); names are declared; the
+DOM copies each node's listener list when the event reaches that node,
+so a listener added to an ancestor during the dispatch runs there and
+not here. Differs
+from Svelte: Svelte 4's `createEventDispatcher` sends a component event
+to its parent's `on:` handler only, not bubbling through the DOM and
+not cancelable unless asked, and Svelte 5 replaced it with callback
+props; vapors' events are DOM events on the component's elements,
+which is what the APG's patterns and their default actions need.
 
 ## Synthetic input
 

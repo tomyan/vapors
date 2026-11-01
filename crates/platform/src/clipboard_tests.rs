@@ -127,3 +127,54 @@ fn a_finished_read_does_not_hold_up_the_next() {
         (ClipboardImage::NoImage, ClipboardImage::NoImage)
     );
 }
+
+#[test]
+fn a_started_read_returns_at_once_and_hands_its_answer_on() {
+    // Given
+    fn answers() -> ClipboardImage {
+        ClipboardImage::NoImage
+    }
+    let (sender, receiver) = std::sync::mpsc::channel();
+
+    // When
+    Reader::default().start(
+        Duration::from_secs(5),
+        answers,
+        Box::new(move |answer| {
+            let _ = sender.send(answer);
+        }),
+    );
+
+    // Then
+    let answer = receiver.recv_timeout(Duration::from_secs(5));
+    assert_eq!(answer, Ok(ClipboardImage::NoImage));
+}
+
+fn slow() -> ClipboardImage {
+    std::thread::sleep(Duration::from_millis(500));
+    ClipboardImage::NoImage
+}
+
+#[test]
+fn a_started_read_past_its_deadline_does_not_block_and_says_it_timed_out() {
+    // Given
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let started = std::time::Instant::now();
+
+    // When
+    Reader::default().start(
+        Duration::from_millis(50),
+        slow,
+        Box::new(move |answer| {
+            let _ = sender.send(answer);
+        }),
+    );
+    let returned = started.elapsed();
+
+    // Then: the caller did not wait for the read, nor for the deadline
+    assert!(returned < Duration::from_millis(50), "{returned:?}");
+    let answer = receiver
+        .recv_timeout(Duration::from_secs(5))
+        .expect("answered");
+    assert_eq!(unreadable(&answer), "timed out after 50 ms");
+}

@@ -18,25 +18,27 @@ pub const TAP_SLOP: f32 = 20.0;
 #[derive(Default)]
 pub(super) struct Press(Option<[f32; 2]>);
 
+/// What the player holds between steps: the finger's press and the
+/// clipboard's text, once a `clipboard` step has set it.
+#[derive(Default)]
+pub(super) struct Held {
+    press: Press,
+    clipboard: Option<String>,
+}
+
 pub(super) fn act(
     doc: &Rc<RefCell<Document>>,
     action: &Action,
-    press: &mut Press,
+    held: &mut Held,
 ) -> Result<(), String> {
+    let press = &mut held.press;
     #[allow(clippy::cast_possible_truncation)] // CSS px within a viewport
     let at = |x: f64, y: f64| [x as f32, y as f32];
     match *action {
-        Action::Click(x, y) => {
-            sent(doc, |doc| Document::pointer_pressed(doc, at(x, y)));
-            sent(doc, |doc| Document::pointer_released(doc, at(x, y)));
-        }
-        Action::Key(ref combination) => {
-            let (key, modifiers) = key_of(combination);
-            sent(doc, |doc| {
-                Document::key_pressed(doc, &key, modifiers);
-            });
-            sent(doc, |doc| Document::key_released(doc, &key, modifiers));
-        }
+        Action::Click(x, y) => clicks(doc, at(x, y), 1),
+        Action::Clicks(x, y, count) => clicks(doc, at(x, y), count),
+        Action::Key(ref combination) => key(doc, combination, held.clipboard.as_deref())?,
+        Action::Clipboard(ref text) => held.clipboard = Some(text.clone()),
         // each character as the platform sends it: the key down, its
         // text, the key up
         Action::Type(ref text) => {
@@ -60,7 +62,9 @@ pub(super) fn act(
             });
         }
         Action::Move(x, y) => Document::pointer_moved(doc, at(x, y)),
-        Action::Press(x, y) => Document::pointer_pressed(doc, at(x, y)),
+        Action::Press(x, y) => {
+            Document::pointer_pressed_clicks(doc, at(x, y), std::num::NonZeroU32::MIN);
+        }
         Action::Release(x, y) => Document::pointer_released(doc, at(x, y)),
         Action::TouchDown(x, y) => {
             press.0 = Some(at(x, y));
@@ -87,6 +91,41 @@ pub(super) fn act(
     }
     Document::settle_selection(doc);
     Ok(())
+}
+
+/// A key down and up; Control+V, as the platform sends it, is the key
+/// down then a paste of the clipboard's text in place of its character.
+fn key(
+    doc: &Rc<RefCell<Document>>,
+    combination: &str,
+    clipboard: Option<&str>,
+) -> Result<(), String> {
+    let (key, modifiers) = key_of(combination);
+    sent(doc, |doc| {
+        Document::key_pressed(doc, &key, modifiers);
+    });
+    if combination == "Control+v" {
+        let text =
+            clipboard.ok_or("Control+v before any `clipboard` step: set the clipboard first")?;
+        // a paste no text field takes is the app's, which the player has not
+        let _taken = Document::text_pasted(doc, text);
+        Document::settle_selection(doc);
+    }
+    sent(doc, |doc| Document::key_released(doc, &key, modifiers));
+    Ok(())
+}
+
+/// `count` presses and releases at `at`, each press counted one more,
+/// as the app's `Clicks` counts presses close in time and place.
+fn clicks(doc: &Rc<RefCell<Document>>, at: [f32; 2], count: u32) {
+    for nth in (1..=count).filter_map(std::num::NonZeroU32::new) {
+        // the press and its count, as one mousePressed is pointerdown
+        // then mousedown in Chromium
+        sent(doc, |doc| {
+            Document::pointer_pressed_clicks(doc, at, nth);
+        });
+        sent(doc, |doc| Document::pointer_released(doc, at));
+    }
 }
 
 /// Sends one platform event, then settles the selection, as the

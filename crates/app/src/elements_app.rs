@@ -40,6 +40,12 @@ pub struct ElementsApp {
     failure: Failure,
     /// Input given to the document, at its last update's scale.
     input: DocumentInput,
+    /// The clipboard a paste into a text field reads (E6b).
+    #[cfg(not(target_family = "wasm"))]
+    clipboard: Box<dyn vapors_platform::Clipboard>,
+    /// The clipboard reads pastes started, answered off the loop.
+    #[cfg(not(target_family = "wasm"))]
+    pastes: paste::Pastes,
     /// Called before each update with the last frame's phase times.
     per_frame: Option<PerFrame>,
     /// Called after each frame with its phase times.
@@ -62,11 +68,17 @@ impl ElementsApp {
     /// Shows `document`.
     #[must_use]
     pub fn new(document: Rc<RefCell<Document>>) -> Self {
+        // a listener's `Err` (`vapors_dom::ListenerResult`) is shown
+        vapors_dom::set_error_report("vapors_platform::report_error", report_error);
         Self {
             document,
             painter: None,
             failure: Failure::default(),
             input: DocumentInput::new(),
+            #[cfg(not(target_family = "wasm"))]
+            clipboard: Box::new(vapors_platform::SystemClipboard::default()),
+            #[cfg(not(target_family = "wasm"))]
+            pastes: paste::Pastes::default(),
             per_frame: None,
             frame_times: None,
             last_times: None,
@@ -122,6 +134,8 @@ impl App for ElementsApp {
     }
 
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
+        #[cfg(not(target_family = "wasm"))]
+        self.deliver_pastes();
         match self.run_phases(frame) {
             Ok(()) => self.next_after_frame(),
             Err(message) => {
@@ -153,6 +167,10 @@ impl ElementsApp {
                 self.failure.set(&unplaced.to_string());
             }
         }
+        #[cfg(not(target_family = "wasm"))]
+        if matches!(event, Event::Paste) {
+            self.paste(platform);
+        }
     }
 }
 
@@ -182,3 +200,6 @@ fn refused(errors: &[ElementError]) -> String {
 
 #[path = "elements_app_frame.rs"]
 mod frame_phases;
+#[cfg(not(target_family = "wasm"))]
+#[path = "elements_app_paste.rs"]
+mod paste;

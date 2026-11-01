@@ -149,7 +149,7 @@ impl ImageView {
             }
             Event::PointerMoved { x, y } => self.pointer_moved([*x, *y]),
             Event::PointerLeft => self.pointer = None,
-            Event::PrimaryButton { pressed } => self.dragging = *pressed,
+            Event::PrimaryButton { pressed, .. } => self.dragging = *pressed,
             // a notch away from the user (one line up) zooms in a step
             Event::Scroll { dy, .. } => {
                 self.zoom(self.scroll_anchor(), ZOOM_STEP.powf(-dy / LINE_PIXELS));

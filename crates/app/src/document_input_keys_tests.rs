@@ -62,8 +62,22 @@ fn give(
 
 fn click(input: &mut DocumentInput, doc: &Rc<RefCell<Document>>, x: f32, y: f32) {
     give(input, doc, &Event::PointerMoved { x, y });
-    give(input, doc, &Event::PrimaryButton { pressed: true });
-    give(input, doc, &Event::PrimaryButton { pressed: false });
+    give(
+        input,
+        doc,
+        &Event::PrimaryButton {
+            pressed: true,
+            clicks: std::num::NonZeroU32::MIN,
+        },
+    );
+    give(
+        input,
+        doc,
+        &Event::PrimaryButton {
+            pressed: false,
+            clicks: std::num::NonZeroU32::MIN,
+        },
+    );
 }
 
 fn key(name: &str, modifiers: Modifiers) -> Event {

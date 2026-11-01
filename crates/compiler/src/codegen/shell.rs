@@ -22,6 +22,16 @@ pub(crate) fn assemble(component: &Component, info: &ScriptInfo, body: &str) -> 
     file.push_str(&props_struct(name, info));
     file.push_str(&component_struct(name, info));
     file.push_str(&mount_methods(name, info, body, scope.is_some()));
+    let uses: Vec<&String> = info
+        .statements
+        .iter()
+        .filter(|statement| statement.starts_with("use "))
+        .collect();
+    file.push_str(&super::events_decl::events_method(
+        &info.events,
+        &super::events_decl::child_types(component),
+        &uses,
+    ));
     file.push_str(&accessors());
     file
 }
@@ -31,7 +41,7 @@ fn header(path: &str, style: &str) -> String {
         "use std::cell::RefCell;
 use std::rc::Rc;
 #[allow(unused_imports)]
-use vapors_dom::{{Dom, DynDom, Event, NodeId, PropertyValue, Root, SCOPE_ATTRIBUTE, Snippet}};
+use vapors_dom::{{Dispatcher, Dom, DynDom, Event, NodeId, PropertyValue, Root, SCOPE_ATTRIBUTE, Snippet}};
 #[allow(unused_imports)]
 use vapors_signals::{{Effect, Memo, Owner, Signal}};
 
@@ -153,7 +163,8 @@ fn mount_methods(name: &str, info: &ScriptInfo, body: &str, styled: bool) -> Str
         Rc<RefCell<D>>: DynDom,
     {{
         let {name}Props {{ {prop_names} }} = props;
-{add_style}        let owner = Owner::new();
+{add_style}        dom.borrow_mut().declare_events(&Self::events());
+        let owner = Owner::new();
         let {returned} = owner.with(|| {{
 {statements}            let mut roots = Vec::new();
 {body}            {returned}

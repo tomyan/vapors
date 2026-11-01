@@ -67,7 +67,7 @@ impl DocumentInput {
         event: &Event,
     ) -> Result<Route, Unplaced> {
         let route = self.routed(&document.borrow(), event)?;
-        let pressed = matches!(event, Event::PrimaryButton { pressed: true })
+        let pressed = matches!(event, Event::PrimaryButton { pressed: true, .. })
             || matches!(
                 event,
                 Event::Touch {
@@ -95,7 +95,7 @@ impl DocumentInput {
         };
         Ok(match action {
             Action::Move(_) | Action::Leave => Route::Document,
-            Action::Press(p) => *self.held.mouse.insert(by_hit(p)),
+            Action::Press(p, _) => *self.held.mouse.insert(by_hit(p)),
             Action::Release(p) => self.held.mouse.take().unwrap_or_else(|| by_hit(p)),
             Action::Tap(p) | Action::Wheel(p, _) => by_hit(p),
             Action::TouchDown(id, p) => self.held.touch_down(id, by_hit(p)),

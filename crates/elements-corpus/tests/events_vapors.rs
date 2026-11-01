@@ -5,7 +5,8 @@
 //! fixture's keys, Tab order and focus (3-E2a); the range fixture's
 //! presses, drags, keys and values (3-E3a); the checkbox fixture's
 //! clicks, Space and states (3-E3b); and the text fixture's caret,
-//! selection, typing and commits (E6a).
+//! selection, typing and commits, and the words fixture's double and
+//! triple clicks (E6a); the undo fixture's undo, redo and paste (E6b).
 
 use vapors_elements::Viewport;
 use vapors_elements_corpus::events_compare::compare;
@@ -144,6 +145,32 @@ fn the_text_script_logs_on_vapors_what_chromium_logged() {
 
     // Then: the events, the focus, the value and the selection after each step
     compare("text", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn the_words_script_logs_on_vapors_what_chromium_logged() {
+    // Given: double and triple clicks in a text field (E6a)
+    let script = parse("words", &read("words.events")).expect("parses");
+    let answers = serde_json::from_str(&read("words.events.json")).expect("json");
+
+    // When
+    let ours = play(&fixture("words"), &script, VIEWPORT).unwrap_or_else(|e| panic!("{e}"));
+
+    // Then: the events and the selection after each step
+    compare("words", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn the_undo_script_logs_on_vapors_what_chromium_logged() {
+    // Given: typing, deleting and pasting undone and redone (E6b)
+    let script = parse("undo", &read("undo.events")).expect("parses");
+    let answers = serde_json::from_str(&read("undo.events.json")).expect("json");
+
+    // When
+    let ours = play(&fixture("undo"), &script, VIEWPORT).unwrap_or_else(|e| panic!("{e}"));
+
+    // Then: the events, the values and the selection after each step
+    compare("undo", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
 }
 
 #[test]

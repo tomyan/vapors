@@ -67,11 +67,9 @@ fn a_prevented_keydown_is_used() {
     assert!(Document::key_pressed(&page.doc, "z", control()));
 }
 
-/// A focused text field takes typing and its moves; a Control key it
-/// has no binding for is the app's. vapors #92 binds Control+Z and
-/// Control+Y in a field (undo, redo) inside `text_input::key`'s match,
-/// whose arms all report the key used: whichever of #92 and this lands
-/// second adds Control+Z as used here.
+/// A focused text field takes typing, its moves, and its undo
+/// (Control+Z, vapors #92); a Control key it has no binding for is the
+/// app's.
 /// A focused `<input type=…>` of `kind`, laid out.
 fn focused_field(kind: &str) -> Rc<RefCell<Document>> {
     let mut doc = document();
@@ -128,5 +126,9 @@ fn a_focused_text_field_uses_a_typing_key_and_not_an_unbound_control_key() {
         "ArrowLeft",
         Modifiers::default()
     ));
+    assert!(
+        Document::key_pressed(&doc, "z", control()),
+        "the field's undo"
+    );
     assert!(!Document::key_pressed(&doc, "k", control()));
 }

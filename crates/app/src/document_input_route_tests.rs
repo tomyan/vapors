@@ -87,7 +87,10 @@ fn moved(x: f32, y: f32) -> Event {
 }
 
 fn button(pressed: bool) -> Event {
-    Event::PrimaryButton { pressed }
+    Event::PrimaryButton {
+        pressed,
+        clicks: std::num::NonZeroU32::MIN,
+    }
 }
 
 #[test]

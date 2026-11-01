@@ -16,7 +16,9 @@ impl DocumentInput {
                 self.touch.mouse();
                 Document::pointer_moved(document, point);
             }
-            Action::Press(point) => Document::pointer_pressed(document, point),
+            Action::Press(point, clicks) => {
+                Document::pointer_pressed_clicks(document, point, clicks);
+            }
             Action::Release(point) => Document::pointer_released(document, point),
             Action::Leave => Document::pointer_left(document),
             Action::Tap(point) => Document::touch_tapped(document, point),

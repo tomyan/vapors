@@ -26,6 +26,8 @@ pub struct Input {
     scale: f64,
     /// The modifier keys held, for the paste shortcut.
     modifiers: ModifiersState,
+    /// The presses in a row.
+    clicks: crate::clicks::Clicks,
 }
 
 impl Input {
@@ -38,6 +40,7 @@ impl Input {
             started: Instant::now(),
             scale: 1.0,
             modifiers: ModifiersState::empty(),
+            clicks: crate::clicks::Clicks::default(),
         }
     }
 
@@ -57,6 +60,7 @@ impl Input {
         let Some(direct) = from_winit(event, self.scale) else {
             return Vec::new();
         };
+        let direct = self.counted(direct);
         let gestures = self.track(&direct);
         let mut events = vec![direct];
         events.extend(gestures);
@@ -86,11 +90,9 @@ impl Input {
     /// backends send no `ModifiersChanged` then), or a key is pressed
     /// (a paste, or `None` for its own character).
     ///
-    /// RELAXED: a paste goes to the app whatever has focus, its
-    /// character swallowed. No element takes typed text yet; F4's text
-    /// inputs retire this, when a focused input takes Ctrl+V first
-    /// (`paste_while_a_text_field_has_focus_goes_to_it`, ignored until
-    /// then).
+    /// A paste goes to the app whatever has focus, its character
+    /// swallowed: focus lives in the app's document, so the app hands
+    /// it to a focused text field first (`ElementsApp`, E6b).
     pub(crate) fn key(&mut self, key: Key<'_>) -> Option<Vec<Event>> {
         match key {
             Key::Modifiers(modifiers) => {
@@ -126,6 +128,30 @@ impl Input {
         Vec::new()
     }
 
+    /// A press of the primary button with its count in a row at the
+    /// pointer (CSS px), stamped now; a release with its press's count;
+    /// any other event as it is. A press with no known pointer position
+    /// starts a new row.
+    ///
+    /// RELAXED: winit 0.30 gives events no timestamp, so a press is
+    /// stamped when winit hands it over; presses queued behind a slow
+    /// frame are stamped together and can count as a row. Retired when
+    /// winit exposes event times.
+    #[allow(clippy::cast_possible_truncation)] // a display scale
+    fn counted(&mut self, event: Event) -> Event {
+        let Event::PrimaryButton { pressed, .. } = event else {
+            return event;
+        };
+        let scale = self.scale as f32;
+        let at = self.pointer.map(|[x, y]| [x / scale, y / scale]);
+        let clicks = if pressed {
+            self.clicks.pressed(at, Instant::now())
+        } else {
+            self.clicks.last()
+        };
+        Event::PrimaryButton { pressed, clicks }
+    }
+
     /// A trackpad pinch, anchored at the pointer, else at the window's
     /// centre (winit's pinch carries no position); dropped before the
     /// window has a size, when there is nothing to zoom.
@@ -145,6 +171,10 @@ impl Input {
 #[cfg(test)]
 #[path = "input_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "input_click_tests.rs"]
+mod click_tests;
 
 #[cfg(test)]
 #[path = "input_wheel_tests.rs"]

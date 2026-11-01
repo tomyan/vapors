@@ -30,6 +30,8 @@ pub(crate) struct Editor {
     /// The field's text style the editor was last given, so its
     /// geometry follows a restyle.
     style: Option<TextStyle>,
+    /// The field's own undo and redo (E6b).
+    pub(crate) history: crate::text_history::History,
 }
 
 /// The editors, by field.
@@ -92,6 +94,7 @@ impl Document {
                     reported: None,
                     pending: false,
                     style: None,
+                    history: crate::text_history::History::default(),
                 },
             );
         }
@@ -131,7 +134,7 @@ impl Document {
     }
 
     /// A signal set the `value` property: the editor, if any, takes the
-    /// text (its selection clamped to it).
+    /// text (its selection clamped to it) and forgets its undo.
     pub(crate) fn editor_from_text(&mut self, node: NodeId) {
         let Some(text) = self.arena.get(node, "text field").element().map(text_of) else {
             return;
@@ -142,6 +145,8 @@ impl Document {
             .filter(|editor| editor.plain.raw_text() != text)
         {
             editor.plain.set_text(&text);
+            // the steps were of a text the field no longer holds
+            editor.history = crate::text_history::History::default();
             editor.pending = true;
         }
     }

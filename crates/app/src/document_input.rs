@@ -169,7 +169,7 @@ fn scale_of(document: &Document) -> Result<f32, Unplaced> {
 fn point_of(action: Action) -> Option<Point> {
     match action {
         Action::Move(p)
-        | Action::Press(p)
+        | Action::Press(p, _)
         | Action::Release(p)
         | Action::Tap(p)
         | Action::Wheel(p, _)

@@ -77,7 +77,10 @@ fn a_drag_does_not_pan_on_the_first_pointer_position() {
     // Given: the button goes down before any pointer position is known
     let mut view = view();
     let before = view.transform().translate;
-    view.event(&Event::PrimaryButton { pressed: true });
+    view.event(&Event::PrimaryButton {
+        pressed: true,
+        clicks: std::num::NonZeroU32::MIN,
+    });
 
     // When
     view.event(&Event::PointerMoved { x: 300.0, y: 300.0 });
@@ -151,11 +154,17 @@ fn primary_button_drag_pans_and_release_stops_it() {
     // Given
     let mut view = view();
     view.event(&Event::PointerMoved { x: 100.0, y: 100.0 });
-    view.event(&Event::PrimaryButton { pressed: true });
+    view.event(&Event::PrimaryButton {
+        pressed: true,
+        clicks: std::num::NonZeroU32::MIN,
+    });
 
     // When
     view.event(&Event::PointerMoved { x: 110.0, y: 105.0 });
-    view.event(&Event::PrimaryButton { pressed: false });
+    view.event(&Event::PrimaryButton {
+        pressed: false,
+        clicks: std::num::NonZeroU32::MIN,
+    });
     view.event(&Event::PointerMoved { x: 200.0, y: 200.0 });
 
     // Then
