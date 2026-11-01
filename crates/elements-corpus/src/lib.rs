@@ -18,9 +18,11 @@ pub mod ax_tree;
 mod ax_value;
 mod events_action;
 pub mod events_compare;
+mod events_expect;
 pub mod events_input;
 pub mod events_oracle;
 pub mod events_play;
+mod events_recording;
 pub mod events_script;
 pub mod events_steps;
 mod events_unmet;
@@ -84,6 +86,7 @@ fixtures![
     shell::Shell,
     sizing::Sizing,
     stacking::Stacking,
+    text::Text,
     text_align::TextAlign,
     text_wrap::TextWrap,
 ];

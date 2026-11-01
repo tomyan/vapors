@@ -33,6 +33,8 @@ pub struct Painted {
     pub(crate) scroll_chains: crate::scroll_chains::Chains,
     /// Each range input's track, for the pointer (3-E3a).
     pub(crate) ranges: HashMap<NodeId, crate::range_paint::Track>,
+    /// Each text field's text origin, for the pointer (E6a).
+    pub(crate) text_origins: HashMap<NodeId, [f32; 2]>,
 }
 
 impl Painted {

@@ -84,18 +84,21 @@ impl Document {
     }
 
     /// The platform's tap at `point`, after the touch's own down and up:
-    /// `click` on the element there, unless a disabled button holds it.
+    /// focus moves to what the tap is on (or leaves), then `click` on
+    /// the element there unless a disabled control holds it, then a
+    /// text field takes the caret at the tap, as Chromium orders a tap.
     pub fn touch_tapped(document: &Rc<RefCell<Document>>, point: Point) {
-        let target = document
-            .borrow()
-            .hit(point)
-            .filter(|node| !document.borrow().in_disabled_button(*node));
-        if let Some(target) = target {
+        let hit = document.borrow().hit(point);
+        let focusable = hit.and_then(|node| document.borrow().focusable_holding(node));
+        Self::focus(document, focusable);
+        let Some(hit) = hit else { return };
+        if !document.borrow().in_disabled_button(hit) {
             let event = document
                 .borrow()
-                .pointer_event("click", touch_id(0), target, point);
-            crate::events::tree::dispatch_click(document, target, event);
+                .pointer_event("click", touch_id(0), hit, point);
+            crate::events::tree::dispatch_click(document, hit, event);
         }
+        crate::text_pointer::tapped(document, hit, point);
     }
 
     /// Whether finger `finger` is down and a listener captured it.

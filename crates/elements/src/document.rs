@@ -32,6 +32,8 @@ pub struct Document {
     pub(crate) selected_all: Option<NodeId>,
     /// Each number field's last committed number, from its focus on.
     pub(crate) committed: std::collections::HashMap<NodeId, f64>,
+    /// Each text field's editor (E6a).
+    pub(crate) editors: crate::text_field::Editors,
     /// Whether the last input was a key rather than a press (3-E2b):
     /// focus that arrives then matches `:focus-visible`.
     pub(crate) keyboard: bool,
@@ -75,6 +77,7 @@ impl Document {
             space_on: None,
             selected_all: None,
             committed: std::collections::HashMap::new(),
+            editors: crate::text_field::Editors::new(),
             keyboard: false,
             texts: crate::layout::TextCache::default(),
             dirty: crate::restyle::Dirty::default(),

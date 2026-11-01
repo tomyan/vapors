@@ -37,7 +37,7 @@ const INPUT_TYPES: &[(&str, Option<&str>)] = &[
     ("range", None),
     ("checkbox", None),
     ("number", None),
-    ("text", Some("3-E6, text editing")),
+    ("text", None),
 ];
 
 /// An `input` of a type not built yet, naming the slice; else a
