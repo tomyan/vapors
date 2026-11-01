@@ -60,6 +60,7 @@ impl Input {
         let Some(direct) = from_winit(event, self.scale) else {
             return Vec::new();
         };
+        let direct = self.counted(direct);
         let gestures = self.track(&direct);
         let mut events = vec![direct];
         events.extend(gestures);
@@ -124,24 +125,33 @@ impl Input {
                 let now = self.started.elapsed();
                 return self.gestures.touch(*id, *phase, *x, *y, now);
             }
-            Event::PrimaryButton { pressed: true } => return vec![self.click_count()],
             _ => {}
         }
         Vec::new()
     }
 
-    /// The press just received as the nth in a row, at the pointer (CSS
-    /// px), stamped now.
+    /// A press of the primary button with its count in a row at the
+    /// pointer (CSS px), stamped now; a release with its press's count;
+    /// any other event as it is. A press with no known pointer position
+    /// starts a new row.
     ///
     /// RELAXED: winit 0.30 gives events no timestamp, so a press is
     /// stamped when winit hands it over; presses queued behind a slow
     /// frame are stamped together and can count as a row. Retired when
     /// winit exposes event times.
     #[allow(clippy::cast_possible_truncation)] // a display scale
-    fn click_count(&mut self) -> Event {
+    fn counted(&mut self, event: Event) -> Event {
+        let Event::PrimaryButton { pressed, .. } = event else {
+            return event;
+        };
         let scale = self.scale as f32;
-        let [x, y] = self.pointer.unwrap_or_default();
-        Event::ClickCount(self.clicks.pressed([x / scale, y / scale], Instant::now()))
+        let at = self.pointer.map(|[x, y]| [x / scale, y / scale]);
+        let clicks = if pressed {
+            self.clicks.pressed(at, Instant::now())
+        } else {
+            self.clicks.last()
+        };
+        Event::PrimaryButton { pressed, clicks }
     }
 
     /// A trackpad pinch, anchored at the pointer, else at the window's

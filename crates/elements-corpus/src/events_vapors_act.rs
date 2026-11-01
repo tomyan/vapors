@@ -57,8 +57,7 @@ pub(super) fn act(
         }
         Action::Move(x, y) => Document::pointer_moved(doc, at(x, y)),
         Action::Press(x, y) => {
-            Document::pointer_pressed(doc, at(x, y));
-            Document::pointer_clicks(doc, std::num::NonZeroU32::MIN);
+            Document::pointer_pressed_clicks(doc, at(x, y), std::num::NonZeroU32::MIN);
         }
         Action::Release(x, y) => Document::pointer_released(doc, at(x, y)),
         Action::TouchDown(x, y) => {
@@ -95,8 +94,7 @@ fn clicks(doc: &Rc<RefCell<Document>>, at: [f32; 2], count: u32) {
         // the press and its count, as one mousePressed is pointerdown
         // then mousedown in Chromium
         sent(doc, |doc| {
-            Document::pointer_pressed(doc, at);
-            Document::pointer_clicks(doc, nth);
+            Document::pointer_pressed_clicks(doc, at, nth);
         });
         sent(doc, |doc| Document::pointer_released(doc, at));
     }

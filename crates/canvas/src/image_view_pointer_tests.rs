@@ -14,7 +14,10 @@ fn a_drag_that_leaves_and_comes_back_does_not_pan_by_the_jump() {
     let mut view = view();
     let start = view.transform().translate;
     moved(&mut view, 100.0, 100.0);
-    view.event(&Event::PrimaryButton { pressed: true });
+    view.event(&Event::PrimaryButton {
+        pressed: true,
+        clicks: std::num::NonZeroU32::MIN,
+    });
     moved(&mut view, 150.0, 100.0);
     assert_eq!(view.transform().translate[0], start[0] + 50.0);
 

@@ -32,8 +32,7 @@ fn warm_tones() -> support::text_page::Page {
 /// Press and release at `point`, the press the `clicks`th in a row.
 fn click_nth(page: &support::text_page::Page, point: [f32; 2], clicks: u32) {
     let clicks = NonZeroU32::new(clicks).expect("a press is at least the first");
-    Document::pointer_pressed(&page.doc, point);
-    Document::pointer_clicks(&page.doc, clicks);
+    Document::pointer_pressed_clicks(&page.doc, point, clicks);
     Document::pointer_released(&page.doc, point);
 }
 
@@ -84,8 +83,7 @@ fn a_double_click_starts_no_drag() {
     let page = warm_tones();
     click_nth(&page, [60.0, 12.0], 1);
     let second = NonZeroU32::new(2).expect("two");
-    Document::pointer_pressed(&page.doc, [60.0, 12.0]);
-    Document::pointer_clicks(&page.doc, second);
+    Document::pointer_pressed_clicks(&page.doc, [60.0, 12.0], second);
 
     // When: the pointer moves to the start before release
     Document::pointer_moved(&page.doc, [3.0, 12.0]);
@@ -129,8 +127,7 @@ fn a_press_inside_the_selection_places_the_caret_on_release() {
     click_nth(&page, [60.0, 12.0], 2);
 
     // When
-    Document::pointer_pressed(&page.doc, [70.0, 12.0]);
-    Document::pointer_clicks(&page.doc, NonZeroU32::MIN);
+    Document::pointer_pressed_clicks(&page.doc, [70.0, 12.0], NonZeroU32::MIN);
     let pressed = selection(&page, page.name);
     Document::pointer_released(&page.doc, [70.0, 12.0]);
 
@@ -166,4 +163,18 @@ fn a_click_listener_reads_the_selection_held_until_after_the_click() {
     assert_eq!(*seen.borrow(), Some((5, 10)));
     let (start, end) = selection(&page, page.name);
     assert!(start == end && (6..10).contains(&start), "{start}..{end}");
+}
+
+#[test]
+fn a_double_click_released_then_moved_keeps_the_word() {
+    // Given: "tones" double-clicked, the button released
+    let page = warm_tones();
+    click_nth(&page, [60.0, 12.0], 1);
+    click_nth(&page, [60.0, 12.0], 2);
+
+    // When: the pointer moves with no button held
+    Document::pointer_moved(&page.doc, [3.0, 12.0]);
+
+    // Then: nothing drags; the word stays selected
+    assert_eq!(selection(&page, page.name), (5, 10));
 }
