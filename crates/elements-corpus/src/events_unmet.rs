@@ -32,6 +32,25 @@ pub fn unmet(expect: &Expect, answer: &Value) -> Option<String> {
                 .unwrap_or("(not recorded)");
             (found != value).then(|| format!("{target} has value {found:?}, not {value:?}"))
         }
+        Expect::Selection { target, start, end } => {
+            let found = answer["selections"][target].as_array().map(|pair| {
+                (
+                    pair.first().and_then(Value::as_u64),
+                    pair.get(1).and_then(Value::as_u64),
+                )
+            });
+            let wanted = (Some(*start as u64), Some(*end as u64));
+            (found != Some(wanted)).then(|| {
+                format!(
+                    "{target} has selection {}, not {start}..{end}",
+                    found.map_or("(not recorded)".to_owned(), |(s, e)| format!(
+                        "{}..{}",
+                        s.map_or("?".to_owned(), |s| s.to_string()),
+                        e.map_or("?".to_owned(), |e| e.to_string())
+                    ))
+                )
+            })
+        }
         Expect::Checked { target, checked } => {
             let found = answer["checked"][target].as_bool();
             (found != Some(*checked)).then(|| {

@@ -317,6 +317,39 @@ blur by a click). Not built: caret movement and selection by pointer
 or Home/End (E6), the spin buttons, `step` mismatch as `:invalid`,
 a locale's decimal separator.
 
+As built (E6a, 2026-11-01): `input type=text` (an `input` without a
+type is one), the editing model's first half, on Parley 0.12's
+`PlainEditor`: one editor per field, made when the field is first
+pressed or focused, given the field's text style whenever it changes
+so its geometry is the painted text's. The text is the `value` property,
+written on every edit and read back when a signal sets it (the
+selection clamped). A press puts the caret where it lands, even on a
+disabled field, as Chromium does; a drag extends the selection under
+capture; focus by keyboard selects the text whole. Typed text replaces
+the selection; Backspace and Delete remove the selection or a cluster,
+a word with Control; the arrows move by cluster, a word with Control,
+Home and End to the ends, each extending with Shift; Control+A selects
+all; Enter and blur commit (`change` when the text differs from the
+last commit, the blur's before `focusout`). `input` fires per edit with
+the value. `selectionchange` fires on the field once per
+`Document::settle_selection` when the selection moved (the app settles
+before each update, the vapors player after each event), as Chromium
+queues one per task: two keys in one frame are one, a key that moves
+nothing none, focus arriving in a field one. `Document::selection` answers in UTF-16
+units, as `selectionStart`/`selectionEnd` count. The caret (1 px, the
+text's colour) and selection (the ring's blue at a third) come from
+the editor's geometry, painted in the field's step under its text. A
+field needs a width of its own, as a number field does. Checked step
+by step against Chromium 155 by `fixtures/text.events` with `expect
+selection`; the Chromium player waits a task after each input call,
+and the vapors player settles after each event, because Chromium's
+queued `selectionchange` otherwise lands before or after the next key
+from run to run. Not built: double-click word selection and `detail`
+(the next E6a pull request),
+paste and undo (E6b), IME (E6c), `beforeinput`, `placeholder`,
+`maxlength`, scrolling a long text to the caret, the blinking caret
+(area 6), vertical selection in a `textarea`.
+
 ## Text editing and IME
 
 One editing model for single- and multi-line fields, built on Parley's

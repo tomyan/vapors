@@ -57,6 +57,7 @@ impl Document {
         if !prevented {
             crate::range_drag::pressed(document, id, target, point);
             crate::number_scrub::pressed(document, id, target, point);
+            crate::text_pointer::pressed(document, id, target, point);
         }
     }
 
@@ -66,6 +67,7 @@ impl Document {
         if Self::touch_event(document, finger, point, "pointermove").is_some() {
             crate::range_drag::moved(document, touch_id(finger), point);
             crate::number_scrub::moved(document, touch_id(finger), point);
+            crate::text_pointer::moved_pointer(document, touch_id(finger), point);
         }
     }
 
@@ -185,10 +187,12 @@ impl Document {
             Ended::Lifted => {
                 crate::range_drag::released(document, id);
                 crate::number_scrub::released(document, id);
+                crate::text_pointer::released(document, id);
             }
             Ended::Taken => {
                 crate::range_drag::dropped(document, id);
                 crate::number_scrub::dropped(document, id);
+                crate::text_pointer::released(document, id);
             }
             Ended::Panned => {}
         }

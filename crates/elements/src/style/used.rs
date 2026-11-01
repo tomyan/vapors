@@ -50,9 +50,9 @@ pub(crate) struct Context<'a> {
     pub(crate) to_viewport: bool,
     /// Device pixels per CSS pixel, for border widths.
     pub(crate) scale: f32,
-    /// The element is an `input type=number`, which needs a width of
-    /// its own (3-E3c).
-    pub(crate) number_field: bool,
+    /// The element is an `input type=number` or a text field, which
+    /// needs a width of its own (3-E3c, E6a).
+    pub(crate) text_like_field: bool,
 }
 
 /// The used style of an element whose computed styles (its own and its
@@ -70,11 +70,11 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
     }
     // pushed directly: `Reader::refuse` leaves an undeclared value to
     // its declarer, and `auto` here is nobody's declaration
-    if context.number_field && layout.size.width == taffy::Dimension::auto() {
+    if context.text_like_field && layout.size.width == taffy::Dimension::auto() {
         reader.refusals.push(Refusal {
             property: "width",
             value: "auto".to_owned(),
-            reason: "is `auto` on a number field; vapors does not model Chromium's default width (its font and spin button), so give it a width, such as `width: 6em`".to_owned(),
+            reason: "is `auto` on a number or text field; vapors does not model Chromium's default width (its font and, for a number, spin button), so give it a width, such as `width: 6em`".to_owned(),
             declared: None,
         });
     }

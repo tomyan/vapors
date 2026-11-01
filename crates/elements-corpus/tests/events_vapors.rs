@@ -3,8 +3,9 @@
 //! (`fixtures/capture.events.json`, written by the events oracle): the
 //! order and targets of pointer capture's events (3-E1); the focus
 //! fixture's keys, Tab order and focus (3-E2a); the range fixture's
-//! presses, drags, keys and values (3-E3a); and the checkbox fixture's
-//! clicks, Space and states (3-E3b).
+//! presses, drags, keys and values (3-E3a); the checkbox fixture's
+//! clicks, Space and states (3-E3b); and the text fixture's caret,
+//! selection, typing and commits (E6a).
 
 use vapors_elements::Viewport;
 use vapors_elements_corpus::events_compare::compare;
@@ -129,6 +130,20 @@ fn the_number_script_logs_on_vapors_what_chromium_logged() {
 
     // Then: the events, the focus and the field's value after each step
     compare("number", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
+}
+
+#[test]
+fn the_text_script_logs_on_vapors_what_chromium_logged() {
+    // Given: a text field clicked into, typed, moved through, selected
+    // and committed (E6a)
+    let script = parse("text", &read("text.events")).expect("parses");
+    let answers = serde_json::from_str(&read("text.events.json")).expect("json");
+
+    // When
+    let ours = play(&fixture("text"), &script, VIEWPORT).unwrap_or_else(|e| panic!("{e}"));
+
+    // Then: the events, the focus, the value and the selection after each step
+    compare("text", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
 }
 
 #[test]

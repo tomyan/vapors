@@ -1,0 +1,55 @@
+# A text field by mouse and keys (E6a). `name` is x 0..160, y 0..24,
+# holding "Warm" in 14 px Geist (about 38 px wide from x 3); `off` is
+# x 320..480 and disabled; the button is x 480..560.
+listen pointerdown pointerup click input change keydown keyup focusin focusout selectionchange
+click 120 12                  a click right of the text puts the caret at its end
+expect event click input#name
+expect focus-visible input#name
+expect selection input#name 4 4
+type "th"                     typed at the caret: Warmth
+expect event input input#name
+expect value input#name Warmth
+expect selection input#name 6 6
+key ArrowLeft                 the caret moves left
+expect selection input#name 5 5
+key Shift+ArrowLeft           Shift extends the selection left
+expect selection input#name 4 5
+key Shift+Home                to the start
+expect selection input#name 0 5
+type "C"                      replaces the selection: Ch
+expect value input#name Ch
+expect selection input#name 1 1
+key End
+expect selection input#name 2 2
+key Backspace                 C
+expect value input#name C
+key Home
+expect selection input#name 0 0
+key Delete                    empties it
+expect value input#name ""
+expect selection input#name 0 0
+type "Cool"
+expect value input#name Cool
+key Enter                     commits: change
+expect event change input#name
+key Enter                     committed already: no change
+expect no event change
+key Tab                       on to plain
+expect focus-visible input#plain
+expect selection input#plain 0 0
+key Shift+Tab                 back by keyboard: the text is selected whole
+expect focus-visible input#name
+expect selection input#name 0 4
+key ArrowRight                collapses the selection to its end
+expect selection input#name 4 4
+click 4 12                    a click at the start puts the caret before the text
+expect selection input#name 0 0
+type "A-"                     A-Cool
+expect value input#name A-Cool
+click 520 12                  the button: name blurs and commits
+expect event change input#name
+expect focus button#after
+click 400 12                  off is disabled: no click, no focus
+expect event pointerdown input#off
+expect no event click
+expect focus body

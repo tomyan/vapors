@@ -77,9 +77,11 @@ impl<'a> Style<'a> {
         }
     }
 
-    /// Parley's properties for this style, laid out at `scale` device
-    /// pixels per logical pixel.
-    pub(crate) fn properties(&self, scale: f32) -> Vec<StyleProperty<'a, Color>> {
+    /// The Parley properties this style sets, at `scale` device pixels
+    /// per CSS pixel; what a layout's builder and an editor's default
+    /// style take.
+    #[must_use]
+    pub fn properties(&self, scale: f32) -> Vec<StyleProperty<'a, Color>> {
         vec![
             StyleProperty::FontFamily(FontFamily::named(self.family.name())),
             StyleProperty::FontSize(self.size),

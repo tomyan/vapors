@@ -28,6 +28,7 @@
       "focus": "button#save",
       "focusVisible": false,
       "line": 4,
+      "selections": {},
       "values": {}
     },
     {
@@ -58,6 +59,7 @@
       "focus": "button#cancel",
       "focusVisible": true,
       "line": 8,
+      "selections": {},
       "values": {}
     },
     {
@@ -88,6 +90,7 @@
       "focus": "button#cancel",
       "focusVisible": true,
       "line": 10,
+      "selections": {},
       "values": {}
     },
     {
@@ -118,6 +121,7 @@
       "focus": "button#cancel",
       "focusVisible": true,
       "line": 12,
+      "selections": {},
       "values": {}
     },
     {
@@ -135,6 +139,7 @@
       "focus": "body",
       "focusVisible": false,
       "line": 14,
+      "selections": {},
       "values": {}
     },
     {
@@ -157,6 +162,7 @@
       "focus": "body",
       "focusVisible": false,
       "line": 17,
+      "selections": {},
       "values": {}
     }
   ]

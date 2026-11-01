@@ -63,7 +63,10 @@ impl Dom for Document {
             .insert(name.to_owned(), value);
         match name {
             "checked" => self.mark_flag(node, vapors_css::tree::States::CHECKED),
-            "value" => self.mark_flag(node, vapors_css::tree::States::INVALID),
+            "value" => {
+                self.mark_flag(node, vapors_css::tree::States::INVALID);
+                self.editor_from_text(node);
+            }
             _ => {}
         }
     }
@@ -98,9 +101,10 @@ impl Dom for Document {
         self.drop_focus_within(node);
         self.arena.detach(node);
         self.arena.free_subtree(node);
-        // a number field's editing state goes with it (3-E3c)
+        // a number or text field's editing state goes with it (3-E3c, E6a)
         self.committed
             .retain(|field, _| self.arena.contains(*field));
+        self.editors.retain(|field, _| self.arena.contains(*field));
         self.selected_all = self
             .selected_all
             .filter(|field| self.arena.contains(*field));

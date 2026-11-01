@@ -35,7 +35,12 @@ pub struct Logged {
     pub values: Vec<(String, String)>,
     /// Each checked target's state, in the script's sorted order.
     pub checked: Vec<(String, bool)>,
+    /// Each selection target's selection, in the script's sorted order.
+    pub selections: Vec<(String, Selection)>,
 }
+
+/// A text field's selection, start then end, in UTF-16 units.
+pub type Selection = (usize, usize);
 
 type Shared = Rc<RefCell<Vec<(String, String)>>>;
 
@@ -73,12 +78,15 @@ pub fn play(fixture: &Fixture, script: &Script, viewport: Viewport) -> Result<Lo
             .map_err(|why| format!("{}.events:{}: {why}", fixture.name, step.line))?;
         let checked = checked(&doc.borrow(), &script.checked_targets())
             .map_err(|why| format!("{}.events:{}: {why}", fixture.name, step.line))?;
+        let selections = selections(&doc.borrow(), &script.selection_targets())
+            .map_err(|why| format!("{}.events:{}: {why}", fixture.name, step.line))?;
         log.push(Logged {
             events: heard.borrow_mut().drain(..).collect(),
             focus,
             focus_visible,
             values,
             checked,
+            selections,
         });
     }
     Ok(log)
@@ -96,6 +104,22 @@ fn values(doc: &Document, targets: &[String]) -> Result<Vec<(String, String)>, S
                 .value(node)
                 .ok_or_else(|| format!("value {target} is not a control with a value"))?;
             Ok((target.clone(), value))
+        })
+        .collect()
+}
+
+/// Each target's selection: a target that names no element, or one
+/// that is not a text field, is refused.
+fn selections(doc: &Document, targets: &[String]) -> Result<Vec<(String, Selection)>, String> {
+    targets
+        .iter()
+        .map(|target| {
+            let node =
+                find(doc, target).ok_or_else(|| format!("selection {target} names no element"))?;
+            let selection = doc
+                .selection(node)
+                .ok_or_else(|| format!("selection {target} is not a text field"))?;
+            Ok((target.clone(), selection))
         })
         .collect()
 }

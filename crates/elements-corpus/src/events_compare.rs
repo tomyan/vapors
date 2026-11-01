@@ -2,11 +2,12 @@
 //! of it (`<name>.events.json`), step by step: the recording must be of
 //! this script (each step's line and action), of a shape this reads,
 //! log the same events at the same targets in the same order, and
-//! agree on focus, on each named control's value and on each named
-//! checkbox's state.
+//! agree on focus, on each named control's value, on each named
+//! checkbox's state and on each named text field's selection.
 
 use serde_json::Value;
 
+use crate::events_recording::{logged, recording_of};
 use crate::events_script::Script;
 use crate::events_vapors::{Log, Logged};
 
@@ -28,26 +29,7 @@ pub fn compare(name: &str, script: &Script, ours: &Log, answers: &Value) -> Resu
         };
         differences.extend(step.events(ours)?);
         differences.extend(step.focus(ours)?);
-        for target in &script.value_targets() {
-            let chromium = step.recorded("values", target, Value::as_str, "string value")?;
-            let vapors = step.ours(&ours.values, target, "value")?;
-            differences.extend(step.differs(
-                target,
-                "has value",
-                &format!("{chromium:?}"),
-                &format!("{vapors:?}"),
-            ));
-        }
-        for target in &script.checked_targets() {
-            let chromium = step.recorded("checked", target, Value::as_bool, "boolean checked")?;
-            let vapors = step.ours(&ours.checked, target, "checked state")?;
-            differences.extend(step.differs(
-                target,
-                "is checked",
-                &chromium.to_string(),
-                &vapors.to_string(),
-            ));
-        }
+        differences.extend(step.controls(script, ours)?);
     }
     if differences.is_empty() {
         Ok(())
@@ -152,65 +134,8 @@ impl Step<'_> {
     }
 }
 
-/// `answers`' steps, when they are this script's: the same count, and
-/// each step's line and action the script's.
-fn recording_of<'a>(
-    name: &str,
-    script: &Script,
-    answers: &'a Value,
-) -> Result<&'a Vec<Value>, String> {
-    let rerun = |why: String| {
-        format!(
-            "{name}.events.json: {why}; rerun the events oracle (cargo run -p vapors-elements-corpus --example events_oracle)"
-        )
-    };
-    let steps = answers["steps"]
-        .as_array()
-        .ok_or_else(|| rerun("no steps".into()))?;
-    if steps.len() != script.steps.len() {
-        return Err(rerun(format!(
-            "{} steps, the script has {}",
-            steps.len(),
-            script.steps.len()
-        )));
-    }
-    for (theirs, step) in steps.iter().zip(&script.steps) {
-        let action = format!("{:?}", step.action);
-        if theirs["line"] != step.line || theirs["action"] != action.as_str() {
-            return Err(rerun(format!(
-                "a step recorded as {} at line {}, the script's is {action} at line {}",
-                theirs["action"], theirs["line"], step.line
-            )));
-        }
-    }
-    Ok(steps)
-}
-
-/// A recorded step's events as (type, target); a step or an event of
-/// another shape is refused, naming the step's line.
-fn logged(name: &str, theirs: &Value) -> Result<Vec<(String, String)>, String> {
-    let refuse = |why: &str| {
-        format!(
-            "{name}.events.json: the step at line {} {why}",
-            theirs["line"]
-        )
-    };
-    let events = theirs["events"]
-        .as_array()
-        .ok_or_else(|| refuse("has no events list"))?;
-    events
-        .iter()
-        .map(|event| {
-            let field = |key: &str| {
-                event[key]
-                    .as_str()
-                    .map(str::to_owned)
-                    .ok_or_else(|| refuse(&format!("has an event with no string {key}: {event}")))
-            };
-            Ok((field("type")?, field("target")?))
-        })
-        .collect()
-}
+#[path = "events_compare_controls.rs"]
+mod controls;
 
 #[cfg(test)]
 #[path = "events_compare_tests.rs"]

@@ -163,11 +163,10 @@ impl Document {
                 )
             }),
             in_inline: parent_used.is_some_and(|p| p.inline),
-            number_field: self
-                .arena
-                .get(node, "restyle")
-                .element()
-                .is_some_and(|e| e.tag == "input" && crate::check::is_type(e, "number")),
+            text_like_field: self.arena.get(node, "restyle").element().is_some_and(|e| {
+                e.tag == "input"
+                    && (crate::check::is_type(e, "number") || crate::text_field::is_text_input(e))
+            }),
             to_viewport: crate::style::to_viewport(
                 node == self.root(),
                 node == self.body(),

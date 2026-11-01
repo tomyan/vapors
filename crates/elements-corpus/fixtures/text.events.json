@@ -1,0 +1,1067 @@
+{
+  "steps": [
+    {
+      "action": "Click(120.0, 12.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#name",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#name",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#name",
+          "type": "click"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 5,
+      "selections": {
+        "input#name": [
+          4,
+          4
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "Warm"
+      }
+    },
+    {
+      "action": "Type(\"th\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "t",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "t",
+          "target": "input#name",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "h",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "h",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 9,
+      "selections": {
+        "input#name": [
+          6,
+          6
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "Warmth"
+      }
+    },
+    {
+      "action": "Key(\"ArrowLeft\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowLeft",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowLeft",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 13,
+      "selections": {
+        "input#name": [
+          5,
+          5
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "Warmth"
+      }
+    },
+    {
+      "action": "Key(\"Shift+ArrowLeft\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowLeft",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowLeft",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 15,
+      "selections": {
+        "input#name": [
+          4,
+          5
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "Warmth"
+      }
+    },
+    {
+      "action": "Key(\"Shift+Home\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Home",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Home",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 17,
+      "selections": {
+        "input#name": [
+          0,
+          5
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "Warmth"
+      }
+    },
+    {
+      "action": "Type(\"C\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "C",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "C",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 19,
+      "selections": {
+        "input#name": [
+          1,
+          1
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "Ch"
+      }
+    },
+    {
+      "action": "Key(\"End\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "End",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "End",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 22,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "Ch"
+      }
+    },
+    {
+      "action": "Key(\"Backspace\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 24,
+      "selections": {
+        "input#name": [
+          1,
+          1
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "C"
+      }
+    },
+    {
+      "action": "Key(\"Home\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Home",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Home",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 26,
+      "selections": {
+        "input#name": [
+          0,
+          0
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "C"
+      }
+    },
+    {
+      "action": "Key(\"Delete\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Delete",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Delete",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 28,
+      "selections": {
+        "input#name": [
+          0,
+          0
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": ""
+      }
+    },
+    {
+      "action": "Type(\"Cool\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "C",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "C",
+          "target": "input#name",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "o",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "o",
+          "target": "input#name",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "o",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "o",
+          "target": "input#name",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "l",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "l",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 31,
+      "selections": {
+        "input#name": [
+          4,
+          4
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "Cool"
+      }
+    },
+    {
+      "action": "Key(\"Enter\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 33,
+      "selections": {
+        "input#name": [
+          4,
+          4
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "Cool"
+      }
+    },
+    {
+      "action": "Key(\"Enter\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 35,
+      "selections": {
+        "input#name": [
+          4,
+          4
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "Cool"
+      }
+    },
+    {
+      "action": "Key(\"Tab\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "focusout"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 37,
+      "selections": {
+        "input#name": [
+          4,
+          4
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "Cool"
+      }
+    },
+    {
+      "action": "Key(\"Shift+Tab\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "focusout"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 40,
+      "selections": {
+        "input#name": [
+          0,
+          4
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "Cool"
+      }
+    },
+    {
+      "action": "Key(\"ArrowRight\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowRight",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowRight",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 43,
+      "selections": {
+        "input#name": [
+          4,
+          4
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "Cool"
+      }
+    },
+    {
+      "action": "Click(4.0, 12.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#name",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#name",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#name",
+          "type": "click"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 45,
+      "selections": {
+        "input#name": [
+          0,
+          0
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "Cool"
+      }
+    },
+    {
+      "action": "Type(\"A-\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "A",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "A",
+          "target": "input#name",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "-",
+          "target": "input#name",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "-",
+          "target": "input#name",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#name",
+      "focusVisible": true,
+      "line": 47,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool"
+      }
+    },
+    {
+      "action": "Click(520.0, 12.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#after",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#name",
+          "type": "focusout"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#after",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#after",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#after",
+          "type": "click"
+        }
+      ],
+      "focus": "button#after",
+      "focusVisible": false,
+      "line": 49,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool"
+      }
+    },
+    {
+      "action": "Click(400.0, 12.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#off",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#after",
+          "type": "focusout"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#off",
+          "type": "selectionchange"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#off",
+          "type": "pointerup"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 52,
+      "selections": {
+        "input#name": [
+          2,
+          2
+        ],
+        "input#plain": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#name": "A-Cool"
+      }
+    }
+  ]
+}

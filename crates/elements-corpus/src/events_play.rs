@@ -22,6 +22,13 @@ const PAGE_SIDE: &str = include_str!("events_play.js");
 const FRAMES: &str =
     "new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => done(true))))";
 
+/// One task after each input call, so a task the input queued (a text
+/// field's `selectionchange`) runs before the next input: without it
+/// Chromium fired `selectionchange` before or after the next key or
+/// `pointerup` from run to run (5 of 8 `--check` runs differed,
+/// 2026-11-01). The vapors player settles after each event to match.
+const TASK: &str = "new Promise((done) => setTimeout(() => done(true), 0))";
+
 /// Half a second after the last step, for timers and transitions a step
 /// set off. It first sets `window.__eventsSettling`, so a page can act
 /// after the last step's log is taken and be sure of the order.
@@ -42,6 +49,7 @@ struct Player<'a> {
     pointer: Pointer,
     values: String,
     checked: String,
+    selections: String,
 }
 
 /// Each step's answers, or every expectation that did not hold, as
@@ -58,12 +66,15 @@ pub fn play(
 ) -> Result<Value, String> {
     let values = serde_json::to_string(&script.value_targets()).map_err(|e| e.to_string())?;
     let checked = serde_json::to_string(&script.checked_targets()).map_err(|e| e.to_string())?;
+    let selections =
+        serde_json::to_string(&script.selection_targets()).map_err(|e| e.to_string())?;
     let mut player = Player {
         session,
         deadline,
         pointer: Pointer::default(),
         values,
         checked,
+        selections,
     };
     let types = serde_json::to_string(&script.listen).map_err(|e| e.to_string())?;
     let capture = serde_json::to_string(&script.capture).map_err(|e| e.to_string())?;
@@ -107,6 +118,7 @@ impl Player<'_> {
     fn act(&mut self, step: &Step) -> Result<Value, String> {
         for (method, params) in calls(&step.action, &mut self.pointer) {
             self.session.call(method, &params, self.deadline)?;
+            self.evaluate(TASK, FRAME_DEADLINE)?;
         }
         self.evaluate(FRAMES, FRAME_DEADLINE)?;
         let events = self.evaluate("window.__eventsDrain()", self.deadline)?;
@@ -119,8 +131,12 @@ impl Player<'_> {
             &format!("window.__eventsChecked({})", self.checked),
             self.deadline,
         )?;
+        let selections = self.evaluate(
+            &format!("window.__eventsSelections({})", self.selections),
+            self.deadline,
+        )?;
         Ok(
-            json!({ "line": step.line, "action": format!("{:?}", step.action), "events": events, "focus": focus["focus"], "focusVisible": focus["focusVisible"], "values": values, "checked": checked }),
+            json!({ "line": step.line, "action": format!("{:?}", step.action), "events": events, "focus": focus["focus"], "focusVisible": focus["focusVisible"], "values": values, "checked": checked, "selections": selections }),
         )
     }
 
@@ -145,7 +161,8 @@ impl Player<'_> {
         | Expect::Focus(target)
         | Expect::FocusVisible(target)
         | Expect::Value { target, .. }
-        | Expect::Checked { target, .. } = expect
+        | Expect::Checked { target, .. }
+        | Expect::Selection { target, .. } = expect
         {
             let selector = serde_json::to_string(target).map_err(|e| e.to_string())?;
             let count =
