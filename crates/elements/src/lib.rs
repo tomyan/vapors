@@ -54,6 +54,7 @@ mod text_marks;
 mod text_paint;
 mod text_paste;
 mod text_pointer;
+mod text_selectionchange;
 mod text_undo;
 mod text_word;
 mod thumb;

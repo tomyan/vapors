@@ -57,7 +57,6 @@ impl Document {
         if !prevented {
             crate::range_drag::pressed(document, id, target, point);
             crate::number_scrub::pressed(document, id, target, point);
-            crate::text_pointer::pressed(document, id, target, point, std::num::NonZeroU32::MIN);
         }
     }
 
@@ -67,7 +66,6 @@ impl Document {
         if Self::touch_event(document, finger, point, "pointermove").is_some() {
             crate::range_drag::moved(document, touch_id(finger), point);
             crate::number_scrub::moved(document, touch_id(finger), point);
-            crate::text_pointer::moved_pointer(document, touch_id(finger), point);
         }
     }
 
@@ -86,18 +84,21 @@ impl Document {
     }
 
     /// The platform's tap at `point`, after the touch's own down and up:
-    /// `click` on the element there, unless a disabled button holds it.
+    /// focus moves to what the tap is on (or leaves), then `click` on
+    /// the element there unless a disabled control holds it, then a
+    /// text field takes the caret at the tap, as Chromium orders a tap.
     pub fn touch_tapped(document: &Rc<RefCell<Document>>, point: Point) {
-        let target = document
-            .borrow()
-            .hit(point)
-            .filter(|node| !document.borrow().in_disabled_button(*node));
-        if let Some(target) = target {
+        let hit = document.borrow().hit(point);
+        let focusable = hit.and_then(|node| document.borrow().focusable_holding(node));
+        Self::focus(document, focusable);
+        let Some(hit) = hit else { return };
+        if !document.borrow().in_disabled_button(hit) {
             let event = document
                 .borrow()
-                .pointer_event("click", touch_id(0), target, point);
-            crate::events::tree::dispatch_click(document, target, event);
+                .pointer_event("click", touch_id(0), hit, point);
+            crate::events::tree::dispatch_click(document, hit, event);
         }
+        crate::text_pointer::tapped(document, hit, point);
     }
 
     /// Whether finger `finger` is down and a listener captured it.
@@ -187,12 +188,10 @@ impl Document {
             Ended::Lifted => {
                 crate::range_drag::released(document, id);
                 crate::number_scrub::released(document, id);
-                crate::text_pointer::released(document, id);
             }
             Ended::Taken => {
                 crate::range_drag::dropped(document, id);
                 crate::number_scrub::dropped(document, id);
-                crate::text_pointer::dropped(document, id);
             }
             Ended::Panned => {}
         }

@@ -1,6 +1,6 @@
 //! A text field's actions (E6a), as Chromium performs them: typed text
 //! replaces the selection; Backspace and Delete remove the selection
-//! or one cluster (a word with Control); the arrows move by cluster (a
+//! or one cluster (with Control, as far as Control and an arrow moves); the arrows move by cluster (a
 //! word with Control), Home and End to the ends, each extending the
 //! selection with Shift; Control+A selects all; Enter commits (the
 //! pointer's part is `text_pointer`). Focus by keyboard selects
@@ -41,6 +41,8 @@ impl Document {
         let editor = editors.get_mut(&node).expect("made above");
         editor.committed = editor.plain.text().to_string();
         editor.history.close();
+        // Chromium fires one as focus arrives, even where the caret was
+        editor.reported = None;
         if keyboard {
             fonts.editor_driver(&mut editor.plain).select_all();
         }
@@ -97,12 +99,7 @@ pub(crate) fn key(document: &Rc<RefCell<Document>>, node: NodeId, key: &str, mod
             };
             document
                 .borrow_mut()
-                .edit(node, kind, |d| match (key, word) {
-                    ("Backspace", false) => d.backdelete(),
-                    ("Backspace", true) => d.backdelete_word(),
-                    (_, false) => d.delete(),
-                    (_, true) => d.delete_word(),
-                });
+                .edit(node, kind, |d| deleted(d, key == "Backspace", word));
             edited(document, node);
         }
         // the method path is not general over the driver's lifetime
@@ -112,6 +109,25 @@ pub(crate) fn key(document: &Rc<RefCell<Document>>, node: NodeId, key: &str, mod
             crate::text_undo::history_key(document, node, key, shift);
         }
         _ => moved(document, node, key, shift, word),
+    }
+}
+
+/// Backspace (`back`) or Delete, by a word with `word`: a selection
+/// goes; else a cluster, or with `word` as far as Control+ArrowLeft or
+/// Control+ArrowRight moves, as Linux Chromium deletes (Parley's own
+/// word deletes skip the space after a word and take "-" with "A").
+fn deleted(d: &mut Driver<'_>, back: bool, word: bool) {
+    if word && d.editor.raw_selection().is_collapsed() {
+        if back {
+            d.select_word_left();
+        } else {
+            d.select_word_right();
+        }
+    }
+    if back {
+        d.backdelete();
+    } else {
+        d.delete();
     }
 }
 
@@ -168,34 +184,4 @@ fn fire(document: &Rc<RefCell<Document>>, node: NodeId, name: &str) {
         return;
     };
     dispatch_bubbling(document, node, Event::new(name).with_value(&value));
-}
-
-impl Document {
-    /// Fires the `selectionchange` each text field owes whose selection
-    /// moved since the last one, as Chromium fires one per task: the
-    /// app calls this before each update, the vapors player after each event.
-    pub fn settle_selection(document: &Rc<RefCell<Document>>) {
-        let owed: Vec<NodeId> = document
-            .borrow_mut()
-            .editors
-            .iter_mut()
-            .filter_map(|(node, editor)| std::mem::take(&mut editor.pending).then_some(*node))
-            .collect();
-        for node in owed {
-            let moved = {
-                let mut doc = document.borrow_mut();
-                let now = doc.selection(node);
-                // a listener of an earlier one may have removed this field
-                let Some(editor) = doc.editors.get_mut(&node) else {
-                    continue;
-                };
-                let moved = editor.reported != now;
-                editor.reported = now;
-                moved && doc.contains(node)
-            };
-            if moved {
-                dispatch_bubbling(document, node, Event::new("selectionchange"));
-            }
-        }
-    }
 }

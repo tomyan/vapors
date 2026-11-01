@@ -21,7 +21,7 @@ fn ours() -> Log {
 }
 
 fn recorded(events: &serde_json::Value) -> serde_json::Value {
-    json!({ "steps": [{ "line": 2, "action": "Click(5.0, 5.0)", "events": events, "focus": "body", "focusVisible": false }] })
+    json!({ "steps": [{ "line": 2, "action": "Click(5.0, 5.0)", "events": events, "focus": "body", "focusVisible": false, "selections": {} }] })
 }
 
 #[test]

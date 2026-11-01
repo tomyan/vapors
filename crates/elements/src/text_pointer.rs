@@ -1,7 +1,10 @@
 //! A text field under the pointer (E6a): a press places the caret
-//! where it lands, even on a disabled field, as Chromium does, and a
-//! drag extends the selection under capture; a double click selects a
-//! word, a triple click the whole text.
+//! where it lands and a drag extends the selection under capture; a
+//! double click selects a word, a triple click the whole text. A press
+//! on a disabled field leaves its selection where it was and owes a
+//! `selectionchange`, as Chromium does. By touch, a tap places the
+//! caret after its click and a finger down or dragging does not, as
+//! Chromium's touch does (a drag pans).
 
 use std::cell::RefCell;
 use std::num::NonZeroU32;
@@ -59,11 +62,11 @@ pub(crate) enum TextPress {
 }
 
 /// Pointer `id` pressed `node` at `point`, the `clicks`th press in a
-/// row: a text field, disabled or not, puts its caret there, as Chromium
-/// does (on release when the press is inside the selection), and a live
-/// one captures the pointer for a drag that extends the selection; a
-/// second press selects the word there and a third the whole text, with
-/// no drag (by word or line: not built).
+/// row: a live text field puts its caret there (on release when the
+/// press is inside the selection) and captures the pointer for a drag
+/// that extends the selection; a second press selects the word there
+/// and a third the whole text, with no drag (by word or line: not
+/// built). A disabled field only owes a `selectionchange`.
 pub(crate) fn pressed(
     document: &Rc<RefCell<Document>>,
     id: u32,
@@ -71,10 +74,7 @@ pub(crate) fn pressed(
     point: Point,
     clicks: NonZeroU32,
 ) {
-    if !document.borrow().is_text_input(node) {
-        return;
-    }
-    let Some(at) = document.borrow().text_point(node, point) else {
+    let Some(at) = live_point(document, node, point) else {
         return;
     };
     match clicks.get() {
@@ -86,9 +86,8 @@ pub(crate) fn pressed(
     }
 }
 
-/// A first press at `at` in the field's text: the caret goes there, now
-/// or, inside the selection, on release; a live field captures the
-/// pointer.
+/// A first press at `at` in a live field's text: the caret goes there,
+/// now or, inside the selection, on release; the pointer is captured.
 fn first(document: &Rc<RefCell<Document>>, id: u32, node: NodeId, (x, y): (f32, f32)) {
     let press = if document.borrow_mut().in_selection(node, (x, y)) {
         TextPress::InSelection(node, (x, y))
@@ -96,10 +95,30 @@ fn first(document: &Rc<RefCell<Document>>, id: u32, node: NodeId, (x, y): (f32, 
         document.borrow_mut().drive(node, |d| d.move_to_point(x, y));
         TextPress::Drag(node)
     };
-    if document.borrow().live_text(node) {
-        document.borrow_mut().pointer.text_presses.insert(id, press);
-        crate::events::capture::ask_unless_asked(document, id, Asked::CaptureTo(node));
+    document.borrow_mut().pointer.text_presses.insert(id, press);
+    crate::events::capture::ask_unless_asked(document, id, Asked::CaptureTo(node));
+}
+
+/// A tap on `node` at `point`: a live text field puts its caret there,
+/// with no drag; a disabled one only owes a `selectionchange`.
+pub(crate) fn tapped(document: &Rc<RefCell<Document>>, node: NodeId, point: Point) {
+    if let Some((x, y)) = live_point(document, node, point) {
+        document.borrow_mut().drive(node, |d| d.move_to_point(x, y));
     }
+}
+
+/// Where `point` lies in `node`'s text when it is a live text field. A
+/// disabled one's selection stays where it was and owes a
+/// `selectionchange`, as Chromium's does; `None` for both.
+fn live_point(document: &Rc<RefCell<Document>>, node: NodeId, point: Point) -> Option<(f32, f32)> {
+    if !document.borrow().is_text_input(node) {
+        return None;
+    }
+    if !document.borrow().live_text(node) {
+        document.borrow_mut().drive(node, |_| {});
+        return None;
+    }
+    document.borrow().text_point(node, point)
 }
 
 /// Pointer `id` moved to `point`: the field it drags extends its
@@ -127,10 +146,4 @@ pub(crate) fn released(document: &Rc<RefCell<Document>>, id: u32) {
     if let Some(TextPress::InSelection(node, (x, y))) = press {
         document.borrow_mut().drive(node, |d| d.move_to_point(x, y));
     }
-}
-
-/// Pointer `id` was taken by the platform: its press of a field ends
-/// with nothing moved.
-pub(crate) fn dropped(document: &Rc<RefCell<Document>>, id: u32) {
-    document.borrow_mut().pointer.text_presses.remove(&id);
 }

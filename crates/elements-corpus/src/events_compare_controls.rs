@@ -15,9 +15,7 @@ impl Step<'_> {
         for target in &script.value_targets() {
             differences.extend(self.value(target, ours)?);
         }
-        for target in &script.selection_targets() {
-            differences.extend(self.selection(target, ours)?);
-        }
+        differences.extend(self.selections(ours)?);
         for target in &script.checked_targets() {
             differences.extend(self.checked(target, ours)?);
         }
@@ -33,6 +31,30 @@ impl Step<'_> {
             &format!("{chromium:?}"),
             &format!("{vapors:?}"),
         ))
+    }
+
+    /// Every text field's selection: both logs must name the same
+    /// fields, and each field's must agree.
+    fn selections(&self, ours: &Logged) -> Result<Vec<String>, String> {
+        let recorded = self.theirs["selections"].as_object().ok_or_else(|| {
+            format!(
+                "{}.events.json: the step at line {} has no selections; rerun the events oracle (cargo run -p vapors-elements-corpus --example events_oracle)",
+                self.name, self.line
+            )
+        })?;
+        let chromium: Vec<&String> = recorded.keys().collect();
+        let vapors: Vec<&String> = ours.selections.iter().map(|(field, _)| field).collect();
+        if chromium != vapors {
+            return Ok(vec![format!(
+                "{}.events:{}: the text fields are {chromium:?} in Chromium, {vapors:?} in vapors",
+                self.name, self.line
+            )]);
+        }
+        let mut differences = Vec::new();
+        for field in chromium {
+            differences.extend(self.selection(field, ours)?);
+        }
+        Ok(differences)
     }
 
     fn selection(&self, target: &str, ours: &Logged) -> Result<Option<String>, String> {
@@ -54,11 +76,15 @@ impl Step<'_> {
     }
 }
 
-/// A recorded `[start, end]` as a pair.
+/// A recorded `[start, end]` as a pair: exactly two whole numbers,
+/// start at most end.
 fn selection_pair(value: &Value) -> Option<(usize, usize)> {
-    let pair = value.as_array()?;
-    let at = |i: usize| pair.get(i)?.as_u64().and_then(|n| usize::try_from(n).ok());
-    Some((at(0)?, at(1)?))
+    let [start, end] = value.as_array()?.as_slice() else {
+        return None;
+    };
+    let at = |n: &Value| n.as_u64().and_then(|n| usize::try_from(n).ok());
+    let (start, end) = (at(start)?, at(end)?);
+    (start <= end).then_some((start, end))
 }
 
 #[cfg(test)]

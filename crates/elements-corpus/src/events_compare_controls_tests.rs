@@ -17,7 +17,7 @@ fn a_value_that_differs_is_reported_and_one_not_recorded_asks_for_a_rerun() {
         focus: "body".to_owned(),
         ..Logged::default()
     }];
-    let step = |values: serde_json::Value| json!({ "steps": [{ "line": 2, "action": "Key(\"End\")", "events": [], "focus": "body", "focusVisible": false, "values": values }] });
+    let step = |values: serde_json::Value| json!({ "steps": [{ "line": 2, "action": "Key(\"End\")", "events": [], "focus": "body", "focusVisible": false, "values": values, "selections": {} }] });
 
     // When
     let differs =
@@ -44,7 +44,7 @@ fn a_value_the_vapors_log_lacks_is_refused_not_passed() {
         focus: "body".to_owned(),
         ..Logged::default()
     }];
-    let answers = json!({ "steps": [{ "line": 2, "action": "Key(\"End\")", "events": [], "focus": "body", "focusVisible": false, "values": { "input#a": "50" } }] });
+    let answers = json!({ "steps": [{ "line": 2, "action": "Key(\"End\")", "events": [], "focus": "body", "focusVisible": false, "values": { "input#a": "50" }, "selections": {} }] });
 
     // When
     let refused = compare("x", &script, &ours, &answers).expect_err("refused");
@@ -68,7 +68,7 @@ fn a_checked_state_the_vapors_log_lacks_is_refused_not_passed() {
         focus: "body".to_owned(),
         ..Logged::default()
     }];
-    let answers = json!({ "steps": [{ "line": 2, "action": "Click(5.0, 5.0)", "events": [], "focus": "body", "focusVisible": false, "values": {}, "checked": { "input#a": true } }] });
+    let answers = json!({ "steps": [{ "line": 2, "action": "Click(5.0, 5.0)", "events": [], "focus": "body", "focusVisible": false, "values": {}, "checked": { "input#a": true }, "selections": {} }] });
 
     // When
     let refused = compare("x", &script, &ours, &answers).expect_err("refused");
@@ -93,7 +93,7 @@ fn a_checked_state_that_differs_is_reported_and_one_not_recorded_asks_for_a_reru
         focus: "body".to_owned(),
         ..Logged::default()
     }];
-    let step = |checked: serde_json::Value| json!({ "steps": [{ "line": 2, "action": "Click(5.0, 5.0)", "events": [], "focus": "body", "focusVisible": false, "values": {}, "checked": checked }] });
+    let step = |checked: serde_json::Value| json!({ "steps": [{ "line": 2, "action": "Click(5.0, 5.0)", "events": [], "focus": "body", "focusVisible": false, "values": {}, "checked": checked, "selections": {} }] });
 
     // When
     let differs =
@@ -109,8 +109,8 @@ fn a_checked_state_that_differs_is_reported_and_one_not_recorded_asks_for_a_reru
 }
 
 #[test]
-fn a_selection_that_differs_is_reported_and_one_not_recorded_asks_for_a_rerun() {
-    // Given: vapors says 4..4, Chromium 0..4, then a recording without it
+fn a_selection_that_differs_is_reported_and_a_malformed_one_asks_for_a_rerun() {
+    // Given: vapors says 4..4
     let script =
         parse("x", "listen input\nkey End\nexpect selection input#a 4 4\n").expect("parses");
     let ours = vec![Logged {
@@ -119,21 +119,27 @@ fn a_selection_that_differs_is_reported_and_one_not_recorded_asks_for_a_rerun() 
         ..Logged::default()
     }];
     let step = |selections: serde_json::Value| json!({ "steps": [{ "line": 2, "action": "Key(\"End\")", "events": [], "focus": "body", "focusVisible": false, "selections": selections }] });
+    let unrecorded = json!({ "steps": [{ "line": 2, "action": "Key(\"End\")", "events": [], "focus": "body", "focusVisible": false }] });
 
     // When
     let differs =
         compare("x", &script, &ours, &step(json!({ "input#a": [0, 4] }))).expect_err("differs");
-    let missing = compare("x", &script, &ours, &step(json!({}))).expect_err("missing");
-    let malformed =
-        compare("x", &script, &ours, &step(json!({ "input#a": [4] }))).expect_err("malformed");
+    let malformed: Vec<String> = [json!([4]), json!([4, 4, 9]), json!([5, 2])]
+        .into_iter()
+        .map(|pair| {
+            compare("x", &script, &ours, &step(json!({ "input#a": pair }))).expect_err("malformed")
+        })
+        .collect();
+    let missing = compare("x", &script, &ours, &unrecorded).expect_err("missing");
 
     // Then
     assert!(
         differs.contains("x.events:2: input#a has selection 0..4 in Chromium, 4..4 in vapors"),
         "{differs}"
     );
-    assert!(missing.contains("rerun the events oracle"), "{missing}");
-    assert!(malformed.contains("rerun the events oracle"), "{malformed}");
+    for refused in malformed.iter().chain([&missing]) {
+        assert!(refused.contains("rerun the events oracle"), "{refused}");
+    }
     assert_eq!(
         compare("x", &script, &ours, &step(json!({ "input#a": [4, 4] }))),
         Ok(())
@@ -141,22 +147,23 @@ fn a_selection_that_differs_is_reported_and_one_not_recorded_asks_for_a_rerun() 
 }
 
 #[test]
-fn a_selection_the_vapors_log_lacks_is_refused_not_passed() {
-    // Given: the script expects a selection, vapors recorded none
+fn every_text_field_is_compared_not_only_those_the_script_names() {
+    // Given: Chromium recorded two fields, vapors one
     let script =
         parse("x", "listen input\nkey End\nexpect selection input#a 4 4\n").expect("parses");
     let ours = vec![Logged {
+        selections: vec![("input#a".to_owned(), (4, 4))],
         focus: "body".to_owned(),
         ..Logged::default()
     }];
-    let answers = json!({ "steps": [{ "line": 2, "action": "Key(\"End\")", "events": [], "focus": "body", "focusVisible": false, "selections": { "input#a": [4, 4] } }] });
+    let answers = json!({ "steps": [{ "line": 2, "action": "Key(\"End\")", "events": [], "focus": "body", "focusVisible": false, "selections": { "input#a": [4, 4], "input#off": [0, 0] } }] });
 
     // When
-    let refused = compare("x", &script, &ours, &answers).expect_err("refused");
+    let differs = compare("x", &script, &ours, &answers).expect_err("differs");
 
     // Then
     assert!(
-        refused.contains("x.events:2: vapors' log has no selection for input#a"),
-        "{refused}"
+        differs.contains("x.events:2: the text fields are [\"input#a\", \"input#off\"] in Chromium, [\"input#a\"] in vapors"),
+        "{differs}"
     );
 }

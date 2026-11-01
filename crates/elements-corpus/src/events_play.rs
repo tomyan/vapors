@@ -49,7 +49,6 @@ struct Player<'a> {
     pointer: Pointer,
     values: String,
     checked: String,
-    selections: String,
 }
 
 /// Each step's answers, or every expectation that did not hold, as
@@ -66,15 +65,12 @@ pub fn play(
 ) -> Result<Value, String> {
     let values = serde_json::to_string(&script.value_targets()).map_err(|e| e.to_string())?;
     let checked = serde_json::to_string(&script.checked_targets()).map_err(|e| e.to_string())?;
-    let selections =
-        serde_json::to_string(&script.selection_targets()).map_err(|e| e.to_string())?;
     let mut player = Player {
         session,
         deadline,
         pointer: Pointer::default(),
         values,
         checked,
-        selections,
     };
     let types = serde_json::to_string(&script.listen).map_err(|e| e.to_string())?;
     let capture = serde_json::to_string(&script.capture).map_err(|e| e.to_string())?;
@@ -134,10 +130,7 @@ impl Player<'_> {
             &format!("window.__eventsChecked({})", self.checked),
             self.deadline,
         )?;
-        let selections = self.evaluate(
-            &format!("window.__eventsSelections({})", self.selections),
-            self.deadline,
-        )?;
+        let selections = self.evaluate("window.__eventsSelections()", self.deadline)?;
         Ok(
             json!({ "line": step.line, "action": format!("{:?}", step.action), "events": events, "focus": focus["focus"], "focusVisible": focus["focusVisible"], "values": values, "checked": checked, "selections": selections }),
         )

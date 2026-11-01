@@ -70,7 +70,7 @@ fn a_drag_selects_from_the_press_to_the_pointer() {
 }
 
 #[test]
-fn a_disabled_field_takes_the_caret_but_no_focus_and_no_text() {
+fn a_disabled_field_takes_no_caret_no_focus_and_no_text() {
     // Given
     let page = page();
 
@@ -78,8 +78,8 @@ fn a_disabled_field_takes_the_caret_but_no_focus_and_no_text() {
     click(&page, [150.0, 60.0]);
     type_text(&page, "x");
 
-    // Then: the caret at the end, as Chromium places it
-    assert_eq!(selection(&page, page.off), (3, 3));
+    // Then: the selection left at the start, as Chromium leaves it
+    assert_eq!(selection(&page, page.off), (0, 0));
     assert_eq!(page.doc.borrow().active_element(), None);
     assert_eq!(value(&page, page.off), "off");
 }
@@ -154,4 +154,41 @@ fn a_removed_field_takes_its_editor_with_it() {
             .iter()
             .all(|e| !e.starts_with("selectionchange"))
     );
+}
+
+#[test]
+fn the_value_attribute_reaches_the_editor_until_the_field_is_edited() {
+    // Given: the field's editor made by a click
+    let page = page();
+    click(&page, [120.0, 12.0]);
+
+    // When: the attribute changes, a letter is typed, the attribute changes again
+    page.doc
+        .borrow_mut()
+        .set_attribute(page.name, "value", "Cool");
+    type_text(&page, "x");
+    page.doc
+        .borrow_mut()
+        .set_attribute(page.name, "value", "Hot");
+
+    // Then: typing went into the attribute's text; once edited, the
+    // attribute no longer moves the value, as the DOM's dirty value
+    assert_eq!(value(&page, page.name), "Coolx");
+}
+
+#[test]
+fn a_field_that_stops_being_a_text_field_fires_no_selectionchange() {
+    // Given: a selectionchange owed by a click
+    let page = page();
+    click(&page, [120.0, 12.0]);
+    page.log.borrow_mut().clear();
+
+    // When: it becomes a number field before the settle
+    page.doc
+        .borrow_mut()
+        .set_attribute(page.name, "type", "number");
+    settle(&page);
+
+    // Then
+    assert!(page.log.borrow().is_empty(), "{:?}", page.log.borrow());
 }

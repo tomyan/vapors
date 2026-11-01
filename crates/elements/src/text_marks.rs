@@ -2,6 +2,8 @@
 //! editor for paint (E6a).
 
 use vapors_dom::NodeId;
+use vapors_scene::Color;
+use vapors_text::parley::PlainEditor;
 
 use crate::document::Document;
 
@@ -24,32 +26,36 @@ impl Document {
         self.editor(node);
         let Document { fonts, editors, .. } = self;
         let editor = editors.get_mut(&node)?;
-        let mut driver = fonts.editor_driver(&mut editor.plain);
-        driver.refresh_layout();
-        // Parley's geometry is f64 CSS px within a field, which f32 holds
-        #[allow(clippy::cast_possible_truncation)]
-        let rect = |b: vapors_text::parley::BoundingBox| {
-            [
-                b.x0 as f32,
-                b.y0 as f32,
-                (b.x1 - b.x0) as f32,
-                (b.y1 - b.y0) as f32,
-            ]
-        };
-        let marks = TextMarks {
-            caret: editor
-                .plain
-                .raw_selection()
-                .is_collapsed()
-                .then(|| editor.plain.cursor_geometry(1.0).map(rect))
-                .flatten(),
-            selection: editor
-                .plain
-                .selection_geometry()
-                .into_iter()
-                .map(|(b, _)| rect(b))
-                .collect(),
-        };
-        Some((node, marks))
+        fonts.editor_driver(&mut editor.plain).refresh_layout();
+        Some((node, marks_of(&editor.plain)))
     }
+}
+
+/// An editor's caret (when its selection is collapsed) and selection
+/// rects, laid out already.
+fn marks_of(plain: &PlainEditor<Color>) -> TextMarks {
+    TextMarks {
+        caret: plain
+            .raw_selection()
+            .is_collapsed()
+            .then(|| plain.cursor_geometry(1.0).map(rect))
+            .flatten(),
+        selection: plain
+            .selection_geometry()
+            .into_iter()
+            .map(|(b, _)| rect(b))
+            .collect(),
+    }
+}
+
+/// A Parley box as `[x, y, width, height]`.
+// Parley's geometry is f64 CSS px within a field, which f32 holds
+#[allow(clippy::cast_possible_truncation)]
+fn rect(b: vapors_text::parley::BoundingBox) -> [f32; 4] {
+    [
+        b.x0 as f32,
+        b.y0 as f32,
+        (b.x1 - b.x0) as f32,
+        (b.y1 - b.y0) as f32,
+    ]
 }
