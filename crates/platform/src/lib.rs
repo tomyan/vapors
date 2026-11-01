@@ -6,6 +6,9 @@
 //! to the app as an [`Event`] and every redraw as a [`Frame`].
 
 mod attributes;
+mod clicks;
+#[cfg(target_family = "wasm")]
+mod clicks_web;
 #[cfg(not(target_family = "wasm"))]
 mod clipboard;
 mod clock;

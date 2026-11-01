@@ -6,6 +6,7 @@
 //! write signals whose effects change the tree.
 
 use std::cell::RefCell;
+use std::num::NonZeroU32;
 use std::rc::Rc;
 
 use vapors_css::tree::States;
@@ -40,8 +41,8 @@ pub(crate) struct Pointer {
     pub(crate) drags: std::collections::HashMap<u32, crate::range_drag::Drag>,
     /// Each pointer's scrub of a number field, by pointer id (3-E3c).
     pub(crate) scrubs: std::collections::HashMap<u32, crate::number_scrub::Scrub>,
-    /// Each pointer's drag over a text field's text, by pointer id (E6a).
-    pub(crate) text_drags: std::collections::HashMap<u32, NodeId>,
+    /// Each pointer's press on a text field, by pointer id (E6a).
+    pub(crate) text_presses: std::collections::HashMap<u32, crate::text_pointer::TextPress>,
 }
 
 impl Document {
@@ -79,9 +80,22 @@ impl Document {
         }
     }
 
-    /// The primary button went down at `point`: the target and its
-    /// ancestors become `:active`, and the target gets `pointerdown`.
+    /// The primary button went down at `point`, the first press in a
+    /// row: see [`Document::pointer_pressed_clicks`].
     pub fn pointer_pressed(document: &Rc<RefCell<Document>>, point: Point) {
+        Self::pointer_pressed_clicks(document, point, NonZeroU32::MIN);
+    }
+
+    /// The primary button went down at `point`, the `clicks`th press in a
+    /// row as the platform counts it (two is a double click), carried on
+    /// the press so nothing waits for it: the target and its ancestors
+    /// become `:active`, the target gets `pointerdown`, focus moves, and
+    /// a text field takes its caret, a word or its whole text.
+    pub fn pointer_pressed_clicks(
+        document: &Rc<RefCell<Document>>,
+        point: Point,
+        clicks: NonZeroU32,
+    ) {
         process_pending(document, MOUSE, point);
         document.borrow_mut().keyboard = false;
         let target = document.borrow().pointer_target(MOUSE, point);
@@ -106,7 +120,7 @@ impl Document {
         // a text field's caret lands where the press did, after focus
         // so keyboard focus's selection does not override it (E6a)
         if let (false, Some(target)) = (prevented, target) {
-            crate::text_pointer::pressed(document, MOUSE, target, point);
+            crate::text_pointer::pressed(document, MOUSE, target, point, clicks);
         }
     }
 
@@ -127,7 +141,6 @@ impl Document {
         }
         crate::range_drag::released(document, MOUSE);
         crate::number_scrub::released(document, MOUSE);
-        crate::text_pointer::released(document, MOUSE);
         release_capture(document, MOUSE);
         process_pending(document, MOUSE, point);
         let click = document.borrow_mut().release(target);
@@ -137,6 +150,9 @@ impl Document {
                 .pointer_event("click", MOUSE, click, point);
             crate::events::tree::dispatch_click(document, click, event);
         }
+        // a press held inside a text field's selection moves the caret
+        // after `click`, as Chromium does (review-v91, S1)
+        crate::text_pointer::released(document, MOUSE);
     }
 
     /// A tap at `point`: a press and a release there, which is a click.
