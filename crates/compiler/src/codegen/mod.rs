@@ -12,6 +12,7 @@ mod blocks;
 mod component_tag;
 mod element;
 mod element_bind;
+mod element_bind_this;
 mod emit;
 mod for_block;
 mod format;
