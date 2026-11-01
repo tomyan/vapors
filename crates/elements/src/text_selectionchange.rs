@@ -1,5 +1,6 @@
-//! `selectionchange` for text fields (E6a): one per field whose
-//! selection moved since the last, as Chromium fires one per task.
+//! A text field's `selectionchange` (E6a): fired once per settle for
+//! each field whose selection moved since the last one, as Chromium
+//! queues one per task.
 
 use std::cell::RefCell;
 use std::rc::Rc;

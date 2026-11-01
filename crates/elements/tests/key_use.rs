@@ -67,8 +67,13 @@ fn a_prevented_keydown_is_used() {
     assert!(Document::key_pressed(&page.doc, "z", control()));
 }
 
+/// A focused text field takes typing and its moves; a Control key it
+/// has no binding for is the app's. vapors #92 binds Control+Z and
+/// Control+Y in a field (undo, redo) inside `text_input::key`'s match,
+/// whose arms all report the key used: whichever of #92 and this lands
+/// second adds Control+Z as used here.
 #[test]
-fn a_focused_text_field_uses_a_typing_key_and_not_control_z() {
+fn a_focused_text_field_uses_a_typing_key_and_not_an_unbound_control_key() {
     // Given
     let mut doc = document();
     doc.add_stylesheet("app.css", "body { display: flex; } input { width: 6em; }")
@@ -88,5 +93,5 @@ fn a_focused_text_field_uses_a_typing_key_and_not_control_z() {
         "ArrowLeft",
         Modifiers::default()
     ));
-    assert!(!Document::key_pressed(&doc, "z", control()));
+    assert!(!Document::key_pressed(&doc, "k", control()));
 }
