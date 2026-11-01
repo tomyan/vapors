@@ -20,10 +20,17 @@ impl Emitter<'_> {
                 "dom.borrow_mut().set_attribute({var}, SCOPE_ATTRIBUTE, SCOPE);"
             ));
         }
-        for attribute in element.attributes.iter() {
+        let (this, rest): (Vec<&Attribute>, Vec<&Attribute>) = element
+            .attributes
+            .iter()
+            .partition(|attribute| attribute.name == "bind:this");
+        for attribute in rest {
             self.emit_attribute(element, &var, attribute)?;
         }
-        self.emit_nodes(&element.children, &Place::child_of(&var))
+        self.emit_nodes(&element.children, &Place::child_of(&var))?;
+        // once the element is whole, so what reads the signal sees it built
+        this.into_iter()
+            .try_for_each(|attribute| self.emit_bind_this(&var, attribute))
     }
 
     fn emit_attribute(
@@ -97,14 +104,19 @@ impl Emitter<'_> {
         Ok(())
     }
 
-    /// A zero-argument script closure is wrapped so it receives no
-    /// event; anything else is passed as the listener itself.
+    /// The listener for a handler: a zero-argument script closure is
+    /// called with no event, anything else with the event; either may
+    /// return `()` or `Result<(), E>`, whose `Err` goes to the error
+    /// report (`vapors_dom::handle`).
     fn handler_expr(&self, expr: &Expr) -> Result<String, CompileError> {
         let code = self.raw(expr)?;
-        match self.script.handlers.get(&code) {
-            Some(0) => Ok(format!("move |_event: &mut Event| {{ {code}(); }}")),
-            _ => Ok(code),
-        }
+        self.refuse_assigning_handler(expr, &code)?;
+        Ok(match self.script.handlers.get(&code) {
+            Some(0) => {
+                format!("move |_event: &mut Event| vapors_dom::handle_without_event(&{code})")
+            }
+            _ => format!("move |event: &mut Event| vapors_dom::handle(event, &{code})"),
+        })
     }
 
     /// A statement, inside a block with the clones when there are any.

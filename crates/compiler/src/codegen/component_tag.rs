@@ -15,6 +15,16 @@ impl Emitter<'_> {
         tag: &ComponentTag,
         place: &Place,
     ) -> Result<(), CompileError> {
+        if let Some(this) = tag
+            .attributes
+            .iter()
+            .find(|attribute| attribute.name == "bind:this")
+        {
+            return Err(self.source.error(this.offset, format!(
+                "`bind:this` binds an element's node, and <{}> is a component: bind an element inside the component, and pass the signal down as a prop",
+                tag.name
+            )));
+        }
         self.check_props(tag);
         let last = tag.name.rsplit("::").next().unwrap_or(&tag.name);
         let var = self.fresh(&last.to_lowercase());

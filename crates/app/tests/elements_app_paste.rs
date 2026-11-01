@@ -9,12 +9,15 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use vapors_app::ElementsApp;
-use vapors_dom::{Dom, NodeId};
-use vapors_elements::{Document, Viewport};
+use vapors_elements::Document;
 use vapors_platform::{
     App, Clipboard, ClipboardDone, ClipboardImage, ClipboardText, Event, Platform,
 };
-use vapors_text::FontSystem;
+
+#[path = "support/paste_page.rs"]
+mod paste_page;
+
+use paste_page::{click_field, field};
 
 /// A clipboard holding `text`, counting its reads.
 struct Held {
@@ -50,27 +53,6 @@ impl Clipboard for Slow {
     }
 }
 
-/// A 160 px text field holding "Warm" at the top left.
-fn field() -> (Rc<RefCell<Document>>, NodeId) {
-    let mut doc = Document::new(FontSystem::bundle_only());
-    doc.add_stylesheet(
-        "app.css",
-        "body { margin: 0; } input { display: block; width: 160px; }",
-    )
-    .expect("parses");
-    let body = doc.body();
-    let input = doc.create_element("input");
-    doc.set_attribute(input, "value", "Warm");
-    doc.append(body, input);
-    doc.update(Viewport {
-        width: 200.0,
-        height: 100.0,
-        scale: 1.0,
-    })
-    .expect("updates");
-    (Rc::new(RefCell::new(doc)), input)
-}
-
 fn app(doc: &Rc<RefCell<Document>>, text: ClipboardText) -> (ElementsApp, Rc<RefCell<u32>>) {
     let reads = Rc::new(RefCell::new(0));
     let clipboard = Held {
@@ -79,23 +61,6 @@ fn app(doc: &Rc<RefCell<Document>>, text: ClipboardText) -> (ElementsApp, Rc<Ref
     };
     let app = ElementsApp::new(Rc::clone(doc)).with_clipboard(Box::new(clipboard));
     (app, reads)
-}
-
-/// A click at the field's right, putting the caret after "Warm".
-fn click_field(app: &mut ElementsApp, platform: &Platform) {
-    for event in [
-        Event::PointerMoved { x: 150.0, y: 10.0 },
-        Event::PrimaryButton {
-            pressed: true,
-            clicks: std::num::NonZeroU32::MIN,
-        },
-        Event::PrimaryButton {
-            pressed: false,
-            clicks: std::num::NonZeroU32::MIN,
-        },
-    ] {
-        app.event(event, platform);
-    }
 }
 
 #[test]

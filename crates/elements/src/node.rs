@@ -1,12 +1,10 @@
 //! A node of the element tree: an element or a text run, and its links
 //! to parent and siblings.
 
-use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::rc::Rc;
 
 use vapors_css::tree::States;
-use vapors_dom::{Handler, NodeId, PropertyValue};
+use vapors_dom::{NodeId, PropertyValue};
 
 /// What a node is.
 pub(crate) enum Kind {
@@ -22,7 +20,7 @@ pub(crate) struct Element {
     pub(crate) attributes: BTreeMap<String, String>,
     pub(crate) properties: BTreeMap<String, PropertyValue>,
     /// Shared so dispatch can call them with the document unborrowed.
-    pub(crate) listeners: Vec<(String, Rc<RefCell<Handler>>)>,
+    pub(crate) listeners: Vec<(String, vapors_dom::Listener)>,
     /// The pointer's flags: `:hover` and `:active`.
     pub(crate) states: States,
 }

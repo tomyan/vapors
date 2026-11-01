@@ -407,8 +407,9 @@ keeps an undo stack, grouped as Chromium 155 groups a field's edits:
 
 Control+Z undoes to the text and selection before the step,
 Control+Shift+Z and Control+Y redo to those after it, each with
-`input` and a `selectionchange` even where the caret was, except a
-caret at the start, which Chromium leaves unreported. A new edit drops
+`input`, and with a `selectionchange` when the selection differs or
+the text changes before the caret (which moves it in the DOM even
+where it ends where it was), as Chromium fires. A new edit drops
 what could be redone; a signal setting the text drops the stack. A
 field keeps at most 1000 steps, the oldest going first, as Blink's
 `kMaximumUndoStackDepth`.
@@ -520,6 +521,76 @@ the clipboard, caret painting and the DOM events. Rules:
 - `user-select` for read-only text (agent replies): selection across
   elements is a range over the inline runs, copy serialises the text
   with newlines at block boundaries.
+
+## A component's own events
+
+As built (the listbox slice's first part, 2026-11-01): a component
+dispatches events of its own, such as a combobox's `comboboxopen`,
+with `#[dispatcher(comboboxopen, optionchoose)] let events;` in its
+script. The compiler makes it a `vapors_dom::Dispatcher` for those
+names. A script has at most one `#[dispatcher]`, and nothing else is
+attached to that `let`; the compiler refuses either.
+
+Names are declared per component type: the compiler generates
+`events()` for each component, its own names and those of every
+component its template uses, and declares them to the tree when the
+component mounts, before its children. The elements document refuses
+a listener for an event it never fires unless it is declared, so an
+ancestor's `onoptionchoose` is accepted before the combobox inside an
+`{if}` has mounted.
+
+`events.dispatch(node, Event::new("optionchoose"))` runs the
+listeners on `node` and then its ancestors at once, as the DOM's
+`dispatchEvent` does, and answers `Ok(true)` unless a listener
+prevented the default, so the component runs its default action only
+then. The listener lists for the whole path are taken at the start,
+before any listener runs: a listener added or removed during the
+dispatch takes effect from the next one. A listener may dispatch again (re-entry),
+since listeners are `Rc<dyn Fn>` and none is borrowed while it runs.
+`Rc` assumes one thread, as every vapors tree is today; a tree shared
+between threads would need `Arc` and a lock, and that change retires
+the assumption.
+
+A dispatch is refused, not dropped, with `DispatchRefused` naming the
+event and node:
+
+- before any listener runs: a name the dispatcher does not declare, a
+  node no longer in the tree (removed), or the tree borrowed (from
+  inside a `Dom` call). `cancelled()` is `None`.
+- after every listener ran: a listener that asked for pointer capture,
+  which only a pointer event carries. The message says how many
+  listeners it was dispatched to, and `cancelled()` keeps their
+  answer.
+
+`events.emit(..)` is `dispatch` for a component that cannot be refused
+except by its own bug; it panics with the refusal. A listener returns
+`()` or `Result<(), E>` with `E: Display`, so it may use `?`; an `Err`
+goes to the platform's error report (`report_error`, which the page
+shows), which the app installs with `vapors_dom::set_error_report`.
+With none installed (a test without an app) it panics with the
+message. A thread has one report: installing a report under another
+name panics, naming both, so `ElementsApp::new` after a test's own
+report refuses rather than taking its errors; the same name again is
+kept.
+
+A component type's `events()` lists its own names, then each child
+type's, through `events_into`, which skips a type already listed: a
+component that uses itself, directly or through another, is listed
+once and its mount ends.
+
+Taken from the DOM: synchronous, bubbling, cancelable, the return
+value of `dispatchEvent`, delivered to listeners on elements, so an app
+listens with `on<name>` on any ancestor. Differs from the DOM: no
+capture phase and no `CustomEvent.detail` yet (the target and the
+component's bound signals carry the data); names are declared; the
+DOM copies each node's listener list when the event reaches that node,
+so a listener added to an ancestor during the dispatch runs there and
+not here. Differs
+from Svelte: Svelte 4's `createEventDispatcher` sends a component event
+to its parent's `on:` handler only, not bubbling through the DOM and
+not cancelable unless asked, and Svelte 5 replaced it with callback
+props; vapors' events are DOM events on the component's elements,
+which is what the APG's patterns and their default actions need.
 
 ## Synthetic input
 
