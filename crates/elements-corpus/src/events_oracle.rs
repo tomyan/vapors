@@ -17,6 +17,9 @@ use crate::oracle::fixtures_dir;
 /// runner (57.9 s); a warm browser answers in milliseconds.
 const DEADLINE: Duration = Duration::from_secs(145);
 
+/// The size another page (`page`) opens at when the script names none.
+const PAGE_SIZE: (u32, u32) = (640, 400);
+
 /// The names of the fixtures with a script, sorted.
 ///
 /// # Errors
@@ -51,6 +54,9 @@ pub fn answers(session: &mut Session, work: &Path, name: &str) -> Result<Value, 
     let path = fixtures_dir().join(format!("{name}.events"));
     let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
     let script = parse(name, &text)?;
-    crate::ax::open(session, work, name, script.viewport)?;
+    match &script.page {
+        Some(file) => crate::ax::open_file(session, file, script.viewport.unwrap_or(PAGE_SIZE))?,
+        None => drop(crate::ax::open(session, work, name, script.viewport)?),
+    }
     play(session, name, &script, DEADLINE)
 }

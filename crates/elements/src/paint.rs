@@ -38,8 +38,17 @@ pub(crate) struct PaintInput<'a> {
 pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> Painted {
     let (canvas, propagated) = canvas_background(input);
     input.propagated = propagated;
+    let canvas_from = propagated.map(|node| {
+        if node == input.root {
+            crate::painted::CanvasFrom::Root
+        } else {
+            crate::painted::CanvasFrom::Body
+        }
+    });
     let mut painted = Painted {
         canvas,
+        canvas_from,
+        scale: input.scale,
         scene: Scene::new(),
         texts: Vec::new(),
         rects: HashMap::new(),

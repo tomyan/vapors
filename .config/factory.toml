@@ -42,6 +42,7 @@ max_lines = "220"
 # Files allowed over the limit, each with its reason. `cargo xtask check-files`
 # and `lint --verbose` print them; the `files` step shows only refusals.
 [files.allow]
+"crates/elements-corpus/fixtures/apg/combobox-autocomplete.js" = "APG's own example script, copied as published (fixtures/apg/NOTICE.md)"
 
 # Files not written by hand; left out of the check.
 [files.generated]
@@ -51,6 +52,10 @@ max_lines = "220"
 # (`cargo xtask check-layers`, the `layers` step of lint and ci). vapors
 # sets none; touche keeps its document, engine and runtime clear of UI
 # crates.
+[layers.forbid]
+# vapors-components: any `Dom` mounts them, so they reach the tree only
+# through vapors-dom (doc 03, "A component's own events").
+"vapors-components" = "vapors-elements, vapors-platform, vapors-app, vapors-renderer, vapors-gpu, vapors-canvas, vapors-text, vapors-css"
 
 # `[gate] twin` names a sibling checkout whose xtask must equal this
 # one's (xtask/src/gate_twin.rs). vapors sets none: xtask changes land

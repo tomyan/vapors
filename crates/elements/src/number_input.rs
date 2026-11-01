@@ -130,9 +130,14 @@ pub(crate) fn fire_input(document: &Rc<RefCell<Document>>, node: NodeId) {
 
 /// `key` went down on `node`, a focused number field: Backspace,
 /// Enter and the arrows act; other keys are typed as characters.
-pub(crate) fn key(document: &Rc<RefCell<Document>>, node: NodeId, key: &str, modifiers: Modifiers) {
+pub(crate) fn key(
+    document: &Rc<RefCell<Document>>,
+    node: NodeId,
+    key: &str,
+    modifiers: Modifiers,
+) -> bool {
     let Some(field) = document.borrow().editable_number(node) else {
-        return;
+        return false;
     };
     match key {
         "Backspace" => backspace(document, node, field),
@@ -142,8 +147,11 @@ pub(crate) fn key(document: &Rc<RefCell<Document>>, node: NodeId, key: &str, mod
             let steps = if modifiers.shift { COARSE_STEPS } else { 1.0 };
             step(document, node, &field, sign * steps);
         }
-        _ => {}
+        // the field's typing (digits, a sign, a point, an exponent) arrives
+        // as a character; a stray letter is still the field's, not a shortcut
+        _ => return crate::keys::types_text(key, modifiers),
     }
+    true
 }
 
 fn backspace(document: &Rc<RefCell<Document>>, node: NodeId, field: Field) {

@@ -62,3 +62,29 @@ fn a_box_holds_its_top_left_edges_but_not_its_bottom_right() {
     // Then
     assert_eq!((top, bottom), (Some(a), Some(b)));
 }
+
+#[test]
+fn under_a_pointer_transparent_html_and_body_only_an_element_with_auto_is_hit() {
+    // Given: a card over a body that lets the pointer through
+    let (doc, row, a, _) = setup(
+        "html, body { margin: 0; pointer-events: none; } .a, .b { height: 20px; } .a { pointer-events: auto; }",
+    );
+
+    // When
+    let on_card = doc.borrow().hit([5.0, 5.0]);
+    let off_card = doc.borrow().hit([5.0, 30.0]);
+
+    // Then
+    assert_eq!(on_card, Some(a));
+    assert_eq!(off_card, None, "the row {row:?} inherits none");
+}
+
+#[test]
+fn pointer_events_none_is_inherited_so_a_card_without_auto_is_not_hit() {
+    // Given
+    let (doc, _, _, _) =
+        setup("html, body { margin: 0; pointer-events: none; } .a, .b { height: 20px; }");
+
+    // Then
+    assert_eq!(doc.borrow().hit([5.0, 5.0]), None);
+}

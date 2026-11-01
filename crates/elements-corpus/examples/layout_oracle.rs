@@ -11,7 +11,7 @@
 use std::process::ExitCode;
 
 use vapors_elements_corpus::oracle::{
-    boxes, fixture_names, fixtures_dir, to_text, write_fonts, write_images,
+    boxes, fixtures_dir, laid_out_fixture_names, to_text, write_fonts, write_images,
 };
 use vapors_text::comparison::Chromium;
 
@@ -38,7 +38,7 @@ fn run(check: bool) -> Result<(), String> {
     write_fonts(&work)?;
     write_images(&work)?;
     let mut differ = Vec::new();
-    for name in fixture_names()? {
+    for name in laid_out_fixture_names()? {
         let text = to_text(&boxes(&chromium, &work, &name)?);
         let path = fixtures_dir().join(format!("{name}.boxes.json"));
         let current = std::fs::read_to_string(&path).unwrap_or_default();

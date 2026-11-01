@@ -1,0 +1,2415 @@
+{
+  "steps": [
+    {
+      "action": "Key(\"Tab\")",
+      "ax": [
+        {
+          "name": "State",
+          "properties": [
+            "expanded=false",
+            "focused=true"
+          ],
+          "role": "combobox"
+        }
+      ],
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "body",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#cb1-input",
+          "type": "focusin"
+        }
+      ],
+      "focus": "input#cb1-input",
+      "focusVisible": true,
+      "line": 9,
+      "selections": {
+        "input#cb1-input": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#cb1-input": ""
+      }
+    },
+    {
+      "action": "Key(\"ArrowDown\")",
+      "ax": [
+        {
+          "name": "State",
+          "properties": [
+            "activedescendant=option \"Alabama\"",
+            "controls=listbox \"States\"",
+            "expanded=true",
+            "focused=true"
+          ],
+          "role": "combobox"
+        },
+        {
+          "name": "States",
+          "properties": [],
+          "role": "listbox"
+        },
+        {
+          "name": "Alabama",
+          "properties": [
+            "selected=true"
+          ],
+          "role": "option"
+        },
+        {
+          "name": "Alaska",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "American Samoa",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Arizona",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Arkansas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "California",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Colorado",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Connecticut",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Delaware",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "District of Columbia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Florida",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Georgia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Guam",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Hawaii",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Idaho",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Illinois",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Indiana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Iowa",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Kansas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Kentucky",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Louisiana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Maine",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Maryland",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Massachusetts",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Michigan",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Minnesota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Mississippi",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Missouri",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Montana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Nebraska",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Nevada",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Hampshire",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Jersey",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Mexico",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New York",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "North Carolina",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "North Dakota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Northern Marianas Islands",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Ohio",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Oklahoma",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Oregon",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Pennsylvania",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Puerto Rico",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Rhode Island",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "South Carolina",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "South Dakota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Tennessee",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Texas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Utah",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Vermont",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Virginia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Virgin Islands",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Washington",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "West Virginia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Wisconsin",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Wyoming",
+          "properties": [],
+          "role": "option"
+        }
+      ],
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": true,
+          "key": "ArrowDown",
+          "target": "input#cb1-input",
+          "type": "keydown"
+        }
+      ],
+      "focus": "input#cb1-input",
+      "focusVisible": true,
+      "line": 11,
+      "selections": {
+        "input#cb1-input": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#cb1-input": ""
+      }
+    },
+    {
+      "action": "Key(\"ArrowDown\")",
+      "ax": [
+        {
+          "name": "State",
+          "properties": [
+            "activedescendant=option \"Alaska\"",
+            "controls=listbox \"States\"",
+            "expanded=true",
+            "focused=true"
+          ],
+          "role": "combobox"
+        },
+        {
+          "name": "States",
+          "properties": [],
+          "role": "listbox"
+        },
+        {
+          "name": "Alabama",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Alaska",
+          "properties": [
+            "selected=true"
+          ],
+          "role": "option"
+        },
+        {
+          "name": "American Samoa",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Arizona",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Arkansas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "California",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Colorado",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Connecticut",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Delaware",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "District of Columbia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Florida",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Georgia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Guam",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Hawaii",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Idaho",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Illinois",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Indiana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Iowa",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Kansas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Kentucky",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Louisiana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Maine",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Maryland",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Massachusetts",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Michigan",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Minnesota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Mississippi",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Missouri",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Montana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Nebraska",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Nevada",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Hampshire",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Jersey",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Mexico",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New York",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "North Carolina",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "North Dakota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Northern Marianas Islands",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Ohio",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Oklahoma",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Oregon",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Pennsylvania",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Puerto Rico",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Rhode Island",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "South Carolina",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "South Dakota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Tennessee",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Texas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Utah",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Vermont",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Virginia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Virgin Islands",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Washington",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "West Virginia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Wisconsin",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Wyoming",
+          "properties": [],
+          "role": "option"
+        }
+      ],
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": true,
+          "key": "ArrowDown",
+          "target": "input#cb1-input",
+          "type": "keydown"
+        }
+      ],
+      "focus": "input#cb1-input",
+      "focusVisible": true,
+      "line": 13,
+      "selections": {
+        "input#cb1-input": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#cb1-input": ""
+      }
+    },
+    {
+      "action": "Key(\"ArrowUp\")",
+      "ax": [
+        {
+          "name": "State",
+          "properties": [
+            "activedescendant=option \"Alabama\"",
+            "controls=listbox \"States\"",
+            "expanded=true",
+            "focused=true"
+          ],
+          "role": "combobox"
+        },
+        {
+          "name": "States",
+          "properties": [],
+          "role": "listbox"
+        },
+        {
+          "name": "Alabama",
+          "properties": [
+            "selected=true"
+          ],
+          "role": "option"
+        },
+        {
+          "name": "Alaska",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "American Samoa",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Arizona",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Arkansas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "California",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Colorado",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Connecticut",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Delaware",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "District of Columbia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Florida",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Georgia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Guam",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Hawaii",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Idaho",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Illinois",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Indiana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Iowa",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Kansas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Kentucky",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Louisiana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Maine",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Maryland",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Massachusetts",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Michigan",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Minnesota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Mississippi",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Missouri",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Montana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Nebraska",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Nevada",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Hampshire",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Jersey",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Mexico",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New York",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "North Carolina",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "North Dakota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Northern Marianas Islands",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Ohio",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Oklahoma",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Oregon",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Pennsylvania",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Puerto Rico",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Rhode Island",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "South Carolina",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "South Dakota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Tennessee",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Texas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Utah",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Vermont",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Virginia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Virgin Islands",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Washington",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "West Virginia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Wisconsin",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Wyoming",
+          "properties": [],
+          "role": "option"
+        }
+      ],
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": true,
+          "key": "ArrowUp",
+          "target": "input#cb1-input",
+          "type": "keydown"
+        }
+      ],
+      "focus": "input#cb1-input",
+      "focusVisible": true,
+      "line": 15,
+      "selections": {
+        "input#cb1-input": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#cb1-input": ""
+      }
+    },
+    {
+      "action": "Key(\"ArrowUp\")",
+      "ax": [
+        {
+          "name": "State",
+          "properties": [
+            "activedescendant=option \"Wyoming\"",
+            "controls=listbox \"States\"",
+            "expanded=true",
+            "focused=true"
+          ],
+          "role": "combobox"
+        },
+        {
+          "name": "States",
+          "properties": [],
+          "role": "listbox"
+        },
+        {
+          "name": "Alabama",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Alaska",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "American Samoa",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Arizona",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Arkansas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "California",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Colorado",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Connecticut",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Delaware",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "District of Columbia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Florida",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Georgia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Guam",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Hawaii",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Idaho",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Illinois",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Indiana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Iowa",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Kansas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Kentucky",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Louisiana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Maine",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Maryland",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Massachusetts",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Michigan",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Minnesota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Mississippi",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Missouri",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Montana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Nebraska",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Nevada",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Hampshire",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Jersey",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Mexico",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New York",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "North Carolina",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "North Dakota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Northern Marianas Islands",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Ohio",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Oklahoma",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Oregon",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Pennsylvania",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Puerto Rico",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Rhode Island",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "South Carolina",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "South Dakota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Tennessee",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Texas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Utah",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Vermont",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Virginia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Virgin Islands",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Washington",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "West Virginia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Wisconsin",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Wyoming",
+          "properties": [
+            "selected=true"
+          ],
+          "role": "option"
+        }
+      ],
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": true,
+          "key": "ArrowUp",
+          "target": "input#cb1-input",
+          "type": "keydown"
+        }
+      ],
+      "focus": "input#cb1-input",
+      "focusVisible": true,
+      "line": 17,
+      "selections": {
+        "input#cb1-input": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#cb1-input": ""
+      }
+    },
+    {
+      "action": "Key(\"End\")",
+      "ax": [
+        {
+          "name": "State",
+          "properties": [
+            "controls=listbox \"States\"",
+            "expanded=true",
+            "focused=true"
+          ],
+          "role": "combobox"
+        },
+        {
+          "name": "States",
+          "properties": [],
+          "role": "listbox"
+        },
+        {
+          "name": "Alabama",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Alaska",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "American Samoa",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Arizona",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Arkansas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "California",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Colorado",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Connecticut",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Delaware",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "District of Columbia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Florida",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Georgia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Guam",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Hawaii",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Idaho",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Illinois",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Indiana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Iowa",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Kansas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Kentucky",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Louisiana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Maine",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Maryland",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Massachusetts",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Michigan",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Minnesota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Mississippi",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Missouri",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Montana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Nebraska",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Nevada",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Hampshire",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Jersey",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Mexico",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New York",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "North Carolina",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "North Dakota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Northern Marianas Islands",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Ohio",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Oklahoma",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Oregon",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Pennsylvania",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Puerto Rico",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Rhode Island",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "South Carolina",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "South Dakota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Tennessee",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Texas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Utah",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Vermont",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Virginia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Virgin Islands",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Washington",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "West Virginia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Wisconsin",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Wyoming",
+          "properties": [],
+          "role": "option"
+        }
+      ],
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": true,
+          "key": "End",
+          "target": "input#cb1-input",
+          "type": "keydown"
+        }
+      ],
+      "focus": "input#cb1-input",
+      "focusVisible": true,
+      "line": 19,
+      "selections": {
+        "input#cb1-input": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#cb1-input": ""
+      }
+    },
+    {
+      "action": "Key(\"ArrowDown\")",
+      "ax": [
+        {
+          "name": "State",
+          "properties": [
+            "activedescendant=option \"Alabama\"",
+            "controls=listbox \"States\"",
+            "expanded=true",
+            "focused=true"
+          ],
+          "role": "combobox"
+        },
+        {
+          "name": "States",
+          "properties": [],
+          "role": "listbox"
+        },
+        {
+          "name": "Alabama",
+          "properties": [
+            "selected=true"
+          ],
+          "role": "option"
+        },
+        {
+          "name": "Alaska",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "American Samoa",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Arizona",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Arkansas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "California",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Colorado",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Connecticut",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Delaware",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "District of Columbia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Florida",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Georgia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Guam",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Hawaii",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Idaho",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Illinois",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Indiana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Iowa",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Kansas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Kentucky",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Louisiana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Maine",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Maryland",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Massachusetts",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Michigan",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Minnesota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Mississippi",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Missouri",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Montana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Nebraska",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Nevada",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Hampshire",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Jersey",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Mexico",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New York",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "North Carolina",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "North Dakota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Northern Marianas Islands",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Ohio",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Oklahoma",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Oregon",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Pennsylvania",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Puerto Rico",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Rhode Island",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "South Carolina",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "South Dakota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Tennessee",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Texas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Utah",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Vermont",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Virginia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Virgin Islands",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Washington",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "West Virginia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Wisconsin",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Wyoming",
+          "properties": [],
+          "role": "option"
+        }
+      ],
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": true,
+          "key": "ArrowDown",
+          "target": "input#cb1-input",
+          "type": "keydown"
+        }
+      ],
+      "focus": "input#cb1-input",
+      "focusVisible": true,
+      "line": 21,
+      "selections": {
+        "input#cb1-input": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#cb1-input": ""
+      }
+    },
+    {
+      "action": "Key(\"Escape\")",
+      "ax": [
+        {
+          "name": "State",
+          "properties": [
+            "expanded=false",
+            "focused=true"
+          ],
+          "role": "combobox"
+        }
+      ],
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": true,
+          "key": "Escape",
+          "target": "input#cb1-input",
+          "type": "keydown"
+        }
+      ],
+      "focus": "input#cb1-input",
+      "focusVisible": true,
+      "line": 23,
+      "selections": {
+        "input#cb1-input": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#cb1-input": ""
+      }
+    },
+    {
+      "action": "Key(\"ArrowDown\")",
+      "ax": [
+        {
+          "name": "State",
+          "properties": [
+            "activedescendant=option \"Alabama\"",
+            "controls=listbox \"States\"",
+            "expanded=true",
+            "focused=true"
+          ],
+          "role": "combobox"
+        },
+        {
+          "name": "States",
+          "properties": [],
+          "role": "listbox"
+        },
+        {
+          "name": "Alabama",
+          "properties": [
+            "selected=true"
+          ],
+          "role": "option"
+        },
+        {
+          "name": "Alaska",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "American Samoa",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Arizona",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Arkansas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "California",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Colorado",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Connecticut",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Delaware",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "District of Columbia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Florida",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Georgia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Guam",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Hawaii",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Idaho",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Illinois",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Indiana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Iowa",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Kansas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Kentucky",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Louisiana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Maine",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Maryland",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Massachusetts",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Michigan",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Minnesota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Mississippi",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Missouri",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Montana",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Nebraska",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Nevada",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Hampshire",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Jersey",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New Mexico",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "New York",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "North Carolina",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "North Dakota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Northern Marianas Islands",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Ohio",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Oklahoma",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Oregon",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Pennsylvania",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Puerto Rico",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Rhode Island",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "South Carolina",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "South Dakota",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Tennessee",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Texas",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Utah",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Vermont",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Virginia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Virgin Islands",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Washington",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "West Virginia",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Wisconsin",
+          "properties": [],
+          "role": "option"
+        },
+        {
+          "name": "Wyoming",
+          "properties": [],
+          "role": "option"
+        }
+      ],
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": true,
+          "key": "ArrowDown",
+          "target": "input#cb1-input",
+          "type": "keydown"
+        }
+      ],
+      "focus": "input#cb1-input",
+      "focusVisible": true,
+      "line": 25,
+      "selections": {
+        "input#cb1-input": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#cb1-input": ""
+      }
+    },
+    {
+      "action": "Key(\"Enter\")",
+      "ax": [
+        {
+          "name": "State",
+          "properties": [
+            "expanded=false",
+            "focused=true"
+          ],
+          "role": "combobox"
+        }
+      ],
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": true,
+          "key": "Enter",
+          "target": "input#cb1-input",
+          "type": "keydown"
+        }
+      ],
+      "focus": "input#cb1-input",
+      "focusVisible": true,
+      "line": 27,
+      "selections": {
+        "input#cb1-input": [
+          7,
+          7
+        ]
+      },
+      "values": {
+        "input#cb1-input": "Alabama"
+      }
+    },
+    {
+      "action": "Key(\"Escape\")",
+      "ax": [
+        {
+          "name": "State",
+          "properties": [
+            "expanded=false",
+            "focused=true"
+          ],
+          "role": "combobox"
+        }
+      ],
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": true,
+          "key": "Escape",
+          "target": "input#cb1-input",
+          "type": "keydown"
+        }
+      ],
+      "focus": "input#cb1-input",
+      "focusVisible": true,
+      "line": 29,
+      "selections": {
+        "input#cb1-input": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#cb1-input": ""
+      }
+    }
+  ]
+}

@@ -49,6 +49,8 @@ struct Player<'a> {
     pointer: Pointer,
     values: String,
     checked: String,
+    /// `project`'s roles.
+    project: Vec<String>,
 }
 
 /// Each step's answers, or every expectation that did not hold, as
@@ -71,12 +73,15 @@ pub fn play(
         pointer: Pointer::default(),
         values,
         checked,
+        project: script.project.clone(),
     };
     let types = serde_json::to_string(&script.listen).map_err(|e| e.to_string())?;
     let capture = serde_json::to_string(&script.capture).map_err(|e| e.to_string())?;
+    let cancel = serde_json::to_string(&script.cancel).map_err(|e| e.to_string())?;
     let page_side = PAGE_SIDE
         .replace("__TYPES__", &types)
-        .replace("__CAPTURE__", &capture);
+        .replace("__CAPTURE__", &capture)
+        .replace("__CANCEL__", &cancel);
     player
         .evaluate(&page_side, deadline)
         .map_err(|e| format!("{name}.events: {e}"))?;
@@ -131,9 +136,24 @@ impl Player<'_> {
             self.deadline,
         )?;
         let selections = self.evaluate("window.__eventsSelections()", self.deadline)?;
-        Ok(
-            json!({ "line": step.line, "action": format!("{:?}", step.action), "events": events, "focus": focus["focus"], "focusVisible": focus["focusVisible"], "values": values, "checked": checked, "selections": selections }),
-        )
+        let ax = self.projection()?;
+        let mut answer = json!({ "line": step.line, "action": format!("{:?}", step.action), "events": events, "focus": focus["focus"], "focusVisible": focus["focusVisible"], "values": values, "checked": checked, "selections": selections });
+        if !ax.is_null() {
+            answer["ax"] = ax;
+        }
+        Ok(answer)
+    }
+
+    /// The a11y projection to `project`'s roles, or null without them.
+    fn projection(&mut self) -> Result<Value, String> {
+        if self.project.is_empty() {
+            return Ok(Value::Null);
+        }
+        let tree = self
+            .session
+            .call("Accessibility.getFullAXTree", &json!({}), self.deadline)?;
+        let reduced = crate::ax_tree::reduce(&tree)?;
+        crate::ax_projection::project(&reduced, &self.project)
     }
 
     /// After the last step, [`SETTLE`] and two more frames; any event

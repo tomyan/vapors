@@ -1,0 +1,30 @@
+# A combobox's keys (5-A1's start, the listbox slice), played on APG's own
+# "Editable Combobox With List Autocomplete" example in Chromium (apg/,
+# see apg/NOTICE.md) and on vapors' defaults in combobox.wisp: the
+# projection of the combobox, its listbox and options after each key.
+# No typing: filtering the options as you type is the app's.
+page apg/combobox-autocomplete-list.html
+project combobox listbox option
+listen keydown focusin
+key Tab                       focus: closed, nothing active
+expect focus input#cb1-input
+key ArrowDown                 opens on the first option
+expect focus input#cb1-input
+key ArrowDown                 the next
+expect focus input#cb1-input
+key ArrowUp                   back
+expect focus input#cb1-input
+key ArrowUp                   past the first: wraps to the last
+expect focus input#cb1-input
+key End                       the caret's key: no option active, still open
+expect focus input#cb1-input
+key ArrowDown                 the first again
+expect focus input#cb1-input
+key Escape                    closes
+expect value input#cb1-input ""
+key ArrowDown                 opens on the first
+expect focus input#cb1-input
+key Enter                     chooses it: the field takes its text, closed
+expect value input#cb1-input Alabama
+key Escape                    closed already: clears the field
+expect value input#cb1-input ""
