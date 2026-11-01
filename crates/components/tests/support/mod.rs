@@ -71,14 +71,10 @@ impl Mounted {
     pub fn key(&self, key: &str) -> bool {
         let mut event = Event::new("keydown").with_key(key);
         let input = self.input();
-        let listeners =
-            vapors_dom::Listeners::listeners_along(&*self.dom.borrow(), input, "keydown");
+        let along = vapors_dom::Listeners::listeners_along(&*self.dom.borrow(), input, "keydown")
+            .expect("the input is in the tree");
         event = event.at(input);
-        for (_, handlers) in listeners {
-            for handler in handlers {
-                (handler.borrow_mut())(&mut event);
-            }
-        }
+        vapors_dom::run_along(along, &mut event, |_, _| {});
         event.default_prevented()
     }
 

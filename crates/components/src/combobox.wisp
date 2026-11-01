@@ -43,21 +43,10 @@ let active_id = {
     move || active.get().map(&option_id).unwrap_or_default()
 };
 
-// One signal per option row for its node, made under the component's
-// owner so a row's removal does not dispose it.
-let slots_owner = Owner::new();
-let slots: std::rc::Rc<std::cell::RefCell<Vec<Signal<Option<NodeId>>>>> = std::rc::Rc::default();
-let slot = move |index: usize| -> Signal<Option<NodeId>> {
-    let mut slots = slots.borrow_mut();
-    while slots.len() <= index {
-        slots.push(slots_owner.with(|| Signal::new(None)));
-    }
-    slots[index]
-};
+// Each option row's node, under the row's key (its index).
+let option_nodes: Signal<std::collections::BTreeMap<usize, NodeId>> = Signal::new(std::collections::BTreeMap::new());
 
-let keys = {
-let slot = slot.clone();
-move |event: &mut Event| {
+let keys = move |event: &mut Event| {
     let count = options.with_untracked(Vec::len);
     let key = event.key().to_owned();
     match key.as_str() {
@@ -84,8 +73,8 @@ move |event: &mut Event| {
         "Enter" => {
             event.prevent_default();
             if let Some(at) = active.get_untracked() {
-                let chosen = slot(at)
-                    .get_untracked()
+                let chosen = option_nodes
+                    .with_untracked(|nodes| nodes.get(&at).copied())
                     .is_some_and(|node| events.emit(node, Event::new("optionchoose")));
                 if !chosen {
                     return;
@@ -111,8 +100,7 @@ move |event: &mut Event| {
         }
         _ => {}
     }
-}
 };
 </script>
 
-<input id={id} type="text" role="combobox" aria-autocomplete="list" aria-label={label} aria-expanded={expanded.get()} aria-controls={list_id} aria-activedescendant={active_id()} bind:value={value} bind:this={field} onkeydown={keys} />{if expanded.get()}<div id={list_id} role="listbox" aria-label={list_label} class="combobox-list">{for row in options.get().into_iter().enumerate().collect::<Vec<_>>() key=row.0}<div id={option_id(row.get().0)} role="option" aria-selected={active.get() == Some(row.get().0)} bind:this={slot(row.get_untracked().0)}>{row.get().1}</div>{/for}</div>{/if}
+<input id={id} type="text" role="combobox" aria-autocomplete="list" aria-label={label} aria-expanded={expanded.get()} aria-controls={list_id} aria-activedescendant={active_id()} bind:value={value} bind:this={field} onkeydown={keys} />{if expanded.get()}<div id={list_id} role="listbox" aria-label={list_label} class="combobox-list">{for row in options.get().into_iter().enumerate().collect::<Vec<_>>() key=row.0}<div id={option_id(row.get().0)} role="option" aria-selected={active.get() == Some(row.get().0)} bind:this={option_nodes}>{row.get().1}</div>{/for}</div>{/if}
