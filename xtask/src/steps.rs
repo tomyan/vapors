@@ -5,6 +5,10 @@
 
 pub use crate::step::Step;
 
+#[path = "steps_tiers.rs"]
+mod tiers;
+use tiers::{gpu, unit};
+
 fn tools() -> Step {
     Step::new(
         "tools",
@@ -139,28 +143,6 @@ fn wasm_release(web_package: &str) -> Step {
         ],
         "a binding or import only debug builds use: cfg it out in release, or use it there",
     ))
-}
-
-// GPU tests are test functions whose names start with `gpu_` (kept in
-// `tests/gpu_*.rs` files); the tiers split on the function name because
-// nextest refuses a `binary()` filter that matches no binary, and a
-// repository may have no GPU tests yet.
-fn unit() -> Step {
-    Step::new(
-        "unit",
-        "cargo",
-        &["nextest", "run", "--workspace", "-E", "not test(/^gpu_/)"],
-        "run the failing test alone with `cargo nextest run <name>`",
-    )
-}
-
-fn gpu() -> Step {
-    Step::new(
-        "gpu",
-        "cargo",
-        &["nextest", "run", "--workspace", "-E", "test(/^gpu_/)"],
-        "needs a Vulkan adapter; the failure names what was found and how to select one",
-    )
 }
 
 /// Everything CI runs, fastest first. `web_package` is `web.package`
