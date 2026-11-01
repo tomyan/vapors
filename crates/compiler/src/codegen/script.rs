@@ -34,6 +34,8 @@ pub(crate) struct ScriptInfo {
     pub props: Vec<Prop>,
     /// Closure bindings and how many parameters each takes.
     pub handlers: HashMap<String, usize>,
+    /// Handlers that assign to a binding they capture, and the binding.
+    pub assigning: HashMap<String, String>,
     /// Names that read as `name.get()` in text holes.
     pub unwrappable: Vec<String>,
     /// Other bindings: cloned into each closure that reads them.
@@ -143,6 +145,9 @@ fn classify_plain(name: Option<String>, init: Option<&syn::Expr>, info: &mut Scr
     };
     if let Some(syn::Expr::Closure(closure)) = init {
         info.handlers.insert(name.clone(), closure.inputs.len());
+        if let Some(captured) = super::handler_capture::assigned_capture(closure) {
+            info.assigning.insert(name.clone(), captured);
+        }
     }
     info.bindings.push(name);
 }

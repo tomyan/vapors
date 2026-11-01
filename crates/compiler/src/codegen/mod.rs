@@ -16,6 +16,7 @@ mod emit;
 mod events_decl;
 mod for_block;
 mod format;
+mod handler_capture;
 mod names;
 mod prop_suggestion;
 mod props_index;

@@ -37,34 +37,49 @@ fn walk(nodes: &[Node], found: &mut Vec<String>) {
     }
 }
 
-/// `events()`: the component's own event names and its children's,
-/// with the script's `use` items, which bring the children's types in.
+/// `events()` and `events_into()`: the component's own event names and
+/// its children's, with the script's `use` items, which bring the
+/// children's types in. A type already listed is skipped, so a component
+/// that uses itself, directly or through another, ends.
 pub(crate) fn events_method(own: &[String], children: &[String], uses: &[&String]) -> String {
-    let own: Vec<String> = own.iter().map(|name| format!("{name:?}")).collect();
-    let binding = if children.is_empty() {
-        "let"
-    } else {
-        "let mut"
-    };
-    let mut body = String::new();
+    let mut imports = String::new();
     for item in uses {
-        let _ = writeln!(body, "#[allow(unused_imports)]\n{item}");
+        let _ = writeln!(imports, "        #[allow(unused_imports)]\n        {item}");
     }
-    let _ = writeln!(
-        body,
-        "{binding} events: Vec<&'static str> = vec![{}];",
-        own.join(", ")
-    );
+    let mut body = String::new();
+    if !own.is_empty() {
+        let own: Vec<String> = own.iter().map(|name| format!("{name:?}")).collect();
+        let _ = writeln!(body, "            events.extend([{}]);", own.join(", "));
+    }
     for child in children {
-        let _ = writeln!(body, "events.extend({child}::events());");
+        let _ = writeln!(body, "            {child}::events_into(seen, events);");
     }
+    // a type that dispatches nothing and has no children adds nothing
+    let (into, listed) = if body.is_empty() {
+        (
+            "_events",
+            "        seen.insert(std::any::type_name::<Self>());\n".to_owned(),
+        )
+    } else {
+        (
+            "events",
+            format!("        if seen.insert(std::any::type_name::<Self>()) {{\n{body}        }}\n"),
+        )
+    };
     format!(
         "    /// The events this component type dispatches itself, its child
     /// components' included, which `mount` declares to the tree.
     #[must_use]
     pub fn events() -> Vec<&'static str> {{
-        {body}        events
+        let mut events = Vec::new();
+        Self::events_into(&mut std::collections::BTreeSet::new(), &mut events);
+        events
     }}
+
+    /// [`Self::events`] onto `events`, unless this type is in `seen`
+    /// already: a component that uses itself is listed once.
+    pub fn events_into(seen: &mut std::collections::BTreeSet<&'static str>, {into}: &mut Vec<&'static str>) {{
+{imports}{listed}    }}
 "
     )
 }

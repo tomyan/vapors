@@ -16,7 +16,7 @@ fn seen(message: &str) {
 #[test]
 fn an_err_goes_to_the_installed_report_and_ok_to_nothing() {
     // Given
-    set_error_report(seen);
+    set_error_report("seen", seen);
 
     // When
     Ok::<(), String>(()).report();
@@ -31,4 +31,26 @@ fn an_err_goes_to_the_installed_report_and_ok_to_nothing() {
 #[should_panic(expected = "a listener failed: lost; no error report is installed")]
 fn an_err_with_no_report_installed_panics_with_it() {
     Err::<(), &str>("lost").report();
+}
+
+#[test]
+fn the_same_report_installed_again_is_kept() {
+    // Given
+    set_error_report("seen", seen);
+
+    // When
+    set_error_report("seen", seen);
+    Err::<(), &str>("twice").report();
+
+    // Then
+    SEEN.with(|seen| assert_eq!(*seen.borrow(), ["a listener failed: twice"]));
+}
+
+#[test]
+#[should_panic(
+    expected = "the error report `seen` is installed on this thread, and `other` would replace it"
+)]
+fn another_report_over_an_installed_one_panics_naming_both() {
+    set_error_report("seen", seen);
+    set_error_report("other", seen);
 }

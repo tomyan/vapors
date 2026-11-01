@@ -103,6 +103,7 @@ impl Emitter<'_> {
     /// report (`vapors_dom::handle`).
     fn handler_expr(&self, expr: &Expr) -> Result<String, CompileError> {
         let code = self.raw(expr)?;
+        self.refuse_assigning_handler(expr, &code)?;
         Ok(match self.script.handlers.get(&code) {
             Some(0) => {
                 format!("move |_event: &mut Event| vapors_dom::handle_without_event(&{code})")

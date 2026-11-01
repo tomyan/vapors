@@ -10,13 +10,29 @@ use std::fmt::Display;
 
 use crate::Event;
 
+/// An installed error report: its name, and where errors go.
+type Report = (&'static str, fn(&str));
+
 thread_local! {
-    static REPORT: Cell<Option<fn(&str)>> = const { Cell::new(None) };
+    static REPORT: Cell<Option<Report>> = const { Cell::new(None) };
 }
 
-/// Sends every listener's `Err` to `report` from now on, on this thread.
-pub fn set_error_report(report: fn(&str)) {
-    REPORT.with(|cell| cell.set(Some(report)));
+/// Sends every listener's `Err` to `report`, named `name`, from now on,
+/// on this thread. Installing the same name again keeps it.
+///
+/// # Panics
+/// When a report of another name is installed on this thread: one
+/// would silently take the other's errors, so neither is replaced
+/// quietly. Install one report, before the app (`ElementsApp::new`
+/// installs the platform's).
+pub fn set_error_report(name: &'static str, report: fn(&str)) {
+    REPORT.with(|cell| match cell.get() {
+        None => cell.set(Some((name, report))),
+        Some((installed, _)) if installed == name => {}
+        Some((installed, _)) => panic!(
+            "the error report `{installed}` is installed on this thread, and `{name}` would replace it: install one report, once"
+        ),
+    });
 }
 
 /// A listener's return value, which the compiler's listener wrapper
@@ -38,7 +54,7 @@ impl<E: Display> ListenerResult for Result<(), E> {
         let Err(error) = self else { return };
         let message = format!("a listener failed: {error}");
         match REPORT.with(Cell::get) {
-            Some(report) => report(&message),
+            Some((_, report)) => report(&message),
             None => {
                 panic!("{message}; no error report is installed (vapors_dom::set_error_report)")
             }

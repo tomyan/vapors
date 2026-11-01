@@ -110,8 +110,17 @@ impl Counter {
     /// components' included, which `mount` declares to the tree.
     #[must_use]
     pub fn events() -> Vec<&'static str> {
-        let events: Vec<&'static str> = vec![];
+        let mut events = Vec::new();
+        Self::events_into(&mut std::collections::BTreeSet::new(), &mut events);
         events
+    }
+    /// [`Self::events`] onto `events`, unless this type is in `seen`
+    /// already: a component that uses itself is listed once.
+    pub fn events_into(
+        seen: &mut std::collections::BTreeSet<&'static str>,
+        _events: &mut Vec<&'static str>,
+    ) {
+        seen.insert(std::any::type_name::<Self>());
     }
     /// The top-level nodes now, in order, including those of a block
     /// or child component at the top level.

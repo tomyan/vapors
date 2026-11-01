@@ -90,7 +90,10 @@ the one difference from the brief in this slice.
   is the attribute name after `on`. The handler is a script closure or
   an inline closure that takes `&mut Event`. It returns `()` or
   `Result<(), E>` with `E: Display`, so it may use `?`; an `Err` goes to
-  the app's error report. Events bubble.
+  the app's error report. A handler is `Fn`, since a listener may run
+  again inside itself when it dispatches: it keeps its state in a
+  signal or a `Cell`, and one that assigns to a binding it captures
+  (`n += 1`, `&mut n`) is refused, naming the binding. Events bubble.
   `event.stop_propagation()` and `event.prevent_default()` work as in
   the DOM.
 - **Bindings:** `bind:value={signal}` on `input`, `textarea` and
