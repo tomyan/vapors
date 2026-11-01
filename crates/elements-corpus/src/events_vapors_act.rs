@@ -101,7 +101,9 @@ fn key(
     clipboard: Option<&str>,
 ) -> Result<(), String> {
     let (key, modifiers) = key_of(combination);
-    sent(doc, |doc| Document::key_pressed(doc, &key, modifiers));
+    sent(doc, |doc| {
+        Document::key_pressed(doc, &key, modifiers);
+    });
     if combination == "Control+v" {
         let text =
             clipboard.ok_or("Control+v before any `clipboard` step: set the clipboard first")?;

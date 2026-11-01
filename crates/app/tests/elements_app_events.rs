@@ -45,7 +45,7 @@ fn setup() -> (Rc<RefCell<Document>>, Rc<RefCell<u32>>) {
 fn a_press_and_release_in_physical_pixels_click_the_button_at_2x() {
     // Given: the button covers CSS x 0..100, so physical x 150 is CSS 75
     let (doc, clicks) = setup();
-    let mut app = ElementsApp::new(Rc::clone(&doc)).with_scale(2.0);
+    let mut app = ElementsApp::new(Rc::clone(&doc));
     let platform = Platform::detached();
 
     // When
@@ -75,7 +75,7 @@ fn a_press_and_release_in_physical_pixels_click_the_button_at_2x() {
 fn a_press_outside_the_button_at_2x_clicks_nothing() {
     // Given: physical x 250 is CSS 125, past the button's 100
     let (doc, clicks) = setup();
-    let mut app = ElementsApp::new(Rc::clone(&doc)).with_scale(2.0);
+    let mut app = ElementsApp::new(Rc::clone(&doc));
     let platform = Platform::detached();
 
     // When
@@ -101,7 +101,7 @@ fn a_press_outside_the_button_at_2x_clicks_nothing() {
 fn an_event_that_changes_nothing_asks_for_no_frame() {
     // Given
     let (doc, _) = setup();
-    let mut app = ElementsApp::new(Rc::clone(&doc)).with_scale(2.0);
+    let mut app = ElementsApp::new(Rc::clone(&doc));
     let platform = Platform::detached();
 
     // When: a key the document does not take
@@ -115,7 +115,7 @@ fn an_event_that_changes_nothing_asks_for_no_frame() {
 fn a_tab_key_moves_focus_to_the_button_and_enter_clicks_it() {
     // Given
     let (doc, clicks) = setup();
-    let mut app = ElementsApp::new(Rc::clone(&doc)).with_scale(2.0);
+    let mut app = ElementsApp::new(Rc::clone(&doc));
     let platform = Platform::detached();
     let key = |key: &str, pressed| Event::Key {
         key: key.to_owned(),

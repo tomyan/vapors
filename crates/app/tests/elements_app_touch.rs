@@ -84,7 +84,7 @@ fn drag(app: &mut ElementsApp, from: f32) {
 fn a_pan_scrolls_the_list_and_cancels_an_uncaptured_touch() {
     // Given
     let (doc, list, log) = list();
-    let mut app = ElementsApp::new(Rc::clone(&doc)).with_scale(1.0);
+    let mut app = ElementsApp::new(Rc::clone(&doc));
 
     // When: on the item
     drag(&mut app, 60.0);
@@ -98,7 +98,7 @@ fn a_pan_scrolls_the_list_and_cancels_an_uncaptured_touch() {
 fn a_captured_touch_owns_its_pans() {
     // Given
     let (doc, list, log) = list();
-    let mut app = ElementsApp::new(Rc::clone(&doc)).with_scale(1.0);
+    let mut app = ElementsApp::new(Rc::clone(&doc));
 
     // When: on the thumb
     drag(&mut app, 15.0);
@@ -113,7 +113,7 @@ fn a_pan_cancels_an_uncaptured_touch_even_when_nothing_scrolls() {
     // Given: a list already at its end, so a pan up moves nothing
     let (doc, list, log) = list();
     doc.borrow_mut().scroll_node_by(list, [0.0, 200.0]);
-    let mut app = ElementsApp::new(Rc::clone(&doc)).with_scale(1.0);
+    let mut app = ElementsApp::new(Rc::clone(&doc));
     let platform = Platform::detached();
 
     // When: a finger on the item pans the list further down
