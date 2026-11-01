@@ -33,6 +33,7 @@ fn painted_tick(shown: &vapors_demos::Shown) -> Vec<u8> {
         scissor: None,
     };
     ScenePainter::new(&gpu.device, texture.format())
+        .expect("Rgba8Unorm is drawn")
         .draw(&target, painted)
         .expect("paints");
     let rgba = read_rgba8(&gpu.device, &gpu.queue, &texture);

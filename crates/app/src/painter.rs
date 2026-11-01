@@ -1,7 +1,7 @@
-//! Drawing an update: clear to the canvas colour (or not, drawing over
-//! what the target holds), then each run of the scene's items with the pipeline for its kind, in painting order,
-//! under the run's clip as a scissor; a run clipped to nothing is not
-//! drawn.
+//! Drawing an update: clear to the canvas colour (or, drawing over what
+//! the target holds, not), then each run of the scene's items with the
+//! pipeline for its kind, in painting order, under the run's clip as a
+//! scissor; a run clipped to nothing is not drawn.
 
 use vapors_elements::Painted;
 use vapors_renderer::{ImagePipeline, QuadPipeline, ShadowPipeline, Target, clear_view};
@@ -19,18 +19,31 @@ pub struct ScenePainter {
 }
 
 impl ScenePainter {
-    /// Pipelines for targets of `format`.
-    #[must_use]
-    pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+    /// Pipelines for targets of `format`: `Rgba8Unorm` or `Bgra8Unorm`,
+    /// the formats its shaders write sRGB-encoded values for (as the
+    /// platform's surfaces are).
+    ///
+    /// # Errors
+    ///
+    /// [`UnsupportedFormat`] for any other format, whose colours would
+    /// come out wrong: an sRGB format encodes twice, a float format
+    /// holds encoded values as linear ones.
+    pub fn new(
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+    ) -> Result<Self, UnsupportedFormat> {
+        if !SUPPORTED.contains(&format) {
+            return Err(UnsupportedFormat(format));
+        }
         let atlas = GlyphAtlas::new(AtlasConfig::default());
-        Self {
+        Ok(Self {
             shadows: ShadowPipeline::new(device, format),
             quads: QuadPipeline::new(device, format),
             text: TextPipeline::new(device, format, &atlas),
             atlas,
             images: ImagePipeline::new(device, format),
             textures: Textures::default(),
-        }
+        })
     }
 
     /// Clears `target` to the canvas colour and draws the scene over it.
@@ -41,7 +54,7 @@ impl ScenePainter {
     /// glyphs do not fit the atlas page; the frame is then incomplete.
     pub fn draw(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), AtlasError> {
         clear_view(target.device, target.queue, target.view, painted.canvas());
-        self.draw_over(target, painted)
+        self.paint(target, painted)
     }
 
     /// Draws the scene over what `target` already holds, with no clear
@@ -50,8 +63,22 @@ impl ScenePainter {
     ///
     /// # Errors
     ///
-    /// As [`ScenePainter::draw`].
-    pub fn draw_over(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), AtlasError> {
+    /// [`DrawOverError::CanvasBackground`], drawing nothing, when `html`
+    /// or `body` sets a background: it is the canvas's, which drawing
+    /// over never paints. As [`ScenePainter::draw`] otherwise.
+    pub fn draw_over(
+        &mut self,
+        target: &Target<'_>,
+        painted: &Painted,
+    ) -> Result<(), DrawOverError> {
+        if let Some(from) = painted.canvas_from() {
+            return Err(DrawOverError::CanvasBackground(from));
+        }
+        self.paint(target, painted).map_err(DrawOverError::Atlas)
+    }
+
+    /// Each run of the scene, in order, under its clip.
+    fn paint(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), AtlasError> {
         self.atlas.begin_frame();
         self.textures.begin_frame();
         for batch in painted.scene().batches() {
@@ -136,6 +163,9 @@ fn clipped<'a>(target: &Target<'a>, clip: Option<Rect>) -> Option<Target<'a>> {
 #[path = "painter_images.rs"]
 mod images;
 use images::Textures;
+#[path = "painter_errors.rs"]
+mod errors;
+pub use errors::{DrawOverError, SUPPORTED, UnsupportedFormat};
 
 #[cfg(test)]
 #[path = "painter_tests.rs"]

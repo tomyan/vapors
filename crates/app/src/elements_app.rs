@@ -38,7 +38,7 @@ pub struct ElementsApp {
     document: Rc<RefCell<Document>>,
     painter: Option<ScenePainter>,
     failure: Failure,
-    /// Input routed into the document, at the last frame's scale.
+    /// Input given to the document, at its last update's scale.
     input: DocumentInput,
     /// Called before each update with the last frame's phase times.
     per_frame: Option<PerFrame>,
@@ -66,7 +66,7 @@ impl ElementsApp {
             document,
             painter: None,
             failure: Failure::default(),
-            input: DocumentInput::new(1.0),
+            input: DocumentInput::new(),
             per_frame: None,
             frame_times: None,
             last_times: None,
@@ -89,14 +89,6 @@ impl ElementsApp {
     #[must_use]
     pub fn with_frame_times(mut self, frame_times: FrameTimesHook) -> Self {
         self.frame_times = Some(frame_times);
-        self
-    }
-
-    /// Takes input as if the display scale were `scale`, until the first
-    /// frame says what it is: for driving `event` without a window.
-    #[must_use]
-    pub fn with_scale(mut self, scale: f32) -> Self {
-        self.input.set_scale(scale);
         self
     }
 
@@ -144,12 +136,22 @@ impl App for ElementsApp {
 impl ElementsApp {
     /// An event, dispatched as it arrives (design 02, 2-S1).
     fn handle(&mut self, event: &Event, platform: &Platform) {
-        let handled = self.input.handle(&self.document, event);
-        if handled.changed {
-            platform.request_redraw();
-        }
-        if let Some(cursor) = handled.cursor {
-            platform.set_cursor(cursor);
+        match self.input.handle(&self.document, event) {
+            Ok(outcome) => {
+                if outcome.changed {
+                    platform.request_redraw();
+                }
+                if let Some(cursor) = outcome.cursor {
+                    platform.set_cursor(cursor);
+                }
+            }
+            // Before the first frame nothing is on screen, so the event
+            // was aimed at nothing; it is dropped.
+            Err(crate::document_input::Unplaced::NotUpdated) => {}
+            Err(unplaced) => {
+                report_error(&unplaced.to_string());
+                self.failure.set(&unplaced.to_string());
+            }
         }
     }
 }
