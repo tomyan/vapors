@@ -26,7 +26,9 @@ writing them with its resolution, or the note that it is open.
    mutations, so dispatching would apply default actions twice.
 4. **One element tree.** `Document` implements `Dom`, `css::Element`,
    Taffy's traits, the hit test, the a11y projection and the recorder's
-   source. A scene (9) is a node kind in it, not a second tree.
+   source. A scene (9) is a node kind in it, not a second tree. A
+   component reaches its own elements through `bind:this` references
+   (1), declared where the element is, never by a query.
 5. **One GPU device.** Created by the platform, shared by the painter,
    the text atlas, scenes and the app's engine. Web devices cannot be
    shared across workers, so render-in-a-worker moves the whole frame
