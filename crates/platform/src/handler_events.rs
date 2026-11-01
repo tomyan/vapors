@@ -62,6 +62,10 @@ impl ApplicationHandler<Message> for Handler {
         if let Some(window) = &self.window {
             self.input.set_scale(window.scale_factor());
         }
+        #[cfg(not(target_family = "wasm"))]
+        if let WindowEvent::Ime(ime) = &event {
+            self.ime(ime);
+        }
         for app_event in self.input.translate(&event) {
             self.app.event(app_event, &self.platform);
         }

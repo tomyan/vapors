@@ -421,6 +421,22 @@ words), the keyboard opening on a tap, the candidate window's place.
 Not built: EditContext, copy and cut, the a11y mirror's ownership of
 the textarea (area 5).
 
+As built (E6c, native IME, 2026-11-01): while a text field has focus
+the window allows the system IME (`set_ime_allowed`) and places its
+candidate window at the field's caret (`set_ime_cursor_area`, from the
+field the app sets for the text input). winit's `Ime` events become the
+same `Event::TextEdited` the web's textarea sends, kept against that
+field: a preedit replaces the selection when it starts and its own
+range after, in the value while it composes and underlined, its caret
+where the IME puts it; a commit replaces the composing range and ends
+it; `Disabled` clears a composition; a field set with another text, or
+none, ends it. So the web and the desktop agree with Chromium's
+`<input>`. Checked by unit tests on winit's own documented sequences
+(pinyin, a dead key over a selection); not checked with a real IME,
+which needs a desktop session (macOS, Windows, Linux with IBus or
+Fcitx) at the sign-off, including whether a platform also sends a
+key's text alongside its commit.
+
 ## Text editing and IME
 
 One editing model for single- and multi-line fields, built on Parley's
