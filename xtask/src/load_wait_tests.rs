@@ -29,6 +29,7 @@ impl Clock for FakeClock {
 }
 
 const SETTINGS: Settings = Settings {
+    enabled: true,
     threshold: 12.0,
     deadline: Duration::from_secs(600),
 };
@@ -118,36 +119,30 @@ fn an_unreadable_load_is_refused_not_taken_as_low() {
 }
 
 #[test]
-fn the_threshold_is_the_core_count_unless_the_config_sets_it() {
+fn with_the_wait_turned_off_it_does_not_read_the_load_and_says_why() {
     // Given
-    let unset = Config::parse("").expect("empty");
-    let set = Config::parse("[load]\nthreshold = \"8\"\ndeadline_minutes = \"2\"\n").expect("set");
+    let off = Settings {
+        enabled: false,
+        ..SETTINGS
+    };
+    let mut load = || -> Result<f64, String> { panic!("the load was read") };
 
     // When
-    let (default, configured) = (settings(&unset, 12), settings(&set, 12));
+    let outcome = wait(off, false, &mut load, &FakeClock::new(), &mut |_| {});
 
     // Then
-    assert_eq!(default, Ok(SETTINGS));
     assert_eq!(
-        configured,
-        Ok(Settings {
-            threshold: 8.0,
-            deadline: Duration::from_secs(120)
-        })
+        outcome,
+        Ok(Outcome::Skipped(
+            "[load] wait = false in .config/factory.toml"
+        ))
     );
 }
 
 #[test]
-fn a_setting_that_is_not_a_positive_number_is_refused_naming_it() {
-    for text in [
-        "[load]\nthreshold = \"0\"\n",
-        "[load]\ndeadline_minutes = \"soon\"\n",
-    ] {
-        // When
-        let refusal = settings(&Config::parse(text).expect(text), 12).expect_err(text);
-
-        // Then
-        assert!(refusal.starts_with("[load] "), "{refusal}");
-        assert!(refusal.contains("fix: .config/factory.toml"), "{refusal}");
-    }
+fn an_unreadable_load_on_this_machine_names_the_switch_that_turns_the_wait_off() {
+    assert!(
+        NO_LOAD_FIX.contains("[load] wait = \"false\""),
+        "{NO_LOAD_FIX}"
+    );
 }

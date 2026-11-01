@@ -3,31 +3,24 @@
 //! [`SAY_EVERY`], and go on at `[load] deadline_minutes` saying that it
 //! did. Several worktrees share the dev machine; a run started into a
 //! saturated one has timed out on its deadlines rather than failed on
-//! its code. An unreadable load is refused, never taken as low. A `ci`
-//! run inside a gate does not wait: the gate already did (`main.rs`,
-//! the in-gate branch of `ci_sharing_the_gate_lock`).
+//! its code. An unreadable load is refused, never taken as low, naming
+//! `[load] wait = false` as the fix. A `ci` run inside a gate does not
+//! wait: the gate already did (`main.rs`, the in-gate branch of
+//! `ci_sharing_the_gate_lock`). The gate waits once it holds its lock,
+//! so the load it measures is what it will run beside.
 
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use crate::config::Config;
+#[path = "load_wait_settings.rs"]
+mod load_settings;
+pub use load_settings::{Settings, settings};
 
 /// How often the wait says the load it is waiting on.
 pub const SAY_EVERY: Duration = Duration::from_secs(30);
-/// The deadline when `[load] deadline_minutes` is unset: the 10 minutes
-/// agents were asked to wait by hand before this (the factory's build
-/// etiquette, 2026-10-26), not a measurement.
-pub const DEFAULT_DEADLINE: Duration = Duration::from_mins(10);
 /// Set by GitHub Actions on its runners.
 pub const GITHUB_ENV: &str = "GITHUB_ACTIONS";
-
-/// When to wait and for how long.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Settings {
-    /// Wait while the one-minute load is over this.
-    pub threshold: f64,
-    /// Then go on, saying so.
-    pub deadline: Duration,
-}
 
 /// How the wait ended.
 #[derive(Debug, PartialEq)]
@@ -59,38 +52,8 @@ impl Clock for RealClock {
     }
 }
 
-/// `[load] threshold` and `[load] deadline_minutes`; the threshold
-/// defaults to `cores`, the deadline to [`DEFAULT_DEADLINE`].
-///
-/// # Errors
-///
-/// A value that is not a positive number, naming the key and the fix.
-pub fn settings(config: &Config, cores: usize) -> Result<Settings, String> {
-    let threshold = match config.get("load.threshold") {
-        None => f64::from(u32::try_from(cores).unwrap_or(u32::MAX)),
-        Some(text) => positive("threshold", text)?,
-    };
-    let deadline = match config.get("load.deadline_minutes") {
-        None => DEFAULT_DEADLINE,
-        Some(text) => Duration::from_secs_f64(positive("deadline_minutes", text)? * 60.0),
-    };
-    Ok(Settings {
-        threshold,
-        deadline,
-    })
-}
-
-fn positive(key: &str, text: &str) -> Result<f64, String> {
-    match text.parse::<f64>() {
-        Ok(value) if value.is_finite() && value > 0.0 => Ok(value),
-        _ => Err(format!(
-            "[load] {key} is `{text}`, not a positive number; fix: .config/factory.toml"
-        )),
-    }
-}
-
 /// Wait while `load` reads over the threshold, calling `say` with each
-/// line; `github` skips it.
+/// line; `github`, or `[load] wait = false`, skips it.
 ///
 /// # Errors
 ///
@@ -109,6 +72,14 @@ pub fn wait(
             "on GitHub Actions, whose runners are single-tenant",
         ));
     }
+    // Relaxed guard, declared: `[load] wait = false` runs without the
+    // wait, for a machine with no /proc/loadavg (the planned Mac Studio),
+    // said on every run. Retired when the load is read portably.
+    if !settings.enabled {
+        return Ok(Outcome::Skipped(
+            "[load] wait = false in .config/factory.toml",
+        ));
+    }
     let started = clock.now();
     loop {
         let now = load()?;
@@ -120,7 +91,8 @@ pub fn wait(
         // than failing. The wait protects other agents' build speed only,
         // not this run's result, and a failure here would have callers
         // retry in a loop that adds load. Retired when runs queue for
-        // CPUs through a scheduler instead of this wait.
+        // CPUs through a scheduler instead of this wait. Tom's choice:
+        // docs/decisions/2026-11-01-load-wait-deadline.md.
         if waited >= settings.deadline {
             say(&past_deadline(now, settings, waited));
             return Ok(Outcome::PastDeadline);
@@ -151,7 +123,8 @@ fn past_deadline(load: f64, settings: Settings, waited: Duration) -> String {
 
 /// The wait before `command` on this machine: `/proc/loadavg`, the
 /// settings in `.config/factory.toml`, the core count, and whether this
-/// is GitHub Actions.
+/// is GitHub Actions. A wait that went past its deadline is kept for
+/// [`went_past_deadline`].
 ///
 /// # Errors
 ///
@@ -163,17 +136,38 @@ pub fn before(command: &str) -> Result<Outcome, String> {
         .get();
     let settings = settings(&config, cores)?;
     let github = std::env::var(GITHUB_ENV).is_ok_and(|v| v == "true");
-    let mut load = || {
-        crate::load::now()?
-            .parse::<f64>()
-            .map_err(|e| format!("/proc/loadavg: {e}"))
+    let mut load = || machine_load().map_err(|e| format!("{e}; {NO_LOAD_FIX}"));
+    let mut last = String::new();
+    let mut say = |line: &str| {
+        println!("{command}: {line}");
+        line.clone_into(&mut last);
     };
-    let mut say = |line: &str| println!("{command}: {line}");
     let outcome = wait(settings, github, &mut load, &RealClock, &mut say)?;
     if let Outcome::Skipped(why) = outcome {
         say(&format!("load: not waited for, {why}"));
     }
+    if outcome == Outcome::PastDeadline {
+        drop(PAST.set(format!("{command}: {last}")));
+    }
     Ok(outcome)
+}
+
+/// The fix when the load cannot be read.
+pub const NO_LOAD_FIX: &str =
+    "fix: on a machine without /proc/loadavg, set [load] wait = \"false\" in .config/factory.toml";
+
+fn machine_load() -> Result<f64, String> {
+    crate::load::now()?
+        .parse::<f64>()
+        .map_err(|e| format!("/proc/loadavg: {e}"))
+}
+
+static PAST: OnceLock<String> = OnceLock::new();
+
+/// The line this run printed when it went on past the load deadline,
+/// for the final summary to repeat.
+pub fn went_past_deadline() -> Option<&'static str> {
+    PAST.get().map(String::as_str)
 }
 
 #[cfg(test)]

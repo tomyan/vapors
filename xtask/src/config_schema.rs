@@ -22,7 +22,10 @@ const TABLES: [(&str, Keys); 17] = [
     ),
     ("files", Keys::Only(&["max_lines"])),
     ("build", Keys::Only(&["jobs"])),
-    ("load", Keys::Only(&["threshold", "deadline_minutes"])),
+    (
+        "load",
+        Keys::Only(&["wait", "threshold", "deadline_minutes"]),
+    ),
     ("files.allow", Keys::Any),
     ("files.generated", Keys::Any),
     ("gate", Keys::Only(&["twin"])),

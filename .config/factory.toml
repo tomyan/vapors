@@ -35,11 +35,17 @@ https = "8446"
 
 # `cargo xtask ci` and `cargo xtask gate` wait first while the one-minute
 # load is over `threshold`, and go on at `deadline_minutes` saying so
-# (xtask/src/load_wait.rs). Unset, the threshold is the machine's core
-# count as std::thread::available_parallelism reads it (12 on the dev
-# machine, 2026-11-01): over that, runs queue for CPUs. The deadline
-# defaults to 10 minutes, the wait the factory asked of agents by hand.
-# Neither is set here; set them under [load] to change them.
+# (xtask/src/load_wait.rs; why it goes on rather than fails:
+# docs/decisions/2026-11-01-load-wait-deadline.md). Unset, the threshold
+# is the machine's core count as std::thread::available_parallelism reads
+# it (12 on the dev machine, 2026-11-01): over that, runs queue for CPUs.
+# The deadline defaults to 10 minutes, the wait agents did by hand before.
+# `wait = "false"` turns the wait off, said on every run, for a machine
+# without /proc/loadavg. None is set here; to change them:
+# [load]
+# wait = "true"
+# threshold = "12"
+# deadline_minutes = "10"
 
 [files]
 # The file-length rule as a check (the `files` step of `lint` and `ci`).
