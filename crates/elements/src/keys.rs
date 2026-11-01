@@ -28,14 +28,18 @@ pub struct Modifiers {
 }
 
 impl Document {
-    /// `key` went down: `keydown`, then its default action.
-    pub fn key_pressed(document: &Rc<RefCell<Document>>, key: &str, modifiers: Modifiers) {
+    /// `key` went down: `keydown`, then its default action. Whether the
+    /// document used it: a listener prevented its default, or a control
+    /// took it (focus moved, a button pressed, a field or range changed).
+    /// A key it did not use is the app's, as a browser gives the page's
+    /// shortcuts the keys no control takes.
+    pub fn key_pressed(document: &Rc<RefCell<Document>>, key: &str, modifiers: Modifiers) -> bool {
         document.borrow_mut().keyboard_interaction(key);
         let target = document.borrow().key_target();
         if dispatch_bubbling(document, target, Event::new("keydown").with_key(key)) {
-            return;
+            return true;
         }
-        Self::key_default(document, target, key, modifiers);
+        Self::key_default(document, target, key, modifiers)
     }
 
     /// A key other than a modifier alone is a keyboard interaction for
@@ -52,35 +56,52 @@ impl Document {
         self.set_flag_on(States::FOCUS_VISIBLE, active);
     }
 
-    /// A key's default action on `target`, after an unprevented keydown.
+    /// A key's default action on `target`, after an unprevented keydown;
+    /// whether a control took it.
     fn key_default(
         document: &Rc<RefCell<Document>>,
         target: NodeId,
         key: &str,
         modifiers: Modifiers,
-    ) {
+    ) -> bool {
+        let mut used = false;
         if matches!(key, "Backspace" | "Enter" | "ArrowUp" | "ArrowDown")
             && document.borrow().number_field(target).is_some()
         {
-            crate::number_input::key(document, target, key, modifiers);
+            used |= crate::number_input::key(document, target, key, modifiers);
         }
         if document.borrow().is_text_input(target) {
-            crate::text_input::key(document, target, key, modifiers);
+            used |= crate::text_input::key(document, target, key, modifiers);
         }
+        used | Self::page_default(document, target, key, modifiers)
+    }
+
+    /// Tab's focus move, Enter's and Space's press, and a range's step;
+    /// whether one happened.
+    fn page_default(
+        document: &Rc<RefCell<Document>>,
+        target: NodeId,
+        key: &str,
+        modifiers: Modifiers,
+    ) -> bool {
         match key {
             // Control, Alt or Meta with Tab is the browser's or the window
             // manager's, which Chromium does not navigate on
             "Tab" if !(modifiers.control || modifiers.alt || modifiers.meta) => {
                 let next = document.borrow().next_in_tab_order(modifiers.shift);
                 Self::focus(document, next);
+                true
             }
             "Enter" => Self::activate(document, target, &["button"]),
-            " " => document.borrow_mut().space_on = Some(target),
-            "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown" | "PageUp" | "PageDown"
-            | "Home" | "End" => {
-                crate::range_input::key(document, target, key, modifiers);
+            " " => {
+                document.borrow_mut().space_on = Some(target);
+                document
+                    .borrow()
+                    .activatable(target, &["button", "checkbox"])
             }
-            _ => {}
+            "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown" | "PageUp" | "PageDown"
+            | "Home" | "End" => crate::range_input::key(document, target, key, modifiers),
+            _ => false,
         }
     }
 
@@ -111,17 +132,22 @@ impl Document {
     /// A focused control's click, when it is one of `kinds` (`button`,
     /// or `checkbox` for Space, which Enter does not click, as in
     /// Chromium) and not disabled; a checkbox then toggles.
-    fn activate(document: &Rc<RefCell<Document>>, target: NodeId, kinds: &[&str]) {
-        let doc = document.borrow();
-        let kind = match doc.tag(target) {
-            Some("button") => "button",
-            Some("input") if doc.checked(target).is_some() => "checkbox",
-            _ => return,
-        };
-        if !kinds.contains(&kind) || doc.in_disabled_button(target) {
-            return;
+    fn activate(document: &Rc<RefCell<Document>>, target: NodeId, kinds: &[&str]) -> bool {
+        if !document.borrow().activatable(target, kinds) {
+            return false;
         }
-        drop(doc);
         crate::events::tree::dispatch_click(document, target, Event::new("click"));
+        true
+    }
+
+    /// Whether `target` is one of `kinds` (`button`, `checkbox`) and not
+    /// disabled: a key would click it.
+    fn activatable(&self, target: NodeId, kinds: &[&str]) -> bool {
+        let kind = match self.tag(target) {
+            Some("button") => "button",
+            Some("input") if self.checked(target).is_some() => "checkbox",
+            _ => return false,
+        };
+        kinds.contains(&kind) && !self.in_disabled_button(target)
     }
 }

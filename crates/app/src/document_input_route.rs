@@ -6,11 +6,16 @@
 //!   the host (the host may read moves too);
 //! - a press, and each touch-down, go by hit at that moment, and that
 //!   route holds for its pointer until the release, or the touch's end
-//!   or cancel, so a drag that leaves the document still ends there;
+//!   or cancel, so a drag that leaves the document still ends there; a
+//!   press or touch-down on the host takes the document's focus away, as
+//!   a click outside a page's control blurs it;
 //! - a pan goes where its gesture's first touch-down went;
 //! - a tap and the wheel go by hit at their own position;
 //! - keys and typed text go to the document while one of its elements
-//!   has focus.
+//!   has focus; a key the document then does not use
+//!   ([`InputOutcome::unused_key`](super::InputOutcome::unused_key)) is
+//!   the host's, so its shortcuts work while a slider has focus and the
+//!   slider's arrows still move it.
 //!
 //! A hit is [`Document::hit`]: an element with `pointer-events: auto`.
 //! `pointer-events` is inherited, so a document whose `html` and `body`
@@ -18,7 +23,9 @@
 //! Any element with `auto` takes the pointer over its whole border box,
 //! painted or not.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use vapors_elements::Document;
 use vapors_platform::Event;
@@ -50,7 +57,27 @@ impl DocumentInput {
     /// # Errors
     ///
     /// [`Unplaced`] when the document's last update gives no usable scale.
-    pub fn route(&mut self, document: &Document, event: &Event) -> Result<Route, Unplaced> {
+    pub fn route(
+        &mut self,
+        document: &Rc<RefCell<Document>>,
+        event: &Event,
+    ) -> Result<Route, Unplaced> {
+        let route = self.routed(&document.borrow(), event)?;
+        let pressed = matches!(event, Event::PrimaryButton { pressed: true })
+            || matches!(
+                event,
+                Event::Touch {
+                    phase: vapors_platform::TouchPhase::Started,
+                    ..
+                }
+            );
+        if pressed && route == Route::Host && document.borrow().active_element().is_some() {
+            Document::focus(document, None);
+        }
+        Ok(route)
+    }
+
+    fn routed(&mut self, document: &Document, event: &Event) -> Result<Route, Unplaced> {
         let Some(action) = self.action(document, event)? else {
             return Ok(by_focus(document, event));
         };
@@ -107,3 +134,7 @@ fn by_focus(document: &Document, event: &Event) -> Route {
 #[cfg(test)]
 #[path = "document_input_route_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "document_input_keys_tests.rs"]
+mod key_tests;

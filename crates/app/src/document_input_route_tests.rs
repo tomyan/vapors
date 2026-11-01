@@ -67,7 +67,7 @@ fn card() -> Card {
 
 /// Route `event` as a host would, giving the document what is its.
 fn give(input: &mut DocumentInput, card: &Card, event: &Event) -> Route {
-    let route = input.route(&card.doc.borrow(), event).expect("placed");
+    let route = input.route(&card.doc, event).expect("placed");
     if route == Route::Document {
         input.handle(&card.doc, event).expect("placed");
         card.doc
@@ -194,15 +194,9 @@ fn keys_and_typed_text_follow_the_documents_focus() {
     let typed = Event::Character("a".into());
 
     // When
-    let unfocused = [
-        input.route(&card.doc.borrow(), &tab),
-        input.route(&card.doc.borrow(), &typed),
-    ];
+    let unfocused = [input.route(&card.doc, &tab), input.route(&card.doc, &typed)];
     Document::focus(&card.doc, Some(card.button));
-    let focused = [
-        input.route(&card.doc.borrow(), &tab),
-        input.route(&card.doc.borrow(), &typed),
-    ];
+    let focused = [input.route(&card.doc, &tab), input.route(&card.doc, &typed)];
 
     // Then
     assert_eq!(unfocused, [Ok(Route::Host); 2]);

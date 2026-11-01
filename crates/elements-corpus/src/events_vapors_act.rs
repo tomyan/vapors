@@ -32,7 +32,9 @@ pub(super) fn act(
         }
         Action::Key(ref combination) => {
             let (key, modifiers) = key_of(combination);
-            sent(doc, |doc| Document::key_pressed(doc, &key, modifiers));
+            sent(doc, |doc| {
+                Document::key_pressed(doc, &key, modifiers);
+            });
             sent(doc, |doc| Document::key_released(doc, &key, modifiers));
         }
         // each character as the platform sends it: the key down, its

@@ -73,9 +73,17 @@ pub(crate) fn typed(document: &Rc<RefCell<Document>>, node: NodeId, text: &str) 
 }
 
 /// `key` went down on `node`, a focused text field.
-pub(crate) fn key(document: &Rc<RefCell<Document>>, node: NodeId, key: &str, modifiers: Modifiers) {
+/// Whether the field took the key: its editing keys and moves, and any
+/// key without Control or Meta, which types (its text arrives as a
+/// character) or is the field's; not Tab or Escape.
+pub(crate) fn key(
+    document: &Rc<RefCell<Document>>,
+    node: NodeId,
+    key: &str,
+    modifiers: Modifiers,
+) -> bool {
     if !document.borrow().live_text(node) {
-        return;
+        return false;
     }
     let (shift, word) = (modifiers.shift, modifiers.control);
     match key {
@@ -89,8 +97,12 @@ pub(crate) fn key(document: &Rc<RefCell<Document>>, node: NodeId, key: &str, mod
         // the method path is not general over the driver's lifetime
         #[allow(clippy::redundant_closure_for_method_calls)]
         "a" | "A" if modifiers.control => document.borrow_mut().drive(node, |d| d.select_all()),
-        _ => moved(document, node, key, shift, word),
+        _ => {
+            let typing = !modifiers.control && !modifiers.meta && !matches!(key, "Tab" | "Escape");
+            return moved(document, node, key, shift, word) || typing;
+        }
     }
+    true
 }
 
 /// Backspace (`back`) or Delete, by a word with `word`: a selection
@@ -114,7 +126,13 @@ fn deleted(d: &mut Driver<'_>, back: bool, word: bool) {
 
 /// An arrow, Home or End moves the caret, extending with `shift`, by
 /// words with `word`; another key does nothing.
-fn moved(document: &Rc<RefCell<Document>>, node: NodeId, key: &str, shift: bool, word: bool) {
+fn moved(
+    document: &Rc<RefCell<Document>>,
+    node: NodeId,
+    key: &str,
+    shift: bool,
+    word: bool,
+) -> bool {
     let act: fn(&mut Driver<'_>) = match (key, shift, word) {
         ("ArrowLeft", false, false) => |d| d.move_left(),
         ("ArrowLeft", true, false) => |d| d.select_left(),
@@ -128,9 +146,10 @@ fn moved(document: &Rc<RefCell<Document>>, node: NodeId, key: &str, shift: bool,
         ("Home", true, _) => |d| d.select_to_line_start(),
         ("End", false, _) => |d| d.move_to_line_end(),
         ("End", true, _) => |d| d.select_to_line_end(),
-        _ => return,
+        _ => return false,
     };
     document.borrow_mut().drive(node, act);
+    true
 }
 
 /// Commits `node`'s text: `change` when it differs from the last
@@ -165,43 +184,4 @@ fn fire(document: &Rc<RefCell<Document>>, node: NodeId, name: &str) {
         return;
     };
     dispatch_bubbling(document, node, Event::new(name).with_value(&value));
-}
-
-impl Document {
-    /// Fires the `selectionchange` each text field owes whose selection
-    /// moved since the last one, as Chromium fires one per task: the
-    /// app calls this before each update, the vapors player after each event.
-    pub fn settle_selection(document: &Rc<RefCell<Document>>) {
-        let owed: Vec<NodeId> = document
-            .borrow_mut()
-            .editors
-            .iter_mut()
-            .filter_map(|(node, editor)| std::mem::take(&mut editor.pending).then_some(*node))
-            .collect();
-        for node in owed {
-            if document.borrow_mut().selection_moved(node) {
-                dispatch_bubbling(document, node, Event::new("selectionchange"));
-            }
-        }
-    }
-}
-
-impl Document {
-    /// Whether `node`'s selection moved since the last `selectionchange`,
-    /// noting it as reported: not for a field a listener removed, or one
-    /// that is no longer a text field.
-    fn selection_moved(&mut self, node: NodeId) -> bool {
-        if !self.contains(node) {
-            return false;
-        }
-        let Some(now) = self.selection(node) else {
-            return false;
-        };
-        let Some(editor) = self.editors.get_mut(&node) else {
-            return false;
-        };
-        let moved = editor.reported != Some(now);
-        editor.reported = Some(now);
-        moved
-    }
 }

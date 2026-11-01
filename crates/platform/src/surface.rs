@@ -163,6 +163,7 @@ fn configuration(
 }
 
 /// First 8-bit RGBA or BGRA format that is not sRGB-encoded.
+#[must_use]
 pub fn pick_format(formats: &[wgpu::TextureFormat]) -> Option<wgpu::TextureFormat> {
     formats.iter().copied().find(|f| {
         matches!(

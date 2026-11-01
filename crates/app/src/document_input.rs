@@ -39,6 +39,9 @@ pub struct InputOutcome {
     pub changed: bool,
     /// The cursor to show, when it is not the one last reported.
     pub cursor: Option<Shown>,
+    /// A key went down that the document did not use (no listener
+    /// prevented it, no control took it): the host's to act on.
+    pub unused_key: bool,
 }
 
 /// Why an event could not be placed in the document.
@@ -120,7 +123,7 @@ impl DocumentInput {
         if let Some(action) = action {
             self.act(document, action);
         }
-        key(document, event);
+        let unused_key = key(document, event) == Some(false);
         let changed = document.borrow_mut().take_changed();
         let cursor = document.borrow().cursor(self.pointer);
         let shown = (Some(cursor) != self.cursor).then(|| {
@@ -130,6 +133,7 @@ impl DocumentInput {
         Ok(InputOutcome {
             changed,
             cursor: shown,
+            unused_key,
         })
     }
 
@@ -167,11 +171,12 @@ fn point_of(action: Action) -> Option<Point> {
 }
 
 /// A key going down or up, to the document's focused element (3-E2a);
-/// the text a key produced, to a focused field (3-E3c).
-fn key(document: &Rc<RefCell<Document>>, event: &Event) {
+/// the text a key produced, to a focused field (3-E3c). For a key going
+/// down, whether the document used it.
+fn key(document: &Rc<RefCell<Document>>, event: &Event) -> Option<bool> {
     if let Event::Character(text) = event {
         Document::character_typed(document, text);
-        return;
+        return None;
     }
     let Event::Key {
         key,
@@ -180,7 +185,7 @@ fn key(document: &Rc<RefCell<Document>>, event: &Event) {
         ..
     } = event
     else {
-        return;
+        return None;
     };
     let modifiers = vapors_elements::Modifiers {
         shift: modifiers.shift,
@@ -189,9 +194,10 @@ fn key(document: &Rc<RefCell<Document>>, event: &Event) {
         meta: modifiers.meta,
     };
     if *pressed {
-        Document::key_pressed(document, key, modifiers);
+        Some(Document::key_pressed(document, key, modifiers))
     } else {
         Document::key_released(document, key, modifiers);
+        None
     }
 }
 
