@@ -1,6 +1,6 @@
 //! A text field's actions (E6a), as Chromium performs them: typed text
 //! replaces the selection; Backspace and Delete remove the selection
-//! or one cluster (a word with Control); the arrows move by cluster (a
+//! or one cluster (with Control, as far as Control and an arrow moves); the arrows move by cluster (a
 //! word with Control), Home and End to the ends, each extending the
 //! selection with Shift; Control+A selects all; Enter commits (the
 //! pointer's part is `text_pointer`). Focus by keyboard selects
@@ -39,6 +39,8 @@ impl Document {
         let Document { fonts, editors, .. } = self;
         let editor = editors.get_mut(&node).expect("made above");
         editor.committed = editor.plain.text().to_string();
+        // Chromium fires one as focus arrives, even where the caret was
+        editor.reported = None;
         if keyboard {
             fonts.editor_driver(&mut editor.plain).select_all();
         }
@@ -79,18 +81,34 @@ pub(crate) fn key(document: &Rc<RefCell<Document>>, node: NodeId, key: &str, mod
     match key {
         "Enter" => commit(document, node),
         "Backspace" | "Delete" => {
-            document.borrow_mut().drive(node, |d| match (key, word) {
-                ("Backspace", false) => d.backdelete(),
-                ("Backspace", true) => d.backdelete_word(),
-                (_, false) => d.delete(),
-                (_, true) => d.delete_word(),
-            });
+            document
+                .borrow_mut()
+                .drive(node, |d| deleted(d, key == "Backspace", word));
             edited(document, node);
         }
         // the method path is not general over the driver's lifetime
         #[allow(clippy::redundant_closure_for_method_calls)]
         "a" | "A" if modifiers.control => document.borrow_mut().drive(node, |d| d.select_all()),
         _ => moved(document, node, key, shift, word),
+    }
+}
+
+/// Backspace (`back`) or Delete, by a word with `word`: a selection
+/// goes; else a cluster, or with `word` as far as Control+ArrowLeft or
+/// Control+ArrowRight moves, as Linux Chromium deletes (Parley's own
+/// word deletes skip the space after a word and take "-" with "A").
+fn deleted(d: &mut Driver<'_>, back: bool, word: bool) {
+    if word && d.editor.raw_selection().is_collapsed() {
+        if back {
+            d.select_word_left();
+        } else {
+            d.select_word_right();
+        }
+    }
+    if back {
+        d.backdelete();
+    } else {
+        d.delete();
     }
 }
 
@@ -161,20 +179,29 @@ impl Document {
             .filter_map(|(node, editor)| std::mem::take(&mut editor.pending).then_some(*node))
             .collect();
         for node in owed {
-            let moved = {
-                let mut doc = document.borrow_mut();
-                let now = doc.selection(node);
-                // a listener of an earlier one may have removed this field
-                let Some(editor) = doc.editors.get_mut(&node) else {
-                    continue;
-                };
-                let moved = editor.reported != now;
-                editor.reported = now;
-                moved && doc.contains(node)
-            };
-            if moved {
+            if document.borrow_mut().selection_moved(node) {
                 dispatch_bubbling(document, node, Event::new("selectionchange"));
             }
         }
+    }
+}
+
+impl Document {
+    /// Whether `node`'s selection moved since the last `selectionchange`,
+    /// noting it as reported: not for a field a listener removed, or one
+    /// that is no longer a text field.
+    fn selection_moved(&mut self, node: NodeId) -> bool {
+        if !self.contains(node) {
+            return false;
+        }
+        let Some(now) = self.selection(node) else {
+            return false;
+        };
+        let Some(editor) = self.editors.get_mut(&node) else {
+            return false;
+        };
+        let moved = editor.reported != Some(now);
+        editor.reported = Some(now);
+        moved
     }
 }

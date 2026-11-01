@@ -51,13 +51,12 @@
     return found[0];
   };
   window.__eventsValues = (targets) => Object.fromEntries(targets.map((t) => [t, one("value", t).value]));
-  // Each named text field's selection as [start, end]; an element
-  // without one stops the script.
-  window.__eventsSelections = (targets) => Object.fromEntries(targets.map((t) => {
-    const found = one("selection", t);
-    if (typeof found.selectionStart !== "number") throw new Error("selection " + t + " is not a text field");
-    return [t, [found.selectionStart, found.selectionEnd]];
-  }));
+  // Every text field's selection as [start, end], by name: each input
+  // whose selectionStart is a number (a number input's is null).
+  window.__eventsSelections = () => Object.fromEntries(
+    Array.from(document.querySelectorAll("input"))
+      .filter((field) => typeof field.selectionStart === "number")
+      .map((field) => [name(field), [field.selectionStart, field.selectionEnd]]));
   // Each named checkbox's state; an element without one stops the script.
   window.__eventsChecked = (targets) => Object.fromEntries(targets.map((t) => {
     const found = one("checked", t);

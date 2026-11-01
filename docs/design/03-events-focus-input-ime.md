@@ -323,11 +323,20 @@ type is one), the editing model's first half, on Parley 0.12's
 pressed or focused, given the field's text style whenever it changes
 so its geometry is the painted text's. The text is the `value` property,
 written on every edit and read back when a signal sets it (the
-selection clamped). A press puts the caret where it lands, even on a
-disabled field, as Chromium does; a drag extends the selection under
-capture; focus by keyboard selects the text whole. Typed text replaces
+selection clamped). A press puts the caret where it lands; on a
+disabled field it leaves the selection where it was and fires
+`selectionchange`, as Chromium does; a drag extends the selection under
+capture; focus by keyboard selects the text whole. By touch, a tap
+focuses the field and places the caret after its `click`, and a finger
+down or dragging moves nothing (a drag pans), as Chromium's touch does.
+A `value` attribute written before the field is edited reaches the
+editor; once edited, the property holds, as the DOM's dirty value
+does. Typed text replaces
 the selection; Backspace and Delete remove the selection or a cluster,
-a word with Control; the arrows move by cluster, a word with Control,
+with Control as far as Control and the arrow would move (Linux
+Chromium: Control+Delete leaves the space after a word, Control+
+Backspace takes "-" alone; Parley's own word deletes differ); the
+arrows move by cluster, a word with Control,
 Home and End to the ends, each extending with Shift; Control+A selects
 all; Enter and blur commit (`change` when the text differs from the
 last commit, the blur's before `focusout`). `input` fires per edit with
@@ -335,13 +344,13 @@ the value. `selectionchange` fires on the field once per
 `Document::settle_selection` when the selection moved (the app settles
 before each update, the vapors player after each event), as Chromium
 queues one per task: two keys in one frame are one, a key that moves
-nothing none, focus arriving in a field one. `Document::selection` answers in UTF-16
-units, as `selectionStart`/`selectionEnd` count. The caret (1 px, the
+nothing none, focus arriving in a field one even where the caret was.
+`Document::selection` answers in UTF-16 units, as `selectionStart`/`selectionEnd` count. The caret (1 px, the
 text's colour) and selection (the ring's blue at a third) come from
 the editor's geometry, painted in the field's step under its text. A
 field needs a width of its own, as a number field does. Checked step
-by step against Chromium 155 by `fixtures/text.events` with `expect
-selection`; the Chromium player waits a task after each input call,
+by step against Chromium 155 by `fixtures/text.events`, every text
+field's selection after every step; the Chromium player waits a task after each input call,
 and the vapors player settles after each event, because Chromium's
 queued `selectionchange` otherwise lands before or after the next key
 from run to run. Not built: double-click word selection and `detail`

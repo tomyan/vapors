@@ -49,6 +49,7 @@ mod style;
 mod tags;
 mod text_field;
 mod text_input;
+mod text_marks;
 mod text_paint;
 mod text_pointer;
 mod thumb;

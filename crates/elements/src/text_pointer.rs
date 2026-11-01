@@ -1,6 +1,9 @@
 //! A text field under the pointer (E6a): a press places the caret
-//! where it lands, even on a disabled field, as Chromium does, and a
-//! drag extends the selection under capture.
+//! where it lands and a drag extends the selection under capture; a
+//! press on a disabled field leaves its selection where it was and
+//! owes a `selectionchange`, as Chromium does. By touch, a tap places
+//! the caret after its click and a finger down or dragging does not, as
+//! Chromium's touch does (a drag pans).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -18,21 +21,38 @@ impl Document {
     }
 }
 
-/// Pointer `id` pressed `node` at `point`: a text field, disabled or
-/// not, puts its caret there, as Chromium does, and a live one
-/// captures the pointer for a drag that extends the selection.
+/// Pointer `id` pressed `node` at `point`: a live text field puts its
+/// caret there and captures the pointer for a drag that extends the
+/// selection; a disabled one only owes a `selectionchange`.
 pub(crate) fn pressed(document: &Rc<RefCell<Document>>, id: u32, node: NodeId, point: Point) {
-    if !document.borrow().is_text_input(node) {
-        return;
-    }
-    let Some((x, y)) = document.borrow().text_point(node, point) else {
-        return;
-    };
-    document.borrow_mut().drive(node, |d| d.move_to_point(x, y));
-    if document.borrow().live_text(node) {
+    if placed(document, node, point) {
         document.borrow_mut().pointer.text_drags.insert(id, node);
         crate::events::capture::ask_unless_asked(document, id, Asked::CaptureTo(node));
     }
+}
+
+/// A tap on `node` at `point`: a live text field puts its caret there,
+/// with no drag; a disabled one only owes a `selectionchange`.
+pub(crate) fn tapped(document: &Rc<RefCell<Document>>, node: NodeId, point: Point) {
+    placed(document, node, point);
+}
+
+/// Puts a live text field's caret at `point`; whether it did. A disabled
+/// field's selection stays where it was and owes a `selectionchange`,
+/// as Chromium's does.
+fn placed(document: &Rc<RefCell<Document>>, node: NodeId, point: Point) -> bool {
+    if !document.borrow().is_text_input(node) {
+        return false;
+    }
+    if !document.borrow().live_text(node) {
+        document.borrow_mut().drive(node, |_| {});
+        return false;
+    }
+    let Some((x, y)) = document.borrow().text_point(node, point) else {
+        return false;
+    };
+    document.borrow_mut().drive(node, |d| d.move_to_point(x, y));
+    true
 }
 
 /// Pointer `id` moved to `point`: the field it presses extends its

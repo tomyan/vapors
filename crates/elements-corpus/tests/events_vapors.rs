@@ -51,7 +51,7 @@ fn an_action_not_played_on_vapors_is_refused_naming_its_line() {
     // Given
     let script = parse(
         "capture",
-        "listen click\nclick 5 5\nexpect event click div#thumb\ntap 5 5\nexpect no event click\n",
+        "listen click\nclick 5 5\nexpect event click div#thumb\nwheel 5 5 0 120\nexpect no event click\n",
     )
     .expect("parses");
 
@@ -60,7 +60,7 @@ fn an_action_not_played_on_vapors_is_refused_naming_its_line() {
 
     // Then
     assert!(
-        refusal.contains("capture.events:4:") && refusal.contains("Tap"),
+        refusal.contains("capture.events:4:") && refusal.contains("Wheel"),
         "{refusal}"
     );
 }
