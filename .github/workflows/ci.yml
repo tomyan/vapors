@@ -142,14 +142,18 @@ jobs:
   gpu:
     name: gpu
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    # About 2.5x (the job's worst without its apt step in the 37 runs to
-    # 2026-10-23, 199 s in run 39802585212, plus that step's worst with
-    # the cache, 16 s in run 39930654120). The uncached 1812 s install in
-    # run 39801264114 is excluded: it is the slow mirror the cache avoids.
-    timeout-minutes: 9
+    # About 2.5x the job's worst with the page's text input step: 303 s
+    # in run 41349572659, of five runs at 243 to 303 s (41343451051,
+    # 41347128242, 41331047735, 41328354163), the step itself 9 to 17 s.
+    # The uncached 1812 s apt install in run 39801264114 is excluded: it
+    # is the slow mirror the cache avoids.
+    timeout-minutes: 13
     # The web job's build, for the page's text input check below; the gate
     # runs jobs in file order in one worktree, so web's target/web is there.
     needs: web
+    # The gpu tier, screenshots and oracles still run when the web job
+    # fails; the text input step then refuses, naming the web job.
+    if: ${{ !cancelled() }}
     env:
       # lavapipe is the CI reference adapter; the tier fails if it is not the one found.
       VAPORS_GPU_ADAPTER: llvmpipe
@@ -212,6 +216,8 @@ jobs:
           name: web
           path: target/web
       - name: the page's text input against Chromium's <input>
+        # also after a failed download: it refuses, naming the web job
+        if: always()
         run: scripts/web-text-input.sh target/web "$(mktemp -d)"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
@@ -228,7 +234,7 @@ jobs:
         timeout-minutes: 1
         env:
           GH_TOKEN: ${{ github.token }}
-          TIMEOUT_MINUTES: 9
+          TIMEOUT_MINUTES: 13
         run: .github/scripts/report-timeout.sh
 
   window:
