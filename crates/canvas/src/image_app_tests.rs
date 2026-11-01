@@ -61,14 +61,23 @@ fn a_tap_or_click_opens_the_picker_only_while_empty() {
         BACKGROUND,
     );
     let tap = Event::Tap { x: 1.0, y: 1.0 };
-    let click = Event::PrimaryButton { pressed: false };
+    let click = Event::PrimaryButton {
+        pressed: false,
+        clicks: std::num::NonZeroU32::MIN,
+    };
 
     // When / Then
     assert!(picks(&empty, &tap));
     assert!(picks(&empty, &click));
     assert!(!picks(&showing, &tap));
     assert!(!picks(&showing, &click));
-    assert!(!picks(&empty, &Event::PrimaryButton { pressed: true }));
+    assert!(!picks(
+        &empty,
+        &Event::PrimaryButton {
+            pressed: true,
+            clicks: std::num::NonZeroU32::MIN
+        }
+    ));
 }
 
 #[test]

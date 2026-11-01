@@ -24,6 +24,8 @@ pub(crate) fn from_winit(event: &WindowEvent, scale: f64) -> Option<Event> {
             ..
         } => Some(Event::PrimaryButton {
             pressed: *state == ElementState::Pressed,
+            // counted by `Input`, which knows the last press
+            clicks: std::num::NonZeroU32::MIN,
         }),
         WindowEvent::MouseWheel { delta, .. } => Some(scroll(*delta, scale)),
         WindowEvent::Touch(touch) => Some(Event::Touch {

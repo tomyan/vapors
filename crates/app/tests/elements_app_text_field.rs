@@ -39,9 +39,14 @@ fn field() -> (Rc<RefCell<Document>>, NodeId) {
 fn click_field(app: &mut ElementsApp, platform: &Platform) {
     for event in [
         Event::PointerMoved { x: 150.0, y: 10.0 },
-        Event::PrimaryButton { pressed: true },
-        Event::ClickCount(std::num::NonZeroU32::MIN),
-        Event::PrimaryButton { pressed: false },
+        Event::PrimaryButton {
+            pressed: true,
+            clicks: std::num::NonZeroU32::MIN,
+        },
+        Event::PrimaryButton {
+            pressed: false,
+            clicks: std::num::NonZeroU32::MIN,
+        },
     ] {
         app.event(event, platform);
     }
@@ -148,9 +153,14 @@ fn leaving_the_field_unsets_it() {
     // When: a press below the field blurs it
     for event in [
         Event::PointerMoved { x: 150.0, y: 80.0 },
-        Event::PrimaryButton { pressed: true },
-        Event::ClickCount(std::num::NonZeroU32::MIN),
-        Event::PrimaryButton { pressed: false },
+        Event::PrimaryButton {
+            pressed: true,
+            clicks: std::num::NonZeroU32::MIN,
+        },
+        Event::PrimaryButton {
+            pressed: false,
+            clicks: std::num::NonZeroU32::MIN,
+        },
     ] {
         app.event(event, &platform);
     }
