@@ -28,6 +28,10 @@ pub(crate) const WINDOWS: (Duration, f32) = (Duration::from_millis(500), 4.0);
 /// distance setting, so Windows' 4 px.
 pub(crate) const MACOS: (Duration, f32) = (Duration::from_millis(500), 4.0);
 
+/// Fallback: Android's `ViewConfiguration` `DOUBLE_TAP_TIMEOUT`
+/// (300 ms); it names no distance for a mouse's clicks, so GTK's 5 px.
+pub(crate) const ANDROID: (Duration, f32) = (Duration::from_millis(300), 5.0);
+
 /// The fallback for this target: its OS's, or on the web its browser's
 /// platform's.
 pub(crate) fn fallback() -> (Duration, f32) {
@@ -37,18 +41,27 @@ pub(crate) fn fallback() -> (Duration, f32) {
     return WINDOWS;
     #[cfg(target_os = "macos")]
     return MACOS;
-    #[cfg(not(any(target_family = "wasm", target_os = "windows", target_os = "macos")))]
+    #[cfg(target_os = "android")]
+    return ANDROID;
+    #[cfg(not(any(
+        target_family = "wasm",
+        target_os = "windows",
+        target_os = "macos",
+        target_os = "android"
+    )))]
     GTK
 }
 
 /// The fallback a browser's platform names (`navigator.userAgentData`
-/// `.platform`, else its user agent): Windows', macOS's (iPhone and
-/// iPad too), else GTK's.
+/// `.platform`, else its user agent): Android's, Windows', macOS's
+/// (iPhone and iPad too), else GTK's.
 // natively its tests run it; only the web reads a browser's platform
 #[cfg_attr(not(target_family = "wasm"), allow(dead_code))]
 pub(crate) fn by_platform(platform: &str) -> (Duration, f32) {
     let platform = platform.to_ascii_lowercase();
-    if platform.contains("win") {
+    if platform.contains("android") {
+        ANDROID
+    } else if platform.contains("win") {
         WINDOWS
     } else if ["mac", "iphone", "ipad"]
         .iter()
@@ -67,8 +80,13 @@ pub(crate) struct Clicks {
 }
 
 impl Clicks {
-    /// A press at `at` (CSS px) received at `now`: its count in the row.
-    pub(crate) fn pressed(&mut self, at: [f32; 2], now: Instant) -> NonZeroU32 {
+    /// A press at `at` (CSS px, `None` when the pointer's place is not
+    /// known, which starts a new row) received at `now`: its count.
+    pub(crate) fn pressed(&mut self, at: Option<[f32; 2]>, now: Instant) -> NonZeroU32 {
+        let Some(at) = at else {
+            self.last = None;
+            return NonZeroU32::MIN;
+        };
         let count = match self.last {
             Some((last_at, last_now, count)) if follows(last_at, last_now, at, now) => {
                 count.saturating_add(1)
@@ -77,6 +95,11 @@ impl Clicks {
         };
         self.last = Some((at, now, count));
         count
+    }
+
+    /// The last press's count, for its release; the first without one.
+    pub(crate) fn last(&self) -> NonZeroU32 {
+        self.last.map_or(NonZeroU32::MIN, |(_, _, count)| count)
     }
 }
 
