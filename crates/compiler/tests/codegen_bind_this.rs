@@ -1,12 +1,14 @@
-//! `bind:this={signal}` on an element: the element's node into a
-//! `Signal<Option<NodeId>>` when it mounts, and `None` when it unmounts
-//! (unless the signal holds another node by then); refused on a
-//! component tag and without a signal.
+//! `bind:this={signal}` on an element: the node into a
+//! `Signal<Option<NodeId>>` once the element is built, children
+//! included, and out again when it unmounts (unless the signal holds
+//! another node by then), the expression evaluated once. Refusals:
+//! `codegen_bind_this_refusals.rs`; inside `{for}`:
+//! `codegen_bind_this_rows.rs`.
 
 #[path = "common/codegen.rs"]
 mod codegen;
 
-use codegen::{assert_has, generated_with, refusal};
+use codegen::{assert_has, assert_lacks, at, generated_with};
 
 const SCRIPT: &str = "let field: Signal<Option<NodeId>> = Signal::new(None);";
 
@@ -16,16 +18,28 @@ fn bind_this_sets_the_node_and_clears_it_on_cleanup() {
     let code = generated_with(SCRIPT, "<input bind:this={field} />");
 
     // Then
-    assert_has(&code, "field.set(Some(input0));");
+    assert_has(&code, "this.set(Some(input0));");
     assert_has(&code, "vapors_signals::on_cleanup(");
     assert_has(&code, "if this.try_get_untracked() == Ok(Some(input0))");
 }
 
 #[test]
-fn bind_this_without_a_signal_is_refused() {
-    let why = refusal(&format!(
-        "<script>\n{SCRIPT}\n</script>\n<input bind:this=\"field\" />"
-    ))
-    .to_string();
-    assert!(why.contains("bind:this={signal}"), "{why}");
+fn bind_this_evaluates_its_expression_once() {
+    // When
+    let code = generated_with(SCRIPT, "<input bind:this={field} />");
+
+    // Then: set and cleanup both act on the one value
+    assert_has(&code, "let this = field;");
+    assert_lacks(&code, "field.set(");
+}
+
+#[test]
+fn bind_this_is_set_after_the_elements_children_and_later_attributes() {
+    // When
+    let code = generated_with(SCRIPT, "<p bind:this={field} class=\"x\">text</p>");
+
+    // Then
+    let set = at(&code, "this.set(Some(p0));");
+    assert!(at(&code, "create_text(") < set, "{code}");
+    assert!(at(&code, "set_attribute(p0, \"class\"") < set, "{code}");
 }

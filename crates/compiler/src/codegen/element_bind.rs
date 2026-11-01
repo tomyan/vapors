@@ -18,27 +18,6 @@ fn is_number_field(element: &Element) -> bool {
 }
 
 impl Emitter<'_> {
-    /// `bind:this={signal}`: the element's node into the signal now, and
-    /// `None` when the owner it was made under (the component, an `{if}`
-    /// branch, a `{for}` row) is disposed, unless the signal holds
-    /// another node by then, or was disposed with it.
-    fn emit_bind_this(&mut self, var: &str, attribute: &Attribute) -> Result<(), CompileError> {
-        let AttrValue::Expr(signal) = &attribute.value else {
-            return Err(self.source.error(
-                attribute.offset,
-                "`bind:this` takes a signal of `Option<NodeId>`: write bind:this={signal}",
-            ));
-        };
-        let signal = self.raw(signal)?;
-        self.line(format!("{signal}.set(Some({var}));"));
-        // a signal disposed with the same owner (the component's own) is
-        // gone, and there is nothing to clear: `try_` reads skip it
-        self.line(format!(
-            "{{ let this = {signal}; vapors_signals::on_cleanup(move || {{ if this.try_get_untracked() == Ok(Some({var})) {{ this.set(None); }} }}); }}"
-        ));
-        Ok(())
-    }
-
     pub(super) fn emit_binding(
         &mut self,
         element: &Element,
@@ -46,9 +25,6 @@ impl Emitter<'_> {
         property: &str,
         attribute: &Attribute,
     ) -> Result<(), CompileError> {
-        if property == "this" {
-            return self.emit_bind_this(var, attribute);
-        }
         let (event, read, wrap) = match property {
             // a number field's text is a number only once committed
             // (Enter, blur, a step), so its binding takes `change`
