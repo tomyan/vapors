@@ -193,6 +193,26 @@ effect through `vapors_dom::blocks::dynamic`, which rebuilds when the
 callee yields a different snippet, compared by identity; `None` renders
 nothing.
 
+## Element references
+
+As built (the listbox slice's second part, 2026-11-01):
+`bind:this={signal}` on an element puts its node into a
+`Signal<Option<NodeId>>` when it mounts, inside `{if}` and `{for}` as
+well, and sets it to `None` when the owner it was mounted under (the
+component, the `{if}` branch, the `{for}` row) is disposed, unless the
+signal holds another node by then (a newer row's) or was disposed with
+it (the component's own). A script uses the node with the tree's
+calls, such as `Dispatcher::dispatch` (doc 03, "A component's own
+events").
+
+Taken from Svelte's `bind:this`: set on mount, cleared on destroy.
+Differs from Svelte: the value is a `NodeId`, not an element object
+(the tree's calls take node ids); inside `{#each}` Svelte binds into an
+array entry per item, where vapors binds the expression given, so a
+row binds its own signal (an item's field) to keep one per row. The DOM
+has no binding; a query (`querySelector`) is the nearest, and vapors
+has none on purpose: a reference is declared where the element is.
+
 ## Deliberately left out
 
 - **Tracking reads after an `await`.** Svelte tracks them; Solid 2 and
