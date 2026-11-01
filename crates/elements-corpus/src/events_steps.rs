@@ -6,6 +6,9 @@
 pub enum Action {
     /// Press and release the left button.
     Click(f64, f64),
+    /// Press and release the left button this many times in a row at
+    /// one point, each press counting one more (a double click is 2).
+    Clicks(f64, f64, u32),
     /// A touch's start and end.
     Tap(f64, f64),
     /// Press the left button.

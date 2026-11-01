@@ -26,10 +26,8 @@ pub(super) fn act(
     #[allow(clippy::cast_possible_truncation)] // CSS px within a viewport
     let at = |x: f64, y: f64| [x as f32, y as f32];
     match *action {
-        Action::Click(x, y) => {
-            sent(doc, |doc| Document::pointer_pressed(doc, at(x, y)));
-            sent(doc, |doc| Document::pointer_released(doc, at(x, y)));
-        }
+        Action::Click(x, y) => clicks(doc, at(x, y), 1),
+        Action::Clicks(x, y, count) => clicks(doc, at(x, y), count),
         Action::Key(ref combination) => {
             let (key, modifiers) = key_of(combination);
             sent(doc, |doc| Document::key_pressed(doc, &key, modifiers));
@@ -58,7 +56,9 @@ pub(super) fn act(
             });
         }
         Action::Move(x, y) => Document::pointer_moved(doc, at(x, y)),
-        Action::Press(x, y) => Document::pointer_pressed(doc, at(x, y)),
+        Action::Press(x, y) => {
+            Document::pointer_pressed_clicks(doc, at(x, y), std::num::NonZeroU32::MIN);
+        }
         Action::Release(x, y) => Document::pointer_released(doc, at(x, y)),
         Action::TouchDown(x, y) => {
             press.0 = Some(at(x, y));
@@ -85,6 +85,19 @@ pub(super) fn act(
     }
     Document::settle_selection(doc);
     Ok(())
+}
+
+/// `count` presses and releases at `at`, each press counted one more,
+/// as the app's `Clicks` counts presses close in time and place.
+fn clicks(doc: &Rc<RefCell<Document>>, at: [f32; 2], count: u32) {
+    for nth in (1..=count).filter_map(std::num::NonZeroU32::new) {
+        // the press and its count, as one mousePressed is pointerdown
+        // then mousedown in Chromium
+        sent(doc, |doc| {
+            Document::pointer_pressed_clicks(doc, at, nth);
+        });
+        sent(doc, |doc| Document::pointer_released(doc, at));
+    }
 }
 
 /// Sends one platform event, then settles the selection, as the
