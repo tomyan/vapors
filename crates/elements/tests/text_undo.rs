@@ -159,8 +159,9 @@ fn a_signal_setting_the_text_forgets_the_undo() {
 }
 
 #[test]
-fn undo_fires_selectionchange_even_where_the_caret_was() {
-    // Given: "ab", a Backspace and "c": the caret at 6 before and after
+fn undo_of_text_before_the_caret_fires_selectionchange_even_where_it_was() {
+    // Given: "ab", a Backspace and "c": the caret at 6 before and after,
+    // the "c" undone at 5, before it
     let page = at_end();
     type_text(&page, "ab");
     key(&page, "Backspace");
@@ -178,5 +179,32 @@ fn undo_fires_selectionchange_even_where_the_caret_was() {
         page.log
             .borrow()
             .contains(&"selectionchange \"\"".to_owned())
+    );
+}
+
+#[test]
+fn undo_of_text_at_the_caret_that_leaves_it_in_place_fires_no_selectionchange() {
+    // Given: the caret at 2, and a Delete there
+    let page = at_end();
+    key(&page, "Home");
+    key(&page, "ArrowRight");
+    key(&page, "ArrowRight");
+    key(&page, "Delete");
+    settle(&page);
+    page.log.borrow_mut().clear();
+
+    // When: the "r" goes back at the caret, not before it
+    undo(&page);
+    settle(&page);
+
+    // Then: as Chromium 155 (undo.events)
+    assert_eq!(value(&page, page.name), "Warm");
+    assert_eq!(selection(&page, page.name), (2, 2));
+    assert!(
+        !page
+            .log
+            .borrow()
+            .iter()
+            .any(|line| line.starts_with("selectionchange"))
     );
 }

@@ -16,22 +16,17 @@ use vapors_platform::{Clipboard, ClipboardText, Platform, report_error};
 
 use super::ElementsApp;
 
-/// The clipboard reads a paste started, and where their answers come.
+/// Where the clipboard's answers to pastes come, each with the field it
+/// was read for: a read refused at once may overtake a slow one.
 pub(super) struct Pastes {
-    sender: mpsc::Sender<ClipboardText>,
-    answers: mpsc::Receiver<ClipboardText>,
-    /// The field each read in flight is for, oldest first.
-    fields: std::collections::VecDeque<NodeId>,
+    sender: mpsc::Sender<(NodeId, ClipboardText)>,
+    answers: mpsc::Receiver<(NodeId, ClipboardText)>,
 }
 
 impl Default for Pastes {
     fn default() -> Self {
         let (sender, answers) = mpsc::channel();
-        Self {
-            sender,
-            answers,
-            fields: std::collections::VecDeque::new(),
-        }
+        Self { sender, answers }
     }
 }
 
@@ -50,11 +45,10 @@ impl ElementsApp {
         let Some(node) = focused.filter(|_| self.document.borrow().text_field_focused()) else {
             return;
         };
-        self.pastes.fields.push_back(node);
         let (sender, waker) = (self.pastes.sender.clone(), platform.waker());
         self.clipboard.read_text(Box::new(move |text| {
             // a closed loop has no app left to paste into
-            if sender.send(text).is_ok() {
+            if sender.send((node, text)).is_ok() {
                 let _ = waker.wake();
             }
         }));
@@ -64,15 +58,14 @@ impl ElementsApp {
     /// was read for; the frame does this first, and a test without a
     /// window may.
     pub fn deliver_pastes(&mut self) {
-        while let Ok(text) = self.pastes.answers.try_recv() {
-            let field = self.pastes.fields.pop_front();
+        while let Ok((field, text)) = self.pastes.answers.try_recv() {
             self.pasted(field, text);
         }
     }
 
-    fn pasted(&self, field: Option<NodeId>, text: ClipboardText) {
+    fn pasted(&self, field: NodeId, text: ClipboardText) {
         match text {
-            ClipboardText::Text(text) if field == self.document.borrow().active_element() => {
+            ClipboardText::Text(text) if Some(field) == self.document.borrow().active_element() => {
                 Document::text_pasted(&self.document, &text);
             }
             ClipboardText::Text(_) => report_error(

@@ -407,8 +407,9 @@ keeps an undo stack, grouped as Chromium 155 groups a field's edits:
 
 Control+Z undoes to the text and selection before the step,
 Control+Shift+Z and Control+Y redo to those after it, each with
-`input` and a `selectionchange` even where the caret was, except a
-caret at the start, which Chromium leaves unreported. A new edit drops
+`input`, and with a `selectionchange` when the selection differs or
+the text changes before the caret (which moves it in the DOM even
+where it ends where it was), as Chromium fires. A new edit drops
 what could be redone; a signal setting the text drops the stack. A
 field keeps at most 1000 steps, the oldest going first, as Blink's
 `kMaximumUndoStackDepth`.

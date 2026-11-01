@@ -36,17 +36,19 @@ impl Document {
         )
     }
 
-    /// Puts the field back to `to`: its text, then its selection, which
-    /// owes a `selectionchange` even where it was, as Chromium sets it;
-    /// but not a caret at the start, which the new text leaves in place
-    /// in Chromium too (`undo.events`).
+    /// Puts the field back to `to`: its text, then its selection. It
+    /// owes a `selectionchange` when the selection differs, or when the
+    /// text changes before the caret, which moves it in the DOM even
+    /// where it ends where it was; as Chromium 155 fires (`undo.events`,
+    /// review-v92's probes).
     fn restore(&mut self, node: NodeId, (text, selection): Snapshot) {
-        let at_start = selection == (0..0);
+        let (was, at) = self.snapshot(node);
+        let changed_from = common_prefix(&was, &text);
         self.drive_editor(node, |d| {
             d.editor.set_text(&text);
             d.select_byte_range(selection.start, selection.end);
         });
-        if !at_start {
+        if selection != at || changed_from < at.start {
             self.editor(node).reported = None;
         }
     }
@@ -65,4 +67,12 @@ pub(crate) fn history_key(document: &Rc<RefCell<Document>>, node: NodeId, key: &
         document.borrow_mut().restore(node, to);
         edited(document, node);
     }
+}
+
+/// The bytes `a` and `b` share from their start, on a char boundary.
+fn common_prefix(a: &str, b: &str) -> usize {
+    a.char_indices()
+        .zip(b.chars())
+        .find(|((_, x), y)| x != y)
+        .map_or(a.len().min(b.len()), |((at, _), _)| at)
 }

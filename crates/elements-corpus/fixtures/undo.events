@@ -116,3 +116,12 @@ key Delete
 expect value input#name "tones here"
 key Control+z
 expect value input#name "Warm tones here"
+key ArrowRight
+expect selection input#name 1 1
+key ArrowRight
+expect selection input#name 2 2
+key Delete                    undone at the caret: the caret is not moved
+expect value input#name "Wam tones here"
+key Control+z
+expect value input#name "Warm tones here"
+expect no event selectionchange
