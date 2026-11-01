@@ -14,6 +14,10 @@ use crate::style::Cursor;
 /// border box, and the elements a pointer can hit.
 pub struct Painted {
     pub(crate) canvas: Color,
+    /// The element whose background became the canvas's, if one did.
+    pub(crate) canvas_from: Option<CanvasFrom>,
+    /// Device pixels per CSS pixel: the update's viewport scale.
+    pub(crate) scale: f32,
     pub(crate) scene: Scene,
     pub(crate) texts: Vec<std::rc::Rc<Layout>>,
     pub(crate) rects: HashMap<NodeId, BoxRect>,
@@ -37,11 +41,45 @@ pub struct Painted {
     pub(crate) text_origins: HashMap<NodeId, [f32; 2]>,
 }
 
+/// Which element's background became the canvas's (CSS Backgrounds 3
+/// section 2.11.2): it then paints none of its own.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CanvasFrom {
+    /// The root (`html`).
+    Root,
+    /// The body, the root's background being transparent.
+    Body,
+}
+
+impl CanvasFrom {
+    /// The element's tag: `html` or `body`.
+    #[must_use]
+    pub fn tag(self) -> &'static str {
+        match self {
+            Self::Root => "html",
+            Self::Body => "body",
+        }
+    }
+}
+
 impl Painted {
     /// The colour under everything: what the window is cleared to.
     #[must_use]
     pub fn canvas(&self) -> Color {
         self.canvas
+    }
+
+    /// The element whose background is the canvas's, when the root or
+    /// the body sets one; `None` when the canvas is the default white.
+    #[must_use]
+    pub fn canvas_from(&self) -> Option<CanvasFrom> {
+        self.canvas_from
+    }
+
+    /// The update's viewport scale, device pixels per CSS pixel.
+    #[must_use]
+    pub fn scale(&self) -> f32 {
+        self.scale
     }
 
     /// The display list.

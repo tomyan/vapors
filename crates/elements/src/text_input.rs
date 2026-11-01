@@ -86,9 +86,17 @@ pub(crate) fn typed(document: &Rc<RefCell<Document>>, node: NodeId, text: &str) 
 }
 
 /// `key` went down on `node`, a focused text field.
-pub(crate) fn key(document: &Rc<RefCell<Document>>, node: NodeId, key: &str, modifiers: Modifiers) {
+/// Whether the field took the key: its editing keys and moves, and a key
+/// that types text (`keys::types_text`); a named key such as F1 or
+/// Escape is the app's.
+pub(crate) fn key(
+    document: &Rc<RefCell<Document>>,
+    node: NodeId,
+    key: &str,
+    modifiers: Modifiers,
+) -> bool {
     if !document.borrow().live_text(node) {
-        return;
+        return false;
     }
     let (shift, word) = (modifiers.shift, modifiers.control);
     match key {
@@ -106,8 +114,12 @@ pub(crate) fn key(document: &Rc<RefCell<Document>>, node: NodeId, key: &str, mod
         "z" | "Z" | "y" | "Y" if modifiers.control => {
             crate::text_undo::history_key(document, node, key, shift);
         }
-        _ => moved(document, node, key, shift, word),
+        _ => {
+            return moved(document, node, key, shift, word)
+                || crate::keys::types_text(key, modifiers);
+        }
     }
+    true
 }
 
 /// Backspace (`back`) or Delete, by a word with `word`: a selection
@@ -131,7 +143,13 @@ fn deleted(d: &mut Driver<'_>, back: bool, word: bool) {
 
 /// An arrow, Home or End moves the caret, extending with `shift`, by
 /// words with `word`; another key does nothing.
-fn moved(document: &Rc<RefCell<Document>>, node: NodeId, key: &str, shift: bool, word: bool) {
+fn moved(
+    document: &Rc<RefCell<Document>>,
+    node: NodeId,
+    key: &str,
+    shift: bool,
+    word: bool,
+) -> bool {
     let act: fn(&mut Driver<'_>) = match (key, shift, word) {
         ("ArrowLeft", false, false) => |d| d.move_left(),
         ("ArrowLeft", true, false) => |d| d.select_left(),
@@ -145,9 +163,10 @@ fn moved(document: &Rc<RefCell<Document>>, node: NodeId, key: &str, shift: bool,
         ("Home", true, _) => |d| d.select_to_line_start(),
         ("End", false, _) => |d| d.move_to_line_end(),
         ("End", true, _) => |d| d.select_to_line_end(),
-        _ => return,
+        _ => return false,
     };
     document.borrow_mut().drive(node, act);
+    true
 }
 
 /// Commits `node`'s text: `change` when it differs from the last
