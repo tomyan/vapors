@@ -46,6 +46,11 @@ pub(crate) struct LayoutBox {
     pub(crate) checked: Option<bool>,
     /// A focused `input type=number`'s selection, for paint (3-E3c).
     pub(crate) number_focus: Option<NumberFocus>,
+    /// Whether the element is a text field (E6a), whose text origin
+    /// paint keeps for the pointer.
+    pub(crate) text_field: bool,
+    /// A focused text field's caret and selection, for paint.
+    pub(crate) text_marks: Option<crate::text_marks::TextMarks>,
 }
 
 /// A focused number field: whether its text is selected whole.
@@ -68,6 +73,8 @@ impl LayoutBox {
             range: None,
             checked: None,
             number_focus: None,
+            text_field: false,
+            text_marks: None,
         }
     }
 
@@ -103,6 +110,8 @@ pub(crate) struct Source<'a> {
     pub(crate) used: &'a HashMap<NodeId, Used>,
     pub(crate) images: &'a crate::images::Images,
     pub(crate) number_focus: Option<(NodeId, NumberFocus)>,
+    /// The focused text field's marks (E6a).
+    pub(crate) text_marks: Option<(NodeId, crate::text_marks::TextMarks)>,
 }
 
 /// Builds the boxes under `root`; box 0 is the root's.
@@ -137,26 +146,13 @@ fn add_element(source: &Source<'_>, node: NodeId, boxes: &mut Vec<LayoutBox>) ->
     );
     replaced.range = range;
     replaced.checked = checked;
-    let field = source
-        .arena
-        .get(node, "build")
-        .element()
-        .filter(|e| e.tag == "input" && crate::check::is_type(e, "number"))
-        .map(|e| crate::number::Field::of(&e.attributes, &e.properties));
-    replaced.number_focus = source
-        .number_focus
-        .filter(|(focused, _)| *focused == node && field.is_some())
-        .map(|(_, focus)| focus);
+    let field_text = super::field_box::fill(source, node, &mut replaced);
     boxes.push(replaced);
     let mut run = Collector::new(style.text, style.visible);
-    // a number field's text is its run; a blank one keeps its line
-    // with a no-break space, which paints nothing (3-E3c)
-    if let Some(field) = field {
-        run.push_text(if field.text.is_empty() {
-            "\u{a0}"
-        } else {
-            &field.text
-        });
+    // a number or text field's text is its run; a blank one keeps its
+    // line with a no-break space, which paints nothing (3-E3c, E6a)
+    if let Some(text) = field_text {
+        run.push_text(if text.is_empty() { "\u{a0}" } else { &text });
     }
     for child in source.arena.children(node) {
         match &source.arena.get(child, "build").kind {

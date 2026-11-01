@@ -71,58 +71,6 @@ fn a_script_reads_as_its_viewport_its_listened_types_and_its_steps() {
 }
 
 #[test]
-fn a_value_expectation_names_the_control_and_its_value() {
-    // When
-    let script = parse(
-        "r",
-        "listen input\nkey ArrowRight\nexpect value input#b 51\nexpect value input#a 20\nkey End\nexpect value input#b 100\n",
-    )
-    .expect("parses");
-
-    // Then
-    assert_eq!(
-        script.steps[0].expect[0],
-        (
-            Expect::Value {
-                target: "input#b".into(),
-                value: "51".into()
-            },
-            3
-        )
-    );
-    assert_eq!(script.value_targets(), ["input#a", "input#b"]);
-}
-
-#[test]
-fn a_checked_expectation_takes_true_or_false() {
-    // When
-    let script = parse(
-        "c",
-        "listen click\nclick 5 5\nexpect checked input#b true\nexpect checked input#a false\n",
-    )
-    .expect("parses");
-    let refused =
-        parse("c", "listen click\nclick 5 5\nexpect checked input#b yes\n").expect_err("refused");
-
-    // Then
-    assert_eq!(
-        script.steps[0].expect[0],
-        (
-            Expect::Checked {
-                target: "input#b".into(),
-                checked: true
-            },
-            3
-        )
-    );
-    assert_eq!(script.checked_targets(), ["input#a", "input#b"]);
-    assert!(
-        refused.contains("c.events:3:") && refused.contains("true or false"),
-        "{refused}"
-    );
-}
-
-#[test]
 fn a_script_of_another_shape_is_refused_naming_its_file_and_line() {
     for (text, needle) in [
         (

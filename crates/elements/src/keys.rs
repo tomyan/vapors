@@ -64,6 +64,9 @@ impl Document {
         {
             crate::number_input::key(document, target, key, modifiers);
         }
+        if document.borrow().is_text_input(target) {
+            crate::text_input::key(document, target, key, modifiers);
+        }
         match key {
             // Control, Alt or Meta with Tab is the browser's or the window
             // manager's, which Chromium does not navigate on

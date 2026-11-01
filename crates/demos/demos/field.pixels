@@ -1,0 +1,12 @@
+# The text field after a click at the end of its text, at 640x400 CSS
+# px at 1x. The card is at x 160..480, y 168..232; the row y 188..212
+# with its field at x 260..380 (content from x 263), the readout at x
+# 380..460. The click focuses the field: its ring shows and a caret
+# stands after "Warm".
+click 360 200
+pixel 4 4 #e9ecef          page, top left
+pixel 300 178 #ffffff      the card, above the row
+pixel 340 200 #ffffff      the field's white, right of the text
+pixel 258 200 #0060df      its focus ring, 1px out from its border
+ink 263 192 310 208 #ffffff the text and the caret are drawn
+ink 420 192 460 208 #ffffff the readout is drawn

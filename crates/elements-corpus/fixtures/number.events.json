@@ -35,6 +35,7 @@
       "focus": "input#amount",
       "focusVisible": true,
       "line": 7,
+      "selections": {},
       "values": {
         "input#amount": "20"
       }
@@ -67,6 +68,7 @@
       "focus": "input#amount",
       "focusVisible": true,
       "line": 11,
+      "selections": {},
       "values": {
         "input#amount": "205"
       }
@@ -99,6 +101,7 @@
       "focus": "input#amount",
       "focusVisible": true,
       "line": 14,
+      "selections": {},
       "values": {
         "input#amount": "20"
       }
@@ -125,6 +128,7 @@
       "focus": "input#amount",
       "focusVisible": true,
       "line": 17,
+      "selections": {},
       "values": {
         "input#amount": "20"
       }
@@ -157,6 +161,7 @@
       "focus": "input#amount",
       "focusVisible": true,
       "line": 20,
+      "selections": {},
       "values": {
         "input#amount": "2"
       }
@@ -189,6 +194,7 @@
       "focus": "input#amount",
       "focusVisible": true,
       "line": 22,
+      "selections": {},
       "values": {
         "input#amount": "27"
       }
@@ -221,6 +227,7 @@
       "focus": "input#amount",
       "focusVisible": true,
       "line": 24,
+      "selections": {},
       "values": {
         "input#amount": "27"
       }
@@ -247,6 +254,7 @@
       "focus": "input#amount",
       "focusVisible": true,
       "line": 27,
+      "selections": {},
       "values": {
         "input#amount": "27"
       }
@@ -285,6 +293,7 @@
       "focus": "input#amount",
       "focusVisible": true,
       "line": 29,
+      "selections": {},
       "values": {
         "input#amount": "28"
       }
@@ -323,6 +332,7 @@
       "focus": "input#amount",
       "focusVisible": true,
       "line": 33,
+      "selections": {},
       "values": {
         "input#amount": "27"
       }
@@ -361,6 +371,7 @@
       "focus": "input#plain",
       "focusVisible": true,
       "line": 35,
+      "selections": {},
       "values": {
         "input#amount": "27"
       }
@@ -399,6 +410,7 @@
       "focus": "input#amount",
       "focusVisible": true,
       "line": 38,
+      "selections": {},
       "values": {
         "input#amount": "27"
       }
@@ -431,6 +443,7 @@
       "focus": "input#amount",
       "focusVisible": true,
       "line": 40,
+      "selections": {},
       "values": {
         "input#amount": "9"
       }
@@ -482,6 +495,7 @@
       "focus": "button#after",
       "focusVisible": false,
       "line": 43,
+      "selections": {},
       "values": {
         "input#amount": "9"
       }
@@ -514,6 +528,7 @@
       "focus": "body",
       "focusVisible": false,
       "line": 48,
+      "selections": {},
       "values": {
         "input#amount": "9"
       }
@@ -540,6 +555,7 @@
       "focus": "body",
       "focusVisible": false,
       "line": 52,
+      "selections": {},
       "values": {
         "input#amount": "9"
       }

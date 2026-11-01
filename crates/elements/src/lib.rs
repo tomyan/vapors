@@ -47,9 +47,15 @@ mod scrolling;
 mod stacking;
 mod style;
 mod tags;
+mod text_field;
+mod text_input;
+mod text_marks;
+mod text_paint;
+mod text_pointer;
 mod thumb;
 mod thumb_order;
 mod tree;
+mod typing;
 mod update;
 
 pub use document::Document;

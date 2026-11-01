@@ -40,6 +40,8 @@ pub(crate) struct Pointer {
     pub(crate) drags: std::collections::HashMap<u32, crate::range_drag::Drag>,
     /// Each pointer's scrub of a number field, by pointer id (3-E3c).
     pub(crate) scrubs: std::collections::HashMap<u32, crate::number_scrub::Scrub>,
+    /// Each pointer's drag over a text field's text, by pointer id (E6a).
+    pub(crate) text_drags: std::collections::HashMap<u32, NodeId>,
 }
 
 impl Document {
@@ -60,6 +62,7 @@ impl Document {
         }
         crate::range_drag::moved(document, MOUSE, point);
         crate::number_scrub::moved(document, MOUSE, point);
+        crate::text_pointer::moved_pointer(document, MOUSE, point);
     }
 
     /// The pointer left the window: nothing is hovered, and a press in
@@ -100,6 +103,11 @@ impl Document {
             let focusable = target.and_then(|target| document.borrow().focusable_holding(target));
             Self::focus(document, focusable);
         }
+        // a text field's caret lands where the press did, after focus
+        // so keyboard focus's selection does not override it (E6a)
+        if let (false, Some(target)) = (prevented, target) {
+            crate::text_pointer::pressed(document, MOUSE, target, point);
+        }
     }
 
     /// The primary button came up at `point`: the target (the capturing
@@ -119,6 +127,7 @@ impl Document {
         }
         crate::range_drag::released(document, MOUSE);
         crate::number_scrub::released(document, MOUSE);
+        crate::text_pointer::released(document, MOUSE);
         release_capture(document, MOUSE);
         process_pending(document, MOUSE, point);
         let click = document.borrow_mut().release(target);
@@ -134,40 +143,6 @@ impl Document {
     pub fn tapped(document: &Rc<RefCell<Document>>, point: Point) {
         Self::pointer_pressed(document, point);
         Self::pointer_released(document, point);
-    }
-
-    /// The cursor over `point` in the last painted update: the hit
-    /// element's, or the default arrow over nothing or before the first.
-    #[must_use]
-    pub fn cursor(&self, point: Point) -> crate::Cursor {
-        self.painted
-            .as_ref()
-            .map_or(crate::Cursor::Default, |painted| painted.cursor(point))
-    }
-
-    /// The element `point` hits in the last painted update, or `None`
-    /// before the first, after a refused one, or where the element hit
-    /// has been removed since (review-v77, H1).
-    #[must_use]
-    pub fn hit(&self, point: Point) -> Option<NodeId> {
-        self.painted
-            .as_ref()?
-            .hit(point)
-            .filter(|node| self.contains(*node))
-    }
-
-    /// After an update: the element under the pointer's last position may
-    /// have changed with the layout, so `:hover` follows it (the next
-    /// update shows it) without an event.
-    pub(crate) fn rehover_in(&mut self, painted: &crate::painted::Painted) {
-        let Some(point) = self.pointer.position else {
-            return;
-        };
-        let target = painted.hit(point);
-        if target != self.pointer.hovered {
-            self.set_flag_chain(States::HOVER, target);
-            self.pointer.hovered = target;
-        }
     }
 
     fn hover(&mut self, point: Point) -> Option<NodeId> {
@@ -205,6 +180,8 @@ impl Document {
 
 #[path = "events_capture.rs"]
 pub(crate) mod capture;
+#[path = "events_hit.rs"]
+mod hit;
 #[path = "events_touch.rs"]
 mod touch;
 #[path = "events_tree.rs"]

@@ -3,6 +3,7 @@
 
 mod boxes;
 mod calcs;
+mod field_box;
 mod inline;
 mod keep;
 mod measure;

@@ -61,6 +61,7 @@
       "focus": "input#level",
       "focusVisible": false,
       "line": 8,
+      "selections": {},
       "values": {
         "input#level": "50",
         "input#off": "50",
@@ -82,6 +83,7 @@
       "focus": "input#level",
       "focusVisible": false,
       "line": 15,
+      "selections": {},
       "values": {
         "input#level": "50",
         "input#off": "50",
@@ -116,6 +118,7 @@
       "focus": "input#level",
       "focusVisible": false,
       "line": 17,
+      "selections": {},
       "values": {
         "input#level": "77",
         "input#off": "50",
@@ -143,6 +146,7 @@
       "focus": "input#level",
       "focusVisible": false,
       "line": 21,
+      "selections": {},
       "values": {
         "input#level": "100",
         "input#off": "50",
@@ -184,6 +188,7 @@
       "focus": "input#level",
       "focusVisible": false,
       "line": 24,
+      "selections": {},
       "values": {
         "input#level": "100",
         "input#off": "50",
@@ -217,6 +222,7 @@
       "focus": "input#level",
       "focusVisible": true,
       "line": 28,
+      "selections": {},
       "values": {
         "input#level": "99",
         "input#off": "50",
@@ -250,6 +256,7 @@
       "focus": "input#level",
       "focusVisible": true,
       "line": 33,
+      "selections": {},
       "values": {
         "input#level": "98",
         "input#off": "50",
@@ -283,6 +290,7 @@
       "focus": "input#level",
       "focusVisible": true,
       "line": 35,
+      "selections": {},
       "values": {
         "input#level": "99",
         "input#off": "50",
@@ -316,6 +324,7 @@
       "focus": "input#level",
       "focusVisible": true,
       "line": 37,
+      "selections": {},
       "values": {
         "input#level": "100",
         "input#off": "50",
@@ -349,6 +358,7 @@
       "focus": "input#level",
       "focusVisible": true,
       "line": 39,
+      "selections": {},
       "values": {
         "input#level": "90",
         "input#off": "50",
@@ -382,6 +392,7 @@
       "focus": "input#level",
       "focusVisible": true,
       "line": 41,
+      "selections": {},
       "values": {
         "input#level": "100",
         "input#off": "50",
@@ -415,6 +426,7 @@
       "focus": "input#level",
       "focusVisible": true,
       "line": 43,
+      "selections": {},
       "values": {
         "input#level": "0",
         "input#off": "50",
@@ -448,6 +460,7 @@
       "focus": "input#level",
       "focusVisible": true,
       "line": 45,
+      "selections": {},
       "values": {
         "input#level": "100",
         "input#off": "50",
@@ -475,6 +488,7 @@
       "focus": "input#plain",
       "focusVisible": true,
       "line": 47,
+      "selections": {},
       "values": {
         "input#level": "100",
         "input#off": "50",
@@ -508,6 +522,7 @@
       "focus": "input#plain",
       "focusVisible": true,
       "line": 49,
+      "selections": {},
       "values": {
         "input#level": "100",
         "input#off": "50",
@@ -536,6 +551,7 @@
       "focus": "body",
       "focusVisible": false,
       "line": 51,
+      "selections": {},
       "values": {
         "input#level": "100",
         "input#off": "50",
@@ -563,6 +579,7 @@
       "focus": "body",
       "focusVisible": false,
       "line": 55,
+      "selections": {},
       "values": {
         "input#level": "50",
         "input#off": "50",
@@ -597,6 +614,7 @@
       "focus": "body",
       "focusVisible": false,
       "line": 59,
+      "selections": {},
       "values": {
         "input#level": "77",
         "input#off": "50",
@@ -631,6 +649,7 @@
       "focus": "body",
       "focusVisible": false,
       "line": 62,
+      "selections": {},
       "values": {
         "input#level": "77",
         "input#off": "50",
@@ -658,6 +677,7 @@
       "focus": "body",
       "focusVisible": false,
       "line": 65,
+      "selections": {},
       "values": {
         "input#level": "50",
         "input#off": "50",
@@ -700,6 +720,7 @@
       "focus": "body",
       "focusVisible": false,
       "line": 67,
+      "selections": {},
       "values": {
         "input#level": "50",
         "input#off": "50",
@@ -720,6 +741,7 @@
       "focus": "body",
       "focusVisible": false,
       "line": 71,
+      "selections": {},
       "values": {
         "input#level": "50",
         "input#off": "50",

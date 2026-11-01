@@ -123,20 +123,6 @@ pub(crate) fn typed(document: &Rc<RefCell<Document>>, node: NodeId, text: &str) 
     }
 }
 
-impl Document {
-    /// `text` was typed (the platform's `Character`): it goes to the
-    /// focused number field, control characters left out.
-    pub fn character_typed(document: &Rc<RefCell<Document>>, text: &str) {
-        let printable: String = text.chars().filter(|c| !c.is_control()).collect();
-        let Some(node) = document.borrow().active_element() else {
-            return;
-        };
-        if !printable.is_empty() {
-            typed(document, node, &printable);
-        }
-    }
-}
-
 /// `input` on `node` after a scrub's step.
 pub(crate) fn fire_input(document: &Rc<RefCell<Document>>, node: NodeId) {
     fire(document, node, "input");

@@ -11,6 +11,7 @@ pub mod pointer;
 pub mod random_css;
 pub mod range_page;
 pub mod scroll_list;
+pub mod text_page;
 pub mod tree;
 
 use vapors_dom::{Dom, NodeId};
