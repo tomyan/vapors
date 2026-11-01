@@ -6,14 +6,19 @@
 //! that cannot run fails. It never skips.
 //!
 //! The tiers split on the test's name: the gpu tier runs `gpu_*`, the
-//! unit tier the rest. xtask's unit tier sets [`TIER_ENV`] to `unit`,
-//! and [`gpu()`] refuses there, so a GPU test without the prefix fails
-//! on a machine with a GPU too, not only on a runner without one.
+//! unit tier the rest. xtask's unit tier sets [`TIER_ENV`] to
+//! [`REFUSED_TIER`], and [`gpu()`] refuses there, so a GPU test without
+//! the prefix fails on a machine with a GPU too, not only on a runner
+//! without one. Only [`gpu()`] is guarded: a test that opens its own
+//! `wgpu::Instance`, as `vapors-platform`'s `surface.rs` does for a
+//! window, is not. Calling [`allowed_in`] there would extend the guard.
 
 pub use vapors_renderer::read_rgba8;
 
-/// Set by xtask for each test tier it runs (`steps.rs`).
+/// Set by xtask's unit tier (`steps_tiers.rs`).
 pub const TIER_ENV: &str = "VAPORS_TEST_TIER";
+/// The value of [`TIER_ENV`] in which [`gpu()`] refuses.
+pub const REFUSED_TIER: &str = "unit";
 
 /// The adapter this process is testing on, with its device and queue.
 pub struct Gpu {
@@ -30,7 +35,9 @@ pub struct Gpu {
 ///
 /// # Panics
 ///
-/// In the unit tier, naming the fix. When no adapter matches, with a message listing the adapters that
+/// In the unit tier, naming the fix.
+///
+/// When no adapter matches, with a message listing the adapters that
 /// were found and how to fix it. A panic is the right failure here: the
 /// caller is a test, and the message is the report.
 #[must_use]
@@ -72,11 +79,11 @@ pub fn gpu() -> Gpu {
 ///
 /// `tier` is `unit`, with a message naming the fix.
 pub fn allowed_in(tier: Option<&str>) -> Result<(), String> {
-    if tier != Some("unit") {
+    if tier != Some(REFUSED_TIER) {
         return Ok(());
     }
     Err(format!(
-        "a test opened the GPU in the unit tier ({TIER_ENV}=unit); the gpu tier runs \
+        "a test opened the GPU in the unit tier ({TIER_ENV}={REFUSED_TIER}); the gpu tier runs \
          test functions named gpu_*, so on a runner without a GPU this test fails. \
          Fix: rename the test function to gpu_<name>, then run `cargo xtask test --tier gpu`"
     ))

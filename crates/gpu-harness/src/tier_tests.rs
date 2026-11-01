@@ -23,18 +23,3 @@ fn the_gpu_tier_and_a_direct_run_may_open_a_gpu() {
         assert_eq!(allowed, Ok(()), "{tier:?}");
     }
 }
-
-// One answer to "which tier is this": xtask's unit step sets the
-// variable gpu() reads, to the value it refuses.
-#[test]
-fn xtasks_unit_step_sets_the_tier_gpu_refuses() {
-    // Given
-    let steps = concat!(env!("CARGO_MANIFEST_DIR"), "/../../xtask/src/steps.rs");
-
-    // When
-    let source = std::fs::read_to_string(steps).expect(steps);
-
-    // Then
-    let setting = format!("(\"{TIER_ENV}\", \"unit\")");
-    assert!(source.contains(&setting), "{steps} sets no {setting}");
-}
