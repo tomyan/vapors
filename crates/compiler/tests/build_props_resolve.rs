@@ -29,6 +29,11 @@ fn a_tag_naming_another_crates_component_is_listed_unchecked() {
         note.contains("page.wisp:1:1") && note.contains("other_crate::Plain"),
         "{note}"
     );
+    // the gap is declared where it is met, with what retires it
+    assert!(
+        note.contains("a known gap") && note.contains("reading another crate's props"),
+        "{note}"
+    );
 }
 
 #[test]

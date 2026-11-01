@@ -30,7 +30,7 @@ enum Ended {
 }
 
 /// Finger `finger`'s pointer id.
-fn touch_id(finger: u64) -> u32 {
+pub(super) fn touch_id(finger: u64) -> u32 {
     TOUCHES + u32::try_from(finger).unwrap_or(u32::MAX - TOUCHES)
 }
 
@@ -53,6 +53,7 @@ impl Document {
             .borrow()
             .pointer_event("pointerdown", id, target, point);
         let prevented = dispatch_pointer(document, id, target, event);
+        document.borrow_mut().pointer.touch_down_prevented = prevented;
         ask_unless_asked(document, id, Asked::CaptureTo(target));
         if !prevented {
             crate::range_drag::pressed(document, id, target, point);
@@ -81,24 +82,6 @@ impl Document {
     /// `touchcancel`; no lift follows (review-v84, N1).
     pub fn touch_cancelled(document: &Rc<RefCell<Document>>, finger: u64, point: Point) {
         Self::touch_ended(document, finger, point, Ended::Taken);
-    }
-
-    /// The platform's tap at `point`, after the touch's own down and up:
-    /// focus moves to what the tap is on (or leaves), then `click` on
-    /// the element there unless a disabled control holds it, then a
-    /// text field takes the caret at the tap, as Chromium orders a tap.
-    pub fn touch_tapped(document: &Rc<RefCell<Document>>, point: Point) {
-        let hit = document.borrow().hit(point);
-        let focusable = hit.and_then(|node| document.borrow().focusable_holding(node));
-        Self::focus(document, focusable);
-        let Some(hit) = hit else { return };
-        if !document.borrow().in_disabled_button(hit) {
-            let event = document
-                .borrow()
-                .pointer_event("click", touch_id(0), hit, point);
-            crate::events::tree::dispatch_click(document, hit, event);
-        }
-        crate::text_pointer::tapped(document, hit, point);
     }
 
     /// Whether finger `finger` is down and a listener captured it.
