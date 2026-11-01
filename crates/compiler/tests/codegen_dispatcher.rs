@@ -10,7 +10,7 @@ use codegen::{assert_has, generated_with, refusal};
 #[test]
 fn a_dispatcher_declares_its_events_and_reaches_handlers() {
     // Given
-    let script = "#[dispatcher(optionchoose, comboboxdismiss)]\nlet events;\nlet choose = move || { let _ = events.dispatch(vapors_dom::NodeId::default(), Event::new(\"optionchoose\")); };";
+    let script = "#[dispatcher(optionchoose, comboboxdismiss)]\nlet events;\nlet choose = move |event: &mut Event| -> Result<(), vapors_dom::DispatchRefused> { if let Some(at) = event.target() { events.dispatch(at, Event::new(\"optionchoose\"))?; } Ok(()) };";
 
     // When
     let code = generated_with(script, "<button onclick={choose}>Go</button>");
@@ -20,6 +20,9 @@ fn a_dispatcher_declares_its_events_and_reaches_handlers() {
         &code,
         "let events = Dispatcher::new(dom.dyn_dom(), &[\"optionchoose\", \"comboboxdismiss\"]);",
     );
+    // the type lists them, and mount declares them first
+    assert_has(&code, "vec![\"optionchoose\", \"comboboxdismiss\"]");
+    assert_has(&code, "dom.borrow_mut().declare_events(&Self::events());");
 }
 
 #[test]
@@ -29,6 +32,11 @@ fn a_dispatcher_written_otherwise_is_refused_naming_the_form() {
         ("#[dispatcher(go)]\nlet events = 1;", "no initialiser"),
         ("#[dispatcher(go)]\nlet (a, b);", "a single name"),
         ("#[dispatcher(\"go\")]\nlet events;", "names the events"),
+        ("#[prop]\n#[dispatcher(go)]\nlet events;", "stands alone"),
+        (
+            "#[dispatcher(go)]\nlet events;\n#[dispatcher(stop)]\nlet more;",
+            "a second #[dispatcher]",
+        ),
     ] {
         let why = refusal(&format!("<script>\n{script}\n</script>\n<p>x</p>")).to_string();
         assert!(why.contains(needle), "{script}: {why}");

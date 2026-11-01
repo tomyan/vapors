@@ -24,11 +24,11 @@ fn zero_arg_handler_is_wrapped() {
         &code,
         "listen(div0, \"click\", Box::new(move |_event: &mut Event|",
     );
-    assert_has(&code, "{ increment(); }");
+    assert_has(&code, "vapors_dom::handle_without_event(&increment)");
 }
 
 #[test]
-fn event_aware_handler_is_passed_directly() {
+fn event_aware_handler_is_called_with_the_event_and_its_result_reported() {
     // Given
     let script = "let count: Signal<i32> = Signal::new(0);\nlet handle_click = move |event: &mut Event| { count.update(|n| *n += 1); event.stop_propagation(); };";
 
@@ -39,12 +39,15 @@ fn event_aware_handler_is_passed_directly() {
     );
 
     // Then
-    assert_has(&code, "listen(div0, \"click\", Box::new(handle_click))");
+    assert_has(
+        &code,
+        "listen(div0, \"click\", Box::new(move |event: &mut Event| vapors_dom::handle(event, &handle_click)))",
+    );
     assert_lacks(&code, "handle_click()");
 }
 
 #[test]
-fn inline_closure_handler_is_passed_directly() {
+fn inline_closure_handler_is_called_with_the_event() {
     // Given
     let script = "let count: Signal<i32> = Signal::new(0);";
 
@@ -57,7 +60,7 @@ fn inline_closure_handler_is_passed_directly() {
     // Then
     assert_has(
         &code,
-        "listen(button0, \"click\", Box::new(move |_event| count.set(0)))",
+        "Box::new(move |event: &mut Event| vapors_dom::handle(event, &move |_event| count.set(0)))",
     );
 }
 
@@ -110,5 +113,8 @@ fn the_event_name_is_the_attribute_name_after_on() {
     let code = generated_with(script, "<input oninput={typed} />");
 
     // Then
-    assert_has(&code, "listen(input0, \"input\", Box::new(typed))");
+    assert_has(
+        &code,
+        "listen(input0, \"input\", Box::new(move |event: &mut Event| vapors_dom::handle(event, &typed)))",
+    );
 }

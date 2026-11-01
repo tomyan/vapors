@@ -13,6 +13,7 @@ mod component_tag;
 mod element;
 mod element_bind;
 mod emit;
+mod events_decl;
 mod for_block;
 mod format;
 mod names;

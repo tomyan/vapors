@@ -44,6 +44,8 @@ pub(crate) struct ScriptInfo {
     pub declared: Vec<(String, usize)>,
     /// The names its `use` items bring in.
     pub uses: Vec<UseName>,
+    /// The events its `#[dispatcher(…)]` declares.
+    pub events: Vec<String>,
 }
 
 /// Parses and classifies the script.

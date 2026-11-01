@@ -439,21 +439,56 @@ As built (the listbox slice's first part, 2026-11-01): a component
 dispatches events of its own, such as a combobox's `comboboxopen`,
 with `#[dispatcher(comboboxopen, optionchoose)] let events;` in its
 script. The compiler makes it a `vapors_dom::Dispatcher` for those
-names, which declares them to the tree at mount: the elements document
-refuses a listener for an event it never fires, unless a component
-declares it. `events.dispatch(node, Event::new("optionchoose"))` runs
-the listeners on `node` and then its ancestors at once, as the DOM's
+names. A script has at most one `#[dispatcher]`, and nothing else is
+attached to that `let`; the compiler refuses either.
+
+Names are declared per component type: the compiler generates
+`events()` for each component, its own names and those of every
+component its template uses, and declares them to the tree when the
+component mounts, before its children. The elements document refuses
+a listener for an event it never fires unless it is declared, so an
+ancestor's `onoptionchoose` is accepted before the combobox inside an
+`{if}` has mounted.
+
+`events.dispatch(node, Event::new("optionchoose"))` runs the
+listeners on `node` and then its ancestors at once, as the DOM's
 `dispatchEvent` does, and answers `Ok(true)` unless a listener
 prevented the default, so the component runs its default action only
-then. It is refused, not dropped: for a name not declared, and when the
-tree is borrowed (from inside a `Dom` call), since a listener may use
-the tree.
+then. The listener lists for the whole path are taken at the start,
+before any listener runs: a listener added or removed during the
+dispatch takes effect from the next one. A listener may dispatch again (re-entry),
+since listeners are `Rc<dyn Fn>` and none is borrowed while it runs.
+`Rc` assumes one thread, as every vapors tree is today; a tree shared
+between threads would need `Arc` and a lock, and that change retires
+the assumption.
+
+A dispatch is refused, not dropped, with `DispatchRefused` naming the
+event and node:
+
+- before any listener runs: a name the dispatcher does not declare, a
+  node no longer in the tree (removed), or the tree borrowed (from
+  inside a `Dom` call). `cancelled()` is `None`.
+- after every listener ran: a listener that asked for pointer capture,
+  which only a pointer event carries. The message says how many
+  listeners it was dispatched to, and `cancelled()` keeps their
+  answer.
+
+`events.emit(..)` is `dispatch` for a component that cannot be refused
+except by its own bug; it panics with the refusal. A listener returns
+`()` or `Result<(), E>` with `E: Display`, so it may use `?`; an `Err`
+goes to the platform's error report (`report_error`, which the page
+shows), which the app installs with `vapors_dom::set_error_report`.
+With none installed (a test without an app) it panics with the
+message.
 
 Taken from the DOM: synchronous, bubbling, cancelable, the return
 value of `dispatchEvent`, delivered to listeners on elements, so an app
 listens with `on<name>` on any ancestor. Differs from the DOM: no
 capture phase and no `CustomEvent.detail` yet (the target and the
-component's bound signals carry the data); names are declared. Differs
+component's bound signals carry the data); names are declared; the
+DOM copies each node's listener list when the event reaches that node,
+so a listener added to an ancestor during the dispatch runs there and
+not here. Differs
 from Svelte: Svelte 4's `createEventDispatcher` sends a component event
 to its parent's `on:` handler only, not bubbling through the DOM and
 not cancelable unless asked, and Svelte 5 replaced it with callback

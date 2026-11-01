@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use vapors_css::tree::States;
-use vapors_dom::{Capture, Event, Handler, NodeId};
+use vapors_dom::{Capture, Event, NodeId};
 
 use crate::document::Document;
 use crate::node::Kind;
@@ -83,7 +83,7 @@ impl Document {
         &self,
         target: NodeId,
         name: &str,
-    ) -> Vec<(NodeId, Vec<Rc<RefCell<Handler>>>)> {
+    ) -> Vec<(NodeId, Vec<vapors_dom::Listener>)> {
         self.chain(target)
             .into_iter()
             .map(|node| match &self.arena.get(node, "dispatch").kind {
@@ -128,15 +128,9 @@ pub(crate) fn deliver(
         along.truncate(1);
     }
     let mut asked = Vec::new();
-    for (node, listeners) in along {
-        for listener in listeners {
-            (listener.borrow_mut())(&mut event);
-            asked.extend(event.take_capture().map(|capture| (node, capture)));
-        }
-        if event.propagation_stopped() {
-            break;
-        }
-    }
+    vapors_dom::run_along(along, &mut event, |node, event| {
+        asked.extend(event.take_capture().map(|capture| (node, capture)));
+    });
     (event, asked)
 }
 

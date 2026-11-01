@@ -1,6 +1,5 @@
 //! The `Dom` implementation: each call is recorded and applied to the tree.
 
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
@@ -76,6 +75,7 @@ impl Dom for RecordingDom {
 
     fn remove(&mut self, node: NodeId) {
         self.detach(node);
+        self.mark_removed(node);
         self.calls.push(Call::Remove { node });
     }
 
@@ -83,7 +83,7 @@ impl Dom for RecordingDom {
         self.listeners
             .entry((node, event.into()))
             .or_default()
-            .push(Rc::new(RefCell::new(handler)));
+            .push(Rc::from(handler));
         self.calls.push(Call::Listen {
             node,
             event: event.into(),

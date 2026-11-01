@@ -49,6 +49,7 @@ when the component mounts. Some `let` forms have a special meaning:
 | `#[prop] let label: String = "Count".into();` | a field of `CounterProps`, with that value as its default |
 | `let increment = move \|\| ..;` | a handler. A closure with no parameters is wrapped so it can take an event. |
 | `use crate::todo_item::{TodoItem, TodoItemProps};` | brings a child component into scope for its tag |
+| `#[dispatcher(pick)] let events;` | a `vapors_dom::Dispatcher` for the component's own events (doc 03, "A component's own events"); at most one, with no other attribute on that `let` |
 
 A signal or memo needs its type written out, because it becomes a struct
 field. `let count = Signal::new(0)` is refused, and the message gives
@@ -87,7 +88,9 @@ the one difference from the brief in this slice.
   Each name may appear once.
 - **Events:** `onclick={handler}` listens for `click`. The event name
   is the attribute name after `on`. The handler is a script closure or
-  an inline closure that takes `&mut Event`. Events bubble.
+  an inline closure that takes `&mut Event`. It returns `()` or
+  `Result<(), E>` with `E: Display`, so it may use `?`; an `Err` goes to
+  the app's error report. Events bubble.
   `event.stop_propagation()` and `event.prevent_default()` work as in
   the DOM.
 - **Bindings:** `bind:value={signal}` on `input`, `textarea` and
