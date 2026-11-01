@@ -32,8 +32,10 @@ impl ElementsApp {
                     self.mirrored = None;
                 }
             }
-            Event::PastedText(text) => {
-                Document::text_pasted(&self.document, text);
+            Event::PastedText(text) if !Document::text_pasted(&self.document, text) => {
+                report_error(
+                    "a paste from the page's text input arrived with no text field focused, so it was not pasted",
+                );
             }
             _ => {}
         }

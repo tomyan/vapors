@@ -62,7 +62,7 @@ impl TextBridge {
             textarea,
             shared: Rc::default(),
         };
-        bridge.listen(proxy);
+        bridge.listen(proxy)?;
         Ok(bridge)
     }
 
@@ -96,46 +96,76 @@ impl TextBridge {
         }
     }
 
-    fn listen(&self, proxy: &EventLoopProxy<Message>) {
-        self.on("input", proxy, |bridge, _event, send| send(bridge.edited()));
+    /// Adds every listener.
+    ///
+    /// # Errors
+    /// One could not be added: that input would never reach the app.
+    fn listen(&self, proxy: &EventLoopProxy<Message>) -> Result<(), PlatformError> {
+        self.on("input", proxy, |bridge, _event, send| send(bridge.edited()))?;
         self.on("compositionstart", proxy, |bridge, _event, _send| {
             *bridge.shared.composing.borrow_mut() = Some(String::new());
-        });
+        })?;
         self.on("compositionupdate", proxy, |bridge, event, _send| {
             let data = event
                 .dyn_ref::<CompositionEvent>()
                 .and_then(CompositionEvent::data);
             *bridge.shared.composing.borrow_mut() = Some(data.unwrap_or_default());
-        });
+        })?;
         self.on("compositionend", proxy, |bridge, _event, send| {
             *bridge.shared.composing.borrow_mut() = None;
             send(bridge.edited());
-        });
+        })?;
+        // a press on the canvas takes DOM focus from the textarea; while
+        // a field is mirrored it goes back, in the press, so the keys and
+        // pastes that follow still reach the field
+        self.on("blur", proxy, |bridge, event, _send| {
+            let to_canvas = event
+                .dyn_ref::<web_sys::FocusEvent>()
+                .and_then(web_sys::FocusEvent::related_target)
+                .is_some_and(|target| target.has_type::<web_sys::HtmlCanvasElement>());
+            if bridge.shared.focused.get() && to_canvas {
+                drop(bridge.textarea.focus());
+            } else {
+                bridge.shared.focused.set(false);
+            }
+        })?;
         self.on("keydown", proxy, |bridge, event, send| {
             bridge.key(event, true, send);
-        });
+        })?;
         self.on("keyup", proxy, |bridge, event, send| {
             bridge.key(event, false, send);
-        });
+        })?;
         self.on("paste", proxy, |_bridge, event, send| {
             event.prevent_default();
-            let text = event
+            let data = event
                 .dyn_ref::<web_sys::ClipboardEvent>()
-                .and_then(web_sys::ClipboardEvent::clipboard_data)
-                .and_then(|data| data.get_data("text/plain").ok());
-            if let Some(text) = text {
-                send(Event::PastedText(text));
+                .and_then(web_sys::ClipboardEvent::clipboard_data);
+            let Some(data) = data else {
+                crate::report_error(
+                    "a paste on the page carried no clipboard data, so nothing was pasted",
+                );
+                return;
+            };
+            match data.get_data("text/plain") {
+                Ok(text) => send(Event::PastedText(text)),
+                Err(error) => crate::report_error(&format!(
+                    "the paste's text could not be read ({error:?}), so nothing was pasted"
+                )),
             }
-        });
+        })?;
+        Ok(())
     }
 
     /// Adds a listener for `name` that may send events into the loop.
+    ///
+    /// # Errors
+    /// The page refused the listener.
     fn on(
         &self,
         name: &str,
         proxy: &EventLoopProxy<Message>,
         handle: impl Fn(&View, &web_sys::Event, &dyn Fn(Event)) + 'static,
-    ) {
+    ) -> Result<(), PlatformError> {
         let view = View {
             textarea: self.textarea.clone(),
             shared: Rc::clone(&self.shared),
@@ -145,11 +175,13 @@ impl TextBridge {
             let send = |event: Event| crate::tasks::send(&proxy, Message::Input(event));
             handle(&view, &event, &send);
         });
-        drop(
-            self.textarea
-                .add_event_listener_with_callback(name, listener.as_ref().unchecked_ref()),
-        );
+        self.textarea
+            .add_event_listener_with_callback(name, listener.as_ref().unchecked_ref())
+            .map_err(|error| {
+                PlatformError::Windowing(format!("the text input's `{name}` listener: {error:?}"))
+            })?;
         listener.forget();
+        Ok(())
     }
 }
 
