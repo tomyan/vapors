@@ -70,6 +70,6 @@ pub use error::ElementError;
 pub use events::Point;
 pub use keys::Modifiers;
 pub use layout::BoxRect;
-pub use painted::Painted;
+pub use painted::{CanvasFrom, Painted};
 pub use style::{ALL_CURSORS, Cursor};
 pub use update::Viewport;

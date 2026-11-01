@@ -1,13 +1,15 @@
 //! What each pointer action does to the document and the gesture.
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use vapors_elements::Document;
 
-use super::ElementsApp;
+use super::DocumentInput;
 use crate::pointer::Action;
 
-impl ElementsApp {
-    pub(super) fn act(&mut self, action: Action) {
-        let document = &std::rc::Rc::clone(&self.document);
+impl DocumentInput {
+    pub(super) fn act(&mut self, document: &Rc<RefCell<Document>>, action: Action) {
         match action {
             Action::Move(point) => {
                 self.pointer = point;
@@ -31,7 +33,7 @@ impl ElementsApp {
                 Document::touch_pressed(document, id, point);
             }
             Action::TouchMove(id, point) => Document::touch_moved(document, id, point),
-            Action::Pan(delta) => self.pan(delta),
+            Action::Pan(delta) => self.pan(document, delta),
             Action::TouchUp(id, point) => {
                 self.touch.up(id);
                 Document::touch_released(document, id, point);
@@ -47,44 +49,12 @@ impl ElementsApp {
     }
 }
 
-impl ElementsApp {
+impl DocumentInput {
     /// A pan scrolls when the document lets it (`Document::touch_panned`,
     /// which holds the RELAXED ownership rule and cancels the touches).
-    fn pan(&mut self, delta: [f32; 2]) {
-        let document = &self.document;
+    fn pan(&mut self, document: &Rc<RefCell<Document>>, delta: [f32; 2]) {
         if Document::touch_panned(document) {
             self.touch.pan(&mut document.borrow_mut(), delta);
-        }
-    }
-}
-
-impl ElementsApp {
-    /// A key going down or up, to the document's focused element
-    /// (3-E2a); the text a key produced, to a focused field (3-E3c).
-    pub(super) fn key(&mut self, event: &vapors_platform::Event) {
-        if let vapors_platform::Event::Character(text) = event {
-            Document::character_typed(&self.document, text);
-            return;
-        }
-        let vapors_platform::Event::Key {
-            key,
-            pressed,
-            modifiers,
-            ..
-        } = event
-        else {
-            return;
-        };
-        let modifiers = vapors_elements::Modifiers {
-            shift: modifiers.shift,
-            control: modifiers.control,
-            alt: modifiers.alt,
-            meta: modifiers.meta,
-        };
-        if *pressed {
-            Document::key_pressed(&self.document, key, modifiers);
-        } else {
-            Document::key_released(&self.document, key, modifiers);
         }
     }
 }

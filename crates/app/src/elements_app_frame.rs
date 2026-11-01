@@ -44,7 +44,6 @@ impl ElementsApp {
     fn update_document(&mut self, frame: &Frame<'_>) -> Result<(), String> {
         #[allow(clippy::cast_possible_truncation)] // a display scale
         let scale = frame.scale_factor as f32;
-        self.scale = scale;
         let size = size_of(frame);
         let mut document = self.document.borrow_mut();
         document
@@ -70,9 +69,12 @@ impl ElementsApp {
             viewport: size,
             scissor: None,
         };
-        let scene_painter = self
-            .painter
-            .get_or_insert_with(|| ScenePainter::new(frame.device, frame.texture.format()));
+        if self.painter.is_none() {
+            let made = ScenePainter::new(frame.device, frame.texture.format())
+                .map_err(|refused| refused.to_string())?;
+            self.painter = Some(made);
+        }
+        let scene_painter = self.painter.as_mut().expect("made above");
         scene_painter
             .draw(&target, painted)
             .map_err(|error| format!("the document could not be painted: {error}"))

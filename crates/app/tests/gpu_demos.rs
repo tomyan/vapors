@@ -43,6 +43,7 @@ fn render(name: &str, spec: &Spec) -> Vec<u8> {
         scissor: None,
     };
     ScenePainter::new(&gpu.device, texture.format())
+        .expect("Rgba8Unorm is drawn")
         .draw(&target, painted)
         .expect("paints");
     read_rgba8(&gpu.device, &gpu.queue, &texture)

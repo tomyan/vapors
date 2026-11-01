@@ -63,7 +63,7 @@ fn width(doc: &Rc<RefCell<Document>>, node: NodeId) -> f32 {
 fn twenty_moves_between_frames_are_one_update_at_the_last_move() {
     // Given: pressed on the thumb
     let (doc, thumb) = thumb();
-    let mut app = ElementsApp::new(Rc::clone(&doc)).with_scale(1.0);
+    let mut app = ElementsApp::new(Rc::clone(&doc));
     let platform = Platform::detached();
     app.event(Event::PointerMoved { x: 5.0, y: 5.0 }, &platform);
     app.event(

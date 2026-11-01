@@ -42,6 +42,7 @@ fn ours(doc: &Document, scale: u32) -> Rgba {
     };
     let painted = doc.painted().expect("painted");
     ScenePainter::new(&gpu.device, texture.format())
+        .expect("Rgba8Unorm is drawn")
         .draw(&target, painted)
         .expect("paints");
     Rgba {

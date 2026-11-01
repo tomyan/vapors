@@ -8,14 +8,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use vapors_elements::{Cursor, Document, ElementError, Point, Viewport};
+use vapors_elements::{Document, ElementError, Viewport};
 use vapors_platform::{App, Event, Frame, Instant, Next, Platform, report_error};
 
 use crate::frame::FrameTimes;
 use vapors_scene::Size;
 
+use crate::document_input::DocumentInput;
 use crate::painter::ScenePainter;
-use crate::pointer::action;
 
 /// Why the app stopped, once it has: shared with whoever ran it.
 #[derive(Clone, Default)]
@@ -38,20 +38,14 @@ pub struct ElementsApp {
     document: Rc<RefCell<Document>>,
     painter: Option<ScenePainter>,
     failure: Failure,
-    /// The last frame's display scale, for input in physical pixels.
-    scale: f32,
-    /// Where the pointer last moved, in CSS pixels.
-    pointer: Point,
-    touch: crate::touch_scroll::TouchScroll,
-    wheel: crate::wheel_scroll::WheelScroll,
+    /// Input given to the document, at its last update's scale.
+    input: DocumentInput,
     /// The clipboard a paste into a text field reads (E6b).
     #[cfg(not(target_family = "wasm"))]
     clipboard: Box<dyn vapors_platform::Clipboard>,
     /// The clipboard reads pastes started, answered off the loop.
     #[cfg(not(target_family = "wasm"))]
     pastes: paste::Pastes,
-    /// The cursor last shown.
-    cursor: Cursor,
     /// Called before each update with the last frame's phase times.
     per_frame: Option<PerFrame>,
     /// Called after each frame with its phase times.
@@ -80,15 +74,11 @@ impl ElementsApp {
             document,
             painter: None,
             failure: Failure::default(),
-            scale: 1.0,
-            pointer: [0.0, 0.0],
-            touch: crate::touch_scroll::TouchScroll::default(),
-            wheel: crate::wheel_scroll::WheelScroll::default(),
+            input: DocumentInput::new(),
             #[cfg(not(target_family = "wasm"))]
             clipboard: Box::new(vapors_platform::SystemClipboard::default()),
             #[cfg(not(target_family = "wasm"))]
             pastes: paste::Pastes::default(),
-            cursor: Cursor::Default,
             per_frame: None,
             frame_times: None,
             last_times: None,
@@ -111,14 +101,6 @@ impl ElementsApp {
     #[must_use]
     pub fn with_frame_times(mut self, frame_times: FrameTimesHook) -> Self {
         self.frame_times = Some(frame_times);
-        self
-    }
-
-    /// Takes input as if the display scale were `scale`, until the first
-    /// frame says what it is: for driving `event` without a window.
-    #[must_use]
-    pub fn with_scale(mut self, scale: f32) -> Self {
-        self.scale = scale;
         self
     }
 
@@ -168,21 +150,26 @@ impl App for ElementsApp {
 impl ElementsApp {
     /// An event, dispatched as it arrives (design 02, 2-S1).
     fn handle(&mut self, event: &Event, platform: &Platform) {
-        if let Some(action) = action(event, self.scale, self.pointer) {
-            self.act(action);
+        match self.input.handle(&self.document, event) {
+            Ok(outcome) => {
+                if outcome.changed {
+                    platform.request_redraw();
+                }
+                if let Some(cursor) = outcome.cursor {
+                    platform.set_cursor(cursor);
+                }
+            }
+            // Before the first frame nothing is on screen, so the event
+            // was aimed at nothing; it is dropped.
+            Err(crate::document_input::Unplaced::NotUpdated) => {}
+            Err(unplaced) => {
+                report_error(&unplaced.to_string());
+                self.failure.set(&unplaced.to_string());
+            }
         }
-        self.key(event);
         #[cfg(not(target_family = "wasm"))]
         if matches!(event, Event::Paste) {
             self.paste(platform);
-        }
-        if self.document.borrow_mut().take_changed() {
-            platform.request_redraw();
-        }
-        let cursor = self.document.borrow().cursor(self.pointer);
-        if cursor != self.cursor {
-            self.cursor = cursor;
-            platform.set_cursor(crate::cursor::shown(cursor));
         }
     }
 }
@@ -211,8 +198,6 @@ fn refused(errors: &[ElementError]) -> String {
     )
 }
 
-#[path = "elements_app_act.rs"]
-mod act;
 #[path = "elements_app_frame.rs"]
 mod frame_phases;
 #[cfg(not(target_family = "wasm"))]
