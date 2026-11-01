@@ -149,6 +149,9 @@ fn is_identifier(name: &str) -> bool {
 /// The closure body listing `(key, item)` pairs. Without a key the
 /// index is the key; `enumerate` appears only when the index is read.
 fn keyed_items(iterable: &str, index: &str, item: &str, key: Option<&str>) -> String {
+    // `key=i` over `(i, item)` is `enumerate`'s own pairs: a map to them
+    // is clippy's `map_identity`
+    let key = key.filter(|key| key.trim() != index);
     match key {
         Some(key) if index.starts_with('_') => {
             format!("move || ({iterable}).into_iter().map(|{item}| (({key}), {item})).collect(),")

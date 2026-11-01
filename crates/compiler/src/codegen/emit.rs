@@ -177,6 +177,11 @@ impl<'a> Emitter<'a> {
         names
     }
 
+    /// Whether `name` is a loop binding in scope here.
+    pub fn is_loop_name(&self, name: &str) -> bool {
+        self.scopes.iter().flatten().any(|bound| bound == name)
+    }
+
     pub fn push_scope(&mut self, names: Vec<String>) {
         self.scopes.push(names);
     }

@@ -30,6 +30,7 @@ pub fn compare(name: &str, script: &Script, ours: &Log, answers: &Value) -> Resu
         differences.extend(step.events(ours)?);
         differences.extend(step.focus(ours)?);
         differences.extend(step.controls(script, ours)?);
+        differences.extend(step.projection(ours));
     }
     if differences.is_empty() {
         Ok(())

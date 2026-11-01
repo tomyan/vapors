@@ -31,6 +31,7 @@ vapors-css = { path = "crates/css" }
 vapors-signals = { path = "crates/signals" }
 vapors-dom = { path = "crates/dom" }
 vapors-compiler = { path = "crates/compiler" }
+vapors-components = { path = "crates/components" }
 vapors-elements = { path = "crates/elements" }
 vapors-app = { path = "crates/app" }
 vapors-elements-corpus = { path = "crates/elements-corpus" }

@@ -5,7 +5,8 @@
 # focus leaves the page, and vapors has no window. `focusin` and
 # `focusout` carry the same moves between elements; the order of all four
 # is pinned by vapors-elements' focus tests.
-listen keydown keyup focusin focusout click
+cancel button#cancel
+listen keydown keyup focusin focusout click pointerdown
 key Tab                       to Save
 expect focus button#save
 key Tab                       to the note
@@ -29,3 +30,9 @@ expect no event click
 expect focus body
 key x                         with nothing focused, keys go to the body
 expect event keydown body
+tap 50 20                     a tap on Save: focus moves to it, then its click
+expect event click button#save
+expect focus button#save
+tap 450 20                    Cancel cancels its pointerdown: the click comes, focus stays
+expect event click button#cancel
+expect focus button#save

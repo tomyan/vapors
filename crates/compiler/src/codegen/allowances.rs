@@ -22,6 +22,7 @@ use super::script::ScriptInfo;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Allowance {
     CloneOnCopy,
+    CloneOnCopyKey,
     ImplicitClone,
     MissingPanicsDoc,
     NeedlessPassByValue,
@@ -32,7 +33,7 @@ pub(crate) enum Allowance {
 impl Allowance {
     fn lint(self) -> &'static str {
         match self {
-            Allowance::CloneOnCopy => "clippy::clone_on_copy",
+            Allowance::CloneOnCopy | Allowance::CloneOnCopyKey => "clippy::clone_on_copy",
             Allowance::ImplicitClone => "clippy::implicit_clone",
             Allowance::MissingPanicsDoc => "clippy::missing_panics_doc",
             Allowance::NeedlessPassByValue => "clippy::needless_pass_by_value",
@@ -45,6 +46,9 @@ impl Allowance {
         match self {
             Allowance::CloneOnCopy => {
                 "a closure gets a clone of each binding it captures; the compiler cannot see which are Copy"
+            }
+            Allowance::CloneOnCopyKey => {
+                "a row's key is cloned into the map and kept for the cleanup; the compiler cannot see a Copy key"
             }
             Allowance::ImplicitClone => {
                 "a text hole or expression attribute shows any Display value through to_string; the compiler cannot see when it is already a String"
