@@ -8,14 +8,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use vapors_elements::{Cursor, Document, ElementError, Point, Viewport};
+use vapors_elements::{Document, ElementError, Viewport};
 use vapors_platform::{App, Event, Frame, Instant, Next, Platform, report_error};
 
 use crate::frame::FrameTimes;
 use vapors_scene::Size;
 
+use crate::document_input::DocumentInput;
 use crate::painter::ScenePainter;
-use crate::pointer::action;
 
 /// Why the app stopped, once it has: shared with whoever ran it.
 #[derive(Clone, Default)]
@@ -38,14 +38,8 @@ pub struct ElementsApp {
     document: Rc<RefCell<Document>>,
     painter: Option<ScenePainter>,
     failure: Failure,
-    /// The last frame's display scale, for input in physical pixels.
-    scale: f32,
-    /// Where the pointer last moved, in CSS pixels.
-    pointer: Point,
-    touch: crate::touch_scroll::TouchScroll,
-    wheel: crate::wheel_scroll::WheelScroll,
-    /// The cursor last shown.
-    cursor: Cursor,
+    /// Input routed into the document, at the last frame's scale.
+    input: DocumentInput,
     /// Called before each update with the last frame's phase times.
     per_frame: Option<PerFrame>,
     /// Called after each frame with its phase times.
@@ -72,11 +66,7 @@ impl ElementsApp {
             document,
             painter: None,
             failure: Failure::default(),
-            scale: 1.0,
-            pointer: [0.0, 0.0],
-            touch: crate::touch_scroll::TouchScroll::default(),
-            wheel: crate::wheel_scroll::WheelScroll::default(),
-            cursor: Cursor::Default,
+            input: DocumentInput::new(1.0),
             per_frame: None,
             frame_times: None,
             last_times: None,
@@ -106,7 +96,7 @@ impl ElementsApp {
     /// frame says what it is: for driving `event` without a window.
     #[must_use]
     pub fn with_scale(mut self, scale: f32) -> Self {
-        self.scale = scale;
+        self.input.set_scale(scale);
         self
     }
 
@@ -154,17 +144,12 @@ impl App for ElementsApp {
 impl ElementsApp {
     /// An event, dispatched as it arrives (design 02, 2-S1).
     fn handle(&mut self, event: &Event, platform: &Platform) {
-        if let Some(action) = action(event, self.scale, self.pointer) {
-            self.act(action);
-        }
-        self.key(event);
-        if self.document.borrow_mut().take_changed() {
+        let handled = self.input.handle(&self.document, event);
+        if handled.changed {
             platform.request_redraw();
         }
-        let cursor = self.document.borrow().cursor(self.pointer);
-        if cursor != self.cursor {
-            self.cursor = cursor;
-            platform.set_cursor(crate::cursor::shown(cursor));
+        if let Some(cursor) = handled.cursor {
+            platform.set_cursor(cursor);
         }
     }
 }
@@ -193,7 +178,5 @@ fn refused(errors: &[ElementError]) -> String {
     )
 }
 
-#[path = "elements_app_act.rs"]
-mod act;
 #[path = "elements_app_frame.rs"]
 mod frame_phases;

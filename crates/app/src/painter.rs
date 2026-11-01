@@ -1,5 +1,5 @@
-//! Drawing an update: clear to the canvas colour, then each run of the
-//! scene's items with the pipeline for its kind, in painting order,
+//! Drawing an update: clear to the canvas colour (or not, drawing over
+//! what the target holds), then each run of the scene's items with the pipeline for its kind, in painting order,
 //! under the run's clip as a scissor; a run clipped to nothing is not
 //! drawn.
 
@@ -41,6 +41,17 @@ impl ScenePainter {
     /// glyphs do not fit the atlas page; the frame is then incomplete.
     pub fn draw(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), AtlasError> {
         clear_view(target.device, target.queue, target.view, painted.canvas());
+        self.draw_over(target, painted)
+    }
+
+    /// Draws the scene over what `target` already holds, with no clear
+    /// and no canvas colour: where no element paints, the target is
+    /// left as it was. For a document over an app's own drawing.
+    ///
+    /// # Errors
+    ///
+    /// As [`ScenePainter::draw`].
+    pub fn draw_over(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), AtlasError> {
         self.atlas.begin_frame();
         self.textures.begin_frame();
         for batch in painted.scene().batches() {

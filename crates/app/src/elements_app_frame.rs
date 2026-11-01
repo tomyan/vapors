@@ -44,7 +44,7 @@ impl ElementsApp {
     fn update_document(&mut self, frame: &Frame<'_>) -> Result<(), String> {
         #[allow(clippy::cast_possible_truncation)] // a display scale
         let scale = frame.scale_factor as f32;
-        self.scale = scale;
+        self.input.set_scale(scale);
         let size = size_of(frame);
         let mut document = self.document.borrow_mut();
         document
