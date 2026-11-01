@@ -6,6 +6,7 @@ use vapors_platform::{Event, LINE_PIXELS};
 use vapors_renderer::ImagePipeline;
 use vapors_scene::{Color, Size, Transform};
 
+use crate::image_view_area::Insets;
 use crate::image_view_painter::Shown;
 
 /// Factor per scroll step or per `+`/`-` press.
@@ -29,6 +30,8 @@ pub struct ImageView {
     pointer: Option<[f32; 2]>,
     dragging: bool,
     pub(crate) background: Color,
+    /// Kept clear of the image's fit on each side (`image_view_area.rs`).
+    pub(crate) insets: Insets,
     /// Bumped by every `set_image` and `set_painter`: two images of the same size, fitted
     /// the same, differ only in this.
     generation: u64,
@@ -61,6 +64,7 @@ impl ImageView {
             pointer: None,
             dragging: false,
             background,
+            insets: Insets::default(),
             generation: 0,
         }
     }
@@ -100,18 +104,24 @@ impl ImageView {
         self.transform
     }
 
-    /// Fit the image to the viewport, centred.
+    /// Fit the image to the viewport less its insets, centred.
     pub fn fit(&mut self) {
-        if let Some(size) = self.image_size() {
-            self.transform = Transform::fit(size, self.viewport);
+        if let Some(fitted) = self.fitted() {
+            self.transform = fitted;
         }
     }
 
-    /// One image pixel per viewport pixel, centred.
+    /// One image pixel per viewport pixel, centred in the viewport less
+    /// its insets.
     pub fn actual_size(&mut self) {
         if let Some(size) = self.image_size() {
-            self.transform = Transform::actual_size(size, self.viewport);
+            self.transform = self.placed(Transform::actual_size(size, self.area_size()));
         }
+    }
+
+    fn fitted(&self) -> Option<Transform> {
+        let size = self.image_size()?;
+        Some(self.placed(Transform::fit(size, self.area_size())))
     }
 
     /// Multiply the scale by `factor`, keeping the image under `anchor` still.
@@ -127,10 +137,7 @@ impl ImageView {
 
     /// Fit the image unless it is fitted already, then show it actual size.
     pub fn toggle_fit(&mut self) {
-        let fitted = self
-            .image_size()
-            .map(|size| Transform::fit(size, self.viewport));
-        if fitted == Some(self.transform) {
+        if self.fitted() == Some(self.transform) {
             self.actual_size();
         } else {
             self.fit();
@@ -188,14 +195,6 @@ impl ImageView {
             "-" => self.zoom(self.centre(), 1.0 / ZOOM_STEP),
             _ => {}
         }
-    }
-
-    #[allow(clippy::cast_precision_loss)] // viewport sizes are far below 2^24
-    fn centre(&self) -> [f32; 2] {
-        [
-            self.viewport.width as f32 / 2.0,
-            self.viewport.height as f32 / 2.0,
-        ]
     }
 }
 

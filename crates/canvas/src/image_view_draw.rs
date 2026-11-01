@@ -22,6 +22,9 @@ impl ImageView {
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
         clear_view(frame.device, frame.queue, &view, self.background);
+        if self.area_is_empty() {
+            return Ok(());
+        }
         if let Some(painted) = self.paint(frame, &view) {
             return painted.map_err(|why| format!("image painter: {why}"));
         }
