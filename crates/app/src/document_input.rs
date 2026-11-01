@@ -112,8 +112,9 @@ impl DocumentInput {
     ///
     /// # Errors
     ///
-    /// [`Unplaced`], and the event is not given, when the document's last
-    /// update gives no usable scale.
+    /// [`Unplaced`], and the event is not given, when it is a pointer
+    /// event and the document's last update gives no usable scale. A key
+    /// or typed text needs no scale and is always given.
     pub fn handle(
         &mut self,
         document: &Rc<RefCell<Document>>,
@@ -137,8 +138,14 @@ impl DocumentInput {
         })
     }
 
-    /// The pointer action for `event` at the document's scale.
+    /// The pointer action for `event` at the document's scale. The
+    /// scale is read only for an event that is a pointer action (any
+    /// scale tells which), so a key or typed text is delivered by focus
+    /// even before the first update.
     fn action(&self, document: &Document, event: &Event) -> Result<Option<Action>, Unplaced> {
+        if action(event, 1.0, self.pointer).is_none() {
+            return Ok(None);
+        }
         Ok(action(event, scale_of(document)?, self.pointer))
     }
 }

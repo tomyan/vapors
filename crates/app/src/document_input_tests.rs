@@ -132,3 +132,39 @@ fn input_before_the_first_update_or_at_a_zero_scale_is_refused() {
         Err(Unplaced::Scale(0.0))
     );
 }
+
+#[test]
+fn a_key_reaches_a_document_never_updated_and_a_pointer_event_is_still_refused() {
+    // Given: a focused button in a document never updated
+    let mut doc = Document::new(FontSystem::bundle_only());
+    let body = doc.body();
+    let button = doc.create_element("button");
+    doc.append(body, button);
+    let keys = Rc::new(RefCell::new(0));
+    let counted = Rc::clone(&keys);
+    doc.listen(
+        body,
+        "keydown",
+        Box::new(move |_: &mut DomEvent| *counted.borrow_mut() += 1),
+    );
+    let document = Rc::new(RefCell::new(doc));
+    Document::focus(&document, Some(button));
+    let mut input = DocumentInput::new();
+    let key = Event::Key {
+        key: "z".into(),
+        pressed: true,
+        repeat: false,
+        modifiers: vapors_platform::Modifiers::default(),
+    };
+
+    // When
+    let routed = input.route(&document, &key);
+    let given = input.handle(&document, &key);
+    let pointer = input.handle(&document, &moved(1.0, 1.0));
+
+    // Then
+    assert_eq!(routed, Ok(super::Route::Document));
+    assert!(given.is_ok(), "{given:?}");
+    assert_eq!(*keys.borrow(), 1);
+    assert_eq!(pointer, Err(Unplaced::NotUpdated));
+}
