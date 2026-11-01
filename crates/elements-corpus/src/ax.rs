@@ -80,6 +80,18 @@ pub fn open(
     Ok((width, height))
 }
 
+/// The page `file` under `fixtures/` (another page than a fixture's,
+/// such as APG's example), opened at `size`.
+///
+/// # Errors
+/// A page that does not load or whose fonts do not.
+pub fn open_file(session: &mut Session, file: &str, size: (u32, u32)) -> Result<(), String> {
+    let metrics =
+        json!({ "width": size.0, "height": size.1, "deviceScaleFactor": 1, "mobile": false });
+    session.call("Emulation.setDeviceMetricsOverride", &metrics, DEADLINE)?;
+    load(session, &fixtures_dir().join(file))
+}
+
 /// Open `page` and wait for its load event and its fonts.
 fn load(session: &mut Session, page: &Path) -> Result<(), String> {
     let url = format!("file://{}", page.display());

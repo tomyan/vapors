@@ -28,6 +28,13 @@
     if (found.length !== 1) throw new Error("capture " + target + " names " + found.length + " elements, not one");
     found[0].addEventListener("pointerdown", (e) => e.currentTarget.setPointerCapture(e.pointerId));
   }
+  // `cancel`: each target prevents its pointerdown's default, as a
+  // vapors listener calling prevent_default does.
+  for (const target of __CANCEL__) {
+    const found = document.querySelectorAll(target);
+    if (found.length !== 1) throw new Error("cancel " + target + " names " + found.length + " elements, not one");
+    found[0].addEventListener("pointerdown", (e) => e.preventDefault());
+  }
   // Set by the player's settle once the last step's log is taken
   // (events_play.rs, SETTLE); false at each injection, so a page that
   // waits for it acts after the last step of this play only.

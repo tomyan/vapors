@@ -131,7 +131,8 @@ impl Document {
     }
 
     /// A signal set the `value` property: the editor, if any, takes the
-    /// text (its selection clamped to it).
+    /// text with the caret at its end, as setting `value` in Chromium
+    /// puts it.
     pub(crate) fn editor_from_text(&mut self, node: NodeId) {
         let Some(text) = self.arena.get(node, "text field").element().map(text_of) else {
             return;
@@ -143,6 +144,10 @@ impl Document {
         {
             editor.plain.set_text(&text);
             editor.pending = true;
+            let Document { fonts, editors, .. } = self;
+            if let Some(editor) = editors.get_mut(&node) {
+                fonts.editor_driver(&mut editor.plain).move_to_text_end();
+            }
         }
     }
 }

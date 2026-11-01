@@ -42,6 +42,9 @@ pub(crate) struct Pointer {
     pub(crate) scrubs: std::collections::HashMap<u32, crate::number_scrub::Scrub>,
     /// Each pointer's drag over a text field's text, by pointer id (E6a).
     pub(crate) text_drags: std::collections::HashMap<u32, NodeId>,
+    /// Whether the last touch's `pointerdown` was cancelled, which a tap
+    /// from it reads: it then moves no focus.
+    pub(crate) touch_down_prevented: bool,
 }
 
 impl Document {
@@ -182,6 +185,8 @@ impl Document {
 pub(crate) mod capture;
 #[path = "events_hit.rs"]
 mod hit;
+#[path = "events_tap.rs"]
+mod tap;
 #[path = "events_touch.rs"]
 mod touch;
 #[path = "events_tree.rs"]

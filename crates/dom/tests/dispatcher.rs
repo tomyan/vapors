@@ -136,3 +136,24 @@ fn an_event_the_dispatcher_did_not_declare_is_refused() {
     );
     assert!(log.borrow().is_empty());
 }
+
+#[test]
+#[should_panic(expected = "declares only")]
+fn emit_panics_on_a_refusal_naming_it() {
+    // Given
+    let (dom, _, option, _) = tree();
+    let events = Dispatcher::new(dom.dyn_dom(), &["optionchoose"]);
+
+    // When: a name not declared, which only a bug in the component sends
+    let _ = events.emit(option, Event::new("optionchose"));
+}
+
+#[test]
+fn emit_answers_as_dispatch_when_it_runs() {
+    // Given
+    let (dom, _, option, _) = tree();
+    let events = Dispatcher::new(dom.dyn_dom(), &["optionchoose"]);
+
+    // Then
+    assert!(events.emit(option, Event::new("optionchoose")));
+}

@@ -96,6 +96,23 @@ impl Dispatcher {
     }
 }
 
+impl Dispatcher {
+    /// [`Dispatcher::dispatch`] for a component whose dispatches cannot
+    /// be refused but by a bug in it: `true` unless a listener cancelled
+    /// the event.
+    ///
+    /// # Panics
+    /// When the dispatch is refused (a name not declared, or a dispatch
+    /// from inside a `Dom` call), naming why: a bug in the component.
+    #[must_use]
+    pub fn emit(&self, node: NodeId, event: Event) -> bool {
+        match self.dispatch(node, event) {
+            Ok(went) => went,
+            Err(why) => panic!("{why}"),
+        }
+    }
+}
+
 fn refused(name: &str, why: &str) -> DispatchRefused {
     DispatchRefused(format!("`{name}` was not dispatched: {why}"))
 }
