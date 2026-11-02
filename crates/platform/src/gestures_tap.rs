@@ -1,5 +1,6 @@
-//! Taps in a run: each tap's count, and the double tap that is the
-//! second of a run.
+//! Taps in a run: each tap's count (1, 2, 3, then 1 again, for a
+//! document's `dblclick`), and the photo's double tap, which pairs taps:
+//! every second quick tap.
 
 use std::time::Duration;
 
@@ -10,43 +11,40 @@ use crate::event::Event;
 pub(super) struct Tap {
     at: [f32; 2],
     ended: Duration,
-    /// Its place in the run: 1, 2 or 3, then 1 again, as Chromium
-    /// counts taps (the elements corpus's `clicks.events`: of five
-    /// quick taps, the 2nd and the 5th send `dblclick`).
+    /// Its place in the run: 1, 2 or 3, then 1 again, as desktop
+    /// headless Chromium 155 counts CDP touch taps (`clicks.events`).
     count: u8,
+    /// It was the second of a pair, a double tap: the next tap starts a
+    /// new pair.
+    paired: bool,
 }
 
 /// The longest run of taps before the count starts again at one.
 const TAP_RUN: u8 = 3;
 
 impl Gestures {
-    /// A tap at `at`, and a double tap when it is the second of a run.
+    /// A tap at `at` with its count, and a double tap when it is the
+    /// second of a pair.
     pub(super) fn tapped(&mut self, at: [f32; 2], started: Duration, now: Duration) -> Vec<Event> {
         let [x, y] = at;
-        let count = self.tap_count(at, started);
+        let follows = self.last_tap.as_ref().filter(|last| {
+            started.saturating_sub(last.ended) <= DOUBLE_TAP_TIME
+                && distance(last.at, at) <= DOUBLE_TAP_SLOP
+        });
+        let count = follows.map_or(1, |last| last.count % TAP_RUN + 1);
+        let paired = follows.is_some_and(|last| !last.paired);
         self.last_tap = Some(Tap {
             at,
             ended: now,
             count,
+            paired,
         });
-        let mut events = vec![Event::Tap { x, y }];
-        if count == 2 {
+        let clicks =
+            std::num::NonZeroU32::new(u32::from(count)).unwrap_or(std::num::NonZeroU32::MIN);
+        let mut events = vec![Event::Tap { x, y, clicks }];
+        if paired {
             events.push(Event::DoubleTap { x, y });
         }
         events
-    }
-
-    /// The count of a tap at `at` that started at `started`: one more
-    /// than the last tap's when it follows soon and close, else 1.
-    fn tap_count(&self, at: [f32; 2], started: Duration) -> u8 {
-        match &self.last_tap {
-            Some(last)
-                if started.saturating_sub(last.ended) <= DOUBLE_TAP_TIME
-                    && distance(last.at, at) <= DOUBLE_TAP_SLOP =>
-            {
-                last.count % TAP_RUN + 1
-            }
-            _ => 1,
-        }
     }
 }

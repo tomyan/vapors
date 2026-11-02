@@ -101,11 +101,17 @@ pub enum Event {
         x: f32,
         /// Y in pixels where the finger lifted.
         y: f32,
+        /// Its place in a run of taps, each within 300 ms and 30 px of
+        /// the last: 1, 2, 3, then 1 again, as desktop headless Chromium
+        /// 155 counts CDP touch taps (of five quick taps the 2nd and the
+        /// 5th send `dblclick`; the elements corpus's `clicks.events`).
+        /// A document's `dblclick` follows it.
+        clicks: std::num::NonZeroU32,
     },
-    /// The second tap of a run, each tap within 300 ms and 30 px of
-    /// the last; a run counts 1, 2, 3 then again, as Chromium counts
-    /// taps, so of five quick taps the 2nd and the 5th are double taps.
-    /// Sent after that tap's own [`Event::Tap`].
+    /// A photo's double tap: every second quick tap, each within 300 ms
+    /// and 30 px of the last, so tap-tap toggles and tap-tap again
+    /// toggles back, as photo apps pair taps; not the DOM's count (the
+    /// lead, review-v100 R2). Sent after that tap's own [`Event::Tap`].
     DoubleTap {
         /// X in pixels where the second finger lifted.
         x: f32,

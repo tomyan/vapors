@@ -175,7 +175,7 @@ fn point_of(action: Action) -> Option<Point> {
         Action::Move(p)
         | Action::Press(p, _, _)
         | Action::Release(p, _)
-        | Action::Tap(p)
+        | Action::Tap(p, _)
         | Action::DoubleTap(p)
         | Action::Wheel(p, _)
         | Action::TouchDown(_, p)

@@ -23,8 +23,15 @@ impl DocumentInput {
                 Document::pointer_released_with(document, point, modifiers);
             }
             Action::Leave => Document::pointer_left(document),
-            Action::Tap(point) => Document::touch_tapped(document, point),
-            Action::DoubleTap(point) => Document::touch_double_tapped(document, point),
+            Action::Tap(point, clicks) => {
+                Document::touch_tapped(document, point);
+                if clicks.get() == 2 {
+                    Document::touch_double_tapped(document, point);
+                }
+            }
+            // the tap's count sends dblclick; the photo's pairing is not
+            // the DOM's (review-v100 R2)
+            Action::DoubleTap(_) => {}
             Action::Wheel(point, delta) => {
                 self.touch.mouse();
                 let now = vapors_platform::Instant::now();

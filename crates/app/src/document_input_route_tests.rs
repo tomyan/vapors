@@ -153,11 +153,13 @@ fn the_wheel_a_tap_and_a_double_tap_go_by_hit_at_their_own_position() {
     assert_eq!(give(&mut input, &card, &wheel), Route::Host);
     give(&mut input, &card, &moved(80.0, 30.0));
     assert_eq!(give(&mut input, &card, &wheel), Route::Document);
-    assert_eq!(
-        give(&mut input, &card, &Event::Tap { x: 150.0, y: 80.0 }),
-        Route::Host
-    );
-    let double = |x, y| Event::DoubleTap { x, y };
+    let (clicks, double) = (std::num::NonZeroU32::MIN, |x, y| Event::DoubleTap { x, y });
+    let tap = Event::Tap {
+        x: 150.0,
+        y: 80.0,
+        clicks,
+    };
+    assert_eq!(give(&mut input, &card, &tap), Route::Host);
     assert_eq!(give(&mut input, &card, &double(150.0, 80.0)), Route::Host);
     assert_eq!(
         give(&mut input, &card, &double(80.0, 30.0)),

@@ -60,7 +60,11 @@ fn a_tap_or_click_opens_the_picker_only_while_empty() {
         },
         BACKGROUND,
     );
-    let tap = Event::Tap { x: 1.0, y: 1.0 };
+    let tap = Event::Tap {
+        x: 1.0,
+        y: 1.0,
+        clicks: std::num::NonZeroU32::MIN,
+    };
     let click = Event::PrimaryButton {
         pressed: false,
         clicks: std::num::NonZeroU32::MIN,

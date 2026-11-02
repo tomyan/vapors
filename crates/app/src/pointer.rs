@@ -1,7 +1,9 @@
 //! Platform input as the document's pointer calls: positions from
 //! physical pixels to CSS pixels, the primary button at the last
-//! position the pointer moved to, a tap as a click and a double tap as
-//! a dblclick. A wheel scrolls
+//! position the pointer moved to, a tap as a click, and the second tap
+//! of a run (the tap's count) also as a dblclick; the photo's double tap
+//! is the document's when on it, so the host does not take it, and does
+//! nothing more there. A wheel scrolls
 //! where the pointer is. A touch is a pointer of its own (3-E1b) and
 //! clicks only as its tap, so one tap is one click; its down and up
 //! also bound a gesture whose pans scroll.
@@ -19,8 +21,10 @@ pub(crate) enum Action {
     /// Its release, with the modifiers held.
     Release(Point, Modifiers),
     Leave,
-    Tap(Point),
-    /// The second tap of a run, after its own tap: a `dblclick`.
+    /// A tap, with its count in a run: the second also sends `dblclick`.
+    Tap(Point, std::num::NonZeroU32),
+    /// The photo's double tap (every second quick tap), after its tap:
+    /// routed by hit so a double tap on the document is not the host's.
     DoubleTap(Point),
     /// Scroll by a delta (CSS pixels) at a point.
     Wheel(Point, [f32; 2]),
@@ -54,7 +58,7 @@ pub(crate) fn action(event: &Event, scale: f32, last: Point) -> Option<Action> {
             ..
         } => Some(Action::Release(last, held(*modifiers))),
         Event::PointerLeft => Some(Action::Leave),
-        Event::Tap { x, y } => Some(Action::Tap(css(*x, *y))),
+        Event::Tap { x, y, clicks } => Some(Action::Tap(css(*x, *y), *clicks)),
         Event::DoubleTap { x, y } => Some(Action::DoubleTap(css(*x, *y))),
         Event::Scroll { dx, dy } => Some(Action::Wheel(last, [*dx, *dy])),
         // a finger moving right drags the content right: a scroll left
@@ -186,7 +190,11 @@ mod tests {
                 x: 10.0,
                 y: 10.0,
             },
-            Event::Tap { x: 10.0, y: 10.0 },
+            Event::Tap {
+                x: 10.0,
+                y: 10.0,
+                clicks: std::num::NonZeroU32::MIN.saturating_add(1),
+            },
             Event::DoubleTap { x: 10.0, y: 10.0 },
         ];
 
@@ -196,14 +204,14 @@ mod tests {
             .filter_map(|e| action(e, 1.0, [0.0, 0.0]))
             .collect();
 
-        // Then: the touch's down and up, then the tap, which is the
-        // click, then the double tap, which is the dblclick
+        // Then: the touch's down and up, then the tap, the second of its
+        // run (click and dblclick), then the photo's double tap
         assert_eq!(
             actions,
             [
                 Action::TouchDown(1, [10.0, 10.0]),
                 Action::TouchUp(1, [10.0, 10.0]),
-                Action::Tap([10.0, 10.0]),
+                Action::Tap([10.0, 10.0], std::num::NonZeroU32::MIN.saturating_add(1)),
                 Action::DoubleTap([10.0, 10.0])
             ]
         );

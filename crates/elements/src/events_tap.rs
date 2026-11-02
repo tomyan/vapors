@@ -1,8 +1,10 @@
 //! A touch tap (the platform's `Tap`, after the touch's own down and up):
 //! focus, `click`, and a text field's caret, in Chromium's order; the
-//! second tap of a run (the platform's `DoubleTap`, after its `Tap`)
-//! sends `dblclick`, as Chrome on Android does on a page without
-//! double-tap zoom.
+//! second tap of a run (the platform's `Tap` with a count of 2) also
+//! sends `dblclick`, as desktop headless Chromium 155 does for CDP touch
+//! taps (the corpus's `clicks.events`). Chrome on Android, on a page
+//! without double-tap zoom, is assumed to do the same; not yet measured
+//! on the Pixel.
 
 use std::cell::RefCell;
 use std::rc::Rc;

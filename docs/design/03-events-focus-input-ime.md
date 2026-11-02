@@ -362,10 +362,14 @@ places the caret, selects a word or the whole text with the press
 A press with no known pointer position starts a new row, and so does
 a press of another button (Chromium counts one button's presses). A
 touch's taps are counted by the platform's gestures in runs of 1, 2, 3
-then again, as Chromium counts them (the corpus's `clicks.events`: of
-five quick taps the 2nd and the 5th send `dblclick`); the second of a
-run sends `dblclick`, as Chrome on Android does on a page without
-double-tap zoom. A mouse press and a tap never share a row. The platform counts on every
+then again (`Event::Tap`'s `clicks`), as desktop headless Chromium 155
+counts CDP touch taps (the corpus's `clicks.events`: of five quick taps
+the 2nd and the 5th send `dblclick`); the second of a run sends
+`dblclick`. Chrome on Android on a page without double-tap zoom is
+assumed to do the same, not yet measured on the Pixel. The photo's
+double tap (`Event::DoubleTap`, `ImageView`'s fit toggle) pairs taps
+instead, every second quick tap, as photo apps do (the lead,
+review-v100 R2). A mouse press and a tap never share a row. The platform counts on every
 target, the web included: winit cancels `pointerdown` (so the canvas
 selects no text), which in Chromium suppresses `mousedown` and with it
 the browser's own count (probed, Chromium 155: `pointerdown`'s `detail`

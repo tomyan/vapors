@@ -100,3 +100,25 @@ fn an_alt_click_and_a_double_click_reach_the_document_as_the_platform_counts_the
         ]
     );
 }
+
+#[test]
+fn a_tap_counted_second_in_its_run_fires_dblclick_and_the_photos_double_tap_adds_none() {
+    // Given
+    let (doc, log) = label();
+    let mut input = DocumentInput::new();
+    let tap = |n: u32| Event::Tap {
+        x: 10.0,
+        y: 10.0,
+        clicks: NonZeroU32::new(n).expect("a count"),
+    };
+
+    // When: taps counted 1 and 2, the photo's double tap after the 2nd
+    for event in [tap(1), tap(2), Event::DoubleTap { x: 10.0, y: 10.0 }] {
+        input
+            .give(&doc, &event, &Platform::detached())
+            .expect("placed");
+    }
+
+    // Then
+    assert_eq!(*log.borrow(), ["click", "click", "dblclick"]);
+}
