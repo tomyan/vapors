@@ -12,7 +12,7 @@ alt-click 50 24               a click with Alt held carries it
 expect event click button#reset
 tap 50 24                     a tap
 expect event click button#reset
-tap 50 24                     a second tap: dblclick as Chrome on Android
+tap 50 24                     a second tap: dblclick (desktop headless Chromium, CDP touch)
 expect event dblclick button#reset
 tap 50 24                     a third tap in a row: no dblclick, as the third click
 expect event click button#reset

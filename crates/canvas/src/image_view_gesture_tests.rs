@@ -5,7 +5,7 @@
 
 use std::num::NonZeroU32;
 
-use vapors_platform::{Event, LINE_PIXELS, TouchPhase};
+use vapors_platform::{Event, LINE_PIXELS, Modifiers, TouchPhase};
 
 use super::Answered;
 use super::tests::{IN_AREA, IN_PANEL, panel_right, touch};
@@ -45,11 +45,13 @@ fn every_event_of_a_drag_from_the_inset_answers_outside_down_moves_and_up() {
     let down = view.event(&Event::PrimaryButton {
         pressed: true,
         clicks: NonZeroU32::MIN,
+        modifiers: Modifiers::default(),
     });
     let moves = [250.0, 100.0].map(|x| view.event(&Event::PointerMoved { x, y: 200.0 }));
     let up = view.event(&Event::PrimaryButton {
         pressed: false,
         clicks: NonZeroU32::MIN,
+        modifiers: Modifiers::default(),
     });
     let after = view.event(&Event::PointerMoved { x: 90.0, y: 200.0 });
 
@@ -83,6 +85,7 @@ fn a_press_at_a_position_the_view_does_not_know_moves_nothing() {
     let down = view.event(&Event::PrimaryButton {
         pressed: true,
         clicks: NonZeroU32::MIN,
+        modifiers: Modifiers::default(),
     });
     view.event(&Event::PointerMoved { x: 100.0, y: 200.0 });
     view.event(&Event::PointerMoved { x: 50.0, y: 200.0 });

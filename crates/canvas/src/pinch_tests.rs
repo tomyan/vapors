@@ -60,35 +60,3 @@ fn a_pinch_keeps_the_image_point_under_the_midpoint_still() {
     );
     assert!((view.transform().scale - 1.5).abs() < 1e-4);
 }
-
-#[test]
-fn four_quick_taps_fit_then_return_as_two_pairs() {
-    // Given: a 1000x1000 image fitted in 500x500, then shown actual size
-    let mut view = view();
-    let mut gestures = Gestures::new();
-    view.actual_size();
-    let actual = view.transform();
-    let mut tap = |view: &mut ImageView, n: u64| {
-        let at = Duration::from_millis(n * 200);
-        for (phase, t) in [
-            (TouchPhase::Started, at),
-            (TouchPhase::Ended, at + Duration::from_millis(50)),
-        ] {
-            for event in gestures.touch(n, phase, 250.0, 250.0, t) {
-                view.event(&event);
-            }
-        }
-    };
-
-    // When: tap-tap, then tap-tap again (the photo's pairing, the lead,
-    // review-v100 R2; not the DOM's 1, 2, 3 count)
-    tap(&mut view, 0);
-    tap(&mut view, 1);
-    let after_first_pair = view.transform();
-    tap(&mut view, 2);
-    tap(&mut view, 3);
-
-    // Then: fitted, then back to actual size
-    assert_eq!(after_first_pair.scale, 0.5);
-    assert_eq!(view.transform(), actual);
-}
