@@ -43,6 +43,11 @@
     const entry = { type: e.type, target: name(e.target), bubbles: e.bubbles, defaultPrevented: e.defaultPrevented };
     if ("pointerType" in e && e.pointerType) entry.pointerType = e.pointerType;
     if ("key" in e && e.key) entry.key = e.key;
+    // the modifiers held, recorded only when held, so recordings made
+    // before they were read stay as they are
+    for (const held of ["altKey", "ctrlKey", "metaKey", "shiftKey"]) {
+      if (e[held] === true && e instanceof MouseEvent) entry[held] = true;
+    }
     return entry;
   });
   window.__eventsFocus = () => {

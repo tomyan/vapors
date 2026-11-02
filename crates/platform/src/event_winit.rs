@@ -1,15 +1,15 @@
 //! A winit window event as the app's [`Event`], in physical pixels:
-//! what `Input` translates before it adds the gestures and click counts
-//! it keeps.
+//! what `Input` translates before it adds the gestures, click counts and
+//! modifiers it keeps.
 
 use winit::event::{ElementState, MouseScrollDelta, WindowEvent};
 
-use crate::event::{Event, LINE_PIXELS, TouchPhase};
+use crate::event::{Event, LINE_PIXELS, Modifiers, TouchPhase};
 
 /// Translate a winit event into ours, the window at `scale` physical
 /// pixels per CSS pixel. `None` for events the app does not get.
 #[allow(clippy::cast_possible_truncation)] // positions and deltas are small
-pub fn from_winit(event: &WindowEvent, scale: f64) -> Option<Event> {
+pub(crate) fn from_winit(event: &WindowEvent, scale: f64) -> Option<Event> {
     match event {
         WindowEvent::Resized(size) => Some(Event::Resized {
             width: size.width,
@@ -28,6 +28,8 @@ pub fn from_winit(event: &WindowEvent, scale: f64) -> Option<Event> {
             pressed: *state == ElementState::Pressed,
             // counted by `Input`, which knows the last press
             clicks: std::num::NonZeroU32::MIN,
+            // held, by `Input`, which keeps the modifiers
+            modifiers: Modifiers::default(),
         }),
         WindowEvent::MouseWheel { delta, .. } => Some(scroll(*delta, scale)),
         WindowEvent::Touch(touch) => Some(Event::Touch {
@@ -53,4 +55,15 @@ fn scroll(delta: MouseScrollDelta, scale: f64) -> Event {
         MouseScrollDelta::PixelDelta(at) => [(at.x / scale) as f32, (at.y / scale) as f32],
     };
     Event::Scroll { dx: -dx, dy: -dy }
+}
+
+impl TouchPhase {
+    pub(crate) fn from_winit(phase: winit::event::TouchPhase) -> Self {
+        match phase {
+            winit::event::TouchPhase::Started => Self::Started,
+            winit::event::TouchPhase::Moved => Self::Moved,
+            winit::event::TouchPhase::Ended => Self::Ended,
+            winit::event::TouchPhase::Cancelled => Self::Cancelled,
+        }
+    }
 }

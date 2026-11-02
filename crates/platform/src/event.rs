@@ -28,6 +28,9 @@ pub enum Event {
         /// the platform (`clicks`) and carried on the press, so nothing
         /// waits for it; a release carries its press's.
         clicks: std::num::NonZeroU32,
+        /// The modifier keys held, as the platform tracks them, for an
+        /// Alt-click or a Shift-click.
+        modifiers: Modifiers,
     },
     /// The wheel or trackpad scrolled, in CSS pixels (not physical, unlike
     /// positions), signed as the DOM's `deltaX` and `deltaY`: positive
@@ -68,6 +71,22 @@ pub enum Event {
         /// Whether the window now has focus.
         focused: bool,
     },
+    /// The page's text input was edited (the web's hidden textarea,
+    /// typing and an IME's composing alike): its whole state after the
+    /// edit, and the text it was made against.
+    TextEdited {
+        /// The text the edit was made against: the last one mirrored.
+        before: String,
+        /// The text after it.
+        text: String,
+        /// The selection after it, start then end, in UTF-16 units.
+        selection: (u32, u32),
+        /// The range an IME is composing, in UTF-16 units, while it does.
+        composing: Option<(u32, u32)>,
+    },
+    /// Text the page's paste delivered (the web's `paste` event on its
+    /// text input), in place of [`Event::Paste`], which is the desktop's.
+    PastedText(String),
     /// One finger on a touch screen, raw. Gestures are derived from these
     /// and sent as well.
     Touch {
@@ -103,9 +122,17 @@ pub enum Event {
         x: f32,
         /// Y in pixels where the finger lifted.
         y: f32,
+        /// Its place in a run of taps, each within 300 ms and 30 px of
+        /// the last: 1, 2, 3, then 1 again, as desktop headless Chromium
+        /// 155 counts CDP touch taps (of five quick taps the 2nd and the
+        /// 5th send `dblclick`; the elements corpus's `clicks.events`).
+        /// A document's `dblclick` follows it.
+        clicks: std::num::NonZeroU32,
     },
-    /// A second tap within 300 ms and 30 px of the first. Sent after
-    /// that tap's own [`Event::Tap`].
+    /// A photo's double tap: every second quick tap, each within 300 ms
+    /// and 30 px of the last, so tap-tap toggles and tap-tap again
+    /// toggles back, as photo apps pair taps; not the DOM's count (the
+    /// lead, review-v100 R2). Sent after that tap's own [`Event::Tap`].
     DoubleTap {
         /// X in pixels where the second finger lifted.
         x: f32,
@@ -139,17 +166,6 @@ pub enum TouchPhase {
     Cancelled,
 }
 
-impl TouchPhase {
-    pub(crate) fn from_winit(phase: winit::event::TouchPhase) -> Self {
-        match phase {
-            winit::event::TouchPhase::Started => Self::Started,
-            winit::event::TouchPhase::Moved => Self::Moved,
-            winit::event::TouchPhase::Ended => Self::Ended,
-            winit::event::TouchPhase::Cancelled => Self::Cancelled,
-        }
-    }
-}
-
 /// CSS pixels a wheel notch (a line) scrolls: what Chromium 155 scrolls
 /// on Linux. Measured 2026-10-25 under Xvfb with one `XTest` button 5
 /// press over a headful Chromium page (smooth scrolling off): its wheel
@@ -157,7 +173,7 @@ impl TouchPhase {
 /// moved by 120 per notch.
 pub const LINE_PIXELS: f32 = 120.0;
 
-/// The modifier keys held with a key.
+/// The modifier keys held with a key or a button.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(clippy::struct_excessive_bools)] // the DOM's shiftKey, ctrlKey, altKey and metaKey, one each
 pub struct Modifiers {

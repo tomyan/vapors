@@ -9,7 +9,10 @@ use vapors_platform::{Frame, Instant};
 
 use vapors_renderer::Target;
 
-use super::{ElementsApp, refused, size_of, viewport};
+use vapors_elements::{ElementError, Viewport};
+use vapors_scene::Size;
+
+use super::ElementsApp;
 use crate::frame::{FrameTimes, Phase, Phases, SystemClock, run_frame};
 use crate::painter::ScenePainter;
 
@@ -109,6 +112,30 @@ pub(super) fn shown_times(times: Option<&FrameTimes>) -> Vec<(&'static str, Dura
                 .collect()
         })
         .unwrap_or_default()
+}
+
+#[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)] // window sizes and scales are small
+fn viewport(size: Size, scale: f32) -> Viewport {
+    Viewport {
+        width: size.width as f32 / scale,
+        height: size.height as f32 / scale,
+        scale,
+    }
+}
+
+fn size_of(frame: &Frame<'_>) -> Size {
+    Size {
+        width: frame.texture.width(),
+        height: frame.texture.height(),
+    }
+}
+
+fn refused(errors: &[ElementError]) -> String {
+    let lines: Vec<String> = errors.iter().map(|error| format!("  {error}")).collect();
+    format!(
+        "the document was refused, so nothing is drawn:\n{}",
+        lines.join("\n")
+    )
 }
 
 #[cfg(test)]

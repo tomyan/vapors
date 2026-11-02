@@ -59,12 +59,17 @@ impl Document {
             true
         };
         let pressed = matches!(name, "pointerdown" | "pointermove") && down;
-        Event::new(name).with_pointer(Pointer {
+        let event = Event::new(name).with_pointer(Pointer {
             client: point,
             offset,
             id,
             pressed,
-        })
+        });
+        if id == MOUSE && matches!(name, "pointerdown" | "pointerup" | "click" | "dblclick") {
+            event.with_modifiers(self.pointer.mouse_press.1)
+        } else {
+            event
+        }
     }
 }
 

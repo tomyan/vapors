@@ -1,6 +1,7 @@
 //! A text field's marks (E6a): a caret after the text when focused by a
 //! click at its end, a selection over the whole text when focused by
-//! keyboard, nothing unfocused, the caret following a restyle; a field
+//! keyboard, nothing unfocused, the caret following a restyle, composing
+//! text underlined; a field
 //! without a width is refused.
 
 mod support;
@@ -72,6 +73,39 @@ fn the_caret_follows_the_text_when_the_field_is_restyled() {
         panic!("one caret each, got {small:?} and {large:?}");
     };
     assert!(after.left > before.left * 1.6, "{before:?} then {after:?}");
+}
+
+#[test]
+fn composing_text_is_underlined_in_the_text_colour() {
+    // Given: an IME composing "th" after "Warm"
+    let page = page();
+    click(&page, [120.0, 12.0]);
+    let edit = vapors_elements::TextEdit {
+        before: "Warm".into(),
+        text: "Warmth".into(),
+        selection: (6, 6),
+        composing: Some((4, 6)),
+    };
+    vapors_elements::Document::text_edited(&page.doc, &edit).expect("applies");
+
+    // When
+    let marks = marks(&page);
+
+    // Then: a 1 px line under "th", beside the caret
+    let lines: Vec<_> = marks
+        .iter()
+        .filter(|(rect, _)| {
+            (rect.bottom - rect.top - 1.0).abs() < 0.01 && rect.right - rect.left > 4.0
+        })
+        .collect();
+    let [(line, color)] = lines[..] else {
+        panic!("one underline, got {marks:?}");
+    };
+    assert_eq!(*color, Color::from_rgba8(0, 0, 0, 255));
+    assert!(
+        line.left > 35.0 && line.right < 60.0 && line.top > 12.0,
+        "{line:?}"
+    );
 }
 
 #[test]

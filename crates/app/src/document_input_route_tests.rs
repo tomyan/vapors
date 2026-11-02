@@ -92,6 +92,7 @@ fn button(pressed: bool) -> Event {
     Event::PrimaryButton {
         pressed,
         clicks: std::num::NonZeroU32::MIN,
+        modifiers: vapors_platform::Modifiers::default(),
     }
 }
 
@@ -141,7 +142,7 @@ fn a_click_on_the_photo_after_moves_over_it_never_lands_on_the_card() {
 }
 
 #[test]
-fn the_wheel_and_a_tap_go_by_hit_at_their_own_position() {
+fn the_wheel_a_tap_and_a_double_tap_go_by_hit_at_their_own_position() {
     // Given
     let card = card();
     let mut input = DocumentInput::new();
@@ -152,9 +153,17 @@ fn the_wheel_and_a_tap_go_by_hit_at_their_own_position() {
     assert_eq!(give(&mut input, &card, &wheel), Route::Host);
     give(&mut input, &card, &moved(80.0, 30.0));
     assert_eq!(give(&mut input, &card, &wheel), Route::Document);
+    let (clicks, double) = (std::num::NonZeroU32::MIN, |x, y| Event::DoubleTap { x, y });
+    let tap = Event::Tap {
+        x: 150.0,
+        y: 80.0,
+        clicks,
+    };
+    assert_eq!(give(&mut input, &card, &tap), Route::Host);
+    assert_eq!(give(&mut input, &card, &double(150.0, 80.0)), Route::Host);
     assert_eq!(
-        give(&mut input, &card, &Event::Tap { x: 150.0, y: 80.0 }),
-        Route::Host
+        give(&mut input, &card, &double(80.0, 30.0)),
+        Route::Document
     );
 }
 

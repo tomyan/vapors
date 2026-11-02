@@ -3,7 +3,7 @@
 
 use vapors_dom::NodeId;
 use vapors_scene::Color;
-use vapors_text::parley::PlainEditor;
+use vapors_text::parley::{Affinity, Cursor, PlainEditor, Selection};
 
 use crate::document::Document;
 
@@ -15,6 +15,8 @@ pub(crate) struct TextMarks {
     pub(crate) caret: Option<[f32; 4]>,
     /// The selection's rects.
     pub(crate) selection: Vec<[f32; 4]>,
+    /// The rects of the text an IME is composing, underlined.
+    pub(crate) composing: Vec<[f32; 4]>,
 }
 
 impl Document {
@@ -27,7 +29,9 @@ impl Document {
         let Document { fonts, editors, .. } = self;
         let editor = editors.get_mut(&node)?;
         fonts.editor_driver(&mut editor.plain).refresh_layout();
-        Some((node, marks_of(&editor.plain)))
+        let mut marks = marks_of(&editor.plain);
+        marks.composing = composing_rects(&editor.plain, editor.composing.clone());
+        Some((node, marks))
     }
 }
 
@@ -45,7 +49,27 @@ fn marks_of(plain: &PlainEditor<Color>) -> TextMarks {
             .into_iter()
             .map(|(b, _)| rect(b))
             .collect(),
+        composing: Vec::new(),
     }
+}
+
+/// The rects of `range` (bytes) in the editor's laid-out text.
+fn composing_rects(
+    plain: &PlainEditor<Color>,
+    range: Option<std::ops::Range<usize>>,
+) -> Vec<[f32; 4]> {
+    let (Some(range), Some(layout)) = (range, plain.try_layout()) else {
+        return Vec::new();
+    };
+    let at = |index, affinity| Cursor::from_byte_index(layout, index, affinity);
+    Selection::new(
+        at(range.start, Affinity::Downstream),
+        at(range.end, Affinity::Upstream),
+    )
+    .geometry(layout)
+    .into_iter()
+    .map(|(b, _)| rect(b))
+    .collect()
 }
 
 /// A Parley box as `[x, y, width, height]`.

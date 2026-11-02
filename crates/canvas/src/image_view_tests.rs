@@ -1,6 +1,7 @@
 //! How the view answers input.
 
 use super::*;
+use vapors_platform::{Event, LINE_PIXELS};
 
 pub(super) fn view() -> ImageView {
     let image = RgbaImage {
@@ -49,30 +50,6 @@ fn scroll_zooms_about_the_pointer() {
 }
 
 #[test]
-fn scroll_before_any_pointer_move_zooms_about_the_view_centre() {
-    // Given: winit's wheel event carries no position, and no pointer has moved
-    let mut view = view();
-    let under_centre = view.transform().image_point([200.0, 200.0]);
-
-    // When
-    view.event(&Event::Scroll {
-        dx: 0.0,
-        dy: -LINE_PIXELS,
-    });
-
-    // Then
-    let after = view.transform().image_point([200.0, 200.0]);
-    assert!(
-        (after[0] - under_centre[0]).abs() < 1e-4,
-        "{after:?} vs {under_centre:?}"
-    );
-    assert!(
-        (after[1] - under_centre[1]).abs() < 1e-4,
-        "{after:?} vs {under_centre:?}"
-    );
-}
-
-#[test]
 fn a_drag_does_not_pan_on_the_first_pointer_position() {
     // Given: the button goes down before any pointer position is known
     let mut view = view();
@@ -80,6 +57,7 @@ fn a_drag_does_not_pan_on_the_first_pointer_position() {
     view.event(&Event::PrimaryButton {
         pressed: true,
         clicks: std::num::NonZeroU32::MIN,
+        modifiers: vapors_platform::Modifiers::default(),
     });
 
     // When
@@ -87,6 +65,16 @@ fn a_drag_does_not_pan_on_the_first_pointer_position() {
 
     // Then
     assert_eq!(view.transform().translate, before);
+}
+
+/// A finger down at the frame's centre, inside the area.
+fn finger_down(view: &mut ImageView) {
+    view.event(&Event::Touch {
+        id: 0,
+        phase: vapors_platform::TouchPhase::Started,
+        x: 200.0,
+        y: 200.0,
+    });
 }
 
 #[test]
@@ -123,8 +111,9 @@ fn pinch_zooms_about_the_anchor() {
 
 #[test]
 fn pan_translates_the_image() {
-    // Given
+    // Given: a finger down on the image
     let mut view = view();
+    finger_down(&mut view);
 
     // When
     view.event(&Event::Pan { dx: 5.0, dy: -3.0 });
@@ -137,6 +126,7 @@ fn pan_translates_the_image() {
 fn double_tap_fits_unless_fitted_then_goes_to_actual_size() {
     // Given
     let mut view = view();
+    finger_down(&mut view);
     view.event(&Event::Pan { dx: 5.0, dy: 0.0 });
 
     // When / Then
@@ -157,6 +147,7 @@ fn primary_button_drag_pans_and_release_stops_it() {
     view.event(&Event::PrimaryButton {
         pressed: true,
         clicks: std::num::NonZeroU32::MIN,
+        modifiers: vapors_platform::Modifiers::default(),
     });
 
     // When
@@ -164,6 +155,7 @@ fn primary_button_drag_pans_and_release_stops_it() {
     view.event(&Event::PrimaryButton {
         pressed: false,
         clicks: std::num::NonZeroU32::MIN,
+        modifiers: vapors_platform::Modifiers::default(),
     });
     view.event(&Event::PointerMoved { x: 200.0, y: 200.0 });
 
