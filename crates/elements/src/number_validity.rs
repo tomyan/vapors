@@ -30,18 +30,34 @@ impl Document {
     }
 }
 
+/// Why [`Document::set_committed_number`] refused.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SetNumberError {
+    /// The node is not an `input type=number`.
+    NotANumberField,
+    /// The number is NaN or infinite, which no field can show.
+    NotFinite,
+}
+
 impl Document {
     /// Show `value` in number field `node` and record it as the field's
     /// last committed number, firing nothing: for a host that refused a
     /// committed number and puts its own back, so the same number typed
-    /// again fires `change` again. False when `node` is not an
-    /// `input type=number`.
-    pub fn set_committed_number(&mut self, node: NodeId, value: f64) -> bool {
+    /// again fires `change` again.
+    ///
+    /// # Errors
+    ///
+    /// [`SetNumberError`]: `node` is no number field, or `value` is not
+    /// finite; nothing changes.
+    pub fn set_committed_number(&mut self, node: NodeId, value: f64) -> Result<(), SetNumberError> {
         if self.number_field(node).is_none() {
-            return false;
+            return Err(SetNumberError::NotANumberField);
+        }
+        if !value.is_finite() {
+            return Err(SetNumberError::NotFinite);
         }
         self.set_number_text(node, crate::range::written(value));
         self.committed.insert(node, value);
-        true
+        Ok(())
     }
 }

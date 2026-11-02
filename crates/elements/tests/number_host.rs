@@ -5,6 +5,7 @@
 mod support;
 
 use support::number_page::{click, key, page, type_text, value};
+use vapors_elements::SetNumberError;
 
 #[test]
 fn after_the_host_puts_its_number_back_the_same_typed_number_changes_again() {
@@ -24,7 +25,7 @@ fn after_the_host_puts_its_number_back_the_same_typed_number_changes_again() {
     key(&page, "Enter");
 
     // Then
-    assert!(set);
+    assert_eq!(set, Ok(()));
     assert_eq!(shown, "20");
     assert_eq!(
         *page.log.borrow(),
@@ -38,14 +39,20 @@ fn after_the_host_puts_its_number_back_the_same_typed_number_changes_again() {
 }
 
 #[test]
-fn set_committed_number_on_anything_but_a_number_field_says_so() {
+fn set_committed_number_refuses_another_element_and_a_number_that_is_not_finite() {
     // Given
     let page = page();
     let body = page.doc.borrow().body();
 
     // When
-    let set = page.doc.borrow_mut().set_committed_number(body, 20.0);
+    let on_body = page.doc.borrow_mut().set_committed_number(body, 20.0);
+    let nan = page
+        .doc
+        .borrow_mut()
+        .set_committed_number(page.amount, f64::NAN);
 
-    // Then
-    assert!(!set);
+    // Then: refused, and the field unchanged
+    assert_eq!(on_body, Err(SetNumberError::NotANumberField));
+    assert_eq!(nan, Err(SetNumberError::NotFinite));
+    assert_eq!(value(&page, page.amount), "20");
 }

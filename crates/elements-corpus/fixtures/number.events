@@ -2,8 +2,9 @@
 # 0..1000 by 1 at 20; `off` is x 200..300 and disabled; the button is x
 # 300..380. A typed value outside the range is kept on commit, as
 # typed; over the max a step up does nothing and a step down comes back
-# to the max (HTML's stepUp and stepDown); on `plain`, by 10, a step
-# back goes to the bound itself.
+# to the max (HTML's stepUp and stepDown); on `plain`, by 10 to 95, a
+# step back goes to the bound itself, and a step up at the max does
+# nothing.
 listen pointerdown pointerup click input change keydown keyup focusin focusout
 click 50 12                   a click focuses amount; a text field always shows the ring
 expect event click input#amount
@@ -62,7 +63,7 @@ key ArrowDown                 a step down comes back to the max
 expect event input input#amount
 expect event change input#amount
 expect value input#amount 1000
-key Tab                       to plain, 0..100 by 10, its text selected whole
+key Tab                       to plain, 0..95 by 10, its text selected whole
 expect focus-visible input#plain
 type "105"                    over the max, off the steps
 expect value input#plain 105
@@ -71,7 +72,10 @@ expect event change input#plain
 expect value input#plain 105
 key ArrowDown                 back to the max itself, not 105 less a step
 expect event change input#plain
-expect value input#plain 100
+expect value input#plain 95
+key ArrowUp                   at the max, off the steps: up does nothing, not down to 90
+expect no event change
+expect value input#plain 95
 key Shift+Tab
 expect focus-visible input#amount
 key Tab                       selected whole again

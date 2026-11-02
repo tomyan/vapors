@@ -104,15 +104,19 @@ impl Field {
     /// The number `steps` steps from `from`, one step being the `step`,
     /// or 1 for `step="any"`, as HTML's `stepUp` and `stepDown` and
     /// Chromium's keyboard step: inside the range, the result stays on
-    /// the steps and at most the last one under `max`; outside it, a
-    /// step further out leaves `from`, and a step back goes to the bound.
+    /// the steps and at most the last one under `max`, and never moves
+    /// against its direction; outside it, a step further out leaves
+    /// `from`, and a step back goes to the bound.
     pub(crate) fn step_from(&self, from: f64, steps: f64) -> f64 {
         if let Some(outside) = self.step_outside(from, steps) {
             return outside;
         }
         let step = self.step.unwrap_or(1.0);
         let to = aligned(from + steps * step, Some(step), from);
-        self.clamped(self.on_steps_under_max(to))
+        let to = self.clamped(self.on_steps_under_max(to));
+        // the last step under the max can lie below `from`: a step never
+        // moves against its direction, as HTML's stepUp and Chromium
+        if (to - from) * steps < 0.0 { from } else { to }
     }
 
     /// From outside the range, or with no step to take: where it goes.

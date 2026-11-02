@@ -34,7 +34,7 @@
       ],
       "focus": "input#amount",
       "focusVisible": true,
-      "line": 8,
+      "line": 9,
       "selections": {},
       "values": {
         "input#amount": "20",
@@ -68,7 +68,7 @@
       ],
       "focus": "input#amount",
       "focusVisible": true,
-      "line": 12,
+      "line": 13,
       "selections": {},
       "values": {
         "input#amount": "205",
@@ -102,7 +102,7 @@
       ],
       "focus": "input#amount",
       "focusVisible": true,
-      "line": 15,
+      "line": 16,
       "selections": {},
       "values": {
         "input#amount": "20",
@@ -130,7 +130,7 @@
       ],
       "focus": "input#amount",
       "focusVisible": true,
-      "line": 18,
+      "line": 19,
       "selections": {},
       "values": {
         "input#amount": "20",
@@ -164,7 +164,7 @@
       ],
       "focus": "input#amount",
       "focusVisible": true,
-      "line": 21,
+      "line": 22,
       "selections": {},
       "values": {
         "input#amount": "2",
@@ -198,7 +198,7 @@
       ],
       "focus": "input#amount",
       "focusVisible": true,
-      "line": 23,
+      "line": 24,
       "selections": {},
       "values": {
         "input#amount": "27",
@@ -232,7 +232,7 @@
       ],
       "focus": "input#amount",
       "focusVisible": true,
-      "line": 25,
+      "line": 26,
       "selections": {},
       "values": {
         "input#amount": "27",
@@ -260,7 +260,7 @@
       ],
       "focus": "input#amount",
       "focusVisible": true,
-      "line": 28,
+      "line": 29,
       "selections": {},
       "values": {
         "input#amount": "27",
@@ -300,7 +300,7 @@
       ],
       "focus": "input#amount",
       "focusVisible": true,
-      "line": 30,
+      "line": 31,
       "selections": {},
       "values": {
         "input#amount": "28",
@@ -340,7 +340,7 @@
       ],
       "focus": "input#amount",
       "focusVisible": true,
-      "line": 34,
+      "line": 35,
       "selections": {},
       "values": {
         "input#amount": "27",
@@ -380,7 +380,7 @@
       ],
       "focus": "input#plain",
       "focusVisible": true,
-      "line": 36,
+      "line": 37,
       "selections": {},
       "values": {
         "input#amount": "27",
@@ -420,7 +420,7 @@
       ],
       "focus": "input#amount",
       "focusVisible": true,
-      "line": 39,
+      "line": 40,
       "selections": {},
       "values": {
         "input#amount": "27",
@@ -454,7 +454,7 @@
       ],
       "focus": "input#amount",
       "focusVisible": true,
-      "line": 41,
+      "line": 42,
       "selections": {},
       "values": {
         "input#amount": "9",
@@ -507,7 +507,7 @@
       ],
       "focus": "button#after",
       "focusVisible": false,
-      "line": 44,
+      "line": 45,
       "selections": {},
       "values": {
         "input#amount": "9",
@@ -547,7 +547,7 @@
       ],
       "focus": "input#plain",
       "focusVisible": true,
-      "line": 49,
+      "line": 50,
       "selections": {},
       "values": {
         "input#amount": "9",
@@ -587,7 +587,7 @@
       ],
       "focus": "input#amount",
       "focusVisible": true,
-      "line": 51,
+      "line": 52,
       "selections": {},
       "values": {
         "input#amount": "9",
@@ -681,7 +681,7 @@
       ],
       "focus": "input#amount",
       "focusVisible": true,
-      "line": 53,
+      "line": 54,
       "selections": {},
       "values": {
         "input#amount": "1500",
@@ -715,7 +715,7 @@
       ],
       "focus": "input#amount",
       "focusVisible": true,
-      "line": 55,
+      "line": 56,
       "selections": {},
       "values": {
         "input#amount": "1500",
@@ -743,7 +743,7 @@
       ],
       "focus": "input#amount",
       "focusVisible": true,
-      "line": 58,
+      "line": 59,
       "selections": {},
       "values": {
         "input#amount": "1500",
@@ -783,7 +783,7 @@
       ],
       "focus": "input#amount",
       "focusVisible": true,
-      "line": 61,
+      "line": 62,
       "selections": {},
       "values": {
         "input#amount": "1000",
@@ -823,7 +823,7 @@
       ],
       "focus": "input#plain",
       "focusVisible": true,
-      "line": 65,
+      "line": 66,
       "selections": {},
       "values": {
         "input#amount": "1000",
@@ -897,7 +897,7 @@
       ],
       "focus": "input#plain",
       "focusVisible": true,
-      "line": 67,
+      "line": 68,
       "selections": {},
       "values": {
         "input#amount": "1000",
@@ -931,7 +931,7 @@
       ],
       "focus": "input#plain",
       "focusVisible": true,
-      "line": 69,
+      "line": 70,
       "selections": {},
       "values": {
         "input#amount": "1000",
@@ -971,11 +971,39 @@
       ],
       "focus": "input#plain",
       "focusVisible": true,
-      "line": 72,
+      "line": 73,
       "selections": {},
       "values": {
         "input#amount": "1000",
-        "input#plain": "100"
+        "input#plain": "95"
+      }
+    },
+    {
+      "action": "Key(\"ArrowUp\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowUp",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowUp",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 76,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "95"
       }
     },
     {
@@ -1011,11 +1039,11 @@
       ],
       "focus": "input#amount",
       "focusVisible": true,
-      "line": 75,
+      "line": 79,
       "selections": {},
       "values": {
         "input#amount": "1000",
-        "input#plain": "100"
+        "input#plain": "95"
       }
     },
     {
@@ -1051,11 +1079,11 @@
       ],
       "focus": "input#plain",
       "focusVisible": true,
-      "line": 77,
+      "line": 81,
       "selections": {},
       "values": {
         "input#amount": "1000",
-        "input#plain": "100"
+        "input#plain": "95"
       }
     },
     {
@@ -1105,7 +1133,7 @@
       ],
       "focus": "input#plain",
       "focusVisible": true,
-      "line": 79,
+      "line": 83,
       "selections": {},
       "values": {
         "input#amount": "1000",
@@ -1139,7 +1167,7 @@
       ],
       "focus": "input#plain",
       "focusVisible": true,
-      "line": 81,
+      "line": 85,
       "selections": {},
       "values": {
         "input#amount": "1000",
@@ -1179,7 +1207,7 @@
       ],
       "focus": "input#plain",
       "focusVisible": true,
-      "line": 83,
+      "line": 87,
       "selections": {},
       "values": {
         "input#amount": "1000",
@@ -1213,7 +1241,7 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 86,
+      "line": 90,
       "selections": {},
       "values": {
         "input#amount": "1000",
@@ -1241,7 +1269,7 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 90,
+      "line": 94,
       "selections": {},
       "values": {
         "input#amount": "1000",

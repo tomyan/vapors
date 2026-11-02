@@ -147,3 +147,14 @@ fn a_step_past_the_max_stops_at_the_last_step_under_it() {
     // Then: as HTML's and Chromium's StepRange::ClampValue
     assert_eq!(near_top.stepped(1.0, 0.0), 9.0);
 }
+
+#[test]
+fn a_step_never_moves_against_its_direction() {
+    // Given: 0..10 by 3, at the max (off the steps) and at 9.5
+    let at_max = field(&[("min", "0"), ("max", "10"), ("step", "3"), ("value", "10")]);
+    let near = field(&[("min", "0"), ("max", "10"), ("step", "3"), ("value", "9.5")]);
+
+    // Then: up leaves them, as HTML's stepUp and Chromium do
+    assert_eq!(at_max.stepped(1.0, 0.0), 10.0);
+    assert_eq!(near.stepped(1.0, 0.0), 9.5);
+}

@@ -45,7 +45,7 @@
         "invalid=false",
         "required=false",
         "settable=true",
-        "valuemax=100",
+        "valuemax=95",
         "valuemin=0",
         "valuetext=50"
       ],
