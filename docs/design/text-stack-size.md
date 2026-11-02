@@ -47,7 +47,7 @@ Savings are against 1666 KiB.
 
 | # | Cut | Saves | Loses | Decision |
 |---|---|---|---|---|
-| 1 | parley `complex-scripts` off | 2062 KiB, measured | Dictionary line breaking for Thai, Lao, Khmer and Burmese: text in those scripts breaks only at spaces and grapheme boundaries | Off in touché's page; keep it a vapors-text feature, on for native |
+| 1 | parley `complex-scripts` off | 2062 KiB, measured | Dictionary line breaking for Thai, Lao, Khmer and Burmese: text in those scripts breaks only at spaces and grapheme boundaries | Taken: vapors-text's `complex-script-breaks` feature (#119), default on; touché's page turns it off |
 | 2 | Geist Mono out of the bundle | 84 KiB, measured | The bundled monospace face | Not taken: the design system sets numbers in Geist Mono with tabular figures |
 | 3 | CSS grid (vapors-elements `grid` feature) | 54 KiB, measured | `display: grid` and the grid properties, refused when off | Taken: the `grid` feature, default on |
 | 4 | Geist subset to Latin and punctuation | 43 KiB, measured (with 2) | Greek, Cyrillic, Vietnamese and other glyphs of the bundled face: tofu on the page | Not taken: layer and file names are the person's text, in any script; revisit only as a subset by what is displayed |
