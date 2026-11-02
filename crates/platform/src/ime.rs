@@ -3,8 +3,11 @@
 //! text is in the field's value while it composes, as Chromium's own
 //! `<input>` holds it (doc 03), replacing the selection when it starts
 //! and its own range after; a commit replaces the composing range and
-//! ends it. Kept against the field the app last set, which the app's
-//! next set confirms.
+//! ends it, in one edit, so one undo goes back to the text before the
+//! composition, as on the web. winit sends an empty preedit right
+//! before each commit; that clear is held until the next event, which
+//! takes it in (a commit) or applies it (anything else). Kept against
+//! the field the app last set, which the app's next set confirms.
 
 use winit::event::Ime;
 
@@ -15,23 +18,49 @@ use crate::{Event, TextField};
 pub(crate) struct Composition {
     field: Option<TextField>,
     composing: Option<(u32, u32)>,
+    /// An empty preedit while composing, not yet applied.
+    clear_held: bool,
 }
 
 impl Composition {
-    /// The app set the focused field, or none: a composition ends with
-    /// the field's focus, or when the field holds another text than the
-    /// composition made (the app refused an edit, or changed the text).
-    pub(crate) fn set_field(&mut self, field: Option<TextField>) {
-        let same = matches!((&self.field, &field), (Some(was), Some(now)) if was.text == now.text);
-        if !same {
+    /// The app set the focused field, or none. A composition ends, its
+    /// text kept, with the field's focus, with another field, when the
+    /// field holds another text than the composition made (the app
+    /// refused an edit, or changed the text), or when the selection
+    /// moves out of the composing range (a click elsewhere in the
+    /// field), as Chromium's `<input>` commits it. Answers whether a
+    /// composition ended so, for the IME to be told.
+    pub(crate) fn set_field(&mut self, field: Option<TextField>) -> bool {
+        let kept = self
+            .composing
+            .is_some_and(|range| match (&self.field, &field) {
+                (Some(was), Some(now)) => {
+                    was.id == now.id && was.text == now.text && inside(now.selection, range)
+                }
+                _ => false,
+            });
+        let ended = self.composing.is_some() && !kept;
+        if ended {
             self.composing = None;
+            self.clear_held = false;
         }
         self.field = field;
+        ended
+    }
+
+    /// The field the app last set.
+    pub(crate) fn field(&self) -> Option<&TextField> {
+        self.field.as_ref()
     }
 
     /// The edit `ime` makes to the field, if it changes anything.
     pub(crate) fn edit(&mut self, ime: &Ime) -> Option<Event> {
         match ime {
+            // winit's clear before a commit: held for the commit
+            Ime::Preedit(text, _) if text.is_empty() && self.composing.is_some() => {
+                self.clear_held = true;
+                None
+            }
             Ime::Preedit(text, cursor) => self.replace(text, cursor.map(|(_, end)| end), true),
             Ime::Commit(text) => self.replace(text, None, false),
             Ime::Disabled => self.replace("", None, false),
@@ -39,10 +68,20 @@ impl Composition {
         }
     }
 
+    /// A held clear that no commit followed, applied before the next
+    /// event that is not the IME's (the IME cancelled its preedit).
+    pub(crate) fn flush(&mut self) -> Option<Event> {
+        if !self.clear_held {
+            return None;
+        }
+        self.replace("", None, false)
+    }
+
     /// Replaces the composing range (else the selection) with `text`;
     /// the caret goes `cursor` bytes into it, else after it; `composes`
     /// keeps the new text as the composing range.
     fn replace(&mut self, text: &str, cursor: Option<usize>, composes: bool) -> Option<Event> {
+        self.clear_held = false;
         let field = self.field.as_mut()?;
         let (start, end) = self.composing.unwrap_or(ordered(field.selection));
         if text.is_empty() && self.composing.is_none() {
@@ -62,6 +101,12 @@ impl Composition {
             composing: self.composing,
         })
     }
+}
+
+/// Whether the selection `(a, b)` lies within `range`, its ends included.
+fn inside((a, b): (u32, u32), (start, end): (u32, u32)) -> bool {
+    let (low, high) = ordered((a, b));
+    start <= low && high <= end
 }
 
 /// `(start, end)` with start first.
@@ -94,3 +139,7 @@ fn replaced(text: &str, (start, end): (u32, u32), with: &str) -> Option<String> 
 #[cfg(test)]
 #[path = "ime_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "ime_end_tests.rs"]
+mod end_tests;

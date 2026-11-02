@@ -15,11 +15,18 @@ impl Handler {
             bridge.mirror(field);
         }
         #[cfg(not(target_family = "wasm"))]
-        {
-            if let Some(window) = &self.window {
-                crate::ime_window::allow(window, field);
-            }
-            self.composition.borrow_mut().set_field(field.cloned());
+        crate::ime_window::mirror(
+            self.window.as_deref(),
+            &mut self.composition.borrow_mut(),
+            field,
+        );
+    }
+
+    /// The window opened: the IME for the field set before it, if any.
+    #[cfg(not(target_family = "wasm"))]
+    pub(super) fn ime_opened(&self) {
+        if let Some(window) = &self.window {
+            crate::ime_window::opened(window.as_ref(), &self.composition.borrow());
         }
     }
 
@@ -27,6 +34,19 @@ impl Handler {
     #[cfg(not(target_family = "wasm"))]
     pub(super) fn ime(&mut self, ime: &winit::event::Ime) {
         let edit = self.composition.borrow_mut().edit(ime);
+        self.send_edit(edit);
+    }
+
+    /// Before an event that is not the IME's: a clear the IME held for a
+    /// commit that did not come is applied first.
+    #[cfg(not(target_family = "wasm"))]
+    pub(super) fn ime_flush(&mut self) {
+        let edit = self.composition.borrow_mut().flush();
+        self.send_edit(edit);
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    fn send_edit(&mut self, edit: Option<crate::Event>) {
         if let Some(edit) = edit {
             self.app.event(edit, &self.platform);
         }

@@ -479,13 +479,22 @@ same `Event::TextEdited` the web's textarea sends, kept against that
 field: a preedit replaces the selection when it starts and its own
 range after, in the value while it composes and underlined, its caret
 where the IME puts it; a commit replaces the composing range and ends
-it; `Disabled` clears a composition; a field set with another text, or
-none, ends it. So the web and the desktop agree with Chromium's
-`<input>`. Checked by unit tests on winit's own documented sequences
-(pinyin, a dead key over a selection); not checked with a real IME,
-which needs a desktop session (macOS, Windows, Linux with IBus or
-Fcitx) at the sign-off, including whether a platform also sends a
-key's text alongside its commit.
+it, in one edit, so one Control+Z goes back to the text before the
+composition, as on the web (winit's empty preedit before each commit is
+held until the next event, which takes it in or applies it); `Disabled`
+clears a composition; another field, the field set with another text,
+or a selection moved out of the composing range (a click elsewhere in
+the field, which Chromium's `<input>` commits on) ends it with its text
+kept, and the IME is told by losing and regaining focus. A field set
+before the window opens is allowed the IME when it does. So the web and
+the desktop agree with Chromium's `<input>`. Checked by unit tests on
+winit's own documented sequences (pinyin, a dead key over a selection),
+whose edits the field's undo test takes too (`ime_cases.rs`); not
+checked with a real IME, which needs a desktop session (macOS, Windows,
+Linux with IBus or Fcitx) at the sign-off, including whether a platform
+also sends a key's text alongside its commit, and macOS's input-source
+switch in the middle of a composition, which sends `Disabled` and so
+removes the preedit where Chromium likely commits it.
 
 ## Text editing and IME
 

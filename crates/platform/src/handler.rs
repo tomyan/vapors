@@ -81,6 +81,8 @@ impl Handler {
             self.platform.lost_state(),
         );
         self.window = Some(window);
+        #[cfg(not(target_family = "wasm"))]
+        self.ime_opened();
         #[cfg(target_family = "wasm")]
         {
             let proxy = self.platform.proxy();
