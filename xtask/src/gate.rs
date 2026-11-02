@@ -17,6 +17,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::process::{Command, ExitCode};
 
+#[path = "gate_floor.rs"]
+mod floor;
+
 use crate::config::Config;
 use crate::gate_plan::{PlannedStep, Sources, plan};
 use crate::report::Reporter;
@@ -38,6 +41,9 @@ pub fn run(reporter: &Reporter) -> ExitCode {
         Ok(held) => held,
         Err(why) => return refuse(&why),
     };
+    if let Err(why) = floor::before() {
+        return refuse(&why);
+    }
     if let Err(why) = crate::load_wait::before("gate") {
         return refuse(&why);
     }
