@@ -22,6 +22,10 @@ use crate::{ImageView, RgbaImage};
 /// - No clip is applied: the painter owns the whole viewport. The view
 ///   and its app draw their own overlays (`ImageApp`'s label strip)
 ///   after the painter, so those stay on top.
+/// - `viewport` is the whole frame, insets included: the transform
+///   places the image in the area, and a zoomed or panned image may
+///   reach under the insets, where the app's own drawing covers it. With
+///   an empty area the painter is not called.
 /// - The painter must not keep `frame`, `target`, the device or the
 ///   queue beyond the call: a later frame may come from another device.
 /// - It is called from inside `ImageView::draw` with the view mutably

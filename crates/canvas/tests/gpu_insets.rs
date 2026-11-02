@@ -74,3 +74,61 @@ fn gpu_the_image_fits_the_frame_less_its_inset_and_the_panel_keeps_the_backgroun
     );
     assert_eq!(pixel(150, 50), BACKGROUND.to_rgba8().to_vec(), "the panel");
 }
+
+/// Counts its calls; it would fill nothing, so only the count shows it ran.
+struct Counting(std::rc::Rc<std::cell::Cell<u32>>);
+
+impl vapors_canvas::ImagePainter for Counting {
+    fn paint(
+        &mut self,
+        _: &Frame<'_>,
+        _: &wgpu::TextureView,
+        _: Size,
+        _: vapors_scene::Transform,
+    ) -> Result<(), String> {
+        self.0.set(self.0.get() + 1);
+        Ok(())
+    }
+}
+
+#[test]
+fn gpu_an_empty_area_draws_only_the_background_and_never_calls_the_painter() {
+    // Given: a panel as wide as the frame, and an app's painter
+    let gpu = gpu();
+    let mut view = view();
+    let calls = std::rc::Rc::new(std::cell::Cell::new(0));
+    view.set_painter(
+        Size {
+            width: 10,
+            height: 10,
+        },
+        Box::new(Counting(std::rc::Rc::clone(&calls))),
+    );
+    view.set_insets(Insets {
+        right: WIDTH,
+        ..Insets::default()
+    });
+    let texture = clear(&gpu.device, &gpu.queue, WIDTH, HEIGHT, Color::default());
+
+    // When
+    view.draw(&Frame {
+        adapter: &gpu.adapter,
+        device: &gpu.device,
+        queue: &gpu.queue,
+        texture: &texture,
+        index: 0,
+        scale_factor: 1.0,
+        now: vapors_platform::Instant::now(),
+    })
+    .expect("draws");
+
+    // Then
+    assert!(view.area_is_empty());
+    assert_eq!(calls.get(), 0, "the painter is not handed an empty area");
+    let pixels = read_rgba8(&gpu.device, &gpu.queue, &texture);
+    let background = BACKGROUND.to_rgba8();
+    assert!(
+        pixels.chunks(4).all(|p| p == background),
+        "only the background"
+    );
+}

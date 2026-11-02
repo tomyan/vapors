@@ -3,15 +3,20 @@
 //! window (touché's side panel). Fitting, actual size and the keys' and
 //! wheel's default anchor use the area; the frame keeps its full size
 //! for drawing, so pixels outside the area are drawn as the transform
-//! puts them, and the app's own drawing covers them. A frame narrower or
-//! shorter than its insets has an empty area and shows nothing, as a
-//! minimised window does.
+//! puts them, and the app's own drawing covers them. A pointer gesture
+//! that starts outside the area is not the view's (`image_view_input.rs`).
+//! A frame narrower or shorter than its insets has an empty area and
+//! draws only the background; [`ImageView::area_is_empty`] tells the app,
+//! which passes smaller insets when its frame is too narrow for its
+//! panel.
 
-use vapors_scene::{Size, Transform};
+use vapors_scene::{Rect, Size, Transform};
 
 use super::ImageView;
 
 /// Device pixels kept clear of the image's fit on each side of the frame.
+/// The app converts its panel's CSS size by the scale factor and sets the
+/// insets again when the scale factor changes; the view does not.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Insets {
     /// From the left edge.
@@ -26,9 +31,41 @@ pub struct Insets {
 
 impl ImageView {
     /// Place the image in the frame less `insets`, and fit it there.
+    /// Insets equal to the view's change nothing, so a host may set them
+    /// on every layout without losing the person's zoom and pan.
     pub fn set_insets(&mut self, insets: Insets) {
+        if insets == self.insets {
+            return;
+        }
         self.insets = insets;
         self.fit();
+    }
+
+    /// The insets set.
+    #[must_use]
+    pub fn insets(&self) -> Insets {
+        self.insets
+    }
+
+    /// The area in the frame, in device pixels.
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)] // see `placed`
+    pub fn area_rect(&self) -> Rect {
+        let area = self.area_size();
+        let (left, top) = (self.insets.left as f32, self.insets.top as f32);
+        Rect::new(
+            left,
+            top,
+            left + area.width as f32,
+            top + area.height as f32,
+        )
+    }
+
+    /// Whether `point` (device pixels) is in the area.
+    #[must_use]
+    pub fn area_contains(&self, point: [f32; 2]) -> bool {
+        let area = self.area_rect();
+        (area.left..area.right).contains(&point[0]) && (area.top..area.bottom).contains(&point[1])
     }
 
     /// The area's size: the frame less its insets, zero where they meet.
@@ -47,15 +84,19 @@ impl ImageView {
         }
     }
 
-    /// Whether the area has no pixels, so nothing is drawn.
-    pub(crate) fn area_is_empty(&self) -> bool {
+    /// Whether the area has no pixels, so only the background is drawn:
+    /// the frame is no wider or taller than its insets.
+    #[must_use]
+    pub fn area_is_empty(&self) -> bool {
         let area = self.area_size();
         area.width == 0 || area.height == 0
     }
 
     /// `transform`, worked out in the area, moved to the area's place in
     /// the frame.
-    #[allow(clippy::cast_precision_loss)] // insets are far below 2^24
+    // f32 holds every whole number to 2^24 exactly; an inset beyond that
+    // (larger than any frame) is rounded, and only empties the area
+    #[allow(clippy::cast_precision_loss)]
     pub(crate) fn placed(&self, transform: Transform) -> Transform {
         let [x, y] = transform.translate;
         Transform {
@@ -65,7 +106,7 @@ impl ImageView {
     }
 
     /// The area's centre, in frame pixels.
-    #[allow(clippy::cast_precision_loss)] // sizes are far below 2^24
+    #[allow(clippy::cast_precision_loss)] // see `placed`
     pub(crate) fn centre(&self) -> [f32; 2] {
         let area = self.area_size();
         [

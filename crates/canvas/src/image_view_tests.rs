@@ -1,6 +1,7 @@
 //! How the view answers input.
 
 use super::*;
+use vapors_platform::{Event, LINE_PIXELS};
 
 pub(super) fn view() -> ImageView {
     let image = RgbaImage {

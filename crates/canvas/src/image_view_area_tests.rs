@@ -117,3 +117,56 @@ fn insets_wider_than_the_frame_leave_an_empty_area_and_nothing_is_fitted() {
     );
     assert_eq!(view.transform().scale, 0.0);
 }
+
+#[test]
+fn a_resize_below_the_insets_empties_the_area_and_growing_back_refits() {
+    // Given: a 200 px panel on the right
+    let mut view = view();
+    view.set_insets(Insets {
+        right: 200,
+        ..Insets::default()
+    });
+
+    // When: narrower than the panel
+    view.event(&Event::Resized {
+        width: 150,
+        height: 400,
+    });
+    let narrow = view.transform();
+
+    // Then: empty, every number finite
+    assert!(view.area_is_empty());
+    assert_eq!(narrow.scale, 0.0);
+    assert!(narrow.scale.is_finite() && narrow.translate.iter().all(|t| t.is_finite()));
+
+    // When: wide again, a 400x400 area
+    view.event(&Event::Resized {
+        width: 600,
+        height: 400,
+    });
+
+    // Then
+    assert!(!view.area_is_empty());
+    assert_eq!(view.transform().scale, 2.0);
+    assert_eq!(view.transform().translate, [0.0, 100.0]);
+}
+
+#[test]
+fn set_insets_with_the_insets_it_has_keeps_the_persons_zoom_and_pan() {
+    // Given: insets set, then a zoom and a pan
+    let mut view = view();
+    let insets = Insets {
+        right: 200,
+        ..Insets::default()
+    };
+    view.set_insets(insets);
+    view.zoom([100.0, 100.0], 2.0);
+    view.pan(10.0, 5.0);
+    let steered = view.transform();
+
+    // When: the host sets the same insets on its next layout
+    view.set_insets(insets);
+
+    // Then
+    assert_eq!(view.transform(), steered);
+}
