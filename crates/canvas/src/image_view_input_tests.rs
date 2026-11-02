@@ -12,7 +12,7 @@ use crate::{ImageView, Insets, RgbaImage};
 
 /// A 200x100 image in a 400x400 frame with a 200 px panel on the right:
 /// the area is x 0..200.
-fn panel_right() -> ImageView {
+pub(super) fn panel_right() -> ImageView {
     let image = RgbaImage {
         size: Size {
             width: 200,
@@ -32,8 +32,8 @@ fn panel_right() -> ImageView {
     view
 }
 
-const IN_AREA: [f32; 2] = [100.0, 200.0];
-const IN_PANEL: [f32; 2] = [300.0, 200.0];
+pub(super) const IN_AREA: [f32; 2] = [100.0, 200.0];
+pub(super) const IN_PANEL: [f32; 2] = [300.0, 200.0];
 
 fn drag_from(view: &mut ImageView, from: [f32; 2]) -> Answered {
     view.event(&Event::PointerMoved {
@@ -55,7 +55,7 @@ fn drag_from(view: &mut ImageView, from: [f32; 2]) -> Answered {
     pressed
 }
 
-fn touch(view: &mut ImageView, phase: TouchPhase, at: [f32; 2]) -> Answered {
+pub(super) fn touch(view: &mut ImageView, phase: TouchPhase, at: [f32; 2]) -> Answered {
     view.event(&Event::Touch {
         id: 1,
         phase,

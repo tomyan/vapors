@@ -1,11 +1,13 @@
 //! The view's answers to input: scroll or pinch zooms about the pointer
 //! or the fingers, a drag or a one-finger pan moves the image, a double
 //! tap fits it or shows it actual size, the keys fit, show actual size
-//! and zoom. A pointer gesture (a press and its drag, a wheel, a touch
-//! and its pan and pinch, a double tap) that starts outside the area is
-//! not the view's: it moves nothing, and the view answers
-//! [`Answered::OutsideArea`] so the host can give it to what it drew
-//! there (touché's tool card in the side panel's inset).
+//! and zoom. A pointer gesture (a press with its drag and release, a
+//! wheel, a touch with its pan, pinch and lift, a double tap) that starts
+//! outside the area, or at a position the view does not know, is not
+//! the view's: it moves nothing, and the view answers
+//! [`Answered::OutsideArea`] for every event of it, so the host can give
+//! the whole gesture to what it drew there (touché's tool card in the
+//! side panel's inset).
 
 use vapors_platform::{Event, LINE_PIXELS, TouchPhase};
 use vapors_scene::Size;
@@ -20,7 +22,10 @@ const ZOOM_STEP: f32 = 1.25;
 pub enum Answered {
     /// The view answered it, or it means nothing to the view.
     Done,
-    /// A pointer gesture that started outside the area: nothing moved.
+    /// An event of a pointer gesture that started outside the area, or
+    /// where the view does not know the pointer: nothing moved. The host
+    /// gives it to its own drawing there; every event of the gesture,
+    /// to its release or last lift, answers this.
     OutsideArea,
 }
 
@@ -31,6 +36,8 @@ pub(crate) struct Steering {
     pointer: Option<[f32; 2]>,
     /// The primary button went down inside the area and is still down.
     dragging: bool,
+    /// The primary button went down outside the area and is still down.
+    pressed_outside: bool,
     /// The fingers down.
     touches: Vec<u64>,
     /// The first finger of the fingers down landed outside the area.
@@ -42,7 +49,7 @@ impl ImageView {
     pub fn event(&mut self, event: &Event) -> Answered {
         match event {
             Event::Resized { width, height } => self.resized(*width, *height),
-            Event::PointerMoved { x, y } => self.pointer_moved([*x, *y]),
+            Event::PointerMoved { x, y } => return self.pointer_moved([*x, *y]),
             Event::PointerLeft => self.steering.pointer = None,
             Event::PrimaryButton { pressed, .. } => return self.pressed(*pressed),
             Event::Touch { id, phase, x, y } => return self.touched(*id, *phase, [*x, *y]),
@@ -65,36 +72,49 @@ impl ImageView {
         self.fit();
     }
 
-    fn pointer_moved(&mut self, to: [f32; 2]) {
+    fn pointer_moved(&mut self, to: [f32; 2]) -> Answered {
         if let (true, Some(from)) = (self.steering.dragging, self.steering.pointer) {
             self.pan(to[0] - from[0], to[1] - from[1]);
         }
         self.steering.pointer = Some(to);
+        answer(self.steering.pressed_outside)
     }
 
+    /// A press decides its gesture; its release answers as it did.
     fn pressed(&mut self, pressed: bool) -> Answered {
-        let outside = pressed && self.pointer_outside();
+        let outside = if pressed {
+            self.pointer_not_inside()
+        } else {
+            self.steering.pressed_outside
+        };
         self.steering.dragging = pressed && !outside;
+        self.steering.pressed_outside = pressed && outside;
         answer(outside)
     }
 
+    /// The first finger decides its gesture, which the last finger's
+    /// lift ends, answering as it did. A finger that starts while listed
+    /// as down lost its end: the fingers listed are forgotten and it
+    /// decides afresh.
     fn touched(&mut self, id: u64, phase: TouchPhase, at: [f32; 2]) -> Answered {
+        let outside = self.touch_outside();
         let touches = &mut self.steering.touches;
         match phase {
-            TouchPhase::Started if touches.is_empty() => {
-                touches.push(id);
+            TouchPhase::Started if touches.contains(&id) || touches.is_empty() => {
+                *touches = vec![id];
                 self.steering.touch_outside = !self.area_contains(at);
+                return answer(self.steering.touch_outside);
             }
             TouchPhase::Started => touches.push(id),
             TouchPhase::Moved => {}
             TouchPhase::Ended | TouchPhase::Cancelled => touches.retain(|t| *t != id),
         }
-        answer(self.touch_outside())
+        answer(outside)
     }
 
     /// A notch away from the user (one line up) zooms in a step.
     fn scrolled(&mut self, dy: f32) -> Answered {
-        if self.pointer_outside() {
+        if self.pointer_not_inside() {
             return Answered::OutsideArea;
         }
         self.zoom(self.scroll_anchor(), ZOOM_STEP.powf(-dy / LINE_PIXELS));
@@ -117,7 +137,7 @@ impl ImageView {
 
     fn panned(&mut self, dx: f32, dy: f32) -> Answered {
         let outside = if self.steering.touches.is_empty() {
-            self.pointer_outside()
+            self.pointer_not_inside()
         } else {
             self.touch_outside()
         };
@@ -139,15 +159,16 @@ impl ImageView {
         !self.steering.touches.is_empty() && self.steering.touch_outside
     }
 
-    /// The pointer is known and outside the area.
-    fn pointer_outside(&self) -> bool {
+    /// The pointer is outside the area, or its position is not known:
+    /// the view moves nothing on a position it does not know.
+    fn pointer_not_inside(&self) -> bool {
         self.steering
             .pointer
-            .is_some_and(|at| !self.area_contains(at))
+            .is_none_or(|at| !self.area_contains(at))
     }
 
-    /// The pointer, or the area's centre when no pointer position is
-    /// known: winit's wheel event carries no position of its own.
+    /// The pointer: winit's wheel event carries no position of its own,
+    /// and a wheel with none known is refused before this.
     fn scroll_anchor(&self) -> [f32; 2] {
         self.steering.pointer.unwrap_or_else(|| self.centre())
     }
@@ -174,3 +195,7 @@ fn answer(outside: bool) -> Answered {
 #[cfg(test)]
 #[path = "image_view_input_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "image_view_gesture_tests.rs"]
+mod gesture_tests;
