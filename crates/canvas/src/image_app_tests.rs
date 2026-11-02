@@ -64,6 +64,7 @@ fn a_tap_or_click_opens_the_picker_only_while_empty() {
     let click = Event::PrimaryButton {
         pressed: false,
         clicks: std::num::NonZeroU32::MIN,
+        modifiers: vapors_platform::Modifiers::default(),
     };
 
     // When / Then
@@ -75,7 +76,8 @@ fn a_tap_or_click_opens_the_picker_only_while_empty() {
         &empty,
         &Event::PrimaryButton {
             pressed: true,
-            clicks: std::num::NonZeroU32::MIN
+            clicks: std::num::NonZeroU32::MIN,
+            modifiers: vapors_platform::Modifiers::default()
         }
     ));
 }

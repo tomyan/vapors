@@ -173,8 +173,8 @@ fn scale_of(document: &Document) -> Result<f32, Unplaced> {
 fn point_of(action: Action) -> Option<Point> {
     match action {
         Action::Move(p)
-        | Action::Press(p, _)
-        | Action::Release(p)
+        | Action::Press(p, _, _)
+        | Action::Release(p, _)
         | Action::Tap(p)
         | Action::Wheel(p, _)
         | Action::TouchDown(_, p)
@@ -203,6 +203,9 @@ impl DocumentInput {
 #[path = "document_input_route.rs"]
 mod route;
 pub use route::Route;
+#[cfg(test)]
+#[path = "document_input_click_tests.rs"]
+mod click_tests;
 #[path = "document_input_types.rs"]
 mod types;
 pub(crate) use types::Handled;

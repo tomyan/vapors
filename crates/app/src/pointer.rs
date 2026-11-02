@@ -5,16 +5,18 @@
 //! clicks only as its tap, so one tap is one click; its down and up
 //! also bound a gesture whose pans scroll.
 
-use vapors_elements::Point;
+use vapors_elements::{Modifiers, Point};
 use vapors_platform::{Event, TouchPhase};
 
 /// What one platform event asks of the document.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum Action {
     Move(Point),
-    /// A press of the primary button, with its count in a row.
-    Press(Point, std::num::NonZeroU32),
-    Release(Point),
+    /// A press of the primary button, with its count in a row and the
+    /// modifiers held.
+    Press(Point, std::num::NonZeroU32, Modifiers),
+    /// Its release, with the modifiers held.
+    Release(Point, Modifiers),
     Leave,
     Tap(Point),
     /// Scroll by a delta (CSS pixels) at a point.
@@ -41,8 +43,13 @@ pub(crate) fn action(event: &Event, scale: f32, last: Point) -> Option<Action> {
         Event::PrimaryButton {
             pressed: true,
             clicks,
-        } => Some(Action::Press(last, *clicks)),
-        Event::PrimaryButton { pressed: false, .. } => Some(Action::Release(last)),
+            modifiers,
+        } => Some(Action::Press(last, *clicks, held(*modifiers))),
+        Event::PrimaryButton {
+            pressed: false,
+            modifiers,
+            ..
+        } => Some(Action::Release(last, held(*modifiers))),
         Event::PointerLeft => Some(Action::Leave),
         Event::Tap { x, y } => Some(Action::Tap(css(*x, *y))),
         Event::Scroll { dx, dy } => Some(Action::Wheel(last, [*dx, *dy])),
@@ -50,6 +57,16 @@ pub(crate) fn action(event: &Event, scale: f32, last: Point) -> Option<Action> {
         Event::Pan { dx, dy } => Some(Action::Pan([-dx / scale, -dy / scale])),
         Event::Touch { id, phase, x, y } => Some(touch(*id, *phase, css(*x, *y))),
         _ => None,
+    }
+}
+
+/// The platform's modifiers as the document's events carry them.
+fn held(modifiers: vapors_platform::Modifiers) -> Modifiers {
+    Modifiers {
+        shift: modifiers.shift,
+        control: modifiers.control,
+        alt: modifiers.alt,
+        meta: modifiers.meta,
     }
 }
 
@@ -85,10 +102,12 @@ mod tests {
             Event::PrimaryButton {
                 pressed: true,
                 clicks: std::num::NonZeroU32::MIN,
+                modifiers: vapors_platform::Modifiers::default(),
             },
             Event::PrimaryButton {
                 pressed: false,
                 clicks: std::num::NonZeroU32::MIN,
+                modifiers: vapors_platform::Modifiers::default(),
             },
         );
 
@@ -102,8 +121,12 @@ mod tests {
         assert_eq!(
             found,
             (
-                Some(Action::Press([4.0, 5.0], std::num::NonZeroU32::MIN)),
-                Some(Action::Release([6.0, 7.0]))
+                Some(Action::Press(
+                    [4.0, 5.0],
+                    std::num::NonZeroU32::MIN,
+                    Modifiers::default()
+                )),
+                Some(Action::Release([6.0, 7.0], Modifiers::default()))
             )
         );
     }

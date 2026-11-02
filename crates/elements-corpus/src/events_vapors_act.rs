@@ -37,6 +37,18 @@ pub(super) fn act(
     match *action {
         Action::Click(x, y) => clicks(doc, at(x, y), 1),
         Action::Clicks(x, y, count) => clicks(doc, at(x, y), count),
+        Action::AltClick(x, y) => {
+            let alt = vapors_elements::Modifiers {
+                alt: true,
+                ..vapors_elements::Modifiers::default()
+            };
+            sent(doc, |doc| {
+                Document::pointer_pressed_with(doc, at(x, y), std::num::NonZeroU32::MIN, alt);
+            });
+            sent(doc, |doc| {
+                Document::pointer_released_with(doc, at(x, y), alt);
+            });
+        }
         Action::Key(ref combination) => key(doc, combination, held.clipboard.as_deref())?,
         Action::Clipboard(ref text) => held.clipboard = Some(text.clone()),
         // each character as the platform sends it: the key down, its

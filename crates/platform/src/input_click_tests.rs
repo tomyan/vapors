@@ -18,6 +18,7 @@ fn button(pressed: bool, n: u32) -> Event {
     Event::PrimaryButton {
         pressed,
         clicks: NonZeroU32::new(n).expect("a count"),
+        modifiers: crate::event::Modifiers::default(),
     }
 }
 
@@ -62,4 +63,29 @@ fn a_press_with_no_known_pointer_place_starts_a_new_row() {
 
     // Then: the first of a new row, never close to the last
     assert_eq!(unknown, [button(true, 1)]);
+}
+
+#[test]
+fn a_press_carries_the_modifiers_held() {
+    // Given: Alt held, as winit reports it
+    let mut input = Input::new();
+    input.translate(&moved(10.0, 10.0));
+    input.key(Key::Modifiers(winit::keyboard::ModifiersState::ALT));
+
+    // When
+    let pressed = input.translate(&pressing(ElementState::Pressed));
+
+    // Then
+    let alt = crate::event::Modifiers {
+        alt: true,
+        ..crate::event::Modifiers::default()
+    };
+    assert_eq!(
+        pressed,
+        [Event::PrimaryButton {
+            pressed: true,
+            clicks: NonZeroU32::MIN,
+            modifiers: alt
+        }]
+    );
 }

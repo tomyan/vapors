@@ -1,0 +1,210 @@
+{
+  "steps": [
+    {
+      "action": "Click(50.0, 24.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "click"
+        }
+      ],
+      "focus": "button#reset",
+      "focusVisible": false,
+      "line": 3,
+      "selections": {},
+      "values": {}
+    },
+    {
+      "action": "Clicks(50.0, 24.0, 2)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "click"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "click"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#reset",
+          "type": "dblclick"
+        }
+      ],
+      "focus": "button#reset",
+      "focusVisible": false,
+      "line": 5,
+      "selections": {},
+      "values": {}
+    },
+    {
+      "action": "Clicks(50.0, 24.0, 3)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "click"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "click"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#reset",
+          "type": "dblclick"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "click"
+        }
+      ],
+      "focus": "button#reset",
+      "focusVisible": false,
+      "line": 7,
+      "selections": {},
+      "values": {}
+    },
+    {
+      "action": "AltClick(50.0, 24.0)",
+      "checked": {},
+      "events": [
+        {
+          "altKey": true,
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "pointerdown"
+        },
+        {
+          "altKey": true,
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "pointerup"
+        },
+        {
+          "altKey": true,
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#reset",
+          "type": "click"
+        }
+      ],
+      "focus": "button#reset",
+      "focusVisible": false,
+      "line": 9,
+      "selections": {},
+      "values": {}
+    }
+  ]
+}

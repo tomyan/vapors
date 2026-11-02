@@ -1,0 +1,10 @@
+# Clicks in a row and modifiers on clicks.wisp's Reset (x 8..98, y 8..40).
+listen pointerdown pointerup click dblclick
+click 50 24                   one click
+expect event click button#reset
+double-click 50 24            two clicks in a row, then dblclick
+expect event dblclick button#reset
+triple-click 50 24            a third press in a row: as Chromium does
+expect event click button#reset
+alt-click 50 24               a click with Alt held carries it
+expect event click button#reset

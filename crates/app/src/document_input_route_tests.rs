@@ -92,6 +92,7 @@ fn button(pressed: bool) -> Event {
     Event::PrimaryButton {
         pressed,
         clicks: std::num::NonZeroU32::MIN,
+        modifiers: vapors_platform::Modifiers::default(),
     }
 }
 

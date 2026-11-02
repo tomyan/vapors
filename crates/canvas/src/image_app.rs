@@ -69,6 +69,7 @@ impl ImageApp {
             | Event::PrimaryButton {
                 pressed: false,
                 clicks: std::num::NonZeroU32::MIN,
+                modifiers: _,
             } => !self.view.has_image(),
             _ => false,
         }

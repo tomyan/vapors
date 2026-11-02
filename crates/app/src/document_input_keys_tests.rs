@@ -70,6 +70,7 @@ pub(super) fn click(input: &mut DocumentInput, doc: &Rc<RefCell<Document>>, x: f
         &Event::PrimaryButton {
             pressed: true,
             clicks: std::num::NonZeroU32::MIN,
+            modifiers: vapors_platform::Modifiers::default(),
         },
     );
     give(
@@ -78,6 +79,7 @@ pub(super) fn click(input: &mut DocumentInput, doc: &Rc<RefCell<Document>>, x: f
         &Event::PrimaryButton {
             pressed: false,
             clicks: std::num::NonZeroU32::MIN,
+            modifiers: vapors_platform::Modifiers::default(),
         },
     );
 }
