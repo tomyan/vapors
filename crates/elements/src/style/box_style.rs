@@ -49,6 +49,7 @@ pub(crate) fn box_style(reader: &mut Reader<'_>, flex_item: bool, border: [f32; 
     super::position::position(reader, &mut style);
     super::overflow::overflow(reader, &mut style);
     flex(reader, &mut style);
+    #[cfg(feature = "grid")]
     super::grid_style::grid(reader, &mut style);
     style
 }
@@ -96,7 +97,7 @@ fn display(value: &Value) -> Result<Display, String> {
         "block" | "inline" => Ok(Display::Block),
         "flex" => Ok(Display::Flex),
         "none" => Ok(Display::None),
-        "grid" => Ok(Display::Grid),
+        "grid" => super::grid_gate::grid(),
         "inline-block" | "inline-flex" | "inline-grid" => Err(
             "an atomic inline (inline-block, inline-flex, inline-grid) is laid out only as a flex or grid item; not scheduled in docs/F2c.md otherwise".to_owned(),
         ),
@@ -109,7 +110,7 @@ fn blockified(value: &Value) -> Result<Display, String> {
     match keyword(value)? {
         "inline" | "inline-block" => Ok(Display::Block),
         "inline-flex" => Ok(Display::Flex),
-        "inline-grid" => Ok(Display::Grid),
+        "inline-grid" => super::grid_gate::grid(),
         _ => display(value),
     }
 }

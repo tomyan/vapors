@@ -17,9 +17,18 @@ pub(crate) enum Treatment {
     Read,
     /// Not implemented; arrives in the named slice.
     Deferred(&'static str),
+    /// Behind a crate feature this build leaves out; why.
+    Off(&'static str),
 }
 
-use Treatment::{Deferred, Read};
+use Treatment::{Deferred, Off, Read};
+
+/// The grid properties: read with the `grid` feature, refused without it.
+const GRID: Treatment = if cfg!(feature = "grid") {
+    Read
+} else {
+    Off(super::grid_gate::GRID_OFF)
+};
 
 /// Every longhand, sorted by name, with its treatment.
 pub(crate) const TABLE: &[(&str, Treatment)] = &[
@@ -79,19 +88,19 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ("font-style", Read),
     ("font-variation-settings", Deferred("a slice after F2c")),
     ("font-weight", Read),
-    ("grid-auto-columns", Read),
-    ("grid-auto-flow", Read),
-    ("grid-auto-rows", Read),
-    ("grid-column-end", Read),
-    ("grid-column-start", Read),
-    ("grid-row-end", Read),
-    ("grid-row-start", Read),
-    ("grid-template-columns", Read),
-    ("grid-template-rows", Read),
+    ("grid-auto-columns", GRID),
+    ("grid-auto-flow", GRID),
+    ("grid-auto-rows", GRID),
+    ("grid-column-end", GRID),
+    ("grid-column-start", GRID),
+    ("grid-row-end", GRID),
+    ("grid-row-start", GRID),
+    ("grid-template-columns", GRID),
+    ("grid-template-rows", GRID),
     ("height", Read),
     ("justify-content", Read),
-    ("justify-items", Read),
-    ("justify-self", Read),
+    ("justify-items", GRID),
+    ("justify-self", GRID),
     ("left", Read),
     ("letter-spacing", Read),
     ("line-height", Read),
@@ -142,28 +151,31 @@ pub(crate) fn check_honoured(styles: Styles<'_>, initial: &ComputedStyle) -> Vec
     TABLE
         .iter()
         .filter_map(|(name, treatment)| match treatment {
-            Deferred(slice) => deferred_in_use(styles, initial, name, slice),
+            Deferred(slice) => in_use(styles, initial, name, || {
+                format!(
+                    "is not implemented by vapors-elements yet: it {}",
+                    later(slice)
+                )
+            }),
+            Off(why) => in_use(styles, initial, name, || (*why).to_owned()),
             Read => None,
         })
         .collect()
 }
 
-fn deferred_in_use(
+/// A refusal for `name` when it is set other than its initial value.
+fn in_use(
     styles: Styles<'_>,
     initial: &ComputedStyle,
     name: &'static str,
-    slice: &str,
+    reason: impl FnOnce() -> String,
 ) -> Option<Refusal> {
     let id = PropertyId::from_name(name)
         .unwrap_or_else(|| panic!("`{name}` is not in vapors-css's table"));
     if styles.own.get(id) == initial.get(id) {
         return None;
     }
-    let reason = format!(
-        "is not implemented by vapors-elements yet: it {}",
-        later(slice)
-    );
-    styles.refusal(name, reason)
+    styles.refusal(name, reason())
 }
 
 #[cfg(test)]

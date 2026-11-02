@@ -156,12 +156,7 @@ impl Document {
         let parent_used = parent_node.and_then(|p| kept.used.get(&p));
         let context = Context {
             initial: &kept.initial,
-            flex_item: parent_used.is_some_and(|p| {
-                matches!(
-                    p.layout.display,
-                    taffy::Display::Flex | taffy::Display::Grid
-                )
-            }),
+            flex_item: parent_used.is_some_and(|p| crate::style::is_container(p.layout.display)),
             in_inline: parent_used.is_some_and(|p| p.inline),
             text_like_field: self.arena.get(node, "restyle").element().is_some_and(|e| {
                 e.tag == "input"

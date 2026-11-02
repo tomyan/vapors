@@ -15,6 +15,13 @@ vapors-scene.workspace = true
 vapors-text.workspace = true
 taffy.workspace = true
 
+# CSS grid layout (taffy's grid): about 54 KiB of brotli wasm in touché's
+# page (docs/design/text-stack-size.md). Without it, `display: grid` and
+# the grid properties are refused, naming this feature.
+[features]
+default = ["grid"]
+grid = ["taffy/grid"]
+
 [dev-dependencies]
 vapors-signals.workspace = true
 vapors-compiler-examples.workspace = true
