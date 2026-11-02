@@ -31,7 +31,7 @@ fn an_empty_run_directory_passes_and_is_removed() {
     let path = run.path().to_path_buf();
 
     // When
-    let finished = run.finish("ci");
+    let finished = run.finish("ci", false);
 
     // Then
     assert_eq!(finished, Ok(()));
@@ -49,7 +49,7 @@ fn anything_left_fails_naming_each_file_and_is_removed() {
     std::fs::write(path.join("org.chromium.Chromium.abc/SingletonCookie"), "").expect("file");
 
     // When
-    let refusal = run.finish("ci").expect_err("left files");
+    let refusal = run.finish("ci", false).expect_err("left files");
 
     // Then
     assert!(
@@ -76,7 +76,7 @@ fn a_long_list_names_the_first_entries_and_counts_the_rest() {
     }
 
     // When
-    let refusal = run.finish("gate").expect_err("left files");
+    let refusal = run.finish("gate", false).expect_err("left files");
 
     // Then
     assert!(refusal.contains("gate left 30 entries"), "{refusal}");
@@ -123,7 +123,7 @@ fn a_tmpdir_a_step_removed_fails_the_run_naming_it() {
     std::fs::remove_dir(run.path()).expect("removed");
 
     // When
-    let refusal = run.finish("ci").expect_err("gone");
+    let refusal = run.finish("ci", false).expect_err("gone");
 
     // Then
     assert!(
@@ -147,7 +147,7 @@ fn an_unreadable_directory_fails_its_run_once_and_is_set_aside() {
     std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).expect("chmod");
 
     // When
-    let refusal = run.finish("ci").expect_err("unreadable");
+    let refusal = run.finish("ci", false).expect_err("unreadable");
     let next = RunTmp::make(&base, 9);
 
     // Then
@@ -164,6 +164,25 @@ fn an_unreadable_directory_fails_its_run_once_and_is_set_aside() {
         base.join("xtask-run-9-unremovable-1/earlier").exists(),
         "the earlier one is kept"
     );
+}
+
+#[test]
+fn with_the_keep_switch_a_run_directory_with_leftovers_is_kept_and_said() {
+    // Given
+    let base = scratch::dir("run-tmp-keep");
+    let run = RunTmp::make(&base, 6).expect("made");
+    let path = run.path().to_path_buf();
+    std::fs::write(path.join("look-at-me"), "x").expect("file");
+
+    // When
+    let refusal = run.finish("ci", true).expect_err("left files");
+
+    // Then
+    assert!(
+        refusal.contains("look-at-me") && refusal.contains("kept"),
+        "{refusal}"
+    );
+    assert!(path.join("look-at-me").exists());
 }
 
 #[path = "run_tmp_sweep_tests.rs"]
