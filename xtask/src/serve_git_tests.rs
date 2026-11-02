@@ -21,10 +21,10 @@ fn run_git(dir: &Path, args: &[&str]) {
     assert!(status.success(), "git {args:?}");
 }
 
-/// A repository with one commit on main, and a clone of it.
-fn origin_and_clone(name: &str) -> (PathBuf, PathBuf) {
-    let root = std::env::temp_dir().join(format!("xtask-serve-git-{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&root);
+/// A repository with one commit on main, and a clone of it, in a
+/// scratch directory.
+fn origin_and_clone(name: &str) -> (crate::scratch::Scratch, PathBuf, PathBuf) {
+    let root = crate::scratch::dir(&format!("serve-git-{name}"));
     let origin = root.join("origin");
     std::fs::create_dir_all(&origin).expect("origin");
     run_git(&origin, &["init", "-q", "-b", "main"]);
@@ -32,13 +32,14 @@ fn origin_and_clone(name: &str) -> (PathBuf, PathBuf) {
     run_git(&origin, &["add", "."]);
     run_git(&origin, &["commit", "-q", "-m", "one"]);
     run_git(&root, &["clone", "-q", "origin", "clone"]);
-    (origin, root.join("clone"))
+    let clone = root.join("clone");
+    (root, origin, clone)
 }
 
 #[test]
 fn a_clean_clone_at_main_is_served_and_a_changed_one_is_not() {
     // Given
-    let (_origin, clone) = origin_and_clone("clean");
+    let (_root, _origin, clone) = origin_and_clone("clean");
     let dir = clone.display().to_string();
 
     // Then
@@ -54,7 +55,7 @@ fn a_clean_clone_at_main_is_served_and_a_changed_one_is_not() {
 #[test]
 fn a_clone_behind_main_is_refused_once_main_is_fetched() {
     // Given: main moves on after the clone
-    let (origin, clone) = origin_and_clone("behind");
+    let (_root, origin, clone) = origin_and_clone("behind");
     std::fs::write(origin.join("b.txt"), "b").expect("file");
     run_git(&origin, &["add", "."]);
     run_git(&origin, &["commit", "-q", "-m", "two"]);

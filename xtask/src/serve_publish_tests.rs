@@ -5,11 +5,8 @@ use std::path::{Path, PathBuf};
 
 use super::*;
 
-fn scratch(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("xtask-publish-{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("scratch");
-    dir
+fn scratch(name: &str) -> crate::scratch::Scratch {
+    crate::scratch::dir(&format!("publish-{name}"))
 }
 
 fn build(root: &Path, index: &str) -> PathBuf {

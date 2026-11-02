@@ -18,6 +18,8 @@ use crate::text_history::EditKind;
 /// The focused text field, for the platform to mirror.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextInput {
+    /// The field's node.
+    pub node: NodeId,
     /// Its text.
     pub text: String,
     /// Its selection, start then end, in UTF-16 units.
@@ -52,6 +54,7 @@ impl Document {
         let (_, marks) = self.focused_text_marks()?;
         let [x, y, width, height] = marks.caret.or(marks.selection.last().copied())?;
         Some(TextInput {
+            node,
             text,
             selection,
             area: [origin[0] + x, origin[1] + y, width.max(1.0), height],

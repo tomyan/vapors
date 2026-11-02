@@ -175,7 +175,7 @@ fn step(document: &Rc<RefCell<Document>>, node: NodeId, field: &Field, steps: f6
     settle(document, node, value);
 }
 
-/// Commits `node`'s text: a number clamped into the range, or the last
+/// Commits `node`'s text: its number, in the range or not, or the last
 /// committed number when the text is no number; `change` when it
 /// differs from the last committed.
 pub(crate) fn commit(document: &Rc<RefCell<Document>>, node: NodeId) {

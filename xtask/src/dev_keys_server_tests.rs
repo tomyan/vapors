@@ -9,11 +9,8 @@ use std::path::PathBuf;
 use super::*;
 use crate::dev_keys::DevKey;
 
-fn key_file(test: &str, contents: &str) -> PathBuf {
-    let path = std::env::temp_dir().join(format!(
-        "xtask-dev-keys-server-{test}-{}",
-        std::process::id()
-    ));
+fn key_file(test: &str, contents: &str) -> tempfile::TempPath {
+    let path = crate::scratch::file(&format!("dev-keys-server-{test}"));
     std::fs::write(&path, contents).expect("temporary key file");
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).expect("its mode");
     path
@@ -47,7 +44,7 @@ fn get(port: u16, path: &str) -> (String, String) {
 fn the_keys_are_answered_as_json_by_provider() {
     // Given
     let file = key_file("json", "sk-test-dev-key-0001\n");
-    let port = start(vec![openai(file.clone())]).expect("started");
+    let port = start(vec![openai(file.to_path_buf())]).expect("started");
 
     // When
     let (status, body) = get(port, KEYS_PATH);
@@ -55,14 +52,13 @@ fn the_keys_are_answered_as_json_by_provider() {
     // Then
     assert_eq!(status, "HTTP/1.1 200 OK");
     assert_eq!(body, r#"{"openai":"sk-test-dev-key-0001"}"#);
-    let _ = std::fs::remove_file(file);
 }
 
 #[test]
 fn each_request_reads_the_file_again() {
     // Given
     let file = key_file("again", "sk-test-dev-key-0001");
-    let port = start(vec![openai(file.clone())]).expect("started");
+    let port = start(vec![openai(file.to_path_buf())]).expect("started");
     let _ = get(port, KEYS_PATH);
 
     // When
@@ -71,14 +67,13 @@ fn each_request_reads_the_file_again() {
 
     // Then
     assert!(body.contains("sk-test-dev-key-0002"), "{body}");
-    let _ = std::fs::remove_file(file);
 }
 
 #[test]
 fn a_key_file_that_has_gone_is_a_500_naming_the_provider_and_not_the_key() {
     // Given
     let file = key_file("gone", "sk-test-dev-key-0001");
-    let port = start(vec![openai(file.clone())]).expect("started");
+    let port = start(vec![openai(file.to_path_buf())]).expect("started");
     let _ = get(port, KEYS_PATH);
 
     // When
@@ -111,7 +106,7 @@ fn without_keys_the_answer_is_404() {
 fn any_other_path_is_404_and_never_the_keys() {
     // Given
     let file = key_file("other", "sk-test-dev-key-0001");
-    let port = start(vec![openai(file.clone())]).expect("started");
+    let port = start(vec![openai(file.to_path_buf())]).expect("started");
 
     // When
     let (status, body) = get(port, "/dev/keys.json/../index.html");
@@ -119,7 +114,6 @@ fn any_other_path_is_404_and_never_the_keys() {
     // Then
     assert_eq!(status, "HTTP/1.1 404 Not Found");
     assert!(!body.contains("sk-test-dev-key"), "{body}");
-    let _ = std::fs::remove_file(file);
 }
 
 #[test]

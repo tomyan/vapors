@@ -43,15 +43,37 @@ fn the_value_is_the_text_when_it_is_a_number_else_empty() {
 }
 
 #[test]
-fn a_number_outside_the_range_is_invalid_and_commits_clamped() {
+fn a_number_outside_the_range_is_invalid_and_commits_as_typed() {
     // Given
     let over = field(&[("min", "0"), ("max", "100"), ("value", "250")]);
+    let under = field(&[("min", "0"), ("max", "100"), ("value", "-3")]);
 
     // Then
     assert!(over.invalid());
-    assert_eq!(over.committed(), Some(100.0));
+    assert_eq!(over.committed(), Some(250.0));
+    assert_eq!(
+        (over.range_underflow(), over.range_overflow()),
+        (false, true)
+    );
+    assert_eq!(
+        (under.range_underflow(), under.range_overflow()),
+        (true, false)
+    );
     assert_eq!(over.clamped(-3.0), 0.0);
     assert_eq!(field(&[("value", "1e")]).committed(), None);
+}
+
+#[test]
+fn outside_the_range_a_step_further_out_does_nothing_and_one_back_comes_inside() {
+    // Given
+    let over = field(&[("min", "0"), ("max", "100"), ("value", "250")]);
+    let under = field(&[("min", "0"), ("max", "100"), ("value", "-3")]);
+
+    // Then
+    assert_eq!(over.stepped(1.0, 0.0), 250.0);
+    assert_eq!(over.stepped(-1.0, 0.0), 100.0);
+    assert_eq!(under.stepped(-1.0, 0.0), -3.0);
+    assert_eq!(under.stepped(1.0, 0.0), 0.0);
 }
 
 #[test]
@@ -99,4 +121,40 @@ fn a_value_property_sets_the_text_a_number_written_and_a_text_as_is() {
 fn only_digits_signs_the_point_and_e_are_typeable() {
     assert!("0123456789+-.eE".chars().all(typeable));
     assert!(!"abc x,".chars().any(typeable));
+}
+
+#[test]
+fn a_step_back_from_outside_the_range_goes_to_the_bound_whatever_the_step() {
+    // Given: step 10, as Chromium's StepUpFromLayoutObject sets the bound
+    let over = field(&[
+        ("min", "0"),
+        ("max", "100"),
+        ("step", "10"),
+        ("value", "105"),
+    ]);
+    let under = field(&[("min", "0"), ("max", "100"), ("step", "5"), ("value", "-3")]);
+
+    // Then
+    assert_eq!(over.stepped(-1.0, 0.0), 100.0);
+    assert_eq!(under.stepped(1.0, 0.0), 0.0);
+}
+
+#[test]
+fn a_step_past_the_max_stops_at_the_last_step_under_it() {
+    // Given: 0..10 by 3, at 9: the steps are 0, 3, 6, 9
+    let near_top = field(&[("min", "0"), ("max", "10"), ("step", "3"), ("value", "9")]);
+
+    // Then: as HTML's and Chromium's StepRange::ClampValue
+    assert_eq!(near_top.stepped(1.0, 0.0), 9.0);
+}
+
+#[test]
+fn a_step_never_moves_against_its_direction() {
+    // Given: 0..10 by 3, at the max (off the steps) and at 9.5
+    let at_max = field(&[("min", "0"), ("max", "10"), ("step", "3"), ("value", "10")]);
+    let near = field(&[("min", "0"), ("max", "10"), ("step", "3"), ("value", "9.5")]);
+
+    // Then: up leaves them, as HTML's stepUp and Chromium do
+    assert_eq!(at_max.stepped(1.0, 0.0), 10.0);
+    assert_eq!(near.stepped(1.0, 0.0), 9.5);
 }

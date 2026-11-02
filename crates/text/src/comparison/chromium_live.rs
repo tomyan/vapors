@@ -3,7 +3,8 @@
 //! `--remote-debugging-port=0`, so `vapors-devtools` reads the port from
 //! the profile and drives the page. Its stderr goes to a file beside the
 //! profile, so an early exit says why ([`Live::alive`]). It is stopped,
-//! with what it started, and its profile removed, when dropped.
+//! with what it started, and its profile and `TMPDIR` removed, when
+//! dropped.
 
 use std::fs::File;
 use std::os::unix::process::CommandExt;
@@ -12,12 +13,15 @@ use std::process::{Child, Command, Stdio};
 
 use super::chromium::{Chromium, ChromiumError};
 use super::chromium_process::kill_group;
+use super::chromium_tmp::launch_tmp;
 
 /// A running headless Chromium.
 pub struct Live {
     child: Child,
     profile: PathBuf,
     stderr: PathBuf,
+    /// Removed after `drop` has stopped Chromium.
+    _tmp: tempfile::TempDir,
 }
 
 impl Chromium {
@@ -37,10 +41,12 @@ impl Chromium {
         scale: u32,
     ) -> Result<Live, ChromiumError> {
         fresh(profile)?;
+        let tmp = launch_tmp()?;
         let stderr = profile.with_extension("stderr.log");
         let log = File::create(&stderr).map_err(|e| failed(&stderr, &e))?;
         let child = self
             .live_command(profile, width, height, scale)
+            .env("TMPDIR", tmp.path())
             .stderr(log)
             .spawn()
             .map_err(|e| {
@@ -50,6 +56,7 @@ impl Chromium {
             child,
             profile: profile.to_path_buf(),
             stderr,
+            _tmp: tmp,
         })
     }
 

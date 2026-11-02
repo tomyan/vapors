@@ -8,16 +8,12 @@ use crate::gate_pr::{Ended, comment};
 use crate::queue_config::{MergeOn, QueueConfig};
 use crate::queue_fake::{Fake, clear, listed};
 
-pub(super) fn config(merge_on: MergeOn) -> QueueConfig {
+pub(super) fn config(merge_on: MergeOn, log: PathBuf) -> QueueConfig {
     QueueConfig {
         repo: "tomyan/touche".into(),
         merge_on,
         run: PathBuf::from("/q/run"),
-        log: std::env::temp_dir().join(format!(
-            "xtask-queue-pass-{}-{:?}.log",
-            std::process::id(),
-            std::thread::current().id()
-        )),
+        log,
         serve: None,
     }
 }
@@ -36,13 +32,13 @@ pub(super) fn run_pass(
     state: &mut State,
     dry_run: bool,
 ) -> Vec<String> {
-    let config = config(merge_on);
+    let scratch = crate::scratch::dir("queue-pass");
+    let config = config(merge_on, scratch.join("queue.log"));
     let log = Log {
         path: config.log.clone(),
     };
     pass(fake, &config, &log, state, dry_run).expect("passed");
     let text = std::fs::read_to_string(&config.log).unwrap_or_default();
-    let _ = std::fs::remove_file(&config.log);
     text.lines()
         .map(|l| l.split_once(' ').map_or(l, |(_, rest)| rest).to_owned())
         .collect()

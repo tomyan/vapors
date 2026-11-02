@@ -28,8 +28,8 @@ fn alive(pid: &str) -> bool {
 #[test]
 fn killing_the_group_kills_the_child_it_started_too() {
     // Given
-    let pid_file = std::env::temp_dir().join(format!("xtask-kill-group-{}", std::process::id()));
-    let _ = std::fs::remove_file(&pid_file);
+    let scratch = crate::scratch::dir("kill-group");
+    let pid_file = scratch.join("child.pid");
     let mut leader = group(&pid_file);
     let started = Instant::now();
     while !pid_file.exists() && started.elapsed() < Duration::from_secs(10) {
@@ -48,7 +48,6 @@ fn killing_the_group_kills_the_child_it_started_too() {
         "the child {} outlived the group kill",
         child.trim()
     );
-    let _ = std::fs::remove_file(&pid_file);
 }
 
 #[test]

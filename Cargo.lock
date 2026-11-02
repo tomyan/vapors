@@ -2875,6 +2875,7 @@ name = "vapors-devtools"
 version = "0.0.0"
 dependencies = [
  "serde_json",
+ "tempfile",
  "tungstenite",
  "vapors-text",
 ]
@@ -2904,6 +2905,7 @@ name = "vapors-elements-corpus"
 version = "0.0.0"
 dependencies = [
  "serde_json",
+ "tempfile",
  "vapors-app",
  "vapors-canvas",
  "vapors-compiler",
@@ -2995,6 +2997,7 @@ dependencies = [
  "parley",
  "png",
  "skrifa",
+ "tempfile",
  "vapors-gpu-harness",
  "vapors-renderer",
  "vapors-scene",
@@ -3778,6 +3781,7 @@ dependencies = [
  "flate2",
  "png",
  "serde_json",
+ "tempfile",
  "yaml-rust2",
 ]
 

@@ -1,7 +1,8 @@
 //! A gesture outside the area answers `OutsideArea` for every event of
-//! it (down, moves, release, last lift), and a position the view does
-//! not know counts as outside; a finger that starts while listed down
-//! lost its end and decides afresh.
+//! it (down, moves, release, last lift), and a press or touch at a
+//! position the view does not know counts as outside, a wheel as inside;
+//! a finger that starts while listed down lost its end and decides
+//! afresh.
 
 use std::num::NonZeroU32;
 
@@ -11,10 +12,10 @@ use super::Answered;
 use super::tests::{IN_AREA, IN_PANEL, panel_right, touch};
 
 #[test]
-fn scroll_before_any_pointer_move_moves_nothing_and_says_so() {
-    // Given: winit's wheel event carries no position, and no pointer has
-    // moved: the view does not move the photo on a position it does not
-    // know (the lead, review-v109)
+fn a_wheel_before_any_pointer_move_zooms() {
+    // Given: winit's wheel event carries no position and no pointer has
+    // moved, as with the cursor resting over the canvas since the page
+    // loaded or the window took focus: the first wheel must zoom
     let mut view = panel_right();
     let before = view.transform();
 
@@ -25,10 +26,8 @@ fn scroll_before_any_pointer_move_moves_nothing_and_says_so() {
     });
 
     // Then
-    assert_eq!(
-        (answered, view.transform()),
-        (Answered::OutsideArea, before)
-    );
+    assert_eq!(answered, Answered::Done);
+    assert!(view.transform().scale > before.scale);
 }
 
 #[test]
@@ -108,4 +107,29 @@ fn a_finger_that_starts_while_listed_down_lost_its_end_and_decides_afresh() {
     // Then
     assert_eq!([landed, panned], [Answered::Done; 2]);
     assert_eq!(view.transform().translate[0], fitted.translate[0] - 30.0);
+}
+
+#[test]
+fn a_drag_held_across_the_window_losing_focus_pans_nothing_after() {
+    // Given: a press in the area
+    let mut view = panel_right();
+    view.event(&Event::PointerMoved {
+        x: IN_AREA[0],
+        y: IN_AREA[1],
+    });
+    view.event(&Event::PrimaryButton {
+        pressed: true,
+        clicks: NonZeroU32::MIN,
+        modifiers: Modifiers::default(),
+    });
+    let before = view.transform();
+
+    // When: the window lost and back, then a move
+    view.event(&Event::WindowFocus { focused: false });
+    view.event(&Event::WindowFocus { focused: true });
+    view.event(&Event::PointerMoved { x: 50.0, y: 200.0 });
+    view.event(&Event::PointerMoved { x: 20.0, y: 200.0 });
+
+    // Then
+    assert_eq!(view.transform(), before);
 }

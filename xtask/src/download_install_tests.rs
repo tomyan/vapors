@@ -6,6 +6,7 @@ use std::os::unix::fs::PermissionsExt as _;
 use super::*;
 
 struct Fixture {
+    _root: crate::scratch::Scratch,
     home: PathBuf,
     marker: PathBuf,
     download: Download,
@@ -13,8 +14,7 @@ struct Fixture {
 
 /// An archive holding `tool/tool`, a script that touches the marker.
 fn fixture(name: &str) -> Fixture {
-    let root = std::env::temp_dir().join(format!("xtask-download-{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&root);
+    let root = crate::scratch::dir(&format!("download-{name}"));
     let marker = root.join("ran");
     std::fs::create_dir_all(root.join("src/tool")).expect("dir");
     let script = root.join("src/tool/tool");
@@ -37,6 +37,7 @@ fn fixture(name: &str) -> Fixture {
     };
     Fixture {
         home: root.join("home"),
+        _root: root,
         marker,
         download,
     }

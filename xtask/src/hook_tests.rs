@@ -2,16 +2,13 @@
 //! any check runs, unless `ALLOW_PUSH_TO_MAIN=1`, which it prints.
 
 use std::io::Write;
-use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 
 const HOOK: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../hooks/pre-push");
 
 /// A directory holding a `cargo` that succeeds and records that it ran.
-fn stub_cargo(test: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("xtask-hook-{test}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("stub dir");
+fn stub_cargo(test: &str) -> crate::scratch::Scratch {
+    let dir = crate::scratch::dir(&format!("hook-{test}"));
     let cargo = dir.join("cargo");
     std::fs::write(&cargo, format!("#!/bin/sh\ntouch {}/ran\n", dir.display())).expect("stub");
     let made = Command::new("chmod")

@@ -28,6 +28,8 @@ log = "0.4"
 fontique = { version = "=0.12.0", default-features = false, features = ["std", "system", "fontconfig-dlopen"] }
 # The comparison page reads Chromium's screenshot and writes its own.
 png.workspace = true
+# Each Chromium launch's own TMPDIR (comparison/chromium_tmp.rs).
+tempfile.workspace = true
 
 [dev-dependencies]
 vapors-gpu-harness.workspace = true

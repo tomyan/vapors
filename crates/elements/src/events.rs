@@ -154,6 +154,8 @@ impl Document {
     }
 }
 
+#[path = "events_cancel.rs"]
+mod cancel;
 #[path = "events_capture.rs"]
 pub(crate) mod capture;
 #[path = "events_hit.rs"]

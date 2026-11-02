@@ -137,6 +137,22 @@ crate, and the web IME path is platform code either way.
   nearest focusable element, or blurs, unless `pointerdown` is
   prevented. `blur`, `focusout`, `focus`, `focusin` fire in Chromium's
   order. A positive or non-integer `tabindex` is refused by name.
+  The window losing focus (`Event::WindowFocus`, from winit's
+  `Focused`) commits a number or text field, then fires `blur` and
+  `focusout` on the focused element, which stays the active element;
+  regaining it fires `focus` and `focusin` (`Document::window_focus`).
+  While the window is away a focus move fires nothing, and the return
+  focuses what has focus then, once, as Chromium. The loss cancels every
+  pointer held (`pointercancel`, a drag ending with no `change`), and
+  `DocumentInput` forgets its held key, press and touch routes; it
+  routes `WindowFocus` to the host too, which drops its own holds. On
+  the web the window is the canvas: focusing the page's own HTML
+  (touché's Ask field) is a loss, and blurs the card.
+  Headless Chromium never moves focus between windows, so the order
+  was probed in headed Chromium 155 under Xvfb
+  (`crates/elements-corpus/probes/window-focus.mjs`, a number and a
+  text field) and is pinned by `tests/focus_window.rs` and
+  `tests/focus_window_held.rs`.
   Checked against Chromium by `fixtures/focus.events` (events and focus
   at each step; `focus` and `blur` are not listened for there, as
   Chromium also sends them to the window, which vapors does not have).
@@ -185,7 +201,7 @@ user-agent behaviour and an implicit ARIA role (area 5).
 |---|---|---|---|---|
 | `button` | Press shows `:active`; `click` on release over the common ancestor | Enter and Space activate (Space on keyup, as browsers do) | `click` | Built, plus keyboard |
 | `input type=range` | Press anywhere on the track sets the value and captures; drag changes it; `step` snaps | Arrow keys by `step`, Page keys by a tenth of the range, Home and End; Shift for ten steps | `input` on every change, `change` on release | Scrub to change, `value_as_number`. The thumb and track are UA parts styled through prefixed custom properties the UA sheet reads (`--vapors-thumb-size`, `--vapors-thumb-color`, `--vapors-track-height`, `--vapors-track-color`), so tokens apply; `::part()` comes later (Q1, decided 2026-10-25) |
-| `input type=number` | Click focuses; drag on the field scrubs when `data-scrub` says so (touché's readout behaviour) | Digits, arrows by `step`, Enter commits | `input`, `change` | A value outside `min`..`max` is `:invalid` while typed and clamped on commit |
+| `input type=number` | Click focuses; drag on the field scrubs when `data-scrub` says so (touché's readout behaviour) | Digits, arrows by `step`, Enter commits | `input`, `change` | A value outside `min`..`max` is `:invalid` and kept on commit, as Chromium keeps it; `Document::range_validity` says under or over |
 | `input type=checkbox`, `type=radio`, `switch` role | Click toggles | Space toggles; arrows move within a radio group | `input`, `change` with `checked` | `bind:checked` exists |
 | `select` | Opens a listbox popover (area 3 owns the popover primitive) | Arrows, type-ahead, Enter, Escape | `change` | Deferred until touché has one; the model choice uses it |
 | `input type=text`, `textarea` | Click places the caret; drag selects; double click selects a word | The editing model below | `beforeinput`, `input`, `change`, `selectionchange` | |
@@ -293,11 +309,19 @@ Two differences from the web, decided with the lead (2026-10-27):
 Svelte's and the web's bindings do, so the app's `Signal<f64>` never
 takes NaN mid-typing; pinned by `codegen_bind.rs:
 bind_value_on_a_number_input_binds_a_number_on_change`. (2) On commit
-a number outside `min`..`max` is clamped into it and text that is no
-number, an emptied field included, reverts to the last committed
-number, where Chromium keeps the text (and `""`) and matches `:invalid`
-after the commit too; pinned by `tests/number_input.rs:
-enter_commits_an_out_of_range_number_clamped_with_one_change`,
+a number outside `min`..`max` is kept as typed, as Chromium keeps it
+(the corpus's `number.events`), and the app refuses or accepts it;
+over the max a step up does nothing and a step down goes to the max
+itself (under the min, the mirror), as HTML's `stepUp` and `stepDown`
+and Chromium's keyboard step; a step inside the range stops at the last
+step at or under the max; a scrub follows the same rule. A host that
+refuses a committed number puts its own back with
+`Document::set_committed_number`, so the same number typed again fires
+`change` again (`tests/number_host.rs`). Text that is no number, an emptied
+field included, reverts to the last committed number, where Chromium
+keeps the text (and `""`) and matches `:invalid` after the commit too;
+pinned by `tests/number_input.rs:
+enter_commits_an_out_of_range_number_as_typed_with_one_change`,
 `text_that_is_no_number_has_an_empty_value_and_no_number_until_committed`
 and `invalid_matches_while_the_text_is_no_number_or_out_of_range`. With `data-scrub`, a drag along the field steps the number
 by one `step` per 2 CSS px (`data-scrub="4"`: per 4 px), `input` per
@@ -480,6 +504,33 @@ phone keyboard (Gboard's autocorrect and its Backspace on composed
 words), the keyboard opening on a tap, the candidate window's place.
 Not built: EditContext, copy and cut, the a11y mirror's ownership of
 the textarea (area 5).
+
+As built (E6c, native IME, 2026-11-01): while a text field has focus
+the window allows the system IME (`set_ime_allowed`) and places its
+candidate window at the field's caret (`set_ime_cursor_area`, from the
+field the app sets for the text input). winit's `Ime` events become the
+same `Event::TextEdited` the web's textarea sends, kept against that
+field: a preedit replaces the selection when it starts and its own
+range after, in the value while it composes and underlined, its caret
+where the IME puts it; a commit replaces the composing range and ends
+it, in one edit, so one Control+Z goes back to the text before the
+composition, as on the web (winit's empty preedit before each commit is
+held until the next event, which takes it in or applies it; any event
+but the IME's own applies it first, a redraw and the loop's messages
+included, so no stale preedit is drawn or read); `Disabled`
+clears a composition; another field, the field set with another text,
+or a selection moved out of the composing range (a click elsewhere in
+the field, which Chromium's `<input>` commits on) ends it with its text
+kept, and the IME is told by losing and regaining focus. A field set
+before the window opens is allowed the IME at the window's first event. So the web and
+the desktop agree with Chromium's `<input>`. Checked by unit tests on
+winit's own documented sequences (pinyin, a dead key over a selection),
+whose edits the field's undo test takes too (`ime_cases.rs`); not
+checked with a real IME, which needs a desktop session (macOS, Windows,
+Linux with IBus or Fcitx) at the sign-off, including whether a platform
+also sends a key's text alongside its commit, and macOS's input-source
+switch in the middle of a composition, which sends `Disabled` and so
+removes the preedit where Chromium likely commits it.
 
 ## Text editing and IME
 

@@ -22,5 +22,9 @@ yaml-rust2 = { version = "=0.13.0", default-features = false }
 brotli = { version = "9.1.0", default-features = false, features = ["std"] }
 flate2 = "1.1.10"
 
+[dev-dependencies]
+# Test scratch directories that delete themselves (scratch.rs).
+tempfile = "3.27.0"
+
 [lints]
 workspace = true

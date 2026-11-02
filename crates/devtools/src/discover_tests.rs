@@ -17,12 +17,14 @@ fn alive() -> Result<(), String> {
     Ok(())
 }
 
-fn profile(test: &str, port_file: Option<&str>) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("devtools-{test}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("dir");
+/// A profile directory, removed when dropped, with `port_file` written.
+fn profile(test: &str, port_file: Option<&str>) -> tempfile::TempDir {
+    let made = tempfile::Builder::new()
+        .prefix(&format!("devtools-{test}-"))
+        .tempdir();
+    let dir = made.expect("a scratch profile under the temp dir");
     if let Some(text) = port_file {
-        std::fs::write(dir.join("DevToolsActivePort"), text).expect("file");
+        std::fs::write(dir.path().join("DevToolsActivePort"), text).expect("file");
     }
     dir
 }
@@ -30,7 +32,7 @@ fn profile(test: &str, port_file: Option<&str>) -> std::path::PathBuf {
 #[test]
 fn the_port_is_read_once_both_lines_are_written() {
     let dir = profile("whole", Some("9222\n/devtools/browser/abc"));
-    assert_eq!(port(&dir, SHORT, &mut alive), Ok(9222));
+    assert_eq!(port(dir.path(), SHORT, &mut alive), Ok(9222));
 }
 
 #[test]
@@ -39,7 +41,7 @@ fn a_half_written_port_file_is_not_trusted_and_the_wait_fails_naming_it() {
     let dir = profile("half", Some("92"));
 
     // When
-    let refusal = port(&dir, SHORT, &mut alive).expect_err("not trusted");
+    let refusal = port(dir.path(), SHORT, &mut alive).expect_err("not trusted");
 
     // Then
     assert!(refusal.contains("DevToolsActivePort"), "{refusal}");
@@ -132,13 +134,13 @@ fn the_host_sent_carries_the_port_as_chromium_builds_its_urls_from_it() {
 fn a_port_file_that_cannot_be_read_or_parsed_is_refused_at_once() {
     // Given: a directory where the file should be, and a port that is not a number
     let unreadable = profile("unreadable", None);
-    std::fs::create_dir_all(unreadable.join("DevToolsActivePort")).expect("dir");
+    std::fs::create_dir_all(unreadable.path().join("DevToolsActivePort")).expect("dir");
     let garbled = profile("garbled", Some("abc\n/devtools/browser/x"));
 
     for (dir, needle) in [(unreadable, "DevToolsActivePort"), (garbled, "abc")] {
         // When
         let started = Instant::now();
-        let refusal = port(&dir, SHORT, &mut alive).expect_err(needle);
+        let refusal = port(dir.path(), SHORT, &mut alive).expect_err(needle);
 
         // Then: at once, not at the deadline
         assert!(started.elapsed() < SHORT / 2, "{:?}", started.elapsed());
@@ -152,7 +154,7 @@ fn a_chromium_that_has_exited_stops_the_wait_with_its_reason() {
     let dir = profile("exited", None);
 
     // When
-    let refusal = port(&dir, SHORT, &mut || {
+    let refusal = port(dir.path(), SHORT, &mut || {
         Err("chromium exited with status 1: bad flag".into())
     })
     .expect_err("exited");

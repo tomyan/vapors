@@ -4,12 +4,12 @@ use std::time::Duration;
 
 use super::*;
 
-use crate::lock_scratch::dir;
+use crate::scratch::lock_dir;
 
 #[test]
 fn a_test_s_lock_directory_is_removed_when_its_guard_drops() {
     // Given
-    let dir = dir("scratch");
+    let dir = lock_dir("scratch");
     let held = acquire(&dir, "/w/touche", Duration::from_millis(200)).expect("taken");
     let path = dir.to_path_buf();
     assert!(path.exists(), "the lock made it");
@@ -25,7 +25,7 @@ fn a_test_s_lock_directory_is_removed_when_its_guard_drops() {
 #[test]
 fn a_free_lock_is_taken_and_names_its_holder() {
     // Given
-    let dir = dir("free");
+    let dir = lock_dir("free");
 
     // When
     let held = acquire(&dir, "/w/touche", Duration::from_millis(200)).expect("taken");
@@ -43,7 +43,7 @@ fn a_free_lock_is_taken_and_names_its_holder() {
 #[test]
 fn a_held_lock_makes_the_next_gate_wait_then_fail_naming_the_holder() {
     // Given
-    let dir = dir("held");
+    let dir = lock_dir("held");
     let _first = acquire(&dir, "/w/first", Duration::from_millis(200)).expect("first");
 
     // When
@@ -59,7 +59,7 @@ fn a_held_lock_makes_the_next_gate_wait_then_fail_naming_the_holder() {
 #[test]
 fn a_released_lock_is_taken_by_the_next_gate() {
     // Given
-    let dir = dir("released");
+    let dir = lock_dir("released");
     let first = acquire(&dir, "/w/first", Duration::from_millis(200)).expect("first");
 
     // When

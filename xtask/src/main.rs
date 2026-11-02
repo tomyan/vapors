@@ -46,8 +46,6 @@ mod layers_graph;
 mod load;
 mod load_wait;
 mod lock_owner;
-#[cfg(test)]
-mod lock_scratch;
 mod pixels;
 mod precompress;
 mod priority;
@@ -82,6 +80,8 @@ mod report;
 #[path = "report_timeout_tests.rs"]
 mod report_timeout_tests;
 mod sccache;
+#[cfg(test)]
+mod scratch;
 mod screenshot;
 mod screenshot_package;
 mod serve;

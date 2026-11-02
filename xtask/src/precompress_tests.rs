@@ -2,9 +2,8 @@ use std::io::Read as _;
 
 use super::*;
 
-fn scratch(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("xtask-precompress-{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
+fn scratch(name: &str) -> crate::scratch::Scratch {
+    let dir = crate::scratch::dir(&format!("precompress-{name}"));
     std::fs::create_dir_all(dir.join("sub")).expect("dir");
     dir
 }

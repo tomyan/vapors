@@ -8,9 +8,8 @@ use super::*;
 use crate::serve_verify_rules::expect_for;
 
 /// A copy with index.html, a script it loads and two wasm files.
-fn copy(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("xtask-verify-{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
+fn copy(name: &str) -> crate::scratch::Scratch {
+    let dir = crate::scratch::dir(&format!("verify-{name}"));
     std::fs::create_dir_all(dir.join("worker")).expect("dir");
     std::fs::write(
         dir.join("index.html"),

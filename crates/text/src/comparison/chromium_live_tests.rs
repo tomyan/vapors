@@ -4,11 +4,11 @@ use std::time::{Duration, Instant};
 
 use super::*;
 
-fn dir(test: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("chromium-live-{test}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("dir");
-    dir
+fn dir(test: &str) -> tempfile::TempDir {
+    let made = tempfile::Builder::new()
+        .prefix(&format!("chromium-live-{test}-"))
+        .tempdir();
+    made.expect("a scratch directory under the temp dir")
 }
 
 /// A "browser" that says why on stderr and exits 3.
@@ -30,8 +30,9 @@ fn failing(dir: &Path) -> Chromium {
 #[test]
 fn a_chromium_that_exits_says_why_with_its_stderr() {
     // Given
-    let dir = dir("exits");
-    let mut live = failing(&dir)
+    let scratch = dir("exits");
+    let dir = scratch.path();
+    let mut live = failing(dir)
         .live(&dir.join("profile"), 400, 300, 1)
         .expect("starts");
 
@@ -56,7 +57,8 @@ fn a_chromium_that_exits_says_why_with_its_stderr() {
 #[test]
 fn a_profile_with_contents_is_refused() {
     // Given
-    let dir = dir("used");
+    let scratch = dir("used");
+    let dir = scratch.path();
     let profile = dir.join("profile");
     std::fs::create_dir_all(&profile).expect("profile");
     std::fs::write(
@@ -66,7 +68,7 @@ fn a_profile_with_contents_is_refused() {
     .expect("stale");
 
     // When
-    let refusal = failing(&dir)
+    let refusal = failing(dir)
         .live(&profile, 400, 300, 1)
         .map(|_| ())
         .expect_err("refused");
