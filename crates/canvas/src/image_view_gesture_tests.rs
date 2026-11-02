@@ -108,3 +108,28 @@ fn a_finger_that_starts_while_listed_down_lost_its_end_and_decides_afresh() {
     assert_eq!([landed, panned], [Answered::Done; 2]);
     assert_eq!(view.transform().translate[0], fitted.translate[0] - 30.0);
 }
+
+#[test]
+fn a_drag_held_across_the_window_losing_focus_pans_nothing_after() {
+    // Given: a press in the area
+    let mut view = panel_right();
+    view.event(&Event::PointerMoved {
+        x: IN_AREA[0],
+        y: IN_AREA[1],
+    });
+    view.event(&Event::PrimaryButton {
+        pressed: true,
+        clicks: NonZeroU32::MIN,
+        modifiers: Modifiers::default(),
+    });
+    let before = view.transform();
+
+    // When: the window lost and back, then a move
+    view.event(&Event::WindowFocus { focused: false });
+    view.event(&Event::WindowFocus { focused: true });
+    view.event(&Event::PointerMoved { x: 50.0, y: 200.0 });
+    view.event(&Event::PointerMoved { x: 20.0, y: 200.0 });
+
+    // Then
+    assert_eq!(view.transform(), before);
+}

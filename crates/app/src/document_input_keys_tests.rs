@@ -95,7 +95,7 @@ fn code_of(name: &str) -> String {
     }
 }
 
-fn key(name: &str, modifiers: Modifiers) -> Event {
+pub(super) fn key(name: &str, modifiers: Modifiers) -> Event {
     Event::Key {
         key: name.into(),
         code: code_of(name),

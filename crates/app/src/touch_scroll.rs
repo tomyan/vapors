@@ -61,6 +61,14 @@ impl TouchScroll {
         }
     }
 
+    /// Every finger was taken away at once (the window lost focus).
+    pub(crate) fn forget(&mut self) {
+        *self = Self {
+            touching: self.touching,
+            ..Self::default()
+        };
+    }
+
     /// The mouse moved or scrolled: thumbs show again.
     pub(crate) fn mouse(&mut self) {
         self.touching = false;

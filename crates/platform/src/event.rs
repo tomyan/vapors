@@ -66,6 +66,11 @@ pub enum Event {
     /// [`crate::Clipboard`]). Desktop only; a web page has its own paste
     /// event.
     Paste,
+    /// The window lost or regained focus (`Document::window_focus`).
+    WindowFocus {
+        /// Whether the window now has focus.
+        focused: bool,
+    },
     /// The page's text input was edited (the web's hidden textarea,
     /// typing and an IME's composing alike): its whole state after the
     /// edit, and the text it was made against.

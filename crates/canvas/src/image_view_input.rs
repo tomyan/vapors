@@ -60,12 +60,15 @@ impl ImageView {
             Event::Pan { dx, dy } => return self.panned(*dx, *dy),
             Event::DoubleTap { x, y } => return self.double_tapped([*x, *y]),
             Event::Character(text) => self.key(text),
+            // the releases of what is held happen outside and never come
+            Event::WindowFocus { focused: false } => self.steering = Steering::default(),
             Event::Key { .. }
             | Event::Tap { .. }
             | Event::OpenRequested
             | Event::Paste
             | Event::TextEdited { .. }
             | Event::PastedText(_)
+            | Event::WindowFocus { focused: true }
             | Event::FileOpened { .. } => {}
         }
         Answered::Done

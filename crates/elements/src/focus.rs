@@ -63,6 +63,12 @@ impl Document {
         if had == node {
             return;
         }
+        // while the window is away focus moves silently; its return
+        // fires `focus` on what has it then (`focus_window.rs`)
+        if document.borrow().window_away() {
+            document.borrow_mut().take_focus(node);
+            return;
+        }
         // a number or text field commits as focus leaves it, before its
         // blur, as Chromium fires its change (3-E3c, E6a)
         if let Some(had) = had {
@@ -163,7 +169,7 @@ impl Document {
 
 /// `names` on `node` in order: the first only there (it does not bubble),
 /// the second bubbling.
-fn fire(document: &Rc<RefCell<Document>>, node: NodeId, names: &[&str; 2]) {
+pub(crate) fn fire(document: &Rc<RefCell<Document>>, node: NodeId, names: &[&str; 2]) {
     crate::events::tree::dispatch_here(document, node, Event::new(names[0]));
     crate::events::tree::dispatch_bubbling(document, node, Event::new(names[1]));
 }
