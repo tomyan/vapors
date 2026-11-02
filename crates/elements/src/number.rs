@@ -3,10 +3,13 @@
 //! what the user typed or a signal set. The DOM's `value` is the text
 //! when it is a valid floating-point number, else empty; a field whose
 //! text is not a number, or is a number outside the range, is
-//! `:invalid`. On commit (Enter, blur) a number outside the range is
-//! clamped into it and text that is no number reverts to the last
+//! `:invalid`, with `rangeUnderflow` or `rangeOverflow`. On commit
+//! (Enter, blur) a number outside the range is kept as typed, as
+//! Chromium keeps it; text that is no number reverts to the last
 //! committed value, vapors' own rule (Chromium keeps the text): a
-//! `change` always carries a number.
+//! `change` always carries a number. A step comes back inside the
+//! range, and does nothing when it would move further out (HTML's
+//! `stepUp` and `stepDown`).
 
 use std::collections::BTreeMap;
 
@@ -76,19 +79,68 @@ impl Field {
         self.max.map_or(low, |max| low.min(max))
     }
 
-    /// The number the text commits to: a number clamped into the range;
-    /// `None` for text that is no number, which reverts.
+    /// The number the text commits to, in the range or not; `None` for
+    /// text that is no number, which reverts.
     pub(crate) fn committed(&self) -> Option<f64> {
-        self.number().map(|n| self.clamped(n))
+        self.number()
+    }
+
+    /// Whether the text is a number below `min`.
+    pub(crate) fn range_underflow(&self) -> bool {
+        matches!((self.number(), self.min), (Some(n), Some(min)) if n < min)
+    }
+
+    /// Whether the text is a number above `max`.
+    pub(crate) fn range_overflow(&self) -> bool {
+        matches!((self.number(), self.max), (Some(n), Some(max)) if n > max)
     }
 
     /// The number `steps` steps from the current one (from `fallback`
-    /// when the text is no number), clamped; one step is the `step`, or
-    /// 1 for `step="any"`.
+    /// when the text is no number); see [`Field::step_from`].
     pub(crate) fn stepped(&self, steps: f64, fallback: f64) -> f64 {
-        let from = self.number().unwrap_or(fallback);
+        self.step_from(self.number().unwrap_or(fallback), steps)
+    }
+
+    /// The number `steps` steps from `from`, one step being the `step`,
+    /// or 1 for `step="any"`, as HTML's `stepUp` and `stepDown` and
+    /// Chromium's keyboard step: inside the range, the result stays on
+    /// the steps and at most the last one under `max`, and never moves
+    /// against its direction; outside it, a step further out leaves
+    /// `from`, and a step back goes to the bound.
+    pub(crate) fn step_from(&self, from: f64, steps: f64) -> f64 {
+        if let Some(outside) = self.step_outside(from, steps) {
+            return outside;
+        }
         let step = self.step.unwrap_or(1.0);
-        self.clamped(aligned(from + steps * step, Some(step), from))
+        let to = aligned(from + steps * step, Some(step), from);
+        let to = self.clamped(self.on_steps_under_max(to));
+        // the last step under the max can lie below `from`: a step never
+        // moves against its direction, as HTML's stepUp and Chromium
+        if (to - from) * steps < 0.0 { from } else { to }
+    }
+
+    /// From outside the range, or with no step to take: where it goes.
+    fn step_outside(&self, from: f64, steps: f64) -> Option<f64> {
+        match (self.min, self.max) {
+            _ if steps == 0.0 => Some(from),
+            (_, Some(max)) if from > max => Some(if steps > 0.0 { from } else { max }),
+            (Some(min), _) if from < min => Some(if steps < 0.0 { from } else { min }),
+            _ => None,
+        }
+    }
+
+    /// `to`, or when it is over `max`, the last step at or under `max`,
+    /// counting steps from `min` (else 0).
+    fn on_steps_under_max(&self, to: f64) -> f64 {
+        let (Some(max), Some(step)) = (self.max, self.step) else {
+            return to;
+        };
+        if to <= max {
+            return to;
+        }
+        let base = self.min.unwrap_or(0.0);
+        let steps = ((max - base) / step + 1e-9).floor();
+        aligned(base + steps * step, Some(step), base)
     }
 }
 

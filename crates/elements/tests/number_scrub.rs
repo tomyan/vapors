@@ -112,3 +112,42 @@ fn a_finger_along_the_field_scrubs_and_one_across_is_the_pans() {
         ["scrub input \"55\" 55", "scrub change \"55\" 55"]
     );
 }
+
+/// The page with `scrub` holding 150, over its max of 100.
+fn scrub_over_the_max() -> support::number_page::Page {
+    let page = page();
+    page.doc
+        .borrow_mut()
+        .set_attribute(page.scrub, "value", "150");
+    page.doc
+        .borrow_mut()
+        .update(support::viewport(400.0, 100.0))
+        .expect("updates");
+    page
+}
+
+#[test]
+fn a_scrub_from_over_the_max_further_out_leaves_it_and_back_goes_to_the_max() {
+    // Given
+    let (further, back) = (scrub_over_the_max(), scrub_over_the_max());
+
+    // When: 10 px right (up) on one, 10 px left (down) on the other
+    Document::pointer_pressed(&further.doc, [50.0, 36.0]);
+    Document::pointer_moved(&further.doc, [60.0, 36.0]);
+    Document::pointer_released(&further.doc, [60.0, 36.0]);
+    Document::pointer_pressed(&back.doc, [50.0, 36.0]);
+    Document::pointer_moved(&back.doc, [40.0, 36.0]);
+    Document::pointer_released(&back.doc, [40.0, 36.0]);
+
+    // Then
+    assert!(
+        further.log.borrow().is_empty(),
+        "{:?}",
+        further.log.borrow()
+    );
+    assert_eq!(value(&further, further.scrub), "150");
+    assert_eq!(
+        *back.log.borrow(),
+        ["scrub input \"100\" 100", "scrub change \"100\" 100"]
+    );
+}

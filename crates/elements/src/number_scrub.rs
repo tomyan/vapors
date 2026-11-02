@@ -107,12 +107,8 @@ fn step_to(document: &Rc<RefCell<Document>>, id: u32, scrub: Scrub, steps: f64) 
     let Some(field) = document.borrow().number_field(scrub.node) else {
         return;
     };
-    let step = field.step.unwrap_or(1.0);
-    let value = field.clamped(crate::range::aligned(
-        scrub.base + steps * step,
-        Some(step),
-        scrub.base,
-    ));
+    // the arrow keys' rule: from outside the range, further out stays
+    let value = field.step_from(scrub.base, steps);
     let changed = document
         .borrow_mut()
         .set_number_text(scrub.node, written(value));

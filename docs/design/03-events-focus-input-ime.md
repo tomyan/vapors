@@ -185,7 +185,7 @@ user-agent behaviour and an implicit ARIA role (area 5).
 |---|---|---|---|---|
 | `button` | Press shows `:active`; `click` on release over the common ancestor | Enter and Space activate (Space on keyup, as browsers do) | `click` | Built, plus keyboard |
 | `input type=range` | Press anywhere on the track sets the value and captures; drag changes it; `step` snaps | Arrow keys by `step`, Page keys by a tenth of the range, Home and End; Shift for ten steps | `input` on every change, `change` on release | Scrub to change, `value_as_number`. The thumb and track are UA parts styled through prefixed custom properties the UA sheet reads (`--vapors-thumb-size`, `--vapors-thumb-color`, `--vapors-track-height`, `--vapors-track-color`), so tokens apply; `::part()` comes later (Q1, decided 2026-10-25) |
-| `input type=number` | Click focuses; drag on the field scrubs when `data-scrub` says so (touché's readout behaviour) | Digits, arrows by `step`, Enter commits | `input`, `change` | A value outside `min`..`max` is `:invalid` while typed and clamped on commit |
+| `input type=number` | Click focuses; drag on the field scrubs when `data-scrub` says so (touché's readout behaviour) | Digits, arrows by `step`, Enter commits | `input`, `change` | A value outside `min`..`max` is `:invalid` and kept on commit, as Chromium keeps it; `Document::range_validity` says under or over |
 | `input type=checkbox`, `type=radio`, `switch` role | Click toggles | Space toggles; arrows move within a radio group | `input`, `change` with `checked` | `bind:checked` exists |
 | `select` | Opens a listbox popover (area 3 owns the popover primitive) | Arrows, type-ahead, Enter, Escape | `change` | Deferred until touché has one; the model choice uses it |
 | `input type=text`, `textarea` | Click places the caret; drag selects; double click selects a word | The editing model below | `beforeinput`, `input`, `change`, `selectionchange` | |
@@ -293,11 +293,19 @@ Two differences from the web, decided with the lead (2026-10-27):
 Svelte's and the web's bindings do, so the app's `Signal<f64>` never
 takes NaN mid-typing; pinned by `codegen_bind.rs:
 bind_value_on_a_number_input_binds_a_number_on_change`. (2) On commit
-a number outside `min`..`max` is clamped into it and text that is no
-number, an emptied field included, reverts to the last committed
-number, where Chromium keeps the text (and `""`) and matches `:invalid`
-after the commit too; pinned by `tests/number_input.rs:
-enter_commits_an_out_of_range_number_clamped_with_one_change`,
+a number outside `min`..`max` is kept as typed, as Chromium keeps it
+(the corpus's `number.events`), and the app refuses or accepts it;
+over the max a step up does nothing and a step down goes to the max
+itself (under the min, the mirror), as HTML's `stepUp` and `stepDown`
+and Chromium's keyboard step; a step inside the range stops at the last
+step at or under the max; a scrub follows the same rule. A host that
+refuses a committed number puts its own back with
+`Document::set_committed_number`, so the same number typed again fires
+`change` again (`tests/number_host.rs`). Text that is no number, an emptied
+field included, reverts to the last committed number, where Chromium
+keeps the text (and `""`) and matches `:invalid` after the commit too;
+pinned by `tests/number_input.rs:
+enter_commits_an_out_of_range_number_as_typed_with_one_change`,
 `text_that_is_no_number_has_an_empty_value_and_no_number_until_committed`
 and `invalid_matches_while_the_text_is_no_number_or_out_of_range`. With `data-scrub`, a drag along the field steps the number
 by one `step` per 2 CSS px (`data-scrub="4"`: per 4 px), `input` per
