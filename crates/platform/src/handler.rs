@@ -29,6 +29,9 @@ pub struct Handler {
     error: Option<PlatformError>,
     /// Set when a lost device stopped the loop; see `stop_if_lost`.
     stopped_for_loss: bool,
+    /// The page's text input, once the window is open (the web).
+    #[cfg(target_family = "wasm")]
+    text_bridge: Option<crate::text_bridge_web::TextBridge>,
 }
 
 /// Consecutive redraws without a texture before giving up: a second at
@@ -50,6 +53,8 @@ impl Handler {
             missed: 0,
             error: None,
             stopped_for_loss: false,
+            #[cfg(target_family = "wasm")]
+            text_bridge: None,
         }
     }
 
@@ -71,6 +76,11 @@ impl Handler {
             self.platform.lost_state(),
         );
         self.window = Some(window);
+        #[cfg(target_family = "wasm")]
+        {
+            let proxy = self.platform.proxy();
+            self.text_bridge = Some(crate::text_bridge_web::TextBridge::new(&proxy)?);
+        }
         Ok(())
     }
 
@@ -108,7 +118,8 @@ impl Handler {
     }
 
     /// Carries out what the app asked for while it handled the events
-    /// just delivered: a frame, and a cursor.
+    /// just delivered or the frame just drawn: a frame, a cursor, and
+    /// the text field the page's text input mirrors.
     fn redraw_if_asked(&self) {
         let Some(window) = &self.window else { return };
         if self.platform.take_redraw_request() {
@@ -116,6 +127,9 @@ impl Handler {
         }
         if let Some(cursor) = self.platform.take_cursor() {
             crate::cursor::apply(window, cursor);
+        }
+        if let Some(field) = self.platform.take_text_field() {
+            self.mirror(field.as_ref());
         }
     }
 
@@ -175,6 +189,8 @@ impl Handler {
         let next = self.app.frame(&frame);
         gpu.queue.present(surface_texture);
         self.presented += 1;
+        self.app.drawn(&self.platform);
+        self.redraw_if_asked();
         match next {
             Next::Continue => window.request_redraw(),
             Next::Wait => {}
@@ -185,3 +201,19 @@ impl Handler {
 
 #[path = "handler_events.rs"]
 mod events;
+
+impl Handler {
+    /// The page's text input mirrors `field` (the web). Natively the
+    /// field is not used yet: the system IME's candidate area is native
+    /// IME's slice.
+    // natively `self` is not used yet; the web's bridge is on it
+    #[cfg_attr(not(target_family = "wasm"), allow(clippy::unused_self))]
+    fn mirror(&self, field: Option<&crate::TextField>) {
+        #[cfg(target_family = "wasm")]
+        if let Some(bridge) = &self.text_bridge {
+            bridge.mirror(field);
+        }
+        #[cfg(not(target_family = "wasm"))]
+        let _ = field;
+    }
+}

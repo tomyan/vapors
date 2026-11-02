@@ -20,6 +20,7 @@ mod cursor;
 mod device_lost;
 mod error;
 mod event;
+mod event_winit;
 mod file_kind;
 mod gestures;
 mod handler;
@@ -38,6 +39,10 @@ mod report;
 mod surface;
 mod surface_texture;
 mod tasks;
+#[cfg(target_family = "wasm")]
+mod text_bridge_web;
+mod text_field;
+mod text_keys;
 mod waker;
 #[cfg(target_family = "wasm")]
 mod web;
@@ -60,6 +65,7 @@ pub use paste_key::paste_shortcut;
 pub use platform::Platform;
 pub use report::{report_error, report_startup, report_status};
 pub use surface::pick_format;
+pub use text_field::TextField;
 pub use waker::{LoopClosed, Waker};
 pub use window::{App, Frame, Next, WindowOptions, run};
 

@@ -32,6 +32,8 @@ pub(crate) struct Editor {
     style: Option<TextStyle>,
     /// The field's own undo and redo (E6b).
     pub(crate) history: crate::text_history::History,
+    /// The bytes an IME is composing, underlined (E6, the web's input).
+    pub(crate) composing: Option<std::ops::Range<usize>>,
 }
 
 /// The editors, by field.
@@ -95,6 +97,7 @@ impl Document {
                     pending: false,
                     style: None,
                     history: crate::text_history::History::default(),
+                    composing: None,
                 },
             );
         }
