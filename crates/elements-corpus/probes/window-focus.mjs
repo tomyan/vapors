@@ -13,7 +13,7 @@
 //
 // pinned on vapors by crates/elements/tests/focus_window.rs.
 import { spawn } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -68,4 +68,7 @@ for (const field of ['a', 't']) {
   await settle();
 }
 chrome.kill();
+await new Promise((exited) => chrome.on('exit', exited));
+// the profile is a Chromium user-data directory, tens of MB: gone with the run
+rmSync(profile, { recursive: true, force: true });
 process.exit(0);
