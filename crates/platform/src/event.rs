@@ -45,6 +45,11 @@ pub enum Event {
         /// The key as the DOM names it: the layout's character (`"a"`),
         /// or a named key's DOM name (`"Tab"`, `"Enter"`, `" "` for Space).
         key: String,
+        /// The key's place on the keyboard, as the DOM's
+        /// `KeyboardEvent.code` names it (`"KeyH"`, `"Digit1"`,
+        /// `"ShiftLeft"`): the same for a key's down and up whatever the
+        /// modifiers do to `key` in between.
+        code: String,
         /// True when it went down.
         pressed: bool,
         /// An auto-repeat of a held key.

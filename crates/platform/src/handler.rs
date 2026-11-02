@@ -86,7 +86,7 @@ impl Handler {
 
     fn gpu_ready(&mut self, gpu: Gpu) {
         let limits = gpu.limits();
-        crate::report::report_status(&format!(
+        crate::report::report_startup(&format!(
             "adapter: {}; max texture {} px, max buffer {} MiB",
             gpu.adapter_summary(),
             limits.max_texture_dimension_2d,

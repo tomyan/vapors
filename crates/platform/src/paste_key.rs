@@ -8,7 +8,9 @@
 //! (`ElementsApp`, E6b).
 
 use winit::event::ElementState;
-use winit::keyboard::{Key, KeyCode, ModifiersState, PhysicalKey};
+use winit::keyboard::{Key, ModifiersState, PhysicalKey};
+
+use crate::event::{Event, Modifiers};
 
 /// One key event's facts that decide a paste.
 pub struct Press<'a> {
@@ -27,27 +29,65 @@ pub struct Press<'a> {
 }
 
 /// Whether `press` is a paste on a platform whose shortcut modifier is
-/// Command (`mac`) or Control.
+/// Command (`mac`) or Control: the press as the DOM names it, through
+/// [`paste_shortcut`], the one rule.
 pub fn is_paste(press: &Press<'_>, mac: bool) -> bool {
-    let shortcut = if mac {
-        ModifiersState::SUPER
-    } else {
-        ModifiersState::CONTROL
+    let Event::Key {
+        key,
+        code,
+        modifiers,
+        ..
+    } = crate::key_event::key_event(
+        press.logical,
+        press.physical,
+        press.state,
+        press.repeat,
+        press.modifiers,
+    )
+    else {
+        unreachable!("key_event makes a key")
     };
     press.state == ElementState::Pressed
-        && !press.repeat
-        && press.modifiers == shortcut
-        && is_v(press)
+        && paste_shortcut(&key, &code, modifiers, press.repeat, mac)
 }
 
-fn is_v(press: &Press<'_>) -> bool {
-    match press.logical {
-        // A Latin letter; a control character ("\u{16}", which Ctrl+V can
-        // produce) or another script falls to the physical key.
-        Key::Character(text) if text.chars().all(|c| c.is_ascii_alphabetic()) => {
-            text.eq_ignore_ascii_case("v")
+/// Whether a key going down, as the DOM names it, is the paste shortcut:
+/// V with Command on macOS (`mac`), with Control elsewhere, and nothing
+/// else held; a first press, not a repeat. V is `key` on a Latin layout
+/// (Dvorak's V is where it says), else the key at the V place (`code`
+/// `KeyV`: on a Cyrillic layout `key` is "м"). The platform makes
+/// `Event::Paste` by this rule, and an app asks it whether a key-down is
+/// the paste that follows.
+#[must_use]
+pub fn paste_shortcut(
+    key: &str,
+    code: &str,
+    modifiers: Modifiers,
+    repeat: bool,
+    mac: bool,
+) -> bool {
+    let shortcut = if mac {
+        Modifiers {
+            meta: true,
+            ..Modifiers::default()
         }
-        _ => press.physical == PhysicalKey::Code(KeyCode::KeyV),
+    } else {
+        Modifiers {
+            control: true,
+            ..Modifiers::default()
+        }
+    };
+    !repeat && modifiers == shortcut && is_v(key, code)
+}
+
+fn is_v(key: &str, code: &str) -> bool {
+    // A single Latin letter; a control character ("\u{16}", which Ctrl+V
+    // can produce), another script, or a named or dead key
+    // ("Unidentified", "Dead") falls to the physical key.
+    let mut chars = key.chars();
+    match (chars.next(), chars.next()) {
+        (Some(c), None) if c.is_ascii_alphabetic() => c.eq_ignore_ascii_case(&'v'),
+        _ => code == "KeyV",
     }
 }
 

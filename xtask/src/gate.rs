@@ -38,6 +38,9 @@ pub fn run(reporter: &Reporter) -> ExitCode {
         Ok(held) => held,
         Err(why) => return refuse(&why),
     };
+    if let Err(why) = crate::load_wait::before("gate") {
+        return refuse(&why);
+    }
     let prepared = Config::load()
         .map_err(|e| e.to_string())
         .and_then(|config| prepare(&config));
