@@ -14,16 +14,20 @@
 pub mod blocks;
 mod dispatcher;
 mod event;
+mod event_pointer;
 mod listener;
 mod listener_result;
+mod modifiers;
 pub mod recording;
 mod roots;
 mod snippet;
 
 pub use dispatcher::{DispatchRefused, Dispatcher, Listeners, run_along};
-pub use event::{Capture, Event, Pointer};
+pub use event::Event;
+pub use event_pointer::{Capture, Pointer};
 pub use listener::{Handler, Listener};
 pub use listener_result::{ListenerResult, handle, handle_without_event, set_error_report};
+pub use modifiers::Modifiers;
 pub use roots::{BlockNodes, Root, current_nodes};
 pub use snippet::{Args, DynDom, Renderable, Snippet};
 

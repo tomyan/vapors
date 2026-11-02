@@ -71,7 +71,9 @@ Failure handling:
 - `listen` for an event name the document never fires is refused the
   same way. F2c fires `click`, `pointerdown`, `pointerup`,
   `pointermove`, `pointerenter` and `pointerleave`. Otherwise
-  `onmouseover` would compile and silently never run.
+  `onmouseover` would compile and silently never run. Later slices add
+  to the list, which `FIRED` in `crates/elements/src/tags.rs` holds;
+  `dblclick`, after the second click or tap in a row, is one.
 
 `Document::update(env) -> Result<(), Vec<ElementError>>` runs restyle,
 then layout, then paint. `ElementsApp` reports any error with

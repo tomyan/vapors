@@ -62,6 +62,7 @@ fn an_event_lands_at_the_scale_of_the_documents_last_update() {
     let press = Event::PrimaryButton {
         pressed: true,
         clicks: std::num::NonZeroU32::MIN,
+        modifiers: vapors_platform::Modifiers::default(),
     };
     assert_eq!(input.at(&document.borrow(), &press), Ok(Some([20.0, 10.0])));
     assert_eq!(input.at(&document.borrow(), &Event::PointerLeft), Ok(None));
@@ -83,6 +84,7 @@ fn a_press_and_release_on_the_button_clicks_it() {
             &Event::PrimaryButton {
                 pressed: true,
                 clicks: std::num::NonZeroU32::MIN,
+                modifiers: vapors_platform::Modifiers::default(),
             },
             &platform(),
         )
@@ -93,6 +95,7 @@ fn a_press_and_release_on_the_button_clicks_it() {
             &Event::PrimaryButton {
                 pressed: false,
                 clicks: std::num::NonZeroU32::MIN,
+                modifiers: vapors_platform::Modifiers::default(),
             },
             &platform(),
         )

@@ -44,10 +44,12 @@ pub fn click_at(app: &mut ElementsApp, platform: &Platform, [x, y]: [f32; 2]) {
         Event::PrimaryButton {
             pressed: true,
             clicks: std::num::NonZeroU32::MIN,
+            modifiers: vapors_platform::Modifiers::default(),
         },
         Event::PrimaryButton {
             pressed: false,
             clicks: std::num::NonZeroU32::MIN,
+            modifiers: vapors_platform::Modifiers::default(),
         },
     ] {
         app.event(event, platform);

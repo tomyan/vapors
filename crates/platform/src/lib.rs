@@ -25,6 +25,7 @@ mod file_kind;
 mod gestures;
 mod handler;
 mod input;
+mod input_keys;
 mod key_event;
 #[cfg(not(target_family = "wasm"))]
 mod log_forward;

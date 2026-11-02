@@ -28,6 +28,9 @@ pub enum Event {
         /// the platform (`clicks`) and carried on the press, so nothing
         /// waits for it; a release carries its press's.
         clicks: std::num::NonZeroU32,
+        /// The modifier keys held, as the platform tracks them, for an
+        /// Alt-click or a Shift-click.
+        modifiers: Modifiers,
     },
     /// The wheel or trackpad scrolled, in CSS pixels (not physical, unlike
     /// positions), signed as the DOM's `deltaX` and `deltaY`: positive
@@ -114,9 +117,17 @@ pub enum Event {
         x: f32,
         /// Y in pixels where the finger lifted.
         y: f32,
+        /// Its place in a run of taps, each within 300 ms and 30 px of
+        /// the last: 1, 2, 3, then 1 again, as desktop headless Chromium
+        /// 155 counts CDP touch taps (of five quick taps the 2nd and the
+        /// 5th send `dblclick`; the elements corpus's `clicks.events`).
+        /// A document's `dblclick` follows it.
+        clicks: std::num::NonZeroU32,
     },
-    /// A second tap within 300 ms and 30 px of the first. Sent after
-    /// that tap's own [`Event::Tap`].
+    /// A photo's double tap: every second quick tap, each within 300 ms
+    /// and 30 px of the last, so tap-tap toggles and tap-tap again
+    /// toggles back, as photo apps pair taps; not the DOM's count (the
+    /// lead, review-v100 R2). Sent after that tap's own [`Event::Tap`].
     DoubleTap {
         /// X in pixels where the second finger lifted.
         x: f32,
@@ -157,7 +168,7 @@ pub enum TouchPhase {
 /// moved by 120 per notch.
 pub const LINE_PIXELS: f32 = 120.0;
 
-/// The modifier keys held with a key.
+/// The modifier keys held with a key or a button.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[allow(clippy::struct_excessive_bools)] // the DOM's shiftKey, ctrlKey, altKey and metaKey, one each
 pub struct Modifiers {

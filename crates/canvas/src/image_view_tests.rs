@@ -57,6 +57,7 @@ fn a_drag_does_not_pan_on_the_first_pointer_position() {
     view.event(&Event::PrimaryButton {
         pressed: true,
         clicks: std::num::NonZeroU32::MIN,
+        modifiers: vapors_platform::Modifiers::default(),
     });
 
     // When
@@ -146,6 +147,7 @@ fn primary_button_drag_pans_and_release_stops_it() {
     view.event(&Event::PrimaryButton {
         pressed: true,
         clicks: std::num::NonZeroU32::MIN,
+        modifiers: vapors_platform::Modifiers::default(),
     });
 
     // When
@@ -153,6 +155,7 @@ fn primary_button_drag_pans_and_release_stops_it() {
     view.event(&Event::PrimaryButton {
         pressed: false,
         clicks: std::num::NonZeroU32::MIN,
+        modifiers: vapors_platform::Modifiers::default(),
     });
     view.event(&Event::PointerMoved { x: 200.0, y: 200.0 });
 

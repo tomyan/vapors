@@ -13,19 +13,7 @@ use vapors_dom::{Event, NodeId};
 use crate::document::Document;
 use crate::events::tree::dispatch_bubbling;
 
-/// The modifier keys held with a key.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-#[allow(clippy::struct_excessive_bools)] // the DOM's shiftKey, ctrlKey, altKey and metaKey, one each
-pub struct Modifiers {
-    /// Shift.
-    pub shift: bool,
-    /// Control.
-    pub control: bool,
-    /// Alt (Option on macOS).
-    pub alt: bool,
-    /// Meta: Command on macOS, the Windows or Super key elsewhere.
-    pub meta: bool,
-}
+pub use vapors_dom::Modifiers;
 
 /// Whether `key` types text into a field: a single printable character
 /// with neither Control nor Meta (its text then arrives as a character).
