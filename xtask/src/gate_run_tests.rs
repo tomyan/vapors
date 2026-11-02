@@ -20,7 +20,7 @@ fn planned(run: &str) -> PlannedStep {
 }
 
 #[test]
-fn a_gate_step_is_bash_with_pipefail_and_reproduces_with_its_environment() {
+fn a_gate_step_is_bash_with_pipefail_without_a_gpu_device_and_reproduces_with_its_environment() {
     // When
     let step = step_for(&planned("cargo xtask test --tier gpu"), Path::new("/t/out"));
 
@@ -28,7 +28,7 @@ fn a_gate_step_is_bash_with_pipefail_and_reproduces_with_its_environment() {
     assert_eq!(step.name, "gpu: gpu tier");
     assert_eq!(
         step.reproduce(),
-        "CI=true VAPORS_GPU_ADAPTER=llvmpipe GITHUB_OUTPUT=/t/out bash -eo pipefail -c 'cargo xtask test --tier gpu'"
+        "CI=true VAPORS_GPU_ADAPTER=llvmpipe GITHUB_OUTPUT=/t/out bwrap --dev-bind / / --tmpfs /dev/dri --die-with-parent bash -eo pipefail -c 'cargo xtask test --tier gpu'"
     );
 }
 

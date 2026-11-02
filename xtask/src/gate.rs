@@ -78,6 +78,7 @@ fn prepare(config: &Config) -> Result<(Vec<PlannedStep>, State, Pinned, PathBuf)
     let siblings: Pinned = config.entries_under("gate.pinned.").into_iter().collect();
     let before = state(&siblings)?;
     refuse_dirty(&before)?;
+    crate::gate_run::check_sandbox()?;
     let twin = config.get(crate::gate_twin::KEY).map(std::path::Path::new);
     println!(
         "{}",

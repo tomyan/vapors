@@ -2,7 +2,8 @@
 //! each step killed at its deadline. A job's `timeout-minutes` bounds
 //! its steps together, from when its first step starts; a step's own
 //! `timeout-minutes` bounds it alone. Every step gets `GITHUB_OUTPUT`,
-//! a file under target/, as CI gives one. Each step's line is followed
+//! a file under target/, as CI gives one, and runs with `/dev/dri`
+//! hidden, as on CI (`gate_sandbox.rs`). Each step's line is followed
 //! by the machine's load at its start and end.
 
 use std::path::Path;
@@ -13,6 +14,10 @@ use crate::command;
 use crate::gate_plan::PlannedStep;
 use crate::report::Reporter;
 use crate::steps::Step;
+
+#[path = "gate_sandbox.rs"]
+mod sandbox;
+pub use sandbox::check as check_sandbox;
 
 /// Run `planned`; `output` is the `GITHUB_OUTPUT` file.
 pub fn run(planned: &[PlannedStep], output: &Path, reporter: &Reporter) -> ExitCode {
@@ -54,10 +59,12 @@ pub fn deadline(planned: &PlannedStep, spent: Duration) -> Duration {
 /// A step running `planned`'s script as CI does.
 #[must_use]
 pub fn step_for(planned: &PlannedStep, output: &Path) -> Step {
+    let mut args = sandbox::HIDE_GPU_DEVICE.to_vec();
+    args.extend(["bash", "-eo", "pipefail", "-c", &planned.run]);
     let mut step = Step::new(
         &planned.name,
-        "bash",
-        &["-eo", "pipefail", "-c", &planned.run],
+        "bwrap",
+        &args,
         "fix it, then rerun `cargo xtask gate`",
     );
     step.env = planned.env.clone().into_iter().collect();
