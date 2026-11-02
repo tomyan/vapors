@@ -97,7 +97,7 @@ fn display(value: &Value) -> Result<Display, String> {
         "block" | "inline" => Ok(Display::Block),
         "flex" => Ok(Display::Flex),
         "none" => Ok(Display::None),
-        "grid" => super::grid_gate::grid(),
+        "grid" => super::grid_gate::grid("grid"),
         "inline-block" | "inline-flex" | "inline-grid" => Err(
             "an atomic inline (inline-block, inline-flex, inline-grid) is laid out only as a flex or grid item; not scheduled in docs/F2c.md otherwise".to_owned(),
         ),
@@ -110,7 +110,7 @@ fn blockified(value: &Value) -> Result<Display, String> {
     match keyword(value)? {
         "inline" | "inline-block" => Ok(Display::Block),
         "inline-flex" => Ok(Display::Flex),
-        "inline-grid" => super::grid_gate::grid(),
+        "inline-grid" => super::grid_gate::grid("inline-grid"),
         _ => display(value),
     }
 }

@@ -22,12 +22,15 @@ fn refused(css: &str) -> Vec<String> {
 fn display_grid_is_refused_naming_the_feature() {
     // inline-grid as a flex item, which blockifies it to grid
     let blockified = "body { display: flex; } .box { display: inline-grid; }";
-    for css in [".box { display: grid; }", blockified] {
+    for (css, written) in [
+        (".box { display: grid; }", "`display: grid`"),
+        (blockified, "`display: inline-grid`"),
+    ] {
         let errors = refused(css);
         assert!(
             errors
                 .iter()
-                .any(|e| e.contains("display") && e.contains("`grid` feature")),
+                .any(|e| e.contains(written) && e.contains("`grid` feature")),
             "{css}: {errors:?}"
         );
     }
@@ -40,6 +43,17 @@ fn a_grid_property_is_refused_naming_the_feature() {
         errors
             .iter()
             .any(|e| e.contains("grid-template-columns") && e.contains("`grid` feature")),
+        "{errors:?}"
+    );
+}
+
+#[test]
+fn justify_self_is_refused_as_grid_only() {
+    let errors = refused(".box { justify-self: center; }");
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("justify-self") && e.contains("grid-only")),
         "{errors:?}"
     );
 }

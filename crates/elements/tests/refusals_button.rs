@@ -63,6 +63,7 @@ fn disabled_false_on_an_element_where_disabled_does_nothing_is_not_refused() {
 }
 
 #[test]
+#[cfg(feature = "grid")]
 fn a_button_in_a_grid_container_is_blockified_and_laid_out() {
     // Given: a grid item, which CSS Display 3 section 2.7 blockifies
     let mut doc = document();

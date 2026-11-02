@@ -30,6 +30,14 @@ const GRID: Treatment = if cfg!(feature = "grid") {
     Off(super::grid_gate::GRID_OFF)
 };
 
+/// `justify-items` and `justify-self`: grid-only, so as [`GRID`], with
+/// a message that says so.
+const GRID_JUSTIFY: Treatment = if cfg!(feature = "grid") {
+    Read
+} else {
+    Off(super::grid_gate::JUSTIFY_OFF)
+};
+
 /// Every longhand, sorted by name, with its treatment.
 pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ("align-content", Read),
@@ -99,8 +107,8 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ("grid-template-rows", GRID),
     ("height", Read),
     ("justify-content", Read),
-    ("justify-items", GRID),
-    ("justify-self", GRID),
+    ("justify-items", GRID_JUSTIFY),
+    ("justify-self", GRID_JUSTIFY),
     ("left", Read),
     ("letter-spacing", Read),
     ("line-height", Read),

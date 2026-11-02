@@ -6,8 +6,9 @@
 //!
 //! RELAXED: the refusal in a build without the feature is tested by
 //! `tests/grid_off.rs`, which runs only under
-//! `cargo test -p vapors-elements --no-default-features`; `cargo xtask
-//! ci` builds the default features. The ci step for no-default-features
+//! `cargo test -p vapors-elements --no-default-features` (where the
+//! crate's grid-using tests, gated on the feature, do not run; every
+//! other test runs in both); `cargo xtask ci` builds the default features. The ci step for no-default-features
 //! builds (vapors issue #121) retires this.
 
 use taffy::Display;
@@ -15,15 +16,22 @@ use taffy::Display;
 /// Why a property or display that needs grid is refused without it.
 pub(crate) const GRID_OFF: &str = "needs CSS grid, which this build leaves out (vapors-elements' `grid` feature); turn the feature on, or lay it out with flex";
 
-/// `display: grid` (or a blockified `inline-grid`): a grid container,
-/// or, without the feature, refused.
+/// Why `justify-items` and `justify-self` are refused without it: flex
+/// ignores them, so in this build they apply to nothing.
+pub(crate) const JUSTIFY_OFF: &str = "is grid-only in this build, which leaves CSS grid out (vapors-elements' `grid` feature), and flex ignores it; remove it, or turn the feature on";
+
+/// `display: grid` (or a blockified `inline-grid`, as `written`): a grid
+/// container, or, without the feature, refused naming what was written.
 // with the feature it is always Ok; the Result is the build without it
 #[cfg_attr(feature = "grid", allow(clippy::unnecessary_wraps))]
-pub(crate) fn grid() -> Result<Display, String> {
+pub(crate) fn grid(written: &str) -> Result<Display, String> {
     #[cfg(feature = "grid")]
-    return Ok(Display::Grid);
+    {
+        let _ = written;
+        Ok(Display::Grid)
+    }
     #[cfg(not(feature = "grid"))]
-    Err(format!("`display: grid` {GRID_OFF}"))
+    Err(format!("`display: {written}` {GRID_OFF}"))
 }
 
 /// Whether a box of `display` makes its children flex or grid items.
