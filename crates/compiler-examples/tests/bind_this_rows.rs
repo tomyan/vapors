@@ -60,3 +60,15 @@ fn every_row_gone_leaves_an_empty_map() {
     // Then
     assert!(refs.rows.get().is_empty());
 }
+
+#[test]
+fn rows_keyed_by_index_bind_under_their_index() {
+    // When: a usize key, whose clone in the generated code clippy checks
+    let (dom, refs, names) = mounted(&["a", "b"]);
+    names.set(vec!["a".into()]);
+
+    // Then
+    let bold = refs::created(&dom, "b");
+    assert_eq!(refs.by_index.get().keys().copied().collect::<Vec<_>>(), [0]);
+    assert!(bold.contains(&refs.by_index.get()[&0]));
+}

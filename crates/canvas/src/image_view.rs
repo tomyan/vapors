@@ -2,14 +2,12 @@
 //! scroll or pinch zooms about the pointer or the fingers, a drag or a
 //! one-finger pan moves it, a double tap fits it or shows it actual size.
 
-use vapors_platform::{Event, LINE_PIXELS};
 use vapors_renderer::ImagePipeline;
 use vapors_scene::{Color, Size, Transform};
 
+use crate::image_view_area::Insets;
+use crate::image_view_input::Steering;
 use crate::image_view_painter::Shown;
-
-/// Factor per scroll step or per `+`/`-` press.
-const ZOOM_STEP: f32 = 1.25;
 
 pub use vapors_scene::RgbaImage;
 
@@ -25,10 +23,11 @@ pub struct ImageView {
     pub(crate) uploaded: Option<Uploaded>,
     pub(crate) viewport: Size,
     transform: Transform,
-    /// The last pointer position; `None` until the pointer first moves.
-    pointer: Option<[f32; 2]>,
-    dragging: bool,
+    /// The gesture in progress (`image_view_input.rs`).
+    pub(crate) steering: Steering,
     pub(crate) background: Color,
+    /// Kept clear of the image's fit on each side (`image_view_area.rs`).
+    pub(crate) insets: Insets,
     /// Bumped by every `set_image` and `set_painter`: two images of the same size, fitted
     /// the same, differ only in this.
     generation: u64,
@@ -58,9 +57,9 @@ impl ImageView {
                 scale: 1.0,
                 translate: [0.0, 0.0],
             },
-            pointer: None,
-            dragging: false,
+            steering: Steering::default(),
             background,
+            insets: Insets::default(),
             generation: 0,
         }
     }
@@ -100,18 +99,24 @@ impl ImageView {
         self.transform
     }
 
-    /// Fit the image to the viewport, centred.
+    /// Fit the image to the viewport less its insets, centred.
     pub fn fit(&mut self) {
-        if let Some(size) = self.image_size() {
-            self.transform = Transform::fit(size, self.viewport);
+        if let Some(fitted) = self.fitted() {
+            self.transform = fitted;
         }
     }
 
-    /// One image pixel per viewport pixel, centred.
+    /// One image pixel per viewport pixel, centred in the viewport less
+    /// its insets.
     pub fn actual_size(&mut self) {
         if let Some(size) = self.image_size() {
-            self.transform = Transform::actual_size(size, self.viewport);
+            self.transform = self.placed(Transform::actual_size(size, self.area_size()));
         }
+    }
+
+    fn fitted(&self) -> Option<Transform> {
+        let size = self.image_size()?;
+        Some(self.placed(Transform::fit(size, self.area_size())))
     }
 
     /// Multiply the scale by `factor`, keeping the image under `anchor` still.
@@ -127,77 +132,11 @@ impl ImageView {
 
     /// Fit the image unless it is fitted already, then show it actual size.
     pub fn toggle_fit(&mut self) {
-        let fitted = self
-            .image_size()
-            .map(|size| Transform::fit(size, self.viewport));
-        if fitted == Some(self.transform) {
+        if self.fitted() == Some(self.transform) {
             self.actual_size();
         } else {
             self.fit();
         }
-    }
-
-    /// Answer an input event.
-    pub fn event(&mut self, event: &Event) {
-        match event {
-            Event::Resized { width, height } => {
-                self.viewport = Size {
-                    width: *width,
-                    height: *height,
-                };
-                self.fit();
-            }
-            Event::PointerMoved { x, y } => self.pointer_moved([*x, *y]),
-            Event::PointerLeft => self.pointer = None,
-            Event::PrimaryButton { pressed, .. } => self.dragging = *pressed,
-            // a notch away from the user (one line up) zooms in a step
-            Event::Scroll { dy, .. } => {
-                self.zoom(self.scroll_anchor(), ZOOM_STEP.powf(-dy / LINE_PIXELS));
-            }
-            Event::Pinch { x, y, factor } => self.zoom([*x, *y], *factor),
-            Event::Pan { dx, dy } => self.pan(*dx, *dy),
-            Event::DoubleTap { .. } => self.toggle_fit(),
-            Event::Character(text) => self.key(text),
-            Event::Touch { .. }
-            | Event::Key { .. }
-            | Event::Tap { .. }
-            | Event::OpenRequested
-            | Event::Paste
-            | Event::TextEdited { .. }
-            | Event::PastedText(_)
-            | Event::FileOpened { .. } => {}
-        }
-    }
-
-    fn pointer_moved(&mut self, to: [f32; 2]) {
-        if let (true, Some(from)) = (self.dragging, self.pointer) {
-            self.pan(to[0] - from[0], to[1] - from[1]);
-        }
-        self.pointer = Some(to);
-    }
-
-    /// The pointer, or the view centre when no pointer position is known:
-    /// winit's wheel event carries no position of its own.
-    fn scroll_anchor(&self) -> [f32; 2] {
-        self.pointer.unwrap_or_else(|| self.centre())
-    }
-
-    fn key(&mut self, text: &str) {
-        match text {
-            "0" => self.fit(),
-            "1" => self.actual_size(),
-            "+" | "=" => self.zoom(self.centre(), ZOOM_STEP),
-            "-" => self.zoom(self.centre(), 1.0 / ZOOM_STEP),
-            _ => {}
-        }
-    }
-
-    #[allow(clippy::cast_precision_loss)] // viewport sizes are far below 2^24
-    fn centre(&self) -> [f32; 2] {
-        [
-            self.viewport.width as f32 / 2.0,
-            self.viewport.height as f32 / 2.0,
-        ]
     }
 }
 

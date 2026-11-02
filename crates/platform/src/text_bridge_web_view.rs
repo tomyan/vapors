@@ -50,6 +50,8 @@ impl View {
         }
         send(Event::Key {
             key: name,
+            // the DOM's own `code`, as winit's place maps to natively
+            code: key.code(),
             pressed,
             repeat: key.repeat(),
             modifiers: Modifiers {

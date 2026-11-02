@@ -203,6 +203,7 @@ pub(crate) enum Key<'a> {
 fn pressed(press: &Press<'_>) -> Vec<Event> {
     let mut events = vec![key_event(
         press.logical,
+        press.physical,
         press.state,
         press.repeat,
         press.modifiers,
