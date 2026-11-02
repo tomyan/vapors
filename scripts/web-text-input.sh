@@ -9,6 +9,8 @@
 # browser.sh picks it and its SwiftShader driver, as the page contract
 # does). Exits 1 naming each step that differed, with the page's
 # console.
+# The directory is removed when the check passes and kept, for its logs,
+# when it fails.
 set -eu
 web=${1:?usage: scripts/web-text-input.sh target/web <new or empty dir>}
 work=${2:?usage: scripts/web-text-input.sh target/web <new or empty dir>}
@@ -16,6 +18,9 @@ work=${2:?usage: scripts/web-text-input.sh target/web <new or empty dir>}
 [ -f "$web/index.html" ] || { echo "$web/index.html: missing: the web job failed, or its build was not downloaded, so the web input check was not run; fix: the web job (in CI) or cargo xtask web (locally)" >&2; exit 1; }
 if [ -e "$work" ] && [ -n "$(ls -A "$work")" ]; then echo "$work: not empty" >&2; exit 1; fi
 mkdir -p "$work/site" "$work/profile"; cp "$web"/* "$work/site"/
+# Chromium leaves org.chromium.Chromium.* directories in TMPDIR on every
+# launch; here they go with $work.
+mkdir -p "$work/tmp"; export TMPDIR="$work/tmp"
 printf '<!doctype html><meta charset="utf-8"><input id="i" value="Warm">\n' > "$work/site/input.html"
 
 # The whole run: a cold Chrome's 58 s to the page (COLD_START in
@@ -50,6 +55,13 @@ browser_pid=$!
 for _ in $(seq 100); do [ -s "$work/port" ] && break; sleep 0.1; done
 [ -s "$work/port" ] || { echo "the page server did not start within 10 s" >&2; exit 1; }
 if timeout "$RUN_S" cargo run -q -p vapors-elements-corpus --example web_input_oracle -- "$work/profile" "http://127.0.0.1:$(cat "$work/port")"; then
+  # the browser's group gone before its profile is removed: a process
+  # still writing there would leave files behind
+  kill -- -"$browser_pid" 2>/dev/null || true
+  for _ in $(seq 100); do pgrep -g "$browser_pid" >/dev/null || break; sleep 0.1; done
+  pgrep -g "$browser_pid" >/dev/null && { echo "the browser's processes outlived 10 s after the kill; $work kept" >&2; exit 1; }
+  browser_pid=
+  rm -rf "$work"
   exit 0
 fi
 echo "  ($version) the page's console and Chrome's last lines:" >&2

@@ -5,8 +5,11 @@ use super::*;
 #[test]
 fn a_stale_screenshot_is_removed_and_a_missing_one_is_fine() {
     // Given
-    let dir = std::env::temp_dir().join(format!("vapors-chromium-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("tmp dir");
+    let scratch = tempfile::Builder::new()
+        .prefix("vapors-chromium-")
+        .tempdir();
+    let scratch = scratch.expect("a scratch directory under the temp dir");
+    let dir = scratch.path();
     let png = dir.join("stale.png");
     std::fs::write(&png, b"old").expect("write");
 
@@ -17,7 +20,6 @@ fn a_stale_screenshot_is_removed_and_a_missing_one_is_fine() {
     // Then
     assert!(!png.exists());
     assert_eq!(again, Ok(()));
-    std::fs::remove_dir_all(&dir).expect("cleanup");
 }
 
 #[test]
@@ -42,8 +44,11 @@ fn a_screenshot_of_the_wrong_size_is_refused_naming_both_sizes() {
 fn a_browser_past_its_deadline_is_killed_with_its_children_and_its_stderr_reported() {
     // Given: a "browser" that writes to stderr, leaves a child holding
     // the pipe, then hangs
-    let dir = std::env::temp_dir().join(format!("vapors-chromium-hang-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("tmp dir");
+    let scratch = tempfile::Builder::new()
+        .prefix("vapors-chromium-hang-")
+        .tempdir();
+    let scratch = scratch.expect("a scratch directory under the temp dir");
+    let dir = scratch.path();
     let script = dir.join("hang.sh");
     let child_pid = dir.join("child.pid");
     let text = format!(
@@ -115,14 +120,16 @@ fn a_browser_past_its_deadline_is_killed_with_its_children_and_its_stderr_report
         "the browser's child {} outlived the deadline",
         child.trim()
     );
-    std::fs::remove_dir_all(&dir).expect("cleanup");
 }
 
 #[test]
 fn a_failed_screenshot_names_the_browser_it_launched() {
     // Given: a "browser" that exits 1 at once
-    let dir = std::env::temp_dir().join(format!("vapors-chromium-named-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("tmp dir");
+    let scratch = tempfile::Builder::new()
+        .prefix("vapors-chromium-named-")
+        .tempdir();
+    let scratch = scratch.expect("a scratch directory under the temp dir");
+    let dir = scratch.path();
     let chromium = Chromium {
         binary: std::path::PathBuf::from("/bin/false"),
         deadline: std::time::Duration::from_secs(5),

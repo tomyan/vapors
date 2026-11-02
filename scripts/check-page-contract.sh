@@ -13,6 +13,8 @@
 # after `cargo xtask web`. CI runs it in the `web` job. Needs python3
 # (the server) and a browser: $CHROME, else google-chrome, else
 # chromium. Vulkan is the browser's own SwiftShader driver, beside it.
+# The directory is removed when the check passes and kept, for its logs,
+# when it fails.
 set -eu
 web=${1:?usage: scripts/check-page-contract.sh target/web <new or empty dir>}
 work=${2:?usage: scripts/check-page-contract.sh target/web <new or empty dir>}
@@ -59,6 +61,9 @@ prepare() {
     echo "$work: not empty; give a new or empty directory" >&2; exit 1
   fi
   mkdir -p "$work"; cp "$web"/* "$work"/
+  # Chromium leaves org.chromium.Chromium.* directories in TMPDIR on every
+  # launch; here they go with $work.
+  mkdir -p "$work/tmp"; export TMPDIR="$work/tmp"
   nogpu='<script>delete Navigator.prototype.gpu;</script>'
   # The device is destroyed 1 s after the page gets it, between frames,
   # as a GPU reset does: WebGPU's device.lost resolves with "destroyed".
@@ -418,4 +423,5 @@ for demo in $demos; do
   done
 done
 [ "$failed" = 0 ] || { echo "the page contract does not hold; reproduce: cargo xtask web && $0 target/web \$(mktemp -d)" >&2; exit 1; }
+rm -rf "$work"
 echo "ok   the page contract holds in all eleven cases, no HTML over the canvas of: $demos index; the gradient screenshot and the screenshots:$shots"
