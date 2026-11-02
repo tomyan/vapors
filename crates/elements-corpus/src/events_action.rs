@@ -51,6 +51,7 @@ pub fn action(word: &str, fields: &[&str], rest: &str) -> Result<Action, String>
         "click" => point(word, fields).map(|(x, y)| Action::Click(x, y)),
         "double-click" => point(word, fields).map(|(x, y)| Action::Clicks(x, y, 2)),
         "triple-click" => point(word, fields).map(|(x, y)| Action::Clicks(x, y, 3)),
+        "quadruple-click" => point(word, fields).map(|(x, y)| Action::Clicks(x, y, 4)),
         "alt-click" => point(word, fields).map(|(x, y)| Action::AltClick(x, y)),
         "tap" => point(word, fields).map(|(x, y)| Action::Tap(x, y)),
         "press" => point(word, fields).map(|(x, y)| Action::Press(x, y)),

@@ -108,7 +108,7 @@ impl DocumentInput {
             Action::Move(_) | Action::Leave => Route::Document,
             Action::Press(p, _, _) => *self.held.mouse.insert(by_hit(p)),
             Action::Release(p, _) => self.held.mouse.take().unwrap_or_else(|| by_hit(p)),
-            Action::Tap(p) | Action::Wheel(p, _) => by_hit(p),
+            Action::Tap(p) | Action::DoubleTap(p) | Action::Wheel(p, _) => by_hit(p),
             Action::TouchDown(id, p) => self.held.touch_down(id, by_hit(p)),
             Action::TouchMove(id, p) => self
                 .held

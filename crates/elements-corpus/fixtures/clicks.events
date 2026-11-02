@@ -6,5 +6,17 @@ double-click 50 24            two clicks in a row, then dblclick
 expect event dblclick button#reset
 triple-click 50 24            a third press in a row: as Chromium does
 expect event click button#reset
+quadruple-click 50 24         a fourth press in a row: no second dblclick
+expect event click button#reset
 alt-click 50 24               a click with Alt held carries it
+expect event click button#reset
+tap 50 24                     a tap
+expect event click button#reset
+tap 50 24                     a second tap: dblclick as Chrome on Android
+expect event dblclick button#reset
+tap 50 24                     a third tap in a row: no dblclick, as the third click
+expect event click button#reset
+tap 50 24                     a fourth tap in a row
+expect event click button#reset
+tap 50 24                     a fifth tap in a row
 expect event click button#reset

@@ -1,5 +1,8 @@
 //! A touch tap (the platform's `Tap`, after the touch's own down and up):
-//! focus, `click`, and a text field's caret, in Chromium's order.
+//! focus, `click`, and a text field's caret, in Chromium's order; the
+//! second tap of a run (the platform's `DoubleTap`, after its `Tap`)
+//! sends `dblclick`, as Chrome on Android does on a page without
+//! double-tap zoom.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -32,5 +35,21 @@ impl Document {
         if !prevented {
             crate::text_pointer::tapped(document, hit, point);
         }
+    }
+
+    /// The platform's double tap at `point`, after that tap's own
+    /// [`Document::touch_tapped`]: `dblclick` on the element the tap
+    /// clicked, none when a disabled control holds it.
+    pub fn touch_double_tapped(document: &Rc<RefCell<Document>>, point: Point) {
+        let Some(hit) = document.borrow().hit(point) else {
+            return;
+        };
+        if document.borrow().in_disabled_button(hit) {
+            return;
+        }
+        let event = document
+            .borrow()
+            .pointer_event("dblclick", touch_id(0), hit, point);
+        crate::events::tree::dispatch_bubbling(document, hit, event);
     }
 }

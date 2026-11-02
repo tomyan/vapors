@@ -102,8 +102,10 @@ pub enum Event {
         /// Y in pixels where the finger lifted.
         y: f32,
     },
-    /// A second tap within 300 ms and 30 px of the first. Sent after
-    /// that tap's own [`Event::Tap`].
+    /// The second tap of a run, each tap within 300 ms and 30 px of
+    /// the last; a run counts 1, 2, 3 then again, as Chromium counts
+    /// taps, so of five quick taps the 2nd and the 5th are double taps.
+    /// Sent after that tap's own [`Event::Tap`].
     DoubleTap {
         /// X in pixels where the second finger lifted.
         x: f32,

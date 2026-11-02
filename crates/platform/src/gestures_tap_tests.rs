@@ -59,6 +59,39 @@ fn taps_and_double_taps_depend_on_time_and_distance() {
     // When / Then
     check(cases);
 }
+/// A tap at `t` ms, as the steps of finger `id`.
+fn tap_at(id: u64, t: u64) -> [Step; 2] {
+    [
+        (id, Started, 10.0, 10.0, t),
+        (id, Ended, 10.0, 10.0, t + 50),
+    ]
+}
+
+#[test]
+fn taps_in_a_row_count_one_two_three_then_again_and_the_second_of_each_is_a_double_tap() {
+    // Given: five quick taps in one place; Chromium 155 sends dblclick
+    // on the 2nd and the 5th (elements-corpus clicks.events), its tap
+    // count running 1, 2, 3, 1, 2
+    let steps: Vec<Step> = (0..5).flat_map(|n| tap_at(n, n * 200)).collect();
+    let tap = Event::Tap { x: 10.0, y: 10.0 };
+    let double = Event::DoubleTap { x: 10.0, y: 10.0 };
+
+    // When / Then
+    check(&[(
+        "five taps",
+        &steps,
+        &[
+            tap.clone(),
+            tap.clone(),
+            double.clone(),
+            tap.clone(),
+            tap.clone(),
+            tap,
+            double,
+        ],
+    )]);
+}
+
 #[test]
 fn slow_moved_cancelled_and_two_finger_presses_are_not_taps() {
     // Given

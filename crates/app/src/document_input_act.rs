@@ -24,6 +24,7 @@ impl DocumentInput {
             }
             Action::Leave => Document::pointer_left(document),
             Action::Tap(point) => Document::touch_tapped(document, point),
+            Action::DoubleTap(point) => Document::touch_double_tapped(document, point),
             Action::Wheel(point, delta) => {
                 self.touch.mouse();
                 let now = vapors_platform::Instant::now();

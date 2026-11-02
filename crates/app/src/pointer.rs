@@ -1,6 +1,7 @@
 //! Platform input as the document's pointer calls: positions from
 //! physical pixels to CSS pixels, the primary button at the last
-//! position the pointer moved to, and a tap as a click. A wheel scrolls
+//! position the pointer moved to, a tap as a click and a double tap as
+//! a dblclick. A wheel scrolls
 //! where the pointer is. A touch is a pointer of its own (3-E1b) and
 //! clicks only as its tap, so one tap is one click; its down and up
 //! also bound a gesture whose pans scroll.
@@ -19,6 +20,8 @@ pub(crate) enum Action {
     Release(Point, Modifiers),
     Leave,
     Tap(Point),
+    /// The second tap of a run, after its own tap: a `dblclick`.
+    DoubleTap(Point),
     /// Scroll by a delta (CSS pixels) at a point.
     Wheel(Point, [f32; 2]),
     /// A finger (by id) went down; the first starts a gesture there.
@@ -52,6 +55,7 @@ pub(crate) fn action(event: &Event, scale: f32, last: Point) -> Option<Action> {
         } => Some(Action::Release(last, held(*modifiers))),
         Event::PointerLeft => Some(Action::Leave),
         Event::Tap { x, y } => Some(Action::Tap(css(*x, *y))),
+        Event::DoubleTap { x, y } => Some(Action::DoubleTap(css(*x, *y))),
         Event::Scroll { dx, dy } => Some(Action::Wheel(last, [*dx, *dy])),
         // a finger moving right drags the content right: a scroll left
         Event::Pan { dx, dy } => Some(Action::Pan([-dx / scale, -dy / scale])),
@@ -183,6 +187,7 @@ mod tests {
                 y: 10.0,
             },
             Event::Tap { x: 10.0, y: 10.0 },
+            Event::DoubleTap { x: 10.0, y: 10.0 },
         ];
 
         // When
@@ -191,13 +196,15 @@ mod tests {
             .filter_map(|e| action(e, 1.0, [0.0, 0.0]))
             .collect();
 
-        // Then: the touch's down and up, then the tap, which is the click
+        // Then: the touch's down and up, then the tap, which is the
+        // click, then the double tap, which is the dblclick
         assert_eq!(
             actions,
             [
                 Action::TouchDown(1, [10.0, 10.0]),
                 Action::TouchUp(1, [10.0, 10.0]),
-                Action::Tap([10.0, 10.0])
+                Action::Tap([10.0, 10.0]),
+                Action::DoubleTap([10.0, 10.0])
             ]
         );
     }

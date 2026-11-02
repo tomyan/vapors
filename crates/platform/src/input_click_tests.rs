@@ -89,3 +89,27 @@ fn a_press_carries_the_modifiers_held() {
         }]
     );
 }
+
+#[test]
+fn a_press_of_another_button_breaks_the_row() {
+    // Given: the pointer over the window, one left click
+    let mut input = Input::new();
+    input.translate(&moved(10.0, 10.0));
+    input.translate(&pressing(ElementState::Pressed));
+    input.translate(&pressing(ElementState::Released));
+
+    // When: a right click, then a left press, all in one place and soon
+    let other = |state| WindowEvent::MouseInput {
+        device_id: DeviceId::dummy(),
+        state,
+        button: MouseButton::Right,
+    };
+    let right = input.translate(&other(ElementState::Pressed));
+    input.translate(&other(ElementState::Released));
+    let left = input.translate(&pressing(ElementState::Pressed));
+
+    // Then: the right press is no app event, and the left starts anew,
+    // as Chromium counts only presses of one button in a row
+    assert_eq!(right, []);
+    assert_eq!(left, [button(true, 1)]);
+}

@@ -3,7 +3,7 @@
 //! and trackpad pinches, which need state (the last pointer position and
 //! the fingers down) that lives here.
 
-use winit::event::WindowEvent;
+use winit::event::{ElementState, MouseButton, WindowEvent};
 use winit::keyboard::ModifiersState;
 
 use crate::paste_key::Press;
@@ -59,6 +59,7 @@ impl Input {
         if let Some(keys) = self.keys(event) {
             return keys;
         }
+        self.break_row_on_other_buttons(event);
         let Some(direct) = from_winit(event, self.scale) else {
             return Vec::new();
         };
@@ -67,6 +68,21 @@ impl Input {
         let mut events = vec![direct];
         events.extend(gestures);
         events
+    }
+
+    /// A press of a button other than the primary is no app event, but
+    /// breaks the primary's row, as Chromium counts presses of one
+    /// button in a row (review-v100, S1).
+    fn break_row_on_other_buttons(&mut self, event: &WindowEvent) {
+        if let WindowEvent::MouseInput {
+            state: ElementState::Pressed,
+            button,
+            ..
+        } = event
+            && *button != MouseButton::Left
+        {
+            self.clicks.break_row();
+        }
     }
 
     /// The modifiers kept, and each key press as its [`Event::Key`] then

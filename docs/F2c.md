@@ -73,7 +73,7 @@ Failure handling:
   `pointermove`, `pointerenter` and `pointerleave`. Otherwise
   `onmouseover` would compile and silently never run. Later slices add
   to the list, which `FIRED` in `crates/elements/src/tags.rs` holds;
-  `dblclick`, after the second click in a row, is one.
+  `dblclick`, after the second click or tap in a row, is one.
 
 `Document::update(env) -> Result<(), Vec<ElementError>>` runs restyle,
 then layout, then paint. `ElementsApp` reports any error with
