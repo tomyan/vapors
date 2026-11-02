@@ -98,7 +98,10 @@ fn a_for_name_that_shadows_a_script_binding_is_refused_naming_both() {
     let why = refused(
         "<ul>{for rows in names.get() key=rows.clone()}<li bind:this={rows}>x</li>{/for}</ul>",
     );
-    assert!(why.contains("`rows`") && why.contains("shadows"), "{why}");
+    assert!(
+        why.contains("`rows` here is the `{for}`'s, which shadows the script's signal `rows`"),
+        "{why}"
+    );
     assert!(why.contains("counter.wisp:"), "{why}");
 }
 
