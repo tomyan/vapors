@@ -50,7 +50,7 @@ impl Download {
     /// A `.zip`: the whole tree is installed, the binary inside it.
     #[must_use]
     pub fn is_tree(&self) -> bool {
-        self.url.ends_with(".zip")
+        is_zip(&self.url)
     }
 }
 
@@ -130,13 +130,18 @@ fn check_value(kind: &str, value: &str) -> Result<(), String> {
             "{kind} must be 64 lower-case hex digits (a SHA-256)"
         )),
         "url"
-            if !value.starts_with("https://")
-                || !(value.ends_with(".tar.gz") || value.ends_with(".zip")) =>
+            if !value.starts_with("https://") || !(value.ends_with(".tar.gz") || is_zip(value)) =>
         {
             Err("url must be an https URL of a .tar.gz or .zip release asset".to_owned())
         }
         _ => Ok(()),
     }
+}
+
+/// The URL names a `.zip`: its last dot-separated part is `zip`, as
+/// release URLs are written (lower case).
+fn is_zip(url: &str) -> bool {
+    url.rsplit('.').next() == Some("zip")
 }
 
 fn collect(fields: &[(String, String, String, usize)]) -> Result<Vec<Download>, ParseError> {
