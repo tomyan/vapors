@@ -24,6 +24,8 @@ impl ApplicationHandler<Message> for Handler {
         if self.stop_if_lost(event_loop) {
             return;
         }
+        #[cfg(not(target_family = "wasm"))]
+        self.ime_message();
         match message {
             Message::GpuReady(Ok(gpu)) => self.gpu_ready(gpu),
             Message::GpuReady(Err(error)) => self.fail(event_loop, error),
@@ -50,6 +52,9 @@ impl ApplicationHandler<Message> for Handler {
             event_loop.exit();
             return;
         }
+        // a held clear before any event, the IME's own edit for its own
+        #[cfg(not(target_family = "wasm"))]
+        self.ime_window_event(&event);
         if let WindowEvent::Resized(size) = event
             && let Some(gpu) = self.gpu.as_mut()
         {
@@ -61,12 +66,6 @@ impl ApplicationHandler<Message> for Handler {
         }
         if let Some(window) = &self.window {
             self.input.set_scale(window.scale_factor());
-        }
-        #[cfg(not(target_family = "wasm"))]
-        match &event {
-            WindowEvent::Ime(ime) => self.ime(ime),
-            WindowEvent::RedrawRequested => {}
-            _ => self.ime_flush(),
         }
         for app_event in self.input.translate(&event) {
             self.app.event(app_event, &self.platform);

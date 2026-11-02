@@ -9,7 +9,7 @@ use winit::event::Ime;
 
 /// A window that records what the IME was told.
 #[derive(Default)]
-struct Told(RefCell<Vec<String>>);
+pub(crate) struct Told(pub(crate) RefCell<Vec<String>>);
 
 impl ImeTarget for Told {
     fn set_ime_allowed(&self, allowed: bool) {

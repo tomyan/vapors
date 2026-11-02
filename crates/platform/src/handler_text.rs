@@ -15,33 +15,24 @@ impl Handler {
             bridge.mirror(field);
         }
         #[cfg(not(target_family = "wasm"))]
-        crate::ime_window::mirror(
-            self.window.as_deref(),
-            &mut self.composition.borrow_mut(),
-            field,
-        );
+        self.ime.borrow_mut().mirror(self.window.as_deref(), field);
     }
 
-    /// The window opened: the IME for the field set before it, if any.
+    /// Before a window event: the IME's own edit, or a held clear (see
+    /// `ime_state`).
     #[cfg(not(target_family = "wasm"))]
-    pub(super) fn ime_opened(&self) {
-        if let Some(window) = &self.window {
-            crate::ime_window::opened(window.as_ref(), &self.composition.borrow());
-        }
-    }
-
-    /// The system IME's event, as the edit it makes to the field.
-    #[cfg(not(target_family = "wasm"))]
-    pub(super) fn ime(&mut self, ime: &winit::event::Ime) {
-        let edit = self.composition.borrow_mut().edit(ime);
+    pub(super) fn ime_window_event(&mut self, event: &winit::event::WindowEvent) {
+        let Some(window) = self.window.clone() else {
+            return;
+        };
+        let edit = self.ime.borrow_mut().window_event(window.as_ref(), event);
         self.send_edit(edit);
     }
 
-    /// Before an event that is not the IME's: a clear the IME held for a
-    /// commit that did not come is applied first.
+    /// Before one of the loop's own messages: a held clear.
     #[cfg(not(target_family = "wasm"))]
-    pub(super) fn ime_flush(&mut self) {
-        let edit = self.composition.borrow_mut().flush();
+    pub(super) fn ime_message(&mut self) {
+        let edit = self.ime.borrow_mut().message();
         self.send_edit(edit);
     }
 

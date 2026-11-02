@@ -481,12 +481,14 @@ range after, in the value while it composes and underlined, its caret
 where the IME puts it; a commit replaces the composing range and ends
 it, in one edit, so one Control+Z goes back to the text before the
 composition, as on the web (winit's empty preedit before each commit is
-held until the next event, which takes it in or applies it); `Disabled`
+held until the next event, which takes it in or applies it; any event
+but the IME's own applies it first, a redraw and the loop's messages
+included, so no stale preedit is drawn or read); `Disabled`
 clears a composition; another field, the field set with another text,
 or a selection moved out of the composing range (a click elsewhere in
 the field, which Chromium's `<input>` commits on) ends it with its text
 kept, and the IME is told by losing and regaining focus. A field set
-before the window opens is allowed the IME when it does. So the web and
+before the window opens is allowed the IME at the window's first event. So the web and
 the desktop agree with Chromium's `<input>`. Checked by unit tests on
 winit's own documented sequences (pinyin, a dead key over a selection),
 whose edits the field's undo test takes too (`ime_cases.rs`); not

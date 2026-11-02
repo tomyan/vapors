@@ -27,6 +27,8 @@ mod handler;
 #[cfg(not(target_family = "wasm"))]
 mod ime;
 #[cfg(not(target_family = "wasm"))]
+mod ime_state;
+#[cfg(not(target_family = "wasm"))]
 mod ime_window;
 mod input;
 mod key_event;

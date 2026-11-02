@@ -64,4 +64,4 @@ fn allow(window: &impl ImeTarget, field: Option<&TextField>) {
 
 #[cfg(test)]
 #[path = "ime_window_tests.rs"]
-mod tests;
+pub(crate) mod tests;

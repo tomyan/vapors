@@ -34,7 +34,7 @@ pub struct Handler {
     text_bridge: Option<crate::text_bridge_web::TextBridge>,
     /// The system IME's composition over the focused field (native).
     #[cfg(not(target_family = "wasm"))]
-    composition: std::cell::RefCell<crate::ime::Composition>,
+    ime: std::cell::RefCell<crate::ime_state::ImeState>,
 }
 
 /// Consecutive redraws without a texture before giving up: a second at
@@ -59,7 +59,7 @@ impl Handler {
             #[cfg(target_family = "wasm")]
             text_bridge: None,
             #[cfg(not(target_family = "wasm"))]
-            composition: std::cell::RefCell::default(),
+            ime: std::cell::RefCell::default(),
         }
     }
 
@@ -81,8 +81,6 @@ impl Handler {
             self.platform.lost_state(),
         );
         self.window = Some(window);
-        #[cfg(not(target_family = "wasm"))]
-        self.ime_opened();
         #[cfg(target_family = "wasm")]
         {
             let proxy = self.platform.proxy();
