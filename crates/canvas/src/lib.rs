@@ -14,6 +14,8 @@ mod label;
 #[cfg(test)]
 mod pinch_tests;
 mod png;
+#[cfg(test)]
+mod tap_tests;
 
 pub use image_app::ImageApp;
 pub use image_view::{ImageView, RgbaImage};

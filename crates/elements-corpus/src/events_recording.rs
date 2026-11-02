@@ -60,7 +60,26 @@ pub(crate) fn logged(name: &str, theirs: &Value) -> Result<Vec<(String, String)>
                     .map(str::to_owned)
                     .ok_or_else(|| refuse(&format!("has an event with no string {key}: {event}")))
             };
-            Ok((field("type")?, field("target")?))
+            Ok((with_modifiers(&field("type")?, event), field("target")?))
         })
         .collect()
 }
+
+/// `kind` with each modifier the event recorded as held: `click+alt`.
+fn with_modifiers(kind: &str, event: &Value) -> String {
+    MODIFIER_KEYS
+        .iter()
+        .filter(|(key, _)| event[key] == true)
+        .fold(kind.to_owned(), |logged, (_, name)| {
+            format!("{logged}+{name}")
+        })
+}
+
+/// The DOM's modifier fields and the names a logged type adds them by,
+/// in the order both sides add them (`events_vapors::logged_type`).
+pub(crate) const MODIFIER_KEYS: [(&str, &str); 4] = [
+    ("altKey", "alt"),
+    ("ctrlKey", "ctrl"),
+    ("metaKey", "meta"),
+    ("shiftKey", "shift"),
+];

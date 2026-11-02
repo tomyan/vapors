@@ -31,6 +31,7 @@ mod ime_state;
 #[cfg(not(target_family = "wasm"))]
 mod ime_window;
 mod input;
+mod input_keys;
 mod key_event;
 #[cfg(not(target_family = "wasm"))]
 mod log_forward;

@@ -72,6 +72,7 @@ fixtures![
     capture::Capture,
     centred_panel::CentredPanel,
     checkbox::Checkbox,
+    clicks::Clicks,
     clipping::Clipping,
     combobox::Combobox,
     flex_row::FlexRow,

@@ -4,8 +4,8 @@
 use winit::event::ElementState;
 use winit::keyboard::{Key, KeyCode, ModifiersState, NamedKey, NativeKeyCode, PhysicalKey};
 
-use super::key_event;
 use crate::event::{Event, Modifiers};
+use crate::key_event::key_event;
 
 fn named(key: NamedKey) -> Key {
     Key::Named(key)

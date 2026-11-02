@@ -18,12 +18,38 @@ pub const TAP_SLOP: f32 = 20.0;
 #[derive(Default)]
 pub(super) struct Press(Option<[f32; 2]>);
 
-/// What the player holds between steps: the finger's press and the
-/// clipboard's text, once a `clipboard` step has set it.
+/// What the player holds between steps: the finger's press, the run of
+/// taps the last steps were, and the clipboard's text, once a
+/// `clipboard` step has set it.
 #[derive(Default)]
 pub(super) struct Held {
     press: Press,
+    taps: Option<([f32; 2], u8)>,
     clipboard: Option<String>,
+}
+
+/// A tap at `point`: the touch's down and up, then the tap the
+/// platform's gestures send for a still, quick touch, and its double tap
+/// when it is the second of a run. Taps on consecutive steps at one
+/// point are a run, counting 1, 2, 3 then again, as the platform's
+/// `Gestures` counts them (the player has no clock: a script's steps
+/// are as quick as Chromium's recording of them).
+fn tap(doc: &Rc<RefCell<Document>>, point: [f32; 2], taps: &mut Option<([f32; 2], u8)>) {
+    // the same script coordinates, parsed twice, not computed
+    #[allow(clippy::float_cmp)]
+    let count = match *taps {
+        Some((last, count)) if last == point => count % 3 + 1,
+        _ => 1,
+    };
+    *taps = Some((point, count));
+    sent(doc, |doc| Document::touch_pressed(doc, 0, point));
+    sent(doc, |doc| {
+        Document::touch_released(doc, 0, point);
+        Document::touch_tapped(doc, point);
+        if count == 2 {
+            Document::touch_double_tapped(doc, point);
+        }
+    });
 }
 
 pub(super) fn act(
@@ -31,12 +57,27 @@ pub(super) fn act(
     action: &Action,
     held: &mut Held,
 ) -> Result<(), String> {
+    if !matches!(action, Action::Tap(..)) {
+        held.taps = None;
+    }
     let press = &mut held.press;
     #[allow(clippy::cast_possible_truncation)] // CSS px within a viewport
     let at = |x: f64, y: f64| [x as f32, y as f32];
     match *action {
         Action::Click(x, y) => clicks(doc, at(x, y), 1),
         Action::Clicks(x, y, count) => clicks(doc, at(x, y), count),
+        Action::AltClick(x, y) => {
+            let alt = vapors_elements::Modifiers {
+                alt: true,
+                ..vapors_elements::Modifiers::default()
+            };
+            sent(doc, |doc| {
+                Document::pointer_pressed_with(doc, at(x, y), std::num::NonZeroU32::MIN, alt);
+            });
+            sent(doc, |doc| {
+                Document::pointer_released_with(doc, at(x, y), alt);
+            });
+        }
         Action::Key(ref combination) => key(doc, combination, held.clipboard.as_deref())?,
         Action::Clipboard(ref text) => held.clipboard = Some(text.clone()),
         // each character as the platform sends it: the key down, its
@@ -52,15 +93,7 @@ pub(super) fn act(
                 sent(doc, |doc| Document::key_released(doc, &key, none));
             }
         }
-        // the touch's down and up, then the tap the platform's gestures
-        // send for a still, quick touch
-        Action::Tap(x, y) => {
-            sent(doc, |doc| Document::touch_pressed(doc, 0, at(x, y)));
-            sent(doc, |doc| {
-                Document::touch_released(doc, 0, at(x, y));
-                Document::touch_tapped(doc, at(x, y));
-            });
-        }
+        Action::Tap(x, y) => tap(doc, at(x, y), &mut held.taps),
         Action::Move(x, y) => Document::pointer_moved(doc, at(x, y)),
         Action::Press(x, y) => {
             Document::pointer_pressed_clicks(doc, at(x, y), std::num::NonZeroU32::MIN);

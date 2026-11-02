@@ -54,10 +54,12 @@ fn a_press_and_release_in_physical_pixels_click_the_button_at_2x() {
         Event::PrimaryButton {
             pressed: true,
             clicks: std::num::NonZeroU32::MIN,
+            modifiers: vapors_platform::Modifiers::default(),
         },
         Event::PrimaryButton {
             pressed: false,
             clicks: std::num::NonZeroU32::MIN,
+            modifiers: vapors_platform::Modifiers::default(),
         },
     ] {
         app.event(event, &platform);
@@ -84,10 +86,12 @@ fn a_press_outside_the_button_at_2x_clicks_nothing() {
         Event::PrimaryButton {
             pressed: true,
             clicks: std::num::NonZeroU32::MIN,
+            modifiers: vapors_platform::Modifiers::default(),
         },
         Event::PrimaryButton {
             pressed: false,
             clicks: std::num::NonZeroU32::MIN,
+            modifiers: vapors_platform::Modifiers::default(),
         },
     ] {
         app.event(event, &platform);

@@ -199,3 +199,17 @@ fn the_focus_script_logs_on_vapors_what_chromium_logged() {
     // Then: the events and the focus after each step
     compare("focus", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
 }
+
+#[test]
+fn the_clicks_script_logs_on_vapors_what_chromium_logged() {
+    // Given: a click, a double and a triple click, and an Alt-click; each
+    // modifier held is part of the logged type, as Chromium recorded it
+    let script = parse("clicks", &read("clicks.events")).expect("parses");
+    let answers = serde_json::from_str(&read("clicks.events.json")).expect("json");
+
+    // When
+    let ours = play(&fixture("clicks"), &script, VIEWPORT).unwrap_or_else(|e| panic!("{e}"));
+
+    // Then: dblclick after the second click only, and Alt on the third step
+    compare("clicks", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
+}
