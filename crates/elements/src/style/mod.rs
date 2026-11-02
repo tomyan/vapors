@@ -7,7 +7,11 @@ mod box_style;
 mod cursor;
 mod decoration;
 mod features;
+mod grid_gate;
+#[cfg(feature = "grid")]
 mod grid_style;
+
+pub(crate) use grid_gate::is_container;
 mod honoured;
 mod inline;
 pub(crate) mod outline;
