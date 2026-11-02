@@ -5,6 +5,9 @@
 /// The focused text field as the app holds it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextField {
+    /// Which field it is, as the app tells its fields apart (an element
+    /// node's id): a composition stays with the field it began in.
+    pub id: u64,
     /// Its text.
     pub text: String,
     /// Its selection, start then end, in UTF-16 units.

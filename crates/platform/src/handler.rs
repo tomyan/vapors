@@ -32,6 +32,9 @@ pub struct Handler {
     /// The page's text input, once the window is open (the web).
     #[cfg(target_family = "wasm")]
     text_bridge: Option<crate::text_bridge_web::TextBridge>,
+    /// The system IME's composition over the focused field (native).
+    #[cfg(not(target_family = "wasm"))]
+    ime: std::cell::RefCell<crate::ime_state::ImeState>,
 }
 
 /// Consecutive redraws without a texture before giving up: a second at
@@ -55,6 +58,8 @@ impl Handler {
             stopped_for_loss: false,
             #[cfg(target_family = "wasm")]
             text_bridge: None,
+            #[cfg(not(target_family = "wasm"))]
+            ime: std::cell::RefCell::default(),
         }
     }
 
@@ -202,18 +207,5 @@ impl Handler {
 #[path = "handler_events.rs"]
 mod events;
 
-impl Handler {
-    /// The page's text input mirrors `field` (the web). Natively the
-    /// field is not used yet: the system IME's candidate area is native
-    /// IME's slice.
-    // natively `self` is not used yet; the web's bridge is on it
-    #[cfg_attr(not(target_family = "wasm"), allow(clippy::unused_self))]
-    fn mirror(&self, field: Option<&crate::TextField>) {
-        #[cfg(target_family = "wasm")]
-        if let Some(bridge) = &self.text_bridge {
-            bridge.mirror(field);
-        }
-        #[cfg(not(target_family = "wasm"))]
-        let _ = field;
-    }
-}
+#[path = "handler_text.rs"]
+mod text;
