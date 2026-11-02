@@ -1,9 +1,11 @@
 //! One external command the factory runs, and how to reproduce it.
 
 use std::fmt::Write;
+use std::path::PathBuf;
 use std::time::Duration;
 
 /// One external command with the advice to print when it fails.
+#[derive(Clone)]
 pub struct Step {
     /// Short name shown in the report, such as `fmt`.
     pub name: String,
@@ -19,6 +21,9 @@ pub struct Step {
     pub dir: Option<String>,
     /// Killed, with its process group, and failed when it runs longer.
     pub deadline: Option<Duration>,
+    /// Its TMPDIR, the run's own (`run_tmp`). Not in [`Step::reproduce`]:
+    /// the directory is removed when the run ends.
+    pub tmpdir: Option<PathBuf>,
 }
 
 impl Step {
@@ -31,6 +36,7 @@ impl Step {
             env: Vec::new(),
             dir: None,
             deadline: None,
+            tmpdir: None,
         }
     }
 

@@ -59,6 +59,9 @@ fn spawn(step: &Step) -> Result<Child, String> {
     if let Some(dir) = &step.dir {
         command.current_dir(dir);
     }
+    if let Some(tmp) = &step.tmpdir {
+        command.env("TMPDIR", tmp);
+    }
     command.spawn().map_err(|error| {
         let started = command.get_program().to_string_lossy();
         format!(
