@@ -10,6 +10,9 @@ repository = "https://github.com/tomyan/vapors"
 rust-version = "1.99"
 
 [workspace.dependencies]
+# Test scratch directories that delete themselves; /tmp is a tmpfs whose
+# inodes ran out on 2026-11-02.
+tempfile = "3.27.0"
 clap = { version = "4", features = ["derive"] }
 wgpu = "30"
 pollster = "1"

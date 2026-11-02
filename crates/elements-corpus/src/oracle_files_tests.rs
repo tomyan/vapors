@@ -2,11 +2,18 @@
 
 use super::*;
 
-fn file(test: &str, contents: Option<&str>) -> std::path::PathBuf {
-    let path = std::env::temp_dir().join(format!("ax-compare-{test}-{}.json", std::process::id()));
-    let _ = std::fs::remove_file(&path);
-    if let Some(contents) = contents {
-        std::fs::write(&path, contents).expect("file");
+/// A file holding `contents`, or no file at all, removed when dropped.
+fn file(test: &str, contents: Option<&str>) -> tempfile::TempPath {
+    let made = tempfile::Builder::new()
+        .prefix(&format!("ax-compare-{test}-"))
+        .suffix(".json")
+        .tempfile();
+    let path = made
+        .expect("a scratch file under the temp dir")
+        .into_temp_path();
+    match contents {
+        Some(contents) => std::fs::write(&path, contents).expect("file"),
+        None => std::fs::remove_file(&path).expect("no file"),
     }
     path
 }

@@ -33,13 +33,16 @@ fn main() -> ExitCode {
 fn run(check: bool) -> Result<(), String> {
     let chromium = Chromium::find().map_err(|e| e.to_string())?;
     println!("chromium: {}", chromium.version());
-    let work = std::env::temp_dir().join(format!("vapors-layout-oracle-{}", std::process::id()));
-    std::fs::create_dir_all(&work).map_err(|e| format!("{}: {e}", work.display()))?;
-    write_fonts(&work)?;
-    write_images(&work)?;
+    let scratch = tempfile::Builder::new()
+        .prefix("vapors-layout-oracle-")
+        .tempdir();
+    let scratch = scratch.map_err(|e| format!("a work directory under the temp dir: {e}"))?;
+    let work = scratch.path();
+    write_fonts(work)?;
+    write_images(work)?;
     let mut differ = Vec::new();
     for name in laid_out_fixture_names()? {
-        let text = to_text(&boxes(&chromium, &work, &name)?);
+        let text = to_text(&boxes(&chromium, work, &name)?);
         let path = fixtures_dir().join(format!("{name}.boxes.json"));
         let current = std::fs::read_to_string(&path).unwrap_or_default();
         if check && current != text {
@@ -49,7 +52,6 @@ fn run(check: bool) -> Result<(), String> {
             println!("wrote {}", path.display());
         }
     }
-    let _ = std::fs::remove_dir_all(&work);
     if differ.is_empty() {
         return Ok(());
     }

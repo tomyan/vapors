@@ -16,9 +16,15 @@ const DEADLINE: Duration = Duration::from_secs(145);
 const PAGE: &str = "data:text/html,<button id=b onclick=\"document.title='clicked'\">Save</button>\
 <input id=i onkeydown=\"document.title='key '+event.key\">";
 
-fn session(test: &str) -> (vapors_text::comparison::Live, Session) {
+/// A live Chromium and its session, in a scratch directory that is
+/// dropped last when bound in this order: the browser is stopped first.
+fn session(test: &str) -> (tempfile::TempDir, vapors_text::comparison::Live, Session) {
     let chromium = Chromium::find().unwrap_or_else(|e| panic!("{e}"));
-    let profile = std::env::temp_dir().join(format!("devtools-{test}-{}", std::process::id()));
+    let made = tempfile::Builder::new()
+        .prefix(&format!("devtools-{test}-"))
+        .tempdir();
+    let dir = made.expect("a scratch directory under the temp dir");
+    let profile = dir.path().join("profile");
     let mut live = chromium
         .live(&profile, 400, 300, 1)
         .unwrap_or_else(|e| panic!("{e}"));
@@ -27,7 +33,7 @@ fn session(test: &str) -> (vapors_text::comparison::Live, Session) {
     session
         .navigate(PAGE, DEADLINE)
         .unwrap_or_else(|e| panic!("{e}"));
-    (live, session)
+    (dir, live, session)
 }
 
 fn call(session: &mut Session, method: &str, params: &Value) -> Value {
@@ -51,7 +57,7 @@ fn title(session: &mut Session) -> String {
 #[test]
 fn gpu_devtools_reads_the_accessibility_tree_and_drives_input_and_frames() {
     // Given
-    let (_live, mut session) = session("all");
+    let (_dir, _live, mut session) = session("all");
 
     // When: the tree
     let tree = call(&mut session, "Accessibility.getFullAXTree", &json!({}));

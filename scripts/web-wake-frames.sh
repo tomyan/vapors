@@ -14,6 +14,8 @@
 # The page posts each stage as it reaches it: script (its first script
 # ran), drew (the first frame), export (vapors_demo_wake is there),
 # counts. In CI it runs after the page contract, so Chrome is warm.
+# The directory is removed when the check passes and kept, for its logs,
+# when it fails.
 set -eu
 web=${1:?usage: scripts/web-wake-frames.sh target/web <new or empty dir>}
 work=${2:?usage: scripts/web-wake-frames.sh target/web <new or empty dir>}
@@ -21,6 +23,9 @@ work=${2:?usage: scripts/web-wake-frames.sh target/web <new or empty dir>}
 [ -f "$web/index.html" ] || { echo "$web/index.html: missing; run cargo xtask web first" >&2; exit 1; }
 if [ -e "$work" ] && [ -n "$(ls -A "$work")" ]; then echo "$work: not empty" >&2; exit 1; fi
 mkdir -p "$work"; cp "$web"/* "$work"/
+# Chromium leaves org.chromium.Chromium.* directories in TMPDIR on every
+# launch; here they go with $work.
+mkdir -p "$work/tmp"; export TMPDIR="$work/tmp"
 
 # The first frame: the page contract's wasm pages draw within its 8 s of
 # virtual time; a cold runner's first wasm compile is slower, and the
@@ -104,11 +109,12 @@ counts=$(env -u DBUS_SESSION_BUS_ADDRESS timeout "$RUN_S" "$chrome" --headless=n
   | sed -n 's#.*<pre id="wake">\([^<]*\)</pre>.*#\1#p') || true
 took=$(( $(date +%s) - started ))
 case $counts in
-  "idle 0; per wake 1,1,1; burst 1-2") echo "wake: $counts ($version, ${took} s)"; exit 0 ;;
+  "idle 0; per wake 1,1,1; burst 1-2") echo "wake: $counts ($version, ${took} s)"; rm -rf "$work"; exit 0 ;;
   '') echo "wake: no counts after ${took} s ($version, deadline ${RUN_S} s); the stages the page reached: $(if [ -f "$work/stages" ]; then tr '\n' ' ' < "$work/stages"; else echo 'none, not even the request for the page'; fi)" >&2 ;;
   *) echo "wake: $counts; expected idle 0; per wake 1,1,1; burst 1-2" >&2 ;;
 esac
 echo "  the page's console and Chrome's last lines:" >&2
 grep -E 'CONSOLE' "$work/chrome.log" | tail -10 | sed 's#^#    #' >&2
 grep -v CONSOLE "$work/chrome.log" | tail -10 | sed 's#^#    #' >&2
+echo "  logs kept in $work" >&2
 exit 1
