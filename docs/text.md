@@ -9,7 +9,7 @@ The brief is `UI-FRAMEWORK-BRIEF.md` section 3 in the touche repository.
 | Concern | Crate | Pinned | Why this one |
 |---|---|---|---|
 | Font collection, fallback | fontique | 0.12.0 | Parley's own; system fonts through fontconfig (dlopen) on Linux, none on the web |
-| Shaping, bidi, line breaking | parley | 0.12.0 | Ranged styles, `complex-scripts` on |
+| Shaping, bidi, line breaking | parley | 0.12.0 | Ranged styles; `complex-scripts` behind vapors-text's `complex-script-breaks` feature (default on; crates/text/Cargo.toml says what turning it off costs) |
 | Outlines, hinting | skrifa | 0.44.0 | The release that shares fontique's read-fonts 0.41; its autohinter does the light hinting |
 | Rasterisation | zeno | 0.3.3 | The rasteriser swash wraps; used directly, so there is no extra layer and no cap on the skrifa version |
 

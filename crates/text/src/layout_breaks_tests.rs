@@ -31,8 +31,9 @@ fn with_complex_script_breaks_narrow_thai_breaks_between_words() {
     assert!(lines_at(40.0) > 1, "{} lines", lines_at(40.0));
 }
 
-/// Run by `cargo test -p vapors-text --no-default-features`; ci builds
-/// the default only, so this is checked by hand when the feature changes.
+/// Runs only under `cargo test -p vapors-text --no-default-features`:
+/// ci builds the default only, so this is checked by hand when the
+/// feature changes, until a ci step runs it (tomyan/vapors#121).
 #[cfg(not(feature = "complex-script-breaks"))]
 #[test]
 fn without_complex_script_breaks_thai_stays_one_line() {
