@@ -41,6 +41,15 @@ pub fn calls(action: &Action, pointer: &mut Pointer) -> Vec<(&'static str, Value
     match action {
         Action::Click(x, y) => clicks(*x, *y, 1),
         Action::Clicks(x, y, count) => clicks(*x, *y, *count),
+        Action::AltClick(x, y) => ["mousePressed", "mouseReleased"]
+            .into_iter()
+            .map(|kind| {
+                let (method, mut params) = mouse(kind, *x, *y);
+                // CDP's modifier bits: Alt 1, Control 2, Meta 4, Shift 8
+                params["modifiers"] = json!(1);
+                (method, params)
+            })
+            .collect(),
         Action::Press(x, y) => {
             pointer.held = true;
             vec![mouse("mousePressed", *x, *y)]

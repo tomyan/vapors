@@ -367,7 +367,17 @@ on the press itself (`Event::PrimaryButton`'s `clicks`, a release its
 press's), so nothing waits for a count that may not come; the document
 places the caret, selects a word or the whole text with the press
 (`Document::pointer_pressed_clicks`), as Chromium does on `mousedown`.
-A press with no known pointer position starts a new row. The platform counts on every
+A press with no known pointer position starts a new row, and so does
+a press of another button (Chromium counts one button's presses). A
+touch's taps are counted by the platform's gestures in runs of 1, 2, 3
+then again (`Event::Tap`'s `clicks`), as desktop headless Chromium 155
+counts CDP touch taps (the corpus's `clicks.events`: of five quick taps
+the 2nd and the 5th send `dblclick`); the second of a run sends
+`dblclick`. Chrome on Android on a page without double-tap zoom is
+assumed to do the same, not yet measured on the Pixel. The photo's
+double tap (`Event::DoubleTap`, `ImageView`'s fit toggle) pairs taps
+instead, every second quick tap, as photo apps do (the lead,
+review-v100 R2). A mouse press and a tap never share a row. The platform counts on every
 target, the web included: winit cancels `pointerdown` (so the canvas
 selects no text), which in Chromium suppresses `mousedown` and with it
 the browser's own count (probed, Chromium 155: `pointerdown`'s `detail`
@@ -393,8 +403,8 @@ difference: words are Parley's (UAX 29), which keep a "." between
 letters inside a word, so a double click in "e.g." selects "e.g" where
 Chromium selects the "." alone; "3.5" and "don't" agree. A press inside
 the selection moves the caret after its `click`, so a `click` listener
-reads the selection held, as in Chromium. Not built: `detail` and
-`dblclick`, dragging by word or line after a double or
+reads the selection held, as in Chromium. Not built: `detail`, a
+text field's own use of `dblclick`, dragging by word or line after a double or
 triple click, dragging selected text, IME, `beforeinput`,
 `placeholder`, `maxlength`, scrolling a long text to the caret, the
 blinking caret (area 6), vertical selection in a `textarea`.
@@ -440,6 +450,45 @@ undo in one field after edits in another differs, and is not compared.
 Not built: copy and cut, the web page's paste (with the web input
 path), Command for Control on macOS, `beforeinput`'s `historyUndo`.
 
+As built (E6, the web's text input, 2026-11-01): a hidden `<textarea>`
+mirrors the focused text field, chosen over EditContext because one
+path serves Chrome, Safari, Firefox and Android's keyboards, doc 03
+needs it as the fallback anyway, and headless Chromium drives it with
+`Input.insertText` and `Input.imeSetComposition`; EditContext can
+follow as Chromium's path. The app sets the field
+(`Platform::set_text_field`: text, UTF-16 selection, caret area) after
+each event and frame when it changed; the textarea takes it, moves to
+the caret (transparent, 16 px so a phone does not zoom, no pointer
+events) and takes DOM focus when the app handles the press or tap,
+so that a phone may open its keyboard, which needs focus inside the
+user's gesture (not checked headless). Its `input` and composition events come back as
+`Event::TextEdited` (its whole state, and the text it was made
+against); the field takes the difference, composing text included,
+underlined, with `input`, and refuses an edit made against a text it
+no longer holds, reporting it and setting the field again. Its keys
+come back as `Event::Key`; it acts itself only on printable
+characters, any key while an IME composes, and Control or Command with
+C, V or X, and every other key's default is prevented, so the field's
+own keys (arrows, Backspace, Enter, Tab, undo) act. Its `paste` comes
+back as `Event::PastedText`, through `Document::text_pasted`; a paste
+with no clipboard data, a `getData` that fails, a listener the page
+refuses, and a paste that arrives with no field focused are each
+reported, never dropped. A press on the canvas takes DOM focus from the
+textarea; while a field is mirrored it goes back in the same press, so
+the keys and pastes after it reach the field. When the field loses
+focus (Tab, a click elsewhere) while the textarea holds DOM focus, the
+canvas takes it, not `<body>`, since winit hears keys on the canvas. Checked by
+`scripts/web-text-input.sh`: typed text, a composition and its commit,
+Backspace, an arrow, a composition in the middle, Shift+Home, a double
+click, a paste of "a\nb\n" (#92's line breaks: "a b"), and keys
+after leaving the field by Tab and by a click, on
+Chromium's own `<input>` and on the built page's field demo, the text
+and selection equal after each. Not checked headless: a real
+phone keyboard (Gboard's autocorrect and its Backspace on composed
+words), the keyboard opening on a tap, the candidate window's place.
+Not built: EditContext, copy and cut, the a11y mirror's ownership of
+the textarea (area 5).
+
 ## Text editing and IME
 
 One editing model for single- and multi-line fields, built on Parley's
@@ -470,9 +519,12 @@ the clipboard, caret painting and the DOM events. Rules:
   area 10 records it, because the hidden textarea has known gaps
   (composition in some IMEs, the caret rectangle) that the brief
   accepts for the secondary target.
-- Preedit text is shown inline with an underline and is not in the
-  value until commit; `beforeinput` is not fired for preedit changes
-  (as in browsers), `compositionupdate` is.
+- Preedit text is shown inline with an underline and is in the value
+  while it composes, with `input` per update, as Chromium's own
+  `<input>` holds it (the lead's decision, 2026-11-01: the web follows
+  the browser, and native winit IME matches it, so the two agree; the
+  launcher's list filters as you compose). `beforeinput` is not fired
+  for preedit changes (as in browsers), `compositionupdate` is.
 - Clipboard through area 7: `paste` carries text and images; the
   Composer's image paste is an event with `files`.
 - Undo inside a field is its own stack, separate from the app's

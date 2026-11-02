@@ -3,6 +3,7 @@
 
 use super::tests::view;
 use super::*;
+use vapors_platform::Event;
 
 fn moved(view: &mut ImageView, x: f32, y: f32) {
     view.event(&Event::PointerMoved { x, y });
@@ -17,6 +18,7 @@ fn a_drag_that_leaves_and_comes_back_does_not_pan_by_the_jump() {
     view.event(&Event::PrimaryButton {
         pressed: true,
         clicks: std::num::NonZeroU32::MIN,
+        modifiers: vapors_platform::Modifiers::default(),
     });
     moved(&mut view, 150.0, 100.0);
     assert_eq!(view.transform().translate[0], start[0] + 50.0);

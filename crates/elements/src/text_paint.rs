@@ -1,7 +1,8 @@
 //! A text field's caret and selection (E6a), painted in the field's
 //! own step, before its text: the selection's rects under the text in
-//! the ring's blue at a third, else the caret as a 1 px bar in the
-//! text's colour, while the field has focus; from the editor's
+//! the ring's blue at a third, a 1 px underline under composing text,
+//! and the caret as a 1 px bar in the text's colour, while the field
+//! has focus; from the editor's
 //! geometry, which agrees with the text's layout (one Parley, one
 //! font). The text's origin is kept for the pointer, which maps a
 //! press to a caret by it (`text_input`).
@@ -47,6 +48,10 @@ pub(crate) fn paint(
     }
     for rect in &marks.selection {
         push(out, origin, *rect, SELECTION, input.scale);
+    }
+    for rect in &marks.composing {
+        let line = [rect[0], rect[1] + rect[3] - 1.0, rect[2], 1.0];
+        push(out, origin, line, used.text.color, input.scale);
     }
     if let Some(caret) = marks.caret {
         push(out, origin, caret, used.text.color, input.scale);

@@ -9,6 +9,8 @@ pub enum Action {
     /// Press and release the left button this many times in a row at
     /// one point, each press counting one more (a double click is 2).
     Clicks(f64, f64, u32),
+    /// Press and release the left button with Alt held.
+    AltClick(f64, f64),
     /// A touch's start and end.
     Tap(f64, f64),
     /// Press the left button.
