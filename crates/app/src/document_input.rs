@@ -126,7 +126,7 @@ impl DocumentInput {
             self.act(document, action);
         }
         if let Event::WindowFocus { focused } = event {
-            Document::window_focus(document, *focused);
+            self.window_focus(document, *focused);
         }
         let unused_key = key(document, event) == Some(false)
             && !keys::field_paste_key(&document.borrow(), event);

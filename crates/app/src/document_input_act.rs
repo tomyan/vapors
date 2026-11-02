@@ -9,6 +9,17 @@ use super::DocumentInput;
 use crate::pointer::Action;
 
 impl DocumentInput {
+    /// The window lost or regained focus: on a loss the releases of what
+    /// is held happen outside and never come, so the routes held and the
+    /// gesture are forgotten, and the document cancels its pointers.
+    pub(super) fn window_focus(&mut self, document: &Rc<RefCell<Document>>, focused: bool) {
+        if !focused {
+            self.held = super::route::Held::default();
+            self.touch.forget();
+        }
+        Document::window_focus(document, focused);
+    }
+
     pub(super) fn act(&mut self, document: &Rc<RefCell<Document>>, action: Action) {
         match action {
             Action::Move(point) => {

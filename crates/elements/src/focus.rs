@@ -63,6 +63,12 @@ impl Document {
         if had == node {
             return;
         }
+        // while the window is away focus moves silently; its return
+        // fires `focus` on what has it then (`focus_window.rs`)
+        if document.borrow().window_away() {
+            document.borrow_mut().take_focus(node);
+            return;
+        }
         // a number or text field commits as focus leaves it, before its
         // blur, as Chromium fires its change (3-E3c, E6a)
         if let Some(had) = had {

@@ -93,3 +93,26 @@ fn a_repeated_loss_or_one_with_nothing_focused_fires_nothing() {
         unfocused.log.borrow()
     );
 }
+
+#[test]
+fn the_window_losing_focus_commits_an_edited_text_field_then_blurs_it() {
+    // Given: "Warm" edited to "Warms", its blur logged
+    let page = support::text_page::page();
+    support::text_page::click(&page, [150.0, 12.0]);
+    let log = Rc::clone(&page.log);
+    page.doc.borrow_mut().listen(
+        page.name,
+        "blur",
+        Box::new(move |_: &mut Event| log.borrow_mut().push("blur".into())),
+    );
+    support::text_page::type_text(&page, "s");
+    page.log.borrow_mut().clear();
+
+    // When
+    Document::window_focus(&page.doc, false);
+
+    // Then: the change before the blur, as Chromium (the probe's #t)
+    let log = page.log.borrow();
+    let names: Vec<&str> = log.iter().filter_map(|l| l.split(' ').next()).collect();
+    assert_eq!(names, ["change", "blur"], "{log:?}");
+}

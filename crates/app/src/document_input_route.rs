@@ -48,7 +48,9 @@ pub enum Route {
     Host,
     /// Both: the document had it, and the host takes it too. A key-down
     /// the document did not use, its repeats and its up, as a browser
-    /// gives the focused element a key and also bubbles it to the page.
+    /// gives the focused element a key and also bubbles it to the page;
+    /// and `WindowFocus`, on whose loss the host drops what it holds
+    /// (a held key's state), as the releases will not come.
     Both,
 }
 

@@ -4,11 +4,12 @@
 //
 //   env -u DBUS_SESSION_BUS_ADDRESS xvfb-run -a node crates/elements-corpus/probes/window-focus.mjs
 //
-// A number field at 5 is focused and 7 typed over it; another window is
-// brought to the front, then this one again. Chromium 155 printed:
+// For a number field at 5 (#a) and a text field holding "x" (#t): the
+// field is focused and 7 typed over it; another window is brought to
+// the front, then this one again. Chromium 155 printed, for each:
 //
-//   lost:     change, blur, focusout, window blur (activeElement: a)
-//   regained: window focus, focus, focusin (activeElement: a)
+//   lost:     change, blur, focusout, window blur (activeElement: a / t)
+//   regained: window focus, focus, focusin (activeElement: a / t)
 //
 // pinned on vapors by crates/elements/tests/focus_window.rs.
 import { spawn } from 'node:child_process';
@@ -44,23 +45,27 @@ const settle = () => new Promise((r) => setTimeout(r, 300));
 const page = (await json('/json')).find((t) => t.type === 'page');
 const send = await connect(page.webSocketDebuggerUrl);
 const value = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.result.value;
-const html = `<input id=a type=number value=5><script>window.log=[];
-for(const n of ['change','blur','focusout','focus','focusin'])a.addEventListener(n,()=>log.push(n));
+const html = `<input id=a type=number value=5><input id=t type=text value=x><script>window.log=[];
+for(const f of [a,t])for(const n of ['change','blur','focusout','focus','focusin'])f.addEventListener(n,()=>log.push(n));
 addEventListener('blur',()=>log.push('window blur'));addEventListener('focus',()=>log.push('window focus'));</script>`;
 await send('Page.navigate', { url: 'data:text/html,' + encodeURIComponent(html) });
 await settle();
 await send('Page.bringToFront');
 await settle();
-await value('a.focus(); a.select(); log.length = 0');
-await send('Input.insertText', { text: '7' });
 const browser = await connect((await json('/json/version')).webSocketDebuggerUrl);
-const other = await browser('Target.createTarget', { url: 'about:blank', newWindow: true });
-const sendOther = await connect((await json('/json')).find((t) => t.id === other.result.targetId).webSocketDebuggerUrl);
-await sendOther('Page.bringToFront');
-await settle();
-console.log('lost:', await value('log.splice(0).join(", ")'), '(activeElement:', await value('document.activeElement.id') + ')');
-await send('Page.bringToFront');
-await settle();
-console.log('regained:', await value('log.splice(0).join(", ")'), '(activeElement:', await value('document.activeElement.id') + ')');
+for (const field of ['a', 't']) {
+  await value(`${field}.focus(); ${field}.select(); log.length = 0`);
+  await send('Input.insertText', { text: '7' });
+  const other = await browser('Target.createTarget', { url: 'about:blank', newWindow: true });
+  const sendOther = await connect((await json('/json')).find((t) => t.id === other.result.targetId).webSocketDebuggerUrl);
+  await sendOther('Page.bringToFront');
+  await settle();
+  console.log(`#${field} lost:`, await value('log.splice(0).join(", ")'), '(activeElement:', await value('document.activeElement.id') + ')');
+  await send('Page.bringToFront');
+  await settle();
+  console.log(`#${field} regained:`, await value('log.splice(0).join(", ")'), '(activeElement:', await value('document.activeElement.id') + ')');
+  await browser('Target.closeTarget', { targetId: other.result.targetId });
+  await settle();
+}
 chrome.kill();
 process.exit(0);
