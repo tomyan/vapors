@@ -55,8 +55,16 @@ fn note(
     );
 }
 
-/// Remove `dir`; when it cannot be, rename it to `<dir>-unremovable` so
-/// no later sweep trips on it, and say how to remove it by hand.
+/// The marker in a set-aside directory's name; the sweep counts them.
+pub const SET_ASIDE: &str = "-unremovable-";
+
+/// How many names a set-aside tries before giving up.
+const SET_ASIDE_TRIES: u32 = 100;
+
+/// Remove `dir`; when it cannot be, rename it to the first free
+/// `<dir>-unremovable-<n>` (never onto one already there, which may hold
+/// another run's leftovers) so no later sweep trips on it, and say how
+/// to remove it by hand.
 ///
 /// # Errors
 /// It could not be removed: the error, where it now is, and the fix.
@@ -66,16 +74,28 @@ pub fn remove_or_set_aside(dir: &Path) -> Result<(), String> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(e) => e,
     };
-    let aside = PathBuf::from(format!("{}-unremovable", dir.display()));
-    let now = match std::fs::rename(dir, &aside) {
-        Ok(()) => format!("set aside as {}", aside.display()),
-        Err(e) => format!("not set aside either ({e})"),
+    let (shown, now) = match set_aside(dir) {
+        Ok(aside) => (aside.clone(), format!("set aside as {}", aside.display())),
+        Err(why) => (dir.to_path_buf(), format!("not set aside either ({why})")),
     };
-    let shown = if aside.exists() { &aside } else { dir };
     Err(format!(
         "{shown} could not be removed ({error}), {now}; \
          fix: chmod -R u+rwx {shown} && rm -rf {shown} \
          (sudo rm -rf {shown} if a file in it is not yours)",
         shown = shown.display(),
     ))
+}
+
+/// Rename `dir` to the first `<dir>-unremovable-<n>` that is not there.
+fn set_aside(dir: &Path) -> Result<PathBuf, String> {
+    for n in 1..=SET_ASIDE_TRIES {
+        let aside = PathBuf::from(format!("{}{SET_ASIDE}{n}", dir.display()));
+        if aside.symlink_metadata().is_ok() {
+            continue;
+        }
+        return std::fs::rename(dir, &aside)
+            .map(|()| aside)
+            .map_err(|e| e.to_string());
+    }
+    Err(format!("{SET_ASIDE_TRIES} set-aside names are taken"))
 }

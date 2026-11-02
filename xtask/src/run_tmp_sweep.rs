@@ -6,7 +6,14 @@
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
-use super::walk::{remove_or_set_aside, walk};
+use super::walk::{SET_ASIDE, remove_or_set_aside, walk};
+
+/// The most set-aside directories (runs' leftovers that could not be
+/// removed) the sweep lets runs go on with. One is a single bad run, said
+/// on every run until someone removes it; more than this many means
+/// something keeps leaving files the factory cannot remove, which needs a
+/// person to look before it fills /tmp, so runs stop until then.
+const SET_ASIDE_LIMIT: usize = 3;
 
 /// Who is sweeping.
 pub struct Who<'a> {
@@ -24,9 +31,17 @@ pub struct Who<'a> {
 pub fn sweep(base: &Path, who: &Who<'_>) -> Result<Vec<String>, String> {
     let listed = std::fs::read_dir(base).map_err(|e| format!("{}: {e}", base.display()))?;
     let mut said = Vec::new();
+    let mut aside = Vec::new();
     for entry in listed {
         let entry = entry.map_err(|e| format!("{}: {e}", base.display()))?;
         let name = entry.file_name().to_string_lossy().into_owned();
+        if name.starts_with("xtask-run-")
+            && name.contains(SET_ASIDE)
+            && mine(&entry.path(), who.uid)
+        {
+            aside.push(entry.path().display().to_string());
+            continue;
+        }
         let Some(pid) = name
             .strip_prefix("xtask-run-")
             .and_then(|p| p.parse::<u32>().ok())
@@ -38,7 +53,33 @@ pub fn sweep(base: &Path, who: &Who<'_>) -> Result<Vec<String>, String> {
         }
         said.extend(one(&entry.path(), pid, who.uid)?);
     }
+    said.extend(set_aside(aside)?);
     Ok(said)
+}
+
+/// A line naming the set-aside directories, or a refusal when there are
+/// more than `SET_ASIDE_LIMIT`.
+fn set_aside(mut aside: Vec<String>) -> Result<Option<String>, String> {
+    if aside.is_empty() {
+        return Ok(None);
+    }
+    aside.sort();
+    let listed = format!(
+        "{} set-aside run directories: {}",
+        aside.len(),
+        aside.join(", ")
+    );
+    let fix = "fix: chmod -R u+rwx <dir> && rm -rf <dir> for each, after looking at what is in it";
+    if aside.len() > SET_ASIDE_LIMIT {
+        return Err(format!(
+            "{listed}; more than {SET_ASIDE_LIMIT}, so runs stop; {fix}"
+        ));
+    }
+    Ok(Some(format!("{listed}; {fix}")))
+}
+
+fn mine(path: &Path, uid: u32) -> bool {
+    std::fs::symlink_metadata(path).is_ok_and(|m| m.uid() == uid)
 }
 
 /// Remove one dead run's directory, if it is this user's.

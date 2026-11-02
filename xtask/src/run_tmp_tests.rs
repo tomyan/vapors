@@ -137,8 +137,10 @@ fn an_unreadable_directory_fails_its_run_once_and_is_set_aside() {
     if as_root() {
         return;
     }
-    // Given: a step left a directory no one can read
+    // Given: a step left a directory no one can read, and an earlier run
+    // with the same pid left a set-aside directory of that name already
     let base = scratch::dir("run-tmp-unreadable");
+    std::fs::create_dir_all(base.join("xtask-run-9-unremovable-1/earlier")).expect("earlier");
     let run = RunTmp::make(&base, 9).expect("made");
     let locked = run.path().join("locked");
     std::fs::create_dir(&locked).expect("dir");
@@ -149,7 +151,7 @@ fn an_unreadable_directory_fails_its_run_once_and_is_set_aside() {
     let next = RunTmp::make(&base, 9);
 
     // Then
-    let aside = base.join("xtask-run-9-unremovable");
+    let aside = base.join("xtask-run-9-unremovable-2");
     std::fs::set_permissions(aside.join("locked"), std::fs::Permissions::from_mode(0o700))
         .expect("chmod back");
     assert!(
@@ -158,6 +160,10 @@ fn an_unreadable_directory_fails_its_run_once_and_is_set_aside() {
     );
     assert!(refusal.contains("fix: chmod -R u+rwx"), "{refusal}");
     assert!(next.is_ok(), "the next run with that pid is not blocked");
+    assert!(
+        base.join("xtask-run-9-unremovable-1/earlier").exists(),
+        "the earlier one is kept"
+    );
 }
 
 #[path = "run_tmp_sweep_tests.rs"]

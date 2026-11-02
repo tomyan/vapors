@@ -81,7 +81,7 @@ fn another_users_directory_is_left_alone_and_said() {
 }
 
 #[test]
-fn an_unremovable_directory_refuses_one_sweep_naming_the_fix_and_not_the_next() {
+fn an_unremovable_directory_refuses_one_sweep_and_is_named_on_every_later_one() {
     if me() == 0 {
         println!("SKIPPED: running as root, which can remove a mode-000 directory's contents");
         return;
@@ -103,12 +103,43 @@ fn an_unremovable_directory_refuses_one_sweep_naming_the_fix_and_not_the_next() 
     let second = sweep(&base, &who);
 
     // Then
-    let aside = base.join("xtask-run-14-unremovable/locked");
-    std::fs::set_permissions(&aside, std::fs::Permissions::from_mode(0o700)).expect("chmod back");
+    let aside = base.join("xtask-run-14-unremovable-1");
+    std::fs::set_permissions(aside.join("locked"), std::fs::Permissions::from_mode(0o700))
+        .expect("chmod back");
     let why = first.expect_err("refused");
     assert!(
         why.contains("xtask-run-14") && why.contains("fix: chmod -R u+rwx"),
         "{why}"
     );
-    assert!(second.is_ok(), "{second:?}");
+    let said = second.expect("the next sweep goes on");
+    let named = format!("1 set-aside run directories: {}", aside.display());
+    assert!(
+        said.iter()
+            .any(|l| l.starts_with(&named) && l.contains("fix: ")),
+        "{said:?}"
+    );
+}
+
+#[test]
+fn more_set_aside_directories_than_the_limit_stop_runs_naming_them_and_the_fix() {
+    // Given: four set-aside directories of this user's
+    let base = scratch::dir("run-tmp-many-aside");
+    for n in 1..=4 {
+        std::fs::create_dir(base.join(format!("xtask-run-{n}-unremovable-1"))).expect("dir");
+    }
+    let who = Who {
+        pid: 1,
+        uid: me(),
+        is_running: &|_| false,
+    };
+
+    // When
+    let refusal = sweep(&base, &who).expect_err("too many");
+
+    // Then
+    assert!(refusal.contains("4 set-aside run directories"), "{refusal}");
+    assert!(
+        refusal.contains("more than 3") && refusal.contains("fix: "),
+        "{refusal}"
+    );
 }
