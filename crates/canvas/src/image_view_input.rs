@@ -3,11 +3,12 @@
 //! tap fits it or shows it actual size, the keys fit, show actual size
 //! and zoom. A pointer gesture (a press with its drag and release, a
 //! wheel, a touch with its pan, pinch and lift, a double tap) that starts
-//! outside the area, or at a position the view does not know, is not
-//! the view's: it moves nothing, and the view answers
+//! outside the area, or a press or touch at a position the view does not
+//! know, is not the view's: it moves nothing, and the view answers
 //! [`Answered::OutsideArea`] for every event of it, so the host can give
 //! the whole gesture to what it drew there (touché's tool card in the
-//! side panel's inset).
+//! side panel's inset). A wheel with no pointer known zooms about the
+//! area's centre.
 
 use vapors_platform::{Event, LINE_PIXELS, TouchPhase};
 use vapors_scene::Size;
@@ -22,8 +23,9 @@ const ZOOM_STEP: f32 = 1.25;
 pub enum Answered {
     /// The view answered it, or it means nothing to the view.
     Done,
-    /// An event of a pointer gesture that started outside the area, or
-    /// where the view does not know the pointer: nothing moved. The host
+    /// An event of a pointer gesture that started outside the area, or a
+    /// press or touch where the view does not know the pointer: nothing
+    /// moved. A wheel with no pointer known zooms (`scrolled`). The host
     /// gives it to its own drawing there; every event of the gesture,
     /// to its release or last lift, answers this.
     OutsideArea,
@@ -115,8 +117,15 @@ impl ImageView {
     }
 
     /// A notch away from the user (one line up) zooms in a step.
+    /// A wheel with the pointer known outside the area is the host's; with
+    /// none known it zooms about the area's centre. winit's wheel event
+    /// carries no position, and the cursor can rest over the canvas from
+    /// the page's load or the window's focus with no move yet, so the
+    /// first wheel must still zoom. Presses and touches at an unknown
+    /// position stay outside: they would move the photo from a point the
+    /// view has not seen.
     fn scrolled(&mut self, dy: f32) -> Answered {
-        if self.pointer_not_inside() {
+        if self.steering.pointer.is_some() && self.pointer_not_inside() {
             return Answered::OutsideArea;
         }
         self.zoom(self.scroll_anchor(), ZOOM_STEP.powf(-dy / LINE_PIXELS));
@@ -169,8 +178,8 @@ impl ImageView {
             .is_none_or(|at| !self.area_contains(at))
     }
 
-    /// The pointer: winit's wheel event carries no position of its own,
-    /// and a wheel with none known is refused before this.
+    /// The pointer, or the area's centre when none is known: winit's wheel
+    /// event carries no position of its own.
     fn scroll_anchor(&self) -> [f32; 2] {
         self.steering.pointer.unwrap_or_else(|| self.centre())
     }
