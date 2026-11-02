@@ -160,7 +160,7 @@ impl Emitter<'_> {
             return Ok(());
         };
         Err(self.source.error(attribute.offset, format!(
-            "`bind:this={{{name}}}`: `{name}` here is the `{{for}}`'s, which shadows the script's `{name}` at {}:{}; bind:this takes the script's signal: rename the loop's",
+            "`bind:this={{{name}}}`: `{name}` here is the template's own (a `{{for}}` name or a snippet parameter), which shadows the script's signal `{name}` at {}:{}; bind:this takes the script's signal: rename the template's",
             self.source.path,
             self.source.describe(*at)
         )))
