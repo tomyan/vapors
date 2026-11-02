@@ -44,11 +44,11 @@ pub fn run(reporter: &Reporter) -> ExitCode {
     let prepared = Config::load()
         .map_err(|e| e.to_string())
         .and_then(|config| prepare(&config));
-    let (steps, before, siblings, output) = match prepared {
+    let (steps, before, siblings, output, wrap) = match prepared {
         Ok(prepared) => prepared,
         Err(why) => return refuse(&why),
     };
-    let code = crate::gate_run::run(&steps, &output, reporter);
+    let code = crate::gate_run::run(&steps, &output, wrap, reporter);
     if code != ExitCode::SUCCESS {
         return code;
     }
@@ -72,13 +72,22 @@ fn refuse(why: &str) -> ExitCode {
 /// Pinned sibling checkouts: the directory, and the file naming its pin.
 type Pinned = Vec<(String, String)>;
 
+/// What the gate runs, and how.
+type Prepared = (
+    Vec<PlannedStep>,
+    State,
+    Pinned,
+    PathBuf,
+    crate::gate_run::Wrap,
+);
+
 /// The plan, the state before (a clean tree), the pinned siblings, and
 /// the `GITHUB_OUTPUT` file, emptied.
-fn prepare(config: &Config) -> Result<(Vec<PlannedStep>, State, Pinned, PathBuf), String> {
+fn prepare(config: &Config) -> Result<Prepared, String> {
     let siblings: Pinned = config.entries_under("gate.pinned.").into_iter().collect();
     let before = state(&siblings)?;
     refuse_dirty(&before)?;
-    crate::gate_run::check_sandbox()?;
+    let wrap = crate::gate_run::sandbox_wrap(config)?;
     let twin = config.get(crate::gate_twin::KEY).map(std::path::Path::new);
     println!(
         "{}",
@@ -94,7 +103,7 @@ fn prepare(config: &Config) -> Result<(Vec<PlannedStep>, State, Pinned, PathBuf)
         read: &read,
     };
     let planned = plan(&workflow, &sources).map_err(|why| format!("{WORKFLOW}: {why}"))?;
-    Ok((planned, before, siblings, output_file()?))
+    Ok((planned, before, siblings, output_file()?, wrap))
 }
 
 /// The gate passes only a commit: a tree with changes is refused.

@@ -17,10 +17,10 @@ use crate::steps::Step;
 
 #[path = "gate_sandbox.rs"]
 mod sandbox;
-pub use sandbox::check as check_sandbox;
+pub use sandbox::{Wrap, wrap as sandbox_wrap};
 
 /// Run `planned`; `output` is the `GITHUB_OUTPUT` file.
-pub fn run(planned: &[PlannedStep], output: &Path, reporter: &Reporter) -> ExitCode {
+pub fn run(planned: &[PlannedStep], output: &Path, wrap: Wrap, reporter: &Reporter) -> ExitCode {
     let started = Instant::now();
     let mut job: Option<(&str, Instant)> = None;
     let mut passed = 0;
@@ -30,7 +30,7 @@ pub fn run(planned: &[PlannedStep], output: &Path, reporter: &Reporter) -> ExitC
             _ => Instant::now(),
         };
         job = Some((&planned_step.job, job_started));
-        let mut step = step_for(planned_step, output);
+        let mut step = step_for(planned_step, output, wrap);
         step.deadline = Some(deadline(planned_step, job_started.elapsed()));
         let load_at_start = crate::load::now();
         let outcome = command::run(&step);
@@ -58,12 +58,15 @@ pub fn deadline(planned: &PlannedStep, spent: Duration) -> Duration {
 
 /// A step running `planned`'s script as CI does.
 #[must_use]
-pub fn step_for(planned: &PlannedStep, output: &Path) -> Step {
-    let mut args = sandbox::HIDE_GPU_DEVICE.to_vec();
-    args.extend(["bash", "-eo", "pipefail", "-c", &planned.run]);
+pub fn step_for(planned: &PlannedStep, output: &Path, wrap: Wrap) -> Step {
+    let script = ["bash", "-eo", "pipefail", "-c", planned.run.as_str()];
+    let (program, args) = match wrap {
+        Wrap::HideGpuDevice => ("bwrap", [&sandbox::HIDE_GPU_DEVICE[..], &script].concat()),
+        Wrap::AsIs => ("bash", script[1..].to_vec()),
+    };
     let mut step = Step::new(
         &planned.name,
-        "bwrap",
+        program,
         &args,
         "fix it, then rerun `cargo xtask gate`",
     );
