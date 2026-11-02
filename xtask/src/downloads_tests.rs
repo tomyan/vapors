@@ -55,3 +55,19 @@ fn a_missing_field_is_refused_naming_it() {
     let error = parse(&text).expect_err("missing");
     assert!(error.reason.contains("sws has no binary_sha256"), "{error}");
 }
+
+#[test]
+fn a_zip_is_a_tree_installed_in_its_own_directory() {
+    // Given
+    let text = file("").replace("sws.tar.gz", "sws.zip");
+
+    // When
+    let download = parse(&text).expect("valid").remove(0);
+
+    // Then
+    assert!(download.is_tree());
+    assert_eq!(
+        installed_path(&download, Path::new("/home/t")),
+        Path::new("/home/t/.local/share/factory/sws-2.44.1/sws/sws")
+    );
+}

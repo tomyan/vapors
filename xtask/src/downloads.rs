@@ -3,7 +3,9 @@
 //! `<name>.<field> = "<value>"` line per field. The archive's SHA-256 and
 //! the binary's are both pinned; the binary is installed to a fixed path
 //! under the home directory (`installed_path`) only after both match, and
-//! is never run to find out what it is (`download_install.rs`).
+//! is never run to find out what it is (`download_install.rs`). A `.zip`
+//! is a tree (a browser with its libraries beside it), installed whole in
+//! its own directory; a `.tar.gz` gives its one binary.
 
 use std::path::{Path, PathBuf};
 
@@ -14,7 +16,7 @@ use crate::tools::ParseError;
 pub struct Download {
     pub name: String,
     pub version: String,
-    /// An https URL of a `.tar.gz` release asset.
+    /// An https URL of a `.tar.gz` (one binary) or `.zip` (a tree) asset.
     pub url: String,
     /// The archive's SHA-256, lower-case hex.
     pub sha256: String,
@@ -44,10 +46,30 @@ pub fn pinned(name: &str) -> Result<Download, String> {
 
 const FIELDS: [&str; 5] = ["version", "url", "sha256", "member", "binary_sha256"];
 
-/// Where `download` is installed: `~/.local/share/factory/bin/<name>-<version>`.
+impl Download {
+    /// A `.zip`: the whole tree is installed, the binary inside it.
+    #[must_use]
+    pub fn is_tree(&self) -> bool {
+        self.url.ends_with(".zip")
+    }
+}
+
+/// Where `download`'s binary is installed: `~/.local/share/factory/bin/
+/// <name>-<version>`, or for a tree `~/.local/share/factory/<name>-
+/// <version>/<member>` ([`tree_dir`]).
 #[must_use]
 pub fn installed_path(download: &Download, home: &Path) -> PathBuf {
+    if download.is_tree() {
+        return tree_dir(download, home).join(&download.member);
+    }
     home.join(".local/share/factory/bin")
+        .join(format!("{}-{}", download.name, download.version))
+}
+
+/// The directory a tree is installed in.
+#[must_use]
+pub fn tree_dir(download: &Download, home: &Path) -> PathBuf {
+    home.join(".local/share/factory")
         .join(format!("{}-{}", download.name, download.version))
 }
 
@@ -107,8 +129,11 @@ fn check_value(kind: &str, value: &str) -> Result<(), String> {
         "sha256" | "binary_sha256" if !hex => Err(format!(
             "{kind} must be 64 lower-case hex digits (a SHA-256)"
         )),
-        "url" if !value.starts_with("https://") || !value.ends_with(".tar.gz") => {
-            Err("url must be an https URL of a .tar.gz release asset".to_owned())
+        "url"
+            if !value.starts_with("https://")
+                || !(value.ends_with(".tar.gz") || value.ends_with(".zip")) =>
+        {
+            Err("url must be an https URL of a .tar.gz or .zip release asset".to_owned())
         }
         _ => Ok(()),
     }

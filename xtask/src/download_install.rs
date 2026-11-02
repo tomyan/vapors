@@ -13,7 +13,8 @@ use crate::deadline::{Finished, run_with_deadline};
 use crate::downloads::{Download, installed_path};
 
 /// The 2.44.1 archive (4.6 MB) downloaded in under 2 s on the dev box
-/// (2026-10-26); 120 s allows a slow link without hanging setup.
+/// (2026-10-26), Chrome for Testing 155's (199 MB) in 18 s (2026-11-02);
+/// 120 s allows a slow link without hanging setup.
 const FETCH_DEADLINE: Duration = Duration::from_secs(120);
 
 /// The installed binary, hashed and matching its pin.
@@ -50,6 +51,9 @@ pub fn ensure(download: &Download, home: &Path) -> Result<PathBuf, String> {
     if let Ok(path) = verified(download, home) {
         return Ok(path);
     }
+    if download.is_tree() {
+        return tree::ensure(download, home);
+    }
     let path = installed_path(download, home);
     let bin = path.parent().ok_or("the install path has no directory")?;
     let work = bin.join(format!(
@@ -80,7 +84,7 @@ fn fetch_and_place(download: &Download, work: &Path, path: &Path) -> Result<(), 
         .map_err(|e| format!("{} to {}: {e}", binary.display(), path.display()))
 }
 
-fn fetch(url: &str, to: &Path) -> Result<(), String> {
+pub(crate) fn fetch(url: &str, to: &Path) -> Result<(), String> {
     let mut command = Command::new("curl");
     command.args(["-sSfL", "-o"]).arg(to).arg(url);
     match run_with_deadline(command, FETCH_DEADLINE)? {
@@ -93,7 +97,7 @@ fn fetch(url: &str, to: &Path) -> Result<(), String> {
     }
 }
 
-fn matches(file: &Path, pinned: &str, what: &str) -> Result<(), String> {
+pub(crate) fn matches(file: &Path, pinned: &str, what: &str) -> Result<(), String> {
     let found = sha256(file)?;
     if found == pinned {
         return Ok(());
@@ -124,7 +128,7 @@ pub fn sha256(file: &Path) -> Result<String, String> {
     }
 }
 
-fn run(command: &mut Command) -> Result<(), String> {
+pub(crate) fn run(command: &mut Command) -> Result<(), String> {
     let output = command.output().map_err(|e| format!("{command:?}: {e}"))?;
     if output.status.success() {
         return Ok(());
@@ -136,16 +140,19 @@ fn run(command: &mut Command) -> Result<(), String> {
 }
 
 #[cfg(unix)]
-fn executable(file: &Path) -> Result<(), String> {
+pub(crate) fn executable(file: &Path) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
     std::fs::set_permissions(file, std::fs::Permissions::from_mode(0o755))
         .map_err(|e| format!("{}: {e}", file.display()))
 }
 
 #[cfg(not(unix))]
-fn executable(_file: &Path) -> Result<(), String> {
+pub(crate) fn executable(_file: &Path) -> Result<(), String> {
     Ok(())
 }
+
+#[path = "download_tree.rs"]
+mod tree;
 
 #[cfg(test)]
 #[path = "download_install_tests.rs"]

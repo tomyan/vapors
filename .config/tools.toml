@@ -26,3 +26,16 @@ static-web-server.url = "https://github.com/static-web-server/static-web-server/
 static-web-server.sha256 = "a71fb43143d0964f82417178fa56d8f6ee4b33f49ddde4b2263d97404fdfbbc4"
 static-web-server.member = "static-web-server-v2.44.1-x86_64-unknown-linux-gnu/static-web-server"
 static-web-server.binary_sha256 = "4b39efe44e995bfb1a19517079046490ccc9b4e9907bf924ec46bef3197be56b"
+# The one browser every Chromium check and oracle runs, in vapors and in
+# touche: Chrome for Testing, the build Google publishes for automated
+# tests, at the version the dev box's Debian Chromium had (155.0.8059.79;
+# this is its latest 155.0.8059 patch). Installed whole to
+# ~/.local/share/factory/chrome-for-testing-155.0.8059.84/. Google lists
+# no checksum for it; both hashes are of the file downloaded on
+# 2026-11-02, where touche's headless and Xvfb checks and vapors' page
+# contract, unit and gpu tiers all passed on it.
+chrome-for-testing.version = "155.0.8059.84"
+chrome-for-testing.url = "https://storage.googleapis.com/chrome-for-testing-public/155.0.8059.84/linux64/chrome-linux64.zip"
+chrome-for-testing.sha256 = "cf0f049892dea22e6a6db26d47ed0d7776b7158edcbec4634086633df8bafcbc"
+chrome-for-testing.member = "chrome-linux64/chrome"
+chrome-for-testing.binary_sha256 = "b866a2964538c825538c454de4867973b926650da57ec12dc3328807d768247b"
