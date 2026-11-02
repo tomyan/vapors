@@ -48,10 +48,14 @@ impl Reporter {
         }
     }
 
-    /// Final line: how many steps passed and the total time.
+    /// Final line: how many steps passed and the total time, then the
+    /// load wait's line if this run went on past its deadline.
     pub fn summary(passed: usize, total: usize, elapsed: Duration) {
         let verdict = if passed == total { "ok" } else { "FAIL" };
         println!("{verdict}   {passed}/{total} steps in {}", seconds(elapsed));
+        if let Some(line) = crate::load_wait::went_past_deadline() {
+            println!("     {line}");
+        }
     }
 }
 

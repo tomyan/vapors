@@ -44,6 +44,7 @@ mod imports_rules;
 mod layers;
 mod layers_graph;
 mod load;
+mod load_wait;
 mod lock_owner;
 #[cfg(test)]
 mod lock_scratch;
@@ -181,6 +182,9 @@ fn ci_sharing_the_gate_lock(steps: &[steps::Step], reporter: &report::Reporter) 
     let gate_env = std::env::var(priority::GATE_ENV).ok();
     if priority::in_gate(false, gate_env.as_deref()) {
         return ci_with_hit_rate(steps, reporter);
+    }
+    if let Err(why) = load_wait::before("ci") {
+        return fail("ci", &why);
     }
     let worktree =
         std::env::current_dir().map_or_else(|_| "?".to_owned(), |d| d.display().to_string());
