@@ -105,25 +105,60 @@ fn a_run_directory_already_there_is_refused_naming_it() {
     assert!(refusal.contains("fix: "), "{refusal}");
 }
 
+/// Whether this process runs as root, which reads any directory, so the
+/// unreadable cases cannot be made; such a test says it is skipped.
+fn as_root() -> bool {
+    let root = crate::xvfb_display::current_uid().expect("uid") == 0;
+    if root {
+        println!("SKIPPED: running as root, which can read a mode-000 directory");
+    }
+    root
+}
+
 #[test]
-fn a_dead_runs_directory_is_removed_and_said_and_a_live_ones_kept() {
-    // Given: runs 10 (dead, two files) and 11 (running), and another name
-    let base = scratch::dir("run-tmp-sweep");
-    std::fs::create_dir_all(base.join("xtask-run-10/sub")).expect("dir");
-    std::fs::write(base.join("xtask-run-10/sub/a"), "").expect("file");
-    std::fs::create_dir(base.join("xtask-run-11")).expect("dir");
-    std::fs::create_dir(base.join("xtask-run-notapid")).expect("dir");
+fn a_tmpdir_a_step_removed_fails_the_run_naming_it() {
+    // Given: a step removed $TMPDIR itself
+    let base = scratch::dir("run-tmp-gone");
+    let run = RunTmp::make(&base, 8).expect("made");
+    std::fs::remove_dir(run.path()).expect("removed");
 
     // When
-    let said = sweep(&base, &|pid| pid == 11).expect("swept");
+    let refusal = run.finish("ci").expect_err("gone");
 
     // Then
-    assert_eq!(said.len(), 1, "{said:?}");
     assert!(
-        said[0].contains("xtask-run-10") && said[0].contains("2 entries"),
-        "{said:?}"
+        refusal.contains("could not read") && refusal.contains("xtask-run-8"),
+        "{refusal}"
     );
-    assert!(!base.join("xtask-run-10").exists());
-    assert!(base.join("xtask-run-11").exists());
-    assert!(base.join("xtask-run-notapid").exists());
 }
+
+#[test]
+fn an_unreadable_directory_fails_its_run_once_and_is_set_aside() {
+    if as_root() {
+        return;
+    }
+    // Given: a step left a directory no one can read
+    let base = scratch::dir("run-tmp-unreadable");
+    let run = RunTmp::make(&base, 9).expect("made");
+    let locked = run.path().join("locked");
+    std::fs::create_dir(&locked).expect("dir");
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).expect("chmod");
+
+    // When
+    let refusal = run.finish("ci").expect_err("unreadable");
+    let next = RunTmp::make(&base, 9);
+
+    // Then
+    let aside = base.join("xtask-run-9-unremovable");
+    std::fs::set_permissions(aside.join("locked"), std::fs::Permissions::from_mode(0o700))
+        .expect("chmod back");
+    assert!(
+        refusal.contains("locked") && refusal.contains("set aside"),
+        "{refusal}"
+    );
+    assert!(refusal.contains("fix: chmod -R u+rwx"), "{refusal}");
+    assert!(next.is_ok(), "the next run with that pid is not blocked");
+}
+
+#[path = "run_tmp_sweep_tests.rs"]
+mod sweep_tests;

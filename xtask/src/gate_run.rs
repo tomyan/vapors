@@ -2,8 +2,8 @@
 //! each step killed at its deadline. A job's `timeout-minutes` bounds
 //! its steps together, from when its first step starts; a step's own
 //! `timeout-minutes` bounds it alone. Every step gets `GITHUB_OUTPUT`,
-//! a file under target/, as CI gives one, and the run's TMPDIR. Each step's line is followed
-//! by the machine's load at its start and end.
+//! a file under target/, as CI gives one, and the run's TMPDIR. Each
+//! step's line is followed by the machine's load at its start and end.
 
 use std::path::Path;
 use std::process::ExitCode;

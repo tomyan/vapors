@@ -9,6 +9,19 @@
 //! Chromium puts its singleton socket in TMPDIR, and a socket path must
 //! fit in 108 bytes. Under a longer TMPDIR, `gpu_devtools` failed with
 //! "Socket path too long" (2026-11-02).
+//!
+//! What it does not cover, so a passing check is not "nothing was left in
+//! /tmp": Xvfb's `/tmp/.X11-unix/X<n>` socket and `/tmp/.X<n>-lock`
+//! (hard-coded by Xvfb; `xvfb.rs` handles stale ones); Chromium's
+//! `/dev/shm` segments; anything under HOME or the XDG directories; and
+//! a step that names `/tmp/...` itself. The gate's floor on free inodes
+//! is the backstop for those.
+//!
+//! A run that panics or is killed leaves its directory; the next run's
+//! sweep removes it if its pid is not running. Declared limit: "running"
+//! is `/proc/<pid>` existing, so a run in another pid namespace sharing
+//! /tmp (a container) looks dead and its directory would be swept; and a
+//! dead run whose pid was reused stays until that process exits.
 
 use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
@@ -48,19 +61,31 @@ impl RunTmp {
         &self.dir
     }
 
-    /// Remove the directory; when it held anything, fail naming it.
+    /// Remove the directory; when it held anything, or any of it could
+    /// not be read or removed, fail naming all of it.
     ///
     /// # Errors
-    /// Entries were left (named), or the directory could not be read or
-    /// removed.
+    /// Entries were left, or could not be read, or the directory could
+    /// not be removed (it is then set aside, and the next run is not
+    /// blocked by it).
     pub fn finish(self, run: &str) -> Result<(), String> {
-        let left = entries(&self.dir)?;
-        std::fs::remove_dir_all(&self.dir)
-            .map_err(|e| format!("{}: {e}; fix: remove it", self.dir.display()))?;
-        if left.is_empty() {
+        let walked = walk::walk(&self.dir);
+        let removed = walk::remove_or_set_aside(&self.dir);
+        let mut said = Vec::new();
+        if !walked.entries.is_empty() {
+            said.push(refusal(run, &self.dir, &walked.entries));
+        }
+        if !walked.unread.is_empty() {
+            said.push(format!(
+                "{run} could not read all of its TMPDIR: {}",
+                walked.unread.join(", ")
+            ));
+        }
+        said.extend(removed.err());
+        if said.is_empty() {
             return Ok(());
         }
-        Err(refusal(run, &self.dir, &left))
+        Err(said.join("; and "))
     }
 }
 
@@ -75,38 +100,12 @@ fn refusal(run: &str, dir: &Path, left: &[String]) -> String {
         n => format!("{n} entries"),
     };
     format!(
-        "{run} left {count} in its TMPDIR {}, now removed: {named}; \
+        "{run} left {count} in its TMPDIR {}: {named}; \
          fix: the test or step that made them removes them (tempfile::TempDir in a test; \
          a TMPDIR of its own for Chromium); reproduce: \
          TMPDIR=$(mktemp -d) cargo nextest run --workspace, then list that directory",
         dir.display()
     )
-}
-
-/// Every entry under `dir`, files and directories, as paths relative to
-/// it, sorted.
-fn entries(dir: &Path) -> Result<Vec<String>, String> {
-    let mut found = Vec::new();
-    let mut pending = vec![dir.to_path_buf()];
-    while let Some(next) = pending.pop() {
-        for entry in read(&next)? {
-            let path = entry.path();
-            if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
-                pending.push(path.clone());
-            }
-            let relative = path.strip_prefix(dir).unwrap_or(&path);
-            found.push(relative.display().to_string());
-        }
-    }
-    found.sort();
-    Ok(found)
-}
-
-fn read(dir: &Path) -> Result<Vec<std::fs::DirEntry>, String> {
-    let entries = std::fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    entries
-        .collect::<Result<_, _>>()
-        .map_err(|e| format!("{}: {e}", dir.display()))
 }
 
 /// A new run's TMPDIR under `base`, once the directories of runs that
@@ -115,10 +114,15 @@ fn read(dir: &Path) -> Result<Vec<std::fs::DirEntry>, String> {
 /// # Errors
 /// [`sweep`]'s or [`RunTmp::make`]'s.
 pub fn begin(base: &Path) -> Result<RunTmp, String> {
-    for line in sweep(base, &crate::xvfb_display::process_is_running)? {
+    let who = sweep::Who {
+        pid: std::process::id(),
+        uid: crate::xvfb_display::current_uid()?,
+        is_running: &crate::xvfb_display::process_is_running,
+    };
+    for line in sweep::sweep(base, &who)? {
         println!("tmp: {line}");
     }
-    RunTmp::make(base, std::process::id())
+    RunTmp::make(base, who.pid)
 }
 
 /// `step` with `tmp` as its TMPDIR.
@@ -151,31 +155,11 @@ pub fn around_temp_dir(run: &str, body: impl FnOnce(&Path) -> ExitCode) -> ExitC
     })
 }
 
-/// Remove each `xtask-run-<pid>` under `base` whose run is not going (a
-/// run that was killed cannot remove its own); one line for each.
-///
-/// # Errors
-/// `base` or such a directory cannot be read or removed.
-pub fn sweep(base: &Path, is_running: &dyn Fn(u32) -> bool) -> Result<Vec<String>, String> {
-    let mut said = Vec::new();
-    for entry in read(base)? {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        let Some(pid) = name.strip_prefix("xtask-run-").and_then(|p| p.parse().ok()) else {
-            continue;
-        };
-        if is_running(pid) {
-            continue;
-        }
-        let path = entry.path();
-        let count = entries(&path)?.len();
-        std::fs::remove_dir_all(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-        said.push(format!(
-            "removed {} ({count} entries), left by run {pid}, which is not going",
-            path.display()
-        ));
-    }
-    Ok(said)
-}
+#[path = "run_tmp_walk.rs"]
+mod walk;
+
+#[path = "run_tmp_sweep.rs"]
+pub mod sweep;
 
 #[cfg(test)]
 #[path = "run_tmp_tests.rs"]
