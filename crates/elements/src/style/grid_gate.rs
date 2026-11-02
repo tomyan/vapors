@@ -7,8 +7,8 @@
 //! RELAXED: the refusal in a build without the feature is tested by
 //! `tests/grid_off.rs`, which runs only under
 //! `cargo test -p vapors-elements --no-default-features`; `cargo xtask
-//! ci` builds the default features. A ci step for the no-grid build
-//! retires this.
+//! ci` builds the default features. The ci step for no-default-features
+//! builds (vapors issue #121) retires this.
 
 use taffy::Display;
 
