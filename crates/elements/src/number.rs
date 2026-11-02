@@ -96,16 +96,47 @@ impl Field {
     }
 
     /// The number `steps` steps from the current one (from `fallback`
-    /// when the text is no number), clamped; one step is the `step`, or
-    /// 1 for `step="any"`. Outside the range, a step further out leaves
-    /// the number as it is.
+    /// when the text is no number); see [`Field::step_from`].
     pub(crate) fn stepped(&self, steps: f64, fallback: f64) -> f64 {
-        let from = self.number().unwrap_or(fallback);
-        if (steps > 0.0 && self.range_overflow()) || (steps < 0.0 && self.range_underflow()) {
-            return from;
+        self.step_from(self.number().unwrap_or(fallback), steps)
+    }
+
+    /// The number `steps` steps from `from`, one step being the `step`,
+    /// or 1 for `step="any"`, as HTML's `stepUp` and `stepDown` and
+    /// Chromium's keyboard step: inside the range, the result stays on
+    /// the steps and at most the last one under `max`; outside it, a
+    /// step further out leaves `from`, and a step back goes to the bound.
+    pub(crate) fn step_from(&self, from: f64, steps: f64) -> f64 {
+        if let Some(outside) = self.step_outside(from, steps) {
+            return outside;
         }
         let step = self.step.unwrap_or(1.0);
-        self.clamped(aligned(from + steps * step, Some(step), from))
+        let to = aligned(from + steps * step, Some(step), from);
+        self.clamped(self.on_steps_under_max(to))
+    }
+
+    /// From outside the range, or with no step to take: where it goes.
+    fn step_outside(&self, from: f64, steps: f64) -> Option<f64> {
+        match (self.min, self.max) {
+            _ if steps == 0.0 => Some(from),
+            (_, Some(max)) if from > max => Some(if steps > 0.0 { from } else { max }),
+            (Some(min), _) if from < min => Some(if steps < 0.0 { from } else { min }),
+            _ => None,
+        }
+    }
+
+    /// `to`, or when it is over `max`, the last step at or under `max`,
+    /// counting steps from `min` (else 0).
+    fn on_steps_under_max(&self, to: f64) -> f64 {
+        let (Some(max), Some(step)) = (self.max, self.step) else {
+            return to;
+        };
+        if to <= max {
+            return to;
+        }
+        let base = self.min.unwrap_or(0.0);
+        let steps = ((max - base) / step + 1e-9).floor();
+        aligned(base + steps * step, Some(step), base)
     }
 }
 

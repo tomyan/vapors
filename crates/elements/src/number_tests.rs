@@ -122,3 +122,28 @@ fn only_digits_signs_the_point_and_e_are_typeable() {
     assert!("0123456789+-.eE".chars().all(typeable));
     assert!(!"abc x,".chars().any(typeable));
 }
+
+#[test]
+fn a_step_back_from_outside_the_range_goes_to_the_bound_whatever_the_step() {
+    // Given: step 10, as Chromium's StepUpFromLayoutObject sets the bound
+    let over = field(&[
+        ("min", "0"),
+        ("max", "100"),
+        ("step", "10"),
+        ("value", "105"),
+    ]);
+    let under = field(&[("min", "0"), ("max", "100"), ("step", "5"), ("value", "-3")]);
+
+    // Then
+    assert_eq!(over.stepped(-1.0, 0.0), 100.0);
+    assert_eq!(under.stepped(1.0, 0.0), 0.0);
+}
+
+#[test]
+fn a_step_past_the_max_stops_at_the_last_step_under_it() {
+    // Given: 0..10 by 3, at 9: the steps are 0, 3, 6, 9
+    let near_top = field(&[("min", "0"), ("max", "10"), ("step", "3"), ("value", "9")]);
+
+    // Then: as HTML's and Chromium's StepRange::ClampValue
+    assert_eq!(near_top.stepped(1.0, 0.0), 9.0);
+}

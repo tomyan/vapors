@@ -1,7 +1,8 @@
 //! A number field's range validity, as the DOM's
 //! `validity.rangeUnderflow` and `validity.rangeOverflow`: a typed
 //! number outside `min` and `max` is kept on commit, as Chromium keeps
-//! it, so a host reads here whether it is outside.
+//! it, so a host reads here whether it is outside, and, when it refuses
+//! the number, puts its own back as the last committed.
 
 use vapors_dom::NodeId;
 
@@ -26,5 +27,21 @@ impl Document {
             underflow: field.range_underflow(),
             overflow: field.range_overflow(),
         })
+    }
+}
+
+impl Document {
+    /// Show `value` in number field `node` and record it as the field's
+    /// last committed number, firing nothing: for a host that refused a
+    /// committed number and puts its own back, so the same number typed
+    /// again fires `change` again. False when `node` is not an
+    /// `input type=number`.
+    pub fn set_committed_number(&mut self, node: NodeId, value: f64) -> bool {
+        if self.number_field(node).is_none() {
+            return false;
+        }
+        self.set_number_text(node, crate::range::written(value));
+        self.committed.insert(node, value);
+        true
     }
 }

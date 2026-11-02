@@ -295,8 +295,13 @@ takes NaN mid-typing; pinned by `codegen_bind.rs:
 bind_value_on_a_number_input_binds_a_number_on_change`. (2) On commit
 a number outside `min`..`max` is kept as typed, as Chromium keeps it
 (the corpus's `number.events`), and the app refuses or accepts it;
-over the max a step up does nothing and a step down comes to the max,
-as HTML's `stepUp` and `stepDown`. Text that is no number, an emptied
+over the max a step up does nothing and a step down goes to the max
+itself (under the min, the mirror), as HTML's `stepUp` and `stepDown`
+and Chromium's keyboard step; a step inside the range stops at the last
+step at or under the max; a scrub follows the same rule. A host that
+refuses a committed number puts its own back with
+`Document::set_committed_number`, so the same number typed again fires
+`change` again (`tests/number_host.rs`). Text that is no number, an emptied
 field included, reverts to the last committed number, where Chromium
 keeps the text (and `""`) and matches `:invalid` after the commit too;
 pinned by `tests/number_input.rs:
