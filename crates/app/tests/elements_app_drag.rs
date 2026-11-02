@@ -70,6 +70,7 @@ fn twenty_moves_between_frames_are_one_update_at_the_last_move() {
         Event::PrimaryButton {
             pressed: true,
             clicks: std::num::NonZeroU32::MIN,
+            modifiers: vapors_platform::Modifiers::default(),
         },
         &platform,
     );

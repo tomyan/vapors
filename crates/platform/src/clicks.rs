@@ -97,6 +97,11 @@ impl Clicks {
         count
     }
 
+    /// A press of another button: the next primary press starts a row.
+    pub(crate) fn break_row(&mut self) {
+        self.last = None;
+    }
+
     /// The last press's count, for its release; the first without one.
     pub(crate) fn last(&self) -> NonZeroU32 {
         self.last.map_or(NonZeroU32::MIN, |(_, _, count)| count)

@@ -11,7 +11,7 @@ use std::rc::Rc;
 use vapors_app::ElementsApp;
 use vapors_dom::{Dom, NodeId};
 use vapors_elements::{Document, Viewport};
-use vapors_platform::{App, Event, Platform, TextField};
+use vapors_platform::{App, Event, Modifiers, Platform, TextField};
 use vapors_text::FontSystem;
 
 /// A 160 px text field holding "Warm" at the top left.
@@ -42,10 +42,12 @@ fn click_field(app: &mut ElementsApp, platform: &Platform) {
         Event::PrimaryButton {
             pressed: true,
             clicks: std::num::NonZeroU32::MIN,
+            modifiers: Modifiers::default(),
         },
         Event::PrimaryButton {
             pressed: false,
             clicks: std::num::NonZeroU32::MIN,
+            modifiers: Modifiers::default(),
         },
     ] {
         app.event(event, platform);
@@ -156,10 +158,12 @@ fn leaving_the_field_unsets_it() {
         Event::PrimaryButton {
             pressed: true,
             clicks: std::num::NonZeroU32::MIN,
+            modifiers: Modifiers::default(),
         },
         Event::PrimaryButton {
             pressed: false,
             clicks: std::num::NonZeroU32::MIN,
+            modifiers: Modifiers::default(),
         },
     ] {
         app.event(event, &platform);

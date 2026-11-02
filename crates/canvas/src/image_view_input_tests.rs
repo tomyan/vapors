@@ -4,7 +4,7 @@
 
 use std::num::NonZeroU32;
 
-use vapors_platform::{Event, TouchPhase};
+use vapors_platform::{Event, Modifiers, TouchPhase};
 use vapors_scene::{Color, Rect, Size};
 
 use super::Answered;
@@ -43,6 +43,7 @@ fn drag_from(view: &mut ImageView, from: [f32; 2]) -> Answered {
     let pressed = view.event(&Event::PrimaryButton {
         pressed: true,
         clicks: NonZeroU32::MIN,
+        modifiers: Modifiers::default(),
     });
     view.event(&Event::PointerMoved {
         x: from[0] - 40.0,
@@ -51,6 +52,7 @@ fn drag_from(view: &mut ImageView, from: [f32; 2]) -> Answered {
     view.event(&Event::PrimaryButton {
         pressed: false,
         clicks: NonZeroU32::MIN,
+        modifiers: Modifiers::default(),
     });
     pressed
 }
