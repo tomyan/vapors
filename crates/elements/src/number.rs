@@ -3,10 +3,13 @@
 //! what the user typed or a signal set. The DOM's `value` is the text
 //! when it is a valid floating-point number, else empty; a field whose
 //! text is not a number, or is a number outside the range, is
-//! `:invalid`. On commit (Enter, blur) a number outside the range is
-//! clamped into it and text that is no number reverts to the last
+//! `:invalid`, with `rangeUnderflow` or `rangeOverflow`. On commit
+//! (Enter, blur) a number outside the range is kept as typed, as
+//! Chromium keeps it; text that is no number reverts to the last
 //! committed value, vapors' own rule (Chromium keeps the text): a
-//! `change` always carries a number.
+//! `change` always carries a number. A step comes back inside the
+//! range, and does nothing when it would move further out (HTML's
+//! `stepUp` and `stepDown`).
 
 use std::collections::BTreeMap;
 
@@ -76,17 +79,31 @@ impl Field {
         self.max.map_or(low, |max| low.min(max))
     }
 
-    /// The number the text commits to: a number clamped into the range;
-    /// `None` for text that is no number, which reverts.
+    /// The number the text commits to, in the range or not; `None` for
+    /// text that is no number, which reverts.
     pub(crate) fn committed(&self) -> Option<f64> {
-        self.number().map(|n| self.clamped(n))
+        self.number()
+    }
+
+    /// Whether the text is a number below `min`.
+    pub(crate) fn range_underflow(&self) -> bool {
+        matches!((self.number(), self.min), (Some(n), Some(min)) if n < min)
+    }
+
+    /// Whether the text is a number above `max`.
+    pub(crate) fn range_overflow(&self) -> bool {
+        matches!((self.number(), self.max), (Some(n), Some(max)) if n > max)
     }
 
     /// The number `steps` steps from the current one (from `fallback`
     /// when the text is no number), clamped; one step is the `step`, or
-    /// 1 for `step="any"`.
+    /// 1 for `step="any"`. Outside the range, a step further out leaves
+    /// the number as it is.
     pub(crate) fn stepped(&self, steps: f64, fallback: f64) -> f64 {
         let from = self.number().unwrap_or(fallback);
+        if (steps > 0.0 && self.range_overflow()) || (steps < 0.0 && self.range_underflow()) {
+            return from;
+        }
         let step = self.step.unwrap_or(1.0);
         self.clamped(aligned(from + steps * step, Some(step), from))
     }

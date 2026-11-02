@@ -43,15 +43,37 @@ fn the_value_is_the_text_when_it_is_a_number_else_empty() {
 }
 
 #[test]
-fn a_number_outside_the_range_is_invalid_and_commits_clamped() {
+fn a_number_outside_the_range_is_invalid_and_commits_as_typed() {
     // Given
     let over = field(&[("min", "0"), ("max", "100"), ("value", "250")]);
+    let under = field(&[("min", "0"), ("max", "100"), ("value", "-3")]);
 
     // Then
     assert!(over.invalid());
-    assert_eq!(over.committed(), Some(100.0));
+    assert_eq!(over.committed(), Some(250.0));
+    assert_eq!(
+        (over.range_underflow(), over.range_overflow()),
+        (false, true)
+    );
+    assert_eq!(
+        (under.range_underflow(), under.range_overflow()),
+        (true, false)
+    );
     assert_eq!(over.clamped(-3.0), 0.0);
     assert_eq!(field(&[("value", "1e")]).committed(), None);
+}
+
+#[test]
+fn outside_the_range_a_step_further_out_does_nothing_and_one_back_comes_inside() {
+    // Given
+    let over = field(&[("min", "0"), ("max", "100"), ("value", "250")]);
+    let under = field(&[("min", "0"), ("max", "100"), ("value", "-3")]);
+
+    // Then
+    assert_eq!(over.stepped(1.0, 0.0), 250.0);
+    assert_eq!(over.stepped(-1.0, 0.0), 100.0);
+    assert_eq!(under.stepped(-1.0, 0.0), -3.0);
+    assert_eq!(under.stepped(1.0, 0.0), 0.0);
 }
 
 #[test]

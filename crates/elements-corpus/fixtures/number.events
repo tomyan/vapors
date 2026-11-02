@@ -1,8 +1,8 @@
 # A number field by mouse and keys (3-E3c). `amount` is x 0..100, y 0..24,
 # 0..1000 by 1 at 20; `off` is x 200..300 and disabled; the button is x
-# 300..380. Values stay inside the range: vapors clamps a typed value on
-# commit and Chromium does not, so that case is pinned by vapors' own
-# tests, not here.
+# 300..380. A typed value outside the range is kept on commit, as
+# typed; over the max a step up does nothing and a step down comes back
+# to the max (HTML's stepUp and stepDown).
 listen pointerdown pointerup click input change keydown keyup focusin focusout
 click 50 12                   a click focuses amount; a text field always shows the ring
 expect event click input#amount
@@ -45,6 +45,22 @@ expect event focusout input#amount
 expect event change input#amount
 expect focus button#after
 expect value input#amount 9
+key Shift+Tab                 back past off (disabled) to plain
+expect focus-visible input#plain
+key Shift+Tab                 to amount, its text selected whole
+expect focus-visible input#amount
+type "1500"                   over the max of 1000
+expect value input#amount 1500
+key Enter                     commits as typed, with change: no clamp
+expect event change input#amount
+expect value input#amount 1500
+key ArrowUp                   over the max, a step up does nothing
+expect no event change
+expect value input#amount 1500
+key ArrowDown                 a step down comes back to the max
+expect event input input#amount
+expect event change input#amount
+expect value input#amount 1000
 click 250 12                  off is disabled: no click, no focus
 expect event pointerdown input#off
 expect no event click
