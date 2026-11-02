@@ -20,6 +20,7 @@ mod cursor;
 mod device_lost;
 mod error;
 mod event;
+mod event_winit;
 mod file_kind;
 mod gestures;
 mod handler;

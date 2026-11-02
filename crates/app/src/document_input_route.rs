@@ -93,6 +93,11 @@ impl DocumentInput {
     }
 
     fn routed(&mut self, document: &Document, event: &Event) -> Result<Route, Unplaced> {
+        // the window's focus is the document's (its focused element
+        // blurs) and the host's alike
+        if matches!(event, Event::WindowFocus { .. }) {
+            return Ok(Route::Both);
+        }
         let Some(action) = self.action(document, event)? else {
             return Ok(self.held.key(document, event));
         };
@@ -186,3 +191,7 @@ mod key_tests;
 #[cfg(test)]
 #[path = "document_input_held_keys_tests.rs"]
 mod held_key_tests;
+
+#[cfg(test)]
+#[path = "document_input_window_tests.rs"]
+mod window_tests;

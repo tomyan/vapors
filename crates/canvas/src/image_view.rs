@@ -163,6 +163,7 @@ impl ImageView {
             | Event::Tap { .. }
             | Event::OpenRequested
             | Event::Paste
+            | Event::WindowFocus { .. }
             | Event::FileOpened { .. } => {}
         }
     }

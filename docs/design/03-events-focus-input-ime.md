@@ -137,6 +137,14 @@ crate, and the web IME path is platform code either way.
   nearest focusable element, or blurs, unless `pointerdown` is
   prevented. `blur`, `focusout`, `focus`, `focusin` fire in Chromium's
   order. A positive or non-integer `tabindex` is refused by name.
+  The window losing focus (`Event::WindowFocus`, from winit's
+  `Focused`) commits a number or text field, then fires `blur` and
+  `focusout` on the focused element, which stays the active element;
+  regaining it fires `focus` and `focusin` (`Document::window_focus`).
+  Headless Chromium never moves focus between windows, so the order
+  was probed in headed Chromium 155 under Xvfb
+  (`crates/elements-corpus/probes/window-focus.mjs`) and is pinned by
+  `tests/focus_window.rs`.
   Checked against Chromium by `fixtures/focus.events` (events and focus
   at each step; `focus` and `blur` are not listened for there, as
   Chromium also sends them to the window, which vapors does not have).

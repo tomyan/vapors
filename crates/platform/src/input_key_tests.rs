@@ -11,16 +11,14 @@ use crate::paste_key::Press;
 /// What follows the press's own `Event::Key`: a paste, its character, or
 /// nothing.
 fn press(input: &mut Input, logical: &Logical, state: ElementState) -> Vec<Event> {
-    let events = input
-        .key(Key::Press(Press {
-            state,
-            repeat: false,
-            logical,
-            physical: PhysicalKey::Code(KeyCode::KeyV),
-            modifiers: ModifiersState::empty(),
-            text: Some("v"),
-        }))
-        .expect("a key press is always taken");
+    let events = input.key(Key::Press(Press {
+        state,
+        repeat: false,
+        logical,
+        physical: PhysicalKey::Code(KeyCode::KeyV),
+        modifiers: ModifiersState::empty(),
+        text: Some("v"),
+    }));
     assert!(
         matches!(events.first(), Some(Event::Key { .. })),
         "{events:?}"
@@ -39,7 +37,7 @@ fn control_held_then_v_pressed_is_a_paste() {
     let pressed = press(&mut input, &v, ElementState::Pressed);
 
     // Then
-    assert_eq!(changed, Some(Vec::new()));
+    assert_eq!(changed, Vec::<Event>::new());
     assert_eq!(pressed, [Event::Paste]);
 }
 
@@ -74,4 +72,18 @@ fn losing_focus_forgets_a_held_control() {
 
     // Then
     assert_eq!(pressed, [Event::Character("v".into())]);
+}
+
+#[test]
+fn the_window_losing_and_regaining_focus_is_sent_as_window_focus() {
+    // Given
+    let mut input = Input::new();
+
+    // When
+    let lost = input.key(Key::Focus(false));
+    let regained = input.key(Key::Focus(true));
+
+    // Then
+    assert_eq!(lost, [Event::WindowFocus { focused: false }]);
+    assert_eq!(regained, [Event::WindowFocus { focused: true }]);
 }

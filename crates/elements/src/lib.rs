@@ -20,6 +20,7 @@ mod dom_impl;
 mod error;
 mod events;
 mod focus;
+mod focus_window;
 mod html;
 mod images;
 mod img_checks;

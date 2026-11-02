@@ -163,7 +163,7 @@ impl Document {
 
 /// `names` on `node` in order: the first only there (it does not bubble),
 /// the second bubbling.
-fn fire(document: &Rc<RefCell<Document>>, node: NodeId, names: &[&str; 2]) {
+pub(crate) fn fire(document: &Rc<RefCell<Document>>, node: NodeId, names: &[&str; 2]) {
     crate::events::tree::dispatch_here(document, node, Event::new(names[0]));
     crate::events::tree::dispatch_bubbling(document, node, Event::new(names[1]));
 }

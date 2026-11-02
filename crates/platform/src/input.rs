@@ -9,7 +9,8 @@ use winit::keyboard::ModifiersState;
 use crate::paste_key::Press;
 
 use crate::clock::Instant;
-use crate::event::{Event, from_winit};
+use crate::event::Event;
+use crate::event_winit::from_winit;
 use crate::gestures::Gestures;
 use crate::key_event::key_event;
 
@@ -70,45 +71,46 @@ impl Input {
     /// The modifiers kept, and each key press as its [`Event::Key`] then
     /// its paste or character; `None` for other events.
     fn keys(&mut self, event: &WindowEvent) -> Option<Vec<Event>> {
-        match event {
-            WindowEvent::ModifiersChanged(modifiers) => self.key(Key::Modifiers(modifiers.state())),
-            WindowEvent::Focused(focused) => self.key(Key::Focus(*focused)),
-            WindowEvent::KeyboardInput { event: key, .. } => self.key(Key::Press(Press {
+        let key = match event {
+            WindowEvent::ModifiersChanged(modifiers) => Key::Modifiers(modifiers.state()),
+            WindowEvent::Focused(focused) => Key::Focus(*focused),
+            WindowEvent::KeyboardInput { event: key, .. } => Key::Press(Press {
                 state: key.state,
                 repeat: key.repeat,
                 logical: &key.logical_key,
                 physical: key.physical_key,
                 modifiers: self.modifiers,
                 text: key.text.as_deref(),
-            })),
-            _ => None,
-        }
+            }),
+            _ => return None,
+        };
+        Some(self.key(key))
     }
 
-    /// One keyboard fact: the modifiers change, the window's focus
-    /// changes (focus lost: no modifier is known to be held, as some
-    /// backends send no `ModifiersChanged` then), or a key is pressed
-    /// (a paste, or `None` for its own character).
+    /// One keyboard fact: the modifiers change; the window's focus
+    /// changes, sent as [`Event::WindowFocus`] (lost, no modifier is known
+    /// held: some backends send no `ModifiersChanged` then); or a key is
+    /// pressed, as its `Key` then its paste or character.
     ///
     /// A paste goes to the app whatever has focus, its character
     /// swallowed: focus lives in the app's document, so the app hands
     /// it to a focused text field first (`ElementsApp`, E6b).
-    pub(crate) fn key(&mut self, key: Key<'_>) -> Option<Vec<Event>> {
+    pub(crate) fn key(&mut self, key: Key<'_>) -> Vec<Event> {
         match key {
             Key::Modifiers(modifiers) => {
                 self.modifiers = modifiers;
-                Some(Vec::new())
+                Vec::new()
             }
             Key::Focus(focused) => {
                 if !focused {
                     self.modifiers = ModifiersState::empty();
                 }
-                None
+                vec![Event::WindowFocus { focused }]
             }
-            Key::Press(press) => Some(pressed(&Press {
+            Key::Press(press) => pressed(&Press {
                 modifiers: self.modifiers,
                 ..press
-            })),
+            }),
         }
     }
 
