@@ -8,6 +8,14 @@ repository.workspace = true
 rust-version.workspace = true
 publish = false
 
+# `complex-script-breaks` (default): vapors-text's, forwarded so an app
+# can turn it off (crates/text/Cargo.toml).
+[features]
+default = ["complex-script-breaks", "grid"]
+complex-script-breaks = ["vapors-text/complex-script-breaks", "vapors-elements/complex-script-breaks"]
+# vapors-elements' CSS grid, forwarded so an app can turn it off
+grid = ["vapors-elements/grid"]
+
 [dependencies]
 wgpu.workspace = true
 vapors-scene.workspace = true
@@ -22,7 +30,7 @@ tracing.workspace = true
 png.workspace = true
 vapors-demos.workspace = true
 vapors-pixels.workspace = true
-vapors-canvas.workspace = true
+vapors-canvas = { workspace = true, features = ["complex-script-breaks"] }
 vapors-gpu-harness.workspace = true
 
 [lints]

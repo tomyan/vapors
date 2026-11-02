@@ -10,11 +10,27 @@ publish = false
 
 # Pinned exactly: fontique, skrifa and zeno must agree on read-fonts, and
 # the rasteriser's output is what the comparison page signed off.
+# `complex-script-breaks` (default): Parley's "complex-scripts", which
+# makes it build ICU4X's dictionary and LSTM segmenters. Without it the
+# segmenters are never built, so the linker drops their data;
+# icu_segmenter_data stays in the dependency graph. Lines of Thai, Lao,
+# Khmer and Burmese then break only at spaces and punctuation, not
+# between words, and word boundaries in those scripts and in Chinese and
+# Japanese fall back to UAX #29's rules (a double click selects a run of
+# characters, not a word). Turned off it saves about 2 MB of brotli in a
+# release wasm (touché's page, measured 2026-11-02: 3732 KiB with it,
+# 1668 KiB without). vapors has no check that the data stays out; the
+# guard is touché's page budget (check_dist, about 1.7 MB): turning the
+# feature back on there puts the page over it.
+[features]
+default = ["complex-script-breaks"]
+complex-script-breaks = ["parley/complex-scripts"]
+
 [dependencies]
 wgpu.workspace = true
 vapors-scene.workspace = true
 vapors-renderer.workspace = true
-parley = { version = "=0.12.0", default-features = false, features = ["std", "complex-scripts"] }
+parley = { version = "=0.12.0", default-features = false, features = ["std"] }
 fontique = { version = "=0.12.0", default-features = false, features = ["std"] }
 skrifa = "=0.44.0"
 # Parley does not re-export its coordinate type; the same release it uses.

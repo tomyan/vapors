@@ -2,11 +2,13 @@
 //! containing-block traits, and the dispatch from a box's display type
 //! to Taffy's block, flex and leaf algorithms.
 
+#[cfg(feature = "grid")]
+use taffy::compute_grid_layout;
 use taffy::{
     BlockContext, Cache, CacheTree, Display, Layout, LayoutInput, LayoutOutput, LayoutPartialTree,
     NodeId, RunMode, Style, TraversePartialTree, TraverseTree, compute_block_layout,
-    compute_cached_layout, compute_flexbox_layout, compute_grid_layout, compute_hidden_layout,
-    compute_leaf_layout, compute_oof_layout,
+    compute_cached_layout, compute_flexbox_layout, compute_hidden_layout, compute_leaf_layout,
+    compute_oof_layout,
 };
 use vapors_text::FontSystem;
 
@@ -65,6 +67,7 @@ impl BoxTree<'_> {
             (Display::None, _) => compute_hidden_layout(self, id),
             (Display::Block, true) => compute_block_layout(self, id, inputs, block),
             (Display::Flex, true) => compute_flexbox_layout(self, id, inputs),
+            #[cfg(feature = "grid")]
             (Display::Grid, true) => compute_grid_layout(self, id, inputs),
             (_, false) => self.leaf(id, inputs),
             (display, true) => unreachable!("{display:?} is refused when styles are read"),

@@ -8,6 +8,16 @@ repository.workspace = true
 rust-version.workspace = true
 publish = false
 
+# `complex-script-breaks` (default): vapors-text's, forwarded so an app
+# can turn it off (crates/text/Cargo.toml).
+# `grid` (default): CSS grid layout (taffy's grid), about 54 KiB of brotli
+# wasm in touché's page (docs/design/text-stack-size.md). Without it,
+# `display: grid` and the grid properties are refused, naming it.
+[features]
+default = ["complex-script-breaks", "grid"]
+complex-script-breaks = ["vapors-text/complex-script-breaks"]
+grid = ["taffy/grid"]
+
 [dependencies]
 vapors-dom.workspace = true
 vapors-css.workspace = true
