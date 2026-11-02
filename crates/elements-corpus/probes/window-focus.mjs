@@ -67,8 +67,21 @@ for (const field of ['a', 't']) {
   await browser('Target.closeTarget', { targetId: other.result.targetId });
   await settle();
 }
+// Chromium 155 exited 19 to 58 ms after SIGTERM on the dev box (three
+// runs, 2026-11-02); 5 s is a hundred times that. Past it the probe
+// kills Chromium and fails, rather than waiting for ever.
+const EXIT_DEADLINE_MS = 5000;
 chrome.kill();
-await new Promise((exited) => chrome.on('exit', exited));
+const exited = await Promise.race([
+  new Promise((done) => chrome.on('exit', () => done(true))),
+  new Promise((done) => setTimeout(() => done(false), EXIT_DEADLINE_MS)),
+]);
+if (!exited) {
+  chrome.kill('SIGKILL');
+  rmSync(profile, { recursive: true, force: true });
+  console.error(`window-focus probe: Chromium did not exit within ${EXIT_DEADLINE_MS} ms of SIGTERM (the deadline above); it was killed`);
+  process.exit(1);
+}
 // the profile is a Chromium user-data directory, tens of MB: gone with the run
 rmSync(profile, { recursive: true, force: true });
 process.exit(0);

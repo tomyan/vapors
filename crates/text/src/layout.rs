@@ -150,5 +150,9 @@ impl Layout {
 mod tests;
 
 #[cfg(test)]
+#[path = "layout_breaks_tests.rs"]
+mod breaks_tests;
+
+#[cfg(test)]
 #[path = "fallback_tests.rs"]
 mod fallback_tests;
