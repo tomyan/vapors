@@ -3,6 +3,7 @@
 
 use super::tests::view;
 use super::*;
+use vapors_platform::Event;
 
 fn moved(view: &mut ImageView, x: f32, y: f32) {
     view.event(&Event::PointerMoved { x, y });

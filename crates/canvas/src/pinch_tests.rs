@@ -29,7 +29,14 @@ fn a_pinch_keeps_the_image_point_under_the_midpoint_still() {
     // Given: finger A still at (100,100), finger B at (200,100)
     let mut view = view();
     let mut gestures = Gestures::new();
+    // the touch itself, then its gestures, as the platform sends them
     let feed = |view: &mut ImageView, gestures: &mut Gestures, id, phase, x, ms| {
+        view.event(&Event::Touch {
+            id,
+            phase,
+            x,
+            y: 100.0,
+        });
         for event in gestures.touch(id, phase, x, 100.0, Duration::from_millis(ms)) {
             view.event(&event);
         }
