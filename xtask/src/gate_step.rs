@@ -26,8 +26,10 @@ pub const WORKFLOW_STEP_KEYS: [&str; 8] = [
 pub const ACTION_STEP_KEYS: [&str; 8] = ["name", "id", "uses", "with", "run", "env", "if", "shell"];
 
 /// The keys of a job the gate models.
-pub const JOB_KEYS: [&str; 6] = [
+pub const JOB_KEYS: [&str; 8] = [
     "name",
+    "needs",
+    "if",
     "runs-on",
     "timeout-minutes",
     "env",
@@ -36,15 +38,16 @@ pub const JOB_KEYS: [&str; 6] = [
 ];
 
 /// Whether CI runs the step when every step before it passed: with no
-/// `if:`, `success()` or `always()` it does; with `failure()` it does not,
+/// `if:`, `success()`, `always()` or `${{ !cancelled() }}` it does; with
+/// `failure()` it does not,
 /// and the gate stops at its first failure; with `cancelled()` it does
 /// not, and the gate never cancels. Any other condition is refused.
 pub fn runs_on_success(label: &str, step: &Value) -> Result<bool, String> {
     match step.get("if").map(Value::as_str) {
-        None | Some(Some("success()" | "always()")) => Ok(true),
+        None | Some(Some("success()" | "always()" | "${{ !cancelled() }}")) => Ok(true),
         Some(Some("failure()" | "cancelled()")) => Ok(false),
         Some(condition) => Err(format!(
-            "{label}: `if: {}`, which the gate cannot evaluate; fix: use success(), always(), failure() or cancelled()",
+            "{label}: `if: {}`, which the gate cannot evaluate; fix: use success(), always(), failure(), cancelled() or ${{{{ !cancelled() }}}}",
             condition.unwrap_or("?")
         )),
     }

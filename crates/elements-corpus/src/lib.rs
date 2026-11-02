@@ -33,6 +33,7 @@ pub mod oracle;
 pub mod oracle_files;
 pub mod page;
 pub mod paint_check;
+pub mod web_input;
 
 /// Mounts a fixture's component into `parent`.
 pub type Mount = fn(&Rc<RefCell<Document>>, NodeId);

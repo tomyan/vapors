@@ -66,6 +66,22 @@ pub enum Event {
     /// [`crate::Clipboard`]). Desktop only; a web page has its own paste
     /// event.
     Paste,
+    /// The page's text input was edited (the web's hidden textarea,
+    /// typing and an IME's composing alike): its whole state after the
+    /// edit, and the text it was made against.
+    TextEdited {
+        /// The text the edit was made against: the last one mirrored.
+        before: String,
+        /// The text after it.
+        text: String,
+        /// The selection after it, start then end, in UTF-16 units.
+        selection: (u32, u32),
+        /// The range an IME is composing, in UTF-16 units, while it does.
+        composing: Option<(u32, u32)>,
+    },
+    /// Text the page's paste delivered (the web's `paste` event on its
+    /// text input), in place of [`Event::Paste`], which is the desktop's.
+    PastedText(String),
     /// One finger on a touch screen, raw. Gestures are derived from these
     /// and sent as well.
     Touch {
@@ -143,17 +159,6 @@ pub enum TouchPhase {
     Ended,
     /// The system took the touch away; no `Ended` follows.
     Cancelled,
-}
-
-impl TouchPhase {
-    pub(crate) fn from_winit(phase: winit::event::TouchPhase) -> Self {
-        match phase {
-            winit::event::TouchPhase::Started => Self::Started,
-            winit::event::TouchPhase::Moved => Self::Moved,
-            winit::event::TouchPhase::Ended => Self::Ended,
-            winit::event::TouchPhase::Cancelled => Self::Cancelled,
-        }
-    }
 }
 
 /// CSS pixels a wheel notch (a line) scrolls: what Chromium 155 scrolls

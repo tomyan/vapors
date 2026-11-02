@@ -35,6 +35,7 @@ impl ApplicationHandler<Message> for Handler {
             // records before it wakes. Nothing to do if it ever did.
             Message::DeviceLost => {}
             Message::Wake => self.platform.request_redraw(),
+            Message::Input(event) => self.app.event(event, &self.platform),
         }
         self.redraw_if_asked();
     }

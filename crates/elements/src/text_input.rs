@@ -64,6 +64,8 @@ impl Document {
         let Document { fonts, editors, .. } = self;
         let editor = editors.get_mut(&node).expect("made above");
         act(&mut fonts.editor_driver(&mut editor.plain));
+        // a composition lasts only through the edits that report it
+        editor.composing = None;
         editor.pending = true;
         self.changed = true;
     }

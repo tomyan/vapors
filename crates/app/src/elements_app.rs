@@ -8,11 +8,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use vapors_elements::{Document, ElementError, Viewport};
+use vapors_elements::Document;
 use vapors_platform::{App, Event, Frame, Instant, Next, Platform, report_error};
 
 use crate::frame::FrameTimes;
-use vapors_scene::Size;
 
 use crate::document_input::DocumentInput;
 use crate::painter::ScenePainter;
@@ -40,6 +39,11 @@ pub struct ElementsApp {
     failure: Failure,
     /// Input given to the document, at its last update's scale.
     input: DocumentInput,
+    /// The text field last set for the platform; `None` before the
+    /// first, or when it must be set again.
+    // set to no field (`Some(None)`) differs from never set (`None`)
+    #[allow(clippy::option_option)]
+    mirrored: Option<Option<vapors_platform::TextField>>,
     /// Called before each update with the last frame's phase times.
     per_frame: Option<PerFrame>,
     /// Called after each frame with its phase times.
@@ -69,6 +73,7 @@ impl ElementsApp {
             painter: None,
             failure: Failure::default(),
             input: DocumentInput::new(),
+            mirrored: None,
             per_frame: None,
             frame_times: None,
             last_times: None,
@@ -135,6 +140,10 @@ impl App for ElementsApp {
             }
         }
     }
+
+    fn drawn(&mut self, platform: &Platform) {
+        self.mirror_text_field(platform);
+    }
 }
 
 impl ElementsApp {
@@ -157,31 +166,12 @@ impl ElementsApp {
                 self.failure.set(&unplaced.to_string());
             }
         }
+        self.text_event(event);
+        if self.document.borrow_mut().take_changed() {
+            platform.request_redraw();
+        }
+        self.mirror_text_field(platform);
     }
-}
-
-#[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)] // window sizes and scales are small
-fn viewport(size: Size, scale: f32) -> Viewport {
-    Viewport {
-        width: size.width as f32 / scale,
-        height: size.height as f32 / scale,
-        scale,
-    }
-}
-
-fn size_of(frame: &Frame<'_>) -> Size {
-    Size {
-        width: frame.texture.width(),
-        height: frame.texture.height(),
-    }
-}
-
-fn refused(errors: &[ElementError]) -> String {
-    let lines: Vec<String> = errors.iter().map(|error| format!("  {error}")).collect();
-    format!(
-        "the document was refused, so nothing is drawn:\n{}",
-        lines.join("\n")
-    )
 }
 
 #[path = "elements_app_frame.rs"]
@@ -189,3 +179,5 @@ mod frame_phases;
 #[cfg(not(target_family = "wasm"))]
 #[path = "elements_app_paste.rs"]
 mod paste;
+#[path = "elements_app_text.rs"]
+mod text;
