@@ -98,6 +98,23 @@ fn a_for_name_that_shadows_a_script_binding_is_refused_naming_both() {
     let why = refused(
         "<ul>{for rows in names.get() key=rows.clone()}<li bind:this={rows}>x</li>{/for}</ul>",
     );
-    assert!(why.contains("`rows`") && why.contains("shadows"), "{why}");
+    assert!(
+        why.contains("`rows` here is the `{for}`'s, which shadows the script's signal `rows`"),
+        "{why}"
+    );
     assert!(why.contains("counter.wisp:"), "{why}");
+}
+
+#[test]
+fn a_snippet_parameter_that_shadows_a_script_signal_is_refused_at_the_snippet_naming_the_signal() {
+    // a snippet parameter never reaches bind:this's shadow check, whose
+    // message names a `{for}`: the snippet refuses the name first
+    let why = refused(
+        "<div>{snippet item(one: Signal<Option<NodeId>>)}<b bind:this={one}>x</b>{/snippet}</div>",
+    );
+    assert!(
+        why.contains("parameter `one` has the name of the script's `one`"),
+        "{why}"
+    );
+    assert!(!why.contains("{for}"), "{why}");
 }

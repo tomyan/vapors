@@ -525,12 +525,16 @@ kept, and the IME is told by losing and regaining focus. A field set
 before the window opens is allowed the IME at the window's first event. So the web and
 the desktop agree with Chromium's `<input>`. Checked by unit tests on
 winit's own documented sequences (pinyin, a dead key over a selection),
-whose edits the field's undo test takes too (`ime_cases.rs`); not
-checked with a real IME, which needs a desktop session (macOS, Windows,
+whose edits the field's undo test takes too (`ime_cases.rs`), and what
+happens before each event by `ImeState`'s tests; the handler's one-line
+calls into `ImeState` are not tested, since they need winit's event
+loop. Not checked with a real IME, which needs a desktop session (macOS, Windows,
 Linux with IBus or Fcitx) at the sign-off, including whether a platform
 also sends a key's text alongside its commit, and macOS's input-source
 switch in the middle of a composition, which sends `Disabled` and so
-removes the preedit where Chromium likely commits it.
+removes the preedit where Chromium likely commits it, and that each
+backend sends an event when the window opens: one that sent none would
+leave the IME disallowed for a field set before it.
 
 ## Text editing and IME
 
