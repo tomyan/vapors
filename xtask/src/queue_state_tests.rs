@@ -19,13 +19,13 @@ fn a_reason_is_new_only_when_it_changed() {
 
 #[test]
 fn the_state_reads_back_from_its_file() {
-    let path = std::env::temp_dir().join(format!("xtask-queue-state-{}.json", std::process::id()));
+    let scratch = crate::scratch::dir("queue-state");
+    let path = scratch.join("state.json");
     let mut state = State::default();
     state.back_off("aaa", 5);
     state.changed(68, "said");
     state.save(&path).expect("saved");
     let read = State::load(&path).expect("read");
-    let _ = std::fs::remove_file(&path);
     assert_eq!(read, state);
     assert_eq!(
         State::load(std::path::Path::new("/nonexistent/state.json")),
@@ -36,13 +36,12 @@ fn the_state_reads_back_from_its_file() {
 #[test]
 fn a_state_file_of_another_shape_is_refused_naming_it() {
     // Given: valid JSON whose backoff holds a string, not a time
-    let path =
-        std::env::temp_dir().join(format!("xtask-queue-state-bad-{}.json", std::process::id()));
+    let scratch = crate::scratch::dir("queue-state-bad");
+    let path = scratch.join("state.json");
     std::fs::write(&path, r#"{"backoff":{"aaa":"soon"},"said":{}}"#).expect("written");
 
     // When
     let read = State::load(&path);
-    let _ = std::fs::remove_file(&path);
 
     // Then
     let why = read.expect_err("refused");

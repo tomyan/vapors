@@ -2,7 +2,6 @@
 //! stub `gh` that answers the jobs API: it tells a timeout from an early
 //! cancel, names the last step to start, and fails in every case.
 
-use std::path::PathBuf;
 use std::process::{Command, Output};
 
 const SCRIPT: &str = concat!(
@@ -23,10 +22,8 @@ echo '{"runner_name":"runner-1","status":"in_progress","started_at":"'$at'","ste
   {"name":"report a timeout","started_at":"'$at'"}]}'
 "#;
 
-fn stub_dir(test: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("xtask-report-{test}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("stub dir");
+fn stub_dir(test: &str) -> crate::scratch::Scratch {
+    let dir = crate::scratch::dir(&format!("report-{test}"));
     let gh = dir.join("gh");
     std::fs::write(&gh, STUB_GH).expect("stub");
     let made = Command::new("chmod")

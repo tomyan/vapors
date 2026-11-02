@@ -10,8 +10,8 @@ use super::*;
 const KEY: &str = "sk-test-dev-key-0001";
 
 /// A key file named for the test, holding `contents`, with `mode`.
-fn key_file(test: &str, contents: &str, mode: u32) -> PathBuf {
-    let path = std::env::temp_dir().join(format!("xtask-dev-key-{test}-{}", std::process::id()));
+fn key_file(test: &str, contents: &str, mode: u32) -> tempfile::TempPath {
+    let path = crate::scratch::file(&format!("dev-key-{test}"));
     std::fs::write(&path, contents).expect("temporary key file");
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode)).expect("its mode");
     path
@@ -98,14 +98,13 @@ fn a_key_file_readable_by_others_is_refused_naming_chmod_600() {
     let file = key_file("mode644", KEY, 0o644);
 
     // When
-    let refused = read(&dev_key("openai", file.clone()));
+    let refused = read(&dev_key("openai", file.to_path_buf()));
 
     // Then
     let why = refused.expect_err("mode 644");
     assert!(why.contains(&file.display().to_string()), "{why}");
     assert!(why.contains("chmod 600"), "{why}");
     assert!(!why.contains(KEY), "the key is in the message");
-    let _ = std::fs::remove_file(file);
 }
 
 #[test]
@@ -114,11 +113,10 @@ fn a_key_file_with_mode_600_gives_its_key_without_the_line_end() {
     let file = key_file("mode600", &format!("{KEY}\n"), 0o600);
 
     // When
-    let key = read(&dev_key("openai", file.clone()));
+    let key = read(&dev_key("openai", file.to_path_buf()));
 
     // Then
     assert_eq!(key.as_deref(), Ok(KEY));
-    let _ = std::fs::remove_file(file);
 }
 
 #[test]
@@ -127,13 +125,12 @@ fn a_key_file_of_only_whitespace_is_refused_naming_the_file() {
     let file = key_file("blank", " \n\t\n", 0o600);
 
     // When
-    let refused = read(&dev_key("anthropic", file.clone()));
+    let refused = read(&dev_key("anthropic", file.to_path_buf()));
 
     // Then
     let why = refused.expect_err("blank");
     assert!(why.contains(&file.display().to_string()), "{why}");
     assert!(why.contains("empty"), "{why}");
-    let _ = std::fs::remove_file(file);
 }
 
 #[test]
@@ -156,7 +153,7 @@ fn the_notice_names_the_provider_and_the_file_but_never_the_key() {
     let file = key_file("notice", KEY, 0o600);
 
     // When
-    let line = notice(&dev_key("openai", file.clone()));
+    let line = notice(&dev_key("openai", file.to_path_buf()));
 
     // Then
     assert!(
@@ -164,7 +161,6 @@ fn the_notice_names_the_provider_and_the_file_but_never_the_key() {
         "{line}"
     );
     assert!(!line.contains(KEY), "{line}");
-    let _ = std::fs::remove_file(file);
 }
 
 #[test]

@@ -12,8 +12,8 @@ fn a_time_reads_as_utc_to_the_second() {
 #[test]
 fn each_line_is_appended_with_its_time() {
     // Given
-    let path = std::env::temp_dir().join(format!("xtask-queue-log-{}.log", std::process::id()));
-    let _ = std::fs::remove_file(&path);
+    let scratch = crate::scratch::dir("queue-log");
+    let path = scratch.join("queue.log");
     let log = Log { path: path.clone() };
 
     // When
@@ -22,7 +22,6 @@ fn each_line_is_appended_with_its_time() {
 
     // Then
     let text = std::fs::read_to_string(&path).expect("read");
-    let _ = std::fs::remove_file(&path);
     let lines: Vec<&str> = text.lines().collect();
     assert_eq!(lines.len(), 2);
     assert!(lines[0].ends_with("Z #68 merged at aaa"), "{text}");
@@ -32,9 +31,7 @@ fn each_line_is_appended_with_its_time() {
 #[test]
 fn a_log_from_an_earlier_day_is_rotated_and_old_ones_deleted() {
     // Given: today's log written on 2026-10-20, and rotations of 10-01 and 10-18
-    let dir = std::env::temp_dir().join(format!("xtask-queue-rotate-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("dir");
+    let dir = crate::scratch::dir("queue-rotate");
     let log = dir.join("touche.log");
     std::fs::write(&log, "2026-10-20T10:00:00Z a line\n").expect("log");
     std::fs::write(dir.join("touche.log.2026-10-01"), "old").expect("old");
@@ -67,13 +64,10 @@ fn a_log_from_an_earlier_day_is_rotated_and_old_ones_deleted() {
 
 #[test]
 fn a_log_from_today_is_kept_and_a_missing_one_is_fine() {
-    let dir = std::env::temp_dir().join(format!("xtask-queue-today-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("dir");
+    let dir = crate::scratch::dir("queue-today");
     let log = dir.join("vapors.log");
     rotate(&log, "2026-10-22").expect("nothing to rotate");
     std::fs::write(&log, "2026-10-22T01:00:00Z a line\n").expect("log");
     rotate(&log, "2026-10-22").expect("kept");
     assert!(log.exists());
-    let _ = std::fs::remove_dir_all(&dir);
 }

@@ -57,8 +57,8 @@ mod tests {
 
     #[test]
     fn a_second_pass_is_refused_while_the_first_holds_the_lock() {
-        let path =
-            std::env::temp_dir().join(format!("xtask-queue-lock-{}.lock", std::process::id()));
+        let scratch = crate::scratch::dir("queue-lock");
+        let path = scratch.join("queue.lock");
         let first = take(&path).expect("first");
         let refused = take(&path).expect_err("held");
         assert!(
@@ -67,6 +67,5 @@ mod tests {
         );
         drop(first);
         assert!(take(&path).is_ok(), "freed when dropped");
-        let _ = std::fs::remove_file(&path);
     }
 }

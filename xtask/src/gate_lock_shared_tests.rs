@@ -4,13 +4,13 @@ use std::time::{Duration, Instant};
 
 use super::*;
 use crate::gate_lock::acquire;
-use crate::lock_scratch::dir;
+use crate::scratch::lock_dir;
 
 const BRIEF: Duration = Duration::from_millis(300);
 
 #[test]
 fn two_ci_runs_share_the_lock() {
-    let dir = dir("shared-two");
+    let dir = lock_dir("shared-two");
     let first = acquire_shared(&dir, "/w/first", BRIEF);
     let second = acquire_shared(&dir, "/w/second", BRIEF);
     assert!(first.is_ok() && second.is_ok(), "{first:?} {second:?}");
@@ -19,7 +19,7 @@ fn two_ci_runs_share_the_lock() {
 #[test]
 fn a_ci_run_waits_for_a_running_gate_then_fails_naming_it() {
     // Given
-    let dir = dir("shared-gate");
+    let dir = lock_dir("shared-gate");
     let _gate = acquire(&dir, "/w/gating", BRIEF).expect("gate");
 
     // When
@@ -34,7 +34,7 @@ fn a_ci_run_waits_for_a_running_gate_then_fails_naming_it() {
 #[test]
 fn a_gate_waits_for_a_running_ci_then_fails_naming_its_worktree() {
     // Given
-    let dir = dir("shared-ci");
+    let dir = lock_dir("shared-ci");
     let _ci = acquire_shared(&dir, "/w/checking", BRIEF).expect("ci");
 
     // When
@@ -47,7 +47,7 @@ fn a_gate_waits_for_a_running_ci_then_fails_naming_its_worktree() {
 #[test]
 fn a_waiting_gate_goes_before_a_ci_run_that_comes_later() {
     // Given: a ci run holds the lock, and a gate starts waiting for it
-    let dir = dir("shared-turn");
+    let dir = lock_dir("shared-turn");
     let first = acquire_shared(&dir, "/w/first", BRIEF).expect("ci");
     let gate_dir = dir.to_path_buf();
     let gate = std::thread::spawn(move || {
@@ -67,7 +67,7 @@ fn a_waiting_gate_goes_before_a_ci_run_that_comes_later() {
 #[test]
 fn a_ci_run_s_marker_goes_when_it_ends() {
     // Given
-    let dir = dir("shared-marker");
+    let dir = lock_dir("shared-marker");
     let held = acquire_shared(&dir, "/w/ci", BRIEF).expect("ci");
     let marker = dir.join(format!("ci.{}", std::process::id()));
     assert!(std::fs::read_to_string(&marker).is_ok_and(|t| t.contains("/w/ci")));
@@ -85,7 +85,7 @@ const GONE: u32 = 4_194_305;
 #[test]
 fn a_stale_gate_holder_is_removed_and_not_named() {
     // Given: a killed gate left its holder file, and a ci run holds a share
-    let dir = dir("shared-stale");
+    let dir = lock_dir("shared-stale");
     let _ci = acquire_shared(&dir, "/w/live-ci", BRIEF).expect("ci");
     std::fs::write(
         dir.join(crate::gate_lock::HOLDER),
@@ -104,7 +104,7 @@ fn a_stale_gate_holder_is_removed_and_not_named() {
 
 #[test]
 fn a_ci_holder_is_named_with_how_long_it_has_held_its_share() {
-    let dir = dir("shared-age");
+    let dir = lock_dir("shared-age");
     let _ci = acquire_shared(&dir, "/w/ci", BRIEF).expect("ci");
     let holders = ci_holders(&dir);
     let start = format!("ci in /w/ci (pid {}) for ", std::process::id());
@@ -117,7 +117,7 @@ fn a_ci_holder_is_named_with_how_long_it_has_held_its_share() {
 #[test]
 fn a_marker_older_than_its_process_names_a_reused_pid_and_is_left_out() {
     // Given: a marker for this pid stamped in 1970, before this process started
-    let dir = dir("shared-reused");
+    let dir = lock_dir("shared-reused");
     std::fs::create_dir_all(&*dir).expect("dir");
     let me = std::process::id();
     std::fs::write(

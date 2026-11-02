@@ -1,16 +1,11 @@
 //! Real git repositories for the queue's tests, each removed when its
 //! guard drops.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
-pub struct Repo(pub PathBuf);
-
-impl Drop for Repo {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
-    }
-}
+/// A repository in a scratch directory, removed when dropped.
+pub struct Repo(pub crate::scratch::Scratch);
 
 pub fn run(dir: &Path, args: &[&str]) -> String {
     let output = Command::new("git")
@@ -68,23 +63,21 @@ pub fn commit(dir: &Path, file: &str, text: &str) -> String {
 
 /// main with one commit, and `feature` branched from it with two.
 pub fn repo(name: &str) -> (Repo, String) {
-    let dir = std::env::temp_dir().join(format!("xtask-queue-git-{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("dir");
+    let scratch = crate::scratch::dir(&format!("queue-git-{name}"));
+    let dir = scratch.to_path_buf();
     init(&dir);
     commit(&dir, "base.txt", "base");
     run(&dir, &["checkout", "-q", "-b", "feature"]);
     commit(&dir, "a.txt", "a");
     let head = commit(&dir, "b.txt", "b");
     run(&dir, &["checkout", "-q", "main"]);
-    (Repo(dir), head)
+    (Repo(scratch), head)
 }
 
 /// main with ten lines in `f.txt`, and `feature` changing line 5.
 pub fn lines_repo(name: &str) -> (Repo, String) {
-    let dir = std::env::temp_dir().join(format!("xtask-queue-lines-{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("dir");
+    let scratch = crate::scratch::dir(&format!("queue-lines-{name}"));
+    let dir = scratch.to_path_buf();
     init(&dir);
     let lines: Vec<String> = (1..=10).map(|n| format!("line {n}")).collect();
     let text = lines.join("\n") + "\n";
@@ -92,5 +85,5 @@ pub fn lines_repo(name: &str) -> (Repo, String) {
     run(&dir, &["checkout", "-q", "-b", "feature"]);
     let head = commit(&dir, "f.txt", &text.replace("line 5\n", "line five\n"));
     run(&dir, &["checkout", "-q", "main"]);
-    (Repo(dir), head)
+    (Repo(scratch), head)
 }

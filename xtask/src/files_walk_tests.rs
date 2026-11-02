@@ -3,11 +3,8 @@
 use super::*;
 
 /// A fresh tree under the temp dir for `name`.
-fn tree(name: &str) -> PathBuf {
-    let root = std::env::temp_dir().join(format!("xtask-walk-{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&root);
-    std::fs::create_dir_all(&root).expect("root");
-    root
+fn tree(name: &str) -> crate::scratch::Scratch {
+    crate::scratch::dir(&format!("walk-{name}"))
 }
 
 fn file(root: &Path, relative: &str, text: &str) {
@@ -47,7 +44,6 @@ fn covered_extensions_are_found_and_others_are_not() {
             "crates/a/shader.wgsl"
         ]
     );
-    let _ = std::fs::remove_dir_all(root);
 }
 
 #[test]
@@ -63,7 +59,6 @@ fn target_git_node_modules_and_fonts_are_skipped_at_any_depth() {
 
     // When / Then
     assert_eq!(names(&root), ["crates/a/lib.rs"]);
-    let _ = std::fs::remove_dir_all(root);
 }
 
 #[test]
@@ -78,7 +73,6 @@ fn a_directory_whose_name_only_starts_like_a_skipped_one_is_walked() {
         names(&root),
         ["crates/a/targeting.rs", "crates/targets/lib.rs"]
     );
-    let _ = std::fs::remove_dir_all(root);
 }
 
 #[test]
@@ -90,7 +84,6 @@ fn hidden_directories_other_than_git_are_walked() {
 
     // When / Then
     assert_eq!(names(&root), [".cargo/config.toml", ".config/factory.toml"]);
-    let _ = std::fs::remove_dir_all(root);
 }
 
 #[cfg(unix)]
@@ -105,7 +98,6 @@ fn a_symlinked_file_is_counted_through_its_target() {
     // When / Then
     assert_eq!(names(&root), ["crates/link.rs", "real/a.rs"]);
     assert_eq!(count_lines(&root.join("crates/link.rs")), Ok(3));
-    let _ = std::fs::remove_dir_all(root);
 }
 
 #[cfg(unix)]
@@ -119,7 +111,6 @@ fn a_symlinked_directory_is_walked_once_and_a_cycle_ends() {
 
     // When / Then: a is walked under its first name only
     assert_eq!(names(&root), ["a/x.rs"]);
-    let _ = std::fs::remove_dir_all(root);
 }
 
 #[cfg(unix)]
@@ -139,7 +130,6 @@ fn a_dangling_symlink_is_refused_naming_it() {
         "{error}"
     );
     assert!(error.contains("fix: remove it"), "{error}");
-    let _ = std::fs::remove_dir_all(root);
 }
 
 #[test]
@@ -163,7 +153,6 @@ fn lines_are_terminators_plus_a_final_unterminated_line() {
     assert_eq!(count_lines(&root.join("n.rs")), Ok(3));
     assert_eq!(count_lines(&root.join("u.rs")), Ok(3));
     assert_eq!(count_lines(&root.join("e.rs")), Ok(0));
-    let _ = std::fs::remove_dir_all(root);
 }
 
 #[test]

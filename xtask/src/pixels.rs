@@ -76,8 +76,7 @@ mod tests {
     #[test]
     fn reads_the_centre_pixel_of_a_png() {
         // Given: a 4x3 RGBA image, centre (2,1) painted distinctly
-        let dir = std::env::temp_dir().join(format!("vapors-xtask-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).expect("temp dir");
+        let dir = crate::scratch::dir("pixels");
         let path = dir.join("centre.png");
         let mut data = vec![0u8; 4 * 3 * 4];
         let start = (4 + 2) * 4;
@@ -89,7 +88,6 @@ mod tests {
 
         // Then
         assert_eq!(centre, [12, 200, 34]);
-        let _ = std::fs::remove_dir_all(dir);
     }
 
     fn write_rgba_png(path: &Path, width: u32, height: u32, data: &[u8]) {
