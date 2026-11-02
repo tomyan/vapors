@@ -1,6 +1,6 @@
 //! The event a listener receives.
 
-use crate::NodeId;
+use crate::{Capture, Modifiers, NodeId, Pointer};
 
 /// An event delivered to a listener. The payload fields are set by
 /// the kind of event: `input` and `change` carry `value`, and on a
@@ -18,31 +18,7 @@ pub struct Event {
     capture: Option<Capture>,
     target: Option<NodeId>,
     key: Option<String>,
-}
-
-/// Where a pointer event happened, and which pointer: positions in CSS
-/// px, unrounded.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct Pointer {
-    /// From the viewport's top-left.
-    pub client: [f32; 2],
-    /// From the target's padding box's top-left.
-    pub offset: [f32; 2],
-    /// 1 for the mouse; each touch has its own (3-E1b).
-    pub id: u32,
-    /// Whether a button or finger is down for this event, so a listener
-    /// may capture the pointer: on `pointerdown` and on `pointermove`
-    /// while pressed.
-    pub pressed: bool,
-}
-
-/// What a listener asked of the pointer's capture.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Capture {
-    /// `set_pointer_capture`.
-    Set,
-    /// `release_pointer_capture`.
-    Release,
+    modifiers: Modifiers,
 }
 
 impl Event {
@@ -53,6 +29,21 @@ impl Event {
             name: name.to_string(),
             ..Event::default()
         }
+    }
+
+    /// The modifier keys held with a pointer event: `pointerdown`,
+    /// `pointerup`, `click` and `dblclick` carry them.
+    #[must_use]
+    pub fn with_modifiers(mut self, modifiers: Modifiers) -> Event {
+        self.modifiers = modifiers;
+        self
+    }
+
+    /// The modifier keys held: the DOM's altKey, ctrlKey, metaKey and
+    /// shiftKey.
+    #[must_use]
+    pub fn modifiers(&self) -> Modifiers {
+        self.modifiers
     }
 
     /// Attaches the `value` payload.

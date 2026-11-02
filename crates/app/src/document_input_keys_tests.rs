@@ -70,6 +70,7 @@ pub(super) fn click(input: &mut DocumentInput, doc: &Rc<RefCell<Document>>, x: f
         &Event::PrimaryButton {
             pressed: true,
             clicks: std::num::NonZeroU32::MIN,
+            modifiers: vapors_platform::Modifiers::default(),
         },
     );
     give(
@@ -78,6 +79,7 @@ pub(super) fn click(input: &mut DocumentInput, doc: &Rc<RefCell<Document>>, x: f
         &Event::PrimaryButton {
             pressed: false,
             clicks: std::num::NonZeroU32::MIN,
+            modifiers: vapors_platform::Modifiers::default(),
         },
     );
 }
@@ -93,7 +95,7 @@ fn code_of(name: &str) -> String {
     }
 }
 
-fn key(name: &str, modifiers: Modifiers) -> Event {
+pub(super) fn key(name: &str, modifiers: Modifiers) -> Event {
     Event::Key {
         key: name.into(),
         code: code_of(name),

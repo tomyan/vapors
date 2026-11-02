@@ -133,7 +133,7 @@ fn listen(doc: &Rc<RefCell<Document>>, types: &[String], heard: &Shared) {
                     (Some(doc), Some(node)) => name(&doc.borrow(), node),
                     _ => "(none)".to_owned(),
                 };
-                heard.borrow_mut().push((e.name().to_owned(), target));
+                heard.borrow_mut().push((logged_type(e), target));
             }),
         );
     }
@@ -179,3 +179,17 @@ mod act;
 #[path = "events_vapors_read.rs"]
 mod read;
 use read::{checked, projection, selections, values};
+
+/// The event's type as the log names it, each modifier held added as the
+/// recording adds it (`events_recording::MODIFIER_KEYS`): `click+alt`.
+fn logged_type(event: &vapors_dom::Event) -> String {
+    let m = event.modifiers();
+    let held = [m.alt, m.control, m.meta, m.shift];
+    crate::events_recording::MODIFIER_KEYS
+        .iter()
+        .zip(held)
+        .filter(|(_, held)| *held)
+        .fold(event.name().to_owned(), |logged, ((_, name), _)| {
+            format!("{logged}+{name}")
+        })
+}

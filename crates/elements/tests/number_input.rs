@@ -1,7 +1,7 @@
 //! A number field's editing (3-E3c): typed characters a number takes
 //! go to the end, letters do not; Backspace deletes; Enter and blur
-//! commit, clamping an out-of-range number and reverting text that is
-//! no number; arrows step, Shift by ten; keyboard focus selects the
+//! commit, keeping an out-of-range number as typed (as Chromium does)
+//! and reverting text that is no number; arrows step, Shift by ten; keyboard focus selects the
 //! text whole, so typing replaces it. The order against Chromium is
 //! pinned by the corpus's `number.events`; these pin the values and
 //! vapors' own commit rule.
@@ -53,7 +53,7 @@ fn text_that_is_no_number_has_an_empty_value_and_no_number_until_committed() {
 }
 
 #[test]
-fn enter_commits_an_out_of_range_number_clamped_with_one_change() {
+fn enter_commits_an_out_of_range_number_as_typed_with_one_change() {
     // Given
     let page = page();
     click(&page, [50.0, 12.0]);
@@ -63,11 +63,18 @@ fn enter_commits_an_out_of_range_number_clamped_with_one_change() {
     key(&page, "Enter");
     key(&page, "Enter");
 
-    // Then: clamped to 100, one change
-    assert_eq!(value(&page, page.amount), "100");
+    // Then: kept at 205, over the max, one change
+    assert_eq!(value(&page, page.amount), "205");
+    assert_eq!(
+        page.doc.borrow().range_validity(page.amount),
+        Some(vapors_elements::RangeValidity {
+            underflow: false,
+            overflow: true
+        })
+    );
     assert_eq!(
         *page.log.borrow(),
-        ["amount input \"205\" 205", "amount change \"100\" 100"]
+        ["amount input \"205\" 205", "amount change \"205\" 205"]
     );
 }
 
@@ -96,7 +103,7 @@ fn blur_commits_too_before_the_focus_leaves() {
 
     // Then
     assert_eq!(*seen.borrow(), ["change", "blur"]);
-    assert_eq!(value(&page, page.amount), "100");
+    assert_eq!(value(&page, page.amount), "207");
 }
 
 #[test]

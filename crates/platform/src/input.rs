@@ -3,7 +3,7 @@
 //! and trackpad pinches, which need state (the last pointer position and
 //! the fingers down) that lives here.
 
-use winit::event::WindowEvent;
+use winit::event::{ElementState, MouseButton, WindowEvent};
 use winit::keyboard::ModifiersState;
 
 use crate::paste_key::Press;
@@ -12,7 +12,8 @@ use crate::clock::Instant;
 use crate::event::Event;
 use crate::event_winit::from_winit;
 use crate::gestures::Gestures;
-use crate::key_event::key_event;
+pub(crate) use crate::input_keys::Key;
+use crate::input_keys::pressed;
 
 /// Stateful translation of winit events for one window.
 pub struct Input {
@@ -58,6 +59,7 @@ impl Input {
         if let Some(keys) = self.keys(event) {
             return keys;
         }
+        self.break_row_on_other_buttons(event);
         let Some(direct) = from_winit(event, self.scale) else {
             return Vec::new();
         };
@@ -68,48 +70,64 @@ impl Input {
         events
     }
 
+    /// A press of a button other than the primary is no app event, but
+    /// breaks the primary's row, as Chromium counts presses of one
+    /// button in a row (review-v100, S1).
+    fn break_row_on_other_buttons(&mut self, event: &WindowEvent) {
+        if let WindowEvent::MouseInput {
+            state: ElementState::Pressed,
+            button,
+            ..
+        } = event
+            && *button != MouseButton::Left
+        {
+            self.clicks.break_row();
+        }
+    }
+
     /// The modifiers kept, and each key press as its [`Event::Key`] then
     /// its paste or character; `None` for other events.
     fn keys(&mut self, event: &WindowEvent) -> Option<Vec<Event>> {
-        match event {
-            WindowEvent::ModifiersChanged(modifiers) => self.key(Key::Modifiers(modifiers.state())),
-            WindowEvent::Focused(focused) => self.key(Key::Focus(*focused)),
-            WindowEvent::KeyboardInput { event: key, .. } => self.key(Key::Press(Press {
+        let key = match event {
+            WindowEvent::ModifiersChanged(modifiers) => Key::Modifiers(modifiers.state()),
+            WindowEvent::Focused(focused) => Key::Focus(*focused),
+            WindowEvent::KeyboardInput { event: key, .. } => Key::Press(Press {
                 state: key.state,
                 repeat: key.repeat,
                 logical: &key.logical_key,
                 physical: key.physical_key,
                 modifiers: self.modifiers,
                 text: key.text.as_deref(),
-            })),
-            _ => None,
-        }
+            }),
+            _ => return None,
+        };
+        Some(self.key(key))
     }
 
-    /// One keyboard fact: the modifiers change, the window's focus
-    /// changes (focus lost: no modifier is known to be held, as some
-    /// backends send no `ModifiersChanged` then), or a key is pressed
-    /// (a paste, or `None` for its own character).
+    /// One keyboard fact: the modifiers change; the window's focus
+    /// changes, sent as [`Event::WindowFocus`] (lost, no modifier is known
+    /// held: some backends send no `ModifiersChanged` then); or a key is
+    /// pressed, as its `Key` then its paste or character.
     ///
     /// A paste goes to the app whatever has focus, its character
     /// swallowed: focus lives in the app's document, so the app hands
     /// it to a focused text field first (`ElementsApp`, E6b).
-    pub(crate) fn key(&mut self, key: Key<'_>) -> Option<Vec<Event>> {
+    pub(crate) fn key(&mut self, key: Key<'_>) -> Vec<Event> {
         match key {
             Key::Modifiers(modifiers) => {
                 self.modifiers = modifiers;
-                Some(Vec::new())
+                Vec::new()
             }
             Key::Focus(focused) => {
                 if !focused {
                     self.modifiers = ModifiersState::empty();
                 }
-                None
+                vec![Event::WindowFocus { focused }]
             }
-            Key::Press(press) => Some(pressed(&Press {
+            Key::Press(press) => pressed(&Press {
                 modifiers: self.modifiers,
                 ..press
-            })),
+            }),
         }
     }
 
@@ -150,7 +168,12 @@ impl Input {
         } else {
             self.clicks.last()
         };
-        Event::PrimaryButton { pressed, clicks }
+        let modifiers = crate::key_event::modifiers(self.modifiers);
+        Event::PrimaryButton {
+            pressed,
+            clicks,
+            modifiers,
+        }
     }
 
     /// A trackpad pinch, anchored at the pointer, else at the window's
@@ -188,32 +211,3 @@ mod key_tests;
 #[cfg(test)]
 #[path = "key_event_tests.rs"]
 mod key_event_tests;
-
-/// A keyboard fact [`Input::key`] takes: what `keys` reads from winit,
-/// so the wiring is testable (winit's `KeyEvent` cannot be built).
-pub(crate) enum Key<'a> {
-    Modifiers(ModifiersState),
-    Focus(bool),
-    Press(Press<'a>),
-}
-
-/// A key going down or up: its [`Event::Key`], then a paste in place
-/// of its text (desktop only: the web page handles paste), or its
-/// text as [`Event::Character`] on a press.
-fn pressed(press: &Press<'_>) -> Vec<Event> {
-    let mut events = vec![key_event(
-        press.logical,
-        press.physical,
-        press.state,
-        press.repeat,
-        press.modifiers,
-    )];
-    let paste = !cfg!(target_family = "wasm")
-        && crate::paste_key::is_paste(press, cfg!(target_os = "macos"));
-    if paste {
-        events.push(Event::Paste);
-    } else if press.state == winit::event::ElementState::Pressed {
-        events.extend(press.text.map(|text| Event::Character(text.to_owned())));
-    }
-    events
-}

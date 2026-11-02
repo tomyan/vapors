@@ -125,6 +125,9 @@ impl DocumentInput {
         if let Some(action) = action {
             self.act(document, action);
         }
+        if let Event::WindowFocus { focused } = event {
+            self.window_focus(document, *focused);
+        }
         let unused_key = key(document, event) == Some(false)
             && !keys::field_paste_key(&document.borrow(), event);
         if let (true, Event::Key { code, .. }) = (unused_key, event) {
@@ -173,9 +176,10 @@ fn scale_of(document: &Document) -> Result<f32, Unplaced> {
 fn point_of(action: Action) -> Option<Point> {
     match action {
         Action::Move(p)
-        | Action::Press(p, _)
-        | Action::Release(p)
-        | Action::Tap(p)
+        | Action::Press(p, _, _)
+        | Action::Release(p, _)
+        | Action::Tap(p, _)
+        | Action::DoubleTap(p)
         | Action::Wheel(p, _)
         | Action::TouchDown(_, p)
         | Action::TouchMove(_, p)
@@ -203,6 +207,9 @@ impl DocumentInput {
 #[path = "document_input_route.rs"]
 mod route;
 pub use route::Route;
+#[cfg(test)]
+#[path = "document_input_click_tests.rs"]
+mod click_tests;
 #[path = "document_input_types.rs"]
 mod types;
 pub(crate) use types::Handled;

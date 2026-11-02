@@ -19,12 +19,7 @@ pub(crate) fn key_event(
         code: dom_code(physical),
         pressed: state == ElementState::Pressed,
         repeat,
-        modifiers: Modifiers {
-            shift: held.shift_key(),
-            control: held.control_key(),
-            alt: held.alt_key(),
-            meta: held.super_key(),
-        },
+        modifiers: modifiers(held),
     }
 }
 
@@ -55,5 +50,15 @@ fn dom_code(physical: PhysicalKey) -> String {
         PhysicalKey::Code(KeyCode::SuperRight) => "MetaRight".to_owned(),
         PhysicalKey::Code(code) => format!("{code:?}"),
         PhysicalKey::Unidentified(native) => format!("Unidentified{native:?}"),
+    }
+}
+
+/// winit's modifiers held, as the event carries them.
+pub(crate) fn modifiers(held: ModifiersState) -> Modifiers {
+    Modifiers {
+        shift: held.shift_key(),
+        control: held.control_key(),
+        alt: held.alt_key(),
+        meta: held.super_key(),
     }
 }

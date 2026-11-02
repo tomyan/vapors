@@ -5,6 +5,15 @@ use crate::event::{Event, TouchPhase};
 
 use TouchPhase::{Cancelled, Ended, Moved, Started};
 
+/// A tap at `x`, `y`, the `clicks`th of its run.
+fn tap(x: f32, y: f32, clicks: u32) -> Event {
+    Event::Tap {
+        x,
+        y,
+        clicks: std::num::NonZeroU32::new(clicks).expect("a tap counts from 1"),
+    }
+}
+
 #[test]
 fn taps_and_double_taps_depend_on_time_and_distance() {
     // Given
@@ -12,7 +21,7 @@ fn taps_and_double_taps_depend_on_time_and_distance() {
         (
             "a quick still press is a tap, not a double tap",
             &[(0, Started, 10.0, 10.0, 0), (0, Ended, 12.0, 11.0, 100)],
-            &[Event::Tap { x: 12.0, y: 11.0 }],
+            &[tap(12.0, 11.0, 1)],
         ),
         (
             "a second tap soon and close is a double tap",
@@ -23,8 +32,8 @@ fn taps_and_double_taps_depend_on_time_and_distance() {
                 (1, Ended, 15.0, 12.0, 350),
             ],
             &[
-                Event::Tap { x: 12.0, y: 11.0 },
-                Event::Tap { x: 15.0, y: 12.0 },
+                tap(12.0, 11.0, 1),
+                tap(15.0, 12.0, 2),
                 Event::DoubleTap { x: 15.0, y: 12.0 },
             ],
         ),
@@ -36,10 +45,7 @@ fn taps_and_double_taps_depend_on_time_and_distance() {
                 (1, Started, 10.0, 10.0, 500),
                 (1, Ended, 10.0, 10.0, 550),
             ],
-            &[
-                Event::Tap { x: 10.0, y: 10.0 },
-                Event::Tap { x: 10.0, y: 10.0 },
-            ],
+            &[tap(10.0, 10.0, 1), tap(10.0, 10.0, 1)],
         ),
         (
             "a second tap too far away is two single taps",
@@ -49,16 +55,47 @@ fn taps_and_double_taps_depend_on_time_and_distance() {
                 (1, Started, 50.0, 10.0, 200),
                 (1, Ended, 50.0, 10.0, 250),
             ],
-            &[
-                Event::Tap { x: 10.0, y: 10.0 },
-                Event::Tap { x: 50.0, y: 10.0 },
-            ],
+            &[tap(10.0, 10.0, 1), tap(50.0, 10.0, 1)],
         ),
     ];
 
     // When / Then
     check(cases);
 }
+/// A tap at `t` ms, as the steps of finger `id`.
+fn tap_at(id: u64, t: u64) -> [Step; 2] {
+    [
+        (id, Started, 10.0, 10.0, t),
+        (id, Ended, 10.0, 10.0, t + 50),
+    ]
+}
+
+#[test]
+fn taps_in_a_row_count_one_two_three_then_again_and_every_second_is_a_double_tap() {
+    // Given: five quick taps in one place. Desktop headless Chromium 155
+    // with CDP touch sends dblclick on the 2nd and the 5th
+    // (elements-corpus clicks.events): the count runs 1, 2, 3, 1, 2. The
+    // photo's double tap pairs taps (the lead, review-v100 R2): the 2nd
+    // and the 4th.
+    let steps: Vec<Step> = (0..5).flat_map(|n| tap_at(n, n * 200)).collect();
+    let double = Event::DoubleTap { x: 10.0, y: 10.0 };
+
+    // When / Then
+    check(&[(
+        "five taps",
+        &steps,
+        &[
+            tap(10.0, 10.0, 1),
+            tap(10.0, 10.0, 2),
+            double.clone(),
+            tap(10.0, 10.0, 3),
+            tap(10.0, 10.0, 1),
+            double,
+            tap(10.0, 10.0, 2),
+        ],
+    )]);
+}
+
 #[test]
 fn slow_moved_cancelled_and_two_finger_presses_are_not_taps() {
     // Given
@@ -119,6 +156,6 @@ fn a_tap_and_a_pan_are_exclusive() {
     ];
 
     // When / Then: the wobble taps and pans nothing; the drag pans and does not tap
-    assert_eq!(play(wobble), [Event::Tap { x: 10.0, y: 50.0 }]);
+    assert_eq!(play(wobble), [tap(10.0, 50.0, 1)]);
     assert_eq!(play(drag), [Event::Pan { dx: 0.0, dy: -30.0 }]);
 }

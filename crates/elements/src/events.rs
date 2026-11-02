@@ -43,6 +43,9 @@ pub(crate) struct Pointer {
     pub(crate) scrubs: std::collections::HashMap<u32, crate::number_scrub::Scrub>,
     /// Each pointer's press on a text field, by pointer id (E6a).
     pub(crate) text_presses: std::collections::HashMap<u32, crate::text_pointer::TextPress>,
+    /// The mouse's press now: its count in a row and the modifiers held,
+    /// for `dblclick` and the events' modifiers.
+    pub(crate) mouse_press: (Option<NonZeroU32>, crate::Modifiers),
     /// Whether the last touch's `pointerdown` was cancelled, which a tap
     /// from it reads: it then moves no focus.
     pub(crate) touch_down_prevented: bool,
@@ -99,32 +102,7 @@ impl Document {
         point: Point,
         clicks: NonZeroU32,
     ) {
-        process_pending(document, MOUSE, point);
-        document.borrow_mut().keyboard = false;
-        let target = document.borrow().pointer_target(MOUSE, point);
-        let target = document.borrow_mut().press(target);
-        let prevented = target.is_some_and(|target| {
-            let event = document
-                .borrow()
-                .pointer_event("pointerdown", MOUSE, target, point);
-            dispatch_pointer(document, MOUSE, target, event)
-        });
-        // a range takes the value at the press before focus moves, as
-        // Chromium orders `input` before `focusin` (3-E3a)
-        if let (false, Some(target)) = (prevented, target) {
-            crate::range_drag::pressed(document, MOUSE, target, point);
-            crate::number_scrub::pressed(document, MOUSE, target, point);
-        }
-        // a press focuses what it is on, or blurs, unless prevented (3-E2a)
-        if !prevented {
-            let focusable = target.and_then(|target| document.borrow().focusable_holding(target));
-            Self::focus(document, focusable);
-        }
-        // a text field's caret lands where the press did, after focus
-        // so keyboard focus's selection does not override it (E6a)
-        if let (false, Some(target)) = (prevented, target) {
-            crate::text_pointer::pressed(document, MOUSE, target, point, clicks);
-        }
+        Self::pointer_pressed_with(document, point, clicks, crate::Modifiers::default());
     }
 
     /// The primary button came up at `point`: the target (the capturing
@@ -134,28 +112,7 @@ impl Document {
     /// released target, as in the DOM, unless a disabled control holds
     /// it.
     pub fn pointer_released(document: &Rc<RefCell<Document>>, point: Point) {
-        process_pending(document, MOUSE, point);
-        let target = document.borrow().pointer_target(MOUSE, point);
-        if let Some(target) = target {
-            let event = document
-                .borrow()
-                .pointer_event("pointerup", MOUSE, target, point);
-            dispatch_pointer(document, MOUSE, target, event);
-        }
-        crate::range_drag::released(document, MOUSE);
-        crate::number_scrub::released(document, MOUSE);
-        release_capture(document, MOUSE);
-        process_pending(document, MOUSE, point);
-        let click = document.borrow_mut().release(target);
-        if let Some(click) = click {
-            let event = document
-                .borrow()
-                .pointer_event("click", MOUSE, click, point);
-            crate::events::tree::dispatch_click(document, click, event);
-        }
-        // a press held inside a text field's selection moves the caret
-        // after `click`, as Chromium does (review-v91, S1)
-        crate::text_pointer::released(document, MOUSE);
+        Self::pointer_released_with(document, point, crate::Modifiers::default());
     }
 
     /// A tap at `point`: a press and a release there, which is a click.
@@ -197,10 +154,14 @@ impl Document {
     }
 }
 
+#[path = "events_cancel.rs"]
+mod cancel;
 #[path = "events_capture.rs"]
 pub(crate) mod capture;
 #[path = "events_hit.rs"]
 mod hit;
+#[path = "events_mouse.rs"]
+mod mouse;
 #[path = "events_tap.rs"]
 mod tap;
 #[path = "events_touch.rs"]
@@ -208,4 +169,4 @@ mod touch;
 #[path = "events_tree.rs"]
 pub(crate) mod tree;
 
-use capture::{MOUSE, dispatch_pointer, hover_capturing, process_pending, release_capture};
+use capture::{MOUSE, dispatch_pointer, hover_capturing, process_pending};

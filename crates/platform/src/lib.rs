@@ -24,7 +24,14 @@ mod event_winit;
 mod file_kind;
 mod gestures;
 mod handler;
+#[cfg(not(target_family = "wasm"))]
+mod ime;
+#[cfg(not(target_family = "wasm"))]
+mod ime_state;
+#[cfg(not(target_family = "wasm"))]
+mod ime_window;
 mod input;
+mod input_keys;
 mod key_event;
 #[cfg(not(target_family = "wasm"))]
 mod log_forward;

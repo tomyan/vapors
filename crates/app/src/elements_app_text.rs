@@ -49,6 +49,7 @@ impl ElementsApp {
             .borrow_mut()
             .text_input()
             .map(|input| TextField {
+                id: input.node.0,
                 text: input.text,
                 selection: (wide(input.selection.0), wide(input.selection.1)),
                 area: input.area,

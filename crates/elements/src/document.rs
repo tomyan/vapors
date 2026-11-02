@@ -26,6 +26,8 @@ pub struct Document {
     pub(crate) pointer: crate::events::Pointer,
     /// The focused element (3-E2a); `None` when the body has focus.
     pub(crate) focused: Option<NodeId>,
+    /// Whether the window has focus (`focus_window.rs`).
+    pub(crate) window: crate::focus_window::Window,
     /// Where Space went down, for its click on keyup.
     pub(crate) space_on: Option<NodeId>,
     /// The number field whose text is selected whole (3-E3c).
@@ -77,6 +79,7 @@ impl Document {
             changed: true,
             pointer: crate::events::Pointer::default(),
             focused: None,
+            window: crate::focus_window::Window::Focused,
             space_on: None,
             selected_all: None,
             committed: std::collections::HashMap::new(),

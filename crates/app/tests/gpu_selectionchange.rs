@@ -79,10 +79,12 @@ fn gpu_two_caret_moves_between_frames_fire_one_selectionchange() {
         Event::PrimaryButton {
             pressed: true,
             clicks: std::num::NonZeroU32::MIN,
+            modifiers: vapors_platform::Modifiers::default(),
         },
         Event::PrimaryButton {
             pressed: false,
             clicks: std::num::NonZeroU32::MIN,
+            modifiers: vapors_platform::Modifiers::default(),
         },
     ] {
         app.event(event, &platform);

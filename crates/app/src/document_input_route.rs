@@ -48,7 +48,9 @@ pub enum Route {
     Host,
     /// Both: the document had it, and the host takes it too. A key-down
     /// the document did not use, its repeats and its up, as a browser
-    /// gives the focused element a key and also bubbles it to the page.
+    /// gives the focused element a key and also bubbles it to the page;
+    /// and `WindowFocus`, on whose loss the host drops what it holds
+    /// (a held key's state), as the releases will not come.
     Both,
 }
 
@@ -93,6 +95,11 @@ impl DocumentInput {
     }
 
     fn routed(&mut self, document: &Document, event: &Event) -> Result<Route, Unplaced> {
+        // the window's focus is the document's (its focused element
+        // blurs) and the host's alike
+        if matches!(event, Event::WindowFocus { .. }) {
+            return Ok(Route::Both);
+        }
         let Some(action) = self.action(document, event)? else {
             return Ok(self.held.key(document, event));
         };
@@ -106,9 +113,9 @@ impl DocumentInput {
         };
         Ok(match action {
             Action::Move(_) | Action::Leave => Route::Document,
-            Action::Press(p, _) => *self.held.mouse.insert(by_hit(p)),
-            Action::Release(p) => self.held.mouse.take().unwrap_or_else(|| by_hit(p)),
-            Action::Tap(p) | Action::Wheel(p, _) => by_hit(p),
+            Action::Press(p, _, _) => *self.held.mouse.insert(by_hit(p)),
+            Action::Release(p, _) => self.held.mouse.take().unwrap_or_else(|| by_hit(p)),
+            Action::Tap(p, _) | Action::DoubleTap(p) | Action::Wheel(p, _) => by_hit(p),
             Action::TouchDown(id, p) => self.held.touch_down(id, by_hit(p)),
             Action::TouchMove(id, p) => self
                 .held
@@ -186,3 +193,7 @@ mod key_tests;
 #[cfg(test)]
 #[path = "document_input_held_keys_tests.rs"]
 mod held_key_tests;
+
+#[cfg(test)]
+#[path = "document_input_window_tests.rs"]
+mod window_tests;

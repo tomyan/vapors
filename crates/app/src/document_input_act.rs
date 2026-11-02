@@ -9,6 +9,17 @@ use super::DocumentInput;
 use crate::pointer::Action;
 
 impl DocumentInput {
+    /// The window lost or regained focus: on a loss the releases of what
+    /// is held happen outside and never come, so the routes held and the
+    /// gesture are forgotten, and the document cancels its pointers.
+    pub(super) fn window_focus(&mut self, document: &Rc<RefCell<Document>>, focused: bool) {
+        if !focused {
+            self.held = super::route::Held::default();
+            self.touch.forget();
+        }
+        Document::window_focus(document, focused);
+    }
+
     pub(super) fn act(&mut self, document: &Rc<RefCell<Document>>, action: Action) {
         match action {
             Action::Move(point) => {
@@ -16,12 +27,22 @@ impl DocumentInput {
                 self.touch.mouse();
                 Document::pointer_moved(document, point);
             }
-            Action::Press(point, clicks) => {
-                Document::pointer_pressed_clicks(document, point, clicks);
+            Action::Press(point, clicks, modifiers) => {
+                Document::pointer_pressed_with(document, point, clicks, modifiers);
             }
-            Action::Release(point) => Document::pointer_released(document, point),
+            Action::Release(point, modifiers) => {
+                Document::pointer_released_with(document, point, modifiers);
+            }
             Action::Leave => Document::pointer_left(document),
-            Action::Tap(point) => Document::touch_tapped(document, point),
+            Action::Tap(point, clicks) => {
+                Document::touch_tapped(document, point);
+                if clicks.get() == 2 {
+                    Document::touch_double_tapped(document, point);
+                }
+            }
+            // the tap's count sends dblclick; the photo's pairing is not
+            // the DOM's (review-v100 R2)
+            Action::DoubleTap(_) => {}
             Action::Wheel(point, delta) => {
                 self.touch.mouse();
                 let now = vapors_platform::Instant::now();

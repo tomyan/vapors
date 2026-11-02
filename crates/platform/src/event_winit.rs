@@ -1,8 +1,10 @@
-//! winit's window events as ours.
+//! A winit window event as the app's [`Event`], in physical pixels:
+//! what `Input` translates before it adds the gestures, click counts and
+//! modifiers it keeps.
 
 use winit::event::{ElementState, MouseScrollDelta, WindowEvent};
 
-use crate::event::{Event, LINE_PIXELS, TouchPhase};
+use crate::event::{Event, LINE_PIXELS, Modifiers, TouchPhase};
 
 /// Translate a winit event into ours, the window at `scale` physical
 /// pixels per CSS pixel. `None` for events the app does not get.
@@ -26,6 +28,8 @@ pub(crate) fn from_winit(event: &WindowEvent, scale: f64) -> Option<Event> {
             pressed: *state == ElementState::Pressed,
             // counted by `Input`, which knows the last press
             clicks: std::num::NonZeroU32::MIN,
+            // held, by `Input`, which keeps the modifiers
+            modifiers: Modifiers::default(),
         }),
         WindowEvent::MouseWheel { delta, .. } => Some(scroll(*delta, scale)),
         WindowEvent::Touch(touch) => Some(Event::Touch {
