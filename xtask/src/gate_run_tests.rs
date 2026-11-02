@@ -71,8 +71,7 @@ fn the_deadline_is_what_is_left_of_the_job_or_the_steps_own_if_sooner() {
 #[test]
 fn a_step_past_its_deadline_is_killed_with_what_it_started() {
     // Given: a step that starts a child and waits on it
-    let dir = std::env::temp_dir().join(format!("xtask-gate-deadline-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("tmp dir");
+    let dir = crate::scratch::dir("gate-deadline");
     let pid_file = dir.join("child.pid");
     let script = format!("sleep 300 & echo $! > {}; wait", pid_file.display());
     let mut step = step_for(&planned(&script), &dir.join("out"));

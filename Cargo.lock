@@ -3778,6 +3778,7 @@ dependencies = [
  "flate2",
  "png",
  "serde_json",
+ "tempfile",
  "yaml-rust2",
 ]
 

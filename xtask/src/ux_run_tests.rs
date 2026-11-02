@@ -4,11 +4,8 @@ use std::path::Path;
 
 use super::*;
 
-fn run_dir(test: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("xtask-ux-run-{test}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("made");
-    dir
+fn run_dir(test: &str) -> crate::scratch::Scratch {
+    crate::scratch::dir(&format!("ux-run-{test}"))
 }
 
 fn write_png(path: &Path, width: u32, height: u32) {

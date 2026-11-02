@@ -3,14 +3,12 @@
 
 use std::fs;
 use std::os::unix::fs::MetadataExt;
-use std::path::PathBuf;
 
 use super::*;
 
 /// An empty fake `/tmp` with its `.X11-unix` directory.
-fn fake_tmp(name: &str) -> PathBuf {
-    let root = std::env::temp_dir().join(format!("xtask-xvfb-{name}-{}", std::process::id()));
-    let _ = fs::remove_dir_all(&root);
+fn fake_tmp(name: &str) -> crate::scratch::Scratch {
+    let root = crate::scratch::dir(&format!("xvfb-{name}"));
     fs::create_dir_all(root.join(".X11-unix")).expect("create the fake /tmp");
     root
 }

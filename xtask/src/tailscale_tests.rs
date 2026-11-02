@@ -54,7 +54,7 @@ fn text_that_is_not_json_is_refused() {
 #[test]
 fn find_in_searches_the_given_path_in_order_for_a_file() {
     // Given: two directories, the second holding `tool`
-    let base = std::env::temp_dir().join(format!("vapors-xtask-path-{}", std::process::id()));
+    let base = crate::scratch::dir("path");
     let (first, second) = (base.join("first"), base.join("second"));
     std::fs::create_dir_all(&first).expect("first");
     std::fs::create_dir_all(&second).expect("second");
@@ -65,7 +65,6 @@ fn find_in_searches_the_given_path_in_order_for_a_file() {
     assert_eq!(find_in(Some(&path), "tool"), Some(second.join("tool")));
     assert_eq!(find_in(Some(&path), "no-such-program"), None);
     assert_eq!(find_in(None, "tool"), None);
-    drop(std::fs::remove_dir_all(base));
 }
 
 #[test]

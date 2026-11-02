@@ -1,12 +1,7 @@
-use std::path::PathBuf;
-
 use super::*;
 
-fn scratch(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("xtask-gate-child-{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("dir");
-    dir
+fn scratch(name: &str) -> crate::scratch::Scratch {
+    crate::scratch::dir(&format!("gate-child-{name}"))
 }
 
 fn shell(script: &str) -> Command {
