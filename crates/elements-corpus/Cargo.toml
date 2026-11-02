@@ -16,9 +16,10 @@ vapors-text.workspace = true
 vapors-devtools.workspace = true
 vapors-components.workspace = true
 serde_json = "=1.0.154"
+# The oracles' work directory (oracle_files.rs).
+tempfile.workspace = true
 
 [dev-dependencies]
-tempfile.workspace = true
 vapors-platform.workspace = true
 vapors-canvas.workspace = true
 wgpu.workspace = true

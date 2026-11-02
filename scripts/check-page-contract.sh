@@ -422,6 +422,6 @@ for demo in $demos; do
     fi
   done
 done
-[ "$failed" = 0 ] || { echo "the page contract does not hold; reproduce: cargo xtask web && $0 target/web \$(mktemp -d)" >&2; exit 1; }
+[ "$failed" = 0 ] || { echo "the page contract does not hold; reproduce: cargo xtask web && $0 target/web \$(mktemp -d); logs kept in $work" >&2; exit 1; }
 rm -rf "$work"
 echo "ok   the page contract holds in all eleven cases, no HTML over the canvas of: $demos index; the gradient screenshot and the screenshots:$shots"

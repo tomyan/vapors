@@ -41,9 +41,9 @@ impl Chromium {
         scale: u32,
     ) -> Result<Live, ChromiumError> {
         fresh(profile)?;
+        let tmp = launch_tmp()?;
         let stderr = profile.with_extension("stderr.log");
         let log = File::create(&stderr).map_err(|e| failed(&stderr, &e))?;
-        let tmp = launch_tmp()?;
         let child = self
             .live_command(profile, width, height, scale)
             .env("TMPDIR", tmp.path())

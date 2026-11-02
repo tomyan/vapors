@@ -67,4 +67,5 @@ fi
 echo "  ($version) the page's console and Chrome's last lines:" >&2
 grep -E 'CONSOLE' "$work/chrome.log" | tail -10 | sed 's#^#    #' >&2
 grep -v CONSOLE "$work/chrome.log" | tail -10 | sed 's#^#    #' >&2
+echo "  logs kept in $work" >&2
 exit 1

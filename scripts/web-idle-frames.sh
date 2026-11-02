@@ -77,5 +77,5 @@ for demo in $demos; do
   esac
   echo "$demo: $count frames in 3 s idle"
 done
-[ "$missing" != 0 ] || rm -rf "$work"
+if [ "$missing" = 0 ]; then rm -rf "$work"; else echo "logs kept in $work" >&2; fi
 exit $missing

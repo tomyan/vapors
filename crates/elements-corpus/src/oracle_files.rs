@@ -3,7 +3,7 @@
 //! first line, or the same), outputs with no fixture refused, and a
 //! scratch directory removed however the run ends.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde_json::Value;
 
@@ -112,30 +112,26 @@ pub fn refuse_orphans(suffix: &str, source: &str) -> Result<(), String> {
 }
 
 /// A scratch directory, removed when dropped, whatever the run did.
-pub struct Work(PathBuf);
+pub struct Work(tempfile::TempDir);
 
 impl Work {
-    /// `<temp>/<name>-<pid>`, made empty.
+    /// A new directory `<temp>/<name>-<random>`.
     ///
     /// # Errors
     /// It cannot be made.
     pub fn new(name: &str) -> Result<Self, String> {
-        let dir = std::env::temp_dir().join(format!("{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-        Ok(Self(dir))
+        let made = tempfile::Builder::new()
+            .prefix(&format!("{name}-"))
+            .tempdir();
+        let under = std::env::temp_dir();
+        made.map(Self)
+            .map_err(|e| format!("a work directory under {}: {e}", under.display()))
     }
 
     /// Its path.
     #[must_use]
     pub fn path(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for Work {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
+        self.0.path()
     }
 }
 

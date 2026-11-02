@@ -23,3 +23,7 @@ pub(super) fn launch_tmp() -> Result<tempfile::TempDir, ChromiumError> {
             ChromiumError::Failed(format!("a TMPDIR for it under {}: {e}", under.display()))
         })
 }
+
+#[cfg(test)]
+#[path = "chromium_tmp_tests.rs"]
+mod tests;

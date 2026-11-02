@@ -34,13 +34,21 @@ expect no event click
 expect value input#title Wa
 ";
 
-fn session(test: &str) -> (vapors_text::comparison::Live, Session) {
+type Running = (tempfile::TempDir, vapors_text::comparison::Live, Session);
+
+fn session(test: &str) -> Running {
     session_on(test, PAGE)
 }
 
-fn session_on(test: &str, page: &str) -> (vapors_text::comparison::Live, Session) {
+/// A live Chromium and its session, in a scratch directory that is
+/// dropped last when bound in this order: the browser is stopped first.
+fn session_on(test: &str, page: &str) -> Running {
     let chromium = Chromium::find().unwrap_or_else(|e| panic!("{e}"));
-    let profile = std::env::temp_dir().join(format!("events-{test}-{}", std::process::id()));
+    let made = tempfile::Builder::new()
+        .prefix(&format!("events-{test}-"))
+        .tempdir();
+    let dir = made.expect("a scratch directory under the temp dir");
+    let profile = dir.path().join("profile");
     let mut live = chromium
         .live(&profile, 400, 300, 1)
         .unwrap_or_else(|e| panic!("{e}"));
@@ -49,13 +57,13 @@ fn session_on(test: &str, page: &str) -> (vapors_text::comparison::Live, Session
     session
         .navigate(page, DEADLINE)
         .unwrap_or_else(|e| panic!("{e}"));
-    (live, session)
+    (dir, live, session)
 }
 
 #[test]
 fn gpu_events_a_script_is_played_and_its_answers_recorded() {
     // Given
-    let (_live, mut session) = session("plays");
+    let (_dir, _live, mut session) = session("plays");
     let script = parse("page", SCRIPT).expect("parses");
 
     // When
@@ -87,7 +95,7 @@ fn gpu_events_a_script_is_played_and_its_answers_recorded() {
 fn gpu_events_an_expectation_that_does_not_hold_is_refused_naming_its_line() {
     // Given: focus goes to the button, but the script says the field; the
     // checkbox, with no id, is named by its path and does take focus
-    let (_live, mut session) = session("refuses");
+    let (_dir, _live, mut session) = session("refuses");
     let script = parse("page", "listen click\nclick 50 20\nexpect focus input#title\nclick 5 125\nexpect focus body>div:nth-child(3)>input:nth-child(1)\n").expect("parses");
 
     // When
@@ -107,7 +115,7 @@ fn gpu_events_an_expectation_that_does_not_hold_is_refused_naming_its_line() {
 #[test]
 fn gpu_events_a_scroll_of_the_document_is_logged_at_the_document() {
     // Given: a page taller than the window, scrolled by the wheel
-    let (_live, mut session) = session_on(
+    let (_dir, _live, mut session) = session_on(
         "document",
         "data:text/html,<body style='height:3000px;margin:0'>tall</body>",
     );
@@ -127,7 +135,7 @@ fn gpu_events_an_event_after_the_last_step_is_refused() {
     // last step's log (`window.__eventsSettling`), so it is always late:
     // a timer alone landed inside the step on a slow runner (vapors #61)
     let page = "data:text/html,<button id=b style='width:100px;height:40px' onclick=\"(function wait() { if (window.__eventsSettling) { document.body.dispatchEvent(new Event('late')); } else { setTimeout(wait, 10); } })()\">x</button>";
-    let (_live, mut session) = session_on("late", page);
+    let (_dir, _live, mut session) = session_on("late", page);
     let script = parse(
         "page",
         "listen click late\nclick 50 20\nexpect event click button#b\n",
@@ -150,7 +158,7 @@ fn gpu_events_a_prevented_pointerdown_does_not_focus_in_chromium() {
     // review-v81 (9) asked whether that stops the press's focus, as
     // vapors makes it; Chromium 155 answers that it does
     let page = "data:text/html,<button id=b style='width:100px;height:40px' onpointerdown='event.preventDefault()'>x</button>";
-    let (_live, mut session) = session_on("prevented", page);
+    let (_dir, _live, mut session) = session_on("prevented", page);
     let script = parse("page", "listen click\nclick 50 20\nexpect focus body\n").expect("parses");
 
     // When / Then: focus stays on the body
