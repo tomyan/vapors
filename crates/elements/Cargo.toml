@@ -8,6 +8,12 @@ repository.workspace = true
 rust-version.workspace = true
 publish = false
 
+# `complex-script-breaks` (default): vapors-text's, forwarded so an app
+# can turn it off (crates/text/Cargo.toml).
+[features]
+default = ["complex-script-breaks"]
+complex-script-breaks = ["vapors-text/complex-script-breaks"]
+
 [dependencies]
 vapors-dom.workspace = true
 vapors-css.workspace = true
