@@ -34,28 +34,36 @@ pub const HIDE_GPU_DEVICE: [&str; 6] = [
 ];
 
 /// How this gate runs its steps: `/dev/dri` hidden, unless this machine
-/// has none (as GitHub's runners have none, so there is nothing to
-/// hide) or `[gate] hide_gpu_device = "false"`.
+/// has no device there (as GitHub's runners have none, so there is
+/// nothing to hide) or `[gate] hide_gpu_device = "false"`.
 ///
 /// # Errors
 ///
 /// Another value for the key, or bwrap missing or not leaving
 /// `/dev/dri` empty, naming the fix.
 pub fn wrap(config: &Config) -> Result<Wrap, String> {
-    wrap_for(config, std::path::Path::new("/dev/dri").exists(), "bwrap")
+    wrap_for(config, has_gpu_device(), "bwrap")
 }
 
-/// [`wrap`] on a machine that has `/dev/dri` or not, with `program` as
-/// bwrap.
+/// Whether `/dev/dri` holds anything: GitHub's runner has the directory
+/// but no device in it (Chromium there: "drmGetDevices2() has not found
+/// any devices"), and no bwrap.
+#[must_use]
+pub fn has_gpu_device() -> bool {
+    std::fs::read_dir("/dev/dri").is_ok_and(|mut entries| entries.next().is_some())
+}
+
+/// [`wrap`] on a machine with a device in `/dev/dri` or not, with
+/// `program` as bwrap.
 ///
 /// # Errors
 ///
 /// As [`wrap`].
-pub fn wrap_for(config: &Config, has_dri: bool, program: &str) -> Result<Wrap, String> {
+pub fn wrap_for(config: &Config, has_device: bool, program: &str) -> Result<Wrap, String> {
     match config.get(KEY) {
-        None | Some("true") if !has_dri => {
+        None | Some("true") if !has_device => {
             println!(
-                "gate: this machine has no /dev/dri, as GitHub's runners have none; steps run as they are"
+                "gate: this machine has no device in /dev/dri, as GitHub's runners have none; steps run as they are"
             );
             Ok(Wrap::AsIs)
         }

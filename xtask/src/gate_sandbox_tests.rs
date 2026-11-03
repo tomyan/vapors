@@ -31,9 +31,9 @@ fn a_machine_without_bwrap_is_refused_naming_the_fix() {
 
 #[test]
 fn where_there_is_a_dev_dri_to_hide_bwrap_hides_it() {
-    // Given: the dev box has /dev/dri; GitHub's runner has none, and there
-    // the gate runs steps as they are (wrap), so bwrap is never needed
-    if !std::path::Path::new("/dev/dri").exists() {
+    // Given: the dev box has a device in /dev/dri; GitHub's runner has
+    // none (and no bwrap), and there the gate runs steps as they are
+    if !has_gpu_device() {
         assert_eq!(wrap(&Config::parse("").expect("empty")), Ok(Wrap::AsIs));
         return;
     }
