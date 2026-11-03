@@ -158,6 +158,35 @@ fn text_of(
     }
 }
 
+/// What the field shows: a value set as a number at its step's
+/// precision, typed text and a step of `any` as they are.
+pub(crate) fn shown(
+    attributes: &BTreeMap<String, String>,
+    properties: &BTreeMap<String, PropertyValue>,
+) -> String {
+    let step = step_of(attributes.get("step").map(String::as_str));
+    match (properties.get("value"), step) {
+        (Some(PropertyValue::Number(n)), Some(step)) if n.is_finite() => at_precision(*n, step),
+        _ => text_of(attributes, properties),
+    }
+}
+
+/// `value` with as many decimals as `step` has (0 for 1, 2 for 0.05, up
+/// to 6), never "-0".
+fn at_precision(value: f64, step: f64) -> String {
+    let decimals = (0..=6)
+        .find(|&d: &i32| {
+            let scaled = step * 10f64.powi(d);
+            (scaled - scaled.round()).abs() < 1e-9
+        })
+        .unwrap_or(6);
+    let text = format!("{value:.0$}", usize::try_from(decimals).unwrap_or(6));
+    match text.strip_prefix('-') {
+        Some(rest) if rest.chars().all(|c| c == '0' || c == '.') => rest.to_owned(),
+        _ => text,
+    }
+}
+
 /// `step`: `any` for none, a positive number, else the default of 1.
 fn step_of(attribute: Option<&str>) -> Option<f64> {
     match attribute.map(str::trim) {
@@ -184,3 +213,7 @@ pub(crate) fn typeable(c: char) -> bool {
 #[cfg(test)]
 #[path = "number_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "number_shown_tests.rs"]
+mod shown_tests;
