@@ -68,6 +68,19 @@ impl ImageView {
         (area.left..area.right).contains(&point[0]) && (area.top..area.bottom).contains(&point[1])
     }
 
+    /// A new frame size: fitted again, unless the view is kept and has a
+    /// placement worth keeping (an area it was sized to, at a finite,
+    /// positive scale; a 0x0 resize before layout gives neither).
+    pub(crate) fn resized(&mut self, width: u32, height: u32) {
+        self.viewport = Size { width, height };
+        let scale = self.transform().scale;
+        let keep = self.keep_view && self.sized && scale.is_finite() && scale > 0.0;
+        self.sized |= !self.area_is_empty();
+        if !keep {
+            self.fit();
+        }
+    }
+
     /// The area's size: the frame less its insets, zero where they meet.
     #[must_use]
     pub fn area_size(&self) -> Size {
