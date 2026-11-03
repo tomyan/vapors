@@ -60,6 +60,17 @@ fn run_in(
     }
 }
 
+/// The gate's last lines: an unsandboxed run's notice again, then the
+/// pass line, which stays last (`gate_pr` reads it).
+#[must_use]
+pub fn pass_lines(head: &str, wrap: Wrap) -> Vec<String> {
+    let notice = wrap.notice().map(|n| format!("gate: {n}"));
+    notice
+        .into_iter()
+        .chain([format!("gate: pass {head}")])
+        .collect()
+}
+
 /// The time `planned` may take, `spent` into its job.
 #[must_use]
 pub fn deadline(planned: &PlannedStep, spent: Duration) -> Duration {
@@ -73,7 +84,7 @@ pub fn step_for(planned: &PlannedStep, output: &Path, wrap: Wrap) -> Step {
     let script = ["bash", "-eo", "pipefail", "-c", planned.run.as_str()];
     let (program, args) = match wrap {
         Wrap::HideGpuDevice => ("bwrap", [&sandbox::HIDE_GPU_DEVICE[..], &script].concat()),
-        Wrap::AsIs => ("bash", script[1..].to_vec()),
+        Wrap::NoRenderNode | Wrap::SwitchedOff => ("bash", script[1..].to_vec()),
     };
     let mut step = Step::new(
         &planned.name,

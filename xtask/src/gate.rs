@@ -19,6 +19,7 @@ use std::process::{Command, ExitCode};
 
 use crate::config::Config;
 use crate::gate_plan::{PlannedStep, Sources, plan};
+use crate::gate_run::{Wrap, pass_lines};
 use crate::report::Reporter;
 
 /// How a state with changes in its tree is marked.
@@ -54,7 +55,7 @@ pub fn run(reporter: &Reporter) -> ExitCode {
     }
     match state(&siblings) {
         Ok(after) if after == before => {
-            println!("gate: pass {}", before.head);
+            println!("{}", pass_lines(&before.head, wrap).join("\n"));
             code
         }
         Ok(after) => refuse(&format!(
@@ -73,13 +74,7 @@ fn refuse(why: &str) -> ExitCode {
 type Pinned = Vec<(String, String)>;
 
 /// What the gate runs, and how.
-type Prepared = (
-    Vec<PlannedStep>,
-    State,
-    Pinned,
-    PathBuf,
-    crate::gate_run::Wrap,
-);
+type Prepared = (Vec<PlannedStep>, State, Pinned, PathBuf, Wrap);
 
 /// The plan, the state before (a clean tree), the pinned siblings, and
 /// the `GITHUB_OUTPUT` file, emptied.

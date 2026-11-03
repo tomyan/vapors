@@ -6,6 +6,7 @@
 //! To run a step by hand outside the sandbox, drop the six arguments
 //! after `bwrap` from its reproduce line.
 
+use std::path::Path;
 use std::process::Command;
 
 use crate::config::Config;
@@ -15,8 +16,27 @@ use crate::config::Config;
 pub enum Wrap {
     /// Through bwrap, `/dev/dri` hidden: as on GitHub.
     HideGpuDevice,
+    /// As they are: this machine has no render node to hide.
+    NoRenderNode,
     /// As they are: `[gate] hide_gpu_device = "false"`.
-    AsIs,
+    SwitchedOff,
+}
+
+impl Wrap {
+    /// What the gate says when its steps were not sandboxed: at the start,
+    /// and again just before its pass line, so posted output shows it.
+    #[must_use]
+    pub fn notice(self) -> Option<&'static str> {
+        match self {
+            Self::HideGpuDevice => None,
+            Self::NoRenderNode => Some(
+                "this machine has no render node in /dev/dri, as GitHub's runners have none; steps ran as they are",
+            ),
+            Self::SwitchedOff => Some(
+                "/dev/dri was not hidden ([gate] hide_gpu_device = \"false\" in .config/factory.toml); a step can pass here that fails on GitHub",
+            ),
+        }
+    }
 }
 
 /// The key that turns the sandbox off.
@@ -39,31 +59,80 @@ pub const HIDE_GPU_DEVICE: [&str; 6] = [
 ///
 /// # Errors
 ///
-/// Another value for the key, or bwrap missing or not leaving
-/// `/dev/dri` empty, naming the fix.
+/// Another value for the key, an unreadable `/dev/dri`, or bwrap missing
+/// or not leaving `/dev/dri` empty, naming the fix.
 pub fn wrap(config: &Config) -> Result<Wrap, String> {
-    wrap_for(config, has_gpu_device(), "bwrap")
+    wrap_for(config, Path::new("/dev/dri"), "bwrap")
 }
 
-/// Whether `/dev/dri` has a render node (`renderD*`), the device
-/// WebGPU and Vulkan open. GitHub's runner has none: its `/dev/dri` held
-/// something (run 41628481884 sent it to bwrap) while Chromium there
-/// found no device ("`drmGetDevices2()` has not found any devices"),
-/// as a display-only card such as a VM's has no render node.
-#[must_use]
-pub fn has_gpu_device() -> bool {
-    std::fs::read_dir("/dev/dri").is_ok_and(|entries| {
-        entries
-            .filter_map(Result::ok)
-            .any(|entry| entry.file_name().to_string_lossy().starts_with("renderD"))
-    })
+/// [`wrap`] reading `dri` for render nodes, with `program` as bwrap.
+///
+/// # Errors
+///
+/// As [`wrap`].
+pub fn wrap_for(config: &Config, dri: &Path, program: &str) -> Result<Wrap, String> {
+    let wrap = match config.get(KEY) {
+        None | Some("true") if !has_render_node(dri)? => Wrap::NoRenderNode,
+        None | Some("true") => check_with(program)
+            .map(|()| Wrap::HideGpuDevice)
+            .map_err(|why| format!("{why} ({} holds: {})", dri.display(), entries(dri)))?,
+        // Relaxed guard, declared: for a machine with a render node but no
+        // working bwrap, steps run as they are, said at the start and
+        // before the pass line; such a gate can pass a check that fails
+        // on GitHub's device-less runners. Retired when that machine has
+        // its own way to hide its GPU from the checks.
+        Some("false") => Wrap::SwitchedOff,
+        Some(other) => {
+            return Err(format!(
+                "[gate] hide_gpu_device is `{other}`, not true or false; fix: .config/factory.toml"
+            ));
+        }
+    };
+    if let Some(notice) = wrap.notice() {
+        println!("gate: {notice}");
+    }
+    Ok(wrap)
 }
 
-fn dri_entries() -> String {
-    std::fs::read_dir("/dev/dri").map_or_else(
+/// Whether `dri` has a render node (`renderD*`), the device WebGPU and
+/// Vulkan open: absent counts as none, unreadable is refused. GitHub's
+/// runner has none: its `/dev/dri` held something (run 41628481884 sent
+/// it to bwrap) while Chromium there found no device
+/// ("`drmGetDevices2()` has not found any devices"), as a display-only
+/// card such as a VM's has no render node.
+///
+/// # Errors
+///
+/// `dri` or one of its entries could not be read, naming the error.
+pub fn has_render_node(dri: &Path) -> Result<bool, String> {
+    let refuse = |e: std::io::Error| {
+        format!(
+            "{}: {e}; the gate cannot tell whether this machine has a GPU to hide; fix: make it readable, or set [gate] hide_gpu_device = \"false\" in .config/factory.toml",
+            dri.display()
+        )
+    };
+    let listing = match std::fs::read_dir(dri) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        other => other.map_err(refuse)?,
+    };
+    for entry in listing {
+        if entry
+            .map_err(refuse)?
+            .file_name()
+            .to_string_lossy()
+            .starts_with("renderD")
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn entries(dri: &Path) -> String {
+    std::fs::read_dir(dri).map_or_else(
         |e| format!("unreadable, {e}"),
-        |entries| {
-            let mut names: Vec<String> = entries
+        |listing| {
+            let mut names: Vec<String> = listing
                 .filter_map(Result::ok)
                 .map(|entry| entry.file_name().to_string_lossy().into_owned())
                 .collect();
@@ -71,40 +140,6 @@ fn dri_entries() -> String {
             names.join(" ")
         },
     )
-}
-
-/// [`wrap`] on a machine with a device in `/dev/dri` or not, with
-/// `program` as bwrap.
-///
-/// # Errors
-///
-/// As [`wrap`].
-pub fn wrap_for(config: &Config, has_device: bool, program: &str) -> Result<Wrap, String> {
-    match config.get(KEY) {
-        None | Some("true") if !has_device => {
-            println!(
-                "gate: this machine has no render node in /dev/dri, as GitHub's runners have none; steps run as they are"
-            );
-            Ok(Wrap::AsIs)
-        }
-        None | Some("true") => check_with(program)
-            .map(|()| Wrap::HideGpuDevice)
-            .map_err(|why| format!("{why} (/dev/dri holds: {})", dri_entries())),
-        // Relaxed guard, declared: for a machine with /dev/dri but no
-        // working bwrap, steps run as they are, said on every gate; such
-        // a gate can pass a check that fails on GitHub's device-less
-        // runners. Retired when that machine has its own way to hide its
-        // GPU from the checks.
-        Some("false") => {
-            println!(
-                "gate: /dev/dri is not hidden ({KEY} = \"false\" in .config/factory.toml); a step can pass here that fails on GitHub"
-            );
-            Ok(Wrap::AsIs)
-        }
-        Some(other) => Err(format!(
-            "[gate] hide_gpu_device is `{other}`, not true or false; fix: .config/factory.toml"
-        )),
-    }
 }
 
 /// [`check`] with `program` as bwrap.

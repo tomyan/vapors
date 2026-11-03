@@ -114,9 +114,9 @@ fn a_step_past_its_deadline_is_killed_with_what_it_started() {
 }
 
 #[test]
-fn with_the_gpu_device_shown_a_step_is_plain_bash() {
+fn with_the_gpu_device_not_hidden_a_step_is_plain_bash() {
     // When
-    let step = step_for(&planned("true"), Path::new("/t/out"), Wrap::AsIs);
+    let step = step_for(&planned("true"), Path::new("/t/out"), Wrap::SwitchedOff);
 
     // Then
     assert!(
@@ -141,7 +141,13 @@ fn every_step_runs_with_the_runs_tmpdir_and_a_leak_fails_the_gate() {
     // When
     let reporter = crate::report::Reporter::new(false);
     let ran = crate::run_tmp::around("gate", &base, |tmp| {
-        let code = run_in(&[planned(&script)], &output, Wrap::AsIs, &reporter, tmp);
+        let code = run_in(
+            &[planned(&script)],
+            &output,
+            Wrap::SwitchedOff,
+            &reporter,
+            tmp,
+        );
         assert_eq!(code, ExitCode::SUCCESS, "the step saw the run's TMPDIR");
         code
     });
@@ -156,4 +162,17 @@ fn every_step_runs_with_the_runs_tmpdir_and_a_leak_fails_the_gate() {
 
 fn wrap_for_this_machine() -> Wrap {
     sandbox_wrap(&crate::config::Config::parse("").expect("empty")).expect("the sandbox")
+}
+
+#[test]
+fn an_unsandboxed_gate_says_so_again_just_before_its_pass_line() {
+    // When
+    let hidden = pass_lines("abc", Wrap::HideGpuDevice);
+    let plain = pass_lines("abc", Wrap::NoRenderNode);
+
+    // Then
+    assert_eq!(hidden, ["gate: pass abc"]);
+    assert_eq!(plain.len(), 2, "{plain:?}");
+    assert!(plain[0].contains("no render node"), "{plain:?}");
+    assert_eq!(plain[1], "gate: pass abc");
 }
