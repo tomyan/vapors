@@ -1,8 +1,7 @@
 //! The factory: every build, test and check command for this repository.
 //!
-//! `cargo xtask --help` lists the commands. Each prints one line per
-//! fact and, on failure, what was expected, what was found, how to fix
-//! it and the exact command that reproduces it.
+//! `cargo xtask --help` lists the commands. Each prints one line per fact and, on failure,
+//! what was expected, what was found, how to fix it and the exact command that reproduces it.
 
 mod ci;
 mod cli;
@@ -79,6 +78,7 @@ mod report;
 #[cfg(test)]
 #[path = "report_timeout_tests.rs"]
 mod report_timeout_tests;
+mod run_tmp;
 mod sccache;
 #[cfg(test)]
 mod scratch;

@@ -124,3 +124,30 @@ fn with_the_gpu_device_shown_a_step_is_plain_bash() {
         step.reproduce()
     );
 }
+
+#[test]
+fn every_step_runs_with_the_runs_tmpdir_and_a_leak_fails_the_gate() {
+    // Given: a step that checks its TMPDIR is the run's, then leaks a file
+    let base = crate::scratch::dir("gate-tmpdir");
+    let run_dir = base.join(format!("xtask-run-{}", std::process::id()));
+    let script = format!(
+        r#"[ "$TMPDIR" = "{}" ] && touch "$TMPDIR/left""#,
+        run_dir.display()
+    );
+    let output = base.join("out");
+
+    // When
+    let reporter = crate::report::Reporter::new(false);
+    let ran = crate::run_tmp::around("gate", &base, |tmp| {
+        let code = run_in(&[planned(&script)], &output, Wrap::AsIs, &reporter, tmp);
+        assert_eq!(code, ExitCode::SUCCESS, "the step saw the run's TMPDIR");
+        code
+    });
+
+    // Then
+    let refusal = ran.expect_err("the leak fails the gate");
+    assert!(
+        refusal.contains("gate left 1 entry ") && refusal.contains("left"),
+        "{refusal}"
+    );
+}

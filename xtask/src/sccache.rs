@@ -13,6 +13,9 @@ use serde_json::Value;
 
 use crate::steps::Step;
 
+#[path = "sccache_start.rs"]
+mod start;
+
 /// The cache's cap: the dev box's worktrees each hold 20 to 50 GB of
 /// target (2026-10-23), and the disk filled at 853 of 898 GB; one shared
 /// cache of 50 GB is smaller than two worktrees' targets.
@@ -71,7 +74,9 @@ const SERVER_ENV: [(&str, &str); 2] = [
 /// Whether sccache answered, checked once per xtask run.
 pub fn ready() -> Result<(), String> {
     static READY: OnceLock<Result<(), String>> = OnceLock::new();
-    READY.get_or_init(|| stats().map(|_| ())).clone()
+    READY
+        .get_or_init(|| start::start().and_then(|()| stats().map(|_| ())))
+        .clone()
 }
 
 /// The server's statistics now, starting it if needed.
