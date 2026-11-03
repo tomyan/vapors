@@ -76,7 +76,11 @@ impl ImageView {
 
     fn resized(&mut self, width: u32, height: u32) {
         self.viewport = Size { width, height };
-        self.fit();
+        let keep = self.keep_view && self.sized;
+        self.sized = true;
+        if !keep {
+            self.fit();
+        }
     }
 
     fn pointer_moved(&mut self, to: [f32; 2]) -> Answered {

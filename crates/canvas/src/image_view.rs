@@ -31,6 +31,10 @@ pub struct ImageView {
     /// Bumped by every `set_image` and `set_painter`: two images of the same size, fitted
     /// the same, differ only in this.
     generation: u64,
+    /// Whether a resize keeps the zoom and position (`keep_view_on_resize`).
+    pub(crate) keep_view: bool,
+    /// Whether a resize has given the view its size yet.
+    pub(crate) sized: bool,
 }
 
 impl ImageView {
@@ -61,6 +65,8 @@ impl ImageView {
             background,
             insets: Insets::default(),
             generation: 0,
+            keep_view: false,
+            sized: false,
         }
     }
 
@@ -130,6 +136,14 @@ impl ImageView {
         self.transform.translate[1] += dy;
     }
 
+    /// Keep the zoom and position across a resize (`keep`), as while a
+    /// phone's keyboard shortens the window under a panel the person is
+    /// typing into, or fit the image again on each resize (the default).
+    /// The first resize, which gives the view its size, always fits.
+    pub fn keep_view_on_resize(&mut self, keep: bool) {
+        self.keep_view = keep;
+    }
+
     /// Fit the image unless it is fitted already, then show it actual size.
     pub fn toggle_fit(&mut self) {
         if self.fitted() == Some(self.transform) {
@@ -147,3 +161,7 @@ mod tests;
 #[cfg(test)]
 #[path = "image_view_pointer_tests.rs"]
 mod pointer_tests;
+
+#[cfg(test)]
+#[path = "image_view_resize_tests.rs"]
+mod resize_tests;
