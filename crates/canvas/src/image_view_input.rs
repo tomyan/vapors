@@ -11,7 +11,6 @@
 //! area's centre.
 
 use vapors_platform::{Event, LINE_PIXELS, TouchPhase};
-use vapors_scene::Size;
 
 use crate::ImageView;
 
@@ -72,11 +71,6 @@ impl ImageView {
             | Event::FileOpened { .. } => {}
         }
         Answered::Done
-    }
-
-    fn resized(&mut self, width: u32, height: u32) {
-        self.viewport = Size { width, height };
-        self.fit();
     }
 
     fn pointer_moved(&mut self, to: [f32; 2]) -> Answered {
