@@ -187,3 +187,21 @@ fn with_the_keep_switch_a_run_directory_with_leftovers_is_kept_and_said() {
 
 #[path = "run_tmp_sweep_tests.rs"]
 mod sweep_tests;
+
+#[test]
+fn with_the_keep_switch_a_tmpdir_that_could_not_be_read_is_kept_naming_it() {
+    // Given: a step removed $TMPDIR itself, so nothing is listed but the
+    // directory could not be read
+    let base = scratch::dir("run-tmp-keep-gone");
+    let run = RunTmp::make(&base, 16).expect("made");
+    std::fs::remove_dir(run.path()).expect("removed");
+
+    // When
+    let refusal = run.finish("ci", true).expect_err("unreadable");
+
+    // Then
+    assert!(
+        refusal.contains("could not read") && refusal.contains("kept"),
+        "{refusal}"
+    );
+}

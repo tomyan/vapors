@@ -16,6 +16,9 @@ use crate::steps::Step;
 #[path = "sccache_start.rs"]
 mod start;
 
+#[path = "sccache_stale.rs"]
+mod stale;
+
 /// The cache's cap: the dev box's worktrees each hold 20 to 50 GB of
 /// target (2026-10-23), and the disk filled at 853 of 898 GB; one shared
 /// cache of 50 GB is smaller than two worktrees' targets.
@@ -75,7 +78,11 @@ const SERVER_ENV: [(&str, &str); 2] = [
 pub fn ready() -> Result<(), String> {
     static READY: OnceLock<Result<(), String>> = OnceLock::new();
     READY
-        .get_or_init(|| start::start().and_then(|()| stats().map(|_| ())))
+        .get_or_init(|| {
+            start::start()
+                .and_then(|()| stale::check())
+                .and_then(|()| stats().map(|_| ()))
+        })
         .clone()
 }
 
@@ -97,6 +104,8 @@ pub fn stats() -> Result<Stats, String> {
         .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
         .collect();
     step.deadline = Some(ANSWER_DEADLINE);
+    // As the start: were this to start a server, it would outlive the run.
+    step.tmpdir = crate::step::TmpDir::Unset;
     let outcome = crate::command::run(&step);
     if !outcome.passed {
         return Err(format!(

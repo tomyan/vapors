@@ -26,8 +26,10 @@ const GB: u64 = 1_000_000_000;
 /// What a filesystem has free.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Free {
-    /// Inodes not in use.
-    pub inodes: u64,
+    /// Inodes not in use; none for a filesystem that reports no inode
+    /// count (a total of 0, as btrfs and some overlays do), which has no
+    /// inode limit to run out of.
+    pub inodes: Option<u64>,
     /// Bytes an unprivileged user may still write.
     pub bytes: u64,
 }
@@ -38,21 +40,41 @@ pub struct Free {
 /// Either is under its floor, or `stat` could not say, naming the fix.
 pub fn before() -> Result<(), String> {
     let tmp = std::env::temp_dir();
-    // A workspace before its first build has no target/ yet; it will be
-    // made here.
-    let target = Path::new("target");
-    let target = if target.exists() {
-        target
-    } else {
-        Path::new(".")
-    };
-    check((&tmp, free(&tmp)?), (target, free(target)?))
+    let target = target_dir(Path::new("."))?;
+    let tmp_free = free(&tmp)?;
+    if tmp_free.inodes.is_none() {
+        println!(
+            "floor: {} reports no inode count; its inode floor is not checked",
+            tmp.display()
+        );
+    }
+    check((&tmp, tmp_free), (&target, free(&target)?))
+}
+
+/// `<workspace>/target`, or the workspace itself before its first build
+/// (target/ will be made there).
+///
+/// # Errors
+/// `target` is a link to nothing: its space cannot be read, and the
+/// workspace's would be the wrong disk.
+pub fn target_dir(workspace: &Path) -> Result<std::path::PathBuf, String> {
+    let target = workspace.join("target");
+    match target.symlink_metadata() {
+        Err(_) => Ok(workspace.to_path_buf()),
+        Ok(_) if target.exists() => Ok(target),
+        Ok(_) => Err(format!(
+            "{} is a link to {}, which does not exist; \
+             fix: mkdir -p the directory it names, as the worktree recipe in CLAUDE.md does",
+            target.display(),
+            std::fs::read_link(&target).map_or_else(|e| e.to_string(), |p| p.display().to_string())
+        )),
+    }
 }
 
 /// `stat -L -f` on `path`, judged by its exit code.
 fn free(path: &Path) -> Result<Free, String> {
     let output = Command::new("stat")
-        .args(["-L", "-f", "-c", "%d %a %S"])
+        .args(["-L", "-f", "-c", "%c %d %a %S"])
         .arg(path)
         .output()
         .map_err(|e| format!("stat: {e}; fix: install coreutils"))?;
@@ -63,20 +85,20 @@ fn free(path: &Path) -> Result<Free, String> {
     parse(&String::from_utf8_lossy(&output.stdout), path)
 }
 
-/// `stat -f -c '%d %a %S'`'s line: free inodes, free blocks for users,
-/// block size.
+/// `stat -f -c '%c %d %a %S'`'s line: total and free inodes, free blocks
+/// for users, block size.
 ///
 /// # Errors
 /// Any other shape, naming the path and the text.
 pub fn parse(text: &str, path: &Path) -> Result<Free, String> {
     let numbers: Option<Vec<u64>> = text.split_whitespace().map(|n| n.parse().ok()).collect();
     match numbers.as_deref() {
-        Some(&[inodes, blocks, size]) => Ok(Free {
-            inodes,
+        Some(&[total, inodes, blocks, size]) => Ok(Free {
+            inodes: (total > 0).then_some(inodes),
             bytes: blocks.saturating_mul(size),
         }),
         _ => Err(format!(
-            "stat -f {} printed `{}`, not free inodes, free blocks and block size",
+            "stat -f {} printed `{}`, not total and free inodes, free blocks and block size",
             path.display(),
             text.trim()
         )),
@@ -89,12 +111,11 @@ pub fn parse(text: &str, path: &Path) -> Result<Free, String> {
 /// Naming which, the numbers, and what to remove.
 pub fn check(tmp: (&Path, Free), target: (&Path, Free)) -> Result<(), String> {
     let (tmp_path, tmp_free) = tmp;
-    if tmp_free.inodes < INODE_FLOOR {
+    if let Some(inodes) = tmp_free.inodes.filter(|&free| free < INODE_FLOOR) {
         return Err(format!(
-            "{} has {} free inodes, under the gate's floor of {INODE_FLOOR}; \
+            "{} has {inodes} free inodes, under the gate's floor of {INODE_FLOOR}; \
              fix: remove what tests and browsers left there (`ls {}` for the oldest), then rerun",
             tmp_path.display(),
-            tmp_free.inodes,
             tmp_path.display()
         ));
     }

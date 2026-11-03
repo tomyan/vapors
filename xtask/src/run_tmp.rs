@@ -77,20 +77,25 @@ impl RunTmp {
     /// blocked by it).
     pub fn finish(self, run: &str, keep: bool) -> Result<(), String> {
         let walked = walk::walk(&self.dir);
-        if keep && !(walked.entries.is_empty() && walked.unread.is_empty()) {
-            let kept = format!("; kept, since {KEEP_ENV} is set, until the next run");
-            return Err(refusal(run, &self.dir, &walked.entries) + &kept);
-        }
-        let removed = walk::remove_or_set_aside(&self.dir);
         let mut said = Vec::new();
         if !walked.entries.is_empty() {
-            said.push(refusal(run, &self.dir, &walked.entries) + "; removed");
+            said.push(refusal(run, &self.dir, &walked.entries));
         }
         if !walked.unread.is_empty() {
             said.push(format!(
                 "{run} could not read all of its TMPDIR: {}",
                 walked.unread.join(", ")
             ));
+        }
+        if keep && !said.is_empty() {
+            return Err(format!(
+                "{}; kept, since {KEEP_ENV} is set, until the next run",
+                said.join("; and ")
+            ));
+        }
+        let removed = walk::remove_or_set_aside(&self.dir);
+        if removed.is_ok() && !said.is_empty() {
+            said.push("removed".to_owned());
         }
         said.extend(removed.err());
         if said.is_empty() {
