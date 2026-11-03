@@ -33,21 +33,38 @@ pub const HIDE_GPU_DEVICE: [&str; 6] = [
     "--die-with-parent",
 ];
 
-/// How this gate runs its steps: hidden unless `[gate] hide_gpu_device
-/// = "false"`, and then only where bwrap works.
+/// How this gate runs its steps: `/dev/dri` hidden, unless this machine
+/// has none (as GitHub's runners have none, so there is nothing to
+/// hide) or `[gate] hide_gpu_device = "false"`.
 ///
 /// # Errors
 ///
 /// Another value for the key, or bwrap missing or not leaving
 /// `/dev/dri` empty, naming the fix.
 pub fn wrap(config: &Config) -> Result<Wrap, String> {
+    wrap_for(config, std::path::Path::new("/dev/dri").exists(), "bwrap")
+}
+
+/// [`wrap`] on a machine that has `/dev/dri` or not, with `program` as
+/// bwrap.
+///
+/// # Errors
+///
+/// As [`wrap`].
+pub fn wrap_for(config: &Config, has_dri: bool, program: &str) -> Result<Wrap, String> {
     match config.get(KEY) {
-        None | Some("true") => check_with("bwrap").map(|()| Wrap::HideGpuDevice),
-        // Relaxed guard, declared: for a machine with no bwrap or no
-        // /dev/dri to hide (the planned Mac Studio), steps run as they
-        // are, said on every gate; such a gate can pass a check that
-        // fails on GitHub's device-less runners. Retired when that
-        // machine has its own way to hide its GPU from the checks.
+        None | Some("true") if !has_dri => {
+            println!(
+                "gate: this machine has no /dev/dri, as GitHub's runners have none; steps run as they are"
+            );
+            Ok(Wrap::AsIs)
+        }
+        None | Some("true") => check_with(program).map(|()| Wrap::HideGpuDevice),
+        // Relaxed guard, declared: for a machine with /dev/dri but no
+        // working bwrap, steps run as they are, said on every gate; such
+        // a gate can pass a check that fails on GitHub's device-less
+        // runners. Retired when that machine has its own way to hide its
+        // GPU from the checks.
         Some("false") => {
             println!(
                 "gate: /dev/dri is not hidden ({KEY} = \"false\" in .config/factory.toml); a step can pass here that fails on GitHub"
@@ -71,11 +88,11 @@ pub fn check_with(program: &str) -> Result<(), String> {
         .args(["/bin/ls", "-A", "/dev/dri"])
         .output()
         .map_err(|e| {
-            format!("{program} could not run ({e}); the gate hides /dev/dri with it; fix: install bubblewrap (apt install bubblewrap), or on a machine without it set [gate] hide_gpu_device = \"false\" in .config/factory.toml")
+            format!("{program} could not run ({e}); the gate hides /dev/dri with it; fix: install bubblewrap (apt install bubblewrap), or on a machine where it cannot run set [gate] hide_gpu_device = \"false\" in .config/factory.toml")
         })?;
     if !output.status.success() || !output.stdout.is_empty() {
         return Err(format!(
-            "{program} did not run with /dev/dri hidden ({}; it listed `{}`); fix: allow unprivileged user namespaces, or on a machine with no /dev/dri set [gate] hide_gpu_device = \"false\" in .config/factory.toml",
+            "{program} did not run with /dev/dri hidden ({}; it listed `{}`); fix: allow unprivileged user namespaces, or set [gate] hide_gpu_device = \"false\" in .config/factory.toml",
             output.status,
             String::from_utf8_lossy(&output.stdout).trim()
         ));

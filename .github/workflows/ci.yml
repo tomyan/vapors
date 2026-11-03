@@ -42,12 +42,11 @@ jobs:
       # Over the last 40 runs (2026-10-23): a cache miss took 12 to 35 s
       # (run 40031283392), a hit 13 s on average and 21 s at worst. One miss
       # stalled on the mirror past the old 1-minute limit (run 40036716064).
-      # bubblewrap: the gate's sandbox test (gate_sandbox.rs) runs bwrap.
-      - name: install a CJK system font for the fallback test, and bubblewrap
+      - name: install a CJK system font for the fallback test
         timeout-minutes: 2
         uses: ./.github/actions/apt-install
         with:
-          packages: fonts-noto-cjk bubblewrap
+          packages: fonts-noto-cjk
       - name: the CJK font is there
         run: |
           fc-list :lang=zh | head -1 | grep . || { echo "::error::no CJK font after the install; fix: check the apt-install step"; exit 1; }

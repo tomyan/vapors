@@ -30,7 +30,14 @@ fn a_machine_without_bwrap_is_refused_naming_the_fix() {
 }
 
 #[test]
-fn this_machine_hides_dev_dri_inside_the_sandbox() {
+fn where_there_is_a_dev_dri_to_hide_bwrap_hides_it() {
+    // Given: the dev box has /dev/dri; GitHub's runner has none, and there
+    // the gate runs steps as they are (wrap), so bwrap is never needed
+    if !std::path::Path::new("/dev/dri").exists() {
+        assert_eq!(wrap(&Config::parse("").expect("empty")), Ok(Wrap::AsIs));
+        return;
+    }
+
     // When
     let checked = check_with("bwrap");
 
@@ -51,9 +58,14 @@ fn the_off_switch_runs_steps_as_they_are_and_another_value_is_refused() {
 }
 
 #[test]
-fn unset_the_steps_hide_the_device() {
+fn unset_the_steps_hide_the_device_where_there_is_one() {
+    // Given
+    let unset = Config::parse("").expect("empty");
+
+    // Then: a missing bwrap is refused only where there is a device
     assert_eq!(
-        wrap(&Config::parse("").expect("empty")),
-        Ok(Wrap::HideGpuDevice)
+        wrap_for(&unset, false, "no-such-bwrap-for-this-test"),
+        Ok(Wrap::AsIs)
     );
+    assert!(wrap_for(&unset, true, "no-such-bwrap-for-this-test").is_err());
 }

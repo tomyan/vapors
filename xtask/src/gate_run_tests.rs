@@ -78,7 +78,9 @@ fn a_step_past_its_deadline_is_killed_with_what_it_started() {
     let dir = crate::scratch::dir("gate-deadline");
     let pid_file = dir.join("child.pid");
     let script = format!("sleep 300 & echo $! > {}; wait", pid_file.display());
-    let mut step = step_for(&planned(&script), &dir.join("out"), Wrap::HideGpuDevice);
+    // As the gate runs it here: hidden where this machine has a /dev/dri
+    let wrap = wrap_for_this_machine();
+    let mut step = step_for(&planned(&script), &dir.join("out"), wrap);
     step.deadline = Some(Duration::from_secs(1));
 
     // When
@@ -150,4 +152,8 @@ fn every_step_runs_with_the_runs_tmpdir_and_a_leak_fails_the_gate() {
         refusal.contains("gate left 1 entry ") && refusal.contains("left"),
         "{refusal}"
     );
+}
+
+fn wrap_for_this_machine() -> Wrap {
+    sandbox_wrap(&crate::config::Config::parse("").expect("empty")).expect("the sandbox")
 }
