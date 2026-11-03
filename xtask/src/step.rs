@@ -4,6 +4,18 @@ use std::fmt::Write;
 use std::path::PathBuf;
 use std::time::Duration;
 
+/// What a step's TMPDIR is.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TmpDir {
+    /// xtask's own.
+    Inherit,
+    /// This directory: the run's own (`run_tmp`).
+    Set(PathBuf),
+    /// None set, so the system's default: for a process that outlives
+    /// the run, such as the sccache server (`sccache_start.rs`).
+    Unset,
+}
+
 /// One external command with the advice to print when it fails.
 #[derive(Clone)]
 pub struct Step {
@@ -21,9 +33,9 @@ pub struct Step {
     pub dir: Option<String>,
     /// Killed, with its process group, and failed when it runs longer.
     pub deadline: Option<Duration>,
-    /// Its TMPDIR, the run's own (`run_tmp`). Not in [`Step::reproduce`]:
-    /// the directory is removed when the run ends.
-    pub tmpdir: Option<PathBuf>,
+    /// Its TMPDIR. Not in [`Step::reproduce`]: a run's own is removed
+    /// when the run ends.
+    pub tmpdir: TmpDir,
 }
 
 impl Step {
@@ -36,7 +48,7 @@ impl Step {
             env: Vec::new(),
             dir: None,
             deadline: None,
-            tmpdir: None,
+            tmpdir: TmpDir::Inherit,
         }
     }
 

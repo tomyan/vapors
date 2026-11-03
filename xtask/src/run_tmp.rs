@@ -127,7 +127,7 @@ pub fn begin(base: &Path) -> Result<RunTmp, String> {
 
 /// `step` with `tmp` as its TMPDIR.
 pub fn with_tmpdir(mut step: Step, tmp: &Path) -> Step {
-    step.tmpdir = Some(tmp.to_path_buf());
+    step.tmpdir = crate::step::TmpDir::Set(tmp.to_path_buf());
     step
 }
 
