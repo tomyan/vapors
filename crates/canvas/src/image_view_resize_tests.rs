@@ -85,3 +85,71 @@ fn the_first_resize_fits_even_with_the_view_kept() {
     // Then: there was no view to keep
     assert_eq!(view.transform().scale, 2.0);
 }
+
+#[test]
+fn a_zero_size_first_resize_leaves_the_next_resize_to_fit_even_with_the_view_kept() {
+    // Given: an image, a 0x0 resize before layout, then keeping on
+    let image = RgbaImage {
+        size: Size {
+            width: 200,
+            height: 100,
+        },
+        rgba: vec![0; 200 * 100 * 4],
+    };
+    let mut view = ImageView::new(image, Color::from_rgba8(40, 40, 40, 255));
+    view.event(&Event::Resized {
+        width: 0,
+        height: 0,
+    });
+    view.keep_view_on_resize(true);
+
+    // When: the real size arrives
+    view.event(&Event::Resized {
+        width: 400,
+        height: 400,
+    });
+
+    // Then: fitted, not left at the empty area's scale
+    assert_eq!(view.transform().scale, 2.0);
+}
+
+#[test]
+fn with_the_view_kept_changed_insets_still_refit_and_the_same_insets_keep() {
+    // Given
+    let mut view = zoomed_in();
+    view.keep_view_on_resize(true);
+    let zoomed = view.transform();
+
+    // When: the same insets, then new ones (a panel opening)
+    view.set_insets(Insets::default());
+    let same = view.transform();
+    view.set_insets(Insets {
+        bottom: 200,
+        ..Insets::default()
+    });
+
+    // Then: kept at 4x, then refitted to the 400x200 area at 2x
+    assert_eq!(same, zoomed);
+    assert_eq!(view.transform().scale, 2.0);
+}
+
+#[test]
+fn with_the_view_kept_an_area_that_empties_and_grows_back_returns_unchanged() {
+    // Given
+    let mut view = zoomed_in();
+    view.keep_view_on_resize(true);
+    let before = view.transform();
+
+    // When: the frame shrinks to nothing, then back
+    view.event(&Event::Resized {
+        width: 400,
+        height: 0,
+    });
+    view.event(&Event::Resized {
+        width: 400,
+        height: 400,
+    });
+
+    // Then
+    assert_eq!(view.transform(), before);
+}

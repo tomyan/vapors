@@ -33,7 +33,7 @@ pub struct ImageView {
     generation: u64,
     /// Whether a resize keeps the zoom and position (`keep_view_on_resize`).
     pub(crate) keep_view: bool,
-    /// Whether a resize has given the view its size yet.
+    /// Whether a resize has given the view an area with pixels yet.
     pub(crate) sized: bool,
 }
 
@@ -139,7 +139,15 @@ impl ImageView {
     /// Keep the zoom and position across a resize (`keep`), as while a
     /// phone's keyboard shortens the window under a panel the person is
     /// typing into, or fit the image again on each resize (the default).
-    /// The first resize, which gives the view its size, always fits.
+    ///
+    /// Kept, the transform in frame pixels is unchanged: what lies past
+    /// the new edge is cut off, not moved in (there is no clamp, as there
+    /// is none for a pan), and a resize back shows the same picture. Until
+    /// a resize has given the view an area with pixels (a 0x0 resize
+    /// before layout does not), and while the scale is not finite and
+    /// positive, a resize still fits. Changed insets still refit
+    /// ([`ImageView::set_insets`]): a panel opening or closing places the
+    /// image again; the same insets keep it.
     pub fn keep_view_on_resize(&mut self, keep: bool) {
         self.keep_view = keep;
     }
