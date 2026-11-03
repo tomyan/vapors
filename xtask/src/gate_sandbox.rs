@@ -46,7 +46,7 @@ pub fn wrap(config: &Config) -> Result<Wrap, String> {
 }
 
 /// Whether `/dev/dri` holds anything: GitHub's runner has the directory
-/// but no device in it (Chromium there: "drmGetDevices2() has not found
+/// but no device in it (Chromium there: "`drmGetDevices2()` has not found
 /// any devices"), and no bwrap.
 #[must_use]
 pub fn has_gpu_device() -> bool {
