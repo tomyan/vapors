@@ -34,7 +34,7 @@ pub const HIDE_GPU_DEVICE: [&str; 6] = [
 ];
 
 /// How this gate runs its steps: `/dev/dri` hidden, unless this machine
-/// has no device there (as GitHub's runners have none, so there is
+/// has no render node there (as GitHub's runners have none, so there is
 /// nothing to hide) or `[gate] hide_gpu_device = "false"`.
 ///
 /// # Errors
@@ -45,12 +45,32 @@ pub fn wrap(config: &Config) -> Result<Wrap, String> {
     wrap_for(config, has_gpu_device(), "bwrap")
 }
 
-/// Whether `/dev/dri` holds anything: GitHub's runner has the directory
-/// but no device in it (Chromium there: "`drmGetDevices2()` has not found
-/// any devices"), and no bwrap.
+/// Whether `/dev/dri` has a render node (`renderD*`), the device
+/// WebGPU and Vulkan open. GitHub's runner has none: its `/dev/dri` held
+/// something (run 41628481884 sent it to bwrap) while Chromium there
+/// found no device ("`drmGetDevices2()` has not found any devices"),
+/// as a display-only card such as a VM's has no render node.
 #[must_use]
 pub fn has_gpu_device() -> bool {
-    std::fs::read_dir("/dev/dri").is_ok_and(|mut entries| entries.next().is_some())
+    std::fs::read_dir("/dev/dri").is_ok_and(|entries| {
+        entries
+            .filter_map(Result::ok)
+            .any(|entry| entry.file_name().to_string_lossy().starts_with("renderD"))
+    })
+}
+
+fn dri_entries() -> String {
+    std::fs::read_dir("/dev/dri").map_or_else(
+        |e| format!("unreadable, {e}"),
+        |entries| {
+            let mut names: Vec<String> = entries
+                .filter_map(Result::ok)
+                .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                .collect();
+            names.sort();
+            names.join(" ")
+        },
+    )
 }
 
 /// [`wrap`] on a machine with a device in `/dev/dri` or not, with
@@ -63,11 +83,13 @@ pub fn wrap_for(config: &Config, has_device: bool, program: &str) -> Result<Wrap
     match config.get(KEY) {
         None | Some("true") if !has_device => {
             println!(
-                "gate: this machine has no device in /dev/dri, as GitHub's runners have none; steps run as they are"
+                "gate: this machine has no render node in /dev/dri, as GitHub's runners have none; steps run as they are"
             );
             Ok(Wrap::AsIs)
         }
-        None | Some("true") => check_with(program).map(|()| Wrap::HideGpuDevice),
+        None | Some("true") => check_with(program)
+            .map(|()| Wrap::HideGpuDevice)
+            .map_err(|why| format!("{why} (/dev/dri holds: {})", dri_entries())),
         // Relaxed guard, declared: for a machine with /dev/dri but no
         // working bwrap, steps run as they are, said on every gate; such
         // a gate can pass a check that fails on GitHub's device-less
