@@ -1,5 +1,6 @@
 //! A number field's editing (3-E3c), the least that takes a typed
-//! exact value before E6's editor: the caret is always at the end;
+//! exact value before E6's editor: the caret is always at the end of
+//! what the field shows (`number_shown.rs`), where editing starts;
 //! typed characters a number takes (`number::typeable`) go there, or
 //! replace the whole text when it is selected (focus by keyboard
 //! selects it, as Chromium does); Backspace deletes the last one.
@@ -113,7 +114,7 @@ pub(crate) fn typed(document: &Rc<RefCell<Document>>, node: NodeId, text: &str) 
     let base = if document.borrow().text_selected(node) {
         String::new()
     } else {
-        field.text
+        field.shown
     };
     if document
         .borrow_mut()
@@ -155,7 +156,7 @@ pub(crate) fn key(
 }
 
 fn backspace(document: &Rc<RefCell<Document>>, node: NodeId, field: Field) {
-    let mut text = field.text;
+    let mut text = field.shown;
     if document.borrow().text_selected(node) {
         text.clear();
     } else {
