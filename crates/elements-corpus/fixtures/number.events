@@ -4,7 +4,8 @@
 # typed; over the max a step up does nothing and a step down comes back
 # to the max (HTML's stepUp and stepDown); on `plain`, by 10 to 95, a
 # step back goes to the bound itself, and a step up at the max does
-# nothing.
+# nothing. Control+A selects the text whole, so typing replaces it and
+# Backspace clears it.
 listen pointerdown pointerup click input change keydown keyup focusin focusout
 click 50 12                   a click focuses amount; a text field always shows the ring
 expect event click input#amount
@@ -87,6 +88,21 @@ expect value input#plain -3
 key ArrowUp                   back to the min
 expect event change input#plain
 expect value input#plain 0
+key Control+a                 selects the text whole, as in a text field
+expect no event input
+type "4"                      replaces it: 4
+expect event input input#plain
+expect value input#plain 4
+key Control+a
+expect no event input
+key Backspace                 clears the selected text
+expect event input input#plain
+expect value input#plain ""
+type "6"                      6
+expect value input#plain 6
+key Enter                     commits 6
+expect event change input#plain
+expect value input#plain 6
 click 250 12                  off is disabled: no click, no focus
 expect event pointerdown input#off
 expect no event click

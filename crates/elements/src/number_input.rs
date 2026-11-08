@@ -2,8 +2,9 @@
 //! exact value before E6's editor: the caret is always at the end of
 //! what the field shows (`number_shown.rs`), where editing starts;
 //! typed characters a number takes (`number::typeable`) go there, or
-//! replace the whole text when it is selected (focus by keyboard
-//! selects it, as Chromium does); Backspace deletes the last one.
+//! replace the whole text when it is selected (focus by keyboard and
+//! Control+A select it, as Chromium does); Backspace deletes the last
+//! one, or the selected text.
 //! `input` fires with each edit, carrying the DOM's sanitized `value`.
 //! Enter and blur commit (`number::Field::committed`), arrows step by
 //! `step` (Shift by ten, vapors' own), each with `input` and `change`.
@@ -95,9 +96,14 @@ impl Document {
         let committed = self.last_committed(node, &field);
         self.committed.insert(node, committed);
         if keyboard {
-            self.selected_all = Some(node);
-            self.changed = true;
+            self.select_number_text(node);
         }
+    }
+
+    /// Selects the field's text whole, so typing replaces it.
+    fn select_number_text(&mut self, node: NodeId) {
+        self.selected_all = Some(node);
+        self.changed = true;
     }
 }
 
@@ -130,7 +136,8 @@ pub(crate) fn fire_input(document: &Rc<RefCell<Document>>, node: NodeId) {
 }
 
 /// `key` went down on `node`, a focused number field: Backspace,
-/// Enter and the arrows act; other keys are typed as characters.
+/// Enter, the arrows and Control+A act; other keys are typed as
+/// characters.
 pub(crate) fn key(
     document: &Rc<RefCell<Document>>,
     node: NodeId,
@@ -143,6 +150,7 @@ pub(crate) fn key(
     match key {
         "Backspace" => backspace(document, node, field),
         "Enter" => commit(document, node),
+        "a" | "A" if modifiers.control => document.borrow_mut().select_number_text(node),
         "ArrowUp" | "ArrowDown" => {
             let sign = if key == "ArrowUp" { 1.0 } else { -1.0 };
             let steps = if modifiers.shift { COARSE_STEPS } else { 1.0 };
