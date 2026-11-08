@@ -28,7 +28,7 @@ const TABLES: [(&str, Keys); 17] = [
     ),
     ("files.allow", Keys::Any),
     ("files.generated", Keys::Any),
-    ("gate", Keys::Only(&["twin"])),
+    ("gate", Keys::Only(&["twin", "hide_gpu_device"])),
     ("gate.setup", Keys::Any),
     ("gate.actions", Keys::Any),
     ("gate.pinned", Keys::Any),
