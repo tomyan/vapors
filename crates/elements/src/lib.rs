@@ -32,6 +32,9 @@ mod number;
 mod number_input;
 mod number_paint;
 mod number_scrub;
+mod number_shown;
+#[cfg(test)]
+mod number_shown_tests;
 mod number_validity;
 mod paint;
 mod paint_inline;

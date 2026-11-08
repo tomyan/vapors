@@ -13,7 +13,7 @@ pub(super) fn fill(source: &Source<'_>, node: NodeId, field: &mut LayoutBox) -> 
     let text = if text_field {
         crate::text_field::text_of(element)
     } else if element.tag == "input" && crate::check::is_type(element, "number") {
-        crate::number::shown(&element.attributes, &element.properties)
+        crate::number::Field::of(&element.attributes, &element.properties).shown
     } else {
         return None;
     };

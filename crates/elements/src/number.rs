@@ -24,9 +24,12 @@ pub(crate) struct Field {
     pub(crate) max: Option<f64>,
     /// `None` for `step="any"`.
     pub(crate) step: Option<f64>,
-    /// The text shown: the `value` property once set, else the `value`
+    /// The text: the `value` property once set, else the `value`
     /// attribute, else empty.
     pub(crate) text: String,
+    /// What the field shows (`number_shown.rs`): the text, or a number
+    /// set on it at its step's precision.
+    pub(crate) shown: String,
 }
 
 impl Field {
@@ -36,12 +39,15 @@ impl Field {
         properties: &BTreeMap<String, PropertyValue>,
     ) -> Self {
         let number = |name: &str| attributes.get(name).and_then(|text| parse(text));
-        Self {
+        let mut field = Self {
             min: number("min"),
             max: number("max"),
             step: step_of(attributes.get("step").map(String::as_str)),
             text: text_of(attributes, properties),
-        }
+            shown: String::new(),
+        };
+        field.shown = crate::number_shown::shown(&field, attributes, properties);
+        field
     }
 
     /// The text as a number, when it is a valid floating-point number.
@@ -111,8 +117,10 @@ impl Field {
         if let Some(outside) = self.step_outside(from, steps) {
             return outside;
         }
-        let step = self.step.unwrap_or(1.0);
-        let to = aligned(from + steps * step, Some(step), from);
+        let to = match self.step {
+            Some(step) => self.on_steps(from, steps, step),
+            None => from + steps,
+        };
         let to = self.clamped(self.on_steps_under_max(to));
         // the last step under the max can lie below `from`: a step never
         // moves against its direction, as HTML's stepUp and Chromium
@@ -127,6 +135,20 @@ impl Field {
             (Some(min), _) if from < min => Some(if steps < 0.0 { from } else { min }),
             _ => None,
         }
+    }
+
+    /// `steps` steps of `step` from `from`, on the steps counted from
+    /// `min` (else 0): from between two, the first step lands on the next
+    /// one in its direction, as HTML's `stepUp` and `stepDown`.
+    fn on_steps(&self, from: f64, steps: f64, step: f64) -> f64 {
+        let base = self.min.unwrap_or(0.0);
+        let at = (from - base) / step;
+        let behind = if steps > 0.0 {
+            (at + 1e-9).floor()
+        } else {
+            (at - 1e-9).ceil()
+        };
+        aligned(base + (behind + steps) * step, Some(step), base)
     }
 
     /// `to`, or when it is over `max`, the last step at or under `max`,
@@ -144,7 +166,7 @@ impl Field {
     }
 }
 
-/// The text shown: the `value` property once set, else the attribute.
+/// The text: the `value` property once set, else the attribute.
 fn text_of(
     attributes: &BTreeMap<String, String>,
     properties: &BTreeMap<String, PropertyValue>,
@@ -155,35 +177,6 @@ fn text_of(
         // a non-finite number and a Bool are refused by `check`
         Some(PropertyValue::Number(_) | PropertyValue::Bool(_)) => String::new(),
         None => attributes.get("value").cloned().unwrap_or_default(),
-    }
-}
-
-/// What the field shows: a value set as a number at its step's
-/// precision, typed text and a step of `any` as they are.
-pub(crate) fn shown(
-    attributes: &BTreeMap<String, String>,
-    properties: &BTreeMap<String, PropertyValue>,
-) -> String {
-    let step = step_of(attributes.get("step").map(String::as_str));
-    match (properties.get("value"), step) {
-        (Some(PropertyValue::Number(n)), Some(step)) if n.is_finite() => at_precision(*n, step),
-        _ => text_of(attributes, properties),
-    }
-}
-
-/// `value` with as many decimals as `step` has (0 for 1, 2 for 0.05, up
-/// to 6), never "-0".
-fn at_precision(value: f64, step: f64) -> String {
-    let decimals = (0..=6)
-        .find(|&d: &i32| {
-            let scaled = step * 10f64.powi(d);
-            (scaled - scaled.round()).abs() < 1e-9
-        })
-        .unwrap_or(6);
-    let text = format!("{value:.0$}", usize::try_from(decimals).unwrap_or(6));
-    match text.strip_prefix('-') {
-        Some(rest) if rest.chars().all(|c| c == '0' || c == '.') => rest.to_owned(),
-        _ => text,
     }
 }
 
@@ -213,7 +206,3 @@ pub(crate) fn typeable(c: char) -> bool {
 #[cfg(test)]
 #[path = "number_tests.rs"]
 mod tests;
-
-#[cfg(test)]
-#[path = "number_shown_tests.rs"]
-mod shown_tests;
