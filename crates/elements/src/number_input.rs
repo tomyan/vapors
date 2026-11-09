@@ -159,21 +159,41 @@ pub(crate) fn commit(document: &Rc<RefCell<Document>>, node: NodeId) {
     let last = document.borrow().last_committed(node, &field);
     let value = field.committed().unwrap_or(last);
     document.borrow_mut().set_number_text(node, written(value));
-    settle(document, node, value);
+    settle_against(document, node, value, Some(&field.value()));
 }
 
 /// `value` and the field's value string become the last committed,
 /// with `change` when the string differs from the last committed's
 /// (`number_committed` cites HTML's rule).
 fn settle(document: &Rc<RefCell<Document>>, node: NodeId, value: f64) {
-    let now = document
-        .borrow()
-        .number_field(node)
-        .map(|field| field.value());
+    let now = shown(document, node);
+    settle_against(document, node, value, now.as_deref());
+}
+
+/// As [`settle`] after vapors rewrote the text on commit, `edited` the
+/// value string before: the rewrite is no edit, so `change` fires only
+/// when both strings differ from the last committed's. Focus and blur
+/// on "3.0", rewritten "3", fires none; "20e", reverted to the last
+/// committed "20", fires none.
+fn settle_against(
+    document: &Rc<RefCell<Document>>,
+    node: NodeId,
+    value: f64,
+    edited: Option<&str>,
+) {
+    let now = shown(document, node);
     let last = document.borrow_mut().remember_committed(node, value);
-    if last != now {
+    if last.as_deref() != edited && last != now {
         fire(document, node, "change");
     }
+}
+
+/// `node`'s value string, when it is a number field.
+fn shown(document: &Rc<RefCell<Document>>, node: NodeId) -> Option<String> {
+    document
+        .borrow()
+        .number_field(node)
+        .map(|field| field.value())
 }
 
 /// `input` or `change` on `node`, carrying the DOM's value, and the

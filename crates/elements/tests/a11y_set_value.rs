@@ -95,6 +95,25 @@ fn a_number_written_differently_is_a_change_as_html_compares_strings() {
 }
 
 #[test]
+fn focus_then_blur_on_a_number_written_with_a_trailing_zero_fires_nothing() {
+    // Given: Radius holds "3.0", settled, and nothing has focus
+    let doc = shared(page());
+    set(&doc, "spinbutton", "Radius", "3.0");
+    Document::focus(&doc, None);
+    update(&doc);
+    let node = node(&doc, "spinbutton", "Radius");
+    let events = log(&doc, node, &["input", "change"]);
+
+    // When: focus arrives and leaves, nothing typed; vapors rewrites the
+    // text "3" on commit, which is no edit
+    Document::focus(&doc, Some(node));
+    Document::focus(&doc, None);
+
+    // Then: as Chromium, which compares the value at the last change
+    assert!(events.borrow().is_empty(), "{:?}", events.borrow());
+}
+
+#[test]
 fn text_that_is_no_number_is_refused_naming_it() {
     // Given
     let doc = shared(page());
