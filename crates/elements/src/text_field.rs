@@ -159,10 +159,14 @@ impl Document {
         true
     }
 
-    /// A signal set the `value` property: the editor, if any, takes the
-    /// text with the caret at its end, as setting `value` in Chromium
-    /// puts it, and forgets its undo.
+    /// A signal set what the field shows (its `value`, or a number
+    /// field's `step`, `min` or `max`): the editor, if any, takes the
+    /// text when it differs, with the caret at its end, as setting
+    /// `value` in Chromium puts it, and forgets its undo.
     pub(crate) fn editor_from_text(&mut self, node: NodeId) {
+        if !self.editors.contains_key(&node) {
+            return;
+        }
         let Some(text) = self
             .arena
             .get(node, "text field")

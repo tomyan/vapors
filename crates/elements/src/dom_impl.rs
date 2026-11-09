@@ -39,10 +39,9 @@ impl Dom for Document {
             .insert(name.to_owned(), value.to_owned());
         self.mark_changed(node);
         // a text field's editor follows its `value` attribute until the
-        // field is edited, as the DOM's value does (E6a)
-        if name == "value" {
-            self.editor_from_text(node);
-        }
+        // field is edited, as the DOM's value does (E6a); a number
+        // field's shown text also follows `step`, `min` and `max`
+        self.editor_from_text(node);
     }
 
     fn set_text(&mut self, node: NodeId, text: &str) {
