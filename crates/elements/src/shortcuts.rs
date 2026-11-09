@@ -1,4 +1,5 @@
-//! Select-all in a field: A with Command on macOS and with Control
+//! Select-all, undo and redo in a field (undo and redo in a text field
+//! only, `text_undo`). Select-all: A with Command on macOS and with Control
 //! elsewhere, and neither the other of the two nor Alt nor Shift held,
 //! as Chromium has it (number.events pins Control+Shift+A; on macOS
 //! Control+A moves to the line's start, which vapors
@@ -70,11 +71,33 @@ impl Document {
     /// Whether `key` with `modifiers` is select-all on this platform:
     /// the one answer for a text field and a number field.
     fn is_select_all(&self, key: &str, modifiers: Modifiers) -> bool {
+        matches!(key, "a" | "A") && self.shortcut_held(modifiers) && !modifiers.shift
+    }
+
+    /// Whether `key` with `modifiers` is a text field's undo (`Some(false)`)
+    /// or redo (`Some(true)`) on this platform: Z with the shortcut
+    /// modifier, with Shift to redo; Control+Y redoes too, but not
+    /// Command+Y (on macOS Chromium leaves it to the browser's history).
+    pub(crate) fn history_shortcut(&self, key: &str, modifiers: Modifiers) -> Option<bool> {
+        if !self.shortcut_held(modifiers) {
+            return None;
+        }
+        let control_y = self.shortcut_modifier == ShortcutModifier::Control;
+        match key {
+            "z" | "Z" => Some(modifiers.shift),
+            "y" | "Y" if control_y && !modifiers.shift => Some(true),
+            _ => None,
+        }
+    }
+
+    /// Whether the platform's shortcut modifier is held, and neither the
+    /// other platform's nor Alt.
+    fn shortcut_held(&self, modifiers: Modifiers) -> bool {
         let (shortcut, other) = if self.shortcut_modifier == ShortcutModifier::Command {
             (modifiers.meta, modifiers.control)
         } else {
             (modifiers.control, modifiers.meta)
         };
-        matches!(key, "a" | "A") && shortcut && !other && !modifiers.alt && !modifiers.shift
+        shortcut && !other && !modifiers.alt
     }
 }

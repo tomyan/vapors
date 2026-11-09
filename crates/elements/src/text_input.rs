@@ -106,9 +106,7 @@ pub(crate) fn key(
             edited(document, node);
         }
         _ if crate::shortcuts::selected_all(document, node, key, modifiers) => {}
-        "z" | "Z" | "y" | "Y" if modifiers.control => {
-            crate::text_undo::history_key(document, node, key, shift);
-        }
+        _ if crate::text_undo::history_key(document, node, key, modifiers) => {}
         _ => {
             return moved(document, node, key, shift, word)
                 || crate::keys::types_text(key, modifiers);
