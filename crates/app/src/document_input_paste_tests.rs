@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use vapors_dom::{Dom, NodeId};
-use vapors_elements::{Document, Viewport};
+use vapors_elements::{Document, ShortcutModifier, Viewport};
 use vapors_platform::{
     Clipboard, ClipboardDone, ClipboardImage, ClipboardText, Event, Modifiers, Platform,
 };
@@ -50,10 +50,20 @@ fn card() -> (Rc<RefCell<Document>>, NodeId) {
 }
 
 fn control_v() -> Event {
-    let modifiers = Modifiers {
+    v_with(Modifiers {
         control: true,
         ..Modifiers::default()
-    };
+    })
+}
+
+fn command_v() -> Event {
+    v_with(Modifiers {
+        meta: true,
+        ..Modifiers::default()
+    })
+}
+
+fn v_with(modifiers: Modifiers) -> Event {
     Event::Key {
         key: "v".into(),
         code: "KeyV".into(),
@@ -107,4 +117,41 @@ fn with_no_card_field_focused_the_paste_is_the_hosts_and_nothing_is_read() {
     // Then
     assert_eq!(paste.route, Route::Host);
     assert_eq!(*reads.borrow(), 0);
+}
+
+/// The route of `key` going down in a focused card field, on a platform
+/// whose shortcuts take `modifier`.
+fn paste_key_route(modifier: ShortcutModifier, key: &Event) -> Route {
+    let (doc, field) = card();
+    doc.borrow_mut().set_shortcut_modifier(modifier);
+    Document::focus(&doc, Some(field));
+    let mut input = DocumentInput::new();
+    input
+        .give(&doc, key, &Platform::detached())
+        .expect("placed")
+        .route
+}
+
+#[test]
+fn command_v_is_the_fields_paste_on_macos_and_control_v_is_not() {
+    assert_eq!(
+        paste_key_route(ShortcutModifier::Command, &command_v()),
+        Route::Document
+    );
+    assert_ne!(
+        paste_key_route(ShortcutModifier::Command, &control_v()),
+        Route::Document
+    );
+}
+
+#[test]
+fn control_v_is_the_fields_paste_elsewhere_and_command_v_is_not() {
+    assert_eq!(
+        paste_key_route(ShortcutModifier::Control, &control_v()),
+        Route::Document
+    );
+    assert_ne!(
+        paste_key_route(ShortcutModifier::Control, &command_v()),
+        Route::Document
+    );
 }
