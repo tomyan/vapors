@@ -8,9 +8,13 @@
    aria-valuenow on ARIA ranges; the hidden attribute, aria-hidden and
    visibility: hidden leave a node out. Widths are set, as vapors lays
    these controls out only at a width of their own; buttons are as
-   tall as their content and take the page's font and align left, so their text sits
-   where Chromium's does. The look is not
-   compared (Q1). */
+   tall as their content. The look is not compared (Q1).
+   RELAXED: the button rule sets font-family: inherit, font-size:
+   inherit and text-align: left, which Chromium's buttons do not have,
+   because vapors' ua.css lacks Chromium's button font and centred text;
+   with them, text positions match Chromium's. Retire them when ua.css
+   gives buttons Chromium's font and centring and the layout oracle
+   still passes on this fixture. */
 body { margin: 0; font-size: 14px; }
 .row { display: flex; align-items: flex-start; height: 40px; }
 button, .ctl { box-sizing: border-box; width: 80px; margin: 0; padding: 0; border: 1px solid #555; font-family: inherit; font-size: inherit; text-align: left; }
