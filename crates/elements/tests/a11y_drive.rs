@@ -7,6 +7,7 @@ mod support;
 use serde_json::{Value, json};
 use support::drive::{node, shared, update};
 use support::roles_page::page;
+use vapors_dom::Dom;
 use vapors_elements::{Command, Document, Reply};
 
 /// `command` as JSON, driven; the reply as JSON.
@@ -28,7 +29,7 @@ fn a_press_by_role_and_name_replies_done() {
     update(&doc);
 
     // Then
-    assert_eq!(reply, json!({"reply": "done"}));
+    assert_eq!(reply["reply"], "done");
     let mono = doc
         .borrow()
         .ax_find("checkbox", "Mono", None)
@@ -48,7 +49,7 @@ fn a_key_carries_its_modifiers() {
     let reply = drive(&doc, key);
 
     // Then
-    assert_eq!(reply, json!({"reply": "done"}));
+    assert_eq!(reply["reply"], "done");
     assert_eq!(doc.borrow().value(amount).as_deref(), Some("60"));
 }
 
@@ -104,4 +105,50 @@ fn the_tree_replied_reads_back_as_the_same_reply() {
     };
     assert_eq!(nodes[0].role, "dialog");
     assert_eq!(serde_json::from_str::<Reply>(&text).expect("reads"), reply);
+}
+
+#[test]
+fn an_action_replies_the_tree_after_it_and_leaves_the_document_updated() {
+    // Given
+    let doc = shared(page());
+
+    // When: no update between the press and the next command
+    let reply = Document::drive(
+        &doc,
+        &Command::Press(support::drive::target("checkbox", "Mono")),
+    );
+    let next = Document::drive(
+        &doc,
+        &Command::Find(support::drive::target("checkbox", "Mono")),
+    );
+
+    // Then: both answer with Mono checked
+    let Reply::Done { nodes } = reply else {
+        panic!("{reply:?}")
+    };
+    let mono = &nodes[0].children[1].children[0];
+    assert_eq!(
+        (mono.name.as_str(), mono.states.checked),
+        ("Mono", Some(true))
+    );
+    assert!(matches!(next, Reply::Found { node } if node.states.checked == Some(true)));
+}
+
+#[test]
+fn a_query_after_a_change_the_driver_did_not_make_is_refused_not_updated() {
+    // Given: an action, then the caller's own change
+    let doc = shared(page());
+    Document::drive(
+        &doc,
+        &Command::Press(support::drive::target("checkbox", "Mono")),
+    );
+    let dialog = doc.borrow().children(doc.borrow().body())[0];
+    doc.borrow_mut()
+        .set_attribute(dialog, "aria-label", "Curves");
+
+    // When
+    let reply = drive(&doc, json!({"command": "query"}));
+
+    // Then
+    assert_eq!(reply["problem"], json!({"problem": "not_updated"}));
 }

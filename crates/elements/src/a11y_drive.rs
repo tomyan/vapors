@@ -3,8 +3,10 @@
 //! a page call carry the same JSON, and one [`Document::drive`] they
 //! share. A command acts on a node by role and exact name, within an
 //! ancestor's when given; every refusal is a [`Reply::Refused`] naming
-//! the problem, never a panic. Commands answer from the last update, so
-//! a driver updates between an action and the next command.
+//! the problem, never a panic. A command that acts updates the document
+//! after its action, at the last update's viewport, and replies the tree
+//! from that update; a query or find on a document changed since by
+//! anything else is refused, as [`Document::ax_tree`] is.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -86,8 +88,11 @@ pub enum Reply {
         /// The node.
         node: AxElement,
     },
-    /// The action happened.
-    Done,
+    /// The action happened; the tree from the update after it.
+    Done {
+        /// The tree's top nodes, each with its subtree.
+        nodes: Vec<AxElement>,
+    },
     /// The command was refused.
     Refused {
         /// Why.
@@ -107,26 +112,48 @@ impl Document {
     }
 
     fn answer(document: &Rc<RefCell<Document>>, command: &Command) -> Result<Reply, AxError> {
-        let done = Reply::Done;
-        match command {
-            Command::Query => Ok(Reply::Tree {
-                nodes: document.borrow().ax_tree()?,
-            }),
-            Command::Find(t) => Ok(Reply::Found {
-                node: document.borrow().ax_find(&t.role, &t.name, t.within())?,
-            }),
-            Command::Press(t) => Self::ax_press(document, t).map(|()| done),
-            Command::Focus(t) => Self::ax_focus(document, t).map(|()| done),
-            Command::SetValue { target, value } => {
-                Self::ax_set_value(document, target, value).map(|()| done)
+        let acted = match command {
+            Command::Query => {
+                return Ok(Reply::Tree {
+                    nodes: document.borrow().ax_tree()?,
+                });
             }
-            Command::Type { target, text } => Self::ax_type(document, target, text).map(|()| done),
+            Command::Find(t) => {
+                return Ok(Reply::Found {
+                    node: document.borrow().ax_find(&t.role, &t.name, t.within())?,
+                });
+            }
+            Command::Press(t) => Self::ax_press(document, t),
+            Command::Focus(t) => Self::ax_focus(document, t),
+            Command::SetValue { target, value } => Self::ax_set_value(document, target, value),
+            Command::Type { target, text } => Self::ax_type(document, target, text),
             Command::Key {
                 target,
                 key,
                 modifiers,
-            } => Self::ax_key(document, target, key, held(modifiers)).map(|()| done),
+            } => Self::ax_key(document, target, key, held(modifiers)),
+        };
+        acted.and_then(|()| Self::updated_tree(document))
+    }
+
+    /// The document updated at its last update's viewport, and its tree.
+    /// A second update follows when the first moved `:hover` (its pointer
+    /// over a box that moved), which only the next restyle shows.
+    fn updated_tree(document: &Rc<RefCell<Document>>) -> Result<Reply, AxError> {
+        let viewport = document.borrow().kept.as_ref().map(|kept| kept.viewport);
+        let viewport = viewport.ok_or(AxError::NotUpdated)?;
+        for _ in 0..2 {
+            document
+                .borrow_mut()
+                .update(viewport)
+                .map_err(|errors| AxError::Update {
+                    errors: errors.iter().map(ToString::to_string).collect(),
+                })?;
+            if let Ok(nodes) = document.borrow().ax_tree() {
+                return Ok(Reply::Done { nodes });
+            }
         }
+        Err(AxError::NotUpdated)
     }
 }
 

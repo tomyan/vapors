@@ -83,6 +83,11 @@ pub enum AxError {
         /// The value sent.
         value: String,
     },
+    /// The update after an action failed.
+    Update {
+        /// Each of the update's errors, in words.
+        errors: Vec<String>,
+    },
 }
 
 impl fmt::Display for AxError {
@@ -148,6 +153,11 @@ impl fmt::Display for AxError {
             Self::NotANumber { role, name, value } => write!(
                 f,
                 "\"{value}\" set on {role} \"{name}\" is not a number; fix: send a number such as 12.5"
+            ),
+            Self::Update { errors } => write!(
+                f,
+                "the update after the action failed: [{}]; fix: the page's styles or layout, then update the document",
+                errors.join(", ")
             ),
         }
     }
