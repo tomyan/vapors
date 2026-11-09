@@ -20,11 +20,11 @@ pub(crate) struct TextMarks {
 }
 
 impl Document {
-    /// The focused text field's caret and selection, laid out now.
+    /// The focused text or number field's caret and selection, laid out now.
     pub(crate) fn focused_text_marks(&mut self) -> Option<(NodeId, TextMarks)> {
         let node = self
             .active_element()
-            .filter(|node| self.is_text_input(*node) && self.editors.contains_key(node))?;
+            .filter(|node| self.is_edited(*node) && self.editors.contains_key(node))?;
         self.editor(node);
         let Document { fonts, editors, .. } = self;
         let editor = editors.get_mut(&node)?;

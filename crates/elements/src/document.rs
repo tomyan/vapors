@@ -32,8 +32,6 @@ pub struct Document {
     pub(crate) space_on: Option<NodeId>,
     /// The modifier shortcuts take (`shortcuts`).
     pub(crate) shortcut_modifier: crate::ShortcutModifier,
-    /// The number field whose text is selected whole (3-E3c).
-    pub(crate) selected_all: Option<NodeId>,
     /// Each number field's last committed number, from its focus on.
     pub(crate) committed: std::collections::HashMap<NodeId, f64>,
     /// Each text field's editor (E6a).
@@ -84,7 +82,6 @@ impl Document {
             window: crate::focus_window::Window::Focused,
             space_on: None,
             shortcut_modifier: crate::ShortcutModifier::default(),
-            selected_all: None,
             committed: std::collections::HashMap::new(),
             editors: crate::text_field::Editors::new(),
             declared_events: std::collections::BTreeSet::new(),

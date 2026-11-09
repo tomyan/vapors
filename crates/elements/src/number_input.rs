@@ -1,10 +1,11 @@
-//! A number field's editing (3-E3c), the least that takes a typed
-//! exact value before E6's editor: the caret is always at the end of
-//! what the field shows (`number_shown.rs`), where editing starts;
-//! typed characters a number takes (`number::typeable`) go there, or
-//! replace the whole text when it is selected (focus by keyboard and
-//! select-all, `shortcuts`, do, as Chromium does); Backspace deletes
-//! the last one, or the selected text.
+//! A number field's editing (3-E3c): its caret and selection are a
+//! text field's (`text_field::Editor`, over what the field shows,
+//! `number_shown.rs`), moved by the arrows, Home and End and the
+//! pointer as a text field's are (`text_input`, `text_pointer`);
+//! typed characters a number takes (`number::typeable`) replace the
+//! selection, and Backspace and Delete delete as a text field's do.
+//! Focus by keyboard selects the text whole, other focus puts the
+//! caret at the end, as Chromium does.
 //! `input` fires with each edit, carrying the DOM's sanitized `value`.
 //! Enter and blur commit (`number::Field::committed`), arrows step by
 //! `step` (Shift by ten, vapors' own), each with `input` and `change`.
@@ -14,13 +15,14 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use vapors_dom::{Event, NodeId, PropertyValue};
+use vapors_dom::{Event, NodeId};
 
 use crate::document::Document;
 use crate::events::tree::dispatch_bubbling;
 use crate::keys::Modifiers;
 use crate::number::{Field, typeable};
 use crate::range::written;
+use crate::text_history::EditKind;
 
 /// Chromium's steps for Shift with an arrow key, vapors' own default
 /// action (`2026-10-27-direct-tools-first`, 3).
@@ -39,12 +41,15 @@ impl Document {
     /// Whether the field's text is selected whole, so typing replaces it.
     #[must_use]
     pub fn text_selected(&self, node: NodeId) -> bool {
-        self.selected_all == Some(node)
+        self.editors.get(&node).is_some_and(|editor| {
+            let range = editor.plain.raw_selection().text_range();
+            !range.is_empty() && range == (0..editor.plain.raw_text().len())
+        })
     }
 
     /// The number the field last committed, from the field's text when
     /// it has not yet.
-    fn last_committed(&self, node: NodeId, field: &Field) -> f64 {
+    pub(crate) fn last_committed(&self, node: NodeId, field: &Field) -> f64 {
         self.committed
             .get(&node)
             .copied()
@@ -67,65 +72,29 @@ impl Document {
         }
         self.number_field(node)
     }
-
-    /// Sets the field's text, clearing the selection; whether it changed.
-    pub(crate) fn set_number_text(&mut self, node: NodeId, text: String) -> bool {
-        let same = self.number_field(node).is_some_and(|f| f.text == text);
-        self.selected_all = None;
-        if same {
-            return false;
-        }
-        self.changed = true;
-        if let Some(element) = self.arena.get_mut(node, "number").element_mut() {
-            element
-                .properties
-                .insert("value".to_owned(), PropertyValue::Text(text));
-        }
-        // the text decides `:invalid`
-        self.mark_flag(node, vapors_css::tree::States::INVALID);
-        true
-    }
-
-    /// Focus arrived at `node` by `keyboard` or not: a number field
-    /// remembers what it would commit against, and keyboard focus
-    /// selects its text whole.
-    pub(crate) fn number_focused(&mut self, node: NodeId, keyboard: bool) {
-        let Some(field) = self.number_field(node) else {
-            return;
-        };
-        let committed = self.last_committed(node, &field);
-        self.committed.insert(node, committed);
-        if keyboard {
-            self.select_number_text(node);
-        }
-    }
-
-    /// Selects the field's text whole, so typing replaces it.
-    pub(crate) fn select_number_text(&mut self, node: NodeId) {
-        self.selected_all = Some(node);
-        self.changed = true;
-    }
 }
 
 /// `text` was typed into `node`, a focused number field: the characters
-/// a number takes go to the end, or replace a selected text.
+/// a number takes replace the selection.
 pub(crate) fn typed(document: &Rc<RefCell<Document>>, node: NodeId, text: &str) {
-    let Some(field) = document.borrow().editable_number(node) else {
+    if document.borrow().editable_number(node).is_none() {
         return;
-    };
+    }
     let accepted: String = text.chars().filter(|c| typeable(*c)).collect();
     if accepted.is_empty() {
         return;
     }
-    let base = if document.borrow().text_selected(node) {
-        String::new()
-    } else {
-        field.shown
-    };
-    if document
-        .borrow_mut()
-        .set_number_text(node, base + &accepted)
-    {
+    document.borrow_mut().edit(node, EditKind::Insert, |d| {
+        d.insert_or_replace_selection(&accepted);
+    });
+    edited(document, node);
+}
+
+/// After an edit: the field's `value` takes the editor's text and
+/// `input` fires.
+fn edited(document: &Rc<RefCell<Document>>, node: NodeId) {
+    let text = document.borrow_mut().editor(node).plain.text().to_string();
+    if document.borrow_mut().write_number_text(node, text) {
         fire(document, node, "input");
     }
 }
@@ -136,7 +105,8 @@ pub(crate) fn fire_input(document: &Rc<RefCell<Document>>, node: NodeId) {
 }
 
 /// `key` went down on `node`, a focused number field: Backspace,
-/// Enter, the arrows and select-all act; other keys are typed.
+/// Delete, Enter, the arrows, Home, End and select-all act; other keys
+/// are typed.
 pub(crate) fn key(
     document: &Rc<RefCell<Document>>,
     node: NodeId,
@@ -147,7 +117,11 @@ pub(crate) fn key(
         return false;
     };
     match key {
-        "Backspace" => backspace(document, node, field),
+        "Backspace" | "Delete" => {
+            let word = modifiers.control;
+            crate::text_delete::delete_key(document, node, key == "Backspace", word);
+            edited(document, node);
+        }
         "Enter" => commit(document, node),
         _ if crate::shortcuts::selected_all(document, node, key, modifiers) => {}
         "ArrowUp" | "ArrowDown" => {
@@ -157,21 +131,13 @@ pub(crate) fn key(
         }
         // the field's typing (digits, a sign, a point, an exponent) arrives
         // as a character; a stray letter is still the field's, not a shortcut
-        _ => return crate::keys::types_text(key, modifiers),
+        _ => {
+            let (shift, word) = (modifiers.shift, modifiers.control);
+            return crate::text_input::moved(document, node, key, shift, word)
+                || crate::keys::types_text(key, modifiers);
+        }
     }
     true
-}
-
-fn backspace(document: &Rc<RefCell<Document>>, node: NodeId, field: Field) {
-    let mut text = field.shown;
-    if document.borrow().text_selected(node) {
-        text.clear();
-    } else {
-        text.pop();
-    }
-    if document.borrow_mut().set_number_text(node, text) {
-        fire(document, node, "input");
-    }
 }
 
 fn step(document: &Rc<RefCell<Document>>, node: NodeId, field: &Field, steps: f64) {

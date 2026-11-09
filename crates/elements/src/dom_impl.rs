@@ -112,9 +112,6 @@ impl Dom for Document {
         self.committed
             .retain(|field, _| self.arena.contains(*field));
         self.editors.retain(|field, _| self.arena.contains(*field));
-        self.selected_all = self
-            .selected_all
-            .filter(|field| self.arena.contains(*field));
     }
 
     fn listen(&mut self, node: NodeId, event: &str, handler: Handler) {

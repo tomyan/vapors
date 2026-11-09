@@ -2,11 +2,13 @@
 //! field steps the number per 2 px (or the px the attribute names),
 //! with `input` per step and `change` at the release; a press without
 //! movement is a click that focuses; a finger across the field is the
-//! pan's; without the attribute a drag does nothing.
+//! pan's; a press is the scrub's, not the caret's; without the
+//! attribute a drag selects text, as a text field's does, and steps
+//! nothing.
 
 mod support;
 
-use support::number_page::{page, value};
+use support::number_page::{page, type_text, value};
 use vapors_dom::Dom;
 use vapors_elements::Document;
 
@@ -45,6 +47,20 @@ fn a_press_without_movement_is_a_click_and_fires_no_change() {
     // Then
     assert!(page.log.borrow().is_empty());
     assert_eq!(value(&page, page.scrub), "50");
+}
+
+#[test]
+fn a_press_on_a_scrubbable_field_is_the_scrubs_and_places_no_caret() {
+    // Given: `scrub`, at 50, pressed before its text
+    let page = page();
+    Document::pointer_pressed(&page.doc, [2.0, 36.0]);
+    Document::pointer_released(&page.doc, [2.0, 36.0]);
+
+    // When
+    type_text(&page, "1");
+
+    // Then: the caret is where focus put it, at the end
+    assert_eq!(value(&page, page.scrub), "501");
 }
 
 #[test]

@@ -122,7 +122,8 @@ fn the_checkbox_script_logs_on_vapors_what_chromium_logged() {
 
 #[test]
 fn the_number_script_logs_on_vapors_what_chromium_logged() {
-    // Given: a number field typed into, stepped and committed (3-E3c)
+    // Given: a number field typed into, stepped and committed (3-E3c),
+    // its caret moved by keys and pointer (number-caret)
     let script = parse("number", &read("number.events")).expect("parses");
     let answers = serde_json::from_str(&read("number.events.json")).expect("json");
 
