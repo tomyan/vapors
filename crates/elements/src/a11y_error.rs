@@ -13,8 +13,12 @@ pub enum AxError {
         role: String,
         /// The name asked for.
         name: String,
-        /// Every node of that role, with its ancestors, `a "x" > b "y"`.
+        /// Every node of that role (inside the ancestor asked for, when
+        /// one was), with its ancestors, `a "x" > b "y"`.
         candidates: Vec<String>,
+        /// The nodes with the role and name outside the ancestor asked
+        /// for; empty when none was.
+        outside: Vec<String>,
     },
     /// More than one node has the role and name.
     Ambiguous {
@@ -89,10 +93,22 @@ impl fmt::Display for AxError {
                 role,
                 name,
                 candidates,
-            } => write!(
+                outside,
+            } if outside.is_empty() => write!(
                 f,
                 "no node is {role} \"{name}\" (names are exact); the {role} nodes: [{}]; fix: use one of their names",
                 candidates.join(", ")
+            ),
+            Self::Missing {
+                role,
+                name,
+                candidates,
+                outside,
+            } => write!(
+                f,
+                "no node inside the ancestor asked for is {role} \"{name}\"; the {role} nodes inside it: [{}]; outside it: [{}]; fix: name the ancestor of one of those, or one of the names inside",
+                candidates.join(", "),
+                outside.join(", ")
             ),
             Self::Ambiguous {
                 role,

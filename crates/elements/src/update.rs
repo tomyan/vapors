@@ -103,8 +103,10 @@ impl Document {
         painted.scroll_chains = crate::scroll_chains::Chains::of(&boxes, &scrolls);
         self.boxes.keep(boxes, viewport.scale);
         self.laid_out = laid_out;
-        self.rehover_in(&painted);
+        // Cleared before the rehover: a hover it moves is a change this
+        // update did not restyle, so the a11y tree refuses until the next.
         self.changes.since_update = false;
+        self.rehover_in(&painted);
         Ok(self.painted.insert(painted))
     }
 
