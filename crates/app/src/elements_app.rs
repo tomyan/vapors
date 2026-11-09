@@ -194,3 +194,6 @@ mod frame_phases;
 mod paste;
 #[path = "elements_app_text.rs"]
 mod text;
+#[cfg(test)]
+#[path = "elements_app_tests.rs"]
+mod tests;
