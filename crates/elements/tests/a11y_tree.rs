@@ -8,7 +8,7 @@ mod support;
 use support::roles_page::{STYLE, labelled, page};
 use support::{document, viewport};
 use vapors_dom::Dom;
-use vapors_elements::{AxElement, AxError, BoxRect};
+use vapors_elements::{AxElement, AxError, BoxRect, Document};
 
 /// Each node as an indented line: role, name, value and the states set.
 fn outline(nodes: &[AxElement], depth: usize, out: &mut Vec<String>) {
@@ -128,4 +128,32 @@ fn a_document_changed_since_its_last_update_is_refused() {
 #[test]
 fn a_document_never_updated_is_refused() {
     assert_eq!(document().ax_tree().map(|_| ()), Err(AxError::NotUpdated));
+}
+
+#[test]
+fn a_hover_moved_by_the_update_itself_leaves_the_tree_refused_until_the_next() {
+    // Given: the pointer over .host, whose :hover shows the menu
+    let mut doc = document();
+    let body = doc.body();
+    let host = support::element(&mut doc, body, "div", "host");
+    let menu = support::element(&mut doc, host, "div", "menu");
+    support::roles_page::button(&mut doc, menu, "Menu", &[]);
+    let sheet = "body { margin: 0; } .host, .spacer { height: 20px; } \
+                 button { display: block; } .menu { display: none; } .host:hover .menu { display: flex; }";
+    doc.add_stylesheet("hover.css", sheet).expect("parses");
+    let doc = std::rc::Rc::new(std::cell::RefCell::new(doc));
+    doc.borrow_mut().update(viewport(640.0, 400.0)).expect("updates");
+    Document::pointer_moved(&doc, [5.0, 5.0]);
+    doc.borrow_mut().update(viewport(640.0, 400.0)).expect("updates");
+
+    // When: a change moves .host from under the pointer
+    let spacer = doc.borrow_mut().create_element("div");
+    doc.borrow_mut().set_attribute(spacer, "class", "spacer");
+    doc.borrow_mut().insert_before(body, spacer, Some(host));
+    doc.borrow_mut().update(viewport(640.0, 400.0)).expect("updates");
+
+    // Then: the hover the update moved is a change; the next update has it
+    assert_eq!(doc.borrow().ax_tree().map(|_| ()), Err(AxError::NotUpdated));
+    doc.borrow_mut().update(viewport(640.0, 400.0)).expect("updates");
+    assert_eq!(lines(&doc.borrow().ax_tree().expect("updated")), Vec::<String>::new());
 }
