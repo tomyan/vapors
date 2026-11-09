@@ -192,8 +192,8 @@ mod frame_phases;
 #[cfg(not(target_family = "wasm"))]
 #[path = "elements_app_paste.rs"]
 mod paste;
-#[path = "elements_app_text.rs"]
-mod text;
 #[cfg(test)]
 #[path = "elements_app_tests.rs"]
 mod tests;
+#[path = "elements_app_text.rs"]
+mod text;

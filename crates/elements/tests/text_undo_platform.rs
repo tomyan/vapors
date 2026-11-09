@@ -83,14 +83,26 @@ fn control_z_undoes_elsewhere_and_command_z_does_not() {
 
 #[test]
 fn shift_command_z_redoes_on_macos_and_command_y_does_not() {
-    assert!(redoes(ShortcutModifier::Command, "Z", with_shift(command())));
+    assert!(redoes(
+        ShortcutModifier::Command,
+        "Z",
+        with_shift(command())
+    ));
     assert!(!redoes(ShortcutModifier::Command, "y", command()));
-    assert!(!redoes(ShortcutModifier::Command, "Z", with_shift(control())));
+    assert!(!redoes(
+        ShortcutModifier::Command,
+        "Z",
+        with_shift(control())
+    ));
 }
 
 #[test]
 fn shift_control_z_and_control_y_redo_elsewhere_and_command_does_not() {
-    assert!(redoes(ShortcutModifier::Control, "Z", with_shift(control())));
+    assert!(redoes(
+        ShortcutModifier::Control,
+        "Z",
+        with_shift(control())
+    ));
     assert!(redoes(ShortcutModifier::Control, "y", control()));
     assert!(!redoes(ShortcutModifier::Control, "y", command()));
 }
