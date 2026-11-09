@@ -101,3 +101,23 @@ fn a_press_on_a_node_with_pointer_events_none_is_refused_as_its_own() {
     };
     assert_eq!(pressed, Err(refused));
 }
+
+#[test]
+fn a_failed_update_names_what_it_came_after_and_its_errors() {
+    // Given
+    let problem = AxError::UpdateFailed {
+        after: "scrolling button \"B6\" into view".into(),
+        errors: vec!["unsupported tag <marquee>".into()],
+    };
+
+    // When
+    let message = problem.to_string();
+
+    // Then
+    assert!(
+        message.starts_with(
+            "the update after scrolling button \"B6\" into view failed: [unsupported tag <marquee>]"
+        ),
+        "{message}"
+    );
+}

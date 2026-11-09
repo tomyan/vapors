@@ -55,8 +55,7 @@ impl Document {
         self.update(viewport)
             .map(|_| ())
             .map_err(|errors| AxError::UpdateFailed {
-                role: found.role.clone(),
-                name: found.name.clone(),
+                after: format!("scrolling {} \"{}\" into view", found.role, found.name),
                 errors: errors.iter().map(ToString::to_string).collect(),
             })
     }
