@@ -1,5 +1,5 @@
 use super::*;
-use crate::{Color, ImageId, TextId};
+use crate::{Color, ImageId, SurfaceId, TextId};
 
 fn quad(left: f32) -> Item {
     Item::Quad(Quad::fill(
@@ -46,6 +46,7 @@ fn consecutive_items_of_one_kind_share_a_batch_in_painting_order() {
             Run::Quads(quads) => ('q', quads.len()),
             Run::Texts(texts) => ('t', texts.len()),
             Run::Images(images) => ('i', images.len()),
+            Run::Surfaces(surfaces) => ('g', surfaces.len()),
         })
         .collect();
     assert_eq!(shape, [('q', 2), ('t', 1), ('q', 1), ('t', 2)]);
@@ -139,4 +140,34 @@ fn consecutive_images_share_a_batch_apart_from_other_kinds() {
         })
         .collect();
     assert_eq!(shape, [('i', 1), ('q', 1), ('i', 2)]);
+}
+
+fn surface(id: u32) -> Item {
+    Item::Surface {
+        surface: SurfaceId(id),
+        rect: Rect::new(0.0, 0.0, 4.0, 4.0),
+    }
+}
+
+#[test]
+fn consecutive_surfaces_share_a_batch_apart_from_images() {
+    // Given: two surfaces, an image, a surface
+    let mut scene = Scene::new();
+    for item in [surface(0), surface(1), picture(0), surface(2)] {
+        scene.push(item);
+    }
+
+    // When
+    let batches = scene.batches();
+
+    // Then
+    let shape: Vec<(char, usize)> = batches
+        .iter()
+        .map(|batch| match &batch.run {
+            Run::Surfaces(surfaces) => ('g', surfaces.len()),
+            Run::Images(images) => ('i', images.len()),
+            other => panic!("unexpected {other:?}"),
+        })
+        .collect();
+    assert_eq!(shape, [('g', 2), ('i', 1), ('g', 1)]);
 }

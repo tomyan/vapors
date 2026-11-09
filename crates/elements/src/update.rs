@@ -157,6 +157,7 @@ impl Document {
             &live,
             &kept.used,
         ));
+        errors.extend(crate::surfaces::refusals(&self.arena, &live, &kept.used));
         if errors.is_empty() {
             Ok(calcs)
         } else {

@@ -4,7 +4,7 @@
    Geist is the face vapors bundles (docs/text.md). */
 
 html, body, div, p, h1, h2, h3, h4, h5, h6, section, header, footer,
-main, nav, aside, article, blockquote, figure, figcaption {
+main, nav, aside, article, blockquote, figure, figcaption, gpu-surface {
   display: block;
 }
 

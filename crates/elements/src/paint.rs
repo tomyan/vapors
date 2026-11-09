@@ -58,6 +58,7 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
         cursors: HashMap::new(),
         scroll_chains: crate::scroll_chains::Chains::default(),
         images: Vec::new(),
+        surfaces: Vec::new(),
         ranges: HashMap::new(),
         text_origins: HashMap::new(),
     };
@@ -86,6 +87,7 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
             Step::Box(_) => {
                 paint_own(boxes, rects, index, input, &mut painted);
                 crate::images::paint(&boxes[index], rects[index], input, &mut painted);
+                crate::surfaces::paint(&boxes[index], rects[index], input, &mut painted);
                 crate::range_paint::paint(&boxes[index], rects[index], input, &mut painted);
                 crate::checkbox_paint::paint(&boxes[index], rects[index], input, &mut painted);
                 crate::number_paint::paint(boxes, rects, index, input, &mut painted);

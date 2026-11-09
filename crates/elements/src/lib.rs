@@ -49,6 +49,7 @@ mod scroll_chains;
 mod scrolling;
 mod stacking;
 mod style;
+mod surfaces;
 mod tags;
 mod text_bridge;
 mod text_field;

@@ -2,7 +2,8 @@
 //! them, and the messages for tags that were removed.
 
 /// The recognised element vocabulary (sumi's, plus `canvas`, `br`,
-/// `fieldset`, `legend`, `small`, `sub`, `sup`, `figure`, `figcaption`).
+/// `fieldset`, `legend`, `small`, `sub`, `sup`, `figure`, `figcaption`, and vapors's
+/// `gpu-surface`, docs/gpu-surface.md).
 const HTML_TAGS: &[&str] = &[
     "a",
     "abbr",
@@ -26,6 +27,7 @@ const HTML_TAGS: &[&str] = &[
     "figcaption",
     "figure",
     "footer",
+    "gpu-surface",
     "h1",
     "h2",
     "h3",

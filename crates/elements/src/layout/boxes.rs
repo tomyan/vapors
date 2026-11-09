@@ -40,6 +40,8 @@ pub(crate) struct LayoutBox {
     pub(crate) natural: Option<[f32; 2]>,
     /// The image an `img` shows, for paint.
     pub(crate) image: Option<std::rc::Rc<vapors_scene::RgbaImage>>,
+    /// The name of the renderer a `gpu-surface` shows, for paint.
+    pub(crate) surface: Option<std::rc::Rc<str>>,
     /// The numbers of an `input type=range`, for paint (3-E3a).
     pub(crate) range: Option<crate::range::Range>,
     /// Whether an `input type=checkbox` is checked, for paint (3-E3b).
@@ -70,6 +72,7 @@ impl LayoutBox {
             hoisted: Vec::new(),
             natural: None,
             image: None,
+            surface: None,
             range: None,
             checked: None,
             number_focus: None,
@@ -144,6 +147,7 @@ fn add_element(source: &Source<'_>, node: NodeId, boxes: &mut Vec<LayoutBox>) ->
         (natural, source.images.of(source.arena, node).cloned()),
         checked.is_some(),
     );
+    replaced.surface = crate::surfaces::name(source.arena, node).map(Into::into);
     replaced.range = range;
     replaced.checked = checked;
     let field_text = super::field_box::fill(source, node, &mut replaced);
