@@ -7,6 +7,7 @@
 mod a11y_act;
 mod a11y_drive;
 mod a11y_error;
+mod a11y_error_message;
 mod a11y_find;
 mod a11y_name;
 mod a11y_press;
