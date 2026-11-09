@@ -1,9 +1,16 @@
-//! One full-screen GPU pass for the circuit and car, under the Vapors HUD.
+//! Ground and solid geometry, sharing a tilted camera under the compiled HUD.
+mod mesh;
+mod pipeline;
 use crate::model::{Camera, RADIUS, ROAD, Race, STRAIGHT};
 use vapors_platform::Frame;
+use wgpu::util::DeviceExt;
 
 pub(crate) struct Track {
     pipeline: wgpu::RenderPipeline,
+    solids: wgpu::RenderPipeline,
+    vertices: wgpu::Buffer,
+    vertex_count: u32,
+    depth: Option<(wgpu::Extent3d, wgpu::TextureView)>,
     uniform: wgpu::Buffer,
     bind: wgpu::BindGroup,
 }
@@ -18,7 +25,7 @@ impl Track {
             label: Some("racer uniforms"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
+                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
@@ -41,14 +48,26 @@ impl Track {
                 resource: uniform.as_entire_binding(),
             }],
         });
+        let mut mesh = mesh::scenery();
+        mesh.vertices.extend(mesh::car().vertices);
+        let bytes: Vec<u8> = mesh.vertices.iter().flat_map(|v| v.to_le_bytes()).collect();
+        let vertices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("racer solid meshes"),
+            contents: &bytes,
+            usage: wgpu::BufferUsages::VERTEX,
+        });
         Self {
-            pipeline: pipeline(device, frame.texture.format(), &layout, &shader),
+            pipeline: pipeline::create(device, frame.texture.format(), &layout, &shader, false),
+            solids: pipeline::create(device, frame.texture.format(), &layout, &shader, true),
+            vertices,
+            vertex_count: u32::try_from(mesh.vertices.len() / 7).expect("mesh fits u32"),
+            depth: None,
             uniform,
             bind,
         }
     }
     pub(crate) fn draw(
-        &self,
+        &mut self,
         frame: &Frame<'_>,
         view: &wgpu::TextureView,
         race: &Race,
@@ -70,17 +89,18 @@ impl Track {
             race.heading,
             race.speed,
             brake,
-            0.0,
+            400.0,
             STRAIGHT,
             RADIUS,
             ROAD,
-            0.0,
+            0.82,
         ];
         let bytes: Vec<u8> = values.iter().flat_map(|v| v.to_le_bytes()).collect();
         frame.queue.write_buffer(&self.uniform, 0, &bytes);
         self.submit(frame, view);
     }
-    fn submit(&self, frame: &Frame<'_>, view: &wgpu::TextureView) {
+    fn submit(&mut self, frame: &Frame<'_>, view: &wgpu::TextureView) {
+        self.resize_depth(frame);
         let mut encoder = frame
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -98,7 +118,14 @@ impl Track {
                         store: wgpu::StoreOp::Store,
                     },
                 })],
-                depth_stencil_attachment: None,
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth.as_ref().expect("depth allocated").1,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Discard,
+                    }),
+                    stencil_ops: None,
+                }),
                 timestamp_writes: None,
                 occlusion_query_set: None,
                 multiview_mask: None,
@@ -106,44 +133,30 @@ impl Track {
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &self.bind, &[]);
             pass.draw(0..3, 0..1);
+            pass.set_pipeline(&self.solids);
+            pass.set_vertex_buffer(0, self.vertices.slice(..));
+            pass.draw(0..self.vertex_count, 0..1);
         }
         frame.queue.submit([encoder.finish()]);
     }
-}
-fn pipeline(
-    device: &wgpu::Device,
-    format: wgpu::TextureFormat,
-    bind: &wgpu::BindGroupLayout,
-    shader: &wgpu::ShaderModule,
-) -> wgpu::RenderPipeline {
-    let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("racer"),
-        bind_group_layouts: &[Some(bind)],
-        immediate_size: 0,
-    });
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("racer"),
-        layout: Some(&layout),
-        vertex: wgpu::VertexState {
-            module: shader,
-            entry_point: Some("vs_main"),
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[],
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: shader,
-            entry_point: Some("fs_main"),
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-            targets: &[Some(wgpu::ColorTargetState {
-                format,
-                blend: None,
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-        }),
-        primitive: wgpu::PrimitiveState::default(),
-        depth_stencil: None,
-        multisample: wgpu::MultisampleState::default(),
-        multiview_mask: None,
-        cache: None,
-    })
+    fn resize_depth(&mut self, frame: &Frame<'_>) {
+        let size = frame.texture.size();
+        if self.depth.as_ref().is_some_and(|(old, _)| *old == size) {
+            return;
+        }
+        let texture = frame.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("racer depth"),
+            size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth32Float,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        });
+        self.depth = Some((
+            size,
+            texture.create_view(&wgpu::TextureViewDescriptor::default()),
+        ));
+    }
 }

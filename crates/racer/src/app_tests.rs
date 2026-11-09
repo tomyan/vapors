@@ -102,3 +102,31 @@ fn fps_uses_wall_time_including_slow_frames_and_resets_on_pause() {
     racer.pause();
     assert_eq!(racer.hud.fps.get(), "—");
 }
+
+#[test]
+fn landscape_stats_leave_space_for_driving() {
+    // Given
+    let racer = Racer::new();
+    racer.hud.short.set(true);
+    racer.hud.paused.set(false);
+    let mut doc = racer.document.borrow_mut();
+    // When
+    doc.update(Viewport {
+        width: 740.0,
+        height: 250.0,
+        scale: 1.0,
+    })
+    .unwrap();
+    // Then
+    let top = doc
+        .elements()
+        .iter()
+        .copied()
+        .find(|n| doc.attribute(*n, "class") == Some("top"))
+        .unwrap();
+    let bounds = doc.painted().unwrap().border_box(top).unwrap();
+    assert!(
+        bounds.y + bounds.height <= 52.0,
+        "stats must leave the track visible: {bounds:?}"
+    );
+}

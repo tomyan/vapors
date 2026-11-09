@@ -65,6 +65,7 @@ impl Racer {
             height: size.height as f32 / self.scale,
             scale: self.scale,
         };
+        self.hud.short.set(viewport.height < 480.0);
         self.sync_hud(viewport.width);
         Document::settle_selection(&self.document);
         self.document
@@ -83,7 +84,7 @@ impl Racer {
                     .map_err(|e| e.to_string())?,
             );
         }
-        self.track.as_ref().expect("created").draw(
+        self.track.as_mut().expect("created").draw(
             frame,
             &view,
             &self.race,

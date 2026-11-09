@@ -8,10 +8,11 @@ let message: Signal<String> = Signal::new(String::from("Three laps. Keep to the 
 let action: Signal<String> = Signal::new(String::new());
 let paused: Signal<bool> = Signal::new(true);
 let settings: Signal<bool> = Signal::new(false);
+let short: Signal<bool> = Signal::new(false);
 let compact: Signal<bool> = Signal::new(false);
 let steering: Signal<f64> = Signal::new(1.0);
 let grip: Signal<f64> = Signal::new(1.0);
-let size_class: Memo<String> = Memo::new(move || if compact.get() { "small".into() } else { "wide".into() });
+let size_class: Memo<String> = Memo::new(move || if short.get() { "small short".into() } else if compact.get() { "small".into() } else { "wide".into() });
 let pause_label: Memo<String> = Memo::new(move || if paused.get() { "Drive".into() } else { "Pause".into() });
 let toggle = move || action.set(String::from("toggle"));
 let restart = move || action.set(String::from("restart"));
@@ -53,11 +54,21 @@ input:invalid { border: 2px solid #ee806b; }
 .small .note { top: 94px; right: 16px; font-size: 14px; }
 .small .help { display: none; }
 .small .pedal { width: 58px; }
+.short .top { top: 8px; left: 8px; right: 8px; }
+.short .stats { padding: 6px 10px; }
+.short .stat { display: flex; align-items: center; gap: 8px; }
+.short .value { font-size: 18px; }
+.short .note { top: 52px; left: 8px; right: auto; max-width: 300px; padding: 4px 8px; }
+.short .menu { right: 8px; bottom: 84px; gap: 6px; }
+.short .drive { bottom: 8px; left: 8px; right: 8px; }
+.short .tuning { top: 48px; right: 8px; padding: 8px; }
+.short .tuning h2 { display: none; }
+.short .tuning .row { margin: 2px 0 4px; }
 </style>
 
 <div class={size_class.get()}>
 <div class="top"><div class="brand"><div class="name">VAPORS / CIRCUIT</div><div class="caption">Rust · compiled components · GPU</div></div><div class="stats"><div class="stat"><div class="caption">KM/H</div><div class="value">{speed}</div></div><div class="stat"><div class="caption">LAP</div><div class="value">{lap}</div></div><div class="stat"><div class="caption">TIME</div><div class="value">{clock}</div></div><div class="stat"><div class="caption">FPS</div><div class="value">{fps}</div></div></div></div>
-<div class="note">{message}</div>
+{if !short.get() || paused.get()}<div class="note">{message}</div>{/if}
 <div class="menu"><button data-action="tune" onclick={tune}>Tune</button><button data-action="restart" onclick={restart}>Restart</button><button class="primary" data-action="toggle" onclick={toggle}>{pause_label}</button></div>
 <div class="drive"><div class="pair"><button class="pedal" data-drive="left">←</button><button class="pedal" data-drive="right">→</button></div><div class="pair"><button class="pedal" data-drive="brake">Brake</button><button class="pedal gas" data-drive="gas">Gas</button></div></div>
 <div class="help">WASD / arrows · Space pauses · R restarts</div>

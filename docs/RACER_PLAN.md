@@ -45,3 +45,25 @@ Show wall-clock frame rate beside the race stats, averaged over half a second.
 Include slow frames before simulation catch-up is capped. Show a dash while
 paused rather than retaining a stale rate. Validate the calculation and pause
 reset with a test proved red first, then check mobile HUD bounds in Chromium.
+
+## Tilted 3D view and phone landscape (2026-11-09)
+
+Approved: real 3D geometry with a tilted overhead camera, a closer view that
+still widens at speed, and a compact landscape HUD.
+
+1. Short viewports: one stats row, no branding/keyboard hints, status only while
+   paused, full-size driving buttons. Validate visible bounds and no overlap.
+2. Geometry: solid car, trees and pit building, with a shared tilted projection
+   and depth buffer. Keep existing planar driving physics. Validate mesh height,
+   GPU shader compilation, occlusion screenshots and existing driving tests.
+3. Publish after mobile portrait/landscape and slow-frame regressions pass.
+
+Trees remain scenery; this does not add collision physics or crash recovery.
+
+Validation: the short-screen stats test failed on the previous HUD. Flattening
+all mesh Z coordinates deliberately failed the solid-height test; restored
+geometry passes. Browser checks cover 740×250, 844×300 and 640×260 landscapes,
+Android visual-viewport resizing, a 400 ms stall, desktop driving, tuning and
+multi-touch. Screenshots confirm solid sides and the slim landscape stats row.
+The orthographic camera is tilted about 35 degrees from vertical; the view scale
+is 1.4 times the previous scale. Physical Android GPU stability remains unverified.
