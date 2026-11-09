@@ -6,6 +6,7 @@
 //! `aria-hidden="true"`. The tree is read from the last update, so a
 //! document changed since then is refused rather than answered from it.
 
+use serde::{Deserialize, Serialize};
 use vapors_dom::NodeId;
 
 use crate::a11y_error::AxError;
@@ -15,9 +16,10 @@ use crate::layout::BoxRect;
 use crate::painted::Painted;
 
 /// One node of the tree.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AxElement {
-    /// The element.
+    /// The element, as its id's number.
+    #[serde(with = "crate::a11y_drive::node_id")]
     pub node: NodeId,
     /// Its role.
     pub role: String,
@@ -34,7 +36,7 @@ pub struct AxElement {
 }
 
 /// A node's states; `None` where Chromium leaves the state out.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AxStates {
     /// It has focus.
     pub focused: bool,

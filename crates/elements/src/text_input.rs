@@ -52,7 +52,7 @@ impl Document {
 
     /// Runs `act`, which moves the selection but edits nothing, on the
     /// field's editor: the open undo step closes.
-    pub(crate) fn drive(&mut self, node: NodeId, act: impl FnOnce(&mut Driver<'_>)) {
+    pub(crate) fn move_selection(&mut self, node: NodeId, act: impl FnOnce(&mut Driver<'_>)) {
         self.editor(node).history.close();
         self.drive_editor(node, act);
     }
@@ -139,7 +139,7 @@ pub(crate) fn moved(
         ("End", true, _) => |d| d.select_to_line_end(),
         _ => return false,
     };
-    document.borrow_mut().drive(node, act);
+    document.borrow_mut().move_selection(node, act);
     true
 }
 

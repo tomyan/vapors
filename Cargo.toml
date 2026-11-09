@@ -58,6 +58,10 @@ quote = "=1.0.47"
 tracing = { version = "=0.1.44", default-features = false, features = ["std"] }
 proc-macro2 = { version = "=1.0.107", features = ["span-locations"] }
 insta = "=1.49.0"
+# The a11y driver's Command and Reply (vapors-elements `a11y_drive`) travel
+# over stdio, a socket and a page call.
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
 # The DevTools protocol is a WebSocket (vapors-devtools); the client only.
 tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
 

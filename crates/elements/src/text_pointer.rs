@@ -21,7 +21,7 @@ impl Document {
     /// Selects the word a double click at `at` in the field's text
     /// selects (`text_word`).
     fn select_word_at(&mut self, node: NodeId, (x, y): (f32, f32)) {
-        self.drive(node, |d| {
+        self.move_selection(node, |d| {
             let word = crate::text_word::word_at(d.layout(), x, y);
             d.select_byte_range(word.start, word.end);
         });
@@ -82,7 +82,9 @@ pub(crate) fn pressed(
         2 => document.borrow_mut().select_word_at(node, at),
         // the method path is not general over the driver's lifetime
         #[allow(clippy::redundant_closure_for_method_calls)]
-        _ => document.borrow_mut().drive(node, |d| d.select_all()),
+        _ => document
+            .borrow_mut()
+            .move_selection(node, |d| d.select_all()),
     }
 }
 
@@ -92,7 +94,9 @@ fn first(document: &Rc<RefCell<Document>>, id: u32, node: NodeId, (x, y): (f32, 
     let press = if document.borrow_mut().in_selection(node, (x, y)) {
         TextPress::InSelection(node, (x, y))
     } else {
-        document.borrow_mut().drive(node, |d| d.move_to_point(x, y));
+        document
+            .borrow_mut()
+            .move_selection(node, |d| d.move_to_point(x, y));
         TextPress::Drag(node)
     };
     document.borrow_mut().pointer.text_presses.insert(id, press);
@@ -103,7 +107,9 @@ fn first(document: &Rc<RefCell<Document>>, id: u32, node: NodeId, (x, y): (f32, 
 /// with no drag; a disabled one only owes a `selectionchange`.
 pub(crate) fn tapped(document: &Rc<RefCell<Document>>, node: NodeId, point: Point) {
     if let Some((x, y)) = live_point(document, node, point) {
-        document.borrow_mut().drive(node, |d| d.move_to_point(x, y));
+        document
+            .borrow_mut()
+            .move_selection(node, |d| d.move_to_point(x, y));
     }
 }
 
@@ -119,7 +125,7 @@ fn live_point(document: &Rc<RefCell<Document>>, node: NodeId, point: Point) -> O
     let disabled = doc.is_disabled_control(node);
     drop(doc);
     if disabled {
-        document.borrow_mut().drive(node, |_| {});
+        document.borrow_mut().move_selection(node, |_| {});
         return None;
     }
     document.borrow().text_point(node, point)
@@ -140,7 +146,7 @@ pub(crate) fn moved_pointer(document: &Rc<RefCell<Document>>, id: u32, point: Po
     };
     document
         .borrow_mut()
-        .drive(node, |d| d.extend_selection_to_point(x, y));
+        .move_selection(node, |d| d.extend_selection_to_point(x, y));
 }
 
 /// Pointer `id` came up: a press inside the selection puts the caret
@@ -148,6 +154,8 @@ pub(crate) fn moved_pointer(document: &Rc<RefCell<Document>>, id: u32, point: Po
 pub(crate) fn released(document: &Rc<RefCell<Document>>, id: u32) {
     let press = document.borrow_mut().pointer.text_presses.remove(&id);
     if let Some(TextPress::InSelection(node, (x, y))) = press {
-        document.borrow_mut().drive(node, |d| d.move_to_point(x, y));
+        document
+            .borrow_mut()
+            .move_selection(node, |d| d.move_to_point(x, y));
     }
 }

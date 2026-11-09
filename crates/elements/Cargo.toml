@@ -24,10 +24,12 @@ vapors-css.workspace = true
 vapors-scene.workspace = true
 vapors-text.workspace = true
 taffy.workspace = true
+serde.workspace = true
 
 [dev-dependencies]
 vapors-signals.workspace = true
 vapors-compiler-examples.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

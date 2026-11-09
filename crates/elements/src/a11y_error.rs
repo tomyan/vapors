@@ -2,8 +2,11 @@
 
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
+
 /// A refusal from the a11y tree.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "problem", rename_all = "snake_case")]
 pub enum AxError {
     /// The document has changed since its last update, or has none.
     NotUpdated,
