@@ -25,8 +25,12 @@ impl Racer {
                 ))
             })
             .collect();
+        let camera = format!(
+            "\"cameraFollow\":{},\"cameraYaw\":{},\"cameraTilt\":{},\"cameraMoving\":{}",
+            self.camera.follow, self.camera.rotation, self.camera.tilt, self.camera.moving
+        );
         vapors_platform::report_status(&format!(
-            "{{\"frame\":{frame},\"paused\":{},\"speed\":{},\"zoom\":{},\"time\":{},\"x\":{},\"y\":{},\"heading\":{},\"laps\":{},\"throttle\":{},\"steer\":{},\"steering\":{},\"grip\":{},\"targets\":{{{}}}}}",
+            "{{\"frame\":{frame},\"paused\":{},\"speed\":{},\"zoom\":{},\"time\":{},\"x\":{},\"y\":{},\"heading\":{},\"laps\":{},\"throttle\":{},\"steer\":{},\"steering\":{},\"grip\":{},{camera},\"targets\":{{{}}}}}",
             self.paused,
             self.race.speed,
             self.camera.zoom,

@@ -36,7 +36,7 @@ impl Track {
         });
         let uniform = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("racer frame"),
-            size: 64,
+            size: 80,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -75,15 +75,14 @@ impl Track {
         brake: f32,
     ) {
         let extent = frame.texture.size();
-        let look = race.speed * 0.20;
         #[allow(clippy::cast_precision_loss)] // viewport dimensions fit f32 exactly
         let values = [
             extent.width as f32,
             extent.height as f32,
             camera.zoom,
             race.elapsed,
-            race.position[0] + race.heading.cos() * look,
-            race.position[1] + race.heading.sin() * look,
+            race.position[0] + camera.offset[0],
+            race.position[1] + camera.offset[1],
             race.position[0],
             race.position[1],
             race.heading,
@@ -93,7 +92,11 @@ impl Track {
             STRAIGHT,
             RADIUS,
             ROAD,
-            0.82,
+            camera.tilt,
+            camera.rotation.cos(),
+            camera.rotation.sin(),
+            0.0,
+            0.0,
         ];
         let bytes: Vec<u8> = values.iter().flat_map(|v| v.to_le_bytes()).collect();
         frame.queue.write_buffer(&self.uniform, 0, &bytes);

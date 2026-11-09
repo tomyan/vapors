@@ -12,10 +12,14 @@ impl Racer {
             .last
             .replace(frame.now)
             .map_or(0.0, |last| frame.now.duration_since(last).as_secs_f32());
-        if self.paused {
-            return Ok(());
+        if !self.paused {
+            self.advance_elapsed(elapsed)?;
         }
-        self.advance_elapsed(elapsed)
+        if !self.paused || self.camera.moving {
+            self.camera
+                .step(elapsed.min(0.05), self.race.speed, self.race.heading)?;
+        }
+        Ok(())
     }
     pub(crate) fn advance_elapsed(&mut self, elapsed: f32) -> Result<(), String> {
         if !elapsed.is_finite() || elapsed < 0.0 {
@@ -29,7 +33,6 @@ impl Racer {
         while self.remainder >= 1.0 / 120.0 {
             self.race
                 .step(1.0 / 120.0, self.driving.controls(), settings)?;
-            self.camera.step(1.0 / 120.0, self.race.speed)?;
             self.remainder -= 1.0 / 120.0;
         }
         if self.race.progress.laps == 3 {
@@ -112,6 +115,7 @@ impl Racer {
     }
     fn sync_hud(&self, width: f32) {
         self.hud.compact.set(width < 760.0);
+        self.hud.follow.set(self.camera.follow);
         self.hud.paused.set(self.paused);
         self.hud.speed.set(format!("{:.0}", self.race.speed * 0.72));
         self.hud

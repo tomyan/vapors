@@ -65,6 +65,7 @@ impl Racer {
     }
     pub(super) fn pause(&mut self) {
         self.paused = true;
+        self.camera.moving = false;
         self.driving.clear();
         self.last = None;
         self.remainder = 0.0;
@@ -86,6 +87,11 @@ impl Racer {
                     self.pause();
                 }
             }
+            "camera" => {
+                self.camera.toggle();
+                self.last = None;
+                self.hud.follow.set(self.camera.follow);
+            }
             "restart" => {
                 self.race = Race::default();
                 self.camera = Camera::default();
@@ -97,7 +103,7 @@ impl Racer {
             }
             _ => {
                 return Err(format!(
-                    "unknown racer command `{command}`; use toggle, restart or tune"
+                    "unknown racer command `{command}`; use toggle, restart, tune or camera"
                 ));
             }
         }
@@ -122,7 +128,7 @@ impl App for Racer {
             self.fail(error);
             return Next::Wait;
         }
-        if self.paused {
+        if self.paused && !self.camera.moving {
             Next::Wait
         } else {
             Next::Continue

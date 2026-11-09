@@ -1,4 +1,6 @@
 <script>
+let follow: Signal<bool> = Signal::new(false);
+let camera_label: Memo<String> = Memo::new(move || if follow.get() { "Camera: Follow".into() } else { "Camera: Fixed".into() });
 let fps: Signal<String> = Signal::new(String::from("—"));
 let speed: Signal<String> = Signal::new(String::from("0"));
 let lap: Signal<String> = Signal::new(String::from("1 / 3"));
@@ -14,6 +16,7 @@ let steering: Signal<f64> = Signal::new(1.0);
 let grip: Signal<f64> = Signal::new(1.0);
 let size_class: Memo<String> = Memo::new(move || if short.get() { "small short".into() } else if compact.get() { "small".into() } else { "wide".into() });
 let pause_label: Memo<String> = Memo::new(move || if paused.get() { "Drive".into() } else { "Pause".into() });
+let camera_toggle = move || action.set(String::from("camera"));
 let toggle = move || action.set(String::from("toggle"));
 let restart = move || action.set(String::from("restart"));
 let tune = move || action.set(String::from("tune"));
@@ -30,6 +33,7 @@ let tune = move || action.set(String::from("tune"));
 .stat { min-width: 55px; }
 .value { font-size: 22px; font-weight: 700; }
 .note { position: absolute; left: 16px; top: 98px; padding: 8px 12px; background-color: #182a2f; border-radius: 4px; font-size: 14px; }
+.camera-mode { width: 164px; display: block; position: absolute; left: 16px; bottom: 92px; }
 .menu { position: absolute; right: 16px; bottom: 92px; display: flex; gap: 8px; }
 button { pointer-events: auto; background-color: #20383d; color: #f3f1e8; border: 1px solid #526a69; border-radius: 5px; padding: 10px 14px; min-height: 44px; font-size: 16px; }
 button:hover { background-color: #395456; }
@@ -53,12 +57,14 @@ input:invalid { border: 2px solid #ee806b; }
 .small .value { font-size: 19px; }
 .small .note { top: 94px; right: 16px; font-size: 14px; }
 .small .help { display: none; }
+.small .camera-mode { left: auto; right: 16px; bottom: 144px; }
 .small .pedal { width: 58px; }
 .short .top { top: 8px; left: 8px; right: 8px; }
 .short .stats { padding: 6px 10px; }
 .short .stat { display: flex; align-items: center; gap: 8px; }
 .short .value { font-size: 18px; }
 .short .note { top: 52px; left: 8px; right: auto; max-width: 300px; padding: 4px 8px; }
+.short .camera-mode { left: 8px; right: auto; bottom: 84px; }
 .short .menu { right: 8px; bottom: 84px; gap: 6px; }
 .short .drive { bottom: 8px; left: 8px; right: 8px; }
 .short .tuning { top: 48px; right: 8px; padding: 8px; }
@@ -69,6 +75,7 @@ input:invalid { border: 2px solid #ee806b; }
 <div class={size_class.get()}>
 <div class="top"><div class="brand"><div class="name">VAPORS / CIRCUIT</div><div class="caption">Rust · compiled components · GPU</div></div><div class="stats"><div class="stat"><div class="caption">KM/H</div><div class="value">{speed}</div></div><div class="stat"><div class="caption">LAP</div><div class="value">{lap}</div></div><div class="stat"><div class="caption">TIME</div><div class="value">{clock}</div></div><div class="stat"><div class="caption">FPS</div><div class="value">{fps}</div></div></div></div>
 {if !short.get() || paused.get()}<div class="note">{message}</div>{/if}
+{if !settings.get()}<button class="camera-mode" data-action="camera" onclick={camera_toggle}>{camera_label}</button>{/if}
 <div class="menu"><button data-action="tune" onclick={tune}>Tune</button><button data-action="restart" onclick={restart}>Restart</button><button class="primary" data-action="toggle" onclick={toggle}>{pause_label}</button></div>
 <div class="drive"><div class="pair"><button class="pedal" data-drive="left">←</button><button class="pedal" data-drive="right">→</button></div><div class="pair"><button class="pedal" data-drive="brake">Brake</button><button class="pedal gas" data-drive="gas">Gas</button></div></div>
 <div class="help">WASD / arrows · Space pauses · R restarts</div>

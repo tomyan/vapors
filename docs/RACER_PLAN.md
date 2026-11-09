@@ -67,3 +67,24 @@ Android visual-viewport resizing, a 400 ms stall, desktop driving, tuning and
 multi-touch. Screenshots confirm solid sides and the slim landscape stats row.
 The orthographic camera is tilted about 35 degrees from vertical; the view scale
 is 1.4 times the previous scale. Physical Android GPU stability remains unverified.
+
+## Fixed / Follow camera (2026-11-09)
+
+Approved: a Camera: Fixed / Follow toggle. Fixed retains world orientation;
+Follow turns the car toward screen-up, moves the view ahead, and sits closer
+and lower. Blend position offset, rotation, tilt and zoom; retain speed zoom.
+
+1. Camera model: shortest-path rotation, smooth mode transitions, validated
+   inputs. Prove tests fail before implementation, including heading wrap.
+2. Connect the same camera transform to ground and solid geometry; expose the
+   mode through a compiled HUD button. Permit transitions while paused, then
+   return to idle rendering. Check phone control bounds and both camera modes.
+3. Run browser driving/viewport regressions and publish the verified build.
+
+Validation: 19 racer tests and clippy pass. Camera-mode tests were red before
+implementation; removing shortest-angle wrapping made the heading-wrap test
+fail, then restoration passed. Chromium checks cover switching while driving,
+switching while paused and settling back to idle, plus 320 px portrait and
+740×250 landscape. Existing driving, tuning, focus-loss, touch, viewport resize
+and slow-frame regressions pass. Ordinary pause freezes the camera; an explicit
+camera toggle while paused runs only its transition.

@@ -3,6 +3,7 @@ struct Params {
     camera: vec4<f32>, // camera x/y, car x/y
     car: vec4<f32>, // heading, speed, brake, unused
     track: vec4<f32>, // straight half length, radius, road half width, unused
+    view: vec4<f32>, // camera yaw cosine/sine, unused, unused
 };
 @group(0) @binding(0) var<uniform> p: Params;
 @vertex fn vs_main(@builtin(vertex_index) index: u32) -> @builtin(position) vec4<f32> {
@@ -55,7 +56,7 @@ fn ground(q: vec2<f32>, pixel: f32) -> vec3<f32> {
 @fragment fn fs_main(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     let scale = min(p.viewport.x,p.viewport.y)/p.car.w * p.viewport.z;
     let screen = (position.xy-p.viewport.xy*0.5)/scale;
-    let q = vec2(screen.x,screen.y/p.track.w)+p.camera.xy;
+    let q = view_to_world(vec2(screen.x,screen.y/p.track.w))+p.camera.xy;
     let pixel = 0.8/scale;
     var c = ground(q,pixel);
     let uv = position.xy / p.viewport.xy;
@@ -73,7 +74,7 @@ struct SolidVertex {
         let cs = cos(p.car.x); let sn = sin(p.car.x);
         world = vec3(point.x*cs-point.y*sn+p.camera.z,point.x*sn+point.y*cs+p.camera.w,point.z);
     }
-    let delta = world.xy-p.camera.xy;
+    let delta = world_to_view(world.xy-p.camera.xy);
     let cosine = p.track.w;
     let sine = sqrt(1.-cosine*cosine);
     let scale = min(p.viewport.x,p.viewport.y)/p.car.w*p.viewport.z;
@@ -85,4 +86,11 @@ struct SolidVertex {
 }
 @fragment fn fs_solid(input: SolidVertex) -> @location(0) vec4<f32> {
     return vec4(input.color,1.);
+}
+
+fn world_to_view(delta: vec2<f32>) -> vec2<f32> {
+    return vec2(delta.x*p.view.x+delta.y*p.view.y,-delta.x*p.view.y+delta.y*p.view.x);
+}
+fn view_to_world(delta: vec2<f32>) -> vec2<f32> {
+    return vec2(delta.x*p.view.x-delta.y*p.view.y,delta.x*p.view.y+delta.y*p.view.x);
 }

@@ -40,15 +40,15 @@ fn camera_widens_smoothly_as_speed_increases() {
     let mut camera = Camera::default();
     let close = camera.zoom;
     // When
-    camera.step(0.016, 220.0).unwrap();
+    camera.step(0.016, 220.0, 0.0).unwrap();
     let first = camera.zoom;
     for _ in 0..180 {
-        camera.step(0.016, 220.0).unwrap();
+        camera.step(0.016, 220.0, 0.0).unwrap();
     }
     // Then
     assert!(first < close && first > 0.69);
     assert!(camera.zoom < 0.72);
-    camera.step(0.016, 0.0).unwrap();
+    camera.step(0.016, 0.0, 0.0).unwrap();
     assert!(camera.zoom > 0.68);
 }
 
