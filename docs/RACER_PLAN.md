@@ -38,3 +38,10 @@ Select-all is being implemented by the other coding agent. No number-field imple
   catch-up at six steps without clearing held controls; focus loss still pauses.
 - Validate with `check-racer-android.mjs` (viewport changes and 400 ms browser stall),
   the existing browser interaction suite, racer tests, and clippy.
+
+## FPS readout (2026-11-09)
+
+Show wall-clock frame rate beside the race stats, averaged over half a second.
+Include slow frames before simulation catch-up is capped. Show a dash while
+paused rather than retaining a stale rate. Validate the calculation and pause
+reset with a test proved red first, then check mobile HUD bounds in Chromium.

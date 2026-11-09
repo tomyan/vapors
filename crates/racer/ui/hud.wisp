@@ -1,4 +1,5 @@
 <script>
+let fps: Signal<String> = Signal::new(String::from("—"));
 let speed: Signal<String> = Signal::new(String::from("0"));
 let lap: Signal<String> = Signal::new(String::from("1 / 3"));
 let clock: Signal<String> = Signal::new(String::from("00:00.00"));
@@ -46,7 +47,8 @@ input[type=range] { width: 170px; --vapors-thumb-color: #e5ac69; --vapors-track-
 input[type=number] { width: 70px; color: #172b30; background-color: #f3f1e8; }
 input:invalid { border: 2px solid #ee806b; }
 .small .brand { display: none; }
-.small .stats { flex-grow: 1; justify-content: space-between; gap: 8px; padding: 10px; }
+.small .stats { flex-grow: 1; justify-content: space-between; gap: 4px; padding: 8px; }
+.small .stat { min-width: 40px; }
 .small .value { font-size: 19px; }
 .small .note { top: 94px; right: 16px; font-size: 14px; }
 .small .help { display: none; }
@@ -54,7 +56,7 @@ input:invalid { border: 2px solid #ee806b; }
 </style>
 
 <div class={size_class.get()}>
-<div class="top"><div class="brand"><div class="name">VAPORS / CIRCUIT</div><div class="caption">Rust · compiled components · GPU</div></div><div class="stats"><div class="stat"><div class="caption">KM/H</div><div class="value">{speed}</div></div><div class="stat"><div class="caption">LAP</div><div class="value">{lap}</div></div><div class="stat"><div class="caption">TIME</div><div class="value">{clock}</div></div></div></div>
+<div class="top"><div class="brand"><div class="name">VAPORS / CIRCUIT</div><div class="caption">Rust · compiled components · GPU</div></div><div class="stats"><div class="stat"><div class="caption">KM/H</div><div class="value">{speed}</div></div><div class="stat"><div class="caption">LAP</div><div class="value">{lap}</div></div><div class="stat"><div class="caption">TIME</div><div class="value">{clock}</div></div><div class="stat"><div class="caption">FPS</div><div class="value">{fps}</div></div></div></div>
 <div class="note">{message}</div>
 <div class="menu"><button data-action="tune" onclick={tune}>Tune</button><button data-action="restart" onclick={restart}>Restart</button><button class="primary" data-action="toggle" onclick={toggle}>{pause_label}</button></div>
 <div class="drive"><div class="pair"><button class="pedal" data-drive="left">←</button><button class="pedal" data-drive="right">→</button></div><div class="pair"><button class="pedal" data-drive="brake">Brake</button><button class="pedal gas" data-drive="gas">Gas</button></div></div>

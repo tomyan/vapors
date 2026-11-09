@@ -87,3 +87,18 @@ fn a_slow_frame_does_not_pause_or_drop_held_throttle() {
     assert!(racer.race.speed > 0.0);
     assert!(racer.race.elapsed <= 0.051);
 }
+
+#[test]
+fn fps_uses_wall_time_including_slow_frames_and_resets_on_pause() {
+    // Given
+    let mut racer = Racer::new();
+    racer.command("toggle").unwrap();
+    // When
+    for _ in 0..4 {
+        racer.advance_elapsed(0.125).unwrap();
+    }
+    // Then
+    assert_eq!(racer.hud.fps.get(), "8");
+    racer.pause();
+    assert_eq!(racer.hud.fps.get(), "—");
+}

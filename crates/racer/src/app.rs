@@ -21,6 +21,8 @@ pub(crate) struct Racer {
     pub(super) paused: bool,
     pub(super) last: Option<Instant>,
     pub(super) remainder: f32,
+    pub(super) fps_elapsed: f32,
+    pub(super) fps_frames: f32,
     pub(super) scale: f32,
     pub(super) pointer: [f32; 2],
     pub(super) inspect: bool,
@@ -44,6 +46,8 @@ impl Racer {
             paused: true,
             last: None,
             remainder: 0.0,
+            fps_elapsed: 0.0,
+            fps_frames: 0.0,
             scale: 1.0,
             pointer: [0.0; 2],
             inspect: vapors_platform::query_parameter("inspect").as_deref() == Some("1"),
@@ -64,6 +68,9 @@ impl Racer {
         self.driving.clear();
         self.last = None;
         self.remainder = 0.0;
+        self.fps_elapsed = 0.0;
+        self.fps_frames = 0.0;
+        self.hud.fps.set("—".into());
     }
     pub(super) fn command(&mut self, command: &str) -> Result<(), String> {
         match command {

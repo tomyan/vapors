@@ -21,6 +21,7 @@ impl Racer {
         if !elapsed.is_finite() || elapsed < 0.0 {
             return Err("racer frame duration must be finite and nonnegative".into());
         }
+        self.sample_fps(elapsed);
         // Cap catch-up at six 120Hz steps; slow rendering must not release
         // held pedals. Actual focus loss pauses through the input handler.
         self.remainder += elapsed.min(0.05);
@@ -35,6 +36,21 @@ impl Racer {
             self.pause();
         }
         Ok(())
+    }
+    fn sample_fps(&mut self, elapsed: f32) {
+        if elapsed == 0.0 {
+            return;
+        }
+        self.fps_elapsed += elapsed;
+        self.fps_frames += 1.0;
+        // Half-second display averaging keeps the readout legible while driving.
+        if self.fps_elapsed >= 0.5 {
+            self.hud
+                .fps
+                .set(format!("{:.0}", self.fps_frames / self.fps_elapsed));
+            self.fps_elapsed = 0.0;
+            self.fps_frames = 0.0;
+        }
     }
     pub(super) fn draw(&mut self, frame: &Frame<'_>) -> Result<(), String> {
         self.advance(frame)?;
