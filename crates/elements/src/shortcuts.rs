@@ -49,14 +49,9 @@ pub(crate) fn selected_all(
     if !document.borrow().is_select_all(key, modifiers) {
         return false;
     }
-    let mut document = document.borrow_mut();
-    if document.number_field(node).is_some() {
-        document.select_number_text(node);
-    } else {
-        // the method path is not general over the driver's lifetime
-        #[allow(clippy::redundant_closure_for_method_calls)]
-        document.drive(node, |d| d.select_all());
-    }
+    // the method path is not general over the driver's lifetime
+    #[allow(clippy::redundant_closure_for_method_calls)]
+    document.borrow_mut().drive(node, |d| d.select_all());
     true
 }
 

@@ -89,7 +89,6 @@ impl Document {
     /// focus.
     fn take_focus(&mut self, node: Option<NodeId>) {
         self.focused = node;
-        self.selected_all = None;
         self.set_flag_on(States::FOCUS, node);
         let visible = node.filter(|node| self.keyboard || self.is_text_field(*node));
         self.set_flag_on(States::FOCUS_VISIBLE, visible);

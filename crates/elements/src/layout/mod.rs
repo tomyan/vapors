@@ -8,7 +8,7 @@ mod inline;
 mod keep;
 mod measure;
 mod replaced;
-pub(crate) use boxes::{NumberFocus, Source};
+pub(crate) use boxes::Source;
 mod text_cache;
 mod tree;
 

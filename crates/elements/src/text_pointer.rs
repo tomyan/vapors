@@ -1,4 +1,4 @@
-//! A text field under the pointer (E6a): a press places the caret
+//! A text or number field under the pointer (E6a): a press places the caret
 //! where it lands and a drag extends the selection under capture; a
 //! double click selects a word, a triple click the whole text. A press
 //! on a disabled field leaves its selection where it was and owes a
@@ -107,14 +107,18 @@ pub(crate) fn tapped(document: &Rc<RefCell<Document>>, node: NodeId, point: Poin
     }
 }
 
-/// Where `point` lies in `node`'s text when it is a live text field. A
-/// disabled one's selection stays where it was and owes a
-/// `selectionchange`, as Chromium's does; `None` for both.
+/// Where `point` lies in `node`'s text when it is a live text or number
+/// field. A disabled one's selection stays where it was and owes a
+/// `selectionchange`, as Chromium's does; `None` for both, and for a
+/// number field that scrubs, whose press is the scrub's (`number_scrub`).
 fn live_point(document: &Rc<RefCell<Document>>, node: NodeId, point: Point) -> Option<(f32, f32)> {
-    if !document.borrow().is_text_input(node) {
+    let doc = document.borrow();
+    if !doc.is_edited(node) || doc.scrub_px(node).is_some() {
         return None;
     }
-    if !document.borrow().live_text(node) {
+    let disabled = doc.is_disabled_control(node);
+    drop(doc);
+    if disabled {
         document.borrow_mut().drive(node, |_| {});
         return None;
     }
