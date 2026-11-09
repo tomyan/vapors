@@ -3,8 +3,8 @@
 //! what the field shows (`number_shown.rs`), where editing starts;
 //! typed characters a number takes (`number::typeable`) go there, or
 //! replace the whole text when it is selected (focus by keyboard and
-//! Control+A select it, as Chromium does); Backspace deletes the last
-//! one, or the selected text.
+//! select-all, `shortcuts`, do, as Chromium does); Backspace deletes
+//! the last one, or the selected text.
 //! `input` fires with each edit, carrying the DOM's sanitized `value`.
 //! Enter and blur commit (`number::Field::committed`), arrows step by
 //! `step` (Shift by ten, vapors' own), each with `input` and `change`.
@@ -101,7 +101,7 @@ impl Document {
     }
 
     /// Selects the field's text whole, so typing replaces it.
-    fn select_number_text(&mut self, node: NodeId) {
+    pub(crate) fn select_number_text(&mut self, node: NodeId) {
         self.selected_all = Some(node);
         self.changed = true;
     }
@@ -136,8 +136,7 @@ pub(crate) fn fire_input(document: &Rc<RefCell<Document>>, node: NodeId) {
 }
 
 /// `key` went down on `node`, a focused number field: Backspace,
-/// Enter, the arrows and Control+A act; other keys are typed as
-/// characters.
+/// Enter, the arrows and select-all act; other keys are typed.
 pub(crate) fn key(
     document: &Rc<RefCell<Document>>,
     node: NodeId,
@@ -150,7 +149,7 @@ pub(crate) fn key(
     match key {
         "Backspace" => backspace(document, node, field),
         "Enter" => commit(document, node),
-        "a" | "A" if modifiers.control => document.borrow_mut().select_number_text(node),
+        _ if crate::shortcuts::selected_all(document, node, key, modifiers) => {}
         "ArrowUp" | "ArrowDown" => {
             let sign = if key == "ArrowUp" { 1.0 } else { -1.0 };
             let steps = if modifiers.shift { COARSE_STEPS } else { 1.0 };

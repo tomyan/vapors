@@ -108,9 +108,7 @@ pub(crate) fn key(
                 .edit(node, kind, |d| deleted(d, key == "Backspace", word));
             edited(document, node);
         }
-        // the method path is not general over the driver's lifetime
-        #[allow(clippy::redundant_closure_for_method_calls)]
-        "a" | "A" if modifiers.control => document.borrow_mut().drive(node, |d| d.select_all()),
+        _ if crate::shortcuts::selected_all(document, node, key, modifiers) => {}
         "z" | "Z" | "y" | "Y" if modifiers.control => {
             crate::text_undo::history_key(document, node, key, shift);
         }
