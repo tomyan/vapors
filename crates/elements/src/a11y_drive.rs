@@ -175,7 +175,8 @@ impl Document {
             document
                 .borrow_mut()
                 .update(viewport)
-                .map_err(|errors| AxError::Update {
+                .map_err(|errors| AxError::UpdateFailed {
+                    after: "the action".to_owned(),
                     errors: errors.iter().map(ToString::to_string).collect(),
                 })?;
             if let Ok(nodes) = document.borrow().ax_tree() {

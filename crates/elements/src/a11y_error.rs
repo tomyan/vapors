@@ -89,13 +89,12 @@ pub enum AxError {
         /// The keys asked for.
         of: usize,
     },
-    /// The update after scrolling the node into view failed.
+    /// An update the driver made failed: after scrolling a node into
+    /// view, or after an action.
     UpdateFailed {
-        /// The node's role.
-        role: String,
-        /// The node's name.
-        name: String,
-        /// The update's errors.
+        /// What the update came after, in words.
+        after: String,
+        /// Each of the update's errors, in words.
         errors: Vec<String>,
     },
     /// Focus was asked of a node that takes none.
@@ -121,11 +120,6 @@ pub enum AxError {
         name: String,
         /// The value sent.
         value: String,
-    },
-    /// The update after an action failed.
-    Update {
-        /// Each of the update's errors, in words.
-        errors: Vec<String>,
     },
 }
 
