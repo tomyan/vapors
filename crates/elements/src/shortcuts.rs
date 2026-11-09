@@ -3,7 +3,9 @@
 //! has it (on macOS Control+A moves to the line's start, which vapors
 //! does not take). The app says which platform it runs on
 //! (`Document::set_shortcut_modifier`; vapors-app asks
-//! `vapors_platform::shortcut_is_command`); Control until it does.
+//! `vapors_platform::shortcut_is_command`). Until it does, natively the
+//! target OS decides; a wasm build names no OS, so the app must set it
+//! before the first key (`ElementsApp::new` does).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -14,13 +16,24 @@ use crate::document::Document;
 use crate::keys::Modifiers;
 
 /// The modifier the platform's shortcuts take.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ShortcutModifier {
     /// Control: Linux, Windows, Chrome OS, Android.
-    #[default]
     Control,
     /// Command (Meta): macOS, iPhone, iPad.
     Command,
+}
+
+impl Default for ShortcutModifier {
+    /// The target OS's: Command on macOS, else Control (on the web, until
+    /// the app sets the browser's).
+    fn default() -> Self {
+        if cfg!(target_os = "macos") {
+            Self::Command
+        } else {
+            Self::Control
+        }
+    }
 }
 
 /// Selects the whole text of `node`, a focused field, when `key` with

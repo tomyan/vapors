@@ -2,8 +2,8 @@
 //! a text field and a number field alike, as Chromium has it: on macOS
 //! Control+A does not select all (Chromium moves to the line's start),
 //! and elsewhere Meta+A is not select-all. The app says which platform
-//! it runs on (`Document::set_shortcut_modifier`); Control is the
-//! default (`text_field.rs` and `number_select_all.rs` pin it).
+//! it runs on (`Document::set_shortcut_modifier`); until it does, the
+//! target OS's (`text_field.rs` and `number_select_all.rs` pin Control).
 
 mod support;
 
@@ -11,7 +11,7 @@ use support::{number_page, text_page};
 use vapors_dom::{Dom, PropertyValue};
 use vapors_elements::{Modifiers, ShortcutModifier};
 
-fn modifier(mac: bool) -> ShortcutModifier {
+fn modifier_for(mac: bool) -> ShortcutModifier {
     if mac {
         ShortcutModifier::Command
     } else {
@@ -30,7 +30,9 @@ fn command() -> Modifiers {
 /// the caret at the end, on macOS when `mac`.
 fn text_field(mac: bool) -> text_page::Page {
     let page = text_page::page();
-    page.doc.borrow_mut().set_shortcut_modifier(modifier(mac));
+    page.doc
+        .borrow_mut()
+        .set_shortcut_modifier(modifier_for(mac));
     page.doc
         .borrow_mut()
         .set_property(page.name, "value", PropertyValue::Text("Warm day".into()));
@@ -41,7 +43,9 @@ fn text_field(mac: bool) -> text_page::Page {
 /// The number page's field, focused by a click, on macOS when `mac`.
 fn number_field(mac: bool) -> number_page::Page {
     let page = number_page::page();
-    page.doc.borrow_mut().set_shortcut_modifier(modifier(mac));
+    page.doc
+        .borrow_mut()
+        .set_shortcut_modifier(modifier_for(mac));
     number_page::click(&page, [50.0, 12.0]);
     page
 }
@@ -49,6 +53,18 @@ fn number_field(mac: bool) -> number_page::Page {
 fn number_key(page: &number_page::Page, modifiers: Modifiers) {
     vapors_elements::Document::key_pressed(&page.doc, "a", modifiers);
     vapors_elements::Document::key_released(&page.doc, "a", modifiers);
+}
+
+#[test]
+fn an_unset_document_takes_the_target_oss_modifier() {
+    // Given
+    let page = number_page::page();
+
+    // When
+    let modifier = page.doc.borrow().shortcut_modifier();
+
+    // Then: natively the target decides, not a fixed Control
+    assert_eq!(modifier, modifier_for(cfg!(target_os = "macos")));
 }
 
 #[test]

@@ -83,7 +83,7 @@ impl Document {
             focused: None,
             window: crate::focus_window::Window::Focused,
             space_on: None,
-            shortcut_modifier: crate::ShortcutModifier::Control,
+            shortcut_modifier: crate::ShortcutModifier::default(),
             selected_all: None,
             committed: std::collections::HashMap::new(),
             editors: crate::text_field::Editors::new(),
