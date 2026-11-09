@@ -38,6 +38,9 @@ fn start() -> Result<(), String> {
         width: 640,
         height: 400,
     };
+    if name == "racer" {
+        return vapors_racer::run();
+    }
     if name == "image" {
         let image = decode_png(GRADIENT).map_err(|message| format!("gradient.png: {message}"))?;
         let app = ImageApp::showing("gradient.png", image, BACKGROUND);
