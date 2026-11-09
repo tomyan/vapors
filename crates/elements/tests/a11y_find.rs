@@ -54,6 +54,7 @@ fn no_match_is_refused_naming_the_nodes_of_that_role() {
             role: "textbox".into(),
             name: "No".into(),
             candidates: vec!["dialog \"Levels\" > group \"Tone\" > textbox \"Note\"".into()],
+            outside: vec![],
         })
     );
 }
@@ -117,4 +118,24 @@ fn a_refusal_names_the_fix_and_the_candidates() {
         "{message}"
     );
     assert!(message.contains("fix: name an ancestor"), "{message}");
+}
+
+#[test]
+fn no_match_within_an_ancestor_names_the_candidates_inside_it_and_the_matches_outside() {
+    // Given
+    let doc = two_applies();
+
+    // When: Pin is in the Options region, not in Extra
+    let refused = doc.ax_find("button", "Pin", Some(("group", "Extra")));
+
+    // Then
+    assert_eq!(
+        refused.map(|_| ()),
+        Err(AxError::Missing {
+            role: "button".into(),
+            name: "Pin".into(),
+            candidates: vec!["dialog \"Levels\" > group \"Extra\" > button \"Apply\"".into()],
+            outside: vec!["dialog \"Levels\" > region \"Options\" > button \"Pin\"".into()],
+        })
+    );
 }

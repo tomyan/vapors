@@ -142,18 +142,29 @@ fn a_hover_moved_by_the_update_itself_leaves_the_tree_refused_until_the_next() {
                  button { display: block; } .menu { display: none; } .host:hover .menu { display: flex; }";
     doc.add_stylesheet("hover.css", sheet).expect("parses");
     let doc = std::rc::Rc::new(std::cell::RefCell::new(doc));
-    doc.borrow_mut().update(viewport(640.0, 400.0)).expect("updates");
+    doc.borrow_mut()
+        .update(viewport(640.0, 400.0))
+        .expect("updates");
     Document::pointer_moved(&doc, [5.0, 5.0]);
-    doc.borrow_mut().update(viewport(640.0, 400.0)).expect("updates");
+    doc.borrow_mut()
+        .update(viewport(640.0, 400.0))
+        .expect("updates");
 
     // When: a change moves .host from under the pointer
     let spacer = doc.borrow_mut().create_element("div");
     doc.borrow_mut().set_attribute(spacer, "class", "spacer");
     doc.borrow_mut().insert_before(body, spacer, Some(host));
-    doc.borrow_mut().update(viewport(640.0, 400.0)).expect("updates");
+    doc.borrow_mut()
+        .update(viewport(640.0, 400.0))
+        .expect("updates");
 
     // Then: the hover the update moved is a change; the next update has it
     assert_eq!(doc.borrow().ax_tree().map(|_| ()), Err(AxError::NotUpdated));
-    doc.borrow_mut().update(viewport(640.0, 400.0)).expect("updates");
-    assert_eq!(lines(&doc.borrow().ax_tree().expect("updated")), Vec::<String>::new());
+    doc.borrow_mut()
+        .update(viewport(640.0, 400.0))
+        .expect("updates");
+    assert_eq!(
+        lines(&doc.borrow().ax_tree().expect("updated")),
+        Vec::<String>::new()
+    );
 }
