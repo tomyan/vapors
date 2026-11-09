@@ -80,6 +80,21 @@ fn a_number_keeps_the_text_as_given_neither_clamped_nor_stepped() {
 }
 
 #[test]
+fn a_number_written_differently_is_a_change_as_html_compares_strings() {
+    // Given: Radius set to 3
+    let doc = shared(page());
+    set(&doc, "spinbutton", "Radius", "3");
+    update(&doc);
+
+    // When: the same number, written another way
+    let (events, value) = set(&doc, "spinbutton", "Radius", "3.0");
+
+    // Then
+    assert_eq!(value, "3.0");
+    assert_eq!(*events.borrow(), ["input", "change"]);
+}
+
+#[test]
 fn text_that_is_no_number_is_refused_naming_it() {
     // Given
     let doc = shared(page());

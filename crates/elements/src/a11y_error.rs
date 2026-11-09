@@ -59,6 +59,47 @@ pub enum AxError {
         /// The element there, if any.
         by: Option<String>,
     },
+    /// A press at the node's centre (`at`, CSS px) falls outside the
+    /// viewport even after its scroll containers brought it into view.
+    OutOfView {
+        /// The node's role.
+        role: String,
+        /// The node's name.
+        name: String,
+        /// The point a press would take.
+        at: [f32; 2],
+    },
+    /// The node has `pointer-events: none`, so no pointer reaches it.
+    NoPointer {
+        /// The node's role.
+        role: String,
+        /// The node's name.
+        name: String,
+    },
+    /// Focus left the node before every key was sent: `sent` of `of`
+    /// went to it; `to` names the node that took focus, `None` when none
+    /// did.
+    FocusLost {
+        /// The node's role.
+        role: String,
+        /// The node's name.
+        name: String,
+        /// The node that has focus, `role "name"` or `<tag>`.
+        to: Option<String>,
+        /// The keys sent to the node.
+        sent: usize,
+        /// The keys asked for.
+        of: usize,
+    },
+    /// The update after scrolling the node into view failed.
+    UpdateFailed {
+        /// The node's role.
+        role: String,
+        /// The node's name.
+        name: String,
+        /// The update's errors.
+        errors: Vec<String>,
+    },
     /// Focus was asked of a node that takes none.
     NotFocusable {
         /// The node's role.
@@ -137,11 +178,36 @@ impl fmt::Display for AxError {
             }
             Self::Covered { role, name, at, by } => write!(
                 f,
-                "a press at the centre of {role} \"{name}\" ({}, {}) reaches {}; fix: scroll it into view or close what covers it",
+                "a press at the centre of {role} \"{name}\" ({}, {}) reaches {}; fix: close what covers it",
                 at[0],
                 at[1],
                 by.as_deref()
                     .map_or("nothing".to_owned(), |tag| format!("<{tag}>"))
+            ),
+            Self::OutOfView { role, name, at } => write!(
+                f,
+                "the centre of {role} \"{name}\" ({}, {}) is outside the viewport, and no scroll container brings it in; fix: make the viewport larger or move the node into it",
+                at[0], at[1]
+            ),
+            Self::NoPointer { role, name } => write!(
+                f,
+                "{role} \"{name}\" has pointer-events: none, so a press cannot reach it; fix: give it pointer-events: auto, or act on it by key"
+            ),
+            Self::FocusLost {
+                role,
+                name,
+                to,
+                sent,
+                of,
+            } => write!(
+                f,
+                "focus left {role} \"{name}\" after {sent} of {of} keys, to {}; fix: find the listener that moves focus, or send the rest to the node that has it",
+                to.as_deref().unwrap_or("nothing")
+            ),
+            Self::UpdateFailed { role, name, errors } => write!(
+                f,
+                "the update after scrolling {role} \"{name}\" into view failed: [{}]; fix: the errors name it",
+                errors.join("; ")
             ),
             Self::NotFocusable { role, name } => {
                 write!(f, "{role} \"{name}\" takes no focus; fix: act on a control")

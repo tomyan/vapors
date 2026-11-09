@@ -42,7 +42,7 @@ impl Document {
             return;
         };
         let committed = self.last_committed(node, &field);
-        self.committed.insert(node, committed);
+        self.remember_committed(node, committed);
         self.move_selection(node, |d| {
             if keyboard {
                 d.select_all();
