@@ -123,7 +123,10 @@ fn an_action_replies_the_tree_after_it_and_leaves_the_document_updated() {
     );
 
     // Then: both answer with Mono checked
-    let Reply::Done { nodes } = reply else {
+    let Reply::Done {
+        nodes: Some(nodes), ..
+    } = reply
+    else {
         panic!("{reply:?}")
     };
     let mono = &nodes[0].children[1].children[0];

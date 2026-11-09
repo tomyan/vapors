@@ -88,10 +88,16 @@ pub enum Reply {
         /// The node.
         node: AxElement,
     },
-    /// The action happened; the tree from the update after it.
+    /// The action happened; the tree from the update after it, or why
+    /// that tree is unavailable: the action is not to be repeated.
     Done {
-        /// The tree's top nodes, each with its subtree.
-        nodes: Vec<AxElement>,
+        /// The tree's top nodes, each with its subtree; `None` when the
+        /// tree after the action is unavailable.
+        nodes: Option<Vec<AxElement>>,
+        /// Why the tree is unavailable, with `nodes` `None`.
+        problem: Option<AxError>,
+        /// The problem in words, naming the fix.
+        message: Option<String>,
     },
     /// The command was refused.
     Refused {
@@ -133,13 +139,30 @@ impl Document {
                 modifiers,
             } => Self::ax_key(document, target, key, held(modifiers)),
         };
-        acted.and_then(|()| Self::updated_tree(document))
+        acted.map(|()| Self::done(document))
+    }
+
+    /// [`Reply::Done`] after an action: with the updated tree, or why
+    /// it is unavailable.
+    fn done(document: &Rc<RefCell<Document>>) -> Reply {
+        match Self::updated_tree(document) {
+            Ok(nodes) => Reply::Done {
+                nodes: Some(nodes),
+                problem: None,
+                message: None,
+            },
+            Err(problem) => Reply::Done {
+                nodes: None,
+                message: Some(problem.to_string()),
+                problem: Some(problem),
+            },
+        }
     }
 
     /// The document updated at its last update's viewport, and its tree.
     /// A second update follows when the first moved `:hover` (its pointer
     /// over a box that moved), which only the next restyle shows.
-    fn updated_tree(document: &Rc<RefCell<Document>>) -> Result<Reply, AxError> {
+    fn updated_tree(document: &Rc<RefCell<Document>>) -> Result<Vec<AxElement>, AxError> {
         let viewport = document.borrow().kept.as_ref().map(|kept| kept.viewport);
         let viewport = viewport.ok_or(AxError::NotUpdated)?;
         for _ in 0..2 {
@@ -150,7 +173,7 @@ impl Document {
                     errors: errors.iter().map(ToString::to_string).collect(),
                 })?;
             if let Ok(nodes) = document.borrow().ax_tree() {
-                return Ok(Reply::Done { nodes });
+                return Ok(nodes);
             }
         }
         Err(AxError::NotUpdated)
