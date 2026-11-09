@@ -15,13 +15,15 @@ impl Racer {
         if self.paused {
             return Ok(());
         }
-        // A gap >250ms is a suspension, not catch-up: 30 physics steps
-        // at 120Hz. This bounds workload and prevents jumping after tab suspension.
-        if elapsed > 0.25 {
-            self.pause();
-            return Ok(());
+        self.advance_elapsed(elapsed)
+    }
+    pub(crate) fn advance_elapsed(&mut self, elapsed: f32) -> Result<(), String> {
+        if !elapsed.is_finite() || elapsed < 0.0 {
+            return Err("racer frame duration must be finite and nonnegative".into());
         }
-        self.remainder += elapsed;
+        // Cap catch-up at six 120Hz steps; slow rendering must not release
+        // held pedals. Actual focus loss pauses through the input handler.
+        self.remainder += elapsed.min(0.05);
         let settings = self.settings();
         while self.remainder >= 1.0 / 120.0 {
             self.race

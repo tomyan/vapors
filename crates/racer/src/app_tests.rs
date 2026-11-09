@@ -72,3 +72,18 @@ fn invalid_tuning_keeps_the_run_paused_and_can_be_corrected() {
     racer.command("toggle").unwrap();
     assert!(!racer.paused);
 }
+
+#[test]
+fn a_slow_frame_does_not_pause_or_drop_held_throttle() {
+    // Given
+    let mut racer = Racer::new();
+    racer.command("toggle").unwrap();
+    racer.driving.key("KeyW", true);
+    // When
+    racer.advance_elapsed(0.5).unwrap();
+    // Then
+    assert!(!racer.paused);
+    assert_eq!(racer.driving.controls().throttle, 1.0);
+    assert!(racer.race.speed > 0.0);
+    assert!(racer.race.elapsed <= 0.051);
+}

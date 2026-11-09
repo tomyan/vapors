@@ -27,3 +27,14 @@ Select-all is being implemented by the other coding agent. No number-field imple
 - Full `cargo xtask ci` completed all 11 steps, including native/wasm lint, unit and GPU tests. Log: `/tmp/vapors-racer-ci.log`.
 - Browser evidence: `/home/tom/.cache/vapors-racer-evidence/browser.json` and screenshots beside it. Hardware touch/stylus and non-Chromium WebGPU remain untested.
 - Next slice: website embed, startup error and deployment validation.
+
+## Android viewport and slow-frame regression (2026-11-09)
+
+- Reproduced clipped controls by shrinking the visual viewport independently of
+  the layout viewport. The browser regression failed before the host canvas fix.
+- Size the racer canvas from the visual viewport and update it when browser bars
+  change its height. The compiled GPU controls continue to use the canvas size.
+- Reproduced unwanted pause with a 500 ms frame in an app test. Cap simulation
+  catch-up at six steps without clearing held controls; focus loss still pauses.
+- Validate with `check-racer-android.mjs` (viewport changes and 400 ms browser stall),
+  the existing browser interaction suite, racer tests, and clippy.

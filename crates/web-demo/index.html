@@ -16,6 +16,24 @@
   </head>
   <body>
     <canvas id="vapors"></canvas>
+    <script>
+      if (new URLSearchParams(location.search).get('demo') === 'racer') {
+        const canvas = document.getElementById('vapors');
+        const resize = () => {
+          const viewport = window.visualViewport;
+          const width = viewport ? viewport.width : innerWidth;
+          const height = viewport ? viewport.height : innerHeight;
+          if (!(width > 0 && height > 0 && Number.isFinite(width + height))) {
+            throw new Error('Racer viewport dimensions must be finite and positive');
+          }
+          canvas.style.width = `${width}px`;
+          canvas.style.height = `${height}px`;
+        };
+        window.visualViewport?.addEventListener('resize', resize);
+        window.addEventListener('resize', resize);
+        resize();
+      }
+    </script>
     <button id="open">Open</button>
     <p id="status">starting</p>
     <p id="error" role="alert" hidden></p>
