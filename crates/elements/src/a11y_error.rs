@@ -88,13 +88,12 @@ pub enum AxError {
         /// The keys asked for.
         of: usize,
     },
-    /// The update after scrolling the node into view failed.
+    /// An update the driver made failed: after scrolling a node into
+    /// view, or after an action.
     UpdateFailed {
-        /// The node's role.
-        role: String,
-        /// The node's name.
-        name: String,
-        /// The update's errors.
+        /// What the update came after, in words.
+        after: String,
+        /// Each of the update's errors, in words.
         errors: Vec<String>,
     },
     /// Focus was asked of a node that takes none.
@@ -179,9 +178,9 @@ impl fmt::Display for AxError {
                 "focus left {role} \"{name}\" after {sent} of {of} keys, to {}; fix: find the listener that moves focus, or send the rest to the node that has it",
                 to.as_deref().unwrap_or("nothing")
             ),
-            Self::UpdateFailed { role, name, errors } => write!(
+            Self::UpdateFailed { after, errors } => write!(
                 f,
-                "the update after scrolling {role} \"{name}\" into view failed: [{}]; fix: the errors name it",
+                "the update after {after} failed: [{}]; fix: the page's styles or layout, as the errors name",
                 errors.join("; ")
             ),
             Self::NotFocusable { role, name } => {
