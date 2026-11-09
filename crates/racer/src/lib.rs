@@ -30,3 +30,6 @@ pub fn run() -> Result<(), String> {
 
 #[cfg(test)]
 mod app_tests;
+
+#[cfg(test)]
+mod component_input_tests;

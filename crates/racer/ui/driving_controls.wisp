@@ -1,0 +1,36 @@
+<script>
+use vapors_components::hold_button::{HoldButton, HoldButtonProps};
+#[prop] let layout: Memo<String> = Memo::new(|| String::from("wide"));
+#[prop] let left: Signal<bool> = Signal::new(false);
+#[prop] let right: Signal<bool> = Signal::new(false);
+#[prop] let brake: Signal<bool> = Signal::new(false);
+#[prop] let gas: Signal<bool> = Signal::new(false);
+#[prop] let reset: Signal<u64> = Signal::new(0);
+#[prop] let enabled: Signal<bool> = Signal::new(true);
+</script>
+
+<style>
+.drive { position: absolute; bottom: 16px; left: 16px; right: 16px; display: flex; justify-content: space-between; }
+.pair { display: flex; gap: 8px; }
+.help { position: absolute; bottom: 26px; left: 200px; font-size: 14px; color: #f3f1e8; background-color: #182a2f; padding: 8px 12px; border-radius: 4px; }
+.small .help { display: none; }
+.short .drive { bottom: 8px; left: 8px; right: 8px; }
+.drive { --hold-width: 68px; }
+.small .drive { --hold-width: 58px; }
+.gas { --hold-background: #b9d7bc; --hold-color: #172b30; }
+
+</style>
+
+<div class={layout.get()}>
+<div class="drive">
+    <div class="pair">
+        <HoldButton id={String::from("left")} label={String::from("←")} bind:pressed={left} reset={reset} enabled={enabled} />
+        <HoldButton id={String::from("right")} label={String::from("→")} bind:pressed={right} reset={reset} enabled={enabled} />
+    </div>
+    <div class="pair">
+        <HoldButton id={String::from("brake")} label={String::from("Brake")} bind:pressed={brake} reset={reset} enabled={enabled} />
+        <div class="gas"><HoldButton id={String::from("gas")} label={String::from("Gas")} bind:pressed={gas} reset={reset} enabled={enabled} /></div>
+    </div>
+</div>
+<div class="help">WASD / arrows · Space pauses · R restarts</div>
+</div>

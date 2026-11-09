@@ -61,7 +61,10 @@ try {
   await until(phone,()=>JSON.parse(document.querySelector('#status').textContent).speed>10);
   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[point('gas',1),point('right',2)]});
   await until(phone,()=>JSON.parse(document.querySelector('#status').textContent).steer===1);
-  await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[point('right',2)]});
+  // Captured component pointers remain held after both fingers leave the controls.
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{id:1,x:width/2,y:300},{id:2,x:width/2+30,y:340}]});
+  await until(phone,()=>{const s=JSON.parse(document.querySelector('#status').textContent);return s.steer===1&&s.throttle===1;});
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[{id:2,x:width/2+30,y:340}]});
   await until(phone,()=>{const s=JSON.parse(document.querySelector('#status').textContent);return s.steer===0&&s.throttle===1;});
   await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});
   await until(phone,()=>JSON.parse(document.querySelector('#status').textContent).throttle===0);

@@ -116,6 +116,10 @@ impl Racer {
     fn sync_hud(&self, width: f32) {
         self.hud.compact.set(width < 760.0);
         self.hud.follow.set(self.camera.follow);
+        let enabled = !self.hud.settings.get() && self.race.progress.laps < 3;
+        if self.hud.enabled.get_untracked() != enabled {
+            self.hud.enabled.set(enabled);
+        }
         self.hud.paused.set(self.paused);
         self.hud.speed.set(format!("{:.0}", self.race.speed * 0.72));
         self.hud

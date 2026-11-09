@@ -88,3 +88,31 @@ switching while paused and settling back to idle, plus 320 px portrait and
 740×250 landscape. Existing driving, tuning, focus-loss, touch, viewport resize
 and slow-frame regressions pass. Ordinary pause freezes the camera; an explicit
 camera toggle while paused runs only its transition.
+
+## Component-driven HUD (2026-11-09)
+
+Approved scope: extract the HUD into compiled RaceStats, RaceMenu,
+CameraToggle, DrivingControls and CarSetup components. Add a reusable HoldButton
+using existing pointer events/capture; remove racer-specific pointer hit-testing.
+Keep rendering, physics, layout and camera behavior unchanged.
+
+1. HoldButton: independent held pointers, release/cancellation/capture loss,
+   keyboard activation, reset/disable/unmount. Prove behavior tests red first.
+2. Compose the HUD with shared signal props and scoped component styles. Route
+   platform input through DocumentInput; combine held signals with keyboard input.
+3. Validate mounted components and real touch capture, including moving outside,
+   releasing one finger, cancellation and focus loss. Run existing camera,
+   viewport and driving checks, then publish the verified build.
+
+Validation: all 11 repository CI steps pass, including GPU tests. The racer has
+21 tests; HoldButton has six new behavior tests, alongside the existing component
+suite. The initial hold tests failed before implementation. Removing explicit
+capture failed the mounted-document regression; resetting on unchanged signals
+failed the repeated-state regression. Both mutations were restored and tests pass.
+Browser tests pass for multi-touch moving outside the buttons, independent
+release, cancellation, focus loss, tuning, camera switching, Android viewport
+changes, slow frames and short landscapes.
+
+The component uses aria-disabled with input guards because dynamic HTML boolean
+attribute removal is unsupported in this checkout. External component props
+produce the compiler's existing diagnostic; generated Rust checks their types.

@@ -24,7 +24,6 @@ pub(crate) struct Racer {
     pub(super) fps_elapsed: f32,
     pub(super) fps_frames: f32,
     pub(super) scale: f32,
-    pub(super) pointer: [f32; 2],
     pub(super) inspect: bool,
     pub(super) error: Option<String>,
     pub(super) setup_error: Option<String>,
@@ -49,7 +48,6 @@ impl Racer {
             fps_elapsed: 0.0,
             fps_frames: 0.0,
             scale: 1.0,
-            pointer: [0.0; 2],
             inspect: vapors_platform::query_parameter("inspect").as_deref() == Some("1"),
             error: None,
             setup_error: None,
@@ -62,11 +60,13 @@ impl Racer {
         self.error = Some(error);
         self.paused = true;
         self.driving.clear();
+        self.hud.reset.update(|epoch| *epoch += 1);
     }
     pub(super) fn pause(&mut self) {
         self.paused = true;
         self.camera.moving = false;
         self.driving.clear();
+        self.hud.reset.update(|epoch| *epoch += 1);
         self.last = None;
         self.remainder = 0.0;
         self.fps_elapsed = 0.0;

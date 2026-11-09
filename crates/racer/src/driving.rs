@@ -43,7 +43,4 @@ impl Driving {
             steer: held("right") - held("left"),
         }
     }
-    pub(crate) fn contains(&self, id: &str) -> bool {
-        self.held.contains_key(id)
-    }
 }

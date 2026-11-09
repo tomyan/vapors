@@ -16,7 +16,7 @@ impl Racer {
             .filter_map(|node| {
                 let name = document
                     .attribute(*node, "data-action")
-                    .or_else(|| document.attribute(*node, "data-drive"))
+                    .or_else(|| document.attribute(*node, "data-hold"))
                     .or_else(|| document.attribute(*node, "data-setting"))?;
                 let rect = document.painted()?.border_box(*node)?;
                 Some(format!(

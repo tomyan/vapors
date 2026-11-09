@@ -17,13 +17,16 @@ fn compiled_hud_accepts_desktop_and_phone_layouts() {
                 scale: 1.0,
             })
             .unwrap();
+            let mut pedals = 0;
             for node in doc.elements() {
-                if doc.attribute(node, "data-drive").is_some() {
+                if doc.attribute(node, "data-hold").is_some() {
+                    pedals += 1;
                     let rect = doc.painted().unwrap().border_box(node).unwrap();
                     assert!(rect.width >= 44.0 && rect.height >= 44.0);
                     assert!(rect.x >= 0.0 && rect.x + rect.width <= width);
                 }
             }
+            assert_eq!(pedals, 4);
         }
     }
 }
