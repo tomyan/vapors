@@ -100,43 +100,45 @@ pub enum Reply {
         /// The tree's top nodes, each with its subtree; `None` when the
         /// tree after the action is unavailable.
         nodes: Option<Vec<AxElement>>,
-        /// Why the tree is unavailable, with `nodes` `None`.
+        /// Why the tree is unavailable, with `nodes` `None`; its fields
+        /// sit beside the reply's.
+        #[serde(flatten)]
         problem: Option<AxError>,
         /// The problem in words, naming the fix.
         message: Option<String>,
     },
     /// The command was refused.
     Refused {
-        /// Why.
+        /// Why; its fields sit beside the reply's.
+        #[serde(flatten)]
         problem: AxError,
         /// The problem in words, naming the fix.
         message: String,
     },
 }
 
+impl Reply {
+    /// `problem` refused, in words beside it.
+    pub(crate) fn refused(problem: AxError) -> Self {
+        Self::Refused {
+            message: problem.to_string(),
+            problem,
+        }
+    }
+}
+
 impl Document {
     /// Answers `command`; a refusal is [`Reply::Refused`].
     pub fn drive(document: &Rc<RefCell<Document>>, command: &Command) -> Reply {
-        Self::answer(document, command).unwrap_or_else(|problem| Reply::Refused {
-            message: problem.to_string(),
-            problem,
-        })
+        Self::answer(document, command).unwrap_or_else(Reply::refused)
     }
 
     fn answer(document: &Rc<RefCell<Document>>, command: &Command) -> Result<Reply, AxError> {
         let acted = match command {
-            Command::Query => {
-                return Ok(Reply::Tree {
-                    nodes: document.borrow().ax_tree()?,
-                });
-            }
-            Command::Find { target: t } => {
-                return Ok(Reply::Found {
-                    node: document.borrow().ax_find(&t.role, &t.name, t.within())?,
-                });
-            }
-            Command::Press { target: t } => Self::ax_press(document, t),
-            Command::Focus { target: t } => Self::ax_focus(document, t),
+            Command::Query => return Self::query(document),
+            Command::Find { target } => return Self::find(document, target),
+            Command::Press { target } => Self::ax_press(document, target),
+            Command::Focus { target } => Self::ax_focus(document, target),
             Command::SetValue { target, value } => Self::ax_set_value(document, target, value),
             Command::Type { target, text } => Self::ax_type(document, target, text),
             Command::Key {
@@ -146,6 +148,20 @@ impl Document {
             } => Self::ax_key(document, target, key, held(modifiers)),
         };
         acted.map(|()| Self::done(document))
+    }
+
+    /// [`Reply::Tree`]: the tree from the last update.
+    fn query(document: &Rc<RefCell<Document>>) -> Result<Reply, AxError> {
+        let nodes = document.borrow().ax_tree()?;
+        Ok(Reply::Tree { nodes })
+    }
+
+    /// [`Reply::Found`]: the one node `target` names.
+    fn find(document: &Rc<RefCell<Document>>, target: &AxTarget) -> Result<Reply, AxError> {
+        let node = document
+            .borrow()
+            .ax_find(&target.role, &target.name, target.within())?;
+        Ok(Reply::Found { node })
     }
 
     /// [`Reply::Done`] after an action: with the updated tree, or why
@@ -194,20 +210,5 @@ fn held(held: &[Held]) -> Modifiers {
         control: held.contains(&Held::Control),
         alt: held.contains(&Held::Alt),
         meta: held.contains(&Held::Meta),
-    }
-}
-
-/// A [`NodeId`](vapors_dom::NodeId) as its number.
-pub(crate) mod node_id {
-    use serde::{Deserialize, Deserializer, Serializer};
-    use vapors_dom::NodeId;
-
-    #[allow(clippy::trivially_copy_pass_by_ref)] // serde's `with` passes a reference
-    pub(crate) fn serialize<S: Serializer>(node: &NodeId, s: S) -> Result<S::Ok, S::Error> {
-        s.serialize_u64(node.0)
-    }
-
-    pub(crate) fn deserialize<'d, D: Deserializer<'d>>(d: D) -> Result<NodeId, D::Error> {
-        u64::deserialize(d).map(NodeId)
     }
 }

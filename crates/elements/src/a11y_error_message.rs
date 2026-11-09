@@ -77,6 +77,18 @@ impl fmt::Display for AxError {
                 "focus left {role} \"{name}\" after {sent} of {of} keys, to {}; fix: find the listener that moves focus, or send the rest to the node that has it",
                 to.as_deref().unwrap_or("nothing")
             ),
+            Self::BadCommand { error } => write!(
+                f,
+                "the text is no command: {error}; fix: send one JSON object such as {{\"command\": \"query\"}}"
+            ),
+            Self::NotFinite { role, name, bounds } => write!(
+                f,
+                "{role} \"{name}\" has bounds that are not finite ({bounds}); fix: the length in its styles that overflows"
+            ),
+            Self::BadReply { error } => write!(
+                f,
+                "the reply did not serialise: {error}; fix: a bug in vapors, report it with the command"
+            ),
             Self::UpdateFailed { after, errors } => write!(
                 f,
                 "the update after {after} failed: [{}]; fix: the page's styles or layout, as the errors name",

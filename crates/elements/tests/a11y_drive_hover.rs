@@ -31,6 +31,13 @@ fn a_press_whose_tree_hover_keeps_changing_is_done_without_a_tree() {
 
     // Then: checked once, and the reply says so, with why there is no tree
     assert_eq!(*changes.borrow(), ["change"]);
+    let written = serde_json::to_string(&reply).expect("serialises");
+    let json: serde_json::Value = serde_json::from_str(&written).expect("JSON");
+    assert_eq!(json["problem"], "not_updated", "one level: {written}");
+    assert_eq!(
+        serde_json::from_str::<Reply>(&written).expect("reads"),
+        reply
+    );
     let Reply::Done {
         nodes: None,
         problem: Some(AxError::NotUpdated),

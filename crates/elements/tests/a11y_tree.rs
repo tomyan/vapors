@@ -168,3 +168,22 @@ fn a_hover_moved_by_the_update_itself_leaves_the_tree_refused_until_the_next() {
         Vec::<String>::new()
     );
 }
+
+#[test]
+fn a_node_whose_bounds_are_not_finite_is_refused_by_name_not_written_null() {
+    // Given: layout keeps a width past f32's range as infinity
+    let mut doc = page();
+    let wide = "button { width: 1e39px; }";
+    doc.add_stylesheet("wide.css", wide).expect("parses");
+    doc.update(viewport(640.0, 400.0)).expect("updates");
+
+    // When
+    let tree = doc.ax_tree();
+
+    // Then
+    let Err(AxError::NotFinite { role, name, bounds }) = tree else {
+        panic!("not_finite expected, got {tree:?}");
+    };
+    assert_eq!((role.as_str(), name.as_str()), ("button", "Pin"));
+    assert!(bounds.contains("width inf"), "{bounds}");
+}

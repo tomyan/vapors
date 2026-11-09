@@ -121,6 +121,26 @@ pub enum AxError {
         /// The value sent.
         value: String,
     },
+    /// The text driven is no [`Command`](crate::Command): not JSON, or
+    /// JSON naming no command or field vapors has.
+    BadCommand {
+        /// The parse error, with its line and column.
+        error: String,
+    },
+    /// A node's bounds are not finite: layout let a length overflow.
+    NotFinite {
+        /// The node's role.
+        role: String,
+        /// The node's name.
+        name: String,
+        /// The bounds, `x 0, y 0, width inf, height 24`.
+        bounds: String,
+    },
+    /// The reply did not serialise: a bug in vapors.
+    BadReply {
+        /// The serialiser's error.
+        error: String,
+    },
 }
 
 impl std::error::Error for AxError {}

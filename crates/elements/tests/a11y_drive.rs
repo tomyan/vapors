@@ -65,7 +65,7 @@ fn find_looks_only_within_the_ancestor_given() {
 
     // Then
     assert_eq!(in_tone["node"]["value"], "50");
-    assert_eq!(in_options["problem"]["problem"], "missing");
+    assert_eq!(in_options["problem"], "missing");
 }
 
 #[test]
@@ -80,9 +80,15 @@ fn a_refusal_replies_the_problem_and_its_message() {
     );
 
     // Then
-    let disabled = json!({"problem": "disabled", "role": "button", "name": "Reset"});
     assert_eq!(reply["reply"], "refused");
-    assert_eq!(reply["problem"], disabled);
+    assert_eq!(
+        reply["problem"], "disabled",
+        "one level, not problem.problem"
+    );
+    assert_eq!(
+        (&reply["role"], &reply["name"]),
+        (&json!("button"), &json!("Reset"))
+    );
     assert!(
         reply["message"]
             .as_str()
@@ -159,5 +165,5 @@ fn a_query_after_a_change_the_driver_did_not_make_is_refused_not_updated() {
     let reply = drive(&doc, json!({"command": "query"}));
 
     // Then
-    assert_eq!(reply["problem"], json!({"problem": "not_updated"}));
+    assert_eq!(reply["problem"], "not_updated");
 }
