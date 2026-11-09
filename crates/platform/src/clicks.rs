@@ -63,10 +63,7 @@ pub(crate) fn by_platform(platform: &str) -> (Duration, f32) {
         ANDROID
     } else if platform.contains("win") {
         WINDOWS
-    } else if ["mac", "iphone", "ipad"]
-        .iter()
-        .any(|name| platform.contains(name))
-    {
+    } else if crate::shortcut_modifier::names_apple(&platform) {
         MACOS
     } else {
         GTK
