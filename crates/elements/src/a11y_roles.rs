@@ -2,13 +2,13 @@
 //! has it (pinned by the corpus's `roles.events` and `combobox.events`):
 //! its role, accessible name, value and states.
 //!
-//! Roles are `role`'s first token (`none`, `presentation` and
-//! `generic` are no role), else implicit: `button`; `input` as
-//! `textbox`, `checkbox`, `slider` (range) or `spinbutton` (number); a
-//! `section` with a name as `region`. Names are `aria-label`,
-//! `aria-labelledby`, or the content of a button, option or checkbox.
-//! `label` arrives in F4. Values are a slider's, spinbutton's, textbox's
-//! or combobox's `value` when not empty. States are written as Chromium
+//! Roles are `role`'s first valid WAI-ARIA token (`none`,
+//! `presentation` and `generic` are no role), else implicit: `button`;
+//! `input` as `textbox`, `checkbox`, `slider` (range) or `spinbutton`
+//! (number); a `section` with a name as `region`. Names: `a11y_name`.
+//! Values are a slider's, spinbutton's, textbox's or combobox's `value`
+//! when not empty, else a slider's or spinbutton's `aria-valuenow`
+//! (Chromium's value; `aria-valuetext` is not it). States are written as Chromium
 //! writes them (`AxStates`).
 
 use std::collections::HashMap;
@@ -21,8 +21,22 @@ use crate::document::Document;
 /// Each element id, to its first element in document order.
 pub(crate) type Ids = HashMap<String, NodeId>;
 
-/// Roles whose name is their content.
-const NAMED_BY_CONTENT: [&str; 3] = ["option", "button", "checkbox"];
+/// WAI-ARIA 1.2's roles, abstract ones left out: `role`'s first of
+/// these is the node's role, as Chromium takes it; other tokens are
+/// skipped.
+const ARIA_ROLES: [&str; 81] = [
+    "alert", "alertdialog", "application", "article", "banner", "blockquote", "button",
+    "caption", "cell", "checkbox", "code", "columnheader", "combobox", "complementary",
+    "contentinfo", "definition", "deletion", "dialog", "document", "emphasis", "feed",
+    "figure", "form", "generic", "grid", "gridcell", "group", "heading", "img", "insertion",
+    "link", "list", "listbox", "listitem", "log", "main", "marquee", "math", "menu",
+    "menubar", "menuitem", "menuitemcheckbox", "menuitemradio", "meter", "navigation",
+    "none", "note", "option", "paragraph", "presentation", "progressbar", "radio",
+    "radiogroup", "region", "row", "rowgroup", "rowheader", "scrollbar", "search",
+    "searchbox", "separator", "slider", "spinbutton", "status", "strong", "subscript",
+    "superscript", "switch", "tab", "table", "tablist", "tabpanel", "term", "textbox",
+    "time", "timer", "toolbar", "tooltip", "tree", "treegrid", "treeitem",
+];
 
 /// Role tokens that give no role.
 const NO_ROLE: [&str; 3] = ["none", "presentation", "generic"];
@@ -47,7 +61,7 @@ impl Document {
     pub(crate) fn ax_role(&self, node: NodeId, ids: &Ids) -> Option<String> {
         if let Some(role) = self
             .attribute(node, "role")
-            .and_then(|r| r.split_whitespace().next())
+            .and_then(|r| r.split_whitespace().find(|t| ARIA_ROLES.contains(t)))
         {
             return (!NO_ROLE.contains(&role)).then(|| role.to_owned());
         }
@@ -63,31 +77,16 @@ impl Document {
         Some(implicit.to_owned())
     }
 
-    /// `node`'s accessible name, empty for none.
-    pub(crate) fn ax_name(&self, node: NodeId, role: &str, ids: &Ids) -> String {
-        if let Some(label) = self.attribute(node, "aria-label") {
-            return label.trim().to_owned();
-        }
-        if let Some(labels) = self.attribute(node, "aria-labelledby") {
-            let parts: Vec<String> = labels
-                .split_whitespace()
-                .filter_map(|id| ids.get(id).copied())
-                .map(|n| self.content(n))
-                .collect();
-            return parts.join(" ");
-        }
-        if NAMED_BY_CONTENT.contains(&role) {
-            return self.content(node);
-        }
-        String::new()
-    }
-
     /// `node`'s value, when its role shows one and it is not empty.
     pub(crate) fn ax_value(&self, node: NodeId, role: &str) -> Option<String> {
         if !VALUED.contains(&role) {
             return None;
         }
-        self.value(node).filter(|value| !value.is_empty())
+        let ranged = role == "slider" || role == "spinbutton";
+        let now = || self.attribute(node, "aria-valuenow").map(str::to_owned);
+        self.value(node)
+            .or_else(|| now().filter(|_| ranged))
+            .filter(|value| !value.is_empty())
     }
 
     /// `node`'s states.
@@ -104,23 +103,6 @@ impl Document {
             expanded: flag("aria-expanded"),
             selected: flag("aria-selected") == Some(true),
             pressed: flag("aria-pressed"),
-        }
-    }
-
-    /// `node`'s text content, whitespace collapsed.
-    fn content(&self, node: NodeId) -> String {
-        let mut text = String::new();
-        self.collect_text(node, &mut text);
-        text.split_whitespace().collect::<Vec<_>>().join(" ")
-    }
-
-    fn collect_text(&self, node: NodeId, out: &mut String) {
-        if let Some(own) = self.text(node) {
-            out.push_str(own);
-            out.push(' ');
-        }
-        for child in self.children(node) {
-            self.collect_text(child, out);
         }
     }
 }

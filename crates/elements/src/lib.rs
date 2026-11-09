@@ -7,6 +7,7 @@
 mod a11y_error;
 mod a11y_find;
 mod a11y_projection;
+mod a11y_name;
 mod a11y_roles;
 mod a11y_tree;
 mod arena;
