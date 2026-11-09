@@ -155,7 +155,7 @@ impl Document {
                 .properties
                 .insert("value".to_owned(), PropertyValue::Text(text));
         }
-        self.changed = true;
+        self.note_change();
         true
     }
 

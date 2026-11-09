@@ -47,7 +47,7 @@ impl Document {
             fonts.editor_driver(&mut editor.plain).select_all();
         }
         editor.pending = true;
-        self.changed = true;
+        self.note_change();
     }
 
     /// Runs `act`, which moves the selection but edits nothing, on the
@@ -67,7 +67,7 @@ impl Document {
         // a composition lasts only through the edits that report it
         editor.composing = None;
         editor.pending = true;
-        self.changed = true;
+        self.note_change();
     }
 }
 

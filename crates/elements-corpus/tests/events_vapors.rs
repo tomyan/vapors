@@ -8,31 +8,14 @@
 //! selection, typing and commits, and the words fixture's double and
 //! triple clicks (E6a); the undo fixture's undo, redo and paste (E6b).
 
-use vapors_elements::Viewport;
 use vapors_elements_corpus::events_compare::compare;
 use vapors_elements_corpus::events_script::parse;
 use vapors_elements_corpus::events_vapors::play;
-use vapors_elements_corpus::oracle::fixtures_dir;
-use vapors_elements_corpus::{Fixture, all};
 
-/// The fixture's comment says 640x400 at 1x.
-const VIEWPORT: Viewport = Viewport {
-    width: 640.0,
-    height: 400.0,
-    scale: 1.0,
-};
+#[path = "corpus_support/events.rs"]
+mod events;
 
-fn fixture(name: &str) -> Fixture {
-    all()
-        .into_iter()
-        .find(|f| f.name == name)
-        .expect("a fixture")
-}
-
-fn read(file: &str) -> String {
-    let path = fixtures_dir().join(file);
-    std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
-}
+use events::{VIEWPORT, fixture, read};
 
 #[test]
 fn the_capture_script_logs_on_vapors_what_chromium_logged() {
@@ -146,20 +129,6 @@ fn the_text_script_logs_on_vapors_what_chromium_logged() {
 
     // Then: the events, the focus, the value and the selection after each step
     compare("text", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
-}
-
-#[test]
-fn the_combobox_script_projects_on_vapors_as_on_apgs_example() {
-    // Given: vapors' combobox component, keyed as APG's own example was
-    // in Chromium (apg/, see apg/NOTICE.md)
-    let script = parse("combobox", &read("combobox.events")).expect("parses");
-    let answers = serde_json::from_str(&read("combobox.events.json")).expect("json");
-
-    // When
-    let ours = play(&fixture("combobox"), &script, VIEWPORT).unwrap_or_else(|e| panic!("{e}"));
-
-    // Then: the projection, focus, values and selections after each key
-    compare("combobox", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
 }
 
 #[test]

@@ -66,7 +66,7 @@ impl Document {
         if snapped == range.value {
             return false;
         }
-        self.changed = true;
+        self.note_change();
         if let Some(element) = self.arena.get_mut(node, "range").element_mut() {
             element
                 .properties

@@ -1,18 +1,22 @@
 //! The a11y projection the events oracle compares (5-A1's start): for
 //! each node with a role the script names, in tree order, its role, its
-//! name and the properties a combobox's keys change: `expanded`,
-//! `controls`, `activedescendant`, `selected` and `focused`, in the
-//! oracle's reduced shape (`ax_tree`: related nodes as role and name).
+//! name, its value when it has one, and the properties a control's
+//! state shows: `expanded`, `controls`, `activedescendant`, `selected`,
+//! `focused`, `checked`, `disabled` and `pressed`, in the oracle's
+//! reduced shape (`ax_tree`: related nodes as role and name).
 //! Depth is left out: another page's wrappers differ from a fixture's.
 
 use serde_json::{Value, json};
 
 /// The properties kept.
-pub const KEPT: [&str; 5] = [
+pub const KEPT: [&str; 8] = [
     "activedescendant",
+    "checked",
     "controls",
+    "disabled",
     "expanded",
     "focused",
+    "pressed",
     "selected",
 ];
 
@@ -36,7 +40,8 @@ pub fn project(reduced: &Value, roles: &[String]) -> Result<Value, String> {
     Ok(Value::Array(out))
 }
 
-/// One node: role, name, and the kept properties, sorted.
+/// One node: role, name, value when there is one, and the kept
+/// properties, sorted.
 fn entry(node: &Value, role: &str) -> Value {
     let properties: Vec<&str> = node["properties"]
         .as_array()
@@ -51,7 +56,11 @@ fn entry(node: &Value, role: &str) -> Value {
             })
         })
         .collect();
-    json!({ "role": role, "name": node["name"].as_str().unwrap_or(""), "properties": properties })
+    let mut entry = json!({ "role": role, "name": node["name"].as_str().unwrap_or(""), "properties": properties });
+    if let Some(value) = node["value"].as_str() {
+        entry["value"] = json!(value);
+    }
+    entry
 }
 
 #[cfg(test)]

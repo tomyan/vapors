@@ -87,6 +87,7 @@ fixtures![
     paint_boxes::PaintBoxes,
     positioned::Positioned,
     range::Range,
+    roles::Roles,
     scrolling::Scrolling,
     shell::Shell,
     sizing::Sizing,
