@@ -4,10 +4,12 @@
 //! needs a GPU device. The plan and what each slice adds:
 //! `docs/F2c.md`.
 
+mod a11y_act;
 mod a11y_error;
 mod a11y_find;
 mod a11y_projection;
 mod a11y_roles;
+mod a11y_target;
 mod a11y_tree;
 mod arena;
 mod bidi;
@@ -78,6 +80,7 @@ mod update;
 
 pub use a11y_error::AxError;
 pub use a11y_projection::AxNode;
+pub use a11y_target::{AxTarget, AxWithin};
 pub use a11y_tree::{AxElement, AxStates};
 pub use document::Document;
 pub use error::ElementError;

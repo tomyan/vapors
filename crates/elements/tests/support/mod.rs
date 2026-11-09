@@ -5,6 +5,7 @@
 
 pub mod changes;
 pub mod checkbox_page;
+pub mod drive;
 pub mod focus_page;
 pub mod number_page;
 pub mod pointer;

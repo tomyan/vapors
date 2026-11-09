@@ -3,7 +3,7 @@
 use std::fmt;
 
 /// A refusal from the a11y tree.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AxError {
     /// The document has changed since its last update, or has none.
     NotUpdated,
@@ -24,6 +24,40 @@ pub enum AxError {
         name: String,
         /// Each match with its ancestors in the tree, `a "x" > b "y"`.
         matches: Vec<String>,
+    },
+    /// No drawn node has the role and name, and one that is not drawn
+    /// (`display: none`, `visibility: hidden`, `aria-hidden`) does.
+    Hidden {
+        /// The node's role.
+        role: String,
+        /// The node's name.
+        name: String,
+    },
+    /// The node is disabled, so a person could not act on it.
+    Disabled {
+        /// The node's role.
+        role: String,
+        /// The node's name.
+        name: String,
+    },
+    /// A press at the node's centre would reach another element, or
+    /// nothing (`at`, CSS px); `by` is the element's tag.
+    Covered {
+        /// The node's role.
+        role: String,
+        /// The node's name.
+        name: String,
+        /// The point pressed.
+        at: [f32; 2],
+        /// The element there, if any.
+        by: Option<String>,
+    },
+    /// Focus was asked of a node that takes none.
+    NotFocusable {
+        /// The node's role.
+        role: String,
+        /// The node's name.
+        name: String,
     },
 }
 
@@ -53,6 +87,24 @@ impl fmt::Display for AxError {
                 matches.len(),
                 matches.join("; ")
             ),
+            Self::Hidden { role, name } => write!(
+                f,
+                "{role} \"{name}\" is not drawn (display: none, visibility: hidden or aria-hidden); fix: show it first"
+            ),
+            Self::Disabled { role, name } => {
+                write!(f, "{role} \"{name}\" is disabled; fix: enable it first")
+            }
+            Self::Covered { role, name, at, by } => write!(
+                f,
+                "a press at the centre of {role} \"{name}\" ({}, {}) reaches {}; fix: scroll it into view or close what covers it",
+                at[0],
+                at[1],
+                by.as_deref()
+                    .map_or("nothing".to_owned(), |tag| format!("<{tag}>"))
+            ),
+            Self::NotFocusable { role, name } => {
+                write!(f, "{role} \"{name}\" takes no focus; fix: act on a control")
+            }
         }
     }
 }

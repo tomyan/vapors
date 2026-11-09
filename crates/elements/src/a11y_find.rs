@@ -1,7 +1,8 @@
 //! Finding one node of the a11y tree by role and exact name (R1),
 //! within an ancestor's role and name when that alone is not enough. No
 //! match, or more than one, is refused naming the candidates: a driver
-//! never acts on a node it did not single out.
+//! never acts on a node it did not single out. No match where a node
+//! that is not drawn matches is refused as hidden.
 
 use crate::a11y_error::AxError;
 use crate::a11y_tree::AxElement;
@@ -43,6 +44,10 @@ impl Document {
         let (role, name) = (role.to_owned(), name.to_owned());
         match matches.len() {
             1 => Ok(matches.remove(0).node.clone()),
+            // with no ancestor asked, every element matching is one the tree left out
+            0 if within.is_none() && self.ax_hidden(&role, &name) => {
+                Err(AxError::Hidden { role, name })
+            }
             0 => {
                 let of_role: Vec<&Visit> = visits.iter().filter(|v| v.node.role == role).collect();
                 Err(AxError::Missing {
@@ -57,6 +62,17 @@ impl Document {
                 name,
             }),
         }
+    }
+}
+
+impl Document {
+    /// Whether an element the tree leaves out has the role and name.
+    fn ax_hidden(&self, role: &str, name: &str) -> bool {
+        let ids = self.ax_ids();
+        self.elements().into_iter().any(|node| {
+            self.ax_role(node, &ids).as_deref() == Some(role)
+                && self.ax_name(node, role, &ids) == name
+        })
     }
 }
 
