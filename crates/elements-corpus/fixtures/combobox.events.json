@@ -2350,7 +2350,8 @@
             "expanded=false",
             "focused=true"
           ],
-          "role": "combobox"
+          "role": "combobox",
+          "value": "Alabama"
         }
       ],
       "checked": {},

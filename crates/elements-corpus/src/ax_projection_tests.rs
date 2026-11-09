@@ -33,3 +33,31 @@ fn only_the_named_roles_and_kept_properties_remain_in_order() {
 fn a_node_without_a_role_is_refused() {
     assert!(project(&json!([{ "depth": 0 }]), &["option".to_owned()]).is_err());
 }
+
+#[test]
+fn a_controls_states_and_value_are_kept() {
+    // Given: a disabled, checked checkbox, a pressed toggle button and a slider
+    let reduced = json!([
+        { "depth": 1, "role": "checkbox", "name": "Lock", "properties": ["checked=true", "disabled=true", "invalid=false"] },
+        { "depth": 1, "role": "button", "name": "Pin", "properties": ["focusable=true", "pressed=true"] },
+        { "depth": 1, "role": "slider", "name": "Amount", "value": "50", "properties": ["valuetext=50"] },
+    ]);
+    let roles = vec![
+        "checkbox".to_owned(),
+        "button".to_owned(),
+        "slider".to_owned(),
+    ];
+
+    // When
+    let projected = project(&reduced, &roles).expect("projects");
+
+    // Then
+    assert_eq!(
+        projected,
+        json!([
+            { "role": "checkbox", "name": "Lock", "properties": ["checked=true", "disabled=true"] },
+            { "role": "button", "name": "Pin", "properties": ["pressed=true"] },
+            { "role": "slider", "name": "Amount", "value": "50", "properties": [] },
+        ])
+    );
+}

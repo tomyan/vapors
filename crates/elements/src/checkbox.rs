@@ -61,7 +61,7 @@ impl Document {
                 .properties
                 .insert("checked".to_owned(), PropertyValue::Bool(checked));
         }
-        self.changed = true;
+        self.note_change();
         self.mark_flag(node, States::CHECKED);
         true
     }

@@ -24,6 +24,24 @@ pub struct Viewport {
     pub scale: f32,
 }
 
+/// Whether anything shown may have changed since the app last asked
+/// ([`Document::take_changed`]) and since the last update; both, for a
+/// new document.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Changes {
+    pub(crate) since_asked: bool,
+    pub(crate) since_update: bool,
+}
+
+impl Default for Changes {
+    fn default() -> Self {
+        Self {
+            since_asked: true,
+            since_update: true,
+        }
+    }
+}
+
 impl Document {
     /// Styles, lays out and paints the document for `viewport`.
     ///
@@ -85,8 +103,17 @@ impl Document {
         painted.scroll_chains = crate::scroll_chains::Chains::of(&boxes, &scrolls);
         self.boxes.keep(boxes, viewport.scale);
         self.laid_out = laid_out;
+        // Cleared before the rehover: a hover it moves is a change this
+        // update did not restyle, so the a11y tree refuses until the next.
+        self.changes.since_update = false;
         self.rehover_in(&painted);
         Ok(self.painted.insert(painted))
+    }
+
+    /// Notes a change to anything shown, for [`Document::take_changed`]
+    /// and for what reads the last update (the a11y tree).
+    pub(crate) fn note_change(&mut self) {
+        self.changes = Changes::default();
     }
 
     /// How many elements the last update restyled: what the incremental

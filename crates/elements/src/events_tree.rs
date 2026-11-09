@@ -49,7 +49,7 @@ impl Document {
                 } else {
                     element.states.without(flag)
                 };
-                self.changed = true;
+                self.note_change();
                 self.mark_flag(node, flag);
             }
         }

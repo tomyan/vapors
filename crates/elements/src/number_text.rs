@@ -23,7 +23,7 @@ impl Document {
         if self.number_field(node).is_some_and(|f| f.text == text) {
             return false;
         }
-        self.changed = true;
+        self.note_change();
         if let Some(element) = self.arena.get_mut(node, "number").element_mut() {
             element
                 .properties

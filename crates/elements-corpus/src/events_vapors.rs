@@ -79,6 +79,13 @@ pub fn play(fixture: &Fixture, script: &Script, viewport: Viewport) -> Result<Lo
     for step in &script.steps {
         act(&doc, &step.action, &mut held)
             .map_err(|why| format!("{}.events:{}: {why}", fixture.name, step.line))?;
+        // a frame after each step, as Chromium draws one before it is read
+        doc.borrow_mut().update(viewport).map_err(|errors| {
+            format!(
+                "{}.events:{}: the update was refused: {errors:?}",
+                fixture.name, step.line
+            )
+        })?;
         let (focus, focus_visible) = {
             let doc = doc.borrow();
             let focus = doc

@@ -20,7 +20,7 @@ impl Dom for Document {
     }
 
     fn add_style(&mut self, scope: &str, css: &str) {
-        self.changed = true;
+        self.note_change();
         self.dirty.everything();
         self.sheets.add_scoped(scope, css);
     }
@@ -33,7 +33,7 @@ impl Dom for Document {
     /// field's `min`, `max` or `step` (3-E3c), which
     /// `invalid_follows_a_max_narrowed_under_the_value` pins.
     fn set_attribute(&mut self, node: NodeId, name: &str, value: &str) {
-        self.changed = true;
+        self.note_change();
         self.element_mut(node, "set_attribute")
             .attributes
             .insert(name.to_owned(), value.to_owned());
@@ -45,7 +45,7 @@ impl Dom for Document {
     }
 
     fn set_text(&mut self, node: NodeId, text: &str) {
-        self.changed = true;
+        self.note_change();
         if self.sheets.features.empty
             && let Some(parent) = self.parent(node)
         {
@@ -63,7 +63,7 @@ impl Dom for Document {
     /// `checked` restyles for `:checked` (3-E3b); `value` for a number
     /// field's `:invalid` (3-E3c).
     fn set_property(&mut self, node: NodeId, name: &str, value: PropertyValue) {
-        self.changed = true;
+        self.note_change();
         self.element_mut(node, "set_property")
             .properties
             .insert(name.to_owned(), value);
@@ -84,7 +84,7 @@ impl Dom for Document {
     /// Also marks what the move restyles: the child, and both parents'
     /// children where the sheets make siblings matter.
     fn insert_before(&mut self, parent: NodeId, child: NodeId, before: Option<NodeId>) {
-        self.changed = true;
+        self.note_change();
         if let Some(old) = self.parent(child) {
             self.mark_children_changed(old, None);
         }
@@ -100,7 +100,7 @@ impl Dom for Document {
             "remove: {node:?} is the document's <{}>, which components mount under and which is never removed",
             if node == self.root() { "html" } else { "body" }
         );
-        self.changed = true;
+        self.note_change();
         if let Some(parent) = self.parent(node) {
             self.mark_children_changed(parent, None);
         }
