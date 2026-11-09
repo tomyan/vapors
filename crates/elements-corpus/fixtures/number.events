@@ -103,6 +103,23 @@ expect value input#plain 6
 key Enter                     commits 6
 expect event change input#plain
 expect value input#plain 6
+key Control+a                 selected, then a step: 6 is off the steps, up to 10
+expect no event input
+key ArrowUp
+expect event input input#plain
+expect value input#plain 10
+type "5"                      after a step the text is not selected: typed at the end
+expect value input#plain 105
+key Enter
+expect event change input#plain
+expect value input#plain 105
+key Control+Shift+a           Shift held: not select-all
+expect no event input
+type "1"                      typed at the end
+expect value input#plain 1051
+key Enter
+expect event change input#plain
+expect value input#plain 1051
 click 250 12                  off is disabled: no click, no focus
 expect event pointerdown input#off
 expect no event click

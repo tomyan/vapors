@@ -18,9 +18,12 @@ use vapors_dom::{Dom, NodeId};
 use vapors_elements::{Document, ElementError, Viewport};
 use vapors_text::FontSystem;
 
-/// An empty document laying text out with Geist and Geist Mono only.
+/// An empty document laying text out with Geist and Geist Mono only,
+/// its shortcuts on Control (Linux's, as the tests' Control keys expect).
 pub fn document() -> Document {
-    Document::new(FontSystem::bundle_only())
+    let mut doc = Document::new(FontSystem::bundle_only());
+    doc.set_shortcut_modifier(vapors_elements::ShortcutModifier::Control);
+    doc
 }
 
 /// A 1x viewport of `width` by `height` CSS pixels.

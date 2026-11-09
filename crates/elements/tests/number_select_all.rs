@@ -52,6 +52,8 @@ fn control_a_then_backspace_clears_the_text() {
     assert_eq!(*page.log.borrow(), ["amount input \"\" none"]);
 }
 
+/// Guards that select-all is a focused field's key, not the document's:
+/// with no field focused the app gets Control+A.
 #[test]
 fn control_a_on_a_field_without_focus_selects_nothing() {
     // Given: nothing focused

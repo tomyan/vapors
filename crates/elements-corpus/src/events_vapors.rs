@@ -108,6 +108,9 @@ pub fn play(fixture: &Fixture, script: &Script, viewport: Viewport) -> Result<Lo
 
 fn mounted(fixture: &Fixture, viewport: Viewport) -> Result<Rc<RefCell<Document>>, String> {
     let doc = Rc::new(RefCell::new(Document::new(FontSystem::bundle_only())));
+    // the answers are Linux Chromium's: Control+A is select-all
+    doc.borrow_mut()
+        .set_shortcut_modifier(vapors_elements::ShortcutModifier::Control);
     doc.borrow_mut()
         .add_stylesheet(fixture.name, fixture.style)
         .map_err(|e| format!("{}: {e:?}", fixture.name))?;

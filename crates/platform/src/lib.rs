@@ -6,7 +6,6 @@
 //! to the app as an [`Event`] and every redraw as a [`Frame`].
 
 mod attributes;
-#[cfg(target_family = "wasm")]
 mod browser_platform;
 mod clicks;
 #[cfg(target_family = "wasm")]

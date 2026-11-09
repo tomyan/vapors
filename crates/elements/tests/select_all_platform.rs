@@ -58,10 +58,10 @@ fn number_key(page: &number_page::Page, modifiers: Modifiers) {
 #[test]
 fn an_unset_document_takes_the_target_oss_modifier() {
     // Given
-    let page = number_page::page();
+    let doc = vapors_elements::Document::new(vapors_text::FontSystem::bundle_only());
 
     // When
-    let modifier = page.doc.borrow().shortcut_modifier();
+    let modifier = doc.shortcut_modifier();
 
     // Then: natively the target decides, not a fixed Control
     assert_eq!(modifier, modifier_for(cfg!(target_os = "macos")));

@@ -1,11 +1,13 @@
 //! Select-all in a field: A with Command on macOS and with Control
-//! elsewhere, and neither the other of the two nor Alt held, as Chromium
-//! has it (on macOS Control+A moves to the line's start, which vapors
+//! elsewhere, and neither the other of the two nor Alt nor Shift held,
+//! as Chromium has it (number.events pins Control+Shift+A; on macOS
+//! Control+A moves to the line's start, which vapors
 //! does not take). The app says which platform it runs on
 //! (`Document::set_shortcut_modifier`; vapors-app asks
 //! `vapors_platform::shortcut_is_command`). Until it does, natively the
-//! target OS decides; a wasm build names no OS, so the app must set it
-//! before the first key (`ElementsApp::new` does).
+//! target OS decides; a wasm build names no OS, so a web host must set
+//! it before the first key: `ElementsApp::new` does, and a host using
+//! `DocumentInput` alone does it itself.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -78,6 +80,6 @@ impl Document {
         } else {
             (modifiers.control, modifiers.meta)
         };
-        matches!(key, "a" | "A") && shortcut && !other && !modifiers.alt
+        matches!(key, "a" | "A") && shortcut && !other && !modifiers.alt && !modifiers.shift
     }
 }
