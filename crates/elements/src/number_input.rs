@@ -149,6 +149,16 @@ fn step(document: &Rc<RefCell<Document>>, node: NodeId, field: &Field, steps: f6
     settle(document, node, value);
 }
 
+/// An accessibility set-value (`a11y_set_value`): `text`, a number,
+/// becomes the field's text as given; when it changed, `input`, then
+/// `change` when `number` differs from the last committed.
+pub(crate) fn set(document: &Rc<RefCell<Document>>, node: NodeId, text: &str, number: f64) {
+    if document.borrow_mut().set_number_text(node, text.to_owned()) {
+        fire(document, node, "input");
+        settle(document, node, number);
+    }
+}
+
 /// Commits `node`'s text: its number, in the range or not, or the last
 /// committed number when the text is no number; `change` when it
 /// differs from the last committed.

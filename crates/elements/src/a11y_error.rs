@@ -59,6 +59,23 @@ pub enum AxError {
         /// The node's name.
         name: String,
     },
+    /// A value was set on a node that is no slider or spinbutton.
+    NotSettable {
+        /// The node's role.
+        role: String,
+        /// The node's name.
+        name: String,
+    },
+    /// The value set is not a valid floating-point number as HTML
+    /// parses one.
+    NotANumber {
+        /// The node's role.
+        role: String,
+        /// The node's name.
+        name: String,
+        /// The value sent.
+        value: String,
+    },
 }
 
 impl fmt::Display for AxError {
@@ -105,6 +122,14 @@ impl fmt::Display for AxError {
             Self::NotFocusable { role, name } => {
                 write!(f, "{role} \"{name}\" takes no focus; fix: act on a control")
             }
+            Self::NotSettable { role, name } => write!(
+                f,
+                "{role} \"{name}\" has no value to set (only a slider or spinbutton has); fix: type into a textbox, press others"
+            ),
+            Self::NotANumber { role, name, value } => write!(
+                f,
+                "\"{value}\" set on {role} \"{name}\" is not a number; fix: send a number such as 12.5"
+            ),
         }
     }
 }
