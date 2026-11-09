@@ -52,7 +52,9 @@ pub(crate) fn selected_all(
     }
     // the method path is not general over the driver's lifetime
     #[allow(clippy::redundant_closure_for_method_calls)]
-    document.borrow_mut().drive(node, |d| d.select_all());
+    document
+        .borrow_mut()
+        .move_selection(node, |d| d.select_all());
     true
 }
 

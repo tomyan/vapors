@@ -14,7 +14,7 @@ impl Document {
         self.editor_from_text(node);
         // the method path is not general over the driver's lifetime
         #[allow(clippy::redundant_closure_for_method_calls)]
-        self.drive(node, |d| d.move_to_text_end());
+        self.move_selection(node, |d| d.move_to_text_end());
         changed
     }
 
@@ -43,7 +43,7 @@ impl Document {
         };
         let committed = self.last_committed(node, &field);
         self.remember_committed(node, committed);
-        self.drive(node, |d| {
+        self.move_selection(node, |d| {
             if keyboard {
                 d.select_all();
             } else {

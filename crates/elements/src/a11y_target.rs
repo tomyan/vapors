@@ -1,19 +1,24 @@
 //! A node as a driver names it (R1): its role and exact name, within an
 //! ancestor's when the name alone is not enough (`a11y_find`).
 
+use serde::{Deserialize, Serialize};
+
 /// A node by its role and exact name, within an ancestor's when given.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AxTarget {
     /// The role.
     pub role: String,
     /// The exact accessible name.
     pub name: String,
     /// An ancestor holding it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub within: Option<AxWithin>,
 }
 
 /// An ancestor's role and exact name.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AxWithin {
     /// The role.
     pub role: String,

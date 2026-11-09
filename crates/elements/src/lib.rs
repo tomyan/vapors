@@ -5,7 +5,10 @@
 //! `docs/F2c.md`.
 
 mod a11y_act;
+mod a11y_drive;
+mod a11y_drive_json;
 mod a11y_error;
+mod a11y_error_message;
 mod a11y_find;
 mod a11y_name;
 mod a11y_press;
@@ -83,6 +86,7 @@ mod tree;
 mod typing;
 mod update;
 
+pub use a11y_drive::{Command, Held, Reply};
 pub use a11y_error::AxError;
 pub use a11y_projection::AxNode;
 pub use a11y_target::{AxTarget, AxWithin};
