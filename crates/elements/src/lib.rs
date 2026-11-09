@@ -39,6 +39,7 @@ mod keys;
 mod layout;
 mod node;
 mod number;
+mod number_committed;
 mod number_input;
 mod number_scrub;
 mod number_shown;

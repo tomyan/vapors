@@ -29,6 +29,7 @@ use std::rc::Rc;
 
 use crate::a11y_error::AxError;
 use crate::a11y_target::AxTarget;
+use crate::a11y_tree::AxElement;
 use crate::document::Document;
 
 impl Document {
@@ -45,24 +46,36 @@ impl Document {
         value: &str,
     ) -> Result<(), AxError> {
         let found = Self::ax_live(document, target)?;
-        let node = found.node;
-        let (range, number) = {
-            let doc = document.borrow();
-            (doc.range(node).is_some(), doc.number_field(node).is_some())
-        };
-        let (role, name) = (found.role, found.name);
-        if !(range || number) {
-            return Err(AxError::NotSettable { role, name });
-        }
-        let Some(parsed) = crate::range::parse(value) else {
-            let value = value.to_owned();
-            return Err(AxError::NotANumber { role, name, value });
-        };
-        if range {
-            crate::range_input::set(document, node, parsed);
-        } else {
-            crate::number_input::set(document, node, value, parsed);
+        let settable = document.borrow().ax_settable(&found)?;
+        let parsed = crate::range::parse(value).ok_or_else(|| AxError::NotANumber {
+            role: found.role.clone(),
+            name: found.name.clone(),
+            value: value.to_owned(),
+        })?;
+        match settable {
+            Settable::Range => crate::range_input::set(document, found.node, parsed),
+            Settable::Number => crate::number_input::set(document, found.node, value, parsed),
         }
         Ok(())
     }
+
+    /// Which control `found` is that takes a value.
+    fn ax_settable(&self, found: &AxElement) -> Result<Settable, AxError> {
+        if self.range(found.node).is_some() {
+            return Ok(Settable::Range);
+        }
+        if self.number_field(found.node).is_some() {
+            return Ok(Settable::Number);
+        }
+        Err(AxError::NotSettable {
+            role: found.role.clone(),
+            name: found.name.clone(),
+        })
+    }
+}
+
+/// A control that takes a value.
+enum Settable {
+    Range,
+    Number,
 }
