@@ -145,7 +145,7 @@ impl Document {
         self.focusable(node) && self.attribute(node, "tabindex") != Some("-1")
     }
 
-    fn focusable(&self, node: NodeId) -> bool {
+    pub(crate) fn focusable(&self, node: NodeId) -> bool {
         let Some(tag) = self.tag(node) else {
             return false;
         };

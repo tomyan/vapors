@@ -1,7 +1,8 @@
 //! Finding one node of the a11y tree by role and exact name (R1),
 //! within an ancestor's role and name when that alone is not enough. No
 //! match, or more than one, is refused naming the candidates: a driver
-//! never acts on a node it did not single out.
+//! never acts on a node it did not single out. No match where a node
+//! that is not drawn matches is refused as hidden.
 
 use crate::a11y_error::AxError;
 use crate::a11y_tree::AxElement;
@@ -40,13 +41,44 @@ impl Document {
         let matches = those(&inside, |node| is(node, (role, name)));
         match matches.as_slice() {
             [one] => Ok(one.node.clone()),
-            [] => Err(missing(&visits, &inside, (role, name))),
+            [] => Err(self.ax_unmatched(&visits, &inside, (role, name), within)),
             _ => Err(AxError::Ambiguous {
                 matches: paths(&matches),
                 role: role.to_owned(),
                 name: name.to_owned(),
             }),
         }
+    }
+}
+
+impl Document {
+    /// The refusal for no match: [`AxError::Hidden`] when, with no
+    /// ancestor asked, every element matching is one the tree left out;
+    /// else [`AxError::Missing`].
+    fn ax_unmatched(
+        &self,
+        all: &[Visit],
+        inside: &[&Visit],
+        named: Named,
+        within: Option<Named>,
+    ) -> AxError {
+        let (role, name) = named;
+        if within.is_none() && self.ax_hidden(role, name) {
+            return AxError::Hidden {
+                role: role.to_owned(),
+                name: name.to_owned(),
+            };
+        }
+        missing(all, inside, named)
+    }
+
+    /// Whether an element the tree leaves out has the role and name.
+    fn ax_hidden(&self, role: &str, name: &str) -> bool {
+        let ids = self.ax_ids();
+        self.elements().into_iter().any(|node| {
+            self.ax_role(node, &ids).as_deref() == Some(role)
+                && self.ax_name(node, role, &ids) == name
+        })
     }
 }
 
