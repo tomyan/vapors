@@ -35,20 +35,28 @@ pub enum Held {
 
 /// What a driver asks.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "command", rename_all = "snake_case")]
+#[serde(tag = "command", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Command {
     /// The whole tree.
     Query,
     /// One node ([`Document::ax_find`]).
-    Find(AxTarget),
+    Find {
+        /// The node.
+        target: AxTarget,
+    },
     /// [`Document::ax_press`].
-    Press(AxTarget),
+    Press {
+        /// The node.
+        target: AxTarget,
+    },
     /// [`Document::ax_focus`].
-    Focus(AxTarget),
+    Focus {
+        /// The node.
+        target: AxTarget,
+    },
     /// [`Document::ax_set_value`].
     SetValue {
         /// The node.
-        #[serde(flatten)]
         target: AxTarget,
         /// The value, as text.
         value: String,
@@ -56,7 +64,6 @@ pub enum Command {
     /// [`Document::ax_type`].
     Type {
         /// The node.
-        #[serde(flatten)]
         target: AxTarget,
         /// The text.
         text: String,
@@ -64,7 +71,6 @@ pub enum Command {
     /// [`Document::ax_key`].
     Key {
         /// The node.
-        #[serde(flatten)]
         target: AxTarget,
         /// The key, as the DOM's `key` (`Enter`, `ArrowUp`, `a`).
         key: String,
@@ -124,13 +130,13 @@ impl Document {
                     nodes: document.borrow().ax_tree()?,
                 });
             }
-            Command::Find(t) => {
+            Command::Find { target: t } => {
                 return Ok(Reply::Found {
                     node: document.borrow().ax_find(&t.role, &t.name, t.within())?,
                 });
             }
-            Command::Press(t) => Self::ax_press(document, t),
-            Command::Focus(t) => Self::ax_focus(document, t),
+            Command::Press { target: t } => Self::ax_press(document, t),
+            Command::Focus { target: t } => Self::ax_focus(document, t),
             Command::SetValue { target, value } => Self::ax_set_value(document, target, value),
             Command::Type { target, text } => Self::ax_type(document, target, text),
             Command::Key {

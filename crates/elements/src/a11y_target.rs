@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 /// A node by its role and exact name, within an ancestor's when given.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AxTarget {
     /// The role.
     pub role: String,
@@ -17,6 +18,7 @@ pub struct AxTarget {
 
 /// An ancestor's role and exact name.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AxWithin {
     /// The role.
     pub role: String,

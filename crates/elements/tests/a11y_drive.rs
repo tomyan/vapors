@@ -24,7 +24,7 @@ fn a_press_by_role_and_name_replies_done() {
     // When
     let reply = drive(
         &doc,
-        json!({"command": "press", "role": "checkbox", "name": "Mono"}),
+        json!({"command": "press", "target": {"role": "checkbox", "name": "Mono"}}),
     );
     update(&doc);
 
@@ -44,7 +44,7 @@ fn a_key_carries_its_modifiers() {
     let amount = node(&doc, "slider", "Amount");
 
     // When: Shift steps a range by ten
-    let key = json!({"command": "key", "role": "slider", "name": "Amount",
+    let key = json!({"command": "key", "target": {"role": "slider", "name": "Amount"},
         "key": "ArrowRight", "modifiers": ["shift"]});
     let reply = drive(&doc, key);
 
@@ -57,7 +57,7 @@ fn a_key_carries_its_modifiers() {
 fn find_looks_only_within_the_ancestor_given() {
     // Given: Amount is in the group Tone, not the region Options
     let doc = shared(page());
-    let find = |within: Value| json!({"command": "find", "role": "slider", "name": "Amount", "within": within});
+    let find = |within: Value| json!({"command": "find", "target": {"role": "slider", "name": "Amount", "within": within}});
 
     // When
     let in_tone = drive(&doc, find(json!({"role": "group", "name": "Tone"})));
@@ -76,7 +76,7 @@ fn a_refusal_replies_the_problem_and_its_message() {
     // When
     let reply = drive(
         &doc,
-        json!({"command": "set_value", "role": "button", "name": "Reset", "value": "1"}),
+        json!({"command": "set_value", "target": {"role": "button", "name": "Reset"}, "value": "1"}),
     );
 
     // Then
@@ -115,11 +115,15 @@ fn an_action_replies_the_tree_after_it_and_leaves_the_document_updated() {
     // When: no update between the press and the next command
     let reply = Document::drive(
         &doc,
-        &Command::Press(support::drive::target("checkbox", "Mono")),
+        &Command::Press {
+            target: support::drive::target("checkbox", "Mono"),
+        },
     );
     let next = Document::drive(
         &doc,
-        &Command::Find(support::drive::target("checkbox", "Mono")),
+        &Command::Find {
+            target: support::drive::target("checkbox", "Mono"),
+        },
     );
 
     // Then: both answer with Mono checked
@@ -143,7 +147,9 @@ fn a_query_after_a_change_the_driver_did_not_make_is_refused_not_updated() {
     let doc = shared(page());
     Document::drive(
         &doc,
-        &Command::Press(support::drive::target("checkbox", "Mono")),
+        &Command::Press {
+            target: support::drive::target("checkbox", "Mono"),
+        },
     );
     let dialog = doc.borrow().children(doc.borrow().body())[0];
     doc.borrow_mut()
