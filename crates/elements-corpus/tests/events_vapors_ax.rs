@@ -38,3 +38,17 @@ fn the_roles_script_projects_on_vapors_as_on_chromium() {
     // Then: the roles, names, values and states after each key
     compare("roles", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
 }
+
+#[test]
+fn the_names_script_projects_on_vapors_as_on_chromium() {
+    // Given: names from content, labels that fall through, role lists,
+    // ARIA range values and nodes left out of the tree (R1)
+    let script = parse("names", &read("names.events")).expect("parses");
+    let answers = serde_json::from_str(&read("names.events.json")).expect("json");
+
+    // When
+    let ours = play(&fixture("names"), &script, VIEWPORT).unwrap_or_else(|e| panic!("{e}"));
+
+    // Then: the names, values and the nodes left out
+    compare("names", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
+}

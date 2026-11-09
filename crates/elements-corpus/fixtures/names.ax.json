@@ -1,0 +1,179 @@
+{
+  "tree": [
+    {
+      "depth": 0,
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "RootWebArea"
+    },
+    {
+      "depth": 1,
+      "name": "Save",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Sa",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": "ve",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "name": "Op en",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Op",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": "en",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "name": "Shown",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Shown",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "name": "Empty",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Empty",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "name": "Fallback",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Fallback",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "name": "Level",
+      "properties": [
+        "focusable=true",
+        "invalid=false",
+        "labelledby=generic \"\""
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Unused",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "generic"
+    },
+    {
+      "depth": 2,
+      "name": "Le",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": "vel",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "name": "Bogus",
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Bogus",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "name": "Level",
+      "properties": [
+        "focusable=true",
+        "orientation=horizontal",
+        "settable=true",
+        "valuemax=100",
+        "valuemin=0",
+        "valuetext="
+      ],
+      "role": "slider",
+      "value": "5"
+    },
+    {
+      "depth": 1,
+      "name": "Count",
+      "properties": [
+        "focusable=true",
+        "required=false",
+        "settable=true",
+        "valuemax=0",
+        "valuemin=0",
+        "valuetext="
+      ],
+      "role": "spinbutton",
+      "value": "3"
+    },
+    {
+      "depth": 1,
+      "name": "Last",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Last",
+      "role": "StaticText"
+    }
+  ],
+  "viewport": [
+    640,
+    400
+  ]
+}

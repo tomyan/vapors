@@ -26,7 +26,8 @@ impl Document {
     /// # Errors
     /// [`AxError::NotUpdated`] as [`Document::ax_tree`];
     /// [`AxError::Missing`] when no node matches, naming every node of
-    /// the role; [`AxError::Ambiguous`] when more than one does.
+    /// the role (inside `within`) and the matches outside `within`;
+    /// [`AxError::Ambiguous`] when more than one does.
     pub fn ax_find(
         &self,
         role: &str,
@@ -36,36 +37,41 @@ impl Document {
         let tree = self.ax_tree()?;
         let mut visits = Vec::new();
         visit(&tree, "", &[], &mut visits);
-        let mut matches: Vec<&Visit> = visits
-            .iter()
-            .filter(|v| is(v.node, (role, name)))
-            .filter(|v| within.is_none_or(|w| v.ancestors.iter().any(|a| is(a, w))))
-            .collect();
-        let (role, name) = (role.to_owned(), name.to_owned());
-        match matches.len() {
-            1 => Ok(matches.remove(0).node.clone()),
-            // with no ancestor asked, every element matching is one the tree left out
-            0 if within.is_none() && self.ax_hidden(&role, &name) => {
-                Err(AxError::Hidden { role, name })
-            }
-            0 => {
-                let of_role: Vec<&Visit> = visits.iter().filter(|v| v.node.role == role).collect();
-                Err(AxError::Missing {
-                    candidates: paths(&of_role),
-                    role,
-                    name,
-                })
-            }
+        let inside: Vec<&Visit> = visits.iter().filter(|v| is_within(v, within)).collect();
+        let matches = those(&inside, |node| is(node, (role, name)));
+        match matches.as_slice() {
+            [one] => Ok(one.node.clone()),
+            [] => Err(self.ax_unmatched(&visits, &inside, (role, name), within)),
             _ => Err(AxError::Ambiguous {
                 matches: paths(&matches),
-                role,
-                name,
+                role: role.to_owned(),
+                name: name.to_owned(),
             }),
         }
     }
 }
 
 impl Document {
+    /// The refusal for no match: [`AxError::Hidden`] when, with no
+    /// ancestor asked, every element matching is one the tree left out;
+    /// else [`AxError::Missing`].
+    fn ax_unmatched(
+        &self,
+        all: &[Visit],
+        inside: &[&Visit],
+        named: Named,
+        within: Option<Named>,
+    ) -> AxError {
+        let (role, name) = named;
+        if within.is_none() && self.ax_hidden(role, name) {
+            return AxError::Hidden {
+                role: role.to_owned(),
+                name: name.to_owned(),
+            };
+        }
+        missing(all, inside, named)
+    }
+
     /// Whether an element the tree leaves out has the role and name.
     fn ax_hidden(&self, role: &str, name: &str) -> bool {
         let ids = self.ax_ids();
@@ -74,6 +80,32 @@ impl Document {
                 && self.ax_name(node, role, &ids) == name
         })
     }
+}
+
+/// Whether `visit` has an ancestor that is `within`, when given.
+fn is_within(visit: &Visit, within: Option<Named>) -> bool {
+    within.is_none_or(|w| visit.ancestors.iter().any(|a| is(a, w)))
+}
+
+/// The refusal for no match: the nodes of the role `inside`, and the
+/// exact matches among `all` that are not inside.
+fn missing(all: &[Visit], inside: &[&Visit], (role, name): Named) -> AxError {
+    let of_role = those(inside, |node| node.role == role);
+    let outside: Vec<&Visit> = all.iter().filter(|v| is(v.node, (role, name))).collect();
+    AxError::Missing {
+        role: role.to_owned(),
+        name: name.to_owned(),
+        candidates: paths(&of_role),
+        outside: paths(&outside),
+    }
+}
+
+/// The visits whose node passes `test`.
+fn those<'v, 't>(
+    visits: &[&'v Visit<'t>],
+    test: impl Fn(&AxElement) -> bool,
+) -> Vec<&'v Visit<'t>> {
+    visits.iter().copied().filter(|v| test(v.node)).collect()
 }
 
 /// Whether `node` is the role and name.
