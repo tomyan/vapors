@@ -199,8 +199,9 @@ surface, with a button positioned over the left one.
   painted, so a scroll container's offset is included. Multiply by
   `SurfaceSize::scale` for backing pixels. vapors refuses `transform`,
   so no ancestor transform applies.
-- UI painted over a surface (a later sibling, a positioned element) is
-  hit first: a press on it goes to it, and the surface gets no event
+- UI painted over a surface is hit first (tested with a positioned
+  button; a later non-positioned sibling covering it by a negative margin
+  is not tested): a press on it goes to it, and the surface gets no event
   for that press.
 - Capture is the web's. A mouse press on a surface goes on to the
   surface past its edge only when a `pointerdown` listener calls
