@@ -1,0 +1,24 @@
+// The scene's one pipeline: positions through the mesh's world matrix
+// and the camera's view-projection, filled with the mesh's colour.
+
+struct Camera {
+    view_projection: mat4x4<f32>,
+};
+
+struct Mesh {
+    world: mat4x4<f32>,
+    colour: vec4<f32>,
+};
+
+@group(0) @binding(0) var<uniform> camera: Camera;
+@group(1) @binding(0) var<uniform> mesh: Mesh;
+
+@vertex
+fn vs_main(@location(0) position: vec3<f32>) -> @builtin(position) vec4<f32> {
+    return camera.view_projection * mesh.world * vec4<f32>(position, 1.0);
+}
+
+@fragment
+fn fs_main() -> @location(0) vec4<f32> {
+    return mesh.colour;
+}
