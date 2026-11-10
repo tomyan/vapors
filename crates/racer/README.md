@@ -5,8 +5,9 @@ RaceStats, RaceMenu, CameraToggle, DrivingControls and CarSetup. Each child owns
 its layout styles. HUD supplies the document's base button theme; DrivingControls
 styles the reusable HoldButton through inherited CSS custom properties.
 
-DrivingControls mounts four `vapors-components` HoldButtons. Their `pressed`
-signals feed the application controls alongside keyboard state. Every pointer
+DrivingControls mounts four `vapors-components` HoldButtons. Each reports
+its held state through `on_change` (`hold_into` writes it into a signal), and
+those signals feed the application controls alongside keyboard state. Every pointer
 event goes through DocumentInput; the racer does not hit-test pedals or capture
 fingers itself. Pause resets the shared held-state signals before a later resume.
 
