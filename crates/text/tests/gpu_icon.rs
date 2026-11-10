@@ -32,7 +32,7 @@ fn half_covered_line() -> Icon {
     Icon::new([0.0, 0.0, 16.0, 16.0], strokes).expect("a valid icon")
 }
 
-fn render(icon: &Icon) -> Vec<u8> {
+fn render(icon: &Icon, colour: Color) -> Vec<u8> {
     let gpu = gpu();
     let mut atlas = GlyphAtlas::new(AtlasConfig { page_size: 64 });
     let target = clear(&gpu.device, &gpu.queue, SIDE, SIDE, WHITE);
@@ -52,7 +52,7 @@ fn render(icon: &Icon) -> Vec<u8> {
         icon,
         origin: ORIGIN,
         size: [16, 16],
-        colour: BLACK,
+        colour,
     };
     pipeline
         .draw_icons(&render_target, &mut atlas, &[draw])
@@ -60,33 +60,51 @@ fn render(icon: &Icon) -> Vec<u8> {
     read_rgba8(&gpu.device, &gpu.queue, &target)
 }
 
-/// White minus the icon's CPU coverage inside its box, white outside.
-fn expected_red(icon: &Icon, x: u32, y: u32) -> f32 {
+/// The plain blend of `channel` over white at the icon's CPU coverage
+/// times the colour's alpha inside its box; white outside.
+fn expected(icon: &Icon, x: u32, y: u32, channel: f32, alpha: f32) -> f32 {
     let coverage = icon.rasterize([16, 16]);
     let (bx, by) = (x.wrapping_sub(4), y.wrapping_sub(5));
     if bx >= 16 || by >= 16 {
         return 255.0;
     }
-    255.0 - f32::from(coverage.data[(by * 16 + bx) as usize])
+    let ink = f32::from(coverage.data[(by * 16 + bx) as usize]) / 255.0 * alpha;
+    255.0 * (channel * ink + 1.0 - ink)
+}
+
+/// Every channel of every pixel within 1/255 of the plain blend.
+fn assert_plain_blend(icon: &Icon, colour: Color) {
+    let pixels = render(icon, colour);
+    let channels = [colour.r, colour.g, colour.b];
+    for y in 0..SIDE {
+        for x in 0..SIDE {
+            for (index, channel) in channels.iter().enumerate() {
+                let actual = f32::from(pixels[((y * SIDE + x) * 4) as usize + index]);
+                let expected = expected(icon, x, y, *channel, colour.a);
+                assert!(
+                    (actual - expected).abs() <= 1.0,
+                    "pixel ({x}, {y}) channel {index} is {actual}, plain blend gives {expected}"
+                );
+            }
+        }
+    }
 }
 
 #[test]
 fn gpu_an_icon_is_its_coverage_at_its_box_blended_without_text_gamma() {
-    // Given
-    let icon = half_covered_line();
+    assert_plain_blend(&half_covered_line(), BLACK);
+}
 
-    // When
-    let pixels = render(&icon);
+#[test]
+fn gpu_a_translucent_coloured_icon_blends_each_channel_at_coverage_times_alpha() {
+    // Given: a blue that differs in every channel, at half alpha
+    let colour = Color {
+        r: 0.2,
+        g: 0.6,
+        b: 0.9,
+        a: 0.5,
+    };
 
-    // Then: every pixel within 1/255 of the plain blend
-    for y in 0..SIDE {
-        for x in 0..SIDE {
-            let actual = f32::from(pixels[((y * SIDE + x) * 4) as usize]);
-            let expected = expected_red(&icon, x, y);
-            assert!(
-                (actual - expected).abs() <= 1.0,
-                "pixel ({x}, {y}) is {actual}, plain blend gives {expected}"
-            );
-        }
-    }
+    // Then
+    assert_plain_blend(&half_covered_line(), colour);
 }
