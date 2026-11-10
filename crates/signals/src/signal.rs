@@ -121,6 +121,24 @@ impl<T: 'static> Signal<T> {
         write_cell(self.id, self.info, true, |slot| *slot = value)
     }
 
+    /// Replaces the value and notifies readers only when it differs by
+    /// `PartialEq`; answers whether it notified. NaN never equals
+    /// itself, so a NaN write always notifies, as a memo of NaN does.
+    /// The comparison does not subscribe the running reader.
+    ///
+    /// # Errors
+    /// Refused by name when the node was disposed, when the read would
+    /// close a cycle, or when its value is borrowed by an enclosing `with`.
+    pub fn try_set_if_changed(&self, value: T) -> Result<bool, Error>
+    where
+        T: PartialEq,
+    {
+        if self.try_with_untracked(|current| *current == value)? {
+            return Ok(false);
+        }
+        self.try_set(value).map(|()| true)
+    }
+
     /// Edits the value in place and notifies readers.
     ///
     /// # Errors
