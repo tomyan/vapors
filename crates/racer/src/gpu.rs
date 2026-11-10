@@ -85,9 +85,13 @@ impl SurfaceRenderer for Track {
         Ok(())
     }
     fn resize(&mut self, device: &wgpu::Device, size: SurfaceSize) -> Result<(), SurfaceError> {
-        self.depth = Some(depth_view(device, extent(size)));
+        let depth = depth_view(device, extent(size));
+        let texture = depth.texture();
+        self.log
+            .depth
+            .set(Some([texture.width(), texture.height()]));
+        self.depth = Some(depth);
         self.log.resizes.set(self.log.resizes.get() + 1);
-        self.log.depth.set(Some([size.width, size.height]));
         Ok(())
     }
     fn render(&mut self, frame: SurfaceFrame<'_>) -> Result<(), SurfaceError> {

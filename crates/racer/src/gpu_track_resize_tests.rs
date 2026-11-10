@@ -17,14 +17,14 @@ const NARROW: SurfaceSize = SurfaceSize {
     scale: 1.0,
 };
 /// The window at device scale 2: the same CSS size.
-const DOUBLE: SurfaceSize = SurfaceSize {
+pub(crate) const DOUBLE: SurfaceSize = SurfaceSize {
     width: WINDOW.width * 2,
     height: WINDOW.height * 2,
     scale: 2.0,
 };
 
 /// A racer racing for two frames in the default window.
-fn racing(gpu: &Gpu) -> (Racer, Instant) {
+pub(crate) fn racing(gpu: &Gpu) -> (Racer, Instant) {
     let mut racer = idle(gpu);
     racer.command("toggle").expect("drives");
     let now = Instant::now();
@@ -36,10 +36,14 @@ fn racing(gpu: &Gpu) -> (Racer, Instant) {
 
 /// One frame in `window` at `now` that must not fail and must ask for
 /// the next; its pixels.
-fn drawn_in(racer: &mut Racer, gpu: &Gpu, window: SurfaceSize, now: Instant) -> Vec<u8> {
+pub(crate) fn drawn_in(racer: &mut Racer, gpu: &Gpu, window: SurfaceSize, now: Instant) -> Vec<u8> {
     let (next, rgba) = frame_in(racer, gpu, window, now);
     assert_eq!(racer.app.failure().get(), None, "the frame failed");
-    assert_eq!(next, Next::Continue, "a racing frame asks for the next");
+    assert_eq!(
+        next,
+        Next::Continue,
+        "Continue was expected: the race runs in every case here, so the frame must ask for the next; got {next:?}"
+    );
     rgba
 }
 
@@ -60,6 +64,12 @@ fn gpu_a_window_resized_mid_race_reallocates_the_depth_texture_once_and_renders_
     // Then
     let log = racer.track.log();
     assert_eq!(log.resizes.get() - resizes, 1, "one resize per size change");
+    // `log.depth` is the depth texture's own extent. A depth of the wrong
+    // size is refused by wgpu validation when the pass runs ("Attachments
+    // have differing sizes"), failing the frame. A right-sized depth with
+    // stale contents cannot occur: the world pass clears depth to 1.0 on
+    // every render (`depth_attachment`, gpu/setup.rs:78), so the centre
+    // pixel below checks the colour only.
     assert_eq!(log.depth.get(), Some([NARROW.width, NARROW.height]));
     let centre = [350.0, 300.0];
     let alone = track_alone_in(&racer, &gpu, NARROW);
@@ -113,23 +123,4 @@ fn gpu_a_device_scale_change_mid_race_rebuilds_the_backing_at_the_new_device_siz
     assert_eq!(log.rendered.get(), Some(WINDOW));
     assert_eq!(surfaces_doubled, 1, "one composition draw at 2x");
     assert_eq!(racer.app.frame_counts().surfaces.draw_calls, 1);
-}
-
-#[test]
-fn gpu_the_track_shows_the_same_colour_at_one_and_two_times_scale() {
-    // Given: racing, the clock held at `now`, so the scene does not move
-    let gpu = gpu();
-    let (mut racer, now) = racing(&gpu);
-    let [x, y, width, height] = hold_button(&racer, "gas");
-    let open = [x - width * 4.0, y - height * 4.0];
-
-    // When
-    let single = drawn_in(&mut racer, &gpu, WINDOW, now);
-    let double = drawn_in(&mut racer, &gpu, DOUBLE, now);
-
-    // Then: the CSS point `open` is device pixel `open` at 1x, twice it at 2x
-    let at_double = [open[0] * 2.0, open[1] * 2.0];
-    let colour = pixel_in(&single, WINDOW.width, open);
-    assert_ne!(colour, [255, 0, 255, 255], "the track drew nothing there");
-    assert_eq!(pixel_in(&double, DOUBLE.width, at_double), colour);
 }

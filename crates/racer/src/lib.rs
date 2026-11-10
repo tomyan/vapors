@@ -46,7 +46,11 @@ mod gpu_track_lifecycle_tests;
 #[cfg(test)]
 mod gpu_track_resize_tests;
 #[cfg(test)]
+mod gpu_track_scale_tests;
+#[cfg(test)]
 mod gpu_track_tests;
+#[cfg(test)]
+mod gpu_track_unmount_order_tests;
 #[cfg(test)]
 mod gpu_track_unmount_tests;
 

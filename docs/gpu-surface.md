@@ -195,6 +195,15 @@ and `gpu_track_unmount_tests.rs`.
   the frame after it returns `Next::Wait`. A new `Track` mounted on a
   new surface with the same name renders, and does not inherit the old
   one's animation request.
+- The order of removing the element and unmounting does not matter for
+  release: unmounting first and then removing the element drops the
+  renderer and the page then waits. Unmounting and leaving the element
+  in the document fails the next frame, naming `ScenePainter::mount` as
+  the fix, and draws nothing stale. `gpu_track_unmount_order_tests.rs`.
+- Resources are released by Rust ownership: dropping the renderer
+  `unmount` returned drops the `Track` and what it owns, which
+  `TrackLog::dropped` shows in each order. There is no separate release
+  call.
 
 ## Supported composition (first release)
 

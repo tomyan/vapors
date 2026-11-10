@@ -20,9 +20,9 @@ const SHEET: &str =
     "html, body { margin: 0; } gpu-surface { display: block; width: 64px; height: 48px; }";
 
 /// The test page: a document with one `gpu-surface` named `track`.
-struct Page {
+pub(crate) struct Page {
     document: Rc<RefCell<Document>>,
-    app: ElementsApp,
+    pub(crate) app: ElementsApp,
     surface: NodeId,
 }
 impl Page {
@@ -55,9 +55,15 @@ impl Page {
         (handle, log)
     }
     /// One frame that must not fail: what it asked for next.
-    fn frame(&mut self, gpu: &Gpu) -> Next {
+    pub(crate) fn frame(&mut self, gpu: &Gpu) -> Next {
+        let next = self.frame_allowing_failure(gpu);
+        assert_eq!(self.app.failure().get(), None, "the frame failed");
+        next
+    }
+    /// One frame, whether or not it failed.
+    pub(crate) fn frame_allowing_failure(&mut self, gpu: &Gpu) -> Next {
         let texture = clear(&gpu.device, &gpu.queue, 64, 48, MAGENTA);
-        let next = self.app.frame(&Frame {
+        self.app.frame(&Frame {
             adapter: &gpu.adapter,
             device: &gpu.device,
             queue: &gpu.queue,
@@ -65,13 +71,18 @@ impl Page {
             index: 1,
             scale_factor: 1.0,
             now: Instant::now(),
-        });
-        assert_eq!(self.app.failure().get(), None, "the frame failed");
-        next
+        })
     }
     /// Removes the surface element and unmounts its renderer, mid-animation.
     fn remove_track(&mut self) {
+        self.remove_element();
+        self.unmount();
+    }
+    pub(crate) fn remove_element(&mut self) {
         self.document.borrow_mut().remove(self.surface);
+    }
+    /// Unmounts the renderer and drops it, as `unmount`'s caller does.
+    pub(crate) fn unmount(&mut self) {
         let renderer = self.app.unmount("track").expect("mounted");
         drop(renderer);
     }
@@ -87,7 +98,7 @@ fn add_surface(doc: &mut Document) -> NodeId {
 }
 
 /// A page whose track has animated for two frames.
-fn animated(gpu: &Gpu) -> (Page, SurfaceHandle, Rc<TrackLog>) {
+pub(crate) fn animated(gpu: &Gpu) -> (Page, SurfaceHandle, Rc<TrackLog>) {
     let mut page = Page::new();
     let (handle, log) = page.mount_animating();
     assert_eq!([page.frame(gpu), page.frame(gpu)], [Next::Continue; 2]);
@@ -127,8 +138,14 @@ fn gpu_an_unmounted_track_s_handle_refuses_every_call_as_not_mounted() {
     assert_eq!(handle.request_animation(), Err(refused()));
     assert_eq!(handle.invalidate(), Err(refused()));
     assert_eq!(handle.stop_animation(), Err(refused()));
-    let message = refused().to_string();
-    assert!(message.contains("\"track\" has no renderer"), "{message}");
+    let expected = "the gpu-surface \"track\" has no renderer mounted, so the call did nothing; mount one with ElementsApp::mount and call through the handle it returns";
+    for call in [
+        handle.request_animation().map(drop),
+        handle.invalidate().map(drop),
+        handle.stop_animation(),
+    ] {
+        assert_eq!(call.expect_err("refused").to_string(), expected);
+    }
     assert_eq!(
         [page.frame(&gpu), page.frame(&gpu)],
         [Next::Continue, Next::Wait]
