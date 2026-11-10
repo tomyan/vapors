@@ -1,6 +1,6 @@
 //! Drawing a [`Layout`]: each glyph is fetched from the atlas at its
 //! quarter-pixel x step with the baseline snapped to a whole pixel, and
-//! becomes one quad; the atlas page is uploaded when it changed.
+//! becomes one quad; the part of the atlas page that changed is uploaded.
 
 use vapors_scene::{Scissor, Size};
 
@@ -50,7 +50,7 @@ impl TextPipeline {
         Ok(())
     }
 
-    /// Upload the atlas page if it changed, set `params`, and draw `quads`.
+    /// Upload what changed in the atlas page, set `params`, and draw `quads`.
     ///
     /// # Panics
     ///
@@ -75,22 +75,33 @@ impl TextPipeline {
         self.draw_quads(target, quads);
     }
 
+    /// Upload the part of the atlas page that changed since the last
+    /// upload: the bounding rectangle of the glyphs added, or the whole
+    /// page when it is new or was repacked. Its rows go packed tight;
+    /// `Queue::write_texture`, unlike a buffer-to-texture copy, takes
+    /// any `bytes_per_row` and pads rows itself when staging.
     fn upload_page(&self, queue: &wgpu::Queue, atlas: &mut GlyphAtlas) {
         let page = atlas.coverage_page_mut();
-        if !page.dirty() {
+        let Some(rect @ [x, y, width, height]) = page.dirty_rect() else {
             return;
-        }
-        let size = page.size();
+        };
         self.work.write_texture(
             queue,
-            self.texture.as_image_copy(),
-            page.pixels(),
+            wgpu::TexelCopyTextureInfo {
+                origin: wgpu::Origin3d { x, y, z: 0 },
+                ..self.texture.as_image_copy()
+            },
+            &page.region_pixels(rect),
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(size),
-                rows_per_image: Some(size),
+                bytes_per_row: Some(width * page.bytes_per_pixel()),
+                rows_per_image: Some(height),
             },
-            self.texture.size(),
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
         );
         page.mark_clean();
     }
