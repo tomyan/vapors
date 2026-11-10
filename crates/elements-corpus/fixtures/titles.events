@@ -1,0 +1,6 @@
+# The title attribute as name and description (docs/tooltips.md), as
+# Chromium's accessibility tree has them.
+project button slider
+listen focusin
+key Tab                       the first button
+expect focus button#open

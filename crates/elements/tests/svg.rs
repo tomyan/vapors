@@ -121,6 +121,7 @@ fn node(role: &str, name: &str) -> AxNode {
         role: role.to_owned(),
         name: name.to_owned(),
         value: None,
+        description: None,
         properties: Vec::new(),
     }
 }
