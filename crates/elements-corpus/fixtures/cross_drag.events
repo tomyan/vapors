@@ -1,0 +1,13 @@
+# An uncaptured drag from A (x 0..100, y 0..40) to B (x 100..200), in
+# the wrapper (3D 1c PR 5): B gets the move and the release, A the
+# press only, and the click is the nearest common ancestor's.
+listen pointerdown pointermove pointerup pointercancel click
+move 50 20                    over A
+expect event pointermove div#a
+press 50 20                   A, which does not capture
+expect event pointerdown div#a
+move 150 20                   over B, not captured
+expect event pointermove div#b
+release 150 20                on B
+expect event pointerup div#b
+expect event click div#wrap
