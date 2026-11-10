@@ -53,6 +53,8 @@ pub struct Document {
     pub(crate) boxes: crate::layout::KeptBoxes,
     /// Boxes the last update laid out rather than read from cache.
     pub(crate) laid_out: usize,
+    /// The last update's structural counts.
+    pub(crate) counts: crate::UpdateCounts,
     /// Each scroll container's offset.
     pub(crate) scroll: crate::scroll::Offsets,
     /// Whether scroll thumbs are drawn now.
@@ -92,6 +94,7 @@ impl Document {
             kept: None,
             boxes: crate::layout::KeptBoxes::default(),
             laid_out: 0,
+            counts: crate::UpdateCounts::default(),
             scroll: crate::scroll::Offsets::default(),
             thumbs_shown: true,
             images: crate::images::Images::default(),
