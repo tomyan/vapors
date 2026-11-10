@@ -20,70 +20,108 @@ pub(crate) fn missing_wedges(commands: &[Command], width: f32) -> Vec<Command> {
 
 fn push_wedge(wedges: &mut Vec<Command>, pivot: Point, d1: Vector, d2: Vector, radius: f32) {
     let dot = d1.dot(d2);
-    let sin_half = f32::midpoint(1.0, dot).sqrt();
+    // A reversal on a diagonal can give a dot just under -1.
+    let sin_half = f32::midpoint(1.0, dot).max(0.0).sqrt();
     if dot >= 0.0 || sin_half * MITER_LIMIT < 1.0 {
         return;
     }
     let outward = (d1 - d2).normalize();
-    let outer = |d: Vector| {
-        let normal = Vector::new(-d.y, d.x);
-        if normal.dot(outward) < 0.0 {
-            normal * -1.0
-        } else {
-            normal
-        }
-    };
-    wedges.push(Command::MoveTo(pivot));
-    wedges.push(Command::LineTo(pivot + outer(d1) * radius));
-    wedges.push(Command::LineTo(pivot + outward * (radius / sin_half)));
-    wedges.push(Command::LineTo(pivot + outer(d2) * radius));
+    let points = [
+        pivot,
+        pivot + outer_normal(d1, outward) * radius,
+        pivot + outward * (radius / sin_half),
+        pivot + outer_normal(d2, outward) * radius,
+    ];
+    // zeno panics on a non-finite point in debug builds.
+    if points.iter().any(|p| !p.x.is_finite() || !p.y.is_finite()) {
+        return;
+    }
+    wedges.push(Command::MoveTo(points[0]));
+    wedges.extend(points[1..].iter().map(|&p| Command::LineTo(p)));
     wedges.push(Command::Close);
 }
 
-/// Each join: its point and the unit directions in and out of it.
-fn joins(commands: &[Command]) -> Vec<(Point, Vector, Vector)> {
-    let mut joins = Vec::new();
-    let (mut start, mut current) = (Point::ZERO, Point::ZERO);
-    let (mut first, mut last): (Option<Vector>, Option<Vector>) = (None, None);
-    for command in commands {
-        let (from, to, end) = match *command {
-            Command::MoveTo(p) => {
-                (start, current, first, last) = (p, p, None, None);
-                continue;
-            }
-            Command::LineTo(p) => (p - current, p - current, p),
-            Command::CurveTo(a, b, p) => {
-                (tangent(&[a, b, p], current), tangent(&[b, a], p) * -1.0, p)
-            }
-            Command::QuadTo(a, p) => (tangent(&[a, p], current), tangent(&[a], p) * -1.0, p),
-            Command::Close => {
-                if let (Some(d1), Some(d2)) = (last, first) {
-                    let close = start - current;
-                    let closing = (close.length() > 1e-6).then(|| close.normalize());
-                    push_join(&mut joins, current, last, closing);
-                    push_join(&mut joins, start, closing.or(Some(d1)), Some(d2));
-                }
-                (current, first, last) = (start, None, None);
-                continue;
-            }
-        };
-        if to.length() > 1e-6 || from.length() > 1e-6 {
-            let (from, to) = (from.normalize(), to.normalize());
-            push_join(&mut joins, current, last, Some(from));
-            first = first.or(Some(from));
-            last = Some(to);
-        }
-        current = end;
+/// The unit normal of `d` on the outer side of the join.
+fn outer_normal(d: Vector, outward: Vector) -> Vector {
+    let normal = Vector::new(-d.y, d.x);
+    if normal.dot(outward) < 0.0 {
+        normal * -1.0
+    } else {
+        normal
     }
-    joins
 }
 
-fn push_join(
-    joins: &mut Vec<(Point, Vector, Vector)>,
-    at: Point,
-    d1: Option<Vector>,
-    d2: Option<Vector>,
-) {
+/// Each join: its point and the unit directions in and out of it.
+type Join = (Point, Vector, Vector);
+
+fn joins(commands: &[Command]) -> Vec<Join> {
+    let mut walk = Walk::default();
+    for command in commands {
+        walk.step(command);
+    }
+    walk.joins
+}
+
+/// The state of a walk along the commands' subpaths.
+#[derive(Default)]
+struct Walk {
+    start: Point,
+    current: Point,
+    first: Option<Vector>,
+    last: Option<Vector>,
+    joins: Vec<Join>,
+}
+
+impl Walk {
+    fn step(&mut self, command: &Command) {
+        match *command {
+            Command::MoveTo(p) => self.begin(p),
+            Command::LineTo(p) => self.segment(p - self.current, p - self.current, p),
+            Command::CurveTo(a, b, p) => {
+                let out = tangent(&[a, b, p], self.current);
+                self.segment(out, tangent(&[b, a], p) * -1.0, p);
+            }
+            Command::QuadTo(a, p) => {
+                let out = tangent(&[a, p], self.current);
+                self.segment(out, tangent(&[a], p) * -1.0, p);
+            }
+            Command::Close => self.close(),
+        }
+    }
+
+    fn begin(&mut self, at: Point) {
+        (self.start, self.current, self.first, self.last) = (at, at, None, None);
+    }
+
+    /// A segment leaving in direction `from` and arriving in direction `to`.
+    fn segment(&mut self, from: Vector, to: Vector, end: Point) {
+        if from.length() > 1e-6 {
+            let from = from.normalize();
+            // A curve ending on its own control points arrives as it left.
+            let to = if to.length() > 1e-6 {
+                to.normalize()
+            } else {
+                from
+            };
+            push_join(&mut self.joins, self.current, self.last, Some(from));
+            self.first = self.first.or(Some(from));
+            self.last = Some(to);
+        }
+        self.current = end;
+    }
+
+    fn close(&mut self) {
+        if let (Some(d1), Some(d2)) = (self.last, self.first) {
+            let close = self.start - self.current;
+            let closing = (close.length() > 1e-6).then(|| close.normalize());
+            push_join(&mut self.joins, self.current, self.last, closing);
+            push_join(&mut self.joins, self.start, closing.or(Some(d1)), Some(d2));
+        }
+        (self.current, self.first, self.last) = (self.start, None, None);
+    }
+}
+
+fn push_join(joins: &mut Vec<Join>, at: Point, d1: Option<Vector>, d2: Option<Vector>) {
     if let (Some(d1), Some(d2)) = (d1, d2) {
         joins.push((at, d1, d2));
     }
@@ -97,3 +135,7 @@ fn tangent(points: &[Point], origin: Point) -> Vector {
         .find(|v| v.length() > 1e-6)
         .unwrap_or(Vector::ZERO)
 }
+
+#[cfg(test)]
+#[path = "icon_miter_tests.rs"]
+mod tests;
