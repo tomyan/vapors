@@ -2,15 +2,16 @@
 //! holds when it shows): the pointer's title from the element it hits,
 //! keyboard focus's from the focused element when a key moved it and
 //! it is `:focus-visible`. Every event updates it, the host's too, so
-//! a key or press the host takes still hides it. A touch never arms
-//! it. A host asks once per frame, after the document's update, for
+//! a key or press the host takes still hides it, and so does an event
+//! only observed ([`DocumentInput::observe`]). A touch never arms it.
+//! A host asks once per frame, after the document's update, for
 //! the tooltip shown ([`DocumentInput::tooltip`]) and for when to wake
 //! ([`DocumentInput::tooltip_deadline`]).
 
 use vapors_elements::{Document, Point};
 use vapors_platform::{Event, Instant};
 
-use super::DocumentInput;
+use super::{DocumentInput, Unplaced};
 use crate::pointer::Action;
 use crate::tooltip::{Titled, Tooltip, TooltipTrigger};
 
@@ -90,6 +91,33 @@ impl DocumentInput {
         self.tooltip.focus(document.active_element(), target, now);
     }
 
+    /// Let the tooltip see `event` without giving it to `document`: a
+    /// host with several documents gives each event to the one it routes
+    /// to and observes it on the others. The tooltip reacts as when
+    /// [`DocumentInput::give`] gives it (a key or window blur hides it, a
+    /// move arms the title under the pointer); the document's focus,
+    /// hover and listeners are untouched. A move records where the
+    /// pointer is ([`DocumentInput::pointer`]), as `give` records every
+    /// move, so the tooltip's checks each frame read the window's pointer.
+    ///
+    /// # Errors
+    ///
+    /// [`Unplaced`] when it is a pointer event and the document's last
+    /// update gives no usable scale.
+    pub fn observe(
+        &mut self,
+        document: &Document,
+        event: &Event,
+        now: Instant,
+    ) -> Result<(), Unplaced> {
+        let action = self.action(document, event)?;
+        if let Some(Action::Move(point)) = action {
+            self.pointer = Some(point);
+        }
+        self.tooltip_event(document, event, action, now);
+        Ok(())
+    }
+
     fn tooltip_action(&mut self, document: &Document, action: Action, now: Instant) {
         match action {
             Action::Move(point) => self.tooltip.pointer_over(title_at(document, point), now),
@@ -143,6 +171,9 @@ fn focus_title(document: &Document) -> Option<Titled> {
 #[cfg(test)]
 #[path = "document_input_tooltip_keys_tests.rs"]
 mod key_tests;
+#[cfg(test)]
+#[path = "document_input_tooltip_observe_tests.rs"]
+mod observe_tests;
 #[cfg(test)]
 #[path = "document_input_tooltip_tests.rs"]
 mod tests;
