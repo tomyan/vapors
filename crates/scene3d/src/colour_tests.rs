@@ -25,10 +25,38 @@ fn a_channel_outside_zero_to_one_is_refused_by_name() {
 }
 
 #[test]
-fn a_nan_channel_is_refused() {
+fn a_non_finite_channel_is_refused_naming_the_channel() {
+    let cases = [
+        (Colour::srgb(f32::NAN, 0.0, 0.0), "Colour::srgb red"),
+        (Colour::srgb(0.0, f32::INFINITY, 0.0), "Colour::srgb green"),
+        (Colour::srgb(0.0, 0.0, f32::NAN), "Colour::srgb blue"),
+    ];
+    for (refused, field) in cases {
+        // Then
+        assert_eq!(refused, Err(SceneError::NonFinite { field }));
+    }
+}
+
+#[test]
+fn the_channel_limits_zero_and_one_are_accepted() {
     // When
-    let refused = Colour::srgb(f32::NAN, 0.0, 0.0);
+    let colour = Colour::srgb(0.0, 1.0, 0.0).unwrap();
 
     // Then
-    assert!(matches!(refused, Err(SceneError::NonFinite { .. })));
+    assert_eq!(colour.rgba(), [0.0, 1.0, 0.0, 1.0]);
+}
+
+#[test]
+fn a_negative_channel_is_refused_by_name() {
+    // When
+    let refused = Colour::srgb(0.0, 0.0, -0.1);
+
+    // Then
+    assert_eq!(
+        refused,
+        Err(SceneError::ChannelOutOfRange {
+            channel: "blue",
+            value: -0.1
+        })
+    );
 }

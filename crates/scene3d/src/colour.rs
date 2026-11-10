@@ -19,9 +19,13 @@ impl Colour {
     ///
     /// [`SceneError::NonFinite`] or [`SceneError::ChannelOutOfRange`].
     pub fn srgb(red: f32, green: f32, blue: f32) -> Result<Self, SceneError> {
-        let named = [("red", red), ("green", green), ("blue", blue)];
-        for (channel, value) in named {
-            finite_scalar("Colour::srgb channel", value)?;
+        let named = [
+            ("red", "Colour::srgb red", red),
+            ("green", "Colour::srgb green", green),
+            ("blue", "Colour::srgb blue", blue),
+        ];
+        for (channel, field, value) in named {
+            finite_scalar(field, value)?;
             if !(0.0..=1.0).contains(&value) {
                 return Err(SceneError::ChannelOutOfRange { channel, value });
             }

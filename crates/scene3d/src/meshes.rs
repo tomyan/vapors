@@ -48,6 +48,10 @@ static NEXT_MESHES: AtomicU64 = AtomicU64::new(0);
 /// The geometry an application has given, shared between it and the
 /// scene renderer. Each piece is queued when given; the renderer takes
 /// the queue and uploads each piece once.
+///
+/// The renderer must take the queue every frame: queued geometry is
+/// held in memory until taken. Nothing releases geometry after upload
+/// yet; release arrives in PR 5.
 #[derive(Debug)]
 pub struct Meshes {
     id: u64,
@@ -66,13 +70,17 @@ impl Meshes {
         }
     }
 
-    /// Validates triangles and queues them for upload.
+    /// Validates triangles and queues them for upload. A triangle whose
+    /// indices repeat, or whose corners are collinear, is allowed and
+    /// draws nothing.
     ///
     /// # Errors
     ///
-    /// [`MeshError`]: no positions, no indices, an index count that is
-    /// not a multiple of 3, an index past the positions, or a position
-    /// that is NaN or infinite.
+    /// [`MeshError`]: no positions, fewer than 3, no indices, an index count
+    /// that is not a multiple of 3, an index past the positions, a
+    /// position that is NaN or infinite, or a position or index buffer
+    /// past WebGPU's default `maxBufferSize` (256 MiB), the limit every
+    /// adapter supports.
     pub fn geometry(
         &mut self,
         positions: Vec<Vec3>,
