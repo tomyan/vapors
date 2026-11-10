@@ -3028,6 +3028,7 @@ dependencies = [
 name = "vapors-renderer"
 version = "0.0.0"
 dependencies = [
+ "tracing",
  "vapors-gpu-harness",
  "vapors-scene",
  "wgpu",
@@ -3069,6 +3070,7 @@ dependencies = [
  "png",
  "skrifa",
  "tempfile",
+ "tracing",
  "vapors-gpu-harness",
  "vapors-renderer",
  "vapors-scene",

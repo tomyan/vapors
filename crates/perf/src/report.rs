@@ -8,10 +8,15 @@ use crate::run::{Counts, Samples};
 use crate::stats::Distribution;
 
 /// The phases reported, in frame order: the app's `update` (which holds
-/// `style`, `layout` and `paint`) and `draw` (encoding, uploads and
-/// submits). The app's other phases (input, tasks, tick, accessibility,
-/// record) do no work in these workloads and are left out.
-pub const PHASES: [&str; 5] = ["update", "style", "layout", "paint", "draw"];
+/// `style`, `layout` and `paint`) and `draw`, which holds each draw
+/// call's `encode` (bind group, encoder and render pass), `write`
+/// (`Queue::write_buffer` and `write_texture`) and `submit`
+/// (`Queue::submit`); the rest of draw is the painter's own work. The
+/// app's other phases (input, tasks, tick, accessibility, record) do no
+/// work in these workloads and are left out.
+pub const PHASES: [&str; 8] = [
+    "update", "style", "layout", "paint", "draw", "encode", "write", "submit",
+];
 
 /// `samples` of the workload `name` as a Markdown section.
 #[must_use]

@@ -113,10 +113,11 @@ impl TextPipeline {
         let (device, queue) = (target.device, target.queue);
         let bytes: Vec<u8> = quads.iter().flat_map(|f| f.to_le_bytes()).collect();
         let vertex_count = u32::try_from(quads.len() / FLOATS_PER_VERTEX).expect("fits u32");
-        let bind_group = self.bind_group(device);
         self.reserve_vertices(device, bytes.len() as u64);
         let vertices = self.vertices.as_ref().expect("reserved above");
         self.work.write_buffer(queue, vertices, 0, &bytes);
+        let encoding = tracing::trace_span!("draw step", phase = "encode").entered();
+        let bind_group = self.bind_group(device);
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("text"),
         });
@@ -145,7 +146,10 @@ impl TextPipeline {
             pass.set_vertex_buffer(0, vertices.slice(..));
             self.work.draw(&mut pass, 0..vertex_count, 0..1);
         }
-        queue.submit([encoder.finish()]);
+        let commands = encoder.finish();
+        drop(encoding);
+        let _submit = tracing::trace_span!("draw step", phase = "submit").entered();
+        queue.submit([commands]);
     }
 }
 

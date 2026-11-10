@@ -95,6 +95,7 @@ impl Instanced {
     }
 
     fn submit(&self, target: &Target<'_>, count: u32) {
+        let encoding = tracing::trace_span!("draw step", phase = "encode").entered();
         let bind_group = target.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some(self.label),
             layout: &self.layout,
@@ -118,7 +119,10 @@ impl Instanced {
             pass.set_vertex_buffer(0, self.instances.slice(..));
             self.work.draw(&mut pass, 0..VERTICES_PER_QUAD, 0..count);
         }
-        target.queue.submit([encoder.finish()]);
+        let commands = encoder.finish();
+        drop(encoding);
+        let _submit = tracing::trace_span!("draw step", phase = "submit").entered();
+        target.queue.submit([commands]);
     }
 }
 

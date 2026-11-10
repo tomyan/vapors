@@ -41,3 +41,17 @@ fn a_span_outside_the_frame_and_update_phases_is_not_timed() {
     // Then
     assert_eq!(names(&clock), Vec::<String>::new());
 }
+
+#[test]
+fn a_draw_step_is_timed_under_its_phase() {
+    // Given
+    let clock = PhaseClock::default();
+
+    // When
+    tracing::subscriber::with_default(clock.clone(), || {
+        let _span = tracing::trace_span!("draw step", phase = "submit").entered();
+    });
+
+    // Then
+    assert_eq!(names(&clock), ["submit"]);
+}

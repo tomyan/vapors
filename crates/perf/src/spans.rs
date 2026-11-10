@@ -1,8 +1,10 @@
 //! A `tracing` subscriber that times the phases of a frame: vapors-app's
-//! `frame phase` spans (input to record; `update` and `draw` do the work)
-//! and vapors-elements' `update phase` spans (`style`, `layout`, `paint`),
-//! each named by its `phase` field. It sums the time between each
-//! span's enter and exit by phase until the times are taken.
+//! `frame phase` spans (input to record; `update` and `draw` do the
+//! work), vapors-elements' `update phase` spans (`style`, `layout`,
+//! `paint`), and the `draw step` spans vapors-renderer and vapors-text
+//! open inside draw (`encode`, `write`, `submit`), each named by its
+//! `phase` field. It sums the time between each span's enter and exit
+//! by phase until the times are taken.
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -13,7 +15,7 @@ use tracing::span::{Attributes, Id, Record};
 use tracing::{Event, Metadata, Subscriber};
 
 /// The spans it times, by name.
-const TIMED: [&str; 2] = ["frame phase", "update phase"];
+const TIMED: [&str; 3] = ["frame phase", "update phase", "draw step"];
 
 /// The subscriber; clones share the times.
 #[derive(Clone, Default)]
