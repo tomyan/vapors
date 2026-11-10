@@ -8,22 +8,22 @@ use vapors_renderer::Target;
 use vapors_scene::Size;
 impl Racer {
     pub(super) fn advance(&mut self, frame: &Frame<'_>) -> Result<(), String> {
-        let elapsed = self
-            .pacing
-            .last
-            .replace(frame.now)
-            .map_or(0.0, |last| frame.now.duration_since(last).as_secs_f32());
+        let elapsed = self.frame_elapsed(frame);
         if !self.run.paused {
             self.advance_elapsed(elapsed)?;
         }
         if !self.run.paused || self.run.camera.moving {
-            self.run.camera.step(
-                elapsed.min(0.05),
-                self.run.race.speed,
-                self.run.race.heading,
-            )?;
+            self.step_camera(elapsed)?;
         }
         Ok(())
+    }
+    fn frame_elapsed(&mut self, frame: &Frame<'_>) -> f32 {
+        let last = self.pacing.last.replace(frame.now);
+        last.map_or(0.0, |last| frame.now.duration_since(last).as_secs_f32())
+    }
+    fn step_camera(&mut self, elapsed: f32) -> Result<(), String> {
+        let (speed, heading) = (self.run.race.speed, self.run.race.heading);
+        self.run.camera.step(elapsed.min(0.05), speed, heading)
     }
     pub(crate) fn advance_elapsed(&mut self, elapsed: f32) -> Result<(), String> {
         check_elapsed(elapsed)?;

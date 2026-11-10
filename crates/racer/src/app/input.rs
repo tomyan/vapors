@@ -21,12 +21,7 @@ impl Racer {
     /// when it was dropped before the first frame.
     fn give(&mut self, event: &Event, platform: &Platform) -> Result<Option<Route>, String> {
         match self.input.give(&self.document, event, platform) {
-            Ok(given) => {
-                if let Some(cursor) = given.cursor {
-                    platform.set_cursor(cursor);
-                }
-                Ok(Some(given.route))
-            }
+            Ok(given) => Ok(Some(given_route(given, platform))),
             // RELAXED: before the first frame the document has no layout,
             // so an event has no target and is dropped, a key included.
             // Only that window is let through: after the first frame
@@ -54,45 +49,61 @@ impl Racer {
         Ok(())
     }
     fn key(&mut self, event: &Event) -> Result<(), String> {
-        if let Event::Key {
-            code,
-            pressed,
-            repeat,
-            ..
-        } = event
-        {
-            if *pressed && !repeat {
-                match code.as_str() {
-                    "Space" | "Escape" => self.command("toggle")?,
-                    "KeyR" => self.command("restart")?,
-                    _ => {}
-                }
-            }
-            if !self.run.paused {
-                self.run.driving.key(code, *pressed);
-            }
+        let Some((code, pressed, repeat)) = key_parts(event) else {
+            return Ok(());
+        };
+        if pressed && !repeat {
+            self.key_command(code)?;
+        }
+        if !self.run.paused {
+            self.run.driving.key(code, pressed);
         }
         Ok(())
     }
+    fn key_command(&mut self, code: &str) -> Result<(), String> {
+        match code {
+            "Space" | "Escape" => self.command("toggle"),
+            "KeyR" => self.command("restart"),
+            _ => Ok(()),
+        }
+    }
     pub(crate) fn sync_driving_controls(&mut self) {
-        let held = [
+        let held = self.held_buttons();
+        if self.run.paused && held.iter().any(|(_, down)| *down) && self.can_resume() {
+            self.resume();
+        }
+        for (name, down) in held {
+            let active = (down && !self.run.paused).then(|| name.to_owned());
+            self.run.driving.hold(format!("ui-{name}"), active);
+        }
+    }
+    fn held_buttons(&self) -> [(&'static str, bool); 4] {
+        [
             ("left", self.hud.left.get()),
             ("right", self.hud.right.get()),
             ("brake", self.hud.brake.get()),
             ("gas", self.hud.gas.get()),
-        ];
-        if self.run.paused
-            && held.iter().any(|(_, down)| *down)
-            && !self.hud.settings.get()
-            && self.run.race.progress.laps < 3
-        {
-            self.resume();
-        }
-        for (name, down) in held {
-            self.run.driving.hold(
-                format!("ui-{name}"),
-                (down && !self.run.paused).then(|| name.to_owned()),
-            );
-        }
+        ]
+    }
+    fn can_resume(&self) -> bool {
+        !self.hud.settings.get() && self.run.race.progress.laps < 3
+    }
+}
+/// The route of what the document did with an event, after the cursor it asked for is set.
+fn given_route(given: vapors_app::Given, platform: &Platform) -> Route {
+    if let Some(cursor) = given.cursor {
+        platform.set_cursor(cursor);
+    }
+    given.route
+}
+fn key_parts(event: &Event) -> Option<(&str, bool, bool)> {
+    match event {
+        Event::Key {
+            code,
+            pressed,
+            repeat,
+            ..
+        } => Some((code, *pressed, *repeat)),
+        _ => None,
     }
 }

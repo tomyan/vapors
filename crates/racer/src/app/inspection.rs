@@ -1,6 +1,8 @@
 //! Read-only QA telemetry, requested explicitly by ?inspect=1.
 use super::Racer;
 use std::fmt::Display;
+use vapors_dom::NodeId;
+use vapors_elements::Document;
 
 /// The status object's fields as JSON text, refusing a number JSON
 /// cannot carry.
@@ -72,19 +74,19 @@ impl Racer {
         let document = self.document.borrow();
         let mut targets = Fields::default();
         for node in document.elements() {
-            let name = ["data-action", "data-hold", "data-setting"]
-                .iter()
-                .find_map(|attribute| document.attribute(node, attribute));
             let rect = document.painted().and_then(|p| p.border_box(node));
-            if let (Some(name), Some(rect)) = (name, rect) {
-                targets.plain(
-                    name,
-                    rect_json(name, [rect.x, rect.y, rect.width, rect.height])?,
-                );
+            if let (Some(name), Some(rect)) = (target_name(&document, node), rect) {
+                let numbers = [rect.x, rect.y, rect.width, rect.height];
+                targets.plain(name, rect_json(name, numbers)?);
             }
         }
         Ok(targets)
     }
+}
+fn target_name(document: &Document, node: NodeId) -> Option<&str> {
+    ["data-action", "data-hold", "data-setting"]
+        .iter()
+        .find_map(|attribute| document.attribute(node, attribute))
 }
 
 pub(super) fn rect_json(name: &str, numbers: [f32; 4]) -> Result<String, String> {

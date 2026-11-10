@@ -2,7 +2,7 @@
 use super::{mesh, pipeline};
 use crate::model::{Camera, RADIUS, ROAD, Race, STRAIGHT};
 use wgpu::util::DeviceExt;
-use wgpu::{CommandEncoder, RenderPass, TextureView};
+use wgpu::{CommandEncoder, Extent3d, RenderPass, TextureView};
 
 pub(super) fn uniform_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -105,7 +105,7 @@ pub(super) fn pipelines(
         pipeline::create(device, format, layout, &shader, true),
     )
 }
-pub(super) fn depth_view(device: &wgpu::Device, size: wgpu::Extent3d) -> TextureView {
+pub(super) fn depth_view(device: &wgpu::Device, size: Extent3d) -> TextureView {
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("racer depth"),
         size,
@@ -119,12 +119,7 @@ pub(super) fn depth_view(device: &wgpu::Device, size: wgpu::Extent3d) -> Texture
     texture.create_view(&wgpu::TextureViewDescriptor::default())
 }
 /// The 80-byte frame uniform: viewport and clock, car, then track and camera angle.
-pub(super) fn frame_uniforms(
-    extent: wgpu::Extent3d,
-    race: &Race,
-    camera: Camera,
-    brake: f32,
-) -> Vec<u8> {
+pub(super) fn frame_uniforms(extent: Extent3d, race: &Race, camera: Camera, brake: f32) -> Vec<u8> {
     let values = [
         viewport_values(extent, camera.zoom, race.elapsed).to_vec(),
         car_values(race, camera, brake).to_vec(),
@@ -136,7 +131,7 @@ pub(super) fn frame_uniforms(
         .flat_map(|v| v.to_le_bytes())
         .collect()
 }
-fn viewport_values(extent: wgpu::Extent3d, zoom: f32, elapsed: f32) -> [f32; 4] {
+fn viewport_values(extent: Extent3d, zoom: f32, elapsed: f32) -> [f32; 4] {
     #[allow(clippy::cast_precision_loss)] // viewport dimensions fit f32 exactly
     [extent.width as f32, extent.height as f32, zoom, elapsed]
 }
