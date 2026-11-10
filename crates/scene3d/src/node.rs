@@ -1,6 +1,6 @@
 //! A node: what it is, where it sits, and reading it from the scene.
 
-use crate::{CameraHandle, NodeId, Projection, Scene, StoreError, Transform};
+use crate::{CameraHandle, Colour, GeometryId, NodeId, Projection, Scene, StoreError, Transform};
 use glam::Mat4;
 
 /// What a node is.
@@ -8,8 +8,13 @@ use glam::Mat4;
 pub enum NodeKind {
     /// Holds children; draws nothing.
     Group,
-    /// Draws geometry (attached in `docs/plans/3d-2.md` PR 3).
-    Mesh,
+    /// Draws geometry in one colour.
+    Mesh {
+        /// The triangles, given to the scene renderer's [`crate::Meshes`].
+        geometry: GeometryId,
+        /// Drawn unlit.
+        colour: Colour,
+    },
     /// A camera the scene root can name by `handle`.
     Camera {
         /// The name the root points at.

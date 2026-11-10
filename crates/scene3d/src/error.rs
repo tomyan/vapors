@@ -51,6 +51,13 @@ pub enum SceneError {
     EyeAtTarget,
     /// A view whose up vector is zero or parallel to its direction.
     UpParallel,
+    /// A colour channel outside 0 to 1.
+    ChannelOutOfRange {
+        /// `red`, `green` or `blue`.
+        channel: &'static str,
+        /// Its value.
+        value: f32,
+    },
     /// Finite inputs whose matrix overflows to NaN or infinity.
     MatrixNotFinite {
         /// The constructor or method that built the matrix.
@@ -75,6 +82,7 @@ impl fmt::Display for SceneError {
             Self::AspectNotPositive { aspect } => fmt_aspect(f, *aspect),
             Self::EyeAtTarget => fmt_eye_at_target(f),
             Self::UpParallel => fmt_up_parallel(f),
+            Self::ChannelOutOfRange { channel, value } => fmt_channel(f, channel, *value),
             Self::MatrixNotFinite { what, inputs } => fmt_matrix(f, what, inputs),
         }
     }
@@ -140,6 +148,13 @@ fn fmt_up_parallel(f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(
         f,
         "View::look_at up is zero or parallel to the view direction (sine of the angle under 1e-6): give an up vector across it, such as Vec3::Y for a camera not looking straight down"
+    )
+}
+
+fn fmt_channel(f: &mut fmt::Formatter<'_>, channel: &str, value: f32) -> fmt::Result {
+    write!(
+        f,
+        "Colour::srgb {channel} is {value}: give an sRGB-encoded value from 0 to 1"
     )
 }
 

@@ -1,4 +1,5 @@
 use super::*;
+use crate::test_support::mesh;
 use crate::{Projection, Transform};
 
 fn camera(handle: CameraHandle) -> NodeKind {
@@ -99,9 +100,7 @@ fn a_group_or_mesh_never_answers_for_a_camera() {
     // Given: no camera nodes at all
     let mut scene = Scene::new();
     let root = scene.root();
-    scene
-        .add(root, NodeKind::Mesh, Transform::IDENTITY)
-        .unwrap();
+    scene.add(root, mesh(), Transform::IDENTITY).unwrap();
     let handle = CameraHandle::new();
     scene.set_camera(Some(handle));
 

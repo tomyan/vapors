@@ -1,4 +1,5 @@
 use super::*;
+use crate::test_support::mesh;
 use crate::{NodeKind, Quat, Vec3};
 use glam::Vec4;
 use std::f32::consts::{FRAC_1_SQRT_2, FRAC_PI_2, FRAC_PI_4};
@@ -23,10 +24,10 @@ pub(super) fn tree() -> Tree {
     let mut scene = Scene::new();
     let root = scene.root();
     let a = scene.add(root, NodeKind::Group, at(1.0)).unwrap();
-    let a1 = scene.add(a, NodeKind::Mesh, at(1.0)).unwrap();
+    let a1 = scene.add(a, mesh(), at(1.0)).unwrap();
     let a2 = scene.add(a, NodeKind::Group, at(1.0)).unwrap();
-    let a2x = scene.add(a2, NodeKind::Mesh, at(1.0)).unwrap();
-    let b = scene.add(root, NodeKind::Mesh, at(1.0)).unwrap();
+    let a2x = scene.add(a2, mesh(), at(1.0)).unwrap();
+    let b = scene.add(root, mesh(), at(1.0)).unwrap();
     let first = scene.update();
     Tree {
         scene,
@@ -52,7 +53,7 @@ fn a_child_world_matrix_is_parent_times_local() {
         .unwrap();
     let eighth = Quat::from_axis_angle(Vec3::Z, FRAC_PI_4);
     let local = Transform::new(Vec3::X, eighth, Vec3::ONE).unwrap();
-    let child = scene.add(parent, NodeKind::Mesh, local).unwrap();
+    let child = scene.add(parent, mesh(), local).unwrap();
 
     // When
     scene.update();
