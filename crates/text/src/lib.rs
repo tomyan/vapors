@@ -12,6 +12,8 @@ pub mod comparison;
 mod draw;
 mod font_system;
 pub mod fonts;
+mod icon_path;
+mod icon_path_lex;
 #[cfg(test)]
 mod italic_tests;
 mod layout;
@@ -31,6 +33,7 @@ pub use atlas::{AtlasConfig, AtlasError, AtlasGlyph, GlyphAtlas, PageKind};
 pub use atlas_page::AtlasPage;
 pub use draw::RenderTarget;
 pub use font_system::FontSystem;
+pub use icon_path::{IconPath, PathError};
 pub use layout::{Align, Glyph, GlyphRun, Layout, LayoutOptions, LineInfo, PlacedGlyph};
 pub use layout_ranges::Fragment;
 pub use line_metrics::content_area;
