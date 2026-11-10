@@ -44,7 +44,9 @@ impl Phases for AppFrame<'_, '_> {
 
 impl ElementsApp {
     /// What the painter's last frame handed the GPU: see
-    /// [`FrameCounts`]. All 0 before the first frame.
+    /// [`FrameCounts`]. All 0 before the first frame. A frame that fails
+    /// before painting (an update refusal, a mount error) leaves the
+    /// counts those of the frame before.
     #[must_use]
     pub fn frame_counts(&self) -> FrameCounts {
         self.painter

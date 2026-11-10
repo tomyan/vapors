@@ -116,6 +116,19 @@ impl ScenePainter {
         painted: &Painted,
         run: &Run<'_>,
     ) -> Result<(), PaintError> {
+        let result = self.issue_run(target, painted, run);
+        self.count_run(run);
+        result
+    }
+
+    /// Issues `run`'s writes and draws; a refusal leaves those already
+    /// issued for the caller to count.
+    fn issue_run(
+        &mut self,
+        target: &Target<'_>,
+        painted: &Painted,
+        run: &Run<'_>,
+    ) -> Result<(), PaintError> {
         match *run {
             Run::Shadows(ref shadows) => self.shadows.draw(target, shadows),
             Run::Quads(ref quads) => self.quads.draw(target, quads),
@@ -124,7 +137,6 @@ impl ScenePainter {
             Run::Images(items) => self.textures.draw(&self.images, target, painted, items),
             Run::Surfaces(items) => self.surfaces.draw(&self.images, target, painted, items)?,
         }
-        self.count_run(run);
         Ok(())
     }
 }

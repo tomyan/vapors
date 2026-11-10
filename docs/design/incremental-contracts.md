@@ -145,7 +145,7 @@ drawing.rs:129-139`, every frame).
 | No document change noted | `Document::take_changed()` false | yes (`document.rs:108`) |
 | No document update or traversal at all | `Document::take_changed()` false, or the caller not calling `update`; `update_counts()` cannot show it: the counts keep the last update's values when no update runs, and `elements_visited` is never 0 after a successful update | yes (`update_counts.rs:47`) |
 | UI paint records reused | `Document::update_counts().scene_items_built == 0` | counted (`update_counts.rs:47`); paint rebuilds every item today |
-| GPU work | `ScenePainter::frame_counts()` or `ElementsApp::frame_counts()`: `FrameCounts`, per run kind, `GpuWork { buffer_bytes, texture_bytes, draw_calls }`, the last frame; `atlas_bytes() == 0` and the HUD's runs unchanged per animating frame | counted (`painter_counts.rs`); every frame redraws and re-uploads every run's vertices today |
+| GPU work | `ScenePainter::frame_counts()` or `ElementsApp::frame_counts()`: `FrameCounts`, per run kind, `GpuWork { buffer_bytes, texture_bytes, draw_calls }`, the last frame (a frame that fails before painting leaves the counts unchanged); `atlas_bytes() == 0` and the HUD's runs unchanged per animating frame | counted (`painter_counts.rs`); every frame redraws and re-uploads every run's vertices today |
 
 With today's signals and setters, two rows fail for a HUD that writes
 equal values: every equal write marks the document changed (b), and an

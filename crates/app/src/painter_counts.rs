@@ -11,8 +11,9 @@ use super::ScenePainter;
 /// [`ScenePainter::draw_over`]) issued, per kind of scene run, for
 /// diagnostics and tests. Structural: bytes and calls, not time.
 ///
-/// Reset when a frame starts; each run adds its work after it draws, so
-/// a refused frame holds the runs drawn before the refusal. A refused
+/// Reset when a frame starts; each run adds its work after it draws,
+/// refused or not, so a refused frame holds the runs drawn before the
+/// refusal and the part of the refused run issued before it. A refused
 /// `draw_over` (a canvas background) draws nothing and leaves the frame
 /// before it. Not counted: the clear (a render pass with no draw), and
 /// what a `gpu-surface`'s own renderer writes and draws into its backing.
@@ -73,7 +74,12 @@ impl ScenePainter {
     /// Starts a frame's counts at 0.
     pub(super) fn begin_counts(&mut self) {
         self.counts = FrameCounts::default();
-        self.take_work();
+        let leftover = self.take_work();
+        debug_assert_eq!(
+            leftover,
+            GpuWork::default(),
+            "work issued outside a counted run; every run goes through draw_run"
+        );
     }
 
     /// Adds the work issued since the last take to `run`'s kind.

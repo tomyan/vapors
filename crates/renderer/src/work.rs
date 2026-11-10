@@ -5,7 +5,8 @@ use std::ops::{Add, AddAssign};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Bytes written to the GPU and draw calls issued. Structural: it counts
-/// what was handed to wgpu, not how long the GPU took.
+/// what was handed to wgpu, not how long the GPU took. wgpu's internal
+/// row padding is not included.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct GpuWork {

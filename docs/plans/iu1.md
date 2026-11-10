@@ -117,7 +117,9 @@ a `gpu-surface`'s own renderer does.
 
 What a frame with nothing changed uploads and draws today, at 640x400,
 scale 1, measured at 94ff557 plus this PR (the second of two identical
-frames):
+frames). Reproduce with `cargo run -p vapors-app --example frame_counts`,
+which prints the first and the idle frame of each demo; the counter's idle
+row is also pinned by `gpu_frame_counts_kinds.rs`:
 
 | Demo | Draw calls | Buffer bytes | Texture bytes | First frame's texture bytes |
 |---|---|---|---|---|
