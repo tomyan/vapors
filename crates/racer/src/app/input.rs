@@ -32,7 +32,7 @@ impl Racer {
             // Only that window is let through: after the first frame
             // NotUpdated is an error. DocumentInput holding events until
             // the first update would retire this.
-            Err(Unplaced::NotUpdated) if self.track.is_none() => Ok(None),
+            Err(Unplaced::NotUpdated) if self.gpu.track.is_none() => Ok(None),
             Err(error) => Err(error.to_string()),
         }
     }
@@ -68,8 +68,8 @@ impl Racer {
                     _ => {}
                 }
             }
-            if !self.paused {
-                self.driving.key(code, *pressed);
+            if !self.run.paused {
+                self.run.driving.key(code, *pressed);
             }
         }
         Ok(())
@@ -81,17 +81,17 @@ impl Racer {
             ("brake", self.hud.brake.get()),
             ("gas", self.hud.gas.get()),
         ];
-        if self.paused
+        if self.run.paused
             && held.iter().any(|(_, down)| *down)
             && !self.hud.settings.get()
-            && self.race.progress.laps < 3
+            && self.run.race.progress.laps < 3
         {
             self.resume();
         }
         for (name, down) in held {
-            self.driving.hold(
+            self.run.driving.hold(
                 format!("ui-{name}"),
-                (down && !self.paused).then(|| name.to_owned()),
+                (down && !self.run.paused).then(|| name.to_owned()),
             );
         }
     }

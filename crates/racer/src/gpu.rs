@@ -2,9 +2,10 @@
 mod mesh;
 mod pipeline;
 mod setup;
-use crate::model::{Camera, RADIUS, ROAD, Race, STRAIGHT};
+use crate::model::{Camera, Race};
 use setup::{
-    begin_world_pass, pipelines, solid_meshes, uniform_bind, uniform_buffer, uniform_layout,
+    begin_world_pass, depth_view, frame_uniforms, pipelines, solid_meshes, uniform_bind,
+    uniform_buffer, uniform_layout,
 };
 use vapors_platform::Frame;
 
@@ -42,31 +43,7 @@ impl Track {
         camera: Camera,
         brake: f32,
     ) {
-        let extent = frame.texture.size();
-        #[allow(clippy::cast_precision_loss)] // viewport dimensions fit f32 exactly
-        let values = [
-            extent.width as f32,
-            extent.height as f32,
-            camera.zoom,
-            race.elapsed,
-            race.position[0] + camera.offset[0],
-            race.position[1] + camera.offset[1],
-            race.position[0],
-            race.position[1],
-            race.heading,
-            race.speed,
-            brake,
-            400.0,
-            STRAIGHT,
-            RADIUS,
-            ROAD,
-            camera.tilt,
-            camera.rotation.cos(),
-            camera.rotation.sin(),
-            0.0,
-            0.0,
-        ];
-        let bytes: Vec<u8> = values.iter().flat_map(|v| v.to_le_bytes()).collect();
+        let bytes = frame_uniforms(frame.texture.size(), race, camera, brake);
         frame.queue.write_buffer(&self.uniform, 0, &bytes);
         self.submit(frame, view);
     }
@@ -95,19 +72,6 @@ impl Track {
         if self.depth.as_ref().is_some_and(|(old, _)| *old == size) {
             return;
         }
-        let texture = frame.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("racer depth"),
-            size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth32Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &[],
-        });
-        self.depth = Some((
-            size,
-            texture.create_view(&wgpu::TextureViewDescriptor::default()),
-        ));
+        self.depth = Some((size, depth_view(frame.device, size)));
     }
 }

@@ -40,15 +40,15 @@ impl Racer {
     pub(crate) fn status(&self, frame: u64) -> Result<String, String> {
         let mut fields = Fields::default();
         fields.plain("frame", frame);
-        fields.plain("paused", self.paused);
+        fields.plain("paused", self.run.paused);
         self.race_fields(&mut fields)?;
         self.camera_fields(&mut fields)?;
         fields.plain("targets", self.targets()?.object());
         Ok(fields.object())
     }
     fn race_fields(&self, fields: &mut Fields) -> Result<(), String> {
-        let controls = self.driving.controls();
-        let race = &self.race;
+        let controls = self.run.driving.controls();
+        let race = &self.run.race;
         fields.number("speed", race.speed)?;
         fields.number("time", race.elapsed)?;
         fields.number("x", race.position[0])?;
@@ -61,11 +61,11 @@ impl Racer {
         fields.number("grip", self.hud.grip.get())
     }
     fn camera_fields(&self, fields: &mut Fields) -> Result<(), String> {
-        fields.number("zoom", self.camera.zoom)?;
-        fields.plain("cameraFollow", self.camera.follow);
-        fields.number("cameraYaw", self.camera.rotation)?;
-        fields.number("cameraTilt", self.camera.tilt)?;
-        fields.plain("cameraMoving", self.camera.moving);
+        fields.number("zoom", self.run.camera.zoom)?;
+        fields.plain("cameraFollow", self.run.camera.follow);
+        fields.number("cameraYaw", self.run.camera.rotation)?;
+        fields.number("cameraTilt", self.run.camera.tilt)?;
+        fields.plain("cameraMoving", self.run.camera.moving);
         Ok(())
     }
     fn targets(&self) -> Result<Fields, String> {

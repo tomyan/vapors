@@ -1,5 +1,6 @@
 //! Track resources built once: uniform layout and bind group, solid meshes, world pass.
 use super::{mesh, pipeline};
+use crate::model::{Camera, RADIUS, ROAD, Race, STRAIGHT};
 use wgpu::util::DeviceExt;
 use wgpu::{CommandEncoder, RenderPass, TextureView};
 
@@ -103,4 +104,64 @@ pub(super) fn pipelines(
         ground,
         pipeline::create(device, format, layout, &shader, true),
     )
+}
+pub(super) fn depth_view(device: &wgpu::Device, size: wgpu::Extent3d) -> TextureView {
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("racer depth"),
+        size,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Depth32Float,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        view_formats: &[],
+    });
+    texture.create_view(&wgpu::TextureViewDescriptor::default())
+}
+/// The 80-byte frame uniform: viewport and clock, car, then track and camera angle.
+pub(super) fn frame_uniforms(
+    extent: wgpu::Extent3d,
+    race: &Race,
+    camera: Camera,
+    brake: f32,
+) -> Vec<u8> {
+    let values = [
+        viewport_values(extent, camera.zoom, race.elapsed).to_vec(),
+        car_values(race, camera, brake).to_vec(),
+        track_values(camera).to_vec(),
+    ];
+    values
+        .concat()
+        .iter()
+        .flat_map(|v| v.to_le_bytes())
+        .collect()
+}
+fn viewport_values(extent: wgpu::Extent3d, zoom: f32, elapsed: f32) -> [f32; 4] {
+    #[allow(clippy::cast_precision_loss)] // viewport dimensions fit f32 exactly
+    [extent.width as f32, extent.height as f32, zoom, elapsed]
+}
+fn car_values(race: &Race, camera: Camera, brake: f32) -> [f32; 7] {
+    [
+        race.position[0] + camera.offset[0],
+        race.position[1] + camera.offset[1],
+        race.position[0],
+        race.position[1],
+        race.heading,
+        race.speed,
+        brake,
+    ]
+}
+fn track_values(camera: Camera) -> [f32; 9] {
+    let (sin, cos) = (camera.rotation.sin(), camera.rotation.cos());
+    [
+        400.0,
+        STRAIGHT,
+        RADIUS,
+        ROAD,
+        camera.tilt,
+        cos,
+        sin,
+        0.0,
+        0.0,
+    ]
 }

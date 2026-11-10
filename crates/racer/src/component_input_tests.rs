@@ -41,16 +41,16 @@ fn captured_fingers_leave_the_buttons_and_release_independently() {
     // Then
     assert!(racer.document.borrow().touch_owned(1));
     assert!(racer.document.borrow().touch_owned(2));
-    assert!(!racer.paused);
-    assert_eq!(racer.driving.controls().throttle, 1.0);
-    assert_eq!(racer.driving.controls().steer, 1.0);
+    assert!(!racer.run.paused);
+    assert_eq!(racer.run.driving.controls().throttle, 1.0);
+    assert_eq!(racer.run.driving.controls().steer, 1.0);
     Document::touch_released(&racer.document, 2, [100.0, 300.0]);
     racer.sync_driving_controls();
-    assert_eq!(racer.driving.controls().throttle, 1.0);
-    assert_eq!(racer.driving.controls().steer, 0.0);
+    assert_eq!(racer.run.driving.controls().throttle, 1.0);
+    assert_eq!(racer.run.driving.controls().steer, 0.0);
     Document::touch_cancelled(&racer.document, 1, [190.0, 300.0]);
     racer.sync_driving_controls();
-    assert_eq!(racer.driving.controls().throttle, 0.0);
+    assert_eq!(racer.run.driving.controls().throttle, 0.0);
 }
 #[test]
 fn pause_resets_held_component_state_before_resuming() {
@@ -65,7 +65,7 @@ fn pause_resets_held_component_state_before_resuming() {
     racer.sync_driving_controls();
     // Then
     assert!(!racer.hud.gas.get());
-    assert_eq!(racer.driving.controls().throttle, 0.0);
+    assert_eq!(racer.run.driving.controls().throttle, 0.0);
 }
 
 fn key(key: &str, code: &str, pressed: bool) -> vapors_platform::Event {
@@ -106,7 +106,7 @@ fn space_pauses_after_a_click_on_gas() {
     // When: nothing focused uses Space, so the host has it
     racer.handle(&space(true), &Platform::detached()).unwrap();
     // Then
-    assert!(racer.paused);
+    assert!(racer.run.paused);
 }
 
 #[test]
@@ -119,9 +119,9 @@ fn space_on_a_focused_hold_button_holds_it_and_does_not_pause() {
     // When
     racer.handle(&space(true), &platform).unwrap();
     // Then
-    assert!(!racer.paused);
+    assert!(!racer.run.paused);
     assert!(racer.hud.gas.get());
-    assert_eq!(racer.driving.controls().throttle, 1.0);
+    assert_eq!(racer.run.driving.controls().throttle, 1.0);
     racer.handle(&space(false), &platform).unwrap();
     assert!(!racer.hud.gas.get());
 }
