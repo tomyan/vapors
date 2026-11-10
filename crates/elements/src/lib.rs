@@ -17,6 +17,7 @@ mod a11y_roles;
 mod a11y_scroll;
 mod a11y_set_value;
 mod a11y_target;
+mod a11y_title;
 mod a11y_tree;
 mod arena;
 mod bidi;
