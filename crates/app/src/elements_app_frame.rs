@@ -78,6 +78,9 @@ impl ElementsApp {
             self.painter = Some(made);
         }
         let scene_painter = self.painter.as_mut().expect("made above");
+        self.surfaces
+            .bring_to(scene_painter)
+            .map_err(|error| format!("the surfaces could not be mounted: {error}"))?;
         scene_painter
             .draw(&target, painted)
             .map_err(|error| format!("the document could not be painted: {error}"))

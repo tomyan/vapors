@@ -22,7 +22,9 @@ mod touch_scroll;
 mod wheel_scroll;
 
 pub use document_input::{DocumentInput, Given, Route, Unplaced};
-pub use elements_app::{ElementsApp, Failure, FrameTimesHook, PerFrame};
+pub use elements_app::{
+    ElementsApp, Failure, FrameTimesHook, InvalidateError, Invalidated, PerFrame, SurfaceHandle,
+};
 pub use painter::{
     DrawOverError, MountError, PaintError, SUPPORTED, ScenePainter, UnsupportedFormat,
 };

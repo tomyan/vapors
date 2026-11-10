@@ -15,6 +15,8 @@ use crate::frame::FrameTimes;
 
 use crate::document_input::DocumentInput;
 use crate::painter::ScenePainter;
+pub use surface_handle::{InvalidateError, Invalidated, SurfaceHandle};
+use surfaces::AppSurfaces;
 
 /// Why the app stopped, once it has: shared with whoever ran it.
 #[derive(Clone, Default)]
@@ -36,6 +38,8 @@ impl Failure {
 pub struct ElementsApp {
     document: Rc<RefCell<Document>>,
     painter: Option<ScenePainter>,
+    /// Surface renderers, before and after the painter exists.
+    surfaces: AppSurfaces,
     failure: Failure,
     /// Input given to the document, at its last update's scale.
     input: DocumentInput,
@@ -75,6 +79,7 @@ impl ElementsApp {
         Self {
             document,
             painter: None,
+            surfaces: AppSurfaces::default(),
             failure: Failure::default(),
             input: DocumentInput::new(),
             mirrored: None,
@@ -113,9 +118,13 @@ impl ElementsApp {
 impl ElementsApp {
     /// What to do after a frame: draw again at once if the document
     /// changed since it was last asked (by something outside an event,
-    /// or by the update itself), else wait for the next change.
+    /// or by the update itself), or a surface was invalidated or wants
+    /// a frame (`ScenePainter::wants_frame`), else wait for the next
+    /// change.
     pub fn next_after_frame(&mut self) -> Next {
-        if self.document.borrow_mut().take_changed() {
+        let surfaces_want = self.surfaces.any_stale()
+            || self.painter.as_ref().is_some_and(ScenePainter::wants_frame);
+        if self.document.borrow_mut().take_changed() || surfaces_want {
             Next::Continue
         } else {
             Next::Wait
@@ -128,6 +137,7 @@ impl ElementsApp {
 impl App for ElementsApp {
     fn event(&mut self, event: Event, platform: &Platform) {
         let started = Instant::now();
+        self.surfaces.keep_waker(platform);
         self.handle(&event, platform);
         self.input_spent += started.elapsed();
     }
@@ -140,12 +150,14 @@ impl App for ElementsApp {
             Err(message) => {
                 report_error(&message);
                 self.failure.set(&message);
+                self.surfaces.close();
                 Next::Exit
             }
         }
     }
 
     fn drawn(&mut self, platform: &Platform) {
+        self.surfaces.keep_waker(platform);
         self.mirror_text_field(platform);
     }
 }
@@ -192,6 +204,10 @@ mod frame_phases;
 #[cfg(not(target_family = "wasm"))]
 #[path = "elements_app_paste.rs"]
 mod paste;
+#[path = "elements_app_surface_handle.rs"]
+mod surface_handle;
+#[path = "elements_app_surfaces.rs"]
+mod surfaces;
 #[cfg(test)]
 #[path = "elements_app_tests.rs"]
 mod tests;
