@@ -85,6 +85,8 @@ impl DocumentInput {
     /// it exactly when [`Given::route`] is [`Route::Host`] or
     /// [`Route::Both`]. A paste routed to the document is read from the
     /// clipboard here (native only; see `document_input_paste.rs`).
+    /// A move, always the document's, records the pointer
+    /// ([`DocumentInput::pointer`]), as [`DocumentInput::observe`] does.
     ///
     /// # Errors
     ///

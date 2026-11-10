@@ -81,7 +81,25 @@ arms the new one.
    `DocumentInput` of the document it routes the event to, and passes
    it to `DocumentInput::observe` on each of the others: their tooltips
    react to it as `give` would make them, but their documents do not
-   get it, so a Tab typed in one does not move focus in another.
+   get it, so a Tab typed in one does not move focus in another. Each
+   `DocumentInput` sees every event once, by `give` or by `observe`,
+   whatever `Route` the `give` returned: the others observe a
+   `Route::Host` or `Route::Both` event too, as a key or press the host
+   takes hides their tooltips as well. When the host passes a
+   `Route::Host` event on to another document with `give`, that
+   document is not also given it by `observe`. `observe` refuses a
+   pointer event with `Unplaced`, as `give` does, when the document has
+   not been updated or its last update's scale is unusable: the tooltip
+   did not see the event. The host goes on with the other documents and
+   the next event, as for `give`'s `Unplaced`; `NotUpdated` happens only
+   before the document's first frame, and `Scale` means the host passed
+   a wrong `Viewport::scale`.
+   Two documents can each have a tooltip at once (one a keyboard
+   tooltip, the other the pointer's). Draw at most one, as a window
+   shows one: the tooltip of the document whose tooltip was last armed,
+   which is the one whose `take_tooltip_changed()` was true with
+   `tooltip_deadline()` `Some` after the most recent `give` or
+   `observe`. While that document shows none, draw none.
    After each `give` or `observe`, when `take_tooltip_changed()` is true
    (the tooltip was armed, armed again, shown or hidden), draw a frame:
    it draws the hide, and its `Next` takes the new deadline or drops

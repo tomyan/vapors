@@ -3,7 +3,8 @@
 //! keyboard focus's from the focused element when a key moved it and
 //! it is `:focus-visible`. Every event updates it, the host's too, so
 //! a key or press the host takes still hides it, and so does an event
-//! only observed ([`DocumentInput::observe`]). A touch never arms it. A host asks once per frame, after the document's update, for
+//! only observed ([`DocumentInput::observe`]). A touch never arms it.
+//! A host asks once per frame, after the document's update, for
 //! the tooltip shown ([`DocumentInput::tooltip`]) and for when to wake
 //! ([`DocumentInput::tooltip_deadline`]).
 
@@ -95,7 +96,9 @@ impl DocumentInput {
     /// to and observes it on the others. The tooltip reacts as when
     /// [`DocumentInput::give`] gives it (a key or window blur hides it, a
     /// move arms the title under the pointer); the document's focus,
-    /// hover and listeners are untouched.
+    /// hover and listeners are untouched. A move records where the
+    /// pointer is ([`DocumentInput::pointer`]), as `give` records every
+    /// move, so the tooltip's checks each frame read the window's pointer.
     ///
     /// # Errors
     ///
