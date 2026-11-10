@@ -70,9 +70,8 @@ impl TextPipeline {
             self.texture.width()
         );
         self.upload_page(target.queue, atlas);
-        target
-            .queue
-            .write_buffer(&self.uniforms, 0, &params_bytes(params));
+        self.work
+            .write_buffer(target.queue, &self.uniforms, 0, &params_bytes(params));
         self.draw_quads(target, quads);
     }
 
@@ -82,7 +81,8 @@ impl TextPipeline {
             return;
         }
         let size = page.size();
-        queue.write_texture(
+        self.work.write_texture(
+            queue,
             self.texture.as_image_copy(),
             page.pixels(),
             wgpu::TexelCopyBufferLayout {
@@ -105,7 +105,7 @@ impl TextPipeline {
         let bind_group = self.bind_group(device);
         self.reserve_vertices(device, bytes.len() as u64);
         let vertices = self.vertices.as_ref().expect("reserved above");
-        queue.write_buffer(vertices, 0, &bytes);
+        self.work.write_buffer(queue, vertices, 0, &bytes);
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("text"),
         });
@@ -132,7 +132,7 @@ impl TextPipeline {
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &bind_group, &[]);
             pass.set_vertex_buffer(0, vertices.slice(..));
-            pass.draw(0..vertex_count, 0..1);
+            self.work.draw(&mut pass, 0..vertex_count, 0..1);
         }
         queue.submit([encoder.finish()]);
     }

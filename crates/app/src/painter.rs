@@ -18,6 +18,7 @@ pub struct ScenePainter {
     images: ImagePipeline,
     textures: Textures,
     surfaces: Surfaces,
+    counts: FrameCounts,
 }
 
 impl ScenePainter {
@@ -46,6 +47,7 @@ impl ScenePainter {
             images: ImagePipeline::new(device, format),
             textures: Textures::default(),
             surfaces: Surfaces::default(),
+            counts: FrameCounts::default(),
         })
     }
 
@@ -83,6 +85,7 @@ impl ScenePainter {
     /// Each run of the scene, in order, under its clip. A refused frame
     /// still ends the surfaces' frame: those it did not paint are inactive.
     fn paint(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
+        self.begin_counts();
         self.atlas.begin_frame();
         self.textures.begin_frame();
         self.surfaces.begin_frame();
@@ -96,7 +99,7 @@ impl ScenePainter {
     fn paint_runs(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
         for batch in painted.scene().batches() {
             match clipped(target, batch.clip) {
-                Some(clipped) => self.draw_run(&clipped, painted, batch.run)?,
+                Some(clipped) => self.draw_run(&clipped, painted, &batch.run)?,
                 None => self
                     .surfaces
                     .check_clipped(target.device, painted, &batch.run)?,
@@ -105,21 +108,23 @@ impl ScenePainter {
         Ok(())
     }
 
-    /// Draws `run` with the pipeline for its kind under `target`'s scissor.
+    /// Draws `run` with the pipeline for its kind under `target`'s
+    /// scissor, and counts the work it issued.
     fn draw_run(
         &mut self,
         target: &Target<'_>,
         painted: &Painted,
-        run: Run<'_>,
+        run: &Run<'_>,
     ) -> Result<(), PaintError> {
-        match run {
-            Run::Shadows(shadows) => self.shadows.draw(target, &shadows),
-            Run::Quads(quads) => self.quads.draw(target, &quads),
+        match *run {
+            Run::Shadows(ref shadows) => self.shadows.draw(target, shadows),
+            Run::Quads(ref quads) => self.quads.draw(target, quads),
             Run::Texts(items) => self.draw_texts(target, painted, items)?,
             Run::Icons(items) => self.draw_icons(target, painted, items)?,
             Run::Images(items) => self.textures.draw(&self.images, target, painted, items),
             Run::Surfaces(items) => self.surfaces.draw(&self.images, target, painted, items)?,
         }
+        self.count_run(run);
         Ok(())
     }
 }
@@ -159,6 +164,9 @@ fn clipped<'a>(target: &Target<'a>, clip: Option<Rect>) -> Option<Target<'a>> {
     Some(Target { scissor, ..*target })
 }
 
+#[path = "painter_counts.rs"]
+mod counts;
+pub use counts::FrameCounts;
 #[path = "painter_images.rs"]
 mod images;
 #[path = "painter_text.rs"]
