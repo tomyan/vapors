@@ -547,10 +547,10 @@ differs from the plan.
   job.
 - **Page controls.** The demo page's own Open button and status line
   sat over an elements demo's canvas. An elements demo now calls
-  `vapors_platform::hide_page_controls()`. That hides both, and the
-  page then needs no Open button. Errors still show: `#error`, or
-  `#status` when the page has no `#error`, is un-hidden whenever an
-  error is written to it. The page contract checks that no visible
+  `vapors_platform::app_draws_open()` and `hide_status_line()`. They
+  hide both, and the page then needs no Open button. Errors still show:
+  `#error`, or `#status` when the page has no `#error`, is un-hidden
+  whenever an error is written to it. The page contract checks that no visible
   element other than `#error` overlaps the canvas of each elements demo
   and the index. It also checks that only the image demo refuses a page
   without the Open button.

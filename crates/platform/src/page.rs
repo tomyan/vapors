@@ -16,10 +16,6 @@ pub const ERROR_ID: &str = "error";
 /// an element, so the status line stays the page's own.
 pub const ADAPTER_ID: &str = "adapter";
 
-/// The page's own controls, drawn over the canvas. An app that draws
-/// its own (an elements demo) hides them; see `hide_page_controls`.
-pub const PAGE_CONTROL_IDS: [&str; 2] = [OPEN_ID, STATUS_ID];
-
 /// What kind of line is being reported.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Report {
@@ -118,8 +114,8 @@ mod tests {
     #[test]
     fn an_error_is_shown_wherever_it_is_written_and_a_status_line_is_not() {
         // Given: an error written to #status on a page without #error,
-        // where the page controls (#status among them) are hidden
-        let hidden = PAGE_CONTROL_IDS;
+        // where the app hid the status line (`hide_status_line`)
+        let hidden = [STATUS_ID];
 
         // When
         let error_shown = shows_target(Report::Error);
