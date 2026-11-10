@@ -14,7 +14,7 @@ fn waiting_on(late: &Late, waker: &LoopWaker, start: Instant) -> Scopes {
 }
 
 #[test]
-fn a_pending_scope_gives_its_deadline_for_the_loop_to_wait_until() {
+fn a_pending_scope_reports_its_deadline_for_the_waiting_diagnostic() {
     // Given
     let (_, waker) = counting();
     let start = Instant::now();
@@ -23,7 +23,7 @@ fn a_pending_scope_gives_its_deadline_for_the_loop_to_wait_until() {
     let scopes = waiting_on(&Late::default(), &waker, start);
 
     // Then
-    assert_eq!(scopes.deadline(), Some(start + DEADLINE));
+    assert_eq!(scopes.waiting(), Some(start + DEADLINE));
 }
 
 #[test]
@@ -41,7 +41,7 @@ fn a_clean_late_result_wakes_nothing_and_the_next_check_clears_it() {
     // Then
     assert_eq!(woken(&count), 0);
     assert!(checked.is_ok());
-    assert_eq!(scopes.deadline(), None);
+    assert_eq!(scopes.waiting(), None);
 }
 
 #[test]
@@ -80,7 +80,7 @@ fn a_scope_unresolved_at_the_deadline_refuses_with_no_wake_before() {
     let at = format!("{:?}", at.expect_err("refused at the deadline"));
     assert!(at.contains("within 1000 ms"), "{at}");
     assert!(after.is_err());
-    assert_eq!(scopes.deadline(), None);
+    assert_eq!(scopes.waiting(), None);
 }
 
 #[test]
@@ -112,6 +112,6 @@ fn settling_past_the_deadline_gives_up_with_no_check_and_the_next_check_refuses(
     scopes.settle(start + DEADLINE);
 
     // Then
-    assert_eq!(scopes.deadline(), None);
+    assert_eq!(scopes.waiting(), None);
     assert!(scopes.check(start + DEADLINE).is_err());
 }

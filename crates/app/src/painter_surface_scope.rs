@@ -17,6 +17,9 @@ use vapors_platform::Instant;
 use super::super::errors::Refusal;
 use crate::surface::SurfaceError;
 
+#[cfg(any(target_family = "wasm", test))]
+#[path = "painter_surface_scope_deadline.rs"]
+mod deadline;
 #[path = "painter_surface_scope_watch.rs"]
 mod watch;
 pub(super) use watch::LoopWaker;
@@ -41,7 +44,20 @@ pub(super) type Caught = Pin<Box<dyn Future<Output = Option<wgpu::Error>>>>;
 /// a heavier render adds more. Refusing a working surface is the worse
 /// error, and a scope that never resolves is refused within a second
 /// either way. Native wgpu resolves in the frame, so it never waits.
+///
+/// On the web only time with the page visible counts: a hidden page
+/// draws no frames, throttles its timers, and its `popErrorScope`
+/// latency is unmeasured. A period the page was hidden at either end is
+/// re-armed in full (`visible_deadline`), since refusing is permanent
+/// until remount.
 pub(crate) const DEADLINE: Duration = Duration::from_millis(1000);
+
+/// Whether a frame refuses a scope unresolved at its deadline. Natively
+/// yes: nothing else watches the clock. Not on the web, where the
+/// watch's page timer does and counts visible time only
+/// (`visible_deadline`): the first frame after a hidden tab returns
+/// would otherwise refuse a scope whose deadline passed while hidden.
+const FRAMES_JUDGE_LATENESS: bool = cfg!(not(target_family = "wasm"));
 
 /// What a scope is begun with: the loop's waker its error wakes, and
 /// the time now, from which its deadline runs.
@@ -83,8 +99,9 @@ impl Scopes {
         self.pending.push((watched, turn.now + DEADLINE));
     }
 
-    /// The earliest deadline of an unresolved scope, if one is waiting.
-    pub(super) fn deadline(&self) -> Option<Instant> {
+    /// The earliest deadline of an unresolved scope, if one is waiting,
+    /// for the surface's diagnostic state (`SurfaceState::waiting`).
+    pub(super) fn waiting(&self) -> Option<Instant> {
         self.pending.iter().map(|(_, deadline)| *deadline).min()
     }
 
@@ -104,10 +121,12 @@ impl Scopes {
 
     /// Takes in what has resolved, then gives up on what is still
     /// unresolved at its deadline: a late result that did arrive is
-    /// judged on what it caught, not refused as a timeout.
+    /// judged on what it caught, not refused as a timeout. On the web
+    /// the watch's timer judges lateness (`FRAMES_JUDGE_LATENESS`).
     pub(super) fn settle(&mut self, now: Instant) {
         self.take_resolved();
-        if self.pending.iter().any(|(_, at)| now >= *at) {
+        let late = self.pending.iter().any(|(_, at)| now >= *at);
+        if FRAMES_JUDGE_LATENESS && late {
             self.pending.clear();
             self.caught.get_or_insert_with(timed_out);
         }

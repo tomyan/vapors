@@ -11,7 +11,7 @@
 use std::cell::RefCell;
 use std::future::Future;
 use std::pin::Pin;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use std::task::{Context, Poll, Waker};
 
 use super::Caught;
@@ -101,17 +101,11 @@ impl Watched {
     }
 }
 
-/// The page's timer at `DEADLINE`; one the page will not set refuses at
-/// once, naming why.
+/// The page's timer at `DEADLINE`, counting visible time only
+/// (`visible_deadline`).
 #[cfg(target_family = "wasm")]
 fn deadline() -> Deadline {
-    let timer = vapors_platform::Timer::after(super::DEADLINE);
-    Box::pin(async move {
-        match timer.await {
-            Ok(()) => super::timed_out(),
-            Err(why) => format!("the GPU error scope's deadline timer was not set: {why}"),
-        }
-    })
+    Box::pin(super::deadline::visible_deadline(super::deadline::WebPage))
 }
 
 /// Natively a scope resolves when popped; frames judge one that did not.
@@ -123,11 +117,13 @@ fn deadline() -> Deadline {
 /// Drives a scope to its result or its deadline, records which, and
 /// wakes the loop for an error or the deadline, for a frame that
 /// refuses the surface. A clean result drops, and so cancels, the
-/// deadline.
+/// deadline. The outcome is held weakly: once the surface's scopes are
+/// dropped (unmount or remount), nothing reads it, so the watch ends on
+/// its next poll, dropping its scope and deadline and waking nothing.
 struct Watch {
     scope: Caught,
     deadline: Deadline,
-    outcome: Rc<RefCell<Outcome>>,
+    outcome: Weak<RefCell<Outcome>>,
     waker: LoopWaker,
 }
 
@@ -138,7 +134,7 @@ impl Watch {
         outcome: &Rc<RefCell<Outcome>>,
         waker: &LoopWaker,
     ) -> Self {
-        let (outcome, waker) = (Rc::clone(outcome), Rc::clone(waker));
+        let (outcome, waker) = (Rc::downgrade(outcome), Rc::clone(waker));
         Self {
             scope,
             deadline,
@@ -148,8 +144,11 @@ impl Watch {
     }
 
     fn record(&self, outcome: Outcome) {
+        let Some(slot) = self.outcome.upgrade() else {
+            return;
+        };
         let caught = matches!(outcome, Outcome::Caught(_));
-        *self.outcome.borrow_mut() = outcome;
+        *slot.borrow_mut() = outcome;
         if let Some(waker) = self.waker.borrow().as_ref().filter(|_| caught) {
             waker.wake_by_ref();
         }
@@ -160,6 +159,9 @@ impl Future for Watch {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<()> {
+        if self.outcome.strong_count() == 0 {
+            return Poll::Ready(());
+        }
         if let Poll::Ready(error) = self.scope.as_mut().poll(context) {
             self.record(outcome_of(error));
             return Poll::Ready(());
@@ -179,3 +181,7 @@ fn outcome_of(error: Option<wgpu::Error>) -> Outcome {
 #[cfg(test)]
 #[path = "painter_surface_scope_watch_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "painter_surface_scope_watch_hidden_tests.rs"]
+mod hidden_tests;

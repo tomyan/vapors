@@ -79,7 +79,7 @@ impl Mounted {
             stale: self.stale,
             animating: self.animating,
             backing: self.backing.is_some(),
-            waiting: self.scopes.deadline().is_some(),
+            waiting: self.scopes.waiting().is_some(),
         }
     }
 

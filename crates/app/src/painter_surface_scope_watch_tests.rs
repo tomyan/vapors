@@ -123,7 +123,7 @@ fn the_waker_given_after_a_scope_began_is_the_one_its_error_wakes() {
     // Given
     let waker = LoopWaker::default();
     let late = Late::default();
-    let (mut watch, _) = watch(&late, &waker);
+    let (mut watch, _outcome) = watch(&late, &waker);
     let (count, given) = counting();
 
     // When
@@ -178,4 +178,39 @@ fn natively_an_unresolved_scope_is_read_on_a_later_outcome() {
     // Then
     assert_eq!(before, Outcome::Waiting);
     assert_eq!(watched.outcome(), Outcome::Clean);
+}
+
+#[test]
+fn an_error_after_the_surface_unmounted_wakes_no_loop() {
+    // Given
+    let (count, waker) = counting();
+    let late = Late::default();
+    let (mut watch, outcome) = watch(&late, &waker);
+
+    // When
+    drop(outcome);
+    late.resolve(Some("bad bind group"));
+
+    // Then
+    assert_eq!(poll(&mut watch), Poll::Ready(()));
+    assert_eq!(woken(&count), 0);
+}
+
+#[test]
+fn a_deadline_after_the_surface_unmounted_wakes_no_loop_and_drops_the_deadline() {
+    // Given
+    let (count, waker) = counting();
+    let (late, deadline) = (Late::default(), FakeDeadline::default());
+    let (mut watch, outcome) = racing(&late, &deadline, &waker);
+
+    // When
+    drop(outcome);
+    deadline.passed.set(true);
+    let polled = poll(&mut watch);
+    drop(watch);
+
+    // Then
+    assert_eq!(polled, Poll::Ready(()));
+    assert_eq!(woken(&count), 0);
+    assert!(deadline.dropped.get());
 }
