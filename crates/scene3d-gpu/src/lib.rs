@@ -6,7 +6,8 @@
 //! with the application, as `Rc<RefCell<..>>`. Each render it uploads
 //! the geometry given since the last (each piece once), runs
 //! [`vapors_scene3d::Scene::update`], writes the uniform of each mesh
-//! node it returned or that has none yet, writes the camera's
+//! node whose world version differs from the one it last wrote for that
+//! node (so a node another caller updated is written too), writes the camera's
 //! view-projection when it changed, and draws every mesh node through
 //! that one view-projection, depth-tested. The backing is cleared to
 //! transparent first, so the page shows where no mesh draws.

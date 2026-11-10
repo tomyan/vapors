@@ -1,6 +1,6 @@
 //! One uniform slot per mesh node in one buffer, bound at the slot's
-//! dynamic offset. A slot is written when its node is new or its world
-//! matrix was recomputed, and not otherwise.
+//! dynamic offset. A slot is written when it does not hold its node's
+//! current world version, and not otherwise.
 
 use crate::pipeline::{MESH_BYTES, Pipeline};
 use std::collections::HashMap;
@@ -15,7 +15,13 @@ pub(crate) struct Slots {
     bind_group: wgpu::BindGroup,
     stride: u32,
     capacity: u32,
-    of: HashMap<NodeId, u32>,
+    of: HashMap<NodeId, Slot>,
+}
+
+/// Where a node's uniform sits, and the world version it holds.
+struct Slot {
+    index: u32,
+    written: Option<u64>,
 }
 
 impl Slots {
@@ -34,39 +40,53 @@ impl Slots {
     }
 
     /// Gives each of `nodes` without a slot one, growing the buffer
-    /// when full. Returns the nodes whose slots hold nothing yet: the
-    /// new ones, or every node with a slot when the buffer was
-    /// reallocated.
-    pub(crate) fn assign(
-        &mut self,
-        device: &wgpu::Device,
-        pipeline: &Pipeline,
-        nodes: &[NodeId],
-    ) -> Vec<NodeId> {
-        let new: Vec<NodeId> = nodes
-            .iter()
-            .copied()
-            .filter(|n| !self.of.contains_key(n))
-            .collect();
-        for node in &new {
-            let slot = u32::try_from(self.of.len()).expect("fewer than 2^32 mesh nodes");
-            self.of.insert(*node, slot);
+    /// when full. A grown buffer holds nothing, so every slot is then
+    /// unwritten.
+    pub(crate) fn assign(&mut self, device: &wgpu::Device, pipeline: &Pipeline, nodes: &[NodeId]) {
+        for node in nodes {
+            let index = u32::try_from(self.of.len()).expect("fewer than 2^32 mesh nodes");
+            self.of.entry(*node).or_insert(Slot {
+                index,
+                written: None,
+            });
         }
         let needed = u32::try_from(self.of.len()).expect("fewer than 2^32 mesh nodes");
         if needed <= self.capacity {
-            return new;
+            return;
         }
         self.capacity = needed.next_power_of_two();
         (self.buffer, self.bind_group) = allocate(device, pipeline, self.stride, self.capacity);
-        self.of.keys().copied().collect()
+        self.of.values_mut().for_each(|slot| slot.written = None);
+    }
+
+    /// Whether `node`'s slot holds world version `version`.
+    pub(crate) fn holds(&self, node: NodeId, version: u64) -> bool {
+        self.of
+            .get(&node)
+            .is_some_and(|slot| slot.written == Some(version))
     }
 
     /// `node`'s slot's byte offset; `None` before [`Slots::assign`].
     pub(crate) fn offset(&self, node: NodeId) -> Option<u32> {
-        self.of.get(&node).map(|slot| slot * self.stride)
+        self.of.get(&node).map(|slot| slot.index * self.stride)
     }
 
-    pub(crate) fn write(&self, queue: &wgpu::Queue, offset: u32, world: Mat4, colour: Colour) {
+    /// Writes `node`'s slot with `world`, at world version `version`,
+    /// and `colour`; `node` has a slot from [`Slots::assign`].
+    pub(crate) fn write(
+        &mut self,
+        queue: &wgpu::Queue,
+        node: NodeId,
+        version: u64,
+        world: Mat4,
+        colour: Colour,
+    ) {
+        let slot = self
+            .of
+            .get_mut(&node)
+            .expect("every mesh node is assigned a slot before it is written");
+        slot.written = Some(version);
+        let offset = slot.index * self.stride;
         let floats = world.to_cols_array().into_iter().chain(colour.rgba());
         let bytes: Vec<u8> = floats.flat_map(f32::to_le_bytes).collect();
         queue.write_buffer(&self.buffer, u64::from(offset), &bytes);

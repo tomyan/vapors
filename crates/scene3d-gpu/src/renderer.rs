@@ -7,7 +7,6 @@ use crate::pipeline::Pipeline;
 use crate::slots::Slots;
 use crate::{FrameError, depth};
 use std::cell::RefCell;
-use std::collections::HashSet;
 use std::rc::Rc;
 use vapors_app::{SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
 use vapors_scene3d::{Meshes, NodeId, Scene};
@@ -66,38 +65,34 @@ impl SurfaceRenderer for SceneRenderer {
         let mut meshes = self.meshes.borrow_mut();
         mounted.geometry.upload_queued(frame.device, &mut meshes);
         let mut scene = self.scene.borrow_mut();
-        let changed: HashSet<NodeId> = scene.update().into_iter().collect();
+        scene.update();
         let nodes = mesh_nodes(&scene, &meshes)?;
         mounted
             .camera
             .write(frame.queue, view_projection(&scene, frame.size)?);
-        mounted.write_slots(&frame, &scene, &nodes, &changed)?;
+        mounted.write_slots(&frame, &scene, &nodes)?;
         mounted.draw(&mut frame, depth, &nodes);
         Ok(())
     }
 }
 
 impl Mounted {
-    /// Writes the slot of each mesh node that is new, recomputed by this
-    /// frame's update, or in a reallocated buffer.
+    /// Writes the slot of each mesh node that does not hold the node's
+    /// current world version: new, moved, or in a grown buffer.
     fn write_slots(
         &mut self,
         frame: &SurfaceFrame<'_>,
         scene: &Scene,
         nodes: &[MeshNode],
-        changed: &HashSet<NodeId>,
     ) -> Result<(), FrameError> {
         let ids: Vec<NodeId> = nodes.iter().map(|mesh| mesh.node).collect();
-        let unwritten: HashSet<NodeId> = self
-            .slots
-            .assign(frame.device, &self.pipeline, &ids)
-            .into_iter()
-            .collect();
+        self.slots.assign(frame.device, &self.pipeline, &ids);
         for mesh in nodes {
-            if changed.contains(&mesh.node) || unwritten.contains(&mesh.node) {
-                let offset = self.offset(mesh.node);
+            let version = scene.world_version(mesh.node)?;
+            if !self.slots.holds(mesh.node, version) {
+                let world = scene.world(mesh.node)?;
                 self.slots
-                    .write(frame.queue, offset, scene.world(mesh.node)?, mesh.colour);
+                    .write(frame.queue, mesh.node, version, world, mesh.colour);
             }
         }
         Ok(())

@@ -80,6 +80,19 @@ impl Scene {
         Ok(self.node(id)?.world)
     }
 
+    /// A number that grows each time [`Scene::update`] recomputes `id`'s
+    /// world matrix, and does not change otherwise: a reader keeps the
+    /// version it last read with the matrix, and reads the matrix again
+    /// when they differ, whoever ran the update.
+    ///
+    /// # Errors
+    ///
+    /// As [`Scene::world`].
+    pub fn world_version(&self, id: NodeId) -> Result<u64, StoreError> {
+        self.world(id)?;
+        Ok(self.node(id)?.world_version)
+    }
+
     pub(crate) fn mark(&mut self, id: NodeId) {
         if let Ok(node) = self.node_mut(id)
             && !node.dirty
@@ -115,6 +128,7 @@ impl Scene {
         let world = parent_world * node.local.matrix();
         let node = self.node_mut(id).expect("update recomputes live nodes");
         node.world = world;
+        node.world_version += 1;
         node.dirty = false;
     }
 
@@ -138,3 +152,7 @@ mod tests;
 #[cfg(test)]
 #[path = "world_reparent_tests.rs"]
 mod reparent_tests;
+
+#[cfg(test)]
+#[path = "world_version_tests.rs"]
+mod version_tests;
