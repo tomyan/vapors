@@ -162,6 +162,56 @@ The compiler already turns `.wisp` templates into Rust. For SVG it can:
   element keeps its mesh; a transform or colour change updates without
   re-tessellating; a removed element releases its geometry.
 
+## Direction: one shape model
+
+The renderer-neutral item (decision 1) can grow into one model for
+everything vapors paints, so boxes, icons and SVG share pipelines and
+antialiasing rules. Status: direction, agreed with Tom on 2026-11-10;
+not a slice yet.
+
+- **Every painted thing is a shape with coverage computed at draw time,**
+  after transforms. Rounded boxes already are: the quad shader takes
+  coverage from the closed-form distance to a rounded rectangle.
+  Rectangles, circles, ellipses and lines also have closed forms and can
+  share that shader. General paths and glyph outlines use an edge or curve
+  representation evaluated in the fragment shader.
+- **Whole-program compile time.** The compiler sees every template, so for
+  literal geometry it can classify each shape to the cheapest exact
+  primitive, deduplicate identical geometry across the app (the same icon
+  in twenty places is one entry), and pack all static geometry into one
+  shape table embedded in the binary. At run time an item is a shape id
+  with a transform, paint and clip.
+- **What stays run time.** CSS can change a box's size, radius and border at
+  run time, so boxes remain run-time instances of the rounded-rectangle
+  primitive, as now. Bound path data is tessellated or encoded when it
+  changes.
+- **Fewer pipelines.** One or two shape pipelines draw boxes, icons and SVG
+  together, batched in paint order.
+
+### Text
+
+Text needs its own handling for ordinary reading. At body sizes, upright
+and at whole device pixels, readable text depends on hinting, subpixel
+positioning and the coverage and gamma treatment that Chromium's text
+uses; an outline rendered as a shape with analytic coverage does not match
+that by default. So:
+
+- **Upright reading text stays on the glyph atlas,** rasterised at its final
+  device size and position as today, and compared with Chromium by the
+  existing text oracle.
+- **Transformed text uses glyph outlines through the shape model:** text
+  under rotation, non-uniform or animated scale, or in a 3D scene, where an
+  atlas glyph would be resampled after its coverage was baked.
+- **The switch is decided per run** from its transform: axis-aligned at a
+  stable scale uses the atlas; anything else uses outlines. A run animating
+  its scale can switch back to the atlas once the scale settles. The rule
+  and its thresholds are measured against Chromium, not assumed.
+- Open: whether large display text (headings) benefits from outlines even
+  when upright, and how hinting interacts with the switch.
+
+This is what to settle before vapors implements CSS `transform` or puts
+UI into a 3D scene: one coverage strategy for boxes, shapes and text.
+
 ## Proposed slices
 
 1. The vector display item and the antialiasing test: tessellate touche's
@@ -194,3 +244,5 @@ alongside F3, whose layers slice 6 shares. Tom decides the placement.
 - Route A with the three decisions above, or another route.
 - Whether the icon route is retired by slice 2 or kept for small icons.
 - Placement relative to H1 to H5, IU3, F3 and the 3D slices.
+- The text switch rule (atlas for upright reading text, outlines under
+  transform) and its thresholds, before CSS `transform` is implemented.
