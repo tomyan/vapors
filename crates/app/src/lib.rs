@@ -23,7 +23,7 @@ mod wheel_scroll;
 
 pub use document_input::{DocumentInput, Given, Route, Unplaced};
 pub use elements_app::{
-    ElementsApp, Failure, FrameTimesHook, InvalidateError, PerFrame, SurfaceHandle,
+    ElementsApp, Failure, FrameTimesHook, InvalidateError, Invalidated, PerFrame, SurfaceHandle,
 };
 pub use painter::{
     DrawOverError, MountError, PaintError, SUPPORTED, ScenePainter, UnsupportedFormat,

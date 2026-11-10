@@ -2,19 +2,16 @@
 //! app mounts them before its painter exists, which is made on the
 //! first frame: the renderers wait in `pending` and go to the painter
 //! when it is made. A taken name is refused at `mount`. `mount` hands
-//! back a [`SurfaceHandle`] whose `invalidate` works while `run` owns
-//! the app: it marks the surface stale, for the next frame to pass to
-//! the painter, and wakes the loop with the waker the app kept from the
-//! platform. Handles are single-threaded, as the document is.
+//! back a [`SurfaceHandle`] (`elements_app_surface_handle.rs`); the app
+//! tells its handles when its loop starts and ends.
 
 use std::cell::RefCell;
-use std::collections::BTreeSet;
-use std::fmt;
 use std::rc::Rc;
 
-use vapors_platform::{Platform, Waker};
+use vapors_platform::Platform;
 
 use super::ElementsApp;
+use super::surface_handle::{Run, Shared, SurfaceHandle};
 use crate::painter::{MountError, ScenePainter};
 use crate::surface::SurfaceRenderer;
 
@@ -24,80 +21,6 @@ use crate::surface::SurfaceRenderer;
 pub(super) struct AppSurfaces {
     pending: Vec<(String, Box<dyn SurfaceRenderer>)>,
     shared: Rc<RefCell<Shared>>,
-}
-
-/// What the app and its handles share.
-#[derive(Default)]
-struct Shared {
-    /// Every mounted name, pending or on the painter.
-    mounted: BTreeSet<String>,
-    /// Names invalidated since the last frame passed them on.
-    stale: BTreeSet<String>,
-    /// The platform's waker, kept from the first event or frame.
-    waker: Option<Waker>,
-}
-
-/// Invalidates one mounted surface from outside the app; cheap to clone.
-#[derive(Clone)]
-pub struct SurfaceHandle {
-    name: String,
-    shared: Rc<RefCell<Shared>>,
-}
-
-/// Why [`SurfaceHandle::invalidate`] did nothing.
-#[derive(Debug, PartialEq, Eq)]
-pub enum InvalidateError {
-    /// The surface's renderer was unmounted.
-    NotMounted(String),
-    /// The event loop has ended, so no frame will render the surface.
-    LoopClosed(String),
-}
-
-impl fmt::Display for InvalidateError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::NotMounted(name) => write!(
-                f,
-                "the gpu-surface {name:?} has no renderer mounted, so it was not invalidated; mount one with ElementsApp::mount and invalidate through its handle"
-            ),
-            Self::LoopClosed(name) => write!(
-                f,
-                "the event loop has ended, so the gpu-surface {name:?} will not render again; invalidate only while the app runs"
-            ),
-        }
-    }
-}
-
-impl std::error::Error for InvalidateError {}
-
-impl SurfaceHandle {
-    /// The surface's name.
-    #[must_use]
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// Renders the surface on the next frame that paints it, and wakes
-    /// the loop for that frame. Before the app's first event there is
-    /// no waker yet; the first frame comes without one.
-    ///
-    /// # Errors
-    ///
-    /// [`InvalidateError::NotMounted`] when the renderer was unmounted;
-    /// [`InvalidateError::LoopClosed`] when the loop has ended.
-    pub fn invalidate(&self) -> Result<(), InvalidateError> {
-        let mut shared = self.shared.borrow_mut();
-        if !shared.mounted.contains(&self.name) {
-            return Err(InvalidateError::NotMounted(self.name.clone()));
-        }
-        shared.stale.insert(self.name.clone());
-        let waker = shared.waker.clone();
-        drop(shared);
-        match waker.map(|waker| waker.wake()) {
-            Some(Err(_)) => Err(InvalidateError::LoopClosed(self.name.clone())),
-            _ => Ok(()),
-        }
-    }
 }
 
 impl ElementsApp {
@@ -112,19 +35,11 @@ impl ElementsApp {
         name: &str,
         renderer: Box<dyn SurfaceRenderer>,
     ) -> Result<SurfaceHandle, MountError> {
-        if !self
-            .surfaces
-            .shared
-            .borrow_mut()
-            .mounted
-            .insert(name.to_owned())
-        {
-            return Err(MountError::AlreadyMounted(name.to_owned()));
-        }
+        self.surfaces.claim(name)?;
         match &mut self.painter {
-            Some(painter) => painter.mount(name, renderer).inspect_err(|_| {
-                self.surfaces.shared.borrow_mut().mounted.remove(name);
-            })?,
+            Some(painter) => painter
+                .mount(name, renderer)
+                .inspect_err(|_| self.surfaces.release(name))?,
             None => self.surfaces.pending.push((name.to_owned(), renderer)),
         }
         Ok(self.surfaces.handle(name))
@@ -158,16 +73,38 @@ impl AppSurfaces {
         }
     }
 
+    fn claim(&self, name: &str) -> Result<(), MountError> {
+        let mut shared = self.shared.borrow_mut();
+        if shared.mounted.insert(name.to_owned()) {
+            Ok(())
+        } else {
+            Err(MountError::AlreadyMounted(name.to_owned()))
+        }
+    }
+
+    fn release(&self, name: &str) {
+        self.shared.borrow_mut().mounted.remove(name);
+    }
+
     fn take_pending(&mut self, name: &str) -> Box<dyn SurfaceRenderer> {
         let at = self.pending.iter().position(|(pending, _)| pending == name);
         let at = at.expect("a mounted name with no painter is pending");
         self.pending.remove(at).1
     }
 
-    /// Keeps the platform's waker, once.
+    /// Keeps the platform's waker, once: the loop has started. A closed
+    /// loop stays closed.
     pub(super) fn keep_waker(&self, platform: &Platform) {
         let mut shared = self.shared.borrow_mut();
-        shared.waker.get_or_insert_with(|| platform.waker());
+        if matches!(shared.run, Run::NotStarted) {
+            shared.run = Run::Running(platform.waker());
+        }
+    }
+
+    /// The loop has ended: the app failed or is dropped. Handles refuse
+    /// from then on.
+    pub(super) fn close(&self) {
+        self.shared.borrow_mut().run = Run::Closed;
     }
 
     /// True when a surface was invalidated since the last frame.
@@ -187,5 +124,11 @@ impl AppSurfaces {
         }
         let stale = std::mem::take(&mut self.shared.borrow_mut().stale);
         stale.iter().try_for_each(|name| painter.invalidate(name))
+    }
+}
+
+impl Drop for AppSurfaces {
+    fn drop(&mut self) {
+        self.close();
     }
 }

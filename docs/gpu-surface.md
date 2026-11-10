@@ -61,12 +61,15 @@ invalidated, or `ScenePainter::wants_frame()`; otherwise `Next::Wait`,
 so an idle app draws nothing.
 
 `mount` returns a `SurfaceHandle`, cheap to clone and single-threaded
-as the document is. Its `invalidate()` works while `run` owns the app:
-it marks the surface for a render on the next frame and wakes the loop
-with the platform's `Waker`, which the app keeps from its first event
-or frame (before that the first frame comes anyway). It refuses a
-surface since unmounted (`InvalidateError::NotMounted`) and a loop
-that has ended (`InvalidateError::LoopClosed`).
+as the document is. Its `invalidate()` marks the surface for a render
+on the next frame and answers in three states. While `run` owns the
+app it wakes the loop with the platform's `Waker`, which the app keeps
+from its first event or frame (`Invalidated::Woke`). Before then the
+loop has not started, and its first frame renders the surface with no
+wake (`Invalidated::AtFirstFrame`). It refuses a surface since
+unmounted (`InvalidateError::NotMounted`) and a loop that has ended:
+a frame failed, the app was dropped, or the wake was refused
+(`InvalidateError::LoopClosed`).
 
 ## Supported composition (first release)
 
