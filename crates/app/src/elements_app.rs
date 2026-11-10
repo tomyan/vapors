@@ -9,13 +9,14 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use vapors_elements::{Document, ShortcutModifier};
-use vapors_platform::{App, Event, Frame, Instant, Next, Platform, report_error};
+use vapors_platform::{App, Event, Frame, Next, Platform, report_error};
 
 use crate::frame::FrameTimes;
 
 use crate::document_input::DocumentInput;
 use crate::painter::ScenePainter;
 pub use decision::FrameDecision;
+use give::Hosting;
 pub use surface_handle::{InvalidateError, Invalidated, SurfaceHandle};
 use surfaces::AppSurfaces;
 
@@ -123,10 +124,15 @@ impl ElementsApp {
 /// frames.
 impl App for ElementsApp {
     fn event(&mut self, event: Event, platform: &Platform) {
-        let started = Instant::now();
-        self.surfaces.keep_waker(platform);
-        self.handle(&event, platform);
-        self.input_spent += started.elapsed();
+        match self.deliver(&event, platform, Hosting::Alone) {
+            // Before the first frame nothing is on screen, so the event
+            // was aimed at nothing; it is dropped.
+            Ok(_) | Err(crate::document_input::Unplaced::NotUpdated) => {}
+            Err(unplaced) => {
+                report_error(&unplaced.to_string());
+                self.failure.set(&unplaced.to_string());
+            }
+        }
     }
 
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
@@ -149,34 +155,6 @@ impl App for ElementsApp {
     }
 }
 
-impl ElementsApp {
-    /// An event, dispatched as it arrives (design 02, 2-S1).
-    fn handle(&mut self, event: &Event, platform: &Platform) {
-        match self.input.handle(&self.document, event, platform) {
-            Ok(outcome) => {
-                if outcome.changed {
-                    platform.request_redraw();
-                }
-                if let Some(cursor) = outcome.cursor {
-                    platform.set_cursor(cursor);
-                }
-            }
-            // Before the first frame nothing is on screen, so the event
-            // was aimed at nothing; it is dropped.
-            Err(crate::document_input::Unplaced::NotUpdated) => {}
-            Err(unplaced) => {
-                report_error(&unplaced.to_string());
-                self.failure.set(&unplaced.to_string());
-            }
-        }
-        self.text_event(event);
-        if self.document.borrow_mut().take_changed() {
-            platform.request_redraw();
-        }
-        self.mirror_text_field(platform);
-    }
-}
-
 /// The modifier the platform's shortcuts take.
 fn shortcut_modifier() -> ShortcutModifier {
     if vapors_platform::shortcut_is_command() {
@@ -190,6 +168,8 @@ fn shortcut_modifier() -> ShortcutModifier {
 mod decision;
 #[path = "elements_app_frame.rs"]
 mod frame_phases;
+#[path = "elements_app_give.rs"]
+mod give;
 #[cfg(not(target_family = "wasm"))]
 #[path = "elements_app_paste.rs"]
 mod paste;
