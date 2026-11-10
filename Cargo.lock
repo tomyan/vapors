@@ -2909,6 +2909,7 @@ dependencies = [
  "serde",
  "serde_json",
  "taffy",
+ "tracing",
  "vapors-compiler-examples",
  "vapors-css",
  "vapors-dom",
@@ -2953,6 +2954,24 @@ dependencies = [
  "pollster 1.0.1",
  "vapors-gpu",
  "vapors-renderer",
+ "wgpu",
+]
+
+[[package]]
+name = "vapors-perf"
+version = "0.0.0"
+dependencies = [
+ "pollster 1.0.1",
+ "tracing",
+ "vapors-app",
+ "vapors-dom",
+ "vapors-elements",
+ "vapors-gpu-harness",
+ "vapors-platform",
+ "vapors-racer",
+ "vapors-renderer",
+ "vapors-scene",
+ "vapors-text",
  "wgpu",
 ]
 

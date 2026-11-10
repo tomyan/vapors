@@ -7,12 +7,15 @@ use crate::{
 use state::{Faults, Pacing, Run};
 use std::{cell::RefCell, rc::Rc};
 use surface::TrackSurface;
-use vapors_app::{ElementsApp, Failure};
+use vapors_app::{ElementsApp, Failure, FrameCounts};
 use vapors_elements::Document;
 use vapors_platform::{App, Event, Frame, Next, Platform, report_error};
 use vapors_text::FontSystem;
 
-pub(crate) struct Racer {
+/// The racer as a platform app: the HUD's document and the track's
+/// surface, paused until Space. Public for drivers outside a window
+/// (the timing harness in `crates/perf`).
+pub struct Racer {
     pub(super) document: Rc<RefCell<Document>>,
     pub(super) hud: Hud,
     pub(super) app: ElementsApp,
@@ -30,8 +33,15 @@ pub(crate) struct Racer {
     pub(super) hud_changed: bool,
     pub(super) inspect: bool,
 }
+impl Default for Racer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl Racer {
-    pub(crate) fn new() -> Self {
+    /// A paused racer whose HUD is mounted and not yet drawn.
+    #[must_use]
+    pub fn new() -> Self {
         let document = Rc::new(RefCell::new(Document::new(FontSystem::new())));
         let body = document.borrow().body();
         let hud = Hud::mount(&document, body, HudProps {});
@@ -53,6 +63,21 @@ impl Racer {
     /// it after the loop.
     pub(crate) fn failure(&self) -> Failure {
         self.app.failure()
+    }
+    /// The HUD's document, for its update counts.
+    #[must_use]
+    pub fn document(&self) -> Rc<RefCell<Document>> {
+        Rc::clone(&self.document)
+    }
+    /// What the HUD's last frame handed the GPU.
+    #[must_use]
+    pub fn frame_counts(&self) -> FrameCounts {
+        self.app.frame_counts()
+    }
+    /// Why the racer stopped, its own fault or the HUD's; `None` while it runs.
+    #[must_use]
+    pub fn error(&self) -> Option<String> {
+        self.faults.error.clone().or_else(|| self.failure().get())
     }
     fn hud_failure(&self) -> String {
         self.failure().get().unwrap_or_else(|| {

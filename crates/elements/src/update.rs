@@ -1,6 +1,8 @@
 //! An update: check the tree, compute styles, read them, lay out and
 //! paint. Every refusal found on the way is returned together, and a
-//! refused update paints nothing.
+//! refused update paints nothing. Each of the three phases runs in a
+//! `tracing` span named `update phase`, its `phase` field `style`,
+//! `layout` or `paint`, for a reader of the spans (`crates/perf`).
 
 use vapors_css::cascade::Environment;
 use vapors_dom::NodeId;
@@ -59,7 +61,10 @@ impl Document {
         self.painted = None;
         self.counts = crate::UpdateCounts::default();
         self.texts.begin();
+        let style = tracing::trace_span!("update phase", phase = "style").entered();
         let calcs = self.styled(viewport)?;
+        drop(style);
+        let layout = tracing::trace_span!("update phase", phase = "layout").entered();
         let (root, body) = (self.root(), self.body());
         let text_marks = self.focused_text_marks();
         let kept = self.kept.as_ref().expect("styled keeps the styles");
@@ -92,6 +97,8 @@ impl Document {
         };
         let offsets = self.scroll.settle(&boxes, &scrolls, viewport.scale);
         let rects = placed(&boxes, &offsets);
+        drop(layout);
+        let paint_span = tracing::trace_span!("update phase", phase = "paint").entered();
         let mut input = PaintInput {
             used,
             root,
@@ -106,6 +113,7 @@ impl Document {
         };
         let mut painted = paint(&boxes, &rects, &mut input);
         painted.scroll_chains = crate::scroll_chains::Chains::of(&boxes, &scrolls);
+        drop(paint_span);
         self.boxes.keep(boxes, viewport.scale);
         (self.counts.boxes_laid_out, self.counts.layout_calls) = (work.laid_out, work.calls);
         self.counts.note_paint(&painted);
