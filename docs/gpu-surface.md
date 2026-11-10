@@ -13,7 +13,7 @@ needs no camera, depth or scene.
 | 1a | `gpu-surface` element, `Item::Surface` in the display list, the refusals | #139 |
 | 1b | `SurfaceRenderer` and the painter's surface host: offscreen texture, resize, scale, clip, on-demand rendering, failures | #140 |
 | 1b2 | `ElementsApp` mounting, `SurfaceHandle`, `Next` from `wants_frame`; the gradient example | #141, #142 |
-| 1c | animation requests (PR 1, #147); the racer's renderer mounted through the surface (PR 2, this branch); two panels; surface-local input. Plan: `docs/plans/3d-1c.md` | in progress |
+| 1c | animation requests (PR 1, #147); the racer's renderer mounted through the surface (PR 2, #150); the racer's per-frame counts (PR 3, #161); two panels (PR 4, this branch); surface-local input. Plan: `docs/plans/3d-1c.md` | in progress |
 | 2-5 | scene, cameras, components, instances, tasks | not started |
 
 Touche's image renderer drawing through a surface in a panel comes
@@ -149,6 +149,21 @@ the app, the invalidate's own) and render once; requests animation,
 which must draw at least 10 frames in a second and render in each but
 the wake's; stops it, after which an idle second must draw nothing;
 after the loop ends an invalidate must be refused as `LoopClosed`.
+
+### Two panels
+
+`crates/app/examples/surface_panels` puts two surfaces in two panels
+side by side, each with its own gradient renderer and handle: the left
+animates throughout, the right is started and stopped every 2 s
+(`cargo run -p vapors-app --example surface_panels`). It has no
+`--check`; `tests/gpu_app_two_panels.rs` holds the checks: while both
+animate each renders once per frame; with one stopped it renders
+nothing and the other renders every frame; a renderer filling a backing
+larger than its `overflow: hidden` panel leaves the pixels just outside
+the panel at the page background, and UI painted after both panels
+stays over them; a panel resized by layout resizes its surface once and
+renders at the new size; `FrameCounts::surfaces` counts one
+composition draw per surface, the stopped one included.
 
 ## Supported composition (first release)
 
