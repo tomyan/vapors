@@ -119,3 +119,25 @@ fn gpu_a_mesh_added_later_uploads_its_geometry_and_writes_its_uniform_alone() {
     assert_eq!(added.buffer_bytes, SQUARE_BYTES + MESH_BYTES);
     assert_eq!(added.draw_calls, 3);
 }
+
+#[test]
+fn gpu_the_node_that_grows_the_slot_buffer_has_every_slot_written_again() {
+    // Given: 16 meshes of one square, filling the first slot buffer
+    let gpu = vapors_gpu_harness::gpu();
+    let fixture = Fixture::new();
+    let projection = Projection::orthographic(6.0, 0.1, 100.0).unwrap();
+    fixture.camera(projection, Vec3::new(0.0, 0.0, 5.0));
+    let square = fixture.square(0.1);
+    let add = || fixture.mesh(fixture.root(), square, RED, Transform::IDENTITY);
+    (0..16).for_each(|_| _ = add());
+    let mut renderer = fixture.renderer(&gpu);
+    render_counted(&mut renderer, &gpu).expect("renders");
+    add();
+
+    // When
+    let (_, grown) = render_counted(&mut renderer, &gpu).expect("renders");
+
+    // Then: all 17 slots, no geometry and no camera
+    assert_eq!(grown.buffer_bytes, 17 * MESH_BYTES);
+    assert_eq!(grown.draw_calls, 17);
+}

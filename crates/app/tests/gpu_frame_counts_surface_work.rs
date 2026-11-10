@@ -81,6 +81,8 @@ fn gpu_a_frame_that_does_not_render_the_surface_counts_only_its_composition() {
     // When
     let counts = drawn(&mut rig, &doc);
 
-    // Then
+    // Then: the placing draw alone, and no frame after it
+    assert_eq!(counts.surfaces.draw_calls, 1);
     assert_eq!(counts.surfaces.buffer_bytes, IMAGE_QUAD_BYTES);
+    assert!(!rig.painter.wants_frame());
 }

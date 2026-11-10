@@ -298,6 +298,14 @@ renderer)`; `unmount` hands it back and dropping it is teardown.
   `SurfaceHandle::request_animation` drives). Other frames composite the
   last render: an idle surface renders nothing. The renderer does not
   ask for frames.
+- `frame.work` (a `WorkCounter`) is where a renderer issues its buffer
+  and texture writes and its draws, so they are counted: the painter
+  adds them to `FrameCounts::surfaces` in the frames that render the
+  surface. Work issued on `frame.queue` or `frame.encoder` directly is
+  not counted. The scene renderer (`vapors-scene3d-gpu`) issues all
+  its work through `frame.work`. Known gap: the racer's `Track` writes
+  its uniform on `frame.queue` and draws on its own pass, so its work
+  is uncounted and `FrameCounts::surfaces` holds only its composition.
 - `ScenePainter::wants_frame()` is true while an active surface is
   invalidated or animating, and for a renderer mounted since the last
   frame; the app returns `Next::Continue` then.
