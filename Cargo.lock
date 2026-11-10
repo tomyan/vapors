@@ -2973,6 +2973,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "vapors-racer"
+version = "0.0.0"
+dependencies = [
+ "vapors-app",
+ "vapors-compiler",
+ "vapors-components",
+ "vapors-dom",
+ "vapors-elements",
+ "vapors-platform",
+ "vapors-renderer",
+ "vapors-scene",
+ "vapors-signals",
+ "vapors-text",
+ "wgpu",
+]
+
+[[package]]
 name = "vapors-renderer"
 version = "0.0.0"
 dependencies = [
@@ -3015,6 +3032,7 @@ dependencies = [
  "vapors-canvas",
  "vapors-demos",
  "vapors-platform",
+ "vapors-racer",
  "vapors-renderer",
  "vapors-scene",
  "wasm-bindgen",
