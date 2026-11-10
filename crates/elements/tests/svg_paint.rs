@@ -83,6 +83,8 @@ fn an_svg_paints_over_its_content_box_snapped_to_device_pixels() {
     for (scale, expected) in [
         // 3.25 px margin, 2 px border, 1 px padding: content at 6.25
         (1.0, Rect::new(6.0, 6.0, 22.0, 22.0)),
+        // 1.5x: edges 9.375 and 33.375 snap to 9 and 33
+        (1.5, Rect::new(9.0, 9.0, 33.0, 33.0)),
         (2.0, Rect::new(13.0, 13.0, 45.0, 45.0)),
     ] {
         // Given
@@ -132,6 +134,18 @@ fn a_hidden_svg_paints_no_icon() {
 
     // Then
     assert_eq!(found, []);
+}
+
+#[test]
+fn a_visible_svg_inside_a_hidden_ancestor_paints() {
+    // Given: visibility inherits, and the svg sets it back to visible
+    let mut doc = undo_page(".frame { visibility: hidden; } .icon { visibility: visible; }");
+
+    // When
+    let found = icons(updated(&mut doc, 1.0));
+
+    // Then
+    assert_eq!(found.len(), 1, "{found:?}");
 }
 
 #[test]

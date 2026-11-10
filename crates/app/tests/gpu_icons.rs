@@ -1,7 +1,7 @@
 //! GPU tier: an `svg` in a document is drawn by `ScenePainter` through
 //! `TextPipeline::draw_icons` (docs/icons.md, Paint): the same pixels as
 //! a direct call with the same icon at the snapped content box, at 1x
-//! and 2x; cut by a clipping ancestor; nothing when hidden; and a
+//! 1.5x and 2x; cut by a clipping ancestor; nothing when hidden; and a
 //! translucent colour compounds where two paths overlap.
 
 use vapors_app::ScenePainter;
@@ -137,8 +137,12 @@ fn inked(rgba: &[u8]) -> Vec<(u32, u32)> {
 
 #[test]
 fn gpu_an_svg_draws_the_pixels_draw_icons_draws_at_its_snapped_content_box() {
-    for (scale, origin, size) in [(1.0, [3, 3], [16, 16]), (2.0, [7, 7], [32, 32])] {
-        // Given: content at 3.25 px, snapped to 3 at 1x and 7 (6.5) at 2x
+    for (scale, origin, size) in [
+        (1.0, [3, 3], [16, 16]),
+        (1.5, [5, 5], [24, 24]),
+        (2.0, [7, 7], [32, 32]),
+    ] {
+        // Given: content at 3.25 px, snapped to 3 at 1x, 5 (4.875) and 29 (28.875) at 1.5x, 7 (6.5) at 2x
         let css = ".frame { color: rgb(200, 30, 60); } .icon { margin: 3.25px; }";
         let mut doc = page(css, UNDO, "1.5");
 

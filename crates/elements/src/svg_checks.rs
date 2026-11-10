@@ -34,24 +34,27 @@ pub(crate) fn refusals(
     arena: &Arena,
     nodes: &[NodeId],
     used: &HashMap<NodeId, Used>,
+    scale: f32,
 ) -> Vec<ElementError> {
     nodes
         .iter()
         .flat_map(|&node| {
             let element = describe(arena, node);
-            reasons(arena, node, used).into_iter().map(move |reason| {
-                ElementError::UnsupportedAttribute(format!("{element}: {reason}"))
-            })
+            reasons(arena, node, used, scale)
+                .into_iter()
+                .map(move |reason| {
+                    ElementError::UnsupportedAttribute(format!("{element}: {reason}"))
+                })
         })
         .collect()
 }
 
-fn reasons(arena: &Arena, node: NodeId, used: &HashMap<NodeId, Used>) -> Vec<String> {
+fn reasons(arena: &Arena, node: NodeId, used: &HashMap<NodeId, Used>, scale: f32) -> Vec<String> {
     let Some(element) = arena.get(node, "svg_checks").element() else {
         return Vec::new();
     };
     let mut found = match element.tag.as_str() {
-        "svg" => svg_reasons(arena, node, &element.attributes),
+        "svg" => svg_reasons(arena, node, &element.attributes, scale),
         "path" => crate::svg_path_checks::reasons(arena, node, &element.attributes),
         _ => return Vec::new(),
     };
@@ -59,9 +62,15 @@ fn reasons(arena: &Arena, node: NodeId, used: &HashMap<NodeId, Used>) -> Vec<Str
     found
 }
 
-fn svg_reasons(arena: &Arena, node: NodeId, attributes: &BTreeMap<String, String>) -> Vec<String> {
+fn svg_reasons(
+    arena: &Arena,
+    node: NodeId,
+    attributes: &BTreeMap<String, String>,
+    scale: f32,
+) -> Vec<String> {
     let mut found = outside(attributes, &ATTRIBUTES, "<svg>");
     found.extend(sizes(attributes));
+    found.extend(crate::svg_limit::reason(attributes, scale));
     found.extend(named(attributes));
     found.extend(namespace(attributes));
     found.extend(children(arena, node));

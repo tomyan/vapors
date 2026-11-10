@@ -57,7 +57,12 @@ pub fn text(doc: &mut Document, parent: NodeId, text: &str) -> NodeId {
 
 /// The update's errors, each as its message; panics when it succeeds.
 pub fn refusals(doc: &mut Document) -> Vec<String> {
-    match doc.update(viewport(400.0, 300.0)) {
+    refusals_at(doc, viewport(400.0, 300.0))
+}
+
+/// The messages of the refusal of `doc` updated at `viewport`.
+pub fn refusals_at(doc: &mut Document, viewport: Viewport) -> Vec<String> {
+    match doc.update(viewport) {
         Ok(_) => panic!("the update succeeded; a refusal was expected"),
         Err(errors) => errors.iter().map(ElementError::to_string).collect(),
     }

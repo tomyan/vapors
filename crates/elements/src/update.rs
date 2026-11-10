@@ -173,14 +173,12 @@ impl Document {
                 errors.extend(self.mixed_metrics(node, &kept.used, viewport.scale));
             }
         }
-        errors.extend(crate::img_checks::refusals(
-            &self.images,
-            &self.arena,
+        errors.extend(crate::media_checks::refusals(
+            self,
             &live,
             &kept.used,
+            viewport.scale,
         ));
-        errors.extend(crate::surfaces::refusals(&self.arena, &live));
-        errors.extend(crate::svg_checks::refusals(&self.arena, &live, &kept.used));
         if errors.is_empty() {
             Ok(calcs)
         } else {

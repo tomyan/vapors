@@ -6,7 +6,7 @@
 use std::rc::Rc;
 
 use vapors_dom::NodeId;
-use vapors_scene::{IconId, Item};
+use vapors_scene::{Color, IconId, Item};
 use vapors_text::{Icon, IconPath, IconStroke};
 
 use crate::arena::Arena;
@@ -64,10 +64,14 @@ pub(crate) fn paint(
         return;
     }
     let content = crate::clip::content_box(layout_box, border_box);
+    push_icon(icon, content, used.text.color, input.scale, out);
+}
+
+/// One `Item::Icon` of `icon` over `content` snapped to device pixels.
+fn push_icon(icon: &Rc<Icon>, content: BoxRect, colour: Color, scale: f32, out: &mut Painted) {
     let id = IconId(u32::try_from(out.icons.len()).expect("fewer than 2^32 icons"));
     out.icons.push(Rc::clone(icon));
-    let rect = crate::paint::snapped(content, input.scale);
-    let colour = used.text.color;
+    let rect = crate::paint::snapped(content, scale);
     out.scene.push(Item::Icon {
         icon: id,
         rect,

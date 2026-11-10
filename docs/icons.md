@@ -30,6 +30,14 @@ attribute and the fix.
   They are the box's CSS `width` and `height`, as in Chromium. Their ratio must equal the
   viewBox's; a different ratio would letterbox under
   `preserveAspectRatio`, which is not built.
+  Their larger value times the viewport scale may not exceed 256
+  device px (`svg_limit::MAX_DEVICE_PX`); the update refuses a larger
+  svg, naming the element, both sizes and the fix (draw it smaller, or
+  as an image), and checks again on every update, so a scale change
+  can refuse an svg that was accepted. Each path takes a mask the size
+  of the content box in the 1024 px atlas page, 16 of them at 256 px
+  fill one page, and a larger icon failed the whole frame at draw time.
+  touche's icons are 16 px, 48 px at 3x.
 - `aria-hidden="true"` (a decorative icon: not in the accessibility
   tree, as in Chromium, so a button holding it keeps its own name), or
   `role="img"` with a non-empty `aria-label` (a named image). One of

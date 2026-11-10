@@ -36,18 +36,19 @@ impl ScenePainter {
         painted: &Painted,
         items: &[Item],
     ) -> Result<(), AtlasError> {
-        let draws: Vec<IconDraw<'_>> = items
-            .iter()
-            .filter_map(|item| match *item {
-                Item::Icon { icon, rect, colour } => {
-                    Some(icon_draw(painted.icon(icon), rect, colour))
-                }
-                _ => None,
-            })
-            .collect();
+        let draws = icon_draws(painted, items);
         self.text
             .draw_icons(&text_target(target), &mut self.atlas, &draws)
     }
+}
+
+/// The draws of the icon items among `items`, in order.
+fn icon_draws<'a>(painted: &'a Painted, items: &[Item]) -> Vec<IconDraw<'a>> {
+    let draw = |item: &Item| match *item {
+        Item::Icon { icon, rect, colour } => Some(icon_draw(painted.icon(icon), rect, colour)),
+        _ => None,
+    };
+    items.iter().filter_map(draw).collect()
 }
 
 /// `icon` over `rect`, which paint snapped to whole device pixels.
