@@ -1,0 +1,5 @@
+# The title attribute on images (docs/tooltips.md), as Chromium's
+# accessibility tree has it.
+project image
+listen focusin
+frame

@@ -199,6 +199,59 @@
       "depth": 2,
       "name": "Desc",
       "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "description": "Hint text",
+      "name": "Named by title",
+      "properties": [
+        "describedby=generic \"\"",
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 1,
+      "name": "Fallback",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 1,
+      "name": " Padded ",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 1,
+      "description": " Pad ",
+      "name": "Named",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Named",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "name": "  ",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
     }
   ],
   "viewport": [

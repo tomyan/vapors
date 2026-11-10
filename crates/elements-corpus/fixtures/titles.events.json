@@ -77,6 +77,33 @@
           "name": "Desc",
           "properties": [],
           "role": "button"
+        },
+        {
+          "description": "Hint text",
+          "name": "Named by title",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "Fallback",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": " Padded ",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "description": " Pad ",
+          "name": "Named",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "  ",
+          "properties": [],
+          "role": "button"
         }
       ],
       "checked": {},

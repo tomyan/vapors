@@ -130,12 +130,12 @@ impl Document {
         let (Some(bounds), Some(role)) = (drawn, self.ax_role(node, ids)) else {
             return Ok(None);
         };
-        let name = self.ax_name(node, &role, ids);
+        let (name, description) = self.ax_name_and_description(node, &role, ids);
         finite(bounds, &role, &name)?;
         Ok(Some(AxElement {
             node,
             value: self.ax_value(node, &role),
-            description: self.ax_description(node, &role, ids),
+            description,
             states: self.ax_states(node),
             bounds,
             children: self.ax_under(node, painted, ids)?,

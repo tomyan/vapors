@@ -20,7 +20,13 @@ hold vapors to Chromium 155's tree for each case below.
   its description, whitespace collapsed and trimmed. The content of the
   ids in `aria-describedby` replaces it when that content is not empty;
   when no id is found, the title is the description.
-- A title of only whitespace, or `title=""`, is neither.
+- A title of only ASCII whitespace, or `title=""`, is neither. Other
+  whitespace is kept: a no-break space at either end stays in the name
+  and in the description, and a title of only no-break spaces is the
+  name.
+- A whitespace-only `aria-label` names nothing, so the title is the
+  name. `aria-describedby` with ids found gives the description even
+  when the title is the name.
 
 ```html
 <button title="Open (o)">Open</button>        <!-- name "Open", description "Open (o)" -->
@@ -32,6 +38,19 @@ hold vapors to Chromium 155's tree for each case below.
 description; the events oracle's projection compares it.
 
 ## Not yet built
+
+Title on images. `fixtures/title_images.wisp` records Chromium 155
+(`title_images.events.json`), and vapors is compared with none of it:
+the icon subset refuses `title` on an `svg` and `<img>` has no role in
+the tree. Chromium's tree has each as an `image`:
+
+| Markup | name | description |
+|---|---|---|
+| `<svg role="img" title="T">` | `T` | none |
+| `<svg role="img" aria-label="L" title="T">` | `L` | `T` |
+| `<img alt="" title="T">` | empty | `T` |
+| `<img title="T">` | `T` | none |
+| `<img alt="A" title="T">` | `A` | `T` |
 
 The tooltip itself: shown after the pointer rests on an element with a
 title, hidden on leave, press, scroll or Esc, placed below the element
