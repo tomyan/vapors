@@ -88,6 +88,7 @@ boxes.
 
 | PR | Content |
 |---|---|
-| 1 | This doc; `vapors-text`: `IconPath` (strict parse, refusals), path rasterisation into the atlas, `TextPipeline` drawing an icon quad; unit and GPU tests |
+| 1 | This doc; `vapors-text`: `IconPath` (strict parse, refusals) |
+| 1b | Path rasterisation into the atlas, `TextPipeline` drawing an icon quad; unit and GPU tests |
 | 2 | Compiler vocabulary (`svg`, `path`); elements: the refusals, replaced layout, accessibility, `Item::Icon` in paint and the painter |
 | 3 | A paint fixture of touche's icons compared with Chromium at 1x and 2x, and an accessibility fixture against the oracle |
