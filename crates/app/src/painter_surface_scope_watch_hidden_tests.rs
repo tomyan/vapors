@@ -13,13 +13,16 @@ use super::super::fakes::{Late, counting, woken};
 use super::super::{DEADLINE, timed_out};
 use super::{LoopWaker, Outcome, Watch};
 
+/// Each timer asked for: its duration, and whether the test fired it.
+type Alarms = Rc<RefCell<Vec<(Duration, Rc<Cell<bool>>)>>>;
+
 /// A page whose visibility the test sets and whose latest timer it
 /// fires; every timer asked for is recorded.
 #[derive(Clone, Default)]
 struct FakePage {
     hidden: Rc<Cell<bool>>,
     unreadable: Rc<Cell<bool>>,
-    alarms: Rc<RefCell<Vec<(Duration, Rc<Cell<bool>>)>>>,
+    alarms: Alarms,
 }
 
 impl FakePage {
