@@ -156,6 +156,28 @@ fn gpu_a_renderer_remounted_on_a_name_while_idle_wants_a_frame_and_renders_in_it
 }
 
 #[test]
+fn gpu_hidden_and_display_none_surfaces_may_share_a_drawn_surface_name() {
+    // Given
+    let css = format!("{TRACK} .gone {{ display: none; }}");
+    let classes = ["track", "track hidden", "track gone"];
+    let mut doc = document(&css, &classes.map(|class| (None, "gpu-surface", class)));
+    for surface in doc.children(doc.body()) {
+        doc.set_attribute(surface, "name", "track");
+    }
+    update(&mut doc, 1.0);
+    let mut rig = Rig::new();
+    rig.painter
+        .mount("track", Box::new(Solid::new(RED).0))
+        .expect("mounts");
+
+    // When
+    let drawn = rig.draw(&doc);
+
+    // Then
+    assert!(drawn.is_ok(), "{:?}", drawn.err());
+}
+
+#[test]
 fn gpu_a_failing_renderer_refuses_the_frame_naming_the_surface() {
     // Given
     let mut doc = document(TRACK, &[(None, "gpu-surface", "track")]);
