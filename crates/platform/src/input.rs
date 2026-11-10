@@ -65,7 +65,8 @@ impl Input {
         };
         let direct = self.counted(direct);
         let gestures = self.track(&direct);
-        let mut events = vec![direct];
+        let mut events: Vec<Event> = self.wheel_placement(event).into_iter().collect();
+        events.push(direct);
         events.extend(gestures);
         events
     }
@@ -175,22 +176,10 @@ impl Input {
             modifiers,
         }
     }
-
-    /// A trackpad pinch, anchored at the pointer, else at the window's
-    /// centre (winit's pinch carries no position); dropped before the
-    /// window has a size, when there is nothing to zoom.
-    #[allow(clippy::cast_possible_truncation)] // a trackpad delta is a small fraction
-    fn pinch(&self, delta: f64) -> Option<Event> {
-        let [x, y] = self
-            .pointer
-            .or_else(|| self.size.map(|[width, height]| [width / 2.0, height / 2.0]))?;
-        Some(Event::Pinch {
-            x,
-            y,
-            factor: 1.0 + delta as f32,
-        })
-    }
 }
+
+#[path = "input_pointer.rs"]
+mod pointer;
 
 #[cfg(test)]
 #[path = "input_tests.rs"]
