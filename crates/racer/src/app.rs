@@ -29,8 +29,7 @@ impl Racer {
         let document = Rc::new(RefCell::new(Document::new(FontSystem::new())));
         let body = document.borrow().body();
         let hud = Hud::mount(&document, body, HudProps {});
-        let mut app = ElementsApp::new(Rc::clone(&document));
-        let track = TrackSurface::mount(&mut app);
+        let (app, track) = TrackSurface::mount(ElementsApp::new(Rc::clone(&document)));
         Self {
             document,
             hud,
@@ -133,7 +132,7 @@ impl App for Racer {
             return Next::Exit;
         }
         self.framed = true;
-        if let Err(error) = self.report_frame(frame.index) {
+        if let Err(error) = self.after_frame(frame.index) {
             self.fail(error);
             return Next::Wait;
         }

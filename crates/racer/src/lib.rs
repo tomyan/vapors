@@ -39,6 +39,8 @@ mod component_input_tests;
 
 // at the crate root, so each test's path starts `gpu_` as the gpu tier's filter needs
 #[cfg(test)]
+mod gpu_track_idle_tests;
+#[cfg(test)]
 mod gpu_track_lifecycle_tests;
 #[cfg(test)]
 mod gpu_track_tests;

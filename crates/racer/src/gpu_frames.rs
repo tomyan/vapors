@@ -45,6 +45,33 @@ pub(crate) fn frame_at(racer: &mut Racer, gpu: &Gpu, now: Instant) -> (Next, Vec
     (next, read_rgba8(&gpu.device, &gpu.queue, &texture))
 }
 
+/// One frame at `now` as the window's loop runs it, `drawn` after:
+/// what it asked for next, and whether a handle woke the loop during
+/// it, which draws another frame too.
+pub(crate) fn looped(
+    racer: &mut Racer,
+    gpu: &Gpu,
+    platform: &Platform,
+    now: Instant,
+) -> (Next, bool) {
+    let (next, _) = frame_at(racer, gpu, now);
+    assert_eq!(racer.app.failure().get(), None, "the frame failed");
+    racer.drawn(platform);
+    (next, platform.take_redraw_request())
+}
+
+/// An idle racer whose app keeps `platform`'s waker, as after the
+/// loop's first frame: a handle call wakes `platform` from then on.
+pub(crate) fn idle_in_loop(gpu: &Gpu, platform: &Platform) -> Racer {
+    let mut racer = idle(gpu);
+    racer.drawn(platform);
+    assert!(
+        !platform.take_redraw_request(),
+        "an idle racer woke the loop"
+    );
+    racer
+}
+
 /// `count` frames: what each asked for next.
 pub(crate) fn frames(racer: &mut Racer, gpu: &Gpu, count: usize) -> Vec<Next> {
     (0..count).map(|_| frame(racer, gpu).0).collect()

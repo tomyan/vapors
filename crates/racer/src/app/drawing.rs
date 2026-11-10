@@ -61,11 +61,14 @@ impl Racer {
         }
     }
     /// Advances the race and writes what the frame shows, before the
-    /// `ElementsApp` updates and paints the document.
+    /// `ElementsApp` updates and paints the document. This frame's
+    /// update draws the HUD values written here, so they are taken as
+    /// seen: they do not ask for a next frame.
     pub(super) fn prepare(&mut self, frame: &Frame<'_>) -> Result<(), String> {
         self.advance(frame)?;
         let viewport = self.viewport(frame);
         self.sync_hud(viewport);
+        self.document.borrow_mut().take_changed();
         let moving = !self.run.paused || self.run.camera.moving;
         self.track
             .show(self.scene(), moving)

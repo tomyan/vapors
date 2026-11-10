@@ -37,9 +37,8 @@ fn gpu_restarting_while_paused_renders_the_track_once_and_waits() {
     racer.command("restart").expect("restarts");
     let after = frames(&mut racer, &gpu, 3);
 
-    // Then: the HUD's readouts change its document in the first frame,
-    // which asks for one more frame; that one renders nothing
-    assert_eq!(after[1..], [Next::Wait; 2]);
+    // Then: the first frame draws the HUD's readouts and the track
+    assert_eq!(after, [Next::Wait; 3]);
     assert_eq!(racer.track.renders() - before, 1);
 }
 
