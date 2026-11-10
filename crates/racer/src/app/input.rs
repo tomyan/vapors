@@ -1,6 +1,6 @@
 //! Document events update component signals; the app handles driving and commands.
 use super::Racer;
-use vapors_app::{Route, Unplaced};
+use vapors_app::{GiveError, Route, Unplaced};
 use vapors_platform::{Event, Platform};
 impl Racer {
     pub(crate) fn handle(&mut self, event: &Event, platform: &Platform) -> Result<(), String> {
@@ -25,7 +25,7 @@ impl Racer {
             // Only that window is let through: after the first frame
             // NotUpdated is an error. ElementsApp holding events until
             // the first update would retire this.
-            Err(Unplaced::NotUpdated) if !self.framed => Ok(None),
+            Err(GiveError::Unplaced(Unplaced::NotUpdated)) if !self.framed => Ok(None),
             Err(error) => Err(error.to_string()),
         }
     }

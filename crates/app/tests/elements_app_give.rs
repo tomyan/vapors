@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::num::NonZeroU32;
 use std::rc::Rc;
 
-use vapors_app::{ElementsApp, Route, Unplaced};
+use vapors_app::{ElementsApp, GiveError, Route, Unplaced};
 use vapors_dom::{Dom, Event as DomEvent};
 use vapors_elements::{Document, Viewport};
 use vapors_platform::{Event, Modifiers, Platform};
@@ -40,7 +40,7 @@ fn page(updated: bool) -> (ElementsApp, Rc<RefCell<Document>>, Rc<RefCell<u32>>)
 }
 
 /// A press and release at `x`: the press's route and the release's.
-fn click_at(app: &mut ElementsApp, platform: &Platform, x: f32) -> Vec<Result<Route, Unplaced>> {
+fn click_at(app: &mut ElementsApp, platform: &Platform, x: f32) -> Vec<Result<Route, GiveError>> {
     let button = |pressed| Event::PrimaryButton {
         pressed,
         clicks: NonZeroU32::MIN,
@@ -120,7 +120,21 @@ fn a_key_the_focused_button_uses_is_the_documents_and_one_it_leaves_is_both() {
 
 #[test]
 fn a_key_with_nothing_focused_is_the_apps_alone_and_the_document_does_not_get_it() {
-    // Given: through `App::event` this Tab would focus the button
+    // Given: no listener for keys, nothing focused
+    let (mut app, _doc, clicks) = page(true);
+    let platform = Platform::detached();
+
+    // When
+    let enter = [key("Enter", true), key("Enter", false)].map(|e| app.give(&e, &platform));
+
+    // Then
+    assert_eq!(enter, [Ok(Route::Host), Ok(Route::Host)]);
+    assert_eq!(*clicks.borrow(), 0);
+}
+
+#[test]
+fn tab_with_nothing_focused_is_both_and_focuses_the_first_control() {
+    // Given
     let (mut app, doc, _clicks) = page(true);
     let platform = Platform::detached();
 
@@ -128,8 +142,14 @@ fn a_key_with_nothing_focused_is_the_apps_alone_and_the_document_does_not_get_it
     let tab = [key("Tab", true), key("Tab", false)].map(|e| app.give(&e, &platform));
 
     // Then
-    assert_eq!(tab, [Ok(Route::Host), Ok(Route::Host)]);
-    assert_eq!(doc.borrow().active_element(), None);
+    assert_eq!(tab, [Ok(Route::Both), Ok(Route::Both)]);
+    let focused = doc.borrow().active_element();
+    assert_eq!(
+        focused
+            .and_then(|n| doc.borrow().tag(n).map(str::to_owned))
+            .as_deref(),
+        Some("button")
+    );
 }
 
 #[test]
@@ -147,6 +167,20 @@ fn a_press_before_the_first_update_is_refused_as_not_updated() {
     let given = app.give(&press, &platform);
 
     // Then
-    assert_eq!(given, Err(Unplaced::NotUpdated));
+    assert_eq!(given, Err(GiveError::Unplaced(Unplaced::NotUpdated)));
     assert_eq!(*clicks.borrow(), 0);
+}
+
+#[test]
+#[cfg(debug_assertions)]
+#[should_panic(expected = "both App::event and give")]
+fn events_through_both_give_and_app_event_are_refused_in_a_debug_build() {
+    // Given
+    let (mut app, _doc, _clicks) = page(true);
+    let platform = Platform::detached();
+    app.give(&key("KeyR", true), &platform)
+        .expect("a key is given");
+
+    // When
+    vapors_platform::App::event(&mut app, key("KeyR", false), &platform);
 }

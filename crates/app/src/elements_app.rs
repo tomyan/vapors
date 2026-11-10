@@ -13,9 +13,10 @@ use vapors_platform::{App, Event, Frame, Next, Platform, report_error};
 
 use crate::frame::FrameTimes;
 
-use crate::document_input::DocumentInput;
+use crate::document_input::{DocumentInput, Unplaced};
 use crate::painter::ScenePainter;
 pub use decision::FrameDecision;
+pub use give::GiveError;
 use give::Hosting;
 pub use surface_handle::{InvalidateError, Invalidated, SurfaceHandle};
 use surfaces::AppSurfaces;
@@ -36,7 +37,9 @@ impl Failure {
     }
 }
 
-/// Shows a document in the window.
+/// Shows a document in the window. Events come through `App::event`,
+/// or through [`ElementsApp::give`] for an app that wraps this one; one
+/// instance takes them one way only (a debug build refuses the mix).
 pub struct ElementsApp {
     document: Rc<RefCell<Document>>,
     painter: Option<ScenePainter>,
@@ -60,6 +63,8 @@ pub struct ElementsApp {
     input_spent: Duration,
     /// Why the last frame asked for the next (`elements_app_decision.rs`).
     decision: FrameDecision,
+    /// Whether events came through `App::event` or `give`; `None` before the first.
+    hosting: Option<Hosting>,
 }
 
 /// What [`ElementsApp::with_per_frame`] calls before each update, with
@@ -92,6 +97,7 @@ impl ElementsApp {
             last_times: None,
             input_spent: Duration::ZERO,
             decision: FrameDecision::default(),
+            hosting: None,
         }
     }
 
@@ -127,11 +133,13 @@ impl App for ElementsApp {
         match self.deliver(&event, platform, Hosting::Alone) {
             // Before the first frame nothing is on screen, so the event
             // was aimed at nothing; it is dropped.
-            Ok(_) | Err(crate::document_input::Unplaced::NotUpdated) => {}
-            Err(unplaced) => {
+            Ok(_) | Err(GiveError::Unplaced(Unplaced::NotUpdated)) => {}
+            Err(GiveError::Unplaced(unplaced)) => {
                 report_error(&unplaced.to_string());
                 self.failure.set(&unplaced.to_string());
             }
+            // refused text input is reported and the app goes on
+            Err(refused) => report_error(&refused.to_string()),
         }
     }
 

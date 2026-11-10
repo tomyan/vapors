@@ -132,6 +132,8 @@ mod drawing;
 #[cfg(test)]
 mod hud_frame_tests;
 mod input;
+#[cfg(test)]
+mod input_tests;
 mod state;
 mod surface;
 
