@@ -162,6 +162,7 @@ impl Document {
                 e.tag == "input"
                     && (crate::check::is_type(e, "number") || crate::text_field::is_text_input(e))
             }),
+            surface: crate::surfaces::is_surface(&self.arena, node),
             to_viewport: crate::style::to_viewport(
                 node == self.root(),
                 node == self.body(),

@@ -1,11 +1,11 @@
 //! `gpu-surface` in the scene (docs/gpu-surface.md): its renderer's
 //! content over its content box, after its own background and before
 //! its children, under its ancestors' clip; nothing when hidden or
-//! empty; and what it refuses.
+//! empty. What it refuses: `gpu_surface_refused.rs`.
 
 mod support;
 
-use support::{document, element, refusals, viewport};
+use support::{document, element, viewport};
 use vapors_dom::Dom;
 use vapors_elements::{Document, Viewport};
 use vapors_scene::{Item, Rect};
@@ -110,47 +110,4 @@ fn a_hidden_or_empty_surface_paints_no_surface() {
         // Then
         assert_eq!(surfaces, [], "{css}");
     }
-}
-
-#[test]
-fn a_surface_refuses_what_its_contract_does_not_cover() {
-    // an inline one without the border and margin, which inline boxes
-    // refuse before a surface is checked
-    for (css, says) in [
-        (format!("{SIZED} .view {{ padding: 2px; }}"), "padding"),
-        (
-            format!("{SIZED} .view {{ border-radius: 4px; }}"),
-            "border-radius",
-        ),
-        (
-            ".view { display: inline; }".to_owned(),
-            "a gpu-surface is inline",
-        ),
-    ] {
-        // Given
-        let mut doc = page(&css);
-
-        // When
-        let refused = refusals(&mut doc).join("\n");
-
-        // Then
-        assert!(
-            refused.contains("gpu-surface") && refused.contains(says),
-            "{css}: {refused}"
-        );
-    }
-}
-
-#[test]
-fn a_surface_without_a_name_is_refused_saying_how_to_name_it() {
-    // Given
-    let mut doc = page(SIZED);
-    let body = doc.body();
-    element(&mut doc, body, "gpu-surface", "bare");
-
-    // When
-    let refused = refusals(&mut doc).join("\n");
-
-    // Then
-    assert!(refused.contains("name=\""), "{refused}");
 }

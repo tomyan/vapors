@@ -37,7 +37,7 @@ pub(crate) struct Used {
 }
 
 /// What a used style depends on besides the element's computed styles.
-#[allow(clippy::struct_excessive_bools)] // four independent facts about the element's place
+#[allow(clippy::struct_excessive_bools)] // independent facts about the element's place
 pub(crate) struct Context<'a> {
     /// Every property at its initial value.
     pub(crate) initial: &'a ComputedStyle,
@@ -53,6 +53,8 @@ pub(crate) struct Context<'a> {
     /// The element is an `input type=number` or a text field, which
     /// needs a width of its own (3-E3c, E6a).
     pub(crate) text_like_field: bool,
+    /// The element is a `gpu-surface` (docs/gpu-surface.md).
+    pub(crate) surface: bool,
 }
 
 /// The used style of an element whose computed styles (its own and its
@@ -77,6 +79,9 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
             reason: "is `auto` on a number or text field; vapors does not model Chromium's default width (its font and, for a number, spin button), so give it a width, such as `width: 6em`".to_owned(),
             declared: None,
         });
+    }
+    if context.surface {
+        super::surface::refuse(&mut reader, &layout, &decoration, inline);
     }
     super::overflow::refuse_rounded_clip(&mut reader, &layout, &decoration);
     super::overflow::refuse_viewport_scroll(&mut reader, &layout, context.to_viewport);

@@ -26,16 +26,20 @@ through a touche pin bump after 1c.
 ```
 
 - `name` names the renderer the application mounts on its painter. A
-  `gpu-surface` without one is refused.
+  `gpu-surface` without one, or with `name=""`, is refused. Two
+  surfaces painted in one frame with the same name are refused by the
+  painter (`PaintError::DuplicateName`, 1b); a hidden or `display: none`
+  surface may share a name, so tabs can swap one renderer.
 - CSS sizes it like a `div`; it has no natural size.
 - The renderer draws over the content box, in device pixels, after the
   element's background and border and before its children: children
   and later siblings paint over it.
-- `padding` other than zero is refused, so the content box is the
+- `padding` other than zero (`0` and `0%` are zero) is refused, so the content box is the
   padding box and a pointer event's `offset` on the surface is in
   surface-local CSS pixels (see Input).
 - `display: inline` is refused (inline-block content is not laid out
-  yet); a hidden surface (`visibility: hidden`) paints no item.
+  yet). Each style refusal names the declaration's sheet and line. A
+  hidden surface (`visibility: hidden`) paints no item.
 
 ## Display list
 
