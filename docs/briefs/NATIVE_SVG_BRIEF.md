@@ -186,25 +186,21 @@ not a slice yet.
   analysis. Shouldn't be different"; "We should not refuse things that are
   runtime, just track them"). Boxes, paths, meshes and text are classified
   the same way. For each painted thing and each property, the compiler
-  records one of three states:
+  records one of two states:
   - **constant:** no binding, toggled class or state pseudo-class can change
     it. Compiled: classified, deduplicated and packed into the shape table.
   - **known variable:** a binding, a class that can be toggled or a
     `:hover`/`:focus`-style state can change it, and the compiler knows
     which. A run-time parameter of the same primitive, updated when its
-    source changes.
-  - **unknown:** the analysis cannot see what changes it. Not refused:
-    tracked. The element is treated as able to change any property the
-    source could reach, and the compiler reports each unknown with its
-    file, line and cause, so the cost is visible and the developer can make
-    it known.
-  Classes are bound from enums, never strings (Tom, 2026-11-10), so every
-  class an element can take is known at build time. A custom property
-  set from Rust (`set_property`, as touche sets `--bar-height`) is known
-  variable when its name is a literal: its value reaches exactly the
-  properties whose `var()` reads it. Which sources, if any, remain unknown
-  is for the analysis slice to list; a name computed at run time is the
-  candidate.
+    source changes. Run-time change is tracked, never refused.
+  There is no third state: vapors does not support a source whose effect
+  cannot be determined at build time (Tom, 2026-11-10). Classes are bound
+  from enums, never strings, so every class an element can take is known.
+  A custom property set from Rust (`set_property`, as touche sets
+  `--bar-height`) reaches exactly the properties whose `var()` reads it,
+  provided its name is known at build time; the analysis slice makes the
+  API take only such names, and any other way in that it finds is closed
+  the same way, so no source of change is unknown.
   Run-time input such as text length, viewport size and image sizes sets
   sizes and positions; it does not change which primitive a thing is.
 - **Retained layout and paint use the same analysis.** Which bindings can
