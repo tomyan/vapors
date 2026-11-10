@@ -31,7 +31,7 @@ impl DocumentInput {
             }
             _ => {}
         }
-        self.tooltip.shown_at(now)
+        self.tooltip.shown_at(now, self.pointer)
     }
 
     /// Whether the tooltip armed or shown changed (armed, armed again,
@@ -51,12 +51,23 @@ impl DocumentInput {
         self.tooltip.deadline()
     }
 
-    /// Where the pointer last moved, in CSS pixels: a pointer tooltip's
-    /// hotspot ([`crate::ScenePainter::draw_tooltip`]). `None` before
-    /// the first move, as the position is then unknown.
+    /// Where the pointer last moved, in CSS pixels. `None` before the
+    /// first move, as the position is then unknown; it stays where it
+    /// was after the pointer leaves the window.
     #[must_use]
     pub fn pointer(&self) -> Option<Point> {
         self.pointer
+    }
+
+    /// Where the pointer was, in CSS pixels, when the tooltip shown
+    /// showed: a pointer tooltip's hotspot
+    /// ([`crate::ScenePainter::draw_tooltip`]), which a later move within
+    /// its title does not change, as in Chromium. `None` while no
+    /// tooltip is shown, or when it showed before the pointer first
+    /// moved.
+    #[must_use]
+    pub fn tooltip_hotspot(&self) -> Option<Point> {
+        self.tooltip.hotspot()
     }
 
     /// `event`, its pointer `action` if it has one, as the tooltip sees

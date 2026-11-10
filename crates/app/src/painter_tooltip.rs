@@ -19,14 +19,14 @@ impl ScenePainter {
     /// Draws `tooltip` over what this frame's [`ScenePainter::draw`] (or
     /// `draw_over`) drew of `document`, styled by the root's
     /// `--tooltip-*` properties and placed by [`crate::place_tooltip`]:
-    /// at `pointer` (from [`crate::DocumentInput::pointer`]) for a
-    /// pointer tooltip, at its element's border box for a keyboard one.
+    /// at `hotspot` (from [`crate::DocumentInput::tooltip_hotspot`]) for
+    /// a pointer tooltip, at its element's border box for a keyboard one.
     /// Call it after the scene, each frame a tooltip is shown.
     ///
     /// # Errors
     ///
     /// [`TooltipError`], drawing nothing: a `--tooltip-*` value of the
-    /// wrong kind, a pointer tooltip with no `pointer`, a keyboard
+    /// wrong kind, a pointer tooltip with no `hotspot`, a keyboard
     /// tooltip whose element has no box, a document not yet updated, or
     /// a glyph that cannot be drawn.
     pub fn draw_tooltip(
@@ -34,11 +34,11 @@ impl ScenePainter {
         target: &Target<'_>,
         document: &mut Document,
         tooltip: &Tooltip,
-        pointer: Option<Point>,
+        hotspot: Option<Point>,
     ) -> Result<(), TooltipError> {
         let style = TooltipStyle::of(document)?;
         let painted = document.painted().ok_or(TooltipError::NotUpdated)?;
-        let (anchor, scale) = (anchor_of(tooltip, pointer, painted)?, painted.scale());
+        let (anchor, scale) = (anchor_of(tooltip, hotspot, painted)?, painted.scale());
         let window = window_of(target.viewport, scale);
         let layout = lay_out(
             document,

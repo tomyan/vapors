@@ -51,7 +51,7 @@ impl fmt::Display for TooltipError {
             ),
             Self::NoPointer => f.write_str(
                 "the tooltip was not drawn: it was brought up by the pointer and no pointer \
-                 position was given; pass `DocumentInput::pointer()`",
+                 position was given; pass `DocumentInput::tooltip_hotspot()`",
             ),
             Self::NoBox(node) => write!(
                 f,

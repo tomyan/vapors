@@ -66,6 +66,29 @@ fn gpu_the_tooltip_draws_from_its_deadline_until_the_frame_after_it_hides() {
 }
 
 #[test]
+fn gpu_a_shown_tooltip_stays_where_it_showed_when_the_pointer_moves_within_its_element() {
+    // Given: shown at the pointer (2, 2)
+    let rig = Rig::new();
+    let mut app = ElementsApp::new(titled_square());
+    let platform = Platform::detached();
+    let moved = Event::PointerMoved { x: 2.0, y: 2.0 };
+    app.give(&moved, &platform).expect("placed");
+    let (Next::WaitUntil(deadline), _) = app_frame_at(&mut app, &rig.gpu, Instant::now()) else {
+        panic!("the frame after the move waits for the tooltip's deadline");
+    };
+    app_frame_at(&mut app, &rig.gpu, deadline);
+
+    // When: 5 px right, still over the square, and a frame drawn
+    let within = Event::PointerMoved { x: 7.0, y: 2.0 };
+    app.give(&within, &platform).expect("placed");
+    let (_, moved_frame) = app_frame_at(&mut app, &rig.gpu, deadline);
+
+    // Then
+    let [left, top, ..] = bounds(&moved_frame, GREEN).expect("still shown");
+    assert_eq!([left, top], [12, 17]);
+}
+
+#[test]
 fn gpu_a_frame_with_no_tooltip_draws_what_the_painter_alone_draws() {
     // Given: the pointer moved, off the title
     let doc = titled_square();

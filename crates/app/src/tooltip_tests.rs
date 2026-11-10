@@ -24,7 +24,7 @@ pub(super) fn armed(t0: Instant) -> TooltipState {
 }
 
 fn shown_text(state: &mut TooltipState, now: Instant) -> Option<String> {
-    state.shown_at(now).map(|tip| tip.text.clone())
+    state.shown_at(now, None).map(|tip| tip.text.clone())
 }
 
 #[test]
@@ -106,7 +106,7 @@ fn a_shown_tooltip_hides_on_each_trigger() {
         // Given
         let t0 = Instant::now();
         let mut state = armed(t0);
-        assert!(state.shown_at(t0 + ms(500)).is_some());
+        assert!(state.shown_at(t0 + ms(500), None).is_some());
 
         // When
         hide(&mut state);
@@ -173,7 +173,7 @@ fn keyboard_focus_shows_its_title_after_the_delay() {
 
     // Then
     assert_eq!(shown_text(&mut state, t0 + ms(499)), None);
-    let shown = state.shown_at(t0 + ms(500)).cloned();
+    let shown = state.shown_at(t0 + ms(500), None).cloned();
     assert_eq!(shown.map(|tip| tip.trigger), Some(TooltipTrigger::Keyboard));
 }
 
@@ -191,7 +191,7 @@ fn focus_that_stays_does_not_arm_again_and_focus_that_moves_hides_it() {
 
     // When / Then: shown, then blurred
     state.focus(Some(NodeId(4)), Some(titled(4, "Load")), t0 + ms(200));
-    assert!(state.shown_at(t0 + ms(700)).is_some());
+    assert!(state.shown_at(t0 + ms(700), None).is_some());
     state.focus(None, None, t0 + ms(800));
     assert_eq!(shown_text(&mut state, t0 + ms(900)), None);
 }

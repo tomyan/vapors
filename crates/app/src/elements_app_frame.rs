@@ -110,7 +110,12 @@ impl ElementsApp {
         };
         let painter = self.painter.as_mut().expect("made by paint");
         painter
-            .draw_tooltip(target, &mut document, &tooltip, self.input.pointer())
+            .draw_tooltip(
+                target,
+                &mut document,
+                &tooltip,
+                self.input.tooltip_hotspot(),
+            )
             .map_err(|error| error.to_string())
     }
 
