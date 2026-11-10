@@ -20,6 +20,14 @@ touche's icons use, and nothing else is drawn approximately.
 Anything outside it is refused before layout, naming the element, the
 attribute and the fix.
 
+The compiler's scoping attribute (`data-wisp`, `vapors_dom::SCOPE_ATTRIBUTE`)
+is accepted on `<svg>` and `<path>`: a component with a `<style>` has it on
+every element. It is the only `data-*` attribute accepted. It is not painted
+and not in the a11y tree, and a scoped rule such as `svg { color: red }`
+matches the svg through it (`svg_scope.rs`). Its value is not checked:
+the compiler refuses `data-wisp` written in a template, so only generated
+code sets it.
+
 `<svg>`:
 
 - `viewBox`: required, four numbers `min-x min-y width height`, width
