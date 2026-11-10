@@ -87,7 +87,7 @@ the 3D lane's slices as reconciled with Tom on 2026-11-09 (touche
 
 | Requirement | Slices | Match |
 |---|---|---|
-| Scene components create persistent nodes; transform updates do not recreate geometry | 2 (persistent scene and camera); the lane's "Reactivity" section | Matches in intent. Slice 2's acceptance checks transforms, camera validation, refusals and cleanup, not upload counts; geometry-upload counts first appear in slice 4 |
+| Scene components create persistent nodes; transform updates do not recreate geometry | 2 (persistent scene and camera); the lane's "Reactivity" section | Matches in intent. Slice 2 PR 3b counts geometry and uniform bytes and draw calls through `SurfaceFrame::work` (`docs/plans/3d-2.md` row 3): geometry uploaded once, an idle frame writing 0 bytes, a transform change one slot's 80 bytes |
 | Geometry and material handles share resources | 3 (sharing, mount and unmount), 3b (one texture across meshes, stale handle refused) | Matches |
 | Keyed instance changes update affected instance records | 4 (insert, remove, reorder, one transform; unchanged geometry uploads) | Matches |
 | Explicit instancing, no automatic batching | 4 (`Instances` as an explicit batching contract) | Matches |

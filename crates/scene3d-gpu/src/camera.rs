@@ -3,7 +3,7 @@
 
 use crate::FrameError;
 use crate::pipeline::{CAMERA_BYTES, Pipeline};
-use vapors_app::SurfaceSize;
+use vapors_app::{SurfaceFrame, SurfaceSize};
 use vapors_scene3d::{Mat4, NodeKind, Scene};
 
 pub(crate) struct CameraUniform {
@@ -35,8 +35,9 @@ impl CameraUniform {
         }
     }
 
-    /// Writes `view_projection` unless it is the one last written.
-    pub(crate) fn write(&mut self, queue: &wgpu::Queue, view_projection: Mat4) {
+    /// Writes `view_projection` through `frame.work` unless it is the one
+    /// last written.
+    pub(crate) fn write(&mut self, frame: &SurfaceFrame<'_>, view_projection: Mat4) {
         if self.written == Some(view_projection) {
             return;
         }
@@ -45,7 +46,9 @@ impl CameraUniform {
             .into_iter()
             .flat_map(f32::to_le_bytes)
             .collect();
-        queue.write_buffer(&self.buffer, 0, &bytes);
+        frame
+            .work
+            .write_buffer(frame.queue, &self.buffer, 0, &bytes);
         self.written = Some(view_projection);
     }
 

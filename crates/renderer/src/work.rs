@@ -16,7 +16,8 @@ pub struct GpuWork {
     /// Bytes passed to `Queue::write_texture`: the glyph atlas page and
     /// image pixels, every mip level counted.
     pub texture_bytes: u64,
-    /// `RenderPass::draw` calls; one call may draw many quads.
+    /// `RenderPass::draw` and `RenderPass::draw_indexed` calls; one call
+    /// may draw many quads.
     pub draw_calls: u64,
 }
 
@@ -89,6 +90,19 @@ impl WorkCounter {
         instances: std::ops::Range<u32>,
     ) {
         pass.draw(vertices, instances);
+        self.draw_calls.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// `pass.draw_indexed(indices, base_vertex, instances)`, counting
+    /// one call.
+    pub fn draw_indexed(
+        &self,
+        pass: &mut wgpu::RenderPass<'_>,
+        indices: std::ops::Range<u32>,
+        base_vertex: i32,
+        instances: std::ops::Range<u32>,
+    ) {
+        pass.draw_indexed(indices, base_vertex, instances);
         self.draw_calls.fetch_add(1, Ordering::Relaxed);
     }
 

@@ -13,7 +13,7 @@ use std::rc::Rc;
 
 use vapors_elements::Painted;
 use vapors_platform::Instant;
-use vapors_renderer::{ImagePipeline, Target};
+use vapors_renderer::{GpuWork, ImagePipeline, Target, WorkCounter};
 use vapors_scene::{Item, Rect, Run};
 
 use super::errors::{MountError, PaintError};
@@ -36,12 +36,14 @@ mod texture;
 #[path = "painter_surface_wake.rs"]
 mod wake;
 
-/// The mounted renderers, by surface name, and the waker a late GPU
-/// error scope result wakes (`ScenePainter::wake_with`).
+/// The mounted renderers, by surface name, the waker a late GPU error
+/// scope result wakes (`ScenePainter::wake_with`), and the work their
+/// renders issued through `SurfaceFrame::work` since the last take.
 #[derive(Default)]
 pub(super) struct Surfaces {
     mounted: BTreeMap<String, Mounted>,
     waker: LoopWaker,
+    work: WorkCounter,
 }
 
 impl ScenePainter {
@@ -129,13 +131,18 @@ impl Surfaces {
         painted: &Painted,
         items: &[Item],
     ) -> Result<(), PaintError> {
-        let waker = Rc::clone(&self.waker);
         for (name, size, rect) in surfaces(painted, items) {
-            let mounted = self.mounted(name)?;
-            let texture = mounted.prepare(target, size, turn(&waker));
+            let mounted = unmounted_refused(&mut self.mounted, name)?;
+            let texture = mounted.prepare(target, size, turn(&self.waker), &self.work);
             pipeline.draw_rect(target, texture.map_err(|r| r.named(name))?, rect);
         }
         Ok(())
+    }
+
+    /// The work renders issued through `SurfaceFrame::work` since the
+    /// last take, and the count back to 0.
+    pub(super) fn take_work(&self) -> GpuWork {
+        self.work.take()
     }
 
     /// Refuses each surface of `run`, which is clipped out of view, as
@@ -153,7 +160,8 @@ impl Surfaces {
         let waker = Rc::clone(&self.waker);
         for (name, size, _) in surfaces(painted, items) {
             let turn = turn(&waker);
-            let claimed = self.mounted(name)?.claim(device, size, turn);
+            let mounted = unmounted_refused(&mut self.mounted, name)?;
+            let claimed = mounted.claim(device, size, turn);
             claimed.map_err(|r| r.named(name))?;
         }
         Ok(())
@@ -163,11 +171,15 @@ impl Surfaces {
         let mounted = self.mounted.get_mut(name);
         mounted.ok_or_else(|| MountError::NotMounted(name.to_owned()))
     }
+}
 
-    fn mounted(&mut self, name: &str) -> Result<&mut Mounted, PaintError> {
-        let mounted = self.mounted.get_mut(name);
-        mounted.ok_or_else(|| PaintError::Unmounted(name.to_owned()))
-    }
+/// The renderer mounted as `name`; a surface item naming none is refused.
+fn unmounted_refused<'a>(
+    mounted: &'a mut BTreeMap<String, Mounted>,
+    name: &str,
+) -> Result<&'a mut Mounted, PaintError> {
+    let found = mounted.get_mut(name);
+    found.ok_or_else(|| PaintError::Unmounted(name.to_owned()))
 }
 
 /// A turn now with the loop's `waker`.

@@ -16,7 +16,8 @@ use super::ScenePainter;
 /// refusal and the part of the refused run issued before it. A refused
 /// `draw_over` (a canvas background) draws nothing and leaves the frame
 /// before it. Not counted: the clear (a render pass with no draw), and
-/// what a `gpu-surface`'s own renderer writes and draws into its backing.
+/// what a `gpu-surface`'s own renderer issues on the queue or encoder
+/// directly rather than through `SurfaceFrame::work`.
 /// Before the first frame, all are 0.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
@@ -35,7 +36,8 @@ pub struct FrameCounts {
     /// image's pixels, every mip level, the first frame that draws it.
     pub images: GpuWork,
     /// `gpu-surface` runs: one composition draw per surface item and its
-    /// quad's vertices.
+    /// quad's vertices, and what each surface's renderer issued through
+    /// `SurfaceFrame::work` in the frames that render it.
     pub surfaces: GpuWork,
 }
 
@@ -96,5 +98,6 @@ impl ScenePainter {
             + self.text.take_work()
             + self.images.take_work()
             + self.textures.take_work()
+            + self.surfaces.take_work()
     }
 }

@@ -67,12 +67,10 @@ impl SurfaceRenderer for SceneRenderer {
         scene.update();
         let nodes = mesh_nodes(&scene, &meshes)?;
         let find = |id| meshes.get(id);
-        mounted
-            .geometry
-            .upload_missing(frame.device, &nodes, find)?;
+        mounted.geometry.upload_missing(&frame, &nodes, find)?;
         mounted
             .camera
-            .write(frame.queue, view_projection(&scene, frame.size)?);
+            .write(&frame, view_projection(&scene, frame.size)?);
         mounted.write_slots(&frame, &scene, &nodes)?;
         Ok(mounted.draw(&mut frame, depth, &nodes)?)
     }
@@ -94,7 +92,7 @@ impl Mounted {
             if !self.slots.holds(mesh.node, version) {
                 let world = scene.world(mesh.node)?;
                 self.slots
-                    .write(frame.queue, mesh.node, version, world, mesh.colour);
+                    .write(frame, mesh.node, version, world, mesh.colour);
             }
         }
         Ok(())
@@ -116,6 +114,7 @@ impl Mounted {
             slots: self.slots.bind_group(),
             colour: frame.view,
             depth,
+            work: frame.work,
         };
         record(frame.encoder, &pass, &draws);
         Ok(())

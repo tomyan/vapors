@@ -1,12 +1,12 @@
 //! Geometry on the GPU: each piece a mesh node names, uploaded by this
 //! renderer once as a vertex and an index buffer, at the first render
-//! that draws it.
+//! that draws it, through the frame's work counter.
 
 use crate::FrameError;
 use crate::draw::MeshNode;
 use std::collections::HashMap;
+use vapors_app::SurfaceFrame;
 use vapors_scene3d::{Geometry, GeometryId, Vec3};
-use wgpu::util::DeviceExt;
 
 /// One piece's buffers.
 pub(crate) struct Uploaded {
@@ -31,12 +31,12 @@ impl GpuGeometry {
     /// piece not yet uploaded; nothing is uploaded then.
     pub(crate) fn upload_missing<'a>(
         &mut self,
-        device: &wgpu::Device,
+        frame: &SurfaceFrame<'_>,
         nodes: &[MeshNode],
         find: impl Fn(GeometryId) -> Option<&'a Geometry>,
     ) -> Result<(), FrameError> {
         for (id, geometry) in self.missing(nodes, find)? {
-            self.uploaded.insert(id, upload(device, geometry));
+            self.uploaded.insert(id, upload(frame, geometry));
         }
         Ok(())
     }
@@ -76,7 +76,7 @@ impl GpuGeometry {
     }
 }
 
-fn upload(device: &wgpu::Device, geometry: &Geometry) -> Uploaded {
+fn upload(frame: &SurfaceFrame<'_>, geometry: &Geometry) -> Uploaded {
     let positions: Vec<u8> = geometry
         .positions()
         .iter()
@@ -90,13 +90,13 @@ fn upload(device: &wgpu::Device, geometry: &Geometry) -> Uploaded {
         .collect();
     Uploaded {
         vertices: buffer(
-            device,
+            frame,
             "scene3d vertices",
             &positions,
             wgpu::BufferUsages::VERTEX,
         ),
         indices: buffer(
-            device,
+            frame,
             "scene3d indices",
             &indices,
             wgpu::BufferUsages::INDEX,
@@ -106,17 +106,23 @@ fn upload(device: &wgpu::Device, geometry: &Geometry) -> Uploaded {
     }
 }
 
+/// A buffer holding `contents`, written through `frame.work`.
+/// `contents` is 4-byte floats or indices, so its length is a multiple
+/// of `wgpu::COPY_BUFFER_ALIGNMENT`.
 fn buffer(
-    device: &wgpu::Device,
+    frame: &SurfaceFrame<'_>,
     label: &str,
     contents: &[u8],
     usage: wgpu::BufferUsages,
 ) -> wgpu::Buffer {
-    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    let buffer = frame.device.create_buffer(&wgpu::BufferDescriptor {
         label: Some(label),
-        contents,
-        usage,
-    })
+        size: contents.len() as u64,
+        usage: usage | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    frame.work.write_buffer(frame.queue, &buffer, 0, contents);
+    buffer
 }
 
 #[cfg(test)]

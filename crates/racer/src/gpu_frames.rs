@@ -181,6 +181,7 @@ pub(crate) fn track_alone_in(racer: &Racer, gpu: &Gpu, size: SurfaceSize) -> Vec
         encoder: &mut encoder,
         view: &view,
         size,
+        work: &vapors_app::WorkCounter::default(),
     };
     track.render(frame).expect("renders");
     gpu.queue.submit([encoder.finish()]);
