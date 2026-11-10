@@ -4,8 +4,8 @@
 //! pixel within 96, and in each element's region at most 2 pixels off
 //! by more than half the local contrast. The composite (vapors | Chromium | difference
 //! x4) is written to `target/tmp/paint_<name>_<scale>x.png`.
-//! The rules are checked in `gpu_paint_rules`. Two pixels of touche's
-//! Mute icon at 1x are compared with exact coverage instead
+//! The rules are checked in `gpu_paint_rules`. Four pixels of touche's
+//! Mute icon at 1x (two in each of the two opaque rows) are compared with exact coverage instead
 //! (`paint_support/exact.rs`, declared there).
 
 #[path = "paint_support/exact.rs"]

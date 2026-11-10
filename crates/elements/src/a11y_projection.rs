@@ -36,6 +36,15 @@ const RELATED: [(&str, &str); 2] = [
 /// Roles Chromium's tree names otherwise than ARIA: `(ARIA, Chromium)`.
 const CHROMIUM_NAMES: [(&str, &str); 1] = [("img", "image")];
 
+/// Chromium's name for `role` when it differs from ARIA's.
+#[must_use]
+pub fn chromium_name_for_aria(role: &str) -> Option<&'static str> {
+    CHROMIUM_NAMES
+        .iter()
+        .find(|(aria, _)| *aria == role)
+        .map(|(_, chromium)| *chromium)
+}
+
 /// `role` as Chromium's accessibility tree names it.
 fn chromium_role(role: &str) -> &str {
     CHROMIUM_NAMES
@@ -52,6 +61,12 @@ impl Document {
     /// # Errors
     /// As [`Document::ax_tree`].
     pub fn ax_projection(&self, roles: &[&str]) -> Result<Vec<AxNode>, AxError> {
+        if let Some(asked) = roles.iter().find(|r| chromium_name_for_aria(r).is_some()) {
+            return Err(AxError::RoleNamedByAria {
+                asked: (*asked).to_owned(),
+                chromium: chromium_name_for_aria(asked).unwrap_or_default().to_owned(),
+            });
+        }
         let tree = self.ax_tree()?;
         let mut all = Vec::new();
         flatten(&tree, &mut all);

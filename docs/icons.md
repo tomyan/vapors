@@ -130,8 +130,8 @@ numbers. Its `path` children are not boxes.
   `tests/gpu_paint.rs`): touche's ten icons pass the paint rules every
   fixture is held to, unchanged, at 1x and 2x. Per icon, the largest
   difference is 46 grey levels at 1x and 74 at 2x, the mean at most
-  1.3. Two pixels of Mute at 1x are compared with exact coverage
-  instead: Chromium draws them 133 off exact (declared in
+  1.3. Four pixels of Mute at 1x (two in each of the two opaque rows) are compared
+  with exact coverage instead: Chromium draws them 133 off exact (declared in
   `tests/paint_support/exact.rs`).
 - Open: zeno sums the coverage of overlapping strokes within one path,
   where SVG paints their union, so a crossing comes out darker by up to

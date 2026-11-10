@@ -1,8 +1,9 @@
-//! RELAXED (lead's decision, 2026-11-10): at two pixels of touche's Mute
+//! RELAXED (lead's decision, 2026-11-10): at four pixels of touche's Mute
 //! icon at 1x, the paint rules compare vapors with exact coverage, not
 //! with Chromium. Mute's X (`M11 6l3 4M14 6l-3 4`, stroke 1.5) crosses
 //! at y = 8; the pixels are svg (11, 8) and (13, 8), in each of the
-//! three rows of `icons_paint`. Exact coverage there, from 32x32
+//! two opaque rows of `icons_paint` (the third, at alpha 0.5, has
+//! Chromium within `EDGE_BOUND` of exact and is compared with Chromium). Exact coverage there, from 32x32
 //! supersampling of the union of the two strokes (computed below from
 //! the path), is 0.789: 73 on the dark row's #ececf0 button, where
 //! rows 7 and 8 read `231 73 29 73 231`. vapors draws `231 45 29 47 232`
@@ -12,8 +13,13 @@
 //! The same `EDGE_BOUND` applies to the exact value as to Chromium's.
 //! Every other pixel, Mute's included, is compared with Chromium.
 //! Retire this when Chromium is within `EDGE_BOUND` of vapors at these
-//! pixels.
+//! pixels; `with_exact_pixels` panics when it is.
+//!
+//! `paint_check`'s flatness and local-contrast rules read `theirs`,
+//! which holds the exact pixels after this replaces them (73 where
+//! Chromium drew 206), so around those pixels those rules are looser.
 
+use vapors_elements_corpus::paint_check::EDGE_BOUND;
 use vapors_text::comparison::Rgba;
 
 /// Mute's crossing strokes, as in `fixtures/icons_paint.wisp`.
@@ -27,10 +33,9 @@ const PIXELS: [(u32, u32); 2] = [(11, 8), (13, 8)];
 const SVG_LEFT: u32 = 446;
 /// Each row's svg top, its button colour, and its stroke colour with
 /// alpha (`icons_paint.wisp`).
-const ROWS: [(u32, [f32; 3], [f32; 4]); 3] = [
+const ROWS: [(u32, [f32; 3], [f32; 4]); 2] = [
     (30, [236.0, 236.0, 240.0], [29.0, 29.0, 31.0, 1.0]),
     (90, [29.0, 29.0, 31.0], [245.0, 245.0, 247.0, 1.0]),
-    (150, [236.0, 236.0, 240.0], [29.0, 29.0, 31.0, 0.5]),
 ];
 
 type Segment = ((f32, f32), (f32, f32));
@@ -47,7 +52,9 @@ pub fn with_exact_pixels(name: &str, scale: u32, mut theirs: Rgba) -> Rgba {
             let coverage = coverage(&segments, x, y);
             let i = (((top + y) * theirs.width + SVG_LEFT + x) * 4) as usize;
             for c in 0..3 {
-                theirs.data[i + c] = blend(button[c], stroke[c], stroke[3] * coverage);
+                let exact = blend(button[c], stroke[c], stroke[3] * coverage);
+                assert_still_far(theirs.data[i + c], exact, SVG_LEFT + x, top + y);
+                theirs.data[i + c] = exact;
             }
         }
     }
@@ -58,15 +65,7 @@ pub fn with_exact_pixels(name: &str, scale: u32, mut theirs: Rgba) -> Rgba {
 fn segments(path: &str) -> Vec<Segment> {
     let mut out = Vec::new();
     let mut at = (0.0, 0.0);
-    let mut rest = path;
-    while let Some(op) = rest.chars().next() {
-        let end = rest[1..]
-            .find(|c: char| c.is_ascii_alphabetic())
-            .map_or(rest.len(), |n| n + 1);
-        let numbers: Vec<f32> = rest[1..end]
-            .split_whitespace()
-            .map(|n| n.parse().expect("a number in the Mute path"))
-            .collect();
+    for (op, numbers) in commands(path) {
         assert!(numbers.len() == 2, "{op} takes two numbers in {path}");
         match op {
             'M' => at = (numbers[0], numbers[1]),
@@ -77,9 +76,36 @@ fn segments(path: &str) -> Vec<Segment> {
             }
             _ => panic!("unsupported command {op} in {path}"),
         }
+    }
+    out
+}
+
+/// The path's commands: each letter with the numbers after it.
+fn commands(path: &str) -> Vec<(char, Vec<f32>)> {
+    let mut out = Vec::new();
+    let mut rest = path;
+    while let Some(op) = rest.chars().next() {
+        let end = rest[1..]
+            .find(|c: char| c.is_ascii_alphabetic())
+            .map_or(rest.len(), |n| n + 1);
+        let numbers = rest[1..end]
+            .split_whitespace()
+            .map(|n| n.parse().expect("a number in the Mute path"))
+            .collect();
+        out.push((op, numbers));
         rest = &rest[end..];
     }
     out
+}
+
+/// Panics unless Chromium's value is still beyond `EDGE_BOUND` of exact:
+/// otherwise the declared pixel is not the crossing, or Chromium no
+/// longer needs the relaxation.
+fn assert_still_far(theirs: u8, exact: u8, x: u32, y: u32) {
+    assert!(
+        theirs.abs_diff(exact) > EDGE_BOUND,
+        "Chromium now draws Mute's crossing at ({x},{y}) within bound, or the fixture moved: retire or update paint_support/exact.rs"
+    );
 }
 
 /// Fraction of the pixel's sample points inside any stroked segment.
