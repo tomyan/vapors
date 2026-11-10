@@ -93,10 +93,11 @@ mod thumb_order;
 mod tree;
 mod typing;
 mod update;
+mod update_counts;
 
 pub use a11y_drive::{Command, Held, Reply};
 pub use a11y_error::AxError;
-pub use a11y_projection::AxNode;
+pub use a11y_projection::{AxNode, chromium_name_for_aria};
 pub use a11y_target::{AxTarget, AxWithin};
 pub use a11y_tree::{AxElement, AxStates};
 pub use document::Document;
@@ -110,3 +111,4 @@ pub use shortcuts::ShortcutModifier;
 pub use style::{ALL_CURSORS, Cursor};
 pub use text_bridge::{TextEdit, TextInput};
 pub use update::Viewport;
+pub use update_counts::UpdateCounts;

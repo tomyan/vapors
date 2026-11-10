@@ -5,8 +5,8 @@
 
 use vapors_scene::{Rect, Size, Transform};
 
-use crate::Target;
 use crate::image_setup::{bind_group_layout, render_pipeline};
+use crate::{GpuWork, Target, WorkCounter};
 
 use crate::quad::{VERTEX_COUNT, VERTEX_SIZE, quad_vertices, vertex_bytes};
 
@@ -20,6 +20,7 @@ pub struct ImagePipeline {
     /// Linear sampling, for an `img` stretched over its box.
     smooth: wgpu::Sampler,
     vertices: wgpu::Buffer,
+    work: WorkCounter,
 }
 
 impl ImagePipeline {
@@ -70,6 +71,7 @@ impl ImagePipeline {
             nearest,
             smooth,
             vertices,
+            work: WorkCounter::default(),
         }
     }
 
@@ -106,6 +108,11 @@ impl ImagePipeline {
         self.quad(target, texture, bounds, &self.smooth);
     }
 
+    /// The work its draws issued since the last take; the count restarts.
+    pub fn take_work(&self) -> GpuWork {
+        self.work.take()
+    }
+
     fn quad(
         &self,
         target: &Target<'_>,
@@ -114,9 +121,8 @@ impl ImagePipeline {
         sampler: &wgpu::Sampler,
     ) {
         let quad = quad_vertices(bounds, target.viewport);
-        target
-            .queue
-            .write_buffer(&self.vertices, 0, &vertex_bytes(&quad));
+        self.work
+            .write_buffer(target.queue, &self.vertices, 0, &vertex_bytes(&quad));
         let bind_group = self.bind_group(target.device, texture, sampler);
         let mut encoder = target
             .device
@@ -131,7 +137,7 @@ impl ImagePipeline {
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &bind_group, &[]);
             pass.set_vertex_buffer(0, self.vertices.slice(..));
-            pass.draw(0..VERTEX_COUNT, 0..1);
+            self.work.draw(&mut pass, 0..VERTEX_COUNT, 0..1);
         }
         target.queue.submit([encoder.finish()]);
     }

@@ -157,3 +157,8 @@ impl Drop for AppSurfaces {
         self.close();
     }
 }
+
+#[path = "elements_app_scope_wake.rs"]
+mod scope_wake;
+#[cfg(test)]
+pub(crate) use scope_wake::give_one_loop_waker_to;

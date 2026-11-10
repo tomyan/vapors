@@ -34,7 +34,7 @@
 
 use crate::events_action::{action, exactly, is_action};
 use crate::events_expect::expect;
-use crate::events_fields::{at, listen, page};
+use crate::events_fields::{at, listen, page, project_roles};
 
 /// A parsed script.
 #[derive(Debug, Default)]
@@ -186,10 +186,7 @@ fn directive(script: &mut Script, line: &str, number: usize) -> Result<(), Strin
             .map(|file| script.page = Some(file)),
         "project" if !script.project.is_empty() => Err("a second `project`".into()),
         "project" if fields.is_empty() => Err("`project` takes roles".into()),
-        "project" => {
-            script.project = fields.iter().map(|f| (*f).to_owned()).collect();
-            Ok(())
-        }
+        "project" => project_roles(&fields).map(|roles| script.project = roles),
         "expect" => expect(script, rest, &fields, number),
         _ if script.listen.is_empty() && is_action(word) => Err("an action before `listen`".into()),
         _ => action(word, &fields, rest).map(|action| {

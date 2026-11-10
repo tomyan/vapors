@@ -27,6 +27,8 @@ pub use elements_app::{
     PerFrame, SurfaceHandle,
 };
 pub use painter::{
-    DrawOverError, MountError, PaintError, SUPPORTED, ScenePainter, SurfaceState, UnsupportedFormat,
+    DrawOverError, FrameCounts, MountError, PaintError, SUPPORTED, ScenePainter, SurfaceState,
+    UnsupportedFormat,
 };
 pub use surface::{SURFACE_FORMAT, SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
+pub use vapors_renderer::GpuWork;

@@ -41,8 +41,14 @@ The elements the platform looks for, by id (`vapors_platform::page`):
   not cover the label strip the image app draws top left. Its click reaches the app as
   `Event::OpenRequested`, and the app answers with `pick_file` and its
   file kinds: a click is user activation in every browser, a tap on the
-  canvas is not always. A page without it is told so as an error; `o`
-  and a tap on an empty canvas still try.
+  canvas is not always. A page without it is told so as an error naming
+  the fix; `o` and a tap on an empty canvas still try. An app that draws
+  its own Open calls `vapors_platform::app_draws_open()` before `run()`:
+  the page then needs no button, nothing is reported, and a button the
+  page has is hidden. `vapors_platform::hide_status_line()` is separate:
+  it hides `#status` (and so removes it from the browser's accessibility
+  tree) for an app whose canvas the line would cover. Errors still
+  un-hide their element.
 - CSS: `html,body{margin:0;height:100%} canvas{width:100vw;height:100vh;
   display:block;touch-action:none}`. Without `touch-action:none` the
   browser scrolls instead of sending touches.

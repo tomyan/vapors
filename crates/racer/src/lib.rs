@@ -11,7 +11,8 @@ include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 /// A platform/window/GPU failure, reported with its cause, or the HUD's
 /// failure (a refused update, a track render error) that ended the loop.
 pub fn run() -> Result<(), String> {
-    vapors_platform::hide_page_controls();
+    vapors_platform::app_draws_open();
+    vapors_platform::hide_status_line();
     vapors_dom::set_error_report(
         "vapors_platform::report_error",
         vapors_platform::report_error,

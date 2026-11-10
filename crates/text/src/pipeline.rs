@@ -37,6 +37,7 @@ pub struct TextPipeline {
     pub(crate) uniforms: wgpu::Buffer,
     pub(crate) texture: wgpu::Texture,
     pub(crate) vertices: Option<wgpu::Buffer>,
+    pub(crate) work: vapors_renderer::WorkCounter,
 }
 
 impl TextPipeline {
@@ -71,7 +72,14 @@ impl TextPipeline {
             }),
             texture: coverage_texture(device, atlas.coverage_page().size()),
             vertices: None,
+            work: vapors_renderer::WorkCounter::default(),
         }
+    }
+
+    /// The work its draws issued since the last take, the atlas page's
+    /// uploads included; the count restarts.
+    pub fn take_work(&self) -> vapors_renderer::GpuWork {
+        self.work.take()
     }
 
     /// Make sure the vertex buffer holds at least `bytes`; it is reused

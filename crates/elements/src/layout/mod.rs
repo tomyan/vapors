@@ -39,11 +39,11 @@ pub struct BoxRect {
 /// initial containing block: the root's percentages resolve against it,
 /// and an `auto` height is still its content's. A box unchanged since
 /// the update `kept` holds takes its cache and layout first. Returns
-/// the boxes and how many times Taffy laid a box out rather than
-/// reading its cache; `placed` gives their border boxes.
+/// the boxes and what Taffy did (`LayoutWork`); `placed` gives their
+/// border boxes.
 ///
 /// # Errors
-/// A `calc()` that did not resolve (see `Calcs`).
+/// A `calc()` that did not resolve (see `Calcs`), with what Taffy did.
 pub(crate) fn lay_out(
     mut boxes: Vec<LayoutBox>,
     texts: (&mut FontSystem, &mut TextCache),
@@ -51,7 +51,7 @@ pub(crate) fn lay_out(
     scale: f32,
     size: (f32, f32),
     calcs: &Calcs,
-) -> Result<(Vec<LayoutBox>, usize), String> {
+) -> Result<(Vec<LayoutBox>, LayoutWork), (String, LayoutWork)> {
     let (fonts, cache) = texts;
     kept.0.lend(&mut boxes, scale, kept.1);
     let mut tree = BoxTree {
@@ -61,16 +61,28 @@ pub(crate) fn lay_out(
         scale,
         calcs,
         laid_out: 0,
+        calls: 0,
     };
     let available = Size {
         width: AvailableSpace::Definite(size.0),
         height: AvailableSpace::Definite(size.1),
     };
     compute_root_layout(&mut tree, NodeId::from(0usize), available);
+    let work = LayoutWork {
+        laid_out: tree.laid_out,
+        calls: tree.calls,
+    };
     match calcs.failure() {
-        Some(failure) => Err(failure),
-        None => Ok((tree.boxes, tree.laid_out)),
+        Some(failure) => Err((failure, work)),
+        None => Ok((tree.boxes, work)),
     }
+}
+
+/// What one layout did: how many times Taffy laid a box out rather than
+/// reading its cache, and how many times it asked a box for its layout.
+pub(crate) struct LayoutWork {
+    pub(crate) laid_out: usize,
+    pub(crate) calls: usize,
 }
 
 /// Each out-of-flow box's containing block, by box index.

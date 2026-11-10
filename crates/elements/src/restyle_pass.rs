@@ -35,7 +35,7 @@ impl Document {
             .clear();
         match self.restyle_all(&roots, &singles, viewport) {
             Ok(count) => {
-                self.kept.as_mut().expect("set above").restyled = count;
+                self.counts.elements_restyled = count;
                 Ok(())
             }
             Err(error) => {
@@ -68,7 +68,6 @@ impl Document {
             styles: Styles::default(),
             used: HashMap::new(),
             refused: HashMap::new(),
-            restyled: 0,
             restyled_nodes: HashSet::new(),
         }
     }

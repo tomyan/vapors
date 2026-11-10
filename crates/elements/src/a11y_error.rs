@@ -136,6 +136,14 @@ pub enum AxError {
         /// The bounds, `x 0, y 0, width inf, height 24`.
         bounds: String,
     },
+    /// A projection asked for a role by ARIA's name where Chromium's
+    /// tree uses another, so it would match nothing on either side.
+    RoleNamedByAria {
+        /// The role asked for, ARIA's name.
+        asked: String,
+        /// Chromium's name for it.
+        chromium: String,
+    },
     /// The reply did not serialise: a bug in vapors.
     BadReply {
         /// The serialiser's error.
