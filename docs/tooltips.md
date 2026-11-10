@@ -77,7 +77,12 @@ arms the new one.
 
 1. Give `DocumentInput` every event, the host's own included (`give`
    does), so a key or press the host takes still hides the tooltip.
-   After each, when `DocumentInput::take_tooltip_changed()` is true
+   A host with several documents in one window gives each event to the
+   `DocumentInput` of the document it routes the event to, and passes
+   it to `DocumentInput::observe` on each of the others: their tooltips
+   react to it as `give` would make them, but their documents do not
+   get it, so a Tab typed in one does not move focus in another.
+   After each `give` or `observe`, when `take_tooltip_changed()` is true
    (the tooltip was armed, armed again, shown or hidden), draw a frame:
    it draws the hide, and its `Next` takes the new deadline or drops
    the wait for an old one.
