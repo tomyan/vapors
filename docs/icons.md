@@ -30,6 +30,14 @@ attribute and the fix.
   They are the box's CSS `width` and `height`, as in Chromium. Their ratio must equal the
   viewBox's; a different ratio would letterbox under
   `preserveAspectRatio`, which is not built.
+  Their larger value times the viewport scale may not exceed 256
+  device px (`svg_limit::MAX_DEVICE_PX`); the update refuses a larger
+  svg, naming the element, both sizes and the fix (draw it smaller, or
+  as an image), and checks again on every update, so a scale change
+  can refuse an svg that was accepted. Each path takes a mask the size
+  of the content box in the 1024 px atlas page, 9 of them at 256 px
+  fill one page (each mask is padded by 1 px), and a larger icon failed the whole frame at draw time.
+  touche's icons are 16 px, 48 px at 3x.
 - `aria-hidden="true"` (a decorative icon: not in the accessibility
   tree, as in Chromium, so a button holding it keeps its own name), or
   `role="img"` with a non-empty `aria-label` (a named image). One of
@@ -127,6 +135,13 @@ numbers. Its `path` children are not boxes.
   `TextPipeline::draw_icons(target, atlas, &[IconDraw])` takes the
   snapped content box in device pixels and draws with `ICON_BLEND`
   (gamma 1, contrast 0), which the text shader makes a plain blend.
+- Built in 2b: an svg's `Icon` is built with its box
+  (`elements::svg_paint`), stroke width 1 when absent. Paint pushes
+  `Item::Icon` with an `IconId` that `Painted::icon` resolves, the
+  colour the svg's used `color`, and none when the svg is not
+  `visibility: visible`. Consecutive icons under one clip are one
+  `Run::Icons`, which the painter draws in one `draw_icons` call under
+  the clip's scissor.
 
 ## Slices
 

@@ -56,7 +56,7 @@ fn kind(item: &Item) -> &'static str {
     match item {
         Item::Quad(_) => "quad",
         Item::Surface { .. } => "surface",
-        Item::Image { .. } | Item::Text { .. } | Item::Shadow(_) => "other",
+        Item::Image { .. } | Item::Icon { .. } | Item::Text { .. } | Item::Shadow(_) => "other",
     }
 }
 

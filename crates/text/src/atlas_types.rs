@@ -60,7 +60,9 @@ pub enum AtlasError {
         /// Page side in pixels.
         page_size: u32,
         /// Glyphs used this frame when it overflowed.
-        used_this_frame: usize,
+        glyphs_this_frame: usize,
+        /// Icon masks (one per path) used this frame when it overflowed.
+        icons_this_frame: usize,
     },
     /// `.notdef` itself is larger than a page, so nothing can stand in.
     TooLarge {
@@ -90,11 +92,13 @@ impl fmt::Display for AtlasError {
             Self::Raster(error) => error.fmt(f),
             Self::Full {
                 page_size,
-                used_this_frame,
+                glyphs_this_frame,
+                icons_this_frame,
             } => write!(
                 f,
-                "glyph atlas page of {page_size}x{page_size} is full with {used_this_frame} glyphs \
-                 in use this frame. Fix: raise AtlasConfig::page_size or draw less text per frame."
+                "atlas page of {page_size}x{page_size} is full with {glyphs_this_frame} glyphs \
+                 and {icons_this_frame} icon masks in use this frame. Fix: raise \
+                 AtlasConfig::page_size, draw less text per frame, or draw fewer or smaller icons."
             ),
             Self::TooLarge {
                 font,

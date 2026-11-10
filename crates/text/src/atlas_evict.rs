@@ -12,16 +12,30 @@ impl GlyphAtlas {
         loop {
             let evicted = self.evict_least_recent(width * height);
             if evicted == 0 {
-                return Err(AtlasError::Full {
-                    page_size: self.coverage.size(),
-                    used_this_frame: self.entries.len(),
-                });
+                return Err(self.full());
             }
             self.evictions += evicted;
             self.repack()?;
             if let Some(origin) = self.coverage.allocate(width, height) {
                 return Ok(origin);
             }
+        }
+    }
+
+    /// [`AtlasError::Full`] with what this frame has in the page.
+    fn full(&self) -> AtlasError {
+        let in_frame = || {
+            self.entries
+                .iter()
+                .filter(|(_, entry)| entry.frame == self.frame)
+        };
+        let icons_this_frame = in_frame()
+            .filter(|(key, _)| matches!(key, AtlasKey::Icon { .. }))
+            .count();
+        AtlasError::Full {
+            page_size: self.coverage.size(),
+            glyphs_this_frame: in_frame().count() - icons_this_frame,
+            icons_this_frame,
         }
     }
 
@@ -69,10 +83,7 @@ impl GlyphAtlas {
                     entry.glyph = glyph_at(origin, &entry.coverage);
                 }
                 None if entry.frame == self.frame => {
-                    return Err(AtlasError::Full {
-                        page_size: self.coverage.size(),
-                        used_this_frame: self.entries.len(),
-                    });
+                    return Err(self.full());
                 }
                 None => {
                     self.entries.remove(&key);

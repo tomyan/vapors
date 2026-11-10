@@ -127,3 +127,20 @@ fn an_icon_fetched_again_this_frame_is_kept_and_the_page_reports_full() {
     assert!(matches!(error, AtlasError::Full { .. }), "{error:?}");
     assert_eq!(atlas.evictions(), 0);
 }
+
+#[test]
+fn a_full_page_message_counts_glyphs_and_icons_and_names_the_icon_fix() {
+    // Given: a page two icons fill in this frame
+    let mut atlas = atlas(40);
+    atlas.icon(&line_icon("8"), 0, [32, 32]).expect("placed");
+    let error = atlas
+        .icon(&line_icon("9"), 0, [32, 32])
+        .expect_err("no room");
+
+    // When
+    let message = error.to_string();
+
+    // Then
+    assert!(message.contains("0 glyphs and 1 icon masks"), "{message}");
+    assert!(message.contains("fewer or smaller icons"), "{message}");
+}

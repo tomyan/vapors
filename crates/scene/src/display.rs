@@ -106,6 +106,11 @@ pub struct TextId(pub u32);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ImageId(pub u32);
 
+/// Which icon an item draws: an index the painter resolves, as with
+/// [`ImageId`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct IconId(pub u32);
+
 /// Which GPU surface an item draws: an index the painter resolves to
 /// the surface's name, as with [`ImageId`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -125,6 +130,17 @@ pub enum Item {
         image: ImageId,
         /// Where it is drawn.
         rect: Rect,
+    },
+    /// An `<svg>` icon's paths stroked in `colour`, scaled uniformly
+    /// into `rect` (device pixels, whole) and centred, by the id its
+    /// painter resolves.
+    Icon {
+        /// Which icon.
+        icon: IconId,
+        /// Where it is drawn: the element's content box.
+        rect: Rect,
+        /// The element's `color`, non-premultiplied.
+        colour: Color,
     },
     /// A GPU surface's content over `rect` (device pixels): what its
     /// renderer drew, by the id its painter resolves.

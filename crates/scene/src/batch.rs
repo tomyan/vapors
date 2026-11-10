@@ -23,6 +23,8 @@ pub enum Run<'a> {
     Texts(&'a [Item]),
     /// Consecutive images.
     Images(&'a [Item]),
+    /// Consecutive icons.
+    Icons(&'a [Item]),
     /// Consecutive GPU surfaces.
     Surfaces(&'a [Item]),
 }
@@ -72,6 +74,7 @@ impl<'a> Run<'a> {
             ),
             Item::Text { .. } => Run::Texts(items),
             Item::Image { .. } => Run::Images(items),
+            Item::Icon { .. } => Run::Icons(items),
             Item::Surface { .. } => Run::Surfaces(items),
         }
     }
@@ -84,6 +87,7 @@ fn kind(item: &Item) -> u8 {
         Item::Text { .. } => 2,
         Item::Image { .. } => 3,
         Item::Surface { .. } => 4,
+        Item::Icon { .. } => 5,
     }
 }
 

@@ -33,6 +33,8 @@ pub struct Painted {
     pub(crate) cursors: HashMap<NodeId, Cursor>,
     /// The images the scene's image items name, by `ImageId`.
     pub(crate) images: Vec<std::rc::Rc<vapors_scene::RgbaImage>>,
+    /// The icons the scene's icon items name, by `IconId`.
+    pub(crate) icons: Vec<std::rc::Rc<vapors_text::Icon>>,
     /// The names of the surfaces the scene's surface items name, by
     /// `SurfaceId`.
     pub(crate) surfaces: Vec<String>,
@@ -107,6 +109,15 @@ impl Painted {
     #[must_use]
     pub fn image(&self, id: vapors_scene::ImageId) -> &std::rc::Rc<vapors_scene::RgbaImage> {
         &self.images[id.0 as usize]
+    }
+
+    /// The icon a scene item names.
+    ///
+    /// # Panics
+    /// When `id` is not from this update's scene.
+    #[must_use]
+    pub fn icon(&self, id: vapors_scene::IconId) -> &vapors_text::Icon {
+        &self.icons[id.0 as usize]
     }
 
     /// The name of the surface a scene item names: its `gpu-surface`'s
