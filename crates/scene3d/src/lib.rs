@@ -24,10 +24,17 @@
 //! matrices of the nodes whose transform or parent changed, and of their
 //! descendants, and returns them. The root names the active camera by
 //! [`CameraHandle`].
+//!
+//! A mesh node names its triangles by [`GeometryId`], issued by a
+//! [`Meshes`] that validates them and queues them for the scene
+//! renderer (`vapors-scene3d-gpu`) to upload once.
 
 mod camera;
+mod colour;
 mod error;
 mod handle;
+mod mesh_error;
+mod meshes;
 mod node;
 mod projection;
 mod store;
@@ -36,9 +43,15 @@ mod transform;
 mod view;
 mod world;
 
+#[cfg(test)]
+mod test_support;
+
+pub use colour::Colour;
 pub use error::SceneError;
 pub use glam::{Mat4, Quat, Vec3};
 pub use handle::{CameraHandle, NodeId};
+pub use mesh_error::MeshError;
+pub use meshes::{Geometry, GeometryId, Meshes};
 pub use node::NodeKind;
 pub use projection::{Projection, project, view_projection};
 pub use store::Scene;
