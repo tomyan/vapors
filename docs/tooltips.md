@@ -3,7 +3,9 @@
 An element's `title` attribute names or describes it in the
 accessibility tree, as Chromium's tree has it, and `DocumentInput`
 works out when its tooltip shows and hides. `place_tooltip` works out
-where it goes. Nothing draws it yet (see "Not yet built").
+where it goes, and `ScenePainter::draw_tooltip` draws it over the
+scene. The tooltips work is done; "Not yet built" lists what it leaves
+out.
 
 ## The accessibility tree
 
@@ -79,8 +81,13 @@ arms the new one.
    (the tooltip was armed, armed again, shown or hidden), draw a frame:
    it draws the hide, and its `Next` takes the new deadline or drops
    the wait for an old one.
-2. Each frame, after the document's update and before drawing, call
-   `DocumentInput::tooltip(&document, now)` for the tooltip shown.
+2. Each frame, after the document's update, call
+   `check_tooltip_style(&document)` and fail the frame on its error, so
+   a bad `--tooltip-*` value is refused at load, not at the first
+   hover. Then call `DocumentInput::tooltip(&document, now)` for the
+   tooltip shown, and after drawing the scene draw it:
+   `painter.draw_tooltip(&target, &mut document, &tooltip, input.tooltip_hotspot())`
+   (see "Drawing").
 3. Each frame, fold `DocumentInput::tooltip_deadline()` into the
    frame's `Next`: `Next::WaitUntil(deadline)` where it would
    otherwise return `Next::Wait`. Ask on every frame until the tooltip
@@ -149,6 +156,73 @@ size, box width or height, or window length is refused. The error
 (`PlacementError`) names the field and its value, for example
 "`size.height` is -1", and says what to pass.
 
+## Drawing
+
+`ScenePainter::draw_tooltip(target, document, tooltip, pointer)` draws
+a quad and a text run after the scene that this frame's `draw` or
+`draw_over` drew, so the tooltip is above every item, `gpu-surface`s
+included. It is not in the scene, so hit-testing never finds it, and
+it is not in the accessibility tree, where the title is already the
+element's name or description. `ElementsApp` calls it in its Draw
+phase, after the scene, on each frame `DocumentInput::tooltip` returns
+one; the frame after the event that hides it draws none. `FrameCounts`
+counts its quad with the quads and its text with the texts.
+
+The anchor: `TooltipTrigger::Pointer` takes `hotspot`
+(`DocumentInput::tooltip_hotspot()`: where the pointer was when the
+tooltip showed, `None` when it showed before the pointer first moved; a
+pointer tooltip with `None` is refused), `TooltipTrigger::Keyboard`
+the border box of the tooltip's `node` (refused when it has none). A
+move within the title after the tooltip shows does not move it, as in
+Chromium, where the position is fixed when the tooltip shows.
+`DocumentInput::pointer()` is the pointer's latest position; it stays
+where it was after the pointer leaves the window.
+
+The text is laid out with the document's own fonts
+(`Document::lay_out_text`: the bundle, and on the web the script
+fallbacks registered on its `FontSystem`) in Geist, and wraps at
+`min(800, (window width + 1) / 2)` CSS px: views' `kTooltipMaxWidth`
+and `TooltipAura::GetMaxWidth` (`ui/views/corewm/tooltip_aura.cc`,
+read 2026-11-10), with the window in place of the display. The width
+limits the text; the padding and border are outside it, as in
+`TooltipViewAura` (`ResetDisplayRect` gives the text the width,
+`CalculatePreferredSize` adds the insets). Line breaks
+in the title are kept. The box is the text plus padding and border,
+placed by `place_tooltip`; its edges and the text's origin are rounded
+to device pixels and its border width snapped as Blink snaps a
+document's.
+
+Style: custom properties on the root, which every element inherits.
+
+| Property | Takes | Default |
+|---|---|---|
+| `--tooltip-background` | a colour | `#2b2b2b` |
+| `--tooltip-color` | a colour | `#f2f2f2` |
+| `--tooltip-border-color` | a colour | `#5c5c5c` |
+| `--tooltip-border-width` | one length in px | `1px` |
+| `--tooltip-border-radius` | one length in px | `4px` |
+| `--tooltip-padding` | one to four lengths in px, as `padding` | `3px 7px 4px 7px` |
+| `--tooltip-font-size` | one length in px | `12px` |
+
+vapors has no design tokens, so the defaults are its own choice; an
+app sets the properties from its own tokens. The default padding plus
+the 1px border make Chromium's insets (`TooltipViewAura`,
+`kBorderInset` = 4, 8, 5, 8 px with the border inside). `currentcolor`
+is the root's `color`, and `light-dark()` takes the light colour, as
+every colour the document computes does. A value of another kind
+(`1em`, a negative length, `12px` for a colour) is refused:
+`TooltipError::Property` names the property, its value and what it
+takes, and nothing of the tooltip is drawn. `ElementsApp` checks the
+style after each update (`check_tooltip_style`), so a bad value fails
+the first frame, with no hover needed.
+
+Text too large for the glyph atlas (`--tooltip-font-size: 900px` with
+the title "MW" fills the 1024 px page) is refused when it is drawn, as
+`TooltipError::Atlas`, whose message names `--tooltip-font-size`. The
+style check cannot refuse it: whether it fits depends on the glyphs,
+the scale and the frame's other text. In `ElementsApp` it fails that
+frame.
+
 ## Not yet built
 
 Title on images. Chromium 155 (2026-11-10, read with the events oracle's
@@ -166,9 +240,6 @@ role in vapors' tree. Adding them needs the subset to take `title` and
 | `<img alt="" title="T">` | empty | `T` |
 | `<img title="T">` | `T` | none |
 | `<img alt="A" title="T">` | `A` | `T` |
-
-Drawing the tooltip: above every item including gpu-surfaces, styled
-by `--tooltip-*` custom properties.
 
 Chromium's other rules: its tooltip hides itself after 10 s
 (`tooltip_controller.cc`, `kDefaultHideTooltipDelay`), and text past

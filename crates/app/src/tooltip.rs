@@ -11,6 +11,7 @@
 use std::time::Duration;
 
 use vapors_dom::NodeId;
+use vapors_elements::Point;
 use vapors_platform::Instant;
 
 /// How long the pointer or focus stays before its tooltip shows:
@@ -50,6 +51,9 @@ pub(crate) struct TooltipState {
     tip: Option<Tooltip>,
     /// When the armed tooltip shows; `None` once shown.
     deadline: Option<Instant>,
+    /// Where the pointer was when the tooltip last showed: a pointer
+    /// tooltip stays there, as Chromium's does, while the pointer moves.
+    hotspot: Option<Point>,
     /// The title the pointer is over, armed for or not.
     hovered: Option<Titled>,
     /// The title a press hid, which does not show again until the
@@ -141,13 +145,21 @@ impl TooltipState {
     }
 
     /// The tooltip shown at `now`: an armed one shows once `now`
-    /// reaches its deadline.
-    pub(crate) fn shown_at(&mut self, now: Instant) -> Option<&Tooltip> {
+    /// reaches its deadline, at `pointer`, its hotspot from then on.
+    pub(crate) fn shown_at(&mut self, now: Instant, pointer: Option<Point>) -> Option<&Tooltip> {
         if self.deadline.is_some_and(|deadline| now >= deadline) {
             self.deadline = None;
+            self.hotspot = pointer;
             self.changed = true;
         }
         self.tip.as_ref().filter(|_| self.deadline.is_none())
+    }
+
+    /// Where the pointer was when the shown tooltip showed; `None`
+    /// while none is shown.
+    pub(crate) fn hotspot(&self) -> Option<Point> {
+        self.hotspot
+            .filter(|_| self.tip.is_some() && self.deadline.is_none())
     }
 
     /// Whether what is armed or shown changed since last asked: a host

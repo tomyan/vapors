@@ -23,7 +23,7 @@ impl DocumentInput {
     pub(super) fn act(&mut self, document: &Rc<RefCell<Document>>, action: Action) {
         match action {
             Action::Move(point) => {
-                self.pointer = point;
+                self.pointer = Some(point);
                 self.touch.mouse();
                 Document::pointer_moved(document, point);
             }

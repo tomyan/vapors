@@ -7,7 +7,7 @@
 //! the tooltip shown ([`DocumentInput::tooltip`]) and for when to wake
 //! ([`DocumentInput::tooltip_deadline`]).
 
-use vapors_elements::Document;
+use vapors_elements::{Document, Point};
 use vapors_platform::{Event, Instant};
 
 use super::DocumentInput;
@@ -31,7 +31,7 @@ impl DocumentInput {
             }
             _ => {}
         }
-        self.tooltip.shown_at(now)
+        self.tooltip.shown_at(now, self.pointer)
     }
 
     /// Whether the tooltip armed or shown changed (armed, armed again,
@@ -49,6 +49,25 @@ impl DocumentInput {
     #[must_use]
     pub fn tooltip_deadline(&self) -> Option<Instant> {
         self.tooltip.deadline()
+    }
+
+    /// Where the pointer last moved, in CSS pixels. `None` before the
+    /// first move, as the position is then unknown; it stays where it
+    /// was after the pointer leaves the window.
+    #[must_use]
+    pub fn pointer(&self) -> Option<Point> {
+        self.pointer
+    }
+
+    /// Where the pointer was, in CSS pixels, when the tooltip shown
+    /// showed: a pointer tooltip's hotspot
+    /// ([`crate::ScenePainter::draw_tooltip`]), which a later move within
+    /// its title does not change, as in Chromium. `None` while no
+    /// tooltip is shown, or when it showed before the pointer first
+    /// moved.
+    #[must_use]
+    pub fn tooltip_hotspot(&self) -> Option<Point> {
+        self.tooltip.hotspot()
     }
 
     /// `event`, its pointer `action` if it has one, as the tooltip sees
@@ -83,7 +102,7 @@ impl DocumentInput {
     }
 
     fn pointer_title(&self, document: &Document) -> Option<Titled> {
-        title_at(document, self.pointer)
+        title_at(document, self.pointer?)
     }
 
     /// The keyboard tooltip's element still has focus, its title and a

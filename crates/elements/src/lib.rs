@@ -40,6 +40,7 @@ mod images;
 mod img_checks;
 mod inline_check;
 mod keys;
+mod lay_out_text;
 mod layout;
 mod media_checks;
 mod node;
