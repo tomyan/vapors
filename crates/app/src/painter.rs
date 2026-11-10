@@ -1,7 +1,8 @@
 //! Drawing an update: clear to the canvas colour (or, drawing over what
 //! the target holds, not), then each run of the scene's items with the
 //! pipeline for its kind, in painting order, under the run's clip as a
-//! scissor; a run clipped to nothing is not drawn.
+//! scissor; a run clipped to nothing is not drawn, though its surfaces
+//! are refused as they would be in view.
 
 use vapors_elements::Painted;
 use vapors_renderer::{ImagePipeline, QuadPipeline, ShadowPipeline, Target, clear_view};
@@ -16,6 +17,7 @@ pub struct ScenePainter {
     atlas: GlyphAtlas,
     images: ImagePipeline,
     textures: Textures,
+    surfaces: Surfaces,
 }
 
 impl ScenePainter {
@@ -43,6 +45,7 @@ impl ScenePainter {
             atlas,
             images: ImagePipeline::new(device, format),
             textures: Textures::default(),
+            surfaces: Surfaces::default(),
         })
     }
 
@@ -50,8 +53,8 @@ impl ScenePainter {
     ///
     /// # Errors
     ///
-    /// [`PaintError`] when a glyph cannot be drawn or a surface has no
-    /// renderer; the frame is then incomplete.
+    /// [`PaintError`] when a glyph or a `gpu-surface` cannot be drawn;
+    /// the frame is then incomplete.
     pub fn draw(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
         clear_view(target.device, target.queue, target.view, painted.canvas());
         self.paint(target, painted)
@@ -77,23 +80,45 @@ impl ScenePainter {
         self.paint(target, painted).map_err(DrawOverError::Paint)
     }
 
-    /// Each run of the scene, in order, under its clip.
+    /// Each run of the scene, in order, under its clip. A refused frame
+    /// still ends the surfaces' frame: those it did not paint are inactive.
     fn paint(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
         self.atlas.begin_frame();
         self.textures.begin_frame();
+        self.surfaces.begin_frame();
+        let runs = self.paint_runs(target, painted);
+        self.surfaces.end_frame();
+        runs?;
+        self.textures.end_frame();
+        Ok(())
+    }
+
+    fn paint_runs(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
         for batch in painted.scene().batches() {
-            let Some(clipped) = clipped(target, batch.clip) else {
-                continue;
-            };
-            match batch.run {
-                Run::Shadows(shadows) => self.shadows.draw(&clipped, &shadows),
-                Run::Quads(quads) => self.quads.draw(&clipped, &quads),
-                Run::Texts(items) => self.draw_texts(&clipped, painted, items)?,
-                Run::Images(items) => self.textures.draw(&self.images, &clipped, painted, items),
-                Run::Surfaces(items) => return Err(unmounted(painted, items)),
+            match clipped(target, batch.clip) {
+                Some(clipped) => self.draw_run(&clipped, painted, batch.run)?,
+                None => self
+                    .surfaces
+                    .check_clipped(target.device, painted, &batch.run)?,
             }
         }
-        self.textures.end_frame();
+        Ok(())
+    }
+
+    /// Draws `run` with the pipeline for its kind under `target`'s scissor.
+    fn draw_run(
+        &mut self,
+        target: &Target<'_>,
+        painted: &Painted,
+        run: Run<'_>,
+    ) -> Result<(), PaintError> {
+        match run {
+            Run::Shadows(shadows) => self.shadows.draw(target, &shadows),
+            Run::Quads(quads) => self.quads.draw(target, &quads),
+            Run::Texts(items) => self.draw_texts(target, painted, items)?,
+            Run::Images(items) => self.textures.draw(&self.images, target, painted, items),
+            Run::Surfaces(items) => self.surfaces.draw(&self.images, target, painted, items)?,
+        }
         Ok(())
     }
 
@@ -166,8 +191,13 @@ mod images;
 use images::Textures;
 #[path = "painter_errors.rs"]
 mod errors;
-use errors::unmounted;
-pub use errors::{DrawOverError, PaintError, SUPPORTED, UnsupportedFormat};
+pub use errors::{DrawOverError, MountError, PaintError, SUPPORTED, UnsupportedFormat};
+#[path = "painter_surfaces.rs"]
+mod surfaces;
+use surfaces::Surfaces;
+// For the root `gpu_` test module (the tier split needs a gpu_ id).
+#[cfg(test)]
+pub(crate) use surfaces::wants_frame_around_a_pending_scope;
 
 #[cfg(test)]
 #[path = "painter_tests.rs"]
