@@ -2,7 +2,7 @@
 //! every frame while racing and the app asks for the next; paused, the
 //! app waits and nothing renders; resuming animates it again; the HUD's
 //! controls draw over it; a press on a `HoldButton` drives the car.
-use super::Racer;
+use crate::app::Racer;
 use std::num::NonZeroU32;
 use vapors_gpu_harness::{Gpu, gpu, read_rgba8};
 use vapors_platform::{App, Event, Frame, Instant, Modifiers, Next, Platform};

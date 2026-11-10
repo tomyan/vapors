@@ -32,3 +32,7 @@ mod app_tests;
 
 #[cfg(test)]
 mod component_input_tests;
+
+// at the crate root, so each test's path starts `gpu_` as the gpu tier's filter needs
+#[cfg(test)]
+mod gpu_track_tests;

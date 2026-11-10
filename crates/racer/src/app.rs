@@ -134,8 +134,6 @@ mod hud_frame_tests;
 mod input;
 mod state;
 mod surface;
-#[cfg(test)]
-mod surface_tests;
 
 mod inspection;
 #[cfg(test)]
