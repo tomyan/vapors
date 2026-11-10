@@ -1,6 +1,7 @@
 //! What the atlas hands out and how it fails.
 
 use std::fmt;
+use std::sync::Arc;
 
 use crate::raster::{GlyphRequest, Hinting, RasterError};
 
@@ -74,6 +75,13 @@ pub enum AtlasError {
         /// Page side in pixels.
         page_size: u32,
     },
+    /// An icon's device size does not fit a page.
+    IconTooLarge {
+        /// Width and height in device pixels.
+        size: [u32; 2],
+        /// Page side in pixels.
+        page_size: u32,
+    },
 }
 
 impl fmt::Display for AtlasError {
@@ -101,11 +109,28 @@ impl fmt::Display for AtlasError {
                  AtlasConfig::page_size or draw this text smaller; large text as paths is later work.",
                 bitmap[0], bitmap[1]
             ),
+            Self::IconTooLarge { size, page_size } => write!(
+                f,
+                "icon of {}x{} device pixels does not fit the {page_size}x{page_size} atlas page. \
+                 Fix: draw the icon smaller or raise AtlasConfig::page_size.",
+                size[0], size[1]
+            ),
         }
     }
 }
 
 impl std::error::Error for AtlasError {}
+
+/// What makes two requests the same atlas entry.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub(crate) enum AtlasKey {
+    Glyph(GlyphKey),
+    /// An icon's bits (`Icon::bits`) at a device size.
+    Icon {
+        bits: Arc<[u32]>,
+        size: [u32; 2],
+    },
+}
 
 /// What makes two glyph requests the same atlas entry.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

@@ -80,21 +80,39 @@ boxes.
   path that passed the check rasterises.
 - The element's content box is snapped to whole device pixels, as an
   image's is. The icon is rasterised at that device-pixel size: the
-  viewBox is scaled into it (device width / viewBox width, and the
-  same for height; the ratios are equal by the `width`/`height`
-  rule) after translating by `-min-x`, `-min-y`. Every path of the
-  `<svg>` is stroked by zeno into one coverage mask, and that
-  8-bit mask is placed in the atlas's coverage page, beside glyphs
-  and evicted with them.
-- One atlas entry per `<svg>`, however many paths it has. Its key is
-  every path's `d` and `stroke-width` in document order, the viewBox,
-  and the device size in pixels: one icon at one size and scale is
-  rasterised once.
+  viewBox is scaled into it by the smaller of device width / viewBox
+  width and device height / viewBox height, and centred, as SVG's
+  default `preserveAspectRatio` (`xMidYMid meet`) does. The ratios
+  are equal by the `width`/`height` rule until snapping to device
+  pixels changes the box's, and the uniform scale keeps strokes from
+  stretching then. Each path of the
+  `<svg>` is stroked by zeno into its own 8-bit coverage mask, placed
+  in the atlas's coverage page, beside glyphs and evicted with them.
+- zeno 0.3.3 bevels every join sharper than 90 degrees whatever the
+  miter limit ([dfrg/zeno#29](https://github.com/dfrg/zeno/issues/29));
+  touche's speaker icon has a 53-degree join. `icon_miter.rs` adds the
+  missing wedge for joins between 90 degrees and SVG's limit of 4, so
+  they miter as in Chromium. Retire it when zeno fixes the issue.
+- One atlas entry per path. Its key is the path's `d` and
+  `stroke-width`, the viewBox, and the device size in pixels: one path
+  at one size and scale is rasterised once.
 - `Item::Icon { icon, rect, colour }` in the display list, one per
   `<svg>`; the painter draws it through the text pipeline as one quad
-  of the atlas coverage tinted by the element's `color`. Text's gamma and contrast
-  boost are glyph-specific and not applied to icons; the blend is
-  confirmed by the paint oracle.
+  per path of the atlas coverage tinted by the element's `color`, in
+  document order. Chromium paints each path separately, so where two
+  paths of a translucent colour overlap the alpha compounds
+  (`a + a(1 - a)`, 0.75 for two paths at 0.5); one quad per path gives
+  the same. Text's gamma and contrast boost are glyph-specific and not
+  applied to icons; the blend is confirmed by the paint oracle.
+- Built in 1b: `vapors_text::Icon` (view box and `IconStroke`s, checked:
+  at least one stroke, a view box with area, positive stroke widths) and
+  `Icon::rasterize_stroke` (`Icon::rasterize` combines the paths
+  source-over, what an opaque colour paints).
+  `GlyphAtlas::icon(icon, stroke, size)` refuses a path
+  larger than a page (`AtlasError::IconTooLarge`) before rasterising.
+  `TextPipeline::draw_icons(target, atlas, &[IconDraw])` takes the
+  snapped content box in device pixels and draws with `ICON_BLEND`
+  (gamma 1, contrast 0), which the text shader makes a plain blend.
 
 ## Slices
 
