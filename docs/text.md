@@ -162,8 +162,9 @@ or `cargo nextest run -E 'test(/^gpu_/)'`, not `cargo test`.
 - Colour emoji (COLRv1 and bitmap glyphs): the RGBA8 page exists, nothing
   is rasterised into it yet.
 - Large text above about 64 px through a capped atlas size or paths.
-- Atlas uploads copy the whole page when anything changed, and the text
-  pipeline makes a bind group per draw; per-rectangle uploads and a kept
-  bind group when either shows in a profile.
+- The text pipeline makes a bind group per draw; a kept bind group when
+  it shows in a profile. (Atlas uploads already copy only the rectangle
+  bounding the glyphs added since the last upload, or the whole page when
+  it is new or was repacked.)
 - Per-platform parameters for macOS and Windows, and the native text
   view comparison the brief asks for on those platforms.
