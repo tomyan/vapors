@@ -6,6 +6,14 @@ Authorised by Tom: build here in an isolated checkout; camera zooms out at highe
 
 Use the existing platform App, DocumentInput, ScenePainter::draw_over and .wisp compiler. A racer crate owns simulation and a GPU track/car pass; compiled components own HUD and settings. No changes to active touché/Vapors checkouts. Scope: arcade driving, not a physics simulator. Steering and grip are adjustable. Camera stays north-up and follows with speed-dependent lookahead and smooth zoom.
 
+## Manual checks
+
+`scripts/check-racer-android.mjs`, `check-racer-browser.mjs`,
+`check-racer-camera.mjs` and `check-racer-landscape.mjs` are manual. No
+`cargo xtask` tier and no CI job runs them, so the Chromium results recorded
+below are from hand runs on the dates given, not from CI. Wiring them into a
+tier changes `xtask/` and `ci.yml`, which needs Tom's clear.
+
 ## Slices and acceptance
 
 1. Deterministic driving model and speed-dependent camera. Red tests: acceleration/braking, grass drag, bounded timestep/input, camera widening and smoothing, ordered laps and no shortcuts. Green then reassess.

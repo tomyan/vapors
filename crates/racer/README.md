@@ -15,6 +15,7 @@ first; ScenePainter draws the compiled HUD over it. The 3D scene is not a templa
 component or a declarative scene graph.
 
 See `../../docs/hold-button.md` for the shared control and
-`../../docs/RACER_PLAN.md` for design and validation. Browser checks in `scripts/`
-at the repository root exercise driving, capture outside button bounds,
+`../../docs/RACER_PLAN.md` for design and validation. The browser checks
+`scripts/check-racer-*.mjs` are manual: no `cargo xtask` tier or CI job runs
+them. Run by hand against a served page, they exercise driving, capture outside button bounds,
 cancellation, camera transitions, short landscape layouts and viewport resizing.
