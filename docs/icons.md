@@ -83,12 +83,20 @@ boxes.
   coverage tinted by the element's `color`. Text's gamma and contrast
   boost are glyph-specific and not applied to icons; the blend is
   confirmed by the paint oracle.
+- Built in 1b: `vapors_text::Icon` (view box and `IconStroke`s, checked:
+  a view box with area, positive stroke widths) and `Icon::rasterize`;
+  paths in one icon combine source-over (`a + b(1 - a)`), as two paths
+  of one colour paint. `GlyphAtlas::icon(icon, size)` refuses an icon
+  larger than a page (`AtlasError::IconTooLarge`) before rasterising.
+  `TextPipeline::draw_icons(target, atlas, &[IconDraw])` takes the
+  snapped content box in device pixels and draws with `ICON_BLEND`
+  (gamma 1, contrast 0), which the text shader makes a plain blend.
 
 ## Slices
 
 | PR | Content |
 |---|---|
 | 1 | This doc; `vapors-text`: `IconPath` (strict parse, refusals) |
-| 1b | Path rasterisation into the atlas, `TextPipeline` drawing an icon quad; unit and GPU tests |
+| 1b | Path rasterisation into the atlas, `TextPipeline` drawing an icon quad; unit and GPU tests (stacked on PR 1) |
 | 2 | Compiler vocabulary (`svg`, `path`); elements: the refusals, replaced layout, accessibility, `Item::Icon` in paint and the painter |
 | 3 | A paint fixture of touche's icons compared with Chromium at 1x and 2x, and an accessibility fixture against the oracle |

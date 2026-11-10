@@ -45,6 +45,23 @@ impl TextPipeline {
         origin: [f32; 2],
         params: BlendParams,
     ) -> Result<(), AtlasError> {
+        let quads = quads(atlas, layout, origin, target.viewport)?;
+        self.submit(target, atlas, &quads, params);
+        Ok(())
+    }
+
+    /// Upload the atlas page if it changed, set `params`, and draw `quads`.
+    ///
+    /// # Panics
+    ///
+    /// If `atlas`'s page is not the size this pipeline's texture was made for.
+    pub(crate) fn submit(
+        &mut self,
+        target: &RenderTarget<'_>,
+        atlas: &mut GlyphAtlas,
+        quads: &[f32],
+        params: BlendParams,
+    ) {
         let page = atlas.coverage_page().size();
         assert_eq!(
             page,
@@ -52,13 +69,11 @@ impl TextPipeline {
             "atlas page is {page} px but the text pipeline's texture is {} px",
             self.texture.width()
         );
-        let quads = quads(atlas, layout, origin, target.viewport)?;
         self.upload_page(target.queue, atlas);
         target
             .queue
             .write_buffer(&self.uniforms, 0, &params_bytes(params));
-        self.draw_quads(target, &quads);
-        Ok(())
+        self.draw_quads(target, quads);
     }
 
     fn upload_page(&self, queue: &wgpu::Queue, atlas: &mut GlyphAtlas) {

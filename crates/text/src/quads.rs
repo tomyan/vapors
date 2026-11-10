@@ -41,7 +41,7 @@ pub(crate) fn quads(
 }
 
 #[allow(clippy::cast_precision_loss)] // atlas and viewport sizes are far below 2^24
-fn push_quad(
+pub(crate) fn push_quad(
     floats: &mut Vec<f32>,
     top_left: [f32; 2],
     glyph: &AtlasGlyph,
