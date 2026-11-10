@@ -1,6 +1,8 @@
 //! Parley layouts kept between updates (F2c S7). A run laid out at a
 //! width is kept by its text, its styles and that width; measuring and
 //! painting ask for it, and only a run that changed is laid out again.
+//! A start-aligned run at a width its max-content layout fits in takes
+//! that layout: its lines and glyphs would be the same.
 //! A layout no update asked for is dropped at the end of the next one.
 
 use std::collections::HashMap;
@@ -111,12 +113,34 @@ impl TextCache {
         if let Some(layout) = self.current.get(&key) {
             return Rc::clone(layout);
         }
-        let layout = self.previous.remove(&key).unwrap_or_else(|| {
+        let layout = self.previous.remove(&key);
+        let layout = layout.or_else(|| self.unwrapped(run, width, scale));
+        let layout = layout.unwrap_or_else(|| {
             self.built += 1;
             Rc::new(text_layout(fonts, scale, run, width))
         });
         self.current.insert(key, Rc::clone(&layout));
         layout
+    }
+
+    /// `run`'s max-content layout, kept, when laying it out at `width`
+    /// would give the same: the run is start-aligned, so its lines do
+    /// not move within the width, and no line is wider than `width`, so
+    /// none breaks. It is kept for the next update too, which may ask
+    /// only for widths.
+    fn unwrapped(&mut self, run: &InlineRun, width: Option<f32>, scale: f32) -> Option<Rc<Layout>> {
+        let width = width?;
+        if !matches!(run.style.align, Align::Start) {
+            return None;
+        }
+        let key = Key::of(run, None, scale);
+        let layout = self.current.get(&key).or_else(|| self.previous.get(&key))?;
+        if layout.width() > width * scale {
+            return None;
+        }
+        let layout = Rc::clone(layout);
+        self.current.insert(key, Rc::clone(&layout));
+        Some(layout)
     }
 
     /// Starts an update: what the last one asked for is kept, what it
@@ -133,35 +157,5 @@ impl TextCache {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_run_whose_style_holds_a_nan_is_kept_like_any_other() {
-        // Given: a letter spacing that is not a number
-        let style = TextStyle {
-            face: Face::Geist,
-            size: 16.0,
-            weight: 400.0,
-            line_height: LineHeight::Normal,
-            color: vapors_scene::Color::default(),
-            letter_spacing: f32::NAN,
-            align: Align::Start,
-            italic: false,
-        };
-        let run = InlineRun {
-            text: "nan".to_owned(),
-            style,
-            visible: true,
-            spans: Vec::new(),
-        };
-        let (mut fonts, mut cache) = (FontSystem::bundle_only(), TextCache::default());
-
-        // When: asked for twice
-        cache.layout(&mut fonts, 1.0, &run, None);
-        cache.layout(&mut fonts, 1.0, &run, None);
-
-        // Then: laid out once
-        assert_eq!(cache.built(), 1);
-    }
-}
+#[path = "text_cache_tests.rs"]
+mod tests;

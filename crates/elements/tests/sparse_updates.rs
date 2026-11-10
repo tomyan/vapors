@@ -50,7 +50,7 @@ enum Check {
 /// restyled, laid out, text layouts built. The table in
 /// docs/plans/iu1.md is these numbers; a change here updates it.
 const EXPECTED: [(usize, usize, usize); 5] =
-    [(0, 5, 1), (0, 9, 3), (0, 0, 0), (4, 0, 0), (1, 0, 0)];
+    [(0, 5, 1), (0, 9, 2), (0, 0, 0), (4, 0, 0), (1, 0, 0)];
 
 /// The walk after each edit of `EDITS`, by row count: elements visited,
 /// boxes built, layout calls, boxes painted, scene items built. A row is

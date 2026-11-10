@@ -35,7 +35,7 @@ of pull requests under about 400 lines each.
   | Edit | restyled | boxes laid out | text layouts built |
   |---|---|---|---|
   | same-size value | 0 | 5 | 1 |
-  | resizing label | 0 | 9 | 3 |
+  | resizing label | 0 | 9 | 2 |
   | equal write | 0 | 0 | 0 |
   | hover | 4 | 0 | 0 |
   | focus | 1 | 0 | 0 |
