@@ -1,70 +1,8 @@
 //! Press-and-hold behavior on the recording DOM; browser tests cover capture routing.
-use std::{cell::RefCell, rc::Rc};
-use vapors_components::hold_button::{HoldButton, HoldButtonProps};
-use vapors_dom::{
-    Capture, Event, Listeners, NodeId, Pointer,
-    recording::{Call, RecordingDom},
-};
-use vapors_signals::Signal;
-struct Mounted {
-    dom: Rc<RefCell<RecordingDom>>,
-    button: HoldButton,
-    node: NodeId,
-    pressed: Signal<bool>,
-    enabled: Signal<bool>,
-    reset: Signal<u64>,
-}
-impl Mounted {
-    fn new() -> Self {
-        let dom = Rc::new(RefCell::new(RecordingDom::new()));
-        let root = dom.borrow().root();
-        let pressed = Signal::new(false);
-        let enabled = Signal::new(true);
-        let reset = Signal::new(0);
-        let button = HoldButton::mount(
-            &dom,
-            root,
-            HoldButtonProps {
-                id: "test".into(),
-                label: "Hold".into(),
-                pressed,
-                enabled,
-                reset,
-            },
-        );
-        let node = dom
-            .borrow()
-            .calls()
-            .iter()
-            .find_map(|c| match c {
-                Call::CreateElement { node, tag } if tag == "button" => Some(*node),
-                _ => None,
-            })
-            .unwrap();
-        Self {
-            dom,
-            button,
-            node,
-            pressed,
-            enabled,
-            reset,
-        }
-    }
-    fn send(&self, mut event: Event) -> Event {
-        let along =
-            Listeners::listeners_along(&*self.dom.borrow(), self.node, event.name()).unwrap();
-        event = event.at(self.node);
-        vapors_dom::run_along(along, &mut event, |_, _| {});
-        event
-    }
-    fn pointer(&self, name: &str, id: u32) -> Event {
-        self.send(Event::new(name).with_pointer(Pointer {
-            id,
-            pressed: name == "pointerdown",
-            ..Pointer::default()
-        }))
-    }
-}
+mod output;
+mod support;
+use support::Mounted;
+use vapors_dom::{Capture, Event};
 #[test]
 fn pointers_remain_held_until_each_has_ended() {
     // Given

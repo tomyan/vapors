@@ -1,14 +1,18 @@
 <script>
 #[prop] let id: String = crate::unique_id("hold");
 #[prop] let label: String = String::from("Hold");
-#[prop] let pressed: Signal<bool> = Signal::new(false);
+// The hold is output-only: `on_change` hears each change (`crate::hold_into` writes it into a signal).
+#[prop] let on_change: std::rc::Rc<dyn Fn(bool)> = std::rc::Rc::new(|_| {});
 #[prop] let enabled: Signal<bool> = Signal::new(true);
 #[prop] let reset: Signal<u64> = Signal::new(0);
 // aria-disabled exposes availability; input guards enforce it without removing focusability.
 // Each pointer remains independent, including two fingers on the same button.
 let pointers: Signal<std::collections::BTreeSet<u32>> = Signal::new(std::collections::BTreeSet::new());
 let keys: Signal<std::collections::BTreeSet<String>> = Signal::new(std::collections::BTreeSet::new());
-Effect::new(move || { pressed.set(!pointers.get().is_empty() || !keys.get().is_empty()); });
+let held: Memo<bool> = Memo::new(move || !pointers.get().is_empty() || !keys.get().is_empty());
+let output = crate::hold_output::HoldOutput::new(on_change);
+let sending = std::rc::Rc::clone(&output);
+Effect::new(move || { sending.send(held.get()); });
 let reset_seen = std::rc::Rc::new(std::cell::Cell::new(reset.get_untracked()));
 Effect::new(move || {
     let epoch = reset.get();
@@ -18,7 +22,7 @@ Effect::new(move || {
         keys.set(std::collections::BTreeSet::new());
     }
 });
-vapors_signals::on_cleanup(move || { crate::clear_hold(pressed); });
+vapors_signals::on_cleanup(move || { output.release(); });
 let down = move |event: &mut Event| -> Result<(), String> {
     if !enabled.get_untracked() { return Ok(()); }
     let pointer = event.pointer().filter(|p| p.pressed)
@@ -55,6 +59,6 @@ button[data-held="true"] { border-color: #f2b26f; }
 button:focus-visible { outline: 2px solid #f2b26f; outline-offset: 2px; }
 </style>
 
-<button id={id} data-hold={id} data-held={pressed.get()} aria-disabled={!enabled.get()}
+<button id={id} data-hold={id} data-held={held.get()} aria-disabled={!enabled.get()}
     onpointerdown={down} onpointerup={release} onpointercancel={release}
     onlostpointercapture={release} onkeydown={key_down} onkeyup={key_up} onblur={blur}>{label}</button>
