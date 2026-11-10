@@ -1,6 +1,8 @@
 use vapors_gpu_harness::gpu;
 
-use super::{Backing, Mounted};
+use vapors_platform::Instant;
+
+use super::{Backing, Mounted, Turn};
 use crate::surface::{SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
 
 struct Idle;
@@ -24,11 +26,18 @@ fn idle_mounted_with_backing() -> Mounted {
     mounted
 }
 
-/// `wants_frame` of an idle, backed surface before and after a scope
-/// that never resolves is added. Called from `gpu_surface_backing_tests`.
-pub(crate) fn wants_frame_around_a_pending_scope() -> (bool, bool) {
+/// `wants_frame` and `deadline` of an idle, backed surface before and
+/// after a scope that never resolves is added at `now`. Called from
+/// `gpu_surface_backing_tests`.
+pub(crate) fn wants_frame_around_a_pending_scope(now: Instant) -> [(bool, Option<Instant>); 2] {
     let mut mounted = idle_mounted_with_backing();
-    let before = mounted.wants_frame();
-    mounted.scopes.wait_for(Box::pin(std::future::pending()));
-    (before, mounted.wants_frame())
+    let before = (mounted.wants_frame(), mounted.deadline());
+    let turn = Turn {
+        waker: std::task::Waker::noop(),
+        now,
+    };
+    mounted
+        .scopes
+        .wait_for(Box::pin(std::future::pending()), turn);
+    [before, (mounted.wants_frame(), mounted.deadline())]
 }

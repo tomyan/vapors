@@ -21,6 +21,8 @@ use crate::surface::SurfaceRenderer;
 pub(super) struct AppSurfaces {
     pending: Vec<(String, Box<dyn SurfaceRenderer>)>,
     shared: Rc<RefCell<Shared>>,
+    /// Whether the painter has the loop's waker (`give_waker`).
+    painter_wakes: bool,
 }
 
 impl ElementsApp {
@@ -157,3 +159,6 @@ impl Drop for AppSurfaces {
         self.close();
     }
 }
+
+#[path = "elements_app_scope_wake.rs"]
+mod scope_wake;

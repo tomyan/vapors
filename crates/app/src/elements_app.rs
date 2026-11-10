@@ -145,6 +145,7 @@ impl App for ElementsApp {
 
     fn drawn(&mut self, platform: &Platform) {
         self.surfaces.keep_waker(platform);
+        self.surfaces.give_waker(self.painter.as_mut());
         self.mirror_text_field(platform);
     }
 }
