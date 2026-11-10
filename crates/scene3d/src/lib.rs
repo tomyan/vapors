@@ -1,4 +1,4 @@
-//! The 3D scene's maths and validation (3D lane slice 2,
+//! The 3D scene's maths, validation and node store (3D lane slice 2,
 //! `docs/plans/3d-2.md`).
 //!
 //! Conventions, the same everywhere in the scene:
@@ -16,14 +16,32 @@
 //!
 //! Every constructor refuses input it cannot use ([`SceneError`]),
 //! naming the field and the fix; nothing is clamped or replaced.
+//!
+//! A [`Scene`] holds the nodes: groups, meshes and cameras in a tree
+//! under one root, named by generational [`NodeId`]s, so the id of a
+//! removed node is refused ([`StoreError::Stale`]) and never names the
+//! node that took its slot. [`Scene::update`] recomputes the world
+//! matrices of the nodes whose transform or parent changed, and of their
+//! descendants, and returns them. The root names the active camera by
+//! [`CameraHandle`].
 
+mod camera;
 mod error;
+mod handle;
+mod node;
 mod projection;
+mod store;
+mod store_error;
 mod transform;
 mod view;
+mod world;
 
 pub use error::SceneError;
 pub use glam::{Mat4, Quat, Vec3};
+pub use handle::{CameraHandle, NodeId};
+pub use node::NodeKind;
 pub use projection::{Projection, project, view_projection};
+pub use store::Scene;
+pub use store_error::StoreError;
 pub use transform::Transform;
 pub use view::View;
