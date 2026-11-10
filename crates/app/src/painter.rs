@@ -6,8 +6,8 @@
 
 use vapors_elements::Painted;
 use vapors_renderer::{ImagePipeline, QuadPipeline, ShadowPipeline, Target, clear_view};
-use vapors_scene::{Item, Rect, Run, Scissor, Size};
-use vapors_text::{AtlasConfig, AtlasError, BlendParams, GlyphAtlas, RenderTarget, TextPipeline};
+use vapors_scene::{Rect, Run, Scissor, Size};
+use vapors_text::{AtlasConfig, GlyphAtlas, TextPipeline};
 
 /// The pipelines and glyph atlas for one target format.
 pub struct ScenePainter {
@@ -116,36 +116,9 @@ impl ScenePainter {
             Run::Shadows(shadows) => self.shadows.draw(target, &shadows),
             Run::Quads(quads) => self.quads.draw(target, &quads),
             Run::Texts(items) => self.draw_texts(target, painted, items)?,
+            Run::Icons(items) => self.draw_icons(target, painted, items)?,
             Run::Images(items) => self.textures.draw(&self.images, target, painted, items),
             Run::Surfaces(items) => self.surfaces.draw(&self.images, target, painted, items)?,
-        }
-        Ok(())
-    }
-
-    fn draw_texts(
-        &mut self,
-        target: &Target<'_>,
-        painted: &Painted,
-        items: &[Item],
-    ) -> Result<(), AtlasError> {
-        let text_target = RenderTarget {
-            device: target.device,
-            queue: target.queue,
-            view: target.view,
-            viewport: target.viewport,
-            scissor: target.scissor,
-        };
-        for item in items {
-            if let Item::Text { text, origin } = item {
-                let layout = painted.text(*text);
-                self.text.draw(
-                    &text_target,
-                    &mut self.atlas,
-                    layout,
-                    *origin,
-                    BlendParams::default(),
-                )?;
-            }
         }
         Ok(())
     }
@@ -188,6 +161,8 @@ fn clipped<'a>(target: &Target<'a>, clip: Option<Rect>) -> Option<Target<'a>> {
 
 #[path = "painter_images.rs"]
 mod images;
+#[path = "painter_text.rs"]
+mod text;
 use images::Textures;
 #[path = "painter_errors.rs"]
 mod errors;

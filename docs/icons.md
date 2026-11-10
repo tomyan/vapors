@@ -114,6 +114,13 @@ boxes.
   `TextPipeline::draw_icons(target, atlas, &[IconDraw])` takes the
   snapped content box in device pixels and draws with `ICON_BLEND`
   (gamma 1, contrast 0), which the text shader makes a plain blend.
+- Built in 2b: an svg's `Icon` is built with its box
+  (`elements::svg_paint`), stroke width 1 when absent. Paint pushes
+  `Item::Icon` with an `IconId` that `Painted::icon` resolves, the
+  colour the svg's used `color`, and none when the svg is not
+  `visibility: visible`. Consecutive icons under one clip are one
+  `Run::Icons`, which the painter draws in one `draw_icons` call under
+  the clip's scissor.
 
 ## Slices
 

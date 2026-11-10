@@ -70,6 +70,7 @@ mod style;
 mod surfaces;
 mod svg;
 mod svg_checks;
+mod svg_paint;
 mod svg_path_checks;
 mod svg_style_checks;
 mod tags;

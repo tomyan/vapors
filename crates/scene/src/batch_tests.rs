@@ -1,5 +1,5 @@
 use super::*;
-use crate::{Color, ImageId, SurfaceId, TextId};
+use crate::{Color, IconId, ImageId, SurfaceId, TextId};
 
 fn quad(left: f32) -> Item {
     Item::Quad(Quad::fill(
@@ -47,6 +47,7 @@ fn consecutive_items_of_one_kind_share_a_batch_in_painting_order() {
             Run::Texts(texts) => ('t', texts.len()),
             Run::Images(images) => ('i', images.len()),
             Run::Surfaces(surfaces) => ('g', surfaces.len()),
+            Run::Icons(icons) => ('v', icons.len()),
         })
         .collect();
     assert_eq!(shape, [('q', 2), ('t', 1), ('q', 1), ('t', 2)]);
@@ -170,4 +171,36 @@ fn consecutive_surfaces_share_a_batch_apart_from_images() {
         })
         .collect();
     assert_eq!(shape, [('g', 2), ('i', 1), ('g', 1)]);
+}
+
+fn icon(id: u32) -> Item {
+    Item::Icon {
+        icon: IconId(id),
+        rect: Rect::new(0.0, 0.0, 4.0, 4.0),
+        colour: Color::from_rgba8(1, 2, 3, 255),
+    }
+}
+
+#[test]
+fn consecutive_icons_share_a_batch_apart_from_images_and_texts() {
+    // Given: two icons, an image, an icon, a text
+    let mut scene = Scene::new();
+    for item in [icon(0), icon(1), picture(0), icon(2), text(0)] {
+        scene.push(item);
+    }
+
+    // When
+    let batches = scene.batches();
+
+    // Then
+    let shape: Vec<(char, usize)> = batches
+        .iter()
+        .map(|batch| match &batch.run {
+            Run::Icons(icons) => ('v', icons.len()),
+            Run::Images(images) => ('i', images.len()),
+            Run::Texts(texts) => ('t', texts.len()),
+            other => panic!("unexpected {other:?}"),
+        })
+        .collect();
+    assert_eq!(shape, [('v', 2), ('i', 1), ('v', 1), ('t', 1)]);
 }
