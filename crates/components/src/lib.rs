@@ -20,16 +20,3 @@ pub fn unique_id(prefix: &str) -> String {
     let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     format!("{prefix}-{n}")
 }
-
-/// Clear a hold when its component unmounts.
-///
-/// # Panics
-/// If a live consumer signal refuses the write for a reason other than disposal.
-pub fn clear_hold(pressed: vapors_signals::Signal<bool>) {
-    match pressed.try_set(false) {
-        // Whole-tree teardown can dispose the consumer before child cleanup.
-        // There is no surviving consumer to notify in that case.
-        Ok(()) | Err(vapors_signals::Error::Disposed { .. }) => {}
-        Err(error) => panic!("HoldButton cleanup refused: {error}"),
-    }
-}
