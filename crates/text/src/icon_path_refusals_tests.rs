@@ -24,6 +24,12 @@ fn malformed_data_is_refused_at_the_first_character_not_understood() {
         ("M1 1z2", 5, "command"),
         ("M1..", 3, "number"),
         ("M1e 1", 3, "exponent"),
+        ("M1 1L1e39 2", 5, "32-bit"),
+        ("M1 1L2 -1e39", 7, "32-bit"),
+        ("M,1 1", 1, "comma cannot follow"),
+        ("M1 1L ,2 2", 6, "comma cannot follow"),
+        ("M1 1é", 4, "'é'"),
+        ("M1 1a4 4 0 é", 11, "'é'"),
     ];
     for (data, offset, says) in cases {
         // When
@@ -33,6 +39,36 @@ fn malformed_data_is_refused_at_the_first_character_not_understood() {
         assert_eq!(error.offset, offset, "{data:?}: {error}");
         assert!(error.to_string().contains(says), "{data:?}: {error}");
     }
+}
+
+#[test]
+fn every_refusal_points_at_the_doc() {
+    for data in [
+        "",
+        "L1 1",
+        "M1",
+        "M1 1#",
+        "M1 1a4 4 0 2 0 1 1",
+        "M1e 1",
+        "M1 1L1e39 1",
+        "M,1 1",
+        "M1 1C1 1 1 1 1 1",
+    ] {
+        // When
+        let message = refused(data).to_string();
+
+        // Then
+        assert!(message.contains("docs/icons.md"), "{data:?}: {message}");
+    }
+}
+
+#[test]
+fn a_comma_between_argument_groups_is_still_allowed() {
+    // When
+    let path = IconPath::parse("M1 1L2 2,3 3");
+
+    // Then
+    assert!(path.is_ok(), "{path:?}");
 }
 
 #[test]
