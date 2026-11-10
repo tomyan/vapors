@@ -19,7 +19,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use vapors_elements::{Cursor, Document, Point};
-use vapors_platform::{Event, Platform};
+use vapors_platform::{Event, Instant, Platform};
 
 use crate::pointer::{Action, action};
 
@@ -37,6 +37,8 @@ pub struct DocumentInput {
     /// started, answered off the loop.
     #[cfg(not(target_family = "wasm"))]
     pastes: paste::Pastes,
+    /// The tooltip armed or shown (`document_input_tooltip.rs`).
+    tooltip: crate::tooltip::TooltipState,
 }
 
 impl Default for DocumentInput {
@@ -57,6 +59,7 @@ impl DocumentInput {
             held: route::Held::default(),
             #[cfg(not(target_family = "wasm"))]
             pastes: paste::Pastes::default(),
+            tooltip: crate::tooltip::TooltipState::default(),
         }
     }
 
@@ -98,6 +101,8 @@ impl DocumentInput {
         self.deliver_pastes(document);
         let route = self.route(document, event)?;
         if route == Route::Host {
+            let action = self.action(&document.borrow(), event)?;
+            self.tooltip_event(&document.borrow(), event, action, Instant::now());
             return Ok(Given {
                 route,
                 changed: false,
@@ -135,6 +140,7 @@ impl DocumentInput {
             self.held.keys.insert(code.clone(), Route::Both);
         }
         self.paste_if(document, event, platform);
+        self.tooltip_event(&document.borrow(), event, action, Instant::now());
         let changed = document.borrow_mut().take_changed();
         let cursor = document.borrow().cursor(self.pointer);
         let shown = (Some(cursor) != self.cursor).then(|| {
@@ -157,17 +163,6 @@ impl DocumentInput {
             return Ok(None);
         }
         Ok(action(event, scale_of(document)?, self.pointer))
-    }
-}
-
-/// The scale of `document`'s last update, refused when there is none or
-/// it is not a positive number.
-fn scale_of(document: &Document) -> Result<f32, Unplaced> {
-    let scale = document.painted().ok_or(Unplaced::NotUpdated)?.scale();
-    if scale.is_finite() && scale > 0.0 {
-        Ok(scale)
-    } else {
-        Err(Unplaced::Scale(scale))
     }
 }
 
@@ -205,6 +200,8 @@ impl DocumentInput {
 }
 #[path = "document_input_route.rs"]
 mod route;
+#[path = "document_input_tooltip.rs"]
+mod tooltip;
 pub use route::Route;
 #[cfg(test)]
 #[path = "document_input_click_tests.rs"]
@@ -212,6 +209,7 @@ mod click_tests;
 #[path = "document_input_types.rs"]
 mod types;
 pub(crate) use types::Handled;
+use types::scale_of;
 pub use types::{Given, Unplaced};
 
 #[cfg(test)]

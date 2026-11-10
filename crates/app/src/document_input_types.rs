@@ -68,3 +68,14 @@ impl fmt::Display for Unplaced {
 }
 
 impl std::error::Error for Unplaced {}
+
+/// The scale of `document`'s last update, refused when there is none or
+/// it is not a positive number.
+pub(super) fn scale_of(document: &vapors_elements::Document) -> Result<f32, Unplaced> {
+    let scale = document.painted().ok_or(Unplaced::NotUpdated)?.scale();
+    if scale.is_finite() && scale > 0.0 {
+        Ok(scale)
+    } else {
+        Err(Unplaced::Scale(scale))
+    }
+}

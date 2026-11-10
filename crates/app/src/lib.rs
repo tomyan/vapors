@@ -18,6 +18,7 @@ mod pointer;
 #[cfg(test)]
 mod scroll_fixture;
 mod surface;
+mod tooltip;
 mod tooltip_place;
 mod tooltip_place_check;
 mod touch_scroll;
@@ -33,6 +34,7 @@ pub use painter::{
     UnsupportedFormat,
 };
 pub use surface::{SURFACE_FORMAT, SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
+pub use tooltip::{TOOLTIP_DELAY, Tooltip, TooltipTrigger};
 pub use tooltip_place::{
     Anchor, CURSOR_OFFSET_X, CURSOR_OFFSET_Y, KEYBOARD_GAP, PlacementError, PlacementField, Point,
     place_tooltip,

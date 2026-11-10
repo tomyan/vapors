@@ -30,11 +30,15 @@ impl Phases for AppFrame<'_, '_> {
         std::mem::take(&mut self.app.input_spent)
     }
 
-    fn update(&mut self, _now: Instant) -> Result<(), String> {
+    fn update(&mut self, now: Instant) -> Result<(), String> {
         // the selectionchange each text field owes, once per frame, as
         // Chromium fires one per task (E6a)
         Document::settle_selection(&self.app.document);
-        self.app.update_document(self.frame)
+        self.app.update_document(self.frame)?;
+        // nothing draws the tooltip yet (docs/tooltips.md); asking
+        // shows one whose deadline passed, which ends its wait
+        let _ = self.app.input.tooltip(&self.app.document.borrow(), now);
+        Ok(())
     }
 
     fn draw(&mut self, _now: Instant) -> Result<(), String> {
