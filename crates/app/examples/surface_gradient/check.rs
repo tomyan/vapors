@@ -52,6 +52,14 @@ impl Counts {
         (frames, self.renders.load(Ordering::SeqCst))
     }
 
+    /// Records a refusal unless a verdict is already there.
+    fn refuse(&self, why: String) {
+        self.outcome
+            .lock()
+            .expect("not poisoned")
+            .get_or_insert(Err(why));
+    }
+
     /// Keeps the first verdict: a refusal from the app stands.
     fn finish(&self, outcome: Result<String, String>, waker: &Waker) {
         let _ = self
@@ -105,7 +113,7 @@ impl Checked {
         let invalidated = self.handle.invalidate();
         if invalidated != Ok(Invalidated::Woke) {
             let why = format!("the running app's invalidate gave {invalidated:?}, not Ok(Woke)");
-            *self.counts.outcome.lock().expect("not poisoned") = Some(Err(why));
+            self.counts.refuse(why);
         }
     }
 }
@@ -121,7 +129,7 @@ impl App for Checked {
         if !self.started {
             self.started = true;
             if let Err(why) = self.start_script() {
-                *self.counts.outcome.lock().expect("not poisoned") = Some(Err(why));
+                self.counts.refuse(why);
                 return Next::Exit;
             }
         }
@@ -182,4 +190,22 @@ fn verdict(
     Ok(format!(
         "{settled_renders} render(s) settling, 0 frames and 0 renders idle for {IDLE:?}, 2 frames and 1 render after an invalidate"
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_first_refusal_is_kept() {
+        // Given
+        let counts = Counts::new(Arc::new(AtomicU64::new(0)));
+
+        // When
+        counts.refuse("first".into());
+        counts.refuse("second".into());
+
+        // Then
+        assert_eq!(counts.outcome(), Err("first".into()));
+    }
 }
