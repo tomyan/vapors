@@ -152,6 +152,9 @@ fn a_named_icon_is_an_image_that_names_its_button() {
     assert_eq!(tree, [node("button", "Export"), node("img", "Export")]);
 }
 
+/// Chromium 155's accessibility tree for the same markup
+/// (`crates/elements-corpus/probes/hidden-icon-name.mjs`): the button
+/// is named "Go" and the hidden image is not in the tree.
 #[test]
 fn a_named_icon_that_is_visibility_hidden_adds_nothing_to_its_buttons_name() {
     // Given
@@ -167,7 +170,7 @@ fn a_named_icon_that_is_visibility_hidden_adds_nothing_to_its_buttons_name() {
     doc.update(viewport(400.0, 300.0)).expect("updates");
 
     // When
-    let tree = doc.ax_projection(&["button"]).expect("projects");
+    let tree = doc.ax_projection(&["button", "img"]).expect("projects");
 
     // Then
     assert_eq!(tree, [node("button", "Go")]);
