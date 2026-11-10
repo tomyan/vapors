@@ -79,6 +79,8 @@ fixtures![
     focus::Focus,
     grid_tracks::GridTracks,
     hello_box::HelloBox,
+    icon_names::IconNames,
+    icons_paint::IconsPaint,
     image_paint::ImagePaint,
     images::Images,
     inline_text::InlineText,

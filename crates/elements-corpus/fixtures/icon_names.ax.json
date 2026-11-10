@@ -1,0 +1,76 @@
+{
+  "tree": [
+    {
+      "depth": 0,
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "RootWebArea"
+    },
+    {
+      "depth": 1,
+      "name": "Undo",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 1,
+      "name": "Open",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Open",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "name": "Export",
+      "role": "image"
+    },
+    {
+      "depth": 1,
+      "name": "Export Go",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Export",
+      "role": "image"
+    },
+    {
+      "depth": 2,
+      "name": "Go",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "name": "Go",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Go",
+      "role": "StaticText"
+    }
+  ],
+  "viewport": [
+    640,
+    400
+  ]
+}

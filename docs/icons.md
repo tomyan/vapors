@@ -134,6 +134,24 @@ numbers. Its `path` children are not boxes.
   (`a + a(1 - a)`, 0.75 for two paths at 0.5); one quad per path gives
   the same. Text's gamma and contrast boost are glyph-specific and not
   applied to icons; the blend is confirmed by the paint oracle.
+- Compared with Chromium 155 in slice 3 (`fixtures/icons_paint.wisp`,
+  `tests/gpu_paint.rs`): touche's ten icons pass the paint rules every
+  fixture is held to, unchanged, at 1x and 2x. Per icon, the largest
+  difference is 46 grey levels at 1x and 74 at 2x, the mean at most
+  1.3. Four pixels of Mute at 1x (two in each of the two opaque rows) are compared
+  with exact coverage instead: Chromium draws them 133 off exact (declared in
+  `tests/paint_support/exact.rs`).
+- Open: zeno sums the coverage of overlapping strokes within one path,
+  where SVG paints their union, so a crossing comes out darker by up to
+  28 grey levels than exact (Mute's X: 45 where exact is 73). Not fixed
+  in slice 3; inside the paint rules' bounds.
+- Open: Chromium 155 (Skia) draws Mute's crossing pixels at 1x, svg
+  (11, 8) and (13, 8), off exact coverage: row 8 reads `236 206 45 206
+  236` where exact is `231 73 29 73 231` (133 off), though row 7 reads
+  `229 63 29 63 229` and the geometry is symmetric about y = 8. Those
+  pixels are compared with exact coverage instead, declared in
+  `tests/paint_support/exact.rs`; retired when Chromium is within
+  `EDGE_BOUND` of vapors there.
 - Built in 1b: `vapors_text::Icon` (view box and `IconStroke`s, checked:
   at least one stroke, a view box with area, positive stroke widths) and
   `Icon::rasterize_stroke` (`Icon::rasterize` combines the paths
@@ -159,4 +177,4 @@ numbers. Its `path` children are not boxes.
 | 1b | Path rasterisation into the atlas, `TextPipeline` drawing an icon quad; unit and GPU tests |
 | 2a | Compiler vocabulary (`svg`, `path`); elements: the refusals, replaced layout, accessibility |
 | 2b | `Item::Icon` in paint and the painter |
-| 3 | A paint fixture of touche's icons compared with Chromium at 1x and 2x, and an accessibility fixture against the oracle |
+| 3 | A paint fixture of touche's icons compared with Chromium at 1x and 2x, and an accessibility fixture against the oracle. Done |

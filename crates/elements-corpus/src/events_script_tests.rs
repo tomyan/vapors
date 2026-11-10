@@ -131,6 +131,10 @@ fn a_script_of_another_shape_is_refused_naming_its_file_and_line() {
             "card.events:2: `type` takes a quoted text",
         ),
         ("at 0x0\n", "card.events:1: `at` takes WxH"),
+        (
+            "listen click\nproject button img\nclick 1 2\nexpect focus a#b\n",
+            "card.events:2: `project` role `img` is ARIA's name; use `image`, Chromium's name",
+        ),
     ] {
         let refusal = parse("card", text).expect_err(needle);
         assert!(refusal.starts_with(needle), "wanted {needle} in: {refusal}");
