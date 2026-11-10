@@ -58,6 +58,9 @@ mod waker;
 #[cfg(target_family = "wasm")]
 mod web;
 mod webgpu;
+mod wheel_position;
+#[cfg(target_family = "wasm")]
+mod wheel_position_web;
 mod window;
 
 #[cfg(not(target_family = "wasm"))]

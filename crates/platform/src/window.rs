@@ -158,6 +158,7 @@ pub fn run(options: WindowOptions, app: impl App + 'static) -> Result<(), Platfo
         .map_err(|e| PlatformError::Windowing(e.to_string()))?;
     let platform = Platform::new(event_loop.create_proxy());
     crate::web::wire_open_button(platform.proxy());
+    crate::wheel_position_web::install();
     let handler = Handler::new(options, Box::new(app), platform);
     event_loop.spawn_app(handler);
     Ok(())
