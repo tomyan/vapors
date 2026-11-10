@@ -99,6 +99,7 @@ fixtures![
     text::Text,
     text_align::TextAlign,
     text_wrap::TextWrap,
+    titles::Titles,
     undo::Undo,
     words::Words,
 ];
