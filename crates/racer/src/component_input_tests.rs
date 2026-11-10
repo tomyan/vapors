@@ -1,6 +1,7 @@
 //! Compiled child controls route through document capture into the race.
 use crate::app::Racer;
 use vapors_elements::{Document, Viewport};
+use vapors_platform::Platform;
 fn mounted() -> Racer {
     let racer = Racer::new();
     racer.hud.compact.set(true);
@@ -67,14 +68,29 @@ fn pause_resets_held_component_state_before_resuming() {
     assert_eq!(racer.driving.controls().throttle, 0.0);
 }
 
-fn space() -> vapors_platform::Event {
+fn key(key: &str, code: &str, pressed: bool) -> vapors_platform::Event {
     vapors_platform::Event::Key {
-        key: " ".into(),
-        code: "Space".into(),
-        pressed: true,
+        key: key.into(),
+        code: code.into(),
+        pressed,
         repeat: false,
         modifiers: vapors_platform::Modifiers::default(),
     }
+}
+fn space(pressed: bool) -> vapors_platform::Event {
+    key(" ", "Space", pressed)
+}
+/// Focuses the named `HoldButton`. Tab cannot: with nothing focused it routes to the host.
+fn focus_hold(racer: &Racer, name: &str) {
+    let node = {
+        let doc = racer.document.borrow();
+        doc.elements()
+            .iter()
+            .copied()
+            .find(|n| doc.attribute(*n, "data-hold") == Some(name))
+            .unwrap()
+    };
+    Document::focus(&racer.document, Some(node));
 }
 
 #[test]
@@ -88,7 +104,24 @@ fn space_pauses_after_a_click_on_gas() {
     let focused = racer.document.borrow().active_element();
     assert_eq!(focused, None, "a click on a HoldButton leaves focus off it");
     // When: nothing focused uses Space, so the host has it
-    racer.routed_key(&space(), vapors_app::Route::Host).unwrap();
+    racer.handle(&space(true), &Platform::detached()).unwrap();
     // Then
     assert!(racer.paused);
+}
+
+#[test]
+fn space_on_a_focused_hold_button_holds_it_and_does_not_pause() {
+    // Given
+    let mut racer = mounted();
+    racer.command("toggle").unwrap();
+    let platform = Platform::detached();
+    focus_hold(&racer, "gas");
+    // When
+    racer.handle(&space(true), &platform).unwrap();
+    // Then
+    assert!(!racer.paused);
+    assert!(racer.hud.gas.get());
+    assert_eq!(racer.driving.controls().throttle, 1.0);
+    racer.handle(&space(false), &platform).unwrap();
+    assert!(!racer.hud.gas.get());
 }

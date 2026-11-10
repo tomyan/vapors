@@ -142,6 +142,8 @@ mod drawing;
 mod input;
 
 mod inspection;
+#[cfg(test)]
+mod inspection_tests;
 
 mod tuning;
 

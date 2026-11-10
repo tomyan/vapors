@@ -3,7 +3,7 @@ use super::Racer;
 use vapors_app::{Route, Unplaced};
 use vapors_platform::{Event, Platform};
 impl Racer {
-    pub(super) fn handle(&mut self, event: &Event, platform: &Platform) -> Result<(), String> {
+    pub(crate) fn handle(&mut self, event: &Event, platform: &Platform) -> Result<(), String> {
         if matches!(event, Event::WindowFocus { focused: false }) {
             self.pause();
         }

@@ -87,7 +87,7 @@ impl Racer {
     }
 }
 
-fn rect_json(name: &str, numbers: [f32; 4]) -> Result<String, String> {
+pub(super) fn rect_json(name: &str, numbers: [f32; 4]) -> Result<String, String> {
     let mut parts = Fields::default();
     for (edge, value) in ["x", "y", "width", "height"].iter().zip(numbers) {
         parts.number(&format!("targets.{name}.{edge}"), value)?;
