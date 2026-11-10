@@ -1,6 +1,7 @@
 //! The scene store: persistent nodes under one root, named by
 //! generational ids.
 
+use crate::handle::next_scene_id;
 use crate::node::Node;
 use crate::{CameraHandle, NodeId, NodeKind, StoreError, Transform};
 use glam::Mat4;
@@ -15,6 +16,7 @@ struct Slot {
 /// other node has a parent.
 #[derive(Debug)]
 pub struct Scene {
+    id: u64,
     slots: Vec<Slot>,
     free: Vec<u32>,
     root: NodeId,
@@ -27,10 +29,13 @@ impl Scene {
     /// A scene holding only its root group, at the identity.
     #[must_use]
     pub fn new() -> Self {
+        let id = next_scene_id();
         let mut scene = Self {
+            id,
             slots: Vec::new(),
             free: Vec::new(),
             root: NodeId {
+                scene: id,
                 index: 0,
                 generation: 0,
             },
@@ -95,6 +100,7 @@ impl Scene {
     }
 
     pub(crate) fn node(&self, id: NodeId) -> Result<&Node, StoreError> {
+        self.check_scene(id)?;
         let slot = self
             .slots
             .get(id.index as usize)
@@ -104,6 +110,7 @@ impl Scene {
     }
 
     pub(crate) fn node_mut(&mut self, id: NodeId) -> Result<&mut Node, StoreError> {
+        self.check_scene(id)?;
         let slot = self
             .slots
             .get_mut(id.index as usize)
@@ -112,16 +119,21 @@ impl Scene {
             .ok_or(StoreError::Stale(id))
     }
 
+    fn check_scene(&self, id: NodeId) -> Result<(), StoreError> {
+        if id.scene == self.id {
+            Ok(())
+        } else {
+            Err(StoreError::ForeignId(id))
+        }
+    }
+
     /// `id` and every node below it, parents before children.
     pub(crate) fn subtree(&self, id: NodeId) -> Vec<NodeId> {
         let mut nodes = vec![id];
         let mut next = 0;
         while let Some(node) = nodes.get(next).copied() {
-            nodes.extend(
-                self.node(node)
-                    .map(|node| node.children.clone())
-                    .unwrap_or_default(),
-            );
+            let node = self.node(node).expect("a live node's children are live");
+            nodes.extend(node.children.iter().copied());
             next += 1;
         }
         nodes
@@ -131,6 +143,7 @@ impl Scene {
     pub(crate) fn nodes(&self) -> impl Iterator<Item = (NodeId, &Node)> {
         self.slots.iter().zip(0u32..).filter_map(|(slot, index)| {
             let id = NodeId {
+                scene: self.id,
                 index,
                 generation: slot.generation,
             };
@@ -152,6 +165,7 @@ impl Scene {
         slot.node = Some(node);
         self.live += 1;
         let id = NodeId {
+            scene: self.id,
             index,
             generation: slot.generation,
         };

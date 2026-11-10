@@ -134,3 +134,7 @@ impl Scene {
 #[cfg(test)]
 #[path = "world_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "world_reparent_tests.rs"]
+mod reparent_tests;

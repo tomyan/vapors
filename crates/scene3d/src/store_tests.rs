@@ -102,11 +102,16 @@ fn the_root_is_neither_removed_nor_moved() {
 fn store_errors_name_the_fix() {
     // Given
     let id = NodeId {
+        scene: 0,
         index: 4,
         generation: 2,
     };
     let cases = [
         (StoreError::Stale(id), "node 4v2 was removed: use an id"),
+        (
+            StoreError::ForeignId(id),
+            "use ids returned by the scene you call",
+        ),
         (StoreError::RootFixed, "remove or move its children instead"),
         (StoreError::WorldPending(id), "call Scene::update"),
         (
@@ -132,6 +137,7 @@ fn a_slot_whose_generation_would_wrap_is_retired() {
     let first = scene.add(scene.root(), NodeKind::Mesh, at(1.0)).unwrap();
     scene.slots[first.index as usize].generation = u32::MAX;
     let last = NodeId {
+        scene: first.scene,
         index: first.index,
         generation: u32::MAX,
     };
@@ -144,4 +150,34 @@ fn a_slot_whose_generation_would_wrap_is_retired() {
     assert_ne!(next.index, last.index);
     assert_eq!(scene.kind(last), Err(StoreError::Stale(last)));
     assert_eq!(scene.len(), 2);
+}
+
+#[test]
+fn an_id_from_another_scene_is_refused_by_every_operation() {
+    // Given: two scenes whose first nodes share an index and generation
+    let mut ours = Scene::new();
+    let mut theirs = Scene::new();
+    let mine = ours.add(ours.root(), NodeKind::Mesh, at(1.0)).unwrap();
+    let foreign = theirs.add(theirs.root(), NodeKind::Mesh, at(1.0)).unwrap();
+    assert_eq!(
+        (foreign.index, foreign.generation),
+        (mine.index, mine.generation)
+    );
+    let refused = StoreError::ForeignId(foreign);
+
+    // When / Then
+    assert_eq!(ours.kind(foreign), Err(refused.clone()));
+    assert_eq!(
+        ours.add(foreign, NodeKind::Mesh, at(1.0)),
+        Err(refused.clone())
+    );
+    assert_eq!(ours.remove(foreign), Err(refused.clone()));
+    assert_eq!(ours.set_transform(foreign, at(2.0)), Err(refused.clone()));
+    assert_eq!(ours.reparent(mine, foreign), Err(refused.clone()));
+    assert_eq!(ours.reparent(foreign, ours.root()), Err(refused.clone()));
+    assert_eq!(
+        ours.world(theirs.root()),
+        Err(StoreError::ForeignId(theirs.root()))
+    );
+    assert_eq!(ours.len(), 2);
 }

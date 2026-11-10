@@ -6,9 +6,10 @@ use std::fmt;
 /// An operation the scene store cannot carry out.
 #[derive(Debug, Clone, PartialEq)]
 pub enum StoreError {
-    /// An id whose node was removed. Ids are per scene: an id from
-    /// another scene is not detected.
+    /// An id whose node was removed.
     Stale(NodeId),
+    /// An id another scene returned.
+    ForeignId(NodeId),
     /// A remove or reparent of the root, which has no parent.
     RootFixed,
     /// A node moved under itself or one of its descendants.
@@ -40,6 +41,10 @@ impl fmt::Display for StoreError {
             Self::Stale(id) => write!(
                 f,
                 "{id} was removed: use an id this scene returned since its removal"
+            ),
+            Self::ForeignId(id) => write!(
+                f,
+                "{id} belongs to another scene: use ids returned by the scene you call"
             ),
             Self::RootFixed => write!(
                 f,
