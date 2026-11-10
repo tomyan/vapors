@@ -102,14 +102,19 @@ fn still(when: &str, (frames, renders): (u64, u64)) -> Result<(), String> {
     Ok(())
 }
 
-/// Refused unless at least `MIN_ANIMATING` frames were drawn, each
-/// rendering the surface but the script's wake frame (and a frame cut
-/// by the count's start or end).
+/// Refused unless at least `MIN_ANIMATING` frames were drawn and
+/// exactly one drew without rendering: the script's own wake frame,
+/// which finds nothing to render. `Counts::now` is read between frames,
+/// so no frame is cut by the count's start or end.
 fn animating((frames, renders): (u64, u64)) -> Result<(), String> {
-    if frames < MIN_ANIMATING || renders > frames || renders + 2 < frames {
+    if frames < MIN_ANIMATING || renders + 1 != frames {
         return Err(format!(
-            "animating for {IDLE:?}, the app drew {frames} frames and rendered {renders} times; expected at least {MIN_ANIMATING} frames, each rendering but the script's wake frame"
+            "animating for {IDLE:?}, the app drew {frames} frames and rendered {renders} times; expected at least {MIN_ANIMATING} frames, all rendering but exactly one (the script's wake frame)"
         ));
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "script_tests.rs"]
+mod tests;

@@ -21,19 +21,27 @@ struct Entry {
 #[derive(Default)]
 pub struct Trace {
     entries: Vec<Entry>,
+    /// The frames that drew without rendering the surface.
+    empty: Vec<u64>,
 }
 
 impl Trace {
-    /// Frame `number` ended asking for `next` for the reasons in `decision`.
+    /// Frame `number` ended asking for `next` for the reasons in
+    /// `decision`; `rendered` when the surface rendered in it.
     pub fn frame(
         &mut self,
         number: u64,
         next: Next,
         decision: FrameDecision,
         states: &[SurfaceState],
+        rendered: bool,
     ) {
+        if !rendered {
+            self.empty.push(number);
+        }
         let text = format!(
-            "next {next:?}; take_changed {}, any_stale {}, surfaces_want {}; {}",
+            "{}; next {next:?}; take_changed {}, any_stale {}, wants_frame {}; {}",
+            if rendered { "rendered" } else { "no render" },
             decision.document_changed,
             decision.surface_invalidated,
             decision.surfaces_want,
@@ -59,7 +67,8 @@ impl Trace {
         });
     }
 
-    /// One line per run, oldest first.
+    /// One line per run, oldest first, then the frames that drew
+    /// without rendering.
     pub fn report(&self) -> String {
         let mut out = String::new();
         for entry in &self.entries {
@@ -72,6 +81,11 @@ impl Trace {
                 writeln!(out, "  frames {first}..={last}: {text}")
             };
         }
+        let _ = writeln!(
+            out,
+            "  frames that drew without rendering: {:?}",
+            self.empty
+        );
         out
     }
 }
@@ -123,16 +137,23 @@ mod tests {
 
         // When
         for number in 5..=9 {
-            trace.frame(number, Next::Continue, wants, &[state(true)]);
+            trace.frame(number, Next::Continue, wants, &[state(true)], true);
         }
         trace.note(9, "StopAnimation".into());
-        trace.frame(10, Next::Wait, FrameDecision::default(), &[state(false)]);
+        trace.frame(
+            10,
+            Next::Wait,
+            FrameDecision::default(),
+            &[state(false)],
+            false,
+        );
 
         // Then
         let lines: Vec<_> = trace.report().lines().map(str::to_owned).collect();
-        assert_eq!(lines.len(), 3);
-        assert!(lines[0].starts_with("  frames 5..=9: next Continue; take_changed false, any_stale false, surfaces_want true; gradient[animating backing]"));
+        assert_eq!(lines.len(), 4);
+        assert!(lines[0].starts_with("  frames 5..=9: rendered; next Continue; take_changed false, any_stale false, wants_frame true; gradient[animating backing]"));
         assert_eq!(lines[1], "  after frame 9: StopAnimation");
-        assert!(lines[2].starts_with("  frame 10: next Wait;"));
+        assert!(lines[2].starts_with("  frame 10: no render; next Wait;"));
+        assert_eq!(lines[3], "  frames that drew without rendering: [10]");
     }
 }

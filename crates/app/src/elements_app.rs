@@ -132,7 +132,7 @@ impl App for ElementsApp {
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
         #[cfg(not(target_family = "wasm"))]
         self.deliver_pastes();
-        match self.run_phases(frame) {
+        match self.run_phases(frame).and_then(|()| self.sync_animating()) {
             Ok(()) => self.next_after_frame(),
             Err(message) => {
                 report_error(&message);

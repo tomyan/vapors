@@ -44,6 +44,19 @@ impl ElementsApp {
         }
     }
 
+    /// Brings the painter's animating flags up to date, after the
+    /// frame's phases and before `next_after_frame` reads them: a
+    /// `stop_animation` made after the paint ends this frame's request
+    /// for the next.
+    pub(super) fn sync_animating(&mut self) -> Result<(), String> {
+        let Some(painter) = self.painter.as_mut() else {
+            return Ok(());
+        };
+        self.surfaces
+            .sync_animating(painter)
+            .map_err(|error| format!("the surfaces could not be synced: {error}"))
+    }
+
     /// The reasons at the end of the last frame; all false before one.
     #[must_use]
     pub fn last_decision(&self) -> FrameDecision {

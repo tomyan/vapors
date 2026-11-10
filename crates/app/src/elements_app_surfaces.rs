@@ -124,12 +124,31 @@ impl AppSurfaces {
         for (name, renderer) in self.pending.drain(..) {
             painter.mount(&name, renderer)?;
         }
-        let mut shared = self.shared.borrow_mut();
-        let stale = std::mem::take(&mut shared.stale);
+        let stale = std::mem::take(&mut self.shared.borrow_mut().stale);
         stale.iter().try_for_each(|name| painter.invalidate(name))?;
+        self.sync_animating(painter)
+    }
+
+    /// Passes the painter whether each mounted surface is animating, so
+    /// its decision for the next frame is the app's current one.
+    ///
+    /// # Errors
+    ///
+    /// When the painter disagrees with the app about what is mounted.
+    pub(super) fn sync_animating(&self, painter: &mut ScenePainter) -> Result<(), MountError> {
+        let shared = self.shared.borrow();
         let animating = |name: &String| shared.animating.contains(name);
         let mut mounted = shared.mounted.iter();
-        mounted.try_for_each(|name| painter.set_animating(name, animating(name)))
+        mounted.try_for_each(|name| painter.set_animating(name, animating(name)))?;
+        debug_assert!(
+            painter
+                .surface_states()
+                .iter()
+                .filter(|state| state.backing)
+                .all(|state| state.animating == shared.animating.contains(&state.name)),
+            "the painter's animating set differs from the app's for a painted surface"
+        );
+        Ok(())
     }
 }
 

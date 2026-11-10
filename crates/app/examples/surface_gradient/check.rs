@@ -52,8 +52,11 @@ impl Counts {
         outcome.unwrap_or_else(|| Err("the loop ended before the idle count finished".into()))
     }
 
-    /// Frames and renders so far.
+    /// Frames and renders so far, between frames: a frame holds the
+    /// trace lock from before its render until it is counted, so a count
+    /// never lands inside one.
     pub fn now(&self) -> (u64, u64) {
+        let _between_frames = self.trace.lock().expect("not poisoned");
         let frames = self.frames.load(Ordering::SeqCst);
         (frames, self.renders.load(Ordering::SeqCst))
     }
@@ -170,7 +173,6 @@ impl App for Checked {
     }
 
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
-        self.counts.frames.fetch_add(1, Ordering::SeqCst);
         if !self.started {
             self.started = true;
             if let Err(why) = self.start_script() {
@@ -181,11 +183,13 @@ impl App for Checked {
         if self.counts.exit.load(Ordering::SeqCst) {
             return Next::Exit;
         }
-        let next = self.app.frame(frame);
-        let number = self.counts.frames.load(Ordering::SeqCst);
-        let (decision, states) = (self.app.last_decision(), self.app.surface_states());
         let mut trace = self.counts.trace.lock().expect("not poisoned");
-        trace.frame(number, next, decision, &states);
+        let renders_before = self.counts.renders.load(Ordering::SeqCst);
+        let next = self.app.frame(frame);
+        let rendered = self.counts.renders.load(Ordering::SeqCst) > renders_before;
+        let number = self.counts.frames.fetch_add(1, Ordering::SeqCst) + 1;
+        let (decision, states) = (self.app.last_decision(), self.app.surface_states());
+        trace.frame(number, next, decision, &states, rendered);
         next
     }
 
