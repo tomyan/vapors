@@ -7,7 +7,7 @@
 //! invalidate, whose wake would draw one (docs/gpu-surface.md,
 //! "Animation"); with an unchanged one it stops before the paint and
 //! renders nothing.
-use crate::gpu::{Scene, Track};
+use crate::gpu::{Scene, Track, TrackLog};
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
@@ -23,7 +23,7 @@ pub(crate) struct TrackSurface {
     // RELAXED: read only by the surface tests until the IU5 counters
     // (docs/plans/3d-1c.md, PR 3) report it per frame.
     #[cfg_attr(not(test), allow(dead_code))]
-    renders: Rc<Cell<u64>>,
+    log: Rc<TrackLog>,
     animating: bool,
     /// Set by the frame where motion ends; the hook stops after its paint.
     settling: Rc<Cell<bool>>,
@@ -35,13 +35,13 @@ impl TrackSurface {
     /// frame-times hook; hands back `app` with the hook that stops.
     pub(crate) fn mount(mut app: ElementsApp) -> (ElementsApp, Self) {
         let scene = Rc::new(RefCell::new(Scene::default()));
-        let renders = Rc::new(Cell::new(0));
-        let track = Box::new(Track::new(Rc::clone(&scene), Rc::clone(&renders)));
+        let log = Rc::new(TrackLog::default());
+        let track = Box::new(Track::new(Rc::clone(&scene), Rc::clone(&log)));
         let handle = app.mount(NAME, track).expect("a new app has no renderers");
         let surface = Self {
             handle,
             scene,
-            renders,
+            log,
             animating: false,
             settling: Rc::default(),
             refused: Rc::default(),
@@ -83,7 +83,12 @@ impl TrackSurface {
     /// How many times the track has rendered.
     #[cfg(test)]
     pub(crate) fn renders(&self) -> u64 {
-        self.renders.get()
+        self.log.renders.get()
+    }
+    /// What the track's renderer has done.
+    #[cfg(test)]
+    pub(crate) fn log(&self) -> &TrackLog {
+        &self.log
     }
     /// Motion ends this frame. A changed scene renders as the last
     /// animated frame and the hook stops after its paint; an unchanged

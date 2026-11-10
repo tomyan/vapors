@@ -13,7 +13,7 @@ needs no camera, depth or scene.
 | 1a | `gpu-surface` element, `Item::Surface` in the display list, the refusals | #139 |
 | 1b | `SurfaceRenderer` and the painter's surface host: offscreen texture, resize, scale, clip, on-demand rendering, failures | #140 |
 | 1b2 | `ElementsApp` mounting, `SurfaceHandle`, `Next` from `wants_frame`; the gradient example | #141, #142 |
-| 1c | animation requests (PR 1, #147); the racer's renderer mounted through the surface (PR 2, #150); the racer's per-frame counts (PR 3, #161); two panels (PR 4, #163); surface-local input (PR 5, this branch). Plan: `docs/plans/3d-1c.md` | in progress |
+| 1c | animation requests (PR 1, #147); the racer's renderer mounted through the surface (PR 2, #150); the racer's per-frame counts (PR 3, #161); two panels (PR 4, #163); surface-local input (PR 5, #164); resize, device scale and unmount on the racer (PR 6, this branch). Plan: `docs/plans/3d-1c.md` | done |
 | 2-5 | scene, cameras, components, instances, tasks | not started |
 
 Touche's image renderer drawing through a surface in a panel comes
@@ -167,6 +167,34 @@ the panel at the page background, and UI painted after both panels
 stays over them; a panel resized by layout resizes its surface once and
 renders at the new size; `FrameCounts::surfaces` counts one
 composition draw per surface, a stopped one included.
+
+### Resize, scale and unmount on the racer
+
+The racer's `Track` renderer allocates its depth texture in `resize`, at
+the backing's device size. Tests: `crates/racer/src/gpu_track_resize_tests.rs`
+and `gpu_track_unmount_tests.rs`.
+
+- A window resized while racing calls `resize` once, on the first frame
+  at the new size; that frame and every later one render at the new
+  size, and the depth texture is the new size. The HUD lays out for the
+  new size on the same frame (below 760 CSS pixels wide, its compact
+  layout).
+- A device scale change from 1x to 2x and back calls `resize` once per
+  change. At 2x the backing is twice the device size and `logical()`
+  is the same CSS size; `FrameCounts::surfaces` counts one composition
+  draw at each scale. With the race's clock held, a CSS point on the
+  track has the same colour at 1x as at 2x.
+- Unmounting while animating (on a test page holding only the track's
+  `gpu-surface`, as the racer's HUD always has one): the surface
+  element is removed and `ElementsApp::unmount` hands the renderer
+  back; dropping it drops the `Track` and the GPU resources it owns
+  (pipelines, buffers, depth texture). Its handle then refuses
+  `request_animation`, `invalidate` and `stop_animation` with
+  `InvalidateError::NotMounted`, naming the surface. The frame that
+  shows the removal asks for one more, as any document change does;
+  the frame after it returns `Next::Wait`. A new `Track` mounted on a
+  new surface with the same name renders, and does not inherit the old
+  one's animation request.
 
 ## Supported composition (first release)
 

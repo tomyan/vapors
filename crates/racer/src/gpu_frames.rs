@@ -1,12 +1,9 @@
 //! What the racer's GPU tests share: a frame into a fresh texture, the
 //! racer settled and idle, and the HUD's buttons and pixels.
 use crate::app::Racer;
-use crate::gpu::Track;
+use crate::gpu::{Track, TrackLog};
 use std::num::NonZeroU32;
-use std::{
-    cell::{Cell, RefCell},
-    rc::Rc,
-};
+use std::{cell::RefCell, rc::Rc};
 use vapors_app::{SurfaceFrame, SurfaceRenderer, SurfaceSize};
 use vapors_gpu_harness::{Gpu, read_rgba8};
 use vapors_platform::{App, Event, Frame, Instant, Modifiers, Next, Platform};
@@ -30,16 +27,35 @@ pub(crate) fn frame(racer: &mut Racer, gpu: &Gpu) -> (Next, Vec<u8>) {
     drawn
 }
 
+/// The window a frame draws into: its device size and scale.
+pub(crate) const WINDOW: SurfaceSize = SurfaceSize {
+    width: WIDTH,
+    height: HEIGHT,
+    scale: 1.0,
+};
+
 /// One racer frame at `now`, whether or not it failed.
 pub(crate) fn frame_at(racer: &mut Racer, gpu: &Gpu, now: Instant) -> (Next, Vec<u8>) {
-    let texture = clear(&gpu.device, &gpu.queue, WIDTH, HEIGHT, MAGENTA);
+    frame_in(racer, gpu, WINDOW, now)
+}
+
+/// One racer frame at `now` into a fresh `window`-sized texture, whether
+/// or not it failed.
+pub(crate) fn frame_in(
+    racer: &mut Racer,
+    gpu: &Gpu,
+    window: SurfaceSize,
+    now: Instant,
+) -> (Next, Vec<u8>) {
+    let SurfaceSize { width, height, .. } = window;
+    let texture = clear(&gpu.device, &gpu.queue, width, height, MAGENTA);
     let next = racer.frame(&Frame {
         adapter: &gpu.adapter,
         device: &gpu.device,
         queue: &gpu.queue,
         texture: &texture,
         index: 1,
-        scale_factor: 1.0,
+        scale_factor: f64::from(window.scale),
         now,
     });
     (next, read_rgba8(&gpu.device, &gpu.queue, &texture))
@@ -130,9 +146,14 @@ pub(crate) fn press(racer: &mut Racer, [x, y]: [f32; 2], pressed: bool) {
     racer.event(button, &platform);
 }
 
+pub(crate) fn pixel(rgba: &[u8], at: [f32; 2]) -> [u8; 4] {
+    pixel_in(rgba, WIDTH, at)
+}
+
+/// The pixel at device `[x, y]` of a frame `width` device pixels wide.
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // a pixel on the frame
-pub(crate) fn pixel(rgba: &[u8], [x, y]: [f32; 2]) -> [u8; 4] {
-    let at = (y as usize * WIDTH as usize + x as usize) * 4;
+pub(crate) fn pixel_in(rgba: &[u8], width: u32, [x, y]: [f32; 2]) -> [u8; 4] {
+    let at = (y as usize * width as usize + x as usize) * 4;
     rgba[at..at + 4].try_into().expect("four bytes")
 }
 
@@ -140,16 +161,16 @@ pub(crate) fn pixel(rgba: &[u8], [x, y]: [f32; 2]) -> [u8; 4] {
 /// fresh `Track` at the window's size: what the HUD's frame shows where
 /// no control covers it.
 pub(crate) fn track_alone(racer: &Racer, gpu: &Gpu) -> Vec<u8> {
+    track_alone_in(racer, gpu, WINDOW)
+}
+
+/// As [`track_alone`], in a window of device size `size`.
+pub(crate) fn track_alone_in(racer: &Racer, gpu: &Gpu, size: SurfaceSize) -> Vec<u8> {
     let scene = Rc::new(RefCell::new(racer.scene()));
-    let mut track = Track::new(scene, Rc::new(Cell::new(0)));
-    let size = SurfaceSize {
-        width: WIDTH,
-        height: HEIGHT,
-        scale: 1.0,
-    };
+    let mut track = Track::new(scene, Rc::new(TrackLog::default()));
     track.mount(&gpu.device).expect("mounts");
     track.resize(&gpu.device, size).expect("resizes");
-    let texture = clear(&gpu.device, &gpu.queue, WIDTH, HEIGHT, MAGENTA);
+    let texture = clear(&gpu.device, &gpu.queue, size.width, size.height, MAGENTA);
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
     let mut encoder = gpu
         .device
