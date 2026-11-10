@@ -11,6 +11,7 @@ use vapors_app::{ElementsApp, Invalidated, SurfaceHandle};
 use vapors_platform::{App, Event, Frame, Next, Platform, Waker};
 
 use super::script::script;
+use super::trace::Trace;
 
 /// What the script asks the app to do with the surface's handle.
 #[derive(Clone, Copy, Debug)]
@@ -28,6 +29,8 @@ pub struct Counts {
     /// Set by the script; the app takes it in `drawn`.
     ask: Mutex<Option<Ask>>,
     outcome: Mutex<Option<Result<String, String>>>,
+    /// What the app did each frame; printed with a failure.
+    trace: Mutex<Trace>,
 }
 
 impl Counts {
@@ -39,6 +42,7 @@ impl Counts {
             exit: AtomicBool::new(false),
             ask: Mutex::new(None),
             outcome: Mutex::new(None),
+            trace: Mutex::new(Trace::default()),
         })
     }
 
@@ -55,11 +59,20 @@ impl Counts {
     }
 
     /// Records a refusal unless a verdict is already there.
-    fn refuse(&self, why: String) {
+    fn refuse(&self, why: &str) {
+        let why = self.with_trace(why);
         self.outcome
             .lock()
             .expect("not poisoned")
             .get_or_insert(Err(why));
+    }
+
+    /// `why` followed by the per-frame trace.
+    fn with_trace(&self, why: &str) -> String {
+        let trace = self.trace.lock().expect("not poisoned").report();
+        format!(
+            "{why}\nper frame, from the first (a run of identical frames is one line):\n{trace}"
+        )
     }
 
     /// Leaves `ask` for the app and wakes the loop; refused when the
@@ -73,6 +86,7 @@ impl Counts {
 
     /// Keeps the first verdict: a refusal from the app stands.
     pub fn finish(&self, outcome: Result<String, String>, waker: &Waker) {
+        let outcome = outcome.map_err(|why| self.with_trace(&why));
         let _ = self
             .outcome
             .lock()
@@ -118,8 +132,13 @@ impl Checked {
     /// Does what the script asked, if anything.
     fn act_if_asked(&self) {
         let ask = self.counts.ask.lock().expect("not poisoned").take();
+        if let Some(ask) = ask {
+            let number = self.counts.frames.load(Ordering::SeqCst);
+            let mut trace = self.counts.trace.lock().expect("not poisoned");
+            trace.note(number, format!("the app acted on {ask:?}"));
+        }
         if let Err(why) = ask.map_or(Ok(()), |ask| self.act(ask)) {
-            self.counts.refuse(why);
+            self.counts.refuse(&why);
         }
     }
 
@@ -155,14 +174,19 @@ impl App for Checked {
         if !self.started {
             self.started = true;
             if let Err(why) = self.start_script() {
-                self.counts.refuse(why);
+                self.counts.refuse(&why);
                 return Next::Exit;
             }
         }
         if self.counts.exit.load(Ordering::SeqCst) {
             return Next::Exit;
         }
-        self.app.frame(frame)
+        let next = self.app.frame(frame);
+        let number = self.counts.frames.load(Ordering::SeqCst);
+        let (decision, states) = (self.app.last_decision(), self.app.surface_states());
+        let mut trace = self.counts.trace.lock().expect("not poisoned");
+        trace.frame(number, next, decision, &states);
+        next
     }
 
     fn drawn(&mut self, platform: &Platform) {
@@ -172,19 +196,5 @@ impl App for Checked {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_first_refusal_is_kept() {
-        // Given
-        let counts = Counts::new(Arc::new(AtomicU64::new(0)));
-
-        // When
-        counts.refuse("first".into());
-        counts.refuse("second".into());
-
-        // Then
-        assert_eq!(counts.outcome(), Err("first".into()));
-    }
-}
+#[path = "check_tests.rs"]
+mod tests;

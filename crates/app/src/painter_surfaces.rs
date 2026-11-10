@@ -14,8 +14,8 @@ use vapors_elements::Painted;
 use vapors_renderer::{ImagePipeline, Target};
 use vapors_scene::{Item, Rect, Run};
 
-use super::ScenePainter;
 use super::errors::{MountError, PaintError};
+use super::{ScenePainter, SurfaceState};
 use crate::surface::{SurfaceRenderer, SurfaceSize};
 
 #[path = "painter_surface_backing.rs"]
@@ -100,6 +100,12 @@ impl ScenePainter {
 }
 
 impl Surfaces {
+    /// Each surface's state, by name.
+    pub(super) fn states(&self) -> Vec<SurfaceState> {
+        let named = self.mounted.iter();
+        named.map(|(name, mounted)| mounted.state(name)).collect()
+    }
+
     /// Marks every surface unpainted, before a frame.
     pub(super) fn begin_frame(&mut self) {
         self.mounted.values_mut().for_each(Mounted::begin_frame);

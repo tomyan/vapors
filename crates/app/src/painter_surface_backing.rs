@@ -4,6 +4,7 @@
 
 use vapors_renderer::Target;
 
+use super::super::SurfaceState;
 use super::super::errors::Refusal;
 use super::scope::Scopes;
 use super::texture::Backing;
@@ -70,6 +71,17 @@ impl Mounted {
     pub(super) fn wants_frame(&self) -> bool {
         self.fresh
             || (self.backing.is_some() && (self.stale || self.animating || self.scopes.waiting()))
+    }
+
+    pub(super) fn state(&self, name: &str) -> SurfaceState {
+        SurfaceState {
+            name: name.to_owned(),
+            fresh: self.fresh,
+            stale: self.stale,
+            animating: self.animating,
+            backing: self.backing.is_some(),
+            waiting: self.scopes.waiting(),
+        }
     }
 
     pub(super) fn begin_frame(&mut self) {

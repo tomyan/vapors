@@ -2,10 +2,11 @@
 //! (docs/gpu-surface.md). A requested surface renders every frame and
 //! the app asks for the next until it is stopped, then waits; two
 //! animating surfaces render once each per frame, and one stopping
-//! leaves the other running; a request on a hidden surface asks for no
-//! frame and is kept until the surface is shown; a renderer mounted
-//! again under an animating name does not animate; a worker thread
-//! relays a request through a channel and a wake.
+//! leaves the other running; a request on an inactive surface (hidden,
+//! zero-sized, display: none, clipped) asks for no frame and is kept
+//! until it is shown; a renderer mounted again under an animating name
+//! does not animate; a worker thread relays a request through a channel
+//! and a wake.
 
 #[path = "support/surface.rs"]
 mod support;
@@ -22,12 +23,17 @@ use vapors_gpu_harness::{Gpu, gpu};
 use vapors_platform::{App, Event, Next, Platform};
 
 const PANELS: &str = ".track, .map { width: 16px; height: 16px; } \
-    .hidden { visibility: hidden; }";
+    .hidden { visibility: hidden; } .none { display: none; } \
+    .zero { width: 0; height: 0; } .clip { height: 0; overflow: hidden; }";
 
 /// An app showing 16 x 16 surfaces `track` and `map`, its document and
 /// its GPU.
 fn rig() -> (ElementsApp, Rc<RefCell<Document>>, Gpu) {
-    let elements = [(None, "gpu-surface", "track"), (None, "gpu-surface", "map")];
+    let elements = [
+        (None, "div", "panel"),
+        (Some(0), "gpu-surface", "track"),
+        (None, "gpu-surface", "map"),
+    ];
     let doc = Rc::new(RefCell::new(document(PANELS, &elements)));
     (ElementsApp::new(Rc::clone(&doc)), doc, gpu())
 }
@@ -87,31 +93,43 @@ fn gpu_two_animating_surfaces_render_once_per_frame_and_one_stopping_leaves_the_
     assert_eq!((renders(&track_log), renders(&map_log)), (3, 5));
 }
 
+/// How `track` becomes inactive: the classes of its panel and itself.
+const INACTIVE: [(&str, &str, &str); 4] = [
+    ("visibility hidden", "panel", "track hidden"),
+    ("zero size", "panel", "track zero"),
+    ("display none", "panel", "track none"),
+    ("wholly clipped", "panel clip", "track"),
+];
+
 #[test]
-fn gpu_an_animation_requested_on_a_hidden_surface_waits_until_it_is_shown() {
-    // Given: `track` hidden
-    let (mut app, doc, gpu) = rig();
-    let (track, log) = mount(&mut app, "track");
-    mount(&mut app, "map");
-    set_track_class(&doc, "track hidden");
-    frames(&mut app, &gpu, 1);
+fn gpu_an_animation_requested_on_an_inactive_surface_waits_until_it_is_shown() {
+    for (how, panel_class, track_class) in INACTIVE {
+        // Given: `track` inactive
+        let (mut app, doc, gpu) = rig();
+        let (track, log) = mount(&mut app, "track");
+        mount(&mut app, "map");
+        set_classes(&doc, panel_class, track_class);
+        frames(&mut app, &gpu, 1);
 
-    // When
-    track.request_animation().expect("mounted");
-    let hidden = frames(&mut app, &gpu, 2);
-    set_track_class(&doc, "track");
-    let shown = frames(&mut app, &gpu, 2);
+        // When
+        track.request_animation().expect("mounted");
+        let inactive = frames(&mut app, &gpu, 2);
+        set_classes(&doc, "panel", "track");
+        let shown = frames(&mut app, &gpu, 2);
 
-    // Then
-    assert_eq!(hidden, [Next::Wait; 2]);
-    assert_eq!(shown, [Next::Continue; 2]);
-    assert_eq!(renders(&log), 2);
+        // Then
+        assert_eq!(inactive, [Next::Wait; 2], "{how}");
+        assert_eq!(shown, [Next::Continue; 2], "{how}");
+        assert_eq!(renders(&log), 2, "{how}");
+    }
 }
 
-fn set_track_class(doc: &Rc<RefCell<Document>>, class: &str) {
+fn set_classes(doc: &Rc<RefCell<Document>>, panel_class: &str, track_class: &str) {
     let mut doc = doc.borrow_mut();
-    let track = doc.children(doc.body())[0];
-    doc.set_attribute(track, "class", class);
+    let panel = doc.children(doc.body())[0];
+    let track = doc.children(panel)[0];
+    doc.set_attribute(panel, "class", panel_class);
+    doc.set_attribute(track, "class", track_class);
 }
 
 #[test]

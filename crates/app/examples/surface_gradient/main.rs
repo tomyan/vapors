@@ -20,6 +20,7 @@ mod check;
 mod gradient;
 mod page;
 mod script;
+mod trace;
 
 use std::process::ExitCode;
 use std::sync::Arc;

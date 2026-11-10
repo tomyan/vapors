@@ -109,9 +109,10 @@ impl SurfaceHandle {
 
     /// Renders the surface on every frame that paints it, from the next,
     /// and wakes the loop for that frame; frames continue until
-    /// [`stop_animation`](Self::stop_animation). A surface not painted
-    /// (hidden, zero-sized, clipped out) asks for no frame and keeps the
-    /// request: it animates again once a frame paints it.
+    /// [`stop_animation`](Self::stop_animation). On a surface not painted
+    /// (hidden, zero-sized, clipped out) the request wakes one frame that
+    /// renders nothing, then asks for none; the request is kept, and the
+    /// surface animates again once a frame paints it.
     ///
     /// # Errors
     ///

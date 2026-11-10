@@ -85,13 +85,24 @@ active surface animates. When none does and nothing else wants a frame
 the app returns `Next::Wait`. `stop_animation()` refuses an unmounted
 surface (`NotMounted`) and does nothing once the loop has ended.
 
+`ElementsApp::next_after_frame` reads the painter's animating flag, which
+`bring_to` resyncs with the app's only while painting. A `stop_animation`
+between the paint and the end of the frame therefore costs one more
+frame, which renders nothing; `surface_gradient --check` allows for it
+(`renders + 2 >= frames`).
+
 A request on an inactive surface (hidden, zero-sized, `display: none`,
-wholly clipped) is kept, not refused: the surface asks for no frame
-while it is not painted, and animates again on the first frame that
-paints it, which the document change that shows it asks for. A tab can
+wholly clipped) is kept, not refused: the request wakes one frame that
+renders nothing, then the surface asks for no frame while it is not
+painted, and animates again on the first frame that paints it, which the
+document change that shows it asks for. A tab can
 hide an animating view and show it again without asking twice.
 Unmounting forgets the request; a renderer mounted again under the name
 does not animate until asked.
+
+`ElementsApp::surface_states()` and `last_decision()` report each surface's
+flags on the painter and why the last frame asked for another; a failing
+check prints them (`surface_gradient --check`).
 
 `SurfaceHandle` is `Rc` and not `Send`, like the document. A worker
 thread sends its request to the app's thread (a channel) and wakes the
