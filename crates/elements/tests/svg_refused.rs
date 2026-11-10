@@ -52,7 +52,7 @@ fn svg_attributes_outside_the_subset_are_refused_naming_the_fix() {
         (&[("fill", "none")][..], &["fill", "not in the icon subset"]),
         (
             &[("xmlns", "http://example.com")][..],
-            &["xmlns", "http://www.w3.org/2000/svg"],
+            &["xmlns", "is not the SVG namespace"],
         ),
     ] {
         // Given
@@ -85,9 +85,12 @@ fn css_the_svg_box_does_not_follow_is_refused() {
         ("height: 20px;", &["height", "attributes"]),
         ("min-width: 20px;", &["min-width", "attributes"]),
         ("max-height: 20px;", &["max-height", "attributes"]),
-        ("display: inline;", &["inline", "display: block"]),
-        ("padding: 10%;", &["padding", "px"]),
-        ("border-radius: 2px;", &["border-radius"]),
+        (
+            "display: inline;",
+            &["inline-block content", "display: block"],
+        ),
+        ("padding: 10%;", &["percentage or calc() padding"]),
+        ("border-radius: 2px;", &["border-radius", "rounded corners"]),
     ] {
         // Given
         let (mut doc, _) = icon(css, &[], &[]);

@@ -84,18 +84,23 @@ pub(crate) fn outside(
 /// The `viewBox`, `width` and `height`, and that the two agree.
 fn sizes(attributes: &BTreeMap<String, String>) -> Vec<String> {
     let view = attributes.get("viewBox").map(|text| (text, view_box(text)));
-    let mut found: Vec<String> = match view {
-        None => vec!["its viewBox attribute is required: four numbers, min-x min-y width height, such as viewBox=\"0 0 16 16\"".to_owned()],
-        Some((text, None)) => vec![format!("its viewBox {text:?} is not four numbers (min-x min-y width height, separated by spaces or one comma); write it as viewBox=\"0 0 16 16\"")],
-        Some((text, Some([.., w, h]))) if w <= 0.0 || h <= 0.0 => vec![format!("its viewBox {text:?} has a width or height not above 0, which draws nothing; give both above 0")],
-        Some(_) => Vec::new(),
-    };
+    let mut found: Vec<String> = view_box_reason(view).into_iter().collect();
     let size = ["width", "height"].map(|name| size(attributes, name));
     found.extend(size.iter().filter_map(|size| size.as_ref().err().cloned()));
     if let (Some((_, Some([.., vw, vh]))), [Ok(w), Ok(h)]) = (view, size) {
         found.extend(ratio([w, h], [vw, vh]));
     }
     found
+}
+
+/// Why the `viewBox` (its text and numbers, when given) is refused.
+fn view_box_reason(view: Option<(&String, Option<[f32; 4]>)>) -> Option<String> {
+    match view {
+        None => Some("its viewBox attribute is required: four numbers, min-x min-y width height, such as viewBox=\"0 0 16 16\"".to_owned()),
+        Some((text, None)) => Some(format!("its viewBox {text:?} is not four numbers (min-x min-y width height, separated by spaces or one comma); write it as viewBox=\"0 0 16 16\"")),
+        Some((text, Some([.., w, h]))) if w <= 0.0 || h <= 0.0 => Some(format!("its viewBox {text:?} has a width or height not above 0, which draws nothing; give both above 0")),
+        Some(_) => None,
+    }
 }
 
 fn size(attributes: &BTreeMap<String, String>, name: &str) -> Result<f32, String> {
@@ -144,12 +149,10 @@ fn namespace(attributes: &BTreeMap<String, String>) -> Option<String> {
 /// Children other than `path`s and whitespace, and no `path` at all.
 fn children(arena: &Arena, node: NodeId) -> Vec<String> {
     let kids = arena.children(node);
-    let mut found: Vec<String> = kids.iter().filter_map(|&child| match &arena.get(child, "svg_checks").kind {
-        Kind::Text(text) if text.trim().is_empty() => None,
-        Kind::Text(text) => Some(format!("holds the text {text:?}, and an icon holds <path> elements and whitespace only; remove the text, or name the icon with aria-label")),
-        Kind::Element(element) if element.tag == "path" => None,
-        Kind::Element(_) => Some(format!("holds {}, and an icon holds <path> elements and whitespace only; move it out of the svg", describe(arena, child))),
-    }).collect();
+    let mut found: Vec<String> = kids
+        .iter()
+        .filter_map(|&child| child_reason(arena, child))
+        .collect();
     if !kids
         .iter()
         .any(|&child| crate::svg::is(arena, child, "path"))
@@ -159,4 +162,19 @@ fn children(arena: &Arena, node: NodeId) -> Vec<String> {
         );
     }
     found
+}
+
+/// Why `child` of an svg is refused: anything but a `path` or whitespace.
+fn child_reason(arena: &Arena, child: NodeId) -> Option<String> {
+    match &arena.get(child, "svg_checks").kind {
+        Kind::Text(text) if text.trim().is_empty() => None,
+        Kind::Text(text) => Some(format!(
+            "holds the text {text:?}, and an icon holds <path> elements and whitespace only; remove the text, or name the icon with aria-label"
+        )),
+        Kind::Element(element) if element.tag == "path" => None,
+        Kind::Element(_) => Some(format!(
+            "holds {}, and an icon holds <path> elements and whitespace only; move it out of the svg",
+            describe(arena, child)
+        )),
+    }
 }
