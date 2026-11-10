@@ -74,19 +74,12 @@ fn updated(doc: &mut Document, viewport: Viewport) -> &Painted {
 
 fn settled(doc: &mut Document, viewport: Viewport) -> Snapshot {
     let nodes = doc.elements();
-    let styles = nodes
-        .iter()
-        .map(|n| doc.computed_style(*n).cloned())
-        .collect();
+    let styles = computed_styles(doc, &nodes);
     let focus = (doc.active_element(), doc.focus_visible());
-    let selections = nodes
-        .iter()
-        .filter_map(|n| doc.selection(*n).map(|s| (*n, s)))
-        .collect();
+    let selections = selections(doc, &nodes);
     let painted = updated(doc, viewport);
-    let boxes = nodes.iter().map(|n| (*n, painted.border_box(*n))).collect();
     Snapshot {
-        boxes,
+        boxes: border_boxes(painted, &nodes),
         styles,
         items: items(painted),
         clips: painted.scene().clips().to_vec(),
@@ -94,6 +87,24 @@ fn settled(doc: &mut Document, viewport: Viewport) -> Snapshot {
         focus,
         selections,
     }
+}
+
+fn computed_styles(doc: &Document, nodes: &[NodeId]) -> Vec<Option<ComputedStyle>> {
+    nodes
+        .iter()
+        .map(|n| doc.computed_style(*n).cloned())
+        .collect()
+}
+
+fn selections(doc: &Document, nodes: &[NodeId]) -> Vec<(NodeId, (usize, usize))> {
+    nodes
+        .iter()
+        .filter_map(|n| doc.selection(*n).map(|s| (*n, s)))
+        .collect()
+}
+
+fn border_boxes(painted: &Painted, nodes: &[NodeId]) -> Vec<(NodeId, Option<BoxRect>)> {
+    nodes.iter().map(|n| (*n, painted.border_box(*n))).collect()
 }
 
 fn hits(painted: &Painted, viewport: Viewport) -> Vec<(Option<NodeId>, Cursor)> {

@@ -3,8 +3,9 @@
 //! `support::rows_page` followed by one update whose structural
 //! counters are reported, and the result checked by the correctness
 //! oracle (`support::oracle`) against a full recomputation. Counts
-//! only: timings belong to the baseline in docs/plans/iu1.md. `cargo nextest run -p
-//! vapors-elements --test sparse_updates --no-capture` prints the table.
+//! only: timings belong to the baseline in docs/plans/iu1.md.
+//! `cargo nextest run -p vapors-elements --test sparse_updates
+//! --no-capture` prints the table.
 
 mod support;
 

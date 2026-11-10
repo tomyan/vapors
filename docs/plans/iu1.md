@@ -54,7 +54,7 @@ boxes painted, and paint records (scene items) rebuilt. Decision
 `#[non_exhaustive]` struct. Its doc says the counts describe the last
 update, are structural rather than timings, and when they reset; each
 field's doc says exactly what one count is. The existing three getters
-stay. It is listed in docs/design/incremental-contracts.md section f.
+stay. PR 2 lists it in docs/design/incremental-contracts.md section f.
 `sparse_updates.rs` reports them; IU3 then shows which counts its
 retained box tree removes.
 
