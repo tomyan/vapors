@@ -57,6 +57,7 @@ impl Document {
     /// the styles layout reads.
     pub fn update(&mut self, viewport: Viewport) -> Result<&Painted, Vec<ElementError>> {
         self.painted = None;
+        self.counts = crate::UpdateCounts::default();
         self.texts.begin();
         let calcs = self.styled(viewport)?;
         let (root, body) = (self.root(), self.body());
@@ -70,9 +71,10 @@ impl Document {
             text_marks,
         };
         let boxes = build(&source, root);
+        self.counts.boxes_built = boxes.len();
         let size = (viewport.width, viewport.height);
         let texts = (&mut self.fonts, &mut self.texts);
-        let (boxes, laid_out) = lay_out(
+        let (boxes, work) = lay_out(
             boxes,
             texts,
             (&self.boxes, &|node| kept.may_keep_layout(node)),
@@ -80,7 +82,10 @@ impl Document {
             size,
             &calcs,
         )
-        .map_err(|failure| vec![ElementError::Layout(failure)])?;
+        .map_err(|(failure, work)| {
+            (self.counts.boxes_laid_out, self.counts.layout_calls) = (work.laid_out, work.calls);
+            vec![ElementError::Layout(failure)]
+        })?;
         let scrolls = |index: usize| match boxes[index].content {
             crate::layout::Content::Element(node) => used[&node].scrolls(),
             crate::layout::Content::Text(_) => false,
@@ -102,7 +107,8 @@ impl Document {
         let mut painted = paint(&boxes, &rects, &mut input);
         painted.scroll_chains = crate::scroll_chains::Chains::of(&boxes, &scrolls);
         self.boxes.keep(boxes, viewport.scale);
-        self.laid_out = laid_out;
+        (self.counts.boxes_laid_out, self.counts.layout_calls) = (work.laid_out, work.calls);
+        self.counts.note_paint(&painted);
         // Cleared before the rehover: a hover it moves is a change this
         // update did not restyle, so the a11y tree refuses until the next.
         self.changes.since_update = false;
@@ -114,28 +120,6 @@ impl Document {
     /// and for what reads the last update (the a11y tree).
     pub(crate) fn note_change(&mut self) {
         self.changes = Changes::default();
-    }
-
-    /// How many elements the last update restyled: what the incremental
-    /// tests count, and what the `stress` demo shows.
-    #[must_use]
-    pub fn elements_restyled(&self) -> usize {
-        self.kept.as_ref().map_or(0, |kept| kept.restyled)
-    }
-
-    /// How many times the last update's layout laid a box out rather
-    /// than reading its cache: what the incremental tests count.
-    #[must_use]
-    pub fn boxes_laid_out(&self) -> usize {
-        self.laid_out
-    }
-
-    /// How many Parley layouts the last update built rather than kept
-    /// from the one before: what the incremental tests count, and what
-    /// the `stress` demo shows.
-    #[must_use]
-    pub fn text_layouts_built(&self) -> usize {
-        self.texts.built()
     }
 
     /// The last successful update's result, if the document has not
@@ -167,6 +151,7 @@ impl Document {
         let kept = self.kept.as_ref().expect("restyle keeps the styles");
         let mut calcs = Calcs::default();
         for &node in &live {
+            self.counts.elements_visited += 1;
             errors.extend(kept.refused.get(&node).into_iter().flatten().cloned());
             calcs.add(kept.styles.of(node), || describe(&self.arena, node));
             if kept.used.get(&node).is_some_and(|style| style.inline) {

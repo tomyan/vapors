@@ -93,6 +93,7 @@ mod thumb_order;
 mod tree;
 mod typing;
 mod update;
+mod update_counts;
 
 pub use a11y_drive::{Command, Held, Reply};
 pub use a11y_error::AxError;
@@ -110,3 +111,4 @@ pub use shortcuts::ShortcutModifier;
 pub use style::{ALL_CURSORS, Cursor};
 pub use text_bridge::{TextEdit, TextInput};
 pub use update::Viewport;
+pub use update_counts::UpdateCounts;
