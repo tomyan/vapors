@@ -77,7 +77,7 @@ impl fmt::Display for InvalidateError {
         match self {
             Self::NotMounted(name) => write!(
                 f,
-                "the gpu-surface {name:?} has no renderer mounted, so it was not invalidated; mount one with ElementsApp::mount and invalidate through its handle"
+                "the gpu-surface {name:?} has no renderer mounted, so the call did nothing; mount one with ElementsApp::mount and call through the handle it returns"
             ),
             Self::LoopClosed(name) => write!(
                 f,
