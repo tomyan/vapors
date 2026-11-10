@@ -16,6 +16,7 @@ pub struct ScenePainter {
     atlas: GlyphAtlas,
     images: ImagePipeline,
     textures: Textures,
+    surfaces: Surfaces,
 }
 
 impl ScenePainter {
@@ -43,6 +44,7 @@ impl ScenePainter {
             atlas,
             images: ImagePipeline::new(device, format),
             textures: Textures::default(),
+            surfaces: Surfaces::default(),
         })
     }
 
@@ -50,8 +52,8 @@ impl ScenePainter {
     ///
     /// # Errors
     ///
-    /// [`PaintError`] when a glyph cannot be drawn or a surface has no
-    /// renderer; the frame is then incomplete.
+    /// [`PaintError`] when a glyph or a `gpu-surface` cannot be drawn;
+    /// the frame is then incomplete.
     pub fn draw(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
         clear_view(target.device, target.queue, target.view, painted.canvas());
         self.paint(target, painted)
@@ -81,6 +83,7 @@ impl ScenePainter {
     fn paint(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
         self.atlas.begin_frame();
         self.textures.begin_frame();
+        self.surfaces.begin_frame();
         for batch in painted.scene().batches() {
             let Some(clipped) = clipped(target, batch.clip) else {
                 continue;
@@ -90,10 +93,13 @@ impl ScenePainter {
                 Run::Quads(quads) => self.quads.draw(&clipped, &quads),
                 Run::Texts(items) => self.draw_texts(&clipped, painted, items)?,
                 Run::Images(items) => self.textures.draw(&self.images, &clipped, painted, items),
-                Run::Surfaces(items) => return Err(unmounted(painted, items)),
+                Run::Surfaces(items) => {
+                    self.surfaces.draw(&self.images, &clipped, painted, items)?;
+                }
             }
         }
         self.textures.end_frame();
+        self.surfaces.end_frame();
         Ok(())
     }
 
@@ -166,8 +172,10 @@ mod images;
 use images::Textures;
 #[path = "painter_errors.rs"]
 mod errors;
-use errors::unmounted;
-pub use errors::{DrawOverError, PaintError, SUPPORTED, UnsupportedFormat};
+pub use errors::{DrawOverError, MountError, PaintError, SUPPORTED, UnsupportedFormat};
+#[path = "painter_surfaces.rs"]
+mod surfaces;
+use surfaces::Surfaces;
 
 #[cfg(test)]
 #[path = "painter_tests.rs"]

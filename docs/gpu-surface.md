@@ -10,8 +10,9 @@ needs no camera, depth or scene.
 
 | Slice | Content | Status |
 |---|---|---|
-| 1a | `gpu-surface` element, `Item::Surface` in the display list, the refusals; `ScenePainter` refuses a frame with a surface (`PaintError::Surface`) until 1b | this PR |
-| 1b | `SurfaceRenderer` and the painter's surface host: offscreen texture, resize, scale, clip, on-demand rendering, failures; a non-3D example | next |
+| 1a | `gpu-surface` element, `Item::Surface` in the display list, the refusals | #139 |
+| 1b | `SurfaceRenderer` and the painter's surface host: offscreen texture, resize, scale, clip, on-demand rendering, failures | this PR |
+| 1b2 | `ElementsApp` mounting and `Next` from `wants_frame`; a non-3D example (gradient) | next |
 | 1c | the racer's renderer mounted through the surface; two panels; surface-local input | after 1b |
 | 2-5 | scene, cameras, components, instances, tasks | not started |
 
@@ -50,7 +51,9 @@ were pushed.
 |---|---|
 | Ancestor `overflow: hidden` or `clip`, rectangular | Clipped: the composite draws under the run's scissor |
 | UI painted later (siblings, children, positioned elements) | Drawn over the surface |
-| Panel resize, device scale change | The backing texture is reallocated at the new device-pixel size (1b) |
+| Panel resize, device scale change | The backing texture is reallocated at the new device-pixel size |
+| Two surfaces, one name | Refused |
+| Backing over the device texture limit | Refused |
 | Rounded clip on an ancestor | Refused document-wide (`style/overflow.rs`) |
 | `border-radius` on the surface | Refused |
 | `opacity`, `transform`, filters | Refused document-wide (deferred properties) |
@@ -64,11 +67,43 @@ On an event whose target is the surface, `Event::offset` is from the
 content box's top-left in CSS pixels; multiply by the scale factor for
 backing pixels.
 
-## Renderer contract (1b, proposed)
+## Renderer contract
 
-To be written with 1b: shared device and queue, a command encoder vapors
-submits, mount/resize/render/teardown, `Rgba8Unorm` holding sRGB-encoded
-values with straight alpha (the format and convention `img` textures
-use), on-demand rendering with explicit invalidation and animation
-requests, and renderer failure and GPU loss reported, not substituted
-with blank output.
+`vapors_app::SurfaceRenderer`, mounted with `ScenePainter::mount(name,
+renderer)`; `unmount` hands it back and dropping it is teardown.
+
+- Device and queue are the application's, shared with the painter.
+- `mount(device)` once, on the first frame that paints the surface:
+  persistent resources.
+- `resize(device, size)` when the backing is allocated: first paint, a
+  change of device size or scale, and the first paint after the surface
+  was inactive. `SurfaceSize` gives device pixels and the scale;
+  `logical()` the CSS size.
+- `render(frame)` records into a vapors-owned `CommandEncoder`, which the
+  painter submits before compositing. It runs after a resize, after
+  `ScenePainter::invalidate(name)`, and every frame while `animating()`.
+  Other frames composite the last render: an idle surface renders
+  nothing.
+- `ScenePainter::wants_frame()` is true while an active surface is
+  invalidated or animating; the app returns `Next::Continue` then.
+- Backing: one texture per surface, `SURFACE_FORMAT` (`Rgba8Unorm`)
+  holding sRGB-encoded values with straight alpha, the `img`
+  convention; composited with alpha blending, unscaled (the backing is
+  the content box's device size), under the run's scissor. No tone
+  mapping or colour management is applied by the surface.
+- A surface not painted in a frame (hidden, zero-sized, `display:
+  none`, wholly clipped, or removed) is inactive: its backing is
+  released and it is not rendered.
+
+Refused, failing the frame (`PaintError`), each naming the surface:
+`Unmounted` (no renderer), `DuplicateName` (two surfaces with one name
+in a frame), `TooLarge` (backing over the device's
+`max_texture_dimension_2d`), `Renderer` (an error from `mount`,
+`resize` or `render`; the frame is never shown with stale or blank
+content). `ElementsApp` reports a failed frame and stops. `mount`,
+`unmount` and `invalidate` refuse a taken or unknown name
+(`MountError`).
+
+GPU loss is reported by the platform frame loop
+(`crates/platform/src/device_lost.rs`), which stops the app; surfaces
+rely on it and attempt no recovery.

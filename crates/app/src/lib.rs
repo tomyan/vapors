@@ -15,9 +15,13 @@ mod painter;
 mod pointer;
 #[cfg(test)]
 mod scroll_fixture;
+mod surface;
 mod touch_scroll;
 mod wheel_scroll;
 
 pub use document_input::{DocumentInput, Given, Route, Unplaced};
 pub use elements_app::{ElementsApp, Failure, FrameTimesHook, PerFrame};
-pub use painter::{DrawOverError, PaintError, SUPPORTED, ScenePainter, UnsupportedFormat};
+pub use painter::{
+    DrawOverError, MountError, PaintError, SUPPORTED, ScenePainter, UnsupportedFormat,
+};
+pub use surface::{SURFACE_FORMAT, SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};

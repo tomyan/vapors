@@ -1,11 +1,13 @@
 //! What the painter refuses: a target format its shaders do not write
-//! correctly, and, drawing over, a document whose canvas has a colour.
+//! correctly, drawing over, a document whose canvas has a colour, and a
+//! frame it cannot draw completely.
 
 use std::fmt;
 
-use vapors_elements::{CanvasFrom, Painted};
-use vapors_scene::Item;
+use vapors_elements::CanvasFrom;
 use vapors_text::AtlasError;
+
+use crate::surface::SurfaceError;
 
 /// The target formats [`ScenePainter`](super::ScenePainter) draws: 8-bit,
 /// not sRGB, as the platform's surfaces are.
@@ -63,10 +65,29 @@ pub enum PaintError {
     /// A glyph could not be rasterised, or a frame's glyphs do not fit
     /// the atlas page.
     Atlas(AtlasError),
-    /// A `gpu-surface`, by name, that the painter cannot draw: no
-    /// surface is drawn before the surface host (docs/gpu-surface.md,
-    /// slice 1b).
-    Surface(String),
+    /// A `gpu-surface`, by name, with no renderer mounted.
+    Unmounted(String),
+    /// Two `gpu-surface`s in one frame share this name.
+    DuplicateName(String),
+    /// A surface's backing would be larger than the device's largest 2D
+    /// texture.
+    TooLarge {
+        /// The surface's name.
+        surface: String,
+        /// The backing's width in device pixels.
+        width: u32,
+        /// The backing's height in device pixels.
+        height: u32,
+        /// The device's `max_texture_dimension_2d`.
+        limit: u32,
+    },
+    /// A surface's renderer failed in `mount`, `resize` or `render`.
+    Renderer {
+        /// The surface's name.
+        surface: String,
+        /// What the renderer reported.
+        error: SurfaceError,
+    },
 }
 
 impl From<AtlasError> for PaintError {
@@ -77,23 +98,13 @@ impl From<AtlasError> for PaintError {
 
 impl fmt::Display for PaintError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Atlas(error) => error.fmt(f),
-            Self::Surface(name) => write!(
-                f,
-                "the gpu-surface {name:?} cannot be drawn: ScenePainter draws no surface until the surface host lands (docs/gpu-surface.md, slice 1b); remove the gpu-surface for now"
-            ),
-        }
+        surface_errors::describe(self, f)
     }
 }
 
 impl std::error::Error for PaintError {}
 
-/// The refusal of the first surface among `items`.
-pub(super) fn unmounted(painted: &Painted, items: &[Item]) -> PaintError {
-    let name = items.iter().find_map(|item| match item {
-        Item::Surface { surface, .. } => Some(painted.surface(*surface).to_owned()),
-        _ => None,
-    });
-    PaintError::Surface(name.expect("a surface run holds surfaces"))
-}
+#[path = "painter_surface_errors.rs"]
+mod surface_errors;
+pub use surface_errors::MountError;
+pub(crate) use surface_errors::Refusal;
