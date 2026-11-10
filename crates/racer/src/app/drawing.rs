@@ -68,7 +68,7 @@ impl Racer {
         self.advance(frame)?;
         let viewport = self.viewport(frame);
         self.sync_hud(viewport);
-        self.document.borrow_mut().take_changed();
+        self.hud_changed = self.document.borrow_mut().take_changed();
         let moving = !self.run.paused || self.run.camera.moving;
         self.track
             .show(self.scene(), moving)

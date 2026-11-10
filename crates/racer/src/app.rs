@@ -22,6 +22,12 @@ pub(crate) struct Racer {
     pub(super) faults: Faults,
     /// A frame has been drawn: the document has been laid out.
     pub(super) framed: bool,
+    /// The last `prepare`'s HUD writes noted a document change, which
+    /// it takes so they ask for no next frame.
+    // RELAXED: read only by the IU5 tests (gpu_hud_iu5_tests.rs) until
+    // the inspector reports it.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(super) hud_changed: bool,
     pub(super) inspect: bool,
 }
 impl Racer {
@@ -39,6 +45,7 @@ impl Racer {
             pacing: Pacing::default(),
             faults: Faults::default(),
             framed: false,
+            hud_changed: false,
             inspect: vapors_platform::query_parameter("inspect").as_deref() == Some("1"),
         }
     }
