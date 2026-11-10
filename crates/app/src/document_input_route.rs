@@ -107,7 +107,7 @@ impl DocumentInput {
         };
         if let Action::Move(point) = action {
             // The press after it is routed where the pointer now is.
-            self.pointer = point;
+            self.pointer = Some(point);
         }
         let by_hit = |point| match document.hit(point) {
             Some(_) => Route::Document,

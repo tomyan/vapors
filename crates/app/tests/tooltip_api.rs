@@ -50,3 +50,20 @@ fn a_host_gets_the_pointers_tooltip_by_its_public_types() {
         ("Open (o)", TooltipTrigger::Pointer)
     );
 }
+
+#[test]
+fn the_pointer_position_is_unknown_until_the_pointer_moves() {
+    // Given
+    let doc = page();
+    let mut input = DocumentInput::new();
+    let before = input.pointer();
+
+    // When
+    let moved = Event::PointerMoved { x: 12.0, y: 7.0 };
+    input
+        .give(&doc, &moved, &Platform::detached())
+        .expect("placed");
+
+    // Then
+    assert_eq!((before, input.pointer()), (None, Some([12.0, 7.0])));
+}

@@ -62,7 +62,7 @@ fn icon_draw(icon: &vapors_text::Icon, rect: Rect, colour: vapors_scene::Color) 
     }
 }
 
-fn text_target<'a>(target: &Target<'a>) -> RenderTarget<'a> {
+pub(super) fn text_target<'a>(target: &Target<'a>) -> RenderTarget<'a> {
     RenderTarget {
         device: target.device,
         queue: target.queue,

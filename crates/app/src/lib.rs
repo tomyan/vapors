@@ -19,8 +19,11 @@ mod pointer;
 mod scroll_fixture;
 mod surface;
 mod tooltip;
+mod tooltip_box;
+mod tooltip_error;
 mod tooltip_place;
 mod tooltip_place_check;
+mod tooltip_style;
 mod touch_scroll;
 mod wheel_scroll;
 
@@ -35,6 +38,7 @@ pub use painter::{
 };
 pub use surface::{SURFACE_FORMAT, SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
 pub use tooltip::{TOOLTIP_DELAY, Tooltip, TooltipTrigger};
+pub use tooltip_error::TooltipError;
 pub use tooltip_place::{
     Anchor, CURSOR_OFFSET_X, CURSOR_OFFSET_Y, KEYBOARD_GAP, PlacementError, PlacementField, Point,
     place_tooltip,

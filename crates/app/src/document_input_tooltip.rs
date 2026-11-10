@@ -7,7 +7,7 @@
 //! the tooltip shown ([`DocumentInput::tooltip`]) and for when to wake
 //! ([`DocumentInput::tooltip_deadline`]).
 
-use vapors_elements::Document;
+use vapors_elements::{Document, Point};
 use vapors_platform::{Event, Instant};
 
 use super::DocumentInput;
@@ -51,6 +51,14 @@ impl DocumentInput {
         self.tooltip.deadline()
     }
 
+    /// Where the pointer last moved, in CSS pixels: a pointer tooltip's
+    /// hotspot ([`crate::ScenePainter::draw_tooltip`]). `None` before
+    /// the first move, as the position is then unknown.
+    #[must_use]
+    pub fn pointer(&self) -> Option<Point> {
+        self.pointer
+    }
+
     /// `event`, its pointer `action` if it has one, as the tooltip sees
     /// it, after the document had it.
     pub(super) fn tooltip_event(
@@ -83,7 +91,7 @@ impl DocumentInput {
     }
 
     fn pointer_title(&self, document: &Document) -> Option<Titled> {
-        title_at(document, self.pointer)
+        title_at(document, self.pointer?)
     }
 
     /// The keyboard tooltip's element still has focus, its title and a

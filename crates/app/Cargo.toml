@@ -21,6 +21,7 @@ wgpu.workspace = true
 vapors-scene.workspace = true
 vapors-renderer.workspace = true
 vapors-text.workspace = true
+vapors-css.workspace = true
 vapors-dom.workspace = true
 vapors-platform.workspace = true
 vapors-elements.workspace = true
