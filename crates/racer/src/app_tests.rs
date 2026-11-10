@@ -167,6 +167,9 @@ fn inspection_status_is_one_json_object() {
     // When
     let status = racer.status(7).unwrap();
     // Then
-    assert!(status.starts_with("{\"frame\":7,\"paused\":true,\"speed\":0,"), "{status}");
+    assert!(
+        status.starts_with("{\"frame\":7,\"paused\":true,\"speed\":0,"),
+        "{status}"
+    );
     assert!(status.ends_with(",\"targets\":{}}"), "{status}");
 }

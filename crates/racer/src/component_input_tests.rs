@@ -66,3 +66,29 @@ fn pause_resets_held_component_state_before_resuming() {
     assert!(!racer.hud.gas.get());
     assert_eq!(racer.driving.controls().throttle, 0.0);
 }
+
+fn space() -> vapors_platform::Event {
+    vapors_platform::Event::Key {
+        key: " ".into(),
+        code: "Space".into(),
+        pressed: true,
+        repeat: false,
+        modifiers: vapors_platform::Modifiers::default(),
+    }
+}
+
+#[test]
+fn space_pauses_after_a_click_on_gas() {
+    // Given
+    let mut racer = mounted();
+    racer.command("toggle").unwrap();
+    let gas = centre(&racer, "gas");
+    Document::pointer_pressed(&racer.document, gas);
+    Document::pointer_released(&racer.document, gas);
+    let focused = racer.document.borrow().active_element();
+    assert_eq!(focused, None, "a click on a HoldButton leaves focus off it");
+    // When: nothing focused uses Space, so the host has it
+    racer.routed_key(&space(), vapors_app::Route::Host).unwrap();
+    // Then
+    assert!(racer.paused);
+}

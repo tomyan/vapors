@@ -77,7 +77,10 @@ impl Racer {
                 .find_map(|attribute| document.attribute(node, attribute));
             let rect = document.painted().and_then(|p| p.border_box(node));
             if let (Some(name), Some(rect)) = (name, rect) {
-                targets.plain(name, rect_json(name, [rect.x, rect.y, rect.width, rect.height])?);
+                targets.plain(
+                    name,
+                    rect_json(name, [rect.x, rect.y, rect.width, rect.height])?,
+                );
             }
         }
         Ok(targets)
