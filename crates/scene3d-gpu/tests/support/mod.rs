@@ -5,7 +5,9 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use vapors_app::{SURFACE_FORMAT, SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
+use vapors_app::{
+    GpuWork, SURFACE_FORMAT, SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize, WorkCounter,
+};
 use vapors_gpu_harness::{Gpu, read_rgba8};
 use vapors_scene3d::{
     CameraHandle, Colour, GeometryId, Meshes, NodeId, NodeKind, Projection, Scene, Transform, Vec3,
@@ -95,6 +97,15 @@ impl Fixture {
 
 /// One render into a fresh backing, read back as RGBA rows from the top.
 pub fn render(renderer: &mut SceneRenderer, gpu: &Gpu) -> Result<Vec<u8>, SurfaceError> {
+    Ok(render_counted(renderer, gpu)?.0)
+}
+
+/// As [`render`], with the work the renderer issued through
+/// `SurfaceFrame::work`.
+pub fn render_counted(
+    renderer: &mut SceneRenderer,
+    gpu: &Gpu,
+) -> Result<(Vec<u8>, GpuWork), SurfaceError> {
     let texture = gpu.device.create_texture(&wgpu::TextureDescriptor {
         label: Some("scene3d test backing"),
         size: wgpu::Extent3d {
@@ -113,15 +124,17 @@ pub fn render(renderer: &mut SceneRenderer, gpu: &Gpu) -> Result<Vec<u8>, Surfac
     let mut encoder = gpu
         .device
         .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+    let work = WorkCounter::default();
     renderer.render(SurfaceFrame {
         device: &gpu.device,
         queue: &gpu.queue,
         encoder: &mut encoder,
         view: &view,
         size: SIZE,
+        work: &work,
     })?;
     gpu.queue.submit([encoder.finish()]);
-    Ok(read_rgba8(&gpu.device, &gpu.queue, &texture))
+    Ok((read_rgba8(&gpu.device, &gpu.queue, &texture), work.take()))
 }
 
 /// The centre of the pixels exactly `rgba`, in backing pixels from the

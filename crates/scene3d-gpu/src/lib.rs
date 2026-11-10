@@ -13,7 +13,9 @@
 //! and draws every mesh node through that one view-projection,
 //! depth-tested. The backing is cleared to transparent first, so the
 //! page shows where no mesh draws. A removed mesh node's uniform slot
-//! is reused by the next one added.
+//! is reused by the next one added. Every upload, uniform write and draw
+//! goes through `SurfaceFrame::work`, so the painter's `FrameCounts`
+//! holds them under `surfaces`.
 
 mod camera;
 mod depth;

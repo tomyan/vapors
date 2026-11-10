@@ -2,7 +2,7 @@
 //! into (`painter_surface_texture.rs`), and whether the next paint must
 //! render it.
 
-use vapors_renderer::Target;
+use vapors_renderer::{Target, WorkCounter};
 
 use super::super::SurfaceState;
 use super::super::errors::Refusal;
@@ -103,13 +103,14 @@ impl Mounted {
         target: &Target<'_>,
         size: SurfaceSize,
         turn: Turn<'_>,
+        work: &WorkCounter,
     ) -> Result<&wgpu::Texture, Refusal> {
         self.claim(target.device, size, turn)?;
         self.seen = Seen::Painted;
         self.start(target.device, turn)?;
         self.allocate(target.device, size, turn)?;
         if self.stale || self.animating {
-            self.render(target, turn)?;
+            self.render(target, turn, work)?;
         }
         Ok(&self.backing.as_ref().expect("allocated above").texture)
     }
@@ -158,12 +159,17 @@ impl Mounted {
         Ok(())
     }
 
-    /// Renders into the backing and submits it.
-    fn render(&mut self, target: &Target<'_>, turn: Turn<'_>) -> Result<(), Refusal> {
+    /// Renders into the backing, counting through `work`, and submits it.
+    fn render(
+        &mut self,
+        target: &Target<'_>,
+        turn: Turn<'_>,
+        work: &WorkCounter,
+    ) -> Result<(), Refusal> {
         let backing = self.backing.as_ref().expect("allocated before rendering");
         let renderer = &mut self.renderer;
         self.scopes.run(target.device, turn, || {
-            render_into(renderer, target, backing)
+            render_into(renderer, target, backing, work)
         })?;
         self.stale = false;
         Ok(())
@@ -179,6 +185,7 @@ fn render_into(
     renderer: &mut Box<dyn SurfaceRenderer>,
     target: &Target<'_>,
     backing: &Backing,
+    work: &WorkCounter,
 ) -> Result<(), SurfaceError> {
     let mut encoder = target.device.create_command_encoder(&ENCODER);
     renderer.render(SurfaceFrame {
@@ -187,6 +194,7 @@ fn render_into(
         encoder: &mut encoder,
         view: &backing.view,
         size: backing.size,
+        work,
     })?;
     target.queue.submit([encoder.finish()]);
     Ok(())

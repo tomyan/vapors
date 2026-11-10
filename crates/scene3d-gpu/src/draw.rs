@@ -2,6 +2,7 @@
 
 use crate::FrameError;
 use crate::geometry::Uploaded;
+use vapors_app::WorkCounter;
 use vapors_scene3d::{Colour, GeometryId, Meshes, NodeId, NodeKind, Scene};
 
 /// A mesh node to draw.
@@ -49,6 +50,8 @@ pub(crate) struct Pass<'a> {
     pub(crate) slots: &'a wgpu::BindGroup,
     pub(crate) colour: &'a wgpu::TextureView,
     pub(crate) depth: &'a wgpu::TextureView,
+    /// Counts each draw.
+    pub(crate) work: &'a WorkCounter,
 }
 
 /// Clears the backing to transparent and the depth to far, then draws
@@ -65,7 +68,8 @@ pub(crate) fn record(
         render.set_bind_group(1, pass.slots, &[*offset]);
         render.set_vertex_buffer(0, geometry.vertices.slice(..));
         render.set_index_buffer(geometry.indices.slice(..), wgpu::IndexFormat::Uint32);
-        render.draw_indexed(0..geometry.index_count, 0, 0..1);
+        let indices = 0..geometry.index_count;
+        pass.work.draw_indexed(&mut render, indices, 0, 0..1);
     }
 }
 

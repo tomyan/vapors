@@ -6,6 +6,7 @@
 use crate::FrameError;
 use crate::pipeline::{MESH_BYTES, Pipeline};
 use crate::slot_table::{SlotTable, capacity_for};
+use vapors_app::SurfaceFrame;
 use vapors_scene3d::{Colour, Mat4, NodeId};
 
 /// Slots the first buffer holds; a full one is replaced by one holding
@@ -70,10 +71,11 @@ impl Slots {
     }
 
     /// Writes `node`'s slot with `world`, at world version `version`,
-    /// and `colour`; `node` has a slot from [`Slots::assign`].
+    /// and `colour`, through `frame.work`; `node` has a slot from
+    /// [`Slots::assign`].
     pub(crate) fn write(
         &mut self,
-        queue: &wgpu::Queue,
+        frame: &SurfaceFrame<'_>,
         node: NodeId,
         version: u64,
         world: Mat4,
@@ -85,7 +87,10 @@ impl Slots {
             .expect("every mesh node is assigned a slot before it is written");
         let floats = world.to_cols_array().into_iter().chain(colour.rgba());
         let bytes: Vec<u8> = floats.flat_map(f32::to_le_bytes).collect();
-        queue.write_buffer(&self.buffer, u64::from(index * self.stride), &bytes);
+        let offset = u64::from(index * self.stride);
+        frame
+            .work
+            .write_buffer(frame.queue, &self.buffer, offset, &bytes);
     }
 
     pub(crate) fn bind_group(&self) -> &wgpu::BindGroup {

@@ -44,4 +44,4 @@ pub use tooltip_place::{
     place_tooltip,
 };
 pub use tooltip_style::check_tooltip_style;
-pub use vapors_renderer::GpuWork;
+pub use vapors_renderer::{GpuWork, WorkCounter};
