@@ -1,0 +1,50 @@
+//! The `title` attribute in the a11y tree, as Chromium's has it (pinned
+//! by the corpus's `titles.events`): the name of a node nothing else
+//! names, its whitespace runs collapsed to one space and not trimmed;
+//! else the description, collapsed and trimmed, unless the content of
+//! the `aria-describedby` ids found describes it. A title of only
+//! whitespace is none.
+
+use vapors_dom::NodeId;
+
+use crate::a11y_roles::Ids;
+use crate::document::Document;
+
+impl Document {
+    /// `node`'s name from its `title`; empty for none.
+    pub(crate) fn ax_title_name(&self, node: NodeId) -> String {
+        self.attribute(node, "title")
+            .map_or_else(String::new, collapsed)
+    }
+
+    /// `node`'s accessible description; `None` for none.
+    pub(crate) fn ax_description(&self, node: NodeId, role: &str, ids: &Ids) -> Option<String> {
+        let described = self.ax_referenced(node, "aria-describedby", ids);
+        if !described.is_empty() {
+            return Some(described);
+        }
+        if self.ax_name_before_title(node, role, ids).is_empty() {
+            return None;
+        }
+        let title = self.ax_title_name(node);
+        Some(title.trim().to_owned()).filter(|title| !title.is_empty())
+    }
+}
+
+/// `text` with each run of whitespace one space, or empty when it is
+/// only whitespace.
+fn collapsed(text: &str) -> String {
+    if text.trim_ascii().is_empty() {
+        return String::new();
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut after_space = false;
+    for c in text.chars() {
+        let space = c.is_ascii_whitespace();
+        if !(space && after_space) {
+            out.push(if space { ' ' } else { c });
+        }
+        after_space = space;
+    }
+    out
+}

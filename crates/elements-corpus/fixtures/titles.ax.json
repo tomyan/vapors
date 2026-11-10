@@ -1,0 +1,208 @@
+{
+  "tree": [
+    {
+      "depth": 0,
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "RootWebArea"
+    },
+    {
+      "depth": 1,
+      "description": "Open (o)",
+      "name": "Open",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Open",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "name": "Undo (Ctrl+Z)",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 1,
+      "description": "Redo (Ctrl+Shift+Z)",
+      "name": "Redo",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "R",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "name": "Blank",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Blank",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "name": " Spaced out ",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 1,
+      "description": "By title",
+      "name": "Labelled",
+      "properties": [
+        "focusable=true",
+        "invalid=false",
+        "labelledby=generic \"\""
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "B",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "generic"
+    },
+    {
+      "depth": 2,
+      "name": "Labelled",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "role": "generic"
+    },
+    {
+      "depth": 2,
+      "name": "Hint text",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "description": "Hint text",
+      "name": "Hinted",
+      "properties": [
+        "describedby=generic \"\"",
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Hinted",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "description": "Falls back",
+      "name": "Nohint",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Nohint",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "name": "Level",
+      "properties": [
+        "focusable=true",
+        "orientation=horizontal",
+        "settable=true",
+        "valuemax=100",
+        "valuemin=0",
+        "valuetext="
+      ],
+      "role": "slider",
+      "value": "5"
+    },
+    {
+      "depth": 1,
+      "description": "Export (e)",
+      "name": "Export",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Export",
+      "role": "image"
+    },
+    {
+      "depth": 1,
+      "name": "WS",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "WS",
+      "role": "StaticText"
+    },
+    {
+      "depth": 1,
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 1,
+      "description": "a b",
+      "name": "Desc",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Desc",
+      "role": "StaticText"
+    }
+  ],
+  "viewport": [
+    640,
+    400
+  ]
+}

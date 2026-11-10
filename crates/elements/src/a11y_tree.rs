@@ -27,6 +27,8 @@ pub struct AxElement {
     pub name: String,
     /// Its value, for a control that shows one, when not empty.
     pub value: Option<String>,
+    /// Its accessible description (`a11y_title.rs`), when not empty.
+    pub description: Option<String>,
     /// Its states.
     pub states: AxStates,
     /// Its border box in CSS pixels, as the last update placed it.
@@ -133,6 +135,7 @@ impl Document {
         Ok(Some(AxElement {
             node,
             value: self.ax_value(node, &role),
+            description: self.ax_description(node, &role, ids),
             states: self.ax_states(node),
             bounds,
             children: self.ax_under(node, painted, ids)?,

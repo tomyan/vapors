@@ -1,7 +1,7 @@
 //! The a11y tree flattened as the events oracle compares it with
 //! Chromium's (the corpus's `ax_projection`): each node with one of the
-//! asked roles, in document order, with its name, its value and its
-//! states as Chromium writes them, and `activedescendant` and
+//! asked roles, in document order, with its name, its value, its
+//! description and its states as Chromium writes them, and `activedescendant` and
 //! `controls` as the related node's role and name (left out when that
 //! node is not in the tree, as Chromium leaves it out).
 
@@ -23,6 +23,8 @@ pub struct AxNode {
     pub name: String,
     /// Its value, when it shows one that is not empty.
     pub value: Option<String>,
+    /// Its accessible description, when not empty.
+    pub description: Option<String>,
     /// Its properties as `name=value`, sorted.
     pub properties: Vec<String>,
 }
@@ -105,6 +107,7 @@ impl Document {
             role: chromium_role(&element.role).to_owned(),
             name: element.name.clone(),
             value: element.value.clone(),
+            description: element.description.clone(),
             properties,
         }
     }
