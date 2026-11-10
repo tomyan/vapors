@@ -1,5 +1,6 @@
 //! A renderer whose pipeline targets `Bgra8Unorm`, so drawing with it
-//! into the `Rgba8Unorm` backing is a GPU validation error.
+//! into the `Rgba8Unorm` backing is a GPU validation error. It draws
+//! with it once; later renders record nothing.
 
 use vapors_app::{SurfaceError, SurfaceFrame, SurfaceRenderer};
 
@@ -11,6 +12,7 @@ const SHADER: &str = "
 #[derive(Default)]
 pub struct Misfit {
     pipeline: Option<wgpu::RenderPipeline>,
+    drawn: bool,
 }
 
 impl SurfaceRenderer for Misfit {
@@ -21,6 +23,9 @@ impl SurfaceRenderer for Misfit {
 
     fn render(&mut self, frame: SurfaceFrame<'_>) -> Result<(), SurfaceError> {
         let pipeline = self.pipeline.as_ref().ok_or("render before mount")?;
+        if std::mem::replace(&mut self.drawn, true) {
+            return Ok(());
+        }
         let mut pass = frame
             .encoder
             .begin_render_pass(&wgpu::RenderPassDescriptor {

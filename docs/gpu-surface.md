@@ -109,9 +109,14 @@ in a frame), `TooLarge` (backing over the device's
 `max_texture_dimension_2d`), `Renderer` (an error from `mount`,
 `resize` or `render`, or a GPU validation error made in one, caught by
 an error scope around each call, `render`'s around its submit too; the
-frame is never shown with stale or blank content). Native wgpu resolves
-the scope in the frame; on the web it resolves later, and the
-surface's next frame is refused instead. A wholly clipped surface is refused for `Unmounted`,
+frame is never shown with stale or blank content). After a caught GPU
+error every frame of that surface is refused until it is remounted.
+Native wgpu resolves the scope in the frame; on the web it resolves
+later, and a frame of the surface within 10 of its frames is refused
+instead; a scope unresolved after 10 frames refuses the surface as
+such. An active surface with an unresolved scope wants a frame. A scope
+still unresolved at `unmount` is dropped unreported: the renderer is
+gone and nothing it drew is shown again. A wholly clipped surface is refused for `Unmounted`,
 `DuplicateName` and `TooLarge` as one in view is, though it is not
 rendered, so scrolling a surface into view cannot be the first time it
 fails. `ElementsApp` reports a failed frame and stops. `mount`,

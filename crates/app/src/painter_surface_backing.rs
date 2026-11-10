@@ -63,7 +63,9 @@ impl Mounted {
     }
 
     pub(super) fn wants_frame(&self) -> bool {
-        self.fresh || (self.backing.is_some() && (self.stale || self.renderer.animating()))
+        self.fresh
+            || (self.backing.is_some()
+                && (self.stale || self.renderer.animating() || self.scopes.waiting()))
     }
 
     pub(super) fn begin_frame(&mut self) {
@@ -85,7 +87,6 @@ impl Mounted {
     ) -> Result<&wgpu::Texture, Refusal> {
         self.claim(target.device, size)?;
         self.seen = Seen::Painted;
-        self.scopes.check()?;
         self.start(target.device)?;
         self.allocate(target.device, size)?;
         if self.stale || self.renderer.animating() {
@@ -105,6 +106,7 @@ impl Mounted {
         if std::mem::replace(&mut self.seen, Seen::Claimed) != Seen::Unseen {
             return Err(Refusal::DuplicateName);
         }
+        self.scopes.check()?;
         fits(device, size)
     }
 

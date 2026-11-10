@@ -72,9 +72,13 @@ pub struct SurfaceFrame<'a> {
 ///
 /// A GPU validation error made in `mount`, `resize` or `render` (the
 /// encoder is submitted inside the same error scope) is refused as the
-/// renderer's failure, naming the surface. Native wgpu reports it in the
-/// frame that made it; the web reports it later, and the surface's next
-/// frame is refused instead.
+/// renderer's failure, naming the surface, and every later frame of the
+/// surface is refused until it is remounted. Native wgpu reports it in
+/// the frame that made it; the web reports it later, and a frame of the
+/// surface within 10 frames is refused instead (a scope unresolved
+/// after 10 is refused as such). A scope still unresolved when the
+/// renderer is unmounted is dropped unreported: the renderer is gone and
+/// nothing it drew is shown again.
 pub trait SurfaceRenderer {
     /// Creates persistent resources (pipelines, buffers) on the shared
     /// device.

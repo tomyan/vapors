@@ -130,7 +130,7 @@ fn gpu_a_mounted_surface_clipped_out_of_view_is_not_rendered_and_holds_no_backin
 }
 
 #[test]
-fn gpu_a_renderer_gpu_validation_error_refuses_the_frame_naming_the_surface() {
+fn gpu_a_renderer_gpu_validation_error_refuses_its_frames_until_remounted() {
     // Given
     let mut doc = document(
         ".track { width: 8px; height: 8px; }",
@@ -151,6 +151,11 @@ fn gpu_a_renderer_gpu_validation_error_refuses_the_frame_naming_the_surface() {
         "{refused:?}"
     );
     assert!(refused.to_string().contains("Bgra8Unorm"), "{refused}");
+    rig.draw(&doc).expect_err("refused until remounted");
+    rig.painter.unmount("track").expect("mounted");
+    let solid = Box::new(Solid::new(RED).0);
+    rig.painter.mount("track", solid).expect("mounts");
+    rig.draw(&doc).expect("a remounted renderer draws");
 }
 
 #[test]
