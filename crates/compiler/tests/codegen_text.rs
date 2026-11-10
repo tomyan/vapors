@@ -35,7 +35,7 @@ fn an_expression_hole_gets_its_own_text_node_and_effect() {
         "let count_text2 = dom.borrow_mut().create_text(\"\");",
     );
     assert_has(&code, "let shown = &(count.get());");
-    assert_has(&code, "set_text(count_text2, &value);");
+    assert_has(&code, "set_text_if_changed(count_text2, &value);");
     assert_has(&code, "create_text(\" \")");
     assert_eq!(code.matches("Effect::new(").count(), 1, "{code}");
 }

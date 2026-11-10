@@ -83,4 +83,37 @@ pub trait Dom: Listeners {
     /// tree that refuses listeners for events it never fires takes
     /// listeners for these.
     fn declare_events(&mut self, names: &[&str]);
+    /// A text node's text; `None` for an element.
+    fn current_text(&self, node: NodeId) -> Option<&str>;
+    /// An element's attribute; `None` when it has none of that name or
+    /// `node` is a text node.
+    fn current_attribute(&self, node: NodeId, name: &str) -> Option<&str>;
+    /// An element's property as it stands now, including what the
+    /// person's own edits wrote (a typed `value`, a toggled `checked`);
+    /// `None` when it has none of that name or `node` is a text node.
+    fn current_property(&self, node: NodeId, name: &str) -> Option<&PropertyValue>;
+
+    /// [`Dom::set_text`] unless the node already holds `text`. The
+    /// bindings the compiler generates call this, so an equal signal
+    /// write changes nothing; a direct `set_text` always writes.
+    fn set_text_if_changed(&mut self, node: NodeId, text: &str) {
+        if self.current_text(node) != Some(text) {
+            self.set_text(node, text);
+        }
+    }
+    /// [`Dom::set_attribute`] unless the element already holds `value`
+    /// under `name`; called by the generated bindings.
+    fn set_attribute_if_changed(&mut self, node: NodeId, name: &str, value: &str) {
+        if self.current_attribute(node, name) != Some(value) {
+            self.set_attribute(node, name, value);
+        }
+    }
+    /// [`Dom::set_property`] unless the element's current property
+    /// equals `value` by `PartialEq` (so a NaN number is always
+    /// written); called by the generated bindings.
+    fn set_property_if_changed(&mut self, node: NodeId, name: &str, value: PropertyValue) {
+        if self.current_property(node, name) != Some(&value) {
+            self.set_property(node, name, value);
+        }
+    }
 }

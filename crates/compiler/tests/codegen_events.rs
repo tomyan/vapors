@@ -76,9 +76,12 @@ fn dynamic_attributes_are_patched_in_effects() {
     );
 
     // Then
-    assert_has(&code, "set_attribute(div0, \"class\", &value)");
+    assert_has(&code, "set_attribute_if_changed(div0, \"class\", &value)");
     assert_has(&code, "let shown = &(cls());");
-    assert_has(&code, "set_attribute(div0, \"disabled\", &value)");
+    assert_has(
+        &code,
+        "set_attribute_if_changed(div0, \"disabled\", &value)",
+    );
     assert_has(&code, "let shown = &(locked.get());");
     assert_eq!(code.matches("Effect::new(").count(), 2, "{code}");
 }
@@ -91,6 +94,7 @@ fn static_attributes_are_set_once() {
     // Then
     assert_has(&code, "set_attribute(div0, \"class\", \"row\");");
     assert_has(&code, "set_attribute(div0, \"id\", \"main\");");
+    assert_lacks(&code, "_if_changed");
     assert_lacks(&code, "Effect::new(");
 }
 
