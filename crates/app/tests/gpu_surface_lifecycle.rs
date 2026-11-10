@@ -68,11 +68,11 @@ fn gpu_invalidating_a_surface_renders_it_on_the_next_frame_only() {
 #[test]
 fn gpu_an_animating_surface_renders_every_frame_and_wants_the_next() {
     // Given
-    let (mut solid, log) = Solid::new(RED);
-    solid.animating = true;
+    let (solid, log) = Solid::new(RED);
     let (mut rig, doc) = drawn_once(solid);
 
     // When
+    rig.painter.set_animating("track", true).expect("mounted");
     rig.draw(&doc).expect("draws");
     rig.draw(&doc).expect("draws");
 

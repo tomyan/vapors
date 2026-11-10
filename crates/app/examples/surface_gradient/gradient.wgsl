@@ -1,6 +1,9 @@
 // A horizontal gradient over the whole surface: one triangle covering
-// the viewport, coloured by its x position. The colours are written as
+// the viewport, coloured by its x position, there and back across two
+// widths, moved along by `shift` (0 to 1). The colours are written as
 // sRGB-encoded values, the convention of SURFACE_FORMAT.
+
+@group(0) @binding(0) var<uniform> shift: f32;
 
 struct Varyings {
     @builtin(position) position: vec4<f32>,
@@ -22,5 +25,6 @@ const RIGHT: vec3<f32> = vec3<f32>(0.95, 0.55, 0.15);
 
 @fragment
 fn fragment(in: Varyings) -> @location(0) vec4<f32> {
-    return vec4<f32>(mix(LEFT, RIGHT, in.across), 1.0);
+    let along = 1.0 - abs(fract(in.across * 0.5 + shift) * 2.0 - 1.0);
+    return vec4<f32>(mix(LEFT, RIGHT, along), 1.0);
 }

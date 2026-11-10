@@ -1,32 +1,36 @@
-//! `--check`: the app wrapped to count its frames, and a script on its
-//! own thread that settles, counts frames and renders over an idle
-//! second, asks the app to invalidate the surface, counts again, then
-//! ends the loop with a wake. A wake reaches the app only as a frame,
-//! so the app invalidates in `drawn` after the script's wake frame: one
-//! frame for that wake, one for the invalidate's own wake, one render.
+//! `--check`: the app wrapped to count its frames and to do what the
+//! script (`script.rs`, on its own thread) asks of the surface's handle.
+//! The handle is not `Send`, so the script sets what it wants in
+//! [`Counts`] and wakes the loop; a wake reaches the app only as a
+//! frame, and the app acts on the ask in `drawn` after that frame.
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use vapors_app::{ElementsApp, Invalidated, SurfaceHandle};
 use vapors_platform::{App, Event, Frame, Next, Platform, Waker};
 
-/// After the first frame, before the idle count: the window's own
-/// start-up frames land in this. `wake_window` measured them well
-/// inside 2 s under Xvfb and lavapipe.
-const SETTLE: Duration = Duration::from_secs(2);
-/// How long the app is left alone, expecting no frame and no render.
-const IDLE: Duration = Duration::from_secs(1);
+use super::script::script;
+use super::trace::Trace;
+
+/// What the script asks the app to do with the surface's handle.
+#[derive(Clone, Copy, Debug)]
+pub enum Ask {
+    Invalidate,
+    RequestAnimation,
+    StopAnimation,
+}
 
 /// What the app and the script share.
 pub struct Counts {
     frames: AtomicU64,
     renders: Arc<AtomicU64>,
     exit: AtomicBool,
-    /// Set by the script; the app invalidates the surface on seeing it.
-    invalidate: AtomicBool,
+    /// Set by the script; the app takes it in `drawn`.
+    ask: Mutex<Option<Ask>>,
     outcome: Mutex<Option<Result<String, String>>>,
+    /// What the app did each frame; printed with a failure.
+    trace: Mutex<Trace>,
 }
 
 impl Counts {
@@ -36,8 +40,9 @@ impl Counts {
             frames: AtomicU64::new(0),
             renders,
             exit: AtomicBool::new(false),
-            invalidate: AtomicBool::new(false),
+            ask: Mutex::new(None),
             outcome: Mutex::new(None),
+            trace: Mutex::new(Trace::default()),
         })
     }
 
@@ -47,21 +52,44 @@ impl Counts {
         outcome.unwrap_or_else(|| Err("the loop ended before the idle count finished".into()))
     }
 
-    fn now(&self) -> (u64, u64) {
+    /// Frames and renders so far, between frames: a frame holds the
+    /// trace lock from before its render until it is counted, so a count
+    /// never lands inside one.
+    pub fn now(&self) -> (u64, u64) {
+        let _between_frames = self.trace.lock().expect("not poisoned");
         let frames = self.frames.load(Ordering::SeqCst);
         (frames, self.renders.load(Ordering::SeqCst))
     }
 
     /// Records a refusal unless a verdict is already there.
-    fn refuse(&self, why: String) {
+    fn refuse(&self, why: &str) {
+        let why = self.with_trace(why);
         self.outcome
             .lock()
             .expect("not poisoned")
             .get_or_insert(Err(why));
     }
 
+    /// `why` followed by the per-frame trace.
+    fn with_trace(&self, why: &str) -> String {
+        let trace = self.trace.lock().expect("not poisoned").report();
+        format!(
+            "{why}\nper frame, from the first (a run of identical frames is one line):\n{trace}"
+        )
+    }
+
+    /// Leaves `ask` for the app and wakes the loop; refused when the
+    /// loop has ended.
+    pub fn ask(&self, ask: Ask, waker: &Waker) -> Result<(), String> {
+        *self.ask.lock().expect("not poisoned") = Some(ask);
+        waker
+            .wake()
+            .map_err(|_| format!("the loop ended before the script asked to {ask:?}"))
+    }
+
     /// Keeps the first verdict: a refusal from the app stands.
-    fn finish(&self, outcome: Result<String, String>, waker: &Waker) {
+    pub fn finish(&self, outcome: Result<String, String>, waker: &Waker) {
+        let outcome = outcome.map_err(|why| self.with_trace(&why));
         let _ = self
             .outcome
             .lock()
@@ -104,16 +132,36 @@ impl Checked {
         Ok(())
     }
 
-    /// Invalidates the surface when the script asked; refused unless
-    /// the invalidate woke the loop.
-    fn invalidate_if_asked(&self) {
-        if !self.counts.invalidate.swap(false, Ordering::SeqCst) {
-            return;
+    /// Does what the script asked, if anything.
+    fn act_if_asked(&self) {
+        let ask = self.counts.ask.lock().expect("not poisoned").take();
+        if let Some(ask) = ask {
+            let number = self.counts.frames.load(Ordering::SeqCst);
+            let mut trace = self.counts.trace.lock().expect("not poisoned");
+            trace.note(number, format!("the app acted on {ask:?}"));
         }
-        let invalidated = self.handle.invalidate();
-        if invalidated != Ok(Invalidated::Woke) {
-            let why = format!("the running app's invalidate gave {invalidated:?}, not Ok(Woke)");
-            self.counts.refuse(why);
+        if let Err(why) = ask.map_or(Ok(()), |ask| self.act(ask)) {
+            self.counts.refuse(&why);
+        }
+    }
+
+    /// Refused unless an invalidate or request woke the loop, or a stop
+    /// was done.
+    fn act(&self, ask: Ask) -> Result<(), String> {
+        let answer = match ask {
+            Ask::Invalidate => self.handle.invalidate(),
+            Ask::RequestAnimation => self.handle.request_animation(),
+            Ask::StopAnimation => {
+                return self.handle.stop_animation().map_err(|error| {
+                    format!("the running app's stop_animation was refused: {error}")
+                });
+            }
+        };
+        match answer {
+            Ok(Invalidated::Woke) => Ok(()),
+            other => Err(format!(
+                "the running app's {ask:?} gave {other:?}, not Ok(Woke)"
+            )),
         }
     }
 }
@@ -125,87 +173,32 @@ impl App for Checked {
     }
 
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
-        self.counts.frames.fetch_add(1, Ordering::SeqCst);
         if !self.started {
             self.started = true;
             if let Err(why) = self.start_script() {
-                self.counts.refuse(why);
+                self.counts.refuse(&why);
                 return Next::Exit;
             }
         }
         if self.counts.exit.load(Ordering::SeqCst) {
             return Next::Exit;
         }
-        self.app.frame(frame)
+        let mut trace = self.counts.trace.lock().expect("not poisoned");
+        let renders_before = self.counts.renders.load(Ordering::SeqCst);
+        let next = self.app.frame(frame);
+        let rendered = self.counts.renders.load(Ordering::SeqCst) > renders_before;
+        let number = self.counts.frames.fetch_add(1, Ordering::SeqCst) + 1;
+        let (decision, states) = (self.app.last_decision(), self.app.surface_states());
+        trace.frame(number, next, decision, &states, rendered);
+        next
     }
 
     fn drawn(&mut self, platform: &Platform) {
         self.app.drawn(platform);
-        self.invalidate_if_asked();
+        self.act_if_asked();
     }
-}
-
-/// Settle, count an idle second, have the app invalidate, end the loop.
-fn script(counts: &Counts, waker: &Waker) {
-    std::thread::sleep(SETTLE);
-    let settled = counts.now();
-    std::thread::sleep(IDLE);
-    let idle = counts.now();
-    counts.invalidate.store(true, Ordering::SeqCst);
-    if waker.wake().is_err() {
-        return counts.finish(Err("the loop ended before the invalidate".into()), waker);
-    }
-    std::thread::sleep(IDLE);
-    let invalidated = since(idle, counts.now());
-    counts.finish(verdict(settled.1, since(settled, idle), invalidated), waker);
-}
-
-/// Frames and renders from `then` to `now`.
-fn since(then: (u64, u64), now: (u64, u64)) -> (u64, u64) {
-    (now.0 - then.0, now.1 - then.1)
-}
-
-/// Passes when the gradient rendered while settling, nothing was drawn
-/// or rendered while idle, and the invalidate drew two frames (the
-/// script's wake, the invalidate's wake) and rendered once.
-fn verdict(
-    settled_renders: u64,
-    (frames, renders): (u64, u64),
-    invalidated: (u64, u64),
-) -> Result<String, String> {
-    if settled_renders == 0 {
-        return Err("the gradient never rendered".to_owned());
-    }
-    if frames + renders > 0 {
-        return Err(format!(
-            "idle for {IDLE:?}, the app drew {frames} frames and rendered {renders} times; expected none"
-        ));
-    }
-    if invalidated != (2, 1) {
-        return Err(format!(
-            "after one invalidate the app drew {} frames and rendered {} times; expected 2 frames (the script's wake, the invalidate's) and 1 render",
-            invalidated.0, invalidated.1
-        ));
-    }
-    Ok(format!(
-        "{settled_renders} render(s) settling, 0 frames and 0 renders idle for {IDLE:?}, 2 frames and 1 render after an invalidate"
-    ))
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_first_refusal_is_kept() {
-        // Given
-        let counts = Counts::new(Arc::new(AtomicU64::new(0)));
-
-        // When
-        counts.refuse("first".into());
-        counts.refuse("second".into());
-
-        // Then
-        assert_eq!(counts.outcome(), Err("first".into()));
-    }
-}
+#[path = "check_tests.rs"]
+mod tests;

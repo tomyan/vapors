@@ -24,7 +24,6 @@ pub struct Solid {
     pub rgba: [u8; 4],
     pub edge: Option<[u8; 4]>,
     pub log: Rc<RefCell<Log>>,
-    pub animating: bool,
     pub fails: bool,
 }
 
@@ -36,7 +35,6 @@ impl Solid {
             rgba,
             edge: None,
             log: Rc::clone(&log),
-            animating: false,
             fails: false,
         };
         (solid, log)
@@ -64,10 +62,6 @@ impl SurfaceRenderer for Solid {
             mark_last_column(&mut frame, edge);
         }
         Ok(())
-    }
-
-    fn animating(&self) -> bool {
-        self.animating
     }
 }
 
