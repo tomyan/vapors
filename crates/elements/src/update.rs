@@ -83,7 +83,7 @@ impl Document {
             &calcs,
         )
         .map_err(|(failure, work)| {
-            self.counts.layout_calls = work.calls;
+            (self.counts.boxes_laid_out, self.counts.layout_calls) = (work.laid_out, work.calls);
             vec![ElementError::Layout(failure)]
         })?;
         let scrolls = |index: usize| match boxes[index].content {
@@ -107,7 +107,7 @@ impl Document {
         let mut painted = paint(&boxes, &rects, &mut input);
         painted.scroll_chains = crate::scroll_chains::Chains::of(&boxes, &scrolls);
         self.boxes.keep(boxes, viewport.scale);
-        (self.laid_out, self.counts.layout_calls) = (work.laid_out, work.calls);
+        (self.counts.boxes_laid_out, self.counts.layout_calls) = (work.laid_out, work.calls);
         self.counts.note_paint(&painted);
         // Cleared before the rehover: a hover it moves is a change this
         // update did not restyle, so the a11y tree refuses until the next.

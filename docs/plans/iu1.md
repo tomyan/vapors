@@ -90,8 +90,12 @@ A row is 4 elements and 7 boxes and draws 4 items. What the counts show
 about the idle update (the equal write, where nothing is restyled, laid
 out or rebuilt as text): the style phase visits every element, `build`
 makes every box again and paint draws every box and rebuilds every
-item, all linear in rows. Layout is not part of that walk: Taffy asks
-the root once and reads its cache. An edit inside one row makes rows + 9
+item, all linear in rows. Taffy's calls are not part of that walk: it
+asks the root once and reads its cache (`layout_calls` counts only
+those calls). `KeptBoxes::lend`, `placed`, `scroll.settle` and
+`Chains::of` still walk every box on every update, and paint's rect and
+padding loop does too; none of these is counted. A later counter may
+cover them if IU3 needs it. An edit inside one row makes rows + 9
 or rows + 11 layout calls: one per row, which fits the body asking each
 row for its layout and reading its cache, plus the edited row's
 chain. The retained box tree in IU3 targets

@@ -18,13 +18,22 @@ pub struct UpdateCounts {
     /// Elements the style phase read kept styles for after restyling:
     /// one per element in the tree, restyled or not.
     pub elements_visited: usize,
-    /// Layout boxes built from the styled tree: one per element with a
-    /// box (not `display: none`) and one per inline text run.
+    /// Elements the style phase restyled; 0 when the restyle failed (the
+    /// partial count of a failed restyle is not kept).
+    pub elements_restyled: usize,
+    /// Layout boxes built from the styled tree: one per element that
+    /// is neither `display: none` nor inline (the root, block-level and
+    /// replaced elements, and an `svg` as one box with none for its
+    /// children), and one per text run. A `display: none` element's
+    /// subtree and inline elements, whose text is part of a run, have
+    /// none.
     pub boxes_built: usize,
     /// Times Taffy asked a box for its layout, a cache hit included. A
     /// box can be asked more than once in an update (measured, then
     /// laid out), and a box under a cache hit is not asked at all.
     pub layout_calls: usize,
+    /// Times Taffy laid a box out rather than reading its cache.
+    pub boxes_laid_out: usize,
     /// Boxes paint drew: one per box in painting order, outlines and
     /// scroll thumbs not included.
     pub boxes_painted: usize,
@@ -52,14 +61,14 @@ impl Document {
     /// tests count, and what the `stress` demo shows.
     #[must_use]
     pub fn elements_restyled(&self) -> usize {
-        self.kept.as_ref().map_or(0, |kept| kept.restyled)
+        self.counts.elements_restyled
     }
 
     /// How many times the last update's layout laid a box out rather
     /// than reading its cache: what the incremental tests count.
     #[must_use]
     pub fn boxes_laid_out(&self) -> usize {
-        self.laid_out
+        self.counts.boxes_laid_out
     }
 
     /// How many Parley layouts the last update built rather than kept

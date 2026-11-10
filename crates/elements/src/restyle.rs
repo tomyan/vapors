@@ -50,8 +50,6 @@ pub(crate) struct Kept {
     pub(crate) used: HashMap<NodeId, Used>,
     /// Each element's refusals, kept until it is restyled again.
     pub(crate) refused: HashMap<NodeId, Vec<ElementError>>,
-    /// Elements restyled by the last update.
-    pub(crate) restyled: usize,
     /// Which elements the last update restyled: their computed styles,
     /// and so the addresses their calc handles hold, are new.
     pub(crate) restyled_nodes: std::collections::HashSet<NodeId>,

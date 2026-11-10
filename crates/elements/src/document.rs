@@ -51,8 +51,6 @@ pub struct Document {
     pub(crate) kept: Option<crate::restyle::Kept>,
     /// The boxes the last update laid out, for the next to reuse.
     pub(crate) boxes: crate::layout::KeptBoxes,
-    /// Boxes the last update laid out rather than read from cache.
-    pub(crate) laid_out: usize,
     /// The last update's structural counts.
     pub(crate) counts: crate::UpdateCounts,
     /// Each scroll container's offset.
@@ -93,7 +91,6 @@ impl Document {
             dirty: crate::restyle::Dirty::default(),
             kept: None,
             boxes: crate::layout::KeptBoxes::default(),
-            laid_out: 0,
             counts: crate::UpdateCounts::default(),
             scroll: crate::scroll::Offsets::default(),
             thumbs_shown: true,

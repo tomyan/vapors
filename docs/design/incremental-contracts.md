@@ -143,7 +143,7 @@ drawing.rs:129-139`, every frame).
 | No HUD text rebuilt | `Document::text_layouts_built() == 0` | yes (`update_counts.rs:69`) |
 | The surface renders each frame | a render count in the test renderer, as `surface_gradient --check` counts | yes, per renderer |
 | No document change noted | `Document::take_changed()` false | yes (`document.rs:108`) |
-| No document update or traversal at all | `Document::update_counts()`: `elements_visited`, `boxes_built`, `layout_calls`, `boxes_painted` all 0, or no update | yes (`update_counts.rs:47`) |
+| No document update or traversal at all | `Document::take_changed()` false, or the caller not calling `update`; `update_counts()` cannot show it: the counts keep the last update's values when no update runs, and `elements_visited` is never 0 after a successful update | yes (`update_counts.rs:47`) |
 | UI paint records reused | `Document::update_counts().scene_items_built == 0` | counted (`update_counts.rs:47`); paint rebuilds every item today |
 | GPU work | upload bytes and draw calls per frame | missing |
 

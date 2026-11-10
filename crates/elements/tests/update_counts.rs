@@ -114,3 +114,53 @@ fn paint_draws_every_box_and_rebuilds_every_item_on_an_update_with_nothing_chang
     let counts = idle_counts(&mut page());
     assert_eq!((counts.boxes_painted, counts.scene_items_built), (5, 2));
 }
+
+#[test]
+fn a_scroll_thumb_is_not_a_painted_box() {
+    // Given: html, body, a scrolling list and its 4 rows, thumb shown
+    let mut list = support::scroll_list::list("overflow: auto;");
+
+    // When
+    list.doc
+        .update(support::scroll_list::at(1.0))
+        .expect("updates");
+
+    // Then: 7 boxes; the thumb is a scene item, not a box
+    assert_eq!(list.doc.update_counts().boxes_painted, 7);
+}
+
+#[test]
+fn every_getter_describes_a_refused_update_not_the_update_before() {
+    // Given: a successful update that restyled and laid out, then a calc
+    // that layout refuses after restyling and laying out
+    let mut doc = page();
+    doc.update(viewport(100.0, 100.0)).expect("updates");
+    assert!(doc.elements_restyled() > 0 && doc.boxes_laid_out() > 0);
+    doc.add_stylesheet("calc.css", ".swatch { width: calc(50% / (1 - 1)); }")
+        .expect("parses");
+
+    // When
+    refusals(&mut doc);
+
+    // Then: the getters report the refused update's numbers
+    let counts = doc.update_counts();
+    assert_eq!(doc.elements_restyled(), counts.elements_restyled);
+    assert_eq!(doc.boxes_laid_out(), counts.boxes_laid_out);
+    assert!(counts.elements_restyled > 0, "{counts:?}");
+    assert!(counts.boxes_laid_out > 0, "{counts:?}");
+}
+
+#[test]
+fn a_style_attribute_refusal_resets_restyled_and_laid_out_to_zero() {
+    // Given
+    let mut doc = page();
+    doc.update(viewport(100.0, 100.0)).expect("updates");
+    let body = doc.body();
+    doc.set_attribute(body, "style", "color: ;;{");
+
+    // When
+    refusals(&mut doc);
+
+    // Then
+    assert_eq!((doc.elements_restyled(), doc.boxes_laid_out()), (0, 0));
+}
