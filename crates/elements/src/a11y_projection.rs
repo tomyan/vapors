@@ -33,8 +33,21 @@ const RELATED: [(&str, &str); 2] = [
     ("aria-controls", "controls"),
 ];
 
+/// Roles Chromium's tree names otherwise than ARIA: `(ARIA, Chromium)`.
+const CHROMIUM_NAMES: [(&str, &str); 1] = [("img", "image")];
+
+/// `role` as Chromium's accessibility tree names it.
+fn chromium_role(role: &str) -> &str {
+    CHROMIUM_NAMES
+        .iter()
+        .find(|(aria, _)| *aria == role)
+        .map_or(role, |(_, chromium)| chromium)
+}
+
 impl Document {
-    /// The tree's nodes with one of `roles`, flattened in document order.
+    /// The tree's nodes with one of `roles`, flattened in document order,
+    /// roles named as Chromium's tree names them (`image` for ARIA's
+    /// `img`).
     ///
     /// # Errors
     /// As [`Document::ax_tree`].
@@ -46,7 +59,7 @@ impl Document {
         let ids = self.ax_ids();
         Ok(all
             .iter()
-            .filter(|element| roles.contains(&element.role.as_str()))
+            .filter(|element| roles.contains(&chromium_role(&element.role)))
             .map(|element| self.ax_node(element, &by_node, &ids))
             .collect())
     }
@@ -65,12 +78,16 @@ impl Document {
                 .attribute(element.node, attribute)
                 .and_then(|id| ids.get(id));
             if let Some(related) = related.and_then(|node| by_node.get(node)) {
-                properties.push(format!("{property}={} \"{}\"", related.role, related.name));
+                properties.push(format!(
+                    "{property}={} \"{}\"",
+                    chromium_role(&related.role),
+                    related.name
+                ));
             }
         }
         properties.sort();
         AxNode {
-            role: element.role.clone(),
+            role: chromium_role(&element.role).to_owned(),
             name: element.name.clone(),
             value: element.value.clone(),
             properties,

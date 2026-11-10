@@ -28,6 +28,11 @@ pub struct FixtureViewport {
 /// The id of the element the page writes its boxes into.
 pub const BOXES_ID: &str = "vapors-boxes";
 
+/// The tag whose elements are left out of the boxes: an svg's paths
+/// are drawn as part of it, not laid out (docs/icons.md), where
+/// Chromium measures a path's geometry. Both lists leave them out.
+pub const NOT_A_BOX: &str = "path";
+
 /// Splits a fixture file.
 ///
 /// # Errors
@@ -138,7 +143,7 @@ document.fonts.ready
   }}
   const boxes = [];
   for (const element of document.querySelectorAll("html, body, body *")) {{
-    if (element.tagName === "SCRIPT") continue;
+    if (element.tagName === "SCRIPT" || element.tagName === "{NOT_A_BOX}") continue;
     const r = element.getBoundingClientRect();
     boxes.push({{ tag: element.tagName.toLowerCase(), x: r.x, y: r.y, width: r.width, height: r.height }});
   }}

@@ -1,0 +1,6 @@
+# Icons in the accessibility tree (docs/icons.md), as Chromium's
+# accessibility tree has them.
+project button image
+listen focusin
+key Tab                       the first button
+expect focus button#undo
