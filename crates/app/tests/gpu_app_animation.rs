@@ -3,8 +3,8 @@
 //! the app asks for the next until it is stopped, then waits; two
 //! animating surfaces render once each per frame, and one stopping
 //! leaves the other running; a request on an inactive surface (hidden,
-//! zero-sized, display: none, clipped) asks for no frame and is kept
-//! until it is shown; a renderer mounted again under an animating name
+//! zero-sized, display: none, clipped) wakes one frame that renders
+//! nothing, then asks for none, and is kept until it is shown; a renderer mounted again under an animating name
 //! does not animate; a worker thread relays a request through a channel
 //! and a wake.
 

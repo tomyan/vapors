@@ -85,6 +85,11 @@ active surface animates. When none does and nothing else wants a frame
 the app returns `Next::Wait`. `stop_animation()` refuses an unmounted
 surface (`NotMounted`) and does nothing once the loop has ended.
 
+A request on a surface no frame paints (hidden, zero-sized, `display:
+none`, clipped out) wakes one frame, which renders nothing; the app then
+asks for no more. The request is kept, and the surface animates again
+from the first frame that paints it. Unmounting forgets it.
+
 At the end of each frame, before it decides whether to ask for the next,
 the app passes the painter the current animating set
 (`AppSurfaces::sync_animating`; a debug assertion checks that the painter
