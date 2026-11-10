@@ -3026,6 +3026,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "vapors-scene3d-gpu"
+version = "0.0.0"
+dependencies = [
+ "vapors-app",
+ "vapors-gpu-harness",
+ "vapors-scene3d",
+ "wgpu",
+]
+
+[[package]]
 name = "vapors-signals"
 version = "0.0.0"
 

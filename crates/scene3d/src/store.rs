@@ -158,6 +158,7 @@ impl Scene {
             parent,
             children: Vec::new(),
             world: Mat4::IDENTITY,
+            world_version: 0,
             dirty: false,
         };
         let index = self.free.pop().unwrap_or_else(|| self.push_slot());

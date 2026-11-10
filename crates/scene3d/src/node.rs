@@ -31,6 +31,8 @@ pub(crate) struct Node {
     pub(crate) parent: Option<NodeId>,
     pub(crate) children: Vec<NodeId>,
     pub(crate) world: Mat4,
+    /// How many times `world` has been recomputed.
+    pub(crate) world_version: u64,
     pub(crate) dirty: bool,
 }
 

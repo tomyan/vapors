@@ -1,8 +1,9 @@
 //! Geometry the application gives the scene: validated here, with no
-//! GPU, and queued for the scene renderer to upload once.
+//! GPU, and held for each scene renderer to upload.
 
 use crate::MeshError;
 use glam::Vec3;
+use std::collections::HashMap;
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -46,17 +47,17 @@ impl Geometry {
 static NEXT_MESHES: AtomicU64 = AtomicU64::new(0);
 
 /// The geometry an application has given, shared between it and the
-/// scene renderer. Each piece is queued when given; the renderer takes
-/// the queue and uploads each piece once.
+/// scene renderers drawing it. Each piece is held from when it is given;
+/// each renderer reads it with [`Meshes::get`] and uploads it once to
+/// its own device, so several renderers can share one `Meshes`.
 ///
-/// The renderer must take the queue every frame: queued geometry is
-/// held in memory until taken. Nothing releases geometry after upload
-/// yet; release arrives in PR 5.
+/// Nothing releases geometry yet, so every piece stays in memory while
+/// the `Meshes` lives; release arrives in PR 5.
 #[derive(Debug)]
 pub struct Meshes {
     id: u64,
     issued: u64,
-    queued: Vec<(GeometryId, Geometry)>,
+    held: HashMap<u64, Geometry>,
 }
 
 impl Meshes {
@@ -66,11 +67,11 @@ impl Meshes {
         Self {
             id: NEXT_MESHES.fetch_add(1, Ordering::Relaxed),
             issued: 0,
-            queued: Vec::new(),
+            held: HashMap::new(),
         }
     }
 
-    /// Validates triangles and queues them for upload. A triangle whose
+    /// Validates triangles and holds them for upload. A triangle whose
     /// indices repeat, or whose corners are collinear, is allowed and
     /// draws nothing.
     ///
@@ -92,7 +93,7 @@ impl Meshes {
             index: self.issued,
         };
         self.issued += 1;
-        self.queued.push((id, Geometry { positions, indices }));
+        self.held.insert(id.index, Geometry { positions, indices });
         Ok(id)
     }
 
@@ -102,10 +103,14 @@ impl Meshes {
         id.meshes == self.id && id.index < self.issued
     }
 
-    /// The geometry given since the last take, for the renderer to
-    /// upload; the queue is left empty.
-    pub fn take_queued(&mut self) -> Vec<(GeometryId, Geometry)> {
-        std::mem::take(&mut self.queued)
+    /// The triangles under `id`; `None` when this store did not issue
+    /// it, or no longer holds it.
+    #[must_use]
+    pub fn get(&self, id: GeometryId) -> Option<&Geometry> {
+        if id.meshes != self.id {
+            return None;
+        }
+        self.held.get(&id.index)
     }
 }
 
