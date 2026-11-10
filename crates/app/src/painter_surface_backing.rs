@@ -15,8 +15,19 @@ pub(super) struct Mounted {
     backing: Option<Backing>,
     /// Invalidated since its last render.
     stale: bool,
-    /// Painted in the current frame.
-    painted: bool,
+    /// What the current frame did with it.
+    seen: Seen,
+}
+
+/// What a frame did with a mounted surface.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Seen {
+    /// No surface item named it.
+    Unseen,
+    /// A surface item named it, clipped out of view.
+    Claimed,
+    /// A surface item named it and it was drawn.
+    Painted,
 }
 
 struct Backing {
@@ -32,7 +43,7 @@ impl Mounted {
             started: false,
             backing: None,
             stale: false,
-            painted: false,
+            seen: Seen::Unseen,
         }
     }
 
@@ -49,11 +60,11 @@ impl Mounted {
     }
 
     pub(super) fn begin_frame(&mut self) {
-        self.painted = false;
+        self.seen = Seen::Unseen;
     }
 
     pub(super) fn end_frame(&mut self) {
-        if !self.painted {
+        if self.seen != Seen::Painted {
             self.backing = None;
         }
     }
@@ -64,16 +75,28 @@ impl Mounted {
         target: &Target<'_>,
         size: SurfaceSize,
     ) -> Result<&wgpu::Texture, Refusal> {
-        if std::mem::replace(&mut self.painted, true) {
-            return Err(Refusal::DuplicateName);
-        }
-        fits(target.device, size)?;
+        self.claim(target.device, size)?;
+        self.seen = Seen::Painted;
         self.start(target.device)?;
         self.allocate(target.device, size)?;
         if self.stale || self.renderer.animating() {
             self.render(target)?;
         }
         Ok(&self.backing.as_ref().expect("allocated above").texture)
+    }
+
+    /// Claims the surface's name for the frame at `size`: refused when
+    /// another surface claimed it, or when `size` is over the device's
+    /// limit.
+    pub(super) fn claim(
+        &mut self,
+        device: &wgpu::Device,
+        size: SurfaceSize,
+    ) -> Result<(), Refusal> {
+        if std::mem::replace(&mut self.seen, Seen::Claimed) != Seen::Unseen {
+            return Err(Refusal::DuplicateName);
+        }
+        fits(device, size)
     }
 
     fn start(&mut self, device: &wgpu::Device) -> Result<(), Refusal> {

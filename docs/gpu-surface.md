@@ -27,8 +27,8 @@ through a touche pin bump after 1c.
 
 - `name` names the renderer the application mounts on its painter. A
   `gpu-surface` without one, or with `name=""`, is refused. Two
-  surfaces painted in one frame with the same name are refused by the
-  painter (`PaintError::DuplicateName`, 1b); a hidden or `display: none`
+  surfaces painted in one frame (in view or wholly clipped) with the
+  same name are refused by the painter (`PaintError::DuplicateName`, 1b); a hidden or `display: none`
   surface may share a name, so tabs can swap one renderer.
 - CSS sizes it like a `div`; it has no natural size.
 - The renderer draws over the content box, in device pixels, after the
@@ -104,7 +104,10 @@ Refused, failing the frame (`PaintError`), each naming the surface:
 in a frame), `TooLarge` (backing over the device's
 `max_texture_dimension_2d`), `Renderer` (an error from `mount`,
 `resize` or `render`; the frame is never shown with stale or blank
-content). `ElementsApp` reports a failed frame and stops. `mount`,
+content). A wholly clipped surface is refused for `Unmounted`,
+`DuplicateName` and `TooLarge` as one in view is, though it is not
+rendered, so scrolling a surface into view cannot be the first time it
+fails. `ElementsApp` reports a failed frame and stops. `mount`,
 `unmount` and `invalidate` refuse a taken or unknown name
 (`MountError`).
 

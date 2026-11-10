@@ -1,7 +1,8 @@
 //! Drawing an update: clear to the canvas colour (or, drawing over what
 //! the target holds, not), then each run of the scene's items with the
 //! pipeline for its kind, in painting order, under the run's clip as a
-//! scissor; a run clipped to nothing is not drawn.
+//! scissor; a run clipped to nothing is not drawn, though its surfaces
+//! are refused as they would be in view.
 
 use vapors_elements::Painted;
 use vapors_renderer::{ImagePipeline, QuadPipeline, ShadowPipeline, Target, clear_view};
@@ -85,21 +86,32 @@ impl ScenePainter {
         self.textures.begin_frame();
         self.surfaces.begin_frame();
         for batch in painted.scene().batches() {
-            let Some(clipped) = clipped(target, batch.clip) else {
-                continue;
-            };
-            match batch.run {
-                Run::Shadows(shadows) => self.shadows.draw(&clipped, &shadows),
-                Run::Quads(quads) => self.quads.draw(&clipped, &quads),
-                Run::Texts(items) => self.draw_texts(&clipped, painted, items)?,
-                Run::Images(items) => self.textures.draw(&self.images, &clipped, painted, items),
-                Run::Surfaces(items) => {
-                    self.surfaces.draw(&self.images, &clipped, painted, items)?;
-                }
+            match clipped(target, batch.clip) {
+                Some(clipped) => self.draw_run(&clipped, painted, batch.run)?,
+                None => self
+                    .surfaces
+                    .check_clipped(target.device, painted, &batch.run)?,
             }
         }
         self.textures.end_frame();
         self.surfaces.end_frame();
+        Ok(())
+    }
+
+    /// Draws `run` with the pipeline for its kind under `target`'s scissor.
+    fn draw_run(
+        &mut self,
+        target: &Target<'_>,
+        painted: &Painted,
+        run: Run<'_>,
+    ) -> Result<(), PaintError> {
+        match run {
+            Run::Shadows(shadows) => self.shadows.draw(target, &shadows),
+            Run::Quads(quads) => self.quads.draw(target, &quads),
+            Run::Texts(items) => self.draw_texts(target, painted, items)?,
+            Run::Images(items) => self.textures.draw(&self.images, target, painted, items),
+            Run::Surfaces(items) => self.surfaces.draw(&self.images, target, painted, items)?,
+        }
         Ok(())
     }
 

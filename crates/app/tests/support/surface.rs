@@ -9,7 +9,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use vapors_app::{
-    PaintError, ScenePainter, SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize,
+    DrawOverError, PaintError, ScenePainter, SurfaceError, SurfaceFrame, SurfaceRenderer,
+    SurfaceSize,
 };
 use vapors_dom::Dom;
 use vapors_elements::{Document, Viewport};
@@ -105,10 +106,18 @@ impl Drop for Solid {
 /// class)` where `parent` indexes an earlier element (`None`: the body).
 /// A `gpu-surface` is named after its class.
 pub fn document(css: &str, elements: &[(Option<usize>, &str, &str)]) -> Document {
-    let mut doc = Document::new(FontSystem::bundle_only());
     let base = "html, body { margin: 0; background-color: #ffffff; } ";
-    doc.add_stylesheet("app.css", &format!("{base}{css}"))
-        .expect("parses");
+    built(&format!("{base}{css}"), elements)
+}
+
+/// As [`document`], with no canvas background: for `draw_over`.
+pub fn bare_document(css: &str, elements: &[(Option<usize>, &str, &str)]) -> Document {
+    built(&format!("html, body {{ margin: 0; }} {css}"), elements)
+}
+
+fn built(sheet: &str, elements: &[(Option<usize>, &str, &str)]) -> Document {
+    let mut doc = Document::new(FontSystem::bundle_only());
+    doc.add_stylesheet("app.css", sheet).expect("parses");
     let mut made = Vec::new();
     for (parent, tag, class) in elements {
         let element = doc.create_element(tag);
@@ -151,22 +160,36 @@ impl Rig {
 
     /// `doc` drawn into a fresh `SIZE` square target: its RGBA bytes.
     pub fn draw(&mut self, doc: &Document) -> Result<Vec<u8>, PaintError> {
+        let painted = doc.painted().expect("updated");
+        self.on_fresh_target(|painter, target| painter.draw(target, painted))
+    }
+
+    /// `doc` drawn over a fresh `SIZE` square target: its RGBA bytes.
+    pub fn draw_over(&mut self, doc: &Document) -> Result<Vec<u8>, DrawOverError> {
+        let painted = doc.painted().expect("updated");
+        self.on_fresh_target(|painter, target| painter.draw_over(target, painted))
+    }
+
+    fn on_fresh_target<E>(
+        &mut self,
+        draw: impl FnOnce(&mut ScenePainter, &Target<'_>) -> Result<(), E>,
+    ) -> Result<Vec<u8>, E> {
         let gpu = &self.gpu;
         let black = Color::from_rgba8(0, 0, 0, 255);
         let texture = clear(&gpu.device, &gpu.queue, SIZE, SIZE, black);
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let size = Size {
+            width: SIZE,
+            height: SIZE,
+        };
         let target = Target {
             device: &gpu.device,
             queue: &gpu.queue,
             view: &view,
-            viewport: Size {
-                width: SIZE,
-                height: SIZE,
-            },
+            viewport: size,
             scissor: None,
         };
-        self.painter
-            .draw(&target, doc.painted().expect("updated"))?;
+        draw(&mut self.painter, &target)?;
         Ok(read_rgba8(&gpu.device, &gpu.queue, &texture))
     }
 }

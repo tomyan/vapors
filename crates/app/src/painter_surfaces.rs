@@ -2,14 +2,16 @@
 //! backing texture, and when it renders (docs/gpu-surface.md). A
 //! surface renders on its first frame, after a resize or an
 //! invalidation, and every frame while animating; other frames
-//! composite its last render. A surface not painted in a frame is
-//! inactive: its backing is released until it is painted again.
+//! composite its last render. A surface not painted in a frame, or
+//! clipped out of view, is inactive: its backing is released until it
+//! is painted again. A clipped-out surface is still refused as one in
+//! view would be.
 
 use std::collections::BTreeMap;
 
 use vapors_elements::Painted;
 use vapors_renderer::{ImagePipeline, Target};
-use vapors_scene::{Item, Rect};
+use vapors_scene::{Item, Rect, Run};
 
 use super::ScenePainter;
 use super::errors::{MountError, PaintError};
@@ -98,29 +100,52 @@ impl Surfaces {
         painted: &Painted,
         items: &[Item],
     ) -> Result<(), PaintError> {
-        for item in items {
-            if let Item::Surface { surface, rect } = item {
-                let name = painted.surface(*surface);
-                let size = backing_size(*rect, painted.scale());
-                let texture = self.prepared(target, name, size)?;
-                pipeline.draw_rect(target, texture, *rect);
-            }
+        for (name, size, rect) in surfaces(painted, items) {
+            let mounted = self.mounted(name)?;
+            let texture = mounted.prepare(target, size);
+            pipeline.draw_rect(target, texture.map_err(|r| r.named(name))?, rect);
         }
         Ok(())
     }
 
-    fn prepared(
+    /// Refuses each surface of `run`, which is clipped out of view, as
+    /// it would be refused in view (no renderer, a shared name, too
+    /// large), without rendering it: it is inactive this frame.
+    pub(super) fn check_clipped(
         &mut self,
-        target: &Target<'_>,
-        name: &str,
-        size: SurfaceSize,
-    ) -> Result<&wgpu::Texture, PaintError> {
-        let mounted = self.mounted.get_mut(name);
-        let mounted = mounted.ok_or_else(|| PaintError::Unmounted(name.to_owned()))?;
-        mounted
-            .prepare(target, size)
-            .map_err(|refusal| refusal.named(name))
+        device: &wgpu::Device,
+        painted: &Painted,
+        run: &Run<'_>,
+    ) -> Result<(), PaintError> {
+        let Run::Surfaces(items) = run else {
+            return Ok(());
+        };
+        for (name, size, _) in surfaces(painted, items) {
+            let claimed = self.mounted(name)?.claim(device, size);
+            claimed.map_err(|r| r.named(name))?;
+        }
+        Ok(())
     }
+
+    fn mounted(&mut self, name: &str) -> Result<&mut Mounted, PaintError> {
+        let mounted = self.mounted.get_mut(name);
+        mounted.ok_or_else(|| PaintError::Unmounted(name.to_owned()))
+    }
+}
+
+/// Each surface item of `items`: its name, backing size and rect.
+fn surfaces<'a>(
+    painted: &'a Painted,
+    items: &'a [Item],
+) -> impl Iterator<Item = (&'a str, SurfaceSize, Rect)> + 'a {
+    items.iter().filter_map(|item| match item {
+        Item::Surface { surface, rect } => Some((
+            painted.surface(*surface),
+            backing_size(*rect, painted.scale()),
+            *rect,
+        )),
+        _ => None,
+    })
 }
 
 /// The device-pixel size of a surface's snapped `rect` at `scale`.
