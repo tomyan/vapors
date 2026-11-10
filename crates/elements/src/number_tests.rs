@@ -158,3 +158,23 @@ fn a_step_never_moves_against_its_direction() {
     assert_eq!(at_max.stepped(1.0, 0.0), 10.0);
     assert_eq!(near.stepped(1.0, 0.0), 9.5);
 }
+
+#[test]
+fn a_step_from_between_the_steps_lands_on_them_as_htmls_step_up() {
+    // Given: by 1, at 7.1465; by 1 from a min of 0.3, at 5
+    let between = field(&[("step", "1"), ("value", "7.1465")]);
+    let from_min = field(&[("min", "0.3"), ("step", "1"), ("value", "5")]);
+
+    // Then: the first step goes to the next step, Shift's ten count on from there
+    assert_eq!(between.stepped(1.0, 0.0), 8.0);
+    assert_eq!(between.stepped(-1.0, 0.0), 7.0);
+    assert_eq!(between.stepped(10.0, 0.0), 17.0);
+    assert_eq!(from_min.stepped(1.0, 0.0), 5.3);
+    assert_eq!(from_min.stepped(-1.0, 0.0), 4.3);
+}
+
+#[test]
+fn with_step_any_a_step_adds_one_to_the_full_number() {
+    let any = field(&[("step", "any"), ("value", "7.1465")]);
+    assert_eq!(any.stepped(1.0, 0.0), 8.1465);
+}

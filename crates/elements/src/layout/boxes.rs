@@ -44,19 +44,11 @@ pub(crate) struct LayoutBox {
     pub(crate) range: Option<crate::range::Range>,
     /// Whether an `input type=checkbox` is checked, for paint (3-E3b).
     pub(crate) checked: Option<bool>,
-    /// A focused `input type=number`'s selection, for paint (3-E3c).
-    pub(crate) number_focus: Option<NumberFocus>,
-    /// Whether the element is a text field (E6a), whose text origin
-    /// paint keeps for the pointer.
+    /// Whether the element is a text or number field (E6a, 3-E3c),
+    /// whose text origin paint keeps for the pointer.
     pub(crate) text_field: bool,
     /// A focused text field's caret and selection, for paint.
     pub(crate) text_marks: Option<crate::text_marks::TextMarks>,
-}
-
-/// A focused number field: whether its text is selected whole.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct NumberFocus {
-    pub(crate) selected: bool,
 }
 
 impl LayoutBox {
@@ -72,7 +64,6 @@ impl LayoutBox {
             image: None,
             range: None,
             checked: None,
-            number_focus: None,
             text_field: false,
             text_marks: None,
         }
@@ -109,8 +100,7 @@ pub(crate) struct Source<'a> {
     pub(crate) arena: &'a Arena,
     pub(crate) used: &'a HashMap<NodeId, Used>,
     pub(crate) images: &'a crate::images::Images,
-    pub(crate) number_focus: Option<(NodeId, NumberFocus)>,
-    /// The focused text field's marks (E6a).
+    /// The focused text or number field's marks (E6a, 3-E3c).
     pub(crate) text_marks: Option<(NodeId, crate::text_marks::TextMarks)>,
 }
 

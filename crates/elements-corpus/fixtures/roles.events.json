@@ -1,0 +1,701 @@
+{
+  "steps": [
+    {
+      "action": "Key(\"Tab\")",
+      "ax": [
+        {
+          "name": "Levels",
+          "properties": [],
+          "role": "dialog"
+        },
+        {
+          "name": "Tone",
+          "properties": [],
+          "role": "group"
+        },
+        {
+          "name": "Amount",
+          "properties": [
+            "focused=true"
+          ],
+          "role": "slider",
+          "value": "50"
+        },
+        {
+          "name": "Radius",
+          "properties": [],
+          "role": "spinbutton",
+          "value": "2"
+        },
+        {
+          "name": "Note",
+          "properties": [],
+          "role": "textbox",
+          "value": "hi"
+        },
+        {
+          "name": "Options",
+          "properties": [],
+          "role": "region"
+        },
+        {
+          "name": "Mono",
+          "properties": [
+            "checked=false"
+          ],
+          "role": "checkbox"
+        },
+        {
+          "name": "Lock",
+          "properties": [
+            "checked=true",
+            "disabled=true"
+          ],
+          "role": "checkbox"
+        },
+        {
+          "name": "Pin",
+          "properties": [
+            "pressed=false"
+          ],
+          "role": "button"
+        },
+        {
+          "name": "Apply",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "Reset",
+          "properties": [
+            "disabled=true"
+          ],
+          "role": "button"
+        },
+        {
+          "name": "After",
+          "properties": [],
+          "role": "button"
+        }
+      ],
+      "checked": {
+        "input#mono": false
+      },
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "focusin"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 5,
+      "selections": {
+        "input#note": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#amount": "50"
+      }
+    },
+    {
+      "action": "Key(\"ArrowRight\")",
+      "ax": [
+        {
+          "name": "Levels",
+          "properties": [],
+          "role": "dialog"
+        },
+        {
+          "name": "Tone",
+          "properties": [],
+          "role": "group"
+        },
+        {
+          "name": "Amount",
+          "properties": [
+            "focused=true"
+          ],
+          "role": "slider",
+          "value": "51"
+        },
+        {
+          "name": "Radius",
+          "properties": [],
+          "role": "spinbutton",
+          "value": "2"
+        },
+        {
+          "name": "Note",
+          "properties": [],
+          "role": "textbox",
+          "value": "hi"
+        },
+        {
+          "name": "Options",
+          "properties": [],
+          "role": "region"
+        },
+        {
+          "name": "Mono",
+          "properties": [
+            "checked=false"
+          ],
+          "role": "checkbox"
+        },
+        {
+          "name": "Lock",
+          "properties": [
+            "checked=true",
+            "disabled=true"
+          ],
+          "role": "checkbox"
+        },
+        {
+          "name": "Pin",
+          "properties": [
+            "pressed=false"
+          ],
+          "role": "button"
+        },
+        {
+          "name": "Apply",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "Reset",
+          "properties": [
+            "disabled=true"
+          ],
+          "role": "button"
+        },
+        {
+          "name": "After",
+          "properties": [],
+          "role": "button"
+        }
+      ],
+      "checked": {
+        "input#mono": false
+      },
+      "events": [],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 7,
+      "selections": {
+        "input#note": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#amount": "51"
+      }
+    },
+    {
+      "action": "Key(\"Tab\")",
+      "ax": [
+        {
+          "name": "Levels",
+          "properties": [],
+          "role": "dialog"
+        },
+        {
+          "name": "Tone",
+          "properties": [],
+          "role": "group"
+        },
+        {
+          "name": "Amount",
+          "properties": [],
+          "role": "slider",
+          "value": "51"
+        },
+        {
+          "name": "Radius",
+          "properties": [
+            "focused=true"
+          ],
+          "role": "spinbutton",
+          "value": "2"
+        },
+        {
+          "name": "Note",
+          "properties": [],
+          "role": "textbox",
+          "value": "hi"
+        },
+        {
+          "name": "Options",
+          "properties": [],
+          "role": "region"
+        },
+        {
+          "name": "Mono",
+          "properties": [
+            "checked=false"
+          ],
+          "role": "checkbox"
+        },
+        {
+          "name": "Lock",
+          "properties": [
+            "checked=true",
+            "disabled=true"
+          ],
+          "role": "checkbox"
+        },
+        {
+          "name": "Pin",
+          "properties": [
+            "pressed=false"
+          ],
+          "role": "button"
+        },
+        {
+          "name": "Apply",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "Reset",
+          "properties": [
+            "disabled=true"
+          ],
+          "role": "button"
+        },
+        {
+          "name": "After",
+          "properties": [],
+          "role": "button"
+        }
+      ],
+      "checked": {
+        "input#mono": false
+      },
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#radius",
+          "type": "focusin"
+        }
+      ],
+      "focus": "input#radius",
+      "focusVisible": true,
+      "line": 9,
+      "selections": {
+        "input#note": [
+          0,
+          0
+        ]
+      },
+      "values": {
+        "input#amount": "51"
+      }
+    },
+    {
+      "action": "Key(\"Tab\")",
+      "ax": [
+        {
+          "name": "Levels",
+          "properties": [],
+          "role": "dialog"
+        },
+        {
+          "name": "Tone",
+          "properties": [],
+          "role": "group"
+        },
+        {
+          "name": "Amount",
+          "properties": [],
+          "role": "slider",
+          "value": "51"
+        },
+        {
+          "name": "Radius",
+          "properties": [],
+          "role": "spinbutton",
+          "value": "2"
+        },
+        {
+          "name": "Note",
+          "properties": [
+            "focused=true"
+          ],
+          "role": "textbox",
+          "value": "hi"
+        },
+        {
+          "name": "Options",
+          "properties": [],
+          "role": "region"
+        },
+        {
+          "name": "Mono",
+          "properties": [
+            "checked=false"
+          ],
+          "role": "checkbox"
+        },
+        {
+          "name": "Lock",
+          "properties": [
+            "checked=true",
+            "disabled=true"
+          ],
+          "role": "checkbox"
+        },
+        {
+          "name": "Pin",
+          "properties": [
+            "pressed=false"
+          ],
+          "role": "button"
+        },
+        {
+          "name": "Apply",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "Reset",
+          "properties": [
+            "disabled=true"
+          ],
+          "role": "button"
+        },
+        {
+          "name": "After",
+          "properties": [],
+          "role": "button"
+        }
+      ],
+      "checked": {
+        "input#mono": false
+      },
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#note",
+          "type": "focusin"
+        }
+      ],
+      "focus": "input#note",
+      "focusVisible": true,
+      "line": 11,
+      "selections": {
+        "input#note": [
+          0,
+          2
+        ]
+      },
+      "values": {
+        "input#amount": "51"
+      }
+    },
+    {
+      "action": "Key(\"Tab\")",
+      "ax": [
+        {
+          "name": "Levels",
+          "properties": [],
+          "role": "dialog"
+        },
+        {
+          "name": "Tone",
+          "properties": [],
+          "role": "group"
+        },
+        {
+          "name": "Amount",
+          "properties": [],
+          "role": "slider",
+          "value": "51"
+        },
+        {
+          "name": "Radius",
+          "properties": [],
+          "role": "spinbutton",
+          "value": "2"
+        },
+        {
+          "name": "Note",
+          "properties": [],
+          "role": "textbox",
+          "value": "hi"
+        },
+        {
+          "name": "Options",
+          "properties": [],
+          "role": "region"
+        },
+        {
+          "name": "Mono",
+          "properties": [
+            "checked=false",
+            "focused=true"
+          ],
+          "role": "checkbox"
+        },
+        {
+          "name": "Lock",
+          "properties": [
+            "checked=true",
+            "disabled=true"
+          ],
+          "role": "checkbox"
+        },
+        {
+          "name": "Pin",
+          "properties": [
+            "pressed=false"
+          ],
+          "role": "button"
+        },
+        {
+          "name": "Apply",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "Reset",
+          "properties": [
+            "disabled=true"
+          ],
+          "role": "button"
+        },
+        {
+          "name": "After",
+          "properties": [],
+          "role": "button"
+        }
+      ],
+      "checked": {
+        "input#mono": false
+      },
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#mono",
+          "type": "focusin"
+        }
+      ],
+      "focus": "input#mono",
+      "focusVisible": true,
+      "line": 13,
+      "selections": {
+        "input#note": [
+          0,
+          2
+        ]
+      },
+      "values": {
+        "input#amount": "51"
+      }
+    },
+    {
+      "action": "Key(\"Space\")",
+      "ax": [
+        {
+          "name": "Levels",
+          "properties": [],
+          "role": "dialog"
+        },
+        {
+          "name": "Tone",
+          "properties": [],
+          "role": "group"
+        },
+        {
+          "name": "Amount",
+          "properties": [],
+          "role": "slider",
+          "value": "51"
+        },
+        {
+          "name": "Radius",
+          "properties": [],
+          "role": "spinbutton",
+          "value": "2"
+        },
+        {
+          "name": "Note",
+          "properties": [],
+          "role": "textbox",
+          "value": "hi"
+        },
+        {
+          "name": "Options",
+          "properties": [],
+          "role": "region"
+        },
+        {
+          "name": "Mono",
+          "properties": [
+            "checked=true",
+            "focused=true"
+          ],
+          "role": "checkbox"
+        },
+        {
+          "name": "Lock",
+          "properties": [
+            "checked=true",
+            "disabled=true"
+          ],
+          "role": "checkbox"
+        },
+        {
+          "name": "Pin",
+          "properties": [
+            "pressed=false"
+          ],
+          "role": "button"
+        },
+        {
+          "name": "Apply",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "Reset",
+          "properties": [
+            "disabled=true"
+          ],
+          "role": "button"
+        },
+        {
+          "name": "After",
+          "properties": [],
+          "role": "button"
+        }
+      ],
+      "checked": {
+        "input#mono": true
+      },
+      "events": [],
+      "focus": "input#mono",
+      "focusVisible": true,
+      "line": 15,
+      "selections": {
+        "input#note": [
+          0,
+          2
+        ]
+      },
+      "values": {
+        "input#amount": "51"
+      }
+    },
+    {
+      "action": "Key(\"Tab\")",
+      "ax": [
+        {
+          "name": "Levels",
+          "properties": [],
+          "role": "dialog"
+        },
+        {
+          "name": "Tone",
+          "properties": [],
+          "role": "group"
+        },
+        {
+          "name": "Amount",
+          "properties": [],
+          "role": "slider",
+          "value": "51"
+        },
+        {
+          "name": "Radius",
+          "properties": [],
+          "role": "spinbutton",
+          "value": "2"
+        },
+        {
+          "name": "Note",
+          "properties": [],
+          "role": "textbox",
+          "value": "hi"
+        },
+        {
+          "name": "Options",
+          "properties": [],
+          "role": "region"
+        },
+        {
+          "name": "Mono",
+          "properties": [
+            "checked=true"
+          ],
+          "role": "checkbox"
+        },
+        {
+          "name": "Lock",
+          "properties": [
+            "checked=true",
+            "disabled=true"
+          ],
+          "role": "checkbox"
+        },
+        {
+          "name": "Pin",
+          "properties": [
+            "focused=true",
+            "pressed=false"
+          ],
+          "role": "button"
+        },
+        {
+          "name": "Apply",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "Reset",
+          "properties": [
+            "disabled=true"
+          ],
+          "role": "button"
+        },
+        {
+          "name": "After",
+          "properties": [],
+          "role": "button"
+        }
+      ],
+      "checked": {
+        "input#mono": true
+      },
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#pin",
+          "type": "focusin"
+        }
+      ],
+      "focus": "button#pin",
+      "focusVisible": true,
+      "line": 17,
+      "selections": {
+        "input#note": [
+          0,
+          2
+        ]
+      },
+      "values": {
+        "input#amount": "51"
+      }
+    }
+  ]
+}

@@ -37,7 +37,7 @@ pub(crate) struct Scrub {
 impl Document {
     /// The px per step `node`'s `data-scrub` asks for, when it is a
     /// live number field with the attribute.
-    fn scrub_px(&self, node: NodeId) -> Option<f32> {
+    pub(crate) fn scrub_px(&self, node: NodeId) -> Option<f32> {
         self.number_field(node)?;
         if self.is_disabled_control(node) {
             return None;

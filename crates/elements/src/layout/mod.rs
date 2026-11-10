@@ -8,7 +8,7 @@ mod inline;
 mod keep;
 mod measure;
 mod replaced;
-pub(crate) use boxes::{NumberFocus, Source};
+pub(crate) use boxes::Source;
 mod text_cache;
 mod tree;
 
@@ -23,7 +23,7 @@ pub(crate) use text_cache::TextCache;
 use tree::BoxTree;
 
 /// A box's border box in document coordinates, CSS pixels.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct BoxRect {
     /// Left edge.
     pub x: f32,
