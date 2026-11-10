@@ -182,3 +182,7 @@ pub fn run(options: WindowOptions, app: impl App + 'static) -> Result<(), Platfo
     event_loop.spawn_app(handler);
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "window_tests.rs"]
+mod tests;

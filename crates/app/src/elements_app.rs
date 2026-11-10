@@ -198,6 +198,9 @@ mod paste;
 mod surface_handle;
 #[path = "elements_app_surfaces.rs"]
 mod surfaces;
+// For the root `gpu_` test module (the tier split needs a gpu_ id).
+#[cfg(test)]
+pub(crate) use surfaces::give_one_loop_waker_to;
 #[cfg(test)]
 #[path = "elements_app_tests.rs"]
 mod tests;

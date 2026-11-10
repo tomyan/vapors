@@ -28,7 +28,7 @@ pub(super) struct Mounted {
     /// What the current frame did with it.
     seen: Seen,
     /// The GPU errors of its calls not yet seen.
-    scopes: Scopes,
+    pub(super) scopes: Scopes,
 }
 
 /// What a frame did with a mounted surface.
@@ -93,7 +93,10 @@ impl Mounted {
         self.seen = Seen::Unseen;
     }
 
-    pub(super) fn end_frame(&mut self) {
+    /// Ends the frame at `now`, settling its scopes even if unpainted:
+    /// one left out of frames still gives up at its deadline.
+    pub(super) fn end_frame(&mut self, now: vapors_platform::Instant) {
+        self.scopes.settle(now);
         self.fresh = false;
         if self.seen != Seen::Painted {
             self.backing = None;
@@ -129,7 +132,7 @@ impl Mounted {
         if std::mem::replace(&mut self.seen, Seen::Claimed) != Seen::Unseen {
             return Err(Refusal::DuplicateName);
         }
-        self.scopes.check(turn)?;
+        self.scopes.check(turn.now)?;
         fits(device, size)
     }
 

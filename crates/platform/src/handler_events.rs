@@ -22,6 +22,9 @@ impl ApplicationHandler<Message> for Handler {
 
     /// The time a frame asked for with `Next::WaitUntil` has come: one
     /// frame, and events alone wake the loop until that frame says more.
+    /// If that redraw gets no texture, `acquire` asks for another
+    /// (`surface_texture.rs`), so the frame is still drawn, or the loop
+    /// fails after `MISSED_LIMIT` misses.
     fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
         if let StartCause::ResumeTimeReached { .. } = cause {
             event_loop.set_control_flow(ControlFlow::Wait);

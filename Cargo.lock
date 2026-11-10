@@ -2810,6 +2810,7 @@ dependencies = [
  "vapors-renderer",
  "vapors-scene",
  "vapors-text",
+ "wasm-bindgen-futures",
  "wgpu",
 ]
 

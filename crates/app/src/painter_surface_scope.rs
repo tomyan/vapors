@@ -2,21 +2,25 @@
 //! around each call into it and refused as its failure, naming the
 //! surface, rather than panicking unnamed in wgpu's uncaptured-error
 //! handler. Native wgpu resolves a scope when it is popped. On the web
-//! the result arrives later: an unresolved scope is kept, polled with
-//! the app's waker so that its result wakes the loop for a frame, and
-//! checked on the surface's next frame, which it refuses instead. It
+//! the result arrives later: an unresolved scope is watched
+//! (`painter_surface_scope_watch.rs`), and an error wakes the loop for
+//! a frame that refuses the surface; a clean result wakes nothing. It
 //! asks for no frame while it waits; its deadline is the time the loop
 //! waits until, so a scope that never resolves still refuses.
 
 use std::future::Future;
 use std::pin::Pin;
-use std::task::{Context, Poll, Waker};
 use std::time::Duration;
 
 use vapors_platform::Instant;
 
 use super::super::errors::Refusal;
 use crate::surface::SurfaceError;
+
+#[path = "painter_surface_scope_watch.rs"]
+mod watch;
+pub(super) use watch::LoopWaker;
+use watch::{Outcome, Watched};
 
 /// A scope's result, once the GPU reports it.
 pub(super) type Caught = Pin<Box<dyn Future<Output = Option<wgpu::Error>>>>;
@@ -39,11 +43,11 @@ pub(super) type Caught = Pin<Box<dyn Future<Output = Option<wgpu::Error>>>>;
 /// either way. Native wgpu resolves in the frame, so it never waits.
 pub(crate) const DEADLINE: Duration = Duration::from_millis(1000);
 
-/// What a scope is polled with: the waker its result wakes, and the
-/// time now, against which deadlines are kept.
+/// What a scope is begun with: the loop's waker its error wakes, and
+/// the time now, from which its deadline runs.
 #[derive(Clone, Copy)]
 pub(super) struct Turn<'a> {
-    pub(super) waker: &'a Waker,
+    pub(super) waker: &'a LoopWaker,
     pub(super) now: Instant,
 }
 
@@ -52,7 +56,7 @@ pub(super) struct Turn<'a> {
 /// of the surface is refused until it is remounted.
 #[derive(Default)]
 pub(super) struct Scopes {
-    pending: Vec<(Caught, Instant)>,
+    pending: Vec<(Watched, Instant)>,
     caught: Option<String>,
 }
 
@@ -68,14 +72,15 @@ impl Scopes {
         let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
         let result = call();
         self.wait_for(Box::pin(scope.pop()), turn);
-        let checked = self.poll(turn.waker);
+        self.take_resolved();
         let value = result.map_err(Refusal::Renderer)?;
-        checked.map(|()| value)
+        self.refusal().map(|()| value)
     }
 
     /// Keeps `scope` until it resolves, refusing at `DEADLINE` from now.
     pub(super) fn wait_for(&mut self, scope: Caught, turn: Turn<'_>) {
-        self.pending.push((scope, turn.now + DEADLINE));
+        let watched = Watched::new(scope, turn.waker);
+        self.pending.push((watched, turn.now + DEADLINE));
     }
 
     /// The earliest deadline of an unresolved scope: the loop waits no
@@ -84,11 +89,26 @@ impl Scopes {
         self.pending.iter().map(|(_, deadline)| *deadline).min()
     }
 
+    /// Whether a scope has caught an error no frame has seen: the loop
+    /// owes a frame that refuses the surface.
+    pub(super) fn error_waiting(&mut self) -> bool {
+        let mut pending = self.pending.iter_mut();
+        pending.any(|(watched, _)| matches!(watched.outcome(), Outcome::Caught(_)))
+    }
+
     /// On each frame of the surface: refused when a scope has caught an
     /// error (now or before), or is unresolved at its deadline.
-    pub(super) fn check(&mut self, turn: Turn<'_>) -> Result<(), Refusal> {
-        let late = self.pending.iter().any(|(_, at)| turn.now >= *at);
-        if late {
+    pub(super) fn check(&mut self, now: Instant) -> Result<(), Refusal> {
+        self.settle(now);
+        self.refusal()
+    }
+
+    /// Takes in what has resolved, then gives up on what is still
+    /// unresolved at its deadline: a late result that did arrive is
+    /// judged on what it caught, not refused as a timeout.
+    pub(super) fn settle(&mut self, now: Instant) {
+        self.take_resolved();
+        if self.pending.iter().any(|(_, at)| now >= *at) {
             self.pending.clear();
             self.caught.get_or_insert_with(|| {
                 format!(
@@ -97,23 +117,23 @@ impl Scopes {
                 )
             });
         }
-        self.poll(turn.waker)
     }
 
-    /// Polls each scope once with `waker`, keeping the unresolved ones.
-    fn poll(&mut self, waker: &Waker) -> Result<(), Refusal> {
-        let mut context = Context::from_waker(waker);
+    /// Drops each resolved scope, keeping the first error caught.
+    fn take_resolved(&mut self) {
         let caught = &mut self.caught;
         self.pending
-            .retain_mut(|(scope, _)| match scope.as_mut().poll(&mut context) {
-                Poll::Ready(error) => {
-                    if let (None, Some(error)) = (&caught, error) {
-                        *caught = Some(error.to_string());
-                    }
+            .retain_mut(|(watched, _)| match watched.outcome() {
+                Outcome::Waiting => true,
+                Outcome::Clean => false,
+                Outcome::Caught(error) => {
+                    caught.get_or_insert(error);
                     false
                 }
-                Poll::Pending => true,
             });
+    }
+
+    fn refusal(&self) -> Result<(), Refusal> {
         match &self.caught {
             None => Ok(()),
             Some(error) => Err(Refusal::Renderer(
@@ -122,6 +142,10 @@ impl Scopes {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "painter_surface_scope_fakes.rs"]
+pub(super) mod fakes;
 
 #[cfg(test)]
 #[path = "painter_surface_scope_tests.rs"]

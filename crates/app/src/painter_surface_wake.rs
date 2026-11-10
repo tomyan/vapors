@@ -1,14 +1,14 @@
 //! When the painter's surfaces want the next frame: at once while one
 //! is stale or animating, or at an unresolved GPU error scope's
 //! deadline, or when the waker it was given is woken by a scope's
-//! result (docs/gpu-surface.md, Animation).
+//! error (docs/gpu-surface.md, Animation).
 
 use std::task::Waker;
 
 use vapors_platform::Instant;
 
 use super::super::ScenePainter;
-use super::Mounted;
+use super::{Mounted, Surfaces};
 
 impl ScenePainter {
     /// True when an active surface (one the last frame painted) is
@@ -18,17 +18,20 @@ impl ScenePainter {
         self.surfaces.mounted.values().any(Mounted::wants_frame)
     }
 
-    /// Sets the waker a surface's GPU error scope wakes when its result
+    /// Sets the waker a surface's GPU error scope wakes when an error
     /// arrives after the frame (on the web): the owner's loop then draws
-    /// a frame that checks it. Without one, the result is seen on the
-    /// next frame drawn for another reason, or at [`Self::scope_deadline`].
-    /// Scopes polled before it was set wake it now, for a frame that
-    /// polls them with it.
+    /// a frame that refuses the surface. A result with no error wakes
+    /// nothing. Without a waker, an error is seen on the next frame
+    /// drawn for another reason, or at [`Self::scope_deadline`]. An
+    /// error that arrived before it was set wakes it now.
     pub fn wake_with(&mut self, waker: Waker) {
-        if self.scope_deadline().is_some() {
-            waker.wake_by_ref();
-        }
-        self.surfaces.waker = Some(waker);
+        self.surfaces.wake_with(waker);
+    }
+
+    /// Whether the painter has been given a waker ([`Self::wake_with`]).
+    #[must_use]
+    pub fn has_waker(&self) -> bool {
+        self.surfaces.waker.borrow().is_some()
     }
 
     /// The earliest time an unresolved GPU error scope is refused, if a
@@ -41,3 +44,17 @@ impl ScenePainter {
         mounted.filter_map(Mounted::deadline).min()
     }
 }
+
+impl Surfaces {
+    fn wake_with(&mut self, waker: Waker) {
+        let mut mounted = self.mounted.values_mut();
+        if mounted.any(|mounted| mounted.scopes.error_waiting()) {
+            waker.wake_by_ref();
+        }
+        *self.waker.borrow_mut() = Some(waker);
+    }
+}
+
+#[cfg(test)]
+#[path = "painter_surface_wake_tests.rs"]
+mod tests;

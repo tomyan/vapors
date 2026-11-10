@@ -48,20 +48,34 @@ impl Wake for LoopWake {
     fn wake_by_ref(self: &Arc<Self>) {
         // LoopClosed: the app failed or was dropped, and its surfaces
         // with it, so no frame is owed to the scope; the failure itself
-        // was reported where it happened.
+        // was reported where it happened. Retired if the scope's watch
+        // ever holds the platform waker itself rather than a std Waker,
+        // whose wake has no result: it could then return LoopClosed.
         let _ = self.0.wake();
     }
 }
 
 impl AppSurfaces {
-    /// Gives `painter` the loop's waker once the loop runs; once.
-    pub(in super::super) fn give_waker(&mut self, painter: Option<&mut ScenePainter>) {
-        let Some(painter) = painter.filter(|_| !self.painter_wakes) else {
+    /// Gives `painter` the loop's waker once the loop runs, if it has
+    /// none: a painter made again later is given it too.
+    pub(in super::super) fn give_waker(&self, painter: Option<&mut ScenePainter>) {
+        let Some(painter) = painter.filter(|painter| !painter.has_waker()) else {
             return;
         };
         if let Run::Running(waker) = &self.shared.borrow().run {
             painter.wake_with(Arc::new(LoopWake(wrapped(waker.clone()))).into());
-            self.painter_wakes = true;
         }
+    }
+}
+
+/// Gives each of `painters`, in turn, the loop's waker from one app's
+/// surfaces, as when the app makes its painter again. Called from
+/// `gpu_surface_backing_tests`.
+#[cfg(test)]
+pub(crate) fn give_one_loop_waker_to(painters: [&mut ScenePainter; 2]) {
+    let surfaces = AppSurfaces::default();
+    surfaces.keep_waker(&vapors_platform::Platform::detached());
+    for painter in painters {
+        surfaces.give_waker(Some(painter));
     }
 }

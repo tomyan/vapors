@@ -192,19 +192,24 @@ frame is never shown with stale or blank content). After a caught GPU
 error every frame of that surface is refused until it is remounted.
 Native wgpu resolves the scope in the frame; on the web it resolves
 later, and the first frame of the surface after the result arrives is
-refused instead. An unresolved scope asks for no frame: the painter
-polls it with the waker `ElementsApp` gives it
-(`ScenePainter::wake_with`, from `drawn` once the loop runs), and the
-result wakes the loop for one frame that checks it. Each scope has a
+refused instead. An unresolved scope asks for no frame: it is driven
+on the page's task queue (`painter_surface_scope_watch.rs`), and an
+error wakes the loop, with the waker `ElementsApp` gives the painter
+(`ScenePainter::wake_with`, from `drawn` once the loop runs), for one
+frame that refuses the surface. A result with no error wakes nothing.
+Each surface's scopes are settled at the end of every frame, painted
+or not, so a surface left out of frames still gives up at its
+deadline. Each scope has a
 deadline of 1000 ms (`DEADLINE` in `painter_surface_scope.rs`, set from
 `scripts/web-scope-latency.mjs`: the largest of 6,500 web results took
 37.6 ms); a scope unresolved at its deadline refuses the surface as
 such. A scope that never resolves wakes nothing, so the app returns
 `Next::WaitUntil(deadline)` (`ScenePainter::scope_deadline`) while one
 is pending and nothing else wants a frame; the frame drawn then refuses
-the surface. A scope that resolves first leaves no frame at its old
-deadline: the frame its result woke returns `Next::Wait`, which replaces
-the time. A scope
+the surface. A scope that resolves with no error first does not
+cancel that time: an idle app on the web draws one frame at the
+deadline of the last frame's scopes, 1000 ms after it, which finds
+nothing pending and returns `Next::Wait`. A scope
 still unresolved at `unmount` is dropped unreported: the renderer is
 gone and nothing it drew is shown again. A wholly clipped surface is refused for `Unmounted`,
 `DuplicateName` and `TooLarge` as one in view is, though it is not

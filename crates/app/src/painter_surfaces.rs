@@ -9,7 +9,7 @@
 //! view would be.
 
 use std::collections::BTreeMap;
-use std::task::Waker;
+use std::rc::Rc;
 
 use vapors_elements::Painted;
 use vapors_platform::Instant;
@@ -30,7 +30,7 @@ pub(crate) use backing::wants_frame_around_a_pending_scope;
 mod scope;
 #[cfg(test)]
 pub(crate) use scope::DEADLINE as SCOPE_DEADLINE;
-use scope::Turn;
+use scope::{LoopWaker, Turn};
 #[path = "painter_surface_texture.rs"]
 mod texture;
 #[path = "painter_surface_wake.rs"]
@@ -41,7 +41,7 @@ mod wake;
 #[derive(Default)]
 pub(super) struct Surfaces {
     mounted: BTreeMap<String, Mounted>,
-    waker: Option<Waker>,
+    waker: LoopWaker,
 }
 
 impl ScenePainter {
@@ -113,9 +113,12 @@ impl Surfaces {
         self.mounted.values_mut().for_each(Mounted::begin_frame);
     }
 
-    /// Releases the backing of each surface the frame did not paint.
+    /// Releases the backing of each surface the frame did not paint, and
+    /// settles every surface's GPU error scopes.
     pub(super) fn end_frame(&mut self) {
-        self.mounted.values_mut().for_each(Mounted::end_frame);
+        let now = Instant::now();
+        let mounted = self.mounted.values_mut();
+        mounted.for_each(|mounted| mounted.end_frame(now));
     }
 
     /// Renders, as needed, and composites each surface item of `items`.
@@ -126,10 +129,10 @@ impl Surfaces {
         painted: &Painted,
         items: &[Item],
     ) -> Result<(), PaintError> {
-        let waker = self.waker.clone();
+        let waker = Rc::clone(&self.waker);
         for (name, size, rect) in surfaces(painted, items) {
             let mounted = self.mounted(name)?;
-            let texture = mounted.prepare(target, size, turn(waker.as_ref()));
+            let texture = mounted.prepare(target, size, turn(&waker));
             pipeline.draw_rect(target, texture.map_err(|r| r.named(name))?, rect);
         }
         Ok(())
@@ -147,9 +150,9 @@ impl Surfaces {
         let Run::Surfaces(items) = run else {
             return Ok(());
         };
-        let waker = self.waker.clone();
+        let waker = Rc::clone(&self.waker);
         for (name, size, _) in surfaces(painted, items) {
-            let turn = turn(waker.as_ref());
+            let turn = turn(&waker);
             let claimed = self.mounted(name)?.claim(device, size, turn);
             claimed.map_err(|r| r.named(name))?;
         }
@@ -167,10 +170,10 @@ impl Surfaces {
     }
 }
 
-/// A turn now with `waker`, or one that wakes nothing.
-fn turn(waker: Option<&Waker>) -> Turn<'_> {
+/// A turn now with the loop's `waker`.
+fn turn(waker: &LoopWaker) -> Turn<'_> {
     Turn {
-        waker: waker.unwrap_or(Waker::noop()),
+        waker,
         now: Instant::now(),
     }
 }
