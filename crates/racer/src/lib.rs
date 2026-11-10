@@ -8,13 +8,16 @@ include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 /// Open the racer with the same implementation on desktop and WebGPU.
 ///
 /// # Errors
-/// A platform/window/GPU failure, reported with its cause.
+/// A platform/window/GPU failure, reported with its cause, or the HUD's
+/// failure (a refused update, a track render error) that ended the loop.
 pub fn run() -> Result<(), String> {
     vapors_platform::hide_page_controls();
     vapors_dom::set_error_report(
         "vapors_platform::report_error",
         vapors_platform::report_error,
     );
+    let racer = app::Racer::new();
+    let failure = racer.failure();
     vapors_platform::run(
         vapors_platform::WindowOptions {
             app_name: "vapors racer".into(),
@@ -22,9 +25,10 @@ pub fn run() -> Result<(), String> {
             width: 1100,
             height: 720,
         },
-        app::Racer::new(),
+        racer,
     )
-    .map_err(|error| error.to_string())
+    .map_err(|error| error.to_string())?;
+    failure.get().map_or(Ok(()), Err)
 }
 
 #[cfg(test)]
@@ -35,4 +39,9 @@ mod component_input_tests;
 
 // at the crate root, so each test's path starts `gpu_` as the gpu tier's filter needs
 #[cfg(test)]
+mod gpu_track_lifecycle_tests;
+#[cfg(test)]
 mod gpu_track_tests;
+
+#[cfg(test)]
+mod gpu_frames;

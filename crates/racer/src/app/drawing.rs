@@ -71,7 +71,7 @@ impl Racer {
             .show(self.scene(), moving)
             .map_err(|error| format!("the racer's track surface refused: {error}"))
     }
-    fn scene(&self) -> Scene {
+    pub(crate) fn scene(&self) -> Scene {
         Scene {
             race: self.run.race.clone(),
             camera: self.run.camera,

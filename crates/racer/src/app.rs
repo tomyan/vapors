@@ -7,7 +7,7 @@ use crate::{
 use state::{Faults, Pacing, Run};
 use std::{cell::RefCell, rc::Rc};
 use surface::TrackSurface;
-use vapors_app::ElementsApp;
+use vapors_app::{ElementsApp, Failure};
 use vapors_elements::Document;
 use vapors_platform::{App, Event, Frame, Next, Platform, report_error};
 use vapors_text::FontSystem;
@@ -42,6 +42,16 @@ impl Racer {
             framed: false,
             inspect: vapors_platform::query_parameter("inspect").as_deref() == Some("1"),
         }
+    }
+    /// Where the HUD's `ElementsApp` keeps why it stopped: `run` reads
+    /// it after the loop.
+    pub(crate) fn failure(&self) -> Failure {
+        self.app.failure()
+    }
+    fn hud_failure(&self) -> String {
+        self.failure().get().unwrap_or_else(|| {
+            "the HUD's ElementsApp ended the loop without a failure; it exits only on one".into()
+        })
     }
     pub(super) fn fail(&mut self, error: String) {
         report_error(&error);
@@ -117,6 +127,11 @@ impl App for Racer {
             return Next::Wait;
         }
         let next = self.app.frame(frame);
+        if next == Next::Exit {
+            // the ElementsApp failed and closed its surfaces: the racer ends
+            self.fail(self.hud_failure());
+            return Next::Exit;
+        }
         self.framed = true;
         if let Err(error) = self.report_frame(frame.index) {
             self.fail(error);

@@ -80,14 +80,26 @@ inner `frame`. For each event it calls `ElementsApp::give(&event,
 &platform)` in place of `App::event`: the document gets the event by
 `DocumentInput::give`'s rules (`document_input_route.rs`), and the
 answer says who it was for. `Route::Document`: the document had it alone
-(a press on its elements, a key its focused control used). `Route::Both`:
-the document had it and the app acts on it too (a key the focused
-element left, a window focus change). `Route::Host`: the app's alone; the
-document did not get it (a press where no element takes the pointer, a
-key with nothing focused). A pointer event the document cannot place is
-refused as `Unplaced` (`NotUpdated` before the first frame) and the
-document does not get it. `App::event` gives the document every event,
-as before: an `ElementsApp` alone has the window to itself.
+(a press on its elements, a key its focused control used, an edit or
+paste from the platform's text input that the focused field took).
+`Route::Both`: the document had it and the app acts on it too (a key the
+focused element left, Tab with nothing focused, which focuses the first
+control, a window focus change). `Route::Host`: the app's alone; the
+document did not get it (a press where no element takes the pointer,
+another key with nothing focused). `give` refuses with a `GiveError`: a
+pointer event the document cannot place (`GiveError::Unplaced`,
+`NotUpdated` before the first frame), which the document does not get;
+an edit from the text input the document refused (`EditRefused`); a paste
+from it with no text field focused (`PasteWithoutField`). The racer
+stops on the last two. `App::event` gives the document every event, as
+before, and reports refused text input and goes on: an `ElementsApp`
+alone has the window to itself. One `ElementsApp` takes events one way;
+a debug build refuses `give` and `App::event` on the same instance.
+
+When the inner `frame` returns `Next::Exit`, the `ElementsApp` failed
+and closed its surfaces: the wrapping app returns `Exit` at once, and
+whoever ran it reads the `Failure` cloned before `run` (the racer's
+`run` returns it as `Err`).
 
 ### Animation
 
