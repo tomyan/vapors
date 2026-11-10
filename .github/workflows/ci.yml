@@ -241,11 +241,12 @@ jobs:
   window:
     name: window
     runs-on: ubuntu-24.04 # pinned: a runner image change changes Mesa and so the screenshots
-    # About 2.5x (the job's worst without its apt step in the 37 runs to
-    # 2026-10-23, 103 s in run 39807737788, plus that step's worst with
-    # the cache, 13 s in run 39932437148). The uncached 733 s install in
-    # run 39803145234 is excluded: it is the slow mirror the cache avoids.
-    timeout-minutes: 5
+    # About 2.5x the worst cold run, 206 s (run 42714931127), plus about
+    # 9 s for the step added with the surface_gradient check: about 215 s,
+    # 2.5 x 215 s = 538 s, rounded up to 9 minutes. The uncached 733 s
+    # apt install in run 39803145234 is excluded: it is the slow mirror
+    # the cache avoids. Cleared by Tom on 2026-11-10.
+    timeout-minutes: 9
     env:
       VAPORS_GPU_ADAPTER: llvmpipe
     steps:
@@ -274,6 +275,10 @@ jobs:
       # The waker in a window: none idle, one frame per wake from a thread.
       - name: the waker in a window
         run: xvfb-run -a cargo run -p vapors-platform --example wake_window
+      # A gpu-surface renderer mounted on an ElementsApp: no frame and no
+      # render while idle, and an invalidate after the loop is LoopClosed.
+      - name: an idle gpu-surface in a window
+        run: xvfb-run -a cargo run -p vapors-app --example surface_gradient -- --check
       # The clipboard's image for Event::Paste: a PNG xclip sets reads
       # back as its pixels, text alone as no image, an unreachable
       # display as unreadable.
@@ -305,5 +310,5 @@ jobs:
         timeout-minutes: 1
         env:
           GH_TOKEN: ${{ github.token }}
-          TIMEOUT_MINUTES: 5
+          TIMEOUT_MINUTES: 9
         run: .github/scripts/report-timeout.sh
