@@ -102,3 +102,20 @@ fn gpu_moving_the_camera_writes_its_uniform_alone() {
     // Then
     assert_eq!(moved.buffer_bytes, CAMERA_BYTES);
 }
+
+#[test]
+fn gpu_a_mesh_added_later_uploads_its_geometry_and_writes_its_uniform_alone() {
+    // Given
+    let gpu = vapors_gpu_harness::gpu();
+    let (fixture, mut renderer, _, _) = drawn_once(&gpu);
+    let bigger = fixture.square(1.0);
+    let up = Transform::from_translation(Vec3::new(0.0, 2.0, 0.0)).unwrap();
+    fixture.mesh(fixture.root(), bigger, RED, up);
+
+    // When
+    let (_, added) = render_counted(&mut renderer, &gpu).expect("renders");
+
+    // Then
+    assert_eq!(added.buffer_bytes, SQUARE_BYTES + MESH_BYTES);
+    assert_eq!(added.draw_calls, 3);
+}
