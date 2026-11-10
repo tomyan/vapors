@@ -13,7 +13,8 @@ of pull requests under about 400 lines each.
 - `crates/elements/tests/sparse_updates.rs` with
   `support/rows_page.rs`: 100 and 1000 rows, the oracle after each edit;
   a same-size value edit, a resizing label edit, an equal write, hover,
-  focus. Reports the existing counters per edit and asserts them equal
+  focus, a class toggled on one row (`ToggleClass`, the `.row.marked`
+  background, added in PR 4). Reports the existing counters per edit and asserts them equal
   to the table below (`EXPECTED` in the test). A change to a count fails
   the test; the table is updated by hand with `EXPECTED`.
 - The baseline run is `VAPORS_SPARSE_ROWS=3000 cargo nextest run -p
@@ -39,6 +40,7 @@ of pull requests under about 400 lines each.
   | equal write | 0 | 0 | 0 |
   | hover | 4 | 0 | 0 |
   | focus | 1 | 0 | 0 |
+  | class toggled | 4 | 0 | 0 |
 
   These are cache misses. Each update still walks the whole tree; a
   debug-build update with nothing changed takes about 0.3 s at 3000 rows
@@ -80,11 +82,13 @@ style attribute, a refused tag, a calc that fails at layout).
 | equal write | 100 | 402 | 702 | 1 | 702 | 400 |
 | hover | 100 | 402 | 702 | 1 | 702 | 400 |
 | focus | 100 | 402 | 702 | 1 | 702 | 401 |
+| class toggled | 100 | 402 | 702 | 1 | 702 | 402 |
 | same-size value | 1000 | 4002 | 7002 | 1009 | 7002 | 4000 |
 | resizing label | 1000 | 4002 | 7002 | 1011 | 7002 | 4000 |
 | equal write | 1000 | 4002 | 7002 | 1 | 7002 | 4000 |
 | hover | 1000 | 4002 | 7002 | 1 | 7002 | 4000 |
 | focus | 1000 | 4002 | 7002 | 1 | 7002 | 4001 |
+| class toggled | 1000 | 4002 | 7002 | 1 | 7002 | 4002 |
 
 A row is 4 elements and 7 boxes and draws 4 items. What the counts show
 about the idle update (the equal write, where nothing is restyled, laid
@@ -145,6 +149,10 @@ Recorded in `docs/`: revision, profile (release), hardware and backend,
 scale, warmup, sampling; per-phase distributions (median, p90, max), not
 averages. No synchronous GPU waits in the normal path; GPU time only
 where timestamp queries exist. Timing is reported, never asserted in CI.
+
+Done: `crates/perf` (vapors-perf). The baseline and its findings are in
+`docs/perf/baseline-2026-11-10.md`: draw is 87% to 95% of every frame,
+because the painter submits once per draw call.
 
 ## PR 5 on: the remaining workloads
 
