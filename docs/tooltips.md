@@ -176,7 +176,10 @@ The text is laid out with the document's own fonts
 fallbacks registered on its `FontSystem`) in Geist, and wraps at
 `min(800, (window width + 1) / 2)` CSS px: views' `kTooltipMaxWidth`
 and `TooltipAura::GetMaxWidth` (`ui/views/corewm/tooltip_aura.cc`,
-read 2026-11-10), with the window in place of the display. Line breaks
+read 2026-11-10), with the window in place of the display. The width
+limits the text; the padding and border are outside it, as in
+`TooltipViewAura` (`ResetDisplayRect` gives the text the width,
+`CalculatePreferredSize` adds the insets). Line breaks
 in the title are kept. The box is the text plus padding and border,
 placed by `place_tooltip`; its edges and the text's origin are rounded
 to device pixels and its border width snapped as Blink snaps a

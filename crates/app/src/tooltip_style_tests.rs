@@ -56,6 +56,7 @@ fn the_tooltip_properties_set_on_the_root_are_read() {
 fn padding_takes_one_to_four_lengths_as_css_padding_does() {
     let cases = [
         ("5px", [5.0; 4]),
+        ("1px 2px", [1.0, 2.0, 1.0, 2.0]),
         ("1px 2px 3px", [1.0, 2.0, 3.0, 2.0]),
         ("1px 2px 3px 4px", [1.0, 2.0, 3.0, 4.0]),
     ];

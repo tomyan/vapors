@@ -10,7 +10,11 @@ use crate::tooltip_style::TooltipStyle;
 use crate::{Anchor, Point, Tooltip, TooltipTrigger, place_tooltip};
 
 /// The widest a tooltip's text runs before it wraps, CSS px: views'
-/// `kTooltipMaxWidth` (`ui/views/corewm/tooltip_aura.cc`).
+/// `kTooltipMaxWidth` (`ui/views/corewm/tooltip_aura.cc`). It limits the
+/// text, not the box: `TooltipViewAura::ResetDisplayRect` gives the
+/// text this width and `CalculatePreferredSize` adds the insets outside
+/// it (`tooltip_view_aura.cc`, read 2026-11-10), as the padding and
+/// border are added here.
 pub(crate) const MAX_TEXT_WIDTH: f32 = 800.0;
 
 /// What the painter draws, in device pixels: the box, and the text's
@@ -58,15 +62,19 @@ pub(crate) fn tooltip_box(
 ) -> Result<TooltipBox, TooltipError> {
     let size = outer_size(style, text_size);
     let at = place_tooltip(anchor, size, window).map_err(TooltipError::Placement)?;
-    let inset = style.border_width;
-    let text_at = [
-        at.x + inset + style.padding[3],
-        at.y + inset + style.padding[0],
-    ];
     Ok(TooltipBox {
         quad: quad(style, at, size, scale),
-        text_origin: text_at.map(|v| (v * scale).round()),
+        text_origin: text_origin(style, at, scale),
     })
+}
+
+/// The text's top-left in device pixels: inside the border as it is
+/// drawn (whole device pixels), then the padding, rounded as Blink
+/// snaps a content box.
+fn text_origin(style: &TooltipStyle, at: Point, scale: f32) -> [f32; 2] {
+    let border = border_pixels(style.border_width, scale);
+    let [top, _, _, left] = style.padding;
+    [(at.x, left), (at.y, top)].map(|(edge, pad)| (edge * scale + border + pad * scale).round())
 }
 
 /// The border box around text of `text_size`.

@@ -156,3 +156,22 @@ fn a_window_that_cannot_be_placed_in_is_refused() {
     // Then
     assert!(matches!(placed, Err(TooltipError::Placement(_))));
 }
+
+#[test]
+fn the_text_is_inset_by_the_border_as_drawn_in_whole_device_pixels() {
+    // Given: a 1px border at scale 1.5 is drawn 1 device px wide, and
+    // the pointer at (2, 0) places the box at (12, 15) CSS, (18, 22.5)
+    let style = TooltipStyle {
+        padding: [2.0; 4],
+        ..style()
+    };
+    let anchor = Anchor::Pointer(Point { x: 2.0, y: 0.0 });
+
+    // When
+    let placed = tooltip_box(&style, [20.0, 10.0], anchor, [200.0, 100.0], 1.5);
+
+    // Then: 18 + 1 + 3, and 22.5 + 1 + 3 rounded
+    let placed = placed.expect("placed");
+    assert_eq!(placed.quad.border, [1.0; 4]);
+    assert_eq!(placed.text_origin, [22.0, 27.0]);
+}
