@@ -6,6 +6,7 @@ use vapors_scene::{Color, Size};
 
 use crate::atlas::{AtlasError, AtlasGlyph, GlyphAtlas};
 use crate::layout::Layout;
+use crate::layout_types::PlacedGlyph;
 use crate::raster::{GlyphRequest, Hinting, subpixel_of};
 
 /// Vertex floats for every inked glyph of `layout`.
@@ -17,27 +18,54 @@ pub(crate) fn quads(
 ) -> Result<Vec<f32>, AtlasError> {
     let hinting = Hinting::for_scale(layout.scale());
     let page = atlas.coverage_page().size();
+    let placed = placed_all(
+        || layout.glyphs(),
+        |glyph| atlas.get(&request(glyph, origin[0], hinting).1),
+    )?;
     let mut floats = Vec::new();
-    for glyph in layout.glyphs() {
-        let (pixel_x, subpixel) = subpixel_of(origin[0] + glyph.x);
-        let baseline = (origin[1] + glyph.y).round();
-        let placed = atlas.get(&GlyphRequest {
-            font: glyph.font,
-            id: glyph.id,
-            size: glyph.size,
-            coords: glyph.coords,
-            subpixel,
-            hinting,
-            skew: glyph.skew,
-        })?;
+    for (glyph, placed) in layout.glyphs().zip(&placed) {
         if placed.is_empty() {
             continue;
         }
+        let pixel_x = request(&glyph, origin[0], hinting).0;
+        let baseline = (origin[1] + glyph.y).round();
         #[allow(clippy::cast_precision_loss)] // pixel positions
         let top_left = [(pixel_x + placed.left) as f32, baseline + placed.top as f32];
-        push_quad(&mut floats, top_left, &placed, page, viewport, glyph.color);
+        push_quad(&mut floats, top_left, placed, page, viewport, glyph.color);
     }
     Ok(floats)
+}
+
+/// Where each item is in the atlas once every one is placed. Placing one
+/// can evict and repack, moving those placed before it, so all are
+/// fetched first and their rects read in a second pass of cache hits.
+pub(crate) fn placed_all<T, I: Iterator<Item = T>>(
+    items: impl Fn() -> I,
+    mut fetch: impl FnMut(&T) -> Result<AtlasGlyph, AtlasError>,
+) -> Result<Vec<AtlasGlyph>, AtlasError> {
+    for item in items() {
+        fetch(&item)?;
+    }
+    items().map(|item| fetch(&item)).collect()
+}
+
+/// The glyph's whole-pixel x and its request at the quarter-pixel step.
+fn request<'a>(
+    glyph: &PlacedGlyph<'a>,
+    origin_x: f32,
+    hinting: Hinting,
+) -> (i32, GlyphRequest<'a>) {
+    let (pixel_x, subpixel) = subpixel_of(origin_x + glyph.x);
+    let request = GlyphRequest {
+        font: glyph.font,
+        id: glyph.id,
+        size: glyph.size,
+        coords: glyph.coords,
+        subpixel,
+        hinting,
+        skew: glyph.skew,
+    };
+    (pixel_x, request)
 }
 
 #[allow(clippy::cast_precision_loss)] // atlas and viewport sizes are far below 2^24
@@ -80,6 +108,47 @@ mod tests {
     use super::*;
     use crate::atlas::PageKind;
     use crate::pipeline::FLOATS_PER_VERTEX;
+    use crate::{AtlasConfig, Family, FontSystem, LayoutOptions, Style};
+
+    const VIEWPORT: Size = Size {
+        width: 64,
+        height: 64,
+    };
+
+    fn layout(system: &mut FontSystem, text: &str, size: f32) -> Layout {
+        let style = Style::new(Family::Geist, size);
+        Layout::new(system, text, &style, &LayoutOptions::default())
+    }
+
+    #[test]
+    fn a_glyph_moved_by_a_later_repack_in_the_same_layout_samples_its_final_rect() {
+        // Given: a tall l (7x29) from the last frame in a 30 px page; then a
+        // period (3x3) placed beside it and an M (18x17) that only fits once
+        // the l is evicted and the page repacked
+        let mut system = FontSystem::bundle_only();
+        let mut atlas = GlyphAtlas::new(AtlasConfig { page_size: 30 });
+        quads(
+            &mut atlas,
+            &layout(&mut system, "l", 40.0),
+            [0.0, 40.0],
+            VIEWPORT,
+        )
+        .expect("l");
+        atlas.begin_frame();
+
+        // When
+        let floats = quads(
+            &mut atlas,
+            &layout(&mut system, ".M", 24.0),
+            [0.0, 40.0],
+            VIEWPORT,
+        )
+        .expect("quads");
+
+        // Then: the repack moved the period to the corner, and its quad samples it there
+        assert_eq!(atlas.evictions(), 1);
+        assert_close(&floats[2..4], &[0.0, 0.0]);
+    }
 
     #[test]
     fn a_quad_maps_the_glyph_rect_to_its_atlas_coordinates() {

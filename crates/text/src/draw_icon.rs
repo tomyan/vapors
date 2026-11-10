@@ -4,13 +4,13 @@
 //! draw with gamma 1 and contrast 0, which the shader makes a plain blend
 //! of coverage.
 
-use vapors_scene::Color;
+use vapors_scene::{Color, Size};
 
 use crate::atlas::{AtlasError, GlyphAtlas};
 use crate::draw::RenderTarget;
 use crate::icon::Icon;
 use crate::pipeline::{BlendParams, TextPipeline};
-use crate::quads::push_quad;
+use crate::quads::{placed_all, push_quad};
 
 /// The blend icons draw with: coverage times the colour's alpha.
 pub const ICON_BLEND: BlendParams = BlendParams {
@@ -48,25 +48,32 @@ impl TextPipeline {
         atlas: &mut GlyphAtlas,
         icons: &[IconDraw<'_>],
     ) -> Result<(), AtlasError> {
-        let page = atlas.coverage_page().size();
-        let mut floats = Vec::new();
-        for draw in icons {
-            let placed = atlas.icon(draw.icon, draw.size)?;
-            if placed.is_empty() {
-                continue;
-            }
-            #[allow(clippy::cast_precision_loss)] // pixel positions
-            let top_left = draw.origin.map(|n| n as f32);
-            push_quad(
-                &mut floats,
-                top_left,
-                &placed,
-                page,
-                target.viewport,
-                draw.colour,
-            );
-        }
+        let floats = icon_quads(atlas, icons, target.viewport)?;
         self.submit(target, atlas, &floats, ICON_BLEND);
         Ok(())
     }
 }
+
+/// Vertex floats for every inked icon of `icons`.
+pub(crate) fn icon_quads(
+    atlas: &mut GlyphAtlas,
+    icons: &[IconDraw<'_>],
+    viewport: Size,
+) -> Result<Vec<f32>, AtlasError> {
+    let page = atlas.coverage_page().size();
+    let placed = placed_all(|| icons.iter(), |draw| atlas.icon(draw.icon, draw.size))?;
+    let mut floats = Vec::new();
+    for (draw, placed) in icons.iter().zip(&placed) {
+        if placed.is_empty() {
+            continue;
+        }
+        #[allow(clippy::cast_precision_loss)] // pixel positions
+        let top_left = draw.origin.map(|n| n as f32);
+        push_quad(&mut floats, top_left, placed, page, viewport, draw.colour);
+    }
+    Ok(floats)
+}
+
+#[cfg(test)]
+#[path = "draw_icon_tests.rs"]
+mod tests;
