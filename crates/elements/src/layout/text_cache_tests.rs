@@ -139,7 +139,10 @@ fn a_run_with_a_nan_letter_spacing_is_laid_out_like_a_fresh_one() {
     // Then: built again, and drawn as a fresh build is (compared as text,
     // since NaN is not equal to itself)
     assert_eq!(built, 2);
-    assert_eq!(format!("{:?}", drawn(&kept)), format!("{:?}", drawn(&fresh)));
+    assert_eq!(
+        format!("{:?}", drawn(&kept)),
+        format!("{:?}", drawn(&fresh))
+    );
 }
 
 #[test]
