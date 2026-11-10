@@ -92,11 +92,39 @@ CSS. Three decisions make that possible, and they are taken first:
 2. **Offscreen layers as shared painter infrastructure.** One mechanism
    renders a subtree to a texture and composites it, used by HTML
    `opacity`/`filter` (F3) and SVG `mask`/`opacity`/`filter`. Built once.
-3. **Antialiasing chosen against the Chromium oracle in the first slice.**
-   Measured on touche's icons at 1x and 2x with the existing paint_check
-   rules, comparing MSAA and edge-fringe. If neither is close enough at 1x,
-   small icons stay on the coverage-mask route (or move to B) and the item
-   format is unchanged.
+3. **Antialiasing happens last, chosen against the Chromium oracle in the
+   first slice.** See "Antialiasing after every transform" below. The
+   candidates are MSAA and analytic coverage in the fragment shader;
+   measured on touche's icons at 1x and 2x, and rotated and scaled, with the
+   existing paint_check rules. If neither is close enough at 1x for
+   untransformed small icons, those stay on the coverage-mask route (or move
+   to B) and the item format is unchanged.
+
+## Antialiasing after every transform
+
+SVG and CSS allow arbitrary transforms: rotation, non-uniform scale, a zoom
+past the scale content was prepared at, and in a 3D scene, perspective.
+Antialiasing done before a transform is resampled by it, and edges blur or
+alias. So coverage is computed per device pixel, after all transforms, at
+draw time. Consequences:
+
+- Anything that bakes coverage early is limited to untransformed content:
+  the icon route's atlas masks (rasterised at one device size, placed axis
+  aligned at whole device pixels), and an antialiasing fringe built on the
+  CPU (its width is a screen-space quantity).
+- Geometry is independent of antialiasing, so compile-time tessellation
+  stays valid. The exception is curve flattening, which depends on the
+  final scale: either flatten at the largest supported scale, or evaluate
+  curves in the fragment shader (Loop-Blinn style), which is exact at any
+  scale.
+- Late options under A: MSAA, resolved by the GPU after every transform,
+  with coverage resolution limited to the sample count; or analytic coverage
+  in the fragment shader from screen-space derivatives (`fwidth`) of the
+  distance to an edge or curve, as vapors' box shader already does. Both
+  work under rotation and perspective.
+- B antialiases in its 2D target after affine transforms, which is late for
+  2D; under 3D perspective its output is a texture that is then mapped, so
+  coverage is baked again.
 
 ## Compile time
 
@@ -122,10 +150,13 @@ The compiler already turns `.wisp` templates into Rust. For SVG it can:
 - **Hit testing and accessibility.** Pointer events land on the painted
   shape, not its bounding box. `role`, `<title>` and `aria-*` go through the
   existing accessibility projection, checked against Chromium's tree.
-- **3D.** An `<svg>` rendered to a texture is a material, through 3D slice
-  3b (a layer texture as a material). A path's mesh is ordinary geometry for
-  flat or extruded vector shapes in a scene, under the 3D brief's shared
-  geometry and material ownership. An `<svg>` over a `gpu-surface` is
+- **3D.** Two ways, with different antialiasing. An `<svg>` rendered to a
+  texture is a material, through 3D slice 3b (a layer texture as a
+  material); its coverage is baked at the texture's resolution, which suits
+  distant surfaces with mipmaps but is soft up close. For crisp vectors in a
+  scene, the vector item is drawn directly in the 3D pass with late
+  antialiasing; a path's mesh is then ordinary geometry for flat or extruded
+  shapes, under the 3D brief's shared geometry and material ownership. An `<svg>` over a `gpu-surface` is
   ordinary UI.
 - **Incremental contracts** (docs/design/incremental-contracts.md). Each
   element keeps its mesh; a transform or colour change updates without
@@ -134,8 +165,9 @@ The compiler already turns `.wisp` templates into Rust. For SVG it can:
 ## Proposed slices
 
 1. The vector display item and the antialiasing test: tessellate touche's
-   ten icons with A, draw them through the item, compare with Chromium at
-   1x and 2x beside the icon route's numbers. Decides antialiasing (point 3
+   ten icons with A, draw them through the item with MSAA and with shader
+   coverage, compare with Chromium at 1x and 2x and under a rotation and a
+   non-integer scale, beside the icon route's numbers. Decides antialiasing (point 3
    above). No template change.
 2. `<path>` with fill and stroke paint from CSS in templates, through the
    item; the icon subset moves onto it and the atlas route, the 256 px cap
