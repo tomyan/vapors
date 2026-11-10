@@ -12,7 +12,7 @@ needs no camera, depth or scene.
 |---|---|---|
 | 1a | `gpu-surface` element, `Item::Surface` in the display list, the refusals | #139 |
 | 1b | `SurfaceRenderer` and the painter's surface host: offscreen texture, resize, scale, clip, on-demand rendering, failures | #140 |
-| 1b2 | `ElementsApp` mounting, `SurfaceHandle`, `Next` from `wants_frame`; the gradient example | this PR |
+| 1b2 | `ElementsApp` mounting, `SurfaceHandle`, `Next` from `wants_frame`; the gradient example | #141 and this PR |
 | 1c | the racer's renderer mounted through the surface; two panels; surface-local input | after 1b |
 | 2-5 | scene, cameras, components, instances, tasks | not started |
 
