@@ -26,7 +26,7 @@
 //! [`CameraHandle`].
 //!
 //! A mesh node names its triangles by [`GeometryId`], issued by a
-//! [`Meshes`] that validates them and queues them for the scene
+//! [`Meshes`] that validates them and holds them for each scene
 //! renderer (`vapors-scene3d-gpu`) to upload once.
 
 mod camera;

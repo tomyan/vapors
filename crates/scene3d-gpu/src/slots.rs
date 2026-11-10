@@ -1,13 +1,15 @@
 //! One uniform slot per mesh node in one buffer, bound at the slot's
 //! dynamic offset. A slot is written when it does not hold its node's
-//! current world version, and not otherwise.
+//! current world version, and not otherwise; a removed node's slot is
+//! reused (`slot_table`).
 
+use crate::FrameError;
 use crate::pipeline::{MESH_BYTES, Pipeline};
-use std::collections::HashMap;
+use crate::slot_table::{SlotTable, capacity_for};
 use vapors_scene3d::{Colour, Mat4, NodeId};
 
 /// Slots the first buffer holds; a full one is replaced by one holding
-/// the next power of two.
+/// the next power of two, up to the device's `max_buffer_size`.
 const FIRST_CAPACITY: u32 = 16;
 
 pub(crate) struct Slots {
@@ -15,13 +17,7 @@ pub(crate) struct Slots {
     bind_group: wgpu::BindGroup,
     stride: u32,
     capacity: u32,
-    of: HashMap<NodeId, Slot>,
-}
-
-/// Where a node's uniform sits, and the world version it holds.
-struct Slot {
-    index: u32,
-    written: Option<u64>,
+    table: SlotTable,
 }
 
 impl Slots {
@@ -35,40 +31,42 @@ impl Slots {
             bind_group,
             stride,
             capacity: FIRST_CAPACITY,
-            of: HashMap::new(),
+            table: SlotTable::default(),
         }
     }
 
-    /// Gives each of `nodes` without a slot one, growing the buffer
-    /// when full. A grown buffer holds nothing, so every slot is then
-    /// unwritten.
-    pub(crate) fn assign(&mut self, device: &wgpu::Device, pipeline: &Pipeline, nodes: &[NodeId]) {
-        for node in nodes {
-            let index = u32::try_from(self.of.len()).expect("fewer than 2^32 mesh nodes");
-            self.of.entry(*node).or_insert(Slot {
-                index,
-                written: None,
-            });
-        }
-        let needed = u32::try_from(self.of.len()).expect("fewer than 2^32 mesh nodes");
+    /// Frees the slots of nodes not in `nodes` and gives each of `nodes`
+    /// without a slot one, growing the buffer when full. A grown buffer
+    /// holds nothing, so every slot is then unwritten.
+    ///
+    /// # Errors
+    ///
+    /// [`FrameError::TooManySlots`] past the device's `max_buffer_size`.
+    pub(crate) fn assign(
+        &mut self,
+        device: &wgpu::Device,
+        pipeline: &Pipeline,
+        nodes: &[NodeId],
+    ) -> Result<(), FrameError> {
+        let needed = self.table.assign(nodes);
         if needed <= self.capacity {
-            return;
+            return Ok(());
         }
-        self.capacity = needed.next_power_of_two();
+        let limit = device.limits().max_buffer_size;
+        self.capacity = capacity_for(needed, self.stride, limit)?;
         (self.buffer, self.bind_group) = allocate(device, pipeline, self.stride, self.capacity);
-        self.of.values_mut().for_each(|slot| slot.written = None);
+        self.table.forget_written();
+        Ok(())
     }
 
     /// Whether `node`'s slot holds world version `version`.
     pub(crate) fn holds(&self, node: NodeId, version: u64) -> bool {
-        self.of
-            .get(&node)
-            .is_some_and(|slot| slot.written == Some(version))
+        self.table.holds(node, version)
     }
 
     /// `node`'s slot's byte offset; `None` before [`Slots::assign`].
     pub(crate) fn offset(&self, node: NodeId) -> Option<u32> {
-        self.of.get(&node).map(|slot| slot.index * self.stride)
+        self.table.index(node).map(|index| index * self.stride)
     }
 
     /// Writes `node`'s slot with `world`, at world version `version`,
@@ -81,15 +79,13 @@ impl Slots {
         world: Mat4,
         colour: Colour,
     ) {
-        let slot = self
-            .of
-            .get_mut(&node)
+        let index = self
+            .table
+            .mark_written(node, version)
             .expect("every mesh node is assigned a slot before it is written");
-        slot.written = Some(version);
-        let offset = slot.index * self.stride;
         let floats = world.to_cols_array().into_iter().chain(colour.rgba());
         let bytes: Vec<u8> = floats.flat_map(f32::to_le_bytes).collect();
-        queue.write_buffer(&self.buffer, u64::from(offset), &bytes);
+        queue.write_buffer(&self.buffer, u64::from(index * self.stride), &bytes);
     }
 
     pub(crate) fn bind_group(&self) -> &wgpu::BindGroup {

@@ -1,7 +1,7 @@
 //! Finding the mesh nodes and recording their draws.
 
 use crate::FrameError;
-use crate::geometry::{GpuGeometry, Uploaded};
+use crate::geometry::Uploaded;
 use vapors_scene3d::{Colour, GeometryId, Meshes, NodeId, NodeKind, Scene};
 
 /// A mesh node to draw.
@@ -17,22 +17,29 @@ pub(crate) fn mesh_nodes(scene: &Scene, meshes: &Meshes) -> Result<Vec<MeshNode>
     let mut found = Vec::new();
     let mut stack = vec![scene.root()];
     while let Some(node) = stack.pop() {
-        if let NodeKind::Mesh { geometry, colour } = scene.kind(node)? {
-            if !meshes.issued(*geometry) {
-                return Err(FrameError::ForeignGeometry {
-                    node,
-                    geometry: *geometry,
-                });
-            }
-            found.push(MeshNode {
-                node,
-                geometry: *geometry,
-                colour: *colour,
-            });
-        }
+        found.extend(mesh_node(node, scene.kind(node)?, meshes)?);
         stack.extend(scene.children(node)?.iter().rev());
     }
     Ok(found)
+}
+
+/// `node` to draw when it is a mesh naming geometry `meshes` issued.
+fn mesh_node(
+    node: NodeId,
+    kind: &NodeKind,
+    meshes: &Meshes,
+) -> Result<Option<MeshNode>, FrameError> {
+    let NodeKind::Mesh { geometry, colour } = *kind else {
+        return Ok(None);
+    };
+    if !meshes.issued(geometry) {
+        return Err(FrameError::ForeignGeometry { node, geometry });
+    }
+    Ok(Some(MeshNode {
+        node,
+        geometry,
+        colour,
+    }))
 }
 
 /// What one pass draws with.
@@ -86,12 +93,4 @@ fn begin<'e>(encoder: &'e mut wgpu::CommandEncoder, pass: &Pass<'_>) -> wgpu::Re
         occlusion_query_set: None,
         multiview_mask: None,
     })
-}
-
-/// `GpuGeometry`'s buffers for an id `Meshes` issued; every issued piece
-/// is uploaded before the draws are gathered.
-pub(crate) fn uploaded(geometry: &GpuGeometry, id: GeometryId) -> &Uploaded {
-    geometry
-        .get(id)
-        .expect("geometry Meshes issued is uploaded at the start of render")
 }

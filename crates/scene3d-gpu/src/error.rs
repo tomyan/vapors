@@ -22,6 +22,26 @@ pub enum FrameError {
         /// The geometry it names.
         geometry: GeometryId,
     },
+    /// A mesh node names geometry its `Meshes` issued but no longer
+    /// holds, and this renderer has not uploaded.
+    GeometryMissing {
+        /// The mesh node.
+        node: NodeId,
+        /// The geometry it names.
+        geometry: GeometryId,
+    },
+    /// The active camera resolved to a node that is not a camera.
+    ActiveCameraNotCamera(NodeId),
+    /// The mesh uniform slots would need a buffer past the device's
+    /// `max_buffer_size`.
+    TooManySlots {
+        /// Slots needed.
+        slots: u32,
+        /// Bytes per slot.
+        stride: u32,
+        /// The device's `max_buffer_size`, in bytes.
+        limit: u64,
+    },
 }
 
 impl From<StoreError> for FrameError {
@@ -52,6 +72,22 @@ impl fmt::Display for FrameError {
             Self::ForeignGeometry { node, geometry } => write!(
                 f,
                 "mesh {node} names {geometry}, which the renderer's Meshes did not issue: give it geometry from the Meshes passed to SceneRenderer::new"
+            ),
+            Self::GeometryMissing { node, geometry } => write!(
+                f,
+                "mesh {node} names {geometry}, which its Meshes no longer holds: release geometry only after removing every mesh node that names it"
+            ),
+            Self::ActiveCameraNotCamera(node) => write!(
+                f,
+                "the active camera resolved to node {node}, which is not a camera: a vapors-scene3d defect; report it with the scene that produced it"
+            ),
+            Self::TooManySlots {
+                slots,
+                stride,
+                limit,
+            } => write!(
+                f,
+                "the scene needs {slots} mesh uniform slots of {stride} bytes, past this device's max_buffer_size of {limit} bytes: draw fewer mesh nodes in one scene"
             ),
         }
     }

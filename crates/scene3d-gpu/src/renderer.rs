@@ -1,7 +1,7 @@
 //! `SceneRenderer`: the scene on a `gpu-surface`.
 
 use crate::camera::{CameraUniform, view_projection};
-use crate::draw::{MeshNode, Pass, mesh_nodes, record, uploaded};
+use crate::draw::{MeshNode, Pass, mesh_nodes, record};
 use crate::geometry::GpuGeometry;
 use crate::pipeline::Pipeline;
 use crate::slots::Slots;
@@ -62,17 +62,19 @@ impl SurfaceRenderer for SceneRenderer {
         let (Some(mounted), Some(depth)) = (self.mounted.as_mut(), self.depth.as_ref()) else {
             return Err(FrameError::NotReady.into());
         };
-        let mut meshes = self.meshes.borrow_mut();
-        mounted.geometry.upload_queued(frame.device, &mut meshes);
+        let meshes = self.meshes.borrow();
         let mut scene = self.scene.borrow_mut();
         scene.update();
         let nodes = mesh_nodes(&scene, &meshes)?;
+        let find = |id| meshes.get(id);
+        mounted
+            .geometry
+            .upload_missing(frame.device, &nodes, find)?;
         mounted
             .camera
             .write(frame.queue, view_projection(&scene, frame.size)?);
         mounted.write_slots(&frame, &scene, &nodes)?;
-        mounted.draw(&mut frame, depth, &nodes);
-        Ok(())
+        Ok(mounted.draw(&mut frame, depth, &nodes)?)
     }
 }
 
@@ -86,7 +88,7 @@ impl Mounted {
         nodes: &[MeshNode],
     ) -> Result<(), FrameError> {
         let ids: Vec<NodeId> = nodes.iter().map(|mesh| mesh.node).collect();
-        self.slots.assign(frame.device, &self.pipeline, &ids);
+        self.slots.assign(frame.device, &self.pipeline, &ids)?;
         for mesh in nodes {
             let version = scene.world_version(mesh.node)?;
             if !self.slots.holds(mesh.node, version) {
@@ -98,16 +100,16 @@ impl Mounted {
         Ok(())
     }
 
-    fn draw(&self, frame: &mut SurfaceFrame<'_>, depth: &wgpu::TextureView, nodes: &[MeshNode]) {
-        let draws: Vec<_> = nodes
+    fn draw(
+        &self,
+        frame: &mut SurfaceFrame<'_>,
+        depth: &wgpu::TextureView,
+        nodes: &[MeshNode],
+    ) -> Result<(), FrameError> {
+        let draws = nodes
             .iter()
-            .map(|mesh| {
-                (
-                    self.offset(mesh.node),
-                    uploaded(&self.geometry, mesh.geometry),
-                )
-            })
-            .collect();
+            .map(|mesh| Ok((self.offset(mesh.node), self.geometry.get(mesh)?)))
+            .collect::<Result<Vec<_>, FrameError>>()?;
         let pass = Pass {
             pipeline: &self.pipeline.render,
             camera: self.camera.bind_group(),
@@ -116,6 +118,7 @@ impl Mounted {
             depth,
         };
         record(frame.encoder, &pass, &draws);
+        Ok(())
     }
 
     fn offset(&self, node: NodeId) -> u32 {

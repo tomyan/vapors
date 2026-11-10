@@ -60,7 +60,7 @@ impl CameraUniform {
 pub(crate) fn view_projection(scene: &Scene, size: SurfaceSize) -> Result<Mat4, FrameError> {
     let camera = scene.active_camera()?;
     let NodeKind::Camera { projection, .. } = scene.kind(camera)? else {
-        unreachable!("active_camera returns a camera node");
+        return Err(FrameError::ActiveCameraNotCamera(camera));
     };
     #[allow(clippy::cast_precision_loss)] // texture sizes are at most 2^14
     let aspect = size.width as f32 / size.height as f32;

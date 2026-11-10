@@ -5,21 +5,30 @@ fn triangle() -> Vec<Vec3> {
 }
 
 #[test]
-fn given_geometry_is_queued_once_under_its_id() {
+fn given_geometry_is_held_under_its_id_for_every_reader() {
     // Given
     let mut meshes = Meshes::new();
     let id = meshes.geometry(triangle(), vec![0, 1, 2]).unwrap();
 
-    // When
-    let first = meshes.take_queued();
-    let second = meshes.take_queued();
+    // When: two renderers read it
+    let first = meshes.get(id).cloned();
+    let second = meshes.get(id).cloned();
 
     // Then
-    assert_eq!(first.len(), 1);
-    assert_eq!(first[0].0, id);
-    assert_eq!(first[0].1.positions(), &triangle()[..]);
-    assert_eq!(first[0].1.indices(), &[0, 1, 2]);
-    assert_eq!(second, []);
+    let geometry = first.expect("held");
+    assert_eq!(geometry.positions(), &triangle()[..]);
+    assert_eq!(geometry.indices(), &[0, 1, 2]);
+    assert_eq!(second, Some(geometry));
+}
+
+#[test]
+fn geometry_from_another_meshes_is_not_found_in_this_one() {
+    // Given
+    let ours = Meshes::new();
+    let foreign = Meshes::new().geometry(triangle(), vec![0, 1, 2]).unwrap();
+
+    // Then
+    assert_eq!(ours.get(foreign), None);
 }
 
 #[test]
@@ -36,7 +45,7 @@ fn an_id_from_another_meshes_is_not_issued_by_this_one() {
 }
 
 #[test]
-fn geometry_the_scene_cannot_draw_is_refused_and_not_queued() {
+fn geometry_the_scene_cannot_draw_is_refused_and_not_held() {
     let cases: [(Vec<Vec3>, Vec<u32>, MeshError); 6] = [
         (vec![], vec![0, 1, 2], MeshError::NoPositions),
         (
@@ -70,7 +79,7 @@ fn geometry_the_scene_cannot_draw_is_refused_and_not_queued() {
 
         // Then
         assert_eq!(result, Err(refusal));
-        assert_eq!(meshes.take_queued(), []);
+        assert!(meshes.held.is_empty());
     }
 }
 
