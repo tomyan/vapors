@@ -17,6 +17,13 @@ Later choices are tested against these three. A claim of "best in class"
 is made only with measurements against named competitors on the same
 workloads (docs/briefs/INCREMENTAL_UI_PERFORMANCE_BRIEF.md says the same).
 
+## Horizon
+
+vapors was about three weeks old on 2026-11-10. Tom: "So far vapors is
+around 3 weeks old, so can think of it as a prospect in 3months." The
+pillars below are judged as a prospect at about three months (around
+2027-02-10), not by today's state.
+
 ## Where each pillar stands (2026-11-10)
 
 **DX and AX**
