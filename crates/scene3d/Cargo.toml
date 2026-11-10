@@ -1,0 +1,15 @@
+[package]
+name = "vapors-scene3d"
+description = "The declarative 3D scene's maths, validation and nodes (docs/plans/3d-2.md)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+glam.workspace = true
+
+[lints]
+workspace = true
