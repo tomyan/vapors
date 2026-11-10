@@ -89,7 +89,8 @@ renderer)`; `unmount` hands it back and dropping it is teardown.
   Other frames composite the last render: an idle surface renders
   nothing.
 - `ScenePainter::wants_frame()` is true while an active surface is
-  invalidated or animating; the app returns `Next::Continue` then.
+  invalidated or animating, and for a renderer mounted since the last
+  frame; the app returns `Next::Continue` then.
 - Backing: one texture per surface, `SURFACE_FORMAT` (`Rgba8Unorm`)
   holding sRGB-encoded values with straight alpha, the `img`
   convention; composited with alpha blending, unscaled (the backing is
@@ -97,14 +98,20 @@ renderer)`; `unmount` hands it back and dropping it is teardown.
   mapping or colour management is applied by the surface.
 - A surface not painted in a frame (hidden, zero-sized, `display:
   none`, wholly clipped, or removed) is inactive: its backing is
-  released and it is not rendered.
+  released and it is not rendered. A refused frame also releases the
+  backings it did not reach. The renderer is not told: it keeps its own
+  resources until it is unmounted. A `deactivate` hook, called when the
+  backing is released, would let it free them; there is none yet.
 
 Refused, failing the frame (`PaintError`), each naming the surface:
 `Unmounted` (no renderer), `DuplicateName` (two surfaces with one name
 in a frame), `TooLarge` (backing over the device's
 `max_texture_dimension_2d`), `Renderer` (an error from `mount`,
-`resize` or `render`; the frame is never shown with stale or blank
-content). A wholly clipped surface is refused for `Unmounted`,
+`resize` or `render`, or a GPU validation error made in one, caught by
+an error scope around each call, `render`'s around its submit too; the
+frame is never shown with stale or blank content). Native wgpu resolves
+the scope in the frame; on the web it resolves later, and the
+surface's next frame is refused instead. A wholly clipped surface is refused for `Unmounted`,
 `DuplicateName` and `TooLarge` as one in view is, though it is not
 rendered, so scrolling a surface into view cannot be the first time it
 fails. `ElementsApp` reports a failed frame and stops. `mount`,

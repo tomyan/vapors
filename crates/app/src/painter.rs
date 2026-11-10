@@ -80,11 +80,20 @@ impl ScenePainter {
         self.paint(target, painted).map_err(DrawOverError::Paint)
     }
 
-    /// Each run of the scene, in order, under its clip.
+    /// Each run of the scene, in order, under its clip. A refused frame
+    /// still ends the surfaces' frame: those it did not paint are inactive.
     fn paint(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
         self.atlas.begin_frame();
         self.textures.begin_frame();
         self.surfaces.begin_frame();
+        let runs = self.paint_runs(target, painted);
+        self.surfaces.end_frame();
+        runs?;
+        self.textures.end_frame();
+        Ok(())
+    }
+
+    fn paint_runs(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
         for batch in painted.scene().batches() {
             match clipped(target, batch.clip) {
                 Some(clipped) => self.draw_run(&clipped, painted, batch.run)?,
@@ -93,8 +102,6 @@ impl ScenePainter {
                     .check_clipped(target.device, painted, &batch.run)?,
             }
         }
-        self.textures.end_frame();
-        self.surfaces.end_frame();
         Ok(())
     }
 

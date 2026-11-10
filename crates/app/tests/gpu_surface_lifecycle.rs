@@ -6,7 +6,7 @@
 #[path = "support/surface.rs"]
 mod support;
 
-use support::{RED, Rig, Solid, document, pixel, update};
+use support::{BLUE, RED, Rig, Solid, document, pixel, update};
 use vapors_app::{MountError, PaintError};
 use vapors_dom::Dom;
 use vapors_elements::Document;
@@ -43,7 +43,7 @@ fn gpu_a_frame_with_nothing_changed_composites_the_last_render() {
     // Then
     assert_eq!(pixel(&rgba, 4, 4), RED);
     let log = log.borrow();
-    assert_eq!((log.mounts, log.resizes.len(), log.renders), (1, 1, 1));
+    assert_eq!((log.mounts, log.resizes.len(), log.frames.len()), (1, 1, 1));
     assert!(!rig.painter.wants_frame());
 }
 
@@ -61,7 +61,7 @@ fn gpu_invalidating_a_surface_renders_it_on_the_next_frame_only() {
 
     // Then
     assert!(wanted);
-    assert_eq!(log.borrow().renders, 2);
+    assert_eq!(log.borrow().frames.len(), 2);
     assert!(!rig.painter.wants_frame());
 }
 
@@ -77,25 +77,28 @@ fn gpu_an_animating_surface_renders_every_frame_and_wants_the_next() {
     rig.draw(&doc).expect("draws");
 
     // Then
-    assert_eq!(log.borrow().renders, 3);
+    assert_eq!(log.borrow().frames.len(), 3);
     assert!(rig.painter.wants_frame());
 }
 
 #[test]
-fn gpu_resizing_the_surface_reallocates_its_backing_once() {
+fn gpu_resizing_the_surface_renders_a_new_backing_at_the_new_size_once() {
     // Given
-    let (solid, log) = Solid::new(RED);
+    let (mut solid, log) = Solid::new(RED);
+    solid.edge = Some(BLUE);
     let (mut rig, mut doc) = drawn_once(solid);
 
     // When
     restyle(&mut doc, "track wide");
     rig.draw(&doc).expect("draws");
-    rig.draw(&doc).expect("draws");
+    let rgba = rig.draw(&doc).expect("draws");
 
     // Then
-    let widths: Vec<u32> = log.borrow().resizes.iter().map(|size| size.width).collect();
-    assert_eq!(widths, [16, 24]);
-    assert_eq!(log.borrow().renders, 2);
+    let widths =
+        |sizes: &[vapors_app::SurfaceSize]| sizes.iter().map(|s| s.width).collect::<Vec<_>>();
+    assert_eq!(widths(&log.borrow().resizes), [16, 24]);
+    assert_eq!(widths(&log.borrow().frames), [16, 24]);
+    assert_eq!([pixel(&rgba, 22, 4), pixel(&rgba, 23, 4)], [RED, BLUE]);
 }
 
 #[test]
@@ -115,7 +118,7 @@ fn gpu_a_hidden_surface_is_inactive_until_shown_again() {
     // Then
     assert!(!wanted_while_hidden);
     let log = log.borrow();
-    assert_eq!((log.mounts, log.resizes.len(), log.renders), (1, 2, 2));
+    assert_eq!((log.mounts, log.resizes.len(), log.frames.len()), (1, 2, 2));
 }
 
 #[test]
@@ -131,6 +134,25 @@ fn gpu_unmounting_drops_the_renderer_and_the_surface_is_then_refused() {
     // Then
     assert!(log.borrow().dropped);
     assert!(matches!(refused, PaintError::Unmounted(ref name) if name == "track"));
+}
+
+#[test]
+fn gpu_a_renderer_remounted_on_a_name_while_idle_wants_a_frame_and_renders_in_it() {
+    // Given
+    let (mut rig, doc) = drawn_once(Solid::new(RED).0);
+    let (blue, log) = Solid::new(BLUE);
+
+    // When
+    rig.painter.unmount("track").expect("mounted");
+    rig.painter.mount("track", Box::new(blue)).expect("mounts");
+    let wanted = rig.painter.wants_frame();
+    let rgba = rig.draw(&doc).expect("draws");
+
+    // Then
+    assert!(wanted);
+    assert_eq!(pixel(&rgba, 4, 4), BLUE);
+    assert_eq!(log.borrow().frames.len(), 1);
+    assert!(!rig.painter.wants_frame());
 }
 
 #[test]

@@ -63,6 +63,18 @@ pub struct SurfaceFrame<'a> {
 /// [`ScenePainter::invalidate`](crate::ScenePainter::invalidate), and on
 /// every frame while `animating`. Unmounting drops the renderer: teardown
 /// is `Drop`. A frame that does not need a render composites the last one.
+///
+/// A surface not painted in a frame is inactive: the painter releases its
+/// backing, but the renderer is not told and keeps its own resources
+/// (pipelines, buffers, a depth texture) until it is unmounted. A
+/// `deactivate` hook called when the backing is released would let it
+/// free them; there is none yet.
+///
+/// A GPU validation error made in `mount`, `resize` or `render` (the
+/// encoder is submitted inside the same error scope) is refused as the
+/// renderer's failure, naming the surface. Native wgpu reports it in the
+/// frame that made it; the web reports it later, and the surface's next
+/// frame is refused instead.
 pub trait SurfaceRenderer {
     /// Creates persistent resources (pipelines, buffers) on the shared
     /// device.

@@ -2,12 +2,13 @@
 //! otherwise have to approximate (docs/gpu-surface.md): a backing larger
 //! than the device allows, two surfaces sharing one name and an
 //! unmounted surface, each also when the surface is clipped out of view;
-//! and `draw_over` refusing as `draw` does.
+//! a renderer's GPU validation error; what a refused frame releases; and
+//! `draw_over` refusing as `draw` does.
 
 #[path = "support/surface.rs"]
 mod support;
 
-use support::{RED, Rig, Solid, bare_document, document, update};
+use support::{BLUE, Misfit, RED, Rig, Solid, bare_document, document, update};
 use vapors_app::{DrawOverError, PaintError};
 use vapors_elements::Document;
 
@@ -124,8 +125,60 @@ fn gpu_a_mounted_surface_clipped_out_of_view_is_not_rendered_and_holds_no_backin
 
     // Then
     let log = log.borrow();
-    assert_eq!((log.mounts, log.resizes.len(), log.renders), (0, 0, 0));
+    assert_eq!((log.mounts, log.resizes.len(), log.frames.len()), (0, 0, 0));
     assert!(!rig.painter.wants_frame());
+}
+
+#[test]
+fn gpu_a_renderer_gpu_validation_error_refuses_the_frame_naming_the_surface() {
+    // Given
+    let mut doc = document(
+        ".track { width: 8px; height: 8px; }",
+        &[(None, "gpu-surface", "track")],
+    );
+    update(&mut doc, 1.0);
+    let mut rig = Rig::new();
+    rig.painter
+        .mount("track", Box::new(Misfit::default()))
+        .expect("mounts");
+
+    // When
+    let refused = rig.draw(&doc).expect_err("refused");
+
+    // Then
+    assert!(
+        matches!(refused, PaintError::Renderer { ref surface, .. } if surface == "track"),
+        "{refused:?}"
+    );
+    assert!(refused.to_string().contains("Bgra8Unorm"), "{refused}");
+}
+
+#[test]
+fn gpu_a_refused_frame_releases_the_backings_it_did_not_paint() {
+    // Given
+    let css = "gpu-surface { display: block; width: 8px; height: 8px; }";
+    let elements = [
+        (None, "gpu-surface", "left"),
+        (None, "gpu-surface", "right"),
+    ];
+    let mut doc = document(css, &elements);
+    update(&mut doc, 1.0);
+    let mut rig = Rig::new();
+    let (right, log) = Solid::new(BLUE);
+    rig.painter
+        .mount("left", Box::new(Solid::new(RED).0))
+        .expect("mounts");
+    rig.painter.mount("right", Box::new(right)).expect("mounts");
+    rig.draw(&doc).expect("draws");
+
+    // When
+    let left = rig.painter.unmount("left").expect("mounted");
+    rig.draw(&doc).expect_err("refused: left is unmounted");
+    rig.painter.mount("left", left).expect("mounts");
+    rig.draw(&doc).expect("draws");
+
+    // Then
+    assert_eq!(log.borrow().resizes.len(), 2);
 }
 
 #[test]

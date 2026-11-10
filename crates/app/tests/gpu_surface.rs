@@ -60,6 +60,56 @@ fn gpu_at_scale_two_the_backing_is_in_device_pixels() {
 }
 
 #[test]
+fn gpu_a_scale_change_renders_a_new_backing_at_the_new_device_size() {
+    // Given
+    let mut doc = document(
+        ".track { width: 8px; height: 8px; }",
+        &[(None, "gpu-surface", "track")],
+    );
+    update(&mut doc, 1.0);
+    let mut rig = Rig::new();
+    let (mut solid, log) = Solid::new(RED);
+    solid.edge = Some(BLUE);
+    rig.painter.mount("track", Box::new(solid)).expect("mounts");
+    rig.draw(&doc).expect("draws");
+
+    // When
+    update(&mut doc, 2.0);
+    let rgba = rig.draw(&doc).expect("draws");
+
+    // Then
+    let scales: Vec<(u32, f32)> = log
+        .borrow()
+        .frames
+        .iter()
+        .map(|s| (s.width, s.scale))
+        .collect();
+    assert_eq!(scales, [(8, 1.0), (16, 2.0)]);
+    assert_eq!([pixel(&rgba, 14, 4), pixel(&rgba, 15, 4)], [RED, BLUE]);
+}
+
+#[test]
+fn gpu_a_half_transparent_surface_is_blended_over_the_page() {
+    // Given
+    let mut doc = document(AT_8, &[(None, "gpu-surface", "track")]);
+    update(&mut doc, 1.0);
+    let mut rig = Rig::new();
+    let solid = Box::new(Solid::new([255, 0, 0, 128]).0);
+    rig.painter.mount("track", solid).expect("mounts");
+
+    // When
+    let rgba = rig.draw(&doc).expect("draws");
+
+    // Then
+    let blended = pixel(&rgba, 12, 12);
+    let near = blended
+        .iter()
+        .zip([255, 127, 127, 255])
+        .all(|(&got, want)| got.abs_diff(want) <= 2);
+    assert!(near, "{blended:?} is not about [255, 127, 127, 255]");
+}
+
+#[test]
 fn gpu_an_overflow_hidden_ancestor_clips_the_surface() {
     // Given
     let css = ".panel { position: absolute; left: 8px; top: 8px; width: 8px; height: 8px; \

@@ -81,11 +81,12 @@ pub enum PaintError {
         /// The device's `max_texture_dimension_2d`.
         limit: u32,
     },
-    /// A surface's renderer failed in `mount`, `resize` or `render`.
+    /// A surface's renderer failed in `mount`, `resize` or `render`, or
+    /// made a GPU validation error there.
     Renderer {
         /// The surface's name.
         surface: String,
-        /// What the renderer reported.
+        /// What the renderer reported, or the GPU's validation error.
         error: SurfaceError,
     },
 }

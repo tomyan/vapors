@@ -20,6 +20,8 @@ use crate::surface::{SurfaceRenderer, SurfaceSize};
 #[path = "painter_surface_backing.rs"]
 mod backing;
 use backing::Mounted;
+#[path = "painter_surface_scope.rs"]
+mod scope;
 
 /// The mounted renderers, by surface name.
 #[derive(Default)]
