@@ -32,7 +32,8 @@ pub struct IconDraw<'a> {
 }
 
 impl TextPipeline {
-    /// Draw `icons` into `target`, each as one quad.
+    /// Draw `icons` into `target`, one quad per path: overlapping paths of
+    /// a translucent colour compound as separate paints, as in Chromium.
     ///
     /// # Errors
     ///
@@ -61,9 +62,14 @@ pub(crate) fn icon_quads(
     viewport: Size,
 ) -> Result<Vec<f32>, AtlasError> {
     let page = atlas.coverage_page().size();
-    let placed = placed_all(|| icons.iter(), |draw| atlas.icon(draw.icon, draw.size))?;
+    let strokes = || {
+        icons
+            .iter()
+            .flat_map(|d| (0..d.icon.strokes()).map(move |i| (d, i)))
+    };
+    let placed = placed_all(strokes, |&(draw, i)| atlas.icon(draw.icon, i, draw.size))?;
     let mut floats = Vec::new();
-    for (draw, placed) in icons.iter().zip(&placed) {
+    for ((draw, _), placed) in strokes().zip(&placed) {
         if placed.is_empty() {
             continue;
         }

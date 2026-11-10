@@ -20,7 +20,7 @@ fn an_icon_is_placed_in_the_coverage_page_at_its_device_size() {
     let icon = line_icon("8");
 
     // When
-    let placed = atlas.icon(&icon, [16, 16]).expect("placed");
+    let placed = atlas.icon(&icon, 0, [16, 16]).expect("placed");
 
     // Then: its rect holds the icon's coverage, row by row
     assert_eq!(placed.page, PageKind::Coverage);
@@ -45,8 +45,8 @@ fn one_icon_at_one_size_is_rasterised_once() {
     let icon = line_icon("8");
 
     // When
-    let first = atlas.icon(&icon, [16, 16]).expect("placed");
-    let again = atlas.icon(&line_icon("8"), [16, 16]).expect("placed");
+    let first = atlas.icon(&icon, 0, [16, 16]).expect("placed");
+    let again = atlas.icon(&line_icon("8"), 0, [16, 16]).expect("placed");
 
     // Then
     assert_eq!(first, again);
@@ -57,18 +57,18 @@ fn one_icon_at_one_size_is_rasterised_once() {
 fn another_size_or_another_path_is_another_entry() {
     // Given
     let mut atlas = atlas(64);
-    atlas.icon(&line_icon("8"), [16, 16]).expect("placed");
+    atlas.icon(&line_icon("8"), 0, [16, 16]).expect("placed");
 
     // When
-    let larger = atlas.icon(&line_icon("8"), [32, 32]).expect("placed");
-    let lower = atlas.icon(&line_icon("9"), [16, 16]).expect("placed");
+    let larger = atlas.icon(&line_icon("8"), 0, [32, 32]).expect("placed");
+    let lower = atlas.icon(&line_icon("9"), 0, [16, 16]).expect("placed");
 
     // Then
     assert_eq!(atlas.rasterisations(), 3);
     assert_eq!([larger.rect[2], larger.rect[3]], [32, 32]);
     assert_ne!(
         lower.rect,
-        atlas.icon(&line_icon("8"), [16, 16]).unwrap().rect
+        atlas.icon(&line_icon("8"), 0, [16, 16]).unwrap().rect
     );
 }
 
@@ -76,11 +76,11 @@ fn another_size_or_another_path_is_another_entry() {
 fn an_icon_from_an_earlier_frame_is_evicted_to_make_room() {
     // Given: a page one icon and its padding fill
     let mut atlas = atlas(40);
-    atlas.icon(&line_icon("8"), [32, 32]).expect("placed");
+    atlas.icon(&line_icon("8"), 0, [32, 32]).expect("placed");
     atlas.begin_frame();
 
     // When
-    let placed = atlas.icon(&line_icon("9"), [32, 32]).expect("placed");
+    let placed = atlas.icon(&line_icon("9"), 0, [32, 32]).expect("placed");
 
     // Then
     assert_eq!(atlas.evictions(), 1);
@@ -93,7 +93,9 @@ fn an_icon_larger_than_a_page_is_refused_naming_both_sizes() {
     let mut atlas = atlas(32);
 
     // When
-    let error = atlas.icon(&line_icon("8"), [48, 16]).expect_err("refused");
+    let error = atlas
+        .icon(&line_icon("8"), 0, [48, 16])
+        .expect_err("refused");
 
     // Then: nothing rasterised, and the message gives the fix
     assert_eq!(
@@ -112,12 +114,14 @@ fn an_icon_larger_than_a_page_is_refused_naming_both_sizes() {
 fn an_icon_fetched_again_this_frame_is_kept_and_the_page_reports_full() {
     // Given: an icon from the last frame, asked for again in this one
     let mut atlas = atlas(40);
-    atlas.icon(&line_icon("8"), [32, 32]).expect("placed");
+    atlas.icon(&line_icon("8"), 0, [32, 32]).expect("placed");
     atlas.begin_frame();
-    atlas.icon(&line_icon("8"), [32, 32]).expect("cached");
+    atlas.icon(&line_icon("8"), 0, [32, 32]).expect("cached");
 
     // When
-    let error = atlas.icon(&line_icon("9"), [32, 32]).expect_err("no room");
+    let error = atlas
+        .icon(&line_icon("9"), 0, [32, 32])
+        .expect_err("no room");
 
     // Then
     assert!(matches!(error, AtlasError::Full { .. }), "{error:?}");

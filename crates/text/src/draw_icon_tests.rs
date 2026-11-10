@@ -42,7 +42,7 @@ fn an_icon_moved_by_a_later_repack_in_the_same_call_samples_its_final_rect() {
     // and a large one that only fits once the tall one is evicted and the page repacked
     let mut atlas = GlyphAtlas::new(AtlasConfig { page_size: 40 });
     let (tall, small, large) = (line_icon("2"), line_icon("4"), line_icon("6"));
-    atlas.icon(&tall, [8, 32]).expect("placed");
+    atlas.icon(&tall, 0, [8, 32]).expect("placed");
     atlas.begin_frame();
 
     // When
@@ -51,7 +51,7 @@ fn an_icon_moved_by_a_later_repack_in_the_same_call_samples_its_final_rect() {
 
     // Then: the repack moved the small icon, and its quad samples where it is now
     assert_eq!(atlas.evictions(), 1);
-    let small_rect = atlas.icon(&small, [8, 8]).expect("cached").rect;
+    let small_rect = atlas.icon(&small, 0, [8, 8]).expect("cached").rect;
     assert_eq!(
         quad_top_left(&floats, 0, 40),
         [small_rect[0], small_rect[1]]

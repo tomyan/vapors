@@ -108,3 +108,23 @@ fn gpu_a_translucent_coloured_icon_blends_each_channel_at_coverage_times_alpha()
     // Then
     assert_plain_blend(&half_covered_line(), colour);
 }
+
+#[test]
+fn gpu_overlapping_paths_of_a_translucent_colour_compound_as_separate_paints() {
+    // Given: two 2-unit paths over the same line, fully covering rows 7 and 8
+    let strokes = (0..2)
+        .map(|_| IconStroke {
+            path: IconPath::parse("M0 8H16").expect("parses"),
+            width: 2.0,
+        })
+        .collect();
+    let icon = Icon::new([0.0, 0.0, 16.0, 16.0], strokes).expect("a valid icon");
+    let half_black = Color { a: 0.5, ..BLACK };
+
+    // When
+    let pixels = render(&icon, half_black);
+
+    // Then: ink 0.5 + 0.5(1 - 0.5) = 0.75 as in Chromium, not one paint's 0.5
+    let red = pixels[(((5 + 7) * SIDE + 10) * 4) as usize];
+    assert!((63..=65).contains(&red), "{red}");
+}

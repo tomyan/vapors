@@ -24,7 +24,7 @@ pub struct IconStroke {
 pub struct Icon {
     view_box: [f32; 4],
     strokes: Vec<IconStroke>,
-    bits: Arc<[u32]>,
+    bits: Vec<Arc<[u32]>>,
 }
 
 /// Why an icon was refused.
@@ -62,7 +62,10 @@ impl Icon {
             let width = strokes[index].width;
             return Err(IconError::StrokeWidth { index, width });
         }
-        let bits = key_bits(view_box, &strokes).into();
+        let bits = strokes
+            .iter()
+            .map(|s| key_bits(view_box, s).into())
+            .collect();
         Ok(Self {
             view_box,
             strokes,
@@ -74,14 +77,26 @@ impl Icon {
     /// pixels, uniformly and centred as SVG's default `xMidYMid meet`, its
     /// top-left at the box's corner. Strokes overlap as two paths of one
     /// colour paint: `a + b(1 - a)`.
+    /// That is what an opaque colour paints; a translucent one is drawn
+    /// path by path ([`Icon::rasterize_stroke`]), as Chromium paints it.
     #[must_use]
     pub fn rasterize(&self, size: [u32; 2]) -> Coverage {
-        let [width, height] = size;
-        let mut data = vec![0; width as usize * height as usize];
-        let transform = self.to_device(size);
-        for stroke in &self.strokes {
-            source_over(&mut data, &stroke_mask(stroke, transform, size));
+        let mut all = self.rasterize_stroke(0, size);
+        for index in 1..self.strokes.len() {
+            source_over(&mut all.data, &self.rasterize_stroke(index, size).data);
         }
+        all
+    }
+
+    /// Coverage of stroke `index` alone, placed as [`Icon::rasterize`].
+    ///
+    /// # Panics
+    ///
+    /// If `index` is not below [`Icon::strokes`]; a caller bug.
+    #[must_use]
+    pub fn rasterize_stroke(&self, index: usize, size: [u32; 2]) -> Coverage {
+        let [width, height] = size;
+        let data = stroke_mask(&self.strokes[index], self.to_device(size), size);
         Coverage {
             left: 0,
             top: 0,
@@ -92,10 +107,16 @@ impl Icon {
         }
     }
 
-    /// The view box, stroke widths and paths as bits: equal for icons that
+    /// How many strokes (paths) the icon has; at least one.
+    #[must_use]
+    pub fn strokes(&self) -> usize {
+        self.strokes.len()
+    }
+
+    /// Stroke `index`'s path, width and the view box as bits: equal for strokes that
     /// rasterise alike, so the atlas can key on it.
-    pub(crate) fn bits(&self) -> &Arc<[u32]> {
-        &self.bits
+    pub(crate) fn bits(&self, index: usize) -> &Arc<[u32]> {
+        &self.bits[index]
     }
 
     /// The view box scaled by the smaller of the two axis ratios and
@@ -133,14 +154,11 @@ fn source_over(under: &mut [u8], over: &[u8]) {
     }
 }
 
-fn key_bits(view_box: [f32; 4], strokes: &[IconStroke]) -> Vec<u32> {
+fn key_bits(view_box: [f32; 4], stroke: &IconStroke) -> Vec<u32> {
     let mut bits: Vec<u32> = view_box.iter().map(|n| n.to_bits()).collect();
-    for stroke in strokes {
-        bits.push(u32::MAX);
-        bits.push(stroke.width.to_bits());
-        for command in stroke.path.commands() {
-            command_bits(command, &mut bits);
-        }
+    bits.push(stroke.width.to_bits());
+    for command in stroke.path.commands() {
+        command_bits(command, &mut bits);
     }
     bits
 }
