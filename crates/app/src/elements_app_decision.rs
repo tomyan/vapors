@@ -7,6 +7,9 @@ use super::ElementsApp;
 use crate::painter::{ScenePainter, SurfaceState};
 
 /// What `next_after_frame` found at the end of a frame.
+// each bool is an independent reason, printed by a failing check; an
+// enum or bitflags would not let one frame hold several
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FrameDecision {
     /// The document changed since it was last asked.
@@ -17,6 +20,12 @@ pub struct FrameDecision {
     pub surfaces_want: bool,
     /// When the armed tooltip shows (`DocumentInput::tooltip_deadline`).
     pub tooltip_deadline: Option<Instant>,
+    /// The tooltip armed or shown changed since an event last asked
+    /// (`DocumentInput::take_tooltip_changed`): this frame's update
+    /// showed, re-armed or hid it, and its draw has that, so it asks
+    /// for no frame. Taking it here keeps the next event from asking
+    /// for a frame for it again.
+    pub tooltip_changed: bool,
 }
 
 impl FrameDecision {
@@ -51,6 +60,7 @@ impl ElementsApp {
             surface_invalidated: self.surfaces.any_stale(),
             surfaces_want: self.painter.as_ref().is_some_and(ScenePainter::wants_frame),
             tooltip_deadline: self.input.tooltip_deadline(),
+            tooltip_changed: self.input.take_tooltip_changed(),
         };
         self.decision.next()
     }

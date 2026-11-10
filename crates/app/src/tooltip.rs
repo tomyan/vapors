@@ -59,14 +59,22 @@ pub(crate) struct TooltipState {
     /// The focused element last seen, so focus that stays does not
     /// arm again.
     focus_seen: Option<NodeId>,
+    /// What is armed or shown changed (an arm, a re-arm, a show or a
+    /// hide) since [`TooltipState::take_changed`] last asked.
+    changed: bool,
 }
 
 impl TooltipState {
     /// The pointer is over `target`'s title (or none): a new title
-    /// arms, none hides. While the button is down no title arms.
+    /// arms, none hides, and a move within the title the pointer was
+    /// over keeps what is armed or shown, a keyboard tooltip included.
+    /// While the button is down it hides and nothing else changes, so
+    /// a drag ending on the pressed title keeps it hidden.
     pub(crate) fn pointer_over(&mut self, target: Option<Titled>, now: Instant) {
-        let target = target.filter(|_| !self.button_down);
-        if self.hovered == target && self.trigger() == Some(TooltipTrigger::Pointer) {
+        if self.button_down {
+            return self.hide();
+        }
+        if self.hovered == target && self.tip.is_some() {
             return;
         }
         self.hovered.clone_from(&target);
@@ -111,6 +119,7 @@ impl TooltipState {
 
     /// Hidden, armed or shown, until the next title reached.
     pub(crate) fn hide(&mut self) {
+        self.changed |= self.tip.is_some();
         self.tip = None;
         self.deadline = None;
     }
@@ -136,11 +145,20 @@ impl TooltipState {
     pub(crate) fn shown_at(&mut self, now: Instant) -> Option<&Tooltip> {
         if self.deadline.is_some_and(|deadline| now >= deadline) {
             self.deadline = None;
+            self.changed = true;
         }
         self.tip.as_ref().filter(|_| self.deadline.is_none())
     }
 
+    /// Whether what is armed or shown changed since last asked: a host
+    /// draws a frame for it, so a hide is drawn and a new deadline
+    /// reaches the frame's `Next`.
+    pub(crate) fn take_changed(&mut self) -> bool {
+        std::mem::take(&mut self.changed)
+    }
+
     fn arm(&mut self, (node, text): Titled, trigger: TooltipTrigger, now: Instant) {
+        self.changed = true;
         self.tip = Some(Tooltip {
             node,
             text,
@@ -154,6 +172,9 @@ impl TooltipState {
     }
 }
 
+#[cfg(test)]
+#[path = "tooltip_rules_tests.rs"]
+mod rules_tests;
 #[cfg(test)]
 #[path = "tooltip_tests.rs"]
 mod tests;

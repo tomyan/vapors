@@ -32,4 +32,5 @@ pub use painter::{
     UnsupportedFormat,
 };
 pub use surface::{SURFACE_FORMAT, SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
+pub use tooltip::{TOOLTIP_DELAY, Tooltip, TooltipTrigger};
 pub use vapors_renderer::GpuWork;

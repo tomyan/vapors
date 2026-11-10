@@ -5,19 +5,19 @@ use vapors_platform::Instant;
 
 use super::{TOOLTIP_DELAY, Titled, TooltipState, TooltipTrigger};
 
-fn titled(id: u64, text: &str) -> Titled {
+pub(super) fn titled(id: u64, text: &str) -> Titled {
     (NodeId(id), text.to_owned())
 }
 
 /// A named way to hide the tooltip.
 type Hide = (&'static str, fn(&mut TooltipState));
 
-fn ms(n: u64) -> Duration {
+pub(super) fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
 }
 
 /// A state with the pointer over node 1's title since `t0`.
-fn armed(t0: Instant) -> TooltipState {
+pub(super) fn armed(t0: Instant) -> TooltipState {
     let mut state = TooltipState::default();
     state.pointer_over(Some(titled(1, "Open (o)")), t0);
     state

@@ -1,6 +1,7 @@
+use vapors_dom::Dom;
 use vapors_platform::Event;
 
-use super::tests::{give, key, page, press, shown};
+use super::tests::{give, key, page, press, shown, update};
 use crate::DocumentInput;
 use crate::tooltip::TooltipTrigger;
 use vapors_elements::Document;
@@ -51,5 +52,23 @@ fn a_keyboard_tooltip_hides_when_a_script_blurs_its_element() {
     Document::focus(&doc, None);
 
     // Then
+    assert_eq!(shown(&mut input, &doc, deadline), None);
+}
+
+#[test]
+fn a_keyboard_tooltip_hides_when_its_element_loses_its_box() {
+    // Given
+    let (doc, open) = page();
+    let mut input = DocumentInput::new();
+    give(&mut input, &doc, &key("Tab", "Tab"));
+    let deadline = input.tooltip_deadline().expect("armed by focus");
+
+    // When
+    doc.borrow_mut()
+        .set_attribute(open, "style", "display: none");
+    update(&mut doc.borrow_mut());
+
+    // Then
+    assert_eq!(doc.borrow().active_element(), Some(open), "still focused");
     assert_eq!(shown(&mut input, &doc, deadline), None);
 }

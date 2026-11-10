@@ -50,9 +50,10 @@ files are in `ui/views/corewm/`.
 | Whitespace trimmed at both ends (Rust's `char::is_whitespace` set, the no-break space included); only whitespace shows nothing | `tooltip_text.rs`, `shown` | `tooltip_state_manager.cc`, `TooltipStateManager::Show` (`base::TrimWhitespace`, `TRIM_ALL`) |
 | Each tab as eight spaces; line breaks kept | `tooltip_text.rs`, `shown` | `tooltip_view_aura.cc`, `TooltipViewAura::SetText` (`base::ReplaceChars`) |
 | Shows 500 ms after the pointer reaches a title; a move within the same element and text does not restart the wait | `TOOLTIP_DELAY`, `TooltipState::pointer_over` | `tooltip_controller.cc`, `kDefaultShowTooltipDelay`; `IsTooltipTextUpdateNeeded` |
+| A move within the title the pointer was over keeps a keyboard tooltip armed or shown | `TooltipState::pointer_over` | `tooltip_controller.cc`, `OnMouseEvent` (`kMouseMoved`) calls `UpdateIfRequired(kCursor)`, which shows again only when the window's text or id differs from the tooltip's (`IsTooltipTextUpdateNeeded`, `IsTooltipIdUpdateNeeded`); a move that does not change the title under the pointer sends no new text, so the keyboard tooltip stays |
 | Hides on any key-down, Esc included | `DocumentInput::tooltip_event` | `tooltip_controller.cc`, `TooltipController::OnKeyEvent` |
 | Hides on a press, and the same title stays hidden until the pointer reaches another | `TooltipState::pressed` | `tooltip_controller.cc`, `OnMouseEvent` (`kMousePressed`), `ShouldHideBecauseMouseWasOncePressed` |
-| Nothing arms while the button is down | `TooltipState::pointer_over` | `tooltip_controller.cc`, `OnMouseEvent` (`IsMouseButtonDown`) |
+| Nothing arms while the button is down, and a move then keeps the pressed title hidden after the release | `TooltipState::pointer_over` | `tooltip_controller.cc`, `OnMouseEvent` (`IsMouseButtonDown` leaves the target `nullptr`; `SetObservedWindow(nullptr)` hides, and only `UpdateIfRequired` clears `tooltip_window_at_mouse_press_tracker_`) |
 | Hides on the wheel | `DocumentInput::tooltip_event` | `tooltip_controller.cc`, `OnMouseEvent` (`kMousewheel`) |
 | A touch never arms one and hides one | `DocumentInput::tooltip_event` | `tooltip_controller.cc`, `TooltipController::OnTouchEvent` |
 | Hides when the window loses focus | `DocumentInput::tooltip_event` | `tooltip_controller.cc`, `TooltipController::OnWindowActivated` |
@@ -61,7 +62,8 @@ files are in `ui/views/corewm/`.
 
 Focus a press gave never arms a tooltip, even on a text field (which
 a press makes `:focus-visible`). A keyboard tooltip hides on blur,
-including a script's, and when its element loses its title. Each
+including a script's, and when its element loses its title or its box
+(`display: none`). Each
 frame, after the update, the pointer's tooltip follows what is under
 the pointer: a removed element hides it, a changed title hides it and
 arms the new one.
@@ -73,6 +75,10 @@ arms the new one.
 
 1. Give `DocumentInput` every event, the host's own included (`give`
    does), so a key or press the host takes still hides the tooltip.
+   After each, when `DocumentInput::take_tooltip_changed()` is true
+   (the tooltip was armed, armed again, shown or hidden), draw a frame:
+   it draws the hide, and its `Next` takes the new deadline or drops
+   the wait for an old one.
 2. Each frame, after the document's update and before drawing, call
    `DocumentInput::tooltip(&document, now)` for the tooltip shown.
 3. Each frame, fold `DocumentInput::tooltip_deadline()` into the
@@ -80,7 +86,11 @@ arms the new one.
    otherwise return `Next::Wait`. Ask on every frame until the tooltip
    shows, because a frame's `Next::Continue` or `Next::Wait` replaces
    the wait. When the tooltip hides before its deadline,
-   `tooltip_deadline` is `None` and no frame is drawn for it.
+   `tooltip_deadline` is `None`, so the frame step 1 asked for waits
+   for nothing and no frame is drawn at the old deadline.
+4. After the frame, call `take_tooltip_changed()` again: the frame drew
+   what its update showed or hid, and the next event must not ask for
+   a frame for it.
 
 An app that skips step 3 never shows a tooltip early: it shows at the
 first frame drawn at or after its deadline, which may be much later.
@@ -106,8 +116,7 @@ role in vapors' tree. Adding them needs the subset to take `title` and
 Drawing and placing the tooltip: below the element, flipped above when
 there is no room, clamped inside the window, clear of the pointer's
 hotspot, drawn above every item including gpu-surfaces, styled by
-`--tooltip-*` custom properties. A tooltip that hides does not yet ask
-for a frame, since nothing is drawn for it.
+`--tooltip-*` custom properties.
 
 Chromium's other rules: its tooltip hides itself after 10 s
 (`tooltip_controller.cc`, `kDefaultHideTooltipDelay`), and text past

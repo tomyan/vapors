@@ -34,6 +34,14 @@ impl DocumentInput {
         self.tooltip.shown_at(now)
     }
 
+    /// Whether the tooltip armed or shown changed (armed, armed again,
+    /// shown or hidden) since last asked. A host that gets `true` after
+    /// an event draws a frame, so the hide is drawn and the frame's
+    /// `Next` takes the new [`DocumentInput::tooltip_deadline`].
+    pub fn take_tooltip_changed(&mut self) -> bool {
+        self.tooltip.take_changed()
+    }
+
     /// When the armed tooltip shows: a host waits until then
     /// (`Next::WaitUntil`) and asks again every frame until it shows,
     /// as a frame's `Next::Continue` replaces the wait. `None` when no
@@ -78,12 +86,22 @@ impl DocumentInput {
         title_at(document, self.pointer)
     }
 
+    /// The keyboard tooltip's element still has focus, its title and a
+    /// box (`display: none` hides it).
     fn keyboard_tip_holds(&self, document: &Document) -> bool {
         self.tooltip.current().is_some_and(|tip| {
             document.active_element() == Some(tip.node)
+                && has_box(document, tip.node)
                 && document.tooltip_text(tip.node) == Some((tip.node, tip.text.clone()))
         })
     }
+}
+
+/// Whether the last update gave `node` a box.
+fn has_box(document: &Document, node: vapors_dom::NodeId) -> bool {
+    document
+        .painted()
+        .is_some_and(|painted| painted.border_box(node).is_some())
 }
 
 /// The title the element hit at `point` shows.

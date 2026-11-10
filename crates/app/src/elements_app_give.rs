@@ -99,7 +99,8 @@ impl ElementsApp {
         self.surfaces.keep_waker(platform);
         let route = self.place(event, platform, hosting);
         let text = self.text_event(event);
-        if self.document.borrow_mut().take_changed() {
+        let tooltip_changed = self.input.take_tooltip_changed();
+        if self.document.borrow_mut().take_changed() || tooltip_changed {
             platform.request_redraw();
         }
         self.mirror_text_field(platform);
@@ -142,3 +143,7 @@ impl ElementsApp {
         Ok(given.route)
     }
 }
+
+#[cfg(test)]
+#[path = "elements_app_give_tooltip_tests.rs"]
+mod tooltip_tests;
