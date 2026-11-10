@@ -111,10 +111,10 @@ impl<'a> Emitter<'a> {
         self.counter
     }
 
-    /// A fresh variable name with the given stem, a tag's hyphens
-    /// (`gpu-surface`) made underscores.
+    /// A fresh variable name with the given stem made a Rust name
+    /// (`names::rust_stem`: `gpu-surface` is `gpu_surface`).
     pub fn fresh(&mut self, stem: &str) -> String {
-        let stem = stem.replace('-', "_");
+        let stem = super::names::rust_stem(stem);
         let name = format!("{stem}{:0width$}", self.counter, width = self.width);
         self.counter += 1;
         self.reserve(&name);
