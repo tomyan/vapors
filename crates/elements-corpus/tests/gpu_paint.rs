@@ -4,8 +4,12 @@
 //! pixel within 96, and in each element's region at most 2 pixels off
 //! by more than half the local contrast. The composite (vapors | Chromium | difference
 //! x4) is written to `target/tmp/paint_<name>_<scale>x.png`.
-//! The rules are checked in `gpu_paint_rules`.
+//! The rules are checked in `gpu_paint_rules`. Two pixels of touche's
+//! Mute icon at 1x are compared with exact coverage instead
+//! (`paint_support/exact.rs`, declared there).
 
+#[path = "paint_support/exact.rs"]
+mod exact;
 mod paint_support;
 
 use std::path::PathBuf;
@@ -81,7 +85,11 @@ fn check_at(scale: u32) {
     let mut failures = Vec::new();
     for fixture in paint_fixtures() {
         // Given
-        let theirs = chromiums("match", fixture.name, scale, "");
+        let theirs = exact::with_exact_pixels(
+            fixture.name,
+            scale,
+            chromiums("match", fixture.name, scale, ""),
+        );
         let doc = laid_out(&fixture, scale);
 
         // When
