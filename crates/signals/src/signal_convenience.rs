@@ -55,6 +55,18 @@ impl<T: 'static> Signal<T> {
             .unwrap_or_else(|error| panic!("{error}"));
     }
 
+    /// Like [`Self::try_set_if_changed`]; panics with the refusal's message.
+    ///
+    /// # Panics
+    /// With the same message the `try_` form returns as an error.
+    pub fn set_if_changed(&self, value: T) -> bool
+    where
+        T: PartialEq,
+    {
+        self.try_set_if_changed(value)
+            .unwrap_or_else(|error| panic!("{error}"))
+    }
+
     /// Like [`Self::try_update`]; panics with the refusal's message.
     ///
     /// # Panics

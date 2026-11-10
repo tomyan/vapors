@@ -120,6 +120,8 @@ impl App for Racer {
     }
 }
 mod drawing;
+#[cfg(test)]
+mod hud_frame_tests;
 mod input;
 mod state;
 

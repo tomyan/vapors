@@ -55,7 +55,7 @@ impl Racer {
         self.pacing.fps_frames += 1.0;
         // Half-second display averaging keeps the readout legible while driving.
         if self.pacing.fps_elapsed >= 0.5 {
-            self.hud.fps.set(format!(
+            self.hud.fps.set_if_changed(format!(
                 "{:.0}",
                 self.pacing.fps_frames / self.pacing.fps_elapsed
             ));
@@ -74,8 +74,8 @@ impl Racer {
         self.paint_hud(frame, &view)?;
         self.report_frame(frame.index)
     }
-    fn layout_hud(&mut self, viewport: Viewport) -> Result<(), String> {
-        self.hud.short.set(viewport.height < 480.0);
+    pub(super) fn layout_hud(&mut self, viewport: Viewport) -> Result<(), String> {
+        self.hud.short.set_if_changed(viewport.height < 480.0);
         self.sync_hud(viewport.width);
         Document::settle_selection(&self.document);
         self.document
@@ -127,27 +127,25 @@ impl Racer {
             .map_err(|e| e.to_string())
     }
     fn sync_hud(&self, width: f32) {
-        self.hud.compact.set(width < 760.0);
-        self.hud.follow.set(self.run.camera.follow);
+        self.hud.compact.set_if_changed(width < 760.0);
+        self.hud.follow.set_if_changed(self.run.camera.follow);
         let enabled = !self.hud.settings.get() && self.run.race.progress.laps < 3;
-        if self.hud.enabled.get_untracked() != enabled {
-            self.hud.enabled.set(enabled);
-        }
-        self.hud.paused.set(self.run.paused);
+        self.hud.enabled.set_if_changed(enabled);
+        self.hud.paused.set_if_changed(self.run.paused);
         self.sync_readouts();
-        self.hud.message.set(self.message().into());
+        self.hud.message.set_if_changed(self.message().into());
     }
     fn sync_readouts(&self) {
         self.hud
             .speed
-            .set(format!("{:.0}", self.run.race.speed * 0.72));
+            .set_if_changed(format!("{:.0}", self.run.race.speed * 0.72));
         self.hud
             .lap
-            .set(format!("{} / 3", (self.run.race.progress.laps + 1).min(3)));
-        self.hud.clock.set(time(self.run.race.elapsed));
+            .set_if_changed(format!("{} / 3", (self.run.race.progress.laps + 1).min(3)));
+        self.hud.clock.set_if_changed(time(self.run.race.elapsed));
         self.hud
             .best
-            .set(self.run.race.progress.best.map_or_else(|| "—".into(), time));
+            .set_if_changed(self.run.race.progress.best.map_or_else(|| "—".into(), time));
     }
     fn message(&self) -> &'static str {
         if self.faults.setup_error.is_some() {
