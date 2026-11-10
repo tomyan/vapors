@@ -42,6 +42,13 @@ impl KeptBoxes {
         *self = Self { scale, boxes };
     }
 
+    /// The kept box of `node`, an element.
+    pub(crate) fn element(&self, node: NodeId) -> Option<&LayoutBox> {
+        self.boxes
+            .iter()
+            .find(|b| matches!(b.content, Content::Element(n) if n == node))
+    }
+
     /// Gives each unchanged box in `boxes` its kept cache and layout,
     /// except an element's for which `may_keep` says no; returns how
     /// many.

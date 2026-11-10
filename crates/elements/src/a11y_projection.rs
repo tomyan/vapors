@@ -1,28 +1,17 @@
-//! The accessibility projection's first slice (5-A1's start): each
-//! rendered element with one of the asked roles, in document order,
-//! with its name and the properties a combobox's keys change, written
-//! as Chromium's accessibility tree writes them (the events oracle's
-//! `ax_projection`): `activedescendant` and `controls` as the related
-//! node's role and name (left out when it is not rendered, as Chromium
-//! leaves it out), `expanded` from `aria-expanded`, `focused` on the
-//! focused element, `selected=true` from `aria-selected="true"`.
-//! Roles are `role`'s first token, else implicit for a text field and a
-//! button (`label`, `ul` and `li` arrive in F4); names are `aria-label`,
-//! `aria-labelledby`, or the content of an option or button.
-//!
-//! RELAXED, this slice's limits: rendered means no `display: none` on
-//! the node or an ancestor, from the last update's styles. A node made
-//! or restyled since that update is judged by what it had then (one
-//! made since counts as rendered), and `visibility: hidden` and the
-//! `hidden` attribute are not read. The events oracle reads it after
-//! each step's update, where it is exact. 5-A1's projection, which
-//! refuses a document with changes not yet updated and reads every
-//! rule that hides a node from the tree, retires this.
+//! The a11y tree flattened as the events oracle compares it with
+//! Chromium's (the corpus's `ax_projection`): each node with one of the
+//! asked roles, in document order, with its name, its value and its
+//! states as Chromium writes them, and `activedescendant` and
+//! `controls` as the related node's role and name (left out when that
+//! node is not in the tree, as Chromium leaves it out).
 
 use std::collections::HashMap;
 
 use vapors_dom::NodeId;
 
+use crate::a11y_error::AxError;
+use crate::a11y_roles::Ids;
+use crate::a11y_tree::AxElement;
 use crate::document::Document;
 
 /// One node of the projection.
@@ -32,153 +21,67 @@ pub struct AxNode {
     pub role: String,
     /// Its accessible name; empty for none.
     pub name: String,
+    /// Its value, when it shows one that is not empty.
+    pub value: Option<String>,
     /// Its properties as `name=value`, sorted.
     pub properties: Vec<String>,
 }
 
-/// Each element id, to its first element in document order.
-type Ids = HashMap<String, NodeId>;
-
-/// Roles whose name is their content.
-const NAMED_BY_CONTENT: [&str; 2] = ["option", "button"];
+/// The attributes naming a related node, and the property each writes.
+const RELATED: [(&str, &str); 2] = [
+    ("aria-activedescendant", "activedescendant"),
+    ("aria-controls", "controls"),
+];
 
 impl Document {
-    /// The projection to `roles`, from the last update's styles (the
-    /// module's RELAXED note says what that leaves out).
+    /// The tree's nodes with one of `roles`, flattened in document order.
     ///
     /// # Errors
-    /// The document has not been updated, so what is rendered is unknown.
-    pub fn ax_projection(&self, roles: &[&str]) -> Result<Vec<AxNode>, String> {
-        if self.kept.is_none() {
-            return Err("the a11y projection needs an update first, for what is rendered".into());
-        }
-        let elements = self.elements();
-        // each id once, so a lookup is not a scan: the first in document
-        // order wins, as `getElementById`
-        let mut ids = HashMap::new();
-        for node in &elements {
-            if let Some(id) = self.attribute(*node, "id") {
-                ids.entry(id.to_owned()).or_insert(*node);
-            }
-        }
-        Ok(elements
-            .into_iter()
-            .filter(|node| self.rendered(*node))
-            .filter_map(|node| {
-                let role = self.ax_role(node)?;
-                roles
-                    .contains(&role.as_str())
-                    .then(|| self.ax_node(node, role, &ids))
-            })
+    /// As [`Document::ax_tree`].
+    pub fn ax_projection(&self, roles: &[&str]) -> Result<Vec<AxNode>, AxError> {
+        let tree = self.ax_tree()?;
+        let mut all = Vec::new();
+        flatten(&tree, &mut all);
+        let by_node: HashMap<NodeId, &AxElement> = all.iter().map(|e| (e.node, *e)).collect();
+        let ids = self.ax_ids();
+        Ok(all
+            .iter()
+            .filter(|element| roles.contains(&element.role.as_str()))
+            .map(|element| self.ax_node(element, &by_node, &ids))
             .collect())
     }
 
-    fn ax_node(&self, node: NodeId, role: String, ids: &Ids) -> AxNode {
-        let mut properties = Vec::new();
-        for (attribute, property) in [
-            ("aria-activedescendant", "activedescendant"),
-            ("aria-controls", "controls"),
-        ] {
-            if let Some(related) = self.related(node, attribute, ids) {
-                properties.push(format!("{property}={related}"));
+    /// `element` as the oracle writes it, its related nodes found in
+    /// `by_node`.
+    fn ax_node(
+        &self,
+        element: &AxElement,
+        by_node: &HashMap<NodeId, &AxElement>,
+        ids: &Ids,
+    ) -> AxNode {
+        let mut properties = element.states.set();
+        for (attribute, property) in RELATED {
+            let related = self
+                .attribute(element.node, attribute)
+                .and_then(|id| ids.get(id));
+            if let Some(related) = related.and_then(|node| by_node.get(node)) {
+                properties.push(format!("{property}={} \"{}\"", related.role, related.name));
             }
-        }
-        if let Some(expanded) = self.attribute(node, "aria-expanded") {
-            properties.push(format!("expanded={expanded}"));
-        }
-        if self.active_element() == Some(node) {
-            properties.push("focused=true".to_owned());
-        }
-        if self.attribute(node, "aria-selected") == Some("true") {
-            properties.push("selected=true".to_owned());
         }
         properties.sort();
         AxNode {
-            name: self.ax_name(node, &role, ids),
-            role,
+            role: element.role.clone(),
+            name: element.name.clone(),
+            value: element.value.clone(),
             properties,
         }
     }
+}
 
-    /// `node`'s role: its `role` attribute's first token, else implicit.
-    fn ax_role(&self, node: NodeId) -> Option<String> {
-        if let Some(role) = self
-            .attribute(node, "role")
-            .and_then(|r| r.split_whitespace().next())
-        {
-            return Some(role.to_owned());
-        }
-        let implicit = match self.tag(node)? {
-            "input" if self.is_text_input(node) => "textbox",
-            "button" => "button",
-            _ => return None,
-        };
-        Some(implicit.to_owned())
-    }
-
-    /// The related node `attribute` names, as role and name, when it is
-    /// rendered.
-    fn related(&self, node: NodeId, attribute: &str, ids: &Ids) -> Option<String> {
-        let target = *ids.get(self.attribute(node, attribute)?)?;
-        if !self.rendered(target) {
-            return None;
-        }
-        let role = self.ax_role(target)?;
-        let name = self.ax_name(target, &role, ids);
-        Some(format!("{role} \"{name}\""))
-    }
-
-    fn ax_name(&self, node: NodeId, role: &str, ids: &Ids) -> String {
-        if let Some(label) = self.attribute(node, "aria-label") {
-            return label.trim().to_owned();
-        }
-        if let Some(labels) = self.attribute(node, "aria-labelledby") {
-            let parts: Vec<String> = labels
-                .split_whitespace()
-                .filter_map(|id| ids.get(id).copied())
-                .map(|n| self.content(n))
-                .collect();
-            return parts.join(" ");
-        }
-        if NAMED_BY_CONTENT.contains(&role) {
-            return self.content(node);
-        }
-        String::new()
-    }
-
-    /// `node`'s text content, whitespace collapsed.
-    fn content(&self, node: NodeId) -> String {
-        let mut text = String::new();
-        self.collect_text(node, &mut text);
-        text.split_whitespace().collect::<Vec<_>>().join(" ")
-    }
-
-    fn collect_text(&self, node: NodeId, out: &mut String) {
-        if let Some(own) = self.text(node) {
-            out.push_str(own);
-            out.push(' ');
-        }
-        for child in self.children(node) {
-            self.collect_text(child, out);
-        }
-    }
-
-    /// Whether `node` and its ancestors are laid out (no `display: none`).
-    fn rendered(&self, node: NodeId) -> bool {
-        let Some(kept) = self.kept.as_ref() else {
-            return false;
-        };
-        let mut at = Some(node);
-        while let Some(current) = at {
-            if kept
-                .used
-                .get(&current)
-                .is_some_and(|used| used.layout.display == taffy::Display::None)
-            {
-                return false;
-            }
-            at = self.parent(current);
-        }
-        true
+/// Every node under `nodes`, depth first, in document order.
+fn flatten<'t>(nodes: &'t [AxElement], out: &mut Vec<&'t AxElement>) {
+    for node in nodes {
+        out.push(node);
+        flatten(&node.children, out);
     }
 }

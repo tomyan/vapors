@@ -24,12 +24,12 @@ use vapors_components::hold_button::{HoldButton, HoldButtonProps};
 <div class={layout.get()}>
 <div class="drive">
     <div class="pair">
-        <HoldButton id={String::from("left")} label={String::from("←")} bind:pressed={left} reset={reset} enabled={enabled} />
-        <HoldButton id={String::from("right")} label={String::from("→")} bind:pressed={right} reset={reset} enabled={enabled} />
+        <HoldButton id={String::from("left")} label={String::from("←")} on_change={vapors_components::hold_into(left)} reset={reset} enabled={enabled} />
+        <HoldButton id={String::from("right")} label={String::from("→")} on_change={vapors_components::hold_into(right)} reset={reset} enabled={enabled} />
     </div>
     <div class="pair">
-        <HoldButton id={String::from("brake")} label={String::from("Brake")} bind:pressed={brake} reset={reset} enabled={enabled} />
-        <div class="gas"><HoldButton id={String::from("gas")} label={String::from("Gas")} bind:pressed={gas} reset={reset} enabled={enabled} /></div>
+        <HoldButton id={String::from("brake")} label={String::from("Brake")} on_change={vapors_components::hold_into(brake)} reset={reset} enabled={enabled} />
+        <div class="gas"><HoldButton id={String::from("gas")} label={String::from("Gas")} on_change={vapors_components::hold_into(gas)} reset={reset} enabled={enabled} /></div>
     </div>
 </div>
 <div class="help">WASD / arrows · Space pauses · R restarts</div>

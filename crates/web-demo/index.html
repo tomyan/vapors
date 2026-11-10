@@ -19,12 +19,28 @@
     <script>
       if (new URLSearchParams(location.search).get('demo') === 'racer') {
         const canvas = document.getElementById('vapors');
-        const resize = () => {
+        const usable = (width, height) =>
+          width > 0 && height > 0 && Number.isFinite(width + height);
+        // A zero-size visualViewport (a hidden or detached page) counts as
+        // inactive: the window's size is used instead.
+        const size = () => {
           const viewport = window.visualViewport;
-          const width = viewport ? viewport.width : innerWidth;
-          const height = viewport ? viewport.height : innerHeight;
-          if (!(width > 0 && height > 0 && Number.isFinite(width + height))) {
-            throw new Error('Racer viewport dimensions must be finite and positive');
+          if (viewport && usable(viewport.width, viewport.height)) {
+            return [viewport.width, viewport.height];
+          }
+          return [innerWidth, innerHeight];
+        };
+        const report = (message) => {
+          const error = document.getElementById('error');
+          if (!error) throw new Error(message);
+          error.textContent = message;
+          error.hidden = false;
+        };
+        const resize = () => {
+          const [width, height] = size();
+          if (!usable(width, height)) {
+            report(`racer viewport is ${width}x${height}; it must be finite and positive`);
+            return;
           }
           canvas.style.width = `${width}px`;
           canvas.style.height = `${height}px`;

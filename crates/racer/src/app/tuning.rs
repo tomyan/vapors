@@ -11,13 +11,13 @@ impl Racer {
     }
     pub(super) fn resume(&mut self) {
         if let Err(error) = self.settings().validate() {
-            self.setup_error = Some(error);
+            self.faults.setup_error = Some(error);
             self.hud.settings.set(true);
             return;
         }
-        self.setup_error = None;
-        self.paused = false;
-        self.last = None;
+        self.faults.setup_error = None;
+        self.run.paused = false;
+        self.pacing.last = None;
         self.hud.settings.set(false);
     }
 }

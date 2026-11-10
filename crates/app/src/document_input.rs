@@ -7,7 +7,8 @@
 //! gives the document what is its, a paste included
 //! (`document_input_paste.rs`), and says who the event was for in the end.
 //! [`ElementsApp`](crate::ElementsApp), whose document is the whole window,
-//! gives it everything.
+//! gives it everything and sets its shortcut modifier; a web host using
+//! this sets it itself first (`Document::set_shortcut_modifier`).
 //!
 //! Single-threaded, as `Document`'s own event calls are: it takes the
 //! document as `Rc<RefCell<Document>>` (touché
@@ -71,8 +72,7 @@ impl DocumentInput {
         Ok(self.action(document, event)?.and_then(point_of))
     }
 
-    /// The host has shown a cursor of its own: the document's is
-    /// reported again on the next event.
+    /// The host showed its own cursor: the document's is reported next.
     pub fn forget_cursor(&mut self) {
         self.cursor = None;
     }
@@ -113,8 +113,7 @@ impl DocumentInput {
         })
     }
 
-    /// Hand `event` to `document`, whatever its route: `ElementsApp`'s
-    /// document is the whole window.
+    /// Hand `event` to `document`, whatever its route (`ElementsApp`'s).
     pub(crate) fn handle(
         &mut self,
         document: &Rc<RefCell<Document>>,

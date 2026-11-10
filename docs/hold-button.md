@@ -1,8 +1,14 @@
 # HoldButton
 
-`vapors_components::hold_button::HoldButton` exposes a `Signal<bool>` that is
-true while at least one pointer or activation key is held. It is a compiled
-`.wisp` component using the existing document event and capture APIs.
+`vapors_components::hold_button::HoldButton` is held while at least one pointer
+or activation key is down. It is a compiled `.wisp` component using the
+existing document event and capture APIs.
+
+The hold is output-only. The button keeps it in its own `held` memo and calls
+its `on_change: Rc<dyn Fn(bool)>` prop once at mount and on each change.
+`vapors_components::hold_into(signal)` builds an `on_change` that writes the
+change into `signal`. The consumer holds no handle to the button's state, so
+writing its own signal does not release the button.
 
 ```html
 <script>
@@ -13,14 +19,18 @@ let reset: Signal<u64> = Signal::new(0);
 </script>
 
 <HoldButton label={String::from("Hold")}
-    bind:pressed={held} enabled={enabled} reset={reset} />
+    on_change={vapors_components::hold_into(held)} enabled={enabled} reset={reset} />
 ```
 
 Each pointer is captured on press. Release, cancellation or capture loss removes
 only that pointer. Space and Enter are held independently; blur clears held
 keys. Increment `reset` to clear all holds, for example when pausing an app.
 Setting `enabled` false clears holds and blocks activation; enabling again does
-not restore them. Unmount clears a surviving consumer's `pressed` signal.
+not restore them. Unmount calls `on_change(false)` if the consumer was last told
+`true`. When one owner's disposal takes both the consumer's signal and the
+button, the signal is disposed before the button's cleanup runs; `hold_into`
+lets that one release through and refuses any other failed write (the relaxed
+guard is declared in `crates/components/src/hold_output.rs`).
 
 The button uses `aria-disabled` and remains focusable when unavailable. This
 checkout cannot dynamically remove HTML boolean attributes; the event guards

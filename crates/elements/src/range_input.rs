@@ -66,7 +66,7 @@ impl Document {
         if snapped == range.value {
             return false;
         }
-        self.changed = true;
+        self.note_change();
         if let Some(element) = self.arena.get_mut(node, "range").element_mut() {
             element
                 .properties
@@ -111,12 +111,18 @@ pub(crate) fn key(
     let Some(value) = stepped(&range, key, steps) else {
         return false;
     };
+    set(document, node, value);
+    // a step at the end of the range moves nothing but is still the range's
+    true
+}
+
+/// Sets `node`'s value, snapped, with `input` and `change` when it
+/// moved: a key's step, and an accessibility set-value (`a11y_set_value`).
+pub(crate) fn set(document: &Rc<RefCell<Document>>, node: NodeId, value: f64) {
     if document.borrow_mut().set_range_value(node, value) {
         fire(document, node, "input");
         fire(document, node, "change");
     }
-    // a step at the end of the range moves nothing but is still the range's
-    true
 }
 
 /// The value `key` moves `range` to, or `None` for a key that does not.
