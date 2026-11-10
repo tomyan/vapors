@@ -159,3 +159,7 @@ fn arc<'a>(
 #[cfg(test)]
 #[path = "icon_path_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "icon_path_refusals_tests.rs"]
+mod refusals_tests;
