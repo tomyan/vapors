@@ -48,3 +48,5 @@ mod gpu_track_tests;
 
 #[cfg(test)]
 mod gpu_frames;
+#[cfg(test)]
+mod gpu_hud_iu5_tests;
