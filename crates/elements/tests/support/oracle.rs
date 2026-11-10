@@ -3,8 +3,9 @@
 //! document once it forgets everything kept between updates
 //! (`Document::forget_kept`) and updates from scratch. Compared: each
 //! element's border box and computed style in tree order; the display
-//! list in paint order, each text run as its text, with each item's
-//! clip; the element hit and the cursor at every `GRID` CSS px; focus;
+//! list in paint order, each text run as its text, origin, layout size
+//! and every glyph run (size, colour, glyph ids and positions), with
+//! each item's clip; the element hit and the cursor at every `GRID` CSS px; focus;
 //! and each text field's selection.
 
 use std::cell::RefCell;
@@ -14,6 +15,7 @@ use vapors_css::cascade::ComputedStyle;
 use vapors_dom::NodeId;
 use vapors_elements::{BoxRect, Cursor, Document, Painted, Viewport};
 use vapors_scene::{Item, Rect};
+use vapors_text::Layout;
 
 /// What the oracle compares.
 #[derive(Debug, PartialEq)]
@@ -82,27 +84,48 @@ fn settled(doc: &mut Document, viewport: Viewport) -> Snapshot {
         .filter_map(|n| doc.selection(*n).map(|s| (*n, s)))
         .collect();
     let painted = updated(doc, viewport);
+    let boxes = nodes.iter().map(|n| (*n, painted.border_box(*n))).collect();
     Snapshot {
-        boxes: nodes.iter().map(|n| (*n, painted.border_box(*n))).collect(),
+        boxes,
         styles,
         items: items(painted),
         clips: painted.scene().clips().to_vec(),
-        hits: grid(viewport)
-            .map(|point| (painted.hit(point), painted.cursor(point)))
-            .collect(),
+        hits: hits(painted, viewport),
         focus,
         selections,
     }
 }
 
+fn hits(painted: &Painted, viewport: Viewport) -> Vec<(Option<NodeId>, Cursor)> {
+    grid(viewport)
+        .map(|point| (painted.hit(point), painted.cursor(point)))
+        .collect()
+}
+
 fn items(painted: &Painted) -> Vec<String> {
     let text = |item: &Item| match item {
         Item::Text { text, origin } => {
-            format!("text {:?} at {origin:?}", painted.text(*text).text())
+            format!("text {} at {origin:?}", layout_detail(painted.text(*text)))
         }
         other => format!("{other:?}"),
     };
     painted.scene().items().iter().map(text).collect()
+}
+
+/// A text layout as the string, its size and every run, so a stale
+/// colour, size or glyph position differs.
+fn layout_detail(layout: &Layout) -> String {
+    format!(
+        "{:?} {}x{} runs {:?}",
+        layout.text(),
+        layout.width(),
+        layout.height(),
+        layout
+            .runs()
+            .iter()
+            .map(|run| (run.size, run.color, &run.glyphs))
+            .collect::<Vec<_>>()
+    )
 }
 
 /// Points `GRID` CSS px apart over `viewport`.
