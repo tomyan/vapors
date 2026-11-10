@@ -9,13 +9,15 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use vapors_elements::{Document, ShortcutModifier};
-use vapors_platform::{App, Event, Frame, Instant, Next, Platform, report_error};
+use vapors_platform::{App, Event, Frame, Next, Platform, report_error};
 
 use crate::frame::FrameTimes;
 
-use crate::document_input::DocumentInput;
+use crate::document_input::{DocumentInput, Unplaced};
 use crate::painter::ScenePainter;
 pub use decision::FrameDecision;
+pub use give::GiveError;
+use give::Hosting;
 pub use surface_handle::{InvalidateError, Invalidated, SurfaceHandle};
 use surfaces::AppSurfaces;
 
@@ -35,7 +37,9 @@ impl Failure {
     }
 }
 
-/// Shows a document in the window.
+/// Shows a document in the window. Events come through `App::event`,
+/// or through [`ElementsApp::give`] for an app that wraps this one; one
+/// instance takes them one way only (a debug build refuses the mix).
 pub struct ElementsApp {
     document: Rc<RefCell<Document>>,
     painter: Option<ScenePainter>,
@@ -59,6 +63,8 @@ pub struct ElementsApp {
     input_spent: Duration,
     /// Why the last frame asked for the next (`elements_app_decision.rs`).
     decision: FrameDecision,
+    /// Whether events came through `App::event` or `give`; `None` before the first.
+    hosting: Option<Hosting>,
 }
 
 /// What [`ElementsApp::with_per_frame`] calls before each update, with
@@ -91,6 +97,7 @@ impl ElementsApp {
             last_times: None,
             input_spent: Duration::ZERO,
             decision: FrameDecision::default(),
+            hosting: None,
         }
     }
 
@@ -123,10 +130,17 @@ impl ElementsApp {
 /// frames.
 impl App for ElementsApp {
     fn event(&mut self, event: Event, platform: &Platform) {
-        let started = Instant::now();
-        self.surfaces.keep_waker(platform);
-        self.handle(&event, platform);
-        self.input_spent += started.elapsed();
+        match self.deliver(&event, platform, Hosting::Alone) {
+            // Before the first frame nothing is on screen, so the event
+            // was aimed at nothing; it is dropped.
+            Ok(_) | Err(GiveError::Unplaced(Unplaced::NotUpdated)) => {}
+            Err(GiveError::Unplaced(unplaced)) => {
+                report_error(&unplaced.to_string());
+                self.failure.set(&unplaced.to_string());
+            }
+            // refused text input is reported and the app goes on
+            Err(refused) => report_error(&refused.to_string()),
+        }
     }
 
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
@@ -150,34 +164,6 @@ impl App for ElementsApp {
     }
 }
 
-impl ElementsApp {
-    /// An event, dispatched as it arrives (design 02, 2-S1).
-    fn handle(&mut self, event: &Event, platform: &Platform) {
-        match self.input.handle(&self.document, event, platform) {
-            Ok(outcome) => {
-                if outcome.changed {
-                    platform.request_redraw();
-                }
-                if let Some(cursor) = outcome.cursor {
-                    platform.set_cursor(cursor);
-                }
-            }
-            // Before the first frame nothing is on screen, so the event
-            // was aimed at nothing; it is dropped.
-            Err(crate::document_input::Unplaced::NotUpdated) => {}
-            Err(unplaced) => {
-                report_error(&unplaced.to_string());
-                self.failure.set(&unplaced.to_string());
-            }
-        }
-        self.text_event(event);
-        if self.document.borrow_mut().take_changed() {
-            platform.request_redraw();
-        }
-        self.mirror_text_field(platform);
-    }
-}
-
 /// The modifier the platform's shortcuts take.
 fn shortcut_modifier() -> ShortcutModifier {
     if vapors_platform::shortcut_is_command() {
@@ -191,6 +177,8 @@ fn shortcut_modifier() -> ShortcutModifier {
 mod decision;
 #[path = "elements_app_frame.rs"]
 mod frame_phases;
+#[path = "elements_app_give.rs"]
+mod give;
 #[cfg(not(target_family = "wasm"))]
 #[path = "elements_app_paste.rs"]
 mod paste;

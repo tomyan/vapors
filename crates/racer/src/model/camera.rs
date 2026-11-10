@@ -1,7 +1,7 @@
 //! Smooth fixed-orientation and heading-following camera poses.
 use super::{Controls, MAX_SPEED, Settings};
 /// Camera scale: smaller means more world visible.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Camera {
     /// Current scale, including speed and camera mode.
     pub zoom: f32,

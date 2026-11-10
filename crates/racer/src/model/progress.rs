@@ -2,7 +2,7 @@
 use super::{ROAD, road_distance};
 use std::f32::consts::{FRAC_PI_2, TAU};
 /// Progress around the circuit, counted at the start line.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Progress {
     /// Laps completed, stopping at three.
     pub laps: u8,
