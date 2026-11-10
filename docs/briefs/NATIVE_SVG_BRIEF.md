@@ -1,0 +1,164 @@
+# Brief: native SVG in vapors
+
+Status: design direction for review. Not in the plan yet; the proposed
+placement is at the end. Written 2026-11-10 from a discussion between Tom
+and the lead. Names of types and functions below are proposals.
+
+## Objective
+
+Let `.wisp` templates hold inline SVG (`<svg>`, `<g>`, `<path>`, basic
+shapes, `<text>`) as elements in the vapors tree, styled by vapors' CSS,
+bound to signals like any other element, and drawn by the vapors painter
+in paint order with HTML content. The design must be able to grow to full
+static SVG without replacing the element, style or item layers.
+
+## Where vapors is today
+
+- Icons (docs/icons.md, vapors #143, #144, #148, #149; the Chromium
+  comparison is #151): a subset of
+  `<svg>`/`<path>` (stroke only, M L H V A Z, `currentColor`), refused
+  outside the subset, sized by CSS from its attributes as Chromium does.
+  Each path is stroked on the CPU by zeno into a coverage mask, cached in
+  the glyph atlas at device size, and drawn as one tinted quad per path
+  (`TextPipeline::draw_icons`). An svg over 256 device px is refused.
+  zeno 0.3.3 bevels joins under 90 degrees whatever the miter limit
+  (dfrg/zeno#29); `icon_miter.rs` draws the missing corners.
+- Boxes are instanced quads whose fragment shader takes coverage from the
+  signed distance to a rounded rectangle (`crates/renderer/src/quads.wgsl`):
+  analytic antialiasing per pixel.
+- Text and icons are CPU coverage masks in an atlas, drawn as quads
+  (`crates/text/src/text.wgsl`).
+- `opacity` and `filter` are refused as deferred to F3 "with the canvas
+  compositing work" (`crates/elements/src/style/honoured.rs`,
+  `docs/F2c.md`). `transform` and rounded clips are also deferred.
+
+The icon route cannot grow to general SVG: rasterising depends on device
+scale, so nothing can move to compile time, every change re-rasterises,
+and size is capped by the atlas page.
+
+## What "full static SVG" needs
+
+| Feature | Kind of work |
+|---|---|
+| Fills (nonzero, evenodd), strokes (joins, caps, miter limit, dashes) | Geometry |
+| `<rect>`, `<circle>`, `<ellipse>`, `<line>`, `<polyline>`, `<polygon>`, all path commands | Geometry |
+| `<g>`, `<use>`, `<defs>`, `<symbol>`, `transform` | Tree and instancing |
+| Linear and radial gradients, patterns | Paint (shader) |
+| `clipPath` | Clipping |
+| `mask`, group `opacity`, `filter`, `mix-blend-mode` | Offscreen layers and compositing |
+| `<text>`, text on a path | Glyph pipeline |
+| Markers | Instanced geometry |
+| `foreignObject`, SMIL animation | Out of scope; CSS animations cover motion |
+
+Only the first three rows depend on how paths become pixels. The layer row
+is the same compositing work F3 needs for HTML `opacity` and `filter`.
+
+## Rendering routes considered
+
+- **A. Tessellation.** Paths become triangle meshes on the CPU (lyon is the
+  likely crate), drawn by the vapors painter as display-list items with the
+  same batching, scissor clips and paint order as boxes and text. Static
+  shapes can be tessellated at build time. Costs: antialiasing needs a
+  choice (MSAA, or an edge-fringe strip that gives each outline a soft
+  edge); a path whose shape changes is re-tessellated on the CPU
+  (transforms and colours are not).
+- **B. GPU vector renderer** (vello is the likely crate). Compute shaders
+  on wgpu with analytic coverage. Strong antialiasing and large scenes.
+  Costs: a second renderer beside the painter whose output is composited
+  back in, like a `gpu-surface`; needs WebGPU compute, unverified on
+  SwiftShader (the gate) and on the Pixel 9 Pro; a heavy dependency; as far
+  as the lead knows, no SVG filters, so B does not avoid the layer work.
+- **C. Extend the icon route.** Least new code; limited to small static
+  graphics for the reasons above.
+- **D. resvg/usvg.** Broad static SVG on the CPU into a texture, but with
+  its own parser and style resolution outside vapors' DOM and CSS: no
+  bindings, no cascade. Does not compose.
+
+Closest to how vapors draws HTML: in structure, A (same painter and
+display list); in pixel quality, B (analytic coverage like the box
+shader). Styling is the same for every route, since it is the element and
+CSS layer.
+
+## Recommendation
+
+Route A, built so that B can be added later without touching elements or
+CSS. Three decisions make that possible, and they are taken first:
+
+1. **A renderer-neutral display item.** Elements and CSS produce a vector
+   item: path geometry (or a reference to compiled geometry), fill and
+   stroke paint, transform, clip, and the layer it draws into. The painter
+   consumes it. A backend (A now, B later, per item or per surface) is
+   chosen in the painter.
+2. **Offscreen layers as shared painter infrastructure.** One mechanism
+   renders a subtree to a texture and composites it, used by HTML
+   `opacity`/`filter` (F3) and SVG `mask`/`opacity`/`filter`. Built once.
+3. **Antialiasing chosen against the Chromium oracle in the first slice.**
+   Measured on touche's icons at 1x and 2x with the existing paint_check
+   rules, comparing MSAA and edge-fringe. If neither is close enough at 1x,
+   small icons stay on the coverage-mask route (or move to B) and the item
+   format is unchanged.
+
+## Compile time
+
+The compiler already turns `.wisp` templates into Rust. For SVG it can:
+
+- refuse literal `d`, `viewBox` and attributes outside the supported set at
+  build time, naming file and line;
+- parse literal path data once and embed the commands;
+- tessellate static shapes once and embed vertex and index buffers. Curves
+  are flattened at a tolerance set for the largest supported scale, so the
+  mesh does not depend on the device;
+- leave bound values to run time: a bound `d` is parsed and tessellated
+  when it changes; bound transforms and colours are per-draw uniforms and
+  need no new geometry.
+
+## Composition
+
+- **HTML and CSS.** The outer `<svg>` is a replaced box in CSS layout (as
+  in icon slice 2a); inside it, geometry uses the viewBox coordinate
+  system. Presentation attributes map to CSS properties in vapors' cascade
+  (`fill`, `stroke`, `stroke-width`, `opacity`, `transform`), as Chromium
+  does.
+- **Hit testing and accessibility.** Pointer events land on the painted
+  shape, not its bounding box. `role`, `<title>` and `aria-*` go through the
+  existing accessibility projection, checked against Chromium's tree.
+- **3D.** An `<svg>` rendered to a texture is a material, through 3D slice
+  3b (a layer texture as a material). A path's mesh is ordinary geometry for
+  flat or extruded vector shapes in a scene, under the 3D brief's shared
+  geometry and material ownership. An `<svg>` over a `gpu-surface` is
+  ordinary UI.
+- **Incremental contracts** (docs/design/incremental-contracts.md). Each
+  element keeps its mesh; a transform or colour change updates without
+  re-tessellating; a removed element releases its geometry.
+
+## Proposed slices
+
+1. The vector display item and the antialiasing test: tessellate touche's
+   ten icons with A, draw them through the item, compare with Chromium at
+   1x and 2x beside the icon route's numbers. Decides antialiasing (point 3
+   above). No template change.
+2. `<path>` with fill and stroke paint from CSS in templates, through the
+   item; the icon subset moves onto it and the atlas route, the 256 px cap
+   and `icon_miter.rs` are retired if slice 1 allows.
+3. Compile-time parse, refusal and tessellation for literal geometry.
+4. Basic shapes, `<g>`, `transform`, `<use>`/`<defs>`.
+5. Gradients and `clipPath`.
+6. Offscreen layers (with F3): group `opacity`, `mask`, `filter`.
+7. `<text>` and markers.
+8. B as a second backend, if measurements of a real workload call for it.
+
+Each slice is compared with Chromium (paint and accessibility oracles) and
+refuses what it does not support, naming the element, the attribute and
+the fix.
+
+## Placement
+
+Not needed by touche's MVP or by 3D slice 1c. Proposed: after 3D slice 3b,
+whose texture-as-material route slice 1's 3D composition reuses, and
+alongside F3, whose layers slice 6 shares. Tom decides the placement.
+
+## Open questions for Tom
+
+- Route A with the three decisions above, or another route.
+- Whether the icon route is retired by slice 2 or kept for small icons.
+- Placement relative to H1 to H5, IU3, F3 and the 3D slices.
