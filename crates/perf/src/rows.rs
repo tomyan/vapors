@@ -1,5 +1,5 @@
 //! The IU1 rows workload, timed: `rows` mounted rows (the page of
-//! vapors-elements' `sparse_updates.rs`, its file included by path so
+//! vapors-elements' `sparse_updates.rs`, its files included by path so
 //! both time and check one workload) in an `ElementsApp`, and a change
 //! made before each frame.
 
@@ -7,13 +7,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use vapors_app::ElementsApp;
-use vapors_dom::{Dom, NodeId};
+use vapors_dom::Dom;
 use vapors_elements::{Document, Viewport};
 use vapors_platform::{App, Next};
-use vapors_text::FontSystem;
 
 use crate::run::{Counts, Workload};
 
+#[path = "../../elements/tests/support/basics.rs"]
+mod basics;
 #[allow(dead_code, clippy::pedantic)] // the tests' file: `edit` and its other edits are theirs
 #[path = "../../elements/tests/support/rows_page.rs"]
 mod rows_page;
@@ -88,34 +89,4 @@ impl Workload for Rows {
 #[must_use]
 pub fn rows_document(count: usize) -> (Rc<RefCell<Document>>, Viewport) {
     (rows_page(count).doc, rows_viewport())
-}
-
-/// An empty document on the bundled fonts, as the elements tests' is.
-fn document() -> Document {
-    let mut doc = Document::new(FontSystem::bundle_only());
-    doc.set_shortcut_modifier(vapors_elements::ShortcutModifier::Control);
-    doc
-}
-
-fn viewport(width: f32, height: f32) -> Viewport {
-    Viewport {
-        width,
-        height,
-        scale: 1.0,
-    }
-}
-
-fn element(doc: &mut Document, parent: NodeId, tag: &str, class: &str) -> NodeId {
-    let node = doc.create_element(tag);
-    if !class.is_empty() {
-        doc.set_attribute(node, "class", class);
-    }
-    doc.append(parent, node);
-    node
-}
-
-fn text(doc: &mut Document, parent: NodeId, text: &str) -> NodeId {
-    let node = doc.create_text(text);
-    doc.append(parent, node);
-    node
 }

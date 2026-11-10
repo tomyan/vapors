@@ -1,7 +1,7 @@
 //! The sparse-update workload of IU1: `rows` mounted rows of a label, a
 //! value and a button, and the edits `sparse_updates.rs` makes to one
 //! of them, each followed by one update. `crates/perf` times the same
-//! workload, including this file by path.
+//! workload, including this file and `basics.rs` by path.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -9,7 +9,7 @@ use std::rc::Rc;
 use vapors_dom::{Dom, NodeId};
 use vapors_elements::{Document, Viewport};
 
-use super::{document, element, text, viewport};
+use super::basics::{document, element, text, viewport};
 
 /// The value has a fixed size, so a same-length edit to it moves no
 /// other box; the label is as wide as its text. The button changes

@@ -5,6 +5,7 @@
 //! exist. Times are reported, never asserted; `src/main.rs` prints the
 //! baseline in docs/perf.
 
+pub mod args;
 pub mod gpu_time;
 pub mod racer;
 pub mod report;

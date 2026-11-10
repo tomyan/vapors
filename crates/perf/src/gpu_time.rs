@@ -5,6 +5,7 @@
 //! it bounds the frame's GPU time from above. Read back once, after
 //! the last frame.
 
+use std::sync::mpsc::{self, TryRecvError};
 use std::time::Duration;
 
 /// The features the clock needs: timestamps written between submits.
@@ -74,23 +75,8 @@ impl GpuClock {
     }
 
     fn read(&self, device: &wgpu::Device, queue: &wgpu::Queue) -> Result<Vec<u64>, String> {
-        let size = u64::from(self.written) * 8;
-        let resolved = buffer(
-            device,
-            size,
-            wgpu::BufferUsages::QUERY_RESOLVE | wgpu::BufferUsages::COPY_SRC,
-        );
-        let readable = buffer(
-            device,
-            size,
-            wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-        );
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-        encoder.resolve_query_set(&self.queries, 0..self.written, &resolved, 0);
-        encoder.copy_buffer_to_buffer(&resolved, 0, &readable, 0, size);
-        queue.submit([encoder.finish()]);
-        readable.slice(..).map_async(wgpu::MapMode::Read, |_| {});
-        wait(device, READ_DEADLINE)?;
+        let readable = self.resolve(device, queue);
+        map(device, &readable)?;
         let bytes = readable
             .slice(..)
             .get_mapped_range()
@@ -101,6 +87,45 @@ impl GpuClock {
             .iter()
             .map(|b| u64::from_le_bytes(*b))
             .collect())
+    }
+
+    /// Submits the copy of the written timestamps into a mappable buffer.
+    fn resolve(&self, device: &wgpu::Device, queue: &wgpu::Queue) -> wgpu::Buffer {
+        let size = u64::from(self.written) * 8;
+        let usage = wgpu::BufferUsages::QUERY_RESOLVE | wgpu::BufferUsages::COPY_SRC;
+        let resolved = buffer(device, size, usage);
+        let usage = wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST;
+        let readable = buffer(device, size, usage);
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        encoder.resolve_query_set(&self.queries, 0..self.written, &resolved, 0);
+        encoder.copy_buffer_to_buffer(&resolved, 0, &readable, 0, size);
+        queue.submit([encoder.finish()]);
+        readable
+    }
+}
+
+/// Maps `readable` for reading, waiting at most [`READ_DEADLINE`].
+fn map(device: &wgpu::Device, readable: &wgpu::Buffer) -> Result<(), String> {
+    let (sender, receiver) = mpsc::channel();
+    readable
+        .slice(..)
+        .map_async(wgpu::MapMode::Read, move |result| {
+            let _ = sender.send(result);
+        });
+    wait(device, READ_DEADLINE)?;
+    mapped(receiver.try_recv())
+}
+
+/// The map's outcome: mapped, refused, or not reported after the wait.
+fn mapped(outcome: Result<Result<(), wgpu::BufferAsyncError>, TryRecvError>) -> Result<(), String> {
+    match outcome {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(error)) => Err(format!(
+            "mapping the timestamps for reading failed: {error}"
+        )),
+        Err(_) => Err(format!(
+            "mapping the timestamps had not finished after the GPU wait of {READ_DEADLINE:?}"
+        )),
     }
 }
 
@@ -146,3 +171,7 @@ fn span(pair: &[u64; 2], period: f64) -> Result<Duration, String> {
     })?;
     Ok(Duration::from_nanos((ticks as f64 * period) as u64))
 }
+
+#[cfg(test)]
+#[path = "gpu_time_tests.rs"]
+mod tests;

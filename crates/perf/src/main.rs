@@ -1,8 +1,9 @@
 //! Prints the timing baseline (docs/perf): every workload, in a release
 //! build. `cargo run --release -p vapors-perf -- [runs] [warmup]`, 200
-//! and 20 by default.
+//! and 20 by default (`args.rs`).
 
 use vapors_gpu_harness::gpu_with;
+use vapors_perf::args::settings;
 use vapors_perf::gpu_time::FEATURES;
 use vapors_perf::racer::RacerFrames;
 use vapors_perf::report::section;
@@ -35,18 +36,6 @@ fn run() -> Result<(), String> {
     }
     println!("Load average at the end: {}", load());
     Ok(())
-}
-
-fn settings(mut args: impl Iterator<Item = String>) -> Result<Settings, String> {
-    let mut number = |default: usize| {
-        args.next().map_or(Ok(default), |arg| {
-            arg.parse().map_err(|_| format!("{arg} is not a count"))
-        })
-    };
-    Ok(Settings {
-        runs: number(200)?,
-        warmup: number(20)?,
-    })
 }
 
 fn workloads() -> Vec<(String, Box<dyn Workload>)> {

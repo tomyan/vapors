@@ -55,30 +55,39 @@ impl<'g> Sampler<'g> {
         workload: &mut dyn Workload,
         settings: Settings,
     ) -> Result<Samples, String> {
-        let (width, height) = workload.size();
-        let texture = clear(
-            &self.gpu.device,
-            &self.gpu.queue,
-            width,
-            height,
-            Color::default(),
-        );
         let frames = u32::try_from(settings.runs).map_err(|_| "too many runs".to_owned())?;
         let mut gpu_clock = GpuClock::new(&self.gpu.device, frames);
-        let mut samples = Samples::default();
-        for index in 0..settings.warmup + settings.runs {
-            let timed = index >= settings.warmup;
-            let clock = gpu_clock.as_mut().filter(|_| timed);
-            let (frame, phases) = self.frame(workload, &texture, index, clock)?;
-            if timed {
-                samples.push(frame, phases);
-            }
-        }
+        let mut samples = self.timed_frames(workload, settings, gpu_clock.as_mut())?;
         samples.gpu = gpu_clock
             .map(|clock| clock.spans(&self.gpu.device, &self.gpu.queue))
             .transpose()?;
         samples.counts = workload.counts();
         Ok(samples)
+    }
+
+    /// The warmup frames, then the timed ones, kept, on one texture.
+    fn timed_frames(
+        &mut self,
+        workload: &mut dyn Workload,
+        settings: Settings,
+        mut gpu_clock: Option<&mut GpuClock>,
+    ) -> Result<Samples, String> {
+        let texture = self.texture(workload.size());
+        let mut samples = Samples::default();
+        for index in 0..settings.warmup + settings.runs {
+            let timed = index >= settings.warmup;
+            let clock = gpu_clock.as_deref_mut().filter(|_| timed);
+            let (frame, phases) = self.frame(workload, &texture, index, clock)?;
+            if timed {
+                samples.push(frame, phases);
+            }
+        }
+        Ok(samples)
+    }
+
+    fn texture(&self, (width, height): (u32, u32)) -> wgpu::Texture {
+        let (device, queue) = (&self.gpu.device, &self.gpu.queue);
+        clear(device, queue, width, height, Color::default())
     }
 
     /// One frame: the change, then the timed frame between timestamps,
