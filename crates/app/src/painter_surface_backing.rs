@@ -209,3 +209,11 @@ fn descriptor(size: SurfaceSize) -> wgpu::TextureDescriptor<'static> {
         view_formats: &[],
     }
 }
+
+#[cfg(test)]
+#[path = "painter_surface_backing_tests.rs"]
+mod tests;
+// Re-exported under cfg(test) so the test can sit in a root `gpu_` module: the
+// tier split matches `^gpu_` on the whole nextest id.
+#[cfg(test)]
+pub(crate) use tests::wants_frame_around_a_pending_scope;

@@ -20,6 +20,9 @@ use crate::surface::{SurfaceRenderer, SurfaceSize};
 #[path = "painter_surface_backing.rs"]
 mod backing;
 use backing::Mounted;
+// For the root `gpu_` test module (the tier split needs a gpu_ id).
+#[cfg(test)]
+pub(crate) use backing::wants_frame_around_a_pending_scope;
 #[path = "painter_surface_scope.rs"]
 mod scope;
 

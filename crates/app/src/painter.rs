@@ -195,6 +195,9 @@ pub use errors::{DrawOverError, MountError, PaintError, SUPPORTED, UnsupportedFo
 #[path = "painter_surfaces.rs"]
 mod surfaces;
 use surfaces::Surfaces;
+// For the root `gpu_` test module (the tier split needs a gpu_ id).
+#[cfg(test)]
+pub(crate) use surfaces::wants_frame_around_a_pending_scope;
 
 #[cfg(test)]
 #[path = "painter_tests.rs"]

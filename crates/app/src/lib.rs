@@ -11,6 +11,8 @@ mod cursor;
 mod document_input;
 mod elements_app;
 pub mod frame;
+#[cfg(test)]
+mod gpu_surface_backing_tests;
 mod painter;
 mod pointer;
 #[cfg(test)]

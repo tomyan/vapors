@@ -16,11 +16,15 @@ use crate::surface::SurfaceError;
 pub(super) type Caught = Pin<Box<dyn Future<Output = Option<wgpu::Error>>>>;
 
 /// Frames of the surface a scope may stay unresolved before the
-/// surface is refused. A stated bound, not a measurement: a WebGPU
-/// `popErrorScope` resolves once the GPU process has handled the
-/// commands before it, which takes a frame or two; 10 frames (about
-/// 170 ms at 60 Hz) leaves room for a slow frame. Native wgpu resolves
-/// in the frame, so it never waits.
+/// surface is refused.
+///
+/// RELAXED guard: the 10 frames (about 170 ms at 60 Hz) is stated, not
+/// measured. The expectation, unmeasured, is that a WebGPU
+/// `popErrorScope` resolves within a frame or two of the GPU process
+/// handling the commands before it, and the rest is slack for a slow
+/// frame. Retired when popErrorScope latency in headless Chromium
+/// WebGPU is measured and this bound is set from the measurement.
+/// Native wgpu resolves in the frame, so it never waits.
 const DEADLINE_FRAMES: u32 = 10;
 
 /// The error scopes of one surface not yet seen resolved, and the first
