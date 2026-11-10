@@ -13,7 +13,7 @@ needs no camera, depth or scene.
 | 1a | `gpu-surface` element, `Item::Surface` in the display list, the refusals | #139 |
 | 1b | `SurfaceRenderer` and the painter's surface host: offscreen texture, resize, scale, clip, on-demand rendering, failures | #140 |
 | 1b2 | `ElementsApp` mounting, `SurfaceHandle`, `Next` from `wants_frame`; the gradient example | #141, #142 |
-| 1c | animation requests (PR 1, #147); the racer's renderer mounted through the surface (PR 2, #150); the racer's per-frame counts (PR 3, #161); two panels (PR 4, this branch); surface-local input. Plan: `docs/plans/3d-1c.md` | in progress |
+| 1c | animation requests (PR 1, #147); the racer's renderer mounted through the surface (PR 2, #150); the racer's per-frame counts (PR 3, #161); two panels (PR 4, #163); surface-local input (PR 5, this branch). Plan: `docs/plans/3d-1c.md` | in progress |
 | 2-5 | scene, cameras, components, instances, tasks | not started |
 
 Touche's image renderer drawing through a surface in a panel comes
@@ -184,11 +184,45 @@ composition draw per surface, a stopped one included.
 
 ## Input
 
-Pointer events reach a surface through ordinary hit testing and
-dispatch: UI over it is hit first, capture works as for any element.
-On an event whose target is the surface, `Event::offset` is from the
-content box's top-left in CSS pixels; multiply by the scale factor for
-backing pixels.
+A surface is an element: pointer events reach it by the document's hit
+testing, dispatch and capture (`events_capture.rs`), not through the
+renderer. The app listens on the `gpu-surface` element, or on an
+ancestor, as on any element; an app that wraps `ElementsApp` gives each
+event with `ElementsApp::give`, and a press on a surface is
+`Route::Document`. Tests: `crates/app/tests/elements_app_surface_input.rs`
+and `elements_app_surface_capture.rs`, on two panels each holding a
+surface, with a button positioned over the left one.
+
+- `Event::offset` is from the surface's content box top-left (its
+  padding box, as padding is refused) in CSS pixels: the platform's
+  physical position divided by the scale factor, less where the box is
+  painted, so a scroll container's offset is included. Multiply by
+  `SurfaceSize::scale` for backing pixels. vapors refuses `transform`,
+  so no ancestor transform applies.
+- UI painted over a surface (a later sibling, a positioned element) is
+  hit first: a press on it goes to it, and the surface gets no event
+  for that press.
+- Capture is the web's. A mouse press on a surface goes on to the
+  surface past its edge only when a `pointerdown` listener calls
+  `set_pointer_capture`; then every move and the release go to it,
+  with offsets negative or beyond its size, and the `click` goes to it
+  as well. A touch is captured by what it went down on without asking.
+  The capture ends at the release; later moves go to whatever is under
+  the pointer.
+- A press that starts on UI over a surface stays with the UI when the
+  UI captures it. When it does not, as on the web, the surface under
+  the pointer gets the moves and the release, though not the
+  `pointerdown` or a `click`.
+- Hover: the surface gets `pointermove` (not pressed) while the
+  pointer is over it and not over UI above it, and `:hover` applies.
+  vapors sends no `pointerover`, `pointerenter`, `pointerout` or
+  `pointerleave`, so nothing tells a surface that the pointer left it
+  or the window; the app sees moves reach another element.
+- `pointer-events: none` on a surface (the racer's track inherits it
+  from its body) lets presses through to what is under it; the racer
+  takes no pointer input on its track.
+- Keyboard: a `gpu-surface` is not focusable unless it has a
+  `tabindex`, when it takes focus and keys as any element does.
 
 ## Renderer contract
 
