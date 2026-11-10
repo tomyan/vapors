@@ -7,7 +7,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use vapors_dom::NodeId;
+use vapors_dom::{NodeId, SCOPE_ATTRIBUTE};
 
 use crate::arena::Arena;
 use crate::check::describe;
@@ -78,6 +78,9 @@ fn svg_reasons(
 }
 
 /// Each of `attributes` not in `allowed`, which `tag` does not take.
+/// The compiler's scoping attribute is always accepted: a component with
+/// a `<style>` tags every element with it, and it is not painted or
+/// exposed to the a11y tree.
 pub(crate) fn outside(
     attributes: &BTreeMap<String, String>,
     allowed: &[&str],
@@ -85,7 +88,7 @@ pub(crate) fn outside(
 ) -> Vec<String> {
     attributes
         .keys()
-        .filter(|name| !allowed.contains(&name.as_str()))
+        .filter(|name| !allowed.contains(&name.as_str()) && *name != SCOPE_ATTRIBUTE)
         .map(|name| format!("its {name} attribute is not in the icon subset (docs/icons.md), which takes {} on an {tag}; remove it", allowed.join(", ")))
         .collect()
 }
