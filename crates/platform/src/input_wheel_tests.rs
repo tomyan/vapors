@@ -76,3 +76,61 @@ fn a_pixel_delta_is_divided_by_the_scale_and_negated() {
 fn a_line_is_what_chromium_scrolls_for_a_notch() {
     assert_eq!(LINE_PIXELS, 120.0);
 }
+
+#[test]
+fn a_wheel_the_page_placed_moves_the_pointer_there_first() {
+    // Given: the page recorded the wheel's own position, no pointer move before
+    let mut input = Input::new();
+    crate::wheel_position::record([30.0, 40.0]);
+
+    // When
+    let events = input.translate(&wheel(MouseScrollDelta::LineDelta(0.0, -1.0)));
+
+    // Then
+    assert_eq!(
+        events,
+        [
+            Event::PointerMoved { x: 30.0, y: 40.0 },
+            Event::Scroll {
+                dx: 0.0,
+                dy: LINE_PIXELS
+            }
+        ]
+    );
+}
+
+#[test]
+fn a_wheel_the_page_placed_is_the_pointers_position_for_what_follows() {
+    // Given
+    let mut input = Input::new();
+    input.size = Some([200.0, 200.0]);
+    crate::wheel_position::record([30.0, 40.0]);
+    input.translate(&wheel(MouseScrollDelta::LineDelta(0.0, -1.0)));
+
+    // When: a pinch is anchored at the pointer
+    let events = input.pinch(0.5).into_iter().collect::<Vec<_>>();
+
+    // Then
+    assert_eq!(
+        events,
+        [Event::Pinch {
+            x: 30.0,
+            y: 40.0,
+            factor: 1.5
+        }]
+    );
+}
+
+#[test]
+fn a_native_wheel_has_no_position_of_its_own_and_sends_only_the_scroll() {
+    // Given: winit's MouseWheel carries none, and nothing recorded one;
+    // natively the CursorMoved winit sends places the pointer
+    let mut input = Input::new();
+
+    // When
+    let events = input.translate(&wheel(MouseScrollDelta::LineDelta(0.0, -1.0)));
+
+    // Then
+    assert_eq!(events.len(), 1);
+    assert!(matches!(events[0], Event::Scroll { .. }));
+}
