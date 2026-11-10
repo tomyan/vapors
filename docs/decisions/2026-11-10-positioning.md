@@ -20,7 +20,7 @@ workloads (docs/briefs/INCREMENTAL_UI_PERFORMANCE_BRIEF.md says the same).
 ## Horizon
 
 vapors was about three weeks old on 2026-11-10. Tom: "So far vapors is
-around 3 weeks old, so can think of it as a prospect in 3months." The
+around 3 weeks old, so can think of it as a prospect in 3 months." The
 pillars below are judged as a prospect at about three months (around
 2027-02-10), not by today's state.
 
