@@ -8,7 +8,7 @@ use crate::elements_app::give_one_loop_waker_to;
 use crate::painter::{SCOPE_DEADLINE, wants_frame_around_a_pending_scope};
 
 #[test]
-fn gpu_an_idle_backed_surface_with_a_pending_scope_wants_no_frame_until_its_deadline() {
+fn gpu_an_idle_backed_surface_with_a_pending_scope_wants_no_frame() {
     // Given
     let now = Instant::now();
 

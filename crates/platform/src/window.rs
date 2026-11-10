@@ -6,10 +6,9 @@
 //! handler and returns at once; failures after that are reported on the
 //! page and in the console.
 
-use winit::event_loop::{ControlFlow, EventLoop};
+use winit::event_loop::EventLoop;
 
 use crate::PlatformError;
-use crate::clock::Instant;
 use crate::event::Event;
 use crate::handler::Handler;
 use crate::platform::Platform;
@@ -71,27 +70,8 @@ pub enum Next {
     /// while handling an event, or the window needs it (shown, resized,
     /// its scale changed). An idle app that returns this draws nothing.
     Wait,
-    /// As [`Next::Wait`], and also draw one frame at this time if nothing
-    /// has drawn one by then: for work with a deadline that may end
-    /// without an event, such as a GPU error scope whose result has not
-    /// arrived. That frame is an ordinary one; when nothing else wants a
-    /// frame it draws what the last did, and the app's own state decides
-    /// what it does (a surface's unresolved scope refuses it). Any frame
-    /// before then replaces the time with what that frame returns.
-    WaitUntil(Instant),
     /// Close the window and return from [`run`].
     Exit,
-}
-
-impl Next {
-    /// How the loop waits after a frame that returned this: until the
-    /// app's time for [`Next::WaitUntil`], else for events alone.
-    pub(crate) fn control_flow(self) -> ControlFlow {
-        match self {
-            Self::WaitUntil(at) => ControlFlow::WaitUntil(at),
-            Self::Continue | Self::Wait | Self::Exit => ControlFlow::Wait,
-        }
-    }
 }
 
 /// The app's side of the window: it gets every input and draws every frame.
@@ -182,7 +162,3 @@ pub fn run(options: WindowOptions, app: impl App + 'static) -> Result<(), Platfo
     event_loop.spawn_app(handler);
     Ok(())
 }
-
-#[cfg(test)]
-#[path = "window_tests.rs"]
-mod tests;

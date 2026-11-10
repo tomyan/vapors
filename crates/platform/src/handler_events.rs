@@ -1,10 +1,10 @@
-//! The handler's answers to winit: resumed, a frame's wait-until time
-//! reached, the loop's own messages, and window events. A lost device is checked first in each, so
+//! The handler's answers to winit: resumed, the loop's own messages,
+//! and window events. A lost device is checked first in each, so
 //! nothing reaches the GPU or the app after it.
 
 use winit::application::ApplicationHandler;
-use winit::event::{StartCause, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, ControlFlow};
+use winit::event::WindowEvent;
+use winit::event_loop::ActiveEventLoop;
 use winit::window::WindowId;
 
 use super::Handler;
@@ -17,19 +17,6 @@ impl ApplicationHandler<Message> for Handler {
             && let Err(error) = self.open(event_loop)
         {
             self.fail(event_loop, error);
-        }
-    }
-
-    /// The time a frame asked for with `Next::WaitUntil` has come: one
-    /// frame, and events alone wake the loop until that frame says more.
-    /// If that redraw gets no texture, `acquire` asks for another
-    /// (`surface_texture.rs`), so the frame is still drawn, or the loop
-    /// fails after `MISSED_LIMIT` misses.
-    fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
-        if let StartCause::ResumeTimeReached { .. } = cause {
-            event_loop.set_control_flow(ControlFlow::Wait);
-            self.platform.request_redraw();
-            self.redraw_if_asked();
         }
     }
 

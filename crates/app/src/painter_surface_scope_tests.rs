@@ -1,10 +1,9 @@
 use std::time::Duration;
 
-use vapors_platform::{Instant, Next};
+use vapors_platform::Instant;
 
 use super::fakes::{Late, counting, woken};
 use super::{DEADLINE, LoopWaker, Scopes, Turn};
-use crate::FrameDecision;
 
 /// Scopes holding one `Late` scope begun at `start`, checked once.
 fn waiting_on(late: &Late, waker: &LoopWaker, start: Instant) -> Scopes {
@@ -84,48 +83,6 @@ fn a_scope_unresolved_at_the_deadline_refuses_with_no_wake_before() {
     assert_eq!(scopes.deadline(), None);
 }
 
-/// What an idle app's loop does after a frame of `scopes`.
-fn idle_next(scopes: &Scopes) -> Next {
-    FrameDecision::default().next(scopes.deadline())
-}
-
-#[test]
-fn a_frame_after_a_scope_resolves_waits_for_events_alone() {
-    // Given
-    let (_, waker) = counting();
-    let start = Instant::now();
-    let late = Late::default();
-    let mut scopes = waiting_on(&late, &waker, start);
-    let asked = idle_next(&scopes);
-
-    // When
-    late.resolve(None);
-    let woken_frame = scopes.check(start + Duration::from_millis(1));
-
-    // Then
-    assert_eq!(asked, Next::WaitUntil(start + DEADLINE));
-    assert!(woken_frame.is_ok());
-    assert_eq!(idle_next(&scopes), Next::Wait);
-}
-
-#[test]
-fn a_scope_never_resolving_gets_one_frame_at_its_deadline_which_refuses() {
-    // Given
-    let (count, waker) = counting();
-    let start = Instant::now();
-    let mut scopes = waiting_on(&Late::default(), &waker, start);
-    let asked = idle_next(&scopes);
-
-    // When
-    let deadline_frame = scopes.check(start + DEADLINE);
-
-    // Then
-    assert_eq!(asked, Next::WaitUntil(start + DEADLINE));
-    assert_eq!(woken(&count), 0);
-    assert!(deadline_frame.is_err());
-    assert_eq!(idle_next(&scopes), Next::Wait);
-}
-
 #[test]
 fn a_late_error_seen_first_after_the_deadline_is_refused_as_itself() {
     // Given
@@ -155,6 +112,6 @@ fn settling_past_the_deadline_gives_up_with_no_check_and_the_next_check_refuses(
     scopes.settle(start + DEADLINE);
 
     // Then
-    assert_eq!(idle_next(&scopes), Next::Wait);
+    assert_eq!(scopes.deadline(), None);
     assert!(scopes.check(start + DEADLINE).is_err());
 }

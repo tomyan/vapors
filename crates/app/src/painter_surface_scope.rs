@@ -2,11 +2,11 @@
 //! around each call into it and refused as its failure, naming the
 //! surface, rather than panicking unnamed in wgpu's uncaptured-error
 //! handler. Native wgpu resolves a scope when it is popped. On the web
-//! the result arrives later: an unresolved scope is watched
-//! (`painter_surface_scope_watch.rs`), and an error wakes the loop for
-//! a frame that refuses the surface; a clean result wakes nothing. It
-//! asks for no frame while it waits; its deadline is the time the loop
-//! waits until, so a scope that never resolves still refuses.
+//! the result arrives later: an unresolved scope is watched against a
+//! timer at its deadline (`painter_surface_scope_watch.rs`), and an
+//! error or the deadline wakes the loop for a frame that refuses the
+//! surface; a clean result wakes nothing and clears the timer. It asks
+//! for no frame while it waits.
 
 use std::future::Future;
 use std::pin::Pin;
@@ -83,14 +83,13 @@ impl Scopes {
         self.pending.push((watched, turn.now + DEADLINE));
     }
 
-    /// The earliest deadline of an unresolved scope: the loop waits no
-    /// later than this for a frame that checks it.
+    /// The earliest deadline of an unresolved scope, if one is waiting.
     pub(super) fn deadline(&self) -> Option<Instant> {
         self.pending.iter().map(|(_, deadline)| *deadline).min()
     }
 
-    /// Whether a scope has caught an error no frame has seen: the loop
-    /// owes a frame that refuses the surface.
+    /// Whether a scope has caught an error, or timed out, that no frame
+    /// has seen: the loop owes a frame that refuses the surface.
     pub(super) fn error_waiting(&mut self) -> bool {
         let mut pending = self.pending.iter_mut();
         pending.any(|(watched, _)| matches!(watched.outcome(), Outcome::Caught(_)))
@@ -110,12 +109,7 @@ impl Scopes {
         self.take_resolved();
         if self.pending.iter().any(|(_, at)| now >= *at) {
             self.pending.clear();
-            self.caught.get_or_insert_with(|| {
-                format!(
-                    "the GPU did not report this surface's errors within {} ms",
-                    DEADLINE.as_millis()
-                )
-            });
+            self.caught.get_or_insert_with(timed_out);
         }
     }
 
@@ -141,6 +135,15 @@ impl Scopes {
             )),
         }
     }
+}
+
+/// The refusal of a scope unresolved at its deadline, whether a frame
+/// or the web's timer finds it first.
+fn timed_out() -> String {
+    format!(
+        "the GPU did not report this surface's errors within {} ms",
+        DEADLINE.as_millis()
+    )
 }
 
 #[cfg(test)]

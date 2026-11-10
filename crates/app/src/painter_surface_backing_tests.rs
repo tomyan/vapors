@@ -34,13 +34,13 @@ fn idle_mounted_with_backing() -> Mounted {
 /// `gpu_surface_backing_tests`.
 pub(crate) fn wants_frame_around_a_pending_scope(now: Instant) -> [(bool, Option<Instant>); 2] {
     let mut mounted = idle_mounted_with_backing();
-    let before = (mounted.wants_frame(), mounted.deadline());
+    let before = (mounted.wants_frame(), mounted.scopes.deadline());
     let waker = LoopWaker::default();
     mounted.scopes.wait_for(
         Box::pin(std::future::pending()),
         Turn { waker: &waker, now },
     );
-    [before, (mounted.wants_frame(), mounted.deadline())]
+    [before, (mounted.wants_frame(), mounted.scopes.deadline())]
 }
 
 /// A mounted surface, needing no GPU, with a scope that never resolves
@@ -69,7 +69,7 @@ fn a_surface_no_frame_names_keeps_its_scope_until_its_deadline() {
     mounted.end_frame(start + DEADLINE.saturating_sub(Duration::from_millis(1)));
 
     // Then
-    assert_eq!(mounted.deadline(), Some(start + DEADLINE));
+    assert_eq!(mounted.scopes.deadline(), Some(start + DEADLINE));
 }
 
 #[test]
@@ -83,7 +83,7 @@ fn a_surface_no_frame_names_gives_up_its_scope_at_the_deadline_and_is_refused_la
     mounted.end_frame(start + DEADLINE);
 
     // Then
-    assert_eq!(mounted.deadline(), None);
+    assert_eq!(mounted.scopes.deadline(), None);
     let refusal = mounted.scopes.check(start + DEADLINE);
     let refusal = format!("{:?}", refusal.expect_err("refused when painted again"));
     assert!(refusal.contains("within 1000 ms"), "{refusal}");

@@ -72,12 +72,6 @@ impl Mounted {
         self.fresh || (self.backing.is_some() && (self.stale || self.animating))
     }
 
-    /// When the loop must wake for a frame that checks its unresolved
-    /// GPU error scopes, if it has any.
-    pub(super) fn deadline(&self) -> Option<vapors_platform::Instant> {
-        self.scopes.deadline()
-    }
-
     pub(super) fn state(&self, name: &str) -> SurfaceState {
         SurfaceState {
             name: name.to_owned(),
