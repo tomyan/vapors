@@ -51,6 +51,13 @@ pub enum SceneError {
     EyeAtTarget,
     /// A view whose up vector is zero or parallel to its direction.
     UpParallel,
+    /// Finite inputs whose matrix overflows to NaN or infinity.
+    MatrixNotFinite {
+        /// The constructor or method that built the matrix.
+        what: &'static str,
+        /// The inputs, formatted.
+        inputs: String,
+    },
 }
 
 impl fmt::Display for SceneError {
@@ -59,44 +66,88 @@ impl fmt::Display for SceneError {
             Self::NonFinite { field } => {
                 write!(f, "{field} is NaN or infinite: give a finite value")
             }
-            Self::ZeroScale { axis } => write!(
-                f,
-                "Transform::scale.{axis} is 0, which flattens the node: give a non-zero scale, or remove the node to hide it"
-            ),
-            Self::RotationNotUnit { length } => write!(
-                f,
-                "Transform::rotation has length {length}, not 1: build it with Quat::from_axis_angle or call normalize()"
-            ),
-            Self::FieldOfView { radians } => write!(
-                f,
-                "Projection::perspective vertical_fov is {radians} radians: give a value strictly between 0 and pi"
-            ),
-            Self::NearNotPositive { near } => write!(
-                f,
-                "Projection::perspective near is {near}: give a distance greater than 0"
-            ),
-            Self::FarNotBeyondNear { near, far } => write!(
-                f,
-                "Projection far is {far}, not beyond near {near}: give far greater than near"
-            ),
-            Self::HeightNotPositive { height } => write!(
-                f,
-                "Projection::orthographic height is {height}: give a height greater than 0"
-            ),
-            Self::AspectNotPositive { aspect } => write!(
-                f,
-                "the viewport aspect ratio is {aspect}: an inactive (zero-sized) surface has no projection; give width / height of a painted one"
-            ),
-            Self::EyeAtTarget => write!(
-                f,
-                "View::look_at eye equals target: move the eye or the target so the view has a direction"
-            ),
-            Self::UpParallel => write!(
-                f,
-                "View::look_at up is zero or parallel to the view direction: give an up vector across it, such as Vec3::Y for a camera not looking straight down"
-            ),
+            Self::ZeroScale { axis } => fmt_zero_scale(f, *axis),
+            Self::RotationNotUnit { length } => fmt_rotation(f, *length),
+            Self::FieldOfView { radians } => fmt_field_of_view(f, *radians),
+            Self::NearNotPositive { near } => fmt_near(f, *near),
+            Self::FarNotBeyondNear { near, far } => fmt_far(f, *near, *far),
+            Self::HeightNotPositive { height } => fmt_height(f, *height),
+            Self::AspectNotPositive { aspect } => fmt_aspect(f, *aspect),
+            Self::EyeAtTarget => fmt_eye_at_target(f),
+            Self::UpParallel => fmt_up_parallel(f),
+            Self::MatrixNotFinite { what, inputs } => fmt_matrix(f, what, inputs),
         }
     }
+}
+
+fn fmt_zero_scale(f: &mut fmt::Formatter<'_>, axis: char) -> fmt::Result {
+    write!(
+        f,
+        "Transform::scale.{axis} is 0, which flattens the node: give a non-zero scale, or remove the node to hide it"
+    )
+}
+
+fn fmt_rotation(f: &mut fmt::Formatter<'_>, length: f32) -> fmt::Result {
+    write!(
+        f,
+        "Transform::rotation has length {length}, not 1: build it with Quat::from_axis_angle or call normalize()"
+    )
+}
+
+fn fmt_field_of_view(f: &mut fmt::Formatter<'_>, radians: f32) -> fmt::Result {
+    write!(
+        f,
+        "Projection::perspective vertical_fov is {radians} radians: give a value strictly between 0 and pi"
+    )
+}
+
+fn fmt_near(f: &mut fmt::Formatter<'_>, near: f32) -> fmt::Result {
+    write!(
+        f,
+        "Projection::perspective near is {near}: give a distance greater than 0"
+    )
+}
+
+fn fmt_far(f: &mut fmt::Formatter<'_>, near: f32, far: f32) -> fmt::Result {
+    write!(
+        f,
+        "Projection far is {far}, not beyond near {near}: give far greater than near"
+    )
+}
+
+fn fmt_height(f: &mut fmt::Formatter<'_>, height: f32) -> fmt::Result {
+    write!(
+        f,
+        "Projection::orthographic height is {height}: give a height greater than 0"
+    )
+}
+
+fn fmt_aspect(f: &mut fmt::Formatter<'_>, aspect: f32) -> fmt::Result {
+    write!(
+        f,
+        "the viewport aspect ratio is {aspect}: an inactive (zero-sized) surface has no projection; give width / height of a painted one"
+    )
+}
+
+fn fmt_eye_at_target(f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(
+        f,
+        "View::look_at eye equals target: move the eye or the target so the view has a direction"
+    )
+}
+
+fn fmt_up_parallel(f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(
+        f,
+        "View::look_at up is zero or parallel to the view direction (sine of the angle under 1e-6): give an up vector across it, such as Vec3::Y for a camera not looking straight down"
+    )
+}
+
+fn fmt_matrix(f: &mut fmt::Formatter<'_>, what: &str, inputs: &str) -> fmt::Result {
+    write!(
+        f,
+        "{what} gives a matrix with NaN or infinite elements for {inputs}: give values of moderate magnitude (distances under 1e19, fields of view and heights well above 1e-30)"
+    )
 }
 
 impl std::error::Error for SceneError {}

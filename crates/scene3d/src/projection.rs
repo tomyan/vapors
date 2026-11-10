@@ -27,7 +27,9 @@ impl Projection {
     /// # Errors
     ///
     /// [`SceneError::NonFinite`], [`SceneError::FieldOfView`],
-    /// [`SceneError::NearNotPositive`] or [`SceneError::FarNotBeyondNear`].
+    /// [`SceneError::NearNotPositive`], [`SceneError::FarNotBeyondNear`]
+    /// or [`SceneError::MatrixNotFinite`] (a field of view so small its
+    /// matrix overflows).
     pub fn perspective(vertical_fov: f32, near: f32, far: f32) -> Result<Self, SceneError> {
         finite_scalar("Projection::perspective vertical_fov", vertical_fov)?;
         if vertical_fov <= 0.0 || vertical_fov >= PI {
@@ -47,8 +49,9 @@ impl Projection {
     ///
     /// # Errors
     ///
-    /// [`SceneError::NonFinite`], [`SceneError::HeightNotPositive`] or
-    /// [`SceneError::FarNotBeyondNear`].
+    /// [`SceneError::NonFinite`], [`SceneError::HeightNotPositive`],
+    /// [`SceneError::FarNotBeyondNear`] or [`SceneError::MatrixNotFinite`]
+    /// (a height so small its matrix overflows).
     pub fn orthographic(height: f32, near: f32, far: f32) -> Result<Self, SceneError> {
         finite_scalar("Projection::orthographic height", height)?;
         if height <= 0.0 {
@@ -63,7 +66,9 @@ impl Projection {
         if far <= near {
             return Err(SceneError::FarNotBeyondNear { near, far });
         }
-        Ok(Self { kind, near, far })
+        let projection = Self { kind, near, far };
+        projection.build(1.0)?;
+        Ok(projection)
     }
 
     /// View space to clip space for a viewport of `aspect` (width /
@@ -71,13 +76,31 @@ impl Projection {
     ///
     /// # Errors
     ///
-    /// [`SceneError::AspectNotPositive`] or [`SceneError::NonFinite`].
+    /// [`SceneError::AspectNotPositive`], [`SceneError::NonFinite`] or
+    /// [`SceneError::MatrixNotFinite`] (an aspect so extreme the matrix
+    /// overflows).
     pub fn matrix(&self, aspect: f32) -> Result<Mat4, SceneError> {
         finite_scalar("the viewport aspect ratio", aspect)?;
         if aspect <= 0.0 {
             return Err(SceneError::AspectNotPositive { aspect });
         }
-        Ok(match self.kind {
+        self.build(aspect)
+    }
+
+    /// The matrix for `aspect`, refused when any element is not finite.
+    fn build(&self, aspect: f32) -> Result<Mat4, SceneError> {
+        let matrix = self.raw_matrix(aspect);
+        if matrix.is_finite() {
+            return Ok(matrix);
+        }
+        Err(SceneError::MatrixNotFinite {
+            what: "Projection::matrix",
+            inputs: format!("{self:?}, aspect {aspect}"),
+        })
+    }
+
+    fn raw_matrix(&self, aspect: f32) -> Mat4 {
+        match self.kind {
             Kind::Perspective { vertical_fov } => {
                 directx::perspective(vertical_fov, aspect, self.near, self.far)
             }
@@ -85,7 +108,7 @@ impl Projection {
                 let (half_h, half_w) = (height / 2.0, height / 2.0 * aspect);
                 directx::orthographic(-half_w, half_w, -half_h, half_h, self.near, self.far)
             }
-        })
+        }
     }
 }
 
@@ -105,9 +128,12 @@ pub fn view_projection(
 
 /// A world point through `view_projection` to normalised device
 /// coordinates: x and y from -1 to 1 (+Y up), z the depth from 0 to 1.
-/// `None` when the point is at or behind the eye plane, which has no
-/// position on screen; a point beyond the frustum's sides, near or far
-/// is returned as is, outside those ranges.
+/// `None` happens only under a perspective projection, for a point at
+/// or behind the eye plane (`w <= 0`), which has no position on screen.
+/// Under an orthographic projection `w` is always 1, so every point
+/// projects, one behind the eye included; a point outside `near..far`
+/// has z outside 0..1. Under either, a point beyond the frustum's sides
+/// is returned as is, with x or y outside -1..1.
 #[must_use]
 pub fn project(view_projection: Mat4, point: Vec3) -> Option<Vec3> {
     let clip = view_projection * point.extend(1.0);
