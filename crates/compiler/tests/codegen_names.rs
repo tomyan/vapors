@@ -125,3 +125,12 @@ fn up_to_ten_names_keep_one_digit() {
     assert_has(&code, "let p0 = dom");
     assert_has(&code, "let p9 = dom");
 }
+
+#[test]
+fn a_hyphenated_tag_gets_a_node_name_rust_accepts() {
+    // When
+    let code = generated(r#"<gpu-surface name="track"></gpu-surface>"#);
+
+    // Then
+    assert_has(&code, r#"let gpu_surface0 = dom.borrow_mut().create_element("gpu-surface");"#);
+}

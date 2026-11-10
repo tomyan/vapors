@@ -111,8 +111,10 @@ impl<'a> Emitter<'a> {
         self.counter
     }
 
-    /// A fresh variable name with the given stem.
+    /// A fresh variable name with the given stem, a tag's hyphens
+    /// (`gpu-surface`) made underscores.
     pub fn fresh(&mut self, stem: &str) -> String {
+        let stem = stem.replace('-', "_");
         let name = format!("{stem}{:0width$}", self.counter, width = self.width);
         self.counter += 1;
         self.reserve(&name);
