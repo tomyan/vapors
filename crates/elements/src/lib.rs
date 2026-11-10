@@ -96,7 +96,7 @@ mod update;
 
 pub use a11y_drive::{Command, Held, Reply};
 pub use a11y_error::AxError;
-pub use a11y_projection::AxNode;
+pub use a11y_projection::{AxNode, chromium_name_for_aria};
 pub use a11y_target::{AxTarget, AxWithin};
 pub use a11y_tree::{AxElement, AxStates};
 pub use document::Document;

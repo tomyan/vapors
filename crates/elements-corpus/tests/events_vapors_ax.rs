@@ -52,3 +52,17 @@ fn the_names_script_projects_on_vapors_as_on_chromium() {
     // Then: the names, values and the nodes left out
     compare("names", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
 }
+
+#[test]
+fn the_icon_names_script_projects_on_vapors_as_on_chromium() {
+    // Given: decorative and named icons, alone and in buttons, and a
+    // named icon that is visibility: hidden (docs/icons.md)
+    let script = parse("icon_names", &read("icon_names.events")).expect("parses");
+    let answers = serde_json::from_str(&read("icon_names.events.json")).expect("json");
+
+    // When
+    let ours = play(&fixture("icon_names"), &script, VIEWPORT).unwrap_or_else(|e| panic!("{e}"));
+
+    // Then: the buttons' names and the images in the tree
+    compare("icon_names", &script, &ours, &answers).unwrap_or_else(|e| panic!("{e}"));
+}
