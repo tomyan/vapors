@@ -102,4 +102,25 @@ impl Dom for RecordingDom {
             css: css.into(),
         });
     }
+
+    fn current_text(&self, node: NodeId) -> Option<&str> {
+        match &self.record(node).kind {
+            Kind::Text(text) => Some(text),
+            Kind::Element { .. } => None,
+        }
+    }
+
+    fn current_attribute(&self, node: NodeId, name: &str) -> Option<&str> {
+        match &self.record(node).kind {
+            Kind::Element { attributes, .. } => attributes.get(name).map(String::as_str),
+            Kind::Text(_) => None,
+        }
+    }
+
+    fn current_property(&self, node: NodeId, name: &str) -> Option<&PropertyValue> {
+        match &self.record(node).kind {
+            Kind::Element { properties, .. } => properties.get(name),
+            Kind::Text(_) => None,
+        }
+    }
 }

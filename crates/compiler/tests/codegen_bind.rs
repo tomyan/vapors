@@ -24,7 +24,7 @@ fn bind_value_on_text_input() {
     // And the display half, from the signal
     assert_has(
         &code,
-        "set_property(input0, \"value\", PropertyValue::Text(name.get()))",
+        "set_property_if_changed(input0, \"value\", PropertyValue::Text(name.get()))",
     );
     assert_lacks(&code, "bind:value");
 }
@@ -49,7 +49,7 @@ fn bind_value_on_a_range_binds_a_number() {
     assert_has(&code, "#[allow(clippy::missing_panics_doc");
     assert_has(
         &code,
-        "set_property(input0, \"value\", PropertyValue::Number(level.get()))",
+        "set_property_if_changed(input0, \"value\", PropertyValue::Number(level.get()))",
     );
 }
 
@@ -102,7 +102,7 @@ fn bind_checked_on_checkbox() {
     assert_has(&code, "#[allow(clippy::missing_panics_doc");
     assert_has(
         &code,
-        "set_property(input0, \"checked\", PropertyValue::Bool(on.get()))",
+        "set_property_if_changed(input0, \"checked\", PropertyValue::Bool(on.get()))",
     );
 }
 
@@ -122,7 +122,7 @@ fn bind_value_on_select_uses_change() {
     assert_has(&code, "name.set(event.value().to_string());");
     assert_has(
         &code,
-        "set_property(select0, \"value\", PropertyValue::Text(name.get()))",
+        "set_property_if_changed(select0, \"value\", PropertyValue::Text(name.get()))",
     );
 }
 
