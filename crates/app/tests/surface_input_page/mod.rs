@@ -35,12 +35,17 @@ pub fn scrolling() -> String {
 
 type Log = Rc<RefCell<Vec<String>>>;
 
-const LOGGED: [&str; 5] = [
+/// Every pointer event vapors fires: a listener for pointerover,
+/// pointerenter, pointerout or pointerleave is refused by the document
+/// (`elements_app_surface_input.rs` pins that).
+const LOGGED: [&str; 7] = [
     "pointerdown",
     "pointermove",
     "pointerup",
     "pointercancel",
     "click",
+    "gotpointercapture",
+    "lostpointercapture",
 ];
 
 /// The page in its app, at a device scale.
@@ -48,6 +53,10 @@ pub struct Page {
     pub app: ElementsApp,
     pub doc: Rc<RefCell<Document>>,
     pub left_panel: NodeId,
+    pub right_panel: NodeId,
+    pub left_surface: NodeId,
+    pub right_surface: NodeId,
+    pub hud: NodeId,
     log: Log,
     scale: f32,
 }
@@ -61,16 +70,21 @@ impl Page {
         doc.add_stylesheet("surface_input.css", style)
             .expect("parses");
         let log = Log::default();
-        let left_panel = panel(&mut doc, "left", (&log, captures));
-        panel(&mut doc, "right", (&log, captures));
+        let (left_panel, left_surface) = panel(&mut doc, "left", (&log, captures));
+        let (right_panel, right_surface) = panel(&mut doc, "right", (&log, captures));
         let body = doc.body();
         let hud = child(&mut doc, body, "button", "hud");
-        logged(&mut doc, hud, "hud", (&log, captures));
+        logged(&mut doc, hud, "hud", (&log, captures), false);
+        logged(&mut doc, body, "body", (&log, false), true);
         let doc = Rc::new(RefCell::new(doc));
         let page = Self {
             app: ElementsApp::new(Rc::clone(&doc)),
             doc,
             left_panel,
+            right_panel,
+            left_surface,
+            right_surface,
+            hud,
             log,
             scale,
         };
@@ -101,6 +115,17 @@ impl Page {
         self.give(&Event::PointerMoved { x, y })
     }
 
+    /// A key goes down (`true`) or up.
+    pub fn key(&mut self, code: &str, pressed: bool) -> Route {
+        self.give(&Event::Key {
+            key: code.to_owned(),
+            code: code.to_owned(),
+            pressed,
+            repeat: false,
+            modifiers: Modifiers::default(),
+        })
+    }
+
     /// The primary button goes down (`true`) or up where the mouse is.
     pub fn button(&mut self, pressed: bool) -> Route {
         let (clicks, modifiers) = (NonZeroU32::MIN, Modifiers::default());
@@ -117,21 +142,37 @@ impl Page {
         self.give(&Event::Touch { id: 1, phase, x, y })
     }
 
+    /// The platform's tap at (`x`, `y`) in CSS pixels, which the
+    /// document turns into a `click`; sent after the finger's lift.
+    pub fn tap(&mut self, x: f32, y: f32) -> Route {
+        let [x, y] = [x * self.scale, y * self.scale];
+        let clicks = NonZeroU32::MIN;
+        self.give(&Event::Tap { x, y, clicks })
+    }
+
     /// The events logged since the last take: `"<who> <event> <x>,<y>"`.
     pub fn take_log(&self) -> Vec<String> {
         std::mem::take(&mut *self.log.borrow_mut())
     }
 }
 
-/// A panel titled and holding the surface `name`; the panel.
-fn panel(doc: &mut Document, name: &str, logging: (&Log, bool)) -> NodeId {
+/// A panel titled and holding the surface `name`; the panel and the
+/// surface. The panel logs only what is aimed at it, as `"<name>-panel"`.
+fn panel(doc: &mut Document, name: &str, logging: (&Log, bool)) -> (NodeId, NodeId) {
     let body = doc.body();
     let panel = child(doc, body, "div", &format!("panel {name}"));
+    logged(
+        doc,
+        panel,
+        &format!("{name}-panel"),
+        (logging.0, false),
+        true,
+    );
     child(doc, panel, "div", "title");
     let surface = child(doc, panel, "gpu-surface", "view");
     doc.set_attribute(surface, "name", name);
-    logged(doc, surface, name, logging);
-    panel
+    logged(doc, surface, name, logging, false);
+    (panel, surface)
 }
 
 fn child(doc: &mut Document, parent: NodeId, tag: &str, class: &str) -> NodeId {
@@ -141,12 +182,17 @@ fn child(doc: &mut Document, parent: NodeId, tag: &str, class: &str) -> NodeId {
     made
 }
 
-/// Logs `LOGGED` on `node` as `who`, capturing on `pointerdown` when asked.
-fn logged(doc: &mut Document, node: NodeId, who: &str, (log, captures): (&Log, bool)) {
+/// Logs `LOGGED` on `node` as `who`, capturing on `pointerdown` when
+/// asked; with `own`, only events aimed at `node` itself, not bubbled
+/// up from a descendant.
+fn logged(doc: &mut Document, node: NodeId, who: &str, (log, captures): (&Log, bool), own: bool) {
     for name in LOGGED {
         let (log, who) = (Rc::clone(log), who.to_owned());
         let capture = captures && name == "pointerdown";
         let listener = move |e: &mut DomEvent| {
+            if own && e.target() != Some(node) {
+                return;
+            }
             let [x, y] = e.offset();
             log.borrow_mut().push(format!("{who} {} {x},{y}", e.name()));
             if capture {

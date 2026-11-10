@@ -8,6 +8,9 @@ mod surface_input_page;
 
 use surface_input_page::{PANELS, Page, scrolling};
 use vapors_app::Route;
+use vapors_dom::Dom;
+use vapors_elements::{Document, Viewport};
+use vapors_text::FontSystem;
 
 /// A click at (`x`, `y`) in CSS pixels: the press's route and the log.
 fn click(page: &mut Page, x: f32, y: f32) -> (Route, Vec<String>) {
@@ -42,14 +45,21 @@ fn at_device_scale_two_the_offset_is_in_css_pixels() {
     // Given: physical positions are twice the CSS ones
     let mut page = Page::new(PANELS, false, 2.0);
 
-    // When
-    let (_, log) = click(&mut page, 150.0, 120.0);
+    // When: a press, a move and the release, at the same CSS positions
+    page.move_to(150.0, 120.0);
+    page.take_log();
+    page.button(true);
+    page.move_to(160.0, 130.0);
+    page.button(false);
 
-    // Then
-    assert_eq!(
-        log.first().map(String::as_str),
-        Some("left pointerdown 140,90")
-    );
+    // Then: every offset in CSS pixels, the release at the moved position
+    let expected = [
+        "left pointerdown 140,90",
+        "left pointermove 150,100",
+        "left pointerup 150,100",
+        "left click 150,100",
+    ];
+    assert_eq!(page.take_log(), expected);
 }
 
 #[test]
@@ -129,4 +139,36 @@ fn hovering_moves_reach_the_surface_under_the_pointer_and_stop_over_the_hud() {
         page.take_log(),
         ["left pointermove 140,90", "hud pointermove 29,14"]
     );
+}
+
+#[test]
+fn a_listener_for_enter_leave_over_or_out_is_refused_so_vapors_sends_none() {
+    // Given: a surface with a listener for each of the four
+    let mut doc = Document::new(FontSystem::bundle_only());
+    doc.add_stylesheet("surface_input.css", PANELS)
+        .expect("parses");
+    let body = doc.body();
+    let surface = doc.create_element("gpu-surface");
+    doc.append(body, surface);
+    let names = ["pointerover", "pointerenter", "pointerout", "pointerleave"];
+    for name in names {
+        doc.listen(surface, name, Box::new(|_: &mut vapors_dom::Event| {}));
+    }
+
+    // When
+    let viewport = Viewport {
+        width: 400.0,
+        height: 200.0,
+        scale: 1.0,
+    };
+    let Err(errors) = doc.update(viewport) else {
+        panic!("the listeners were accepted")
+    };
+    let refusals = format!("{errors:?}");
+
+    // Then: the document says it never fires each, so none can be logged
+    for name in names {
+        let refusal = format!("on{name}: vapors-elements never fires `{name}`");
+        assert!(refusals.contains(&refusal), "{refusals}");
+    }
 }

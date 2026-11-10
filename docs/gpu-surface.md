@@ -190,7 +190,7 @@ renderer. The app listens on the `gpu-surface` element, or on an
 ancestor, as on any element; an app that wraps `ElementsApp` gives each
 event with `ElementsApp::give`, and a press on a surface is
 `Route::Document`. Tests: `crates/app/tests/elements_app_surface_input.rs`
-and `elements_app_surface_capture.rs`, on two panels each holding a
+`elements_app_surface_input_state.rs` and `elements_app_surface_capture.rs`, on two panels each holding a
 surface, with a button positioned over the left one.
 
 - `Event::offset` is from the surface's content box top-left (its
@@ -212,17 +212,34 @@ surface, with a button positioned over the left one.
 - A press that starts on UI over a surface stays with the UI when the
   UI captures it. When it does not, as on the web, the surface under
   the pointer gets the moves and the release, though not the
-  `pointerdown` or a `click`.
+  `pointerdown`; the `click` goes to the nearest common ancestor of
+  the pressed and released elements (the body, for two panels), as in
+  Chromium (recorded: `crates/elements-corpus/fixtures/cross_drag.events.json`).
 - Hover: the surface gets `pointermove` (not pressed) while the
-  pointer is over it and not over UI above it, and `:hover` applies.
-  vapors sends no `pointerover`, `pointerenter`, `pointerout` or
-  `pointerleave`, so nothing tells a surface that the pointer left it
-  or the window; the app sees moves reach another element.
-- `pointer-events: none` on a surface (the racer's track inherits it
-  from its body) lets presses through to what is under it; the racer
-  takes no pointer input on its track.
+  pointer is over it and not over UI above it, and `:hover` applies
+  (tested: `elements_app_surface_input_state.rs`; the surface is not
+  hovered while the pointer is over a HUD button above it). vapors sends
+  no `pointerover`, `pointerenter`, `pointerout` or `pointerleave`, so
+  nothing tells a surface that the pointer left it or the window; the
+  app sees moves reach another element. Chromium does send all four, so
+  this is a known gap, not the web's behaviour. The document refuses a
+  listener for any of them (`a_listener_for_enter_leave_over_or_out_is_refused_so_vapors_sends_none`),
+  so an app cannot wait for one.
+- `pointer-events: none` on a surface lets presses through to what is
+  under it (tested: the panel below takes the press). The racer's HUD
+  (`crates/racer/ui/hud.wisp`) puts `pointer-events: none` on `html` and
+  `body` and `auto` on buttons; its track is a `gpu-surface` child of
+  the body, so it inherits `none`.
+  `pointer_events_none_on_the_body_reaches_a_surface_but_not_a_button_with_auto`
+  tests that CSS shape on the test page, not the racer itself; the racer
+  has no test that a press on its track reaches nothing.
 - Keyboard: a `gpu-surface` is not focusable unless it has a
-  `tabindex`, when it takes focus and keys as any element does.
+  `tabindex`, when it takes focus from a press and from Tab, as any
+  element does (tested: a press and Tab).
+- Not the web's: a touch that drags past the slop ends with `pointerup`
+  on the captured surface and no `click`; Chromium cancels the touch at
+  the first pan (`pointercancel`). A tap, which the platform sends after
+  a short touch, ends in a `click`.
 
 ## Renderer contract
 
