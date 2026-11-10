@@ -20,4 +20,4 @@ mod wheel_scroll;
 
 pub use document_input::{DocumentInput, Given, Route, Unplaced};
 pub use elements_app::{ElementsApp, Failure, FrameTimesHook, PerFrame};
-pub use painter::{DrawOverError, SUPPORTED, ScenePainter, UnsupportedFormat};
+pub use painter::{DrawOverError, PaintError, SUPPORTED, ScenePainter, UnsupportedFormat};

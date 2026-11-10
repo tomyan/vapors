@@ -93,3 +93,14 @@ fn parse_button_label_with_expression() {
     assert_eq!(common::attr_expr(button, "onclick"), "save");
     assert_eq!(parts(&button.children[0]).len(), 2);
 }
+
+#[test]
+fn gpu_surface_is_an_html_element() {
+    // When
+    let doc = parse_ok(r#"<gpu-surface name="track"></gpu-surface>"#);
+
+    // Then
+    let surface = element(&doc.children[0]);
+    assert_eq!(surface.tag, "gpu-surface");
+    assert_eq!(common::attr_literal(surface, "name"), "track");
+}

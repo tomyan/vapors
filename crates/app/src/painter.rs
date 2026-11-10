@@ -50,9 +50,9 @@ impl ScenePainter {
     ///
     /// # Errors
     ///
-    /// [`AtlasError`] when a glyph cannot be rasterised or a frame's
-    /// glyphs do not fit the atlas page; the frame is then incomplete.
-    pub fn draw(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), AtlasError> {
+    /// [`PaintError`] when a glyph cannot be drawn or a surface has no
+    /// renderer; the frame is then incomplete.
+    pub fn draw(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
         clear_view(target.device, target.queue, target.view, painted.canvas());
         self.paint(target, painted)
     }
@@ -74,11 +74,11 @@ impl ScenePainter {
         if let Some(from) = painted.canvas_from() {
             return Err(DrawOverError::CanvasBackground(from));
         }
-        self.paint(target, painted).map_err(DrawOverError::Atlas)
+        self.paint(target, painted).map_err(DrawOverError::Paint)
     }
 
     /// Each run of the scene, in order, under its clip.
-    fn paint(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), AtlasError> {
+    fn paint(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
         self.atlas.begin_frame();
         self.textures.begin_frame();
         for batch in painted.scene().batches() {
@@ -90,6 +90,7 @@ impl ScenePainter {
                 Run::Quads(quads) => self.quads.draw(&clipped, &quads),
                 Run::Texts(items) => self.draw_texts(&clipped, painted, items)?,
                 Run::Images(items) => self.textures.draw(&self.images, &clipped, painted, items),
+                Run::Surfaces(items) => return Err(unmounted(painted, items)),
             }
         }
         self.textures.end_frame();
@@ -165,7 +166,8 @@ mod images;
 use images::Textures;
 #[path = "painter_errors.rs"]
 mod errors;
-pub use errors::{DrawOverError, SUPPORTED, UnsupportedFormat};
+use errors::unmounted;
+pub use errors::{DrawOverError, PaintError, SUPPORTED, UnsupportedFormat};
 
 #[cfg(test)]
 #[path = "painter_tests.rs"]

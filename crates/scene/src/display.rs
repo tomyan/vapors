@@ -106,6 +106,11 @@ pub struct TextId(pub u32);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ImageId(pub u32);
 
+/// Which GPU surface an item draws: an index the painter resolves to
+/// the surface's name, as with [`ImageId`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct SurfaceId(pub u32);
+
 /// One thing to draw.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Item {
@@ -119,6 +124,14 @@ pub enum Item {
         /// Which image.
         image: ImageId,
         /// Where it is drawn.
+        rect: Rect,
+    },
+    /// A GPU surface's content over `rect` (device pixels): what its
+    /// renderer drew, by the id its painter resolves.
+    Surface {
+        /// Which surface.
+        surface: SurfaceId,
+        /// Where it is drawn: the element's content box.
         rect: Rect,
     },
     /// A text run, its layout origin at `origin` (device pixels).

@@ -67,6 +67,7 @@ mod scrolling;
 mod shortcuts;
 mod stacking;
 mod style;
+mod surfaces;
 mod tags;
 mod text_bridge;
 mod text_delete;

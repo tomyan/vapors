@@ -33,6 +33,9 @@ pub struct Painted {
     pub(crate) cursors: HashMap<NodeId, Cursor>,
     /// The images the scene's image items name, by `ImageId`.
     pub(crate) images: Vec<std::rc::Rc<vapors_scene::RgbaImage>>,
+    /// The names of the surfaces the scene's surface items name, by
+    /// `SurfaceId`.
+    pub(crate) surfaces: Vec<String>,
     /// Which scroll containers a scroll over each element tries.
     pub(crate) scroll_chains: crate::scroll_chains::Chains,
     /// Each range input's track, for the pointer (3-E3a).
@@ -104,6 +107,16 @@ impl Painted {
     #[must_use]
     pub fn image(&self, id: vapors_scene::ImageId) -> &std::rc::Rc<vapors_scene::RgbaImage> {
         &self.images[id.0 as usize]
+    }
+
+    /// The name of the surface a scene item names: its `gpu-surface`'s
+    /// `name`, which the painter resolves to a mounted renderer.
+    ///
+    /// # Panics
+    /// When `id` is not from this update's scene.
+    #[must_use]
+    pub fn surface(&self, id: vapors_scene::SurfaceId) -> &str {
+        &self.surfaces[id.0 as usize]
     }
 
     /// The element's border box in CSS pixels, or `None` when it has no
