@@ -18,11 +18,11 @@ section f states 3D slice 1c's acceptance as counters.
 | Outside a batch, effects run synchronously inside the `set` call, before it returns | `flush.rs:34-39` | `ported_effect.rs` `test_batch` |
 | Two related writes outside a batch: an effect reading both sees the state between them | `flush.rs:34-39` | `test_batch` logs `(1, 0)` between `(0, 0)` and `(1, 1)` |
 | Inside `batch`, effects wait for the outermost batch to end; nested batches flush once; an effect sees only the final state | `flush.rs:18-30` | `test_batch` (`(3, 3)` only), `semantics_batching.rs` `effects_run_after_the_batch_in_creation_order` |
-| A memo reading several signals written in one batch recomputes once | `flush.rs:18-20` | `memo_reading_two_signals_set_in_one_batch_runs_once` |
+| A memo reading several signals written in one batch recomputes once | `propagate.rs:68-84` (a memo recomputes when read or when its effect runs, not at the write) | `semantics_batching.rs:13` `memo_reading_two_signals_set_in_one_batch_runs_once` |
 | Effects in a flush run in creation order | `flush.rs:86-100` | `effects_run_after_the_batch_in_creation_order` |
 | A write inside an effect is picked up after the running pass, never inside the writing effect | `flush.rs:34-39`, `effect.rs:62-64` | `signal_set_inside_an_effect_is_deferred_until_the_pass_ends`, `semantics_first_run.rs` |
-| More than 100 passes in one flush panics, naming the effects | `flush.rs:16`, `102-114` | `ported_effect.rs` `recursive_effect_runs_recursively` (converges in 2) |
-| Before a re-run, an effect's previous run is disposed: its cleanups run in registration order, then its nested effects and memos are disposed newest first, each running its own cleanups | `propagate.rs:101-111`, `owner.rs:83-90`, `104-122` | `semantics_writes.rs` `a_rerun_runs_the_effects_cleanups_in_order_then_its_nested_effects_newest_first` (IU0) |
+| More than 100 passes in one flush panics. The message names `MAX_FLUSH_PASSES` (100 passes) and each effect still scheduled by kind, optional name and creation site, e.g. `effect created at <file>:<line>` | `flush.rs:16`, `52-54`, `102-114`, `error.rs:39-46` | `semantics_writes.rs` `an_effect_that_rewrites_its_own_source_forever_panics_naming_the_effect` (IU0); `ported_effect.rs` `recursive_effect_runs_recursively` converges in 2 and does not reach it |
+| Before a re-run, an effect's previous run is disposed: the cleanups run as `Released::finish` orders them: every memo's compute is dropped first, then the effect's own cleanups in registration order, then those of nested nodes, newest first | `propagate.rs:101-111`, `owner.rs:83-89`, `104-122` | `semantics_writes.rs` `a_rerun_runs_the_effects_cleanups_in_order_then_its_nested_effects_newest_first` (IU0) |
 | Disposing an effect runs its last run's cleanups and stops it | `effect.rs:75-77` | `semantics_refusals.rs` `disposing_an_effect_stops_it_and_runs_its_cleanups` |
 
 There is no transaction API other than `batch`. A component that writes
@@ -35,8 +35,8 @@ Generated bindings call the setters from an effect with no comparison
 (`crates/compiler/src/codegen/text.rs:37`, `element.rs:73-76`,
 `element_bind.rs:58`), so an equal signal write reaches the setter.
 What a setter does when given the value the node already holds, pinned
-by `crates/elements/tests/same_value_writes.rs` (IU0), on ten text cells
-and a checkbox:
+by `crates/elements/tests/same_value_writes.rs` (IU0), on ten text
+cells (the first also has a child element) and a checkbox:
 
 | Setter, same value | `take_changed` | Elements restyled | Boxes laid out | Text layouts built |
 |---|---|---|---|---|
@@ -69,9 +69,9 @@ the brief's "GPU surfaces" list:
 | Item | What exists | What is missing | What 1c needs |
 |---|---|---|---|
 | Explicit content invalidation | `SurfaceHandle::invalidate` marks the surface stale and wakes the loop, answering `Woke`, `AtFirstFrame`, `NotMounted` or `LoopClosed` (`elements_app_surface_handle.rs:100-123`); the next frame renders it once (`painter_surface_backing.rs:61-63`, `92-94`). Pinned: `elements_app_surfaces.rs`, `gpu_app_surfaces.rs` `gpu_an_invalidate_through_the_handle_renders_the_surface_once_more` | An invalidate re-renders the surface but the frame also runs the whole document update and UI paint (b); surface content and surrounding UI share one invalidation path | Nothing more for a correct 1c; IU5 separates the paths |
-| Animation under the shared scheduler | `SurfaceRenderer::animating()` (`surface.rs:114-116`) is polled after each frame; while true `wants_frame` holds and the app returns `Next::Continue` (`painter_surface_backing.rs:65-69`, `elements_app.rs:124-132`), on the same platform loop as the UI. Requests from several surfaces coalesce into one frame. Pinned: `gpu_an_animating_renderer_asks_for_every_frame`, `gpu_surface_lifecycle.rs` `gpu_an_animating_surface_renders_every_frame_and_wants_the_next` | Starting: a renderer that turns `animating` on while the loop waits is not seen until something wakes the loop, and the renderer does not hold its `SurfaceHandle` (`mount` returns it). `SurfaceFrame` carries no frame time (`surface.rs:40-54`); the platform `Frame` has `now` | A way to start animating from idle and a frame time for the racer's simulation and camera (question e3) |
+| Animation under the shared scheduler | `SurfaceRenderer::animating()` (`surface.rs:114-116`) is polled after each frame; while true `wants_frame` holds and the app returns `Next::Continue` (`painter_surface_backing.rs:65-69`, `elements_app.rs:124-132`), on the same platform loop as the UI. Requests from several surfaces coalesce into one frame: `next_after_frame` reduces them to one `surfaces_want` bool (`elements_app.rs:125-126`). Pinned: `gpu_an_animating_renderer_asks_for_every_frame`, `gpu_surface_lifecycle.rs` `gpu_an_animating_surface_renders_every_frame_and_wants_the_next` | Starting: a renderer that turns `animating` on while the loop waits is not seen until something wakes the loop, and the renderer does not hold its `SurfaceHandle` (`mount` returns it). `SurfaceFrame` carries no frame time (`surface.rs:40-54`); the platform `Frame` has `now` | A way to start animating from idle and a frame time for the racer's simulation and camera (question e3) |
 | Resource ownership | The renderer owns its resources; the painter owns the backing texture, the encoder and submission (`surface.rs:1-5`, `40-54`); device and queue are shared | Inactive surfaces release the backing but the renderer is not told (no `deactivate`, `surface.rs:67-71`) | Nothing: the racer keeps its pipelines while mounted |
-| Resize | `resize(device, size)` on allocation, size or scale change, and re-activation (`surface.rs:94-102`, `painter_surface_backing.rs:129`). Pinned: `gpu_resizing_the_surface_renders_a_new_backing_at_the_new_size_once`, `gpu_surface.rs` `gpu_a_scale_change_renders_a_new_backing_at_the_new_device_size` | Nothing found | The racer's depth texture is reallocated in `resize` |
+| Resize | `resize(device, size)` on allocation, size or scale change, and re-activation (`surface.rs:59-62`, `painter_surface_backing.rs:129`). Pinned: `gpu_resizing_the_surface_renders_a_new_backing_at_the_new_size_once`, `gpu_surface.rs` `gpu_a_scale_change_renders_a_new_backing_at_the_new_device_size` | Nothing found | The racer's depth texture is reallocated in `resize` |
 | Unmount | `ElementsApp::unmount` removes the name, its pending invalidation, and hands the renderer back (`elements_app_surfaces.rs:54-65`); teardown is `Drop`. Pinned: `gpu_a_renderer_unmounted_after_the_first_frame_is_handed_back`, `gpu_unmounting_drops_the_renderer_and_the_surface_is_then_refused` | Nothing found | Nothing |
 | Device loss | Reported by the platform frame loop, which stops the app (`crates/platform/src/device_lost.rs:31-99`); surfaces attempt no recovery (`docs/gpu-surface.md`) | No surface-level transition; by design for the MVP | Nothing |
 
@@ -144,8 +144,23 @@ drawing.rs:129-139`, every frame).
 | UI paint records reused | paint records rebuilt per frame | missing |
 | GPU work | upload bytes and draw calls per frame | missing |
 
-With today's signals and setters, two rows fail for the racer's HUD:
-every equal write marks the document changed (b), and an equal write to
-an attribute-bound signal restyles its element. Both pass once e1 or e4
-lands. The three missing counters belong to IU1's baseline; until then
-1c can assert the five that exist.
+With today's signals and setters, two rows fail for a HUD that writes
+equal values: every equal write marks the document changed (b), and an
+equal write to an attribute-bound signal restyles its element. The first
+is what the racer's `sync_hud` does today: it `set`s `speed`, `lap`,
+`clock`, `best`, `message`, `compact`, `follow` and `paused`
+unconditionally every frame (`drawing.rs:129-150`); the first five feed
+text nodes through generated bindings, and `compact`, `follow` and
+`paused` feed memos. Those signals reach no attribute: the HUD's
+attribute bindings are the layout class (`hud.wisp:42`,
+`race_stats.wisp:27`, `car_setup.wisp:22`, `camera_toggle.wisp:15`,
+`race_menu.wisp:17`, `driving_controls.wisp:24`), fed by the
+`size_class` memo (`hud.wisp:21`) that stops equal `compact` writes, and
+`aria-disabled` (`hold_button.wisp:62`), whose signal `sync_hud` already
+compares before writing (`drawing.rs:133-135`). So the restyle row
+passes today for the racer's per-frame writes, and the changed row needs
+a change: e1 is opt-in, so `sync_hud` must switch those calls to
+`set_if_changed`; e4(b) needs no change to `sync_hud`, because the HUD's
+bindings are generated and would compare before calling `set_text`. The
+three missing counters belong to IU1's baseline; until then 1c can
+assert the five that exist.

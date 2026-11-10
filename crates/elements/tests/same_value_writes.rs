@@ -27,8 +27,8 @@ struct Work {
     text_layouts: usize,
 }
 
-/// Ten cells with text and a checked checkbox, updated once, with the
-/// change flag taken.
+/// Ten cells with text, the first with an element child as well, and a
+/// checked checkbox, updated once, with the change flag taken.
 fn page() -> Page {
     let mut doc = document();
     let body = doc.body();
@@ -38,6 +38,7 @@ fn page() -> Page {
     });
     let (cell, label) = cells.next().expect("ten cells");
     cells.for_each(drop);
+    element(&mut doc, cell, "span", "");
     let checkbox = element(&mut doc, body, "input", "");
     doc.set_attribute(checkbox, "type", "checkbox");
     doc.set_property(checkbox, "checked", PropertyValue::Bool(true));
@@ -94,12 +95,12 @@ fn the_same_text_marks_the_document_changed_and_redoes_no_work() {
 }
 
 #[test]
-fn the_same_attribute_marks_changed_and_restyles_the_element() {
+fn the_same_attribute_marks_changed_and_restyles_the_elements_subtree() {
     // When
     let same = work_after(|p| p.doc.set_attribute(p.cell, "class", "cell"));
 
-    // Then
-    assert_eq!(same, work(true, 1, 0));
+    // Then: the cell and its span child
+    assert_eq!(same, work(true, 2, 0));
 }
 
 #[test]

@@ -67,9 +67,10 @@ fn a_memo_of_nan_notifies_its_readers_on_every_recompute() {
 
     // When
     a.set(1);
+    a.set(2);
 
     // Then
-    assert_eq!(runs.get(), 2);
+    assert_eq!(runs.get(), 3);
 }
 
 #[test]
@@ -104,4 +105,16 @@ fn a_rerun_runs_the_effects_cleanups_in_order_then_its_nested_effects_newest_fir
         *events.borrow(),
         ["outer first", "outer second", "inner two", "inner one"]
     );
+}
+
+#[test]
+#[should_panic(expected = "effects re-dirtied themselves 100 passes in a row: effect `forever`")]
+fn an_effect_that_rewrites_its_own_source_forever_panics_naming_the_effect() {
+    // Given
+    let owner = Owner::new();
+    owner.set();
+    let a = Signal::new(0);
+
+    // When
+    Effect::named("forever", move || a.set(a.get() + 1));
 }
