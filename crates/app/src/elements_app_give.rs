@@ -9,7 +9,7 @@
 use vapors_platform::{Event, Instant, Platform};
 
 use super::ElementsApp;
-use crate::document_input::{Given, Route, Unplaced};
+use crate::document_input::{Route, Unplaced};
 
 /// Whether the document has the window alone or shares it with a host.
 #[derive(Clone, Copy)]

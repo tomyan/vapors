@@ -1,11 +1,13 @@
-//! Platform app: routes input, advances simulation, paints world and compiled HUD.
+//! Platform app: routes input, advances simulation, and shows the compiled HUD
+//! through an `ElementsApp`, the track drawn in its `gpu-surface`.
 use crate::{
     hud::{Hud, HudProps},
     model::{Camera, Race},
 };
-use state::{Faults, Gpu, Pacing, Run};
+use state::{Faults, Pacing, Run};
 use std::{cell::RefCell, rc::Rc};
-use vapors_app::DocumentInput;
+use surface::TrackSurface;
+use vapors_app::ElementsApp;
 use vapors_elements::Document;
 use vapors_platform::{App, Event, Frame, Next, Platform, report_error};
 use vapors_text::FontSystem;
@@ -13,11 +15,13 @@ use vapors_text::FontSystem;
 pub(crate) struct Racer {
     pub(super) document: Rc<RefCell<Document>>,
     pub(super) hud: Hud,
-    pub(super) input: DocumentInput,
+    pub(super) app: ElementsApp,
+    pub(super) track: TrackSurface,
     pub(super) run: Run,
     pub(super) pacing: Pacing,
     pub(super) faults: Faults,
-    pub(super) gpu: Gpu,
+    /// A frame has been drawn: the document has been laid out.
+    pub(super) framed: bool,
     pub(super) inspect: bool,
 }
 impl Racer {
@@ -25,14 +29,17 @@ impl Racer {
         let document = Rc::new(RefCell::new(Document::new(FontSystem::new())));
         let body = document.borrow().body();
         let hud = Hud::mount(&document, body, HudProps {});
+        let mut app = ElementsApp::new(Rc::clone(&document));
+        let track = TrackSurface::mount(&mut app);
         Self {
             document,
             hud,
-            input: DocumentInput::new(),
+            app,
+            track,
             run: Run::default(),
             pacing: Pacing::default(),
             faults: Faults::default(),
-            gpu: Gpu::default(),
+            framed: false,
             inspect: vapors_platform::query_parameter("inspect").as_deref() == Some("1"),
         }
     }
@@ -105,18 +112,20 @@ impl App for Racer {
         if self.faults.error.is_some() {
             return Next::Wait;
         }
-        if let Err(error) = self.draw(frame) {
+        if let Err(error) = self.prepare(frame) {
             self.fail(error);
             return Next::Wait;
         }
-        if self.run.paused && !self.run.camera.moving {
-            Next::Wait
-        } else {
-            Next::Continue
+        let next = self.app.frame(frame);
+        self.framed = true;
+        if let Err(error) = self.report_frame(frame.index) {
+            self.fail(error);
+            return Next::Wait;
         }
+        next
     }
     fn drawn(&mut self, platform: &Platform) {
-        crate::text_input::mirror(&self.document, platform);
+        self.app.drawn(platform);
     }
 }
 mod drawing;
@@ -124,6 +133,9 @@ mod drawing;
 mod hud_frame_tests;
 mod input;
 mod state;
+mod surface;
+#[cfg(test)]
+mod surface_tests;
 
 mod inspection;
 #[cfg(test)]

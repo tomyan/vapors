@@ -13,7 +13,7 @@ needs no camera, depth or scene.
 | 1a | `gpu-surface` element, `Item::Surface` in the display list, the refusals | #139 |
 | 1b | `SurfaceRenderer` and the painter's surface host: offscreen texture, resize, scale, clip, on-demand rendering, failures | #140 |
 | 1b2 | `ElementsApp` mounting, `SurfaceHandle`, `Next` from `wants_frame`; the gradient example | #141, #142 |
-| 1c | animation requests (PR 1, this branch); the racer's renderer mounted through the surface; two panels; surface-local input. Plan: `docs/plans/3d-1c.md` | in progress |
+| 1c | animation requests (PR 1, #147); the racer's renderer mounted through the surface (PR 2, this branch); two panels; surface-local input. Plan: `docs/plans/3d-1c.md` | in progress |
 | 2-5 | scene, cameras, components, instances, tasks | not started |
 
 Touche's image renderer drawing through a surface in a panel comes
@@ -70,6 +70,24 @@ wake (`Invalidated::AtFirstFrame`). It refuses a surface since
 unmounted (`InvalidateError::NotMounted`) and a loop that has ended:
 a frame failed, the app was dropped, or the wake was refused
 (`InvalidateError::LoopClosed`).
+
+### An app that wraps ElementsApp
+
+An app that draws under the document and owns state the document does
+not (the racer: its race, its keys) wraps an `ElementsApp` and is the
+platform `App` itself. Each frame it does its own work, then calls the
+inner `frame`. For each event it calls `ElementsApp::give(&event,
+&platform)` in place of `App::event`: the document gets the event by
+`DocumentInput::give`'s rules (`document_input_route.rs`), and the
+answer says who it was for. `Route::Document`: the document had it alone
+(a press on its elements, a key its focused control used). `Route::Both`:
+the document had it and the app acts on it too (a key the focused
+element left, a window focus change). `Route::Host`: the app's alone; the
+document did not get it (a press where no element takes the pointer, a
+key with nothing focused). A pointer event the document cannot place is
+refused as `Unplaced` (`NotUpdated` before the first frame) and the
+document does not get it. `App::event` gives the document every event,
+as before: an `ElementsApp` alone has the window to itself.
 
 ### Animation
 

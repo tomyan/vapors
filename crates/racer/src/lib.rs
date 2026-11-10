@@ -3,7 +3,6 @@ mod app;
 mod driving;
 mod gpu;
 pub mod model;
-mod text_input;
 include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
 /// Open the racer with the same implementation on desktop and WebGPU.

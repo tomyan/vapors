@@ -34,11 +34,13 @@ let enabled: Signal<bool> = Signal::new(true);
 :global(button) { pointer-events: auto; background-color: #20383d; color: #f3f1e8; border: 1px solid #526a69; border-radius: 5px; padding: 10px 14px; min-height: 44px; font-size: 16px; }
 :global(button):hover { background-color: #395456; }
 :global(button):focus-visible { outline: 2px solid #f2b26f; outline-offset: 2px; }
+.track { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
 .note { position: absolute; left: 16px; top: 98px; padding: 8px 12px; background-color: #182a2f; border-radius: 4px; font-size: 14px; }
 .small .note { top: 94px; right: 16px; font-size: 14px; }
 .short .note { top: 52px; left: 8px; right: auto; max-width: 300px; padding: 4px 8px; }
 </style>
 
+<gpu-surface name="track" class="track"></gpu-surface>
 <div class={size_class.get()}>
     <RaceStats layout={size_class} speed={speed} lap={lap} clock={clock} fps={fps} />
     {if !short.get() || paused.get()}<div class="note">{message}</div>{/if}
