@@ -76,38 +76,38 @@ impl Racer {
     pub(super) fn command(&mut self, command: &str) -> Result<(), String> {
         match command {
             "" => {}
-            "toggle" => {
-                if self.race.progress.laps == 3 {
-                    self.race = Race::default();
-                    self.camera = Camera::default();
-                }
-                if self.paused {
-                    self.resume();
-                } else {
-                    self.pause();
-                }
-            }
-            "camera" => {
-                self.camera.toggle();
-                self.last = None;
-                self.hud.follow.set(self.camera.follow);
-            }
-            "restart" => {
-                self.race = Race::default();
-                self.camera = Camera::default();
-                self.pause();
-            }
-            "tune" => {
-                self.pause();
-                self.hud.settings.set(!self.hud.settings.get());
-            }
-            _ => {
-                return Err(format!(
-                    "unknown racer command `{command}`; use toggle, restart, tune or camera"
-                ));
-            }
+            "toggle" => self.toggle(),
+            "camera" => self.toggle_camera(),
+            "restart" => self.restart(),
+            "tune" => self.tune(),
+            _ => return Err(unknown_command(command)),
         }
         Ok(())
+    }
+    fn toggle(&mut self) {
+        if self.race.progress.laps == 3 {
+            self.race = Race::default();
+            self.camera = Camera::default();
+        }
+        if self.paused {
+            self.resume();
+        } else {
+            self.pause();
+        }
+    }
+    fn toggle_camera(&mut self) {
+        self.camera.toggle();
+        self.last = None;
+        self.hud.follow.set(self.camera.follow);
+    }
+    fn restart(&mut self) {
+        self.race = Race::default();
+        self.camera = Camera::default();
+        self.pause();
+    }
+    fn tune(&mut self) {
+        self.pause();
+        self.hud.settings.set(!self.hud.settings.get());
     }
 }
 impl App for Racer {
@@ -144,3 +144,7 @@ mod input;
 mod inspection;
 
 mod tuning;
+
+fn unknown_command(command: &str) -> String {
+    format!("unknown racer command `{command}`; use toggle, restart, tune or camera")
+}

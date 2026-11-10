@@ -57,60 +57,65 @@ impl Racer {
     }
     pub(super) fn draw(&mut self, frame: &Frame<'_>) -> Result<(), String> {
         self.advance(frame)?;
-        #[allow(clippy::cast_possible_truncation)] // display scale is a small positive number
-        {
-            self.scale = frame.scale_factor as f32;
-        }
-        let size = frame.texture.size();
-        #[allow(clippy::cast_precision_loss)] // viewport dimensions fit f32
-        let viewport = Viewport {
-            width: size.width as f32 / self.scale,
-            height: size.height as f32 / self.scale,
-            scale: self.scale,
-        };
+        let viewport = self.viewport(frame);
+        self.layout_hud(viewport)?;
+        let view = frame
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        self.paint_world(frame, &view)?;
+        self.paint_hud(frame, &view)?;
+        self.report_frame(frame.index)
+    }
+    fn layout_hud(&mut self, viewport: Viewport) -> Result<(), String> {
         self.hud.short.set(viewport.height < 480.0);
         self.sync_hud(viewport.width);
         Document::settle_selection(&self.document);
         self.document
             .borrow_mut()
             .update(viewport)
-            .map_err(|errors| format!("racer HUD refused: {errors:?}"))?;
-        let view = frame
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-        if self.track.is_none() {
-            self.track = Some(Track::new(frame));
+            .map_err(|errors| format!("racer HUD refused: {errors:?}"))
+            .map(drop)
+    }
+    fn viewport(&mut self, frame: &Frame<'_>) -> Viewport {
+        #[allow(clippy::cast_possible_truncation)] // display scale is a small positive number
+        {
+            self.scale = frame.scale_factor as f32;
         }
-        if self.painter.is_none() {
-            self.painter = Some(
-                ScenePainter::new(frame.device, frame.texture.format())
-                    .map_err(|e| e.to_string())?,
-            );
+        let size = frame.texture.size();
+        #[allow(clippy::cast_precision_loss)] // viewport dimensions fit f32
+        Viewport {
+            width: size.width as f32 / self.scale,
+            height: size.height as f32 / self.scale,
+            scale: self.scale,
         }
-        self.track.as_mut().expect("created").draw(
+    }
+    fn paint_world(&mut self, frame: &Frame<'_>, view: &wgpu::TextureView) -> Result<(), String> {
+        self.ensure_painter(frame)?;
+        let track = self.track.get_or_insert_with(|| Track::new(frame));
+        track.draw(
             frame,
-            &view,
+            view,
             &self.race,
             self.camera,
             self.driving.controls().brake,
         );
-        let target = Target {
-            device: frame.device,
-            queue: frame.queue,
-            view: &view,
-            viewport: Size {
-                width: size.width,
-                height: size.height,
-            },
-            scissor: None,
-        };
+        Ok(())
+    }
+    fn ensure_painter(&mut self, frame: &Frame<'_>) -> Result<(), String> {
+        if self.painter.is_none() {
+            let painter = ScenePainter::new(frame.device, frame.texture.format());
+            self.painter = Some(painter.map_err(|e| e.to_string())?);
+        }
+        Ok(())
+    }
+    fn paint_hud(&mut self, frame: &Frame<'_>, view: &wgpu::TextureView) -> Result<(), String> {
+        let target = hud_target(frame, view);
         let document = self.document.borrow();
         self.painter
             .as_mut()
             .expect("created")
             .draw_over(&target, document.painted().expect("updated"))
-            .map_err(|e| e.to_string())?;
-        self.report_frame(frame.index)
+            .map_err(|e| e.to_string())
     }
     fn sync_hud(&self, width: f32) {
         self.hud.compact.set(width < 760.0);
@@ -120,6 +125,10 @@ impl Racer {
             self.hud.enabled.set(enabled);
         }
         self.hud.paused.set(self.paused);
+        self.sync_readouts();
+        self.hud.message.set(self.message().into());
+    }
+    fn sync_readouts(&self) {
         self.hud.speed.set(format!("{:.0}", self.race.speed * 0.72));
         self.hud
             .lap
@@ -128,7 +137,9 @@ impl Racer {
         self.hud
             .best
             .set(self.race.progress.best.map_or_else(|| "—".into(), time));
-        let message = if self.setup_error.is_some() {
+    }
+    fn message(&self) -> &'static str {
+        if self.setup_error.is_some() {
             "Steering and grip must be between 0.5 and 1.5."
         } else if self.race.progress.laps == 3 {
             "Finished. Restart for another run."
@@ -140,8 +151,20 @@ impl Racer {
             "Off track · return for a clean lap"
         } else {
             "Clockwise · camera widens with speed"
-        };
-        self.hud.message.set(message.into());
+        }
+    }
+}
+fn hud_target<'a>(frame: &Frame<'a>, view: &'a wgpu::TextureView) -> Target<'a> {
+    let size = frame.texture.size();
+    Target {
+        device: frame.device,
+        queue: frame.queue,
+        view,
+        viewport: Size {
+            width: size.width,
+            height: size.height,
+        },
+        scissor: None,
     }
 }
 fn time(seconds: f32) -> String {

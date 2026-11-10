@@ -1,9 +1,12 @@
 //! Ground and solid geometry, sharing a tilted camera under the compiled HUD.
 mod mesh;
 mod pipeline;
+mod setup;
 use crate::model::{Camera, RADIUS, ROAD, Race, STRAIGHT};
+use setup::{
+    begin_world_pass, pipelines, solid_meshes, uniform_bind, uniform_buffer, uniform_layout,
+};
 use vapors_platform::Frame;
-use wgpu::util::DeviceExt;
 
 pub(crate) struct Track {
     pipeline: wgpu::RenderPipeline,
@@ -17,53 +20,18 @@ pub(crate) struct Track {
 impl Track {
     pub(crate) fn new(frame: &Frame<'_>) -> Self {
         let device = frame.device;
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("racer track"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("track.wgsl").into()),
-        });
-        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("racer uniforms"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-        });
-        let uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("racer frame"),
-            size: 80,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("racer"),
-            layout: &layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniform.as_entire_binding(),
-            }],
-        });
-        let mut mesh = mesh::scenery();
-        mesh.vertices.extend(mesh::car().vertices);
-        let bytes: Vec<u8> = mesh.vertices.iter().flat_map(|v| v.to_le_bytes()).collect();
-        let vertices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("racer solid meshes"),
-            contents: &bytes,
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+        let layout = uniform_layout(device);
+        let uniform = uniform_buffer(device);
+        let (vertices, vertex_count) = solid_meshes(device);
+        let (pipeline, solids) = pipelines(device, frame.texture.format(), &layout);
         Self {
-            pipeline: pipeline::create(device, frame.texture.format(), &layout, &shader, false),
-            solids: pipeline::create(device, frame.texture.format(), &layout, &shader, true),
+            pipeline,
+            solids,
             vertices,
-            vertex_count: u32::try_from(mesh.vertices.len() / 7).expect("mesh fits u32"),
+            vertex_count,
             depth: None,
+            bind: uniform_bind(device, &layout, &uniform),
             uniform,
-            bind,
         }
     }
     pub(crate) fn draw(
@@ -109,38 +77,18 @@ impl Track {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("racer"),
             });
-        {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("racer world"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.depth.as_ref().expect("depth allocated").1,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: wgpu::StoreOp::Discard,
-                    }),
-                    stencil_ops: None,
-                }),
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
-            pass.set_pipeline(&self.pipeline);
-            pass.set_bind_group(0, &self.bind, &[]);
-            pass.draw(0..3, 0..1);
-            pass.set_pipeline(&self.solids);
-            pass.set_vertex_buffer(0, self.vertices.slice(..));
-            pass.draw(0..self.vertex_count, 0..1);
-        }
+        self.record_world(&mut encoder, view);
         frame.queue.submit([encoder.finish()]);
+    }
+    fn record_world(&self, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) {
+        let depth = &self.depth.as_ref().expect("depth allocated").1;
+        let mut pass = begin_world_pass(encoder, view, depth);
+        pass.set_pipeline(&self.pipeline);
+        pass.set_bind_group(0, &self.bind, &[]);
+        pass.draw(0..3, 0..1);
+        pass.set_pipeline(&self.solids);
+        pass.set_vertex_buffer(0, self.vertices.slice(..));
+        pass.draw(0..self.vertex_count, 0..1);
     }
     fn resize_depth(&mut self, frame: &Frame<'_>) {
         let size = frame.texture.size();
