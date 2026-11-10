@@ -129,6 +129,7 @@ fn add_element(source: &Source<'_>, node: NodeId, boxes: &mut Vec<LayoutBox>) ->
     let natural = source
         .images
         .natural(source.arena, node)
+        .or_else(|| crate::svg::natural(source.arena, node))
         .or(range.map(|_| crate::range::NATURAL_SIZE))
         .or(checked.map(|_| crate::checkbox::NATURAL_SIZE));
     let mut replaced = LayoutBox::replaced(
@@ -148,7 +149,7 @@ fn add_element(source: &Source<'_>, node: NodeId, boxes: &mut Vec<LayoutBox>) ->
     if let Some(text) = field_text {
         run.push_text(if text.is_empty() { "\u{a0}" } else { &text });
     }
-    for child in source.arena.children(node) {
+    for child in box_children(source.arena, node) {
         match &source.arena.get(child, "build").kind {
             Kind::Text(text) => run.push_text(text),
             // No box, and no break in the run around it (CSS Display 3,
@@ -166,6 +167,15 @@ fn add_element(source: &Source<'_>, node: NodeId, boxes: &mut Vec<LayoutBox>) ->
     }
     add_run(run, index, boxes);
     Some(index)
+}
+
+/// The children of `node` that may have boxes: none for an `svg`,
+/// whose paths are drawn as its content (docs/icons.md, Layout).
+fn box_children(arena: &Arena, node: NodeId) -> Vec<NodeId> {
+    if crate::svg::is(arena, node, "svg") {
+        return Vec::new();
+    }
+    arena.children(node)
 }
 
 /// An inline element's text into `run`, its inline descendants' too.

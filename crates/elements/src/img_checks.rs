@@ -100,6 +100,6 @@ fn percentages(style: &taffy::Style) -> Vec<String> {
         .collect()
 }
 
-fn relative(raw: taffy::CompactLength) -> bool {
+pub(crate) fn relative(raw: taffy::CompactLength) -> bool {
     raw.tag() == taffy::CompactLength::PERCENT_TAG || raw.is_plain_calc()
 }

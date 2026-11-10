@@ -31,7 +31,8 @@ attribute and the fix.
 - `aria-hidden="true"` (a decorative icon: not in the accessibility
   tree, as in Chromium, so a button holding it keeps its own name), or
   `role="img"` with a non-empty `aria-label` (a named image). One of
-  the two is required.
+  the two is required. A button holding a named image takes the
+  image's `aria-label` into its name from content, as Chromium does.
 - `id`, `class`, and `xmlns` with the SVG namespace, which is ignored.
 - Children: `<path>` elements and whitespace only.
 - CSS: sized by its attributes only, so `width`, `height`, `min-*` and
@@ -120,5 +121,6 @@ boxes.
 |---|---|
 | 1 | This doc; `vapors-text`: `IconPath` (strict parse, refusals) |
 | 1b | Path rasterisation into the atlas, `TextPipeline` drawing an icon quad; unit and GPU tests |
-| 2 | Compiler vocabulary (`svg`, `path`); elements: the refusals, replaced layout, accessibility, `Item::Icon` in paint and the painter |
+| 2a | Compiler vocabulary (`svg`, `path`); elements: the refusals, replaced layout, accessibility |
+| 2b | `Item::Icon` in paint and the painter |
 | 3 | A paint fixture of touche's icons compared with Chromium at 1x and 2x, and an accessibility fixture against the oracle |
