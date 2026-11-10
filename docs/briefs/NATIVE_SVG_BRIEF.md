@@ -181,10 +181,28 @@ not a slice yet.
   in twenty places is one entry), and pack all static geometry into one
   shape table embedded in the binary. At run time an item is a shape id
   with a transform, paint and clip.
-- **What stays run time.** CSS can change a box's size, radius and border at
-  run time, so boxes remain run-time instances of the rounded-rectangle
-  primitive, as now. Bound path data is tessellated or encoded when it
-  changes.
+- **One analysis for every painted thing** (Tom, 2026-11-10: "Anything can
+  change at runtime, but we should be able to know what through static
+  analysis. Shouldn't be different"; "We should not refuse things that are
+  runtime, just track them"). Boxes, paths, meshes and text are classified
+  the same way. For each painted thing and each property, the compiler
+  records one of three states:
+  - **constant:** no binding, toggled class or state pseudo-class can change
+    it. Compiled: classified, deduplicated and packed into the shape table.
+  - **known variable:** a binding, a class that can be toggled or a
+    `:hover`/`:focus`-style state can change it, and the compiler knows
+    which. A run-time parameter of the same primitive, updated when its
+    source changes.
+  - **unknown:** the analysis cannot see what changes it, such as a class
+    name or style built from a run-time string. Not refused: tracked. The
+    element is treated as able to change any property the source could
+    reach, and the compiler reports each unknown with its file, line and
+    cause, so the cost is visible and the developer can make it known.
+  Run-time input such as text length, viewport size and image sizes sets
+  sizes and positions; it does not change which primitive a thing is.
+- **Retained layout and paint use the same analysis.** Which bindings can
+  change which properties tells, at build time, which subtrees can ever need
+  layout or paint again; IU3 and IU4 can take their boundaries from it.
 - **Fewer pipelines.** One or two shape pipelines draw boxes, icons and SVG
   together, batched in paint order.
 
