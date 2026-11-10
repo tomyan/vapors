@@ -1,6 +1,8 @@
 //! The handler's answers to winit: resumed, a frame's wait-until time
-//! reached, the loop's own messages, and window events. A lost device is checked first in each, so
-//! nothing reaches the GPU or the app after it.
+//! reached, the loop's own messages, and window events. A lost device is
+//! checked first in `user_event` and `window_event`, so nothing reaches
+//! the GPU or the app after it; the redraw `new_events` requests goes
+//! through `window_event`, which checks.
 
 use winit::application::ApplicationHandler;
 use winit::event::{StartCause, WindowEvent};
@@ -24,6 +26,11 @@ impl ApplicationHandler<Message> for Handler {
     /// frame, and events alone wake the loop until that frame says more.
     fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
         if let StartCause::ResumeTimeReached { .. } = cause {
+            // Guards a dropped frame at the deadline: if the surface
+            // gives no texture, `redraw` returns before it sets the
+            // control flow, and the spent `WaitUntil` would fire again
+            // at once. Unproven: no test can make the acquire fail, and
+            // `Handler` needs a real `ActiveEventLoop`.
             event_loop.set_control_flow(ControlFlow::Wait);
             self.platform.request_redraw();
             self.redraw_if_asked();

@@ -5,7 +5,8 @@
 # or two for a burst of 5 calls with no wait between; then a frame that
 # returns Next::WaitUntil 600 ms ahead (vapors_demo_wait_until, then a
 # wake) gets one more frame by 900 ms, and none if a wake 100 ms later
-# drew a frame that returned Wait (frames counted with getCurrentTexture).
+# drew a frame that returned Wait (frames counted with getCurrentTexture),
+# and that frame came at or after the 600 ms, not before.
 #
 # Usage: scripts/web-wake-frames.sh target/web <new or empty dir>
 # after `cargo xtask web`. Needs python3 and a browser (scripts/
@@ -43,8 +44,8 @@ python3 - "$work/index.html" "$work/wake.html" "$FIRST_FRAME_MS" <<'PY'
 import sys
 source, target, first_ms = sys.argv[1:4]
 text = open(source).read()
-head = ('<script>var frames = 0; var current = GPUCanvasContext.prototype.getCurrentTexture;'
-        ' GPUCanvasContext.prototype.getCurrentTexture = function () { frames++; return current.apply(this, arguments); };'
+head = ('<script>var frames = 0; var lastAt = 0; var current = GPUCanvasContext.prototype.getCurrentTexture;'
+        ' GPUCanvasContext.prototype.getCurrentTexture = function () { frames++; lastAt = performance.now(); return current.apply(this, arguments); };'
         ' function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }'
         ' function stage(name) { return fetch("/stage/" + name, { method: "POST" }).catch(function () {}); }'
         ' function report(text) { var p = document.createElement("pre"); p.id = "wake"; p.textContent = text;'
@@ -65,13 +66,13 @@ head = ('<script>var frames = 0; var current = GPUCanvasContext.prototype.getCur
         ' var before = frames;'
         ' try { for (var j = 0; j < 5; j++) { window.wasmBindings.vapors_demo_wake(); } } catch (x) { report("refused: vapors_demo_wake threw " + x); return; }'
         ' await wait(300); var burst = frames - before;'
-        ' var w = window.wasmBindings; var timedAt = frames;'
+        ' var w = window.wasmBindings; var timedAt = frames; var timedStart = performance.now();'
         ' try { w.vapors_demo_wait_until(600); w.vapors_demo_wake(); } catch (x) { report("refused: vapors_demo_wait_until threw " + x); return; }'
-        ' await wait(900); var timed = frames - timedAt; var replacedAt = frames;'
+        ' await wait(900); var timed = frames - timedAt; var lateBy = lastAt - timedStart - 600; var replacedAt = frames;'
         ' w.vapors_demo_wait_until(600); w.vapors_demo_wake(); await wait(100); w.vapors_demo_wake();'
         ' await wait(900); var replaced = frames - replacedAt;'
         ' report("idle " + idle + "; per wake " + each.join(",") + "; burst " + (burst >= 1 && burst <= 2 ? "1-2" : burst)'
-        ' + "; timed " + timed + "; replaced " + replaced); })();</script>')
+        ' + "; timed " + timed + (lateBy >= 0 ? "" : " (the last " + Math.round(-lateBy) + " ms early)") + "; replaced " + replaced); })();</script>')
 open(target, 'w').write(text.replace('</head>', head + '</head>').replace('</body>', '<img src="/wait" hidden></body>'))
 PY
 # The page's load waits on /wait until it posts /done, so the dump comes

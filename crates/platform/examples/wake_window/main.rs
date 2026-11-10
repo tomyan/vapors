@@ -1,7 +1,8 @@
 //! The waker natively: an app that returns `Next::Wait` draws nothing
 //! while idle, exactly one frame per `Waker::wake` from another thread,
 //! at most two for a burst of five, one frame at the time a frame asked
-//! for with `Next::WaitUntil` and none if a later frame returned `Wait`,
+//! for with `Next::WaitUntil`, none if a later frame returned `Wait`, one more
+//! for a time already past,
 //! and once the loop has ended a wake says `LoopClosed`. `xvfb-run -a cargo run -p vapors-platform
 //! --example wake_window` (the CI window job runs it). Exit 1 names
 //! what differed.

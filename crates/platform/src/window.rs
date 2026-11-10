@@ -80,6 +80,11 @@ pub enum Next {
     /// is winit's `ControlFlow::WaitUntil`; on the web, winit's timer
     /// (`scheduler.postTask` with a delay, else `setTimeout`), cleared
     /// when the control flow changes.
+    ///
+    /// A time that has already passed asks for another frame at once, and
+    /// a frame that returns one again asks again: the loop redraws
+    /// continuously (natively a busy loop, on the web a 0 ms timer loop).
+    /// A frame must not return a time in the past unless it wants that.
     WaitUntil(Instant),
     /// Close the window and return from [`run`].
     Exit,
