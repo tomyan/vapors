@@ -5,6 +5,15 @@ use crate::gpu_frames::{WINDOW, pixel_in, track_alone_in};
 use crate::gpu_track_resize_tests::{DOUBLE, drawn_in, racing};
 use vapors_gpu_harness::gpu;
 
+/// 8-bit rounding of the 2x block's mean.
+const TOLERANCE: f32 = 2.0;
+
+/// A grid coordinate (under 2^23) as `f32`.
+#[allow(clippy::cast_precision_loss)] // window dimensions fit f32 exactly
+fn f32_of(value: u32) -> f32 {
+    value as f32
+}
+
 /// Largest per-channel difference between a pixel and its right and
 /// lower neighbours: how steep the colour is there.
 fn steepness(rgba: &[u8], [x, y]: [f32; 2]) -> u8 {
@@ -24,10 +33,10 @@ fn track_points(single: &[u8], alone: &[u8]) -> Vec<([f32; 2], u8)> {
             .iter()
             .all(|p| pixel_in(single, WINDOW.width, *p) == pixel_in(alone, WINDOW.width, *p))
     };
-    let (width, height) = (WINDOW.width as usize, WINDOW.height as usize);
-    let grid = (8..height - 8)
+    let (width, height) = (WINDOW.width - 8, WINDOW.height - 8);
+    let grid = (8..height)
         .step_by(8)
-        .flat_map(|y| (8..width - 8).step_by(8).map(move |x| [x as f32, y as f32]));
+        .flat_map(|y| (8..width).step_by(8).map(move |x| [f32_of(x), f32_of(y)]));
     grid.filter(|at| clear(*at))
         .map(|at| (at, steepness(alone, at)))
         .collect()
@@ -52,8 +61,8 @@ fn sampled(points: &[([f32; 2], u8)]) -> [[f32; 2]; 3] {
 
 /// Per channel, the range of the 3x3 device pixels at 1x around `at`.
 fn range_around(rgba: &[u8], [x, y]: [f32; 2]) -> [(u8, u8); 3] {
-    let around: Vec<[u8; 4]> = (-1..=1)
-        .flat_map(|dy| (-1..=1).map(move |dx| [x + dx as f32, y + dy as f32]))
+    let around: Vec<[u8; 4]> = (-1_i8..=1)
+        .flat_map(|dy| (-1_i8..=1).map(move |dx| [x + f32::from(dx), y + f32::from(dy)]))
         .map(|at| pixel_in(rgba, WINDOW.width, at))
         .collect();
     [0, 1, 2].map(|c| {
@@ -85,9 +94,7 @@ fn gpu_the_track_shows_the_same_colour_at_one_and_two_times_scale() {
     // range of the 1x pixels around it, widened by TOLERANCE. The 1x
     // pixel and the block are sampled up to one device pixel apart, so
     // on an edge or gradient they can differ by what the colour changes
-    // across that pixel; the range is that change. TOLERANCE is 8-bit
-    // rounding of the mean.
-    const TOLERANCE: f32 = 2.0;
+    // across that pixel; the range is that change.
     for at in points {
         let colour = pixel_in(&single, WINDOW.width, at);
         assert_ne!(
