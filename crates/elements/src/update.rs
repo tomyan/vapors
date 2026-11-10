@@ -180,6 +180,7 @@ impl Document {
             &kept.used,
         ));
         errors.extend(crate::surfaces::refusals(&self.arena, &live));
+        errors.extend(crate::svg_checks::refusals(&self.arena, &live, &kept.used));
         if errors.is_empty() {
             Ok(calcs)
         } else {

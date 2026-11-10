@@ -24,20 +24,23 @@ attribute and the fix.
 
 - `viewBox`: required, four numbers `min-x min-y width height`, width
   and height above 0.
-- `width`, `height`: required, positive numbers with no unit (CSS px).
-  They are the box's natural size. Their ratio must equal the
+- `width`, `height`: required, positive numbers with no unit (CSS px),
+  written as CSS numbers: `16.` and `1.e1` are refused, as Chromium
+  drops them. The viewBox's numbers follow the same syntax.
+  They are the box's CSS `width` and `height`, as in Chromium. Their ratio must equal the
   viewBox's; a different ratio would letterbox under
   `preserveAspectRatio`, which is not built.
 - `aria-hidden="true"` (a decorative icon: not in the accessibility
   tree, as in Chromium, so a button holding it keeps its own name), or
   `role="img"` with a non-empty `aria-label` (a named image). One of
-  the two is required.
+  the two is required. A button holding a named image takes the
+  image's `aria-label` into its name from content, as Chromium does.
 - `id`, `class`, and `xmlns` with the SVG namespace, which is ignored.
 - Children: `<path>` elements and whitespace only.
 - CSS: sized by its attributes only, so `width`, `height`, `min-*` and
   `max-*` in CSS are refused (in Chromium the attributes are
-  presentation hints that CSS overrides one axis at a time, which the
-  natural-size route does not reproduce). Inline is refused as for
+  presentation hints that CSS overrides one axis at a time; vapors
+  takes the size from the attributes only). Inline is refused as for
   `img`: give it `display: block` or make it a flex or grid item.
   touche's ask-bar svgs are inline today (`#tools-open`,
   `#conversation-expand`, `#ask-mic`, `#ask-voice`, `#ask-voice-mute`,
@@ -63,15 +66,26 @@ attribute and the fix.
   in SVG.
 - Nothing else: no `class`, `style`, `transform`, caps or joins. Joins
   are miter with limit 4 and caps butt, SVG's defaults.
+- CSS: a `color` different from its svg's, `display: none`, and a
+  `visibility` different from its svg's are refused. Paint strokes
+  every path of an icon in the svg's colour and shows them with the
+  svg's visibility, so a path styled otherwise would not be drawn as
+  styled.
 
 touche's Dictate icon also uses `<rect rx>`; it is written as a path
 when that button moves, rather than widening the subset.
 
 ## Layout
 
-The `svg` is a replaced box like `img` (`layout::replaced`), its natural
-size the `width` and `height` attributes. Its `path` children are not
-boxes.
+The `svg` is a replaced box like `img`. Its `width` and `height`
+attributes are its CSS width and height, as Chromium maps them
+(presentational hints): definite, so a flex or grid container does not
+stretch it, and following `box-sizing`, so under `border-box` padding
+and border are inside the 16 px. As a flex item it grows, shrinks and
+takes a `flex-basis` on the main axis as in Chromium, which gives an
+svg no automatic minimum size, so it can shrink below its attributes
+(min size 0). `crates/elements/tests/svg_size.rs` holds Chromium 155's
+numbers. Its `path` children are not boxes.
 
 ## Paint
 
@@ -120,5 +134,6 @@ boxes.
 |---|---|
 | 1 | This doc; `vapors-text`: `IconPath` (strict parse, refusals) |
 | 1b | Path rasterisation into the atlas, `TextPipeline` drawing an icon quad; unit and GPU tests |
-| 2 | Compiler vocabulary (`svg`, `path`); elements: the refusals, replaced layout, accessibility, `Item::Icon` in paint and the painter |
+| 2a | Compiler vocabulary (`svg`, `path`); elements: the refusals, replaced layout, accessibility |
+| 2b | `Item::Icon` in paint and the painter |
 | 3 | A paint fixture of touche's icons compared with Chromium at 1x and 2x, and an accessibility fixture against the oracle |

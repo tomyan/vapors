@@ -8,7 +8,8 @@
 //! `display: none` or `aria-hidden="true"` adds nothing, text under
 //! `visibility: hidden` adds nothing, inline elements join their
 //! neighbours' text and other boxes are set apart by a space, as
-//! Chromium's name from content is. Whitespace is collapsed and trimmed.
+//! Chromium's name from content is; a named icon (`<svg role="img">`)
+//! adds its `aria-label`. Whitespace is collapsed and trimmed.
 
 use vapors_dom::NodeId;
 
@@ -69,10 +70,24 @@ impl Document {
         };
         let apart = if inline { "" } else { " " };
         out.push_str(apart);
+        if let Some(label) = self.ax_icon_label(node) {
+            out.push_str(if self.ax_shown(node) { label } else { "" });
+            out.push_str(apart);
+            return;
+        }
         for child in self.children(node) {
             self.collect_rendered(child, self.ax_shown(node), out);
         }
         out.push_str(apart);
+    }
+
+    /// A named icon's `aria-label` (`<svg role="img">`, docs/icons.md),
+    /// which a name from content takes in place of its paths when the
+    /// icon is `visibility: visible`.
+    fn ax_icon_label(&self, node: NodeId) -> Option<&str> {
+        let label = self.attribute(node, "aria-label").map(str::trim)?;
+        let named = self.tag(node) == Some("svg") && self.attribute(node, "role") == Some("img");
+        (named && !label.is_empty()).then_some(label)
     }
 
     /// Whether element `node` is inline; `None` when it renders nothing

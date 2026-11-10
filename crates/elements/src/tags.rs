@@ -3,8 +3,8 @@
 //! not implement is an error, never drawn as a `div`.
 
 /// Tags laid out and painted now: block-level containers, the inline
-/// elements of F2c S6, `img` (S10), `gpu-surface` (docs/gpu-surface.md)
-/// and `input` (3-E3; `check` refuses the types not built yet).
+/// elements of F2c S6, `img` (S10), `gpu-surface` (docs/gpu-surface.md),
+/// the `svg` icon and its `path`s (docs/icons.md) and `input` (3-E3; `check` refuses the types not built yet).
 const SUPPORTED: &[&str] = &[
     "html",
     "body",
@@ -31,6 +31,8 @@ const SUPPORTED: &[&str] = &[
     "hr",
     "img",
     "gpu-surface",
+    "svg",
+    "path",
     "span",
     "b",
     "strong",
