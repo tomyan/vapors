@@ -7,9 +7,10 @@ use std::collections::BTreeMap;
 
 use crate::svg::positive;
 
-/// The most device px an svg's width or height may be: 16 masks of
-/// this size fill one 1024 px atlas page, and touche's icons are 16 px,
-/// 48 px at 3x.
+/// The most device px an svg's width or height may be: 9 masks of
+/// this size fill one 1024 px atlas page (each is padded by 1 px;
+/// pinned by the test in `svg_limit_tests.rs`), and touche's icons are
+/// 16 px, 48 px at 3x.
 pub(crate) const MAX_DEVICE_PX: f32 = 256.0;
 
 /// A refusal when the svg's `width` or `height` times `scale` is over
@@ -27,3 +28,7 @@ pub(crate) fn reason(attributes: &BTreeMap<String, String>, scale: f32) -> Optio
         height * scale
     ))
 }
+
+#[cfg(test)]
+#[path = "svg_limit_tests.rs"]
+mod tests;

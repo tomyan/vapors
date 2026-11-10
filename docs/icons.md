@@ -35,8 +35,8 @@ attribute and the fix.
   svg, naming the element, both sizes and the fix (draw it smaller, or
   as an image), and checks again on every update, so a scale change
   can refuse an svg that was accepted. Each path takes a mask the size
-  of the content box in the 1024 px atlas page, 16 of them at 256 px
-  fill one page, and a larger icon failed the whole frame at draw time.
+  of the content box in the 1024 px atlas page, 9 of them at 256 px
+  fill one page (each mask is padded by 1 px), and a larger icon failed the whole frame at draw time.
   touche's icons are 16 px, 48 px at 3x.
 - `aria-hidden="true"` (a decorative icon: not in the accessibility
   tree, as in Chromium, so a button holding it keeps its own name), or
