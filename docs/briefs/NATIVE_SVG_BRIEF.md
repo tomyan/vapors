@@ -193,11 +193,18 @@ not a slice yet.
     `:hover`/`:focus`-style state can change it, and the compiler knows
     which. A run-time parameter of the same primitive, updated when its
     source changes.
-  - **unknown:** the analysis cannot see what changes it, such as a class
-    name or style built from a run-time string. Not refused: tracked. The
-    element is treated as able to change any property the source could
-    reach, and the compiler reports each unknown with its file, line and
-    cause, so the cost is visible and the developer can make it known.
+  - **unknown:** the analysis cannot see what changes it. Not refused:
+    tracked. The element is treated as able to change any property the
+    source could reach, and the compiler reports each unknown with its
+    file, line and cause, so the cost is visible and the developer can make
+    it known.
+  Classes are bound from enums, never strings (Tom, 2026-11-10), so every
+  class an element can take is known at build time. A custom property
+  set from Rust (`set_property`, as touche sets `--bar-height`) is known
+  variable when its name is a literal: its value reaches exactly the
+  properties whose `var()` reads it. Which sources, if any, remain unknown
+  is for the analysis slice to list; a name computed at run time is the
+  candidate.
   Run-time input such as text length, viewport size and image sizes sets
   sizes and positions; it does not change which primitive a thing is.
 - **Retained layout and paint use the same analysis.** Which bindings can
