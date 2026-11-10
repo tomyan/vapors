@@ -94,6 +94,7 @@ prepare() {
   # elements demo hides it and the status line, and needs neither.
   page no-open-button "" "!error.hidden && $adapter" 's#<button id="open">Open</button>##'
   page no-open-button-elements "" "$adapter" 's#<button id="open">Open</button>##'
+  page own-open-no-button "" "$adapter" 's#<button id="open">Open</button>##'
   page no-webgpu "$nogpu" ""
   page no-webgpu-no-error-element "$nogpu" "" 's#<p id="error"[^>]*></p>##'
   page device-lost "$lose" "!error.hidden"
@@ -384,8 +385,12 @@ fi
 if grep -q 'vkCreateInstance() failed' "$work/as-built.log"; then
   fail "Chromium has no Vulkan driver, so SwiftShader's WebGPU cannot present; fix: check that $VK_DRIVER_FILES loads (vulkaninfo --summary with VK_DRIVER_FILES set)"
 fi
-check no-open-button '^adapter: ' 'touch screens cannot open files' '?demo=image'
+check no-open-button '^adapter: ' 'touch screens cannot open files.*app_draws_open' '?demo=image'
 check no-open-button-elements '^adapter: ' hidden '?demo=hello'
+# An app that calls app_draws_open and not hide_status_line: no error for
+# the missing button, and #status stays shown, so it stays announced.
+check own-open-no-button '^adapter: ' hidden '?demo=own-open'
+printf '%s' "$status_tag" | grep -q ' hidden' && fail "own-open-no-button: #status is hidden, wanted it shown"
 check no-webgpu '^starting$' '^no WebGPU adapter'
 check no-webgpu-no-error-element '^no WebGPU adapter' absent
 check device-lost '^adapter: ' '^the GPU device was lost \(Destroyed: .*\); fix: reload the page$'
@@ -403,7 +408,7 @@ overlap() {
   held "$1-overlap" || return
   found=$(printf '%s' "$dom" | grep -o 'data-overlaps="[^"]*"' | sed 's#data-overlaps="\(.*\)"#\1#')
   echo "$1-overlap: HTML over the canvas: [${found:-not measured}]"
-  [ "$found" = none ] || fail "$1-overlap: [${found:-not measured}] lies over the canvas of an elements demo; hide it (vapors_platform::hide_page_controls) or move it off the canvas"
+  [ "$found" = none ] || fail "$1-overlap: [${found:-not measured}] lies over the canvas of an elements demo; hide it (vapors_platform::hide_status_line, app_draws_open) or move it off the canvas"
 }
 for demo in $demos index; do overlap "$demo"; done
 # Each demo as Chromium shows the canvas after its clicks, held to the

@@ -79,14 +79,24 @@ pub use text_field::TextField;
 pub use waker::{LoopClosed, Waker};
 pub use window::{App, Frame, Next, WindowOptions, run};
 
-/// Hide the page's own HTML controls drawn over the canvas (the Open
-/// button and the status line), for an app that draws its own; errors
-/// are still shown, and a page without the Open button is not an error.
-/// Call it before [`run`]. Natively there is no page, so it does
-/// nothing.
-pub fn hide_page_controls() {
+/// Declare that the app draws its own Open button, so the page needs no
+/// `<button id="open">`: without this call a page lacking one is
+/// reported as an error. A button the page has is hidden. Call it before
+/// [`run`]. Natively there is no page, so it does nothing.
+pub fn app_draws_open() {
     #[cfg(target_family = "wasm")]
-    web::hide_page_controls();
+    web::app_draws_open();
+}
+
+/// Hide the page's `#status` line, for an app whose canvas the line
+/// would cover. It also leaves the browser's accessibility tree, so an
+/// app that keeps `#status` as its announced status does not call it.
+/// Errors still show: `#error`, or `#status` when the page has no
+/// `#error`, is un-hidden whenever an error is written. Call it before
+/// [`run`]. Natively there is no page, so it does nothing.
+pub fn hide_status_line() {
+    #[cfg(target_family = "wasm")]
+    web::hide_status_line();
 }
 
 /// The value of `name` in the page URL's query string (`?demo=hello`).
