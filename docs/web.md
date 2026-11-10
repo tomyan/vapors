@@ -201,3 +201,16 @@ for values that are not the strip colour. `--dump-dom` in place of
 155 keeps `navigator.gpu` under every disable flag, so to see the
 no-WebGPU path add `<script>delete Navigator.prototype.gpu;</script>` to
 the head of a copy of `index.html`.
+
+## Wheel position
+
+A wheel before any pointer movement is placed by
+`crates/platform/src/wheel_position_web.rs`, which records the wheel
+event's `offsetX`/`offsetY` (read as f64, as winit reads them for its
+pointer events) when the event's target is the canvas. In a browser this
+listener is exercised only by touche's `check_idle` and
+`check_zoom_status`; vapors has no browser check that dispatches a wheel
+before a pointer move. Follow-up: add one to `scripts/` (a page under
+`?demo=` that shows the position a wheel scrolled at, driven from
+headless Chromium by `Input.dispatchMouseEvent` of type `mouseWheel`);
+it retires this gap.

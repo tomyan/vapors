@@ -12,19 +12,40 @@ use std::cell::Cell;
 
 thread_local! {
     static AT: Cell<Option<[f32; 2]>> = const { Cell::new(None) };
+    static CANVAS_REPORTED: Cell<bool> = const { Cell::new(false) };
+    static INSTALLED: Cell<bool> = const { Cell::new(false) };
 }
 
-/// A wheel event's `clientX`/`clientY` as physical pixels from the
-/// canvas's top-left: relative to `origin` (the canvas's client rect
-/// corner), times `scale` physical pixels per CSS pixel, as winit
-/// positions pointer events.
+/// A wheel event's `offsetX`/`offsetY` (CSS pixels from the canvas's
+/// padding edge, in the canvas's own space, so a CSS transform, a
+/// border or a sub-pixel offset is already applied) as physical pixels,
+/// times `scale` physical pixels per CSS pixel: the conversion winit
+/// applies to its pointer events (`event::mouse_position`).
 #[allow(clippy::cast_possible_truncation)] // positions are small
 #[cfg_attr(not(target_family = "wasm"), allow(dead_code))] // the web converts; tests too
-pub(crate) fn canvas_position(client: [f64; 2], origin: [f64; 2], scale: f64) -> [f32; 2] {
-    [
-        ((client[0] - origin[0]) * scale) as f32,
-        ((client[1] - origin[1]) * scale) as f32,
-    ]
+pub(crate) fn canvas_position(offset: [f64; 2], scale: f64) -> [f32; 2] {
+    [(offset[0] * scale) as f32, (offset[1] * scale) as f32]
+}
+
+/// Drop a recorded position that no wheel event will use: the page
+/// could not place the next one.
+#[cfg_attr(not(target_family = "wasm"), allow(dead_code))] // only the web clears
+pub(crate) fn clear() {
+    AT.take();
+}
+
+/// True the first time it is called on this thread, false after: the
+/// web listener is installed once.
+#[cfg_attr(not(target_family = "wasm"), allow(dead_code))] // only the web installs
+pub(crate) fn first_install() -> bool {
+    !INSTALLED.replace(true)
+}
+
+/// True the first time it is called on this thread, false after: a
+/// page with no canvas reports it once, not on every wheel event.
+#[cfg_attr(not(target_family = "wasm"), allow(dead_code))] // only the web reports
+pub(crate) fn first_canvas_report() -> bool {
+    !CANVAS_REPORTED.replace(true)
 }
 
 /// Record the position of the wheel event about to be translated.
