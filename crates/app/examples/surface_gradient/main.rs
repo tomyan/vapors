@@ -6,8 +6,9 @@
 //! ```
 //!
 //! With `--check` (the CI window job runs it) it settles, then counts
-//! the frames and renders while idle, which must be none; ends the loop;
-//! and checks that an invalidate after the loop ended is refused as
+//! the frames and renders while idle, which must be none; invalidates
+//! the surface from the running app, which must draw 2 frames and
+//! render once; ends the loop; and checks that an invalidate after the loop ended is refused as
 //! `LoopClosed`. Exit 1 names what differed.
 
 mod check;
@@ -50,7 +51,8 @@ fn start(checking: bool) -> Result<String, String> {
     let failure = app.failure();
     if checking {
         let counts = Counts::new(renders);
-        open(Checked::new(app, Arc::clone(&counts)), &failure)?;
+        let checked = Checked::new(app, handle.clone(), Arc::clone(&counts));
+        open(checked, &failure)?;
         let idle = counts.outcome()?;
         after_the_loop(&handle)?;
         return Ok(format!(

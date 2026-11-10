@@ -73,7 +73,11 @@ a frame failed, the app was dropped, or the wake was refused
 
 `crates/app/examples/surface_gradient` draws a WGSL gradient in a
 surface beside a panel of text; with `--check` (the CI window job) it
-counts frames and renders over an idle second, which must be none.
+counts frames and renders over an idle second, which must be none;
+then the running app invalidates the surface from `drawn`, which must
+draw 2 frames (the wake that reached the app, the invalidate's own)
+and render once; after the loop ends an invalidate must be refused as
+`LoopClosed`.
 
 ## Supported composition (first release)
 

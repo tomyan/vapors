@@ -39,6 +39,9 @@ xvfb-run -a cargo run -p vapors-platform --example wake_window
                           Platform::waker in a window: 0 frames idle, 1 per wake
 scripts/web-wake-frames.sh target/web <new dir>
                           the same on the built page (?demo=wake)
+xvfb-run -a cargo run -p vapors-app --example surface_gradient -- --check
+                          a gpu-surface in a window: 0 frames and renders idle, 2 frames
+                          and 1 render per invalidate, LoopClosed after the loop ends
 cargo run -p vapors-elements-corpus --example layout_oracle [-- --check]
                           Chromium's boxes for the layout fixtures
 bacon                     unit tier on every save
