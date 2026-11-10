@@ -53,7 +53,7 @@ fn a_join_at_exactly_90_degrees_adds_no_wedge() {
     let wedges = missing_wedges(&commands, WIDTH);
 
     // Then
-    assert!(wedges.is_empty());
+    assert_eq!(wedges, []);
 }
 
 #[test]
@@ -71,7 +71,7 @@ fn a_join_of_28_degrees_adds_no_wedge_since_its_miter_ratio_is_4_13() {
     let wedges = missing_wedges(&corner(28.0), WIDTH);
 
     // Then
-    assert!(wedges.is_empty());
+    assert_eq!(wedges, []);
 }
 
 #[test]
@@ -162,6 +162,6 @@ fn a_reversal_on_a_diagonal_adds_no_wedge_and_rasterizes() {
     let coverage = icon.rasterize([200, 200]);
 
     // Then
-    assert!(wedges.is_empty());
+    assert_eq!(wedges, []);
     assert!(coverage.data.iter().any(|&a| a > 0));
 }
