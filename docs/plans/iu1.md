@@ -44,19 +44,64 @@ of pull requests under about 400 lines each.
   debug-build update with nothing changed takes about 0.3 s at 3000 rows
   and a full one about 5 s. PR 2 counts that walk.
 
-## PR 2: traversal and paint counters
+## PR 2: traversal and paint counters (done)
 
-Structural counts per update, beside `elements_restyled`,
-`boxes_laid_out` and `text_layouts_built`: elements the style phase
-visits, boxes built and boxes Taffy visits (cache hits included),
-boxes painted, and paint records (scene items) rebuilt. Decision
-(lead): a public `Document::update_counts()` returning a
-`#[non_exhaustive]` struct. Its doc says the counts describe the last
-update, are structural rather than timings, and when they reset; each
-field's doc says exactly what one count is. The existing three getters
-stay. PR 2 lists it in docs/design/incremental-contracts.md section f.
-`sparse_updates.rs` reports them; IU3 then shows which counts its
-retained box tree removes.
+`Document::update_counts()` returns `UpdateCounts`
+(`crates/elements/src/update_counts.rs`), `#[non_exhaustive]`, beside
+`elements_restyled`, `boxes_laid_out` and `text_layouts_built`, which
+stay. Every count resets when an update starts and each phase sets its
+own, so a refused update reports the phases it ran. The fields, each one
+increment per unit:
+
+- `elements_visited`: elements the style phase reads kept styles for
+  after restyling, one per element in the tree (the loop in
+  `Document::styled`).
+- `boxes_built`: layout boxes `build` made, one per element box and
+  text run.
+- `layout_calls`: calls Taffy makes to a box's layout, cache hits
+  included (`BoxTree::lay_out`). Not "boxes Taffy visits": a box can be
+  asked more than once, and a box under a cache hit is not asked.
+- `boxes_painted`: `Step::Box` steps paint drew (outlines and thumbs
+  not included).
+- `scene_items_built`: the scene's items. Paint builds the scene from
+  empty each update, so this is every item; there are no kept records to
+  count separately yet.
+
+`crates/elements/tests/update_counts.rs` holds each count on an update
+with nothing changed and at 0 behind an earlier refusal (an unparsed
+style attribute, a refused tag, a calc that fails at layout).
+`sparse_updates.rs` asserts them per edit at 100 and 1000 rows
+(`EXPECTED_WALKS`). Counts on this machine (2026-11-10):
+
+| Edit | rows | elements visited | boxes built | layout calls | boxes painted | scene items |
+|---|---|---|---|---|---|---|
+| same-size value | 100 | 402 | 702 | 109 | 702 | 400 |
+| resizing label | 100 | 402 | 702 | 111 | 702 | 400 |
+| equal write | 100 | 402 | 702 | 1 | 702 | 400 |
+| hover | 100 | 402 | 702 | 1 | 702 | 400 |
+| focus | 100 | 402 | 702 | 1 | 702 | 401 |
+| same-size value | 1000 | 4002 | 7002 | 1009 | 7002 | 4000 |
+| resizing label | 1000 | 4002 | 7002 | 1011 | 7002 | 4000 |
+| equal write | 1000 | 4002 | 7002 | 1 | 7002 | 4000 |
+| hover | 1000 | 4002 | 7002 | 1 | 7002 | 4000 |
+| focus | 1000 | 4002 | 7002 | 1 | 7002 | 4001 |
+
+A row is 4 elements and 7 boxes and draws 4 items. What the counts show
+about the idle update (the equal write, where nothing is restyled, laid
+out or rebuilt as text): the style phase visits every element, `build`
+makes every box again and paint draws every box and rebuilds every
+item, all linear in rows. Taffy's calls are not part of that walk: it
+asks the root once and reads its cache (`layout_calls` counts only
+those calls). `KeptBoxes::lend`, `placed`, `scroll.settle` and
+`Chains::of` still walk every box on every update, and paint's rect and
+padding loop does too; none of these is counted. A later counter may
+cover them if IU3 needs it. An edit inside one row makes rows + 9
+or rows + 11 layout calls: one per row, which fits the body asking each
+row for its layout and reading its cache, plus the edited row's
+chain. The retained box tree in IU3 targets
+`boxes_built` and, with paint reuse, `boxes_painted` and
+`scene_items_built`; `elements_visited` needs the style phase to stop
+reading every element.
 
 ## PR 3: GPU counters
 

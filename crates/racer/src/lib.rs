@@ -11,7 +11,8 @@ include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 /// # Errors
 /// A platform/window/GPU failure, reported with its cause.
 pub fn run() -> Result<(), String> {
-    vapors_platform::hide_page_controls();
+    vapors_platform::app_draws_open();
+    vapors_platform::hide_status_line();
     vapors_dom::set_error_report(
         "vapors_platform::report_error",
         vapors_platform::report_error,
