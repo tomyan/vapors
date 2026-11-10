@@ -95,6 +95,7 @@ prepare() {
   page no-open-button "" "!error.hidden && $adapter" 's#<button id="open">Open</button>##'
   page no-open-button-elements "" "$adapter" 's#<button id="open">Open</button>##'
   page own-open-no-button "" "$adapter" 's#<button id="open">Open</button>##'
+  page own-open-keeps-button "" "$adapter"
   page no-webgpu "$nogpu" ""
   page no-webgpu-no-error-element "$nogpu" "" 's#<p id="error"[^>]*></p>##'
   page device-lost "$lose" "!error.hidden"
@@ -390,7 +391,13 @@ check no-open-button-elements '^adapter: ' hidden '?demo=hello'
 # An app that calls app_draws_open and not hide_status_line: no error for
 # the missing button, and #status stays shown, so it stays announced.
 check own-open-no-button '^adapter: ' hidden '?demo=own-open'
+[ -n "$status_tag" ] || fail "own-open-no-button: the page has no #status, wanted it shown"
 printf '%s' "$status_tag" | grep -q ' hidden' && fail "own-open-no-button: #status is hidden, wanted it shown"
+# The same app on a page that has the Open button: app_draws_open hides it.
+check own-open-keeps-button '^adapter: ' hidden '?demo=own-open'
+open_tag=$(printf '%s' "$dom" | grep -o '<button id="open"[^>]*>' || true)
+[ -n "$open_tag" ] || fail "own-open-keeps-button: the page has no Open button, wanted one that is hidden"
+printf '%s' "$open_tag" | grep -q ' hidden' || fail "own-open-keeps-button: Open is [$open_tag], wanted hidden"
 check no-webgpu '^starting$' '^no WebGPU adapter'
 check no-webgpu-no-error-element '^no WebGPU adapter' absent
 check device-lost '^adapter: ' '^the GPU device was lost \(Destroyed: .*\); fix: reload the page$'

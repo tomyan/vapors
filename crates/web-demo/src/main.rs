@@ -53,6 +53,8 @@ fn start() -> Result<(), String> {
     }
     // `own-open` is `hello` with the page's status line left as it is: the
     // page check's case for an app that draws its own Open and keeps `#status`.
+    // A test hook for scripts/check-page-contract.sh only; like `wake`, it is
+    // not in `vapors_demos`, so no demo list or error message names it.
     let keeps_status = name == "own-open";
     let demo = vapors_demos::find(if keeps_status { "hello" } else { &name })?;
     // An elements demo draws its own controls; the page's would cover them.
