@@ -6,12 +6,17 @@
 
 mod atlas;
 mod atlas_evict;
+mod atlas_icon;
 mod atlas_page;
 mod atlas_types;
 pub mod comparison;
 mod draw;
+mod draw_icon;
 mod font_system;
 pub mod fonts;
+mod icon;
+mod icon_key;
+mod icon_miter;
 mod icon_path;
 mod icon_path_lex;
 #[cfg(test)]
@@ -32,7 +37,9 @@ mod style;
 pub use atlas::{AtlasConfig, AtlasError, AtlasGlyph, GlyphAtlas, PageKind};
 pub use atlas_page::AtlasPage;
 pub use draw::RenderTarget;
+pub use draw_icon::{ICON_BLEND, IconDraw};
 pub use font_system::FontSystem;
+pub use icon::{Icon, IconError, IconStroke};
 pub use icon_path::{IconPath, PathError};
 pub use layout::{Align, Glyph, GlyphRun, Layout, LayoutOptions, LineInfo, PlacedGlyph};
 pub use layout_ranges::Fragment;
