@@ -185,3 +185,24 @@ fn just_before(at: Instant) -> Instant {
     at.checked_sub(Duration::from_nanos(1))
         .expect("after the clock's start")
 }
+
+#[test]
+fn an_app_that_ignores_the_deadline_shows_it_at_its_next_frame_and_never_early() {
+    // Given: an app that never wakes for the deadline, drawing only
+    // when something else asks
+    let (doc, mut input, deadline) = hovered();
+    let early = [Duration::from_millis(400), Duration::from_nanos(1)];
+
+    // When / Then: frames before the deadline show nothing
+    for before in early {
+        let at = deadline
+            .checked_sub(before)
+            .expect("after the clock's start");
+        assert_eq!(shown(&mut input, &doc, at), None);
+        assert_eq!(input.tooltip_deadline(), Some(deadline));
+    }
+
+    // When / Then: the first frame after it, however late, shows it
+    let late = deadline + Duration::from_secs(3);
+    assert_eq!(shown(&mut input, &doc, late), Some("Open (o)".into()));
+}

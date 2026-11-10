@@ -39,49 +39,51 @@ description; the events oracle's projection compares it.
 
 ## When the tooltip shows
 
-Matched against Chromium's source (2026-11-10): Blink's
-`HitTestResult::Title` and `ChromeClient`, and views'
-`TooltipController`, `TooltipStateManager` and `TooltipViewAura`, the
-desktop tooltips of Linux, Windows and ChromeOS. macOS Chromium uses
-the system's tooltips instead.
+Matched against Chromium's source (main, read 2026-11-10): the desktop
+tooltips of Linux, Windows and ChromeOS. macOS Chromium uses the
+system's tooltips instead. Paths are under `chromium/src`; views'
+files are in `ui/views/corewm/`.
 
-- **Text.** `Document::tooltip_text(node)`: the title of the node or
-  its nearest ancestor with a `title` attribute. `title=""` is present,
-  so it stops the walk and nothing shows. The text has whitespace
-  trimmed at both ends (the set Rust's `char::is_whitespace` has, which
-  includes the no-break space, unlike the accessible name), each tab
-  as eight spaces, and its line breaks kept. A title of only whitespace
-  shows nothing.
-- **Delay.** `TOOLTIP_DELAY`, 500 ms: Windows' default initial tooltip
-  delay (`TTM_SETDELAYTIME`) and views' `kDefaultShowTooltipDelay`. The
-  wait starts when the pointer reaches a title; moving within the same
-  element and text does not restart it, another element or text does.
-- **Hiding.** Leaving the window, moving off the title, a press, the
-  wheel, any key-down (Esc included), a touch and the window's blur
-  hide it, armed or shown. After a press the same title stays hidden
-  until the pointer reaches another; after the others the next move
-  arms it again. No title arms while the primary button is down.
-- **Keyboard.** Focus a key moved (Tab) to an element whose own title
-  is non-empty, while it is `:focus-visible`, arms its tooltip with the
-  same 500 ms delay, as Chromium's keyboard tooltips do (behind a flag
-  there; on here so touché's shortcuts can be found from the keyboard,
-  following the APG tooltip pattern). Focus a press gave never arms
-  it, even on a text field. It hides on blur, on any key-down and when
-  the element loses its title.
-- **Touch.** A touch, tap or pan never arms a tooltip and hides one.
-- **Changes.** Each frame, after the update, the pointer's tooltip
-  follows what is under the pointer: a removed element hides it, a
-  changed title hides it and arms the new one.
+| Behaviour | vapors | Chromium source |
+|---|---|---|
+| The title of the node or its nearest ancestor with a `title` attribute; `title=""` is present, so it stops the walk and nothing shows | `Document::tooltip_text` | `third_party/blink/renderer/core/layout/hit_test_result.cc`, `HitTestResult::Title` (`!title.IsNull()`) |
+| Whitespace trimmed at both ends (Rust's `char::is_whitespace` set, the no-break space included); only whitespace shows nothing | `tooltip_text.rs`, `shown` | `tooltip_state_manager.cc`, `TooltipStateManager::Show` (`base::TrimWhitespace`, `TRIM_ALL`) |
+| Each tab as eight spaces; line breaks kept | `tooltip_text.rs`, `shown` | `tooltip_view_aura.cc`, `TooltipViewAura::SetText` (`base::ReplaceChars`) |
+| Shows 500 ms after the pointer reaches a title; a move within the same element and text does not restart the wait | `TOOLTIP_DELAY`, `TooltipState::pointer_over` | `tooltip_controller.cc`, `kDefaultShowTooltipDelay`; `IsTooltipTextUpdateNeeded` |
+| Hides on any key-down, Esc included | `DocumentInput::tooltip_event` | `tooltip_controller.cc`, `TooltipController::OnKeyEvent` |
+| Hides on a press, and the same title stays hidden until the pointer reaches another | `TooltipState::pressed` | `tooltip_controller.cc`, `OnMouseEvent` (`kMousePressed`), `ShouldHideBecauseMouseWasOncePressed` |
+| Nothing arms while the button is down | `TooltipState::pointer_over` | `tooltip_controller.cc`, `OnMouseEvent` (`IsMouseButtonDown`) |
+| Hides on the wheel | `DocumentInput::tooltip_event` | `tooltip_controller.cc`, `OnMouseEvent` (`kMousewheel`) |
+| A touch never arms one and hides one | `DocumentInput::tooltip_event` | `tooltip_controller.cc`, `TooltipController::OnTouchEvent` |
+| Hides when the window loses focus | `DocumentInput::tooltip_event` | `tooltip_controller.cc`, `TooltipController::OnWindowActivated` |
+| Hides on leaving the window or moving off the title | `TooltipState::left`, `pointer_over` | `tooltip_controller.cc`, `OnMouseEvent` (`kMouseExited`); Blink sends an empty tooltip off a title (`core/page/chrome_client.cc`, `UpdateTooltipUnderCursor`) |
+| Keyboard focus a key moved, `:focus-visible`, shows the element's own title after the same 500 ms | `TooltipState::focus` | `core/page/chrome_client.cc`, `ElementFocusedFromKeypress` (`element->title()`); `tooltip_controller.cc`, `UpdateIfRequired` (`GetShowTooltipDelay` for both triggers). Behind a flag in Chromium; on here so touché's shortcuts can be found from the keyboard |
 
-A host gives `DocumentInput` every event (`give`, the host's own
-included) and, once per frame after the document's update, asks
-`DocumentInput::tooltip(&document, now)` for the tooltip shown and
-`DocumentInput::tooltip_deadline()` for when to wake: it returns
-`Next::WaitUntil(deadline)` when it would otherwise wait, and asks again
-on every frame until the tooltip shows, because a frame that returns
-`Next::Continue` or `Next::Wait` replaces the wait. When the tooltip
-hides before its deadline, `tooltip_deadline` is `None` and no frame
-is drawn for it. `ElementsApp` does both.
+Focus a press gave never arms a tooltip, even on a text field (which
+a press makes `:focus-visible`). A keyboard tooltip hides on blur,
+including a script's, and when its element loses its title. Each
+frame, after the update, the pointer's tooltip follows what is under
+the pointer: a removed element hides it, a changed title hides it and
+arms the new one.
+
+## For apps not using ElementsApp
+
+`ElementsApp` does this itself. An app that drives its own frames
+(touché's page, `crates/web/src/page_next.rs`) must:
+
+1. Give `DocumentInput` every event, the host's own included (`give`
+   does), so a key or press the host takes still hides the tooltip.
+2. Each frame, after the document's update and before drawing, call
+   `DocumentInput::tooltip(&document, now)` for the tooltip shown.
+3. Each frame, fold `DocumentInput::tooltip_deadline()` into the
+   frame's `Next`: `Next::WaitUntil(deadline)` where it would
+   otherwise return `Next::Wait`. Ask on every frame until the tooltip
+   shows, because a frame's `Next::Continue` or `Next::Wait` replaces
+   the wait. When the tooltip hides before its deadline,
+   `tooltip_deadline` is `None` and no frame is drawn for it.
+
+An app that skips step 3 never shows a tooltip early: it shows at the
+first frame drawn at or after its deadline, which may be much later.
 
 ## Not yet built
 
@@ -108,5 +110,6 @@ hotspot, drawn above every item including gpu-surfaces, styled by
 for a frame, since nothing is drawn for it.
 
 Chromium's other rules: its tooltip hides itself after 10 s
-(`kDefaultHideTooltipDelay`), and text past 2048 characters is cut at a
-word break.
+(`tooltip_controller.cc`, `kDefaultHideTooltipDelay`), and text past
+2048 characters (1024 on Windows) is cut at a word break
+(`tooltip_state_manager.cc`, `kMaxTooltipLength`). Neither is built.
