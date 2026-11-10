@@ -1,11 +1,14 @@
 //! `wake_window`'s script, on its own thread: settle, count idle frames,
-//! wake singly, wake in a burst, then end the loop with a last wake.
+//! wake singly, wake in a burst, wait until a time (`timed.rs`), then end
+//! the loop with a last wake.
 
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
-use vapors_platform::Waker;
+use vapors_platform::{Next, Waker};
+
+use crate::timed;
 
 /// After the first frame, before the idle count. The window's own
 /// start-up frames (mapped, sized, exposed) land in this; 2 s is far
@@ -28,6 +31,7 @@ pub struct Shared {
     outcome: Mutex<Option<Result<String, String>>>,
     first_at: Mutex<Option<Instant>>,
     last_at: Mutex<Option<Instant>>,
+    until: Mutex<Option<Instant>>,
 }
 
 impl Shared {
@@ -41,11 +45,28 @@ impl Shared {
         *self.last_at.lock().expect("not poisoned") = Some(now);
     }
 
+    /// What the app returns from this frame: `WaitUntil` the time the
+    /// script set for this one frame, else `Wait`.
+    pub fn next(&self) -> Next {
+        let until = self.until.lock().expect("not poisoned").take();
+        until.map_or(Next::Wait, Next::WaitUntil)
+    }
+
+    /// Make the next frame return `WaitUntil(at)`.
+    pub fn wait_until(&self, at: Instant) {
+        *self.until.lock().expect("not poisoned") = Some(at);
+    }
+
+    /// When the last frame came.
+    pub fn last_at(&self) -> Option<Instant> {
+        *self.last_at.lock().expect("not poisoned")
+    }
+
     pub fn exit_asked(&self) -> bool {
         self.exit.load(Ordering::SeqCst)
     }
 
-    fn count(&self) -> u64 {
+    pub fn count(&self) -> u64 {
         self.frames.load(Ordering::SeqCst)
     }
 
@@ -94,22 +115,24 @@ fn measure(waker: &Waker, shared: &Shared) -> Result<String, String> {
         .map(|_| frames_over(shared, || wake_then_wait(waker, 1)))
         .collect::<Result<Vec<_>, _>>()?;
     let burst = frames_over(shared, || wake_then_wait(waker, BURST))?;
+    let timed = timed::measure(waker, shared)?;
     let line = format!(
-        "start-up {} frames over {:?}; idle frames in {IDLE:?}: {idle}; per wake: {single:?}; a burst of {BURST}: {burst}",
+        "start-up {} frames over {:?}; idle frames in {IDLE:?}: {idle}; per wake: {single:?}; a burst of {BURST}: {burst}; {timed}",
         startup.0, startup.1
     );
     let held = idle == 0 && single.iter().all(|n| *n == 1) && (1..=2).contains(&burst);
-    if held {
+    if held && timed.held() {
         Ok(line)
     } else {
         Err(format!(
-            "{line}; expected 0 idle, 1 per wake and 1 or 2 for the burst"
+            "{line}; expected 0 idle, 1 per wake, 1 or 2 for the burst, {}",
+            timed::EXPECTED
         ))
     }
 }
 
 /// Frames drawn while `during` runs, or its error.
-fn frames_over(
+pub fn frames_over(
     shared: &Shared,
     during: impl FnOnce() -> Result<(), String>,
 ) -> Result<u64, String> {

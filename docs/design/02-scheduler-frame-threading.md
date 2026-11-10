@@ -69,7 +69,10 @@ on the phone). The
 
 `Next::Wait` draws again only when asked: `Platform::request_redraw`
 from inside `event`, `Waker::wake` from outside, or the window
-(resize, scale, shown). The idle measurement is zero frames in three
+(resize, scale, shown). `Next::WaitUntil(at)` also draws one frame
+at `at` if no frame came before then; a frame before then replaces it
+with what that frame returns. `wake_window` and `web-wake-frames.sh`
+count those frames. The idle measurement is zero frames in three
 seconds on both targets, held by `idle_fps` and `web-idle-frames.sh`.
 This page keeps that rule and adds the three new reasons to ask: a
 ready future, a running animation, a scene with an active animation.
