@@ -15,8 +15,8 @@ use crate::frame::FrameTimes;
 
 use crate::document_input::DocumentInput;
 use crate::painter::ScenePainter;
+pub use surface_handle::{InvalidateError, Invalidated, SurfaceHandle};
 use surfaces::AppSurfaces;
-pub use surfaces::{InvalidateError, SurfaceHandle};
 
 /// Why the app stopped, once it has: shared with whoever ran it.
 #[derive(Clone, Default)]
@@ -150,6 +150,7 @@ impl App for ElementsApp {
             Err(message) => {
                 report_error(&message);
                 self.failure.set(&message);
+                self.surfaces.close();
                 Next::Exit
             }
         }
@@ -203,6 +204,8 @@ mod frame_phases;
 #[cfg(not(target_family = "wasm"))]
 #[path = "elements_app_paste.rs"]
 mod paste;
+#[path = "elements_app_surface_handle.rs"]
+mod surface_handle;
 #[path = "elements_app_surfaces.rs"]
 mod surfaces;
 #[cfg(test)]
