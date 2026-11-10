@@ -26,10 +26,10 @@ pub struct FrameCounts {
     /// Quad runs: one draw per run, its instances and the viewport.
     pub quads: GpuWork,
     /// Text runs: one draw per text item, its vertices and blend
-    /// uniform; the atlas page, whole, when a glyph was added to it.
+    /// uniform; the part of the atlas page its new glyphs changed.
     pub texts: GpuWork,
     /// Icon runs: one draw per run, its vertices and blend uniform; the
-    /// atlas page, whole, when an icon mask was added to it.
+    /// part of the atlas page its new icon masks changed.
     pub icons: GpuWork,
     /// Image runs: one draw per image item and its quad's vertices; an
     /// image's pixels, every mip level, the first frame that draws it.

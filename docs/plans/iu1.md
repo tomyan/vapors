@@ -123,17 +123,21 @@ row is also pinned by `gpu_frame_counts_kinds.rs`:
 
 | Demo | Draw calls | Buffer bytes | Texture bytes | First frame's texture bytes |
 |---|---|---|---|---|
-| hello | 4 (2 quad runs, 2 text items) | 26 624 | 0 | 2 097 152 |
+| hello | 4 (2 quad runs, 2 text items) | 26 624 | 0 | 1 053 856 |
 | counter | 3 (2 quad runs, 1 text item) | 2 800 | 0 | 1 048 576 |
-| stress | 1 803 (901 quad runs, 902 text items) | 820 784 | 0 | 44 040 192 |
+| stress | 1 803 (901 quad runs, 902 text items) | 820 784 | 0 | 1 051 420 |
 
 So an idle frame re-uploads every run's instances or vertices and
 redraws every run: one draw per quad or shadow run, one per text item,
 image and surface, one per icon run. The atlas is not uploaded when no
-glyph was added; when one is, the whole 1024 x 1024 page is uploaded
-(1 048 576 bytes), once per text item that adds a glyph, which is why
-stress's first frame uploads 42 pages. These are the numbers IU4's
-retained paint targets.
+glyph was added. The first upload of a page is the whole 1024 x 1024
+page (1 048 576 bytes); after that, a text item or icon run that adds
+glyphs uploads the rectangle bounding the glyphs it added, and a repack
+uploads the whole page again. Before the region uploads (measured at
+94ff557), every text item that added a glyph uploaded the whole page:
+hello's first frame was 2 097 152 bytes and stress's 44 040 192 (42
+pages). The first-frame column is from a rerun at 1a102da plus the
+region-upload PR. These are the numbers IU4's retained paint targets.
 
 ## PR 4: timing baseline
 
