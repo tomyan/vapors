@@ -11,8 +11,8 @@ needs no camera, depth or scene.
 | Slice | Content | Status |
 |---|---|---|
 | 1a | `gpu-surface` element, `Item::Surface` in the display list, the refusals | #139 |
-| 1b | `SurfaceRenderer` and the painter's surface host: offscreen texture, resize, scale, clip, on-demand rendering, failures | this PR |
-| 1b2 | `ElementsApp` mounting and `Next` from `wants_frame`; a non-3D example (gradient) | next |
+| 1b | `SurfaceRenderer` and the painter's surface host: offscreen texture, resize, scale, clip, on-demand rendering, failures | #140 |
+| 1b2 | `ElementsApp` mounting, `SurfaceHandle`, `Next` from `wants_frame`; the gradient example | this PR and the next |
 | 1c | the racer's renderer mounted through the surface; two panels; surface-local input | after 1b |
 | 2-5 | scene, cameras, components, instances, tasks | not started |
 
@@ -48,6 +48,25 @@ painter resolves through `Painted::surface`, to the element's `name`;
 `rect` is the content box snapped to device pixels. Surfaces batch as
 their own run kind, in painting order, under the clip set when they
 were pushed.
+
+## In an ElementsApp
+
+`ElementsApp::mount(name, renderer)` mounts a renderer before the
+first frame; the painter is made on that frame and the app hands it
+the renderers then. A taken name is refused at `mount`
+(`MountError::AlreadyMounted`), not on the frame. `ElementsApp::unmount`
+hands a renderer back. After each frame the app returns
+`Next::Continue` while the document changed, a surface was
+invalidated, or `ScenePainter::wants_frame()`; otherwise `Next::Wait`,
+so an idle app draws nothing.
+
+`mount` returns a `SurfaceHandle`, cheap to clone and single-threaded
+as the document is. Its `invalidate()` works while `run` owns the app:
+it marks the surface for a render on the next frame and wakes the loop
+with the platform's `Waker`, which the app keeps from its first event
+or frame (before that the first frame comes anyway). It refuses a
+surface since unmounted (`InvalidateError::NotMounted`) and a loop
+that has ended (`InvalidateError::LoopClosed`).
 
 ## Supported composition (first release)
 
