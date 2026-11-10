@@ -88,6 +88,11 @@ boxes.
   stretching then. Each path of the
   `<svg>` is stroked by zeno into its own 8-bit coverage mask, placed
   in the atlas's coverage page, beside glyphs and evicted with them.
+- zeno 0.3.3 bevels every join sharper than 90 degrees whatever the
+  miter limit ([dfrg/zeno#29](https://github.com/dfrg/zeno/issues/29));
+  touche's speaker icon has a 53-degree join. `icon_miter.rs` adds the
+  missing wedge for joins between 90 degrees and SVG's limit of 4, so
+  they miter as in Chromium. Retire it when zeno fixes the issue.
 - One atlas entry per path. Its key is the path's `d` and
   `stroke-width`, the viewBox, and the device size in pixels: one path
   at one size and scale is rasterised once.

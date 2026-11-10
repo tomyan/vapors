@@ -168,6 +168,20 @@ fn a_box_snapped_to_another_ratio_scales_the_view_box_uniformly_and_centres_it()
 }
 
 #[test]
+fn a_join_with_miter_ratio_3_is_mitered_under_svgs_limit_of_4() {
+    // Given: legs 19.47 degrees either side of vertical, apex (8, 4); the
+    // miter reaches 3 half-widths past the apex, to y = 1
+    let icon = icon("M4.464 14L8 4L11.536 14", 2.0);
+
+    // When
+    let coverage = icon.rasterize([16, 16]);
+
+    // Then: row 2 beside the apex is about half covered (a bevel, as a limit of 2 gives, leaves it empty)
+    assert!(at(&coverage, 7, 2) > 100, "{}", at(&coverage, 7, 2));
+    assert!(at(&coverage, 8, 2) > 100, "{}", at(&coverage, 8, 2));
+}
+
+#[test]
 fn an_icon_is_refused_when_it_has_no_strokes() {
     // When
     let error = Icon::new([0.0, 0.0, 16.0, 16.0], Vec::new()).expect_err("refused");

@@ -5,8 +5,10 @@
 use std::fmt;
 use std::sync::Arc;
 
-use zeno::{Cap, Command, Format, Join, Mask, Origin, Stroke, Transform};
+use zeno::{Cap, Command, Fill, Format, Join, Mask, Origin, Stroke, Style, Transform};
 
+use crate::icon_key::key_bits;
+use crate::icon_miter::missing_wedges;
 use crate::icon_path::IconPath;
 use crate::raster::Coverage;
 
@@ -133,16 +135,34 @@ impl Icon {
 }
 
 /// One stroke's coverage: miter joins with limit 4 and butt caps, SVG's
-/// defaults, set here rather than left to zeno's.
+/// defaults, with the miters zeno bevels added (`icon_miter.rs`).
 fn stroke_mask(stroke: &IconStroke, transform: Transform, [width, height]: [u32; 2]) -> Vec<u8> {
     let mut style = Stroke::new(stroke.width);
     style.join(Join::Miter).miter_limit(4.0).cap(Cap::Butt);
-    Mask::new(stroke.path.commands())
+    let mut mask = render(
+        stroke.path.commands(),
+        style.into(),
+        transform,
+        [width, height],
+    );
+    let wedges = missing_wedges(stroke.path.commands(), stroke.width);
+    if !wedges.is_empty() {
+        let fill = Style::Fill(Fill::NonZero);
+        source_over(
+            &mut mask,
+            &render(&wedges, fill, transform, [width, height]),
+        );
+    }
+    mask
+}
+
+fn render(commands: &[Command], style: Style, transform: Transform, size: [u32; 2]) -> Vec<u8> {
+    Mask::new(commands)
         .style(style)
         .transform(Some(transform))
         .format(Format::Alpha)
         .origin(Origin::TopLeft)
-        .size(width, height)
+        .size(size[0], size[1])
         .render()
         .0
 }
@@ -152,28 +172,6 @@ fn source_over(under: &mut [u8], over: &[u8]) {
         let sum = u32::from(*a) * 255 + u32::from(b) * (255 - u32::from(*a));
         *a = u8::try_from((sum + 127) / 255).expect("at most 255");
     }
-}
-
-fn key_bits(view_box: [f32; 4], stroke: &IconStroke) -> Vec<u32> {
-    let mut bits: Vec<u32> = view_box.iter().map(|n| n.to_bits()).collect();
-    bits.push(stroke.width.to_bits());
-    for command in stroke.path.commands() {
-        command_bits(command, &mut bits);
-    }
-    bits
-}
-
-/// A tag per command kind, then its points' coordinates.
-fn command_bits(command: &Command, bits: &mut Vec<u32>) {
-    let (tag, points) = match command {
-        Command::MoveTo(p) => (0, vec![*p]),
-        Command::LineTo(p) => (1, vec![*p]),
-        Command::CurveTo(a, b, p) => (2, vec![*a, *b, *p]),
-        Command::QuadTo(a, p) => (3, vec![*a, *p]),
-        Command::Close => (4, vec![]),
-    };
-    bits.push(tag);
-    bits.extend(points.iter().flat_map(|p| [p.x.to_bits(), p.y.to_bits()]));
 }
 
 impl fmt::Display for IconError {

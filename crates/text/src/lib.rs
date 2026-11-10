@@ -15,6 +15,8 @@ mod draw_icon;
 mod font_system;
 pub mod fonts;
 mod icon;
+mod icon_key;
+mod icon_miter;
 mod icon_path;
 mod icon_path_lex;
 #[cfg(test)]
