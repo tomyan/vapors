@@ -155,15 +155,18 @@ after the loop ends an invalidate must be refused as `LoopClosed`.
 `crates/app/examples/surface_panels` puts two surfaces in two panels
 side by side, each with its own gradient renderer and handle: the left
 animates throughout, the right is started and stopped every 2 s
-(`cargo run -p vapors-app --example surface_panels`). It has no
-`--check`; `tests/gpu_app_two_panels.rs` holds the checks: while both
+(`cargo run -p vapors-app --example surface_panels`). It is not run in
+CI and has no `--check`: its 2 s start/stop timing is checked by the
+unit tests in `examples/surface_panels/flip.rs`, and
+`tests/gpu_app_two_panels.rs` and `gpu_app_two_panels_resize.rs` hold
+the GPU checks: while both
 animate each renders once per frame; with one stopped it renders
 nothing and the other renders every frame; a renderer filling a backing
 larger than its `overflow: hidden` panel leaves the pixels just outside
 the panel at the page background, and UI painted after both panels
 stays over them; a panel resized by layout resizes its surface once and
 renders at the new size; `FrameCounts::surfaces` counts one
-composition draw per surface, the stopped one included.
+composition draw per surface, a stopped one included.
 
 ## Supported composition (first release)
 

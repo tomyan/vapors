@@ -7,8 +7,10 @@
 //!
 //! The left surface animates throughout. The right one animates for
 //! 2 s, is stopped for 2 s, and so on, while the left keeps moving.
-//! The checks are the GPU tests in `tests/gpu_app_two_panels.rs`.
+//! The timing is checked by the unit tests in `flip.rs`, the rest by the
+//! GPU tests in `tests/gpu_app_two_panels.rs`.
 
+mod flip;
 #[path = "../surface_gradient/gradient.rs"]
 mod gradient;
 mod page;
@@ -16,15 +18,12 @@ mod page;
 use std::process::ExitCode;
 use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
-use std::time::Duration;
 
 use vapors_app::{ElementsApp, InvalidateError, SurfaceHandle};
 use vapors_platform::{App, Event, Frame, Instant, Next, Platform, WindowOptions, run};
 
+use flip::{Flip, Flipper};
 use gradient::Gradient;
-
-/// How long the right surface animates, then stays stopped.
-const PHASE: Duration = Duration::from_secs(2);
 
 fn main() -> ExitCode {
     match start() {
@@ -65,8 +64,7 @@ fn start() -> Result<(), String> {
 struct Alternating {
     inner: ElementsApp,
     right: SurfaceHandle,
-    phase_began: Option<Instant>,
-    animating: bool,
+    flipper: Flipper,
 }
 
 impl Alternating {
@@ -74,26 +72,15 @@ impl Alternating {
         Self {
             inner,
             right,
-            phase_began: None,
-            animating: false,
+            flipper: Flipper::default(),
         }
     }
 
-    /// Starts the right surface's animation on the first frame, and
-    /// flips it each time a phase is over.
     fn turn(&mut self, now: Instant) -> Result<(), InvalidateError> {
-        let over = self
-            .phase_began
-            .is_none_or(|began| now.duration_since(began) >= PHASE);
-        if !over {
-            return Ok(());
-        }
-        self.phase_began = Some(now);
-        self.animating = !self.animating;
-        if self.animating {
-            self.right.request_animation().map(drop)
-        } else {
-            self.right.stop_animation()
+        match self.flipper.at(now) {
+            Flip::Start => self.right.request_animation().map(drop),
+            Flip::Stop => self.right.stop_animation(),
+            Flip::Keep => Ok(()),
         }
     }
 }
