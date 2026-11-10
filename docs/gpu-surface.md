@@ -185,11 +185,31 @@ an error scope around each call, `render`'s around its submit too; the
 frame is never shown with stale or blank content). After a caught GPU
 error every frame of that surface is refused until it is remounted.
 Native wgpu resolves the scope in the frame; on the web it resolves
-later, and a frame of the surface within 10 of its frames is refused
-instead; a scope unresolved after 10 frames refuses the surface as
-such. An active surface with an unresolved scope wants a frame. A scope
-still unresolved at `unmount` is dropped unreported: the renderer is
-gone and nothing it drew is shown again. A wholly clipped surface is refused for `Unmounted`,
+later, and the first frame of the surface after the result arrives is
+refused instead. An unresolved scope asks for no frame. On the web it
+is raced against a page timer at its deadline, in a task on the page's
+queue (`painter_surface_scope_watch.rs`, `vapors_platform::Timer`).
+An error, or the deadline passing first, wakes the loop, with the waker
+`ElementsApp` gives the painter (`ScenePainter::wake_with`, from
+`drawn` once the loop runs), for one frame that refuses the surface. A
+result with no error clears the timer and wakes nothing, so an idle app
+draws nothing. The deadline is 1000 ms (`DEADLINE` in
+`painter_surface_scope.rs`, set from `scripts/web-scope-latency.mjs`:
+the largest of 6,500 web results took 37.6 ms). On the web only time
+with the page visible counts: a timer period that began or ended with
+the page hidden (`document.hidden`, read through
+`vapors_platform::page_hidden`) is re-armed for the full 1000 ms, so a
+scope is refused after 1000 to 2000 ms of visible time
+(`painter_surface_scope_deadline.rs`). Each surface's scopes are also
+settled at the end of every frame, painted or not; natively one past
+its deadline refuses the surface with the same message, while on the
+web the timer alone judges lateness, so the first frame after a hidden
+tab returns does not refuse a scope whose deadline passed while hidden.
+Natively wgpu resolves every scope when it is popped, so nothing waits.
+When a surface is unmounted or remounted with a scope unresolved, its
+watch holds the result only weakly: when the scope's result or the
+timer next arrives, the watch ends, dropping the timer, recording
+nothing and waking nothing, so no frame follows. A wholly clipped surface is refused for `Unmounted`,
 `DuplicateName` and `TooLarge` as one in view is, though it is not
 rendered, so scrolling a surface into view cannot be the first time it
 fails. `ElementsApp` reports a failed frame and stops. `mount`,

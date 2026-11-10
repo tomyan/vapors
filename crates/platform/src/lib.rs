@@ -52,6 +52,8 @@ mod tasks;
 mod text_bridge_web;
 mod text_field;
 mod text_keys;
+#[cfg(target_family = "wasm")]
+mod timer_web;
 mod waker;
 #[cfg(target_family = "wasm")]
 mod web;
@@ -76,6 +78,8 @@ pub use report::{report_error, report_startup, report_status};
 pub use shortcut_modifier::shortcut_is_command;
 pub use surface::pick_format;
 pub use text_field::TextField;
+#[cfg(target_family = "wasm")]
+pub use timer_web::{Timer, page_hidden};
 pub use waker::{LoopClosed, Waker};
 pub use window::{App, Frame, Next, WindowOptions, run};
 

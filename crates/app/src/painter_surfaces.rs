@@ -9,8 +9,10 @@
 //! view would be.
 
 use std::collections::BTreeMap;
+use std::rc::Rc;
 
 use vapors_elements::Painted;
+use vapors_platform::Instant;
 use vapors_renderer::{ImagePipeline, Target};
 use vapors_scene::{Item, Rect, Run};
 
@@ -26,13 +28,20 @@ use backing::Mounted;
 pub(crate) use backing::wants_frame_around_a_pending_scope;
 #[path = "painter_surface_scope.rs"]
 mod scope;
+#[cfg(test)]
+pub(crate) use scope::DEADLINE as SCOPE_DEADLINE;
+use scope::{LoopWaker, Turn};
 #[path = "painter_surface_texture.rs"]
 mod texture;
+#[path = "painter_surface_wake.rs"]
+mod wake;
 
-/// The mounted renderers, by surface name.
+/// The mounted renderers, by surface name, and the waker a late GPU
+/// error scope result wakes (`ScenePainter::wake_with`).
 #[derive(Default)]
 pub(super) struct Surfaces {
     mounted: BTreeMap<String, Mounted>,
+    waker: LoopWaker,
 }
 
 impl ScenePainter {
@@ -90,13 +99,6 @@ impl ScenePainter {
         self.surfaces.named(name)?.set_animating(animating);
         Ok(())
     }
-
-    /// True when an active surface (one the last frame painted) is
-    /// invalidated or animating: the app should draw another frame.
-    #[must_use]
-    pub fn wants_frame(&self) -> bool {
-        self.surfaces.mounted.values().any(Mounted::wants_frame)
-    }
 }
 
 impl Surfaces {
@@ -111,9 +113,12 @@ impl Surfaces {
         self.mounted.values_mut().for_each(Mounted::begin_frame);
     }
 
-    /// Releases the backing of each surface the frame did not paint.
+    /// Releases the backing of each surface the frame did not paint, and
+    /// settles every surface's GPU error scopes.
     pub(super) fn end_frame(&mut self) {
-        self.mounted.values_mut().for_each(Mounted::end_frame);
+        let now = Instant::now();
+        let mounted = self.mounted.values_mut();
+        mounted.for_each(|mounted| mounted.end_frame(now));
     }
 
     /// Renders, as needed, and composites each surface item of `items`.
@@ -124,9 +129,10 @@ impl Surfaces {
         painted: &Painted,
         items: &[Item],
     ) -> Result<(), PaintError> {
+        let waker = Rc::clone(&self.waker);
         for (name, size, rect) in surfaces(painted, items) {
             let mounted = self.mounted(name)?;
-            let texture = mounted.prepare(target, size);
+            let texture = mounted.prepare(target, size, turn(&waker));
             pipeline.draw_rect(target, texture.map_err(|r| r.named(name))?, rect);
         }
         Ok(())
@@ -144,8 +150,10 @@ impl Surfaces {
         let Run::Surfaces(items) = run else {
             return Ok(());
         };
+        let waker = Rc::clone(&self.waker);
         for (name, size, _) in surfaces(painted, items) {
-            let claimed = self.mounted(name)?.claim(device, size);
+            let turn = turn(&waker);
+            let claimed = self.mounted(name)?.claim(device, size, turn);
             claimed.map_err(|r| r.named(name))?;
         }
         Ok(())
@@ -159,6 +167,14 @@ impl Surfaces {
     fn mounted(&mut self, name: &str) -> Result<&mut Mounted, PaintError> {
         let mounted = self.mounted.get_mut(name);
         mounted.ok_or_else(|| PaintError::Unmounted(name.to_owned()))
+    }
+}
+
+/// A turn now with the loop's `waker`.
+fn turn(waker: &LoopWaker) -> Turn<'_> {
+    Turn {
+        waker,
+        now: Instant::now(),
     }
 }
 

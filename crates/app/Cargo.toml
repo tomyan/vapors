@@ -26,6 +26,14 @@ vapors-platform.workspace = true
 vapors-elements.workspace = true
 tracing.workspace = true
 
+# The loop's waker behind a std::task::Waker for GPU error scopes
+# (elements_app_scope_wake.rs): on the web vapors_platform::Waker is not Send.
+# wasm-bindgen-futures (as vapors-platform's) drives an unresolved scope
+# on the page's task queue (painter_surface_scope_watch.rs).
+[target.'cfg(target_family = "wasm")'.dependencies]
+send_wrapper = "=0.6.0"
+wasm-bindgen-futures = "0.4.79"
+
 [dev-dependencies]
 png.workspace = true
 vapors-demos.workspace = true
