@@ -6,7 +6,7 @@ use vapors_renderer::Target;
 
 use super::super::SurfaceState;
 use super::super::errors::Refusal;
-use super::scope::Scopes;
+use super::scope::{Scopes, Turn};
 use super::texture::Backing;
 use crate::surface::{SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
 
@@ -28,7 +28,7 @@ pub(super) struct Mounted {
     /// What the current frame did with it.
     seen: Seen,
     /// The GPU errors of its calls not yet seen.
-    scopes: Scopes,
+    pub(super) scopes: Scopes,
 }
 
 /// What a frame did with a mounted surface.
@@ -69,8 +69,7 @@ impl Mounted {
     }
 
     pub(super) fn wants_frame(&self) -> bool {
-        self.fresh
-            || (self.backing.is_some() && (self.stale || self.animating || self.scopes.waiting()))
+        self.fresh || (self.backing.is_some() && (self.stale || self.animating))
     }
 
     pub(super) fn state(&self, name: &str) -> SurfaceState {
@@ -80,7 +79,7 @@ impl Mounted {
             stale: self.stale,
             animating: self.animating,
             backing: self.backing.is_some(),
-            waiting: self.scopes.waiting(),
+            waiting: self.scopes.waiting().is_some(),
         }
     }
 
@@ -88,7 +87,10 @@ impl Mounted {
         self.seen = Seen::Unseen;
     }
 
-    pub(super) fn end_frame(&mut self) {
+    /// Ends the frame at `now`, settling its scopes even if unpainted:
+    /// one left out of frames still gives up at its deadline.
+    pub(super) fn end_frame(&mut self, now: vapors_platform::Instant) {
+        self.scopes.settle(now);
         self.fresh = false;
         if self.seen != Seen::Painted {
             self.backing = None;
@@ -100,13 +102,14 @@ impl Mounted {
         &mut self,
         target: &Target<'_>,
         size: SurfaceSize,
+        turn: Turn<'_>,
     ) -> Result<&wgpu::Texture, Refusal> {
-        self.claim(target.device, size)?;
+        self.claim(target.device, size, turn)?;
         self.seen = Seen::Painted;
-        self.start(target.device)?;
-        self.allocate(target.device, size)?;
+        self.start(target.device, turn)?;
+        self.allocate(target.device, size, turn)?;
         if self.stale || self.animating {
-            self.render(target)?;
+            self.render(target, turn)?;
         }
         Ok(&self.backing.as_ref().expect("allocated above").texture)
     }
@@ -118,42 +121,50 @@ impl Mounted {
         &mut self,
         device: &wgpu::Device,
         size: SurfaceSize,
+        turn: Turn<'_>,
     ) -> Result<(), Refusal> {
         if std::mem::replace(&mut self.seen, Seen::Claimed) != Seen::Unseen {
             return Err(Refusal::DuplicateName);
         }
-        self.scopes.check()?;
+        self.scopes.check(turn.now)?;
         fits(device, size)
     }
 
-    fn start(&mut self, device: &wgpu::Device) -> Result<(), Refusal> {
+    fn start(&mut self, device: &wgpu::Device, turn: Turn<'_>) -> Result<(), Refusal> {
         if !self.started {
             let renderer = &mut self.renderer;
-            self.scopes.run(device, || renderer.mount(device))?;
+            self.scopes.run(device, turn, || renderer.mount(device))?;
             self.started = true;
         }
         Ok(())
     }
 
     /// A new backing when there is none at `size`; it needs a render.
-    fn allocate(&mut self, device: &wgpu::Device, size: SurfaceSize) -> Result<(), Refusal> {
+    fn allocate(
+        &mut self,
+        device: &wgpu::Device,
+        size: SurfaceSize,
+        turn: Turn<'_>,
+    ) -> Result<(), Refusal> {
         if self.backing.as_ref().is_some_and(|held| held.size == size) {
             return Ok(());
         }
         let backing = Backing::new(device, size);
         let renderer = &mut self.renderer;
-        self.scopes.run(device, || renderer.resize(device, size))?;
+        self.scopes
+            .run(device, turn, || renderer.resize(device, size))?;
         self.backing = Some(backing);
         self.stale = true;
         Ok(())
     }
 
     /// Renders into the backing and submits it.
-    fn render(&mut self, target: &Target<'_>) -> Result<(), Refusal> {
+    fn render(&mut self, target: &Target<'_>, turn: Turn<'_>) -> Result<(), Refusal> {
         let backing = self.backing.as_ref().expect("allocated before rendering");
         let renderer = &mut self.renderer;
-        self.scopes
-            .run(target.device, || render_into(renderer, target, backing))?;
+        self.scopes.run(target.device, turn, || {
+            render_into(renderer, target, backing)
+        })?;
         self.stale = false;
         Ok(())
     }

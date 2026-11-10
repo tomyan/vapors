@@ -13,7 +13,7 @@ needs no camera, depth or scene.
 | 1a | `gpu-surface` element, `Item::Surface` in the display list, the refusals | #139 |
 | 1b | `SurfaceRenderer` and the painter's surface host: offscreen texture, resize, scale, clip, on-demand rendering, failures | #140 |
 | 1b2 | `ElementsApp` mounting, `SurfaceHandle`, `Next` from `wants_frame`; the gradient example | #141, #142 |
-| 1c | animation requests (PR 1, this branch); the racer's renderer mounted through the surface; two panels; surface-local input. Plan: `docs/plans/3d-1c.md` | in progress |
+| 1c | animation requests (PR 1, #147); the racer's renderer mounted through the surface (PR 2, this branch); two panels; surface-local input. Plan: `docs/plans/3d-1c.md` | in progress |
 | 2-5 | scene, cameras, components, instances, tasks | not started |
 
 Touche's image renderer drawing through a surface in a panel comes
@@ -70,6 +70,36 @@ wake (`Invalidated::AtFirstFrame`). It refuses a surface since
 unmounted (`InvalidateError::NotMounted`) and a loop that has ended:
 a frame failed, the app was dropped, or the wake was refused
 (`InvalidateError::LoopClosed`).
+
+### An app that wraps ElementsApp
+
+An app that draws under the document and owns state the document does
+not (the racer: its race, its keys) wraps an `ElementsApp` and is the
+platform `App` itself. Each frame it does its own work, then calls the
+inner `frame`. For each event it calls `ElementsApp::give(&event,
+&platform)` in place of `App::event`: the document gets the event by
+`DocumentInput::give`'s rules (`document_input_route.rs`), and the
+answer says who it was for. `Route::Document`: the document had it alone
+(a press on its elements, a key its focused control used, an edit or
+paste from the platform's text input that the focused field took).
+`Route::Both`: the document had it and the app acts on it too (a key the
+focused element left, Tab with nothing focused, which focuses the first
+control, a window focus change). `Route::Host`: the app's alone; the
+document did not get it (a press where no element takes the pointer,
+another key with nothing focused). `give` refuses with a `GiveError`: a
+pointer event the document cannot place (`GiveError::Unplaced`,
+`NotUpdated` before the first frame), which the document does not get;
+an edit from the text input the document refused (`EditRefused`); a paste
+from it with no text field focused (`PasteWithoutField`). The racer
+stops on the last two. `App::event` gives the document every event, as
+before, and reports refused text input and goes on: an `ElementsApp`
+alone has the window to itself. One `ElementsApp` takes events one way;
+a debug build refuses `give` and `App::event` on the same instance.
+
+When the inner `frame` returns `Next::Exit`, the `ElementsApp` failed
+and closed its surfaces: the wrapping app returns `Exit` at once, and
+whoever ran it reads the `Failure` cloned before `run` (the racer's
+`run` returns it as `Err`).
 
 ### Animation
 
@@ -185,11 +215,31 @@ an error scope around each call, `render`'s around its submit too; the
 frame is never shown with stale or blank content). After a caught GPU
 error every frame of that surface is refused until it is remounted.
 Native wgpu resolves the scope in the frame; on the web it resolves
-later, and a frame of the surface within 10 of its frames is refused
-instead; a scope unresolved after 10 frames refuses the surface as
-such. An active surface with an unresolved scope wants a frame. A scope
-still unresolved at `unmount` is dropped unreported: the renderer is
-gone and nothing it drew is shown again. A wholly clipped surface is refused for `Unmounted`,
+later, and the first frame of the surface after the result arrives is
+refused instead. An unresolved scope asks for no frame. On the web it
+is raced against a page timer at its deadline, in a task on the page's
+queue (`painter_surface_scope_watch.rs`, `vapors_platform::Timer`).
+An error, or the deadline passing first, wakes the loop, with the waker
+`ElementsApp` gives the painter (`ScenePainter::wake_with`, from
+`drawn` once the loop runs), for one frame that refuses the surface. A
+result with no error clears the timer and wakes nothing, so an idle app
+draws nothing. The deadline is 1000 ms (`DEADLINE` in
+`painter_surface_scope.rs`, set from `scripts/web-scope-latency.mjs`:
+the largest of 6,500 web results took 37.6 ms). On the web only time
+with the page visible counts: a timer period that began or ended with
+the page hidden (`document.hidden`, read through
+`vapors_platform::page_hidden`) is re-armed for the full 1000 ms, so a
+scope is refused after 1000 to 2000 ms of visible time
+(`painter_surface_scope_deadline.rs`). Each surface's scopes are also
+settled at the end of every frame, painted or not; natively one past
+its deadline refuses the surface with the same message, while on the
+web the timer alone judges lateness, so the first frame after a hidden
+tab returns does not refuse a scope whose deadline passed while hidden.
+Natively wgpu resolves every scope when it is popped, so nothing waits.
+When a surface is unmounted or remounted with a scope unresolved, its
+watch holds the result only weakly: when the scope's result or the
+timer next arrives, the watch ends, dropping the timer, recording
+nothing and waking nothing, so no frame follows. A wholly clipped surface is refused for `Unmounted`,
 `DuplicateName` and `TooLarge` as one in view is, though it is not
 rendered, so scrolling a surface into view cannot be the first time it
 fails. `ElementsApp` reports a failed frame and stops. `mount`,

@@ -20,6 +20,18 @@ const VIEW: Viewport = Viewport {
     scale: 1.0,
 };
 
+impl Racer {
+    /// What a frame does to the HUD: the racer's writes, then the
+    /// `ElementsApp`'s selection settling and update.
+    fn layout_hud(&mut self, viewport: Viewport) -> Result<(), String> {
+        self.sync_hud(viewport);
+        Document::settle_selection(&self.document);
+        let mut document = self.document.borrow_mut();
+        let updated = document.update(viewport).map(drop);
+        updated.map_err(|errors| format!("racer HUD refused: {errors:?}"))
+    }
+}
+
 /// A racer whose HUD has been laid out twice, its change flag taken.
 fn settled() -> Racer {
     let mut racer = Racer::new();

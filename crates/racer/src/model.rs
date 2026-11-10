@@ -22,7 +22,7 @@ pub fn road_distance([x, y]: [f32; 2]) -> f32 {
 }
 
 /// Car, timer and ordered checkpoints for a three-lap run.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Race {
     /// World position.
     pub position: [f32; 2],

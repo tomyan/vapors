@@ -19,6 +19,8 @@
 //!   [`Route::Both`], as are its repeats and its up, so the host's
 //!   shortcuts work while a slider has focus and the slider's arrows
 //!   still move it;
+//! - Tab with nothing focused is [`Route::Both`]: the document focuses
+//!   its first control, as a page does, and the host sees the key too;
 //! - a paste goes to the document while one of its text fields has focus
 //!   (`document_input_paste.rs`), else to the host.
 //!
@@ -170,14 +172,15 @@ impl Held {
 }
 
 /// A key or typed text: the document's while one of its elements has
-/// focus; a paste, while one of its text fields has. Any other
-/// placeless event is the host's.
+/// focus; a paste, while one of its text fields has; Tab with nothing
+/// focused, both. Any other placeless event is the host's.
 fn by_focus(document: &Document, event: &Event) -> Route {
     match event {
         Event::Paste if document.text_field_focused() => Route::Document,
         Event::Key { .. } | Event::Character(_) if document.active_element().is_some() => {
             Route::Document
         }
+        Event::Key { code, .. } if code == "Tab" => Route::Both,
         _ => Route::Host,
     }
 }

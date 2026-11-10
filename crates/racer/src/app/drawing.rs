@@ -1,11 +1,8 @@
-//! Fixed-step simulation and GPU world with compiled document overlay.
+//! Fixed-step simulation, and what the frame shows: the HUD's values and the track's scene.
 use super::Racer;
-use crate::gpu::Track;
-use vapors_app::ScenePainter;
-use vapors_elements::{Document, Viewport};
+use crate::gpu::Scene;
+use vapors_elements::Viewport;
 use vapors_platform::Frame;
-use vapors_renderer::Target;
-use vapors_scene::Size;
 impl Racer {
     pub(super) fn advance(&mut self, frame: &Frame<'_>) -> Result<(), String> {
         let elapsed = self.frame_elapsed(frame);
@@ -63,26 +60,26 @@ impl Racer {
             self.pacing.fps_frames = 0.0;
         }
     }
-    pub(super) fn draw(&mut self, frame: &Frame<'_>) -> Result<(), String> {
+    /// Advances the race and writes what the frame shows, before the
+    /// `ElementsApp` updates and paints the document. This frame's
+    /// update draws the HUD values written here, so they are taken as
+    /// seen: they do not ask for a next frame.
+    pub(super) fn prepare(&mut self, frame: &Frame<'_>) -> Result<(), String> {
         self.advance(frame)?;
         let viewport = self.viewport(frame);
-        self.layout_hud(viewport)?;
-        let view = frame
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-        self.paint_world(frame, &view)?;
-        self.paint_hud(frame, &view)?;
-        self.report_frame(frame.index)
+        self.sync_hud(viewport);
+        self.document.borrow_mut().take_changed();
+        let moving = !self.run.paused || self.run.camera.moving;
+        self.track
+            .show(self.scene(), moving)
+            .map_err(|error| format!("the racer's track surface refused: {error}"))
     }
-    pub(super) fn layout_hud(&mut self, viewport: Viewport) -> Result<(), String> {
-        self.hud.short.set_if_changed(viewport.height < 480.0);
-        self.sync_hud(viewport.width);
-        Document::settle_selection(&self.document);
-        self.document
-            .borrow_mut()
-            .update(viewport)
-            .map_err(|errors| format!("racer HUD refused: {errors:?}"))
-            .map(drop)
+    pub(crate) fn scene(&self) -> Scene {
+        Scene {
+            race: self.run.race.clone(),
+            camera: self.run.camera,
+            brake: self.run.driving.controls().brake,
+        }
     }
     fn viewport(&mut self, frame: &Frame<'_>) -> Viewport {
         #[allow(clippy::cast_possible_truncation)] // display scale is a small positive number
@@ -97,37 +94,9 @@ impl Racer {
             scale: self.pacing.scale,
         }
     }
-    fn paint_world(&mut self, frame: &Frame<'_>, view: &wgpu::TextureView) -> Result<(), String> {
-        self.ensure_painter(frame)?;
-        let track = self.gpu.track.get_or_insert_with(|| Track::new(frame));
-        track.draw(
-            frame,
-            view,
-            &self.run.race,
-            self.run.camera,
-            self.run.driving.controls().brake,
-        );
-        Ok(())
-    }
-    fn ensure_painter(&mut self, frame: &Frame<'_>) -> Result<(), String> {
-        if self.gpu.painter.is_none() {
-            let painter = ScenePainter::new(frame.device, frame.texture.format());
-            self.gpu.painter = Some(painter.map_err(|e| e.to_string())?);
-        }
-        Ok(())
-    }
-    fn paint_hud(&mut self, frame: &Frame<'_>, view: &wgpu::TextureView) -> Result<(), String> {
-        let target = hud_target(frame, view);
-        let document = self.document.borrow();
-        self.gpu
-            .painter
-            .as_mut()
-            .expect("created")
-            .draw_over(&target, document.painted().expect("updated"))
-            .map_err(|e| e.to_string())
-    }
-    fn sync_hud(&self, width: f32) {
-        self.hud.compact.set_if_changed(width < 760.0);
+    pub(super) fn sync_hud(&self, viewport: Viewport) {
+        self.hud.short.set_if_changed(viewport.height < 480.0);
+        self.hud.compact.set_if_changed(viewport.width < 760.0);
         self.hud.follow.set_if_changed(self.run.camera.follow);
         let enabled = !self.hud.settings.get() && self.run.race.progress.laps < 3;
         self.hud.enabled.set_if_changed(enabled);
@@ -168,19 +137,6 @@ fn check_elapsed(elapsed: f32) -> Result<(), String> {
         return Ok(());
     }
     Err("racer frame duration must be finite and nonnegative".into())
-}
-fn hud_target<'a>(frame: &Frame<'a>, view: &'a wgpu::TextureView) -> Target<'a> {
-    let size = frame.texture.size();
-    Target {
-        device: frame.device,
-        queue: frame.queue,
-        view,
-        viewport: Size {
-            width: size.width,
-            height: size.height,
-        },
-        scissor: None,
-    }
 }
 fn time(seconds: f32) -> String {
     let minutes = (seconds / 60.0).floor();

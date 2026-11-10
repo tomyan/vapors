@@ -31,6 +31,17 @@ pub(crate) struct Handled {
     pub(crate) unused_key: bool,
 }
 
+/// An event the document had alone (`ElementsApp`'s `App::event`).
+impl From<Handled> for Given {
+    fn from(handled: Handled) -> Self {
+        Given {
+            route: Route::Document,
+            changed: handled.changed,
+            cursor: handled.cursor,
+        }
+    }
+}
+
 /// Why an event could not be placed in the document.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Unplaced {
