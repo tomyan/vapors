@@ -133,3 +133,40 @@ fn landscape_stats_leave_space_for_driving() {
         "stats must leave the track visible: {bounds:?}"
     );
 }
+
+#[test]
+fn no_step_runs_once_the_third_lap_is_done() {
+    // Given
+    let mut racer = Racer::new();
+    racer.command("toggle").unwrap();
+    racer.driving.key("KeyW", true);
+    racer.race.progress.laps = 3;
+    // When
+    racer.advance_elapsed(0.05).unwrap();
+    // Then
+    assert_eq!(racer.race.elapsed, 0.0);
+    assert_eq!(racer.race.speed, 0.0);
+    assert!(racer.paused);
+}
+
+#[test]
+fn inspection_refuses_a_non_finite_number_naming_the_field() {
+    // Given
+    let mut racer = Racer::new();
+    racer.race.speed = f32::NAN;
+    // When
+    let status = racer.status(1);
+    // Then
+    assert!(status.unwrap_err().contains("`speed` is NaN"));
+}
+
+#[test]
+fn inspection_status_is_one_json_object() {
+    // Given
+    let racer = Racer::new();
+    // When
+    let status = racer.status(7).unwrap();
+    // Then
+    assert!(status.starts_with("{\"frame\":7,\"paused\":true,\"speed\":0,"), "{status}");
+    assert!(status.ends_with(",\"targets\":{}}"), "{status}");
+}

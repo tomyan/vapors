@@ -110,8 +110,7 @@ impl Racer {
             .expect("created")
             .draw_over(&target, document.painted().expect("updated"))
             .map_err(|e| e.to_string())?;
-        self.report_frame(frame.index);
-        Ok(())
+        self.report_frame(frame.index)
     }
     fn sync_hud(&self, width: f32) {
         self.hud.compact.set(width < 760.0);
