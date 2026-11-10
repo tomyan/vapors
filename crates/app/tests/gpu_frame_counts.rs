@@ -21,8 +21,9 @@ const ONE_QUAD_BYTES: u64 = 8 * 16 + 16;
 const ONE_SHADOW_BYTES: u64 = 7 * 16 + 16;
 /// The atlas page, one coverage byte per pixel, uploaded whole.
 const PAGE_BYTES: u64 = 1024 * 1024;
-/// Larger than any one glyph's bitmap in the default 16 px text.
-const GLYPH_BOUND: u64 = 24 * 24;
+/// The coverage bitmap of the default-size "c" in the test font, one
+/// byte per pixel, as the atlas stored it when measured.
+const C_GLYPH_BYTES: u64 = 72;
 /// An image quad: 6 vertices of 4 floats.
 const IMAGE_QUAD_BYTES: u64 = 6 * 16;
 
@@ -64,7 +65,7 @@ fn gpu_a_frame_with_nothing_changed_uploads_no_atlas_bytes() {
 }
 
 #[test]
-fn gpu_a_frame_adding_one_glyph_uploads_about_that_glyphs_bytes() {
+fn gpu_a_frame_adding_one_glyph_uploads_exactly_that_glyphs_bytes() {
     // Given
     let (mut doc, text) = labelled("Ab");
     let mut rig = Rig::new();
@@ -76,11 +77,7 @@ fn gpu_a_frame_adding_one_glyph_uploads_about_that_glyphs_bytes() {
     let changed = drawn(&mut rig, &doc);
 
     // Then
-    assert!(
-        changed.atlas_bytes() > 0 && changed.atlas_bytes() < GLYPH_BOUND,
-        "uploaded {} bytes for one new glyph",
-        changed.atlas_bytes()
-    );
+    assert_eq!(changed.atlas_bytes(), C_GLYPH_BYTES);
     assert_eq!(AtlasConfig::default().page_size, 1024);
 }
 

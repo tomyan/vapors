@@ -16,8 +16,9 @@ const HEIGHT: u32 = 32;
 const LARGE_PAGE: u32 = 128;
 /// Holds four 16 px capitals, not eight, so a second word evicts the first.
 const SMALL_PAGE: u32 = 32;
-/// Larger than any one 16 px Geist capital's bitmap.
-const GLYPH_BOUND: u64 = 24 * 24;
+/// The coverage bitmap of Geist "B" at 16 px, one byte per pixel, as the
+/// atlas stored it when measured (`GlyphAtlas::get` rect width * height).
+const B_GLYPH_BYTES: u64 = 120;
 const WHITE: Color = Color {
     r: 1.0,
     g: 1.0,
@@ -64,6 +65,20 @@ impl Painter {
         let layout = Layout::new(&mut self.system, text, &style, &LayoutOptions::default());
         self.frame(|pipeline, atlas, target| {
             pipeline.draw(target, atlas, &layout, [2.0, 4.0], BlendParams::default())
+        })
+    }
+
+    /// Draw `first` then `second` in one frame, at different heights; the
+    /// bytes reported are the second draw's, the first draw's are dropped.
+    fn two_words(&mut self, first: &str, second: &str) -> Drawn {
+        let style = Style::new(Family::Geist, 16.0);
+        let options = LayoutOptions::default();
+        let one = Layout::new(&mut self.system, first, &style, &options);
+        let two = Layout::new(&mut self.system, second, &style, &options);
+        self.frame(|pipeline, atlas, target| {
+            pipeline.draw(target, atlas, &one, [2.0, 0.0], BlendParams::default())?;
+            pipeline.take_work();
+            pipeline.draw(target, atlas, &two, [2.0, 16.0], BlendParams::default())
         })
     }
 
@@ -132,7 +147,7 @@ fn gpu_a_new_page_is_uploaded_whole() {
 }
 
 #[test]
-fn gpu_a_draw_adding_one_glyph_uploads_about_that_glyphs_bytes() {
+fn gpu_a_draw_adding_one_glyph_uploads_exactly_that_glyphs_bytes() {
     // Given
     let mut painter = Painter::new(LARGE_PAGE);
     painter.text("A");
@@ -141,11 +156,7 @@ fn gpu_a_draw_adding_one_glyph_uploads_about_that_glyphs_bytes() {
     let drawn = painter.text("AB");
 
     // Then
-    assert!(
-        drawn.atlas_bytes > 0 && drawn.atlas_bytes < GLYPH_BOUND,
-        "uploaded {} bytes for one new glyph",
-        drawn.atlas_bytes
-    );
+    assert_eq!(drawn.atlas_bytes, B_GLYPH_BYTES);
 }
 
 #[test]
@@ -207,6 +218,26 @@ fn gpu_a_repack_uploads_the_whole_page_and_draws_as_from_a_fresh_atlas() {
 
     // When
     let drawn = warm.text("EFGH");
+
+    // Then
+    assert!(warm.atlas.evictions() > 0, "the page was not repacked");
+    assert_eq!(drawn.atlas_bytes, u64::from(SMALL_PAGE * SMALL_PAGE));
+    assert!(
+        drawn.pixels == fresh.pixels,
+        "pixels differ from a fresh atlas"
+    );
+}
+
+#[test]
+fn gpu_a_repack_in_a_frame_that_already_added_a_glyph_uploads_the_whole_page() {
+    // Given: three glyphs from last frame; the first draw adds a fourth,
+    // so the second draw's three new glyphs only fit after a repack
+    let mut warm = Painter::new(SMALL_PAGE);
+    warm.text("ABC");
+    let fresh = Painter::new(SMALL_PAGE).two_words("D", "EFG");
+
+    // When
+    let drawn = warm.two_words("D", "EFG");
 
     // Then
     assert!(warm.atlas.evictions() > 0, "the page was not repacked");

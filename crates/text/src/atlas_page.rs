@@ -64,8 +64,17 @@ impl AtlasPage {
     }
 
     /// The pixels of `rect`, rows from the top, packed tight.
+    ///
+    /// # Panics
+    ///
+    /// If the rectangle leaves the page; a caller bug.
     #[must_use]
     pub fn region_pixels(&self, rect: [u32; 4]) -> Vec<u8> {
+        assert!(
+            rect[0] + rect[2] <= self.size && rect[1] + rect[3] <= self.size,
+            "rect {rect:?} leaves a {} page",
+            self.size
+        );
         let bpp = self.bytes_per_pixel as usize;
         let [x, y, width, height] = rect.map(|n| n as usize);
         let row_bytes = width * bpp;

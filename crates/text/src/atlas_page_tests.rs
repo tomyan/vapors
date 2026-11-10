@@ -143,3 +143,13 @@ fn region_pixels_are_the_rectangles_rows_packed_tight() {
     // Then
     assert_eq!(region, [1, 2, 3, 4, 0, 0, 0, 0, 5, 6, 7, 8, 0, 0, 0, 0]);
 }
+
+#[test]
+#[should_panic(expected = "rect [3, 0, 2, 2] leaves a 4 page")]
+fn region_pixels_of_a_rectangle_outside_the_page_names_it() {
+    // Given
+    let page = AtlasPage::new(4, 1);
+
+    // When
+    let _ = page.region_pixels([3, 0, 2, 2]);
+}
