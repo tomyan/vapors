@@ -103,3 +103,22 @@ fn gpu_a_frame_with_no_tooltip_draws_what_the_painter_alone_draws() {
     // Then
     assert_eq!(framed, rig.draw(&doc.borrow()).expect("draws"));
 }
+
+#[test]
+fn gpu_a_bad_tooltip_style_fails_the_first_frame_with_no_hover() {
+    // Given: a background that is not a colour, and the pointer never moved
+    let doc = document(":root { --tooltip-background: 12px; }", &[]);
+    let rig = Rig::new();
+    let mut app = ElementsApp::new(Rc::new(RefCell::new(doc)));
+
+    // When
+    let (next, _) = app_frame_at(&mut app, &rig.gpu, Instant::now());
+
+    // Then
+    assert!(matches!(next, Next::Exit));
+    let failure = app.failure().get().expect("a failure");
+    assert!(
+        failure.contains("`--tooltip-background: 12px`"),
+        "{failure}"
+    );
+}

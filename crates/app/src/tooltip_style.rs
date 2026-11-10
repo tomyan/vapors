@@ -60,6 +60,19 @@ impl TooltipStyle {
     }
 }
 
+/// Refuses the root's `--tooltip-*` properties when one holds a value of
+/// the wrong kind, as the last update computed them. `ElementsApp` calls
+/// it after each update, so a bad value fails the first frame, not the
+/// first hover; an app driving its own frames calls it there too.
+///
+/// # Errors
+///
+/// [`TooltipError::Property`] naming the property and its value, or
+/// [`TooltipError::NotUpdated`] before the first update.
+pub fn check_tooltip_style(document: &Document) -> Result<(), TooltipError> {
+    TooltipStyle::of(document).map(|_| ())
+}
+
 /// Reads one custom property at a time from the root's style.
 struct Reader<F> {
     custom: F,

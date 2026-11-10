@@ -124,3 +124,49 @@ fn gpu_a_tooltip_at_the_bottom_right_corner_stays_inside_the_window() {
     let [_, _, right, bottom] = bounds(&rgba, GREEN).expect("the tooltip shows");
     assert_eq!([right, bottom], [SIZE - 1, 30]);
 }
+
+#[test]
+fn gpu_at_scale_2_the_default_radius_rounds_the_corners() {
+    // Given: `TOOLTIP` without its radius, so the default 4px (8 device px)
+    let style = ":root { --tooltip-background: #00ff00; --tooltip-color: #0000ff; \
+        --tooltip-font-size: 8px; --tooltip-padding: 2px; --tooltip-border-width: 0; }";
+    let mut doc = document(style, &[]);
+    update(&mut doc, 2.0);
+    let mut rig = Rig::new();
+    let tooltip = tip(&doc, ".");
+
+    // When
+    let rgba = rig
+        .draw_tooltip(&mut doc, &tooltip, Some([0.0, 0.0]))
+        .expect("draws");
+
+    // Then: the corner is cut, the middle of each edge is not
+    let [left, top, right, bottom] = bounds(&rgba, GREEN).expect("the tooltip shows");
+    let (middle_x, middle_y) = (left.midpoint(right), top.midpoint(bottom));
+    assert_eq!(
+        [pixel(&rgba, left, middle_y), pixel(&rgba, middle_x, top)],
+        [GREEN; 2]
+    );
+    let corners = [(left, top), (right, top), (left, bottom), (right, bottom)];
+    assert!(
+        corners.iter().all(|(x, y)| pixel(&rgba, *x, *y) != GREEN),
+        "square corners at [{left}, {top}, {right}, {bottom}]"
+    );
+}
+
+#[test]
+fn gpu_text_too_large_for_the_glyph_atlas_is_refused_naming_the_font_size() {
+    // Given: whether 900px text fits the 1024px atlas page depends on its
+    // glyphs and the scale, so the style check cannot know; "MW" does not
+    let mut doc = document(":root { --tooltip-font-size: 900px; }", &[]);
+    update(&mut doc, 1.0);
+    let mut rig = Rig::new();
+    let tooltip = tip(&doc, "MW");
+
+    // When
+    let drawn = rig.draw_tooltip(&mut doc, &tooltip, Some([0.0, 0.0]));
+
+    // Then
+    let message = drawn.expect_err("the atlas is full").to_string();
+    assert!(message.contains("lower `--tooltip-font-size`"), "{message}");
+}

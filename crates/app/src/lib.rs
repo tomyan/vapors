@@ -43,4 +43,5 @@ pub use tooltip_place::{
     Anchor, CURSOR_OFFSET_X, CURSOR_OFFSET_Y, KEYBOARD_GAP, PlacementError, PlacementField, Point,
     place_tooltip,
 };
+pub use tooltip_style::check_tooltip_style;
 pub use vapors_renderer::GpuWork;

@@ -29,7 +29,9 @@ pub enum TooltipError {
     NoBox(NodeId),
     /// The window or the tooltip's size could not be placed.
     Placement(PlacementError),
-    /// A glyph of the text could not be drawn.
+    /// A glyph of the text could not be drawn: too large for the glyph
+    /// atlas's page, alone or with this frame's other glyphs. Only the
+    /// glyphs drawn can tell, so the style check does not refuse it.
     Atlas(AtlasError),
 }
 
@@ -42,8 +44,8 @@ impl fmt::Display for TooltipError {
                 expected,
             } => write!(
                 f,
-                "the tooltip was not drawn: `{name}: {value}` on the root is not {expected}; \
-                 set it to {expected}, or remove it for the default"
+                "the tooltip's style was refused: `{name}: {value}` on the root is not \
+                 {expected}; set it to {expected}, or remove it for the default"
             ),
             Self::NotUpdated => f.write_str(
                 "the tooltip was not drawn: the document has not been updated; \
@@ -59,7 +61,11 @@ impl fmt::Display for TooltipError {
                  `DocumentInput::tooltip` after the update, which hides it then"
             ),
             Self::Placement(error) => write!(f, "the tooltip was not drawn: {error}"),
-            Self::Atlas(error) => write!(f, "the tooltip's text could not be drawn: {error:?}"),
+            Self::Atlas(error) => write!(
+                f,
+                "the tooltip's text could not be drawn: {error} For the tooltip: lower \
+                 `--tooltip-font-size` on the root, or shorten the title"
+            ),
         }
     }
 }

@@ -13,6 +13,7 @@ use vapors_elements::{ElementError, Viewport};
 use vapors_scene::Size;
 
 use super::ElementsApp;
+use crate::check_tooltip_style;
 use crate::frame::{FrameTimes, Phase, Phases, SystemClock, run_frame};
 use crate::painter::{FrameCounts, ScenePainter};
 
@@ -55,7 +56,9 @@ impl ElementsApp {
             .unwrap_or_default()
     }
 
-    /// The Update phase: `Document::update`.
+    /// The Update phase: `Document::update`, then the tooltip's style
+    /// checked, so a bad `--tooltip-*` value fails this frame and not
+    /// the first hover (seven lookups on the root's custom properties).
     fn update_document(&mut self, frame: &Frame<'_>) -> Result<(), String> {
         #[allow(clippy::cast_possible_truncation)] // a display scale
         let scale = frame.scale_factor as f32;
@@ -63,8 +66,9 @@ impl ElementsApp {
         let mut document = self.document.borrow_mut();
         document
             .update(viewport(size, scale))
-            .map(|_| ())
-            .map_err(|errors| refused(&errors))
+            .map_err(|errors| refused(&errors))?;
+        check_tooltip_style(&document)
+            .map_err(|error| format!("the document was refused, so nothing is drawn: {error}"))
     }
 
     /// The Draw phase: the update's scene painted into the frame, then

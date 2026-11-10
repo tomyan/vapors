@@ -82,9 +82,11 @@ arms the new one.
    it draws the hide, and its `Next` takes the new deadline or drops
    the wait for an old one.
 2. Each frame, after the document's update, call
-   `DocumentInput::tooltip(&document, now)` for the tooltip shown, and
-   after drawing the scene draw it:
-   `painter.draw_tooltip(&target, &mut document, &tooltip, input.pointer())`
+   `check_tooltip_style(&document)` and fail the frame on its error, so
+   a bad `--tooltip-*` value is refused at load, not at the first
+   hover. Then call `DocumentInput::tooltip(&document, now)` for the
+   tooltip shown, and after drawing the scene draw it:
+   `painter.draw_tooltip(&target, &mut document, &tooltip, input.tooltip_hotspot())`
    (see "Drawing").
 3. Each frame, fold `DocumentInput::tooltip_deadline()` into the
    frame's `Next`: `Next::WaitUntil(deadline)` where it would
@@ -166,10 +168,15 @@ phase, after the scene, on each frame `DocumentInput::tooltip` returns
 one; the frame after the event that hides it draws none. `FrameCounts`
 counts its quad with the quads and its text with the texts.
 
-The anchor: `TooltipTrigger::Pointer` takes `pointer`
-(`DocumentInput::pointer()`, `None` until the pointer first moves; a
+The anchor: `TooltipTrigger::Pointer` takes `hotspot`
+(`DocumentInput::tooltip_hotspot()`: where the pointer was when the
+tooltip showed, `None` when it showed before the pointer first moved; a
 pointer tooltip with `None` is refused), `TooltipTrigger::Keyboard`
-the border box of the tooltip's `node` (refused when it has none).
+the border box of the tooltip's `node` (refused when it has none). A
+move within the title after the tooltip shows does not move it, as in
+Chromium, where the position is fixed when the tooltip shows.
+`DocumentInput::pointer()` is the pointer's latest position; it stays
+where it was after the pointer leaves the window.
 
 The text is laid out with the document's own fonts
 (`Document::lay_out_text`: the bundle, and on the web the script
@@ -205,8 +212,16 @@ is the root's `color`, and `light-dark()` takes the light colour, as
 every colour the document computes does. A value of another kind
 (`1em`, a negative length, `12px` for a colour) is refused:
 `TooltipError::Property` names the property, its value and what it
-takes, and nothing of the tooltip is drawn. In `ElementsApp` that
-fails the frame.
+takes, and nothing of the tooltip is drawn. `ElementsApp` checks the
+style after each update (`check_tooltip_style`), so a bad value fails
+the first frame, with no hover needed.
+
+Text too large for the glyph atlas (`--tooltip-font-size: 900px` with
+the title "MW" fills the 1024 px page) is refused when it is drawn, as
+`TooltipError::Atlas`, whose message names `--tooltip-font-size`. The
+style check cannot refuse it: whether it fits depends on the glyphs,
+the scale and the frame's other text. In `ElementsApp` it fails that
+frame.
 
 ## Not yet built
 
