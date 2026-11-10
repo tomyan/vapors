@@ -14,7 +14,7 @@ use vapors_scene::Size;
 
 use super::ElementsApp;
 use crate::frame::{FrameTimes, Phase, Phases, SystemClock, run_frame};
-use crate::painter::ScenePainter;
+use crate::painter::{FrameCounts, ScenePainter};
 
 /// The phases that do work today, shown by a per-frame hook.
 const SHOWN: [Phase; 3] = [Phase::Input, Phase::Update, Phase::Draw];
@@ -43,6 +43,18 @@ impl Phases for AppFrame<'_, '_> {
 }
 
 impl ElementsApp {
+    /// What the painter's last frame handed the GPU: see
+    /// [`FrameCounts`]. All 0 before the first frame. A frame that fails
+    /// before painting (an update refusal, a mount error) leaves the
+    /// counts those of the frame before.
+    #[must_use]
+    pub fn frame_counts(&self) -> FrameCounts {
+        self.painter
+            .as_ref()
+            .map(ScenePainter::frame_counts)
+            .unwrap_or_default()
+    }
+
     /// The Update phase: `Document::update`.
     fn update_document(&mut self, frame: &Frame<'_>) -> Result<(), String> {
         #[allow(clippy::cast_possible_truncation)] // a display scale

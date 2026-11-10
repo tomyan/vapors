@@ -4,6 +4,7 @@
 
 use vapors_scene::Shadow;
 
+use crate::GpuWork;
 use crate::instanced::{Instanced, Target, float_bytes};
 use crate::quads::rgba;
 
@@ -31,6 +32,11 @@ impl ShadowPipeline {
     pub fn draw(&mut self, target: &Target<'_>, shadows: &[Shadow]) {
         let bytes = float_bytes(shadows.iter().flat_map(instance));
         self.0.draw(target, &bytes);
+    }
+
+    /// The work its draws issued since the last take; the count restarts.
+    pub fn take_work(&self) -> GpuWork {
+        self.0.work.take()
     }
 }
 

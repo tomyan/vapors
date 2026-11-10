@@ -15,13 +15,15 @@ mod readback;
 mod shadows;
 mod solid;
 mod upload;
+mod work;
 
 pub use clear::{clear, clear_view};
 pub use image::ImagePipeline;
 pub use instanced::Target;
-pub use mips::upload_rgba8_mipmapped;
+pub use mips::{upload_rgba8_mipmapped, upload_rgba8_mipmapped_counted};
 pub use quads::QuadPipeline;
 pub use readback::read_rgba8;
 pub use shadows::ShadowPipeline;
 pub use solid::SolidPipeline;
 pub use upload::upload_rgba8;
+pub use work::{GpuWork, WorkCounter};

@@ -4,6 +4,7 @@
 
 use vapors_scene::{Color, Quad};
 
+use crate::GpuWork;
 use crate::instanced::{Instanced, Target, float_bytes};
 
 /// A pipeline that draws quads. Create once per target format.
@@ -27,6 +28,11 @@ impl QuadPipeline {
     pub fn draw(&mut self, target: &Target<'_>, quads: &[Quad]) {
         let bytes = float_bytes(quads.iter().flat_map(instance));
         self.0.draw(target, &bytes);
+    }
+
+    /// The work its draws issued since the last take; the count restarts.
+    pub fn take_work(&self) -> GpuWork {
+        self.0.work.take()
     }
 }
 
