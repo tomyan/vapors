@@ -3,9 +3,10 @@
 //! (`ui/views/corewm/tooltip_aura.cc`); keyboard placement is vapors'
 //! own (see docs/tooltips.md, "Where the tooltip goes").
 
-use std::fmt;
-
 use vapors_elements::BoxRect;
+
+use crate::tooltip_place_check::check;
+pub use crate::tooltip_place_check::{PlacementError, PlacementField};
 
 /// Offset of a pointer tooltip's top-left from the hotspot, CSS px:
 /// `TooltipAura::kCursorOffsetX`.
@@ -26,34 +27,16 @@ pub struct Point {
     pub y: f32,
 }
 
-/// What showed the tooltip, and where it points.
+/// What showed the tooltip, and where it points. The caller maps its
+/// trigger to one: hover to `Pointer` with the hotspot, focus to
+/// `Keyboard` with the element's border box.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Trigger {
+pub enum Anchor {
     /// The pointer rested; its hotspot.
     Pointer(Point),
     /// Keyboard focus; the focused element's border box.
     Keyboard(BoxRect),
 }
-
-/// An input to [`place_tooltip`] that is not a usable length.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PlacementError {
-    /// Which input: `trigger`, `size` or `window`.
-    pub input: &'static str,
-}
-
-impl fmt::Display for PlacementError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "place_tooltip: `{}` has a value that is NaN, infinite or negative \
-             (sizes) - pass finite CSS pixels",
-            self.input
-        )
-    }
-}
-
-impl std::error::Error for PlacementError {}
 
 #[derive(Clone, Copy)]
 struct Rect {
@@ -105,31 +88,15 @@ impl Rect {
 /// # Errors
 /// A NaN or infinite value, or a negative `size` or `window`.
 pub fn place_tooltip(
-    trigger: Trigger,
+    anchor: Anchor,
     size: [f32; 2],
     window: [f32; 2],
 ) -> Result<Point, PlacementError> {
-    check(trigger, size, window)?;
-    Ok(match trigger {
-        Trigger::Pointer(hotspot) => pointer(hotspot, size, window),
-        Trigger::Keyboard(anchor) => keyboard(anchor, size, window),
+    check(anchor, size, window)?;
+    Ok(match anchor {
+        Anchor::Pointer(hotspot) => pointer(hotspot, size, window),
+        Anchor::Keyboard(anchor) => keyboard(anchor, size, window),
     })
-}
-
-fn check(trigger: Trigger, size: [f32; 2], window: [f32; 2]) -> Result<(), PlacementError> {
-    let lengths = |values: &[f32]| values.iter().all(|v| v.is_finite() && *v >= 0.0);
-    let finite = |values: &[f32]| values.iter().all(|v| v.is_finite());
-    let trigger_ok = match trigger {
-        Trigger::Pointer(p) => finite(&[p.x, p.y]),
-        Trigger::Keyboard(r) => finite(&[r.x, r.y]) && lengths(&[r.width, r.height]),
-    };
-    let refused = |input| Err(PlacementError { input });
-    match (trigger_ok, lengths(&size), lengths(&window)) {
-        (false, _, _) => refused("trigger"),
-        (_, false, _) => refused("size"),
-        (_, _, false) => refused("window"),
-        _ => Ok(()),
-    }
 }
 
 fn pointer(hotspot: Point, size: [f32; 2], window: [f32; 2]) -> Point {
@@ -186,3 +153,7 @@ fn keyboard(anchor: BoxRect, size: [f32; 2], window: [f32; 2]) -> Point {
 #[cfg(test)]
 #[path = "tooltip_place_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "tooltip_place_keyboard_tests.rs"]
+mod keyboard_tests;

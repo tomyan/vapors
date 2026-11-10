@@ -1,13 +1,13 @@
 use super::*;
 
-const WINDOW: [f32; 2] = [800.0, 600.0];
-const SIZE: [f32; 2] = [100.0, 40.0];
+pub(super) const WINDOW: [f32; 2] = [800.0, 600.0];
+pub(super) const SIZE: [f32; 2] = [100.0, 40.0];
 
 fn pointer_at(x: f32, y: f32, size: [f32; 2], window: [f32; 2]) -> Point {
-    place_tooltip(Trigger::Pointer(Point { x, y }), size, window).unwrap()
+    place_tooltip(Anchor::Pointer(Point { x, y }), size, window).unwrap()
 }
 
-fn keyboard_at(anchor: [f32; 4], size: [f32; 2], window: [f32; 2]) -> Point {
+pub(super) fn keyboard_at(anchor: [f32; 4], size: [f32; 2], window: [f32; 2]) -> Point {
     let [x, y, width, height] = anchor;
     let anchor = BoxRect {
         x,
@@ -15,14 +15,14 @@ fn keyboard_at(anchor: [f32; 4], size: [f32; 2], window: [f32; 2]) -> Point {
         width,
         height,
     };
-    place_tooltip(Trigger::Keyboard(anchor), size, window).unwrap()
+    place_tooltip(Anchor::Keyboard(anchor), size, window).unwrap()
 }
 
-fn at(x: f32, y: f32) -> Point {
+pub(super) fn at(x: f32, y: f32) -> Point {
     Point { x, y }
 }
 
-fn inside(p: Point, size: [f32; 2], window: [f32; 2]) -> bool {
+pub(super) fn inside(p: Point, size: [f32; 2], window: [f32; 2]) -> bool {
     p.x >= 0.0 && p.y >= 0.0 && p.x + size[0] <= window[0] && p.y + size[1] <= window[1]
 }
 
@@ -81,7 +81,7 @@ fn pointer_hotspot_is_never_covered_by_a_tooltip_that_fits_the_window() {
             for hy in (0..=600_u16).step_by(20) {
                 let hotspot = at(f32::from(hx), f32::from(hy));
                 // When placed
-                let p = place_tooltip(Trigger::Pointer(hotspot), size, WINDOW).unwrap();
+                let p = place_tooltip(Anchor::Pointer(hotspot), size, WINDOW).unwrap();
                 // Then it is inside the window and the hotspot is outside it
                 assert!(inside(p, size, WINDOW), "{size:?} at {hotspot:?}: {p:?}");
                 let covered = hotspot.x >= p.x
@@ -132,59 +132,29 @@ fn tooltip_larger_than_the_window_is_placed_at_the_top_left() {
 }
 
 #[test]
-fn keyboard_tooltip_is_centred_below_the_element_with_a_gap() {
-    let p = keyboard_at([100.0, 100.0, 80.0, 20.0], SIZE, WINDOW);
-    assert_eq!(p, at(90.0, 124.0));
-}
-
-#[test]
-fn keyboard_tooltip_flips_above_when_it_does_not_fit_below() {
-    let p = keyboard_at([100.0, 560.0, 80.0, 20.0], SIZE, WINDOW);
-    assert_eq!(p, at(90.0, 516.0));
-}
-
-#[test]
-fn keyboard_tooltip_that_just_fits_below_stays_below() {
-    // Given an element whose bottom plus gap plus height is the window's height
-    let p = keyboard_at([100.0, 536.0, 80.0, 20.0], SIZE, WINDOW);
-    // Then the tooltip's bottom edge is the window's
-    assert_eq!(p, at(90.0, 560.0));
-}
-
-#[test]
-fn keyboard_tooltip_is_clamped_at_each_side() {
-    let left = keyboard_at([0.0, 100.0, 20.0, 20.0], SIZE, WINDOW);
-    let right = keyboard_at([780.0, 100.0, 20.0, 20.0], SIZE, WINDOW);
-    assert_eq!((left.x, right.x), (0.0, 700.0));
-}
-
-#[test]
-fn keyboard_tooltip_with_no_room_above_or_below_is_placed_below_and_clamped() {
-    let p = keyboard_at([100.0, 30.0, 80.0, 20.0], [100.0, 80.0], [800.0, 100.0]);
-    assert_eq!(p, at(90.0, 20.0));
-}
-
-#[test]
-fn unusable_inputs_are_refused_naming_the_input() {
-    // Given each kind of bad input
-    let hotspot = Trigger::Pointer(at(1.0, 1.0));
-    let bad_box = Trigger::Keyboard(BoxRect {
-        x: 0.0,
-        y: 0.0,
-        width: 5.0,
-        height: -1.0,
-    });
-    let cases = [
-        (Trigger::Pointer(at(f32::NAN, 1.0)), SIZE, WINDOW, "trigger"),
-        (bad_box, SIZE, WINDOW, "trigger"),
-        (hotspot, [-1.0, 5.0], WINDOW, "size"),
-        (hotspot, [5.0, f32::INFINITY], WINDOW, "size"),
-        (hotspot, SIZE, [f32::INFINITY, 600.0], "window"),
-    ];
-    for (trigger, size, window, input) in cases {
+fn pointer_hotspot_outside_the_window_is_accepted_and_clamped() {
+    // Given hotspots past each edge, as a captured drag can produce
+    for (x, y) in [
+        (-50.0, 300.0),
+        (900.0, 300.0),
+        (300.0, -50.0),
+        (300.0, 700.0),
+    ] {
         // When placed
-        let result = place_tooltip(trigger, size, window);
-        // Then it is refused, naming the input
-        assert_eq!(result, Err(PlacementError { input }));
+        let p = pointer_at(x, y, SIZE, WINDOW);
+        // Then it is inside the window
+        assert!(inside(p, SIZE, WINDOW), "hotspot ({x}, {y}): {p:?}");
     }
+}
+
+#[test]
+fn pointer_beside_placements_are_half_open_at_the_hotspot_column() {
+    // Given a window too short above or below, hotspot x = 700 so right starts at 710
+    // When the right candidate's right edge is exactly the window's
+    let right = pointer_at(690.0, 50.0, [100.0, 80.0], [800.0, 100.0]);
+    // Then it is used
+    assert_eq!(right.x, 700.0);
+    // When it is one px over, the left candidate ends on the hotspot column
+    let left = pointer_at(691.0, 50.0, [100.0, 80.0], [800.0, 100.0]);
+    assert_eq!(left.x, 591.0);
 }
