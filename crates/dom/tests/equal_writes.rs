@@ -110,3 +110,45 @@ fn a_nan_property_is_written_every_time() {
     // Then
     assert_eq!(dom.calls().len(), 1, "{:?}", dom.calls());
 }
+
+#[test]
+fn zero_to_negative_zero_is_written() {
+    // Given: a range shows "0" for 0.0 and "-0" for -0.0
+    let (mut dom, input, _) = tree();
+    dom.set_property(input, "value", PropertyValue::Number(0.0));
+    dom.clear_calls();
+
+    // When
+    dom.set_property_if_changed(input, "value", PropertyValue::Number(-0.0));
+
+    // Then
+    assert_eq!(dom.calls().len(), 1, "{:?}", dom.calls());
+}
+
+#[test]
+fn negative_zero_to_zero_is_written() {
+    // Given
+    let (mut dom, input, _) = tree();
+    dom.set_property(input, "value", PropertyValue::Number(-0.0));
+    dom.clear_calls();
+
+    // When
+    dom.set_property_if_changed(input, "value", PropertyValue::Number(0.0));
+
+    // Then
+    assert_eq!(dom.calls().len(), 1, "{:?}", dom.calls());
+}
+
+#[test]
+fn an_equal_number_is_not_written() {
+    // Given
+    let (mut dom, input, _) = tree();
+    dom.set_property(input, "value", PropertyValue::Number(2.5));
+    dom.clear_calls();
+
+    // When
+    dom.set_property_if_changed(input, "value", PropertyValue::Number(2.5));
+
+    // Then
+    assert_eq!(dom.calls(), &[]);
+}

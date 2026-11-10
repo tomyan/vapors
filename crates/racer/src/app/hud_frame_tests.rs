@@ -1,13 +1,14 @@
 //! A frame whose HUD writes equal values does no document work (IU2):
 //! after the HUD settles, `layout_hud` with an unchanged race restyles
-//! and shapes nothing, notes no change, and lays out only the boxes an
-//! update with no writes at all lays out; a changed speed still reaches
+//! and shapes nothing and notes no change; a changed speed still reaches
 //! the drawn text.
 //!
-//! The HUD's layout misses its cache for 19 boxes on every update, with
-//! or without writes, so `boxes_laid_out` is compared with that idle
-//! update rather than with 0; `equal_writes_bindings` in the elements
-//! crate shows 0 on a document whose layout cache holds.
+//! Box layout is not measured here. The HUD's layout misses its cache
+//! for 19 boxes on every update, with or without writes, and with the
+//! writes put back on `set` and the binding comparisons removed
+//! `boxes_laid_out` stayed equal to an update with no writes, so it
+//! would not catch a regression. `equal_writes_bindings` in the elements
+//! crate measures it on a document whose layout cache holds.
 use super::Racer;
 use std::{cell::Cell, rc::Rc};
 use vapors_elements::{Document, Viewport};
@@ -18,13 +19,6 @@ const VIEW: Viewport = Viewport {
     height: 720.0,
     scale: 1.0,
 };
-
-/// Boxes an update with no writes lays out.
-fn idle_boxes(racer: &Racer) -> usize {
-    let mut doc = racer.document.borrow_mut();
-    doc.update(VIEW).expect("updates");
-    doc.boxes_laid_out()
-}
 
 /// A racer whose HUD has been laid out twice, its change flag taken.
 fn settled() -> Racer {
@@ -48,19 +42,14 @@ fn texts(doc: &Document) -> Vec<String> {
 fn a_frame_of_equal_hud_writes_does_no_document_work() {
     // Given
     let mut racer = settled();
-    let idle = idle_boxes(&racer);
 
     // When
     racer.layout_hud(VIEW).expect("lays out");
 
     // Then
     let mut doc = racer.document.borrow_mut();
-    let work = (
-        doc.elements_restyled(),
-        doc.boxes_laid_out(),
-        doc.text_layouts_built(),
-    );
-    assert_eq!(work, (0, idle, 0));
+    let work = (doc.elements_restyled(), doc.text_layouts_built());
+    assert_eq!(work, (0, 0));
     assert!(!doc.take_changed());
 }
 
@@ -83,30 +72,35 @@ fn a_changed_speed_reaches_the_drawn_text() {
     assert!(doc.text_layouts_built() >= 1);
 }
 
-#[test]
-fn a_frame_of_equal_hud_writes_notifies_no_hud_reader() {
-    // Given: an effect reading every signal `layout_hud` writes
-    let mut racer = settled();
-    let owner = Owner::new();
-    owner.set();
+/// An effect reading every signal `layout_hud` writes; the counter
+/// holds how many times it has run.
+fn hud_reader(racer: &Racer) -> Rc<Cell<u32>> {
     let hud = &racer.hud;
     let (flags, texts) = (
         [hud.short, hud.compact, hud.follow, hud.enabled, hud.paused],
         [hud.message, hud.speed, hud.lap, hud.clock, hud.best],
     );
     let runs = Rc::new(Cell::new(0));
-    Effect::new({
-        let runs = Rc::clone(&runs);
-        move || {
-            for flag in flags {
-                flag.with(|_| ());
-            }
-            for text in texts {
-                text.with(|_| ());
-            }
-            runs.set(runs.get() + 1);
+    let counter = Rc::clone(&runs);
+    Effect::new(move || {
+        for flag in flags {
+            flag.with(|_| ());
         }
+        for text in texts {
+            text.with(|_| ());
+        }
+        counter.set(counter.get() + 1);
     });
+    runs
+}
+
+#[test]
+fn a_frame_of_equal_hud_writes_notifies_no_hud_reader() {
+    // Given
+    let mut racer = settled();
+    let owner = Owner::new();
+    owner.set();
+    let runs = hud_reader(&racer);
 
     // When
     racer.layout_hud(VIEW).expect("lays out");

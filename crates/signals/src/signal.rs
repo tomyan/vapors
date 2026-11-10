@@ -124,6 +124,7 @@ impl<T: 'static> Signal<T> {
     /// Replaces the value and notifies readers only when it differs by
     /// `PartialEq`; answers whether it notified. NaN never equals
     /// itself, so a NaN write always notifies, as a memo of NaN does.
+    /// `0.0 == -0.0`, so a write between them does not notify.
     /// The comparison does not subscribe the running reader.
     ///
     /// # Errors

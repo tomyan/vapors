@@ -120,11 +120,19 @@ impl Dom for Document {
     }
 
     fn current_text(&self, node: NodeId) -> Option<&str> {
-        self.text(node)
+        match &self.arena.get(node, "current_text").kind {
+            Kind::Text(text) => Some(text),
+            Kind::Element(_) => None,
+        }
     }
 
     fn current_attribute(&self, node: NodeId, name: &str) -> Option<&str> {
-        self.attribute(node, name)
+        self.arena
+            .get(node, "current_attribute")
+            .element()?
+            .attributes
+            .get(name)
+            .map(String::as_str)
     }
 
     /// The properties map, which the person's edits also write: a typed

@@ -47,6 +47,19 @@ pub enum PropertyValue {
     Number(f64),
 }
 
+/// Whether writing `new` over `current` changes nothing. Numbers compare
+/// by `to_bits`, not `==`: `0.0 == -0.0` would skip a visible change, and
+/// a NaN is only equal to the NaN with the same bits, which is not a
+/// reason to skip the write either.
+fn property_unchanged(current: &PropertyValue, new: &PropertyValue) -> bool {
+    match (current, new) {
+        (PropertyValue::Number(a), PropertyValue::Number(b)) => {
+            !a.is_nan() && !b.is_nan() && a.to_bits() == b.to_bits()
+        }
+        _ => current == new,
+    }
+}
+
 /// The attribute a component's `mount` sets on each element it creates,
 /// to the scope its `<style>` was added under (see [`Dom::add_style`]).
 pub const SCOPE_ATTRIBUTE: &str = "data-wisp";
@@ -83,14 +96,20 @@ pub trait Dom: Listeners {
     /// tree that refuses listeners for events it never fires takes
     /// listeners for these.
     fn declare_events(&mut self, names: &[&str]);
-    /// A text node's text; `None` for an element.
+    /// A text node's text; `None` for an element. The `_if_changed`
+    /// setters read this: `None` means absent or the wrong kind, and
+    /// they then call the plain setter, which refuses the wrong kind
+    /// loudly.
     fn current_text(&self, node: NodeId) -> Option<&str>;
     /// An element's attribute; `None` when it has none of that name or
-    /// `node` is a text node.
+    /// `node` is a text node (absent or wrong kind: the `_if_changed`
+    /// setter then calls the plain setter, which refuses the wrong kind
+    /// loudly).
     fn current_attribute(&self, node: NodeId, name: &str) -> Option<&str>;
     /// An element's property as it stands now, including what the
     /// person's own edits wrote (a typed `value`, a toggled `checked`);
-    /// `None` when it has none of that name or `node` is a text node.
+    /// `None` when it has none of that name or `node` is a text node
+    /// (absent or wrong kind, handled as for [`Dom::current_attribute`]).
     fn current_property(&self, node: NodeId, name: &str) -> Option<&PropertyValue>;
 
     /// [`Dom::set_text`] unless the node already holds `text`. The
@@ -108,11 +127,16 @@ pub trait Dom: Listeners {
             self.set_attribute(node, name, value);
         }
     }
-    /// [`Dom::set_property`] unless the element's current property
-    /// equals `value` by `PartialEq` (so a NaN number is always
-    /// written); called by the generated bindings.
+    /// [`Dom::set_property`] unless the element's current property is
+    /// `value`: numbers compare by bit pattern, so a NaN number and a
+    /// change between 0.0 and -0.0 are written (a range formats them
+    /// "NaN", "0" and "-0"); other kinds compare by `PartialEq`. Called
+    /// by the generated bindings.
     fn set_property_if_changed(&mut self, node: NodeId, name: &str, value: PropertyValue) {
-        if self.current_property(node, name) != Some(&value) {
+        if !self
+            .current_property(node, name)
+            .is_some_and(|current| property_unchanged(current, &value))
+        {
             self.set_property(node, name, value);
         }
     }
