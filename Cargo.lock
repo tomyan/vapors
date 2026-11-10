@@ -2807,6 +2807,7 @@ dependencies = [
  "send_wrapper",
  "tracing",
  "vapors-canvas",
+ "vapors-css",
  "vapors-demos",
  "vapors-dom",
  "vapors-elements",

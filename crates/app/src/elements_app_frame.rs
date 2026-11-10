@@ -13,6 +13,7 @@ use vapors_elements::{ElementError, Viewport};
 use vapors_scene::Size;
 
 use super::ElementsApp;
+use crate::check_tooltip_style;
 use crate::frame::{FrameTimes, Phase, Phases, SystemClock, run_frame};
 use crate::painter::{FrameCounts, ScenePainter};
 
@@ -30,19 +31,15 @@ impl Phases for AppFrame<'_, '_> {
         std::mem::take(&mut self.app.input_spent)
     }
 
-    fn update(&mut self, now: Instant) -> Result<(), String> {
+    fn update(&mut self, _now: Instant) -> Result<(), String> {
         // the selectionchange each text field owes, once per frame, as
         // Chromium fires one per task (E6a)
         Document::settle_selection(&self.app.document);
-        self.app.update_document(self.frame)?;
-        // nothing draws the tooltip yet (docs/tooltips.md); asking
-        // shows one whose deadline passed, which ends its wait
-        let _ = self.app.input.tooltip(&self.app.document.borrow(), now);
-        Ok(())
+        self.app.update_document(self.frame)
     }
 
-    fn draw(&mut self, _now: Instant) -> Result<(), String> {
-        self.app.paint(self.frame)
+    fn draw(&mut self, now: Instant) -> Result<(), String> {
+        self.app.paint(self.frame, now)
     }
 }
 
@@ -59,7 +56,9 @@ impl ElementsApp {
             .unwrap_or_default()
     }
 
-    /// The Update phase: `Document::update`.
+    /// The Update phase: `Document::update`, then the tooltip's style
+    /// checked, so a bad `--tooltip-*` value fails this frame and not
+    /// the first hover (seven lookups on the root's custom properties).
     fn update_document(&mut self, frame: &Frame<'_>) -> Result<(), String> {
         #[allow(clippy::cast_possible_truncation)] // a display scale
         let scale = frame.scale_factor as f32;
@@ -67,12 +66,14 @@ impl ElementsApp {
         let mut document = self.document.borrow_mut();
         document
             .update(viewport(size, scale))
-            .map(|_| ())
-            .map_err(|errors| refused(&errors))
+            .map_err(|errors| refused(&errors))?;
+        check_tooltip_style(&document)
+            .map_err(|error| format!("the document was refused, so nothing is drawn: {error}"))
     }
 
-    /// The Draw phase: the update's scene painted into the frame.
-    fn paint(&mut self, frame: &Frame<'_>) -> Result<(), String> {
+    /// The Draw phase: the update's scene painted into the frame, then
+    /// the tooltip shown at `now` over it.
+    fn paint(&mut self, frame: &Frame<'_>, now: Instant) -> Result<(), String> {
         let size = size_of(frame);
         let document = self.document.borrow();
         let painted = document
@@ -99,7 +100,27 @@ impl ElementsApp {
             .map_err(|error| format!("the surfaces could not be mounted: {error}"))?;
         scene_painter
             .draw(&target, painted)
-            .map_err(|error| format!("the document could not be painted: {error}"))
+            .map_err(|error| format!("the document could not be painted: {error}"))?;
+        drop(document);
+        self.paint_tooltip(&target, now)
+    }
+
+    /// The tooltip shown at `now`, if any, over the painted scene.
+    /// Asking also shows one whose deadline passed, which ends its wait.
+    fn paint_tooltip(&mut self, target: &Target<'_>, now: Instant) -> Result<(), String> {
+        let mut document = self.document.borrow_mut();
+        let Some(tooltip) = self.input.tooltip(&document, now).cloned() else {
+            return Ok(());
+        };
+        let painter = self.painter.as_mut().expect("made by paint");
+        painter
+            .draw_tooltip(
+                target,
+                &mut document,
+                &tooltip,
+                self.input.tooltip_hotspot(),
+            )
+            .map_err(|error| error.to_string())
     }
 
     /// Runs the frame's phases, keeping their times and handing them to

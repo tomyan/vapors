@@ -25,8 +25,8 @@ use crate::pointer::{Action, action};
 
 /// The input state for one document.
 pub struct DocumentInput {
-    /// Where the pointer last moved, in CSS pixels.
-    pointer: Point,
+    /// Where the pointer last moved, in CSS pixels; `None` before.
+    pointer: Option<Point>,
     touch: crate::touch_scroll::TouchScroll,
     wheel: crate::wheel_scroll::WheelScroll,
     /// The cursor last reported; `None` once the host showed its own.
@@ -52,7 +52,7 @@ impl DocumentInput {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            pointer: [0.0, 0.0],
+            pointer: None,
             touch: crate::touch_scroll::TouchScroll::default(),
             wheel: crate::wheel_scroll::WheelScroll::default(),
             cursor: Some(Cursor::Default),
@@ -142,7 +142,7 @@ impl DocumentInput {
         self.paste_if(document, event, platform);
         self.tooltip_event(&document.borrow(), event, action, Instant::now());
         let changed = document.borrow_mut().take_changed();
-        let cursor = document.borrow().cursor(self.pointer);
+        let cursor = document.borrow().cursor(self.pointer.unwrap_or_default());
         let shown = (Some(cursor) != self.cursor).then(|| {
             self.cursor = Some(cursor);
             crate::cursor::shown(cursor)
@@ -159,10 +159,11 @@ impl DocumentInput {
     /// scale tells which), so a key or typed text is delivered by focus
     /// even before the first update.
     fn action(&self, document: &Document, event: &Event) -> Result<Option<Action>, Unplaced> {
-        if action(event, 1.0, self.pointer).is_none() {
+        let at = self.pointer.unwrap_or_default();
+        if action(event, 1.0, at).is_none() {
             return Ok(None);
         }
-        Ok(action(event, scale_of(document)?, self.pointer))
+        Ok(action(event, scale_of(document)?, at))
     }
 }
 

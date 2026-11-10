@@ -183,6 +183,8 @@ pub use counts::FrameCounts;
 mod images;
 #[path = "painter_text.rs"]
 mod text;
+#[path = "painter_tooltip.rs"]
+mod tooltip;
 use images::Textures;
 #[path = "painter_errors.rs"]
 mod errors;

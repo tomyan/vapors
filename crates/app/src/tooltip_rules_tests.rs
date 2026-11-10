@@ -34,7 +34,7 @@ fn a_move_within_the_hovered_title_keeps_a_keyboard_tooltip() {
     state.pointer_over(Some(titled(1, "Open (o)")), t0 + ms(200));
 
     // Then
-    let shown = state.shown_at(t0 + ms(600)).cloned();
+    let shown = state.shown_at(t0 + ms(600), None).cloned();
     assert_eq!(shown.map(|tip| tip.trigger), Some(TooltipTrigger::Keyboard));
 }
 
@@ -49,9 +49,9 @@ fn arming_showing_and_hiding_each_count_as_a_change_once() {
     assert!(!state.take_changed(), "taken");
     state.pointer_over(Some(titled(1, "Open (o)")), t0 + ms(100));
     assert!(!state.take_changed(), "a move within the title");
-    assert!(state.shown_at(t0 + ms(500)).is_some());
+    assert!(state.shown_at(t0 + ms(500), None).is_some());
     assert!(state.take_changed(), "shown");
-    assert!(state.shown_at(t0 + ms(600)).is_some());
+    assert!(state.shown_at(t0 + ms(600), None).is_some());
     assert!(!state.take_changed(), "still shown");
     state.hide();
     assert!(state.take_changed(), "hidden");

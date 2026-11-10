@@ -11,11 +11,11 @@ mod app_frame;
 mod misfit;
 #[path = "renderers.rs"]
 mod renderers;
-pub use app_frame::app_frame;
+pub use app_frame::{app_frame, app_frame_at};
 pub use misfit::Misfit;
 pub use renderers::{Log, Solid};
 
-use vapors_app::{DrawOverError, PaintError, ScenePainter};
+use vapors_app::{DrawOverError, PaintError, ScenePainter, Tooltip, TooltipError};
 use vapors_dom::Dom;
 use vapors_elements::{Document, Viewport};
 use vapors_gpu_harness::{Gpu, gpu, read_rgba8};
@@ -95,6 +95,21 @@ impl Rig {
     pub fn draw_over(&mut self, doc: &Document) -> Result<Vec<u8>, DrawOverError> {
         let painted = doc.painted().expect("updated");
         self.on_fresh_target(|painter, target| painter.draw_over(target, painted))
+    }
+
+    /// `doc` drawn into a fresh `SIZE` square target with `tooltip`
+    /// over it at `pointer`: its RGBA bytes.
+    pub fn draw_tooltip(
+        &mut self,
+        doc: &mut Document,
+        tooltip: &Tooltip,
+        pointer: Option<[f32; 2]>,
+    ) -> Result<Vec<u8>, TooltipError> {
+        self.on_fresh_target(|painter, target| {
+            let painted = doc.painted().expect("updated");
+            painter.draw(target, painted).expect("draws");
+            painter.draw_tooltip(target, doc, tooltip, pointer)
+        })
     }
 
     fn on_fresh_target<E>(
