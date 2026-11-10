@@ -18,6 +18,7 @@ mod pointer;
 #[cfg(test)]
 mod scroll_fixture;
 mod surface;
+mod tooltip;
 mod touch_scroll;
 mod wheel_scroll;
 

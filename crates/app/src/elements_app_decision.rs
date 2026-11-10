@@ -1,7 +1,7 @@
 //! Why the app asked for the next frame, kept for a failing check to
 //! print (`ElementsApp::last_decision`).
 
-use vapors_platform::Next;
+use vapors_platform::{Instant, Next};
 
 use super::ElementsApp;
 use crate::painter::{ScenePainter, SurfaceState};
@@ -15,13 +15,26 @@ pub struct FrameDecision {
     pub surface_invalidated: bool,
     /// An active surface is stale, animating or waiting on a GPU scope.
     pub surfaces_want: bool,
+    /// When the armed tooltip shows (`DocumentInput::tooltip_deadline`).
+    pub tooltip_deadline: Option<Instant>,
 }
 
 impl FrameDecision {
-    /// Whether any reason holds: the app draws again.
+    /// Whether any reason holds: the app draws again at once.
     #[must_use]
     pub fn wants_frame(self) -> bool {
         self.document_changed || self.surface_invalidated || self.surfaces_want
+    }
+
+    /// The next frame: at once when a reason holds, else at the
+    /// tooltip's deadline, else on the next change.
+    #[must_use]
+    pub fn next(self) -> Next {
+        match (self.wants_frame(), self.tooltip_deadline) {
+            (true, _) => Next::Continue,
+            (false, Some(deadline)) => Next::WaitUntil(deadline),
+            (false, None) => Next::Wait,
+        }
     }
 }
 
@@ -29,19 +42,17 @@ impl ElementsApp {
     /// What to do after a frame: draw again at once if the document
     /// changed since it was last asked (by something outside an event,
     /// or by the update itself), or a surface was invalidated or wants
-    /// a frame (`ScenePainter::wants_frame`), else wait for the next
-    /// change.
+    /// a frame (`ScenePainter::wants_frame`), else wait until an armed
+    /// tooltip's deadline, asked again every frame until it shows, or
+    /// for the next change.
     pub fn next_after_frame(&mut self) -> Next {
         self.decision = FrameDecision {
             document_changed: self.document.borrow_mut().take_changed(),
             surface_invalidated: self.surfaces.any_stale(),
             surfaces_want: self.painter.as_ref().is_some_and(ScenePainter::wants_frame),
+            tooltip_deadline: self.input.tooltip_deadline(),
         };
-        if self.decision.wants_frame() {
-            Next::Continue
-        } else {
-            Next::Wait
-        }
+        self.decision.next()
     }
 
     /// Brings the painter's animating flags up to date, after the
@@ -69,5 +80,33 @@ impl ElementsApp {
         self.painter
             .as_ref()
             .map_or_else(Vec::new, ScenePainter::surface_states)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use vapors_platform::{Instant, Next};
+
+    use super::FrameDecision;
+
+    #[test]
+    fn an_armed_tooltip_waits_until_its_deadline_and_none_waits_for_a_change() {
+        // Given
+        let deadline = Instant::now() + Duration::from_millis(500);
+        let armed = FrameDecision {
+            tooltip_deadline: Some(deadline),
+            ..FrameDecision::default()
+        };
+        let changed = FrameDecision {
+            document_changed: true,
+            ..armed
+        };
+
+        // Then
+        assert_eq!(armed.next(), Next::WaitUntil(deadline));
+        assert_eq!(changed.next(), Next::Continue);
+        assert_eq!(FrameDecision::default().next(), Next::Wait);
     }
 }
