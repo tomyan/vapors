@@ -203,9 +203,11 @@ not a slice yet.
   the same way, so no source of change is unknown.
   Run-time input such as text length, viewport size and image sizes sets
   sizes and positions; it does not change which primitive a thing is.
-- **Retained layout and paint use the same analysis.** Which bindings can
-  change which properties tells, at build time, which subtrees can ever need
-  layout or paint again; IU3 and IU4 can take their boundaries from it.
+- **Retained layout and paint use the same analysis to skip work.** IU3
+  and IU4 track at run time which subtrees need layout or paint again
+  (Tom, 2026-11-10: IU3 does not wait for the analysis). Where the analysis
+  proves a subtree constant, they skip its tracking and work; it removes
+  work, it does not replace the run-time tracking.
 - **Fewer pipelines.** One or two shape pipelines draw boxes, icons and SVG
   together, batched in paint order.
 
