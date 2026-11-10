@@ -39,10 +39,13 @@ description; the events oracle's projection compares it.
 
 ## Not yet built
 
-Title on images. `fixtures/title_images.wisp` records Chromium 155
-(`title_images.events.json`), and vapors is compared with none of it:
-the icon subset refuses `title` on an `svg` and `<img>` has no role in
-the tree. Chromium's tree has each as an `image`:
+Title on images. Chromium 155 (2026-11-10, read with the events oracle's
+`project image`) has each of these as an `image`. No corpus fixture
+holds them, because the corpus requires vapors to accept every fixture
+and compare its boxes: the icon subset refuses `title` on an `svg`
+(and an `svg` with `role="img"` and no `aria-label`), and `<img>` has no
+role in vapors' tree. Adding them needs the subset to take `title` and
+`img` to get a role, name and description:
 
 | Markup | name | description |
 |---|---|---|
