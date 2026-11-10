@@ -22,6 +22,7 @@ mod scope;
 mod scrollbar;
 mod sizes;
 mod styles;
+mod surface;
 mod text_style;
 mod used;
 mod values;
