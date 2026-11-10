@@ -1,5 +1,6 @@
 # Documentation
 
+- [decisions/2026-11-10-positioning.md](decisions/2026-11-10-positioning.md): what vapors is for: DX and AX, efficiency, portability
 - [components.md](components.md): `.wisp` components
 - [css.md](css.md): the CSS engine
 - [F2c.md](F2c.md): elements, layout and paint
