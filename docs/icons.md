@@ -24,7 +24,9 @@ The compiler's scoping attribute (`data-wisp`, `vapors_dom::SCOPE_ATTRIBUTE`)
 is accepted on `<svg>` and `<path>`: a component with a `<style>` has it on
 every element. It is the only `data-*` attribute accepted. It is not painted
 and not in the a11y tree, and a scoped rule such as `svg { color: red }`
-matches the svg through it (`svg_scope.rs`).
+matches the svg through it (`svg_scope.rs`). Its value is not checked:
+the compiler refuses `data-wisp` written in a template, so only generated
+code sets it.
 
 `<svg>`:
 

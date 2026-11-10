@@ -11,7 +11,9 @@ use vapors_dom::{Dom, NodeId, SCOPE_ATTRIBUTE};
 use vapors_elements::Document;
 use vapors_scene::{Color, Item};
 
-const SCOPE: &str = "bar";
+/// Shaped as the compiler emits it: the crate name, a slash, the file
+/// (crates/compiler/src/codegen/shell.rs).
+const SCOPE: &str = "touche-bar/src/top_bar.wisp";
 
 /// An icon page whose `svg` and its `path` are tagged with `SCOPE`, as
 /// a component's `mount` tags every element.
