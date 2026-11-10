@@ -71,7 +71,7 @@ impl Document {
         let apart = if inline { "" } else { " " };
         out.push_str(apart);
         if let Some(label) = self.ax_icon_label(node) {
-            out.push_str(label);
+            out.push_str(if self.ax_shown(node) { label } else { "" });
             out.push_str(apart);
             return;
         }
@@ -82,7 +82,8 @@ impl Document {
     }
 
     /// A named icon's `aria-label` (`<svg role="img">`, docs/icons.md),
-    /// which a name from content takes in place of its paths.
+    /// which a name from content takes in place of its paths when the
+    /// icon is `visibility: visible`.
     fn ax_icon_label(&self, node: NodeId) -> Option<&str> {
         let label = self.attribute(node, "aria-label").map(str::trim)?;
         let named = self.tag(node) == Some("svg") && self.attribute(node, "role") == Some("img");

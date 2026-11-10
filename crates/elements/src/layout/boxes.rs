@@ -134,7 +134,7 @@ fn add_element(source: &Source<'_>, node: NodeId, boxes: &mut Vec<LayoutBox>) ->
         .or(checked.map(|_| crate::checkbox::NATURAL_SIZE));
     let mut replaced = LayoutBox::replaced(
         Content::Element(node),
-        style.layout.clone(),
+        crate::svg::layout_style(source.arena, node, &style.layout),
         (natural, source.images.of(source.arena, node).cloned()),
         checked.is_some(),
     );

@@ -151,3 +151,24 @@ fn a_named_icon_is_an_image_that_names_its_button() {
     // Then
     assert_eq!(tree, [node("button", "Export"), node("img", "Export")]);
 }
+
+#[test]
+fn a_named_icon_that_is_visibility_hidden_adds_nothing_to_its_buttons_name() {
+    // Given
+    let mut doc = document();
+    let body = doc.body();
+    let button = element(&mut doc, body, "button", "");
+    icon(&mut doc, button, Some("Export"));
+    text(&mut doc, button, "Go");
+    styled(
+        &mut doc,
+        "button { display: flex; } .icon { visibility: hidden; }",
+    );
+    doc.update(viewport(400.0, 300.0)).expect("updates");
+
+    // When
+    let tree = doc.ax_projection(&["button"]).expect("projects");
+
+    // Then
+    assert_eq!(tree, [node("button", "Go")]);
+}
