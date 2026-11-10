@@ -30,7 +30,7 @@ pub fn document() -> Rc<RefCell<Document>> {
     text(
         &mut doc,
         note,
-        "Drawn by a WGSL renderer in a gpu-surface, only when it changes.",
+        "Drawn by a WGSL renderer in a gpu-surface, every frame while the app animates it.",
     );
     let view = element(&mut doc, body, "gpu-surface", "view");
     doc.set_attribute(view, "name", SURFACE);

@@ -5,15 +5,23 @@
 //! xvfb-run -a cargo run -p vapors-app --example surface_gradient -- --check
 //! ```
 //!
+//! Without `--check` the gradient moves: the app requests animation
+//! before the loop starts.
+//!
 //! With `--check` (the CI window job runs it) it settles, then counts
 //! the frames and renders while idle, which must be none; invalidates
 //! the surface from the running app, which must draw 2 frames and
-//! render once; ends the loop; and checks that an invalidate after the loop ended is refused as
-//! `LoopClosed`. Exit 1 names what differed.
+//! render once; requests animation, which must draw at least 10 frames
+//! in a second, rendering in each but the script's wake frame (exactly
+//! one frame draws without rendering); stops it, after which it must draw
+//! nothing; ends the loop; and checks that an invalidate after the loop
+//! ended is refused as `LoopClosed`. Exit 1 names what differed.
 
 mod check;
 mod gradient;
 mod page;
+mod script;
+mod trace;
 
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -59,6 +67,9 @@ fn start(checking: bool) -> Result<String, String> {
             "ok   surface_gradient: {idle}; an invalidate after the loop ended: LoopClosed"
         ));
     }
+    handle
+        .request_animation()
+        .map_err(|error| error.to_string())?;
     open(app, &failure).map(|()| String::new())
 }
 

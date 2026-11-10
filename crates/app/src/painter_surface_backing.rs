@@ -1,13 +1,18 @@
 //! One mounted surface: its renderer, the backing texture it renders
-//! into, and whether the next paint must render it.
+//! into (`painter_surface_texture.rs`), and whether the next paint must
+//! render it.
 
 use vapors_renderer::Target;
 
+use super::super::SurfaceState;
 use super::super::errors::Refusal;
 use super::scope::Scopes;
-use crate::surface::{SURFACE_FORMAT, SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
+use super::texture::Backing;
+use crate::surface::{SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
 
 /// A renderer and its state on the painter.
+// four independent flags: each is set and cleared at its own time
+#[allow(clippy::struct_excessive_bools)]
 pub(super) struct Mounted {
     renderer: Box<dyn SurfaceRenderer>,
     /// Whether its `mount` has been called.
@@ -18,6 +23,8 @@ pub(super) struct Mounted {
     backing: Option<Backing>,
     /// Invalidated since its last render.
     stale: bool,
+    /// Rendered on every frame that paints it.
+    animating: bool,
     /// What the current frame did with it.
     seen: Seen,
     /// The GPU errors of its calls not yet seen.
@@ -35,12 +42,6 @@ enum Seen {
     Painted,
 }
 
-struct Backing {
-    texture: wgpu::Texture,
-    view: wgpu::TextureView,
-    size: SurfaceSize,
-}
-
 impl Mounted {
     pub(super) fn new(renderer: Box<dyn SurfaceRenderer>) -> Self {
         Self {
@@ -49,6 +50,7 @@ impl Mounted {
             fresh: true,
             backing: None,
             stale: false,
+            animating: false,
             seen: Seen::Unseen,
             scopes: Scopes::default(),
         }
@@ -62,10 +64,24 @@ impl Mounted {
         self.stale = true;
     }
 
+    pub(super) fn set_animating(&mut self, animating: bool) {
+        self.animating = animating;
+    }
+
     pub(super) fn wants_frame(&self) -> bool {
         self.fresh
-            || (self.backing.is_some()
-                && (self.stale || self.renderer.animating() || self.scopes.waiting()))
+            || (self.backing.is_some() && (self.stale || self.animating || self.scopes.waiting()))
+    }
+
+    pub(super) fn state(&self, name: &str) -> SurfaceState {
+        SurfaceState {
+            name: name.to_owned(),
+            fresh: self.fresh,
+            stale: self.stale,
+            animating: self.animating,
+            backing: self.backing.is_some(),
+            waiting: self.scopes.waiting(),
+        }
     }
 
     pub(super) fn begin_frame(&mut self) {
@@ -89,7 +105,7 @@ impl Mounted {
         self.seen = Seen::Painted;
         self.start(target.device)?;
         self.allocate(target.device, size)?;
-        if self.stale || self.renderer.animating() {
+        if self.stale || self.animating {
             self.render(target)?;
         }
         Ok(&self.backing.as_ref().expect("allocated above").texture)
@@ -172,42 +188,6 @@ fn fits(device: &wgpu::Device, size: SurfaceSize) -> Result<(), Refusal> {
         return Err(Refusal::TooLarge { size, limit });
     }
     Ok(())
-}
-
-impl Backing {
-    fn new(device: &wgpu::Device, size: SurfaceSize) -> Self {
-        let texture = device.create_texture(&descriptor(size));
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        Self {
-            texture,
-            view,
-            size,
-        }
-    }
-}
-
-/// A backing is rendered into, sampled, and copyable both ways.
-const USAGE: wgpu::TextureUsages = wgpu::TextureUsages::RENDER_ATTACHMENT
-    .union(wgpu::TextureUsages::TEXTURE_BINDING)
-    .union(wgpu::TextureUsages::COPY_SRC)
-    .union(wgpu::TextureUsages::COPY_DST);
-
-/// A [`SURFACE_FORMAT`] backing of `size`.
-fn descriptor(size: SurfaceSize) -> wgpu::TextureDescriptor<'static> {
-    wgpu::TextureDescriptor {
-        label: Some("gpu-surface backing"),
-        size: wgpu::Extent3d {
-            width: size.width,
-            height: size.height,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: SURFACE_FORMAT,
-        usage: USAGE,
-        view_formats: &[],
-    }
 }
 
 #[cfg(test)]

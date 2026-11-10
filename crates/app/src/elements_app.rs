@@ -15,6 +15,7 @@ use crate::frame::FrameTimes;
 
 use crate::document_input::DocumentInput;
 use crate::painter::ScenePainter;
+pub use decision::FrameDecision;
 pub use surface_handle::{InvalidateError, Invalidated, SurfaceHandle};
 use surfaces::AppSurfaces;
 
@@ -56,6 +57,8 @@ pub struct ElementsApp {
     last_times: Option<FrameTimes>,
     /// Time spent handling events since the last frame: the Input phase.
     input_spent: Duration,
+    /// Why the last frame asked for the next (`elements_app_decision.rs`).
+    decision: FrameDecision,
 }
 
 /// What [`ElementsApp::with_per_frame`] calls before each update, with
@@ -87,6 +90,7 @@ impl ElementsApp {
             frame_times: None,
             last_times: None,
             input_spent: Duration::ZERO,
+            decision: FrameDecision::default(),
         }
     }
 
@@ -115,23 +119,6 @@ impl ElementsApp {
     }
 }
 
-impl ElementsApp {
-    /// What to do after a frame: draw again at once if the document
-    /// changed since it was last asked (by something outside an event,
-    /// or by the update itself), or a surface was invalidated or wants
-    /// a frame (`ScenePainter::wants_frame`), else wait for the next
-    /// change.
-    pub fn next_after_frame(&mut self) -> Next {
-        let surfaces_want = self.surfaces.any_stale()
-            || self.painter.as_ref().is_some_and(ScenePainter::wants_frame);
-        if self.document.borrow_mut().take_changed() || surfaces_want {
-            Next::Continue
-        } else {
-            Next::Wait
-        }
-    }
-}
-
 /// Draws only when the document changed: an idle document draws no
 /// frames.
 impl App for ElementsApp {
@@ -145,7 +132,7 @@ impl App for ElementsApp {
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
         #[cfg(not(target_family = "wasm"))]
         self.deliver_pastes();
-        match self.run_phases(frame) {
+        match self.run_phases(frame).and_then(|()| self.sync_animating()) {
             Ok(()) => self.next_after_frame(),
             Err(message) => {
                 report_error(&message);
@@ -199,6 +186,8 @@ fn shortcut_modifier() -> ShortcutModifier {
     }
 }
 
+#[path = "elements_app_decision.rs"]
+mod decision;
 #[path = "elements_app_frame.rs"]
 mod frame_phases;
 #[cfg(not(target_family = "wasm"))]

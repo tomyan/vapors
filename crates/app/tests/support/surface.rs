@@ -1,14 +1,17 @@
 //! Shared by the `gpu_surface*` tests: test renderers (`renderers.rs`,
 //! `misfit.rs`), documents built from a short element list, and a
-//! painter drawing into a readable target.
+//! painter or an `ElementsApp` drawing into a readable target.
 
 // each test crate including this uses a part of it
 #![allow(dead_code, unused_imports)]
 
+#[path = "app_frame.rs"]
+mod app_frame;
 #[path = "misfit.rs"]
 mod misfit;
 #[path = "renderers.rs"]
 mod renderers;
+pub use app_frame::app_frame;
 pub use misfit::Misfit;
 pub use renderers::{Log, Solid};
 

@@ -12,8 +12,8 @@ needs no camera, depth or scene.
 |---|---|---|
 | 1a | `gpu-surface` element, `Item::Surface` in the display list, the refusals | #139 |
 | 1b | `SurfaceRenderer` and the painter's surface host: offscreen texture, resize, scale, clip, on-demand rendering, failures | #140 |
-| 1b2 | `ElementsApp` mounting, `SurfaceHandle`, `Next` from `wants_frame`; the gradient example | #141 and this PR |
-| 1c | the racer's renderer mounted through the surface; two panels; surface-local input | after 1b |
+| 1b2 | `ElementsApp` mounting, `SurfaceHandle`, `Next` from `wants_frame`; the gradient example | #141, #142 |
+| 1c | animation requests (PR 1, this branch); the racer's renderer mounted through the surface; two panels; surface-local input. Plan: `docs/plans/3d-1c.md` | in progress |
 | 2-5 | scene, cameras, components, instances, tasks | not started |
 
 Touche's image renderer drawing through a surface in a panel comes
@@ -71,13 +71,54 @@ unmounted (`InvalidateError::NotMounted`) and a loop that has ended:
 a frame failed, the app was dropped, or the wake was refused
 (`InvalidateError::LoopClosed`).
 
+### Animation
+
+The app, not the renderer, decides when a surface animates (touche
+decision e3, `2026-11-10-incremental-ui-contract-answers.md`).
+`SurfaceHandle::request_animation()` renders the surface on every frame
+that paints it, from the next, until `stop_animation()`; it wakes the
+loop and answers as `invalidate` does. Each frame passes the app's
+animating surfaces to the painter (`ScenePainter::set_animating`).
+Requests from several surfaces coalesce: one frame renders each
+animating surface once, and the app returns `Next::Continue` while any
+active surface animates. When none does and nothing else wants a frame
+the app returns `Next::Wait`. `stop_animation()` refuses an unmounted
+surface (`NotMounted`) and does nothing once the loop has ended.
+
+A request on a surface no frame paints (hidden, zero-sized, `display:
+none`, clipped out) wakes one frame, which renders nothing; the app then
+asks for no more. The request is kept, and the surface animates again
+from the first frame that paints it. Unmounting forgets it.
+
+At the end of each frame, before it decides whether to ask for the next,
+the app passes the painter the current animating set
+(`AppSurfaces::sync_animating`; a debug assertion checks that the painter
+agrees for each painted surface). A `stop_animation` made during the
+frame, even after its paint (a frame-times hook), therefore ends that
+frame's request for the next. One made after the frame returned (in
+`drawn`, or an event) cannot recall the frame already asked for: that
+frame renders nothing, then the app waits. `surface_gradient --check`
+stops from `drawn` and its idle count starts after that frame.
+
+`ElementsApp::surface_states()` and `last_decision()` report each surface's
+flags on the painter and why the last frame asked for another; a failing
+check prints them (`surface_gradient --check`).
+
+`SurfaceHandle` is `Rc` and not `Send`, like the document. A worker
+thread sends its request to the app's thread (a channel) and wakes the
+loop with the platform's `Waker`, which is `Send`; the app's thread
+calls `request_animation` on the frame or event that follows.
+
 `crates/app/examples/surface_gradient` draws a WGSL gradient in a
-surface beside a panel of text; with `--check` (the CI window job) it
-counts frames and renders over an idle second, which must be none;
-then the running app invalidates the surface from `drawn`, which must
-draw 2 frames (the wake that reached the app, the invalidate's own)
-and render once; after the loop ends an invalidate must be refused as
-`LoopClosed`.
+surface beside a panel of text, moving it a step at each render; run
+without flags, the app requests animation before the loop starts. With
+`--check` (the CI window job) it counts frames and renders over an idle
+second, which must be none; then the running app invalidates the
+surface from `drawn`, which must draw 2 frames (the wake that reached
+the app, the invalidate's own) and render once; requests animation,
+which must draw at least 10 frames in a second and render in each but
+the wake's; stops it, after which an idle second must draw nothing;
+after the loop ends an invalidate must be refused as `LoopClosed`.
 
 ## Supported composition (first release)
 
@@ -115,9 +156,11 @@ renderer)`; `unmount` hands it back and dropping it is teardown.
   `logical()` the CSS size.
 - `render(frame)` records into a vapors-owned `CommandEncoder`, which the
   painter submits before compositing. It runs after a resize, after
-  `ScenePainter::invalidate(name)`, and every frame while `animating()`.
-  Other frames composite the last render: an idle surface renders
-  nothing.
+  `ScenePainter::invalidate(name)`, and every frame while the surface
+  is animating (`ScenePainter::set_animating(name, true)`, which
+  `SurfaceHandle::request_animation` drives). Other frames composite the
+  last render: an idle surface renders nothing. The renderer does not
+  ask for frames.
 - `ScenePainter::wants_frame()` is true while an active surface is
   invalidated or animating, and for a renderer mounted since the last
   frame; the app returns `Next::Continue` then.
@@ -150,8 +193,8 @@ gone and nothing it drew is shown again. A wholly clipped surface is refused for
 `DuplicateName` and `TooLarge` as one in view is, though it is not
 rendered, so scrolling a surface into view cannot be the first time it
 fails. `ElementsApp` reports a failed frame and stops. `mount`,
-`unmount` and `invalidate` refuse a taken or unknown name
-(`MountError`).
+`unmount`, `invalidate` and `set_animating` refuse a taken or unknown
+name (`MountError`).
 
 GPU loss is reported by the platform frame loop
 (`crates/platform/src/device_lost.rs`), which stops the app; surfaces

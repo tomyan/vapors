@@ -52,7 +52,7 @@ alone when its text is unchanged, so an equal write keeps the caret,
 selection and undo history.
 
 `take_changed` true is what `ElementsApp::next_after_frame` turns into
-another frame (`crates/app/src/elements_app.rs:124-132`), and every
+another frame (`crates/app/src/elements_app_decision.rs:29-45`), and every
 frame runs the whole `Document::update`: tree check, restyle of the
 marked elements, box build, layout with its cache, scroll settle and a
 new `Painted` (`crates/elements/src/update.rs:58-111`), then
@@ -68,15 +68,15 @@ the brief's "GPU surfaces" list:
 
 | Item | What exists | What is missing | What 1c needs |
 |---|---|---|---|
-| Explicit content invalidation | `SurfaceHandle::invalidate` marks the surface stale and wakes the loop, answering `Woke`, `AtFirstFrame`, `NotMounted` or `LoopClosed` (`elements_app_surface_handle.rs:100-123`); the next frame renders it once (`painter_surface_backing.rs:61-63`, `92-94`). Pinned: `elements_app_surfaces.rs`, `gpu_app_surfaces.rs` `gpu_an_invalidate_through_the_handle_renders_the_surface_once_more` | An invalidate re-renders the surface but the frame also runs the whole document update and UI paint (b); surface content and surrounding UI share one invalidation path | Nothing more for a correct 1c; IU5 separates the paths |
-| Animation under the shared scheduler | `SurfaceRenderer::animating()` (`surface.rs:114-116`) is polled after each frame; while true `wants_frame` holds and the app returns `Next::Continue` (`painter_surface_backing.rs:65-69`, `elements_app.rs:124-132`), on the same platform loop as the UI. Requests from several surfaces coalesce into one frame: `next_after_frame` reduces them to one `surfaces_want` bool (`elements_app.rs:125-126`). Pinned: `gpu_an_animating_renderer_asks_for_every_frame`, `gpu_surface_lifecycle.rs` `gpu_an_animating_surface_renders_every_frame_and_wants_the_next` | Starting: a renderer that turns `animating` on while the loop waits is not seen until something wakes the loop, and the renderer does not hold its `SurfaceHandle` (`mount` returns it). `SurfaceFrame` carries no frame time (`surface.rs:40-54`); the platform `Frame` has `now` | A way to start animating from idle and a frame time for the racer's simulation and camera (question e3) |
+| Explicit content invalidation | `SurfaceHandle::invalidate` marks the surface stale and wakes the loop, answering `Woke`, `AtFirstFrame`, `NotMounted` or `LoopClosed` (`elements_app_surface_handle.rs:106-108`, `146-160`); the next frame renders it once (`painter_surface_backing.rs:63-65`, `108-110`). Pinned: `elements_app_surfaces.rs`, `gpu_app_surfaces.rs` `gpu_an_invalidate_through_the_handle_renders_the_surface_once_more` | An invalidate re-renders the surface but the frame also runs the whole document update and UI paint (b); surface content and surrounding UI share one invalidation path | Nothing more for a correct 1c; IU5 separates the paths |
+| Animation under the shared scheduler | `SurfaceHandle::request_animation` marks the surface stale, records it as animating and wakes the loop; `stop_animation` removes it (`elements_app_surface_handle.rs:120-143`). Each frame `bring_to` passes the animating set to the painter (`ScenePainter::set_animating`, `elements_app_surfaces.rs:123-153`, `painter_surfaces.rs:89`); an animating surface renders on every frame that paints it (`painter_surface_backing.rs:108-110`) and `wants_frame` holds while it has a backing, so the app returns `Next::Continue` (`painter_surface_backing.rs:71-73`, `elements_app_decision.rs:29-45`), on the same platform loop as the UI. Requests from several surfaces coalesce into one frame: `next_after_frame` reduces them to one `surfaces_want` bool (`elements_app_decision.rs:34-45`). A request on an inactive surface is kept and wakes one frame that renders nothing. Pinned: `gpu_app_animation.rs` (`gpu_an_animation_request_renders_every_frame_until_stopped_then_the_app_waits`, `gpu_two_animating_surfaces_render_once_per_frame_and_one_stopping_leaves_the_other`, `gpu_an_animation_requested_on_an_inactive_surface_waits_until_it_is_shown`, `gpu_a_renderer_mounted_again_under_an_animating_name_does_not_animate`, `gpu_a_worker_thread_relays_a_request_through_a_channel_and_a_wake`), `elements_app_animation.rs`, `gpu_surface_lifecycle.rs` `gpu_an_animating_surface_renders_every_frame_and_wants_the_next` | `SurfaceFrame` carries no frame time (`surface.rs:40-54`); the platform `Frame` has `now`. a stop made after the frame returned (in `drawn` or an event) costs the frame already asked for, which renders nothing; a stop during the frame does not (`sync_animating`, `elements_app_surfaces.rs:138`) | A frame time for the racer's simulation and camera (the second half of e3, not yet decided) |
 | Resource ownership | The renderer owns its resources; the painter owns the backing texture, the encoder and submission (`surface.rs:1-5`, `40-54`); device and queue are shared | Inactive surfaces release the backing but the renderer is not told (no `deactivate`, `surface.rs:67-71`) | Nothing: the racer keeps its pipelines while mounted |
-| Resize | `resize(device, size)` on allocation, size or scale change, and re-activation (`surface.rs:59-62`, `painter_surface_backing.rs:129`). Pinned: `gpu_resizing_the_surface_renders_a_new_backing_at_the_new_size_once`, `gpu_surface.rs` `gpu_a_scale_change_renders_a_new_backing_at_the_new_device_size` | Nothing found | The racer's depth texture is reallocated in `resize` |
+| Resize | `resize(device, size)` on allocation, size or scale change, and re-activation (`surface.rs:59-62`, `painter_surface_backing.rs:145`). Pinned: `gpu_resizing_the_surface_renders_a_new_backing_at_the_new_size_once`, `gpu_surface.rs` `gpu_a_scale_change_renders_a_new_backing_at_the_new_device_size` | Nothing found | The racer's depth texture is reallocated in `resize` |
 | Unmount | `ElementsApp::unmount` removes the name, its pending invalidation, and hands the renderer back (`elements_app_surfaces.rs:54-65`); teardown is `Drop`. Pinned: `gpu_a_renderer_unmounted_after_the_first_frame_is_handed_back`, `gpu_unmounting_drops_the_renderer_and_the_surface_is_then_refused` | Nothing found | Nothing |
 | Device loss | Reported by the platform frame loop, which stops the app (`crates/platform/src/device_lost.rs:31-99`); surfaces attempt no recovery (`docs/gpu-surface.md`) | No surface-level transition; by design for the MVP | Nothing |
 
 The brief asked whether surfaces animate outside the scheduler: they do
-not. `animating` feeds the same `Next` the document does, so 1c builds on
+not. an animation request feeds the same `Next` the document does, so 1c builds on
 the shared loop.
 
 ## d. 3D: the brief's requirements against slices 2 to 4
@@ -92,7 +92,7 @@ the 3D lane's slices as reconciled with Tom on 2026-11-09 (touche
 | Keyed instance changes update affected instance records | 4 (insert, remove, reorder, one transform; unchanged geometry uploads) | Matches |
 | Explicit instancing, no automatic batching | 4 (`Instances` as an explicit batching contract) | Matches |
 | Measure uploads and draw calls | 4 asserts geometry uploads; draw counts appear only in the lane's performance section | Differs: no slice asserts draw calls, and the painter has no upload or draw counter |
-| Custom renderers declare invalidation | Layer 1 has `SurfaceHandle::invalidate` and `animating` (c); slice 5 says signal changes and tasks invalidate the surface | Differs: slices 2 to 4 do not say how a scene node's signal change reaches the surface's invalidation; `Scene3d` is itself a renderer and must call it |
+| Custom renderers declare invalidation | Layer 1 has `SurfaceHandle::invalidate` and `request_animation` (c); slice 5 says signal changes and tasks invalidate the surface | Differs: slices 2 to 4 do not say how a scene node's signal change reaches the surface's invalidation; `Scene3d` is itself a renderer and must call it |
 
 ## e. Open API choices for Tom
 
@@ -119,6 +119,9 @@ wake the loop when it starts. (b) Replace the flag with
 app; the renderer stays passive. (c) Frame tasks (slice 5) own
 animation, and surfaces only invalidate. Separately: add `now` to
 `SurfaceFrame`, or leave time to the app's `with_per_frame` hook.
+**Decided: (b)** (Tom, 2026-11-10, touche
+`docs/decisions/2026-11-10-incremental-ui-contract-answers.md`), built in
+#147. The `now` question is not decided.
 
 e4. **Equal-value setters.** (a) Each setter returns early on an equal
 value, after confirming no observer depends on the write (editor,

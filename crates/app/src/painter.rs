@@ -192,6 +192,9 @@ use images::Textures;
 #[path = "painter_errors.rs"]
 mod errors;
 pub use errors::{DrawOverError, MountError, PaintError, SUPPORTED, UnsupportedFormat};
+#[path = "painter_surface_state.rs"]
+mod surface_state;
+pub use surface_state::SurfaceState;
 #[path = "painter_surfaces.rs"]
 mod surfaces;
 use surfaces::Surfaces;

@@ -1,22 +1,32 @@
-//! A `SurfaceRenderer` drawing `gradient.wgsl` over its surface, and
-//! counting its renders for the idle check.
+//! A `SurfaceRenderer` drawing `gradient.wgsl` over its surface, moved
+//! a step along at each render, and counting its renders for the check.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use vapors_app::{SURFACE_FORMAT, SurfaceError, SurfaceFrame, SurfaceRenderer};
 
-/// Draws the gradient; its pipeline is made in `mount`.
+/// Renders for the gradient to move through two widths and back.
+const CYCLE: u64 = 240;
+
+/// Draws the gradient; its pipeline and shift are made in `mount`.
 pub struct Gradient {
-    pipeline: Option<wgpu::RenderPipeline>,
+    drawing: Option<Drawing>,
     renders: Arc<AtomicU64>,
+}
+
+/// The pipeline, and the `shift` uniform it reads.
+struct Drawing {
+    pipeline: wgpu::RenderPipeline,
+    shift: wgpu::Buffer,
+    bindings: wgpu::BindGroup,
 }
 
 impl Gradient {
     /// A renderer that adds one to `renders` for each render.
     pub fn counting(renders: Arc<AtomicU64>) -> Self {
         Self {
-            pipeline: None,
+            drawing: None,
             renders,
         }
     }
@@ -24,15 +34,21 @@ impl Gradient {
 
 impl SurfaceRenderer for Gradient {
     fn mount(&mut self, device: &wgpu::Device) -> Result<(), SurfaceError> {
-        self.pipeline = Some(pipeline(device));
+        self.drawing = Some(Drawing::new(device));
         Ok(())
     }
 
     fn render(&mut self, frame: SurfaceFrame<'_>) -> Result<(), SurfaceError> {
-        let pipeline = self
-            .pipeline
+        let drawing = self
+            .drawing
             .as_ref()
             .ok_or("the gradient rendered before it was mounted")?;
+        let renders = self.renders.fetch_add(1, Ordering::SeqCst);
+        #[allow(clippy::cast_precision_loss)] // under CYCLE
+        let shift = (renders % CYCLE) as f32 / CYCLE as f32;
+        frame
+            .queue
+            .write_buffer(&drawing.shift, 0, &shift.to_ne_bytes());
         let mut pass = frame
             .encoder
             .begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -48,10 +64,35 @@ impl SurfaceRenderer for Gradient {
                 })],
                 ..Default::default()
             });
-        pass.set_pipeline(pipeline);
+        pass.set_pipeline(&drawing.pipeline);
+        pass.set_bind_group(0, &drawing.bindings, &[]);
         pass.draw(0..3, 0..1);
-        self.renders.fetch_add(1, Ordering::SeqCst);
         Ok(())
+    }
+}
+
+impl Drawing {
+    fn new(device: &wgpu::Device) -> Self {
+        let pipeline = pipeline(device);
+        let shift = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("gradient shift"),
+            size: 16,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let bindings = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("gradient shift"),
+            layout: &pipeline.get_bind_group_layout(0),
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: shift.as_entire_binding(),
+            }],
+        });
+        Self {
+            pipeline,
+            shift,
+            bindings,
+        }
     }
 }
 
