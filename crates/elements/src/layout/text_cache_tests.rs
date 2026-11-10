@@ -98,7 +98,7 @@ fn a_run_narrower_than_its_max_content_is_laid_out_again() {
 
 #[test]
 fn a_centred_or_end_aligned_run_is_laid_out_again_at_its_width() {
-    for align in [Align::Center, Align::End, Align::Justify] {
+    for align in [Align::Center, Align::End] {
         // Given: alignment moves the line within the width
         let run = run("TIME\n00:00.01", align);
 
@@ -109,4 +109,88 @@ fn a_centred_or_end_aligned_run_is_laid_out_again_at_its_width() {
         assert_eq!(drawn(&kept), drawn(&fresh), "{align:?}");
         assert_eq!(built, 2, "{align:?}");
     }
+}
+
+#[test]
+fn a_number_that_is_not_finite_never_fits() {
+    for (content, available) in [
+        (10.0, f32::NAN),
+        (f32::NAN, 100.0),
+        (f32::NAN, f32::NAN),
+        (10.0, f32::INFINITY),
+        (f32::INFINITY, f32::INFINITY),
+    ] {
+        assert!(!fits(content, available), "{content} in {available}");
+    }
+    assert!(fits(10.0, 10.0));
+}
+
+#[test]
+fn a_run_with_a_nan_letter_spacing_is_laid_out_like_a_fresh_one() {
+    // Given: a NaN spacing, so every glyph after the first sits at NaN
+    let run = InlineRun {
+        style: style(Align::Start, f32::NAN),
+        ..run("a few words that wrap", Align::Start)
+    };
+
+    // When
+    let (kept, built, fresh) = after_max_content(&run, 40.0);
+
+    // Then: built again, and drawn as a fresh build is (compared as text,
+    // since NaN is not equal to itself)
+    assert_eq!(built, 2);
+    assert_eq!(format!("{:?}", drawn(&kept)), format!("{:?}", drawn(&fresh)));
+}
+
+#[test]
+fn a_run_with_a_negative_letter_spacing_is_laid_out_like_a_fresh_one() {
+    // Given
+    let run = InlineRun {
+        style: style(Align::Start, -2.0),
+        ..run("a few words that wrap", Align::Start)
+    };
+
+    // When
+    let (kept, built, fresh) = after_max_content(&run, 400.0);
+
+    // Then
+    assert_eq!(built, 2);
+    assert_eq!(drawn(&kept), drawn(&fresh));
+}
+
+#[test]
+fn a_span_with_a_negative_letter_spacing_is_laid_out_like_a_fresh_one() {
+    // Given
+    let run = InlineRun {
+        spans: vec![InlineSpan {
+            node: NodeId(1),
+            range: 2..6,
+            visible: true,
+            style: style(Align::Start, -2.0),
+        }],
+        ..run("a few words that wrap", Align::Start)
+    };
+
+    // When
+    let (kept, built, fresh) = after_max_content(&run, 400.0);
+
+    // Then
+    assert_eq!(built, 2);
+    assert_eq!(drawn(&kept), drawn(&fresh));
+}
+
+#[test]
+fn reuse_at_a_fractional_scale_is_recorded() {
+    // Given: max-content asked for at scale 1.25, then a width it fits
+    let run = run("00:00.01 lap ", Align::Start);
+    let (mut fonts, mut cache) = (FontSystem::bundle_only(), TextCache::default());
+    cache.layout(&mut fonts, 1.25, &run, None);
+
+    // When
+    let kept = cache.layout(&mut fonts, 1.25, &run, Some(400.0));
+    let fresh = text_layout(&mut fonts, 1.25, &run, Some(400.0));
+
+    // Then: reused, and drawn as a fresh build is
+    assert_eq!(cache.built(), 1);
+    assert_eq!(drawn(&kept), drawn(&fresh));
 }

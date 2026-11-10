@@ -2,7 +2,15 @@
 //! width is kept by its text, its styles and that width; measuring and
 //! painting ask for it, and only a run that changed is laid out again.
 //! A start-aligned run at a width its max-content layout fits in takes
-//! that layout: its lines and glyphs would be the same.
+//! that layout: its lines and glyphs would be the same. Justify is
+//! left out deliberately, to be conservative. Runs with a negative or
+//! NaN letter spacing are left out too. A reused layout differs from a
+//! fresh one in parley's `layout_max_advance` (`f32::MAX`) and in each
+//! line's `inline_max_coord` (the content width); nothing in vapors
+//! reads either, but a reader of those fields would see the difference.
+//! Reuse compares widths in device pixels, so at a fractional scale
+//! rounding may stop it firing: a performance limit, not a correctness
+//! one.
 //! A layout no update asked for is dropped at the end of the next one.
 
 use std::collections::HashMap;
@@ -127,15 +135,17 @@ impl TextCache {
     /// would give the same: the run is start-aligned, so its lines do
     /// not move within the width, and no line is wider than `width`, so
     /// none breaks. It is kept for the next update too, which may ask
-    /// only for widths.
+    /// only for widths. The layout's `layout_max_advance` and each
+    /// line's `inline_max_coord` are those of the max-content layout,
+    /// not of one built at `width`.
     fn unwrapped(&mut self, run: &InlineRun, width: Option<f32>, scale: f32) -> Option<Rc<Layout>> {
         let width = width?;
-        if !matches!(run.style.align, Align::Start) {
+        if !reusable(run) {
             return None;
         }
         let key = Key::of(run, None, scale);
         let layout = self.current.get(&key).or_else(|| self.previous.get(&key))?;
-        if layout.width() > width * scale {
+        if !fits(layout.width(), width * scale) {
             return None;
         }
         let layout = Rc::clone(layout);
@@ -154,6 +164,23 @@ impl TextCache {
     pub(crate) fn built(&self) -> usize {
         self.built
     }
+}
+
+/// Whether a max-content layout of `run` can stand in for one at a
+/// width: it is start-aligned and no letter spacing, its own or a
+/// span's, is negative or NaN (a negative one can make the running x
+/// non-monotonic, so a position mid-line can pass the final width).
+fn reusable(run: &InlineRun) -> bool {
+    let spacing = |style: &TextStyle| style.letter_spacing >= 0.0;
+    matches!(run.style.align, Align::Start)
+        && spacing(&run.style)
+        && run.spans.iter().all(|span| spacing(&span.style))
+}
+
+/// Whether a line `content` wide fits `available`. A NaN or infinite
+/// number on either side does not fit, so it is laid out, not reused.
+fn fits(content: f32, available: f32) -> bool {
+    content.is_finite() && available.is_finite() && content <= available
 }
 
 #[cfg(test)]
