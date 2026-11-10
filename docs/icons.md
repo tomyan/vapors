@@ -80,9 +80,12 @@ boxes.
   path that passed the check rasterises.
 - The element's content box is snapped to whole device pixels, as an
   image's is. The icon is rasterised at that device-pixel size: the
-  viewBox is scaled into it (device width / viewBox width, and the
-  same for height; the ratios are equal by the `width`/`height`
-  rule) after translating by `-min-x`, `-min-y`. Every path of the
+  viewBox is scaled into it by the smaller of device width / viewBox
+  width and device height / viewBox height, and centred, as SVG's
+  default `preserveAspectRatio` (`xMidYMid meet`) does. The ratios
+  are equal by the `width`/`height` rule until snapping to device
+  pixels changes the box's, and the uniform scale keeps strokes from
+  stretching then. Every path of the
   `<svg>` is stroked by zeno into one coverage mask, and that
   8-bit mask is placed in the atlas's coverage page, beside glyphs
   and evicted with them.
@@ -96,7 +99,7 @@ boxes.
   boost are glyph-specific and not applied to icons; the blend is
   confirmed by the paint oracle.
 - Built in 1b: `vapors_text::Icon` (view box and `IconStroke`s, checked:
-  a view box with area, positive stroke widths) and `Icon::rasterize`;
+  at least one stroke, a view box with area, positive stroke widths) and `Icon::rasterize`;
   paths in one icon combine source-over (`a + b(1 - a)`), as two paths
   of one colour paint. `GlyphAtlas::icon(icon, size)` refuses an icon
   larger than a page (`AtlasError::IconTooLarge`) before rasterising.

@@ -2,6 +2,8 @@
 //! box and device size, packed into the coverage page beside glyphs and
 //! evicted with them (docs/icons.md, Paint).
 
+use std::sync::Arc;
+
 use crate::atlas::{AtlasError, AtlasGlyph, GlyphAtlas};
 use crate::atlas_types::AtlasKey;
 use crate::icon::Icon;
@@ -17,7 +19,7 @@ impl GlyphAtlas {
     /// [`AtlasError::Full`] when the frame's glyphs and icons overflow one.
     pub fn icon(&mut self, icon: &Icon, size: [u32; 2]) -> Result<AtlasGlyph, AtlasError> {
         let key = AtlasKey::Icon {
-            bits: icon.bits().to_vec(),
+            bits: Arc::clone(icon.bits()),
             size,
         };
         if let Some(placed) = self.cached(&key) {

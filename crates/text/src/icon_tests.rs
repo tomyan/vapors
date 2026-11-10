@@ -151,3 +151,28 @@ fn an_icon_is_refused_when_a_stroke_width_is_not_positive() {
         );
     }
 }
+
+#[test]
+fn a_box_snapped_to_another_ratio_scales_the_view_box_uniformly_and_centres_it() {
+    // Given: a 16 by 16 view box in a 16 by 18 box
+    let icon = icon("M0 8H16", 2.0);
+
+    // When
+    let coverage = icon.rasterize([16, 18]);
+
+    // Then: scale 1 and one pixel above, so rows 8 and 9 full (a stretch gives partial rows 7 and 10)
+    let mut expected = vec![0; 18];
+    expected[8] = 255;
+    expected[9] = 255;
+    assert_eq!(column(&coverage, 5), expected);
+}
+
+#[test]
+fn an_icon_is_refused_when_it_has_no_strokes() {
+    // When
+    let error = Icon::new([0.0, 0.0, 16.0, 16.0], Vec::new()).expect_err("refused");
+
+    // Then
+    assert_eq!(error, IconError::NoStrokes);
+    assert!(error.to_string().contains("Fix: give the <svg>"), "{error}");
+}

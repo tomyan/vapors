@@ -1,6 +1,7 @@
 //! What the atlas hands out and how it fails.
 
 use std::fmt;
+use std::sync::Arc;
 
 use crate::raster::{GlyphRequest, Hinting, RasterError};
 
@@ -126,7 +127,7 @@ pub(crate) enum AtlasKey {
     Glyph(GlyphKey),
     /// An icon's bits (`Icon::bits`) at a device size.
     Icon {
-        bits: Vec<u32>,
+        bits: Arc<[u32]>,
         size: [u32; 2],
     },
 }

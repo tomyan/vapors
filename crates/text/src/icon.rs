@@ -3,8 +3,9 @@
 //! zeno's defaults, which are SVG's: miter joins with limit 4, butt caps.
 
 use std::fmt;
+use std::sync::Arc;
 
-use zeno::{Command, Format, Mask, Origin, Stroke, Transform};
+use zeno::{Cap, Command, Format, Join, Mask, Origin, Stroke, Transform};
 
 use crate::icon_path::IconPath;
 use crate::raster::Coverage;
@@ -23,12 +24,14 @@ pub struct IconStroke {
 pub struct Icon {
     view_box: [f32; 4],
     strokes: Vec<IconStroke>,
-    bits: Vec<u32>,
+    bits: Arc<[u32]>,
 }
 
 /// Why an icon was refused.
 #[derive(Clone, Debug, PartialEq)]
 pub enum IconError {
+    /// No paths: nothing to draw.
+    NoStrokes,
     /// A view box with a non-finite number, or a width or height not above 0.
     ViewBox([f32; 4]),
     /// A stroke width that is not a positive finite number.
@@ -44,9 +47,12 @@ impl Icon {
     /// The icon `strokes` draw in `view_box` (`min-x min-y width height`).
     ///
     /// # Errors
-    /// [`IconError`] for a view box without area or a stroke width that is
-    /// not positive.
+    /// [`IconError`] for no strokes, a view box without area, or a stroke
+    /// width that is not positive.
     pub fn new(view_box: [f32; 4], strokes: Vec<IconStroke>) -> Result<Self, IconError> {
+        if strokes.is_empty() {
+            return Err(IconError::NoStrokes);
+        }
         let has_area = view_box[2] > 0.0 && view_box[3] > 0.0;
         if !has_area || !view_box.iter().all(|n| n.is_finite()) {
             return Err(IconError::ViewBox(view_box));
@@ -56,7 +62,7 @@ impl Icon {
             let width = strokes[index].width;
             return Err(IconError::StrokeWidth { index, width });
         }
-        let bits = key_bits(view_box, &strokes);
+        let bits = key_bits(view_box, &strokes).into();
         Ok(Self {
             view_box,
             strokes,
@@ -65,22 +71,16 @@ impl Icon {
     }
 
     /// Coverage of the strokes scaled from the view box to `size` device
-    /// pixels, its top-left at the box's corner. Strokes overlap as two
-    /// paths of one colour paint: `a + b(1 - a)`.
+    /// pixels, uniformly and centred as SVG's default `xMidYMid meet`, its
+    /// top-left at the box's corner. Strokes overlap as two paths of one
+    /// colour paint: `a + b(1 - a)`.
     #[must_use]
     pub fn rasterize(&self, size: [u32; 2]) -> Coverage {
         let [width, height] = size;
         let mut data = vec![0; width as usize * height as usize];
         let transform = self.to_device(size);
         for stroke in &self.strokes {
-            let (layer, _) = Mask::new(stroke.path.commands())
-                .style(Stroke::new(stroke.width))
-                .transform(Some(transform))
-                .format(Format::Alpha)
-                .origin(Origin::TopLeft)
-                .size(width, height)
-                .render();
-            source_over(&mut data, &layer);
+            source_over(&mut data, &stroke_mask(stroke, transform, size));
         }
         Coverage {
             left: 0,
@@ -94,16 +94,36 @@ impl Icon {
 
     /// The view box, stroke widths and paths as bits: equal for icons that
     /// rasterise alike, so the atlas can key on it.
-    pub(crate) fn bits(&self) -> &[u32] {
+    pub(crate) fn bits(&self) -> &Arc<[u32]> {
         &self.bits
     }
 
+    /// The view box scaled by the smaller of the two axis ratios and
+    /// centred in the box, so device-pixel snapping never stretches it.
     #[allow(clippy::cast_precision_loss)] // device sizes are far below 2^24
     fn to_device(&self, [width, height]: [u32; 2]) -> Transform {
         let [x, y, w, h] = self.view_box;
-        let (sx, sy) = (width as f32 / w, height as f32 / h);
-        Transform::new(sx, 0.0, 0.0, sy, -x * sx, -y * sy)
+        let (width, height) = (width as f32, height as f32);
+        let scale = (width / w).min(height / h);
+        let left = (width - w * scale) / 2.0 - x * scale;
+        let top = (height - h * scale) / 2.0 - y * scale;
+        Transform::new(scale, 0.0, 0.0, scale, left, top)
     }
+}
+
+/// One stroke's coverage: miter joins with limit 4 and butt caps, SVG's
+/// defaults, set here rather than left to zeno's.
+fn stroke_mask(stroke: &IconStroke, transform: Transform, [width, height]: [u32; 2]) -> Vec<u8> {
+    let mut style = Stroke::new(stroke.width);
+    style.join(Join::Miter).miter_limit(4.0).cap(Cap::Butt);
+    Mask::new(stroke.path.commands())
+        .style(style)
+        .transform(Some(transform))
+        .format(Format::Alpha)
+        .origin(Origin::TopLeft)
+        .size(width, height)
+        .render()
+        .0
 }
 
 fn source_over(under: &mut [u8], over: &[u8]) {
@@ -141,6 +161,11 @@ fn command_bits(command: &Command, bits: &mut Vec<u32>) {
 impl fmt::Display for IconError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::NoStrokes => write!(
+                f,
+                "icon has no paths. Fix: give the <svg> at least one <path> child \
+                 (docs/icons.md)."
+            ),
             Self::ViewBox(view_box) => write!(
                 f,
                 "icon viewBox {view_box:?} has no area. Fix: give viewBox four finite numbers, \
