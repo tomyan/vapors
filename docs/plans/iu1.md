@@ -108,6 +108,33 @@ reading every element.
 Upload bytes and draw calls per frame in `ScenePainter`
 (`crates/app`), if they can be counted without a synchronous GPU wait.
 
+Done: `ScenePainter::frame_counts()` (and `ElementsApp::frame_counts()`)
+returns `FrameCounts`, the last frame's `GpuWork` per run kind: bytes
+passed to `write_buffer`, bytes passed to `write_texture`, and `draw`
+calls, counted where the pipelines issue them (`WorkCounter`, in
+`vapors-renderer`), with no readback. Not counted: the clear, and what
+a `gpu-surface`'s own renderer does.
+
+What a frame with nothing changed uploads and draws today, at 640x400,
+scale 1, measured at 94ff557 plus this PR (the second of two identical
+frames). Reproduce with `cargo run -p vapors-app --example frame_counts`,
+which prints the first and the idle frame of each demo; the counter's idle
+row is also pinned by `gpu_frame_counts_kinds.rs`:
+
+| Demo | Draw calls | Buffer bytes | Texture bytes | First frame's texture bytes |
+|---|---|---|---|---|
+| hello | 4 (2 quad runs, 2 text items) | 26 624 | 0 | 2 097 152 |
+| counter | 3 (2 quad runs, 1 text item) | 2 800 | 0 | 1 048 576 |
+| stress | 1 803 (901 quad runs, 902 text items) | 820 784 | 0 | 44 040 192 |
+
+So an idle frame re-uploads every run's instances or vertices and
+redraws every run: one draw per quad or shadow run, one per text item,
+image and surface, one per icon run. The atlas is not uploaded when no
+glyph was added; when one is, the whole 1024 x 1024 page is uploaded
+(1 048 576 bytes), once per text item that adds a glyph, which is why
+stress's first frame uploads 42 pages. These are the numbers IU4's
+retained paint targets.
+
 ## PR 4: timing baseline
 
 Recorded in `docs/`: revision, profile (release), hardware and backend,

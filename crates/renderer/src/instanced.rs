@@ -6,6 +6,7 @@
 
 use vapors_scene::{Scissor, Size};
 
+use crate::WorkCounter;
 use crate::quads_setup::{bind_group_layout, load_pass, render_pipeline, uniform};
 
 const VERTICES_PER_QUAD: u32 = 6;
@@ -31,6 +32,7 @@ pub(crate) struct Instanced {
     viewport: wgpu::Buffer,
     instances: wgpu::Buffer,
     stride: u64,
+    pub(crate) work: WorkCounter,
 }
 
 impl Instanced {
@@ -66,6 +68,7 @@ impl Instanced {
             viewport: uniform(device),
             instances: instance_buffer(device, label, stride * 64),
             stride,
+            work: WorkCounter::default(),
         }
     }
 
@@ -83,10 +86,11 @@ impl Instanced {
         if self.instances.size() < bytes.len() as u64 {
             self.instances = instance_buffer(target.device, self.label, bytes.len() as u64);
         }
-        target.queue.write_buffer(&self.instances, 0, bytes);
-        target
-            .queue
-            .write_buffer(&self.viewport, 0, &viewport_bytes(target.viewport));
+        let viewport = viewport_bytes(target.viewport);
+        self.work
+            .write_buffer(target.queue, &self.instances, 0, bytes);
+        self.work
+            .write_buffer(target.queue, &self.viewport, 0, &viewport);
         self.submit(target, count);
     }
 
@@ -112,7 +116,7 @@ impl Instanced {
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &bind_group, &[]);
             pass.set_vertex_buffer(0, self.instances.slice(..));
-            pass.draw(0..VERTICES_PER_QUAD, 0..count);
+            self.work.draw(&mut pass, 0..VERTICES_PER_QUAD, 0..count);
         }
         target.queue.submit([encoder.finish()]);
     }

@@ -4,6 +4,8 @@
 //! aliasing (F2c S10 review: 1 px stripes shrunk 3x came out black and
 //! white where Chromium shows grey 127).
 
+use crate::WorkCounter;
+
 /// An `Rgba8Unorm` texture of `rgba` (`width * height * 4` bytes) with a
 /// full mip chain, for sampling with a linear mipmap filter.
 ///
@@ -16,6 +18,23 @@ pub fn upload_rgba8_mipmapped(
     width: u32,
     height: u32,
     rgba: &[u8],
+) -> wgpu::Texture {
+    let work = WorkCounter::default();
+    upload_rgba8_mipmapped_counted(device, queue, [width, height], rgba, &work)
+}
+
+/// As [`upload_rgba8_mipmapped`], of `size` (width, height), counting
+/// every level's bytes in `work`.
+///
+/// # Panics
+/// If `rgba` does not hold `width * height` pixels: a caller bug.
+#[must_use]
+pub fn upload_rgba8_mipmapped_counted(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    [width, height]: [u32; 2],
+    rgba: &[u8],
+    work: &WorkCounter,
 ) -> wgpu::Texture {
     assert_eq!(
         rgba.len(),
@@ -34,17 +53,17 @@ pub fn upload_rgba8_mipmapped(
         view_formats: &[],
     });
     for (level, (size, pixels)) in levels.iter().enumerate() {
-        write_level(queue, &texture, level, *size, pixels);
+        write_level(queue, work, &texture, level, (*size, pixels.as_slice()));
     }
     texture
 }
 
 fn write_level(
     queue: &wgpu::Queue,
+    work: &WorkCounter,
     texture: &wgpu::Texture,
     level: usize,
-    size: [u32; 2],
-    pixels: &[u8],
+    (size, pixels): ([u32; 2], &[u8]),
 ) {
     let target = wgpu::TexelCopyTextureInfo {
         mip_level: u32::try_from(level).expect("a mip chain is short"),
@@ -55,7 +74,7 @@ fn write_level(
         bytes_per_row: Some(size[0] * 4),
         rows_per_image: Some(size[1]),
     };
-    queue.write_texture(target, pixels, layout, extent(size));
+    work.write_texture(queue, target, pixels, layout, extent(size));
 }
 
 fn extent([width, height]: [u32; 2]) -> wgpu::Extent3d {
