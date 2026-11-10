@@ -25,10 +25,13 @@ impl IconPath {
         let mut cursor = Cursor::new(data);
         cursor.skip_space();
         if cursor.at_end() {
-            return Err(cursor.error("path data is empty; give d a move (M) and a line"));
+            return Err(
+                cursor.error("path data is empty; write a move and a line, such as M1 1L5 5")
+            );
         }
         if !matches!(cursor.peek(), Some(b'M' | b'm')) {
-            return Err(cursor.error("path data must start with M or m"));
+            return Err(cursor
+                .error("path data must start with M or m; write M x y before the first command"));
         }
         let mut commands = Vec::new();
         while !cursor.at_end() {
@@ -76,12 +79,13 @@ impl Verb {
 /// follow (a move's repeats are lines).
 fn segment(cursor: &mut Cursor<'_>, out: &mut Vec<Command>) -> Result<(), PathError> {
     let letter = cursor.peek().expect("not at the end");
-    let (mut verb, relative) = Verb::of(letter).ok_or_else(|| cursor.error(unknown(letter)))?;
+    let (mut verb, relative) = Verb::of(letter).ok_or_else(|| cursor.error(unknown(cursor)))?;
     cursor.advance();
     if verb == Verb::Close {
         out.close();
         return Ok(());
     }
+    cursor.refuse_comma_after_command()?;
     loop {
         group(cursor, verb, relative, out)?;
         if verb == Verb::Move {
@@ -93,14 +97,20 @@ fn segment(cursor: &mut Cursor<'_>, out: &mut Vec<Command>) -> Result<(), PathEr
     }
 }
 
-fn unknown(letter: u8) -> String {
-    let shown = char::from(letter);
-    if b"CcSsQqTt".contains(&letter) {
+/// Why the character at the cursor is not a command of the subset.
+fn unknown(cursor: &Cursor<'_>) -> String {
+    let found = cursor.found();
+    if matches!(
+        cursor.peek(),
+        Some(b'C' | b'c' | b'S' | b's' | b'Q' | b'q' | b'T' | b't')
+    ) {
         return format!(
-            "{shown:?} (a curve) is not in the icon subset, which draws M L H V A Z (docs/icons.md); draw it with lines and arcs"
+            "{found} (a curve) is not in the icon subset, which draws M L H V A Z; draw it with lines (L) and arcs (A)"
         );
     }
-    format!("expected a command, one of M L H V A Z (or lower case for relative), found {shown:?}")
+    format!(
+        "expected a command, one of M L H V A Z (lower case for relative), found {found}; write the segment with those commands"
+    )
 }
 
 /// One argument group of `verb`, added to `out`.
@@ -136,29 +146,47 @@ fn axis_line(out: &mut Vec<Command>, [x, y]: [Option<f32>; 2]) -> &mut Vec<Comma
     out.line_to(Point::new(x.unwrap_or(current.x), y.unwrap_or(current.y)))
 }
 
+/// An arc to its end point. A zero radius is a straight line (SVG 2
+/// 9.5.1), which zeno would turn into NaN; zeno takes negative radii as
+/// absolute, scales radii too small up, and skips an end point equal to
+/// the current point, as SVG says.
 fn arc<'a>(
     cursor: &mut Cursor<'_>,
     from: Point,
     out: &'a mut Vec<Command>,
 ) -> Result<&'a mut Vec<Command>, PathError> {
     let (rx, ry, angle) = (cursor.number()?, cursor.number()?, cursor.number()?);
-    let size = if cursor.flag()? {
+    let (size, sweep) = (arc_size(cursor)?, arc_sweep(cursor)?);
+    let to = point(cursor)? + from;
+    if rx == 0.0 || ry == 0.0 {
+        return Ok(out.line_to(to));
+    }
+    Ok(out.arc_to(rx, ry, Angle::from_degrees(angle), size, sweep, to))
+}
+
+fn arc_size(cursor: &mut Cursor<'_>) -> Result<ArcSize, PathError> {
+    Ok(if cursor.flag()? {
         ArcSize::Large
     } else {
         ArcSize::Small
-    };
-    let sweep = if cursor.flag()? {
+    })
+}
+
+fn arc_sweep(cursor: &mut Cursor<'_>) -> Result<ArcSweep, PathError> {
+    Ok(if cursor.flag()? {
         ArcSweep::Positive
     } else {
         ArcSweep::Negative
-    };
-    let to = point(cursor)? + from;
-    Ok(out.arc_to(rx, ry, Angle::from_degrees(angle), size, sweep, to))
+    })
 }
 
 #[cfg(test)]
 #[path = "icon_path_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "icon_path_arc_tests.rs"]
+mod arc_tests;
 
 #[cfg(test)]
 #[path = "icon_path_refusals_tests.rs"]

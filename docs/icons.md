@@ -39,6 +39,10 @@ attribute and the fix.
   presentation hints that CSS overrides one axis at a time, which the
   natural-size route does not reproduce). Inline is refused as for
   `img`: give it `display: block` or make it a flex or grid item.
+  touche's ask-bar svgs are inline today (`#tools-open`,
+  `#conversation-expand`, `#ask-mic`, `#ask-voice`, `#ask-voice-mute`,
+  `#ask-send`), so touche's CSS gives them `display: block`, as it does
+  for Dictate's rect.
   `color`, `margin`, `display`, `visibility` and `opacity` apply as to
   any box.
 
@@ -48,8 +52,11 @@ attribute and the fix.
   implicit repeats (`l4 4-4 4`), SVG number syntax (signs, decimals,
   exponents, `1.5.5` as two numbers), and arc flags written `0` or `1`,
   packed or spaced. Malformed data is refused with the offset of the
-  first character not understood. Curves (`C S Q T`) are not in the
-  subset.
+  first character not understood, naming the fix. Only whitespace may
+  follow a command letter, so `M,1 1` is refused as in Chromium. A
+  number that does not fit a 32-bit float is refused. An arc with a
+  zero radius is drawn as a line to its end point, as SVG says.
+  Curves (`C S Q T`) are not in the subset.
 - `fill="none"`: required (SVG's default fill is black).
 - `stroke="currentColor"`: required.
 - `stroke-width`: a positive number in viewBox units; 1 when absent, as
@@ -72,15 +79,20 @@ boxes.
   commands; the same parser answers the elements' refusal check, so a
   path that passed the check rasterises.
 - The element's content box is snapped to whole device pixels, as an
-  image's is. The path is scaled from viewBox units to device pixels
-  (width / viewBox width times the scale factor), stroked by zeno, and
-  its 8-bit coverage placed in the atlas's coverage page, beside
-  glyphs and evicted with them.
-- The atlas key is the path data, stroke width, viewBox and device
-  size in pixels: one icon at one size and scale is rasterised once.
-- `Item::Icon { icon, rect, colour }` in the display list; the painter
-  draws it through the text pipeline as one quad of the atlas
-  coverage tinted by the element's `color`. Text's gamma and contrast
+  image's is. The icon is rasterised at that device-pixel size: the
+  viewBox is scaled into it (device width / viewBox width, and the
+  same for height; the ratios are equal by the `width`/`height`
+  rule) after translating by `-min-x`, `-min-y`. Every path of the
+  `<svg>` is stroked by zeno into one coverage mask, and that
+  8-bit mask is placed in the atlas's coverage page, beside glyphs
+  and evicted with them.
+- One atlas entry per `<svg>`, however many paths it has. Its key is
+  every path's `d` and `stroke-width` in document order, the viewBox,
+  and the device size in pixels: one icon at one size and scale is
+  rasterised once.
+- `Item::Icon { icon, rect, colour }` in the display list, one per
+  `<svg>`; the painter draws it through the text pipeline as one quad
+  of the atlas coverage tinted by the element's `color`. Text's gamma and contrast
   boost are glyph-specific and not applied to icons; the blend is
   confirmed by the paint oracle.
 - Built in 1b: `vapors_text::Icon` (view box and `IconStroke`s, checked:

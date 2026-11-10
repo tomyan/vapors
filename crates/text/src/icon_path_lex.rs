@@ -23,6 +23,7 @@ impl std::error::Error for PathError {}
 
 /// A position in path data.
 pub(crate) struct Cursor<'a> {
+    text: &'a str,
     bytes: &'a [u8],
     at: usize,
 }
@@ -30,6 +31,7 @@ pub(crate) struct Cursor<'a> {
 impl<'a> Cursor<'a> {
     pub(crate) fn new(data: &'a str) -> Self {
         Self {
+            text: data,
             bytes: data.as_bytes(),
             at: 0,
         }
@@ -47,12 +49,34 @@ impl<'a> Cursor<'a> {
         self.at >= self.bytes.len()
     }
 
-    /// A refusal at the current position.
+    /// A refusal at the current position. Every refusal points at the
+    /// doc here, so none can leave it out.
     pub(crate) fn error(&self, reason: impl Into<String>) -> PathError {
         PathError {
             offset: self.at,
-            reason: reason.into(),
+            reason: format!("{} (docs/icons.md lists the subset)", reason.into()),
         }
+    }
+
+    /// The character at the cursor, quoted, for a message. `at` only ever
+    /// advances over ASCII, so it is on a character boundary.
+    pub(crate) fn found(&self) -> String {
+        match self.text[self.at..].chars().next() {
+            Some(found) => format!("{found:?}"),
+            None => "the end of the data".to_string(),
+        }
+    }
+
+    /// Only whitespace may follow a command letter (SVG 2's grammar;
+    /// Chromium refuses `M,1 1`).
+    pub(crate) fn refuse_comma_after_command(&mut self) -> Result<(), PathError> {
+        self.skip_space();
+        if self.peek() == Some(b',') {
+            return Err(self.error(
+                "a comma cannot follow a command letter; remove it (write M1 1, not M,1 1)",
+            ));
+        }
+        Ok(())
     }
 
     pub(crate) fn skip_space(&mut self) {
@@ -83,7 +107,7 @@ impl<'a> Cursor<'a> {
         let flag = match self.peek() {
             Some(b'0') => false,
             Some(b'1') => true,
-            _ => return Err(self.error("expected an arc flag, 0 or 1")),
+            _ => return Err(self.expected("an arc flag, 0 or 1", "write each arc flag as 0 or 1")),
         };
         self.advance();
         Ok(flag)
@@ -99,12 +123,24 @@ impl<'a> Cursor<'a> {
         let mantissa = self.digits() + self.fraction();
         if mantissa == 0 {
             self.at = start;
-            return Err(self.error("expected a number"));
+            return Err(self.expected("a number", "write the argument as digits such as 4 or -1.5"));
         }
         self.exponent()?;
-        let text = std::str::from_utf8(&self.bytes[start..self.at]).expect("ASCII digits");
-        text.parse()
-            .map_err(|_| self.error(format!("{text:?} is not a number")))
+        let text = &self.text[start..self.at];
+        let value: f32 = text.parse().unwrap_or(f32::NAN);
+        if value.is_finite() {
+            return Ok(value);
+        }
+        self.at = start;
+        Err(self.error(format!(
+            "{text:?} does not fit a 32-bit float; write a number under 3.4e38"
+        )))
+    }
+
+    /// A refusal at the current position: `what` was expected, what is
+    /// here was found, and `fix` says what to write.
+    fn expected(&self, what: &str, fix: &str) -> PathError {
+        self.error(format!("expected {what}, found {}; {fix}", self.found()))
     }
 
     fn skip_sign(&mut self) {
@@ -136,7 +172,9 @@ impl<'a> Cursor<'a> {
         self.advance();
         self.skip_sign();
         if self.digits() == 0 {
-            return Err(self.error("expected the exponent's digits"));
+            return Err(
+                self.error("expected the exponent's digits after e; write 1e2, or drop the e")
+            );
         }
         Ok(())
     }
