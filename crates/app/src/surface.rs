@@ -61,7 +61,9 @@ pub struct SurfaceFrame<'a> {
 /// painted, on a change of device size or scale, and when it is painted
 /// again after a frame it was not); `render` after a `resize`, after
 /// [`ScenePainter::invalidate`](crate::ScenePainter::invalidate), and on
-/// every frame while `animating`. Unmounting drops the renderer: teardown
+/// every frame while the app animates the surface
+/// ([`SurfaceHandle::request_animation`](crate::SurfaceHandle::request_animation)).
+/// The renderer does not ask for frames. Unmounting drops the renderer: teardown
 /// is `Drop`. A frame that does not need a render composites the last one.
 ///
 /// A surface not painted in a frame is inactive: the painter releases its
@@ -108,10 +110,4 @@ pub trait SurfaceRenderer {
     /// When it cannot draw; the frame is refused rather than shown with
     /// stale or blank content.
     fn render(&mut self, frame: SurfaceFrame<'_>) -> Result<(), SurfaceError>;
-
-    /// True while the content changes every frame: the painter renders
-    /// it each frame and asks for the next ([`ScenePainter::wants_frame`](crate::ScenePainter::wants_frame)).
-    fn animating(&self) -> bool {
-        false
-    }
 }

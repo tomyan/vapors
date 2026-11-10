@@ -1,7 +1,8 @@
 //! The painter's surface host: each mounted renderer by name, its
 //! backing texture, and when it renders (docs/gpu-surface.md). A
 //! surface renders on its first frame, after a resize or an
-//! invalidation, and every frame while animating; other frames
+//! invalidation, and every frame while animating (`set_animating`,
+//! which `SurfaceHandle::request_animation` drives); other frames
 //! composite its last render. A surface not painted in a frame, or
 //! clipped out of view, is inactive: its backing is released until it
 //! is painted again. A clipped-out surface is still refused as one in
@@ -25,6 +26,8 @@ use backing::Mounted;
 pub(crate) use backing::wants_frame_around_a_pending_scope;
 #[path = "painter_surface_scope.rs"]
 mod scope;
+#[path = "painter_surface_texture.rs"]
+mod texture;
 
 /// The mounted renderers, by surface name.
 #[derive(Default)]
@@ -72,9 +75,19 @@ impl ScenePainter {
     ///
     /// [`MountError::NotMounted`] when no renderer has that name.
     pub fn invalidate(&mut self, name: &str) -> Result<(), MountError> {
-        let mounted = self.surfaces.mounted.get_mut(name);
-        let mounted = mounted.ok_or_else(|| MountError::NotMounted(name.to_owned()))?;
-        mounted.invalidate();
+        self.surfaces.named(name)?.invalidate();
+        Ok(())
+    }
+
+    /// Renders the surface named `name` on every frame that paints it
+    /// while `animating`; a surface that is not painted renders nothing
+    /// and asks for no frame. The caller asks for the next frame.
+    ///
+    /// # Errors
+    ///
+    /// [`MountError::NotMounted`] when no renderer has that name.
+    pub fn set_animating(&mut self, name: &str, animating: bool) -> Result<(), MountError> {
+        self.surfaces.named(name)?.set_animating(animating);
         Ok(())
     }
 
@@ -130,6 +143,11 @@ impl Surfaces {
             claimed.map_err(|r| r.named(name))?;
         }
         Ok(())
+    }
+
+    fn named(&mut self, name: &str) -> Result<&mut Mounted, MountError> {
+        let mounted = self.mounted.get_mut(name);
+        mounted.ok_or_else(|| MountError::NotMounted(name.to_owned()))
     }
 
     fn mounted(&mut self, name: &str) -> Result<&mut Mounted, PaintError> {

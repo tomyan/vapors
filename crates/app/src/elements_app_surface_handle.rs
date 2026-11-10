@@ -4,7 +4,10 @@
 //! the app kept from the platform; it answers in three states: woken,
 //! left for the first frame (the loop has not started), or refused
 //! (unmounted, or the loop has ended: the app failed or was dropped).
-//! Handles are single-threaded, as the document is.
+//! `request_animation` does the same and keeps the surface rendering
+//! every frame until `stop_animation`. Handles are single-threaded, as
+//! the document is: another thread sends to the app's thread and wakes
+//! the loop with a `Waker`, which is `Send`.
 //!
 //! [`ElementsApp`]: super::ElementsApp
 
@@ -22,6 +25,8 @@ pub(super) struct Shared {
     pub(super) mounted: BTreeSet<String>,
     /// Names invalidated since the last frame passed them on.
     pub(super) stale: BTreeSet<String>,
+    /// Names the app animates, passed to the painter on every frame.
+    pub(super) animating: BTreeSet<String>,
     /// Whether the app's loop has started, runs, or has ended.
     pub(super) run: Run,
 }
@@ -47,7 +52,8 @@ pub struct SurfaceHandle {
     pub(super) shared: Rc<RefCell<Shared>>,
 }
 
-/// What [`SurfaceHandle::invalidate`] did.
+/// What [`SurfaceHandle::invalidate`] or
+/// [`SurfaceHandle::request_animation`] did.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Invalidated {
     /// It woke the running loop for a frame that renders the surface.
@@ -56,7 +62,7 @@ pub enum Invalidated {
     AtFirstFrame,
 }
 
-/// Why [`SurfaceHandle::invalidate`] did nothing.
+/// Why a [`SurfaceHandle`] call did nothing.
 #[derive(Debug, PartialEq, Eq)]
 pub enum InvalidateError {
     /// The surface's renderer was unmounted.
@@ -98,6 +104,45 @@ impl SurfaceHandle {
     /// [`InvalidateError::NotMounted`] when the renderer was unmounted;
     /// [`InvalidateError::LoopClosed`] when the loop has ended.
     pub fn invalidate(&self) -> Result<Invalidated, InvalidateError> {
+        self.mark(|_| ())
+    }
+
+    /// Renders the surface on every frame that paints it, from the next,
+    /// and wakes the loop for that frame; frames continue until
+    /// [`stop_animation`](Self::stop_animation). A surface not painted
+    /// (hidden, zero-sized, clipped out) asks for no frame and keeps the
+    /// request: it animates again once a frame paints it.
+    ///
+    /// # Errors
+    ///
+    /// As [`invalidate`](Self::invalidate).
+    pub fn request_animation(&self) -> Result<Invalidated, InvalidateError> {
+        self.mark(|shared| {
+            shared.animating.insert(self.name.clone());
+        })
+    }
+
+    /// Stops the frames [`request_animation`](Self::request_animation)
+    /// asked for: from the next frame the surface renders only when
+    /// invalidated, and the app returns to waiting once nothing else
+    /// wants a frame. Stopping a surface that is not animating, or after
+    /// the loop has ended, does nothing.
+    ///
+    /// # Errors
+    ///
+    /// [`InvalidateError::NotMounted`] when the renderer was unmounted.
+    pub fn stop_animation(&self) -> Result<(), InvalidateError> {
+        let mut shared = self.shared.borrow_mut();
+        if !shared.mounted.contains(&self.name) {
+            return Err(InvalidateError::NotMounted(self.name.clone()));
+        }
+        shared.animating.remove(&self.name);
+        Ok(())
+    }
+
+    /// Marks the surface stale, with `also` applied to what is shared,
+    /// and wakes the loop.
+    fn mark(&self, also: impl FnOnce(&mut Shared)) -> Result<Invalidated, InvalidateError> {
         let mut shared = self.shared.borrow_mut();
         if !shared.mounted.contains(&self.name) {
             return Err(InvalidateError::NotMounted(self.name.clone()));
@@ -108,6 +153,7 @@ impl SurfaceHandle {
             Run::Closed => return Err(InvalidateError::LoopClosed(self.name.clone())),
         };
         shared.stale.insert(self.name.clone());
+        also(&mut shared);
         drop(shared);
         self.wake(waker)
     }

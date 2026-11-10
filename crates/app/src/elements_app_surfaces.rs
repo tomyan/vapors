@@ -57,6 +57,7 @@ impl ElementsApp {
             return Err(MountError::NotMounted(name.to_owned()));
         }
         shared.stale.remove(name);
+        shared.animating.remove(name);
         drop(shared);
         match &mut self.painter {
             Some(painter) => painter.unmount(name),
@@ -113,7 +114,8 @@ impl AppSurfaces {
     }
 
     /// Mounts the pending renderers on the painter just made, and passes
-    /// it the surfaces invalidated since the last frame.
+    /// it the surfaces invalidated since the last frame and whether each
+    /// is animating.
     ///
     /// # Errors
     ///
@@ -122,8 +124,12 @@ impl AppSurfaces {
         for (name, renderer) in self.pending.drain(..) {
             painter.mount(&name, renderer)?;
         }
-        let stale = std::mem::take(&mut self.shared.borrow_mut().stale);
-        stale.iter().try_for_each(|name| painter.invalidate(name))
+        let mut shared = self.shared.borrow_mut();
+        let stale = std::mem::take(&mut shared.stale);
+        stale.iter().try_for_each(|name| painter.invalidate(name))?;
+        let animating = |name: &String| shared.animating.contains(name);
+        let mut mounted = shared.mounted.iter();
+        mounted.try_for_each(|name| painter.set_animating(name, animating(name)))
     }
 }
 
