@@ -274,6 +274,10 @@ jobs:
       # The waker in a window: none idle, one frame per wake from a thread.
       - name: the waker in a window
         run: xvfb-run -a cargo run -p vapors-platform --example wake_window
+      # A gpu-surface renderer mounted on an ElementsApp: no frame and no
+      # render while idle, and an invalidate after the loop is LoopClosed.
+      - name: an idle gpu-surface in a window
+        run: xvfb-run -a cargo run -p vapors-app --example surface_gradient -- --check
       # The clipboard's image for Event::Paste: a PNG xclip sets reads
       # back as its pixels, text alone as no image, an unreachable
       # display as unreadable.

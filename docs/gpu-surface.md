@@ -12,7 +12,7 @@ needs no camera, depth or scene.
 |---|---|---|
 | 1a | `gpu-surface` element, `Item::Surface` in the display list, the refusals | #139 |
 | 1b | `SurfaceRenderer` and the painter's surface host: offscreen texture, resize, scale, clip, on-demand rendering, failures | #140 |
-| 1b2 | `ElementsApp` mounting, `SurfaceHandle`, `Next` from `wants_frame`; the gradient example | this PR and the next |
+| 1b2 | `ElementsApp` mounting, `SurfaceHandle`, `Next` from `wants_frame`; the gradient example | this PR |
 | 1c | the racer's renderer mounted through the surface; two panels; surface-local input | after 1b |
 | 2-5 | scene, cameras, components, instances, tasks | not started |
 
@@ -67,6 +67,10 @@ with the platform's `Waker`, which the app keeps from its first event
 or frame (before that the first frame comes anyway). It refuses a
 surface since unmounted (`InvalidateError::NotMounted`) and a loop
 that has ended (`InvalidateError::LoopClosed`).
+
+`crates/app/examples/surface_gradient` draws a WGSL gradient in a
+surface beside a panel of text; with `--check` (the CI window job) it
+counts frames and renders over an idle second, which must be none.
 
 ## Supported composition (first release)
 
