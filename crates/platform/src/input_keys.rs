@@ -27,7 +27,7 @@ pub(crate) fn pressed(press: &Press<'_>) -> Vec<Event> {
         press.modifiers,
     )];
     let paste = !cfg!(target_family = "wasm")
-        && crate::paste_key::is_paste(press, cfg!(target_os = "macos"));
+        && crate::paste_key::is_paste(press, crate::shortcut_is_command());
     if paste {
         events.push(Event::Paste);
     } else if press.state == winit::event::ElementState::Pressed {

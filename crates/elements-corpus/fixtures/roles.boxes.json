@@ -1,0 +1,20 @@
+{"viewports": [
+{"viewport": [640,400], "scale": 1,
+"boxes": [
+{"height":72,"tag":"html","width":640,"x":0,"y":0},
+{"height":72,"tag":"body","width":640,"x":0,"y":0},
+{"height":72,"tag":"div","width":640,"x":0,"y":0},
+{"height":24,"tag":"div","width":640,"x":0,"y":0},
+{"height":24,"tag":"input","width":200,"x":0,"y":0},
+{"height":24,"tag":"input","width":80,"x":200,"y":0},
+{"height":24,"tag":"input","width":120,"x":280,"y":0},
+{"height":24,"tag":"section","width":640,"x":0,"y":24},
+{"height":13,"tag":"input","width":13,"x":3,"y":27},
+{"height":13,"tag":"input","width":13,"x":22,"y":27},
+{"height":24,"tag":"button","width":80,"x":38,"y":24},
+{"height":24,"tag":"button","width":80,"x":118,"y":24},
+{"height":24,"tag":"button","width":80,"x":198,"y":24},
+{"height":24,"tag":"section","width":640,"x":0,"y":48},
+{"height":24,"tag":"button","width":80,"x":0,"y":48}
+]}
+]}

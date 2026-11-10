@@ -45,6 +45,21 @@ pub(crate) fn is_text_input(element: &Element) -> bool {
     element.tag == "input" && crate::check::is_type(element, "text")
 }
 
+/// Whether `element` has an editor: a text field, or an `input
+/// type=number`, whose caret and selection are a text field's.
+pub(crate) fn is_edited(element: &Element) -> bool {
+    is_text_input(element) || (element.tag == "input" && crate::check::is_type(element, "number"))
+}
+
+/// The text `element`'s editor holds: a text field's text, a number
+/// field's shown text (`number_shown`).
+pub(crate) fn editor_text(element: &Element) -> String {
+    if is_text_input(element) {
+        return text_of(element);
+    }
+    crate::number::Field::of(&element.attributes, &element.properties).shown
+}
+
 /// The field's text: its `value` property once set, else the attribute.
 pub(crate) fn text_of(element: &Element) -> String {
     match element.properties.get("value") {
@@ -63,6 +78,14 @@ impl Document {
             .get(node, "text field")
             .element()
             .is_some_and(is_text_input)
+    }
+
+    /// Whether `node` has an editor (`is_edited`).
+    pub(crate) fn is_edited(&self, node: NodeId) -> bool {
+        self.arena
+            .get(node, "text field")
+            .element()
+            .is_some_and(is_edited)
     }
 
     /// A text field's selection as the DOM counts it (`selectionStart`,
@@ -85,7 +108,7 @@ impl Document {
         let style = self.text_style(node);
         if !self.editors.contains_key(&node) {
             let element = self.arena.get(node, "text field").element();
-            let text = element.map(text_of).unwrap_or_default();
+            let text = element.map(editor_text).unwrap_or_default();
             let mut editor = PlainEditor::new(16.0);
             editor.set_text(&text);
             self.editors.insert(
@@ -123,7 +146,7 @@ impl Document {
             .arena
             .get(node, "text field")
             .element()
-            .is_some_and(|element| text_of(element) == text);
+            .is_some_and(|element| editor_text(element) == text);
         if same {
             return false;
         }
@@ -132,15 +155,24 @@ impl Document {
                 .properties
                 .insert("value".to_owned(), PropertyValue::Text(text));
         }
-        self.changed = true;
+        self.note_change();
         true
     }
 
-    /// A signal set the `value` property: the editor, if any, takes the
-    /// text with the caret at its end, as setting `value` in Chromium
-    /// puts it, and forgets its undo.
+    /// A signal set what the field shows (its `value`, or a number
+    /// field's `step`, `min` or `max`): the editor, if any, takes the
+    /// text when it differs, with the caret at its end, as setting
+    /// `value` in Chromium puts it, and forgets its undo.
     pub(crate) fn editor_from_text(&mut self, node: NodeId) {
-        let Some(text) = self.arena.get(node, "text field").element().map(text_of) else {
+        if !self.editors.contains_key(&node) {
+            return;
+        }
+        let Some(text) = self
+            .arena
+            .get(node, "text field")
+            .element()
+            .map(editor_text)
+        else {
             return;
         };
         if let Some(editor) = self

@@ -79,6 +79,13 @@ pub fn play(fixture: &Fixture, script: &Script, viewport: Viewport) -> Result<Lo
     for step in &script.steps {
         act(&doc, &step.action, &mut held)
             .map_err(|why| format!("{}.events:{}: {why}", fixture.name, step.line))?;
+        // a frame after each step, as Chromium draws one before it is read
+        doc.borrow_mut().update(viewport).map_err(|errors| {
+            format!(
+                "{}.events:{}: the update was refused: {errors:?}",
+                fixture.name, step.line
+            )
+        })?;
         let (focus, focus_visible) = {
             let doc = doc.borrow();
             let focus = doc
@@ -108,6 +115,9 @@ pub fn play(fixture: &Fixture, script: &Script, viewport: Viewport) -> Result<Lo
 
 fn mounted(fixture: &Fixture, viewport: Viewport) -> Result<Rc<RefCell<Document>>, String> {
     let doc = Rc::new(RefCell::new(Document::new(FontSystem::bundle_only())));
+    // the answers are Linux Chromium's: Control+A is select-all
+    doc.borrow_mut()
+        .set_shortcut_modifier(vapors_elements::ShortcutModifier::Control);
     doc.borrow_mut()
         .add_stylesheet(fixture.name, fixture.style)
         .map_err(|e| format!("{}: {e:?}", fixture.name))?;

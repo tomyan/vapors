@@ -6,6 +6,7 @@
 //! to the app as an [`Event`] and every redraw as a [`Frame`].
 
 mod attributes;
+mod browser_platform;
 mod clicks;
 #[cfg(target_family = "wasm")]
 mod clicks_web;
@@ -43,6 +44,7 @@ mod picker_web;
 mod platform;
 mod redraw;
 mod report;
+mod shortcut_modifier;
 mod surface;
 mod surface_texture;
 mod tasks;
@@ -71,6 +73,7 @@ pub use gestures::{Gestures, TAP_SLOP};
 pub use paste_key::paste_shortcut;
 pub use platform::Platform;
 pub use report::{report_error, report_startup, report_status};
+pub use shortcut_modifier::shortcut_is_command;
 pub use surface::pick_format;
 pub use text_field::TextField;
 pub use waker::{LoopClosed, Waker};

@@ -35,15 +35,15 @@ fn pause_clears_held_inputs_and_restart_resets_camera() {
     // Given
     let mut racer = Racer::new();
     racer.command("toggle").unwrap();
-    racer.driving.key("KeyW", true);
-    racer.camera.zoom = 0.7;
+    racer.run.driving.key("KeyW", true);
+    racer.run.camera.zoom = 0.7;
     // When
     racer.pause();
     // Then
-    assert!(racer.paused);
-    assert_eq!(racer.driving.controls().throttle, 0.0);
+    assert!(racer.run.paused);
+    assert_eq!(racer.run.driving.controls().throttle, 0.0);
     racer.command("restart").unwrap();
-    assert_eq!(racer.camera.zoom, 1.0);
+    assert_eq!(racer.run.camera.zoom, 1.0);
     assert!(racer.command("unknown").is_err());
 }
 #[test]
@@ -69,11 +69,11 @@ fn invalid_tuning_keeps_the_run_paused_and_can_be_corrected() {
     // When
     racer.command("toggle").unwrap();
     // Then
-    assert!(racer.paused);
+    assert!(racer.run.paused);
     assert!(racer.hud.settings.get());
     racer.hud.steering.set(1.25);
     racer.command("toggle").unwrap();
-    assert!(!racer.paused);
+    assert!(!racer.run.paused);
 }
 
 #[test]
@@ -81,14 +81,14 @@ fn a_slow_frame_does_not_pause_or_drop_held_throttle() {
     // Given
     let mut racer = Racer::new();
     racer.command("toggle").unwrap();
-    racer.driving.key("KeyW", true);
+    racer.run.driving.key("KeyW", true);
     // When
     racer.advance_elapsed(0.5).unwrap();
     // Then
-    assert!(!racer.paused);
-    assert_eq!(racer.driving.controls().throttle, 1.0);
-    assert!(racer.race.speed > 0.0);
-    assert!(racer.race.elapsed <= 0.051);
+    assert!(!racer.run.paused);
+    assert_eq!(racer.run.driving.controls().throttle, 1.0);
+    assert!(racer.run.race.speed > 0.0);
+    assert!(racer.run.race.elapsed <= 0.051);
 }
 
 #[test]
@@ -132,4 +132,44 @@ fn landscape_stats_leave_space_for_driving() {
         bounds.y + bounds.height <= 52.0,
         "stats must leave the track visible: {bounds:?}"
     );
+}
+
+#[test]
+fn no_step_runs_once_the_third_lap_is_done() {
+    // Given
+    let mut racer = Racer::new();
+    racer.command("toggle").unwrap();
+    racer.run.driving.key("KeyW", true);
+    racer.run.race.progress.laps = 3;
+    // When
+    racer.advance_elapsed(0.05).unwrap();
+    // Then
+    assert_eq!(racer.run.race.elapsed, 0.0);
+    assert_eq!(racer.run.race.speed, 0.0);
+    assert!(racer.run.paused);
+}
+
+#[test]
+fn inspection_refuses_a_non_finite_number_naming_the_field() {
+    // Given
+    let mut racer = Racer::new();
+    racer.run.race.speed = f32::NAN;
+    // When
+    let status = racer.status(1);
+    // Then
+    assert!(status.unwrap_err().contains("`speed` is NaN"));
+}
+
+#[test]
+fn inspection_status_is_one_json_object() {
+    // Given
+    let racer = Racer::new();
+    // When
+    let status = racer.status(7).unwrap();
+    // Then
+    assert!(
+        status.starts_with("{\"frame\":7,\"paused\":true,\"speed\":0,"),
+        "{status}"
+    );
+    assert!(status.ends_with(",\"targets\":{}}"), "{status}");
 }

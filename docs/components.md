@@ -104,7 +104,11 @@ the one difference from the brief in this slice.
   (`Signal<f64>`, `event.value_as_number()`), elsewhere text, so the
   `type` is written as a literal; a number field's binding updates on
   `change` (Enter, blur, a step), since its text is a number only once
-  committed. A binding plus a handler for the same event is refused.
+  committed. A number set on a number field shows at its `step`
+  attribute's precision (0.5000001 by 0.01 shows "0.50"), while its
+  value keeps the full number; Chromium shows the full number
+  (`crates/elements/src/number_shown.rs`). A binding plus a handler for
+  the same event is refused.
 - **Conditionals:** `{if cond} .. {else} .. {/if}`. There is no
   `{else if}`. Nest an `{if}` inside the `{else}` instead.
 - **Loops:** `{for (i, x) in expr key=expr} .. {/for}` or

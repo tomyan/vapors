@@ -8,7 +8,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use vapors_elements::Document;
+use vapors_elements::{Document, ShortcutModifier};
 use vapors_platform::{App, Event, Frame, Instant, Next, Platform, report_error};
 
 use crate::frame::FrameTimes;
@@ -63,11 +63,15 @@ pub type PerFrame = Box<dyn FnMut(&[(&'static str, Duration)])>;
 pub type FrameTimesHook = Box<dyn FnMut(&FrameTimes)>;
 
 impl ElementsApp {
-    /// Shows `document`.
+    /// Shows `document`, its shortcuts taking the platform's modifier
+    /// (`vapors_platform::shortcut_is_command`).
     #[must_use]
     pub fn new(document: Rc<RefCell<Document>>) -> Self {
         // a listener's `Err` (`vapors_dom::ListenerResult`) is shown
         vapors_dom::set_error_report("vapors_platform::report_error", report_error);
+        document
+            .borrow_mut()
+            .set_shortcut_modifier(shortcut_modifier());
         Self {
             document,
             painter: None,
@@ -174,10 +178,22 @@ impl ElementsApp {
     }
 }
 
+/// The modifier the platform's shortcuts take.
+fn shortcut_modifier() -> ShortcutModifier {
+    if vapors_platform::shortcut_is_command() {
+        ShortcutModifier::Command
+    } else {
+        ShortcutModifier::Control
+    }
+}
+
 #[path = "elements_app_frame.rs"]
 mod frame_phases;
 #[cfg(not(target_family = "wasm"))]
 #[path = "elements_app_paste.rs"]
 mod paste;
+#[cfg(test)]
+#[path = "elements_app_tests.rs"]
+mod tests;
 #[path = "elements_app_text.rs"]
 mod text;

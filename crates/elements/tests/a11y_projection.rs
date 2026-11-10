@@ -63,6 +63,7 @@ fn node(role: &str, name: &str, properties: &[&str]) -> AxNode {
     AxNode {
         role: role.into(),
         name: name.into(),
+        value: None,
         properties: properties.iter().map(|p| (*p).to_owned()).collect(),
     }
 }
@@ -87,6 +88,9 @@ fn an_open_combobox_names_its_active_option_and_listbox() {
     let (doc, input) = combobox(true);
     let doc = std::rc::Rc::new(std::cell::RefCell::new(doc));
     Document::focus(&doc, Some(input));
+    doc.borrow_mut()
+        .update(viewport(400.0, 300.0))
+        .expect("updates");
 
     // Then
     assert_eq!(

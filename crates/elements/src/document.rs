@@ -20,9 +20,9 @@ pub struct Document {
     pub(crate) sheets: Sheets,
     pub(crate) fonts: FontSystem,
     pub(crate) painted: Option<Painted>,
-    /// Whether anything shown may have changed since the last
-    /// `take_changed`: a tree, attribute, text or pointer-state change.
-    pub(crate) changed: bool,
+    /// Whether anything shown may have changed: a tree, attribute,
+    /// text, scroll or pointer-state change.
+    pub(crate) changes: crate::update::Changes,
     pub(crate) pointer: crate::events::Pointer,
     /// The focused element (3-E2a); `None` when the body has focus.
     pub(crate) focused: Option<NodeId>,
@@ -30,10 +30,11 @@ pub struct Document {
     pub(crate) window: crate::focus_window::Window,
     /// Where Space went down, for its click on keyup.
     pub(crate) space_on: Option<NodeId>,
-    /// The number field whose text is selected whole (3-E3c).
-    pub(crate) selected_all: Option<NodeId>,
-    /// Each number field's last committed number, from its focus on.
-    pub(crate) committed: std::collections::HashMap<NodeId, f64>,
+    /// The modifier shortcuts take (`shortcuts`).
+    pub(crate) shortcut_modifier: crate::ShortcutModifier,
+    /// Each number field's last committed number and value string,
+    /// from its focus on (`number_committed`).
+    pub(crate) committed: std::collections::HashMap<NodeId, crate::number_committed::Committed>,
     /// Each text field's editor (E6a).
     pub(crate) editors: crate::text_field::Editors,
     /// The events components dispatch themselves (`declare_events`),
@@ -76,12 +77,12 @@ impl Document {
             sheets: Sheets::new(),
             fonts,
             painted: None,
-            changed: true,
+            changes: crate::update::Changes::default(),
             pointer: crate::events::Pointer::default(),
             focused: None,
             window: crate::focus_window::Window::Focused,
             space_on: None,
-            selected_all: None,
+            shortcut_modifier: crate::ShortcutModifier::default(),
             committed: std::collections::HashMap::new(),
             editors: crate::text_field::Editors::new(),
             declared_events: std::collections::BTreeSet::new(),
@@ -102,7 +103,7 @@ impl Document {
     /// pointer's hover and active state, or a scroll. An app that redraws on change
     /// asks this after each event. True for a new document.
     pub fn take_changed(&mut self) -> bool {
-        std::mem::replace(&mut self.changed, false)
+        std::mem::replace(&mut self.changes.since_asked, false)
     }
 
     /// Registers `image` under `name` for the `img` elements whose `src`
@@ -118,7 +119,7 @@ impl Document {
         image: vapors_scene::RgbaImage,
     ) -> Result<(), String> {
         self.images.register(name, image)?;
-        self.changed = true;
+        self.note_change();
         Ok(())
     }
 
@@ -153,7 +154,7 @@ impl Document {
     /// The CSS crate's refusal, with line and column; the sheet is not
     /// added.
     pub fn add_stylesheet(&mut self, name: &str, text: &str) -> Result<(), ElementError> {
-        self.changed = true;
+        self.note_change();
         self.dirty.everything();
         self.sheets.add_author(name, text)
     }

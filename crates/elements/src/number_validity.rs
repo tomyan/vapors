@@ -57,7 +57,7 @@ impl Document {
             return Err(SetNumberError::NotFinite);
         }
         self.set_number_text(node, crate::range::written(value));
-        self.committed.insert(node, value);
+        self.remember_committed(node, value);
         Ok(())
     }
 }

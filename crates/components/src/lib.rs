@@ -7,6 +7,9 @@
 
 include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
+mod hold_output;
+pub use hold_output::hold_into;
+
 /// `prefix` and a number no other call on this process has had: a
 /// component's default id, so two left on their defaults never share
 /// one (`aria-controls` and `aria-activedescendant` find the first id in

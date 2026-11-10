@@ -106,3 +106,7 @@ hr {
    (:focus-visible), not by a press. Inline elements get no ring until
    inline elements have element boxes of their own (S6). */
 :focus-visible { outline: 2px solid #0060df; outline-offset: 1px; }
+
+/* The `hidden` attribute, as Chromium's sheet has it; an author's
+   `display` wins over it. `hidden=until-found` is not modelled. */
+[hidden] { display: none; }

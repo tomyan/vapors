@@ -1,0 +1,29 @@
+{"viewports": [
+{"viewport": [640,400], "scale": 1,
+"boxes": [
+{"height":120,"tag":"html","width":640,"x":0,"y":0},
+{"height":120,"tag":"body","width":640,"x":0,"y":0},
+{"height":40,"tag":"div","width":640,"x":0,"y":0},
+{"height":20,"tag":"button","width":80,"x":0,"y":0},
+{"height":18,"tag":"b","width":16.609375,"x":17.828125,"y":1},
+{"height":38,"tag":"button","width":80,"x":80,"y":0},
+{"height":18,"tag":"span","width":78,"x":81,"y":19},
+{"height":20,"tag":"button","width":80,"x":160,"y":0},
+{"height":0,"tag":"span","width":0,"x":0,"y":0},
+{"height":18,"tag":"span","width":48.328125,"x":205.03125,"y":1},
+{"height":20,"tag":"button","width":80,"x":240,"y":0},
+{"height":20,"tag":"button","width":80,"x":320,"y":0},
+{"height":20,"tag":"button","width":80,"x":400,"y":0},
+{"height":40,"tag":"div","width":640,"x":0,"y":40},
+{"height":18,"tag":"span","width":36.359375,"x":0,"y":40},
+{"height":18,"tag":"b","width":20.921875,"x":15.4375,"y":40},
+{"height":20,"tag":"div","width":80,"x":36.359375,"y":40},
+{"height":20,"tag":"div","width":80,"x":116.359375,"y":40},
+{"height":20,"tag":"div","width":80,"x":196.359375,"y":40},
+{"height":40,"tag":"div","width":640,"x":0,"y":80},
+{"height":0,"tag":"button","width":0,"x":0,"y":0},
+{"height":20,"tag":"button","width":80,"x":0,"y":80},
+{"height":20,"tag":"button","width":80,"x":80,"y":80},
+{"height":20,"tag":"button","width":80,"x":160,"y":80}
+]}
+]}

@@ -8,35 +8,42 @@ use vapors_renderer::Target;
 use vapors_scene::Size;
 impl Racer {
     pub(super) fn advance(&mut self, frame: &Frame<'_>) -> Result<(), String> {
-        let elapsed = self
-            .last
-            .replace(frame.now)
-            .map_or(0.0, |last| frame.now.duration_since(last).as_secs_f32());
-        if !self.paused {
+        let elapsed = self.frame_elapsed(frame);
+        if !self.run.paused {
             self.advance_elapsed(elapsed)?;
         }
-        if !self.paused || self.camera.moving {
-            self.camera
-                .step(elapsed.min(0.05), self.race.speed, self.race.heading)?;
+        if !self.run.paused || self.run.camera.moving {
+            self.step_camera(elapsed)?;
         }
         Ok(())
     }
+    fn frame_elapsed(&mut self, frame: &Frame<'_>) -> f32 {
+        let last = self.pacing.last.replace(frame.now);
+        last.map_or(0.0, |last| frame.now.duration_since(last).as_secs_f32())
+    }
+    fn step_camera(&mut self, elapsed: f32) -> Result<(), String> {
+        let (speed, heading) = (self.run.race.speed, self.run.race.heading);
+        self.run.camera.step(elapsed.min(0.05), speed, heading)
+    }
     pub(crate) fn advance_elapsed(&mut self, elapsed: f32) -> Result<(), String> {
-        if !elapsed.is_finite() || elapsed < 0.0 {
-            return Err("racer frame duration must be finite and nonnegative".into());
-        }
+        check_elapsed(elapsed)?;
         self.sample_fps(elapsed);
         // Cap catch-up at six 120Hz steps; slow rendering must not release
         // held pedals. Actual focus loss pauses through the input handler.
-        self.remainder += elapsed.min(0.05);
-        let settings = self.settings();
-        while self.remainder >= 1.0 / 120.0 {
-            self.race
-                .step(1.0 / 120.0, self.driving.controls(), settings)?;
-            self.remainder -= 1.0 / 120.0;
-        }
-        if self.race.progress.laps == 3 {
+        self.pacing.remainder += elapsed.min(0.05);
+        self.step_fixed()?;
+        if self.run.race.progress.laps == 3 {
             self.pause();
+        }
+        Ok(())
+    }
+    fn step_fixed(&mut self) -> Result<(), String> {
+        let settings = self.settings();
+        while self.pacing.remainder >= 1.0 / 120.0 {
+            self.run
+                .race
+                .step(1.0 / 120.0, self.run.driving.controls(), settings)?;
+            self.pacing.remainder -= 1.0 / 120.0;
         }
         Ok(())
     }
@@ -44,105 +51,137 @@ impl Racer {
         if elapsed == 0.0 {
             return;
         }
-        self.fps_elapsed += elapsed;
-        self.fps_frames += 1.0;
+        self.pacing.fps_elapsed += elapsed;
+        self.pacing.fps_frames += 1.0;
         // Half-second display averaging keeps the readout legible while driving.
-        if self.fps_elapsed >= 0.5 {
-            self.hud
-                .fps
-                .set(format!("{:.0}", self.fps_frames / self.fps_elapsed));
-            self.fps_elapsed = 0.0;
-            self.fps_frames = 0.0;
+        if self.pacing.fps_elapsed >= 0.5 {
+            self.hud.fps.set(format!(
+                "{:.0}",
+                self.pacing.fps_frames / self.pacing.fps_elapsed
+            ));
+            self.pacing.fps_elapsed = 0.0;
+            self.pacing.fps_frames = 0.0;
         }
     }
     pub(super) fn draw(&mut self, frame: &Frame<'_>) -> Result<(), String> {
         self.advance(frame)?;
-        #[allow(clippy::cast_possible_truncation)] // display scale is a small positive number
-        {
-            self.scale = frame.scale_factor as f32;
-        }
-        let size = frame.texture.size();
-        #[allow(clippy::cast_precision_loss)] // viewport dimensions fit f32
-        let viewport = Viewport {
-            width: size.width as f32 / self.scale,
-            height: size.height as f32 / self.scale,
-            scale: self.scale,
-        };
+        let viewport = self.viewport(frame);
+        self.layout_hud(viewport)?;
+        let view = frame
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        self.paint_world(frame, &view)?;
+        self.paint_hud(frame, &view)?;
+        self.report_frame(frame.index)
+    }
+    fn layout_hud(&mut self, viewport: Viewport) -> Result<(), String> {
         self.hud.short.set(viewport.height < 480.0);
         self.sync_hud(viewport.width);
         Document::settle_selection(&self.document);
         self.document
             .borrow_mut()
             .update(viewport)
-            .map_err(|errors| format!("racer HUD refused: {errors:?}"))?;
-        let view = frame
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-        if self.track.is_none() {
-            self.track = Some(Track::new(frame));
+            .map_err(|errors| format!("racer HUD refused: {errors:?}"))
+            .map(drop)
+    }
+    fn viewport(&mut self, frame: &Frame<'_>) -> Viewport {
+        #[allow(clippy::cast_possible_truncation)] // display scale is a small positive number
+        {
+            self.pacing.scale = frame.scale_factor as f32;
         }
-        if self.painter.is_none() {
-            self.painter = Some(
-                ScenePainter::new(frame.device, frame.texture.format())
-                    .map_err(|e| e.to_string())?,
-            );
+        let size = frame.texture.size();
+        #[allow(clippy::cast_precision_loss)] // viewport dimensions fit f32
+        Viewport {
+            width: size.width as f32 / self.pacing.scale,
+            height: size.height as f32 / self.pacing.scale,
+            scale: self.pacing.scale,
         }
-        self.track.as_mut().expect("created").draw(
+    }
+    fn paint_world(&mut self, frame: &Frame<'_>, view: &wgpu::TextureView) -> Result<(), String> {
+        self.ensure_painter(frame)?;
+        let track = self.gpu.track.get_or_insert_with(|| Track::new(frame));
+        track.draw(
             frame,
-            &view,
-            &self.race,
-            self.camera,
-            self.driving.controls().brake,
+            view,
+            &self.run.race,
+            self.run.camera,
+            self.run.driving.controls().brake,
         );
-        let target = Target {
-            device: frame.device,
-            queue: frame.queue,
-            view: &view,
-            viewport: Size {
-                width: size.width,
-                height: size.height,
-            },
-            scissor: None,
-        };
+        Ok(())
+    }
+    fn ensure_painter(&mut self, frame: &Frame<'_>) -> Result<(), String> {
+        if self.gpu.painter.is_none() {
+            let painter = ScenePainter::new(frame.device, frame.texture.format());
+            self.gpu.painter = Some(painter.map_err(|e| e.to_string())?);
+        }
+        Ok(())
+    }
+    fn paint_hud(&mut self, frame: &Frame<'_>, view: &wgpu::TextureView) -> Result<(), String> {
+        let target = hud_target(frame, view);
         let document = self.document.borrow();
-        self.painter
+        self.gpu
+            .painter
             .as_mut()
             .expect("created")
             .draw_over(&target, document.painted().expect("updated"))
-            .map_err(|e| e.to_string())?;
-        self.report_frame(frame.index);
-        Ok(())
+            .map_err(|e| e.to_string())
     }
     fn sync_hud(&self, width: f32) {
         self.hud.compact.set(width < 760.0);
-        self.hud.follow.set(self.camera.follow);
-        let enabled = !self.hud.settings.get() && self.race.progress.laps < 3;
+        self.hud.follow.set(self.run.camera.follow);
+        let enabled = !self.hud.settings.get() && self.run.race.progress.laps < 3;
         if self.hud.enabled.get_untracked() != enabled {
             self.hud.enabled.set(enabled);
         }
-        self.hud.paused.set(self.paused);
-        self.hud.speed.set(format!("{:.0}", self.race.speed * 0.72));
+        self.hud.paused.set(self.run.paused);
+        self.sync_readouts();
+        self.hud.message.set(self.message().into());
+    }
+    fn sync_readouts(&self) {
+        self.hud
+            .speed
+            .set(format!("{:.0}", self.run.race.speed * 0.72));
         self.hud
             .lap
-            .set(format!("{} / 3", (self.race.progress.laps + 1).min(3)));
-        self.hud.clock.set(time(self.race.elapsed));
+            .set(format!("{} / 3", (self.run.race.progress.laps + 1).min(3)));
+        self.hud.clock.set(time(self.run.race.elapsed));
         self.hud
             .best
-            .set(self.race.progress.best.map_or_else(|| "—".into(), time));
-        let message = if self.setup_error.is_some() {
+            .set(self.run.race.progress.best.map_or_else(|| "—".into(), time));
+    }
+    fn message(&self) -> &'static str {
+        if self.faults.setup_error.is_some() {
             "Steering and grip must be between 0.5 and 1.5."
-        } else if self.race.progress.laps == 3 {
+        } else if self.run.race.progress.laps == 3 {
             "Finished. Restart for another run."
         } else if self.hud.settings.get() {
             "Paused · adjust the car, then Drive."
-        } else if self.paused {
+        } else if self.run.paused {
             "Drive to start · clockwise · three clean laps"
-        } else if crate::model::road_distance(self.race.position) > crate::model::ROAD + 6.0 {
+        } else if crate::model::road_distance(self.run.race.position) > crate::model::ROAD + 6.0 {
             "Off track · return for a clean lap"
         } else {
             "Clockwise · camera widens with speed"
-        };
-        self.hud.message.set(message.into());
+        }
+    }
+}
+fn check_elapsed(elapsed: f32) -> Result<(), String> {
+    if elapsed.is_finite() && elapsed >= 0.0 {
+        return Ok(());
+    }
+    Err("racer frame duration must be finite and nonnegative".into())
+}
+fn hud_target<'a>(frame: &Frame<'a>, view: &'a wgpu::TextureView) -> Target<'a> {
+    let size = frame.texture.size();
+    Target {
+        device: frame.device,
+        queue: frame.queue,
+        view,
+        viewport: Size {
+            width: size.width,
+            height: size.height,
+        },
+        scissor: None,
     }
 }
 fn time(seconds: f32) -> String {

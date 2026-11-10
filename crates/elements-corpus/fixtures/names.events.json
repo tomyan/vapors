@@ -1,0 +1,77 @@
+{
+  "steps": [
+    {
+      "action": "Key(\"Tab\")",
+      "ax": [
+        {
+          "name": "Save",
+          "properties": [
+            "focused=true"
+          ],
+          "role": "button"
+        },
+        {
+          "name": "Op en",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "Shown",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "Empty",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "Fallback",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "Level",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "Bogus",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "Level",
+          "properties": [],
+          "role": "slider",
+          "value": "5"
+        },
+        {
+          "name": "Count",
+          "properties": [],
+          "role": "spinbutton",
+          "value": "3"
+        },
+        {
+          "name": "Last",
+          "properties": [],
+          "role": "button"
+        }
+      ],
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#save",
+          "type": "focusin"
+        }
+      ],
+      "focus": "button#save",
+      "focusVisible": true,
+      "line": 5,
+      "selections": {},
+      "values": {}
+    }
+  ]
+}
