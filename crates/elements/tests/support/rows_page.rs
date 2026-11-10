@@ -1,0 +1,112 @@
+//! The sparse-update workload of IU1: `rows` mounted rows of a label, a
+//! value and a button, and the edits `sparse_updates.rs` makes to one
+//! of them, each followed by one update.
+
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use vapors_dom::{Dom, NodeId};
+use vapors_elements::{Document, Viewport};
+
+use super::{document, element, text, viewport};
+
+/// The value has a fixed size, so a same-length edit to it moves no
+/// other box; the label is as wide as its text. The button changes
+/// colour on hover and gains an outline on focus.
+const CSS: &str = "body { margin: 0; } \
+    .row { display: flex; height: 24px; gap: 8px; } \
+    .value { width: 80px; height: 20px; overflow: hidden; } \
+    button { width: 60px; height: 20px; background-color: #ddd; } \
+    button:hover { background-color: #bbb; } \
+    button:focus { outline: 2px solid #36c; }";
+
+/// One row's nodes.
+pub struct Row {
+    pub label: NodeId,
+    pub value: NodeId,
+    pub button: NodeId,
+}
+
+pub struct RowsPage {
+    pub doc: Rc<RefCell<Document>>,
+    pub rows: Vec<Row>,
+}
+
+/// The viewport the workload updates at: the first 16 rows show.
+pub fn rows_viewport() -> Viewport {
+    viewport(640.0, 400.0)
+}
+
+/// `count` rows under the body, updated once.
+pub fn rows_page(count: usize) -> RowsPage {
+    let mut doc = document();
+    let rows = (0..count).map(|index| row(&mut doc, index)).collect();
+    doc.add_stylesheet("rows.css", CSS).expect("parses");
+    doc.update(rows_viewport()).expect("updates");
+    RowsPage {
+        doc: Rc::new(RefCell::new(doc)),
+        rows,
+    }
+}
+
+fn row(doc: &mut Document, index: usize) -> Row {
+    let body = doc.body();
+    let row = element(doc, body, "div", "row");
+    let label = element(doc, row, "span", "label");
+    let value = element(doc, row, "span", "value");
+    let button = element(doc, row, "button", "");
+    text(doc, button, "Edit");
+    Row {
+        label: text(doc, label, &format!("Row {index}")),
+        value: text(doc, value, &format!("{:05}", index * 7)),
+        button,
+    }
+}
+
+/// One edit of the workload, named for reports and failures.
+#[derive(Clone, Copy, Debug)]
+pub enum Edit {
+    /// The middle row's value, the same length: no box changes size.
+    FixedSizeText,
+    /// The middle row's label, longer: its box and its siblings move.
+    SizeChangingText,
+    /// The middle row's value set to the text it holds.
+    EqualText,
+    /// The pointer moves onto the second row's button.
+    Hover,
+    /// The second row's button takes focus.
+    Focus,
+}
+
+pub const EDITS: [Edit; 5] = [
+    Edit::FixedSizeText,
+    Edit::SizeChangingText,
+    Edit::EqualText,
+    Edit::Hover,
+    Edit::Focus,
+];
+
+impl RowsPage {
+    /// Makes `edit`; the second row's button is at (`HOVER_X`, 34).
+    pub fn edit(&self, edit: Edit) {
+        let middle = &self.rows[self.rows.len() / 2];
+        match edit {
+            Edit::FixedSizeText => self.set_text(middle.value, "99999"),
+            Edit::SizeChangingText => self.set_text(middle.label, "A much longer label"),
+            Edit::EqualText => {
+                let same = self.doc.borrow().text(middle.value).map(str::to_owned);
+                self.set_text(middle.value, &same.expect("a text node"));
+            }
+            Edit::Hover => Document::pointer_moved(&self.doc, [HOVER_X, 34.0]),
+            Edit::Focus => Document::focus(&self.doc, Some(self.rows[1].button)),
+        }
+    }
+
+    fn set_text(&self, node: NodeId, value: &str) {
+        self.doc.borrow_mut().set_text(node, value);
+    }
+}
+
+/// A point inside every row's button: the label of "Row 1" is under
+/// 50 px wide, the value 80 px, the gaps 8 px each.
+const HOVER_X: f32 = 170.0;
