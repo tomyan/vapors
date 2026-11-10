@@ -3,7 +3,7 @@
 //! order, and try again until the new glyph fits.
 
 use crate::atlas::{Entry, GlyphAtlas, glyph_at};
-use crate::atlas_types::{AtlasError, GlyphKey};
+use crate::atlas_types::{AtlasError, AtlasKey};
 
 impl GlyphAtlas {
     /// Room for a `width` by `height` glyph, or [`AtlasError::Full`] when
@@ -28,7 +28,7 @@ impl GlyphAtlas {
     /// Drop evictable glyphs oldest first until at least `area` pixels of
     /// their bitmaps are gone; how many were dropped.
     fn evict_least_recent(&mut self, area: u32) -> u64 {
-        let mut candidates: Vec<(u64, u32, GlyphKey)> = self
+        let mut candidates: Vec<(u64, u32, AtlasKey)> = self
             .entries
             .iter()
             .filter(|(_, entry)| entry.frame != self.frame)
@@ -85,8 +85,8 @@ impl GlyphAtlas {
 
     /// Keys of the inked glyphs, tallest first, then widest, then most
     /// recently used; a total order, so repacking is deterministic.
-    fn survivors_tallest_first(&self) -> Vec<GlyphKey> {
-        let mut survivors: Vec<(&GlyphKey, &Entry)> = self
+    fn survivors_tallest_first(&self) -> Vec<AtlasKey> {
+        let mut survivors: Vec<(&AtlasKey, &Entry)> = self
             .entries
             .iter()
             .filter(|(_, entry)| !entry.coverage.is_empty())

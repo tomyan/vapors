@@ -4,6 +4,7 @@
 
 use super::*;
 use crate::atlas::{AtlasConfig, Entry};
+use crate::atlas_types::GlyphKey;
 use crate::raster::{Coverage, Hinting};
 
 fn key(id: u32) -> GlyphKey {
@@ -45,7 +46,9 @@ fn repack_fits_the_reviewers_shape_whatever_order_the_map_holds_it_in() {
         .enumerate()
     {
         let id = u32::try_from(id).expect("six");
-        atlas.entries.insert(key(id), entry(w, h, u64::from(id)));
+        atlas
+            .entries
+            .insert(AtlasKey::Glyph(key(id)), entry(w, h, u64::from(id)));
     }
 
     // When
