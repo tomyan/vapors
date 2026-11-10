@@ -196,9 +196,10 @@ impl Handler {
         self.presented += 1;
         self.app.drawn(&self.platform);
         self.redraw_if_asked();
+        event_loop.set_control_flow(next.control_flow());
         match next {
             Next::Continue => window.request_redraw(),
-            Next::Wait => {}
+            Next::Wait | Next::WaitUntil(_) => {}
             Next::Exit => event_loop.exit(),
         }
     }
