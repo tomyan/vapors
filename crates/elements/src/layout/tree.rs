@@ -98,6 +98,7 @@ impl BoxTree<'_> {
             |handle, basis| calcs.resolve(handle, basis),
             |known, available| match &node.content {
                 Content::Text(run) => measure_text((fonts, cache), scale, run, known, available),
+                Content::Vacant => unreachable!("a vacant slot is no box's child"),
                 Content::Element(_) => node.natural.map_or(taffy::Size::ZERO, |natural| {
                     if node.style.item_is_replaced {
                         super::replaced::measure(&node.style, inputs.parent_size, known, natural)

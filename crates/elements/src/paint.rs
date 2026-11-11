@@ -134,6 +134,7 @@ fn paint_own(
     match &boxes[index].content {
         Content::Element(node) => paint_element(*node, rects[index], input, out),
         Content::Text(run) => paint_text(run, rects[index], input, out),
+        Content::Vacant => unreachable!("a vacant slot is no box's child"),
     }
 }
 

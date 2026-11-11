@@ -75,12 +75,12 @@ impl Document {
             images: &self.images,
             text_marks,
         };
-        let boxes = build(&source, root);
-        self.counts.boxes_built = boxes.len();
+        let built = build(&source, root);
+        self.counts.boxes_built = built.len();
         let size = (viewport.width, viewport.height);
         let texts = (&mut self.fonts, &mut self.texts);
-        let (boxes, work) = lay_out(
-            boxes,
+        let (slotted, work) = lay_out(
+            self.boxes.place(built),
             texts,
             (&self.boxes, &|node| kept.may_keep_layout(node)),
             viewport.scale,
@@ -91,12 +91,13 @@ impl Document {
             (self.counts.boxes_laid_out, self.counts.layout_calls) = (work.laid_out, work.calls);
             vec![ElementError::Layout(failure)]
         })?;
+        let boxes = &slotted.boxes;
         let scrolls = |index: usize| match boxes[index].content {
             crate::layout::Content::Element(node) => used[&node].scrolls(),
-            crate::layout::Content::Text(_) => false,
+            crate::layout::Content::Text(_) | crate::layout::Content::Vacant => false,
         };
-        let offsets = self.scroll.settle(&boxes, &scrolls, viewport.scale);
-        let rects = placed(&boxes, &offsets);
+        let offsets = self.scroll.settle(boxes, &scrolls, viewport.scale);
+        let rects = placed(boxes, &offsets);
         drop(layout);
         let paint_span = tracing::trace_span!("update phase", phase = "paint").entered();
         let mut input = PaintInput {
@@ -111,10 +112,10 @@ impl Document {
             scroll: &self.scroll,
             thumbs_shown: self.thumbs_shown,
         };
-        let mut painted = paint(&boxes, &rects, &mut input);
-        painted.scroll_chains = crate::scroll_chains::Chains::of(&boxes, &scrolls);
+        let mut painted = paint(boxes, &rects, &mut input);
+        painted.scroll_chains = crate::scroll_chains::Chains::of(boxes, &scrolls);
         drop(paint_span);
-        self.boxes.keep(boxes, viewport.scale);
+        self.boxes.keep(slotted, viewport.scale);
         (self.counts.boxes_laid_out, self.counts.layout_calls) = (work.laid_out, work.calls);
         self.counts.note_paint(&painted);
         // Cleared before the rehover: a hover it moves is a change this

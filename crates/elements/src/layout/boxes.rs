@@ -1,104 +1,20 @@
 //! The box tree: what Taffy lays out, derived from the document on each
 //! update. An element with `display: none` has no box. Each run of a
 //! block's consecutive inline content (text nodes and `display: inline`
-//! elements) becomes one anonymous box holding an [`InlineRun`]; a run
+//! elements) becomes one anonymous box holding an [`InlineRun`](super::inline::InlineRun); a run
 //! that collapses to nothing has no box (the empty anchors `{if}` and
 //! `{for}` leave, and the whitespace between blocks).
 
 use std::collections::HashMap;
 
-use taffy::{Cache, Display, Layout, Style};
+use taffy::{Display, Style};
 use vapors_dom::NodeId;
 
-use super::inline::{Collector, InlineRun, InlineSpan};
+use super::inline::{Collector, InlineSpan};
+pub(crate) use super::layout_box::{Content, LayoutBox};
 use crate::arena::Arena;
 use crate::node::Kind;
 use crate::style::Used;
-
-/// What a box is.
-#[derive(PartialEq)]
-pub(crate) enum Content {
-    /// An element's box; its children are boxes too.
-    Element(NodeId),
-    /// An anonymous box holding an inline run.
-    Text(InlineRun),
-}
-
-/// One box: its content, Taffy style, children, and Taffy's results.
-pub(crate) struct LayoutBox {
-    pub(crate) content: Content,
-    pub(crate) style: Style,
-    pub(crate) children: Vec<usize>,
-    pub(crate) cache: Cache,
-    pub(crate) layout: Layout,
-    /// The out-of-flow (absolute and fixed) boxes this box is the
-    /// containing block of, as Taffy hoists them; their layouts are
-    /// relative to this box.
-    pub(crate) hoisted: Vec<usize>,
-    /// The natural size of the image an `img` shows, CSS px; a kept
-    /// layout is lent only to a box with the same.
-    pub(crate) natural: Option<[f32; 2]>,
-    /// The image an `img` shows, for paint.
-    pub(crate) image: Option<std::rc::Rc<vapors_scene::RgbaImage>>,
-    /// The icon an `svg` draws, for paint.
-    pub(crate) icon: Option<std::rc::Rc<vapors_text::Icon>>,
-    /// The name of the renderer a `gpu-surface` shows, for paint.
-    pub(crate) surface: Option<std::rc::Rc<str>>,
-    /// The numbers of an `input type=range`, for paint (3-E3a).
-    pub(crate) range: Option<crate::range::Range>,
-    /// Whether an `input type=checkbox` is checked, for paint (3-E3b).
-    pub(crate) checked: Option<bool>,
-    /// Whether the element is a text or number field (E6a, 3-E3c),
-    /// whose text origin paint keeps for the pointer.
-    pub(crate) text_field: bool,
-    /// A focused text field's caret and selection, for paint.
-    pub(crate) text_marks: Option<crate::text_marks::TextMarks>,
-}
-
-impl LayoutBox {
-    pub(crate) fn new(content: Content, style: Style) -> Self {
-        Self {
-            content,
-            style,
-            children: Vec::new(),
-            cache: Cache::new(),
-            layout: Layout::with_order(0),
-            hoisted: Vec::new(),
-            natural: None,
-            image: None,
-            icon: None,
-            surface: None,
-            range: None,
-            checked: None,
-            text_field: false,
-            text_marks: None,
-        }
-    }
-
-    /// A box showing an image of `natural` size (CSS px), when it has
-    /// one: a replaced box, which Taffy does not stretch, measured from its
-    /// natural size and its limits (`replaced::size`). A checkbox has a
-    /// natural size too but is not replaced: as a flex item it stretches
-    /// across the line, as Chromium lays one out (`fixtures/checkbox`).
-    pub(crate) fn replaced(
-        content: Content,
-        mut style: Style,
-        (natural, image): (
-            Option<[f32; 2]>,
-            Option<std::rc::Rc<vapors_scene::RgbaImage>>,
-        ),
-        stretches: bool,
-    ) -> Self {
-        if natural.is_some() && !stretches {
-            style.item_is_replaced = true;
-        }
-        Self {
-            natural,
-            image,
-            ..Self::new(content, style)
-        }
-    }
-}
 
 /// What building reads: the tree, each element's used style, the
 /// images, and the focused number field with its selection.

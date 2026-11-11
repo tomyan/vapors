@@ -6,8 +6,10 @@ mod calcs;
 mod field_box;
 mod inline;
 mod keep;
+mod layout_box;
 mod measure;
 mod replaced;
+mod slots;
 pub(crate) use boxes::Source;
 mod text_cache;
 mod tree;
@@ -19,6 +21,7 @@ pub(crate) use boxes::{Content, LayoutBox, build};
 pub(crate) use calcs::Calcs;
 pub(crate) use inline::{InlineRun, InlineSpan};
 pub(crate) use keep::KeptBoxes;
+pub(crate) use slots::Placed;
 pub(crate) use text_cache::TextCache;
 use tree::BoxTree;
 
@@ -35,27 +38,27 @@ pub struct BoxRect {
     pub height: f32,
 }
 
-/// Lays `boxes` out in a viewport of `size` CSS pixels, which is the
+/// Lays the `placed` boxes out in a viewport of `size` CSS pixels, which is the
 /// initial containing block: the root's percentages resolve against it,
 /// and an `auto` height is still its content's. A box unchanged since
 /// the update `kept` holds takes its cache and layout first. Returns
-/// the boxes and what Taffy did (`LayoutWork`); `placed` gives their
+/// them and what Taffy did (`LayoutWork`); `placed` gives their
 /// border boxes.
 ///
 /// # Errors
 /// A `calc()` that did not resolve (see `Calcs`), with what Taffy did.
 pub(crate) fn lay_out(
-    mut boxes: Vec<LayoutBox>,
+    mut placed: Placed,
     texts: (&mut FontSystem, &mut TextCache),
     kept: (&KeptBoxes, &dyn Fn(vapors_dom::NodeId) -> bool),
     scale: f32,
     size: (f32, f32),
     calcs: &Calcs,
-) -> Result<(Vec<LayoutBox>, LayoutWork), (String, LayoutWork)> {
+) -> Result<(Placed, LayoutWork), (String, LayoutWork)> {
     let (fonts, cache) = texts;
-    kept.0.lend(&mut boxes, scale, kept.1);
+    kept.0.lend(&mut placed, scale, kept.1);
     let mut tree = BoxTree {
-        boxes,
+        boxes: placed.boxes,
         fonts,
         cache,
         scale,
@@ -74,7 +77,13 @@ pub(crate) fn lay_out(
     };
     match calcs.failure() {
         Some(failure) => Err((failure, work)),
-        None => Ok((tree.boxes, work)),
+        None => Ok((
+            Placed {
+                boxes: tree.boxes,
+                slots: placed.slots,
+            },
+            work,
+        )),
     }
 }
 
