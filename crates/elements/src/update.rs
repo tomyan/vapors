@@ -68,8 +68,8 @@ impl Document {
         drop(style);
         let layout = tracing::trace_span!("update phase", phase = "layout").entered();
         let (slotted, rebuilt, written) = self.laid_out(viewport)?;
-        let stackings = self.stackings(&slotted.boxes);
-        let mut changed = ChangedSlots::of(rebuilt, last.as_ref(), &stackings);
+        let (stackings, restacked) = self.stackings(&slotted.boxes, &rebuilt, last.as_mut());
+        let mut changed = ChangedSlots::of(rebuilt, last.as_ref(), restacked);
         let laid = (&slotted, &stackings);
         let from = self.painted_from(laid, viewport, (last.as_mut(), &written), &mut changed);
         drop(layout);
