@@ -159,7 +159,7 @@ impl Document {
         let parent_used = parent_node.and_then(|p| kept.used.get(&p));
         let context = Context {
             initial: &kept.initial,
-            flex_item: parent_used.is_some_and(|p| crate::style::is_container(p.layout.display)),
+            flex_item: parent_used.is_some_and(|p| blockifies(p.layout.display)),
             in_inline: parent_used.is_some_and(|p| p.inline),
             text_like_field: self.arena.get(node, "restyle").element().is_some_and(|e| {
                 e.tag == "input"
@@ -189,4 +189,13 @@ impl Document {
             Err(_) => drop(kept.used.remove(&node)),
         }
     }
+}
+
+/// Whether a parent of `display` blockifies its children: a flex or
+/// grid container does; under `display: none` the children have no box
+/// and whether the parent will be a container once shown is unknown, so
+/// they are checked as blockified, and checked again when it is shown
+/// (its computed style changes, which restyles them).
+fn blockifies(display: taffy::Display) -> bool {
+    crate::style::is_container(display) || display == taffy::Display::None
 }

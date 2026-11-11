@@ -5,7 +5,7 @@
 //! update and assert the kept checks agree, so a missed mark fails the
 //! tests that miss it.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use vapors_dom::NodeId;
 
@@ -13,7 +13,6 @@ use crate::check::{check_element, check_tree, describe, elements, style_attribut
 use crate::document::Document;
 use crate::error::ElementError;
 use crate::kept_checks::KeptChecks;
-use crate::style::Used;
 
 impl Document {
     /// The elements under the root to check again: every one when
@@ -97,35 +96,21 @@ impl Document {
         self.assert_calcs_kept();
     }
 
-    /// The refusals after styling of `nodes` not inside a `display: none`
-    /// element, which has no boxes (showing one restyles it, so its
-    /// nodes are rechecked): each one's used style and, for an inline
-    /// element, mixed metrics; then their media's.
+    /// The refusals after styling of `nodes`: each one's used style and,
+    /// for an inline element, mixed metrics; then their media's.
     fn styled_refusals(&self, nodes: &[NodeId], scale: f32) -> Vec<ElementError> {
         let kept = self.kept.as_ref().expect("restyle keeps the styles");
-        let nodes = self.outside_hidden(nodes, &kept.used);
         let mut errors = Vec::new();
-        for &node in &nodes {
+        for &node in nodes {
             errors.extend(kept.refused.get(&node).into_iter().flatten().cloned());
             if kept.used.get(&node).is_some_and(|style| style.inline) {
                 errors.extend(self.mixed_metrics(node, &kept.used, scale));
             }
         }
         errors.extend(crate::media_checks::refusals(
-            self, &nodes, &kept.used, scale,
+            self, nodes, &kept.used, scale,
         ));
         errors
-    }
-
-    /// `nodes` but those inside a `display: none` element. The element's
-    /// own refusals stand: an icon's path refuses `display: none` itself.
-    fn outside_hidden(&self, nodes: &[NodeId], used: &HashMap<NodeId, Used>) -> Vec<NodeId> {
-        let none = |n: &NodeId| {
-            used.get(n)
-                .is_some_and(|u| u.layout.display == taffy::Display::None)
-        };
-        let shown = |&node: &NodeId| !self.chain(node).iter().skip(1).any(none);
-        nodes.iter().copied().filter(shown).collect()
     }
 
     /// The tree's refusals, in document order.
