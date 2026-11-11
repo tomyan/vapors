@@ -4,7 +4,9 @@
 //! or an ancestor, that held a box slot last update and still makes a
 //! box of its own; the owner's subtree is built again.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
+
+use crate::node_map::NodeMap;
 
 use taffy::Display;
 use vapors_dom::NodeId;
@@ -42,7 +44,7 @@ impl Marks {
     pub(crate) fn rebuild(
         &self,
         arena: &Arena,
-        used: &HashMap<NodeId, Used>,
+        used: &NodeMap<Used>,
         slots: &Slots,
         root: NodeId,
     ) -> Rebuild {
@@ -90,13 +92,7 @@ fn outermost(arena: &Arena, slots: &Slots, owners: &HashSet<NodeId>, root: NodeI
 
 /// The nearest element at or above `node` with a slot and a box of
 /// its own.
-fn owner(
-    arena: &Arena,
-    used: &HashMap<NodeId, Used>,
-    slots: &Slots,
-    root: NodeId,
-    node: NodeId,
-) -> Owner {
+fn owner(arena: &Arena, used: &NodeMap<Used>, slots: &Slots, root: NodeId, node: NodeId) -> Owner {
     let mut at = Some(node).filter(|&node| arena.contains(node));
     while let Some(node) = at {
         if boxed(used, node) && slots.of(Key::Element(node)).is_some() {
@@ -112,7 +108,7 @@ fn owner(
 
 /// Whether `node` makes a box of its own: not `display: none` and not
 /// inline.
-fn boxed(used: &HashMap<NodeId, Used>, node: NodeId) -> bool {
+fn boxed(used: &NodeMap<Used>, node: NodeId) -> bool {
     used.get(&node)
         .is_some_and(|style| style.layout.display != Display::None && !style.inline)
 }

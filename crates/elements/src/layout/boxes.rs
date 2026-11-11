@@ -5,7 +5,7 @@
 //! that collapses to nothing has no box (the empty anchors `{if}` and
 //! `{for}` leave, and the whitespace between blocks).
 
-use std::collections::HashMap;
+use crate::node_map::NodeMap;
 
 use taffy::{Display, Style};
 use vapors_dom::NodeId;
@@ -20,7 +20,7 @@ use crate::style::Used;
 /// images, and the focused number field with its selection.
 pub(crate) struct Source<'a> {
     pub(crate) arena: &'a Arena,
-    pub(crate) used: &'a HashMap<NodeId, Used>,
+    pub(crate) used: &'a NodeMap<Used>,
     pub(crate) images: &'a crate::images::Images,
     /// The focused text or number field's marks (E6a, 3-E3c).
     pub(crate) text_marks: Option<(NodeId, crate::text_marks::TextMarks)>,

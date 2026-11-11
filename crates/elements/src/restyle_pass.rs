@@ -1,7 +1,9 @@
 //! The restyle pass: the marked subtrees and elements restyled against
 //! the styles kept for their parents (see `restyle`).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
+
+use crate::node_map::{NodeMap, NodeSet};
 
 use vapors_dom::NodeId;
 
@@ -66,9 +68,9 @@ impl Document {
             viewport,
             initial: crate::style::initial_style(&self.arena, self.root(), &environment(viewport)),
             styles: Styles::default(),
-            used: HashMap::new(),
-            refused: HashMap::new(),
-            restyled_nodes: HashSet::new(),
+            used: NodeMap::default(),
+            refused: NodeMap::default(),
+            restyled_nodes: NodeSet::default(),
             calcs: crate::layout::Calcs::default(),
         }
     }

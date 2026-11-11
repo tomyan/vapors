@@ -3,7 +3,7 @@
 //! the last one marked (`restyle_pass`). A sheet added, a viewport other
 //! than the last, or a failed restyle restyles everything.
 
-use std::collections::HashMap;
+use crate::node_map::{NodeMap, NodeSet};
 
 use vapors_css::cascade::ComputedStyle;
 use vapors_css::tree::States;
@@ -47,12 +47,12 @@ pub(crate) struct Kept {
     pub(crate) viewport: Viewport,
     pub(crate) initial: ComputedStyle,
     pub(crate) styles: Styles,
-    pub(crate) used: HashMap<NodeId, Used>,
+    pub(crate) used: NodeMap<Used>,
     /// Each element's refusals, kept until it is restyled again.
-    pub(crate) refused: HashMap<NodeId, Vec<ElementError>>,
+    pub(crate) refused: NodeMap<Vec<ElementError>>,
     /// Which elements the last update restyled: their computed styles,
     /// and so the addresses their calc handles hold, are new.
-    pub(crate) restyled_nodes: std::collections::HashSet<NodeId>,
+    pub(crate) restyled_nodes: NodeSet,
     /// The calcs of the kept styles, by the handles boxes hold.
     pub(crate) calcs: crate::layout::Calcs,
 }

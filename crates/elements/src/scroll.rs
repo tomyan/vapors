@@ -3,7 +3,7 @@
 //! clamps them to the content and drops those of elements that no
 //! longer scroll; paint applies them rounded to whole device pixels.
 
-use std::collections::HashMap;
+use crate::node_map::NodeMap;
 
 use vapors_dom::NodeId;
 
@@ -12,7 +12,7 @@ use crate::layout::{Content, LayoutBox};
 /// The offsets, by scroll container.
 #[derive(Debug, Default)]
 pub(crate) struct Offsets {
-    by_node: HashMap<NodeId, Offset>,
+    by_node: NodeMap<Offset>,
 }
 
 /// One container's offset and how far it can go.
@@ -44,7 +44,7 @@ impl Offsets {
         scrolls: &dyn Fn(usize) -> bool,
         scale: f32,
     ) -> Vec<[f32; 2]> {
-        let mut kept = HashMap::new();
+        let mut kept = NodeMap::default();
         let applied = (0..boxes.len())
             .map(|index| {
                 let Content::Element(node) = boxes[index].content else {

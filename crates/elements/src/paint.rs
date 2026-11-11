@@ -3,7 +3,7 @@
 //! off (`clip`), with every edge snapped to the device pixel grid as
 //! Chromium snaps it.
 
-use std::collections::HashMap;
+use crate::node_map::NodeMap;
 
 use vapors_dom::NodeId;
 use vapors_scene::{Rect, Scene};
@@ -16,7 +16,7 @@ use crate::style::Used;
 
 /// What paint reads besides the boxes.
 pub(crate) struct PaintInput<'a> {
-    pub(crate) used: &'a HashMap<NodeId, Used>,
+    pub(crate) used: &'a NodeMap<Used>,
     /// `html` and `body`, whose backgrounds can become the canvas's.
     pub(crate) root: NodeId,
     pub(crate) body: NodeId,
@@ -37,7 +37,7 @@ impl<'a> PaintInput<'a> {
     /// The input for paint made from `from`: `page` is `html` and
     /// `body`, `text` the fonts and the text cache.
     pub(crate) fn new(
-        used: &'a HashMap<NodeId, Used>,
+        used: &'a NodeMap<Used>,
         page: (NodeId, NodeId),
         (fonts, cache): (&'a mut FontSystem, &'a mut crate::layout::TextCache),
         scroll: &'a crate::scroll::Offsets,

@@ -13,7 +13,7 @@
 //! one.
 //! A layout no update asked for is dropped at the end of the next one.
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::mem::{Discriminant, discriminant};
 use std::rc::Rc;
 
@@ -102,8 +102,8 @@ impl StyleKey {
 /// The layouts asked for this update, and those kept from the last.
 #[derive(Clone, Default)]
 pub(crate) struct TextCache {
-    current: HashMap<Key, Rc<Layout>>,
-    previous: HashMap<Key, Rc<Layout>>,
+    current: FxHashMap<Key, Rc<Layout>>,
+    previous: FxHashMap<Key, Rc<Layout>>,
     built: usize,
 }
 

@@ -1,7 +1,7 @@
 //! The refusals of the media a document draws: images, surfaces and svg
 //! icons (`img_checks`, `surfaces`, `svg_checks`), run after styling.
 
-use std::collections::HashMap;
+use crate::node_map::NodeMap;
 
 use vapors_dom::NodeId;
 
@@ -14,7 +14,7 @@ use crate::style::Used;
 pub(crate) fn refusals(
     doc: &Document,
     live: &[NodeId],
-    used: &HashMap<NodeId, Used>,
+    used: &NodeMap<Used>,
     scale: f32,
 ) -> Vec<ElementError> {
     let mut errors = crate::img_checks::refusals(&doc.images, &doc.arena, live, used);

@@ -1,9 +1,7 @@
 //! An update's paint: the last one kept, or a new one
 //! (`kept_paint.rs`).
 
-use std::collections::HashMap;
-
-use vapors_dom::NodeId;
+use crate::node_map::NodeMap;
 
 use crate::document::Document;
 use crate::kept_paint::{PaintedFrom, keep, paint_all};
@@ -43,7 +41,7 @@ impl Document {
 /// Whether the box at an index is a scroll container.
 pub(crate) fn scroll_containers<'a>(
     boxes: &'a [LayoutBox],
-    used: &'a HashMap<NodeId, Used>,
+    used: &'a NodeMap<Used>,
 ) -> impl Fn(usize) -> bool + 'a {
     move |index| match boxes[index].content {
         Content::Element(node) => used[&node].scrolls(),

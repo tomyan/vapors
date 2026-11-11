@@ -27,7 +27,7 @@ impl Stacking {
 pub(crate) fn stacking_of(
     boxes: &[LayoutBox],
     index: usize,
-    used: &std::collections::HashMap<vapors_dom::NodeId, crate::style::Used>,
+    used: &crate::node_map::NodeMap<crate::style::Used>,
 ) -> Stacking {
     let Some(node) = boxes[index].element_in(index) else {
         return Stacking::default();
