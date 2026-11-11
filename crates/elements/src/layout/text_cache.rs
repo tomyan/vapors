@@ -54,19 +54,19 @@ impl TextCache {
         width: Option<f32>,
     ) -> Rc<Layout> {
         let key = Key::of(run, width, scale);
-        if let Some(layout) = self.asked(&key) {
+        if let Some(layout) = self.asked(&key).or_else(|| self.unwrapped(run, width, scale)) {
             return layout;
         }
-        let layout = self.unwrapped(run, width, scale).unwrap_or_else(|| {
-            self.built += 1;
-            Rc::new(text_layout(fonts, scale, run, width))
-        });
+        self.built += 1;
+        let layout = Rc::new(text_layout(fonts, scale, run, width));
         self.insert(key, Rc::clone(&layout));
         layout
     }
 
     /// `run`'s max-content layout, kept, when laying it out at `width`
-    /// would give the same: the run is start-aligned, so its lines do
+    /// would give the same. It is not kept again by the width: two map
+    /// entries holding one layout would each count as a holder of the
+    /// other, and a sweep would never drop either. The conditions: the run is start-aligned, so its lines do
     /// not move within the width, and no line is wider than `width`, so
     /// none breaks. The layout's `layout_max_advance` and each line's
     /// `inline_max_coord` are those of the max-content layout, not of

@@ -75,3 +75,20 @@ fn the_map_never_holds_more_than_twice_what_the_last_sweep_left() {
         );
     });
 }
+
+#[test]
+fn a_layout_reused_at_a_width_is_dropped_once_nothing_holds_it() {
+    // Given
+    let (mut fonts, mut cache) = (FontSystem::bundle_only(), TextCache::default());
+    let label = run("label", Align::Start);
+    cache.begin();
+    cache.layout(&mut fonts, 1.0, &label, None);
+    cache.layout(&mut fonts, 1.0, &label, Some(500.0));
+
+    // When
+    later_updates(&mut cache, &mut fonts, &|_| {});
+
+    // Then
+    let first: Vec<_> = cache.entries.values().filter(|entry| entry.asked == 1).collect();
+    assert_eq!(first.len(), 0, "{} entries from update 1 survive", first.len());
+}
