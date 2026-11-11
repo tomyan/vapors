@@ -31,6 +31,8 @@ fn assert_shape(samples: &Samples, timestamps: bool) {
     }
     let spans = samples.gpu.as_ref().map(Vec::len);
     assert_eq!(spans, timestamps.then_some(FEW.runs));
+    let times = samples.gpu_time.as_ref().map(Vec::len);
+    assert_eq!(times, timestamps.then_some(FEW.runs));
 }
 
 #[test]

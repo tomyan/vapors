@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use vapors_app::FrameCounts;
+use vapors_app::{FrameCounts, FrameTiming};
 use vapors_elements::{Document, UpdateCounts};
 use vapors_platform::{App, Next};
 
@@ -25,6 +25,8 @@ pub trait Workload {
     fn check(&self, next: Next) -> Result<(), String>;
     /// The last frame's counts.
     fn counts(&self) -> Counts;
+    /// The app's frame times, its GPU time read back by this frame.
+    fn timing(&self) -> FrameTiming;
 }
 
 /// What the last frame did, counted: the document's update and what the
@@ -73,8 +75,13 @@ pub struct Samples {
     /// not enter has 0 for it.
     pub phases: BTreeMap<String, Vec<Duration>>,
     /// The GPU's time from before the frame's first submit to after its
-    /// last, per frame; `None` without timestamp queries.
+    /// last, per frame: an upper bound, as it holds the GPU's idle gaps;
+    /// `None` without timestamp queries.
     pub gpu: Option<Vec<Duration>>,
+    /// The GPU's time in the frame's render passes and `gpu-surface`
+    /// renders, from the app's `FrameTiming`, per frame; `None` without
+    /// timestamp queries.
+    pub gpu_time: Option<Vec<Duration>>,
     /// The last frame's counts.
     pub counts: Counts,
 }
@@ -91,6 +98,13 @@ impl Samples {
         self.frame.push(frame);
         for times in self.phases.values_mut() {
             times.resize(self.frame.len(), Duration::ZERO);
+        }
+    }
+
+    /// Adds one frame's GPU time; `None`, without timestamp queries, adds none.
+    pub(crate) fn push_gpu_time(&mut self, time: Option<Duration>) {
+        if let Some(time) = time {
+            self.gpu_time.get_or_insert_default().push(time);
         }
     }
 }

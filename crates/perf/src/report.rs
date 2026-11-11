@@ -30,10 +30,21 @@ pub fn section(name: &str, samples: &Samples) -> String {
         row(&mut out, phase, times);
     }
     match &samples.gpu {
-        Some(spans) => row(&mut out, "GPU span", spans),
-        None => out.push_str("| GPU span | no timestamp queries | | |\n"),
+        Some(spans) => row(&mut out, SPAN, spans),
+        None => no_timestamps(&mut out, SPAN),
+    }
+    match &samples.gpu_time {
+        Some(times) => row(&mut out, "GPU time", times),
+        None => no_timestamps(&mut out, "GPU time"),
     }
     out
+}
+
+/// The span from before the frame's first submit to after its last.
+const SPAN: &str = "GPU span (upper bound)";
+
+fn no_timestamps(out: &mut String, phase: &str) {
+    let _ = writeln!(out, "| {phase} | no timestamp queries | | |");
 }
 
 fn row(out: &mut String, phase: &str, times: &[Duration]) {

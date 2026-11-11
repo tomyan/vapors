@@ -6,7 +6,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use vapors_app::ElementsApp;
+use vapors_app::{ElementsApp, FrameTiming};
 use vapors_dom::Dom;
 use vapors_elements::{Document, Viewport};
 use vapors_platform::{App, Next};
@@ -82,6 +82,10 @@ impl Workload for Rows {
     fn counts(&self) -> Counts {
         let frame = self.app.frame_counts();
         Counts::of(&self.page.doc.borrow(), frame, self.app.render_passes())
+    }
+
+    fn timing(&self) -> FrameTiming {
+        self.app.frame_timing()
     }
 }
 
