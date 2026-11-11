@@ -18,7 +18,7 @@ fn style(align: Align, letter_spacing: f32) -> TextStyle {
     }
 }
 
-fn run(text: &str, align: Align) -> InlineRun {
+pub(super) fn run(text: &str, align: Align) -> InlineRun {
     InlineRun {
         text: text.to_owned(),
         style: style(align, 0.0),
