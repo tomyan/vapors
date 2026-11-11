@@ -31,12 +31,12 @@ impl Document {
         let text = (&mut self.fonts, &mut self.texts);
         let mut input = PaintInput::new((used, stackings), page, text, &self.scroll, from);
         let last = match last {
-            Some(kept) if kept.from.shows(from, changed.built()) => {
-                return keep(kept, boxes, &from.rects, &mut input);
+            Some(kept) if kept.from.shows(from, changed) => {
+                return keep(kept, boxes, &from.placement.rects, &mut input);
             }
             last => last,
         };
-        let painted = paint_all(boxes, &from.rects, &mut input, (last, changed));
+        let painted = paint_all(boxes, &from.placement.rects, &mut input, (last, changed));
         self.counts.note_paint(&painted);
         painted
     }

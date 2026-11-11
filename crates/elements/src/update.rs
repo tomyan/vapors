@@ -57,7 +57,7 @@ impl Document {
     /// Only on a bug in this crate: a restyle that succeeds always keeps
     /// the styles layout reads.
     pub fn update(&mut self, viewport: Viewport) -> Result<&Painted, Vec<ElementError>> {
-        let last = self.painted.take();
+        let mut last = self.painted.take();
         self.counts = crate::UpdateCounts::default();
         self.texts.begin(
             last.as_ref()
@@ -67,12 +67,13 @@ impl Document {
         self.styled(viewport)?;
         drop(style);
         let layout = tracing::trace_span!("update phase", phase = "layout").entered();
-        let (slotted, rebuilt) = self.laid_out(viewport)?;
+        let (slotted, rebuilt, written) = self.laid_out(viewport)?;
         let stackings = self.stackings(&slotted.boxes);
-        let from = self.painted_from(&slotted.boxes, &stackings, viewport);
+        let mut changed = ChangedSlots::of(rebuilt, last.as_ref(), &stackings);
+        let laid = (&slotted, &stackings);
+        let from = self.painted_from(laid, viewport, (last.as_mut(), &written), &mut changed);
         drop(layout);
         let paint_span = tracing::trace_span!("update phase", phase = "paint").entered();
-        let changed = ChangedSlots::of(rebuilt, last.as_ref(), (&from, &stackings));
         let mut painted = self.paint_or_keep(last, (&slotted.boxes, &stackings), &from, &changed);
         drop(paint_span);
         self.boxes.keep(slotted, viewport.scale);
