@@ -120,6 +120,7 @@ impl Document {
     ) -> Result<(), String> {
         self.images.register(name, image)?;
         self.note_change();
+        self.boxes.marks.all = true;
         Ok(())
     }
 

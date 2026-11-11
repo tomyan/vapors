@@ -29,6 +29,7 @@ impl Document {
                 .properties
                 .insert("value".to_owned(), PropertyValue::Text(text));
         }
+        self.boxes.marks.mark(node);
         // the text decides `:invalid`
         self.mark_flag(node, vapors_css::tree::States::INVALID);
         true

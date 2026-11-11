@@ -140,6 +140,10 @@ impl Document {
         let kept = self.kept.as_mut().expect("restyle sets it");
         kept.styles.set(node, style);
         kept.restyled_nodes.insert(node);
+        // a box holding a calc handle points into the replaced style
+        if changed || !kept.may_keep_layout(node) {
+            self.boxes.marks.mark(node);
+        }
         self.keep_used(node, viewport);
         Ok(changed)
     }

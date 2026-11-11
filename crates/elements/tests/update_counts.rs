@@ -62,8 +62,8 @@ fn a_style_attribute_that_does_not_parse_refuses_before_any_element_is_visited()
 }
 
 #[test]
-fn every_box_is_built_on_an_update_with_nothing_changed() {
-    assert_eq!(idle_counts(&mut page()).boxes_built, 5);
+fn no_box_is_built_on_an_update_with_nothing_changed() {
+    assert_eq!(idle_counts(&mut page()).boxes_built, 0);
 }
 
 #[test]

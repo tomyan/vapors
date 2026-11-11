@@ -1,9 +1,9 @@
-//! Taffy's work kept between updates (F2c S7). The box tree is rebuilt
-//! each update; a box whose style, content and children are those of a
-//! box from the last update, at the same display scale, with every
-//! child unchanged too, takes that box's cache and layout, so Taffy
-//! lays out only the changed boxes and their ancestors. Kept by diffing,
-//! not by marks: a change a mark missed cannot leave a stale layout.
+//! Taffy's work kept between updates (F2c S7, IU3). The boxes under
+//! marked elements are built again (`rebuild`); a rebuilt box whose
+//! style, content and children are those of the last update's box in
+//! its slot, at the same display scale, with every child unchanged too,
+//! takes that box's cache and layout, so Taffy lays out only the
+//! changed boxes and their ancestors.
 //!
 //! One part of a style is not compared by value: a `calc()` with a %
 //! term is a handle, the address of a computed `Calc`. An element
@@ -18,19 +18,25 @@ use taffy::Position;
 use vapors_dom::NodeId;
 
 use super::boxes::{Content, LayoutBox};
+use super::marks::Marks;
 use super::slots::{Key, Placed, Slots};
+use crate::text_marks::TextMarks;
 
 /// The boxes laid out by the last update, in their slots, at its scale.
 #[derive(Default)]
 pub(crate) struct KeptBoxes {
-    scale: f32,
-    placed: Placed,
+    pub(super) scale: f32,
+    pub(super) placed: Placed,
+    /// What changed since: the boxes the next update builds again.
+    pub(crate) marks: Marks,
+    /// The focused field's caret and selection the kept boxes show.
+    pub(super) text_marks: Option<(NodeId, TextMarks)>,
 }
 
 impl KeptBoxes {
     /// Keeps `placed`, laid out at `scale`, for the next update.
     pub(crate) fn keep(&mut self, placed: Placed, scale: f32) {
-        *self = Self { scale, placed };
+        (self.placed, self.scale) = (placed, scale);
     }
 
     /// `built`, boxes in pre-order, placed into the kept boxes' slots
@@ -54,13 +60,15 @@ impl KeptBoxes {
         scale: f32,
         may_keep: &dyn Fn(NodeId) -> bool,
     ) -> usize {
-        if self.placed.boxes.is_empty() || self.scale.to_bits() != scale.to_bits() {
+        let nothing = self.placed.boxes.is_empty() || placed.boxes.is_empty();
+        if nothing || self.scale.to_bits() != scale.to_bits() {
             return 0;
         }
+        let (old, old_boxes) = (&self.placed.slots, &self.placed.boxes);
+        let before = |at: usize| Some((old.key(at)?, old_boxes.get(at)?));
         let mut lender = Lender {
-            old: &self.placed.slots,
+            before: &before,
             new: &placed.slots,
-            old_boxes: &self.placed.boxes,
             may_keep,
             lent: 0,
         };
@@ -70,12 +78,12 @@ impl KeptBoxes {
 }
 
 /// What lending compares against.
-struct Lender<'a> {
-    old: &'a Slots,
-    new: &'a Slots,
-    old_boxes: &'a [LayoutBox],
-    may_keep: &'a dyn Fn(NodeId) -> bool,
-    lent: usize,
+pub(super) struct Lender<'a> {
+    /// The last update's key and box in a slot.
+    pub(super) before: &'a dyn Fn(usize) -> Option<(Key, &'a LayoutBox)>,
+    pub(super) new: &'a Slots,
+    pub(super) may_keep: &'a dyn Fn(NodeId) -> bool,
+    pub(super) lent: usize,
 }
 
 impl Lender<'_> {
@@ -83,16 +91,18 @@ impl Lender<'_> {
     /// A key keeps its slot, so a box is unchanged only where the last
     /// update's box in its slot had its key, and its children are
     /// unchanged when they hold the same slots and are unchanged too.
-    fn lend_from(&mut self, boxes: &mut [LayoutBox], at: usize) -> bool {
+    pub(super) fn lend_from(&mut self, boxes: &mut [LayoutBox], at: usize) -> bool {
         let children = boxes[at].children.clone();
         let mut clean = true;
         for &child in &children {
             clean &= self.lend_from(boxes, child);
         }
-        if self.old.key(at) != self.new.key(at) {
+        let Some((key, before)) = (self.before)(at) else {
+            return false;
+        };
+        if Some(key) != self.new.key(at) {
             return false;
         }
-        let before = &self.old_boxes[at];
         // An absolute or fixed box is placed against a containing block
         // outside its subtree, which may have changed, so it is laid
         // out again, and with it every ancestor up to that block, which
@@ -140,6 +150,19 @@ mod tests {
             ..Style::default()
         };
         vec![LayoutBox::new(Content::Element(NodeId(7)), style)]
+    }
+
+    #[test]
+    fn lending_to_an_update_that_built_no_box_lends_nothing() {
+        // Given: kept boxes; html became display: none, so no box
+        let mut kept = KeptBoxes::default();
+        kept.keep(crate::layout::slots::tests::churned(), 1.0);
+
+        // When
+        let lent = kept.lend(&mut Placed::default(), 1.0, &|_| true);
+
+        // Then
+        assert_eq!(lent, 0);
     }
 
     #[test]
