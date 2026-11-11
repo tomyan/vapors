@@ -134,3 +134,13 @@ Requirements from the review of #185, each with a test in its PR:
   `element` reads the wrong slot. `update`'s `scrolls` panics on a
   vacant slot (`settle` asks only element boxes); `Chains::of` visits
   every slot by index, so its `None` for a vacant slot stays.
+- PR 1b (#186): `layout/marks.rs` marks elements at each edit point
+  (attributes, properties, the person's edits, text, moves, removal,
+  images, restyles whose computed style changed or holds a calc, the
+  focused field's text marks); `KeptBoxes::rebuild` builds again only
+  the marked owners' subtrees and lends the rest their caches. Boxes
+  built per update: idle 0, one text edit 2, a class toggle 7 (702,
+  7002 or 21002 before). Layout at 1000 rows idle 7.52 → 0.77 ms,
+  update 18.57 → 11.05 ms; at 3000 rows layout 26.87 → 3.30 ms, update
+  65.98 → 39.43 ms (`docs/perf/baseline-2026-11-10.md`, "IU3 PR 1b").
+  Oracle cases per mark point: #187.
