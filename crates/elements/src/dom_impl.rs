@@ -38,6 +38,7 @@ impl Dom for Document {
             .attributes
             .insert(name.to_owned(), value.to_owned());
         self.mark_changed(node);
+        self.boxes.marks.mark(node);
         // a text field's editor follows its `value` attribute until the
         // field is edited, as the DOM's value does (E6a); a number
         // field's shown text also follows `step`, `min` and `max`
@@ -52,7 +53,13 @@ impl Dom for Document {
             self.dirty.subtree(parent);
         }
         match &mut self.arena.get_mut(node, "set_text").kind {
-            Kind::Text(current) => text.clone_into(current),
+            Kind::Text(current) if current == text => {}
+            Kind::Text(current) => {
+                text.clone_into(current);
+                if let Some(parent) = self.arena.get(node, "set_text").parent {
+                    self.boxes.marks.mark(parent);
+                }
+            }
             Kind::Element(element) => panic!(
                 "set_text: {node:?} is a <{}> element, not a text node",
                 element.tag
@@ -67,6 +74,7 @@ impl Dom for Document {
         self.element_mut(node, "set_property")
             .properties
             .insert(name.to_owned(), value);
+        self.boxes.marks.mark(node);
         match name {
             "checked" => self.mark_flag(node, vapors_css::tree::States::CHECKED),
             "value" => {
@@ -87,8 +95,10 @@ impl Dom for Document {
         self.note_change();
         if let Some(old) = self.parent(child) {
             self.mark_children_changed(old, None);
+            self.boxes.marks.mark(old);
         }
         self.arena.place("insert_before", parent, child, before);
+        self.boxes.marks.mark(parent);
         self.mark_children_changed(parent, Some(child));
     }
 
@@ -103,6 +113,7 @@ impl Dom for Document {
         self.note_change();
         if let Some(parent) = self.parent(node) {
             self.mark_children_changed(parent, None);
+            self.boxes.marks.mark(parent);
         }
         self.drop_focus_within(node);
         self.arena.detach(node);

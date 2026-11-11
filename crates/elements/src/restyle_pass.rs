@@ -23,6 +23,7 @@ impl Document {
         let fresh = self.dirty.all || self.kept.as_ref().is_none_or(|k| k.viewport != viewport);
         let (roots, singles) = if fresh {
             self.kept = Some(self.fresh_kept(viewport));
+            self.boxes.marks.all = true;
             (vec![self.root()], Vec::new())
         } else {
             self.dirty_roots()
@@ -140,6 +141,10 @@ impl Document {
         let kept = self.kept.as_mut().expect("restyle sets it");
         kept.styles.set(node, style);
         kept.restyled_nodes.insert(node);
+        // a box holding a calc handle points into the replaced style
+        if changed || !kept.may_keep_layout(node) {
+            self.boxes.marks.mark(node);
+        }
         self.keep_used(node, viewport);
         Ok(changed)
     }

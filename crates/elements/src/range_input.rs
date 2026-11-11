@@ -72,6 +72,7 @@ impl Document {
                 .properties
                 .insert("value".to_owned(), PropertyValue::Number(snapped));
         }
+        self.boxes.marks.mark(node);
         true
     }
 

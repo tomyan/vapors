@@ -10,7 +10,7 @@ use vapors_dom::NodeId;
 use crate::check::{check_tree, describe, elements, style_attribute_refusals};
 use crate::document::Document;
 use crate::error::ElementError;
-use crate::layout::{Calcs, build, lay_out, placed};
+use crate::layout::{Calcs, lay_out, placed};
 use crate::paint::{PaintInput, paint};
 use crate::painted::Painted;
 use crate::style::Refusal;
@@ -75,22 +75,17 @@ impl Document {
             images: &self.images,
             text_marks,
         };
-        let built = build(&source, root);
-        self.counts.boxes_built = built.len();
+        let may_keep = |node| kept.may_keep_layout(node);
+        let (boxes, built) = self.boxes.rebuild(&source, root, viewport.scale, &may_keep);
+        self.counts.boxes_built = built;
         let size = (viewport.width, viewport.height);
         let texts = (&mut self.fonts, &mut self.texts);
-        let (slotted, work) = lay_out(
-            self.boxes.place(built),
-            texts,
-            (&self.boxes, &|node| kept.may_keep_layout(node)),
-            viewport.scale,
-            size,
-            &calcs,
-        )
-        .map_err(|(failure, work)| {
-            (self.counts.boxes_laid_out, self.counts.layout_calls) = (work.laid_out, work.calls);
-            vec![ElementError::Layout(failure)]
-        })?;
+        let (slotted, work) =
+            lay_out(boxes, texts, viewport.scale, size, &calcs).map_err(|(failure, work)| {
+                (self.counts.boxes_laid_out, self.counts.layout_calls) =
+                    (work.laid_out, work.calls);
+                vec![ElementError::Layout(failure)]
+            })?;
         let boxes = &slotted.boxes;
         let scrolls = |index: usize| match boxes[index].content {
             crate::layout::Content::Element(node) => used[&node].scrolls(),

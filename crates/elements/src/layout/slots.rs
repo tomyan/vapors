@@ -191,6 +191,10 @@ fn keys(boxes: &[LayoutBox]) -> Vec<Key> {
     keys
 }
 
+#[path = "slots_subtree.rs"]
+mod subtree;
+pub(crate) use subtree::Taken;
+
 #[cfg(test)]
 #[path = "slots_tests.rs"]
 pub(super) mod tests;
