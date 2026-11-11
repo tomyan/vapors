@@ -34,6 +34,14 @@ pub(crate) enum Step {
     Outline(usize),
 }
 
+impl Step {
+    /// The box the step paints.
+    pub(crate) fn index(self) -> usize {
+        let (Self::Box(index) | Self::Thumb(index) | Self::Outline(index)) = self;
+        index
+    }
+}
+
 /// The boxes, box 0 the root, in paint order, with each scroll
 /// container's thumb.
 #[cfg(test)]

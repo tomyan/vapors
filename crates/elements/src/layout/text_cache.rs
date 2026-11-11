@@ -28,7 +28,7 @@ use crate::style::{Face, TextStyle};
 /// and the width and scale, every float by its bits. Eq and Hash both
 /// derive from these, so they agree (a NaN equals itself here).
 #[derive(Clone, Hash, PartialEq, Eq)]
-struct Key {
+pub(crate) struct Key {
     text: String,
     style: StyleKey,
     visible: bool,
@@ -58,7 +58,7 @@ struct StyleKey {
 }
 
 impl Key {
-    fn of(run: &InlineRun, width: Option<f32>, scale: f32) -> Self {
+    pub(crate) fn of(run: &InlineRun, width: Option<f32>, scale: f32) -> Self {
         Self {
             text: run.text.clone(),
             style: StyleKey::of(&run.style),
@@ -100,7 +100,7 @@ impl StyleKey {
 }
 
 /// The layouts asked for this update, and those kept from the last.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(crate) struct TextCache {
     current: HashMap<Key, Rc<Layout>>,
     previous: HashMap<Key, Rc<Layout>>,
@@ -168,6 +168,14 @@ impl TextCache {
             return;
         }
         for (key, layout) in self.previous.drain() {
+            self.current.entry(key).or_insert(layout);
+        }
+    }
+
+    /// Keeps the layout kept by `key` for the next update, when the last
+    /// update asked for it: a kept paint shows it (`kept_box.rs`).
+    pub(crate) fn touch(&mut self, key: &Key) {
+        if let Some((key, layout)) = self.previous.remove_entry(key) {
             self.current.entry(key).or_insert(layout);
         }
     }
