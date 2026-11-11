@@ -1,7 +1,7 @@
 //! The handler's answers to winit: resumed, a frame's wait-until time
-//! reached, the loop's own messages, and window events. A lost device is
-//! checked first in `user_event` and `window_event`, so nothing reaches
-//! the GPU or the app after it; the redraw `new_events` requests goes
+//! reached, the loop's own messages, and window events. A lost device or
+//! an uncaptured GPU error is checked first in `user_event` and
+//! `window_event`, so nothing reaches the GPU or the app after it; the redraw `new_events` requests goes
 //! through `window_event`, which checks.
 
 use winit::application::ApplicationHandler;
@@ -38,7 +38,7 @@ impl ApplicationHandler<Message> for Handler {
     }
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, message: Message) {
-        if self.stop_if_lost(event_loop) {
+        if self.stop_if_gpu_failed(event_loop) {
             return;
         }
         #[cfg(not(target_family = "wasm"))]
@@ -50,19 +50,20 @@ impl ApplicationHandler<Message> for Handler {
                 .app
                 .event(Event::FileOpened { name, bytes }, &self.platform),
             Message::OpenRequested => self.app.event(Event::OpenRequested, &self.platform),
-            // A wake with no loss recorded cannot happen: the callback
-            // records before it wakes. Nothing to do if it ever did.
-            Message::DeviceLost => {}
+            // A wake with nothing recorded cannot happen: the callbacks
+            // record before they wake. Nothing to do if it ever did.
+            Message::GpuStopped => {}
             Message::Wake => self.platform.request_redraw(),
             Message::Input(event) => self.app.event(event, &self.platform),
         }
         self.redraw_if_asked();
     }
 
-    /// A lost device stops everything here first: a resize would
-    /// reconfigure the surface on it and input would reach the app.
+    /// A lost device or an uncaptured GPU error stops everything here
+    /// first: a resize would reconfigure the surface on it and input
+    /// would reach the app.
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
-        if self.stop_if_lost(event_loop) {
+        if self.stop_if_gpu_failed(event_loop) {
             return;
         }
         if let WindowEvent::CloseRequested = event {

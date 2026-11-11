@@ -23,7 +23,9 @@ mod error;
 mod event;
 mod event_winit;
 mod file_kind;
+mod first_report;
 mod gestures;
+mod gpu_watch;
 mod handler;
 #[cfg(not(target_family = "wasm"))]
 mod ime;
@@ -54,6 +56,7 @@ mod text_field;
 mod text_keys;
 #[cfg(target_family = "wasm")]
 mod timer_web;
+mod uncaptured;
 mod waker;
 #[cfg(target_family = "wasm")]
 mod web;
