@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use crate::command_encoder::{Open, encoder, submit_timed};
 use crate::encoder_budget::Spent;
+use crate::frame_clock::FrameClock;
 use crate::open_pass::OpenPass;
 use crate::{ArenaFull, EncoderBudget, Target};
 
@@ -50,6 +51,7 @@ pub struct FrameEncoder {
     id: u64,
     open: Open,
     refusal: RefCell<Option<ArenaFull>>,
+    clock: Option<FrameClock>,
 }
 
 impl FrameEncoder {
@@ -80,6 +82,7 @@ impl FrameEncoder {
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             open: Open(Arc::new(AtomicBool::new(true))),
             refusal: RefCell::new(None),
+            clock: None,
         }
     }
 
@@ -91,13 +94,6 @@ impl FrameEncoder {
     pub fn record<R>(&self, record: impl FnOnce(&mut wgpu::CommandEncoder) -> R) -> R {
         self.end_pass();
         record(&mut self.encoder.borrow_mut())
-    }
-
-    /// The render passes begun since this encoder was made, flushes
-    /// included.
-    #[must_use]
-    pub fn render_passes(&self) -> u64 {
-        self.passes.get()
     }
 
     /// Runs `draw` in the render pass open on `target`'s view, under its
@@ -160,24 +156,15 @@ impl FrameEncoder {
     /// [`FrameEncoder::take_refusal`]; the draws recorded are submitted.
     pub fn submit(self, queue: &wgpu::Queue) -> Result<(), ArenaFull> {
         self.end_pass();
-        submit_timed(queue, self.encoder.into_inner());
+        let mut last = self.encoder.into_inner();
+        if let Some(clock) = &self.clock {
+            clock.resolve(&mut last);
+        }
+        submit_timed(queue, last);
+        if let Some(clock) = self.clock {
+            clock.submitted();
+        }
         self.refusal.into_inner().map_or(Ok(()), Err)
-    }
-
-    /// The first draw refused since the last take, if any.
-    pub fn take_refusal(&self) -> Option<ArenaFull> {
-        self.refusal.borrow_mut().take()
-    }
-
-    /// Records that a draw was refused; the first refusal is kept.
-    pub(crate) fn refuse(&self, refusal: ArenaFull) {
-        self.refusal.borrow_mut().get_or_insert(refusal);
-    }
-
-    /// Whether this encoder is still open, read after it is gone: false
-    /// once it is submitted or dropped.
-    pub(crate) fn open_flag(&self) -> Arc<AtomicBool> {
-        Arc::clone(&self.open.0)
     }
 
     /// Ends the open pass and begins one on `view`, flushing first when
@@ -194,21 +181,15 @@ impl FrameEncoder {
         }
         self.passes.set(self.passes.get() + 1);
         self.spent.pass();
-        let pass = OpenPass::begin(&mut self.encoder.borrow_mut(), view, load);
+        let writes = self.clock.as_ref().and_then(FrameClock::pass_writes);
+        let pass = OpenPass::begin(&mut self.encoder.borrow_mut(), view, load, writes);
         *self.pass.borrow_mut() = Some(pass);
     }
 
     fn end_pass(&self) {
         self.pass.borrow_mut().take();
     }
-
-    /// The device it records for.
-    pub(crate) fn device(&self) -> &wgpu::Device {
-        &self.device
-    }
-
-    /// This encoder's number: later encoders have larger ones.
-    pub(crate) fn id(&self) -> u64 {
-        self.id
-    }
 }
+
+#[path = "frame_encoder_parts.rs"]
+mod parts;
