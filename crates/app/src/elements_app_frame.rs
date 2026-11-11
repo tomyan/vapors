@@ -12,7 +12,7 @@ use vapors_scene::Size;
 use super::ElementsApp;
 use crate::check_tooltip_style;
 use crate::frame::{FrameTimes, Phase, Phases, SystemClock, run_frame};
-use crate::painter::{FrameCounts, ScenePainter};
+use crate::painter::ScenePainter;
 
 /// The phases that do work today, shown by a per-frame hook.
 const SHOWN: [Phase; 3] = [Phase::Input, Phase::Update, Phase::Draw];
@@ -41,18 +41,6 @@ impl Phases for AppFrame<'_, '_> {
 }
 
 impl ElementsApp {
-    /// What the painter's last frame handed the GPU: see
-    /// [`FrameCounts`]. All 0 before the first frame. A frame that fails
-    /// before painting (an update refusal, a mount error) leaves the
-    /// counts those of the frame before.
-    #[must_use]
-    pub fn frame_counts(&self) -> FrameCounts {
-        self.painter
-            .as_ref()
-            .map(ScenePainter::frame_counts)
-            .unwrap_or_default()
-    }
-
     /// The Update phase: `Document::update`, then the tooltip's style
     /// checked, so a bad `--tooltip-*` value fails this frame and not
     /// the first hover (seven lookups on the root's custom properties).
@@ -74,6 +62,7 @@ impl ElementsApp {
     fn paint(&mut self, frame: &Frame<'_>, now: Instant) -> Result<(), String> {
         let encoder = FrameEncoder::new(frame.device);
         let painted = self.record(frame, &encoder, now);
+        self.render_passes = encoder.render_passes();
         let submitted = encoder.submit(frame.queue);
         painted.and(submitted.map_err(|refused| refused.to_string()))
     }

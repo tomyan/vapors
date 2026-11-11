@@ -119,7 +119,7 @@ impl TextPipeline {
         };
         let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
         let bind_group = self.bind_group(target.device, params);
-        target.draw_pass("text", |pass| {
+        target.draw_pass(|pass| {
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &bind_group, &[]);
             pass.set_vertex_buffer(0, vertices.slice());

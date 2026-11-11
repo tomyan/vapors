@@ -11,6 +11,7 @@ mod image;
 mod image_setup;
 mod instanced;
 mod mips;
+mod open_pass;
 mod quad;
 mod quads;
 mod quads_setup;

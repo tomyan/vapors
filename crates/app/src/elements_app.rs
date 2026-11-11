@@ -65,6 +65,8 @@ pub struct ElementsApp {
     decision: FrameDecision,
     /// Whether events came through `App::event` or `give`; `None` before the first.
     hosting: Option<Hosting>,
+    /// Render passes the last painted frame's encoder began.
+    render_passes: u64,
 }
 
 /// What [`ElementsApp::with_per_frame`] calls before each update, with
@@ -98,6 +100,7 @@ impl ElementsApp {
             input_spent: Duration::ZERO,
             decision: FrameDecision::default(),
             hosting: None,
+            render_passes: 0,
         }
     }
 
@@ -173,6 +176,8 @@ fn shortcut_modifier() -> ShortcutModifier {
     }
 }
 
+#[path = "elements_app_counts.rs"]
+mod counts;
 #[path = "elements_app_decision.rs"]
 mod decision;
 #[path = "elements_app_frame.rs"]

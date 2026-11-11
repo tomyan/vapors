@@ -141,7 +141,7 @@ impl ImagePipeline {
         };
         let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
         let bind_group = self.bind_group(target.device, texture, sampler);
-        target.draw_pass("image", |pass| {
+        target.draw_pass(|pass| {
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &bind_group, &[]);
             pass.set_vertex_buffer(0, vertices.slice());

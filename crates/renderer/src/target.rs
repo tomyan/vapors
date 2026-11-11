@@ -27,38 +27,11 @@ pub struct Target<'a> {
 }
 
 impl Target<'_> {
-    /// Records a render pass named `label` that loads and stores the
-    /// view, under the scissor, and runs `draw` in it.
-    pub fn draw_pass(&self, label: &str, draw: impl FnOnce(&mut wgpu::RenderPass<'_>)) {
-        self.encoder.record(|encoder| {
-            let mut pass = load_pass(encoder, self.view, label);
-            if let Some(s) = self.scissor {
-                pass.set_scissor_rect(s.x, s.y, s.width, s.height);
-            }
-            draw(&mut pass);
-        });
+    /// Runs `draw` in the encoder's render pass on the view, which loads
+    /// and stores it, under the scissor. Consecutive draws on one view
+    /// share the pass.
+    pub fn draw_pass(&self, draw: impl FnOnce(&mut wgpu::RenderPass<'_>)) {
+        self.encoder
+            .draw(self.view, self.scissor, |pass| draw(pass));
     }
-}
-
-fn load_pass<'e>(
-    encoder: &'e mut wgpu::CommandEncoder,
-    view: &wgpu::TextureView,
-    label: &str,
-) -> wgpu::RenderPass<'e> {
-    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some(label),
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view,
-            depth_slice: None,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Load,
-                store: wgpu::StoreOp::Store,
-            },
-        })],
-        depth_stencil_attachment: None,
-        timestamp_writes: None,
-        occlusion_query_set: None,
-        multiview_mask: None,
-    })
 }

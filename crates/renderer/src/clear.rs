@@ -47,11 +47,10 @@ pub fn clear_view(
     queue.submit([encoder.finish()]);
 }
 
-/// Record a clear of `target`'s whole view to `color` into its encoder.
+/// Record a clear of `target`'s whole view to `color` into its encoder,
+/// in the render pass the draws on that view that follow share.
 pub fn clear_target(target: &Target<'_>, color: Color) {
-    target
-        .encoder
-        .record(|encoder| clear_pass(encoder, target.view, color));
+    target.encoder.clear(target.view, to_wgpu(color));
 }
 
 fn clear_pass(encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView, color: Color) {

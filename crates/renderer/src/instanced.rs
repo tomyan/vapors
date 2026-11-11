@@ -92,7 +92,7 @@ impl Instanced {
                 resource: viewport.binding(),
             }],
         });
-        target.draw_pass(self.label, |pass| {
+        target.draw_pass(|pass| {
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &bind_group, &[]);
             pass.set_vertex_buffer(0, instances.slice());

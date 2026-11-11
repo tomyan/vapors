@@ -4,11 +4,12 @@
 //! (docs/perf/baseline-2026-11-10.md, run 3), about half of each draw
 //! call's time when every draw submitted.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use crate::ArenaFull;
+use crate::open_pass::OpenPass;
 
 /// Each encoder's number, so a pipeline's [`FrameArena`](crate::FrameArena)
 /// knows when a new frame starts.
@@ -31,9 +32,16 @@ static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 /// `max_buffer_size` is not recorded; [`FrameEncoder::submit`] returns
 /// the first such refusal, and [`FrameEncoder::take_refusal`] hands it
 /// over sooner.
+///
+/// Consecutive draws on one view share one render pass. The pass ends
+/// when a draw goes to another view, on a clear, on [`FrameEncoder::record`],
+/// [`FrameEncoder::flush`] and [`FrameEncoder::submit`].
 pub struct FrameEncoder {
     device: wgpu::Device,
+    // declared before `encoder`, so a dropped encoder ends its pass first
+    pass: RefCell<Option<OpenPass>>,
     encoder: RefCell<wgpu::CommandEncoder>,
+    passes: Cell<u64>,
     id: u64,
     open: Open,
     refusal: RefCell<Option<ArenaFull>>,
@@ -45,26 +53,66 @@ impl FrameEncoder {
     pub fn new(device: &wgpu::Device) -> Self {
         Self {
             device: device.clone(),
+            pass: RefCell::new(None),
             encoder: RefCell::new(encoder(device)),
+            passes: Cell::new(0),
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             open: Open(Arc::new(AtomicBool::new(true))),
             refusal: RefCell::new(None),
         }
     }
 
-    /// Runs `record` with the encoder.
+    /// Runs `record` with the encoder, after ending the open render pass.
     ///
     /// # Panics
     ///
     /// If `record` itself calls `record` on this encoder.
     pub fn record<R>(&self, record: impl FnOnce(&mut wgpu::CommandEncoder) -> R) -> R {
+        self.end_pass();
         record(&mut self.encoder.borrow_mut())
+    }
+
+    /// The render passes begun since this encoder was made, flushes
+    /// included.
+    #[must_use]
+    pub fn render_passes(&self) -> u64 {
+        self.passes.get()
+    }
+
+    /// Runs `draw` in the render pass open on `view`, under `scissor`
+    /// (`None`: the whole view), beginning one that loads the view if the
+    /// open pass is on another view or none is open.
+    ///
+    /// # Panics
+    ///
+    /// If `draw` uses this encoder.
+    pub(crate) fn draw(
+        &self,
+        view: &wgpu::TextureView,
+        scissor: Option<vapors_scene::Scissor>,
+        draw: impl FnOnce(&mut wgpu::RenderPass<'static>),
+    ) {
+        let mut open = self.pass.borrow_mut();
+        if !open.as_ref().is_some_and(|pass| pass.is_on(view)) {
+            *open = None;
+            *open = Some(self.begin(view, wgpu::LoadOp::Load));
+        }
+        draw(open.as_mut().expect("opened above").scissored(scissor));
+    }
+
+    /// Clears `view` to `color` in a render pass left open for the draws
+    /// on `view` that follow.
+    pub(crate) fn clear(&self, view: &wgpu::TextureView, color: wgpu::Color) {
+        self.end_pass();
+        let cleared = self.begin(view, wgpu::LoadOp::Clear(color));
+        *self.pass.borrow_mut() = Some(cleared);
     }
 
     /// Submits what is recorded so far and goes on recording into a new
     /// encoder: for a change to a resource that recorded draws read and
     /// later draws must see changed, such as a repacked glyph atlas page.
     pub fn flush(&self, queue: &wgpu::Queue) {
+        self.end_pass();
         let done = self.encoder.replace(encoder(&self.device));
         submit_timed(queue, done);
     }
@@ -76,6 +124,7 @@ impl FrameEncoder {
     /// [`ArenaFull`] when a draw was refused and not taken with
     /// [`FrameEncoder::take_refusal`]; the draws recorded are submitted.
     pub fn submit(self, queue: &wgpu::Queue) -> Result<(), ArenaFull> {
+        self.end_pass();
         submit_timed(queue, self.encoder.into_inner());
         self.refusal.into_inner().map_or(Ok(()), Err)
     }
@@ -94,6 +143,15 @@ impl FrameEncoder {
     /// once it is submitted or dropped.
     pub(crate) fn open_flag(&self) -> Arc<AtomicBool> {
         Arc::clone(&self.open.0)
+    }
+
+    fn begin(&self, view: &wgpu::TextureView, load: wgpu::LoadOp<wgpu::Color>) -> OpenPass {
+        self.passes.set(self.passes.get() + 1);
+        OpenPass::begin(&mut self.encoder.borrow_mut(), view, load)
+    }
+
+    fn end_pass(&self) {
+        self.pass.borrow_mut().take();
     }
 
     /// The device it records for.
