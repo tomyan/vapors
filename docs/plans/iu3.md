@@ -301,6 +301,38 @@ uninstrumented or single-span figures at 3000 rows.
 | 3c-3d1 | Slabs for texts, images, icons and surfaces; parts keep their ids, copied without renumbering; the debug check compares resolved ids | Scene items and ids equal a full paint's after resolving; harness unchanged or better |
 | 3c-3d2 | Parts kept in place; the scene view and batching over an iterator; hits by walking order; per-element maps patched | `parts_visited_kept` 0; Text and Class edit paint at 3000 rows under 1 ms; at 1000 rows recorded; draw at 3000 rows recorded before and after |
 | 3c-3e | Moved slots shift their kept part by the rect's change (option (a) below) in place of painting it again; a harness workload whose edit resizes a label near the top of the list, and one that scrolls the list | Resize and scroll edits at 3000 rows: `boxes_painted` only the rebuilt slots, pinned; paint recorded before and after |
+| 3c-3f | Kept batches ("3c-3f: kept batches" below): the drawing steps with an item in the view, and the culled count of the others, kept for the last view and patched for the slots painted again; the batches kept until a shown step changes or the view does | Draw at 3000 rows at or below 1.0 ms for Text, Class, Idle and HoveredClass; recorded at 1000 rows; update and paint not worse; counts unchanged |
+
+### 3c-3f: kept batches
+
+3c-3d2 batches every drawing step's items on every drawn frame: 12,000
+items at 3000 rows, each read through its step's slot, though only the
+rows in the window are drawn and the rest are culled. 3c-3f keeps, in
+`Painted`, for the view of the last draw:
+
+- the drawing steps that show something in the view: an item whose
+  bounds meet the view under its clip, or a surface (a culled surface
+  keeps its place in a batch marked culled);
+- for every other drawing step, how many items it has, all culled, and
+  their sum;
+- the batches, made from the shown steps' items, with the sum added to
+  their culled count.
+
+A draw with the same view returns the kept batches; with no batches
+kept, it batches the shown steps' items only. A draw with another
+view, or the first draw after paint order is walked again, finds the
+shown steps afresh over every item. An update that paints slots again
+patches the kept steps for those slots' steps, through the places
+`DrawnSteps` holds: a step hidden before and after changes only the
+sum; a step shown before or after drops the batches. Scale changes and
+fresh paints start a new `Painted`, which keeps nothing. Thumbs are
+painted on every update and patched as any other slot.
+
+The painter takes the batches from `Painted::batches(view)` by
+reference in place of `scene().batches(view)`; what it receives is the
+same `Batched`. A debug build compares every batches call's result with
+`batched` over the scene view's items and names the first differing
+batch.
 
 ### Lead decisions (2026-11-11)
 
