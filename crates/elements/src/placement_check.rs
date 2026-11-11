@@ -2,13 +2,15 @@
 //! box settled and placed afresh with `Offsets::settle` and
 //! `layout::placed`, and compared slot by slot with what placement kept,
 //! the offsets by element, and the moved slots with a comparison of
-//! every held slot's rect and padding with the last paint's.
+//! every held slot's rect and padding with the last paint's. The chain
+//! the next update's walk follows (`up`, `containing`) is compared too,
+//! so a broken chain fails on the update that broke it.
 
 use rustc_hash::FxHashSet;
 
 use crate::changed_slots::ChangedSlots;
-use crate::layout::{BoxRect, Content, placed};
-use crate::placement::{LaidOut, Placement};
+use crate::layout::{BoxRect, Content, LayoutBox, containing_blocks, placed};
+use crate::placement::{LaidOut, NO_SLOT, Placement};
 use crate::scroll::Offsets;
 
 /// What placement started from: the offsets, rects and paddings.
@@ -36,6 +38,29 @@ impl Before {
     }
 }
 
+impl Fresh {
+    /// `boxes` settled from `before`'s offsets and placed afresh, and
+    /// the offsets by element after.
+    fn of(before: &Before, boxes: &LaidOut<'_>) -> (Self, Offsets) {
+        let mut scroll = before.scroll.clone();
+        let offsets = scroll.settle(boxes.boxes, boxes.scrolls, boxes.scale);
+        let (rects, paddings) = placed(boxes.boxes, &offsets);
+        let fresh = Self {
+            rects,
+            paddings,
+            offsets,
+        };
+        (fresh, scroll)
+    }
+}
+
+/// The slots of `boxes` that hold a box.
+fn held(boxes: &[LayoutBox]) -> Vec<usize> {
+    (0..boxes.len())
+        .filter(|&slot| !matches!(boxes[slot].content, Content::Vacant))
+        .collect()
+}
+
 /// Panics, naming the first differing slot, when `kept` and `scroll`
 /// are not a fresh placement of `boxes` from `before`, or `moved` is not
 /// every slot not in `changed` whose rect or padding changed.
@@ -45,18 +70,10 @@ pub(crate) fn assert_same(
     (kept, scroll): (&Placement, &Offsets),
     (moved, changed): (&[usize], &ChangedSlots),
 ) {
-    let mut fresh_scroll = before.scroll.clone();
-    let offsets = fresh_scroll.settle(boxes.boxes, boxes.scrolls, boxes.scale);
-    let (rects, paddings) = placed(boxes.boxes, &offsets);
-    let fresh = Fresh {
-        rects,
-        paddings,
-        offsets,
-    };
-    let held: Vec<usize> = (0..fresh.rects.len())
-        .filter(|&slot| !matches!(boxes.boxes[slot].content, Content::Vacant))
-        .collect();
+    let (fresh, fresh_scroll) = Fresh::of(before, boxes);
+    let held = held(boxes.boxes);
     assert_slots_same(kept, &fresh, &held);
+    assert_chain_same(kept, boxes.boxes, &held);
     if !scroll.same_offsets(&fresh_scroll) {
         fail("the offsets by element differ from a fresh settle");
     }
@@ -73,6 +90,21 @@ fn assert_slots_same(kept: &Placement, fresh: &Fresh, held: &[usize]) {
     if let Some(&slot) = held.iter().find(|&&slot| of_kept(slot) != of_fresh(slot)) {
         let (kept, fresh) = (of_kept(slot), of_fresh(slot));
         fail(&format!("slot {slot} kept {kept:?}, fresh {fresh:?}"));
+    }
+}
+
+/// Fails on the first `held` slot whose containing block or the slot
+/// it is placed in differs in `kept` from a fresh walk of `boxes`.
+fn assert_chain_same(kept: &Placement, boxes: &[LayoutBox], held: &[usize]) {
+    let up = crate::chain::by_containing_block(boxes, NO_SLOT, &|slot, _| slot);
+    let containing = containing_blocks(boxes);
+    let of_kept = |slot: usize| (kept.up[slot], kept.containing[slot]);
+    let of_fresh = |slot: usize| (up[slot], containing[slot]);
+    if let Some(&slot) = held.iter().find(|&&slot| of_kept(slot) != of_fresh(slot)) {
+        let (kept, fresh) = (of_kept(slot), of_fresh(slot));
+        fail(&format!(
+            "slot {slot} kept (up, containing) {kept:?}, fresh {fresh:?}"
+        ));
     }
 }
 

@@ -3,7 +3,7 @@
 //! for the boxes Taffy laid out or wrote, the boxes built again, the
 //! scrolled boxes, and the boxes placed in a box whose content moved.
 //! A debug build also places every box afresh and compares
-//! (`kept_placement_check.rs`), so a box left out panics there too.
+//! (`placement_check.rs`), so a box left out panics there too.
 
 mod support;
 
@@ -136,4 +136,42 @@ fn a_box_made_absolute_places_its_children_against_its_new_place() {
         (child_box.x, child_box.y),
         (holder_box.x + 20.0, holder_box.y + 100.0)
     );
+}
+
+/// The first row's top after a scroll of 30px, in a scroller given,
+/// before the scroll, the class that `restyled` names (which changes no
+/// layout) on the node it names.
+fn top_after_restyle_and_scroll(
+    restyled: fn(&support::scroll_list::List) -> (NodeId, &'static str),
+) -> f32 {
+    let mut list = list("overflow: auto;");
+    list.doc
+        .add_stylesheet("tint.css", ".tint { color: red; }")
+        .expect("parses");
+    updated(&mut list.doc, 200.0);
+    let (node, class) = restyled(&list);
+    list.doc.set_attribute(node, "class", class);
+    updated(&mut list.doc, 200.0);
+    assert!(list.doc.scroll_node_by(list.container, [0.0, 30.0]));
+    updated(&mut list.doc, 200.0);
+    let painted = list.doc.painted().expect("painted");
+    painted.border_box(list.rows[0]).expect("a box").y
+}
+
+#[test]
+fn a_scroll_after_a_restyle_of_the_scroller_that_changes_no_layout_moves_the_rows() {
+    // Given, When
+    let top = top_after_restyle_and_scroll(|list| (list.container, "list tint"));
+
+    // Then
+    assert_eq!(top, -30.0);
+}
+
+#[test]
+fn a_scroll_after_a_restyle_of_an_ancestor_that_changes_no_layout_moves_the_rows() {
+    // Given, When
+    let top = top_after_restyle_and_scroll(|list| (list.doc.body(), "tint"));
+
+    // Then
+    assert_eq!(top, -30.0);
 }

@@ -69,17 +69,18 @@ impl Document {
         let take = |last: &mut Painted| std::mem::take(&mut last.from.placement);
         let mut placement = last.map(take).unwrap_or_default();
         let scrolls = |slot| stackings.scrolls(slot);
-        let boxes = LaidOut {
-            boxes: &placed.boxes,
-            scrolls: &scrolls,
-            scale: viewport.scale,
-        };
-        let moved = self.placed(&mut placement, (&boxes, &placed.slots), written, changed);
+        let boxes = LaidOut::new(&placed.boxes, &scrolls, viewport.scale);
+        let moved = self.placed(&mut placement, (&boxes, &placed.slots), (written, changed));
         changed.moved = moved;
+        self.made_from(placement, viewport.scale)
+    }
+
+    /// What paint is made from: `placement`, the thumbs and `scale`.
+    fn made_from(&self, placement: Placement, scale: f32) -> PaintedFrom {
         PaintedFrom {
             placement,
             thumbs_shown: self.thumbs_shown,
-            scale: viewport.scale,
+            scale,
         }
     }
 
@@ -90,26 +91,31 @@ impl Document {
         &mut self,
         placement: &mut Placement,
         (boxes, slots): (&LaidOut<'_>, &Slots),
-        written: &Written,
-        changed: &ChangedSlots,
+        (written, changed): (&Written, &ChangedSlots),
     ) -> Vec<usize> {
         let scrolled = self.scrolled_slots(slots);
-        let since = Changes {
-            every: changed.every,
-            rebuilt: &changed.rebuilt,
-            freed: &changed.freed,
-            written,
-            scrolled: &scrolled,
-        };
+        let since = Changes::since(changed, written, &scrolled);
         let before = cfg!(debug_assertions).then(|| Before::of(&self.scroll, placement));
         let done = placement.place(boxes, &mut self.scroll, &since);
         self.forget_freed(&changed.freed, slots);
         (self.counts.boxes_placed, self.counts.boxes_moved) = (done.count, done.moved.len());
-        if let Some(before) = before {
-            let after = ((&*placement, &self.scroll), (&done.moved[..], changed));
-            crate::placement_check::assert_same(&before, boxes, after.0, after.1);
-        }
+        self.check_placed(before, (boxes, placement), (&done.moved, changed));
         done.moved
+    }
+
+    /// In a debug build, panics when `placement` and the offsets are not
+    /// a fresh placement of `boxes` from `before`, or `moved` is not the
+    /// slots that moved (`placement_check.rs`).
+    fn check_placed(
+        &self,
+        before: Option<Before>,
+        (boxes, placement): (&LaidOut<'_>, &Placement),
+        moved: (&[usize], &ChangedSlots),
+    ) {
+        if let Some(before) = before {
+            let kept = (placement, &self.scroll);
+            crate::placement_check::assert_same(&before, boxes, kept, moved);
+        }
     }
 
     /// The slots of the containers scrolled since the last update.

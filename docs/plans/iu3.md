@@ -424,8 +424,14 @@ Kept between updates, beside the rects and paddings in `PaintedFrom`:
 each slot's applied scroll offset, the slot whose content origin it is
 placed in (`up`), and each out-of-flow slot's containing block,
 patched from the hoisted lists written this update (a rebuilt or freed
-slot's entry is cleared first; its new containing block is an ancestor,
-whose cache the rebuild cleared, so Taffy hoists it again).
+slot's entry is cleared first; an out-of-flow box is never lent a
+layout, so Taffy lays it out and its containing block writes its
+hoisted list again). A freed slot's `up` is cleared; a rebuilt slot
+keeps its `up`. A rebuilt subtree whose layout is unchanged is lent
+its caches and its ancestors' caches are not cleared, so nothing above
+it is laid out; the kept `up` of the subtree's top slot (which keeps
+its slot and parent) still marks the chain to the root, and the walk
+sets `up` again for every slot below it.
 
 Placement. A slot is dirty when it was dispatched, its layout changed,
 it was rebuilt, or its scroll offset was moved since the last update
@@ -446,8 +452,10 @@ is dirty.
 Counts: `boxes_placed` (slots the walk visited) and `boxes_moved`.
 The debug check settles and places every box afresh with today's
 `settle` and `placed`, and compares the rects, paddings and offsets of
-every held slot, and the moved set with a full comparison, naming the
-first differing slot.
+every held slot, each held slot's `up` and containing block with a
+fresh walk (`chain::by_containing_block`), so a broken chain fails on
+the update that broke it, and the moved set with a full comparison,
+naming the first differing slot.
 
 ## Open points
 

@@ -4,11 +4,12 @@
 //! (`layout/written.rs`), built again or scrolled, and the boxes placed
 //! in a box whose content moved (`placement_walk.rs`).
 
+use crate::changed_slots::ChangedSlots;
 use crate::layout::{BoxRect, Key, LayoutBox, Written, containing_blocks};
 use crate::placement_walk::{Mark, Walk};
 use crate::scroll::Offsets;
 
-/// No slot: the root's `up`, and a slot built again before it is placed.
+/// No slot: the root's `up`, and a new or freed slot's before it is placed.
 pub(crate) const NO_SLOT: usize = usize::MAX;
 
 /// A slot's rect before it is placed.
@@ -44,6 +45,20 @@ pub(crate) struct LaidOut<'a> {
     pub(crate) scale: f32,
 }
 
+impl<'a> LaidOut<'a> {
+    pub(crate) fn new(
+        boxes: &'a [LayoutBox],
+        scrolls: &'a dyn Fn(usize) -> bool,
+        scale: f32,
+    ) -> Self {
+        Self {
+            boxes,
+            scrolls,
+            scale,
+        }
+    }
+}
+
 /// What changed since the kept placement.
 pub(crate) struct Changes<'a> {
     /// Nothing is kept: every slot is placed.
@@ -60,6 +75,24 @@ pub(crate) struct Changes<'a> {
 pub(crate) struct Placed {
     pub(crate) moved: Vec<usize>,
     pub(crate) count: usize,
+}
+
+impl<'a> Changes<'a> {
+    /// What `changed` names, what layout `written`, and the containers
+    /// `scrolled`.
+    pub(crate) fn since(
+        changed: &'a ChangedSlots,
+        written: &'a Written,
+        scrolled: &'a [usize],
+    ) -> Self {
+        Self {
+            every: changed.every,
+            rebuilt: &changed.rebuilt,
+            freed: &changed.freed,
+            written,
+            scrolled,
+        }
+    }
 }
 
 impl Placement {
@@ -98,20 +131,34 @@ impl Placement {
         }
     }
 
-    /// Sizes the vectors to `boxes`, and patches the containing blocks:
-    /// cleared for each slot built again or freed, then set from each
-    /// hoisted list layout wrote.
+    /// Sizes the vectors to `boxes`, and patches the chain: a freed
+    /// slot is placed in no slot; a slot built again keeps the slot it
+    /// was placed in, so a rebuilt subtree whose layout is lent unchanged
+    /// (no ancestor laid out) is still marked to the root.
     fn patch(&mut self, boxes: &[LayoutBox], changes: &Changes<'_>) {
-        let len = boxes.len();
+        self.resize(boxes.len());
+        for &(slot, _) in changes.freed {
+            self.up[slot] = NO_SLOT;
+        }
+        self.patch_containing(boxes, changes);
+    }
+
+    /// Sizes the vectors to `len` slots.
+    fn resize(&mut self, len: usize) {
         self.rects.resize(len, NO_RECT);
         self.paddings.resize(len, taffy::Rect::zero());
         self.offsets.resize(len, [0.0; 2]);
         self.up.resize(len, NO_SLOT);
         self.containing.resize(len, None);
         self.marks.resize(len, Mark::None);
+    }
+
+    /// Clears the containing block of each slot built again or freed,
+    /// then sets it from each hoisted list layout wrote.
+    fn patch_containing(&mut self, boxes: &[LayoutBox], changes: &Changes<'_>) {
         let freed = changes.freed.iter().map(|(slot, _)| slot);
         for &slot in changes.rebuilt.iter().chain(freed) {
-            (self.containing[slot], self.up[slot]) = (None, NO_SLOT);
+            self.containing[slot] = None;
         }
         for &block in &changes.written.hoisting {
             for &hoisted in &boxes[block].hoisted {
@@ -138,10 +185,10 @@ impl Placement {
     /// Marks `slot` with `mark`, and the slots up its chain not yet
     /// marked with `Mark::Below`.
     fn mark_up(&mut self, slot: usize, mark: Mark, marked: &mut Vec<usize>) {
-        if self.marks[slot] == Mark::None {
+        let first = self.marks[slot] == Mark::None;
+        if first {
             marked.push(slot);
         }
-        let first = self.marks[slot] == Mark::None;
         self.marks[slot] = self.marks[slot].max(mark);
         let mut up = if first { self.up[slot] } else { NO_SLOT };
         while up != NO_SLOT && self.marks[up] == Mark::None {
