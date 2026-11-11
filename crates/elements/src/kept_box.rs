@@ -74,6 +74,16 @@ impl BoxFrom {
 }
 
 impl KeptBox {
+    /// The items `step`, one of this box's steps, paints: its own
+    /// part's, its outline or its thumbs.
+    pub(crate) fn scene_of(&self, step: crate::paint_order::Step) -> &Scene {
+        match step {
+            crate::paint_order::Step::Box(_) => &self.own.scene,
+            crate::paint_order::Step::Thumb(_) => &self.thumb,
+            crate::paint_order::Step::Outline(_) => &self.outline,
+        }
+    }
+
     /// How many scene items this box's own step and outline hold.
     pub(crate) fn items(&self) -> usize {
         self.own.scene.items().len() + self.outline.items().len()

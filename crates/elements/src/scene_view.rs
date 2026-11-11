@@ -1,12 +1,13 @@
 //! A paint's scene as a view over its kept paint order and each slot's
 //! kept part (IU3 3c-3d2, `docs/plans/iu3.md` "The scene in stable
-//! slots"): the items are each step's part's, walked in order, so no
-//! update copies a kept part into a flat list. Hit testing reads the
+//! slots"): the items are each drawing step's part's, walked in order
+//! (`drawn_steps.rs`), so no update copies a kept part into a flat list. Hit testing reads the
 //! parts' hits in the same order (`Painted::hit`).
 
 use vapors_dom::NodeId;
 use vapors_scene::{Batched, Item, Rect, Scene};
 
+use crate::drawn_steps::DrawnSteps;
 use crate::kept_box::{KeptBox, Part};
 use crate::layout::BoxRect;
 use crate::paint_order::Step;
@@ -15,19 +16,29 @@ use crate::paint_order::Step;
 #[derive(Clone, Copy)]
 pub struct SceneView<'a> {
     steps: &'a [Step],
+    drawn: &'a DrawnSteps,
     boxes: &'a [Option<KeptBox>],
 }
 
 impl<'a> SceneView<'a> {
-    /// The view of `boxes`' parts walked through `steps`.
-    pub(crate) fn new(steps: &'a [Step], boxes: &'a [Option<KeptBox>]) -> Self {
-        Self { steps, boxes }
+    /// The view of `boxes`' parts walked through `steps`, whose steps
+    /// that draw are `drawn`.
+    pub(crate) fn new(
+        steps: &'a [Step],
+        drawn: &'a DrawnSteps,
+        boxes: &'a [Option<KeptBox>],
+    ) -> Self {
+        Self {
+            steps,
+            drawn,
+            boxes,
+        }
     }
 
     /// Each item, first drawn first, with its clip (device pixels).
     pub fn items(&self) -> impl Iterator<Item = (&'a Item, Option<Rect>)> + 'a {
         let boxes = self.boxes;
-        self.steps.iter().flat_map(move |&step| {
+        self.drawn.steps().flat_map(move |step| {
             let scene = step_scene(boxes, step);
             let clips = scene.clips().iter().copied();
             scene.items().iter().zip(clips)
@@ -78,12 +89,7 @@ impl<'a> SceneView<'a> {
 
 /// The items `step` paints: its slot's own part, outline or thumbs.
 fn step_scene(boxes: &[Option<KeptBox>], step: Step) -> &Scene {
-    let kept = kept(boxes, step.index(), step);
-    match step {
-        Step::Box(_) => &kept.own.scene,
-        Step::Thumb(_) => &kept.thumb,
-        Step::Outline(_) => &kept.outline,
-    }
+    kept(boxes, step.index(), step).scene_of(step)
 }
 
 /// Slot `slot`'s kept paint, or a panic naming the step and slot.

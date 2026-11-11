@@ -2,7 +2,7 @@
 //! update paints again and compares every part of the two paints but
 //! `from`, which the update sets after, the kept boxes, and the counts;
 //! the hits in painting order, and any hits gathered for hit testing
-//! against them; the scene item by item with ids
+//! against them; the steps that draw against ones found afresh; the scene item by item with ids
 //! resolved, the slabs against the kept boxes' items, and each kept
 //! part's slot against paint order (`kept_scene_check.rs`); the kept
 //! `rects` and `paddings` maps name their first differing entry.
@@ -49,6 +49,7 @@ fn differing_parts(kept: &Painted, fresh: &Painted) -> Vec<String> {
     .map(String::from)
     .collect();
     parts.extend(differing_hits(kept, fresh).map(String::from));
+    parts.extend(differing_drawn(kept).map(String::from));
     parts.extend(crate::kept_scene_check::first_differing_item(kept, fresh));
     parts.extend(crate::kept_scene_check::part_off_steps(kept));
     parts.extend(crate::kept_scene_check::slab_difference(
@@ -74,6 +75,13 @@ fn differing_hits(kept: &Painted, fresh: &Painted) -> impl Iterator<Item = &'sta
     [("hits", hits), ("gathered hits", gathered)]
         .into_iter()
         .filter_map(|(name, differs)| differs.then_some(name))
+}
+
+/// "drawn steps" when the steps `kept` lists as drawing are not those
+/// found afresh from its paint order and kept boxes.
+fn differing_drawn(kept: &Painted) -> Option<&'static str> {
+    let drawn = crate::drawn_steps::DrawnSteps::of(&kept.order.steps, &kept.kept_boxes);
+    (kept.drawn != drawn).then_some("drawn steps")
 }
 
 /// The first node, in node order, whose entry in the kept map `name`

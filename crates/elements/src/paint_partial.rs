@@ -6,11 +6,12 @@
 //! (`BoxFrom`); no other kept part is read. A dropped part frees its
 //! slab ids and removes its map entries before any part is painted, so
 //! a part painted after takes them. Scroll thumbs are painted on every
-//! update that paints. The scene is the parts walked in paint order
-//! (`scene_view.rs`); it equals a full paint's, which a debug build
+//! update that paints. The scene is the parts of the steps that draw
+//! walked in paint order (`scene_view.rs`, `drawn_steps.rs`); it equals a full paint's, which a debug build
 //! checks (`kept_paint.rs`).
 
 use crate::changed_slots::ChangedSlots;
+use crate::drawn_steps::DrawnSteps;
 use crate::kept_box::{BoxFrom, KeptBox};
 use crate::kept_order::KeptOrder;
 use crate::layout::{BoxRect, Content, LayoutBox};
@@ -40,11 +41,40 @@ pub(crate) fn paint_partial(
     let again = to_paint(&order, (boxes, rects), (changed, kept), &mut painted);
     dropped(&again, changed, boxes.len(), &mut painted);
     crate::kept_maps::fill(&mut painted, (boxes, rects), kept, changed);
+    let patched = patched_slots(&again, changed, &order);
     let mut repaint = Repaint::new(boxes, rects, &order);
     repaint.boxes(again, input, &mut painted);
     repaint.thumbs(input, &mut painted);
+    drawn_updated(&mut painted, &order, patched);
     painted.order = order;
     painted
+}
+
+/// The slots whose parts this update paints again or drops: those
+/// painted `again`, the freed and the scroll containers.
+fn patched_slots(
+    again: &[(usize, BoxFrom)],
+    changed: &ChangedSlots,
+    order: &KeptOrder,
+) -> Vec<usize> {
+    let again = again.iter().map(|(slot, _)| *slot);
+    let freed = changed.freed.iter().map(|(slot, _)| *slot);
+    again
+        .chain(freed)
+        .chain(order.thumbs.iter().copied())
+        .collect()
+}
+
+/// `painted`'s drawing steps made afresh when `order` was walked again,
+/// else patched for the `patched` slots.
+fn drawn_updated(painted: &mut Painted, order: &KeptOrder, patched: Vec<usize>) {
+    if order.walks.order > 0 {
+        painted.drawn = DrawnSteps::of(&order.steps, &painted.kept_boxes);
+    } else {
+        painted
+            .drawn
+            .patch(patched.into_iter(), &painted.kept_boxes);
+    }
 }
 
 /// `last` for this update, with `started`'s canvas and scale, its counts and

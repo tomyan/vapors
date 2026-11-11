@@ -46,6 +46,8 @@ pub struct Painted {
     /// Each slot's kept paint (`kept_box.rs`), walked in `order` for the
     /// scene and hits (`scene_view.rs`), kept in place for the next update.
     pub(crate) kept_boxes: Vec<Option<crate::kept_box::KeptBox>>,
+    /// The steps of `order` that draw, which the scene's items walk.
+    pub(crate) drawn: crate::drawn_steps::DrawnSteps,
     /// Boxes painted by this update, for `UpdateCounts`.
     pub(crate) boxes_drawn: usize,
     /// Kept parts this update visited without painting again (`paint_partial.rs`), for
@@ -79,6 +81,7 @@ impl Painted {
             text_origins: NodeMap::default(),
             from: crate::kept_paint::PaintedFrom::default(),
             kept_boxes: Vec::new(),
+            drawn: crate::drawn_steps::DrawnSteps::default(),
             boxes_drawn: 0,
             parts_visited_kept: 0,
             items_built: 0,
@@ -109,7 +112,7 @@ impl Painted {
     /// The display list: a view over the kept paint in paint order.
     #[must_use]
     pub fn scene(&self) -> crate::SceneView<'_> {
-        crate::SceneView::new(&self.order.steps, &self.kept_boxes)
+        crate::SceneView::new(&self.order.steps, &self.drawn, &self.kept_boxes)
     }
 
     /// The text run a scene item names.

@@ -34,6 +34,7 @@ mod corners;
 mod css_element;
 mod document;
 mod dom_impl;
+mod drawn_steps;
 mod error;
 mod events;
 mod focus;
