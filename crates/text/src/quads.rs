@@ -32,12 +32,17 @@ pub(crate) fn quads(
     let mut floats = Vec::new();
     for ((at, _), placed) in glyphs().zip(&placed) {
         if !placed.is_empty() {
-            #[allow(clippy::cast_precision_loss)] // pixel positions
-            let top_left = [(at.x + placed.left) as f32, at.baseline + placed.top as f32];
-            push_quad(&mut floats, top_left, placed, page, viewport, at.color);
+            push_glyph(&mut floats, &at, placed, page, viewport);
         }
     }
     Ok(floats)
+}
+
+/// The quad of one inked glyph placed at `at`.
+fn push_glyph(floats: &mut Vec<f32>, at: &GlyphAt, placed: &AtlasGlyph, page: u32, viewport: Size) {
+    #[allow(clippy::cast_precision_loss)] // pixel positions
+    let top_left = [(at.x + placed.left) as f32, at.baseline + placed.top as f32];
+    push_quad(floats, top_left, placed, page, viewport, at.color);
 }
 
 /// Where a glyph's bitmap goes: its whole-pixel x, its baseline rounded
@@ -54,17 +59,17 @@ fn glyphs_of(text: TextDraw<'_>) -> impl Iterator<Item = (GlyphAt, GlyphRequest<
     let [x, y] = text.origin;
     text.layout.glyphs().map(move |glyph| {
         let (pixel_x, request) = request(&glyph, x, hinting);
-        let baseline = (y + glyph.y).round();
-        let color = glyph.color;
-        (
-            GlyphAt {
-                x: pixel_x,
-                baseline,
-                color,
-            },
-            request,
-        )
+        (glyph_at(pixel_x, y, &glyph), request)
     })
+}
+
+/// `glyph` at whole-pixel `pixel_x`, its baseline rounded under origin `y`.
+fn glyph_at(pixel_x: i32, y: f32, glyph: &PlacedGlyph<'_>) -> GlyphAt {
+    GlyphAt {
+        x: pixel_x,
+        baseline: (y + glyph.y).round(),
+        color: glyph.color,
+    }
 }
 
 /// Where each item is in the atlas once every one is placed. Placing one

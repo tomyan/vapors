@@ -100,6 +100,25 @@ fn gpu_draw_calls_are_one_per_quad_shadow_or_text_run() {
 }
 
 #[test]
+fn gpu_two_text_items_in_one_run_are_one_draw() {
+    // Given
+    let (mut doc, _) = labelled("Ab");
+    let div = doc.create_element("div");
+    let body = doc.body();
+    doc.append(body, div);
+    let second = doc.create_text("Cd");
+    doc.append(div, second);
+    update(&mut doc, 1.0);
+    let mut rig = Rig::new();
+
+    // When
+    let counts = drawn(&mut rig, &doc);
+
+    // Then
+    assert_eq!(counts.texts.draw_calls, 1);
+}
+
+#[test]
 fn gpu_an_elements_app_reports_its_painters_last_frame() {
     // Given
     let (doc, _) = labelled("Ab");
