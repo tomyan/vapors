@@ -60,7 +60,8 @@ impl KeptBoxes {
         scale: f32,
         may_keep: &dyn Fn(NodeId) -> bool,
     ) -> usize {
-        if self.placed.boxes.is_empty() || self.scale.to_bits() != scale.to_bits() {
+        let nothing = self.placed.boxes.is_empty() || placed.boxes.is_empty();
+        if nothing || self.scale.to_bits() != scale.to_bits() {
             return 0;
         }
         let (old, old_boxes) = (&self.placed.slots, &self.placed.boxes);
@@ -149,6 +150,19 @@ mod tests {
             ..Style::default()
         };
         vec![LayoutBox::new(Content::Element(NodeId(7)), style)]
+    }
+
+    #[test]
+    fn lending_to_an_update_that_built_no_box_lends_nothing() {
+        // Given: kept boxes; html became display: none, so no box
+        let mut kept = KeptBoxes::default();
+        kept.keep(crate::layout::slots::tests::churned(), 1.0);
+
+        // When
+        let lent = kept.lend(&mut Placed::default(), 1.0, &|_| true);
+
+        // Then
+        assert_eq!(lent, 0);
     }
 
     #[test]
