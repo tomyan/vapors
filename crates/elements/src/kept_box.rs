@@ -1,14 +1,16 @@
 //! One box's kept paint (IU3 3c-2, `docs/plans/iu3.md`): what its own
-//! step and its outline put into the paint, its items naming ids in the
-//! paint's slabs (`slab.rs`), and what it was made from besides its box. A box kept from the last
-//! update (`LayoutBox::kept`) whose values below are unchanged has its
-//! kept paint copied (`paint_partial.rs`); any other is painted again.
+//! step, its outline and its thumbs put into the paint, its items
+//! naming ids in the paint's slabs (`slab.rs`), and what it was made
+//! from besides its box. A box kept from the last update
+//! (`LayoutBox::kept`) whose values below are unchanged keeps its part
+//! in place (`paint_partial.rs`); any other is painted again.
 
 use vapors_dom::NodeId;
 use vapors_scene::{Item, Scene};
 
 use crate::layout::{BoxRect, LayoutBox};
 use crate::painted::Painted;
+use crate::painting::Painting;
 use crate::style::Cursor;
 
 /// What a box's paint reads besides its box and style. Not here, as
@@ -36,15 +38,18 @@ pub(crate) struct KeptBox {
     /// Its own step's paint.
     pub(crate) own: Part,
     /// Its outline's items.
-    pub(crate) outline: Vec<Item>,
+    pub(crate) outline: Scene,
+    /// Its scroll thumbs' items, painted again on every update that
+    /// paints.
+    pub(crate) thumb: Scene,
 }
 
 /// What one step put into a paint; its items name ids its paint's
 /// slabs hold while the part is kept.
 #[derive(Default)]
 pub(crate) struct Part {
-    scene: Scene,
-    hits: Vec<(NodeId, BoxRect)>,
+    pub(crate) scene: Scene,
+    pub(crate) hits: Vec<(NodeId, BoxRect)>,
     cursors: Vec<(NodeId, Cursor)>,
     visible: Vec<NodeId>,
     rects: Vec<(NodeId, BoxRect)>,
@@ -69,51 +74,79 @@ impl BoxFrom {
 }
 
 impl KeptBox {
-    /// How many scene items this box's paint holds.
+    /// The items `step`, one of this box's steps, paints: its own
+    /// part's, its outline or its thumbs.
+    pub(crate) fn scene_of(&self, step: crate::paint_order::Step) -> &Scene {
+        match step {
+            crate::paint_order::Step::Box(_) => &self.own.scene,
+            crate::paint_order::Step::Thumb(_) => &self.thumb,
+            crate::paint_order::Step::Outline(_) => &self.outline,
+        }
+    }
+
+    /// How many scene items this box's own step and outline hold.
     pub(crate) fn items(&self) -> usize {
-        self.own.scene.items().len() + self.outline.len()
+        self.own.scene.items().len() + self.outline.items().len()
     }
 
-    /// Each scene item this box's paint holds: its own step's, then its
-    /// outline's.
+    /// Each scene item this box's paint holds: its own step's, its
+    /// outline's, then its thumbs'.
     pub(crate) fn all_items(&self) -> impl Iterator<Item = &Item> {
-        self.own.scene.items().iter().chain(&self.outline)
+        let outline = self.outline.items().iter();
+        let own = self.own.scene.items().iter();
+        own.chain(outline).chain(self.thumb.items())
     }
 
-    /// Frees the slab ids this box's paint names, as it is dropped.
-    pub(crate) fn free(&self, slabs: &mut crate::slab::Slabs) {
-        slabs.free(self.own.scene.items());
-        slabs.free(&self.outline);
+    /// Frees the slab ids this box's paint names and removes its
+    /// entries from `painted`'s maps, as it is dropped.
+    pub(crate) fn drop_from(&self, painted: &mut Painted) {
+        painted.slabs.free(self.own.scene.items());
+        painted.slabs.free(self.outline.items());
+        self.own.leave(painted);
     }
 }
 
 impl Part {
-    /// What `scratch` holds but its slabs, leaving it empty.
-    pub(crate) fn take(scratch: &mut Painted) -> Self {
+    /// What `painting` holds but its slabs, leaving it empty.
+    pub(crate) fn take(painting: &mut Painting) -> Self {
         use std::mem::take;
         Self {
-            scene: take(&mut scratch.scene),
-            hits: take(&mut scratch.hits),
-            cursors: scratch.cursors.drain().collect(),
-            visible: scratch.visible.drain().collect(),
-            rects: scratch.rects.drain().collect(),
-            ranges: scratch.ranges.drain().collect(),
-            text_origins: scratch.text_origins.drain().collect(),
+            scene: take(&mut painting.scene),
+            hits: take(&mut painting.hits),
+            cursors: painting.cursors.drain().collect(),
+            visible: painting.visible.drain().collect(),
+            rects: painting.rects.drain().collect(),
+            ranges: painting.ranges.drain().collect(),
+            text_origins: painting.text_origins.drain().collect(),
         }
     }
 
-    /// The items, each under its clip, then the rest, into `out`; the
-    /// ids they name are `out`'s already.
-    pub(crate) fn copy_into(&self, out: &mut Painted) {
-        for (item, clip) in self.scene.items().iter().zip(self.scene.clips()) {
-            out.scene.set_clip(*clip);
-            out.scene.push(*item);
+    /// Puts this part's entries into `painted`'s maps.
+    pub(crate) fn enter(&self, painted: &mut Painted) {
+        painted.cursors.extend(self.cursors.iter().copied());
+        painted.visible.extend(self.visible.iter().copied());
+        painted.rects.extend(self.rects.iter().copied());
+        painted.ranges.extend(self.ranges.iter().copied());
+        painted
+            .text_origins
+            .extend(self.text_origins.iter().copied());
+    }
+
+    /// Removes this part's entries from `painted`'s maps.
+    fn leave(&self, painted: &mut Painted) {
+        removed(&mut painted.cursors, &self.cursors);
+        removed(&mut painted.rects, &self.rects);
+        removed(&mut painted.ranges, &self.ranges);
+        removed(&mut painted.text_origins, &self.text_origins);
+        for node in &self.visible {
+            painted.visible.remove(node);
         }
-        out.hits.extend_from_slice(&self.hits);
-        out.cursors.extend(self.cursors.iter().copied());
-        out.visible.extend(self.visible.iter().copied());
-        out.rects.extend(self.rects.iter().copied());
-        out.ranges.extend(self.ranges.iter().copied());
-        out.text_origins.extend(self.text_origins.iter().copied());
+    }
+}
+
+/// Removes the node of each of `entries` from `map`.
+fn removed<V, W>(map: &mut crate::node_map::NodeMap<V>, entries: &[(NodeId, W)]) {
+    for (node, _) in entries {
+        map.remove(node);
     }
 }

@@ -48,6 +48,10 @@ fn workloads() -> Vec<(String, Box<dyn Workload>)> {
             ));
         }
     }
+    for count in [1000, 3000] {
+        let rows = Rows::new(count, RowChange::HoveredClass);
+        all.push((format!("{count} rows, HoveredClass"), Box::new(rows)));
+    }
     all.push(("racer, paused".into(), Box::new(RacerFrames::new(false))));
     all.push(("racer, racing".into(), Box::new(RacerFrames::new(true))));
     all

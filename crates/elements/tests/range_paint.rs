@@ -33,6 +33,7 @@ fn quads(doc: &mut vapors_elements::Document, scale: f32) -> Vec<Quad> {
         .expect("updates");
     painted
         .scene()
+        .to_scene()
         .items()
         .iter()
         .filter_map(|item| match item {

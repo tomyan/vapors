@@ -83,7 +83,7 @@ fn settled(doc: &mut Document, viewport: Viewport) -> Snapshot {
         boxes: border_boxes(painted, &nodes),
         styles,
         items: items(painted),
-        clips: painted.scene().clips().to_vec(),
+        clips: painted.scene().to_scene().clips().to_vec(),
         hits: hits(painted, viewport),
         focus,
         selections,
@@ -123,7 +123,13 @@ fn items(painted: &Painted) -> Vec<String> {
         Item::Icon { icon, .. } => format!("{item:?} {:?}", painted.icon(*icon)),
         other => format!("{other:?}"),
     };
-    painted.scene().items().iter().map(text).collect()
+    painted
+        .scene()
+        .to_scene()
+        .items()
+        .iter()
+        .map(text)
+        .collect()
 }
 
 /// A text layout as the string, its size and every run, so a stale

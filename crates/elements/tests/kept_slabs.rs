@@ -36,7 +36,13 @@ fn text_items(painted: &Painted) -> Vec<(u32, String)> {
         Item::Text { text, .. } => Some((text.0, painted.text(text).text().to_owned())),
         _ => None,
     };
-    painted.scene().items().iter().filter_map(named).collect()
+    painted
+        .scene()
+        .to_scene()
+        .items()
+        .iter()
+        .filter_map(named)
+        .collect()
 }
 
 /// Whether `id` names a text run in `painted`.
@@ -75,8 +81,13 @@ fn a_removed_boxs_ids_are_freed() {
     doc.remove(divs[0]);
     let painted = doc.update(viewport(100.0, 100.0)).expect("updates");
 
-    // Then: "b" and "c" keep their ids and "a"'s 0 resolves no more
+    // Then: "b" and "c", built again with the body, are painted again,
+    // and of the three ids only the two they name resolve
     let now = text_items(painted);
-    assert_eq!(now, [(1, "b".into()), (2, "c".into())]);
-    assert!(!resolves(painted, 0));
+    let texts: Vec<&str> = now.iter().map(|(_, text)| text.as_str()).collect();
+    assert_eq!(texts, ["b", "c"]);
+    let named: Vec<u32> = now.iter().map(|(id, _)| *id).collect();
+    let mut resolving: Vec<u32> = (0..3).filter(|&id| resolves(painted, id)).collect();
+    resolving.sort_by_key(|id| named.iter().position(|named| named == id));
+    assert_eq!(resolving, named);
 }

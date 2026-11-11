@@ -3,7 +3,7 @@
 
 use crate::changed_slots::ChangedSlots;
 use crate::document::Document;
-use crate::kept_paint::{LastPaint, PaintedFrom, keep, paint_all};
+use crate::kept_paint::{PaintedFrom, keep, paint_all};
 use crate::layout::LayoutBox;
 use crate::paint::PaintInput;
 use crate::paint_order::Stackings;
@@ -34,7 +34,7 @@ impl Document {
             Some(kept) if kept.from.shows(from, changed.built()) => {
                 return keep(kept, boxes, &from.rects, &mut input);
             }
-            last => LastPaint::of(last),
+            last => last,
         };
         let painted = paint_all(boxes, &from.rects, &mut input, (last, changed));
         self.counts.note_paint(&painted);

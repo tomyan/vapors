@@ -22,6 +22,11 @@ pub(crate) struct KeptOrder {
     pub(crate) tree: ClipTree,
     pub(crate) clips: Clips,
     pub(crate) chains: Chains,
+    /// The scroll containers, whose thumbs are painted on every update
+    /// that paints.
+    pub(crate) thumbs: Vec<usize>,
+    /// The slots whose clips the update that made this redid.
+    pub(crate) redone: Vec<usize>,
     /// What the update that made this walked, for `UpdateCounts`.
     pub(crate) walks: OrderWalks,
 }
@@ -42,16 +47,19 @@ impl KeptOrder {
         let (clips, redone) = Clips::of(&tree, &|slot, own| {
             crate::clip::inner(boxes, rects, slot, own, input)
         });
+        let steps = paint_steps_with_outlines(boxes, &|index| input.stackings.get(index));
         Self {
-            steps: paint_steps_with_outlines(boxes, &|index| input.stackings.get(index)),
+            thumbs: thumbs(&steps),
+            steps,
             tree,
             clips,
             chains: Chains::of(boxes, &|index| input.stackings.scrolls(index)),
             walks: OrderWalks {
                 order: 1,
                 chains: 1,
-                clips: redone,
+                clips: redone.len(),
             },
+            redone,
         }
     }
 
@@ -77,15 +85,21 @@ impl KeptOrder {
         changed: &ChangedSlots,
     ) -> Self {
         let slots = changed.rebuilt.iter().chain(&changed.moved).copied();
-        let redone = self
+        self.redone = self
             .clips
             .redo_under(slots.collect(), &self.tree, &|slot, own| {
                 crate::clip::inner(boxes, rects, slot, own, input)
             });
         self.walks = OrderWalks {
-            clips: redone,
+            clips: self.redone.len(),
             ..OrderWalks::default()
         };
         self
     }
+}
+
+/// The slots of `steps`' thumb steps.
+fn thumbs(steps: &[Step]) -> Vec<usize> {
+    let thumb = |step: &Step| matches!(step, Step::Thumb(_)).then(|| step.index());
+    steps.iter().filter_map(thumb).collect()
 }

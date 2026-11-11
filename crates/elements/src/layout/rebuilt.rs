@@ -1,10 +1,7 @@
 //! What an update's box build changed, by slot (IU3 3c-3b,
 //! `docs/plans/iu3.md` "Changed slots"): the slots a built box took,
-//! the slots whose box is gone, the inline elements of the text runs
-//! taken out, and whether the tree's shape changed.
+//! the slots whose box is gone, and whether the tree's shape changed.
 //! Paint patches what it keeps from these (`changed_slots.rs`).
-
-use vapors_dom::NodeId;
 
 use super::boxes::{Content, LayoutBox};
 use super::slots::{Key, Taken};
@@ -18,9 +15,6 @@ pub(crate) struct Rebuilt {
     pub(crate) slots: Vec<usize>,
     /// The slots whose box is gone, with the key each held.
     pub(crate) freed: Vec<(usize, Key)>,
-    /// The inline elements of every text run taken out, rebuilt or
-    /// freed: a run built again may hold fewer.
-    pub(crate) spans: Vec<NodeId>,
     /// A slot was freed or newly taken, or a rebuilt box's children
     /// differ from the box it replaced.
     pub(crate) shape_changed: bool,
@@ -36,7 +30,6 @@ impl Rebuilt {
             every: true,
             slots: boxes.iter().enumerate().filter_map(held).collect(),
             freed: Vec::new(),
-            spans: Vec::new(),
             shape_changed: true,
         }
     }
@@ -51,7 +44,6 @@ impl Rebuilt {
             every: false,
             slots,
             freed,
-            spans: taken_spans(taken),
             shape_changed,
         }
     }
@@ -70,13 +62,4 @@ fn reshaped(boxes: &[LayoutBox], slot: usize, taken: &Taken) -> bool {
         .boxes
         .get(&slot)
         .is_none_or(|(_, old)| old.children != boxes[slot].children)
-}
-
-/// The inline elements of the text runs `taken` out.
-fn taken_spans(taken: &Taken) -> Vec<NodeId> {
-    let spans = |(_, old): &(Key, LayoutBox)| match &old.content {
-        Content::Text(run) => run.spans.iter().map(|span| span.node).collect(),
-        _ => Vec::new(),
-    };
-    taken.boxes.values().flat_map(spans).collect()
 }

@@ -113,8 +113,12 @@ pub(crate) fn containing_blocks(boxes: &[LayoutBox]) -> Vec<Option<usize>> {
 
 /// Each box's border box in document coordinates: its place in its
 /// containing block's content, whose origin is that box's corner less
-/// its scroll offset (`offsets`, by box index, in CSS pixels).
-pub(crate) fn placed(boxes: &[LayoutBox], offsets: &[[f32; 2]]) -> Vec<BoxRect> {
+/// its scroll offset (`offsets`, by box index, in CSS pixels); and each
+/// box's padding, read in the same pass.
+pub(crate) fn placed(
+    boxes: &[LayoutBox],
+    offsets: &[[f32; 2]],
+) -> (Vec<BoxRect>, Vec<taffy::Rect<f32>>) {
     let corner = |index: usize, origin: (f32, f32)| {
         let location = boxes[index].layout.location;
         (origin.0 + location.x, origin.1 + location.y)
@@ -126,15 +130,19 @@ pub(crate) fn placed(boxes: &[LayoutBox], offsets: &[[f32; 2]]) -> Vec<BoxRect> 
     (0..boxes.len())
         .map(|index| {
             let (x, y) = corner(index, origins[index]);
-            let size = boxes[index].layout.size;
-            BoxRect {
-                x,
-                y,
-                width: size.width,
-                height: size.height,
-            }
+            let layout = &boxes[index].layout;
+            let (width, height) = (layout.size.width, layout.size.height);
+            (
+                BoxRect {
+                    x,
+                    y,
+                    width,
+                    height,
+                },
+                layout.padding,
+            )
         })
-        .collect()
+        .unzip()
 }
 
 #[cfg(test)]

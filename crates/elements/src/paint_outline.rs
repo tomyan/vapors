@@ -9,7 +9,7 @@ use vapors_scene::{Color, Item, Quad, Rect};
 
 use crate::layout::{BoxRect, Content, LayoutBox};
 use crate::paint::{PaintInput, snapped};
-use crate::painted::Painted;
+use crate::painting::Painting;
 use crate::style::outline::Outline;
 
 /// The outline of the element `layout_box` lays out at `rect`, if it is
@@ -18,7 +18,7 @@ pub(crate) fn paint_outline(
     layout_box: &LayoutBox,
     rect: BoxRect,
     input: &PaintInput<'_>,
-    out: &mut Painted,
+    out: &mut Painting,
 ) {
     let Content::Element(node) = layout_box.content else {
         return;

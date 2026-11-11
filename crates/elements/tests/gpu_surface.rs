@@ -36,7 +36,7 @@ fn painted(doc: &mut Document, scale: f32) -> (Vec<&'static str>, Vec<Drawn>) {
             ..viewport(200.0, 200.0)
         })
         .expect("updates");
-    let scene = painted.scene();
+    let scene = painted.scene().to_scene();
     let kinds = scene.items().iter().map(kind).collect();
     let surfaces = scene
         .items()

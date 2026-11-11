@@ -17,7 +17,7 @@ fn red(page: &support::number_page::Page) -> bool {
     let painted = doc
         .update(support::viewport(400.0, 100.0))
         .expect("updates");
-    painted.scene().items().iter().any(|item| {
+    painted.scene().to_scene().items().iter().any(|item| {
         matches!(item, vapors_scene::Item::Quad(q) if q.rect.top == 0.0 && q.background == vapors_scene::Color::from_rgba8(255, 0, 0, 255))
     })
 }

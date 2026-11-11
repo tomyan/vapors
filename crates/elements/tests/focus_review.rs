@@ -89,6 +89,7 @@ fn removing_the_focused_element_clears_focus_and_focus_within() {
         .painted()
         .expect("painted")
         .scene()
+        .to_scene()
         .items()
         .iter()
         .any(|item| matches!(item, Item::Quad(q) if q.background.to_rgba8() == [0, 0, 255, 255]));

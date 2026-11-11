@@ -1,9 +1,11 @@
 //! The debug build's check on a kept paint (`kept_paint.rs`): the
 //! update paints again and compares every part of the two paints but
 //! `from`, which the update sets after, the kept boxes, and the counts;
-//! the scene item by item with ids resolved, and the slabs against the
-//! kept boxes' items (`kept_scene_check.rs`); the kept `rects` and
-//! `paddings` maps name their first differing entry.
+//! the hits in painting order, and any hits gathered for hit testing
+//! against them; the steps that draw against ones found afresh; the scene item by item with ids
+//! resolved, the slabs against the kept boxes' items, and each kept
+//! part's slot against paint order (`kept_scene_check.rs`); the kept
+//! `rects` and `paddings` maps name their first differing entry.
 
 use std::fmt::Debug;
 
@@ -23,9 +25,8 @@ macro_rules! differing {
     };
 }
 
-/// Panics, naming each part that differs, when `kept` is not `fresh`;
-/// `fresh` with the index of each of its steps' first item.
-pub(crate) fn assert_same(kept: &Painted, fresh: (&Painted, &[usize])) {
+/// Panics, naming each part that differs, when `kept` is not `fresh`.
+pub(crate) fn assert_same(kept: &Painted, fresh: &Painted) {
     let parts = differing_parts(kept, fresh);
     assert!(
         parts.is_empty(),
@@ -41,16 +42,16 @@ pub(crate) fn assert_same(kept: &Painted, fresh: (&Painted, &[usize])) {
 /// first differing entry.
 // Exact: a paint made from the same inputs has the same scale, bit for bit.
 #[allow(clippy::float_cmp)]
-fn differing_parts(kept: &Painted, (fresh, starts): (&Painted, &[usize])) -> Vec<String> {
+fn differing_parts(kept: &Painted, fresh: &Painted) -> Vec<String> {
     let mut parts: Vec<String> = differing!(kept, fresh; canvas, canvas_from, scale,
-        visible, hits, cursors, ranges, text_origins)
+        visible, cursors, ranges, text_origins)
     .into_iter()
     .map(String::from)
     .collect();
-    parts.extend(crate::kept_scene_check::first_differing_item(
-        kept,
-        (fresh, starts),
-    ));
+    parts.extend(differing_hits(kept, fresh).map(String::from));
+    parts.extend(differing_drawn(kept).map(String::from));
+    parts.extend(crate::kept_scene_check::first_differing_item(kept, fresh));
+    parts.extend(crate::kept_scene_check::part_off_steps(kept));
     parts.extend(crate::kept_scene_check::slab_difference(
         &kept.slabs,
         kept_items(kept),
@@ -62,6 +63,25 @@ fn differing_parts(kept: &Painted, (fresh, starts): (&Painted, &[usize])) -> Vec
         &fresh.order,
     ));
     parts
+}
+
+/// "hits" when `kept`'s hits are not `fresh`'s, in painting order;
+/// "gathered hits" when the hits `kept` gathered for hit testing are
+/// not its scene's.
+fn differing_hits(kept: &Painted, fresh: &Painted) -> impl Iterator<Item = &'static str> {
+    let hits = !kept.scene().hits().eq(fresh.scene().hits());
+    let gathered = kept.hits.get();
+    let gathered = !gathered.is_none_or(|hits| hits.iter().eq(kept.scene().hits()));
+    [("hits", hits), ("gathered hits", gathered)]
+        .into_iter()
+        .filter_map(|(name, differs)| differs.then_some(name))
+}
+
+/// "drawn steps" when the steps `kept` lists as drawing are not those
+/// found afresh from its paint order and kept boxes.
+fn differing_drawn(kept: &Painted) -> Option<&'static str> {
+    let drawn = crate::drawn_steps::DrawnSteps::of(&kept.order.steps, &kept.kept_boxes);
+    (kept.drawn != drawn).then_some("drawn steps")
 }
 
 /// The first node, in node order, whose entry in the kept map `name`

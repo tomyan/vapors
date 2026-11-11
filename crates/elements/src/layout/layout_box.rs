@@ -47,7 +47,7 @@ pub(crate) struct LayoutBox {
     /// A focused text field's caret and selection, for paint.
     pub(crate) text_marks: Option<crate::text_marks::TextMarks>,
     /// Whether the box was kept from the last update rather than built
-    /// in this one: only a kept box's kept paint may be copied
+    /// in this one: only a kept box's kept paint may stay in place
     /// (`kept_box.rs`).
     pub(crate) kept: bool,
 }

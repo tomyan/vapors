@@ -37,6 +37,7 @@ fn an_inline_elements_text_is_part_of_one_paragraph_with_spaces_collapsed() {
     // Then: one text run holding all of it
     let texts: Vec<&str> = painted
         .scene()
+        .to_scene()
         .items()
         .iter()
         .filter_map(|item| match item {
@@ -73,7 +74,8 @@ fn an_inline_elements_background_is_painted_behind_its_text() {
 
     // Then: a yellow quad over the b's box, then the text
     let rect = painted.border_box(bold).expect("the b has a box");
-    let items = painted.scene().items();
+    let scene = painted.scene().to_scene();
+    let items = scene.items();
     let quad = items
         .iter()
         .position(|item| matches!(item, Item::Quad(q) if q.background == Color::from_rgba8(255, 255, 0, 255)))
@@ -147,6 +149,7 @@ fn a_hidden_inline_element_leaves_its_paragraph_whole() {
     // Then: one text run, one line
     let texts: Vec<&str> = painted
         .scene()
+        .to_scene()
         .items()
         .iter()
         .filter_map(|item| match item {

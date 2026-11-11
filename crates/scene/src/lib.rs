@@ -10,7 +10,7 @@ mod image;
 mod scissor;
 mod transform;
 
-pub use batch::{Batch, Batched, Run};
+pub use batch::{Batch, Batched, Run, batched};
 pub use color::Color;
 pub use display::{IconId, ImageId, Item, Quad, Rect, Scene, Shadow, SurfaceId, TextId};
 pub use image::RgbaImage;

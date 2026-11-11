@@ -65,6 +65,7 @@ fn a_checked_box_draws_its_mark_inset_a_quarter_and_an_unchecked_none() {
         let painted = doc.update(viewport(100.0, 100.0)).expect("updates");
         painted
             .scene()
+            .to_scene()
             .items()
             .iter()
             .filter_map(|item| match item {

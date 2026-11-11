@@ -9,9 +9,8 @@ use vapors_dom::NodeId;
 use vapors_scene::{Rect, Scene};
 use vapors_text::FontSystem;
 
-use crate::kept_order::KeptOrder;
 use crate::layout::{BoxRect, LayoutBox};
-use crate::paint_order::{Stackings, Step};
+use crate::paint_order::Stackings;
 use crate::painted::Painted;
 use crate::style::Used;
 
@@ -62,41 +61,11 @@ impl<'a> PaintInput<'a> {
     }
 }
 
-/// Paints `boxes` (box 0 the root) at the rects layout gave them; with
-/// the index of each step's first scene item, for the debug build's
-/// check (`kept_paint_check.rs`) to name the step an item is from.
-pub(crate) fn paint(
-    boxes: &[LayoutBox],
-    rects: &[BoxRect],
-    input: &mut PaintInput<'_>,
-) -> (Painted, Vec<usize>) {
-    let mut painted = started(input);
-    painted.maps_patched = crate::kept_maps::build(&mut painted, (boxes, rects));
-    let order = KeptOrder::of(boxes, rects, input);
-    let mut starts = Vec::with_capacity(order.steps.len());
-    for &step in &order.steps {
-        let index = step.index();
-        starts.push(painted.scene.items().len());
-        clip_to(order.clips.own(index), input, &mut painted.scene);
-        match step {
-            Step::Box(_) => {
-                painted.boxes_drawn += 1;
-                paint_box(boxes, rects, index, input, &mut painted);
-            }
-            Step::Thumb(_) => crate::thumb::paint(&boxes[index], rects[index], input, &mut painted),
-            Step::Outline(_) => {
-                crate::paint_outline::paint_outline(
-                    &boxes[index],
-                    rects[index],
-                    input,
-                    &mut painted,
-                );
-            }
-        }
-    }
-    painted.items_built = painted.scene.items().len();
-    painted.order = order;
-    (painted, starts)
+/// Paints `boxes` (box 0 the root) at the rects layout gave them, every
+/// box afresh.
+pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> Painted {
+    let changed = crate::changed_slots::ChangedSlots::all();
+    crate::paint_partial::paint_partial(boxes, rects, input, None, &changed)
 }
 
 /// A paint with the canvas, before any box is painted; notes in
@@ -126,7 +95,7 @@ pub(crate) fn paint_box(
     rects: &[BoxRect],
     index: usize,
     input: &mut PaintInput<'_>,
-    out: &mut Painted,
+    out: &mut crate::painting::Painting,
 ) {
     let (layout_box, rect) = (&boxes[index], rects[index]);
     crate::paint_own::paint_own(boxes, rects, index, input, out);

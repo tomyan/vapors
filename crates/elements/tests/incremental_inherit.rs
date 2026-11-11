@@ -35,6 +35,7 @@ fn hovering_a_row_whose_hover_sets_color_turns_its_cells_text_red() {
     // Then: the cell's text is red
     let inks: Vec<Color> = painted
         .scene()
+        .to_scene()
         .items()
         .iter()
         .filter_map(|item| match item {
