@@ -7,7 +7,7 @@ use vapors_scene::{Color, Item, Quad, Rect, Shadow, TextId};
 use crate::corners;
 use crate::layout::{BoxRect, Content, InlineRun, LayoutBox};
 use crate::paint::{PaintInput, snapped};
-use crate::painted::Painted;
+use crate::painting::Painting;
 use crate::style::BoxShadow;
 
 /// One box's own painting: an element's shadows, background and
@@ -17,7 +17,7 @@ pub(crate) fn paint_own(
     rects: &[BoxRect],
     index: usize,
     input: &mut PaintInput<'_>,
-    out: &mut Painted,
+    out: &mut Painting,
 ) {
     match &boxes[index].content {
         Content::Element(node) => paint_element(*node, rects[index], input, out),
@@ -29,7 +29,7 @@ pub(crate) fn paint_own(
 /// The element's shadows, then its background and border, unless it is
 /// hidden; a background that became the canvas's is not painted again.
 /// Also its place among the elements the pointer can hit.
-fn paint_element(node: NodeId, rect: BoxRect, input: &PaintInput<'_>, out: &mut Painted) {
+fn paint_element(node: NodeId, rect: BoxRect, input: &PaintInput<'_>, out: &mut Painting) {
     let used = &input.used[&node];
     if used.visible && used.takes_pointer {
         out.hits.push((node, crate::clip::within(input.clip, rect)));
@@ -84,7 +84,7 @@ fn shadow_item(shadow: &BoxShadow, caster: Rect, radii: [f32; 4], scale: f32) ->
     }
 }
 
-fn paint_text(run: &InlineRun, rect: BoxRect, input: &mut PaintInput<'_>, out: &mut Painted) {
+fn paint_text(run: &InlineRun, rect: BoxRect, input: &mut PaintInput<'_>, out: &mut Painting) {
     let layout = input
         .cache
         .layout(input.fonts, input.scale, run, Some(rect.width));

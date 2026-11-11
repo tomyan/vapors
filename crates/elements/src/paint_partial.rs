@@ -1,185 +1,149 @@
-//! Paint that copies kept paint (IU3 3c-2, `docs/plans/iu3.md`): paint
-//! order and clips are walked again, each box kept from the last update
-//! with the values its kept paint was made from has that paint copied,
-//! its slab ids unchanged, and every other box is painted again, its
-//! old ids freed, and its paint kept for the next update (`kept_box.rs`). Scroll
-//! thumbs are painted on every update. The scene equals a full paint's
-//! (`paint.rs`), which a debug build checks (`kept_paint.rs`).
+//! Paint that keeps the last paint in place (IU3 3c-3d2,
+//! `docs/plans/iu3.md` "The scene in stable slots"): the last update's
+//! `Painted` is taken, the changed slots' parts are dropped and painted
+//! again, and it is returned. Which slots: those built again, and those
+//! moved or whose clip was redone whose part was made from other values
+//! (`BoxFrom`); no other kept part is read. A dropped part frees its
+//! slab ids and removes its map entries before any part is painted, so
+//! a part painted after takes them. Scroll thumbs are painted on every
+//! update that paints. The scene is the parts of the steps that draw
+//! walked in paint order (`scene_view.rs`, `drawn_steps.rs`); it equals a full paint's, which a debug build
+//! checks (`kept_paint.rs`).
 
 use crate::changed_slots::ChangedSlots;
-use crate::kept_box::{BoxFrom, KeptBox, Part};
+use crate::drawn_steps::DrawnSteps;
+use crate::kept_box::{BoxFrom, KeptBox};
 use crate::kept_order::KeptOrder;
-use crate::kept_paint::LastPaint;
-use crate::layout::{BoxRect, Key, LayoutBox};
-use crate::paint::{PaintInput, clip_to, paint_box, started};
+use crate::layout::{BoxRect, Content, LayoutBox};
+use crate::paint::{PaintInput, started};
 use crate::paint_order::Step;
 use crate::painted::Painted;
-use crate::slab::Slabs;
-use vapors_scene::Item;
+use crate::repaint::Repaint;
 
-/// Paints `boxes` at `rects`, copying from `last`, the last update's
-/// kept paint, where it shows what painting again would, and patching
-/// its maps for the `changed` slots.
+/// Paints `boxes` at `rects`, keeping `last`'s parts in place where
+/// they show what painting again would, and patching its maps for the
+/// `changed` slots; a new paint of every box when `last` is `None` or
+/// every box changed.
 pub(crate) fn paint_partial(
     boxes: &[LayoutBox],
     rects: &[BoxRect],
     input: &mut PaintInput<'_>,
-    last: LastPaint,
+    last: Option<Painted>,
     changed: &ChangedSlots,
 ) -> Painted {
-    let mut painted = started(input);
-    painted.slabs = last.slabs;
-    crate::kept_maps::fill(&mut painted, (boxes, rects), last.maps, changed);
-    let order = KeptOrder::updated(last.order, (boxes, rects), input, changed);
-    let mut walk = Walk::new(boxes, rects, last.boxes, &painted);
-    walk.free_slots(&changed.freed, &mut painted.slabs);
-    walk.steps(&order, input, &mut painted);
-    walk.free_unvisited(&mut painted.slabs);
-    painted.kept_boxes = walk.kept;
+    let started = started(input);
+    let (mut painted, kept_order) = match last {
+        Some(last) if !changed.every => restarted(last, &started),
+        _ => (started, None),
+    };
+    let kept = kept_order.is_some();
+    let order = KeptOrder::updated(kept_order, (boxes, rects), input, changed);
+    let again = to_paint(&order, (boxes, rects), (changed, kept), &mut painted);
+    dropped(&again, changed, boxes.len(), &mut painted);
+    crate::kept_maps::fill(&mut painted, (boxes, rects), kept, changed);
+    let patched = patched_slots(&again, changed, &order);
+    let mut repaint = Repaint::new(boxes, rects, &order);
+    repaint.boxes(again, input, &mut painted);
+    repaint.thumbs(input, &mut painted);
+    drawn_updated(&mut painted, &order, patched);
     painted.order = order;
     painted
 }
 
-/// A scroll thumb, painted on every update, its items counted.
-fn thumb(layout_box: &LayoutBox, rect: BoxRect, input: &PaintInput<'_>, out: &mut Painted) {
-    let before = out.scene.items().len();
-    crate::thumb::paint(layout_box, rect, input, out);
-    out.items_built += out.scene.items().len() - before;
+/// The slots whose parts this update paints again or drops: those
+/// painted `again`, the freed and the scroll containers.
+fn patched_slots(
+    again: &[(usize, BoxFrom)],
+    changed: &ChangedSlots,
+    order: &KeptOrder,
+) -> Vec<usize> {
+    let again = again.iter().map(|(slot, _)| *slot);
+    let freed = changed.freed.iter().map(|(slot, _)| *slot);
+    again
+        .chain(freed)
+        .chain(order.thumbs.iter().copied())
+        .collect()
 }
 
-struct Walk<'a> {
-    boxes: &'a [LayoutBox],
-    rects: &'a [BoxRect],
-    /// The last update's kept paint, by slot, taken as it is used; at
-    /// least as long as `boxes`.
-    last: Vec<Option<KeptBox>>,
-    /// This update's, by slot.
-    kept: Vec<Option<KeptBox>>,
-    /// Where a box painted again is painted, before it is kept.
-    scratch: Painted,
-}
-
-impl<'a> Walk<'a> {
-    /// A walk of `boxes` copying from `last`, painting again into a
-    /// scratch paint with `started`'s canvas and scale.
-    fn new(
-        boxes: &'a [LayoutBox],
-        rects: &'a [BoxRect],
-        mut last: Vec<Option<KeptBox>>,
-        started: &Painted,
-    ) -> Self {
-        if last.len() < boxes.len() {
-            last.resize_with(boxes.len(), || None);
-        }
-        Self {
-            boxes,
-            rects,
-            last,
-            kept: std::iter::repeat_with(|| None).take(boxes.len()).collect(),
-            scratch: Painted::empty(started.canvas, started.canvas_from, started.scale),
-        }
-    }
-
-    /// Each of `order`'s steps, under its clip, into `out`.
-    fn steps(&mut self, order: &KeptOrder, input: &mut PaintInput<'_>, out: &mut Painted) {
-        for &step in &order.steps {
-            let index = step.index();
-            let clip = order.clips.own(index);
-            clip_to(clip, input, &mut out.scene);
-            match step {
-                Step::Box(_) => self.own(index, clip, input, out),
-                Step::Thumb(_) => thumb(&self.boxes[index], self.rects[index], input, out),
-                Step::Outline(_) => self.outline(index, out),
-            }
-        }
-    }
-
-    /// Frees the ids of the `freed` slots' last kept paint before any
-    /// box is painted, so boxes painted after take them.
-    fn free_slots(&mut self, freed: &[(usize, Key)], slabs: &mut Slabs) {
-        for &(slot, _) in freed {
-            if let Some(gone) = self.last.get_mut(slot).and_then(Option::take) {
-                gone.free(slabs);
-            }
-        }
-    }
-
-    /// Box `index`'s own step: its kept paint copied when it shows what
-    /// painting again would, else its ids freed and painted again.
-    fn own(
-        &mut self,
-        index: usize,
-        clip: Option<BoxRect>,
-        input: &mut PaintInput<'_>,
-        out: &mut Painted,
-    ) {
-        let from = BoxFrom::of(self.boxes, self.rects, clip, index);
-        let kept = match self.reusable(index, &from, out) {
-            Some(kept) => kept,
-            None => self.painted_again(index, from, input, out),
-        };
-        kept.own.copy_into(out);
-        self.kept[index] = Some(kept);
-    }
-
-    /// Box `index`'s last kept paint, when the box was kept and its
-    /// paint was made `from` what it reads now; else its ids are freed
-    /// from `out`'s slabs.
-    fn reusable(&mut self, index: usize, from: &BoxFrom, out: &mut Painted) -> Option<KeptBox> {
-        let last = self.last[index].take()?;
-        if self.boxes[index].kept && last.from == *from {
-            return Some(last);
-        }
-        last.free(&mut out.slabs);
-        None
-    }
-
-    /// Frees the ids of each last kept paint no step took: one past the
-    /// boxes, or of a box with no step.
-    fn free_unvisited(&mut self, slabs: &mut Slabs) {
-        for unvisited in self.last.drain(..).flatten() {
-            unvisited.free(slabs);
-        }
-    }
-
-    /// Box `index`'s own step and outline painted, kept, and counted;
-    /// their ids taken from `out`'s slabs.
-    fn painted_again(
-        &mut self,
-        index: usize,
-        from: BoxFrom,
-        input: &mut PaintInput<'_>,
-        out: &mut Painted,
-    ) -> KeptBox {
-        self.scratch.slabs = std::mem::take(&mut out.slabs);
-        clip_to(input.clip, input, &mut self.scratch.scene);
-        paint_box(self.boxes, self.rects, index, input, &mut self.scratch);
-        let kept = KeptBox {
-            from,
-            own: Part::take(&mut self.scratch),
-            outline: self.outline_again(index, input),
-        };
-        out.slabs = std::mem::take(&mut self.scratch.slabs);
-        out.boxes_drawn += 1;
-        out.items_built += kept.items();
-        kept
-    }
-
-    /// Box `index`'s outline's items, painted again.
-    fn outline_again(&mut self, index: usize, input: &mut PaintInput<'_>) -> Vec<Item> {
-        clip_to(input.clip, input, &mut self.scratch.scene);
-        let (layout_box, rect) = (&self.boxes[index], self.rects[index]);
-        crate::paint_outline::paint_outline(layout_box, rect, input, &mut self.scratch);
-        std::mem::take(&mut self.scratch.scene).items().to_vec()
-    }
-
-    /// Box `index`'s outline, kept at its own step.
-    fn outline(&self, index: usize, out: &mut Painted) {
-        let kept = self.kept[index]
-            .as_ref()
-            .expect("a box's outline is painted after its own step");
-        for item in &kept.outline {
-            out.scene.push(*item);
-        }
+/// `painted`'s drawing steps made afresh when `order` was walked again,
+/// else patched for the `patched` slots.
+fn drawn_updated(painted: &mut Painted, order: &KeptOrder, patched: Vec<usize>) {
+    if order.walks.order > 0 {
+        painted.drawn = DrawnSteps::of(&order.steps, &painted.kept_boxes);
+    } else {
+        painted
+            .drawn
+            .patch(patched.into_iter(), &painted.kept_boxes);
     }
 }
+
+/// `last` for this update, with `started`'s canvas and scale, its counts and
+/// gathered hits cleared; and its paint order, taken.
+fn restarted(mut last: Painted, started: &Painted) -> (Painted, Option<KeptOrder>) {
+    let order = std::mem::take(&mut last.order);
+    (last.canvas, last.canvas_from) = (started.canvas, started.canvas_from);
+    last.scale = started.scale;
+    (last.boxes_drawn, last.items_built, last.parts_visited_kept) = (0, 0, 0);
+    last.hits = std::cell::OnceCell::new();
+    (last, Some(order))
+}
+
+/// The slots to paint again, each with what it reads now: every box
+/// step's when nothing is kept, else each changed or reclipped slot
+/// whose box was built again or whose part was made from other values.
+/// Notes how many kept parts that read and kept.
+fn to_paint(
+    order: &KeptOrder,
+    (boxes, rects): (&[LayoutBox], &[BoxRect]),
+    (changed, kept): (&ChangedSlots, bool),
+    painted: &mut Painted,
+) -> Vec<(usize, BoxFrom)> {
+    let slots = candidates(order, changed, !kept);
+    let shown = slots
+        .into_iter()
+        .filter(|&slot| !matches!(boxes[slot].content, Content::Vacant));
+    let read = shown.map(|slot| (slot, BoxFrom::of(boxes, rects, order.clips.own(slot), slot)));
+    let kept = |(slot, from): &(usize, BoxFrom)| {
+        let part = painted.kept_boxes.get(*slot).and_then(Option::as_ref);
+        boxes[*slot].kept && part.is_some_and(|part| part.from == *from)
+    };
+    let (kept, again): (Vec<_>, Vec<_>) = read.partition(kept);
+    painted.parts_visited_kept = kept.len();
+    again
+}
+
+/// Every box step's slot when `fresh`, else the rebuilt, moved and
+/// reclipped slots, each once.
+fn candidates(order: &KeptOrder, changed: &ChangedSlots, fresh: bool) -> Vec<usize> {
+    if fresh {
+        let own = |step: &Step| matches!(step, Step::Box(_)).then(|| step.index());
+        return order.steps.iter().filter_map(own).collect();
+    }
+    let changed = changed.rebuilt.iter().chain(&changed.moved);
+    let mut slots: Vec<usize> = changed.chain(&order.redone).copied().collect();
+    slots.sort_unstable();
+    slots.dedup();
+    slots
+}
+
+/// Drops the parts of the freed slots, of the slots painted `again`,
+/// and of any slot past the `len` boxes, freeing their ids and removing
+/// their entries.
+fn dropped(again: &[(usize, BoxFrom)], changed: &ChangedSlots, len: usize, painted: &mut Painted) {
+    let freed = changed.freed.iter().map(|(slot, _)| *slot);
+    for slot in freed.chain(again.iter().map(|(slot, _)| *slot)) {
+        if let Some(gone) = painted.kept_boxes.get_mut(slot).and_then(Option::take) {
+            gone.drop_from(painted);
+        }
+    }
+    let past = len.min(painted.kept_boxes.len());
+    let past: Vec<KeptBox> = painted.kept_boxes.drain(past..).flatten().collect();
+    for gone in past {
+        gone.drop_from(painted);
+    }
+    painted.kept_boxes.resize_with(len, || None);
+}
+
+#[cfg(test)]
+#[path = "paint_partial_tests.rs"]
+mod tests;

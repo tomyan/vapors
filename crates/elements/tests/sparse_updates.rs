@@ -59,7 +59,9 @@ const EXPECTED: [(usize, usize, usize); 6] = [
 ];
 
 /// The walk after each edit of `EDITS`, by row count: elements visited,
-/// boxes built, layout calls, boxes painted, scene items built, map
+/// boxes built, layout calls, boxes painted, boxes copied (kept parts
+/// read and kept: none, as no edit moves a box it did not build), scene
+/// items built, map
 /// entries patched (the elements built again or moved), paint order
 /// and scroll chain walks (none: no edit changes the tree's shape),
 /// clips redone (the boxes built again or moved). A row is
@@ -68,30 +70,30 @@ const EXPECTED: [(usize, usize, usize); 6] = [
 /// the marked row's background; `html` and `body` add 2
 /// elements and 2 boxes. An update that builds no box and moves none
 /// paints nothing (`kept_paint.rs`); any other paints only the boxes it
-/// built or moved, copying the rest (`kept_box.rs`): the longer label
+/// built or moved, keeping the rest in place (`kept_box.rs`): the longer label
 /// moves the 4 boxes after it in its row. The second table in
 /// docs/plans/iu1.md is these numbers.
-const EXPECTED_WALKS: [(usize, [[usize; 9]; 6]); 2] = [
+const EXPECTED_WALKS: [(usize, [[usize; 10]; 6]); 2] = [
     (
         100,
         [
-            [1, 2, 109, 2, 1, 1, 0, 0, 2],
-            [1, 2, 111, 6, 4, 3, 0, 0, 6],
-            [0, 0, 1, 0, 0, 0, 0, 0, 0],
-            [4, 2, 1, 2, 2, 1, 0, 0, 2],
-            [1, 2, 1, 2, 3, 1, 0, 0, 2],
-            [4, 7, 1, 7, 5, 4, 0, 0, 7],
+            [1, 2, 109, 2, 0, 1, 1, 0, 0, 2],
+            [1, 2, 111, 6, 0, 4, 3, 0, 0, 6],
+            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+            [4, 2, 1, 2, 0, 2, 1, 0, 0, 2],
+            [1, 2, 1, 2, 0, 3, 1, 0, 0, 2],
+            [4, 7, 1, 7, 0, 5, 4, 0, 0, 7],
         ],
     ),
     (
         1000,
         [
-            [1, 2, 1009, 2, 1, 1, 0, 0, 2],
-            [1, 2, 1011, 6, 4, 3, 0, 0, 6],
-            [0, 0, 1, 0, 0, 0, 0, 0, 0],
-            [4, 2, 1, 2, 2, 1, 0, 0, 2],
-            [1, 2, 1, 2, 3, 1, 0, 0, 2],
-            [4, 7, 1, 7, 5, 4, 0, 0, 7],
+            [1, 2, 1009, 2, 0, 1, 1, 0, 0, 2],
+            [1, 2, 1011, 6, 0, 4, 3, 0, 0, 6],
+            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+            [4, 2, 1, 2, 0, 2, 1, 0, 0, 2],
+            [1, 2, 1, 2, 0, 3, 1, 0, 0, 2],
+            [4, 7, 1, 7, 0, 5, 4, 0, 0, 7],
         ],
     ),
 ];
@@ -142,6 +144,7 @@ fn assert_walk(rows: usize, index: usize, edit: Edit, work: &Work) {
         c.boxes_built,
         c.layout_calls,
         c.boxes_painted,
+        c.parts_visited_kept,
         c.scene_items_built,
         c.map_entries_patched,
         c.order_walks,

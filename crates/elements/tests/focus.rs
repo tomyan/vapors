@@ -127,6 +127,7 @@ fn focus_and_focus_within_style_the_focused_element_and_its_ancestors() {
         .painted()
         .expect("painted")
         .scene()
+        .to_scene()
         .items()
         .iter()
         .filter_map(|item| match item {

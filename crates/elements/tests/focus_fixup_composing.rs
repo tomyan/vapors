@@ -18,7 +18,7 @@ use vapors_scene::Item;
 fn underlines(page: &Page) -> usize {
     let doc = page.doc.borrow();
     let painted = doc.painted().expect("painted");
-    let lines = painted.scene().items().iter().filter(|item| match item {
+    let lines = painted.scene().items().filter(|(item, _)| match item {
         Item::Quad(q) => {
             (q.rect.bottom - q.rect.top - 1.0).abs() < 0.01 && q.rect.right - q.rect.left > 4.0
         }

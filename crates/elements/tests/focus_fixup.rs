@@ -165,6 +165,7 @@ fn colours(page: &Page) -> Vec<[u8; 4]> {
     let painted = doc.painted().expect("painted");
     painted
         .scene()
+        .to_scene()
         .items()
         .iter()
         .filter_map(|item| match item {

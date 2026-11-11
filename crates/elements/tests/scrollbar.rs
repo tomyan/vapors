@@ -13,6 +13,7 @@ fn quads_of(list: &mut List, color: Color) -> Vec<Rect> {
     let painted = list.doc.update(at(1.0)).expect("updates");
     painted
         .scene()
+        .to_scene()
         .items()
         .iter()
         .filter_map(|item| match item {

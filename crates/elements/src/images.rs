@@ -14,7 +14,7 @@ use vapors_scene::{ImageId, Item, RgbaImage};
 use crate::arena::Arena;
 use crate::layout::{BoxRect, Content, LayoutBox};
 use crate::paint::PaintInput;
-use crate::painted::Painted;
+use crate::painting::Painting;
 
 /// The registered images.
 #[derive(Debug, Default)]
@@ -124,7 +124,7 @@ pub(crate) fn paint(
     layout_box: &LayoutBox,
     border_box: BoxRect,
     input: &PaintInput<'_>,
-    out: &mut Painted,
+    out: &mut Painting,
 ) {
     let (Some(image), &Content::Element(node)) = (&layout_box.image, &layout_box.content) else {
         return;

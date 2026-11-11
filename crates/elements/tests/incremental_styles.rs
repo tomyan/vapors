@@ -185,6 +185,7 @@ fn a_restyled_element_shows_its_new_style() {
     let red = vapors_scene::Color::from_rgba8(255, 0, 0, 255);
     let quads = painted
         .scene()
+        .to_scene()
         .items()
         .iter()
         .filter(|item| matches!(item, vapors_scene::Item::Quad(q) if q.background == red))

@@ -23,16 +23,16 @@ pub(crate) struct Clips {
 }
 
 impl Clips {
-    /// Every box's clips; how many boxes that redid.
-    pub(crate) fn of(tree: &ClipTree, inner: Inner<'_>) -> (Self, usize) {
+    /// Every box's clips; the slots that redid.
+    pub(crate) fn of(tree: &ClipTree, inner: Inner<'_>) -> (Self, Vec<usize>) {
         let mut clips = Self {
             own: vec![None; tree.len()],
             inner: vec![None; tree.len()],
         };
-        let redone = match tree.len() {
-            0 => 0,
-            _ => clips.descend(0, tree, inner, &mut Redo::Every),
-        };
+        let mut redone = Vec::new();
+        if tree.len() > 0 {
+            clips.descend(0, (tree, inner), &mut Redo::Every, &mut redone);
+        }
         (clips, redone)
     }
 
@@ -42,36 +42,37 @@ impl Clips {
     }
 
     /// Redoes the clips of the `changed` slots and below them where an
-    /// inner clip changed; how many boxes that redid.
+    /// inner clip changed; the slots that redid.
     pub(crate) fn redo_under(
         &mut self,
         mut changed: Vec<usize>,
         tree: &ClipTree,
         inner: Inner<'_>,
-    ) -> usize {
+    ) -> Vec<usize> {
         changed.sort_unstable_by_key(|&slot| tree.depth(slot));
         let mut done = Redo::Changed(FxHashSet::default());
-        changed
-            .into_iter()
-            .map(|slot| self.descend(slot, tree, inner, &mut done))
-            .sum()
+        let mut redone = Vec::new();
+        for slot in changed {
+            self.descend(slot, (tree, inner), &mut done, &mut redone);
+        }
+        redone
     }
 
-    /// Redoes `start` and the boxes below it that `redo` reaches; how
-    /// many.
+    /// Redoes `start` and the boxes below it that `redo` reaches,
+    /// noting each in `redone`.
     fn descend(
         &mut self,
         start: usize,
-        tree: &ClipTree,
-        inner: Inner<'_>,
+        (tree, inner): (&ClipTree, Inner<'_>),
         redo: &mut Redo,
-    ) -> usize {
+        redone: &mut Vec<usize>,
+    ) {
         let mut open = vec![start];
-        let mut redone = 0;
         while let Some(slot) = open.pop() {
-            redone += usize::from(self.visit(slot, (tree, inner), redo, &mut open));
+            if self.visit(slot, (tree, inner), redo, &mut open) {
+                redone.push(slot);
+            }
         }
-        redone
     }
 
     /// Redoes `slot` unless `redo` already has, and opens its

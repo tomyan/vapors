@@ -16,6 +16,7 @@ fn items(sheet: &str) -> Vec<Item> {
     doc.update(viewport(200.0, 100.0))
         .expect("updates")
         .scene()
+        .to_scene()
         .items()
         .to_vec()
 }
@@ -164,7 +165,7 @@ fn an_overflow_hidden_ancestor_clips_a_childs_outline_but_not_its_own() {
 
     // When
     let painted = doc.update(viewport(200.0, 100.0)).expect("updates");
-    let scene = painted.scene();
+    let scene = painted.scene().to_scene();
 
     // Then: the child's ring is under the parent's clip; the parent's is not
     let clip_of = |rgba: [u8; 4]| {

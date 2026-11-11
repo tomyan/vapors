@@ -6,36 +6,45 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
-use vapors_scene::{IconId, ImageId, Item, SurfaceId, TextId};
+use vapors_scene::{IconId, ImageId, Item, Rect, Scene, SurfaceId, TextId};
 
+use crate::paint_order::Step;
 use crate::painted::Painted;
 use crate::slab::{Named, Slabs};
 
+/// One scene item with its clip and the step that painted it.
+type Placed = (Item, Option<Rect>, Step);
+
 /// The first scene item at which `kept` and `fresh` differ, ids
-/// resolved, with the step and slot `fresh` painted it at; `starts` is
-/// the index of each of `fresh`'s steps' first item.
-pub(crate) fn first_differing_item(
-    kept: &Painted,
-    (fresh, starts): (&Painted, &[usize]),
-) -> Option<String> {
-    let len = kept.scene.items().len().max(fresh.scene.items().len());
-    let at = (0..len).find(|&at| !same_at(kept, fresh, at))?;
-    let step = match starts.partition_point(|&start| start <= at).checked_sub(1) {
-        Some(step) => format!("fresh step {step}, {:?}", fresh.order.steps[step]),
-        None => "before the first step".into(),
-    };
+/// resolved, with the steps (each naming its slot) that painted it.
+pub(crate) fn first_differing_item(kept: &Painted, fresh: &Painted) -> Option<String> {
+    let (a, b) = (placed(kept), placed(fresh));
+    let at = (0..a.len().max(b.len())).find(|&at| !same_at(kept, fresh, (a.get(at), b.get(at))))?;
     Some(format!(
-        "scene item {at} ({step}): kept {:?}, fresh {:?}",
-        kept.scene.items().get(at),
-        fresh.scene.items().get(at)
+        "scene item {at}: kept {:?}, fresh {:?}",
+        a.get(at),
+        b.get(at)
     ))
 }
 
-/// Whether item `at` and its clip are the same in both, ids resolved.
-fn same_at(kept: &Painted, fresh: &Painted, at: usize) -> bool {
-    let clips = (kept.scene.clips().get(at), fresh.scene.clips().get(at));
-    match (kept.scene.items().get(at), fresh.scene.items().get(at)) {
-        (Some(a), Some(b)) => clips.0 == clips.1 && same_item((kept, a), (fresh, b)),
+/// Each item of `painted`'s scene with its clip and step.
+fn placed(painted: &Painted) -> Vec<Placed> {
+    painted.scene().steps().flat_map(step_items).collect()
+}
+
+/// `scene`'s items, each with its clip and `step`.
+fn step_items((step, scene): (Step, &Scene)) -> impl Iterator<Item = Placed> + '_ {
+    let clips = scene.clips().iter();
+    let items = scene.items().iter().zip(clips);
+    items.map(move |(item, clip)| (*item, *clip, step))
+}
+
+/// Whether two placed items and their clips are the same, ids resolved.
+fn same_at(kept: &Painted, fresh: &Painted, items: (Option<&Placed>, Option<&Placed>)) -> bool {
+    match items {
+        (Some((a, clip_a, _)), Some((b, clip_b, _))) => {
+            clip_a == clip_b && same_item((kept, a), (fresh, b))
+        }
         _ => false,
     }
 }
@@ -122,6 +131,27 @@ pub(crate) fn slab_difference<'a>(
         (slots.len() != 1)
             .then(|| format!("slab id {named:?} is named by slots {slots:?}, not one"))
     })
+}
+
+/// The first slot that holds a kept part but has no box step: a part
+/// that is never shown, whose ids stay held.
+pub(crate) fn part_off_steps(painted: &Painted) -> Option<String> {
+    let mut stepped = vec![false; painted.kept_boxes.len()];
+    let boxes = painted
+        .order
+        .steps
+        .iter()
+        .filter(|step| matches!(step, Step::Box(_)));
+    for step in boxes {
+        if let Some(seen) = stepped.get_mut(step.index()) {
+            *seen = true;
+        }
+    }
+    let parts = painted.kept_boxes.iter().map(Option::is_some);
+    let slot = parts
+        .zip(stepped)
+        .position(|(part, stepped)| part && !stepped)?;
+    Some(format!("slot {slot} holds a kept part but has no box step"))
 }
 
 #[cfg(test)]

@@ -12,7 +12,8 @@ use vapors_scene::{Color, Item};
 use vapors_text::{Icon, IconPath, IconStroke};
 
 fn only_icon(painted: &Painted) -> (&Icon, Color) {
-    let items = painted.scene().items();
+    let scene = painted.scene().to_scene();
+    let items = scene.items();
     let found: Vec<_> = items
         .iter()
         .filter_map(|item| match *item {

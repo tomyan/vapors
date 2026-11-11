@@ -33,6 +33,7 @@ fn fills(doc: &mut Document) -> Vec<Color> {
     let painted = doc.update(viewport(100.0, 100.0)).expect("updates");
     painted
         .scene()
+        .to_scene()
         .items()
         .iter()
         .filter_map(|item| match item {

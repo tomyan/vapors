@@ -7,7 +7,7 @@ use vapors_scene::{Item, Quad};
 
 use crate::layout::{BoxRect, Content, LayoutBox};
 use crate::paint::{PaintInput, snapped};
-use crate::painted::Painted;
+use crate::painting::Painting;
 
 /// The mark's inset from each edge, as a fraction of the content box's
 /// smaller side.
@@ -19,7 +19,7 @@ pub(crate) fn paint(
     layout_box: &LayoutBox,
     border_box: BoxRect,
     input: &PaintInput<'_>,
-    out: &mut Painted,
+    out: &mut Painting,
 ) {
     let (Some(true), &Content::Element(node)) = (layout_box.checked, &layout_box.content) else {
         return;
