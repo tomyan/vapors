@@ -41,10 +41,11 @@ pub enum GpuResolution {
     /// Natively: one tick of the device's timestamp period
     /// (`Queue::get_timestamp_period`), truncated to the nanosecond.
     Tick(Duration),
-    /// In a browser, which quantises WebGPU timestamps: Chrome rounds
-    /// them to 100 µs unless its WebGPU developer features are on
-    /// (`chrome://flags/#enable-webgpu-developer-features`), so a frame's
-    /// passes shorter than that can read 0. Not faked finer.
+    /// In a browser, which quantises WebGPU timestamps: Chrome to 100 µs
+    /// unless its "WebGPU Developer Features" flag is on
+    /// (<https://developer.chrome.com/docs/web-platform/webgpu/developer-features>,
+    /// read 2026-11-11), so a frame's passes shorter than that can read
+    /// 0. Other browsers' steps are not known here. Not faked finer.
     BrowserQuantised,
 }
 
