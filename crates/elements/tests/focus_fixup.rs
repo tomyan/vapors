@@ -9,7 +9,16 @@
 //! connected, then a typed key reaches the body and the value stays.
 //! One difference: in Chromium focus is already on the body during
 //! `change`; here it is still on the field, as for every blur
-//! (`Document::focus`). Rerun: `node scripts/chromium-focus-fixup.mjs`.
+//! (`Document::focus`).
+//!
+//! Removal differs from Chromium: removing the focused field (or an
+//! ancestor) clears focus here with no events (`drop_focus_within`),
+//! while Chromium 155 fires `change`, `blur`, `focusout` on it during
+//! the `remove()` call, before it is detached (`isConnected` true), so
+//! capture listeners on the document see them. Matching it needs the
+//! remove path to dispatch, which `Dom::remove` (`&mut self`) cannot.
+//!
+//! Rerun Chromium's side: `node scripts/chromium-focus-fixup.mjs`.
 
 mod support;
 
