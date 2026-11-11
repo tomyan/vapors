@@ -13,6 +13,7 @@ use super::random_css::{CLASSES, CSS};
 use super::tree::{is_inside, text_nodes};
 
 const VIEWPORTS: &[(f32, f32)] = &[(640.0, 400.0), (400.0, 300.0), (700.0, 500.0)];
+const SCALES: &[f32] = &[1.0, 1.5, 2.0];
 
 /// xorshift64: a seed gives the same changes on every machine.
 pub struct Random(pub u64);
@@ -80,7 +81,7 @@ pub fn change(
         f32::from(u16::try_from(random.below(below)).expect("a few hundred"))
     };
     let point = [coordinate(random, 640), coordinate(random, 400)];
-    match random.below(12) {
+    match random.below(13) {
         0 => {
             let (node, class) = (any(random), random.pick(CLASSES));
             doc.borrow_mut().set_attribute(node, "class", class);
@@ -142,7 +143,13 @@ pub fn change(
         9 => {
             let (width, height) = random.pick(VIEWPORTS);
             *viewport = super::viewport(width, height);
-            format!("resize to {width}x{height}")
+            viewport.scale = random.pick(SCALES);
+            format!("resize to {width}x{height} at scale {}", viewport.scale)
+        }
+        11 => {
+            let shown = random.below(2) == 0;
+            doc.borrow_mut().set_thumbs_shown(shown);
+            format!("thumbs shown: {shown}")
         }
         _ => {
             let mut d = doc.borrow_mut();

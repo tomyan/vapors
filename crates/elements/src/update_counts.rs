@@ -36,10 +36,12 @@ pub struct UpdateCounts {
     /// Times Taffy laid a box out rather than reading its cache.
     pub boxes_laid_out: usize,
     /// Boxes paint drew: one per box in painting order, outlines and
-    /// scroll thumbs not included.
+    /// scroll thumbs not included; 0 when the update showed the last
+    /// update's paint (`kept_paint.rs`).
     pub boxes_painted: usize,
     /// Scene items (paint records) paint built. Paint builds the scene
-    /// from empty on every update, so this is every item in it.
+    /// from empty when it paints, so this is every item in it, or 0
+    /// when the update showed the last update's paint.
     pub scene_items_built: usize,
 }
 

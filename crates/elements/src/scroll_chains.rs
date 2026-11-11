@@ -9,7 +9,7 @@ use crate::layout::{Content, LayoutBox};
 /// Which scroll container a scroll over an element moves first, and
 /// which one each container passes a scroll it cannot take to: by
 /// containing block, as clips pass (`crate::chain`).
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub(crate) struct Chains {
     first: HashMap<NodeId, NodeId>,
     outer: HashMap<NodeId, NodeId>,

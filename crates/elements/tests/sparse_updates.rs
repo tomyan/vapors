@@ -63,7 +63,8 @@ const EXPECTED: [(usize, usize, usize); 6] = [
 /// 4 elements and 7 boxes (3 text runs) and draws 4 items (the button's
 /// quad and 3 texts), 5 with the focus outline, 6 with the outline and
 /// the marked row's background; `html` and `body` add 2
-/// elements and 2 boxes. The second table in docs/plans/iu1.md is these
+/// elements and 2 boxes. An update that builds no box and moves none
+/// paints nothing (`kept_paint.rs`). The second table in docs/plans/iu1.md is these
 /// numbers.
 const EXPECTED_WALKS: [(usize, [[usize; 5]; 6]); 2] = [
     (
@@ -71,7 +72,7 @@ const EXPECTED_WALKS: [(usize, [[usize; 5]; 6]); 2] = [
         [
             [1, 2, 109, 702, 400],
             [1, 2, 111, 702, 400],
-            [0, 0, 1, 702, 400],
+            [0, 0, 1, 0, 0],
             [4, 2, 1, 702, 400],
             [1, 2, 1, 702, 401],
             [4, 7, 1, 702, 402],
@@ -82,7 +83,7 @@ const EXPECTED_WALKS: [(usize, [[usize; 5]; 6]); 2] = [
         [
             [1, 2, 1009, 7002, 4000],
             [1, 2, 1011, 7002, 4000],
-            [0, 0, 1, 7002, 4000],
+            [0, 0, 1, 0, 0],
             [4, 2, 1, 7002, 4000],
             [1, 2, 1, 7002, 4001],
             [4, 7, 1, 7002, 4002],

@@ -125,8 +125,8 @@ impl Document {
         self.kept.as_ref()?.styles.get(node)
     }
 
-    /// Drops every style, layout and text layout kept between updates,
-    /// so the next update works from scratch: for tests that compare an
+    /// Drops every style, layout, text layout and paint kept between
+    /// updates, so the next update works from scratch: for tests that compare an
     /// incremental update with a full one.
     #[doc(hidden)]
     pub fn forget_kept(&mut self) {
@@ -134,6 +134,7 @@ impl Document {
         self.checks = crate::kept_checks::KeptChecks::default();
         self.boxes = crate::layout::KeptBoxes::default();
         self.texts = crate::layout::TextCache::default();
+        self.painted = None;
         self.dirty.everything();
     }
 }

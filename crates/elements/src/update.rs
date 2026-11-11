@@ -10,8 +10,8 @@ use vapors_dom::NodeId;
 use crate::check::describe;
 use crate::document::Document;
 use crate::error::ElementError;
+use crate::kept_paint::PaintedFrom;
 use crate::layout::{lay_out, placed};
-use crate::paint::{PaintInput, paint};
 use crate::painted::Painted;
 use crate::style::Refusal;
 
@@ -58,14 +58,14 @@ impl Document {
     /// Only on a bug in this crate: a restyle that succeeds always keeps
     /// the styles layout reads.
     pub fn update(&mut self, viewport: Viewport) -> Result<&Painted, Vec<ElementError>> {
-        self.painted = None;
+        let last = self.painted.take();
         self.counts = crate::UpdateCounts::default();
         self.texts.begin();
         let style = tracing::trace_span!("update phase", phase = "style").entered();
         self.styled(viewport)?;
         drop(style);
         let layout = tracing::trace_span!("update phase", phase = "layout").entered();
-        let (root, body) = (self.root(), self.body());
+        let root = self.root();
         let text_marks = self.focused_text_marks();
         let kept = self.kept.as_ref().expect("styled keeps the styles");
         let used = &kept.used;
@@ -93,33 +93,21 @@ impl Document {
             },
         )?;
         let boxes = &slotted.boxes;
-        let scrolls = |index: usize| match boxes[index].content {
-            crate::layout::Content::Element(node) => used[&node].scrolls(),
-            crate::layout::Content::Text(_) => false,
-            crate::layout::Content::Vacant => unreachable!("a vacant slot is no box's child"),
-        };
+        let scrolls = crate::update_paint::scroll_containers(boxes, used);
         let offsets = self.scroll.settle(boxes, &scrolls, viewport.scale);
-        let rects = placed(boxes, &offsets);
+        drop(scrolls);
+        let from = PaintedFrom {
+            rects: placed(boxes, &offsets),
+            thumbs_shown: self.thumbs_shown,
+            scale: viewport.scale,
+        };
         drop(layout);
         let paint_span = tracing::trace_span!("update phase", phase = "paint").entered();
-        let mut input = PaintInput {
-            used,
-            root,
-            body,
-            propagated: None,
-            fonts: &mut self.fonts,
-            cache: &mut self.texts,
-            scale: viewport.scale,
-            clip: None,
-            scroll: &self.scroll,
-            thumbs_shown: self.thumbs_shown,
-        };
-        let mut painted = paint(boxes, &rects, &mut input);
-        painted.scroll_chains = crate::scroll_chains::Chains::of(boxes, &scrolls);
+        let mut painted = self.paint_or_keep(last, boxes, &from, built);
         drop(paint_span);
         self.boxes.keep(slotted, viewport.scale);
+        painted.from = from;
         (self.counts.boxes_laid_out, self.counts.layout_calls) = (work.laid_out, work.calls);
-        self.counts.note_paint(&painted);
         // Cleared before the rehover: a hover it moves is a change this
         // update did not restyle, so the a11y tree refuses until the next.
         self.changes.since_update = false;

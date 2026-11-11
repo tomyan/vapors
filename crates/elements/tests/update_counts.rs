@@ -110,9 +110,9 @@ fn a_calc_refused_by_layout_paints_nothing() {
 }
 
 #[test]
-fn paint_draws_every_box_and_rebuilds_every_item_on_an_update_with_nothing_changed() {
+fn paint_draws_no_box_and_builds_no_item_on_an_update_with_nothing_changed() {
     let counts = idle_counts(&mut page());
-    assert_eq!((counts.boxes_painted, counts.scene_items_built), (5, 2));
+    assert_eq!((counts.boxes_painted, counts.scene_items_built), (0, 0));
 }
 
 #[test]
