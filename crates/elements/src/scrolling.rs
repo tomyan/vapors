@@ -22,7 +22,7 @@ impl Document {
     pub fn scroll_target(&self, point: [f32; 2], delta: [f32; 2]) -> Option<NodeId> {
         let painted = self.painted.as_ref()?;
         let element = painted.hit(point)?;
-        let chain = painted.scroll_chains.from(element);
+        let chain = painted.order.chains.from(element);
         chain
             .into_iter()
             .find(|container| self.scroll.can_move(*container, delta))

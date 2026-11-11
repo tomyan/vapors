@@ -38,8 +38,9 @@ pub struct Painted {
     /// The names of the surfaces the scene's surface items name, by
     /// `SurfaceId`.
     pub(crate) surfaces: Vec<String>,
-    /// Which scroll containers a scroll over each element tries.
-    pub(crate) scroll_chains: crate::scroll_chains::Chains,
+    /// Paint order, clips and which scroll containers a scroll over
+    /// each element tries (`kept_order.rs`).
+    pub(crate) order: crate::kept_order::KeptOrder,
     /// Each range input's track, for the pointer (3-E3a).
     pub(crate) ranges: NodeMap<crate::range_paint::Track>,
     /// Each text field's text origin, for the pointer (E6a).
@@ -96,7 +97,7 @@ impl Painted {
             visible: NodeSet::default(),
             hits: Vec::new(),
             cursors: NodeMap::default(),
-            scroll_chains: crate::scroll_chains::Chains::default(),
+            order: crate::kept_order::KeptOrder::default(),
             images: Vec::new(),
             icons: Vec::new(),
             surfaces: Vec::new(),

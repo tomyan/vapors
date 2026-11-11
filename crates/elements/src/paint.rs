@@ -9,8 +9,9 @@ use vapors_dom::NodeId;
 use vapors_scene::{Rect, Scene};
 use vapors_text::FontSystem;
 
+use crate::kept_order::KeptOrder;
 use crate::layout::{BoxRect, LayoutBox};
-use crate::paint_order::{Stackings, Step, paint_steps_with_outlines};
+use crate::paint_order::{Stackings, Step};
 use crate::painted::Painted;
 use crate::style::Used;
 
@@ -65,10 +66,10 @@ impl<'a> PaintInput<'a> {
 pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> Painted {
     let mut painted = started(input);
     painted.maps_patched = crate::kept_maps::build(&mut painted, (boxes, rects));
-    let (steps, clips) = order(boxes, rects, input);
-    for step in steps {
+    let order = KeptOrder::of(boxes, rects, input);
+    for &step in &order.steps {
         let index = step.index();
-        clip_to(clips[index], input, &mut painted.scene);
+        clip_to(order.clips.own(index), input, &mut painted.scene);
         match step {
             Step::Box(_) => {
                 painted.boxes_drawn += 1;
@@ -86,6 +87,7 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
         }
     }
     painted.items_built = painted.scene.items().len();
+    painted.order = order;
     painted
 }
 
@@ -96,19 +98,6 @@ pub(crate) fn started(input: &mut PaintInput<'_>) -> Painted {
     input.propagated = propagated;
     let canvas_from = crate::canvas::canvas_from(propagated, input.root);
     Painted::empty(canvas, canvas_from, input.scale)
-}
-
-/// The steps of painting in order, and each box's clip.
-pub(crate) fn order(
-    boxes: &[LayoutBox],
-    rects: &[BoxRect],
-    input: &PaintInput<'_>,
-) -> (Vec<Step>, Vec<Option<BoxRect>>) {
-    let steps = paint_steps_with_outlines(boxes, &|index| input.stackings.get(index));
-    let clips = crate::clip::clips(boxes, rects, &|index| {
-        crate::clip::clipping(boxes, index, input)
-    });
-    (steps, clips)
 }
 
 /// Sets the clip the next step paints under.

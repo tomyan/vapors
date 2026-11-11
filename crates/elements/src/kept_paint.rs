@@ -14,7 +14,6 @@ use crate::layout::{BoxRect, LayoutBox};
 use crate::paint::{PaintInput, paint};
 use crate::paint_partial::paint_partial;
 use crate::painted::Painted;
-use crate::scroll_chains::Chains;
 
 /// What the kept paint was made from, besides the boxes.
 #[derive(Debug, Default, PartialEq)]
@@ -44,20 +43,21 @@ pub(crate) fn keep(
     boxes: &[LayoutBox],
     rects: &[BoxRect],
     input: &mut PaintInput<'_>,
-    scrolls: &dyn Fn(usize) -> bool,
 ) -> Painted {
     if cfg!(debug_assertions) {
-        crate::kept_paint_check::assert_same(&kept, &fresh(boxes, rects, input, scrolls));
+        crate::kept_paint_check::assert_same(&kept, &fresh(boxes, rects, input));
     }
     kept
 }
 
 /// What the last paint keeps for a paint that is not the same: each
-/// slot's kept paint and the element maps (`kept_maps.rs`).
+/// slot's kept paint, the element maps (`kept_maps.rs`), and paint
+/// order and clips (`kept_order.rs`).
 #[derive(Default)]
 pub(crate) struct LastPaint {
     pub(crate) boxes: Vec<Option<KeptBox>>,
     pub(crate) maps: Option<crate::kept_maps::ElementMaps>,
+    pub(crate) order: Option<crate::kept_order::KeptOrder>,
 }
 
 impl LastPaint {
@@ -66,40 +66,33 @@ impl LastPaint {
         last.map_or_else(Self::default, |last| Self {
             boxes: last.kept_boxes,
             maps: Some((last.rects, last.paddings)),
+            order: Some(last.order),
         })
     }
 }
 
-/// A paint of `boxes` at `rects`, with its scroll chains, copying the
-/// kept paint in `last` where it shows what painting again would
-/// (`paint_partial.rs`). A debug build paints every box again and
-/// panics, naming each part, when that paint differs.
+/// A paint of `boxes` at `rects`, copying the kept paint in `last`
+/// where it shows what painting again would (`paint_partial.rs`). A
+/// debug build paints every box again and panics, naming each part,
+/// when that paint differs.
 pub(crate) fn paint_all(
     boxes: &[LayoutBox],
     rects: &[BoxRect],
     input: &mut PaintInput<'_>,
-    scrolls: &dyn Fn(usize) -> bool,
     (last, changed): (LastPaint, &ChangedSlots),
 ) -> Painted {
-    let mut painted = paint_partial(boxes, rects, input, last, changed);
-    painted.scroll_chains = Chains::of(boxes, scrolls);
+    let painted = paint_partial(boxes, rects, input, last, changed);
     if cfg!(debug_assertions) {
-        crate::kept_paint_check::assert_same(&painted, &fresh(boxes, rects, input, scrolls));
+        crate::kept_paint_check::assert_same(&painted, &fresh(boxes, rects, input));
     }
     painted
 }
 
 /// A paint of every box, for the debug build's check; the text cache is
 /// left as it was, so the check keeps no layout the update would not.
-fn fresh(
-    boxes: &[LayoutBox],
-    rects: &[BoxRect],
-    input: &mut PaintInput<'_>,
-    scrolls: &dyn Fn(usize) -> bool,
-) -> Painted {
+fn fresh(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> Painted {
     let cache = input.cache.clone();
-    let mut painted = paint(boxes, rects, input);
-    painted.scroll_chains = Chains::of(boxes, scrolls);
+    let painted = paint(boxes, rects, input);
     *input.cache = cache;
     painted
 }

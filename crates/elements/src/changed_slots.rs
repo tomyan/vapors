@@ -23,13 +23,9 @@ pub(crate) struct ChangedSlots {
     /// The kept slots whose rect differs from the last paint's.
     pub(crate) moved: Vec<usize>,
     /// A slot was freed or newly taken, or a rebuilt box's children or
-    /// `Stacking` differ. Every box has an outline step today, so no
-    /// outline flag is compared until paint order lists outlines only
-    /// for boxes that have one (3c-3c).
-    #[expect(
-        dead_code,
-        reason = "3c-3c's kept paint order reads it; untested until then"
-    )]
+    /// `Stacking` differ: paint order is walked again
+    /// (`kept_order.rs`). Every box has an outline step, so whether a
+    /// box has an outline is not compared.
     pub(crate) shape_changed: bool,
 }
 
