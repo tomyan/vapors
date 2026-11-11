@@ -293,6 +293,7 @@ uninstrumented or single-span figures at 3000 rows.
 
 | PR | Content | Acceptance |
 |---|---|---|
+| 3c-3h | Hashing (perf profile, `docs/perf/baseline-2026-11-10.md`): SipHash and `hash_one` are about 5 ms of a 21.6 ms edit paint at 3000 rows on #192 and main alike (NodeId lookups about 2, text `Key` about 2.4). `NodeId` maps and the text cache use a fast non-cryptographic hasher (`rustc-hash`); `scroll_containers` and `stacking_of` read per-slot values computed once per update in place of a `NodeId` lookup per walk; the text `Key` stores its hash, computed once | Text and Class edit paint at 1000 and 3000 rows before and after, on the full-repaint path too; no change to any oracle or Chromium comparison |
 | 3c-3a | Text cache by age and holder | `text_layouts_built` unchanged on every `EXPECTED_WALKS` case; Text and Class paint at 3000 rows recorded (`touch` is 4.5 ms instrumented, less uninstrumented) |
 | 3c-3b | Changed slots (`rebuild` returns rebuilt and freed slots; moved found by comparing rects); `rects` and `paddings` kept and patched | `map_entries_patched` pinned (the changed element slots); `started`'s 2.0 ms gone at 3000 rows |
 | 3c-3c | Order, containing blocks and chains kept, redone on shape change; clips kept, redone under changed slots | `order_walks` and `chain_walks` 0, `clips_redone` 2 and 7 for Text and Class; a row insert `order_walks` 1; about 9 ms less at 3000 rows (order 4.4, chains 2.9, clips 1.7). Split at order and clips if over 400 lines |
@@ -308,6 +309,9 @@ uninstrumented or single-span figures at 3000 rows.
 - Moved boxes: option (a), as PR 3c-3e. A scroll or a resized label
   repainting most of a 3000-row list is the scaling case this plan is
   for, and (a) needs no change to the scene format. (b) stays in IU4.
+- 3c-3h (hashing) goes first: it lowers both the full-repaint and the
+  kept-paint paths, needs no change to what is kept, and makes the
+  later PRs' before and after figures smaller and easier to read.
 - Batching over steps and items per drawn frame is accepted for 3c;
   3c-3d2 records draw at 3000 rows, and a measurable rise brings kept
   batches into this stack.
