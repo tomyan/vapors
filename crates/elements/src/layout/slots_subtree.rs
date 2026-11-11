@@ -15,6 +15,13 @@ pub(crate) struct Taken {
     slots: FxHashMap<Key, usize>,
 }
 
+impl Taken {
+    /// The taken slots no new box took, with the key each held.
+    pub(crate) fn unclaimed(&self) -> Vec<(usize, Key)> {
+        self.slots.iter().map(|(&key, &slot)| (slot, key)).collect()
+    }
+}
+
 impl Placed {
     /// Takes out the boxes of the subtree at `slot` into `taken`,
     /// leaving their slots vacant and keyless.
@@ -34,12 +41,13 @@ impl Placed {
 
     /// Puts `built`, boxes in pre-order with the subtree's root first,
     /// into slots: a key `taken` holds takes its slot, a new key the
-    /// lowest vacant slot or a new one. Returns the root's slot.
+    /// lowest vacant slot or a new one. Returns each box's slot, in
+    /// `built`'s order.
     ///
     /// # Panics
     /// A key that holds a slot outside the taken subtrees: a box that
     /// moved without a mark on its old parent.
-    pub(crate) fn put_subtree(&mut self, built: Vec<LayoutBox>, taken: &mut Taken) -> usize {
+    pub(crate) fn put_subtree(&mut self, built: Vec<LayoutBox>, taken: &mut Taken) -> Vec<usize> {
         let keys = keys(&built);
         let to: Vec<usize> = keys.iter().map(|key| self.slot_for(*key, taken)).collect();
         for (&key, &slot) in keys.iter().zip(&to) {
@@ -51,7 +59,7 @@ impl Placed {
             }
             self.boxes[slot] = layout_box;
         }
-        to[0]
+        to
     }
 
     /// Records that `key` holds `slot`.

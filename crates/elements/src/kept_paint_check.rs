@@ -1,9 +1,14 @@
 //! The debug build's check on a kept paint (`kept_paint.rs`): the
 //! update paints again and compares every part of the two paints but
-//! `from`, which the update sets after, the kept boxes, and the counts.
+//! `from`, which the update sets after, the kept boxes, and the counts;
+//! the kept `rects` and `paddings` maps name their first differing entry.
 
+use std::fmt::Debug;
 use std::rc::Rc;
 
+use vapors_dom::NodeId;
+
+use crate::node_map::NodeMap;
 use crate::painted::Painted;
 
 /// The names of the fields of `Painted` that differ between `$a` and
@@ -18,22 +23,64 @@ macro_rules! differing {
 }
 
 /// Panics, naming each part that differs, when `kept` is not `fresh`.
-// Exact: a paint made from the same inputs has the same scale, bit for bit.
-#[allow(clippy::float_cmp)]
 pub(crate) fn assert_same(kept: &Painted, fresh: &Painted) {
-    let mut parts = differing!(kept, fresh; canvas, canvas_from, scale, scene, rects,
-        paddings, visible, hits, cursors, images, icons, surfaces, scroll_chains, ranges,
-        text_origins);
-    if !same_layouts(&kept.texts, &fresh.texts) {
-        parts.push("texts");
-    }
+    let parts = differing_parts(kept, fresh);
     assert!(
         parts.is_empty(),
         "the kept paint differs from a new paint in {parts:?}: a paint input is not \
          compared in PaintedFrom (crates/elements/src/kept_paint.rs) or BoxFrom \
-         (crates/elements/src/kept_box.rs), or a copy renumbers wrongly \
-         (paint_partial.rs); reproduce with `cargo xtask test`"
+         (crates/elements/src/kept_box.rs), a copy renumbers wrongly \
+         (paint_partial.rs), or a changed slot is missed (changed_slots.rs, \
+         kept_maps.rs); reproduce with `cargo xtask test`"
     );
+}
+
+/// The parts of `kept` that differ from `fresh`'s; each map's with its
+/// first differing entry.
+// Exact: a paint made from the same inputs has the same scale, bit for bit.
+#[allow(clippy::float_cmp)]
+fn differing_parts(kept: &Painted, fresh: &Painted) -> Vec<String> {
+    let mut parts: Vec<String> = differing!(kept, fresh; canvas, canvas_from, scale, scene,
+        visible, hits, cursors, images, icons, surfaces, scroll_chains, ranges, text_origins)
+    .into_iter()
+    .map(String::from)
+    .collect();
+    if !same_layouts(&kept.texts, &fresh.texts) {
+        parts.push("texts".into());
+    }
+    parts.extend(first_differing("rects", &kept.rects, &fresh.rects));
+    parts.extend(first_differing("paddings", &kept.paddings, &fresh.paddings));
+    parts
+}
+
+/// The first node, in node order, whose entry in the kept map `name`
+/// differs from the fresh map's, with both entries.
+fn first_differing<V: PartialEq + Debug>(
+    name: &str,
+    kept: &NodeMap<V>,
+    fresh: &NodeMap<V>,
+) -> Option<String> {
+    let node = first_differing_node(kept, fresh)?;
+    let (kept, fresh) = (kept.get(node), fresh.get(node));
+    Some(format!(
+        "{name} at {node:?}: kept {kept:?}, fresh {fresh:?}"
+    ))
+}
+
+/// The first node, in node order, whose entry in `kept` differs from
+/// `fresh`'s.
+fn first_differing_node<'a, V: PartialEq>(
+    kept: &'a NodeMap<V>,
+    fresh: &'a NodeMap<V>,
+) -> Option<&'a NodeId> {
+    if kept == fresh {
+        return None;
+    }
+    let mut nodes: Vec<&NodeId> = kept.keys().chain(fresh.keys()).collect();
+    nodes.sort_unstable();
+    nodes
+        .into_iter()
+        .find(|node| kept.get(node) != fresh.get(node))
 }
 
 /// Whether each text run is the same layout: a layout kept in the text

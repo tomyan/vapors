@@ -53,6 +53,12 @@ pub struct Painted {
     pub(crate) boxes_drawn: usize,
     /// Scene items this update built, not copied, for `UpdateCounts`.
     pub(crate) items_built: usize,
+    /// Elements whose `rects` and `paddings` entries this update put or
+    /// removed (`kept_maps.rs`), for `UpdateCounts`.
+    pub(crate) maps_patched: usize,
+    /// Each slot's stacking, for the next update's shape comparison
+    /// (`changed_slots.rs`).
+    pub(crate) stackings: crate::paint_order::Stackings,
 }
 
 /// Which element's background became the canvas's (CSS Backgrounds 3
@@ -100,6 +106,8 @@ impl Painted {
             kept_boxes: Vec::new(),
             boxes_drawn: 0,
             items_built: 0,
+            maps_patched: 0,
+            stackings: crate::paint_order::Stackings::default(),
         }
     }
 

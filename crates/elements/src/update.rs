@@ -7,6 +7,7 @@
 use vapors_css::cascade::Environment;
 use vapors_dom::NodeId;
 
+use crate::changed_slots::ChangedSlots;
 use crate::check::describe;
 use crate::document::Document;
 use crate::error::ElementError;
@@ -58,20 +59,22 @@ impl Document {
     pub fn update(&mut self, viewport: Viewport) -> Result<&Painted, Vec<ElementError>> {
         let last = self.painted.take();
         self.counts = crate::UpdateCounts::default();
-        self.texts.begin();
+        self.texts
+            .begin(last.as_ref().map_or(0, |painted| painted.texts.len()));
         let style = tracing::trace_span!("update phase", phase = "style").entered();
         self.styled(viewport)?;
         drop(style);
         let layout = tracing::trace_span!("update phase", phase = "layout").entered();
-        let (slotted, built) = self.laid_out(viewport)?;
+        let (slotted, rebuilt) = self.laid_out(viewport)?;
         let stackings = self.stackings(&slotted.boxes);
         let from = self.painted_from(&slotted.boxes, &stackings, viewport);
         drop(layout);
         let paint_span = tracing::trace_span!("update phase", phase = "paint").entered();
-        let mut painted = self.paint_or_keep(last, (&slotted.boxes, &stackings), &from, built);
+        let changed = ChangedSlots::of(rebuilt, last.as_ref(), (&from.rects, &stackings));
+        let mut painted = self.paint_or_keep(last, (&slotted.boxes, &stackings), &from, &changed);
         drop(paint_span);
         self.boxes.keep(slotted, viewport.scale);
-        painted.from = from;
+        (painted.from, painted.stackings) = (from, stackings);
         Ok(self.shown(painted))
     }
 

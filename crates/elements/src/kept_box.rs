@@ -9,7 +9,7 @@ use std::rc::Rc;
 use vapors_dom::NodeId;
 use vapors_scene::{IconId, ImageId, Item, Scene, SurfaceId, TextId};
 
-use crate::layout::{BoxRect, Content, LayoutBox, TextCache, TextKey};
+use crate::layout::{BoxRect, LayoutBox};
 use crate::painted::Painted;
 use crate::style::Cursor;
 
@@ -39,8 +39,6 @@ pub(crate) struct KeptBox {
     pub(crate) own: Part,
     /// Its outline's items.
     pub(crate) outline: Vec<Item>,
-    /// The text cache's key for a text box's layout.
-    pub(crate) text: Option<TextKey>,
 }
 
 /// What one step put into a paint; ids count from 0.
@@ -76,21 +74,6 @@ impl BoxFrom {
 }
 
 impl KeptBox {
-    /// The text cache's key for box `index`'s layout, when it is a run.
-    pub(crate) fn text_key(layout_box: &LayoutBox, rect: BoxRect, scale: f32) -> Option<TextKey> {
-        match &layout_box.content {
-            Content::Text(run) => Some(TextKey::of(run, Some(rect.width), scale)),
-            Content::Element(_) | Content::Vacant => None,
-        }
-    }
-
-    /// Keeps this box's text layout in `cache` for the next update.
-    pub(crate) fn touch(&self, cache: &mut TextCache) {
-        if let Some(key) = &self.text {
-            cache.touch(key);
-        }
-    }
-
     /// How many scene items this box's paint holds.
     pub(crate) fn items(&self) -> usize {
         self.own.scene.items().len() + self.outline.len()

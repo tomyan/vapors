@@ -208,6 +208,7 @@ today.
 | Scroll chains | shape, containing blocks, `Stacking::scrolls` | shape changed | `Chains::of`, as today; `chain_walks` |
 | Clips, by slot | containing blocks; each clipping box's padding box and its `clips()` | a changed slot; shape changed | own and inner clip again for each changed slot and its descendants, stopping below a slot whose own and inner clips come out equal unless a descendant is itself changed; whole tree on shape change; `clips_redone` |
 | `rects` and `paddings` maps | rect, border, padding | rebuilt, moved or freed slot | entry replaced or removed; `map_entries_patched` |
+| Inline elements' entries in `rects` | the spans of each text run's box | the run's slot rebuilt or freed | each span of the taken run removed before paint; paint (or the copied part) puts back those still in a run; not counted |
 | A slot's part | its box and style, rect, clip, padding (3c-2's `BoxFrom`) | rebuilt, or `BoxFrom` differs | painted again (3c-2's rule), compared only for changed slots and slots whose clip was redone |
 | Thumbs | scroll offsets, whether shown | every repainting update | painted again, O(scroll containers), as today |
 | Canvas | `html` and `body` style | every repainting update | O(1), as today |
