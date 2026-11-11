@@ -1,15 +1,20 @@
 //! Prints the timing baseline (docs/perf): every workload, in a release
-//! build. `cargo run --release -p vapors-perf -- [runs] [warmup]`, 200
-//! and 20 by default (`args.rs`).
+//! build. `cargo run --release -p vapors-perf -- [runs] [warmup]
+//! [--only <substring>] [--instructions]`, 200 and 20 by default
+//! (`args.rs`).
 
 use vapors_gpu_harness::gpu_with;
-use vapors_perf::args::settings;
+use vapors_perf::args::{Options, options};
 use vapors_perf::gpu_time::FEATURES;
+use vapors_perf::instructions::InstructionCounter;
+use vapors_perf::instructions_check::{phases_counted, self_check};
 use vapors_perf::racer::RacerFrames;
-use vapors_perf::report::section;
+use vapors_perf::report::{instructions_section, section};
 use vapors_perf::rows::{RowChange, Rows};
-use vapors_perf::run::{Settings, Workload};
+use vapors_perf::run::{Samples, Settings, Workload};
 use vapors_perf::sampler::Sampler;
+use vapors_perf::select::matching;
+use vapors_perf::spans::PhaseClock;
 
 fn main() {
     if let Err(error) = run() {
@@ -24,18 +29,46 @@ fn run() -> Result<(), String> {
                     cargo run --release -p vapors-perf"
             .into());
     }
-    let settings = settings(std::env::args().skip(1))?;
+    let Options {
+        settings,
+        only,
+        instructions,
+    } = options(std::env::args().skip(1))?;
+    let chosen = matching(workloads(), only.as_deref())?;
+    let clock = if instructions {
+        PhaseClock::with_instructions(checked_counter()?)
+    } else {
+        PhaseClock::default()
+    };
     let gpu = gpu_with(FEATURES);
     print_setup(&gpu, settings);
-    let mut timer = Sampler::new(&gpu);
-    for (name, mut workload) in workloads() {
+    let mut timer = Sampler::with_clock(&gpu, clock);
+    for (name, mut workload) in chosen {
         let samples = timer
             .sample(workload.as_mut(), settings)
             .map_err(|e| format!("{name}: {e}"))?;
-        println!("{}", section(&name, &samples));
+        let report = if instructions {
+            every_phase_counted(&name, &samples)?;
+            instructions_section(&name, &samples)?
+        } else {
+            section(&name, &samples)
+        };
+        println!("{report}");
     }
     println!("Load average at the end: {}", load());
     Ok(())
+}
+
+fn checked_counter() -> Result<InstructionCounter, String> {
+    let mut counter = InstructionCounter::open()?;
+    self_check(&mut counter)?;
+    Ok(counter)
+}
+
+fn every_phase_counted(name: &str, samples: &Samples) -> Result<(), String> {
+    let counted = samples.instructions.as_ref().map(|kept| &kept.phases);
+    let empty = std::collections::BTreeMap::new();
+    phases_counted(&samples.phases, counted.unwrap_or(&empty)).map_err(|e| format!("{name}: {e}"))
 }
 
 fn workloads() -> Vec<(String, Box<dyn Workload>)> {

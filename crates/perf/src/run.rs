@@ -10,6 +10,8 @@ use vapors_app::{FrameCounts, FrameTiming, GpuResolution};
 use vapors_elements::{Document, UpdateCounts};
 use vapors_platform::{App, Next};
 
+use crate::instruction_samples::InstructionSamples;
+
 /// A workload: an app and the change made before each of its frames.
 pub trait Workload {
     /// The frame's device size.
@@ -84,6 +86,8 @@ pub struct Samples {
     pub gpu_time: Option<Vec<Duration>>,
     /// The smallest step the GPU times can show; `None` without them.
     pub gpu_resolution: Option<GpuResolution>,
+    /// Instructions per frame; `None` unless the sampler counts them.
+    pub instructions: Option<InstructionSamples>,
     /// The last frame's counts.
     pub counts: Counts,
 }

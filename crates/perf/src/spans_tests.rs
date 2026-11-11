@@ -55,3 +55,8 @@ fn a_draw_step_is_timed_under_its_phase() {
     // Then
     assert_eq!(names(&clock), ["submit"]);
 }
+
+#[test]
+fn a_clock_without_a_counter_has_no_instruction_counts() {
+    assert_eq!(PhaseClock::default().take_instructions(), Ok(None));
+}
