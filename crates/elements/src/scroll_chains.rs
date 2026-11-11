@@ -21,7 +21,7 @@ impl Chains {
     pub(crate) fn of(boxes: &[LayoutBox], scrolls: &dyn Fn(usize) -> bool) -> Self {
         let node = |index: usize| match boxes[index].content {
             Content::Element(node) => Some(node),
-            Content::Text(_) => None,
+            Content::Text(_) | Content::Vacant => None,
         };
         let around = crate::chain::by_containing_block(boxes, None, &|index, own| {
             if scrolls(index) { node(index) } else { own }
