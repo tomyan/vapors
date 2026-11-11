@@ -30,8 +30,8 @@ pub(crate) fn assert_same(kept: &Painted, fresh: &Painted) {
         "the kept paint differs from a new paint in {parts:?}: a paint input is not \
          compared in PaintedFrom (crates/elements/src/kept_paint.rs) or BoxFrom \
          (crates/elements/src/kept_box.rs), a copy renumbers wrongly \
-         (paint_partial.rs), or a changed slot is missed (changed_slots.rs, \
-         kept_maps.rs); reproduce with `cargo xtask test`"
+         (paint_partial.rs), or a changed slot or shape change is missed \
+         (changed_slots.rs, kept_maps.rs, kept_order.rs); reproduce with `cargo xtask test`"
     );
 }
 
@@ -41,7 +41,7 @@ pub(crate) fn assert_same(kept: &Painted, fresh: &Painted) {
 #[allow(clippy::float_cmp)]
 fn differing_parts(kept: &Painted, fresh: &Painted) -> Vec<String> {
     let mut parts: Vec<String> = differing!(kept, fresh; canvas, canvas_from, scale, scene,
-        visible, hits, cursors, images, icons, surfaces, scroll_chains, ranges, text_origins)
+        visible, hits, cursors, images, icons, surfaces, ranges, text_origins)
     .into_iter()
     .map(String::from)
     .collect();
@@ -50,6 +50,10 @@ fn differing_parts(kept: &Painted, fresh: &Painted) -> Vec<String> {
     }
     parts.extend(first_differing("rects", &kept.rects, &fresh.rects));
     parts.extend(first_differing("paddings", &kept.paddings, &fresh.paddings));
+    parts.extend(crate::kept_order_check::differing(
+        &kept.order,
+        &fresh.order,
+    ));
     parts
 }
 

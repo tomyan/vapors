@@ -28,16 +28,15 @@ impl Document {
     ) -> Painted {
         let page = (self.root(), self.body());
         let used = &self.kept.as_ref().expect("styled keeps the styles").used;
-        let scrolls = |index| stackings.scrolls(index);
         let text = (&mut self.fonts, &mut self.texts);
         let mut input = PaintInput::new((used, stackings), page, text, &self.scroll, from);
         let last = match last {
             Some(kept) if kept.from.shows(from, changed.built()) => {
-                return keep(kept, boxes, &from.rects, &mut input, &scrolls);
+                return keep(kept, boxes, &from.rects, &mut input);
             }
             last => LastPaint::of(last),
         };
-        let painted = paint_all(boxes, &from.rects, &mut input, &scrolls, (last, changed));
+        let painted = paint_all(boxes, &from.rects, &mut input, (last, changed));
         self.counts.note_paint(&painted);
         painted
     }

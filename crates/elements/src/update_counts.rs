@@ -50,6 +50,18 @@ pub struct UpdateCounts {
     /// last paint (IU3 3c-3b); every element when paint built the maps
     /// afresh, and none when the update showed the last update's paint.
     pub map_entries_patched: usize,
+    /// Times paint order (the paint steps, with each thumb's place)
+    /// was walked over the whole tree: 1 when the tree's shape changed
+    /// since the last paint (a box added, removed or moved among its
+    /// siblings, or its stacking changed), else 0 (IU3 3c-3c).
+    pub order_walks: usize,
+    /// Times the scroll chains were walked over the whole tree: 1 when
+    /// the shape changed, else 0.
+    pub chain_walks: usize,
+    /// Boxes whose clip paint worked out again: those built again or
+    /// moved, and below them those whose clip comes from a box whose
+    /// clip changed; every slot when the shape changed.
+    pub clips_redone: usize,
 }
 
 impl UpdateCounts {
@@ -58,6 +70,9 @@ impl UpdateCounts {
         self.boxes_painted = painted.boxes_drawn;
         self.scene_items_built = painted.items_built;
         self.map_entries_patched = painted.maps_patched;
+        let walks = painted.order.walks;
+        (self.order_walks, self.chain_walks, self.clips_redone) =
+            (walks.order, walks.chains, walks.clips);
     }
 }
 
