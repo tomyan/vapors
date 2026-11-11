@@ -89,12 +89,24 @@ fn rebuild_owners(
         .collect();
     placed.free_taken(&taken);
     let rebuilt = Rebuilt::subtrees(&placed.boxes, put, &taken);
-    for (&owner, &slot) in owners.iter().zip(&slots) {
-        if !lend_subtree(placed, slot, &taken, may_keep) {
-            clear_ancestors(placed, ancestors(source.arena, owner));
+    lend_owners(placed, (owners, &slots), &taken, (source.arena, may_keep));
+    rebuilt
+}
+
+/// Lends the taken boxes' caches to each owner's rebuilt subtree, at
+/// its slot; clears the caches of an owner's ancestors when its subtree
+/// changed.
+fn lend_owners(
+    placed: &mut Placed,
+    (owners, slots): (&[NodeId], &[usize]),
+    taken: &Taken,
+    (arena, may_keep): (&Arena, &dyn Fn(NodeId) -> bool),
+) {
+    for (&owner, &slot) in owners.iter().zip(slots) {
+        if !lend_subtree(placed, slot, taken, may_keep) {
+            clear_ancestors(placed, ancestors(arena, owner));
         }
     }
-    rebuilt
 }
 
 /// Takes the subtrees at `slots` out of `placed`.

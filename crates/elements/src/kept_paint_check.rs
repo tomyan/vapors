@@ -23,19 +23,8 @@ macro_rules! differing {
 }
 
 /// Panics, naming each part that differs, when `kept` is not `fresh`.
-// Exact: a paint made from the same inputs has the same scale, bit for bit.
-#[allow(clippy::float_cmp)]
 pub(crate) fn assert_same(kept: &Painted, fresh: &Painted) {
-    let mut parts: Vec<String> = differing!(kept, fresh; canvas, canvas_from, scale, scene,
-        visible, hits, cursors, images, icons, surfaces, scroll_chains, ranges, text_origins)
-    .into_iter()
-    .map(String::from)
-    .collect();
-    if !same_layouts(&kept.texts, &fresh.texts) {
-        parts.push("texts".into());
-    }
-    parts.extend(first_differing("rects", &kept.rects, &fresh.rects));
-    parts.extend(first_differing("paddings", &kept.paddings, &fresh.paddings));
+    let parts = differing_parts(kept, fresh);
     assert!(
         parts.is_empty(),
         "the kept paint differs from a new paint in {parts:?}: a paint input is not \
@@ -46,6 +35,24 @@ pub(crate) fn assert_same(kept: &Painted, fresh: &Painted) {
     );
 }
 
+/// The parts of `kept` that differ from `fresh`'s; each map's with its
+/// first differing entry.
+// Exact: a paint made from the same inputs has the same scale, bit for bit.
+#[allow(clippy::float_cmp)]
+fn differing_parts(kept: &Painted, fresh: &Painted) -> Vec<String> {
+    let mut parts: Vec<String> = differing!(kept, fresh; canvas, canvas_from, scale, scene,
+        visible, hits, cursors, images, icons, surfaces, scroll_chains, ranges, text_origins)
+    .into_iter()
+    .map(String::from)
+    .collect();
+    if !same_layouts(&kept.texts, &fresh.texts) {
+        parts.push("texts".into());
+    }
+    parts.extend(first_differing("rects", &kept.rects, &fresh.rects));
+    parts.extend(first_differing("paddings", &kept.paddings, &fresh.paddings));
+    parts
+}
+
 /// The first node, in node order, whose entry in the kept map `name`
 /// differs from the fresh map's, with both entries.
 fn first_differing<V: PartialEq + Debug>(
@@ -53,18 +60,27 @@ fn first_differing<V: PartialEq + Debug>(
     kept: &NodeMap<V>,
     fresh: &NodeMap<V>,
 ) -> Option<String> {
+    let node = first_differing_node(kept, fresh)?;
+    let (kept, fresh) = (kept.get(node), fresh.get(node));
+    Some(format!(
+        "{name} at {node:?}: kept {kept:?}, fresh {fresh:?}"
+    ))
+}
+
+/// The first node, in node order, whose entry in `kept` differs from
+/// `fresh`'s.
+fn first_differing_node<'a, V: PartialEq>(
+    kept: &'a NodeMap<V>,
+    fresh: &'a NodeMap<V>,
+) -> Option<&'a NodeId> {
     if kept == fresh {
         return None;
     }
     let mut nodes: Vec<&NodeId> = kept.keys().chain(fresh.keys()).collect();
     nodes.sort_unstable();
-    let node = nodes
+    nodes
         .into_iter()
-        .find(|node| kept.get(node) != fresh.get(node))?;
-    let (kept, fresh) = (kept.get(node), fresh.get(node));
-    Some(format!(
-        "{name} at {node:?}: kept {kept:?}, fresh {fresh:?}"
-    ))
+        .find(|node| kept.get(node) != fresh.get(node))
 }
 
 /// Whether each text run is the same layout: a layout kept in the text

@@ -2,7 +2,9 @@
 //! box and padding box's top-left), kept from the last paint and
 //! patched only for the slots this update changed (IU3 3c-3b,
 //! `docs/plans/iu3.md`): a rebuilt or moved element's entries replaced,
-//! a freed one's removed. A debug build compares them with maps built
+//! a freed one's removed. The rects of the inline elements of a rebuilt
+//! or freed text run are removed; paint puts back those still in a run.
+//! A debug build compares them with maps built
 //! afresh (`kept_paint_check.rs`).
 
 use crate::changed_slots::ChangedSlots;
@@ -37,14 +39,18 @@ pub(crate) fn build(painted: &mut Painted, (boxes, rects): (&[LayoutBox], &[BoxR
     (0..boxes.len()).filter(put).count()
 }
 
-/// Removes the freed elements' entries, then puts the rebuilt and moved
-/// ones'; how many elements. Removing first lets a node freed and built
-/// again in one update keep its new entries.
+/// Removes the freed elements' entries and the taken runs' inline
+/// elements' rects, then puts the rebuilt and moved elements' entries;
+/// how many elements, not counting inline ones. Removing first lets a
+/// node freed and built again in one update keep its new entries.
 fn patch(
     painted: &mut Painted,
     (boxes, rects): (&[LayoutBox], &[BoxRect]),
     changed: &ChangedSlots,
 ) -> usize {
+    for span in &changed.spans {
+        painted.rects.remove(span);
+    }
     let removed = changed
         .freed
         .iter()

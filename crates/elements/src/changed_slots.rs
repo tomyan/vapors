@@ -17,6 +17,9 @@ pub(crate) struct ChangedSlots {
     pub(crate) rebuilt: Vec<usize>,
     /// The slots whose box is gone, with the key each held.
     pub(crate) freed: Vec<(usize, Key)>,
+    /// The inline elements of the text runs rebuilt or freed, whose
+    /// rects paint puts back only for those still in a run.
+    pub(crate) spans: Vec<vapors_dom::NodeId>,
     /// The kept slots whose rect differs from the last paint's.
     pub(crate) moved: Vec<usize>,
     /// A slot was freed or newly taken, or a rebuilt box's children or
@@ -42,16 +45,13 @@ impl ChangedSlots {
         let Some(last) = last else {
             return Self::every(rebuilt);
         };
-        let restacked = rebuilt
-            .slots
-            .iter()
-            .any(|&slot| last.stackings.at(slot) != stackings.at(slot));
         Self {
             every: false,
             moved: moved(&last.from.rects, rects, &rebuilt),
-            shape_changed: rebuilt.shape_changed || restacked,
+            shape_changed: rebuilt.shape_changed || restacked(&rebuilt, last, stackings),
             rebuilt: rebuilt.slots,
             freed: rebuilt.freed,
+            spans: rebuilt.spans,
         }
     }
 
@@ -61,6 +61,7 @@ impl ChangedSlots {
             every: true,
             rebuilt: rebuilt.slots,
             freed: rebuilt.freed,
+            spans: rebuilt.spans,
             moved: Vec::new(),
             shape_changed: true,
         }
@@ -70,6 +71,14 @@ impl ChangedSlots {
     pub(crate) fn built(&self) -> usize {
         self.rebuilt.len()
     }
+}
+
+/// Whether a rebuilt slot's stacking differs from `last`'s.
+fn restacked(rebuilt: &Rebuilt, last: &Painted, stackings: &Stackings) -> bool {
+    rebuilt
+        .slots
+        .iter()
+        .any(|&slot| last.stackings.at(slot) != stackings.at(slot))
 }
 
 /// The slots neither rebuilt nor freed whose rect in `now` differs
