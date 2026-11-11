@@ -1,8 +1,10 @@
 //! What the oracles share about their committed files: a committed
 //! answer compared with Chromium's (missing, malformed, different at its
-//! first line, or the same), outputs with no fixture refused, and a
-//! scratch directory removed however the run ends.
+//! first line, or the same), outputs with no fixture refused, a
+//! scratch directory removed however the run ends, and files written
+//! whole into a directory other runs read.
 
+use std::io::Write;
 use std::path::Path;
 
 use serde_json::Value;
@@ -133,6 +135,23 @@ impl Work {
     pub fn path(&self) -> &Path {
         self.0.path()
     }
+}
+
+/// Writes `bytes` to `path` so a reader sees the old file or the new
+/// one, never a part. The paint tests run in parallel processes that
+/// share one work directory per scale; a plain write truncates the file
+/// first, and a Chromium loading an image in that moment draws a broken
+/// image (vapors #181, run 42941848579).
+///
+/// # Errors
+/// When the file cannot be written or moved into place.
+pub fn write_whole(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    let named = |e: &dyn std::fmt::Display| format!("{}: {e}", path.display());
+    let dir = path.parent().ok_or_else(|| named(&"no parent directory"))?;
+    let mut file = tempfile::NamedTempFile::new_in(dir).map_err(|e| named(&e))?;
+    file.write_all(bytes).map_err(|e| named(&e))?;
+    file.persist(path).map_err(|e| named(&e.error))?;
+    Ok(())
 }
 
 #[cfg(test)]
