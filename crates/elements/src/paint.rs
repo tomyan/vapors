@@ -36,15 +36,9 @@ pub(crate) struct PaintInput<'a> {
 
 /// Paints `boxes` (box 0 the root) at the rects layout gave them.
 pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> Painted {
-    let (canvas, propagated) = canvas_background(input);
+    let (canvas, propagated) = crate::canvas::canvas_background(boxes, input);
     input.propagated = propagated;
-    let canvas_from = propagated.map(|node| {
-        if node == input.root {
-            crate::painted::CanvasFrom::Root
-        } else {
-            crate::painted::CanvasFrom::Body
-        }
-    });
+    let canvas_from = crate::canvas::canvas_from(propagated, input.root);
     let mut painted = Painted {
         canvas,
         canvas_from,
@@ -106,20 +100,6 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
         }
     }
     painted
-}
-
-/// The canvas's colour, as CSS Backgrounds 3 section 2.11.2 gives it:
-/// the root's background, else the body's when the root's is
-/// transparent, else white; and the element whose background it took,
-/// which then paints none of its own.
-fn canvas_background(input: &PaintInput<'_>) -> (Color, Option<NodeId>) {
-    for node in [input.root, input.body] {
-        match input.used.get(&node) {
-            Some(used) if used.background.a > 0.0 => return (used.background, Some(node)),
-            _ => {}
-        }
-    }
-    (Color::from_rgba8(255, 255, 255, 255), None)
 }
 
 /// One box's own painting: an element's shadows, background and

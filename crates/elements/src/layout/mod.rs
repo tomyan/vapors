@@ -45,7 +45,7 @@ pub struct BoxRect {
 /// and an `auto` height is still its content's. A box lent its cache
 /// (`KeptBoxes::rebuild`) is not laid out again. Returns
 /// them and what Taffy did (`LayoutWork`); `placed` gives their
-/// border boxes.
+/// border boxes. An empty tree (html `display: none`) lays out nothing.
 ///
 /// # Errors
 /// A `calc()` that did not resolve (see `Calcs`), with what Taffy did.
@@ -70,7 +70,10 @@ pub(crate) fn lay_out(
         width: AvailableSpace::Definite(size.0),
         height: AvailableSpace::Definite(size.1),
     };
-    compute_root_layout(&mut tree, NodeId::from(0usize), available);
+    // With html `display: none` there is no box, so no root to lay out.
+    if !tree.boxes.is_empty() {
+        compute_root_layout(&mut tree, NodeId::from(0usize), available);
+    }
     let work = LayoutWork {
         laid_out: tree.laid_out,
         calls: tree.calls,
@@ -130,3 +133,7 @@ pub(crate) fn placed(boxes: &[LayoutBox], offsets: &[[f32; 2]]) -> Vec<BoxRect> 
         })
         .collect()
 }
+
+#[cfg(test)]
+#[path = "lay_out_tests.rs"]
+mod tests;

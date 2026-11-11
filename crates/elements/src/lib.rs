@@ -21,6 +21,7 @@ mod a11y_title;
 mod a11y_tree;
 mod arena;
 mod bidi;
+mod canvas;
 mod chain;
 mod check;
 mod check_inputs;

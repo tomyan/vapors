@@ -8,7 +8,7 @@ use crate::layout::{LayoutBox, containing_blocks};
 
 /// Each box's own value, box 0 taking `outside`; `content(index, own)`
 /// is what box `index` gives its content. Ancestors, and so containing
-/// blocks, are visited first.
+/// blocks, are visited first. No boxes (html `display: none`), no values.
 pub(crate) fn by_containing_block<T: Copy>(
     boxes: &[LayoutBox],
     outside: T,
@@ -21,7 +21,9 @@ pub(crate) fn by_containing_block<T: Copy>(
         own: vec![outside; boxes.len()],
         inner: vec![outside; boxes.len()],
     };
-    walk.visit(0, outside);
+    if !boxes.is_empty() {
+        walk.visit(0, outside);
+    }
     walk.own
 }
 
