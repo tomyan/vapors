@@ -63,23 +63,18 @@ impl Document {
         if had == node {
             return;
         }
+        document.borrow_mut().take_focus(node);
         // while the window is away focus moves silently; its return
         // fires `focus` on what has it then (`focus_window.rs`)
         if document.borrow().window_away() {
-            document.borrow_mut().take_focus(node);
             return;
         }
-        // a number or text field commits as focus leaves it, before its
-        // blur, as Chromium fires its change (3-E3c, E6a)
         if let Some(had) = had {
-            crate::number_input::commit(document, had);
-            crate::text_input::commit(document, had);
+            left(document, had);
         }
-        document.borrow_mut().take_focus(node);
-        if let Some(had) = had {
-            fire(document, had, &["blur", "focusout"]);
-        }
-        if let Some(node) = node {
+        // a `change` or `blur` handler that moved focus on keeps it,
+        // and `node` gets no `focus`, as in Chromium
+        if let Some(node) = node.filter(|node| document.borrow().active_element() == Some(*node)) {
             fire(document, node, &["focus", "focusin"]);
         }
     }
@@ -164,6 +159,16 @@ impl Document {
         self.tag(node).is_some_and(|tag| INTERACTIVE.contains(&tag))
             && self.attribute(node, "disabled").is_some()
     }
+}
+
+/// Focus has left `had`: a composition ends, a number or text field
+/// commits, with `change`, then `blur` and `focusout` fire, as Chromium
+/// orders them with focus already moved on (3-E3c, E6a).
+fn left(document: &Rc<RefCell<Document>>, had: NodeId) {
+    document.borrow_mut().end_composition(had);
+    crate::number_input::commit(document, had);
+    crate::text_input::commit(document, had);
+    fire(document, had, &["blur", "focusout"]);
 }
 
 /// `names` on `node` in order: the first only there (it does not bubble),

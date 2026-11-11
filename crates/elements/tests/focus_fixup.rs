@@ -4,12 +4,17 @@
 //! The field commits (`change`), then `blur` and `focusout` fire, and
 //! typing afterwards goes nowhere.
 //!
-//! Chromium 155.0.8059.79 in each case, after the mutation and before
-//! the next task: `change`, `blur`, `focusout` on the field, still
-//! connected, then a typed key reaches the body and the value stays.
-//! One difference: in Chromium focus is already on the body during
-//! `change`; here it is still on the field, as for every blur
-//! (`Document::focus`).
+//! Chromium 155.0.8059.79 in each case, after the mutation and within
+//! 300 ms: `change`, `blur`, `focusout` on the field, still connected,
+//! then a typed key reaches the body and the value stays. During
+//! `change` focus is already on the body, in Chromium and here.
+//!
+//! A key sent straight after the mutation differs: Chromium dispatches
+//! its `keydown` to the still-focused field and inserts nothing, the
+//! field being uneditable without a box. Here a key routed before the
+//! next update edits the field, since whether it has a box is known
+//! only at the update; matching needs a style and layout pass before
+//! each key is routed, so it is recorded, not matched.
 //!
 //! Removal differs from Chromium: removing the focused field (or an
 //! ancestor) clears focus here with no events (`drop_focus_within`),
@@ -22,11 +27,10 @@
 
 mod support;
 
-use std::rc::Rc;
-
-use support::text_page::{Page, click, page, type_text, value};
+use support::fixup::{typed_in, update_and_settle};
+use support::text_page::{Page, type_text, value};
 use support::viewport;
-use vapors_dom::{Dom, Event, NodeId};
+use vapors_dom::{Dom, NodeId};
 use vapors_elements::Document;
 
 /// The ways the field stops being focusable, each by name.
@@ -58,32 +62,6 @@ fn hide(page: &Page, node: NodeId) {
     doc.set_attribute(node, "style", "display: none");
 }
 
-/// "Warm" focused by a click, "er" typed at its start, `blur` and
-/// `focusout` logged with `input` and `change`, the log then cleared.
-fn typed_in() -> Page {
-    let page = page();
-    for kind in ["blur", "focusout"] {
-        let into = Rc::clone(&page.log);
-        let handler = move |e: &mut Event| into.borrow_mut().push(e.name().to_owned());
-        page.doc
-            .borrow_mut()
-            .listen(page.name, kind, Box::new(handler));
-    }
-    click(&page, [1.0, 12.0]);
-    type_text(&page, "er");
-    page.log.borrow_mut().clear();
-    page
-}
-
-/// The update after a change, then the settle the app runs after it.
-fn update_and_settle(page: &Page) {
-    page.doc
-        .borrow_mut()
-        .update(viewport(400.0, 100.0))
-        .expect("updates");
-    Document::settle_focus(&page.doc);
-}
-
 #[test]
 fn a_field_that_loses_its_box_or_is_disabled_commits_then_blurs() {
     for (name, lose) in LOSSES {
@@ -93,7 +71,6 @@ fn a_field_that_loses_its_box_or_is_disabled_commits_then_blurs() {
         // When
         lose(&page);
         update_and_settle(&page);
-        Document::settle_focus(&page.doc);
 
         // Then: change, blur, focusout once each, and the body has focus
         let log = page.log.borrow().clone();

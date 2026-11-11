@@ -22,11 +22,21 @@ const CASES = {
   'visibility: hidden': "f().style.visibility='hidden'",
   'disabled': 'f().disabled=true',
   'removed': 'f().remove()',
+  // a change handler that focuses a button (review-v190 M1)
+  'change focuses a button': "f().onchange=()=>b().focus();f().style.display='none'",
+  // the same while focus moves to another field
+  'change focuses a button, focus going to g': "f().onchange=()=>b().focus();g().focus()",
+  // a blur handler that refocuses the hidden field (M2)
+  'blur refocuses the field': "f().onblur=()=>f().focus();f().style.display='none'",
 };
-const PAGE = `<!doctype html><div><input id=f value=Warm></div><script>
-window.log=[];const f=()=>document.getElementById('f');
+// the key sent straight after the hide, with no wait between (L1)
+const NO_WAIT = {'key with no wait': "f().style.display='none'"};
+// a composition in progress at the hide (L2)
+const COMPOSING = {'composing': "f().style.display='none'"};
+const PAGE = `<!doctype html><div><input id=f value=Warm><button id=b>B</button><input id=g></div><script>
+window.log=[];const f=()=>document.getElementById('f');const b=()=>document.getElementById('b');const g=()=>document.getElementById('g');
 const at=()=>document.activeElement.id||document.activeElement.nodeName;
-for(const n of ['blur','focusout','focus','focusin','change','input','keydown'])
+for(const n of ['blur','focusout','focus','focusin','change','input','keydown','compositionstart','compositionend'])
  document.addEventListener(n,e=>log.push(n+' on '+(e.target.id||e.target.nodeName)+
   ' (active '+at()+', connected '+e.target.isConnected+')'),true);
 </script>`;
@@ -69,15 +79,16 @@ async function connect(page) {
   return {ws, send};
 }
 
-async function run(send, name, mutation) {
+async function run(send, name, mutation, {wait = 300, composing = false} = {}) {
   const evaluate = expression => send('Runtime.evaluate', {expression, returnByValue: true});
   await send('Page.navigate', {url: 'data:text/html,' + encodeURIComponent(PAGE)});
   await sleep(500);
   await evaluate("f().focus();f().setSelectionRange(0,0)");
   await send('Input.insertText', {text: 'er'});
+  if (composing) await send('Input.imeSetComposition', {text: 'ka', selectionStart: 2, selectionEnd: 2});
   await evaluate(`log.push('-- ${name}');${mutation};log.push('-- after the mutation, active '+at())`);
-  await sleep(300);
-  await evaluate("log.push('-- x typed')");
+  if (wait) await sleep(wait);
+  if (wait) await evaluate("log.push('-- x typed')");
   await send('Input.dispatchKeyEvent', {type: 'keyDown', key: 'x', text: 'x', code: 'KeyX', windowsVirtualKeyCode: 88});
   await send('Input.dispatchKeyEvent', {type: 'keyUp', key: 'x', code: 'KeyX', windowsVirtualKeyCode: 88});
   await evaluate("log.push('value '+(f()?f().value:'(removed)'))");
@@ -93,11 +104,14 @@ try {
   await send('Page.enable');
   await send('Emulation.setFocusEmulationEnabled', {enabled: true});
   for (const [name, mutation] of Object.entries(CASES)) console.log(await run(send, name, mutation) + '\n');
+  for (const [name, mutation] of Object.entries(NO_WAIT)) console.log(await run(send, name, mutation, {wait: 0}) + '\n');
+  for (const [name, mutation] of Object.entries(COMPOSING)) console.log(await run(send, name, mutation, {composing: true}) + '\n');
   ws.close();
 } catch (error) {
   console.error(`chromium-focus-fixup: ${error.message}; rerun: node scripts/chromium-focus-fixup.mjs`);
   process.exitCode = 1;
 } finally {
   if (browser?.pid) process.kill(-browser.pid);
-  await rm(dir, {recursive: true, force: true});
+  // the killed Chromium may still be writing its profile
+  await rm(dir, {recursive: true, force: true, maxRetries: 10, retryDelay: 200});
 }
