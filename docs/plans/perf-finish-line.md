@@ -34,13 +34,19 @@ it is added with the first PR that claims property 1.
 3. IU3 3c-3e: moved boxes shift their kept paint (property 4).
 4. IU3 3b: layout positioning kept, moved boxes reported (properties 1
    and 6).
-5. Splice step, brought forward from the build-time analysis (Tom,
-   2026-11-11): the compiler marks list templates whose rows cannot
-   change paint order (no positioned, z-indexed, scrolling or
-   outline-only descendants), and inserting or removing such a row
-   splices it into the kept order (property 3).
+5. Splice step (property 3), runtime first (Tom, 2026-11-11;
+   `docs/plans/splice.md`): (A) an insert or remove builds only the
+   row's boxes and keeps its siblings'; (B) paint decides at runtime,
+   from what `ChangedSlots` compares and each new box's `Stacking`,
+   whether to splice the row's steps, clips and chains into the kept
+   order, debug builds checking every splice against the whole walk;
+   (C) the insert workload measures it. Rows after the insert still
+   move, O(rows after) once 3c-3e shifts them, until IU4. The
+   compiler's mark of list templates moves to item 7.
 6. IU4: GPU-side paint kept between frames (property 2).
-7. The build-time analysis, first version (properties 7 and 8).
+7. The build-time analysis, first version (properties 7 and 8),
+   with the compiler's mark of list templates whose rows cannot
+   change paint order (`docs/plans/splice.md` section (d)).
 8. The shape table and the one-scene proof with 3D slice 2 (property 9).
 
 ## After the line
