@@ -1,9 +1,10 @@
 //! The debug build's check on a kept paint (`kept_paint.rs`): the
 //! update paints again and compares every part of the two paints but
 //! `from`, which the update sets after, the kept boxes, and the counts;
-//! the scene item by item with ids resolved, and the slabs against the
-//! kept boxes' items (`kept_scene_check.rs`); the kept `rects` and
-//! `paddings` maps name their first differing entry.
+//! the hits in painting order; the scene item by item with ids
+//! resolved, the slabs against the kept boxes' items, and each kept
+//! part's slot against paint order (`kept_scene_check.rs`); the kept
+//! `rects` and `paddings` maps name their first differing entry.
 
 use std::fmt::Debug;
 
@@ -23,9 +24,8 @@ macro_rules! differing {
     };
 }
 
-/// Panics, naming each part that differs, when `kept` is not `fresh`;
-/// `fresh` with the index of each of its steps' first item.
-pub(crate) fn assert_same(kept: &Painted, fresh: (&Painted, &[usize])) {
+/// Panics, naming each part that differs, when `kept` is not `fresh`.
+pub(crate) fn assert_same(kept: &Painted, fresh: &Painted) {
     let parts = differing_parts(kept, fresh);
     assert!(
         parts.is_empty(),
@@ -41,16 +41,17 @@ pub(crate) fn assert_same(kept: &Painted, fresh: (&Painted, &[usize])) {
 /// first differing entry.
 // Exact: a paint made from the same inputs has the same scale, bit for bit.
 #[allow(clippy::float_cmp)]
-fn differing_parts(kept: &Painted, (fresh, starts): (&Painted, &[usize])) -> Vec<String> {
+fn differing_parts(kept: &Painted, fresh: &Painted) -> Vec<String> {
     let mut parts: Vec<String> = differing!(kept, fresh; canvas, canvas_from, scale,
-        visible, hits, cursors, ranges, text_origins)
+        visible, cursors, ranges, text_origins)
     .into_iter()
     .map(String::from)
     .collect();
-    parts.extend(crate::kept_scene_check::first_differing_item(
-        kept,
-        (fresh, starts),
-    ));
+    if !kept.scene().hits().eq(fresh.scene().hits()) {
+        parts.push("hits".into());
+    }
+    parts.extend(crate::kept_scene_check::first_differing_item(kept, fresh));
+    parts.extend(crate::kept_scene_check::part_off_steps(kept));
     parts.extend(crate::kept_scene_check::slab_difference(
         &kept.slabs,
         kept_items(kept),

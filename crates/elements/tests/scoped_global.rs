@@ -49,10 +49,10 @@ fn the_other_compounds_of_a_selector_with_a_global_one_stay_scoped() {
 
     // Then: only scope a's .t is painted
     assert_eq!(
-        painted.scene().items().len(),
+        painted.scene().to_scene().items().len(),
         1,
         "{:?}",
-        painted.scene().items()
+        painted.scene().to_scene().items()
     );
 }
 
@@ -100,6 +100,7 @@ fn a_global_subject_gains_its_one_attribute_on_the_last_scoped_compound() {
     // Then
     let colours: Vec<Color> = painted
         .scene()
+        .to_scene()
         .items()
         .iter()
         .filter_map(|item| match item {

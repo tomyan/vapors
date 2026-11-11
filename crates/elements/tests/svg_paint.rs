@@ -45,7 +45,7 @@ fn updated(doc: &mut Document, scale: f32) -> &Painted {
 
 /// The scene's icon items: id, rect, colour and clip.
 fn icons(painted: &Painted) -> Vec<(IconId, Rect, Color, Option<Rect>)> {
-    let scene = painted.scene();
+    let scene = painted.scene().to_scene();
     let pairs = scene.items().iter().zip(scene.clips());
     pairs
         .filter_map(|(item, clip)| match *item {

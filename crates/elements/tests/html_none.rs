@@ -65,9 +65,9 @@ fn html_hidden_paints_nothing_on_the_default_white_canvas() {
 
     // Then
     assert!(
-        painted.scene().items().is_empty(),
+        painted.scene().to_scene().items().is_empty(),
         "{:?}",
-        painted.scene().items()
+        painted.scene().to_scene().items()
     );
     assert_eq!(painted.canvas(), Color::from_rgba8(255, 255, 255, 255));
     assert_eq!(painted.canvas_from(), None);

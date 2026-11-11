@@ -5,7 +5,6 @@ use vapors_dom::NodeId;
 use vapors_scene::Color;
 
 use crate::paint::PaintInput;
-use crate::painted::CanvasFrom;
 
 /// The canvas's colour, as CSS Backgrounds 3 section 2.11.2 gives it:
 /// the root's background, else the body's when the root's is
@@ -44,4 +43,25 @@ pub(crate) fn canvas_from(propagated: Option<NodeId>, root: NodeId) -> Option<Ca
 
 fn white() -> Color {
     Color::from_rgba8(255, 255, 255, 255)
+}
+
+/// Which element's background became the canvas's (CSS Backgrounds 3
+/// section 2.11.2): it then paints none of its own.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CanvasFrom {
+    /// The root (`html`).
+    Root,
+    /// The body, the root's background being transparent.
+    Body,
+}
+
+impl CanvasFrom {
+    /// The element's tag: `html` or `body`.
+    #[must_use]
+    pub fn tag(self) -> &'static str {
+        match self {
+            Self::Root => "html",
+            Self::Body => "body",
+        }
+    }
 }

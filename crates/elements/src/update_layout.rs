@@ -50,7 +50,8 @@ impl Document {
     }
 
     /// What paint is made from besides `boxes`: their rects, scroll
-    /// offsets settled and applied, the thumbs and the scale.
+    /// offsets settled and applied, their paddings, the thumbs and the
+    /// scale.
     pub(crate) fn painted_from(
         &mut self,
         boxes: &[LayoutBox],
@@ -62,6 +63,10 @@ impl Document {
             .settle(boxes, &|index| stackings.scrolls(index), viewport.scale);
         PaintedFrom {
             rects: placed(boxes, &offsets),
+            paddings: boxes
+                .iter()
+                .map(|layout_box| layout_box.layout.padding)
+                .collect(),
             thumbs_shown: self.thumbs_shown,
             scale: viewport.scale,
         }

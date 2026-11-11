@@ -18,6 +18,7 @@ fn marks(page: &support::text_page::Page) -> Vec<(vapors_scene::Rect, Color)> {
         .expect("updates");
     painted
         .scene()
+        .to_scene()
         .items()
         .iter()
         .filter_map(|item| match item {

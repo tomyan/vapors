@@ -54,6 +54,7 @@ fn an_update_with_nothing_changed_shows_the_kept_scene() {
         .update(viewport(100.0, 100.0))
         .expect("updates")
         .scene()
+        .to_scene()
         .clone();
 
     // When
@@ -61,6 +62,7 @@ fn an_update_with_nothing_changed_shows_the_kept_scene() {
         .update(viewport(100.0, 100.0))
         .expect("updates")
         .scene()
+        .to_scene()
         .clone();
 
     // Then
@@ -115,7 +117,12 @@ fn hiding_the_thumbs_alone_paints_without_them() {
 
 /// How many items an update at scale 1 shows.
 fn items(doc: &mut Document) -> usize {
-    doc.update(at(1.0)).expect("updates").scene().items().len()
+    doc.update(at(1.0))
+        .expect("updates")
+        .scene()
+        .to_scene()
+        .items()
+        .len()
 }
 
 #[test]

@@ -4,9 +4,10 @@
 use crate::node_map::{NodeMap, NodeSet};
 
 use vapors_dom::NodeId;
-use vapors_scene::{Color, Scene, TextId};
+use vapors_scene::{Color, TextId};
 use vapors_text::Layout;
 
+use crate::canvas::CanvasFrom;
 use crate::layout::BoxRect;
 use crate::style::Cursor;
 
@@ -18,7 +19,6 @@ pub struct Painted {
     pub(crate) canvas_from: Option<CanvasFrom>,
     /// Device pixels per CSS pixel: the update's viewport scale.
     pub(crate) scale: f32,
-    pub(crate) scene: Scene,
     /// The texts, images, icons and surface names the scene's items
     /// name, by id (`slab.rs`).
     pub(crate) slabs: crate::slab::Slabs,
@@ -28,10 +28,11 @@ pub struct Painted {
     /// The elements drawn: with a box and `visibility: visible` (focus,
     /// 3-E2a).
     pub(crate) visible: NodeSet,
-    /// Elements with a box, `visibility: visible` and `pointer-events:
-    /// auto`, in painting order: a later one is drawn over an earlier.
-    pub(crate) hits: Vec<(NodeId, BoxRect)>,
-    /// The cursor over each element in `hits`.
+    /// Each part's hits in painting order, gathered from the scene view
+    /// on the first hit test after the update: one walk of paint order,
+    /// then each test reads only the hits.
+    pub(crate) hits: std::cell::OnceCell<Vec<(NodeId, BoxRect)>>,
+    /// The cursor over each element that takes the pointer.
     pub(crate) cursors: NodeMap<Cursor>,
     /// Paint order, clips and which scroll containers a scroll over
     /// each element tries (`kept_order.rs`).
@@ -42,12 +43,15 @@ pub struct Painted {
     pub(crate) text_origins: NodeMap<[f32; 2]>,
     /// What this was painted from (`kept_paint`).
     pub(crate) from: crate::kept_paint::PaintedFrom,
-    /// Each slot's kept paint, for the next update (`kept_box.rs`).
+    /// Each slot's kept paint (`kept_box.rs`), walked in `order` for the
+    /// scene and hits (`scene_view.rs`), kept in place for the next update.
     pub(crate) kept_boxes: Vec<Option<crate::kept_box::KeptBox>>,
-    /// Boxes painted by this update, not copied from a kept paint, for
-    /// `UpdateCounts`.
+    /// Boxes painted by this update, for `UpdateCounts`.
     pub(crate) boxes_drawn: usize,
-    /// Scene items this update built, not copied, for `UpdateCounts`.
+    /// Kept parts this update read and kept (`paint_partial.rs`), for
+    /// `UpdateCounts`.
+    pub(crate) boxes_copied: usize,
+    /// Scene items this update built, for `UpdateCounts`.
     pub(crate) items_built: usize,
     /// Elements whose `rects` and `paddings` entries this update put or
     /// removed (`kept_maps.rs`), for `UpdateCounts`.
@@ -57,27 +61,6 @@ pub struct Painted {
     pub(crate) stackings: crate::paint_order::Stackings,
 }
 
-/// Which element's background became the canvas's (CSS Backgrounds 3
-/// section 2.11.2): it then paints none of its own.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CanvasFrom {
-    /// The root (`html`).
-    Root,
-    /// The body, the root's background being transparent.
-    Body,
-}
-
-impl CanvasFrom {
-    /// The element's tag: `html` or `body`.
-    #[must_use]
-    pub fn tag(self) -> &'static str {
-        match self {
-            Self::Root => "html",
-            Self::Body => "body",
-        }
-    }
-}
-
 impl Painted {
     /// A paint of nothing on `canvas` at `scale`.
     pub(crate) fn empty(canvas: Color, canvas_from: Option<CanvasFrom>, scale: f32) -> Self {
@@ -85,12 +68,11 @@ impl Painted {
             canvas,
             canvas_from,
             scale,
-            scene: Scene::new(),
             slabs: crate::slab::Slabs::default(),
             rects: NodeMap::default(),
             paddings: NodeMap::default(),
             visible: NodeSet::default(),
-            hits: Vec::new(),
+            hits: std::cell::OnceCell::new(),
             cursors: NodeMap::default(),
             order: crate::kept_order::KeptOrder::default(),
             ranges: NodeMap::default(),
@@ -98,6 +80,7 @@ impl Painted {
             from: crate::kept_paint::PaintedFrom::default(),
             kept_boxes: Vec::new(),
             boxes_drawn: 0,
+            boxes_copied: 0,
             items_built: 0,
             maps_patched: 0,
             stackings: crate::paint_order::Stackings::default(),
@@ -123,10 +106,10 @@ impl Painted {
         self.scale
     }
 
-    /// The display list.
+    /// The display list: a view over the kept paint in paint order.
     #[must_use]
-    pub fn scene(&self) -> &Scene {
-        &self.scene
+    pub fn scene(&self) -> crate::SceneView<'_> {
+        crate::SceneView::new(&self.order.steps, &self.kept_boxes)
     }
 
     /// The text run a scene item names.
@@ -200,10 +183,11 @@ impl Painted {
     /// pointer: the last one painted whose border box holds it. A box
     /// holds its left and top edges, not its right and bottom.
     #[must_use]
-    pub fn hit(&self, point: [f32; 2]) -> Option<NodeId> {
-        let [x, y] = point;
-        self.hits
-            .iter()
+    pub fn hit(&self, [x, y]: [f32; 2]) -> Option<NodeId> {
+        let hits = self
+            .hits
+            .get_or_init(|| self.scene().hits().copied().collect());
+        hits.iter()
             .rev()
             .find(|(_, r)| x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height)
             .map(|(node, _)| *node)

@@ -29,7 +29,8 @@ fn field_app() -> (ElementsApp, Rc<RefCell<vapors_elements::Document>>, NodeId) 
 /// Whether the last update drew `:focus-within`'s red.
 fn red_drawn(doc: &RefCell<vapors_elements::Document>) -> bool {
     let doc = doc.borrow();
-    let items = doc.painted().expect("painted").scene().items();
+    let scene = doc.painted().expect("painted").scene().to_scene();
+    let items = scene.items();
     let red = vapors_scene::Color::from_rgba8(255, 0, 0, 255);
     items
         .iter()

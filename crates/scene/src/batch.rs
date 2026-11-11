@@ -45,26 +45,33 @@ pub struct Batched {
 
 impl Scene {
     /// The scene's batches for a target whose drawable area is `view`
-    /// (device pixels), in order. An item whose [`Item::bounds`] miss
-    /// `view` cut to its clip is culled: left out, so the items either
-    /// side of it can share a batch; a culled surface instead keeps its
-    /// place in a batch marked [`Batch::culled`], so the painter refuses
-    /// it as it refuses a clipped one.
+    /// (device pixels), in order: [`batched`] over its items and clips.
     #[must_use]
     pub fn batches(&self, view: Rect) -> Batched {
-        let mut batched = Batched::default();
-        for (item, &clip) in self.items().iter().zip(self.clips()) {
-            if !culled(item, clip, view) {
-                batched.push(item, clip, false);
-                continue;
-            }
-            batched.culled += 1;
-            if let Item::Surface { .. } = item {
-                batched.push(item, clip, true);
-            }
-        }
-        batched
+        let clips = self.clips().iter().copied();
+        batched(self.items().iter().copied().zip(clips), view)
     }
+}
+
+/// The batches of `items`, each with its clip, for a target whose
+/// drawable area is `view` (device pixels), in order. An item whose
+/// [`Item::bounds`] miss `view` cut to its clip is culled: left out, so
+/// the items either side of it can share a batch; a culled surface
+/// instead keeps its place in a batch marked [`Batch::culled`], so the
+/// painter refuses it as it refuses a clipped one.
+pub fn batched(items: impl IntoIterator<Item = (Item, Option<Rect>)>, view: Rect) -> Batched {
+    let mut batched = Batched::default();
+    for (item, clip) in items {
+        if !culled(&item, clip, view) {
+            batched.push(&item, clip, false);
+            continue;
+        }
+        batched.culled += 1;
+        if let Item::Surface { .. } = item {
+            batched.push(&item, clip, true);
+        }
+    }
+    batched
 }
 
 /// True when nothing `item` paints falls inside `view` cut to `clip`.
