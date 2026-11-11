@@ -97,3 +97,11 @@ dominates.
 ## Progress
 
 - Plan: this file.
+- PR 1a (fdb4feb, on #185 with the plan): `layout/slots.rs` places the
+  pre-order boxes `build` makes into slots by key (kept slot, else the
+  lowest vacant one, else a new one); `KeptBoxes` keeps the slots, and
+  `element` and `lend` read them. Counts and the oracle unchanged;
+  harness in `docs/perf/baseline-2026-11-10.md` ("IU3 PR 1a"). For 1b:
+  `Slots::place` takes a whole tree; rebuilding an owner's subtree needs
+  a variant that places only that subtree's keys and frees only its
+  slots.
