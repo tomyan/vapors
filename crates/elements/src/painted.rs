@@ -19,7 +19,9 @@ pub struct Painted {
     /// Device pixels per CSS pixel: the update's viewport scale.
     pub(crate) scale: f32,
     pub(crate) scene: Scene,
-    pub(crate) texts: Vec<std::rc::Rc<Layout>>,
+    /// The texts, images, icons and surface names the scene's items
+    /// name, by id (`slab.rs`).
+    pub(crate) slabs: crate::slab::Slabs,
     pub(crate) rects: NodeMap<BoxRect>,
     /// Each element's padding box's top-left, for pointer offsets.
     pub(crate) paddings: NodeMap<[f32; 2]>,
@@ -31,13 +33,6 @@ pub struct Painted {
     pub(crate) hits: Vec<(NodeId, BoxRect)>,
     /// The cursor over each element in `hits`.
     pub(crate) cursors: NodeMap<Cursor>,
-    /// The images the scene's image items name, by `ImageId`.
-    pub(crate) images: Vec<std::rc::Rc<vapors_scene::RgbaImage>>,
-    /// The icons the scene's icon items name, by `IconId`.
-    pub(crate) icons: Vec<std::rc::Rc<vapors_text::Icon>>,
-    /// The names of the surfaces the scene's surface items name, by
-    /// `SurfaceId`.
-    pub(crate) surfaces: Vec<String>,
     /// Paint order, clips and which scroll containers a scroll over
     /// each element tries (`kept_order.rs`).
     pub(crate) order: crate::kept_order::KeptOrder,
@@ -91,16 +86,13 @@ impl Painted {
             canvas_from,
             scale,
             scene: Scene::new(),
-            texts: Vec::new(),
+            slabs: crate::slab::Slabs::default(),
             rects: NodeMap::default(),
             paddings: NodeMap::default(),
             visible: NodeSet::default(),
             hits: Vec::new(),
             cursors: NodeMap::default(),
             order: crate::kept_order::KeptOrder::default(),
-            images: Vec::new(),
-            icons: Vec::new(),
-            surfaces: Vec::new(),
             ranges: NodeMap::default(),
             text_origins: NodeMap::default(),
             from: crate::kept_paint::PaintedFrom::default(),
@@ -140,38 +132,38 @@ impl Painted {
     /// The text run a scene item names.
     ///
     /// # Panics
-    /// When `id` is not from this update's scene.
+    /// When `id` is not one this update's scene names.
     #[must_use]
     pub fn text(&self, id: TextId) -> &Layout {
-        &self.texts[id.0 as usize]
+        resolved::<std::rc::Rc<Layout>>(self.slabs.texts.get(id.0), "text", id.0)
     }
 
     /// The image a scene item names.
     ///
     /// # Panics
-    /// When `id` is not from this update's scene.
+    /// When `id` is not one this update's scene names.
     #[must_use]
     pub fn image(&self, id: vapors_scene::ImageId) -> &std::rc::Rc<vapors_scene::RgbaImage> {
-        &self.images[id.0 as usize]
+        resolved(self.slabs.images.get(id.0), "image", id.0)
     }
 
     /// The icon a scene item names.
     ///
     /// # Panics
-    /// When `id` is not from this update's scene.
+    /// When `id` is not one this update's scene names.
     #[must_use]
     pub fn icon(&self, id: vapors_scene::IconId) -> &vapors_text::Icon {
-        &self.icons[id.0 as usize]
+        resolved::<std::rc::Rc<vapors_text::Icon>>(self.slabs.icons.get(id.0), "icon", id.0)
     }
 
     /// The name of the surface a scene item names: its `gpu-surface`'s
     /// `name`, which the painter resolves to a mounted renderer.
     ///
     /// # Panics
-    /// When `id` is not from this update's scene.
+    /// When `id` is not one this update's scene names.
     #[must_use]
     pub fn surface(&self, id: vapors_scene::SurfaceId) -> &str {
-        &self.surfaces[id.0 as usize]
+        resolved::<String>(self.slabs.surfaces.get(id.0), "surface", id.0)
     }
 
     /// The element's border box in CSS pixels, or `None` when it has no
@@ -216,4 +208,11 @@ impl Painted {
             .find(|(_, r)| x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height)
             .map(|(node, _)| *node)
     }
+}
+
+/// The value an id names, or a panic naming the id.
+fn resolved<'a, T>(value: Option<&'a T>, kind: &str, id: u32) -> &'a T {
+    value.unwrap_or_else(|| {
+        panic!("{kind} id {id} is not one this update's scene names: an id from an earlier update")
+    })
 }

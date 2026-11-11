@@ -1,10 +1,11 @@
 //! The debug build's check on a kept paint (`kept_paint.rs`): the
 //! update paints again and compares every part of the two paints but
 //! `from`, which the update sets after, the kept boxes, and the counts;
-//! the kept `rects` and `paddings` maps name their first differing entry.
+//! the scene item by item with ids resolved, and the slabs against the
+//! kept boxes' items (`kept_scene_check.rs`); the kept `rects` and
+//! `paddings` maps name their first differing entry.
 
 use std::fmt::Debug;
-use std::rc::Rc;
 
 use vapors_dom::NodeId;
 
@@ -22,15 +23,16 @@ macro_rules! differing {
     };
 }
 
-/// Panics, naming each part that differs, when `kept` is not `fresh`.
-pub(crate) fn assert_same(kept: &Painted, fresh: &Painted) {
+/// Panics, naming each part that differs, when `kept` is not `fresh`;
+/// `fresh` with the index of each of its steps' first item.
+pub(crate) fn assert_same(kept: &Painted, fresh: (&Painted, &[usize])) {
     let parts = differing_parts(kept, fresh);
     assert!(
         parts.is_empty(),
         "the kept paint differs from a new paint in {parts:?}: a paint input is not \
          compared in PaintedFrom (crates/elements/src/kept_paint.rs) or BoxFrom \
-         (crates/elements/src/kept_box.rs), a copy renumbers wrongly \
-         (paint_partial.rs), or a changed slot or shape change is missed \
+         (crates/elements/src/kept_box.rs), a part's slab ids are not freed \
+         or taken once (paint_partial.rs, slab.rs), or a changed slot or shape change is missed \
          (changed_slots.rs, kept_maps.rs, kept_order.rs); reproduce with `cargo xtask test`"
     );
 }
@@ -39,15 +41,20 @@ pub(crate) fn assert_same(kept: &Painted, fresh: &Painted) {
 /// first differing entry.
 // Exact: a paint made from the same inputs has the same scale, bit for bit.
 #[allow(clippy::float_cmp)]
-fn differing_parts(kept: &Painted, fresh: &Painted) -> Vec<String> {
-    let mut parts: Vec<String> = differing!(kept, fresh; canvas, canvas_from, scale, scene,
-        visible, hits, cursors, images, icons, surfaces, ranges, text_origins)
+fn differing_parts(kept: &Painted, (fresh, starts): (&Painted, &[usize])) -> Vec<String> {
+    let mut parts: Vec<String> = differing!(kept, fresh; canvas, canvas_from, scale,
+        visible, hits, cursors, ranges, text_origins)
     .into_iter()
     .map(String::from)
     .collect();
-    if !same_layouts(&kept.texts, &fresh.texts) {
-        parts.push("texts".into());
-    }
+    parts.extend(crate::kept_scene_check::first_differing_item(
+        kept,
+        (fresh, starts),
+    ));
+    parts.extend(crate::kept_scene_check::slab_difference(
+        &kept.slabs,
+        kept_items(kept),
+    ));
     parts.extend(first_differing("rects", &kept.rects, &fresh.rects));
     parts.extend(first_differing("paddings", &kept.paddings, &fresh.paddings));
     parts.extend(crate::kept_order_check::differing(
@@ -87,8 +94,11 @@ fn first_differing_node<'a, V: PartialEq>(
         .find(|node| kept.get(node) != fresh.get(node))
 }
 
-/// Whether each text run is the same layout: a layout kept in the text
-/// cache is shared, not copied, by every paint that uses it.
-fn same_layouts(kept: &[Rc<vapors_text::Layout>], fresh: &[Rc<vapors_text::Layout>]) -> bool {
-    kept.len() == fresh.len() && kept.iter().zip(fresh).all(|(a, b)| Rc::ptr_eq(a, b))
+/// Each item a kept box holds, with its slot.
+fn kept_items(kept: &Painted) -> impl Iterator<Item = (usize, &vapors_scene::Item)> {
+    let boxes = kept.kept_boxes.iter().enumerate();
+    boxes.flat_map(|(slot, kept)| {
+        kept.iter()
+            .flat_map(move |kept| kept.all_items().map(move |item| (slot, item)))
+    })
 }

@@ -37,8 +37,7 @@ pub(crate) fn paint(
 }
 
 fn push(out: &mut Painted, name: &str, rect: Rect) {
-    let id = SurfaceId(u32::try_from(out.surfaces.len()).expect("fewer than 2^32 surfaces"));
-    out.surfaces.push(name.to_owned());
+    let id = SurfaceId(out.slabs.surfaces.insert(name.to_owned()));
     out.scene.push(Item::Surface { surface: id, rect });
 }
 

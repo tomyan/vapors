@@ -133,8 +133,7 @@ pub(crate) fn paint(
         return;
     }
     let content = crate::clip::content_box(layout_box, border_box);
-    let id = ImageId(u32::try_from(out.images.len()).expect("fewer than 2^32 images"));
-    out.images.push(Rc::clone(image));
+    let id = ImageId(out.slabs.images.insert(Rc::clone(image)));
     let rect = crate::paint::snapped(content, input.scale);
     out.scene.push(Item::Image { image: id, rect });
 }

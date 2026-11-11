@@ -30,6 +30,13 @@ pub(crate) struct Placement {
     /// (`CoreStyle::is_containing_block`).
     contains_absolute: bool,
     /// The containing block of fixed boxes, likewise.
+    // No test fails when this field is left out of the comparison:
+    // Taffy 0.15's default `is_containing_block`, which `taffy::Style`
+    // uses, never claims fixed boxes, so it is false on every box. It
+    // becomes testable when a property that makes a box the containing
+    // block of fixed boxes (`transform`, `filter`, `contain: paint`) is
+    // implemented through a `CoreStyle` that claims them: a test then
+    // sets that property on a rebuilt box with its children kept.
     contains_fixed: bool,
     /// `position` absolute or fixed: placed against its containing
     /// block, not its parent.
