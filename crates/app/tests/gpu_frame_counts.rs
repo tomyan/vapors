@@ -82,7 +82,7 @@ fn gpu_a_frame_adding_one_glyph_uploads_exactly_that_glyphs_bytes() {
 }
 
 #[test]
-fn gpu_draw_calls_are_one_per_quad_or_shadow_batch_and_one_per_text_item() {
+fn gpu_draw_calls_are_one_per_quad_shadow_or_text_run() {
     // Given
     let (doc, _) = labelled("Ab");
     let mut rig = Rig::new();
