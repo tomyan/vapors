@@ -9,7 +9,7 @@ use vapors_app::ScenePainter;
 use vapors_dom::Dom;
 use vapors_elements::Document;
 use vapors_gpu_harness::gpu;
-use vapors_renderer::{Target, clear};
+use vapors_renderer::{FrameEncoder, Target, clear};
 use vapors_scene::{Color, Size};
 use vapors_text::FontSystem;
 
@@ -37,9 +37,11 @@ fn gpu_the_counter_demos_idle_frame_matches_the_plan_row() {
         width: 640,
         height: 400,
     };
+    let encoder = FrameEncoder::new(&gpu.device);
     let target = Target {
         device: &gpu.device,
         queue: &gpu.queue,
+        encoder: &encoder,
         view: &view,
         viewport: size,
         scissor: None,

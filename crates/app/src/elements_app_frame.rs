@@ -3,19 +3,16 @@
 //! its event handlers took since the last frame is the Input phase's.
 
 use std::time::Duration;
-use vapors_elements::Document;
 
+use vapors_elements::{Document, ElementError, Viewport};
 use vapors_platform::{Frame, Instant};
-
-use vapors_renderer::Target;
-
-use vapors_elements::{ElementError, Viewport};
+use vapors_renderer::{FrameEncoder, Target};
 use vapors_scene::Size;
 
 use super::ElementsApp;
 use crate::check_tooltip_style;
 use crate::frame::{FrameTimes, Phase, Phases, SystemClock, run_frame};
-use crate::painter::{FrameCounts, ScenePainter};
+use crate::painter::ScenePainter;
 
 /// The phases that do work today, shown by a per-frame hook.
 const SHOWN: [Phase; 3] = [Phase::Input, Phase::Update, Phase::Draw];
@@ -44,18 +41,6 @@ impl Phases for AppFrame<'_, '_> {
 }
 
 impl ElementsApp {
-    /// What the painter's last frame handed the GPU: see
-    /// [`FrameCounts`]. All 0 before the first frame. A frame that fails
-    /// before painting (an update refusal, a mount error) leaves the
-    /// counts those of the frame before.
-    #[must_use]
-    pub fn frame_counts(&self) -> FrameCounts {
-        self.painter
-            .as_ref()
-            .map(ScenePainter::frame_counts)
-            .unwrap_or_default()
-    }
-
     /// The Update phase: `Document::update`, then the tooltip's style
     /// checked, so a bad `--tooltip-*` value fails this frame and not
     /// the first hover (seven lookups on the root's custom properties).
@@ -72,9 +57,22 @@ impl ElementsApp {
     }
 
     /// The Draw phase: the update's scene painted into the frame, then
-    /// the tooltip shown at `now` over it.
+    /// the tooltip shown at `now` over it, in one submit. A refused
+    /// frame submits what it recorded before the refusal.
     fn paint(&mut self, frame: &Frame<'_>, now: Instant) -> Result<(), String> {
-        let size = size_of(frame);
+        let encoder = FrameEncoder::new(frame.device);
+        let painted = self.record(frame, &encoder, now);
+        self.render_passes = encoder.render_passes();
+        let submitted = encoder.submit(frame.queue);
+        painted.and(submitted.map_err(|refused| refused.to_string()))
+    }
+
+    fn record(
+        &mut self,
+        frame: &Frame<'_>,
+        encoder: &FrameEncoder,
+        now: Instant,
+    ) -> Result<(), String> {
         let document = self.document.borrow();
         let painted = document
             .painted()
@@ -85,8 +83,9 @@ impl ElementsApp {
         let target = Target {
             device: frame.device,
             queue: frame.queue,
+            encoder,
             view: &view,
-            viewport: size,
+            viewport: size_of(frame),
             scissor: None,
         };
         if self.painter.is_none() {

@@ -126,7 +126,7 @@ impl Surfaces {
     /// Renders, as needed, and composites each surface item of `items`.
     pub(super) fn draw(
         &mut self,
-        pipeline: &ImagePipeline,
+        pipeline: &mut ImagePipeline,
         target: &Target<'_>,
         painted: &Painted,
         items: &[Item],

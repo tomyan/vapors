@@ -7,7 +7,7 @@
 use vapors_app::{FrameCounts, ScenePainter};
 use vapors_elements::Viewport;
 use vapors_gpu_harness::{Gpu, gpu};
-use vapors_renderer::{Target, clear};
+use vapors_renderer::{FrameEncoder, Target, clear};
 use vapors_scene::{Color, Size};
 
 const VIEWPORT: Viewport = Viewport {
@@ -39,9 +39,11 @@ fn two_frames(gpu: &Gpu, shown: &vapors_demos::Shown) -> (FrameCounts, FrameCoun
     let scene = document.update(VIEWPORT).expect("updates");
     let texture = clear(&gpu.device, &gpu.queue, 640, 400, Color::default());
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let encoder = FrameEncoder::new(&gpu.device);
     let target = Target {
         device: &gpu.device,
         queue: &gpu.queue,
+        encoder: &encoder,
         view: &view,
         viewport: Size {
             width: 640,

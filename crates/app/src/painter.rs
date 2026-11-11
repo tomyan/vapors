@@ -5,7 +5,7 @@
 //! are refused as they would be in view.
 
 use vapors_elements::Painted;
-use vapors_renderer::{ImagePipeline, QuadPipeline, ShadowPipeline, Target, clear_view};
+use vapors_renderer::{ImagePipeline, QuadPipeline, ShadowPipeline, Target, clear_target};
 use vapors_scene::{Rect, Run, Scissor, Size};
 use vapors_text::{AtlasConfig, GlyphAtlas, TextPipeline};
 
@@ -58,7 +58,7 @@ impl ScenePainter {
     /// [`PaintError`] when a glyph or a `gpu-surface` cannot be drawn;
     /// the frame is then incomplete.
     pub fn draw(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
-        clear_view(target.device, target.queue, target.view, painted.canvas());
+        clear_target(target, painted.canvas());
         self.paint(target, painted)
     }
 
@@ -109,7 +109,8 @@ impl ScenePainter {
     }
 
     /// Draws `run` with the pipeline for its kind under `target`'s
-    /// scissor, and counts the work it issued.
+    /// scissor, and counts the work it issued. A draw the pipeline's
+    /// buffers refused ends the frame here.
     fn draw_run(
         &mut self,
         target: &Target<'_>,
@@ -118,7 +119,11 @@ impl ScenePainter {
     ) -> Result<(), PaintError> {
         let result = self.issue_run(target, painted, run);
         self.count_run(run);
-        result
+        result?;
+        target
+            .encoder
+            .take_refusal()
+            .map_or(Ok(()), |refused| Err(refused.into()))
     }
 
     /// Issues `run`'s writes and draws; a refusal leaves those already
@@ -134,8 +139,10 @@ impl ScenePainter {
             Run::Quads(ref quads) => self.quads.draw(target, quads),
             Run::Texts(items) => self.draw_texts(target, painted, items)?,
             Run::Icons(items) => self.draw_icons(target, painted, items)?,
-            Run::Images(items) => self.textures.draw(&self.images, target, painted, items),
-            Run::Surfaces(items) => self.surfaces.draw(&self.images, target, painted, items)?,
+            Run::Images(items) => self.textures.draw(&mut self.images, target, painted, items),
+            Run::Surfaces(items) => self
+                .surfaces
+                .draw(&mut self.images, target, painted, items)?,
         }
         Ok(())
     }

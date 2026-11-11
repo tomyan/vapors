@@ -1,6 +1,6 @@
 //! Rendering the page and the composite's labels with this crate.
 
-use vapors_renderer::{SolidPipeline, clear, read_rgba8};
+use vapors_renderer::{FrameEncoder, SolidPipeline, clear, read_rgba8};
 use vapors_scene::Size;
 
 use crate::{
@@ -16,8 +16,9 @@ use super::spec::{Block, PADDING, PAGE_HEIGHT, PAGE_WIDTH, PANEL_WIDTH, SCHEMES,
 ///
 /// # Panics
 ///
-/// If a block cannot be drawn; the message is the atlas error, and a
-/// fixed page of bundled fonts failing to draw is a bug, not an input.
+/// If a block cannot be drawn, or its vertices need a buffer over the
+/// device's `max_buffer_size`; the message is the error, and a fixed
+/// page of bundled fonts failing to draw is a bug, not an input.
 #[must_use]
 pub fn render_page(
     device: &wgpu::Device,
@@ -33,13 +34,6 @@ pub fn render_page(
     let (texture, view) = target(device, queue, viewport, &SCHEMES[0]);
     let mut text = Text::new(device, texture.format());
     let solid = SolidPipeline::new(device, texture.format());
-    let render_target = RenderTarget {
-        device,
-        queue,
-        view: &view,
-        viewport,
-        scissor: None,
-    };
     for (index, scheme) in (0u32..).zip(SCHEMES.iter()) {
         let left = px(PANEL_WIDTH * index * scale);
         let rect = [
@@ -49,11 +43,23 @@ pub fn render_page(
             px(viewport.height),
         ];
         solid.fill(device, queue, &view, viewport, rect, scheme.background);
+        let encoder = FrameEncoder::new(device);
+        let render_target = RenderTarget {
+            device,
+            queue,
+            encoder: &encoder,
+            view: &view,
+            viewport,
+            scissor: None,
+        };
         for block in blocks() {
             let layout = block_layout(system, &block, scheme, scale);
             let origin = [left + px(PADDING * scale), px(block.top * scale)];
             text.draw(&render_target, &layout, origin, params);
         }
+        encoder
+            .submit(queue)
+            .unwrap_or_else(|refused| panic!("text comparison: {refused}"));
     }
     Rgba {
         width: viewport.width,
@@ -63,6 +69,11 @@ pub fn render_page(
 }
 
 /// A `width` by 24 px strip naming the two columns of the composite.
+///
+/// # Panics
+///
+/// If the labels' vertices need a buffer over the device's
+/// `max_buffer_size`; two short labels doing so is a bug.
 #[must_use]
 pub fn render_labels(
     device: &wgpu::Device,
@@ -75,9 +86,11 @@ pub fn render_labels(
     let scheme = SCHEMES[0];
     let (texture, view) = target(device, queue, viewport, &scheme);
     let mut text = Text::new(device, texture.format());
+    let encoder = FrameEncoder::new(device);
     let render_target = RenderTarget {
         device,
         queue,
+        encoder: &encoder,
         view: &view,
         viewport,
         scissor: None,
@@ -92,6 +105,9 @@ pub fn render_labels(
         let x = px(width / 2 * index + 8);
         text.draw(&render_target, &layout, [x, 3.0], BlendParams::default());
     }
+    encoder
+        .submit(queue)
+        .unwrap_or_else(|refused| panic!("text comparison: {refused}"));
     Rgba {
         width,
         height: 24,

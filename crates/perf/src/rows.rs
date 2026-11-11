@@ -80,7 +80,8 @@ impl Workload for Rows {
     }
 
     fn counts(&self) -> Counts {
-        Counts::of(&self.page.doc.borrow(), self.app.frame_counts())
+        let frame = self.app.frame_counts();
+        Counts::of(&self.page.doc.borrow(), frame, self.app.render_passes())
     }
 }
 

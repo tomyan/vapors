@@ -37,16 +37,20 @@ pub struct Counts {
     pub text_layouts: usize,
     /// The painter's frame.
     pub frame: FrameCounts,
+    /// Render passes the frame's encoder began, flushes included.
+    pub render_passes: u64,
 }
 
 impl Counts {
-    /// The counts of `document`'s last update and `frame`.
+    /// The counts of `document`'s last update, `frame` and the
+    /// `render_passes` it began.
     #[must_use]
-    pub fn of(document: &Document, frame: FrameCounts) -> Self {
+    pub fn of(document: &Document, frame: FrameCounts, render_passes: u64) -> Self {
         Self {
             update: document.update_counts(),
             text_layouts: document.text_layouts_built(),
             frame,
+            render_passes,
         }
     }
 }

@@ -154,7 +154,9 @@ Done: `crates/perf` (vapors-perf). The baseline and its findings are in
 `docs/perf/baseline-2026-11-10.md`: draw is 87% to 95% of every frame.
 The painter makes an encoder, a render pass and a submit per draw call;
 measured per call, `Queue::submit` takes about 35 µs, the encoder, pass
-and bind group about 25 µs, and buffer writes about 10 µs.
+and bind group about 25 µs, and buffer writes about 10 µs (run 3, 100
+and 1000 rows idle; load average 1.35 at the start of that run and 9.06
+at its end; the spans themselves make draw about 5% longer).
 
 ## PR 5 on: the remaining workloads
 

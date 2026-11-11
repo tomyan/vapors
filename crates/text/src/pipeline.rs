@@ -2,6 +2,8 @@
 //! gamma and contrast shader, the atlas texture it samples, and the
 //! buffers it draws from. Create once per target format.
 
+use vapors_renderer::{FrameArena, Placed};
+
 use crate::GlyphAtlas;
 use crate::pipeline_gpu::{bind_group_layout, coverage_texture, render_pipeline};
 
@@ -34,9 +36,9 @@ pub struct TextPipeline {
     pub(crate) pipeline: wgpu::RenderPipeline,
     pub(crate) layout: wgpu::BindGroupLayout,
     pub(crate) sampler: wgpu::Sampler,
-    pub(crate) uniforms: wgpu::Buffer,
+    pub(crate) uniforms: FrameArena,
     pub(crate) texture: wgpu::Texture,
-    pub(crate) vertices: Option<wgpu::Buffer>,
+    pub(crate) vertices: FrameArena,
     pub(crate) work: vapors_renderer::WorkCounter,
 }
 
@@ -64,14 +66,14 @@ impl TextPipeline {
                 min_filter: wgpu::FilterMode::Nearest,
                 ..Default::default()
             }),
-            uniforms: device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("text params"),
-                size: 16,
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            }),
+            uniforms: FrameArena::uniforms(device, "text params"),
             texture: coverage_texture(device, atlas.coverage_page().size()),
-            vertices: None,
+            vertices: FrameArena::new(
+                device,
+                "text quads",
+                wgpu::BufferUsages::VERTEX,
+                VERTEX_SIZE,
+            ),
             work: vapors_renderer::WorkCounter::default(),
         }
     }
@@ -82,21 +84,7 @@ impl TextPipeline {
         self.work.take()
     }
 
-    /// Make sure the vertex buffer holds at least `bytes`; it is reused
-    /// across frames and only grows.
-    pub(crate) fn reserve_vertices(&mut self, device: &wgpu::Device, bytes: u64) {
-        if self.vertices.as_ref().is_some_and(|b| b.size() >= bytes) {
-            return;
-        }
-        self.vertices = Some(device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("text quads"),
-            size: bytes.max(VERTEX_SIZE * 6 * 64),
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        }));
-    }
-
-    pub(crate) fn bind_group(&self, device: &wgpu::Device) -> wgpu::BindGroup {
+    pub(crate) fn bind_group(&self, device: &wgpu::Device, params: &Placed) -> wgpu::BindGroup {
         let view = self
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
@@ -114,7 +102,7 @@ impl TextPipeline {
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: self.uniforms.as_entire_binding(),
+                    resource: params.binding(),
                 },
             ],
         })

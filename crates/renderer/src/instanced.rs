@@ -2,35 +2,22 @@
 //! the box and shadow pipelines. Each instance is `vec4s` four-float
 //! attributes, in device pixels where they are positions; the viewport
 //! size is a uniform. Alpha blends over what the target holds, in
-//! instance order, in one draw and one submit.
+//! instance order, in one draw recorded into the target's encoder.
 
-use vapors_scene::{Scissor, Size};
+use vapors_scene::Size;
 
-use crate::WorkCounter;
-use crate::quads_setup::{bind_group_layout, load_pass, render_pipeline, uniform};
+use crate::frame_arena::{FrameArena, Placed};
+use crate::quads_setup::{bind_group_layout, render_pipeline};
+use crate::{Target, WorkCounter};
 
 const VERTICES_PER_QUAD: u32 = 6;
-
-/// Where a draw goes: the target view and its size in pixels.
-pub struct Target<'a> {
-    /// Device the pipeline was made on.
-    pub device: &'a wgpu::Device,
-    /// Queue to submit to.
-    pub queue: &'a wgpu::Queue,
-    /// The view drawn into; pixels under no quad keep what was there.
-    pub view: &'a wgpu::TextureView,
-    /// Size of the view in pixels.
-    pub viewport: Size,
-    /// Where drawing may change pixels; `None` for the whole view.
-    pub scissor: Option<Scissor>,
-}
 
 pub(crate) struct Instanced {
     label: &'static str,
     pipeline: wgpu::RenderPipeline,
     layout: wgpu::BindGroupLayout,
-    viewport: wgpu::Buffer,
-    instances: wgpu::Buffer,
+    viewports: FrameArena,
+    instances: FrameArena,
     stride: u64,
     pub(crate) work: WorkCounter,
 }
@@ -65,14 +52,15 @@ impl Instanced {
             label,
             pipeline: render_pipeline(device, &layout, &shader, format, instance),
             layout,
-            viewport: uniform(device),
-            instances: instance_buffer(device, label, stride * 64),
+            viewports: FrameArena::uniforms(device, label),
+            instances: FrameArena::new(device, label, wgpu::BufferUsages::VERTEX, stride),
             stride,
             work: WorkCounter::default(),
         }
     }
 
-    /// Draws `count` instances whose attributes are `bytes`.
+    /// Draws `count` instances whose attributes are `bytes`; a draw its
+    /// arenas refuse is not recorded (the refusal is on the encoder).
     pub(crate) fn draw(&mut self, target: &Target<'_>, bytes: &[u8]) {
         let count = u32::try_from(bytes.len() as u64 / self.stride).unwrap_or_else(|_| {
             panic!(
@@ -83,56 +71,34 @@ impl Instanced {
         if count == 0 {
             return;
         }
-        if self.instances.size() < bytes.len() as u64 {
-            self.instances = instance_buffer(target.device, self.label, bytes.len() as u64);
-        }
+        let (frame, queue) = (target.encoder, target.queue);
+        let Some(instances) = self.instances.push(frame, queue, &self.work, bytes) else {
+            return;
+        };
         let viewport = viewport_bytes(target.viewport);
-        self.work
-            .write_buffer(target.queue, &self.instances, 0, bytes);
-        self.work
-            .write_buffer(target.queue, &self.viewport, 0, &viewport);
-        self.submit(target, count);
+        let Some(viewport) = self.viewports.push(frame, queue, &self.work, &viewport) else {
+            return;
+        };
+        self.record(target, count, &instances, &viewport);
     }
 
-    fn submit(&self, target: &Target<'_>, count: u32) {
-        let encoding = tracing::trace_span!("draw step", phase = "encode").entered();
+    fn record(&self, target: &Target<'_>, count: u32, instances: &Placed, viewport: &Placed) {
+        let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
         let bind_group = target.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some(self.label),
             layout: &self.layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
-                resource: self.viewport.as_entire_binding(),
+                resource: viewport.binding(),
             }],
         });
-        let mut encoder = target
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some(self.label),
-            });
-        {
-            let mut pass = load_pass(&mut encoder, target.view);
-            if let Some(s) = target.scissor {
-                pass.set_scissor_rect(s.x, s.y, s.width, s.height);
-            }
+        target.draw_pass(|pass| {
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &bind_group, &[]);
-            pass.set_vertex_buffer(0, self.instances.slice(..));
-            self.work.draw(&mut pass, 0..VERTICES_PER_QUAD, 0..count);
-        }
-        let commands = encoder.finish();
-        drop(encoding);
-        let _submit = tracing::trace_span!("draw step", phase = "submit").entered();
-        target.queue.submit([commands]);
+            pass.set_vertex_buffer(0, instances.slice());
+            self.work.draw(pass, 0..VERTICES_PER_QUAD, 0..count);
+        });
     }
-}
-
-fn instance_buffer(device: &wgpu::Device, label: &str, size: u64) -> wgpu::Buffer {
-    device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some(label),
-        size,
-        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    })
 }
 
 #[allow(clippy::cast_precision_loss)] // viewports are far below 2^24 pixels

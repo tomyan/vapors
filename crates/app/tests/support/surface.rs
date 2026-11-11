@@ -19,7 +19,7 @@ use vapors_app::{DrawOverError, PaintError, ScenePainter, Tooltip, TooltipError}
 use vapors_dom::Dom;
 use vapors_elements::{Document, Viewport};
 use vapors_gpu_harness::{Gpu, gpu, read_rgba8};
-use vapors_renderer::{Target, clear};
+use vapors_renderer::{FrameEncoder, Target, clear};
 use vapors_scene::{Color, Size};
 use vapors_text::FontSystem;
 
@@ -79,7 +79,11 @@ pub struct Rig {
 
 impl Rig {
     pub fn new() -> Self {
-        let gpu = gpu();
+        Self::on(gpu())
+    }
+
+    /// A painter on `gpu`.
+    pub fn on(gpu: Gpu) -> Self {
         let painter =
             ScenePainter::new(&gpu.device, wgpu::TextureFormat::Rgba8Unorm).expect("Rgba8Unorm");
         Self { gpu, painter }
@@ -120,13 +124,16 @@ impl Rig {
         let black = Color::from_rgba8(0, 0, 0, 255);
         let texture = clear(&gpu.device, &gpu.queue, SIZE, SIZE, black);
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        draw(&mut self.painter, &target(gpu, &view))?;
+        let encoder = FrameEncoder::new(&gpu.device);
+        let drawn = draw(&mut self.painter, &target(gpu, &encoder, &view));
+        encoder.submit(&gpu.queue).expect("no draw refused");
+        drawn?;
         Ok(read_rgba8(&gpu.device, &gpu.queue, &texture))
     }
 }
 
 /// The whole of `view`, a `SIZE` square, as a target on `gpu`.
-fn target<'a>(gpu: &'a Gpu, view: &'a wgpu::TextureView) -> Target<'a> {
+fn target<'a>(gpu: &'a Gpu, encoder: &'a FrameEncoder, view: &'a wgpu::TextureView) -> Target<'a> {
     let size = Size {
         width: SIZE,
         height: SIZE,
@@ -134,6 +141,7 @@ fn target<'a>(gpu: &'a Gpu, view: &'a wgpu::TextureView) -> Target<'a> {
     Target {
         device: &gpu.device,
         queue: &gpu.queue,
+        encoder,
         view,
         viewport: size,
         scissor: None,

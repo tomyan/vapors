@@ -62,6 +62,7 @@ impl Refusal {
 pub(super) fn describe(error: &PaintError, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match error {
         PaintError::Atlas(error) => fmt::Display::fmt(error, f),
+        PaintError::Arena(error) => fmt::Display::fmt(error, f),
         PaintError::Unmounted(name) => unmounted(f, name),
         PaintError::DuplicateName(name) => duplicate(f, name),
         PaintError::TooLarge {

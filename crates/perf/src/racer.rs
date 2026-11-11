@@ -63,7 +63,12 @@ impl Workload for RacerFrames {
     }
 
     fn counts(&self) -> Counts {
-        Counts::of(&self.racer.document().borrow(), self.racer.frame_counts())
+        let frame = self.racer.frame_counts();
+        Counts::of(
+            &self.racer.document().borrow(),
+            frame,
+            self.racer.render_passes(),
+        )
     }
 }
 

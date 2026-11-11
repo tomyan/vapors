@@ -8,12 +8,13 @@ use crate::run::{Counts, Samples};
 use crate::stats::Distribution;
 
 /// The phases reported, in frame order: the app's `update` (which holds
-/// `style`, `layout` and `paint`) and `draw`, which holds each draw
-/// call's `encode` (bind group, encoder and render pass), `write`
-/// (`Queue::write_buffer` and `write_texture`) and `submit`
-/// (`Queue::submit`); the rest of draw is the painter's own work. The
-/// app's other phases (input, tasks, tick, accessibility, record) do no
-/// work in these workloads and are left out.
+/// `style`, `layout` and `paint`) and `draw`, which holds `encode` (each
+/// draw call's bind group and render pass, and `finish` on the frame's
+/// encoder), `write` (`Queue::write_buffer` and `write_texture`) and
+/// `submit` (`Queue::submit`: once per frame, plus once per glyph atlas
+/// repack and per `gpu-surface` that renders); the rest of draw is the
+/// painter's own work. The app's other phases (input, tasks, tick,
+/// accessibility, record) do no work in these workloads and are left out.
 pub const PHASES: [&str; 8] = [
     "update", "style", "layout", "paint", "draw", "encode", "write", "submit",
 ];
@@ -59,7 +60,7 @@ fn counts(counts: &Counts) -> String {
     format!(
         "Counts (last frame): restyled {}, text layouts {}, laid out {}, elements visited {}, \
          boxes built {}, layout calls {}, boxes painted {}, scene items {}; draw calls {}, \
-         buffer bytes {}, texture bytes {}.",
+         buffer bytes {}, texture bytes {}, render passes {}.",
         u.elements_restyled,
         counts.text_layouts,
         u.boxes_laid_out,
@@ -70,6 +71,11 @@ fn counts(counts: &Counts) -> String {
         u.scene_items_built,
         gpu.draw_calls,
         gpu.buffer_bytes,
-        gpu.texture_bytes
+        gpu.texture_bytes,
+        counts.render_passes
     )
 }
+
+#[cfg(test)]
+#[path = "report_tests.rs"]
+mod tests;

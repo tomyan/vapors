@@ -65,3 +65,30 @@ fn each_outcome_is_reported_with_its_fix() {
             .contains("buttons: line 3: committed `a`, Chromium `b`")
     );
 }
+
+#[test]
+fn a_reader_never_sees_part_of_a_file_being_rewritten() {
+    // Given
+    let dir = tempfile::tempdir().expect("a scratch directory");
+    let path = dir.path().join("tall.png");
+    let bytes = vec![7_u8; 4096];
+    write_whole(&path, &bytes).expect("first write");
+
+    // When
+    let writer = {
+        let (path, bytes) = (path.clone(), bytes.clone());
+        std::thread::spawn(move || {
+            for _ in 0..2000 {
+                write_whole(&path, &bytes).expect("rewrite");
+            }
+        })
+    };
+    let lengths: Vec<usize> = (0..2000)
+        .map(|_| std::fs::read(&path).expect("read").len())
+        .collect();
+    writer.join().expect("writer");
+
+    // Then
+    let short = lengths.iter().filter(|&&n| n != bytes.len()).count();
+    assert_eq!(short, 0, "{short} of 2000 reads saw part of the file");
+}

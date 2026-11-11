@@ -9,7 +9,7 @@ use vapors_app::{DrawOverError, ScenePainter, UnsupportedFormat};
 use vapors_dom::Dom;
 use vapors_elements::{CanvasFrom, Document, Viewport};
 use vapors_gpu_harness::{gpu, read_rgba8};
-use vapors_renderer::{Target, clear};
+use vapors_renderer::{FrameEncoder, Target, clear};
 use vapors_scene::{Color, Size};
 use vapors_text::FontSystem;
 
@@ -49,9 +49,11 @@ fn painted(css: &str, over: bool) -> Result<Vec<u8>, DrawOverError> {
         Color::from_rgba8(255, 0, 0, 255),
     );
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let encoder = FrameEncoder::new(&gpu.device);
     let target = Target {
         device: &gpu.device,
         queue: &gpu.queue,
+        encoder: &encoder,
         view: &view,
         viewport: Size {
             width: SIZE,
@@ -66,6 +68,7 @@ fn painted(css: &str, over: bool) -> Result<Vec<u8>, DrawOverError> {
     } else {
         painter.draw(&target, update).expect("paints");
     }
+    encoder.submit(&gpu.queue).expect("no draw refused");
     Ok(read_rgba8(&gpu.device, &gpu.queue, &texture))
 }
 

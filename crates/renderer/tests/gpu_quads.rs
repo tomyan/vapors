@@ -2,7 +2,7 @@
 //! one draw.
 
 use vapors_gpu_harness::{gpu, read_rgba8};
-use vapors_renderer::{QuadPipeline, Target, clear};
+use vapors_renderer::{FrameEncoder, QuadPipeline, Target, clear};
 use vapors_scene::{Color, Quad, Rect, Size};
 
 const BACKGROUND: [u8; 4] = [40, 40, 40, 255];
@@ -33,16 +33,19 @@ fn draw(quads: &[Quad], width: u32, height: u32) -> Vec<u8> {
     let mut pipeline = QuadPipeline::new(&gpu.device, target.format());
     let view = target.create_view(&wgpu::TextureViewDescriptor::default());
     let viewport = Size { width, height };
+    let encoder = FrameEncoder::new(&gpu.device);
     pipeline.draw(
         &Target {
             device: &gpu.device,
             queue: &gpu.queue,
+            encoder: &encoder,
             view: &view,
             viewport,
             scissor: None,
         },
         quads,
     );
+    encoder.submit(&gpu.queue).expect("no draw refused");
     read_rgba8(&gpu.device, &gpu.queue, &target)
 }
 

@@ -3,7 +3,7 @@
 //! or contrast boost (docs/icons.md, Paint).
 
 use vapors_gpu_harness::{gpu, read_rgba8};
-use vapors_renderer::clear;
+use vapors_renderer::{FrameEncoder, clear};
 use vapors_scene::{Color, Size};
 use vapors_text::{
     AtlasConfig, GlyphAtlas, Icon, IconDraw, IconPath, IconStroke, RenderTarget, TextPipeline,
@@ -38,9 +38,11 @@ fn render(icon: &Icon, colour: Color) -> Vec<u8> {
     let target = clear(&gpu.device, &gpu.queue, SIDE, SIDE, WHITE);
     let mut pipeline = TextPipeline::new(&gpu.device, target.format(), &atlas);
     let view = target.create_view(&wgpu::TextureViewDescriptor::default());
+    let encoder = FrameEncoder::new(&gpu.device);
     let render_target = RenderTarget {
         device: &gpu.device,
         queue: &gpu.queue,
+        encoder: &encoder,
         view: &view,
         viewport: Size {
             width: SIDE,
@@ -57,6 +59,7 @@ fn render(icon: &Icon, colour: Color) -> Vec<u8> {
     pipeline
         .draw_icons(&render_target, &mut atlas, &[draw])
         .expect("draws");
+    encoder.submit(&gpu.queue).expect("no draw refused");
     read_rgba8(&gpu.device, &gpu.queue, &target)
 }
 

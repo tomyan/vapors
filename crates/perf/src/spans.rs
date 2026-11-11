@@ -1,10 +1,10 @@
 //! A `tracing` subscriber that times the phases of a frame: vapors-app's
 //! `frame phase` spans (input to record; `update` and `draw` do the
 //! work), vapors-elements' `update phase` spans (`style`, `layout`,
-//! `paint`), and the `draw step` spans vapors-renderer and vapors-text
-//! open inside draw (`encode`, `write`, `submit`), each named by its
-//! `phase` field. It sums the time between each span's enter and exit
-//! by phase until the times are taken.
+//! `paint`), and the `draw step` spans vapors-renderer, vapors-text and
+//! vapors-app open inside draw (`encode`, `write`, `submit`), each
+//! named by its `phase` field. It sums the time between each span's
+//! enter and exit by phase until the times are taken.
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex, MutexGuard};

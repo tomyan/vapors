@@ -12,6 +12,8 @@ pub struct AtlasPage {
     shelf_height: u32,
     /// `[x, y, width, height]` changed since the last upload.
     dirty: Option<[u32; 4]>,
+    /// Cleared since the last upload: glyphs may have moved.
+    cleared: bool,
 }
 
 /// Gap kept around every glyph so nearest sampling never reads a neighbour.
@@ -29,6 +31,7 @@ impl AtlasPage {
             shelf_y: 0,
             shelf_height: 0,
             dirty: Some([0, 0, size, size]),
+            cleared: false,
         }
     }
 
@@ -48,6 +51,13 @@ impl AtlasPage {
     #[must_use]
     pub fn pixels(&self) -> &[u8] {
         &self.pixels
+    }
+
+    /// True when the page was cleared since [`AtlasPage::mark_clean`]:
+    /// glyphs already uploaded may be elsewhere now, or gone.
+    #[must_use]
+    pub fn cleared(&self) -> bool {
+        self.cleared
     }
 
     /// True when the pixels changed since [`AtlasPage::mark_clean`].
@@ -89,6 +99,7 @@ impl AtlasPage {
     /// The caller uploaded the pixels.
     pub fn mark_clean(&mut self) {
         self.dirty = None;
+        self.cleared = false;
     }
 
     /// True when a `width` by `height` glyph could ever be placed in an
@@ -157,6 +168,7 @@ impl AtlasPage {
         self.shelf_y = 0;
         self.shelf_height = 0;
         self.dirty = Some([0, 0, self.size, self.size]);
+        self.cleared = true;
     }
 }
 
