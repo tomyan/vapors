@@ -49,10 +49,14 @@ impl Calcs {
                     element: element(),
                     property: property.name(),
                 };
-                self.by_handle.insert(handle(calc), entry);
-                self.by_node.entry(node).or_default().push(handle(calc));
+                self.insert(handle(calc), entry);
             }
         }
+    }
+
+    fn insert(&mut self, handle: usize, entry: Entry) {
+        self.by_node.entry(entry.node).or_default().push(handle);
+        self.by_handle.insert(handle, entry);
     }
 
     /// Drops `node`'s calcs. An address another element's calc took
@@ -69,7 +73,9 @@ impl Calcs {
         }
     }
 
-    /// The handles held, for a check against calcs collected afresh.
+    /// The handles held, for a debug build's check against calcs
+    /// collected afresh.
+    #[cfg(debug_assertions)]
     pub(crate) fn handles(&self) -> std::collections::BTreeSet<usize> {
         self.by_handle.keys().copied().collect()
     }

@@ -22,21 +22,28 @@ impl Document {
         if self.checks.all || self.boxes.marks.all {
             return elements(&self.arena, self.root());
         }
-        let marked = self
-            .boxes
-            .marks
-            .nodes()
-            .chain(self.checks.marked.iter().copied());
-        let mut nodes: Vec<NodeId> = marked.filter(|&node| self.attached(node)).collect();
-        for &added in self
-            .checks
-            .added
-            .iter()
-            .filter(|&&node| self.attached(node))
-        {
-            nodes.extend(elements(&self.arena, added));
-        }
+        let mut nodes = self.marked();
+        nodes.extend(self.added_subtrees());
         nodes
+    }
+
+    /// The box-marked and listener-marked elements still in the tree.
+    fn marked(&self) -> Vec<NodeId> {
+        let marked = self.boxes.marks.nodes();
+        marked
+            .chain(self.checks.marked.iter().copied())
+            .filter(|&node| self.attached(node))
+            .collect()
+    }
+
+    /// The elements of each subtree added since the last update and
+    /// still in the tree.
+    fn added_subtrees(&self) -> Vec<NodeId> {
+        let added = self.checks.added.iter().copied();
+        added
+            .filter(|&node| self.attached(node))
+            .flat_map(|node| elements(&self.arena, node))
+            .collect()
     }
 
     /// `touched` and the elements restyled, each once.
@@ -109,23 +116,26 @@ impl Document {
     /// The tree's refusals, in document order.
     pub(crate) fn tree_refusals(&self) -> Vec<ElementError> {
         let walk = || check_tree(&self.arena, self.root(), &self.declared_events);
-        walked(!self.checks.tree.is_empty(), walk, "tree")
+        walked(&self.checks.tree, walk, "tree", |node| self.described(node))
     }
 
     /// The `style` attributes that do not parse, in document order.
     pub(crate) fn style_attribute_refusals(&self) -> Vec<ElementError> {
         let walk = || crate::check::style_attribute_refusals(&self.arena, self.root());
-        walked(
-            !self.checks.style_attribute.is_empty(),
-            walk,
-            "style attribute",
-        )
+        let kept = &self.checks.style_attribute;
+        walked(kept, walk, "style attribute", |node| self.described(node))
     }
 
     /// The refusals after styling, in document order.
     pub(crate) fn all_styled_refusals(&self, scale: f32) -> Vec<ElementError> {
         let walk = || self.styled_refusals(&elements(&self.arena, self.root()), scale);
-        walked(!self.checks.styled.is_empty(), walk, "styled")
+        walked(&self.checks.styled, walk, "styled", |node| {
+            self.described(node)
+        })
+    }
+
+    fn described(&self, node: NodeId) -> String {
+        describe(&self.arena, node)
     }
 
     /// Drops what is kept for `node` and its subtree, which leave the
@@ -157,21 +167,39 @@ impl Document {
 }
 
 /// The refusals a walk over the tree finds, when the kept checks say
-/// some element refuses, or always in a debug build; panics when the two
-/// disagree, which a missed mark causes.
+/// some element refuses, or always in a debug build, which panics when
+/// the two disagree. A missed mark causes that; a release build, which
+/// walks only when the kept checks say some element refuses, refuses
+/// the update naming the element when the walk finds nothing.
 fn walked(
-    refuses: bool,
+    kept: &HashSet<NodeId>,
     walk: impl FnOnce() -> Vec<ElementError>,
     checks: &str,
+    describe: impl Fn(NodeId) -> String,
 ) -> Vec<ElementError> {
-    if !refuses && !cfg!(debug_assertions) {
+    if kept.is_empty() && !cfg!(debug_assertions) {
         return Vec::new();
     }
     let errors = walk();
-    assert_eq!(
-        refuses,
+    debug_assert_eq!(
+        !kept.is_empty(),
         !errors.is_empty(),
-        "the kept {checks} checks say {refuses}, a walk over the tree finds {errors:?}: a change was not marked (docs/plans/iu3.md, PR 3a); reproduce with the failing test"
+        "the kept {checks} checks say {kept:?} refuse, a walk over the tree finds {errors:?}: a change was not marked (docs/plans/iu3.md, PR 3a); reproduce with the failing test"
     );
-    errors
+    match kept.iter().min_by_key(|node| node.0) {
+        Some(&node) if errors.is_empty() => vec![unmarked(&describe(node), checks)],
+        _ => errors,
+    }
 }
+
+/// The refusal when the kept checks say `element` refuses and a walk
+/// over the tree finds no refusal.
+fn unmarked(element: &str, checks: &str) -> ElementError {
+    ElementError::Unmarked(format!(
+        "{element}: the kept {checks} checks say it refuses and a check of the whole tree finds nothing: a change was not marked (docs/plans/iu3.md, PR 3a); reproduce in a debug build, which checks every update and panics at the change"
+    ))
+}
+
+#[cfg(test)]
+#[path = "style_checks_tests.rs"]
+mod tests;
