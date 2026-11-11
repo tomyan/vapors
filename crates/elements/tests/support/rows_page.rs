@@ -119,7 +119,14 @@ impl RowsPage {
                 self.set_text(middle.value, &same.expect("a text node"));
             }
             Edit::Hover => Document::pointer_moved(&self.doc, [HOVER_X, 34.0]),
-            Edit::Focus => Document::focus(&self.doc, Some(self.rows[1].button)),
+            Edit::Focus => {
+                let focused = Document::focus(&self.doc, Some(self.rows[1].button));
+                assert_eq!(
+                    focused,
+                    vapors_elements::Focus::Done,
+                    "the button takes focus"
+                );
+            }
             Edit::ToggleClass => self.toggle_marked(middle.element),
         }
     }

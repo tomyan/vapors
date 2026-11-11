@@ -32,7 +32,11 @@ impl Phases for AppFrame<'_, '_> {
         // the selectionchange each text field owes, once per frame, as
         // Chromium fires one per task (E6a)
         Document::settle_selection(&self.app.document);
-        self.app.update_document(self.frame)
+        self.app.update_document(self.frame)?;
+        // the focus fixup: an element the update left without a box, or
+        // disabled, loses focus before the next event can reach it
+        Document::settle_focus(&self.app.document);
+        Ok(())
     }
 
     fn draw(&mut self, now: Instant) -> Result<(), String> {
