@@ -15,6 +15,7 @@ use vapors_css::tree::States;
 use vapors_dom::{Event, NodeId};
 
 use crate::document::Document;
+use crate::focus_style::Focus;
 
 /// Focusable without a `tabindex`.
 const INTERACTIVE: [&str; 5] = ["button", "input", "textarea", "select", "summary"];
@@ -57,31 +58,24 @@ impl Document {
     }
 
     /// Moves focus to `node` (`None`: to nothing), firing the focus
-    /// events; nothing happens when it already has focus.
-    pub fn focus(document: &Rc<RefCell<Document>>, node: Option<NodeId>) {
-        let had = document.borrow().active_element();
-        if had == node {
-            return;
-        }
-        // while the window is away focus moves silently; its return
-        // fires `focus` on what has it then (`focus_window.rs`)
-        if document.borrow().window_away() {
-            document.borrow_mut().take_focus(node);
-            return;
-        }
-        // a number or text field commits as focus leaves it, before its
-        // blur, as Chromium fires its change (3-E3c, E6a)
-        if let Some(had) = had {
-            crate::number_input::commit(document, had);
-            crate::text_input::commit(document, had);
-        }
-        document.borrow_mut().take_focus(node);
-        if let Some(had) = had {
-            fire(document, had, &["blur", "focusout"]);
-        }
+    /// events; nothing happens when it already has focus, or when it
+    /// cannot take focus now ([`Focus`] says which), as in Chromium.
+    pub fn focus(document: &Rc<RefCell<Document>>, node: Option<NodeId>) -> Focus {
+        document.borrow_mut().settle.pending = None;
         if let Some(node) = node {
-            fire(document, node, &["focus", "focusin"]);
+            let now = document.borrow().focusability(node);
+            if now == Focus::Pending {
+                document.borrow_mut().settle.pending = Some(node);
+            }
+            if now != Focus::Done {
+                return now;
+            }
         }
+        let had = document.borrow().active_element();
+        if had != node {
+            move_focus(document, had, node);
+        }
+        Focus::Done
     }
 
     /// `node` takes focus: the flags move, and a number field notes
@@ -146,17 +140,23 @@ impl Document {
     }
 
     pub(crate) fn focusable(&self, node: NodeId) -> bool {
+        let drawn = self
+            .painted
+            .as_ref()
+            .is_some_and(|painted| painted.is_visible(node));
+        drawn && self.focus_candidate(node)
+    }
+
+    /// Whether `node`'s tag and attributes let it take focus: a control,
+    /// `a` with `href` or an element with `tabindex`, and not disabled.
+    pub(crate) fn focus_candidate(&self, node: NodeId) -> bool {
         let Some(tag) = self.tag(node) else {
             return false;
         };
         let named =
             INTERACTIVE.contains(&tag) || (tag == "a" && self.attribute(node, "href").is_some());
         let indexed = matches!(self.attribute(node, "tabindex"), Some("0" | "-1"));
-        let drawn = self
-            .painted
-            .as_ref()
-            .is_some_and(|painted| painted.is_visible(node));
-        (named || indexed) && drawn && !self.is_disabled_control(node)
+        (named || indexed) && !self.is_disabled_control(node)
     }
 
     /// Whether `node` is a form control with a `disabled` attribute.
@@ -164,6 +164,34 @@ impl Document {
         self.tag(node).is_some_and(|tag| INTERACTIVE.contains(&tag))
             && self.attribute(node, "disabled").is_some()
     }
+}
+
+/// Focus moves from `had` to `node`, with the events.
+fn move_focus(document: &Rc<RefCell<Document>>, had: Option<NodeId>, node: Option<NodeId>) {
+    document.borrow_mut().take_focus(node);
+    // while the window is away focus moves silently; its return
+    // fires `focus` on what has it then (`focus_window.rs`)
+    if document.borrow().window_away() {
+        return;
+    }
+    if let Some(had) = had {
+        left(document, had);
+    }
+    // a `change` or `blur` handler that moved focus on keeps it,
+    // and `node` gets no `focus`, as in Chromium
+    if let Some(node) = node.filter(|node| document.borrow().active_element() == Some(*node)) {
+        fire(document, node, &["focus", "focusin"]);
+    }
+}
+
+/// Focus has left `had`: a composition ends, a number or text field
+/// commits, with `change`, then `blur` and `focusout` fire, as Chromium
+/// orders them with focus already moved on (3-E3c, E6a).
+fn left(document: &Rc<RefCell<Document>>, had: NodeId) {
+    document.borrow_mut().end_composition(had);
+    crate::number_input::commit(document, had);
+    crate::text_input::commit(document, had);
+    fire(document, had, &["blur", "focusout"]);
 }
 
 /// `names` on `node` in order: the first only there (it does not bubble),

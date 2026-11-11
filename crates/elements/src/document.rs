@@ -20,20 +20,20 @@ pub struct Document {
     pub(crate) sheets: Sheets,
     pub(crate) fonts: FontSystem,
     pub(crate) painted: Option<Painted>,
-    /// Whether anything shown may have changed: a tree, attribute,
-    /// text, scroll or pointer-state change.
+    /// Whether anything shown may have changed (`update::Changes`).
     pub(crate) changes: crate::update::Changes,
     pub(crate) pointer: crate::events::Pointer,
-    /// The focused element (3-E2a); `None` when the body has focus.
+    /// The focused element (3-E2a), `None` when the body has focus; and
+    /// what the next `settle_focus` does (`focus_fixup`).
     pub(crate) focused: Option<NodeId>,
+    pub(crate) settle: crate::focus_fixup::Settle,
     /// Whether the window has focus (`focus_window.rs`).
     pub(crate) window: crate::focus_window::Window,
     /// Where Space went down, for its click on keyup.
     pub(crate) space_on: Option<NodeId>,
     /// The modifier shortcuts take (`shortcuts`).
     pub(crate) shortcut_modifier: crate::ShortcutModifier,
-    /// Each number field's last committed number and value string,
-    /// from its focus on (`number_committed`).
+    /// Each number field's last committed number and value (`number_committed`).
     pub(crate) committed: std::collections::HashMap<NodeId, crate::number_committed::Committed>,
     /// Each text field's editor (E6a).
     pub(crate) editors: crate::text_field::Editors,
@@ -82,6 +82,7 @@ impl Document {
             changes: crate::update::Changes::default(),
             pointer: crate::events::Pointer::default(),
             focused: None,
+            settle: crate::focus_fixup::Settle::default(),
             window: crate::focus_window::Window::Focused,
             space_on: None,
             shortcut_modifier: crate::ShortcutModifier::default(),

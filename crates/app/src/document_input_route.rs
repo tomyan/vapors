@@ -200,3 +200,7 @@ mod held_key_tests;
 #[cfg(test)]
 #[path = "document_input_window_tests.rs"]
 mod window_tests;
+
+#[cfg(test)]
+#[path = "document_input_settle_tests.rs"]
+mod settle_tests;

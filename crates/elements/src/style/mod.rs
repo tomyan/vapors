@@ -45,7 +45,7 @@ pub(crate) use styles::Styles;
 pub(crate) use text_style::Face;
 pub(crate) use text_style::TextStyle;
 pub(crate) use used::{Context, Used, used};
-pub(crate) use values::{Refusal, Styles as ElementStyles};
+pub(crate) use values::{Refusal, Styles as ElementStyles, keyword};
 
 const UA_SHEET: &str = include_str!("ua.css");
 

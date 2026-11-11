@@ -1,10 +1,9 @@
 //! A focused text field whose `html` then goes `display: none`: the
 //! update, the caret and selection the platform reads, typing, an IME
 //! composition, selection keys and Tab all run without panicking over
-//! the empty box tree. The field keeps focus and takes the typing:
-//! vapors has no focus fixup yet (Chromium blurs a focused element that
-//! loses its box at the next update), for html or any other element.
-
+//! the empty box tree. These run between the update and the settle
+//! after it, while the field still has focus; the settle then moves
+//! focus to nothing (`Document::settle_focus`, `tests/focus_fixup.rs`).
 mod support;
 
 use support::text_page::{Page, click, key, page, shift, type_text};
