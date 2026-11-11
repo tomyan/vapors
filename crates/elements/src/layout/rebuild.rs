@@ -7,9 +7,11 @@
 
 use vapors_dom::NodeId;
 
-use super::boxes::{Source, build};
+use rustc_hash::FxHashMap;
+
+use super::boxes::{Source, build, build_shallow};
 use super::keep::{KeptBoxes, Lender};
-use super::marks::Rebuild;
+use super::marks::{Owner, Rebuild};
 use super::rebuilt::Rebuilt;
 use super::slots::{Key, Placed, Taken};
 use crate::arena::Arena;
@@ -36,13 +38,15 @@ impl KeptBoxes {
         let rebuild = if every {
             Rebuild::Every
         } else {
-            marks.rebuild(source.arena, source.used, &self.placed.slots, root)
+            marks.rebuild(source.arena, source.used, &self.placed, root)
         };
         let Rebuild::Owners(owners) = rebuild else {
             return self.build_every(source, root, scale, may_keep);
         };
         let mut kept = std::mem::take(&mut self.placed);
         let built = rebuild_owners(&mut kept, &owners, source, may_keep);
+        #[cfg(debug_assertions)]
+        super::rebuild_check::check_against_fresh(&kept, source, root);
         (kept, built)
     }
 
@@ -74,22 +78,26 @@ impl KeptBoxes {
     }
 }
 
-/// Builds each owner's subtree again in `placed`; which slots.
+/// Builds each owner's boxes again in `placed`; which slots.
 fn rebuild_owners(
     placed: &mut Placed,
-    owners: &[NodeId],
+    owners: &[Owner],
     source: &Source<'_>,
     may_keep: &dyn Fn(NodeId) -> bool,
 ) -> Rebuilt {
-    let slots: Vec<usize> = owners.iter().map(|&owner| slot_of(placed, owner)).collect();
-    let mut taken = take_subtrees(placed, &slots);
+    let slots: Vec<usize> = owners
+        .iter()
+        .map(|owner| slot_of(placed, owner.node))
+        .collect();
+    let mut taken = take_owners(placed, owners, &slots);
     let put = owners
         .iter()
-        .flat_map(|&owner| put_owner(placed, source, owner, &mut taken))
+        .flat_map(|owner| put_owner(placed, source, owner, &mut taken))
         .collect();
     placed.free_taken(&taken);
     let rebuilt = Rebuilt::subtrees(&placed.boxes, put, &taken);
-    lend_owners(placed, (owners, &slots), &taken, (source.arena, may_keep));
+    let nodes: Vec<NodeId> = owners.iter().map(|owner| owner.node).collect();
+    lend_owners(placed, (&nodes, &slots), &taken, (source.arena, may_keep));
     rebuilt
 }
 
@@ -109,23 +117,33 @@ fn lend_owners(
     }
 }
 
-/// Takes the subtrees at `slots` out of `placed`.
-fn take_subtrees(placed: &mut Placed, slots: &[usize]) -> Taken {
+/// Takes each owner's boxes, at `slots`, out of `placed`: a shallow
+/// owner's own box and the subtrees of the children it does not keep.
+fn take_owners(placed: &mut Placed, owners: &[Owner], slots: &[usize]) -> Taken {
     let mut taken = Taken::default();
-    for &slot in slots {
-        placed.take_subtree(slot, &mut taken);
+    for (owner, &slot) in owners.iter().zip(slots) {
+        match &owner.kept {
+            Some(kept) => placed.take_shallow(slot, kept, &mut taken),
+            None => placed.take_subtree(slot, &mut taken),
+        }
     }
     taken
 }
 
-/// Builds `owner`'s subtree into `placed`; the slots its boxes took.
+/// Builds `owner`'s boxes into `placed`; the slots the built boxes took.
 fn put_owner(
     placed: &mut Placed,
     source: &Source<'_>,
-    owner: NodeId,
+    owner: &Owner,
     taken: &mut Taken,
 ) -> Vec<usize> {
-    placed.put_subtree(build(source, owner), taken)
+    match &owner.kept {
+        Some(kept) => {
+            let (built, placeholders) = build_shallow(source, owner.node, kept);
+            placed.put_subtree(built, &placeholders, taken)
+        }
+        None => placed.put_subtree(build(source, owner.node), &FxHashMap::default(), taken),
+    }
 }
 
 fn slot_of(placed: &Placed, owner: NodeId) -> usize {

@@ -5,6 +5,7 @@
 
 use rustc_hash::FxHashMap;
 
+use super::super::owners::KeptChildren;
 use super::{Key, LayoutBox, Placed, keys, misplaced};
 
 /// The boxes taken out of the rebuilt subtrees, with their keys, by
@@ -28,38 +29,70 @@ impl Placed {
     pub(crate) fn take_subtree(&mut self, slot: usize, taken: &mut Taken) {
         let mut stack = vec![slot];
         while let Some(at) = stack.pop() {
-            let old = std::mem::replace(&mut self.boxes[at], LayoutBox::vacant());
-            let key = self.slots.keys[at]
-                .take()
-                .unwrap_or_else(|| panic!("slot {at} is in two rebuilt subtrees, or vacant"));
-            self.slots.of.remove(&key);
-            stack.extend(&old.children);
-            taken.slots.insert(key, at);
-            taken.boxes.insert(at, (key, old));
+            stack.extend(self.take_box(at, taken));
         }
+    }
+
+    /// Takes out the box at `slot` and the subtrees of its children
+    /// other than `kept`'s, which keep their slots and boxes.
+    pub(crate) fn take_shallow(&mut self, slot: usize, kept: &KeptChildren, taken: &mut Taken) {
+        for child in self.take_box(slot, taken) {
+            let held = |key| matches!(key, Key::Element(node) if kept.get(&node) == Some(&child));
+            if !self.slots.key(child).is_some_and(held) {
+                self.take_subtree(child, taken);
+            }
+        }
+    }
+
+    /// Takes out the box at `slot` into `taken`; its children.
+    fn take_box(&mut self, at: usize, taken: &mut Taken) -> Vec<usize> {
+        let old = std::mem::replace(&mut self.boxes[at], LayoutBox::vacant());
+        let key = self.slots.keys[at]
+            .take()
+            .unwrap_or_else(|| panic!("slot {at} is in two rebuilt subtrees, or vacant"));
+        self.slots.of.remove(&key);
+        let children = old.children.clone();
+        taken.slots.insert(key, at);
+        taken.boxes.insert(at, (key, old));
+        children
     }
 
     /// Puts `built`, boxes in pre-order with the subtree's root first,
     /// into slots: a key `taken` holds takes its slot, a new key the
-    /// lowest vacant slot or a new one. Returns each box's slot, in
-    /// `built`'s order.
+    /// lowest vacant slot or a new one. A box at an index `kept` names
+    /// is a placeholder for the kept box in the slot it gives, which
+    /// stays as it is. Returns the slot of each box built, in `built`'s
+    /// order.
     ///
     /// # Panics
     /// A key that holds a slot outside the taken subtrees: a box that
     /// moved without a mark on its old parent.
-    pub(crate) fn put_subtree(&mut self, built: Vec<LayoutBox>, taken: &mut Taken) -> Vec<usize> {
+    pub(crate) fn put_subtree(
+        &mut self,
+        built: Vec<LayoutBox>,
+        kept: &FxHashMap<usize, usize>,
+        taken: &mut Taken,
+    ) -> Vec<usize> {
         let keys = keys(&built);
-        let to: Vec<usize> = keys.iter().map(|key| self.slot_for(*key, taken)).collect();
-        for (&key, &slot) in keys.iter().zip(&to) {
-            self.hold(key, slot);
-        }
-        for (mut layout_box, &slot) in built.into_iter().zip(&to) {
+        let to: Vec<usize> = (keys.iter().enumerate())
+            .map(|(index, &key)| match kept.get(&index) {
+                Some(&slot) => slot,
+                None => self.slot_for(key, taken),
+            })
+            .collect();
+        let mut put = Vec::with_capacity(built.len() - kept.len());
+        for (index, (mut layout_box, &slot)) in built.into_iter().zip(&to).enumerate() {
+            if kept.contains_key(&index) {
+                continue;
+            }
+            self.hold(keys[index], slot);
             for child in &mut layout_box.children {
                 *child = to[*child];
             }
             self.boxes[slot] = layout_box;
+            put.push(slot);
         }
-        to
+        put
     }
 
     /// Records that `key` holds `slot`.

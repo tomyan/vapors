@@ -48,7 +48,7 @@ fn clearing_ancestors_clears_their_caches_and_hoisted_lists_and_not_the_box() {
 fn rebuilt_at_node_2(placed: &mut Placed, built: &[(u64, &[usize])]) -> Taken {
     let mut taken = Taken::default();
     placed.take_subtree(1, &mut taken);
-    placed.put_subtree(tree(built), &mut taken);
+    placed.put_subtree(tree(built), &rustc_hash::FxHashMap::default(), &mut taken);
     placed.free_taken(&taken);
     taken
 }

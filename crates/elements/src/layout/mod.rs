@@ -9,7 +9,10 @@ mod keep;
 mod layout_box;
 mod marks;
 mod measure;
+mod owners;
 mod rebuild;
+#[cfg(debug_assertions)]
+mod rebuild_check;
 mod rebuilt;
 mod replaced;
 mod slots;

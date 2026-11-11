@@ -460,9 +460,10 @@ naming the first differing slot.
 
 - Rebuilding an owner rebuilds its whole subtree: a restyle of a large
   container (`:hover` on a list, a class on `body`) still builds every
-  box under it, as today. Rebuilding only the owner's own box and
-  runs, reusing unmarked child subtrees, is a later step if a workload
-  shows it.
+  box under it, as today. An insert, remove or move under a container
+  builds only the container's own box and runs and the children it did
+  not have (`docs/plans/splice.md` (b)); doing the same for a box mark
+  is a later step if a workload shows it.
 - Moving an element to another parent builds its boxes again in a new
   slot; no reuse across owners.
 - Inserting or removing boxes keeps other slots in place, so no index
