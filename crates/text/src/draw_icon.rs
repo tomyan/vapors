@@ -50,7 +50,7 @@ impl TextPipeline {
         icons: &[IconDraw<'_>],
     ) -> Result<(), AtlasError> {
         let floats = icon_quads(atlas, icons, target.viewport)?;
-        self.submit(target, atlas, &floats, ICON_BLEND);
+        self.record(target, atlas, &floats, ICON_BLEND);
         Ok(())
     }
 }

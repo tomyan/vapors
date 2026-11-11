@@ -6,8 +6,10 @@ mod calcs;
 mod field_box;
 mod inline;
 mod keep;
+mod layout_box;
 mod measure;
 mod replaced;
+mod slots;
 pub(crate) use boxes::Source;
 mod text_cache;
 mod tree;
@@ -19,6 +21,7 @@ pub(crate) use boxes::{Content, LayoutBox, build};
 pub(crate) use calcs::Calcs;
 pub(crate) use inline::{InlineRun, InlineSpan};
 pub(crate) use keep::KeptBoxes;
+pub(crate) use slots::Placed;
 pub(crate) use text_cache::TextCache;
 use tree::BoxTree;
 
@@ -35,42 +38,60 @@ pub struct BoxRect {
     pub height: f32,
 }
 
-/// Lays `boxes` out in a viewport of `size` CSS pixels, which is the
+/// Lays the `placed` boxes out in a viewport of `size` CSS pixels, which is the
 /// initial containing block: the root's percentages resolve against it,
 /// and an `auto` height is still its content's. A box unchanged since
 /// the update `kept` holds takes its cache and layout first. Returns
-/// the boxes and how many times Taffy laid a box out rather than
-/// reading its cache; `placed` gives their border boxes.
+/// them and what Taffy did (`LayoutWork`); `placed` gives their
+/// border boxes.
 ///
 /// # Errors
-/// A `calc()` that did not resolve (see `Calcs`).
+/// A `calc()` that did not resolve (see `Calcs`), with what Taffy did.
 pub(crate) fn lay_out(
-    mut boxes: Vec<LayoutBox>,
+    mut placed: Placed,
     texts: (&mut FontSystem, &mut TextCache),
     kept: (&KeptBoxes, &dyn Fn(vapors_dom::NodeId) -> bool),
     scale: f32,
     size: (f32, f32),
     calcs: &Calcs,
-) -> Result<(Vec<LayoutBox>, usize), String> {
+) -> Result<(Placed, LayoutWork), (String, LayoutWork)> {
     let (fonts, cache) = texts;
-    kept.0.lend(&mut boxes, scale, kept.1);
+    kept.0.lend(&mut placed, scale, kept.1);
     let mut tree = BoxTree {
-        boxes,
+        boxes: placed.boxes,
         fonts,
         cache,
         scale,
         calcs,
         laid_out: 0,
+        calls: 0,
     };
     let available = Size {
         width: AvailableSpace::Definite(size.0),
         height: AvailableSpace::Definite(size.1),
     };
     compute_root_layout(&mut tree, NodeId::from(0usize), available);
+    let work = LayoutWork {
+        laid_out: tree.laid_out,
+        calls: tree.calls,
+    };
     match calcs.failure() {
-        Some(failure) => Err(failure),
-        None => Ok((tree.boxes, tree.laid_out)),
+        Some(failure) => Err((failure, work)),
+        None => Ok((
+            Placed {
+                boxes: tree.boxes,
+                slots: placed.slots,
+            },
+            work,
+        )),
     }
+}
+
+/// What one layout did: how many times Taffy laid a box out rather than
+/// reading its cache, and how many times it asked a box for its layout.
+pub(crate) struct LayoutWork {
+    pub(crate) laid_out: usize,
+    pub(crate) calls: usize,
 }
 
 /// Each out-of-flow box's containing block, by box index.

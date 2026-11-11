@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use serde_json::Value;
 use vapors_text::comparison::{Chromium, FONT_FILES};
 
+use crate::oracle_files::write_whole;
 use crate::page::{FixtureViewport, Source, boxes_from_dom, framed, split};
 
 /// The fixtures directory of this crate.
@@ -154,8 +155,7 @@ fn check_scale(name: &str, page: &Value, scale: f64) -> Result<(), String> {
 /// When a file cannot be written.
 pub fn write_fonts(work: &Path) -> Result<(), String> {
     for (file, bytes) in FONT_FILES {
-        let path = work.join(file);
-        std::fs::write(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))?;
+        write_whole(&work.join(file), bytes)?;
     }
     Ok(())
 }
@@ -189,8 +189,7 @@ pub fn image_files() -> Result<Vec<(String, Vec<u8>)>, String> {
 /// When one cannot be read or written.
 pub fn write_images(work: &Path) -> Result<(), String> {
     for (name, bytes) in image_files()? {
-        let path = work.join(name);
-        std::fs::write(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))?;
+        write_whole(&work.join(name), &bytes)?;
     }
     Ok(())
 }

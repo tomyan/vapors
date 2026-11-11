@@ -3,13 +3,14 @@
 //! can be asserted on in tests without a device.
 
 mod batch;
+mod bounds;
 mod color;
 mod display;
 mod image;
 mod scissor;
 mod transform;
 
-pub use batch::{Batch, Run};
+pub use batch::{Batch, Batched, Run};
 pub use color::Color;
 pub use display::{IconId, ImageId, Item, Quad, Rect, Scene, Shadow, SurfaceId, TextId};
 pub use image::RgbaImage;

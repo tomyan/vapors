@@ -42,6 +42,18 @@ pub struct Gpu {
 /// caller is a test, and the message is the report.
 #[must_use]
 pub fn gpu() -> Gpu {
+    gpu_with(wgpu::Features::empty())
+}
+
+/// As [`gpu()`], with those of `wanted` the adapter has: the device's
+/// `features()` say which. For a reader of optional features, such as
+/// the timing harness's timestamp queries (`crates/perf`).
+///
+/// # Panics
+///
+/// As [`gpu()`].
+#[must_use]
+pub fn gpu_with(wanted: wgpu::Features) -> Gpu {
     if let Err(refusal) = allowed_in(std::env::var(TIER_ENV).ok().as_deref()) {
         panic!("{refusal}");
     }
@@ -50,8 +62,8 @@ pub fn gpu() -> Gpu {
         ..wgpu::InstanceDescriptor::new_without_display_handle()
     });
     let adapters = pollster::block_on(instance.enumerate_adapters(wgpu::Backends::PRIMARY));
-    let wanted = vapors_gpu::wanted_from_env();
-    let adapter = match vapors_gpu::select(adapters, wanted.as_deref()) {
+    let named = vapors_gpu::wanted_from_env();
+    let adapter = match vapors_gpu::select(adapters, named.as_deref()) {
         Ok(adapter) => adapter,
         Err(error) => panic!("{error}"),
     };
@@ -61,6 +73,7 @@ pub fn gpu() -> Gpu {
     };
     let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
         label: Some("vapors gpu test"),
+        required_features: wanted & adapter.features(),
         required_limits,
         ..Default::default()
     }))
@@ -69,6 +82,34 @@ pub fn gpu() -> Gpu {
         adapter,
         device,
         queue,
+    }
+}
+
+impl Gpu {
+    /// The same adapter opened again with `max_buffer_size` lowered to
+    /// `limit`, for a test of what refuses a buffer over it.
+    ///
+    /// # Panics
+    ///
+    /// If the adapter will not open the device.
+    #[must_use]
+    pub fn with_max_buffer_size(&self, limit: u64) -> Gpu {
+        let required_limits = wgpu::Limits {
+            max_buffer_size: limit,
+            ..self.device.limits()
+        };
+        let descriptor = wgpu::DeviceDescriptor {
+            label: Some("vapors gpu test, small buffers"),
+            required_limits,
+            ..Default::default()
+        };
+        let (device, queue) = pollster::block_on(self.adapter.request_device(&descriptor))
+            .unwrap_or_else(|error| panic!("the adapter refused max_buffer_size {limit}: {error}"));
+        Gpu {
+            adapter: self.adapter.clone(),
+            device,
+            queue,
+        }
     }
 }
 

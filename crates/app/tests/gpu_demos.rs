@@ -7,7 +7,7 @@ use vapors_app::ScenePainter;
 use vapors_elements::Viewport;
 use vapors_gpu_harness::{gpu, read_rgba8};
 use vapors_pixels::{Image, Spec, failures, parse};
-use vapors_renderer::{Target, clear};
+use vapors_renderer::{FrameEncoder, Target, clear};
 use vapors_scene::{Color, Size};
 
 /// The demo at `spec`'s viewport after its inputs, painted offscreen.
@@ -35,9 +35,11 @@ fn render(name: &str, spec: &Spec) -> Vec<u8> {
     let texture = clear(&gpu.device, &gpu.queue, width, height, Color::default());
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
     let size = Size { width, height };
+    let encoder = FrameEncoder::new(&gpu.device);
     let target = Target {
         device: &gpu.device,
         queue: &gpu.queue,
+        encoder: &encoder,
         view: &view,
         viewport: size,
         scissor: None,
@@ -46,6 +48,7 @@ fn render(name: &str, spec: &Spec) -> Vec<u8> {
         .expect("Rgba8Unorm is drawn")
         .draw(&target, painted)
         .expect("paints");
+    encoder.submit(&gpu.queue).expect("no draw refused");
     read_rgba8(&gpu.device, &gpu.queue, &texture)
 }
 

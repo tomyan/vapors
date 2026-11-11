@@ -1,0 +1,20 @@
+[package]
+name = "vapors-scene3d-gpu"
+description = "The 3D scene's renderer on a gpu-surface (docs/plans/3d-2.md)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+vapors-app.workspace = true
+vapors-scene3d.workspace = true
+wgpu.workspace = true
+
+[dev-dependencies]
+vapors-gpu-harness.workspace = true
+
+[lints]
+workspace = true

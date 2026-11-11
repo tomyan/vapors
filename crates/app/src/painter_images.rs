@@ -4,7 +4,9 @@
 use std::rc::Rc;
 
 use vapors_elements::Painted;
-use vapors_renderer::{ImagePipeline, Target, upload_rgba8_mipmapped};
+use vapors_renderer::{
+    GpuWork, ImagePipeline, Target, WorkCounter, upload_rgba8_mipmapped_counted,
+};
 use vapors_scene::{Item, RgbaImage};
 
 /// The images uploaded so far, by the image they hold (compared by
@@ -12,6 +14,8 @@ use vapors_scene::{Item, RgbaImage};
 #[derive(Default)]
 pub(super) struct Textures {
     uploaded: Vec<(Rc<RgbaImage>, wgpu::Texture, bool)>,
+    /// The uploads' bytes.
+    work: WorkCounter,
 }
 
 impl Textures {
@@ -22,6 +26,11 @@ impl Textures {
         }
     }
 
+    /// The bytes uploaded since the last take; the count restarts.
+    pub(super) fn take_work(&self) -> GpuWork {
+        self.work.take()
+    }
+
     /// Drops the textures the last frame did not draw.
     pub(super) fn end_frame(&mut self) {
         self.uploaded.retain(|(_, _, used)| *used);
@@ -30,7 +39,7 @@ impl Textures {
     /// Draws each image item of `items` with `pipeline`.
     pub(super) fn draw(
         &mut self,
-        pipeline: &ImagePipeline,
+        pipeline: &mut ImagePipeline,
         target: &Target<'_>,
         painted: &Painted,
         items: &[Item],
@@ -50,7 +59,7 @@ impl Textures {
             .position(|(held, _, _)| Rc::ptr_eq(held, image));
         let at = found.unwrap_or_else(|| {
             self.uploaded
-                .push((Rc::clone(image), upload(target, image), false));
+                .push((Rc::clone(image), upload(target, image, &self.work), false));
             self.uploaded.len() - 1
         });
         self.uploaded[at].2 = true;
@@ -58,13 +67,7 @@ impl Textures {
     }
 }
 
-fn upload(target: &Target<'_>, image: &RgbaImage) -> wgpu::Texture {
-    let size = image.size;
-    upload_rgba8_mipmapped(
-        target.device,
-        target.queue,
-        size.width,
-        size.height,
-        &image.rgba,
-    )
+fn upload(target: &Target<'_>, image: &RgbaImage, work: &WorkCounter) -> wgpu::Texture {
+    let size = [image.size.width, image.size.height];
+    upload_rgba8_mipmapped_counted(target.device, target.queue, size, &image.rgba, work)
 }

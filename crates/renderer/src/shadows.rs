@@ -4,12 +4,10 @@
 
 use vapors_scene::Shadow;
 
-use crate::instanced::{Instanced, Target, float_bytes};
+use crate::GpuWork;
+use crate::Target;
+use crate::instanced::{Instanced, float_bytes};
 use crate::quads::rgba;
-
-/// Three standard deviations: past this the Gaussian is under 0.3% of
-/// its peak, so the quad drawn for a shadow stops there.
-const REACH: f32 = 3.0;
 
 /// A pipeline that draws shadows. Create once per target format.
 pub struct ShadowPipeline(Instanced);
@@ -27,26 +25,26 @@ impl ShadowPipeline {
         ))
     }
 
-    /// Draw `shadows` into `target`, in one submit.
+    /// Draw `shadows` into `target`, in one draw call.
     pub fn draw(&mut self, target: &Target<'_>, shadows: &[Shadow]) {
         let bytes = float_bytes(shadows.iter().flat_map(instance));
         self.0.draw(target, &bytes);
     }
+
+    /// The work its draws issued since the last take; the count restarts.
+    pub fn take_work(&self) -> GpuWork {
+        self.0.work.take()
+    }
 }
 
 /// The shadow's seven four-float attributes, as `shadows.wgsl` reads them:
-/// the quad to draw, the shape, its radii, the caster, its radii, and
-/// the colour, and the standard deviation.
+/// the quad to draw ([`Shadow::drawn`], which culling also reads), the
+/// shape, its radii, the caster, its radii, and the colour, and the
+/// standard deviation.
 fn instance(shadow: &Shadow) -> Vec<f32> {
     let sigma = shadow.blur / 2.0;
-    let reach = sigma * REACH;
-    let (r, c) = (shadow.rect, shadow.caster);
-    let mut floats = vec![
-        r.left - reach,
-        r.top - reach,
-        r.right + reach,
-        r.bottom + reach,
-    ];
+    let (r, c, quad) = (shadow.rect, shadow.caster, shadow.drawn());
+    let mut floats = vec![quad.left, quad.top, quad.right, quad.bottom];
     floats.extend([r.left, r.top, r.right, r.bottom]);
     floats.extend(shadow.radii);
     floats.extend([c.left, c.top, c.right, c.bottom]);

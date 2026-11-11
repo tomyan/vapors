@@ -12,7 +12,13 @@ fn text(id: u32) -> Item {
     Item::Text {
         text: TextId(id),
         origin: [0.0, 0.0],
+        ink: Rect::new(0.0, 0.0, 4.0, 4.0),
     }
+}
+
+/// The scene's batches on a target that shows every item.
+fn batches(scene: &Scene) -> Vec<Batch> {
+    scene.batches(Rect::new(0.0, 0.0, 100.0, 100.0)).batches
 }
 
 #[test]
@@ -21,7 +27,7 @@ fn an_empty_scene_has_no_batches() {
     let scene = Scene::new();
 
     // When
-    let batches = scene.batches();
+    let batches = batches(&scene);
 
     // Then
     assert_eq!(batches, []);
@@ -36,7 +42,7 @@ fn consecutive_items_of_one_kind_share_a_batch_in_painting_order() {
     }
 
     // When
-    let batches = scene.batches();
+    let batches = batches(&scene);
 
     // Then
     let shape: Vec<(char, usize)> = batches
@@ -61,7 +67,7 @@ fn a_batch_keeps_its_items_in_order() {
     scene.push(quad(7.0));
 
     // When
-    let batches = scene.batches();
+    let batches = batches(&scene);
 
     // Then
     let Run::Quads(quads) = &batches[0].run else {
@@ -84,7 +90,7 @@ fn a_change_of_clip_starts_a_batch_that_carries_the_clip() {
     scene.push(quad(3.0));
 
     // When
-    let batches = scene.batches();
+    let batches = batches(&scene);
 
     // Then
     let shape: Vec<(Option<Rect>, usize)> = batches
@@ -129,7 +135,7 @@ fn consecutive_images_share_a_batch_apart_from_other_kinds() {
     }
 
     // When
-    let batches = scene.batches();
+    let batches = batches(&scene);
 
     // Then
     let shape: Vec<(char, usize)> = batches
@@ -159,7 +165,7 @@ fn consecutive_surfaces_share_a_batch_apart_from_images() {
     }
 
     // When
-    let batches = scene.batches();
+    let batches = batches(&scene);
 
     // Then
     let shape: Vec<(char, usize)> = batches
@@ -190,7 +196,7 @@ fn consecutive_icons_share_a_batch_apart_from_images_and_texts() {
     }
 
     // When
-    let batches = scene.batches();
+    let batches = batches(&scene);
 
     // Then
     let shape: Vec<(char, usize)> = batches

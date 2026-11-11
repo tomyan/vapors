@@ -2,18 +2,30 @@
 //! page's hidden textarea): the app sets the field for the platform to
 //! mirror after each event and frame when it changed, and hands the
 //! text input's edits and pastes to the field. An edit made against a
-//! text the field no longer holds is refused, reported, and the field
-//! set again, so the mirror is corrected rather than the field
-//! overwritten.
+//! text the field no longer holds is refused and the field set again,
+//! so the mirror is corrected rather than the field overwritten.
 
 use vapors_elements::{Document, TextEdit};
-use vapors_platform::{Event, Platform, TextField, report_error};
+use vapors_platform::{Event, Platform, TextField};
 
-use super::ElementsApp;
+use super::{ElementsApp, GiveError};
+
+/// What the field did with an event from the platform's text input.
+pub(super) enum Text {
+    /// The field took the edit or paste.
+    Taken,
+    /// The event is not from the text input.
+    NotText,
+}
 
 impl ElementsApp {
     /// An edit or paste from the platform's text input, to the field.
-    pub(super) fn text_event(&mut self, event: &Event) {
+    ///
+    /// # Errors
+    ///
+    /// [`GiveError::EditRefused`] or [`GiveError::PasteWithoutField`]
+    /// when the document refused it.
+    pub(super) fn text_event(&mut self, event: &Event) -> Result<Text, GiveError> {
         match event {
             Event::TextEdited {
                 before,
@@ -27,17 +39,17 @@ impl ElementsApp {
                     selection: units(*selection),
                     composing: composing.map(units),
                 };
-                if let Err(why) = Document::text_edited(&self.document, &edit) {
-                    report_error(&why);
+                Document::text_edited(&self.document, &edit).map_err(|why| {
                     self.mirrored = None;
-                }
+                    GiveError::EditRefused(why)
+                })?;
+                Ok(Text::Taken)
             }
             Event::PastedText(text) if !Document::text_pasted(&self.document, text) => {
-                report_error(
-                    "a paste from the page's text input arrived with no text field focused, so it was not pasted",
-                );
+                Err(GiveError::PasteWithoutField)
             }
-            _ => {}
+            Event::PastedText(_) => Ok(Text::Taken),
+            _ => Ok(Text::NotText),
         }
     }
 

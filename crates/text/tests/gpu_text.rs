@@ -4,7 +4,7 @@
 //! keeps glyphs from the pixels outside it.
 
 use vapors_gpu_harness::{gpu, read_rgba8};
-use vapors_renderer::clear;
+use vapors_renderer::{FrameEncoder, clear};
 use vapors_scene::{Color, Scissor, Size};
 use vapors_text::{
     AtlasConfig, BlendParams, Family, FontSystem, GlyphAtlas, Layout, LayoutOptions, RenderTarget,
@@ -58,9 +58,11 @@ fn render_under(
         width: WIDTH,
         height: HEIGHT,
     };
+    let encoder = FrameEncoder::new(&gpu.device);
     let render_target = RenderTarget {
         device: &gpu.device,
         queue: &gpu.queue,
+        encoder: &encoder,
         view: &view,
         viewport,
         scissor,
@@ -68,6 +70,7 @@ fn render_under(
     pipeline
         .draw(&render_target, &mut atlas, &layout, origin, params)
         .expect("draws");
+    encoder.submit(&gpu.queue).expect("no draw refused");
     read_rgba8(&gpu.device, &gpu.queue, &target)
 }
 

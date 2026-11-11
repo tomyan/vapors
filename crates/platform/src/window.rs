@@ -6,9 +6,10 @@
 //! handler and returns at once; failures after that are reported on the
 //! page and in the console.
 
-use winit::event_loop::EventLoop;
+use winit::event_loop::{ControlFlow, EventLoop};
 
 use crate::PlatformError;
+use crate::clock::Instant;
 use crate::event::Event;
 use crate::handler::Handler;
 use crate::platform::Platform;
@@ -70,8 +71,34 @@ pub enum Next {
     /// while handling an event, or the window needs it (shown, resized,
     /// its scale changed). An idle app that returns this draws nothing.
     Wait,
+    /// As [`Next::Wait`], and also draw one frame at this time if no
+    /// frame has been drawn by then: for work with a deadline that may
+    /// pass without an event, such as a tooltip's show delay. That frame
+    /// is an ordinary one, and the app's own state decides what it draws.
+    /// Any frame before then replaces the time with what that frame
+    /// returns, so a later `Wait` or `Continue` cancels it. Natively this
+    /// is winit's `ControlFlow::WaitUntil`; on the web, winit's timer
+    /// (`scheduler.postTask` with a delay, else `setTimeout`), cleared
+    /// when the control flow changes.
+    ///
+    /// A time that has already passed asks for another frame at once, and
+    /// a frame that returns one again asks again: the loop redraws
+    /// continuously (natively a busy loop, on the web a 0 ms timer loop).
+    /// A frame must not return a time in the past unless it wants that.
+    WaitUntil(Instant),
     /// Close the window and return from [`run`].
     Exit,
+}
+
+impl Next {
+    /// How the loop waits after a frame that returned this: until the
+    /// app's time for [`Next::WaitUntil`], else for events alone.
+    pub(crate) fn control_flow(self) -> ControlFlow {
+        match self {
+            Self::WaitUntil(at) => ControlFlow::WaitUntil(at),
+            Self::Continue | Self::Wait | Self::Exit => ControlFlow::Wait,
+        }
+    }
 }
 
 /// The app's side of the window: it gets every input and draws every frame.
@@ -158,6 +185,7 @@ pub fn run(options: WindowOptions, app: impl App + 'static) -> Result<(), Platfo
         .map_err(|e| PlatformError::Windowing(e.to_string()))?;
     let platform = Platform::new(event_loop.create_proxy());
     crate::web::wire_open_button(platform.proxy());
+    crate::wheel_position_web::install();
     let handler = Handler::new(options, Box::new(app), platform);
     event_loop.spawn_app(handler);
     Ok(())

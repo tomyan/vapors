@@ -66,4 +66,12 @@ must_fail! {
     gpu_paint_rules_catch_a_spread_at_3_at_2x: "paint_boxes", ".spread { box-shadow: 0 0 0 3px #3a7bd5; }", 2;
     gpu_paint_rules_catch_one_border_side_at_7_at_1x: "paint_boxes", ".sides { border-left-width: 7px; width: 81px; }", 1;
     gpu_paint_rules_catch_one_border_side_at_7_at_2x: "paint_boxes", ".sides { border-left-width: 7px; width: 81px; }", 2;
+    gpu_paint_rules_catch_mute_joins_bevelled_at_1x: "icons_paint", ".mute path { stroke-linejoin: bevel; }", 1;
+    gpu_paint_rules_catch_mute_joins_bevelled_at_2x: "icons_paint", ".mute path { stroke-linejoin: bevel; }", 2;
+    gpu_paint_rules_catch_an_icon_moved_1px_at_1x: "icons_paint", ".expand svg { position: relative; left: 1px; }", 1;
+    gpu_paint_rules_catch_an_icon_moved_1px_at_2x: "icons_paint", ".expand svg { position: relative; left: 1px; }", 2;
+    gpu_paint_rules_catch_an_icon_scaled_to_18px_at_1x: "icons_paint", ".export svg { width: 18px; height: 18px; }", 1;
+    gpu_paint_rules_catch_an_icon_scaled_to_18px_at_2x: "icons_paint", ".export svg { width: 18px; height: 18px; }", 2;
+    gpu_paint_rules_catch_a_doubled_stroke_width_at_1x: "icons_paint", ".voice path { stroke-width: 3; }", 1;
+    gpu_paint_rules_catch_a_doubled_stroke_width_at_2x: "icons_paint", ".voice path { stroke-width: 3; }", 2;
 }

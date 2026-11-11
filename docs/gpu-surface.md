@@ -13,7 +13,7 @@ needs no camera, depth or scene.
 | 1a | `gpu-surface` element, `Item::Surface` in the display list, the refusals | #139 |
 | 1b | `SurfaceRenderer` and the painter's surface host: offscreen texture, resize, scale, clip, on-demand rendering, failures | #140 |
 | 1b2 | `ElementsApp` mounting, `SurfaceHandle`, `Next` from `wants_frame`; the gradient example | #141, #142 |
-| 1c | animation requests (PR 1, this branch); the racer's renderer mounted through the surface; two panels; surface-local input. Plan: `docs/plans/3d-1c.md` | in progress |
+| 1c | animation requests (PR 1, #147); the racer's renderer mounted through the surface (PR 2, #150); the racer's per-frame counts (PR 3, #161); two panels (PR 4, #163); surface-local input (PR 5, #164); resize, device scale and unmount on the racer (PR 6, this branch). Plan: `docs/plans/3d-1c.md` | done |
 | 2-5 | scene, cameras, components, instances, tasks | not started |
 
 Touche's image renderer drawing through a surface in a panel comes
@@ -71,6 +71,36 @@ unmounted (`InvalidateError::NotMounted`) and a loop that has ended:
 a frame failed, the app was dropped, or the wake was refused
 (`InvalidateError::LoopClosed`).
 
+### An app that wraps ElementsApp
+
+An app that draws under the document and owns state the document does
+not (the racer: its race, its keys) wraps an `ElementsApp` and is the
+platform `App` itself. Each frame it does its own work, then calls the
+inner `frame`. For each event it calls `ElementsApp::give(&event,
+&platform)` in place of `App::event`: the document gets the event by
+`DocumentInput::give`'s rules (`document_input_route.rs`), and the
+answer says who it was for. `Route::Document`: the document had it alone
+(a press on its elements, a key its focused control used, an edit or
+paste from the platform's text input that the focused field took).
+`Route::Both`: the document had it and the app acts on it too (a key the
+focused element left, Tab with nothing focused, which focuses the first
+control, a window focus change). `Route::Host`: the app's alone; the
+document did not get it (a press where no element takes the pointer,
+another key with nothing focused). `give` refuses with a `GiveError`: a
+pointer event the document cannot place (`GiveError::Unplaced`,
+`NotUpdated` before the first frame), which the document does not get;
+an edit from the text input the document refused (`EditRefused`); a paste
+from it with no text field focused (`PasteWithoutField`). The racer
+stops on the last two. `App::event` gives the document every event, as
+before, and reports refused text input and goes on: an `ElementsApp`
+alone has the window to itself. One `ElementsApp` takes events one way;
+a debug build refuses `give` and `App::event` on the same instance.
+
+When the inner `frame` returns `Next::Exit`, the `ElementsApp` failed
+and closed its surfaces: the wrapping app returns `Exit` at once, and
+whoever ran it reads the `Failure` cloned before `run` (the racer's
+`run` returns it as `Err`).
+
 ### Animation
 
 The app, not the renderer, decides when a surface animates (touche
@@ -120,6 +150,61 @@ which must draw at least 10 frames in a second and render in each but
 the wake's; stops it, after which an idle second must draw nothing;
 after the loop ends an invalidate must be refused as `LoopClosed`.
 
+### Two panels
+
+`crates/app/examples/surface_panels` puts two surfaces in two panels
+side by side, each with its own gradient renderer and handle: the left
+animates throughout, the right is started and stopped every 2 s
+(`cargo run -p vapors-app --example surface_panels`). It is not run in
+CI and has no `--check`: its 2 s start/stop timing is checked by the
+unit tests in `examples/surface_panels/flip.rs`, and
+`tests/gpu_app_two_panels.rs` and `gpu_app_two_panels_resize.rs` hold
+the GPU checks: while both
+animate each renders once per frame; with one stopped it renders
+nothing and the other renders every frame; a renderer filling a backing
+larger than its `overflow: hidden` panel leaves the pixels just outside
+the panel at the page background, and UI painted after both panels
+stays over them; a panel resized by layout resizes its surface once and
+renders at the new size; `FrameCounts::surfaces` counts one
+composition draw per surface, a stopped one included.
+
+### Resize, scale and unmount on the racer
+
+The racer's `Track` renderer allocates its depth texture in `resize`, at
+the backing's device size. Tests: `crates/racer/src/gpu_track_resize_tests.rs`
+and `gpu_track_unmount_tests.rs`.
+
+- A window resized while racing calls `resize` once, on the first frame
+  at the new size; that frame and every later one render at the new
+  size, and the depth texture is the new size. The HUD lays out for the
+  new size on the same frame (below 760 CSS pixels wide, its compact
+  layout).
+- A device scale change from 1x to 2x and back calls `resize` once per
+  change. At 2x the backing is twice the device size and `logical()`
+  is the same CSS size; `FrameCounts::surfaces` counts one composition
+  draw at each scale. With the race's clock held, a CSS point on the
+  track has the same colour at 1x as at 2x.
+- Unmounting while animating (on a test page holding only the track's
+  `gpu-surface`, as the racer's HUD always has one): the surface
+  element is removed and `ElementsApp::unmount` hands the renderer
+  back; dropping it drops the `Track` and the GPU resources it owns
+  (pipelines, buffers, depth texture). Its handle then refuses
+  `request_animation`, `invalidate` and `stop_animation` with
+  `InvalidateError::NotMounted`, naming the surface. The frame that
+  shows the removal asks for one more, as any document change does;
+  the frame after it returns `Next::Wait`. A new `Track` mounted on a
+  new surface with the same name renders, and does not inherit the old
+  one's animation request.
+- The order of removing the element and unmounting does not matter for
+  release: unmounting first and then removing the element drops the
+  renderer and the page then waits. Unmounting and leaving the element
+  in the document fails the next frame, naming `ScenePainter::mount` as
+  the fix, and draws nothing stale. `gpu_track_unmount_order_tests.rs`.
+- Resources are released by Rust ownership: dropping the renderer
+  `unmount` returned drops the `Track` and what it owns, which
+  `TrackLog::dropped` shows in each order. There is no separate release
+  call.
+
 ## Supported composition (first release)
 
 | Case | Behaviour |
@@ -136,11 +221,63 @@ after the loop ends an invalidate must be refused as `LoopClosed`.
 
 ## Input
 
-Pointer events reach a surface through ordinary hit testing and
-dispatch: UI over it is hit first, capture works as for any element.
-On an event whose target is the surface, `Event::offset` is from the
-content box's top-left in CSS pixels; multiply by the scale factor for
-backing pixels.
+A surface is an element: pointer events reach it by the document's hit
+testing, dispatch and capture (`events_capture.rs`), not through the
+renderer. The app listens on the `gpu-surface` element, or on an
+ancestor, as on any element; an app that wraps `ElementsApp` gives each
+event with `ElementsApp::give`, and a press on a surface is
+`Route::Document`. Tests: `crates/app/tests/elements_app_surface_input.rs`
+`elements_app_surface_input_state.rs` and `elements_app_surface_capture.rs`, on two panels each holding a
+surface, with a button positioned over the left one.
+
+- `Event::offset` is from the surface's content box top-left (its
+  padding box, as padding is refused) in CSS pixels: the platform's
+  physical position divided by the scale factor, less where the box is
+  painted, so a scroll container's offset is included. Multiply by
+  `SurfaceSize::scale` for backing pixels. vapors refuses `transform`,
+  so no ancestor transform applies.
+- UI painted over a surface is hit first (tested with a positioned
+  button; a later non-positioned sibling covering it by a negative margin
+  is not tested): a press on it goes to it, and the surface gets no event
+  for that press.
+- Capture is the web's. A mouse press on a surface goes on to the
+  surface past its edge only when a `pointerdown` listener calls
+  `set_pointer_capture`; then every move and the release go to it,
+  with offsets negative or beyond its size, and the `click` goes to it
+  as well. A touch is captured by what it went down on without asking.
+  The capture ends at the release; later moves go to whatever is under
+  the pointer.
+- A press that starts on UI over a surface stays with the UI when the
+  UI captures it. When it does not, as on the web, the surface under
+  the pointer gets the moves and the release, though not the
+  `pointerdown`; the `click` goes to the nearest common ancestor of
+  the pressed and released elements (the body, for two panels), as in
+  Chromium (recorded: `crates/elements-corpus/fixtures/cross_drag.events.json`).
+- Hover: the surface gets `pointermove` (not pressed) while the
+  pointer is over it and not over UI above it, and `:hover` applies
+  (tested: `elements_app_surface_input_state.rs`; the surface is not
+  hovered while the pointer is over a HUD button above it). vapors sends
+  no `pointerover`, `pointerenter`, `pointerout` or `pointerleave`, so
+  nothing tells a surface that the pointer left it or the window; the
+  app sees moves reach another element. Chromium does send all four, so
+  this is a known gap, not the web's behaviour. The document refuses a
+  listener for any of them (`a_listener_for_enter_leave_over_or_out_is_refused_so_vapors_sends_none`),
+  so an app cannot wait for one.
+- `pointer-events: none` on a surface lets presses through to what is
+  under it (tested: the panel below takes the press). The racer's HUD
+  (`crates/racer/ui/hud.wisp`) puts `pointer-events: none` on `html` and
+  `body` and `auto` on buttons; its track is a `gpu-surface` child of
+  the body, so it inherits `none`.
+  `pointer_events_none_on_the_body_reaches_a_surface_but_not_a_button_with_auto`
+  tests that CSS shape on the test page, not the racer itself; the racer
+  has no test that a press on its track reaches nothing.
+- Keyboard: a `gpu-surface` is not focusable unless it has a
+  `tabindex`, when it takes focus from a press and from Tab, as any
+  element does (tested: a press and Tab).
+- Not the web's: a touch that drags past the slop ends with `pointerup`
+  on the captured surface and no `click`; Chromium cancels the touch at
+  the first pan (`pointercancel`). A tap, which the platform sends after
+  a short touch, ends in a `click`.
 
 ## Renderer contract
 
@@ -161,6 +298,14 @@ renderer)`; `unmount` hands it back and dropping it is teardown.
   `SurfaceHandle::request_animation` drives). Other frames composite the
   last render: an idle surface renders nothing. The renderer does not
   ask for frames.
+- `frame.work` (a `WorkCounter`) is where a renderer issues its buffer
+  and texture writes and its draws, so they are counted: the painter
+  adds them to `FrameCounts::surfaces` in the frames that render the
+  surface. Work issued on `frame.queue` or `frame.encoder` directly is
+  not counted. The scene renderer (`vapors-scene3d-gpu`) issues all
+  its work through `frame.work`. Known gap: the racer's `Track` writes
+  its uniform on `frame.queue` and draws on its own pass, so its work
+  is uncounted and `FrameCounts::surfaces` holds only its composition.
 - `ScenePainter::wants_frame()` is true while an active surface is
   invalidated or animating, and for a renderer mounted since the last
   frame; the app returns `Next::Continue` then.
@@ -170,8 +315,10 @@ renderer)`; `unmount` hands it back and dropping it is teardown.
   the content box's device size), under the run's scissor. No tone
   mapping or colour management is applied by the surface.
 - A surface not painted in a frame (hidden, zero-sized, `display:
-  none`, wholly clipped, or removed) is inactive: its backing is
-  released and it is not rendered. A refused frame also releases the
+  none`, wholly clipped, wholly outside the target, or removed) is
+  inactive: its backing is released, it is not rendered and its
+  animation does not ask for frames. It renders again, into a new
+  backing, in the first frame that paints it. A refused frame also releases the
   backings it did not reach. The renderer is not told: it keeps its own
   resources until it is unmounted. A `deactivate` hook, called when the
   backing is released, would let it free them; there is none yet.
@@ -185,11 +332,31 @@ an error scope around each call, `render`'s around its submit too; the
 frame is never shown with stale or blank content). After a caught GPU
 error every frame of that surface is refused until it is remounted.
 Native wgpu resolves the scope in the frame; on the web it resolves
-later, and a frame of the surface within 10 of its frames is refused
-instead; a scope unresolved after 10 frames refuses the surface as
-such. An active surface with an unresolved scope wants a frame. A scope
-still unresolved at `unmount` is dropped unreported: the renderer is
-gone and nothing it drew is shown again. A wholly clipped surface is refused for `Unmounted`,
+later, and the first frame of the surface after the result arrives is
+refused instead. An unresolved scope asks for no frame. On the web it
+is raced against a page timer at its deadline, in a task on the page's
+queue (`painter_surface_scope_watch.rs`, `vapors_platform::Timer`).
+An error, or the deadline passing first, wakes the loop, with the waker
+`ElementsApp` gives the painter (`ScenePainter::wake_with`, from
+`drawn` once the loop runs), for one frame that refuses the surface. A
+result with no error clears the timer and wakes nothing, so an idle app
+draws nothing. The deadline is 1000 ms (`DEADLINE` in
+`painter_surface_scope.rs`, set from `scripts/web-scope-latency.mjs`:
+the largest of 6,500 web results took 37.6 ms). On the web only time
+with the page visible counts: a timer period that began or ended with
+the page hidden (`document.hidden`, read through
+`vapors_platform::page_hidden`) is re-armed for the full 1000 ms, so a
+scope is refused after 1000 to 2000 ms of visible time
+(`painter_surface_scope_deadline.rs`). Each surface's scopes are also
+settled at the end of every frame, painted or not; natively one past
+its deadline refuses the surface with the same message, while on the
+web the timer alone judges lateness, so the first frame after a hidden
+tab returns does not refuse a scope whose deadline passed while hidden.
+Natively wgpu resolves every scope when it is popped, so nothing waits.
+When a surface is unmounted or remounted with a scope unresolved, its
+watch holds the result only weakly: when the scope's result or the
+timer next arrives, the watch ends, dropping the timer, recording
+nothing and waking nothing, so no frame follows. A wholly clipped surface is refused for `Unmounted`,
 `DuplicateName` and `TooLarge` as one in view is, though it is not
 rendered, so scrolling a surface into view cannot be the first time it
 fails. `ElementsApp` reports a failed frame and stops. `mount`,

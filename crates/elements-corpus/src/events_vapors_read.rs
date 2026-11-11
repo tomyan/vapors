@@ -22,13 +22,15 @@ pub(super) fn projection(
     )))
 }
 
-/// One node as the oracle writes Chromium's: its value only when it
-/// has one.
+/// One node as the oracle writes Chromium's: its value and its
+/// description only when it has them.
 fn ax_entry(node: vapors_elements::AxNode) -> serde_json::Value {
     let mut entry =
         serde_json::json!({ "role": node.role, "name": node.name, "properties": node.properties });
-    if let Some(value) = node.value {
-        entry["value"] = serde_json::json!(value);
+    for (key, text) in [("value", node.value), ("description", node.description)] {
+        if let Some(text) = text {
+            entry[key] = serde_json::json!(text);
+        }
     }
     entry
 }

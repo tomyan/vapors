@@ -14,90 +14,65 @@
 //! handles point into. An absolute or fixed box is never lent: its
 //! containing block lies outside its subtree.
 
-use std::collections::HashMap;
-
 use taffy::Position;
 use vapors_dom::NodeId;
 
 use super::boxes::{Content, LayoutBox};
+use super::slots::{Key, Placed, Slots};
 
-/// Which box a box is across updates: an element's, or the text box
-/// at a position among its parent's text boxes.
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
-enum Key {
-    Element(NodeId),
-    Text(NodeId, usize),
-}
-
-/// The boxes laid out by the last update, at its scale.
+/// The boxes laid out by the last update, in their slots, at its scale.
 #[derive(Default)]
 pub(crate) struct KeptBoxes {
     scale: f32,
-    boxes: Vec<LayoutBox>,
+    placed: Placed,
 }
 
 impl KeptBoxes {
-    /// Keeps `boxes`, laid out at `scale`, for the next update.
-    pub(crate) fn keep(&mut self, boxes: Vec<LayoutBox>, scale: f32) {
-        *self = Self { scale, boxes };
+    /// Keeps `placed`, laid out at `scale`, for the next update.
+    pub(crate) fn keep(&mut self, placed: Placed, scale: f32) {
+        *self = Self { scale, placed };
+    }
+
+    /// `built`, boxes in pre-order, placed into the kept boxes' slots
+    /// (`Slots::place`).
+    pub(crate) fn place(&self, built: Vec<LayoutBox>) -> Placed {
+        self.placed.slots.place(built)
     }
 
     /// The kept box of `node`, an element.
     pub(crate) fn element(&self, node: NodeId) -> Option<&LayoutBox> {
-        self.boxes
-            .iter()
-            .find(|b| matches!(b.content, Content::Element(n) if n == node))
+        let slot = self.placed.slots.of(Key::Element(node))?;
+        Some(&self.placed.boxes[slot])
     }
 
-    /// Gives each unchanged box in `boxes` its kept cache and layout,
+    /// Gives each unchanged box in `placed` its kept cache and layout,
     /// except an element's for which `may_keep` says no; returns how
     /// many.
     pub(crate) fn lend(
         &self,
-        boxes: &mut [LayoutBox],
+        placed: &mut Placed,
         scale: f32,
         may_keep: &dyn Fn(NodeId) -> bool,
     ) -> usize {
-        if self.boxes.is_empty() || self.scale.to_bits() != scale.to_bits() {
+        if self.placed.boxes.is_empty() || self.scale.to_bits() != scale.to_bits() {
             return 0;
         }
-        let old = keys(&self.boxes);
         let mut lender = Lender {
-            index: old.iter().enumerate().map(|(i, k)| (*k, i)).collect(),
-            old,
-            new: keys(boxes),
-            old_boxes: &self.boxes,
+            old: &self.placed.slots,
+            new: &placed.slots,
+            old_boxes: &self.placed.boxes,
             may_keep,
             lent: 0,
         };
-        lender.lend_from(boxes, 0);
+        lender.lend_from(&mut placed.boxes, 0);
         lender.lent
     }
 }
 
-/// Every box's key, by index.
-fn keys(boxes: &[LayoutBox]) -> Vec<Key> {
-    let mut keys = vec![Key::Text(NodeId(0), 0); boxes.len()];
-    for (index, layout_box) in boxes.iter().enumerate() {
-        if let Content::Element(node) = layout_box.content {
-            keys[index] = Key::Element(node);
-            let mut texts = 0;
-            for &child in &layout_box.children {
-                if matches!(boxes[child].content, Content::Text(_)) {
-                    keys[child] = Key::Text(node, texts);
-                    texts += 1;
-                }
-            }
-        }
-    }
-    keys
-}
-
 /// What lending compares against.
 struct Lender<'a> {
-    new: Vec<Key>,
-    old: Vec<Key>,
-    index: HashMap<Key, usize>,
+    old: &'a Slots,
+    new: &'a Slots,
     old_boxes: &'a [LayoutBox],
     may_keep: &'a dyn Fn(NodeId) -> bool,
     lent: usize,
@@ -105,22 +80,19 @@ struct Lender<'a> {
 
 impl Lender<'_> {
     /// Lends to `at` and below; whether `at`'s subtree was unchanged.
+    /// A key keeps its slot, so a box is unchanged only where the last
+    /// update's box in its slot had its key, and its children are
+    /// unchanged when they hold the same slots and are unchanged too.
     fn lend_from(&mut self, boxes: &mut [LayoutBox], at: usize) -> bool {
         let children = boxes[at].children.clone();
         let mut clean = true;
         for &child in &children {
             clean &= self.lend_from(boxes, child);
         }
-        let Some(&was) = self.index.get(&self.new[at]) else {
+        if self.old.key(at) != self.new.key(at) {
             return false;
-        };
-        let before = &self.old_boxes[was];
-        let same_children = before.children.len() == children.len()
-            && before
-                .children
-                .iter()
-                .zip(&children)
-                .all(|(o, n)| self.old[*o] == self.new[*n]);
+        }
+        let before = &self.old_boxes[at];
         // An absolute or fixed box is placed against a containing block
         // outside its subtree, which may have changed, so it is laid
         // out again, and with it every ancestor up to that block, which
@@ -134,9 +106,10 @@ impl Lender<'_> {
             && match boxes[at].content {
                 Content::Element(node) => (self.may_keep)(node),
                 Content::Text(_) => true,
+                Content::Vacant => unreachable!("slot {at} is vacant, and no box's child"),
             };
         if !(clean
-            && same_children
+            && before.children == children
             && keepable
             && before.style == boxes[at].style
             && before.content == boxes[at].content
@@ -170,15 +143,34 @@ mod tests {
     }
 
     #[test]
+    fn the_kept_box_of_a_node_is_its_element_box_and_a_removed_node_has_none() {
+        // Given: boxes after three updates, with text runs; nodes 10, 11
+        // and 13 were removed
+        let mut kept = KeptBoxes::default();
+
+        // When
+        kept.keep(crate::layout::slots::tests::churned(), 1.0);
+
+        // Then
+        for node in [1, 12, 14].map(NodeId) {
+            let content = kept.element(node).map(|b| &b.content);
+            assert!(content == Some(&Content::Element(node)), "{node:?}");
+        }
+        for node in [10, 11, 13].map(NodeId) {
+            assert!(kept.element(node).is_none(), "{node:?}");
+        }
+    }
+
+    #[test]
     fn a_restyled_box_holding_a_calc_is_lent_nothing_even_when_the_address_matches() {
         // Given: the last update's box and this one's share a handle
         // address, as a freed and reused allocation would make them
         let mut kept = KeptBoxes::default();
-        kept.keep(with_calc(0x1000), 1.0);
-        let mut boxes = with_calc(0x1000);
+        kept.keep(Slots::default().place(with_calc(0x1000)), 1.0);
+        let mut placed = kept.place(with_calc(0x1000));
 
         // When: the element was restyled, its calc may have changed
-        let lent = kept.lend(&mut boxes, 1.0, &|_| false);
+        let lent = kept.lend(&mut placed, 1.0, &|_| false);
 
         // Then
         assert_eq!(lent, 0);
@@ -188,11 +180,11 @@ mod tests {
     fn an_unrestyled_box_holding_a_calc_is_lent_its_cache() {
         // Given
         let mut kept = KeptBoxes::default();
-        kept.keep(with_calc(0x1000), 1.0);
-        let mut boxes = with_calc(0x1000);
+        kept.keep(Slots::default().place(with_calc(0x1000)), 1.0);
+        let mut placed = kept.place(with_calc(0x1000));
 
         // When
-        let lent = kept.lend(&mut boxes, 1.0, &|_| true);
+        let lent = kept.lend(&mut placed, 1.0, &|_| true);
 
         // Then
         assert_eq!(lent, 1);

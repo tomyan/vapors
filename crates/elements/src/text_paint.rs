@@ -9,7 +9,7 @@
 
 use vapors_scene::{Color, Item, Quad};
 
-use crate::layout::{BoxRect, Content, LayoutBox};
+use crate::layout::{BoxRect, LayoutBox};
 use crate::paint::{PaintInput, snapped};
 use crate::painted::Painted;
 
@@ -31,7 +31,7 @@ pub(crate) fn paint(
     input: &PaintInput<'_>,
     out: &mut Painted,
 ) {
-    let Content::Element(node) = boxes[index].content else {
+    let Some(node) = boxes[index].element_in(index) else {
         return;
     };
     if !boxes[index].text_field {

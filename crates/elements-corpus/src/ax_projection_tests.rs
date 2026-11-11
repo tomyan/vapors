@@ -61,3 +61,20 @@ fn a_controls_states_and_value_are_kept() {
         ])
     );
 }
+
+#[test]
+fn a_description_is_kept() {
+    // Given: a button its content names, described by its title
+    let reduced = json!([
+        { "depth": 1, "role": "button", "name": "Open", "description": "Open (o)", "properties": ["focusable=true"] },
+    ]);
+
+    // When
+    let projected = project(&reduced, &["button".to_owned()]).expect("projects");
+
+    // Then
+    assert_eq!(
+        projected,
+        json!([{ "role": "button", "name": "Open", "description": "Open (o)", "properties": [] }])
+    );
+}

@@ -22,6 +22,7 @@ mod icon_path_lex;
 #[cfg(test)]
 mod italic_tests;
 mod layout;
+mod layout_ink;
 mod layout_ranges;
 mod layout_runs;
 mod layout_types;
@@ -46,6 +47,7 @@ pub use layout_ranges::Fragment;
 pub use line_metrics::content_area;
 pub use parley;
 pub use pipeline::{BlendParams, TextPipeline};
+pub use quads::TextDraw;
 pub use raster::{
     Coverage, GlyphRequest, Hinting, RasterError, Rasterizer, SUBPIXEL_STEPS, subpixel_of,
 };

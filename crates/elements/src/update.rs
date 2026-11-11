@@ -1,6 +1,8 @@
 //! An update: check the tree, compute styles, read them, lay out and
 //! paint. Every refusal found on the way is returned together, and a
-//! refused update paints nothing.
+//! refused update paints nothing. Each of the three phases runs in a
+//! `tracing` span named `update phase`, its `phase` field `style`,
+//! `layout` or `paint`, for a reader of the spans (`crates/perf`).
 
 use vapors_css::cascade::Environment;
 use vapors_dom::NodeId;
@@ -57,8 +59,12 @@ impl Document {
     /// the styles layout reads.
     pub fn update(&mut self, viewport: Viewport) -> Result<&Painted, Vec<ElementError>> {
         self.painted = None;
+        self.counts = crate::UpdateCounts::default();
         self.texts.begin();
+        let style = tracing::trace_span!("update phase", phase = "style").entered();
         let calcs = self.styled(viewport)?;
+        drop(style);
+        let layout = tracing::trace_span!("update phase", phase = "layout").entered();
         let (root, body) = (self.root(), self.body());
         let text_marks = self.focused_text_marks();
         let kept = self.kept.as_ref().expect("styled keeps the styles");
@@ -69,24 +75,32 @@ impl Document {
             images: &self.images,
             text_marks,
         };
-        let boxes = build(&source, root);
+        let built = build(&source, root);
+        self.counts.boxes_built = built.len();
         let size = (viewport.width, viewport.height);
         let texts = (&mut self.fonts, &mut self.texts);
-        let (boxes, laid_out) = lay_out(
-            boxes,
+        let (slotted, work) = lay_out(
+            self.boxes.place(built),
             texts,
             (&self.boxes, &|node| kept.may_keep_layout(node)),
             viewport.scale,
             size,
             &calcs,
         )
-        .map_err(|failure| vec![ElementError::Layout(failure)])?;
+        .map_err(|(failure, work)| {
+            (self.counts.boxes_laid_out, self.counts.layout_calls) = (work.laid_out, work.calls);
+            vec![ElementError::Layout(failure)]
+        })?;
+        let boxes = &slotted.boxes;
         let scrolls = |index: usize| match boxes[index].content {
             crate::layout::Content::Element(node) => used[&node].scrolls(),
             crate::layout::Content::Text(_) => false,
+            crate::layout::Content::Vacant => unreachable!("a vacant slot is no box's child"),
         };
-        let offsets = self.scroll.settle(&boxes, &scrolls, viewport.scale);
-        let rects = placed(&boxes, &offsets);
+        let offsets = self.scroll.settle(boxes, &scrolls, viewport.scale);
+        let rects = placed(boxes, &offsets);
+        drop(layout);
+        let paint_span = tracing::trace_span!("update phase", phase = "paint").entered();
         let mut input = PaintInput {
             used,
             root,
@@ -99,10 +113,12 @@ impl Document {
             scroll: &self.scroll,
             thumbs_shown: self.thumbs_shown,
         };
-        let mut painted = paint(&boxes, &rects, &mut input);
-        painted.scroll_chains = crate::scroll_chains::Chains::of(&boxes, &scrolls);
-        self.boxes.keep(boxes, viewport.scale);
-        self.laid_out = laid_out;
+        let mut painted = paint(boxes, &rects, &mut input);
+        painted.scroll_chains = crate::scroll_chains::Chains::of(boxes, &scrolls);
+        drop(paint_span);
+        self.boxes.keep(slotted, viewport.scale);
+        (self.counts.boxes_laid_out, self.counts.layout_calls) = (work.laid_out, work.calls);
+        self.counts.note_paint(&painted);
         // Cleared before the rehover: a hover it moves is a change this
         // update did not restyle, so the a11y tree refuses until the next.
         self.changes.since_update = false;
@@ -114,28 +130,6 @@ impl Document {
     /// and for what reads the last update (the a11y tree).
     pub(crate) fn note_change(&mut self) {
         self.changes = Changes::default();
-    }
-
-    /// How many elements the last update restyled: what the incremental
-    /// tests count, and what the `stress` demo shows.
-    #[must_use]
-    pub fn elements_restyled(&self) -> usize {
-        self.kept.as_ref().map_or(0, |kept| kept.restyled)
-    }
-
-    /// How many times the last update's layout laid a box out rather
-    /// than reading its cache: what the incremental tests count.
-    #[must_use]
-    pub fn boxes_laid_out(&self) -> usize {
-        self.laid_out
-    }
-
-    /// How many Parley layouts the last update built rather than kept
-    /// from the one before: what the incremental tests count, and what
-    /// the `stress` demo shows.
-    #[must_use]
-    pub fn text_layouts_built(&self) -> usize {
-        self.texts.built()
     }
 
     /// The last successful update's result, if the document has not
@@ -167,6 +161,7 @@ impl Document {
         let kept = self.kept.as_ref().expect("restyle keeps the styles");
         let mut calcs = Calcs::default();
         for &node in &live {
+            self.counts.elements_visited += 1;
             errors.extend(kept.refused.get(&node).into_iter().flatten().cloned());
             calcs.add(kept.styles.of(node), || describe(&self.arena, node));
             if kept.used.get(&node).is_some_and(|style| style.inline) {

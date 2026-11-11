@@ -1,28 +1,17 @@
 //! Drawing a [`Layout`]: each glyph is fetched from the atlas at its
 //! quarter-pixel x step with the baseline snapped to a whole pixel, and
-//! becomes one quad; the atlas page is uploaded when it changed.
+//! becomes one quad; the part of the atlas page that changed is uploaded.
 
-use vapors_scene::{Scissor, Size};
+use vapors_renderer::Placed;
 
 use crate::atlas::{AtlasError, GlyphAtlas};
 use crate::layout::Layout;
 use crate::pipeline::{BlendParams, FLOATS_PER_VERTEX, TextPipeline};
-use crate::quads::quads;
+use crate::quads::{TextDraw, quads};
 
-/// Where a draw goes: the device and queue to use, the texture view to
-/// draw into, and its size in pixels.
-pub struct RenderTarget<'a> {
-    /// Device the pipeline was made on.
-    pub device: &'a wgpu::Device,
-    /// Queue to submit to.
-    pub queue: &'a wgpu::Queue,
-    /// The view drawn into; pixels under no glyph keep what was there.
-    pub view: &'a wgpu::TextureView,
-    /// Size of the view in pixels.
-    pub viewport: Size,
-    /// Where drawing may change pixels; `None` for the whole view.
-    pub scissor: Option<Scissor>,
-}
+/// Where a draw goes: [`vapors_renderer::Target`], under the name the
+/// text pipeline has always used.
+pub type RenderTarget<'a> = vapors_renderer::Target<'a>;
 
 impl TextPipeline {
     /// Draw `layout` with its origin at `origin` (device pixels, y down)
@@ -45,17 +34,39 @@ impl TextPipeline {
         origin: [f32; 2],
         params: BlendParams,
     ) -> Result<(), AtlasError> {
-        let quads = quads(atlas, layout, origin, target.viewport)?;
-        self.submit(target, atlas, &quads, params);
+        self.draw_texts(target, atlas, &[TextDraw { layout, origin }], params)
+    }
+
+    /// Draw `texts` into `target` in one draw call, in order: where
+    /// their glyphs overlap, later ones blend over earlier ones as they
+    /// would drawn one at a time.
+    ///
+    /// # Errors
+    ///
+    /// [`AtlasError`] when a glyph cannot be rasterised or the texts'
+    /// glyphs overflow the atlas page; nothing is drawn then.
+    ///
+    /// # Panics
+    ///
+    /// As [`TextPipeline::draw`].
+    pub fn draw_texts(
+        &mut self,
+        target: &RenderTarget<'_>,
+        atlas: &mut GlyphAtlas,
+        texts: &[TextDraw<'_>],
+        params: BlendParams,
+    ) -> Result<(), AtlasError> {
+        let quads = quads(atlas, texts, target.viewport)?;
+        self.record(target, atlas, &quads, params);
         Ok(())
     }
 
-    /// Upload the atlas page if it changed, set `params`, and draw `quads`.
+    /// Upload what changed in the atlas page, set `params`, and draw `quads`.
     ///
     /// # Panics
     ///
     /// If `atlas`'s page is not the size this pipeline's texture was made for.
-    pub(crate) fn submit(
+    pub(crate) fn record(
         &mut self,
         target: &RenderTarget<'_>,
         atlas: &mut GlyphAtlas,
@@ -69,72 +80,73 @@ impl TextPipeline {
             "atlas page is {page} px but the text pipeline's texture is {} px",
             self.texture.width()
         );
-        self.upload_page(target.queue, atlas);
-        target
-            .queue
-            .write_buffer(&self.uniforms, 0, &params_bytes(params));
-        self.draw_quads(target, quads);
+        self.upload_page(target, atlas);
+        let params = params_bytes(params);
+        let Some(params) = self
+            .uniforms
+            .push(target.encoder, target.queue, &self.work, &params)
+        else {
+            return;
+        };
+        self.draw_quads(target, quads, &params);
     }
 
-    fn upload_page(&self, queue: &wgpu::Queue, atlas: &mut GlyphAtlas) {
+    /// Upload the part of the atlas page that changed since the last
+    /// upload: the bounding rectangle of the glyphs added, or the whole
+    /// page when it is new or was repacked. Its rows go packed tight;
+    /// `Queue::write_texture`, unlike a buffer-to-texture copy, takes
+    /// any `bytes_per_row` and pads rows itself when staging. A repack
+    /// moves glyphs that draws already recorded this frame read, so those
+    /// are submitted first: a frame that repacks submits once more.
+    fn upload_page(&self, target: &RenderTarget<'_>, atlas: &mut GlyphAtlas) {
         let page = atlas.coverage_page_mut();
-        if !page.dirty() {
+        let Some(rect @ [x, y, width, height]) = page.dirty_rect() else {
             return;
+        };
+        if page.cleared() {
+            target.encoder.flush(target.queue);
         }
-        let size = page.size();
-        queue.write_texture(
-            self.texture.as_image_copy(),
-            page.pixels(),
+        self.work.write_texture(
+            target.queue,
+            wgpu::TexelCopyTextureInfo {
+                origin: wgpu::Origin3d { x, y, z: 0 },
+                ..self.texture.as_image_copy()
+            },
+            &page.region_pixels(rect),
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(size),
-                rows_per_image: Some(size),
+                bytes_per_row: Some(width * page.bytes_per_pixel()),
+                rows_per_image: Some(height),
             },
-            self.texture.size(),
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
         );
         page.mark_clean();
     }
 
-    fn draw_quads(&mut self, target: &RenderTarget<'_>, quads: &[f32]) {
+    fn draw_quads(&mut self, target: &RenderTarget<'_>, quads: &[f32], params: &Placed) {
         if quads.is_empty() {
             return;
         }
-        let (device, queue) = (target.device, target.queue);
         let bytes: Vec<u8> = quads.iter().flat_map(|f| f.to_le_bytes()).collect();
         let vertex_count = u32::try_from(quads.len() / FLOATS_PER_VERTEX).expect("fits u32");
-        let bind_group = self.bind_group(device);
-        self.reserve_vertices(device, bytes.len() as u64);
-        let vertices = self.vertices.as_ref().expect("reserved above");
-        queue.write_buffer(vertices, 0, &bytes);
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("text"),
-        });
-        {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("text"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: target.view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
-            if let Some(s) = target.scissor {
-                pass.set_scissor_rect(s.x, s.y, s.width, s.height);
-            }
+        let Some(vertices) = self
+            .vertices
+            .push(target.encoder, target.queue, &self.work, &bytes)
+        else {
+            return;
+        };
+        let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
+        let bind_group = self.bind_group(target.device, params);
+        target.draw_pass(|pass| {
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &bind_group, &[]);
-            pass.set_vertex_buffer(0, vertices.slice(..));
-            pass.draw(0..vertex_count, 0..1);
-        }
-        queue.submit([encoder.finish()]);
+            pass.set_vertex_buffer(0, vertices.slice());
+            self.work.draw(pass, 0..vertex_count, 0..1);
+        });
     }
 }
 

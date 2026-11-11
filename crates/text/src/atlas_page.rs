@@ -10,7 +10,10 @@ pub struct AtlasPage {
     shelf_x: u32,
     shelf_y: u32,
     shelf_height: u32,
-    dirty: bool,
+    /// `[x, y, width, height]` changed since the last upload.
+    dirty: Option<[u32; 4]>,
+    /// Cleared since the last upload: glyphs may have moved.
+    cleared: bool,
 }
 
 /// Gap kept around every glyph so nearest sampling never reads a neighbour.
@@ -27,7 +30,8 @@ impl AtlasPage {
             shelf_x: 0,
             shelf_y: 0,
             shelf_height: 0,
-            dirty: true,
+            dirty: Some([0, 0, size, size]),
+            cleared: false,
         }
     }
 
@@ -37,21 +41,65 @@ impl AtlasPage {
         self.size
     }
 
+    /// Bytes per pixel: 1 for coverage, 4 for colour.
+    #[must_use]
+    pub fn bytes_per_pixel(&self) -> u32 {
+        self.bytes_per_pixel
+    }
+
     /// The pixels, rows from the top, `size * size * bytes_per_pixel`.
     #[must_use]
     pub fn pixels(&self) -> &[u8] {
         &self.pixels
     }
 
+    /// True when the page was cleared since [`AtlasPage::mark_clean`]:
+    /// glyphs already uploaded may be elsewhere now, or gone.
+    #[must_use]
+    pub fn cleared(&self) -> bool {
+        self.cleared
+    }
+
     /// True when the pixels changed since [`AtlasPage::mark_clean`].
     #[must_use]
     pub fn dirty(&self) -> bool {
+        self.dirty.is_some()
+    }
+
+    /// `[x, y, width, height]` of the pixels changed since
+    /// [`AtlasPage::mark_clean`], or `None` when none did.
+    #[must_use]
+    pub fn dirty_rect(&self) -> Option<[u32; 4]> {
         self.dirty
+    }
+
+    /// The pixels of `rect`, rows from the top, packed tight.
+    ///
+    /// # Panics
+    ///
+    /// If the rectangle leaves the page; a caller bug.
+    #[must_use]
+    pub fn region_pixels(&self, rect: [u32; 4]) -> Vec<u8> {
+        assert!(
+            rect[0] + rect[2] <= self.size && rect[1] + rect[3] <= self.size,
+            "rect {rect:?} leaves a {} page",
+            self.size
+        );
+        let bpp = self.bytes_per_pixel as usize;
+        let [x, y, width, height] = rect.map(|n| n as usize);
+        let row_bytes = width * bpp;
+        let mut region = Vec::with_capacity(row_bytes * height);
+        for row in y..y + height {
+            let start = (row * self.size as usize + x) * bpp;
+            region.extend_from_slice(&self.pixels[start..start + row_bytes]);
+        }
+        region
     }
 
     /// The caller uploaded the pixels.
     pub fn mark_clean(&mut self) {
-        self.dirty = false;
+        self.dirty = None;
+        self.cleared = false;
     }
 
     /// True when a `width` by `height` glyph could ever be placed in an
@@ -100,6 +148,9 @@ impl AtlasPage {
             "blit of {width}x{height} at {origin:?} leaves a {} page",
             self.size
         );
+        if width == 0 || height == 0 {
+            return;
+        }
         let row_bytes = width as usize * bpp;
         for row in 0..height as usize {
             let start =
@@ -107,7 +158,7 @@ impl AtlasPage {
             self.pixels[start..start + row_bytes]
                 .copy_from_slice(&data[row * row_bytes..(row + 1) * row_bytes]);
         }
-        self.dirty = true;
+        self.dirty = Some(bounding(self.dirty, [origin[0], origin[1], width, height]));
     }
 
     /// Forget every allocation and zero the pixels.
@@ -116,8 +167,20 @@ impl AtlasPage {
         self.shelf_x = 0;
         self.shelf_y = 0;
         self.shelf_height = 0;
-        self.dirty = true;
+        self.dirty = Some([0, 0, self.size, self.size]);
+        self.cleared = true;
     }
+}
+
+/// The rectangle holding `rect` and, when there is one, `dirty`.
+fn bounding(dirty: Option<[u32; 4]>, rect: [u32; 4]) -> [u32; 4] {
+    let Some([x, y, width, height]) = dirty else {
+        return rect;
+    };
+    let (left, top) = (x.min(rect[0]), y.min(rect[1]));
+    let right = (x + width).max(rect[0] + rect[2]);
+    let bottom = (y + height).max(rect[1] + rect[3]);
+    [left, top, right - left, bottom - top]
 }
 
 #[cfg(test)]

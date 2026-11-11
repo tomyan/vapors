@@ -26,6 +26,8 @@ pub(crate) struct BoxTree<'f> {
     /// Boxes laid out, not read from their cache: what the incremental
     /// tests count.
     pub(crate) laid_out: usize,
+    /// Calls to `lay_out`, cache hits included.
+    pub(crate) calls: usize,
 }
 
 impl BoxTree<'_> {
@@ -43,6 +45,7 @@ impl BoxTree<'_> {
         inputs: LayoutInput,
         block: Option<&mut BlockContext<'_>>,
     ) -> LayoutOutput {
+        self.calls += 1;
         if inputs.run_mode == RunMode::PerformHiddenLayout {
             return compute_hidden_layout(self, id);
         }
@@ -95,6 +98,7 @@ impl BoxTree<'_> {
             |handle, basis| calcs.resolve(handle, basis),
             |known, available| match &node.content {
                 Content::Text(run) => measure_text((fonts, cache), scale, run, known, available),
+                Content::Vacant => unreachable!("a vacant slot is no box's child"),
                 Content::Element(_) => node.natural.map_or(taffy::Size::ZERO, |natural| {
                     if node.style.item_is_replaced {
                         super::replaced::measure(&node.style, inputs.parent_size, known, natural)

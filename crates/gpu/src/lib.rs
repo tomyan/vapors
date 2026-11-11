@@ -6,11 +6,14 @@
 //! When unset, the first hardware adapter wins, then the first software
 //! one. No adapter is an error that lists what was found and the fix.
 //! Devices ask for the default limits with the three image-size limits
-//! raised to the adapter's ([`raised_limits`]).
+//! raised to the adapter's ([`raised_limits`]), and for the timing
+//! features the adapter offers ([`timing_features`]).
 
+mod features;
 mod limits;
 mod select;
 
+pub use features::timing_features;
 pub use limits::{LimitsBelowDefault, raised_limits};
 pub use select::{Candidate, NoAdapter, choose};
 

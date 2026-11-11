@@ -11,15 +11,15 @@ mod app_frame;
 mod misfit;
 #[path = "renderers.rs"]
 mod renderers;
-pub use app_frame::app_frame;
+pub use app_frame::{app_frame, app_frame_at};
 pub use misfit::Misfit;
 pub use renderers::{Log, Solid};
 
-use vapors_app::{DrawOverError, PaintError, ScenePainter};
+use vapors_app::{DrawOverError, PaintError, ScenePainter, Tooltip, TooltipError};
 use vapors_dom::Dom;
 use vapors_elements::{Document, Viewport};
 use vapors_gpu_harness::{Gpu, gpu, read_rgba8};
-use vapors_renderer::{Target, clear};
+use vapors_renderer::{FrameEncoder, Target, clear};
 use vapors_scene::{Color, Size};
 use vapors_text::FontSystem;
 
@@ -79,7 +79,11 @@ pub struct Rig {
 
 impl Rig {
     pub fn new() -> Self {
-        let gpu = gpu();
+        Self::on(gpu())
+    }
+
+    /// A painter on `gpu`.
+    pub fn on(gpu: Gpu) -> Self {
         let painter =
             ScenePainter::new(&gpu.device, wgpu::TextureFormat::Rgba8Unorm).expect("Rgba8Unorm");
         Self { gpu, painter }
@@ -97,6 +101,21 @@ impl Rig {
         self.on_fresh_target(|painter, target| painter.draw_over(target, painted))
     }
 
+    /// `doc` drawn into a fresh `SIZE` square target with `tooltip`
+    /// over it at `pointer`: its RGBA bytes.
+    pub fn draw_tooltip(
+        &mut self,
+        doc: &mut Document,
+        tooltip: &Tooltip,
+        pointer: Option<[f32; 2]>,
+    ) -> Result<Vec<u8>, TooltipError> {
+        self.on_fresh_target(|painter, target| {
+            let painted = doc.painted().expect("updated");
+            painter.draw(target, painted).expect("draws");
+            painter.draw_tooltip(target, doc, tooltip, pointer)
+        })
+    }
+
     fn on_fresh_target<E>(
         &mut self,
         draw: impl FnOnce(&mut ScenePainter, &Target<'_>) -> Result<(), E>,
@@ -105,13 +124,16 @@ impl Rig {
         let black = Color::from_rgba8(0, 0, 0, 255);
         let texture = clear(&gpu.device, &gpu.queue, SIZE, SIZE, black);
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        draw(&mut self.painter, &target(gpu, &view))?;
+        let encoder = FrameEncoder::new(&gpu.device);
+        let drawn = draw(&mut self.painter, &target(gpu, &encoder, &view));
+        encoder.submit(&gpu.queue).expect("no draw refused");
+        drawn?;
         Ok(read_rgba8(&gpu.device, &gpu.queue, &texture))
     }
 }
 
 /// The whole of `view`, a `SIZE` square, as a target on `gpu`.
-fn target<'a>(gpu: &'a Gpu, view: &'a wgpu::TextureView) -> Target<'a> {
+fn target<'a>(gpu: &'a Gpu, encoder: &'a FrameEncoder, view: &'a wgpu::TextureView) -> Target<'a> {
     let size = Size {
         width: SIZE,
         height: SIZE,
@@ -119,6 +141,7 @@ fn target<'a>(gpu: &'a Gpu, view: &'a wgpu::TextureView) -> Target<'a> {
     Target {
         device: &gpu.device,
         queue: &gpu.queue,
+        encoder,
         view,
         viewport: size,
         scissor: None,

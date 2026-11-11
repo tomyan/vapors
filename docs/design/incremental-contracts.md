@@ -87,7 +87,7 @@ the 3D lane's slices as reconciled with Tom on 2026-11-09 (touche
 
 | Requirement | Slices | Match |
 |---|---|---|
-| Scene components create persistent nodes; transform updates do not recreate geometry | 2 (persistent scene and camera); the lane's "Reactivity" section | Matches in intent. Slice 2's acceptance checks transforms, camera validation, refusals and cleanup, not upload counts; geometry-upload counts first appear in slice 4 |
+| Scene components create persistent nodes; transform updates do not recreate geometry | 2 (persistent scene and camera); the lane's "Reactivity" section | Matches in intent. Slice 2 PR 3b counts geometry and uniform bytes and draw calls through `SurfaceFrame::work` (`docs/plans/3d-2.md` row 3): geometry uploaded once, an idle frame writing 0 bytes, a transform change one slot's 80 bytes |
 | Geometry and material handles share resources | 3 (sharing, mount and unmount), 3b (one texture across meshes, stale handle refused) | Matches |
 | Keyed instance changes update affected instance records | 4 (insert, remove, reorder, one transform; unchanged geometry uploads) | Matches |
 | Explicit instancing, no automatic batching | 4 (`Instances` as an explicit batching contract) | Matches |
@@ -138,14 +138,14 @@ drawing.rs:129-139`, every frame).
 
 | Check | Counter | Exists |
 |---|---|---|
-| No HUD restyle | `Document::elements_restyled() == 0` | yes (`update.rs:122`) |
-| No HUD layout | `Document::boxes_laid_out() == 0` | yes (`update.rs:129`) |
-| No HUD text rebuilt | `Document::text_layouts_built() == 0` | yes (`update.rs:137`) |
+| No HUD restyle | `Document::elements_restyled() == 0` | yes (`update_counts.rs:54`) |
+| No HUD layout | `Document::boxes_laid_out() == 0` | yes (`update_counts.rs:61`) |
+| No HUD text rebuilt | `Document::text_layouts_built() == 0` | yes (`update_counts.rs:69`) |
 | The surface renders each frame | a render count in the test renderer, as `surface_gradient --check` counts | yes, per renderer |
-| No document change noted | `Document::take_changed()` false | yes (`document.rs:105`) |
-| No document update or traversal at all | elements visited per update | missing |
-| UI paint records reused | paint records rebuilt per frame | missing |
-| GPU work | upload bytes and draw calls per frame | missing |
+| No document change noted | `Document::take_changed()` false | yes (`document.rs:108`) |
+| No document update or traversal at all | `Document::take_changed()` false, or the caller not calling `update`; `update_counts()` cannot show it: the counts keep the last update's values when no update runs, and `elements_visited` is never 0 after a successful update | yes (`update_counts.rs:47`) |
+| UI paint records reused | `Document::update_counts().scene_items_built == 0` | counted (`update_counts.rs:47`); paint rebuilds every item today |
+| GPU work | `ScenePainter::frame_counts()` or `ElementsApp::frame_counts()`: `FrameCounts`, per run kind, `GpuWork { buffer_bytes, texture_bytes, draw_calls }`, the last frame (a frame that fails before painting leaves the counts unchanged); `atlas_bytes() == 0` and the HUD's runs unchanged per animating frame | counted (`painter_counts.rs`); every frame redraws and re-uploads every run's vertices today |
 
 With today's signals and setters, two rows fail for a HUD that writes
 equal values: every equal write marks the document changed (b), and an
@@ -165,5 +165,5 @@ passes today for the racer's per-frame writes, and the changed row needs
 a change: e1 is opt-in, so `sync_hud` must switch those calls to
 `set_if_changed`; e4(b) needs no change to `sync_hud`, because the HUD's
 bindings are generated and would compare before calling `set_text`. The
-three missing counters belong to IU1's baseline; until then 1c can
-assert the five that exist.
+traversal and paint counts are `UpdateCounts` (IU1 PR 2); the GPU
+counters are `FrameCounts` (IU1 PR 3).

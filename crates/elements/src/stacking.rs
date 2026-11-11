@@ -29,7 +29,7 @@ pub(crate) fn stacking_of(
     index: usize,
     used: &std::collections::HashMap<vapors_dom::NodeId, crate::style::Used>,
 ) -> Stacking {
-    let crate::layout::Content::Element(node) = boxes[index].content else {
+    let Some(node) = boxes[index].element_in(index) else {
         return Stacking::default();
     };
     let used = &used[&node];

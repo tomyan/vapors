@@ -5,6 +5,8 @@ use std::fmt;
 use crate::a11y_error::AxError;
 
 impl fmt::Display for AxError {
+    // One arm per refusal, each a single message: the match is flat, and splitting it would scatter the wording.
+    #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NotUpdated => write!(
@@ -84,6 +86,10 @@ impl fmt::Display for AxError {
             Self::NotFinite { role, name, bounds } => write!(
                 f,
                 "{role} \"{name}\" has bounds that are not finite ({bounds}); fix: the length in its styles that overflows"
+            ),
+            Self::RoleNamedByAria { asked, chromium } => write!(
+                f,
+                "the projection asked for `{asked}`, ARIA's name; fix: use `{chromium}`, Chromium's name for ARIA {asked}"
             ),
             Self::BadReply { error } => write!(
                 f,

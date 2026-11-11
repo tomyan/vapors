@@ -1,10 +1,8 @@
 //! The racer's state, grouped by what changes it.
 use crate::{
     driving::Driving,
-    gpu::Track,
     model::{Camera, Race},
 };
-use vapors_app::ScenePainter;
 use vapors_platform::Instant;
 
 /// The race, its camera, its controls and whether it is paused.
@@ -50,11 +48,4 @@ impl Default for Pacing {
 pub(crate) struct Faults {
     pub(crate) error: Option<String>,
     pub(crate) setup_error: Option<String>,
-}
-
-/// Created on the first frame, once a device exists.
-#[derive(Default)]
-pub(crate) struct Gpu {
-    pub(crate) track: Option<Track>,
-    pub(crate) painter: Option<ScenePainter>,
 }

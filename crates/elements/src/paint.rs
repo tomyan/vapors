@@ -62,6 +62,7 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
         surfaces: Vec::new(),
         ranges: HashMap::new(),
         text_origins: HashMap::new(),
+        boxes_drawn: 0,
     };
     for (index, layout_box) in boxes.iter().enumerate() {
         if let Content::Element(node) = layout_box.content {
@@ -86,6 +87,7 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
         painted.scene.set_clip(device);
         match step {
             Step::Box(_) => {
+                painted.boxes_drawn += 1;
                 paint_own(boxes, rects, index, input, &mut painted);
                 crate::images::paint(&boxes[index], rects[index], input, &mut painted);
                 crate::svg_paint::paint(&boxes[index], rects[index], input, &mut painted);
@@ -132,6 +134,7 @@ fn paint_own(
     match &boxes[index].content {
         Content::Element(node) => paint_element(*node, rects[index], input, out),
         Content::Text(run) => paint_text(run, rects[index], input, out),
+        Content::Vacant => unreachable!("a vacant slot is no box's child"),
     }
 }
 
@@ -152,12 +155,8 @@ fn paint_element(node: NodeId, rect: BoxRect, input: &PaintInput<'_>, out: &mut 
     let decoration = &used.decoration;
     let radii = corners::fitted(decoration.radii.map(|r| r * input.scale), border_box);
     for shadow in decoration.shadows.iter().rev() {
-        out.scene.push(Item::Shadow(shadow_item(
-            shadow,
-            border_box,
-            radii,
-            input.scale,
-        )));
+        let item = shadow_item(shadow, border_box, radii, input.scale);
+        out.scene.push(Item::Shadow(item));
     }
     let background = if input.propagated == Some(node) {
         Color::default()
@@ -203,9 +202,10 @@ fn paint_text(run: &InlineRun, rect: BoxRect, input: &mut PaintInput<'_>, out: &
         .layout(input.fonts, input.scale, run, Some(rect.width));
     crate::paint_inline::paint_spans(run, &layout, rect, input, out);
     let id = TextId(u32::try_from(out.texts.len()).expect("fewer than 2^32 text runs"));
-    out.texts.push(layout);
     let origin = [rect.x * input.scale, rect.y * input.scale];
-    out.scene.push(Item::Text { text: id, origin });
+    let (text, ink) = (id, layout.ink().offset(origin));
+    out.texts.push(layout);
+    out.scene.push(Item::Text { text, origin, ink });
 }
 
 /// `rect` in device pixels, each edge rounded to the nearest pixel, so

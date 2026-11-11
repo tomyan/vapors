@@ -18,15 +18,30 @@ mod pointer;
 #[cfg(test)]
 mod scroll_fixture;
 mod surface;
+mod tooltip;
+mod tooltip_box;
+mod tooltip_error;
+mod tooltip_place;
+mod tooltip_place_check;
+mod tooltip_style;
 mod touch_scroll;
 mod wheel_scroll;
 
 pub use document_input::{DocumentInput, Given, Route, Unplaced};
 pub use elements_app::{
-    ElementsApp, Failure, FrameDecision, FrameTimesHook, InvalidateError, Invalidated, PerFrame,
-    SurfaceHandle,
+    ElementsApp, Failure, FrameDecision, FrameTimesHook, FrameTiming, GiveError, InvalidateError,
+    Invalidated, PerFrame, SurfaceHandle,
 };
 pub use painter::{
-    DrawOverError, MountError, PaintError, SUPPORTED, ScenePainter, SurfaceState, UnsupportedFormat,
+    DrawOverError, FrameCounts, MountError, PaintError, SUPPORTED, ScenePainter, SurfaceState,
+    UnsupportedFormat,
 };
 pub use surface::{SURFACE_FORMAT, SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
+pub use tooltip::{TOOLTIP_DELAY, Tooltip, TooltipTrigger};
+pub use tooltip_error::TooltipError;
+pub use tooltip_place::{
+    Anchor, CURSOR_OFFSET_X, CURSOR_OFFSET_Y, KEYBOARD_GAP, PlacementError, PlacementField, Point,
+    place_tooltip,
+};
+pub use tooltip_style::check_tooltip_style;
+pub use vapors_renderer::{GpuMissing, GpuReading, GpuResolution, GpuTime, GpuWork, WorkCounter};

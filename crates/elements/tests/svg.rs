@@ -113,7 +113,7 @@ fn button(label: Option<&str>, words: Option<&str>, icon_label: Option<&str>) ->
     }
     styled(&mut doc, "button { display: flex; }");
     doc.update(viewport(400.0, 300.0)).expect("updates");
-    doc.ax_projection(&["button", "img"]).expect("projects")
+    doc.ax_projection(&["button", "image"]).expect("projects")
 }
 
 fn node(role: &str, name: &str) -> AxNode {
@@ -121,6 +121,7 @@ fn node(role: &str, name: &str) -> AxNode {
         role: role.to_owned(),
         name: name.to_owned(),
         value: None,
+        description: None,
         properties: Vec::new(),
     }
 }
@@ -149,11 +150,11 @@ fn a_named_icon_is_an_image_that_names_its_button() {
     let tree = button(None, None, Some("Export"));
 
     // Then
-    assert_eq!(tree, [node("button", "Export"), node("img", "Export")]);
+    assert_eq!(tree, [node("button", "Export"), node("image", "Export")]);
 }
 
 /// Chromium 155's accessibility tree for the same markup
-/// (`crates/elements-corpus/probes/hidden-icon-name.mjs`): the button
+/// (`crates/elements-corpus/fixtures/icon_names.wisp`): the button
 /// is named "Go" and the hidden image is not in the tree.
 #[test]
 fn a_named_icon_that_is_visibility_hidden_adds_nothing_to_its_buttons_name() {
@@ -170,7 +171,7 @@ fn a_named_icon_that_is_visibility_hidden_adds_nothing_to_its_buttons_name() {
     doc.update(viewport(400.0, 300.0)).expect("updates");
 
     // When
-    let tree = doc.ax_projection(&["button", "img"]).expect("projects");
+    let tree = doc.ax_projection(&["button", "image"]).expect("projects");
 
     // Then
     assert_eq!(tree, [node("button", "Go")]);
