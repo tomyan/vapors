@@ -22,4 +22,4 @@ The toolchain is pinned in `rust-toolchain.toml`; tool versions in
 
 ## Licence
 
-MIT or Apache-2.0, at your option.
+MIT; see `LICENSE`.
