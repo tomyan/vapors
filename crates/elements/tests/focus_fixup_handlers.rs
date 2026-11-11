@@ -42,7 +42,9 @@ fn change_focuses_button() -> (Page, NodeId) {
     let button = button(&page);
     update_and_settle(&page);
     let doc = Rc::clone(&page.doc);
-    let to_button = move |_: &mut Event| Document::focus(&doc, Some(button));
+    let to_button = move |_: &mut Event| {
+        let _ = Document::focus(&doc, Some(button));
+    };
     page.doc
         .borrow_mut()
         .listen(page.name, "change", Box::new(to_button));

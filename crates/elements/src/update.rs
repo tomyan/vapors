@@ -123,6 +123,7 @@ impl Document {
         // Cleared before the rehover: a hover it moves is a change this
         // update did not restyle, so the a11y tree refuses until the next.
         self.changes.since_update = false;
+        self.settle_due = true;
         self.rehover_in(&painted);
         Ok(self.painted.insert(painted))
     }
