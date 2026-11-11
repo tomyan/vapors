@@ -37,7 +37,7 @@ impl ScenePainter {
 /// The draws of the text items among `items`, in order.
 fn text_draws<'a>(painted: &'a Painted, items: &[Item]) -> Vec<TextDraw<'a>> {
     let draw = |item: &Item| match *item {
-        Item::Text { text, origin } => Some(TextDraw {
+        Item::Text { text, origin, .. } => Some(TextDraw {
             layout: painted.text(text),
             origin,
         }),

@@ -152,7 +152,7 @@ impl Surfaces {
         &mut self,
         device: &wgpu::Device,
         painted: &Painted,
-        run: &Run<'_>,
+        run: &Run,
     ) -> Result<(), PaintError> {
         let Run::Surfaces(items) = run else {
             return Ok(());

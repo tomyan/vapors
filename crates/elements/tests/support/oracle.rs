@@ -115,7 +115,7 @@ fn hits(painted: &Painted, viewport: Viewport) -> Vec<(Option<NodeId>, Cursor)> 
 
 fn items(painted: &Painted) -> Vec<String> {
     let text = |item: &Item| match item {
-        Item::Text { text, origin } => {
+        Item::Text { text, origin, .. } => {
             format!("text {} at {origin:?}", layout_detail(painted.text(*text)))
         }
         other => format!("{other:?}"),
