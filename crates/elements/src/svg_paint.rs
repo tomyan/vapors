@@ -69,8 +69,7 @@ pub(crate) fn paint(
 
 /// One `Item::Icon` of `icon` over `content` snapped to device pixels.
 fn push_icon(icon: &Rc<Icon>, content: BoxRect, colour: Color, scale: f32, out: &mut Painted) {
-    let id = IconId(u32::try_from(out.icons.len()).expect("fewer than 2^32 icons"));
-    out.icons.push(Rc::clone(icon));
+    let id = IconId(out.slabs.icons.insert(Rc::clone(icon)));
     let rect = crate::paint::snapped(content, scale);
     out.scene.push(Item::Icon {
         icon: id,
