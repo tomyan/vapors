@@ -17,7 +17,10 @@ use crate::style::Cursor;
 /// they change only with a rebuilt box: border widths, which come only
 /// from style (CSS has no % border); and whether its background became
 /// the canvas's, which reads only html's and body's style, whose
-/// restyle rebuilds the tree or body.
+/// restyle rebuilds the tree or body; and a text field's text origin,
+/// which follows from its rect, padding, border and style, while a
+/// value or style change rebuilds the field. The debug check
+/// (`kept_paint_check.rs`) guards all three.
 #[derive(PartialEq)]
 pub(crate) struct BoxFrom {
     /// Its border box, scroll offsets applied.
@@ -27,8 +30,6 @@ pub(crate) struct BoxFrom {
     /// Its padding widths, for its padding and content box (% padding
     /// follows the containing block's width).
     pub(crate) padding: taffy::Rect<f32>,
-    /// A text field's text origin: its text child's box.
-    pub(crate) text_origin: Option<BoxRect>,
 }
 
 /// One box's kept paint.
@@ -70,9 +71,6 @@ impl BoxFrom {
             rect: rects[index],
             clip,
             padding: boxes[index].layout.padding,
-            text_origin: boxes[index]
-                .text_field
-                .then(|| crate::text_paint::text_origin(boxes, rects, index)),
         }
     }
 }

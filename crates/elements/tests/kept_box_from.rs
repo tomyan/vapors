@@ -62,6 +62,7 @@ fn a_range_whose_percent_padding_follows_its_container_paints_its_track_again() 
     doc.update(viewport(400.0, 200.0)).expect("updates");
 }
 
+/// Not in `BoxFrom`: a text field's text origin.
 #[test]
 fn a_fields_text_moved_inside_an_unmoved_field_moves_its_text_origin() {
     // Given: a centred field of fixed size
