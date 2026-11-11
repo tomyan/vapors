@@ -5,11 +5,11 @@ use crate::layout::InlineRun;
 use crate::style::{Face, TextStyle};
 
 /// The node number `tree` reads as a text box.
-const TEXT: u64 = 0;
+pub(in crate::layout) const TEXT: u64 = 0;
 
 /// Boxes in pre-order from `(node, children)` pairs, the children
 /// given by pre-order index: an element box, or a text box for `TEXT`.
-fn tree(spec: &[(u64, &[usize])]) -> Vec<LayoutBox> {
+pub(in crate::layout) fn tree(spec: &[(u64, &[usize])]) -> Vec<LayoutBox> {
     spec.iter()
         .map(|(node, children)| {
             let content = match *node {
@@ -55,7 +55,7 @@ fn slot_of(placed: &Placed, node: u64) -> Option<usize> {
 
 /// Three updates: element and text boxes inserted, removed, and
 /// inserted again; node 1's first text box is in every update.
-fn churned() -> Placed {
+pub(in crate::layout) fn churned() -> Placed {
     place_each(vec![
         tree(&[
             (1, &[1, 2, 3, 5]),

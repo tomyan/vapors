@@ -94,7 +94,8 @@ impl Document {
         let boxes = &slotted.boxes;
         let scrolls = |index: usize| match boxes[index].content {
             crate::layout::Content::Element(node) => used[&node].scrolls(),
-            crate::layout::Content::Text(_) | crate::layout::Content::Vacant => false,
+            crate::layout::Content::Text(_) => false,
+            crate::layout::Content::Vacant => unreachable!("a vacant slot is no box's child"),
         };
         let offsets = self.scroll.settle(boxes, &scrolls, viewport.scale);
         let rects = placed(boxes, &offsets);

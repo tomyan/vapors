@@ -143,6 +143,25 @@ mod tests {
     }
 
     #[test]
+    fn the_kept_box_of_a_node_is_its_element_box_and_a_removed_node_has_none() {
+        // Given: boxes after three updates, with text runs; nodes 10, 11
+        // and 13 were removed
+        let mut kept = KeptBoxes::default();
+
+        // When
+        kept.keep(crate::layout::slots::tests::churned(), 1.0);
+
+        // Then
+        for node in [1, 12, 14].map(NodeId) {
+            let content = kept.element(node).map(|b| &b.content);
+            assert!(content == Some(&Content::Element(node)), "{node:?}");
+        }
+        for node in [10, 11, 13].map(NodeId) {
+            assert!(kept.element(node).is_none(), "{node:?}");
+        }
+    }
+
+    #[test]
     fn a_restyled_box_holding_a_calc_is_lent_nothing_even_when_the_address_matches() {
         // Given: the last update's box and this one's share a handle
         // address, as a freed and reused allocation would make them

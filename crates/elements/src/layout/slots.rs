@@ -193,4 +193,4 @@ fn keys(boxes: &[LayoutBox]) -> Vec<Key> {
 
 #[cfg(test)]
 #[path = "slots_tests.rs"]
-mod tests;
+pub(super) mod tests;

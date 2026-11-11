@@ -129,4 +129,8 @@ Requirements from the review of #185, each with a test in its PR:
   three new-root cases. The map-vs-scan test fails alone when the
   slot-to-key map is wrong; a wrong key-to-slot map breaks every slot
   test, since each reads slots through it; a slot given to two keys
-  panics naming both, where it would otherwise hang `permute`.
+  panics naming both, where it would otherwise hang `permute`. A
+  `KeptBoxes::element` test fails alone among the unit tests when
+  `element` reads the wrong slot. `update`'s `scrolls` panics on a
+  vacant slot (`settle` asks only element boxes); `Chains::of` visits
+  every slot by index, so its `None` for a vacant slot stays.
