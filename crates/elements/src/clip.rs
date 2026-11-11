@@ -8,7 +8,7 @@
 
 use vapors_dom::NodeId;
 
-use crate::layout::{BoxRect, Content, LayoutBox};
+use crate::layout::{BoxRect, LayoutBox};
 use crate::paint::PaintInput;
 use crate::style::Used;
 
@@ -70,7 +70,7 @@ pub(crate) fn content_box(layout_box: &LayoutBox, border_box: BoxRect) -> BoxRec
 /// `overflow` is not `visible`; otherwise the body's is the viewport's
 /// (CSS Overflow 3 section 3.3).
 pub(crate) fn clipping(boxes: &[LayoutBox], index: usize, input: &PaintInput<'_>) -> bool {
-    let Content::Element(node) = boxes[index].content else {
+    let Some(node) = boxes[index].element_in(index) else {
         return false;
     };
     let clips = |node: NodeId| input.used.get(&node).is_some_and(Used::clips);

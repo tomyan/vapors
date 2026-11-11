@@ -105,7 +105,8 @@ impl Lender<'_> {
         let keepable = in_flow
             && match boxes[at].content {
                 Content::Element(node) => (self.may_keep)(node),
-                Content::Text(_) | Content::Vacant => true,
+                Content::Text(_) => true,
+                Content::Vacant => unreachable!("slot {at} is vacant, and no box's child"),
             };
         if !(clean
             && before.children == children

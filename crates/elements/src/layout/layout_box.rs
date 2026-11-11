@@ -68,6 +68,16 @@ impl LayoutBox {
         }
     }
 
+    /// The element of the box in `slot`, this box; none for a text box.
+    /// Panics on a vacant slot, which no walk from the root reaches.
+    pub(crate) fn element_in(&self, slot: usize) -> Option<NodeId> {
+        match self.content {
+            Content::Element(node) => Some(node),
+            Content::Text(_) => None,
+            Content::Vacant => unreachable!("slot {slot} is vacant, and no box's child"),
+        }
+    }
+
     /// What a vacant slot holds.
     pub(crate) fn vacant() -> Self {
         Self::new(Content::Vacant, Style::default())

@@ -81,6 +81,22 @@ pin proven by breaking what it guards.
 3a to 3c each may split further once 1b's measurement shows which walk
 dominates.
 
+Requirements from the review of #185, each with a test in its PR:
+
+- 1b: a slot a new key takes resets the box's `cache`, `layout` and
+  `hoisted`, so nothing from the slot's last box survives. Clearing an
+  ancestor's cache also clears its `hoisted` list; otherwise
+  `containing_blocks` reads slots that were freed.
+- 1b: marks cover every input a box depends on. An edit inside an svg
+  marks the svg element, which owns the boxes. A viewport resize that
+  changes `vw` lengths or which media rules apply marks what restyle
+  restyles on resize, or every element when that set is not known.
+- 2: `lend_from` (`layout/keep.rs`) lends `hoisted` along with `cache`
+  and `layout`, or an absolute box lent its cache is missing from its
+  containing block's list.
+- 3a: unmarked elements keep their `Calcs` entries, since retained
+  boxes hold calc handles into them.
+
 ## Open points
 
 - Rebuilding an owner rebuilds its whole subtree: a restyle of a large
@@ -105,3 +121,12 @@ dominates.
   `Slots::place` takes a whole tree; rebuilding an owner's subtree needs
   a variant that places only that subtree's keys and frees only its
   slots.
+- #185 review fixes: a key placed twice panics naming it (it would
+  otherwise loop in `permute` or index out of bounds); a vacant slot
+  reached by `keep`, `stacking`, `clip` or `text_paint` panics naming
+  the slot; `Slots::place` debug-asserts that a walk from the root
+  reaches exactly the non-vacant slots. Slot tests cover text keys and
+  three new-root cases. The map-vs-scan test fails alone when the
+  slot-to-key map is wrong; a wrong key-to-slot map breaks every slot
+  test, since each reads slots through it; a slot given to two keys
+  panics naming both, where it would otherwise hang `permute`.

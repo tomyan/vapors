@@ -64,6 +64,11 @@ impl Slots {
             }
         }
         let boxes = arrange(built, &to, slots.keys.len());
+        debug_assert_eq!(
+            misplaced(&boxes),
+            None,
+            "a walk from the root reaches a vacant slot or misses a box"
+        );
         Placed { boxes, slots }
     }
 
@@ -91,8 +96,13 @@ impl Slots {
             free,
         };
         for (key, &slot) in keys.iter().zip(to) {
-            slots.of.insert(*key, slot);
-            slots.keys[slot] = Some(*key);
+            let earlier = slots.of.insert(*key, slot);
+            assert!(earlier.is_none(), "box key {key:?} placed twice");
+            let other = slots.keys[slot].replace(*key);
+            assert!(
+                other.is_none(),
+                "slot {slot} given to {key:?} and {other:?}"
+            );
         }
         slots
     }
@@ -143,6 +153,24 @@ fn permute(boxes: &mut [LayoutBox], mut destination: Vec<usize>) {
             destination.swap(index, slot);
         }
     }
+}
+
+/// The first slot a walk from the root gets wrong: a vacant slot it
+/// reaches, or a box it misses; none when it reaches exactly the boxes.
+fn misplaced(boxes: &[LayoutBox]) -> Option<usize> {
+    let seen = reached(boxes);
+    (0..boxes.len()).find(|&slot| seen[slot] == matches!(boxes[slot].content, Content::Vacant))
+}
+
+/// The slots a walk from the root reaches.
+fn reached(boxes: &[LayoutBox]) -> Vec<bool> {
+    let mut seen = vec![false; boxes.len()];
+    let mut stack = vec![0];
+    while let Some(slot) = stack.pop() {
+        seen[slot] = true;
+        stack.extend(&boxes[slot].children);
+    }
+    seen
 }
 
 /// Every box's key, by index, in boxes built in pre-order.
