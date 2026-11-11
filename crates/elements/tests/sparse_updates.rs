@@ -144,7 +144,7 @@ fn assert_walk(rows: usize, index: usize, edit: Edit, work: &Work) {
         c.boxes_built,
         c.layout_calls,
         c.boxes_painted,
-        c.boxes_copied,
+        c.parts_read_kept,
         c.scene_items_built,
         c.map_entries_patched,
         c.order_walks,

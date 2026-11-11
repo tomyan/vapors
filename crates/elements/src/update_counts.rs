@@ -45,7 +45,7 @@ pub struct UpdateCounts {
     /// those moved or whose clip was worked out again, but whose paint
     /// was made from the same rect, clip and padding (IU3 3c-3d2). The
     /// kept paint of every other box is neither read nor copied.
-    pub boxes_copied: usize,
+    pub parts_read_kept: usize,
     /// Scene items (paint records) paint built: those of the boxes it
     /// drew, their outlines, and every scroll thumb; kept items are
     /// not counted.
@@ -73,7 +73,7 @@ impl UpdateCounts {
     /// Notes what paint drew into `painted`.
     pub(crate) fn note_paint(&mut self, painted: &Painted) {
         self.boxes_painted = painted.boxes_drawn;
-        self.boxes_copied = painted.boxes_copied;
+        self.parts_read_kept = painted.parts_read_kept;
         self.scene_items_built = painted.items_built;
         self.map_entries_patched = painted.maps_patched;
         let walks = painted.order.walks;

@@ -50,7 +50,7 @@ pub struct Painted {
     pub(crate) boxes_drawn: usize,
     /// Kept parts this update read and kept (`paint_partial.rs`), for
     /// `UpdateCounts`.
-    pub(crate) boxes_copied: usize,
+    pub(crate) parts_read_kept: usize,
     /// Scene items this update built, for `UpdateCounts`.
     pub(crate) items_built: usize,
     /// Elements whose `rects` and `paddings` entries this update put or
@@ -80,7 +80,7 @@ impl Painted {
             from: crate::kept_paint::PaintedFrom::default(),
             kept_boxes: Vec::new(),
             boxes_drawn: 0,
-            boxes_copied: 0,
+            parts_read_kept: 0,
             items_built: 0,
             maps_patched: 0,
             stackings: crate::paint_order::Stackings::default(),
