@@ -98,7 +98,7 @@ impl ScenePainter {
     }
 
     fn paint_runs(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
-        let batched = painted.scene().batches(view(target));
+        let batched = painted.batches(view(target));
         self.counts.culled = batched.culled;
         for batch in &batched.batches {
             match clipped(target, batch.clip).filter(|_| !batch.culled) {

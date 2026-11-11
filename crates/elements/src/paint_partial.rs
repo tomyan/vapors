@@ -45,7 +45,7 @@ pub(crate) fn paint_partial(
     let mut repaint = Repaint::new(boxes, rects, &order);
     repaint.boxes(again, input, &mut painted);
     repaint.thumbs(input, &mut painted);
-    drawn_updated(&mut painted, &order, patched);
+    drawn_updated(&mut painted, &order, &patched);
     painted.order = order;
     painted
 }
@@ -65,15 +65,23 @@ fn patched_slots(
         .collect()
 }
 
-/// `painted`'s drawing steps made afresh when `order` was walked again,
-/// else patched for the `patched` slots.
-fn drawn_updated(painted: &mut Painted, order: &KeptOrder, patched: Vec<usize>) {
+/// `painted`'s drawing steps made afresh, and its kept batches dropped,
+/// when `order` was walked again; else both patched for the `patched`
+/// slots.
+fn drawn_updated(painted: &mut Painted, order: &KeptOrder, patched: &[usize]) {
     if order.walks.order > 0 {
         painted.drawn = DrawnSteps::of(&order.steps, &painted.kept_boxes);
-    } else {
-        painted
-            .drawn
-            .patch(patched.into_iter(), &painted.kept_boxes);
+        painted.kept_batches = std::cell::RefCell::default();
+        return;
+    }
+    painted
+        .drawn
+        .patch(patched.iter().copied(), &painted.kept_boxes);
+    if let Some(kept) = painted.kept_batches.get_mut() {
+        let steps = patched
+            .iter()
+            .flat_map(|&slot| painted.drawn.places_of(slot));
+        kept.patch(steps, &painted.kept_boxes);
     }
 }
 
