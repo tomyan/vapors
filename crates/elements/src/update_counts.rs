@@ -45,6 +45,11 @@ pub struct UpdateCounts {
     /// drew, their outlines, and every scroll thumb; copied items are
     /// not counted.
     pub scene_items_built: usize,
+    /// Elements whose entries in the border and padding box maps paint
+    /// replaced or removed: those built again, moved or gone since the
+    /// last paint (IU3 3c-3b); every element when paint built the maps
+    /// afresh, and none when the update showed the last update's paint.
+    pub map_entries_patched: usize,
 }
 
 impl UpdateCounts {
@@ -52,6 +57,7 @@ impl UpdateCounts {
     pub(crate) fn note_paint(&mut self, painted: &Painted) {
         self.boxes_painted = painted.boxes_drawn;
         self.scene_items_built = painted.items_built;
+        self.map_entries_patched = painted.maps_patched;
     }
 }
 

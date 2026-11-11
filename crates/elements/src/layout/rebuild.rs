@@ -10,24 +10,25 @@ use vapors_dom::NodeId;
 use super::boxes::{Source, build};
 use super::keep::{KeptBoxes, Lender};
 use super::marks::Rebuild;
+use super::rebuilt::Rebuilt;
 use super::slots::{Key, Placed, Taken};
 use crate::arena::Arena;
 use crate::text_marks::TextMarks;
 
 impl KeptBoxes {
-    /// This update's boxes and how many were built: the kept boxes with
-    /// each owner's subtree built again, or every box built when
-    /// everything is marked, a mark reaches the root with no owner,
-    /// nothing is kept or the scale changed. The
-    /// boxes are no longer kept until `keep` hands them back, so an
-    /// update that fails builds every box next time.
+    /// This update's boxes and the slots built and freed: the kept
+    /// boxes with each owner's subtree built again, or every box built
+    /// when everything is marked, a mark reaches the root with no
+    /// owner, nothing is kept or the scale changed. The boxes are no
+    /// longer kept until `keep` hands them back, so an update that
+    /// fails builds every box next time.
     pub(crate) fn rebuild(
         &mut self,
         source: &Source<'_>,
         root: NodeId,
         scale: f32,
         may_keep: &dyn Fn(NodeId) -> bool,
-    ) -> (Placed, usize) {
+    ) -> (Placed, Rebuilt) {
         self.mark_text_marks(source.text_marks.as_ref());
         let marks = std::mem::take(&mut self.marks);
         let every =
@@ -41,24 +42,23 @@ impl KeptBoxes {
             return self.build_every(source, root, scale, may_keep);
         };
         let mut kept = std::mem::take(&mut self.placed);
-        let count = rebuild_owners(&mut kept, &owners, source, may_keep);
-        (kept, count)
+        let built = rebuild_owners(&mut kept, &owners, source, may_keep);
+        (kept, built)
     }
 
-    /// Every box built, lent the kept boxes' caches, and how many.
+    /// Every box built, lent the kept boxes' caches, every slot built.
     fn build_every(
         &mut self,
         source: &Source<'_>,
         root: NodeId,
         scale: f32,
         may_keep: &dyn Fn(NodeId) -> bool,
-    ) -> (Placed, usize) {
-        let built = build(source, root);
-        let count = built.len();
-        let mut placed = self.place(built);
+    ) -> (Placed, Rebuilt) {
+        let mut placed = self.place(build(source, root));
         self.lend(&mut placed, scale, may_keep);
         self.placed = Placed::default();
-        (placed, count)
+        let rebuilt = Rebuilt::every(&placed.boxes);
+        (placed, rebuilt)
     }
 
     /// Marks the field whose caret or selection the kept boxes show,
@@ -74,26 +74,39 @@ impl KeptBoxes {
     }
 }
 
-/// Builds each owner's subtree again in `placed`; how many boxes.
+/// Builds each owner's subtree again in `placed`; which slots.
 fn rebuild_owners(
     placed: &mut Placed,
     owners: &[NodeId],
     source: &Source<'_>,
     may_keep: &dyn Fn(NodeId) -> bool,
-) -> usize {
+) -> Rebuilt {
     let slots: Vec<usize> = owners.iter().map(|&owner| slot_of(placed, owner)).collect();
     let mut taken = take_subtrees(placed, &slots);
-    let count = owners
+    let put = owners
         .iter()
-        .map(|&owner| put_owner(placed, source, owner, &mut taken))
-        .sum();
+        .flat_map(|&owner| put_owner(placed, source, owner, &mut taken))
+        .collect();
     placed.free_taken(&taken);
-    for (&owner, &slot) in owners.iter().zip(&slots) {
-        if !lend_subtree(placed, slot, &taken, may_keep) {
-            clear_ancestors(placed, ancestors(source.arena, owner));
+    let rebuilt = Rebuilt::subtrees(&placed.boxes, put, &taken);
+    lend_owners(placed, (owners, &slots), &taken, (source.arena, may_keep));
+    rebuilt
+}
+
+/// Lends the taken boxes' caches to each owner's rebuilt subtree, at
+/// its slot; clears the caches of an owner's ancestors when its subtree
+/// changed.
+fn lend_owners(
+    placed: &mut Placed,
+    (owners, slots): (&[NodeId], &[usize]),
+    taken: &Taken,
+    (arena, may_keep): (&Arena, &dyn Fn(NodeId) -> bool),
+) {
+    for (&owner, &slot) in owners.iter().zip(slots) {
+        if !lend_subtree(placed, slot, taken, may_keep) {
+            clear_ancestors(placed, ancestors(arena, owner));
         }
     }
-    count
 }
 
 /// Takes the subtrees at `slots` out of `placed`.
@@ -105,12 +118,14 @@ fn take_subtrees(placed: &mut Placed, slots: &[usize]) -> Taken {
     taken
 }
 
-/// Builds `owner`'s subtree into `placed`; how many boxes.
-fn put_owner(placed: &mut Placed, source: &Source<'_>, owner: NodeId, taken: &mut Taken) -> usize {
-    let built = build(source, owner);
-    let count = built.len();
-    placed.put_subtree(built, taken);
-    count
+/// Builds `owner`'s subtree into `placed`; the slots its boxes took.
+fn put_owner(
+    placed: &mut Placed,
+    source: &Source<'_>,
+    owner: NodeId,
+    taken: &mut Taken,
+) -> Vec<usize> {
+    placed.put_subtree(build(source, owner), taken)
 }
 
 fn slot_of(placed: &Placed, owner: NodeId) -> usize {
