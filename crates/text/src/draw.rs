@@ -111,13 +111,14 @@ impl TextPipeline {
         }
         let bytes: Vec<u8> = quads.iter().flat_map(|f| f.to_le_bytes()).collect();
         let vertex_count = u32::try_from(quads.len() / FLOATS_PER_VERTEX).expect("fits u32");
-        let bind_group = self.bind_group(target.device, params);
         let Some(vertices) = self
             .vertices
             .push(target.encoder, target.queue, &self.work, &bytes)
         else {
             return;
         };
+        let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
+        let bind_group = self.bind_group(target.device, params);
         target.draw_pass("text", |pass| {
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &bind_group, &[]);

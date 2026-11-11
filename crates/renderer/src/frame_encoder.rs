@@ -1,8 +1,8 @@
 //! One command encoder per frame: every pipeline records its passes
 //! into it through a [`Target`](crate::Target), and the frame submits
-//! it once. On ANV one submit costs about 70 µs
-//! (docs/perf/baseline-2026-11-10.md, finding 1), so a submit per draw
-//! made draw time linear in draw calls.
+//! it once. On ANV one `Queue::submit` took about 35 µs
+//! (docs/perf/baseline-2026-11-10.md, run 3), about half of each draw
+//! call's time when every draw submitted.
 
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -66,7 +66,7 @@ impl FrameEncoder {
     /// later draws must see changed, such as a repacked glyph atlas page.
     pub fn flush(&self, queue: &wgpu::Queue) {
         let done = self.encoder.replace(encoder(&self.device));
-        queue.submit([done.finish()]);
+        submit_timed(queue, done);
     }
 
     /// Submits everything recorded on `queue`.
@@ -76,7 +76,7 @@ impl FrameEncoder {
     /// [`ArenaFull`] when a draw was refused and not taken with
     /// [`FrameEncoder::take_refusal`]; the draws recorded are submitted.
     pub fn submit(self, queue: &wgpu::Queue) -> Result<(), ArenaFull> {
-        queue.submit([self.encoder.into_inner().finish()]);
+        submit_timed(queue, self.encoder.into_inner());
         self.refusal.into_inner().map_or(Ok(()), Err)
     }
 
@@ -114,6 +114,17 @@ impl Drop for Open {
     fn drop(&mut self) {
         self.0.store(false, Ordering::Relaxed);
     }
+}
+
+/// Finishes `encoder` inside a `draw step` span with phase `encode` and
+/// submits it inside one with phase `submit`, for vapors-perf.
+fn submit_timed(queue: &wgpu::Queue, encoder: wgpu::CommandEncoder) {
+    let commands = {
+        let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
+        encoder.finish()
+    };
+    let _submit = tracing::trace_span!("draw step", phase = "submit").entered();
+    queue.submit([commands]);
 }
 
 fn encoder(device: &wgpu::Device) -> wgpu::CommandEncoder {

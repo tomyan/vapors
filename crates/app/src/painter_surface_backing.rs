@@ -196,7 +196,9 @@ fn render_into(
         size: backing.size,
         work,
     })?;
-    target.queue.submit([encoder.finish()]);
+    let commands = encoder.finish();
+    let _submit = tracing::trace_span!("draw step", phase = "submit").entered();
+    target.queue.submit([commands]);
     Ok(())
 }
 

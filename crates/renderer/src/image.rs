@@ -139,6 +139,7 @@ impl ImagePipeline {
         else {
             return;
         };
+        let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
         let bind_group = self.bind_group(target.device, texture, sampler);
         target.draw_pass("image", |pass| {
             pass.set_pipeline(&self.pipeline);

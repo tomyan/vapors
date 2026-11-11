@@ -83,6 +83,7 @@ impl Instanced {
     }
 
     fn record(&self, target: &Target<'_>, count: u32, instances: &Placed, viewport: &Placed) {
+        let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
         let bind_group = target.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some(self.label),
             layout: &self.layout,

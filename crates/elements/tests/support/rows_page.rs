@@ -1,6 +1,7 @@
 //! The sparse-update workload of IU1: `rows` mounted rows of a label, a
 //! value and a button, and the edits `sparse_updates.rs` makes to one
-//! of them, each followed by one update.
+//! of them, each followed by one update. `crates/perf` times the same
+//! workload, including this file and `basics.rs` by path.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -8,13 +9,15 @@ use std::rc::Rc;
 use vapors_dom::{Dom, NodeId};
 use vapors_elements::{Document, Viewport};
 
-use super::{document, element, text, viewport};
+use super::basics::{document, element, text, viewport};
 
 /// The value has a fixed size, so a same-length edit to it moves no
 /// other box; the label is as wide as its text. The button changes
-/// colour on hover and gains an outline on focus.
+/// colour on hover and gains an outline on focus. A marked row has a
+/// background.
 const CSS: &str = "body { margin: 0; } \
     .row { display: flex; height: 24px; gap: 8px; } \
+    .row.marked { background-color: #eef; } \
     .value { width: 80px; height: 20px; overflow: hidden; } \
     button { width: 60px; height: 20px; background-color: #ddd; } \
     button:hover { background-color: #bbb; } \
@@ -22,6 +25,7 @@ const CSS: &str = "body { margin: 0; } \
 
 /// One row's nodes.
 pub struct Row {
+    pub element: NodeId,
     pub label: NodeId,
     pub value: NodeId,
     pub button: NodeId,
@@ -57,6 +61,7 @@ fn row(doc: &mut Document, index: usize) -> Row {
     let button = element(doc, row, "button", "");
     text(doc, button, "Edit");
     Row {
+        element: row,
         label: text(doc, label, &format!("Row {index}")),
         value: text(doc, value, &format!("{:05}", index * 7)),
         button,
@@ -76,14 +81,17 @@ pub enum Edit {
     Hover,
     /// The second row's button takes focus.
     Focus,
+    /// The middle row's `marked` class added, or removed when it has it.
+    ToggleClass,
 }
 
-pub const EDITS: [Edit; 5] = [
+pub const EDITS: [Edit; 6] = [
     Edit::FixedSizeText,
     Edit::SizeChangingText,
     Edit::EqualText,
     Edit::Hover,
     Edit::Focus,
+    Edit::ToggleClass,
 ];
 
 impl RowsPage {
@@ -99,7 +107,14 @@ impl RowsPage {
             }
             Edit::Hover => Document::pointer_moved(&self.doc, [HOVER_X, 34.0]),
             Edit::Focus => Document::focus(&self.doc, Some(self.rows[1].button)),
+            Edit::ToggleClass => self.toggle_marked(middle.element),
         }
+    }
+
+    fn toggle_marked(&self, row: NodeId) {
+        let mut doc = self.doc.borrow_mut();
+        let marked = doc.attribute(row, "class") == Some("row marked");
+        doc.set_attribute(row, "class", if marked { "row" } else { "row marked" });
     }
 
     fn set_text(&self, node: NodeId, value: &str) {
