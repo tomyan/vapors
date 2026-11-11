@@ -144,3 +144,14 @@ Requirements from the review of #185, each with a test in its PR:
   update 18.57 → 11.05 ms; at 3000 rows layout 26.87 → 3.30 ms, update
   65.98 → 39.43 ms (`docs/perf/baseline-2026-11-10.md`, "IU3 PR 1b").
   Oracle cases per mark point: #187.
+- PR 3a (in progress, perf/iu3-3a-style): `kept_checks.rs` keeps which
+  elements the tree checks, the `style` attribute check and the checks
+  after styling last refused; `style_checks.rs` checks again only the
+  elements box-marked, listener-marked, added or restyled since the
+  last update, and walks the whole tree for the refusals, in document
+  order, only when one refuses (debug builds walk every update and
+  assert the two agree). `Calcs` is kept in `Kept`, per element.
+  Idle `elements_visited` 0. A compiler flag for "this element's style
+  never changes" would plug in at `Document::rechecked`
+  (`style_checks.rs`), dropping flagged elements from the set the
+  checks after styling and `Calcs::set` run for.

@@ -53,6 +53,8 @@ pub(crate) struct Kept {
     /// Which elements the last update restyled: their computed styles,
     /// and so the addresses their calc handles hold, are new.
     pub(crate) restyled_nodes: std::collections::HashSet<NodeId>,
+    /// The calcs of the kept styles, by the handles boxes hold.
+    pub(crate) calcs: crate::layout::Calcs,
 }
 
 impl Kept {
@@ -129,6 +131,7 @@ impl Document {
     #[doc(hidden)]
     pub fn forget_kept(&mut self) {
         self.kept = None;
+        self.checks = crate::kept_checks::KeptChecks::default();
         self.boxes = crate::layout::KeptBoxes::default();
         self.texts = crate::layout::TextCache::default();
         self.dirty.everything();

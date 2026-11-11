@@ -12,6 +12,9 @@ pub enum ElementError {
     UnfiredEvent(String),
     /// Layout could not finish: a `calc()` that did not resolve.
     Layout(String),
+    /// A change vapors-elements did not mark for checking again: a
+    /// defect in it, which a debug build reports where it happens.
+    Unmarked(String),
     /// An attribute the tree does not honour (`style`), or a value of one
     /// it cannot honour (`disabled="false"`).
     UnsupportedAttribute(String),
@@ -45,6 +48,7 @@ impl fmt::Display for ElementError {
             Self::UnsupportedTag(message)
             | Self::UnfiredEvent(message)
             | Self::UnsupportedAttribute(message)
+            | Self::Unmarked(message)
             | Self::Layout(message) => f.write_str(message),
             Self::Css { sheet, error } => write!(
                 f,

@@ -1,6 +1,6 @@
 //! What the last update did, counted: the cache misses the incremental
-//! tests hold (restyled, laid out, text built) and the structural walk
-//! every update makes whether or not anything changed.
+//! tests hold (restyled, laid out, text built) and the structural work
+//! of each phase.
 
 use crate::document::Document;
 use crate::painted::Painted;
@@ -15,8 +15,9 @@ use crate::painted::Painted;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct UpdateCounts {
-    /// Elements the style phase read kept styles for after restyling:
-    /// one per element in the tree, restyled or not.
+    /// Elements the style phase checked again after restyling: those
+    /// restyled, marked or added since the last update; every element
+    /// on the first update.
     pub elements_visited: usize,
     /// Elements the style phase restyled; 0 when the restyle failed (the
     /// partial count of a failed restyle is not kept).
