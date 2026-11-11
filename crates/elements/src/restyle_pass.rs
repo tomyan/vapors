@@ -29,6 +29,7 @@ impl Document {
         } else {
             self.dirty_roots()
         };
+        let check_narrowed = cfg!(debug_assertions) && self.dirty.narrowed && !fresh;
         self.dirty = Dirty::default();
         self.kept
             .as_mut()
@@ -38,6 +39,9 @@ impl Document {
         match self.restyle_all(&roots, &singles, viewport) {
             Ok(count) => {
                 self.counts.elements_restyled = count;
+                if check_narrowed {
+                    self.check_narrowed_restyle(viewport);
+                }
                 Ok(())
             }
             Err(error) => {

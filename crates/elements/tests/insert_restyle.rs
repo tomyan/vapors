@@ -7,17 +7,16 @@
 mod support;
 
 use support::column_page::{ALL, Page, page, restyled_after};
-use vapors_dom::{Dom, NodeId};
+use vapors_dom::Dom;
 
 const ROW: usize = 6;
 
 /// A bare `div.row` inserted before `rows[at]`, or appended at 10.
-fn insert_row(p: &mut Page, at: usize) -> NodeId {
+fn insert_row(p: &mut Page, at: usize) {
     let row = p.doc.create_element("div");
     p.doc.set_attribute(row, "class", "row");
     let column = p.doc.parent(p.rows[0]).expect("rows are in the column");
     p.doc.insert_before(column, row, p.rows.get(at).copied());
-    row
 }
 
 #[test]
@@ -26,7 +25,7 @@ fn without_structural_rules_an_insert_restyles_the_new_row_only() {
     let mut page = page(".row { color: red; }");
 
     // When
-    let count = restyled_after(&mut page, |p| drop(insert_row(p, 5)));
+    let count = restyled_after(&mut page, |p| insert_row(p, 5));
 
     // Then
     assert_eq!(count, 1);
@@ -38,7 +37,7 @@ fn a_next_sibling_combinator_reaches_the_next_row() {
     let mut page = page(".row + .row { margin-top: 1px; }");
 
     // When
-    let inserted = restyled_after(&mut page, |p| drop(insert_row(p, 5)));
+    let inserted = restyled_after(&mut page, |p| insert_row(p, 5));
     let removed = restyled_after(&mut page, |p| p.doc.remove(p.rows[2]));
 
     // Then: the new row and the next; after a removal the next alone
@@ -51,7 +50,7 @@ fn a_chain_of_next_sibling_combinators_reaches_as_many_rows() {
     let mut page = page(".row + .row + .row { margin-top: 1px; }");
 
     // When
-    let count = restyled_after(&mut page, |p| drop(insert_row(p, 5)));
+    let count = restyled_after(&mut page, |p| insert_row(p, 5));
 
     // Then: the new row and the next two
     assert_eq!(count, 3);
@@ -63,7 +62,7 @@ fn a_next_sibling_rule_on_an_ancestor_reaches_the_next_rows_subtree() {
     let mut page = page(".row + .row .cell { color: red; }");
 
     // When
-    let count = restyled_after(&mut page, |p| drop(insert_row(p, 5)));
+    let count = restyled_after(&mut page, |p| insert_row(p, 5));
 
     // Then: the new row, and the next row with its cells
     assert_eq!(count, 1 + ROW);
@@ -75,7 +74,7 @@ fn nth_child_reaches_the_rows_after() {
     let mut page = page(".row:nth-child(odd) { color: red; }");
 
     // When
-    let count = restyled_after(&mut page, |p| drop(insert_row(p, 5)));
+    let count = restyled_after(&mut page, |p| insert_row(p, 5));
 
     // Then: the new row, and rows 5 to 9 whose parity flipped, with their cells
     assert_eq!(count, 1 + 5 * ROW);
@@ -87,16 +86,17 @@ fn last_child_reaches_the_old_and_new_last() {
     let mut page = page(".row:last-child { color: red; }");
 
     // When
-    let appended = restyled_after(&mut page, |p| drop(insert_row(p, 10)));
-    let middle = restyled_after(&mut page, |p| drop(insert_row(p, 5)));
+    let appended = restyled_after(&mut page, |p| insert_row(p, 10));
+    let middle = restyled_after(&mut page, |p| insert_row(p, 5));
     let removed = restyled_after(&mut page, |p| {
         let last = p.doc.children(p.doc.parent(p.rows[0]).expect("column"))[11];
         p.doc.remove(last);
     });
 
     // Then: the old last changed, so its cells too, and the new row; in the
-    // middle the previous row is restyled unchanged; the new last after a removal
-    assert_eq!((appended, middle, removed), (ROW + 1, 2, 1));
+    // middle the previous row is restyled unchanged; after a removal the new
+    // last changed, with its cells
+    assert_eq!((appended, middle, removed), (ROW + 1, 2, ROW));
 }
 
 #[test]
@@ -105,7 +105,7 @@ fn subsequent_sibling_combinator_reaches_the_following_rows() {
     let mut page = page(".on ~ .row { color: red; }");
 
     // When
-    let count = restyled_after(&mut page, |p| drop(insert_row(p, 5)));
+    let count = restyled_after(&mut page, |p| insert_row(p, 5));
 
     // Then: the new row and the 5 rows after it, each unchanged
     assert_eq!(count, 1 + 5);
@@ -117,7 +117,7 @@ fn has_restyles_everything() {
     let mut page = page(".column:has(.on) { color: red; }");
 
     // When
-    let count = restyled_after(&mut page, |p| drop(insert_row(p, 5)));
+    let count = restyled_after(&mut page, |p| insert_row(p, 5));
 
     // Then
     assert_eq!(count, ALL + 1);
@@ -127,7 +127,7 @@ fn has_restyles_everything() {
 fn a_sheet_added_between_inserts_changes_the_reach() {
     // Given
     let mut page = page(".row { color: red; }");
-    let before = restyled_after(&mut page, |p| drop(insert_row(p, 5)));
+    let before = restyled_after(&mut page, |p| insert_row(p, 5));
 
     // When
     page.doc
@@ -136,7 +136,7 @@ fn a_sheet_added_between_inserts_changes_the_reach() {
     page.doc
         .update(support::viewport(400.0, 600.0))
         .expect("updates");
-    let after = restyled_after(&mut page, |p| drop(insert_row(p, 5)));
+    let after = restyled_after(&mut page, |p| insert_row(p, 5));
 
     // Then
     assert_eq!((before, after), (1, 2));

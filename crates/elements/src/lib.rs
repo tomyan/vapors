@@ -90,6 +90,8 @@ mod range_input;
 mod range_paint;
 mod repaint;
 mod restyle;
+mod restyle_check;
+mod restyle_children;
 mod restyle_pass;
 mod scene_view;
 mod scroll;

@@ -5,31 +5,35 @@
 
 mod support;
 
-use support::rows_page::{row_before, rows_page, rows_viewport};
-use vapors_dom::Dom;
+use support::rows_page::{RowsPage, row_before, rows_page, rows_viewport};
 
 /// A row's elements: the row, its label, value and button.
 const ROW: usize = 4;
 
 /// The elements restyled by one update after a row is inserted before
-/// the middle row, under `extra_css` added to the workload's sheet.
-fn restyled_by_middle_insert(rows: usize, extra_css: &str) -> usize {
-    let page = rows_page(rows);
+/// the middle row, under `extra_css` added to the sheets so far.
+fn restyled_by_middle_insert(page: &RowsPage, extra_css: &str) -> usize {
     let mut doc = page.doc.borrow_mut();
     if !extra_css.is_empty() {
-        doc.add_stylesheet("extra.css", extra_css).expect("parses");
+        doc.add_stylesheet(extra_css, extra_css).expect("parses");
         doc.update(rows_viewport()).expect("updates");
     }
+    let rows = page.rows.len();
     row_before(&mut doc, rows, Some(page.rows[rows / 2].element));
     doc.update(rows_viewport()).expect("updates");
     doc.elements_restyled()
 }
 
+/// One page, the sheets added in turn: each insert goes before the
+/// original middle row, so the rows after it stay `rows - rows / 2`.
 fn assert_middle_insert_counts(rows: usize) {
+    // Given
+    let page = rows_page(rows);
+
     // When
-    let plain = restyled_by_middle_insert(rows, "");
-    let next = restyled_by_middle_insert(rows, ".row + .row { margin-top: 1px; }");
-    let odd = restyled_by_middle_insert(rows, ".row:nth-child(odd) { color: red; }");
+    let plain = restyled_by_middle_insert(&page, "");
+    let next = restyled_by_middle_insert(&page, ".row + .row { margin-top: 1px; }");
+    let odd = restyled_by_middle_insert(&page, ".row:nth-child(odd) { color: red; }");
 
     // Then: the new row; and the next row; and every row after, changed, with its children
     assert_eq!(

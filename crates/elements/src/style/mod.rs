@@ -20,6 +20,8 @@ mod parts;
 mod position;
 mod scope;
 mod scrollbar;
+mod sibling_deps;
+pub(crate) use sibling_deps::SiblingDeps;
 mod sizes;
 mod styles;
 mod surface;
@@ -139,6 +141,22 @@ impl Sheets {
         flag: vapors_css::tree::States,
     ) -> vapors_css::cascade::RestyleScope {
         self.cascade.restyle_scope_of_selectors(flag)
+    }
+
+    /// The selectors of the rules that reach siblings, as written, each
+    /// with whether it matches `node` now: what a narrowed restyle that
+    /// went wrong missed.
+    pub(crate) fn sibling_selectors(&self, arena: &Arena, node: NodeId) -> Vec<(String, bool)> {
+        let element = ElementRef::new(arena, node);
+        self.cascade
+            .rules()
+            .filter(|rule| SiblingDeps::of_selector(&rule.selector).any())
+            .map(|rule| {
+                let text = vapors_css::serialize::component_values(&rule.prelude);
+                let matches = vapors_css::selector::matches(&rule.selector, &element);
+                (text.trim().to_owned(), matches)
+            })
+            .collect()
     }
 
     /// The scoped styles that did not parse.

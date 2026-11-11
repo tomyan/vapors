@@ -95,13 +95,13 @@ impl Dom for Document {
     fn insert_before(&mut self, parent: NodeId, child: NodeId, before: Option<NodeId>) {
         self.note_change();
         if let Some(old) = self.parent(child) {
-            self.mark_children_changed(old, None);
+            self.mark_children_changed(old, child, false);
             self.boxes.marks.mark(old);
         }
         self.arena.place("insert_before", parent, child, before);
         self.checks.added.push(child);
         self.boxes.marks.mark(parent);
-        self.mark_children_changed(parent, Some(child));
+        self.mark_children_changed(parent, child, true);
     }
 
     /// Detaches the node and frees it with its subtree: its id and its
@@ -114,7 +114,7 @@ impl Dom for Document {
         );
         self.note_change();
         if let Some(parent) = self.parent(node) {
-            self.mark_children_changed(parent, None);
+            self.mark_children_changed(parent, node, false);
             self.boxes.marks.mark(parent);
         }
         self.drop_focus_within(node);
