@@ -11,7 +11,7 @@ use crate::event::Event;
 use crate::input::Input;
 use crate::platform::Platform;
 use crate::surface::Gpu;
-use crate::surface_texture::acquire;
+use crate::surface_texture::{Miss, acquire};
 use crate::tasks;
 use crate::window::{App, Frame, Next, WindowOptions};
 
@@ -23,7 +23,7 @@ pub struct Handler {
     window: Option<Arc<Window>>,
     gpu: Option<Gpu>,
     presented: u64,
-    /// Redraws in a row that produced no texture; see [`acquire`].
+    /// Redraws in a row whose surface failed; see [`acquire`].
     missed: u32,
     error: Option<PlatformError>,
     /// Set when the GPU watch stopped the loop; see `stop_if_gpu_failed`.
@@ -36,10 +36,10 @@ pub struct Handler {
     ime: std::cell::RefCell<crate::ime_state::ImeState>,
 }
 
-/// Consecutive redraws without a texture before giving up: a second at
-/// 60 Hz. An occluded window on some compositors reports Occluded for
-/// as long as it is hidden, so this is a first number to be measured
-/// against that; the failure names the outcome so a reader can tell.
+/// Consecutive redraws whose surface failed (`Outdated`, `Lost`,
+/// `Validation`) before giving up: a second at 60 Hz, unmeasured. A
+/// hidden window (`Occluded`, `Timeout`) is waited for and not counted.
+/// The failure names the last outcome.
 const MISSED_LIMIT: u32 = 60;
 
 impl Handler {
@@ -168,7 +168,8 @@ impl Handler {
         };
         let surface_texture = match acquire(window, gpu) {
             Ok(texture) => texture,
-            Err(outcome) => {
+            Err(Miss::Waiting(_)) => return,
+            Err(Miss::Failed(outcome)) => {
                 self.missed += 1;
                 if self.missed >= MISSED_LIMIT {
                     let error = PlatformError::Surface(format!(
