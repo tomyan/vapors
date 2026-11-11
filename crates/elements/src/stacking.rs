@@ -28,6 +28,7 @@ impl Stacking {
 /// Each slot's stacking, made once per update so paint order and
 /// scroll chains read a slot in place of looking its node's style up on
 /// every visit; `None` for a vacant slot.
+#[derive(Default)]
 pub(crate) struct Stackings(Vec<Option<Stacking>>);
 
 impl Stackings {
@@ -45,6 +46,11 @@ impl Stackings {
     /// box's child.
     pub(crate) fn get(&self, index: usize) -> Stacking {
         self.0[index].unwrap_or_else(|| unreachable!("slot {index} is vacant, and no box's child"))
+    }
+
+    /// Slot `index`'s stacking; `None` when vacant or past the end.
+    pub(crate) fn at(&self, index: usize) -> Option<Stacking> {
+        self.0.get(index).copied().flatten()
     }
 
     /// Whether box `index` is a scroll container.

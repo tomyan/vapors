@@ -59,7 +59,8 @@ const EXPECTED: [(usize, usize, usize); 6] = [
 ];
 
 /// The walk after each edit of `EDITS`, by row count: elements visited,
-/// boxes built, layout calls, boxes painted, scene items built. A row is
+/// boxes built, layout calls, boxes painted, scene items built, map
+/// entries patched (the elements built again or moved). A row is
 /// 4 elements and 7 boxes (3 text runs) and draws 4 items (the button's
 /// quad and 3 texts), 5 with the focus outline, 6 with the outline and
 /// the marked row's background; `html` and `body` add 2
@@ -68,27 +69,27 @@ const EXPECTED: [(usize, usize, usize); 6] = [
 /// built or moved, copying the rest (`kept_box.rs`): the longer label
 /// moves the 4 boxes after it in its row. The second table in
 /// docs/plans/iu1.md is these numbers.
-const EXPECTED_WALKS: [(usize, [[usize; 5]; 6]); 2] = [
+const EXPECTED_WALKS: [(usize, [[usize; 6]; 6]); 2] = [
     (
         100,
         [
-            [1, 2, 109, 2, 1],
-            [1, 2, 111, 6, 4],
-            [0, 0, 1, 0, 0],
-            [4, 2, 1, 2, 2],
-            [1, 2, 1, 2, 3],
-            [4, 7, 1, 7, 5],
+            [1, 2, 109, 2, 1, 1],
+            [1, 2, 111, 6, 4, 3],
+            [0, 0, 1, 0, 0, 0],
+            [4, 2, 1, 2, 2, 1],
+            [1, 2, 1, 2, 3, 1],
+            [4, 7, 1, 7, 5, 4],
         ],
     ),
     (
         1000,
         [
-            [1, 2, 1009, 2, 1],
-            [1, 2, 1011, 6, 4],
-            [0, 0, 1, 0, 0],
-            [4, 2, 1, 2, 2],
-            [1, 2, 1, 2, 3],
-            [4, 7, 1, 7, 5],
+            [1, 2, 1009, 2, 1, 1],
+            [1, 2, 1011, 6, 4, 3],
+            [0, 0, 1, 0, 0, 0],
+            [4, 2, 1, 2, 2, 1],
+            [1, 2, 1, 2, 3, 1],
+            [4, 7, 1, 7, 5, 4],
         ],
     ),
 ];
@@ -140,6 +141,7 @@ fn assert_walk(rows: usize, index: usize, edit: Edit, work: &Work) {
         c.layout_calls,
         c.boxes_painted,
         c.scene_items_built,
+        c.map_entries_patched,
     ];
     assert_eq!(
         actual, walks[index],

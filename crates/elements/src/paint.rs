@@ -9,7 +9,7 @@ use vapors_dom::NodeId;
 use vapors_scene::{Rect, Scene};
 use vapors_text::FontSystem;
 
-use crate::layout::{BoxRect, Content, LayoutBox};
+use crate::layout::{BoxRect, LayoutBox};
 use crate::paint_order::{Stackings, Step, paint_steps_with_outlines};
 use crate::painted::Painted;
 use crate::style::Used;
@@ -63,7 +63,8 @@ impl<'a> PaintInput<'a> {
 
 /// Paints `boxes` (box 0 the root) at the rects layout gave them.
 pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> Painted {
-    let mut painted = started(boxes, rects, input);
+    let mut painted = started(input);
+    painted.maps_patched = crate::kept_maps::build(&mut painted, (boxes, rects));
     let (steps, clips) = order(boxes, rects, input);
     for step in steps {
         let index = step.index();
@@ -88,26 +89,13 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
     painted
 }
 
-/// A paint with the canvas and every element's border and padding box,
-/// before any box is painted; notes in `input` which element gave the
-/// canvas its colour.
-pub(crate) fn started(
-    boxes: &[LayoutBox],
-    rects: &[BoxRect],
-    input: &mut PaintInput<'_>,
-) -> Painted {
+/// A paint with the canvas, before any box is painted; notes in
+/// `input` which element gave the canvas its colour.
+pub(crate) fn started(input: &mut PaintInput<'_>) -> Painted {
     let (canvas, propagated) = crate::canvas::canvas_background(input);
     input.propagated = propagated;
     let canvas_from = crate::canvas::canvas_from(propagated, input.root);
-    let mut painted = Painted::empty(canvas, canvas_from, input.scale);
-    for (index, layout_box) in boxes.iter().enumerate() {
-        if let Content::Element(node) = layout_box.content {
-            painted.rects.insert(node, rects[index]);
-            let padding = crate::clip::padding_box(&boxes[index], rects[index]);
-            painted.paddings.insert(node, [padding.x, padding.y]);
-        }
-    }
-    painted
+    Painted::empty(canvas, canvas_from, input.scale)
 }
 
 /// The steps of painting in order, and each box's clip.

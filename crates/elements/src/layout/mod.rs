@@ -10,6 +10,7 @@ mod layout_box;
 mod marks;
 mod measure;
 mod rebuild;
+mod rebuilt;
 mod replaced;
 mod slots;
 pub(crate) use boxes::Source;
@@ -24,7 +25,8 @@ pub(crate) use boxes::{Content, LayoutBox};
 pub(crate) use calcs::Calcs;
 pub(crate) use inline::{InlineRun, InlineSpan};
 pub(crate) use keep::KeptBoxes;
-pub(crate) use slots::Placed;
+pub(crate) use rebuilt::Rebuilt;
+pub(crate) use slots::{Key, Placed};
 pub(crate) use text_cache::TextCache;
 use tree::BoxTree;
 

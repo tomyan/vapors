@@ -6,7 +6,9 @@
 //! thumbs are painted on every update. The scene equals a full paint's
 //! (`paint.rs`), which a debug build checks (`kept_paint.rs`).
 
+use crate::changed_slots::ChangedSlots;
 use crate::kept_box::{BoxFrom, KeptBox, Part};
+use crate::kept_paint::LastPaint;
 use crate::layout::{BoxRect, LayoutBox};
 use crate::paint::{PaintInput, clip_to, order, paint_box, started};
 use crate::paint_order::Step;
@@ -14,16 +16,19 @@ use crate::painted::Painted;
 use vapors_scene::Item;
 
 /// Paints `boxes` at `rects`, copying from `last`, the last update's
-/// kept paint by slot, where it shows what painting again would.
+/// kept paint, where it shows what painting again would, and patching
+/// its maps for the `changed` slots.
 pub(crate) fn paint_partial(
     boxes: &[LayoutBox],
     rects: &[BoxRect],
     input: &mut PaintInput<'_>,
-    last: Vec<Option<KeptBox>>,
+    last: LastPaint,
+    changed: &ChangedSlots,
 ) -> Painted {
-    let mut painted = started(boxes, rects, input);
+    let mut painted = started(input);
+    crate::kept_maps::fill(&mut painted, (boxes, rects), last.maps, changed);
     let (steps, clips) = order(boxes, rects, input);
-    let mut walk = Walk::new(boxes, rects, last, &painted);
+    let mut walk = Walk::new(boxes, rects, last.boxes, &painted);
     for step in steps {
         let index = step.index();
         clip_to(clips[index], input, &mut painted.scene);
