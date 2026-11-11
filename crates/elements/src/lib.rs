@@ -41,6 +41,7 @@ mod images;
 mod img_checks;
 mod inline_check;
 mod kept_checks;
+mod kept_paint;
 mod keys;
 mod lay_out_text;
 mod layout;

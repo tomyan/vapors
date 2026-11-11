@@ -160,6 +160,18 @@ impl TextCache {
         self.built = 0;
     }
 
+    /// Keeps the layouts the last update used for the next, as when
+    /// this update used them all: its paint is the last one's, kept.
+    pub(crate) fn keep_previous(&mut self) {
+        if self.current.is_empty() {
+            std::mem::swap(&mut self.current, &mut self.previous);
+            return;
+        }
+        for (key, layout) in self.previous.drain() {
+            self.current.entry(key).or_insert(layout);
+        }
+    }
+
     /// How many layouts this update built rather than kept.
     pub(crate) fn built(&self) -> usize {
         self.built
