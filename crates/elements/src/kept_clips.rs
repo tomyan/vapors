@@ -69,15 +69,27 @@ impl Clips {
         let mut open = vec![start];
         let mut redone = 0;
         while let Some(slot) = open.pop() {
-            if !redo.first_visit(slot) {
-                continue;
-            }
-            redone += 1;
-            if self.redo(slot, tree, inner) || matches!(redo, Redo::Every) {
-                open.extend_from_slice(tree.dependents(slot));
-            }
+            redone += usize::from(self.visit(slot, (tree, inner), redo, &mut open));
         }
         redone
+    }
+
+    /// Redoes `slot` unless `redo` already has, and opens its
+    /// dependents where `redo` reaches them; whether it was redone.
+    fn visit(
+        &mut self,
+        slot: usize,
+        (tree, inner): (&ClipTree, Inner<'_>),
+        redo: &mut Redo,
+        open: &mut Vec<usize>,
+    ) -> bool {
+        if !redo.first_visit(slot) {
+            return false;
+        }
+        if self.redo(slot, tree, inner) || matches!(redo, Redo::Every) {
+            open.extend_from_slice(tree.dependents(slot));
+        }
+        true
     }
 
     /// Box `slot`'s clips worked out again from its clip parent's

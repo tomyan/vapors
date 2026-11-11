@@ -1,6 +1,7 @@
 //! What paint order needs of each box's style (`paint_order`): whether
 //! it is positioned, its z-index, whether it is fixed and whether it
-//! scrolls.
+//! scrolls; and what decides containing blocks, which kept paint
+//! compares to know when to walk them again (`changed_slots.rs`).
 
 use super::layout::{Content, LayoutBox};
 use crate::node_map::NodeMap;
@@ -17,6 +18,14 @@ pub(crate) struct Stacking {
     pub(crate) fixed: bool,
     /// A scroll container, which paints a thumb.
     pub(crate) scrolls: bool,
+    /// The containing block of absolute boxes, as Taffy hoists them
+    /// (`CoreStyle::is_containing_block`).
+    pub(crate) contains_absolute: bool,
+    /// The containing block of fixed boxes, likewise.
+    pub(crate) contains_fixed: bool,
+    /// `position` absolute or fixed: placed against its containing
+    /// block, not its parent.
+    pub(crate) out_of_flow: bool,
 }
 
 impl Stacking {
@@ -66,15 +75,23 @@ fn stacking_of(layout_box: &LayoutBox, used: &NodeMap<Used>) -> Option<Stacking>
         Content::Text(_) => return Some(Stacking::default()),
         Content::Vacant => return None,
     };
-    let used = &used[&node];
-    Some(Stacking {
+    Some(stacking_of_style(&used[&node]))
+}
+
+/// An element's stacking, from its used style.
+fn stacking_of_style(used: &Used) -> Stacking {
+    let claims = taffy::CoreStyle::is_containing_block(&used.layout);
+    Stacking {
         // a z-index is kept only where it applies: on a static box, a
         // flex or grid item, which then stacks as if positioned
         positioned: used.layout.position != taffy::Position::Static || used.z_index.is_some(),
         z: used.z_index,
         fixed: used.layout.position == taffy::Position::Fixed,
         scrolls: used.scrolls(),
-    })
+        contains_absolute: claims.absolute,
+        contains_fixed: claims.fixed,
+        out_of_flow: used.layout.position.is_out_of_flow(),
+    }
 }
 
 #[cfg(test)]

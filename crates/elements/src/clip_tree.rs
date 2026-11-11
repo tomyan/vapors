@@ -25,17 +25,7 @@ pub(crate) struct ClipTree {
 impl ClipTree {
     /// The clip tree of `boxes`, box 0 the root.
     pub(crate) fn of(boxes: &[LayoutBox]) -> Self {
-        let containing = containing_blocks(boxes);
-        let mut parent = vec![None; boxes.len()];
-        let mut depth = vec![0; boxes.len()];
-        let mut open: Vec<usize> = (!boxes.is_empty()).then_some(0).into_iter().collect();
-        while let Some(index) = open.pop() {
-            for &child in &boxes[index].children {
-                parent[child] = containing[child].or(Some(index));
-                depth[child] = depth[index] + 1;
-                open.push(child);
-            }
-        }
+        let (parent, depth) = parents_and_depths(boxes);
         let (first, dependents) = grouped(&parent);
         Self {
             parent,
@@ -76,16 +66,27 @@ impl ClipTree {
     }
 }
 
+/// Each box's clip parent, the containing block of an out-of-flow box
+/// else its parent, and its depth in the tree.
+fn parents_and_depths(boxes: &[LayoutBox]) -> (Vec<Option<usize>>, Vec<usize>) {
+    let containing = containing_blocks(boxes);
+    let mut parent = vec![None; boxes.len()];
+    let mut depth = vec![0; boxes.len()];
+    let mut open: Vec<usize> = (!boxes.is_empty()).then_some(0).into_iter().collect();
+    while let Some(index) = open.pop() {
+        for &child in &boxes[index].children {
+            parent[child] = containing[child].or(Some(index));
+            depth[child] = depth[index] + 1;
+            open.push(child);
+        }
+    }
+    (parent, depth)
+}
+
 /// Each slot's dependents in one vector, grouped by parent, and where
 /// each group starts.
 fn grouped(parent: &[Option<usize>]) -> (Vec<usize>, Vec<usize>) {
-    let mut first = vec![0; parent.len() + 1];
-    for &above in parent.iter().flatten() {
-        first[above + 1] += 1;
-    }
-    for slot in 0..parent.len() {
-        first[slot + 1] += first[slot];
-    }
+    let first = group_starts(parent);
     let mut next = first.clone();
     let mut dependents = vec![0; first[parent.len()]];
     for (slot, above) in parent.iter().enumerate() {
@@ -95,4 +96,17 @@ fn grouped(parent: &[Option<usize>]) -> (Vec<usize>, Vec<usize>) {
         }
     }
     (first, dependents)
+}
+
+/// Where each slot's group of dependents starts, and one past the last
+/// group's end: the running count of dependents of the slots before.
+fn group_starts(parent: &[Option<usize>]) -> Vec<usize> {
+    let mut first = vec![0; parent.len() + 1];
+    for &above in parent.iter().flatten() {
+        first[above + 1] += 1;
+    }
+    for slot in 0..parent.len() {
+        first[slot + 1] += first[slot];
+    }
+    first
 }
