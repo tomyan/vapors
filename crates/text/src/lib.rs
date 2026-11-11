@@ -22,6 +22,7 @@ mod icon_path_lex;
 #[cfg(test)]
 mod italic_tests;
 mod layout;
+mod layout_ink;
 mod layout_ranges;
 mod layout_runs;
 mod layout_types;

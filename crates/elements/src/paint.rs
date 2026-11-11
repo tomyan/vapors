@@ -201,9 +201,10 @@ fn paint_text(run: &InlineRun, rect: BoxRect, input: &mut PaintInput<'_>, out: &
         .layout(input.fonts, input.scale, run, Some(rect.width));
     crate::paint_inline::paint_spans(run, &layout, rect, input, out);
     let id = TextId(u32::try_from(out.texts.len()).expect("fewer than 2^32 text runs"));
-    out.texts.push(layout);
     let origin = [rect.x * input.scale, rect.y * input.scale];
-    out.scene.push(Item::Text { text: id, origin });
+    let (text, ink) = (id, layout.ink().offset(origin));
+    out.texts.push(layout);
+    out.scene.push(Item::Text { text, origin, ink });
 }
 
 /// `rect` in device pixels, each edge rounded to the nearest pixel, so

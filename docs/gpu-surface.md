@@ -315,8 +315,10 @@ renderer)`; `unmount` hands it back and dropping it is teardown.
   the content box's device size), under the run's scissor. No tone
   mapping or colour management is applied by the surface.
 - A surface not painted in a frame (hidden, zero-sized, `display:
-  none`, wholly clipped, or removed) is inactive: its backing is
-  released and it is not rendered. A refused frame also releases the
+  none`, wholly clipped, wholly outside the target, or removed) is
+  inactive: its backing is released, it is not rendered and its
+  animation does not ask for frames. It renders again, into a new
+  backing, in the first frame that paints it. A refused frame also releases the
   backings it did not reach. The renderer is not told: it keeps its own
   resources until it is unmounted. A `deactivate` hook, called when the
   backing is released, would let it free them; there is none yet.

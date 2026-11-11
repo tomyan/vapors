@@ -1,12 +1,13 @@
 //! Drawing an update: clear to the canvas colour (or, drawing over what
 //! the target holds, not), then each run of the scene's items with the
 //! pipeline for its kind, in painting order, under the run's clip as a
-//! scissor; a run clipped to nothing is not drawn, though its surfaces
-//! are refused as they would be in view.
+//! scissor. Items that paint nothing inside the target under their clip
+//! are culled when the scene is batched; a run clipped to nothing is not
+//! drawn, though its surfaces are refused as they would be in view.
 
 use vapors_elements::Painted;
 use vapors_renderer::{ImagePipeline, QuadPipeline, ShadowPipeline, Target, clear_target};
-use vapors_scene::{Rect, Run, Scissor, Size};
+use vapors_scene::Run;
 use vapors_text::{AtlasConfig, GlyphAtlas, TextPipeline};
 
 /// The pipelines and glyph atlas for one target format.
@@ -97,8 +98,10 @@ impl ScenePainter {
     }
 
     fn paint_runs(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
-        for batch in painted.scene().batches() {
-            match clipped(target, batch.clip) {
+        let batched = painted.scene().batches(view(target));
+        self.counts.culled = batched.culled;
+        for batch in &batched.batches {
+            match clipped(target, batch.clip).filter(|_| !batch.culled) {
                 Some(clipped) => self.draw_run(&clipped, painted, &batch.run)?,
                 None => self
                     .surfaces
@@ -115,7 +118,7 @@ impl ScenePainter {
         &mut self,
         target: &Target<'_>,
         painted: &Painted,
-        run: &Run<'_>,
+        run: &Run,
     ) -> Result<(), PaintError> {
         let result = self.issue_run(target, painted, run);
         self.count_run(run);
@@ -132,11 +135,11 @@ impl ScenePainter {
         &mut self,
         target: &Target<'_>,
         painted: &Painted,
-        run: &Run<'_>,
+        run: &Run,
     ) -> Result<(), PaintError> {
-        match *run {
-            Run::Shadows(ref shadows) => self.shadows.draw(target, shadows),
-            Run::Quads(ref quads) => self.quads.draw(target, quads),
+        match run {
+            Run::Shadows(shadows) => self.shadows.draw(target, shadows),
+            Run::Quads(quads) => self.quads.draw(target, quads),
             Run::Texts(items) => self.draw_texts(target, painted, items)?,
             Run::Icons(items) => self.draw_icons(target, painted, items)?,
             Run::Images(items) => self.textures.draw(&mut self.images, target, painted, items),
@@ -148,41 +151,9 @@ impl ScenePainter {
     }
 }
 
-/// Where a batch may draw.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Region {
-    /// The whole target.
-    Whole,
-    /// Inside this scissor.
-    Within(Scissor),
-    /// Nowhere: the batch is not drawn.
-    Nowhere,
-}
-
-/// Where a batch under `clip` may draw on a `viewport`-sized target
-/// that has its own scissor `outer`: inside both.
-fn region(outer: Option<Scissor>, clip: Option<Rect>, viewport: Size) -> Region {
-    let inner = match clip.map(|clip| clip.scissor(viewport)) {
-        None => return outer.map_or(Region::Whole, Region::Within),
-        Some(None) => return Region::Nowhere,
-        Some(Some(inner)) => inner,
-    };
-    match outer.map_or(Some(inner), |outer| outer.intersect(inner)) {
-        Some(both) => Region::Within(both),
-        None => Region::Nowhere,
-    }
-}
-
-/// `target` cut to `clip`; `None` when nothing of it is left.
-fn clipped<'a>(target: &Target<'a>, clip: Option<Rect>) -> Option<Target<'a>> {
-    let scissor = match region(target.scissor, clip, target.viewport) {
-        Region::Whole => None,
-        Region::Within(scissor) => Some(scissor),
-        Region::Nowhere => return None,
-    };
-    Some(Target { scissor, ..*target })
-}
-
+#[path = "painter_region.rs"]
+mod region;
+use region::{clipped, view};
 #[path = "painter_counts.rs"]
 mod counts;
 pub use counts::FrameCounts;

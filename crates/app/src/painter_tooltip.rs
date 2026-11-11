@@ -67,7 +67,7 @@ impl ScenePainter {
             placed.text_origin,
             BlendParams::default(),
         );
-        self.count_run(&Run::Texts(&[]));
+        self.count_run(&Run::Texts(Vec::new()));
         drawn.map_err(TooltipError::Atlas)
     }
 }

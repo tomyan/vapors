@@ -22,6 +22,26 @@ fn the_counts_line_gives_the_last_frames_render_passes() {
 }
 
 #[test]
+fn the_counts_line_gives_the_items_culled_after_the_scene_items() {
+    // Given
+    let mut frame = vapors_app::FrameCounts::default();
+    frame.culled = 7;
+    let samples = Samples {
+        counts: Counts {
+            frame,
+            ..Counts::default()
+        },
+        ..Samples::default()
+    };
+
+    // When
+    let report = section("rows", &samples);
+
+    // Then
+    assert!(report.contains("scene items 0, culled 7;"), "{report}");
+}
+
+#[test]
 fn the_gpu_rows_are_the_pass_time_and_the_span_labelled_an_upper_bound() {
     // Given
     let samples = Samples {

@@ -9,10 +9,6 @@ use crate::Target;
 use crate::instanced::{Instanced, float_bytes};
 use crate::quads::rgba;
 
-/// Three standard deviations: past this the Gaussian is under 0.3% of
-/// its peak, so the quad drawn for a shadow stops there.
-const REACH: f32 = 3.0;
-
 /// A pipeline that draws shadows. Create once per target format.
 pub struct ShadowPipeline(Instanced);
 
@@ -42,18 +38,13 @@ impl ShadowPipeline {
 }
 
 /// The shadow's seven four-float attributes, as `shadows.wgsl` reads them:
-/// the quad to draw, the shape, its radii, the caster, its radii, and
-/// the colour, and the standard deviation.
+/// the quad to draw ([`Shadow::drawn`], which culling also reads), the
+/// shape, its radii, the caster, its radii, and the colour, and the
+/// standard deviation.
 fn instance(shadow: &Shadow) -> Vec<f32> {
     let sigma = shadow.blur / 2.0;
-    let reach = sigma * REACH;
-    let (r, c) = (shadow.rect, shadow.caster);
-    let mut floats = vec![
-        r.left - reach,
-        r.top - reach,
-        r.right + reach,
-        r.bottom + reach,
-    ];
+    let (r, c, quad) = (shadow.rect, shadow.caster, shadow.drawn());
+    let mut floats = vec![quad.left, quad.top, quad.right, quad.bottom];
     floats.extend([r.left, r.top, r.right, r.bottom]);
     floats.extend(shadow.radii);
     floats.extend([c.left, c.top, c.right, c.bottom]);

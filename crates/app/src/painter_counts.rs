@@ -8,8 +8,9 @@ use vapors_scene::Run;
 use super::ScenePainter;
 
 /// GPU work the painter's last frame ([`ScenePainter::draw`] or
-/// [`ScenePainter::draw_over`]) issued, per kind of scene run, for
-/// diagnostics and tests. Structural: bytes and calls, not time.
+/// [`ScenePainter::draw_over`]) issued, per kind of scene run, and the
+/// items it culled, for diagnostics and tests. Structural: bytes,
+/// calls and items, not time.
 ///
 /// Reset when a frame starts; each run adds its work after it draws,
 /// refused or not, so a refused frame holds the runs drawn before the
@@ -39,6 +40,11 @@ pub struct FrameCounts {
     /// quad's vertices, and what each surface's renderer issued through
     /// `SurfaceFrame::work` in the frames that render it.
     pub surfaces: GpuWork,
+    /// Scene items not drawn because nothing they paint falls inside the
+    /// target under their clip (`Scene::batches`); culled surfaces are
+    /// refused as clipped ones are. Set before any run draws, so a
+    /// refused frame holds the whole scene's.
+    pub culled: u64,
 }
 
 impl FrameCounts {
@@ -54,7 +60,7 @@ impl FrameCounts {
         self.texts.texture_bytes + self.icons.texture_bytes
     }
 
-    fn of_kind(&mut self, run: &Run<'_>) -> &mut GpuWork {
+    fn of_kind(&mut self, run: &Run) -> &mut GpuWork {
         match run {
             Run::Shadows(_) => &mut self.shadows,
             Run::Quads(_) => &mut self.quads,
@@ -85,7 +91,7 @@ impl ScenePainter {
     }
 
     /// Adds the work issued since the last take to `run`'s kind.
-    pub(super) fn count_run(&mut self, run: &Run<'_>) {
+    pub(super) fn count_run(&mut self, run: &Run) {
         let work = self.take_work();
         *self.counts.of_kind(run) += work;
     }
