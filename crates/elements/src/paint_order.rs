@@ -57,7 +57,10 @@ fn steps(boxes: &[LayoutBox], stacking: &dyn Fn(usize) -> Stacking, outlines: bo
         out: Vec::with_capacity(boxes.len()),
         outlines: outlines.then(Vec::new),
     };
-    walk.context(0);
+    // No boxes (html `display: none`): nothing to paint.
+    if !boxes.is_empty() {
+        walk.context(0);
+    }
     crate::thumb_order::thumbs_after_descendants(&walk.out, boxes)
 }
 
