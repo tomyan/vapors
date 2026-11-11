@@ -18,14 +18,33 @@ pub(crate) struct Stacking {
     pub(crate) fixed: bool,
     /// A scroll container, which paints a thumb.
     pub(crate) scrolls: bool,
+    /// What decides containing blocks.
+    pub(crate) placement: Placement,
+}
+
+/// What decides which box is a box's containing block: compared, not
+/// read, by paint order (`changed_slots.rs`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Placement {
     /// The containing block of absolute boxes, as Taffy hoists them
     /// (`CoreStyle::is_containing_block`).
-    pub(crate) contains_absolute: bool,
+    contains_absolute: bool,
     /// The containing block of fixed boxes, likewise.
-    pub(crate) contains_fixed: bool,
+    contains_fixed: bool,
     /// `position` absolute or fixed: placed against its containing
     /// block, not its parent.
-    pub(crate) out_of_flow: bool,
+    out_of_flow: bool,
+}
+
+impl Placement {
+    fn of(layout: &taffy::Style) -> Self {
+        let claims = taffy::CoreStyle::is_containing_block(layout);
+        Self {
+            contains_absolute: claims.absolute,
+            contains_fixed: claims.fixed,
+            out_of_flow: layout.position.is_out_of_flow(),
+        }
+    }
 }
 
 impl Stacking {
@@ -80,7 +99,6 @@ fn stacking_of(layout_box: &LayoutBox, used: &NodeMap<Used>) -> Option<Stacking>
 
 /// An element's stacking, from its used style.
 fn stacking_of_style(used: &Used) -> Stacking {
-    let claims = taffy::CoreStyle::is_containing_block(&used.layout);
     Stacking {
         // a z-index is kept only where it applies: on a static box, a
         // flex or grid item, which then stacks as if positioned
@@ -88,9 +106,7 @@ fn stacking_of_style(used: &Used) -> Stacking {
         z: used.z_index,
         fixed: used.layout.position == taffy::Position::Fixed,
         scrolls: used.scrolls(),
-        contains_absolute: claims.absolute,
-        contains_fixed: claims.fixed,
-        out_of_flow: used.layout.position.is_out_of_flow(),
+        placement: Placement::of(&used.layout),
     }
 }
 
