@@ -85,10 +85,7 @@ impl<'a> Walk<'a> {
     ) {
         let from = BoxFrom::of(self.boxes, self.rects, clip, index);
         let kept = match self.reusable(index, &from) {
-            Some(kept) => {
-                kept.touch(input.cache);
-                kept
-            }
+            Some(kept) => kept,
             None => self.painted_again(index, from, input, out),
         };
         kept.own.copy_into(out);
@@ -116,7 +113,6 @@ impl<'a> Walk<'a> {
             from,
             own: Part::take(&mut self.scratch),
             outline: self.outline_again(index, input),
-            text: KeptBox::text_key(&self.boxes[index], self.rects[index], input.scale),
         };
         out.boxes_drawn += 1;
         out.items_built += kept.items();
