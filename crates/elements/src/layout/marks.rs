@@ -27,6 +27,11 @@ impl Marks {
         self.nodes.insert(node);
     }
 
+    /// The marked nodes, freed and detached ones included.
+    pub(crate) fn nodes(&self) -> impl Iterator<Item = NodeId> + '_ {
+        self.nodes.iter().copied()
+    }
+
     /// What the next update builds again: every box when a mark
     /// reaches the root with no owner on the way (the root lost its
     /// box), or the subtrees of these elements under `root`, none

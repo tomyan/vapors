@@ -35,23 +35,33 @@ pub(crate) fn check_tree(
     root: NodeId,
     declared: &std::collections::BTreeSet<String>,
 ) -> Vec<ElementError> {
-    let mut errors = Vec::new();
-    for node in elements(arena, root) {
-        let Kind::Element(element) = &arena.get(node, "check").kind else {
-            continue;
-        };
-        if let Some(refusal) = tags::unsupported(&element.tag) {
-            errors.push(ElementError::UnsupportedTag(refusal));
-        }
-        errors.extend(attribute_refusals(arena, node, element));
-        errors.extend(right_to_left_text(arena, node));
-        for (event, _) in &element.listeners {
-            if let Some(refusal) = tags::unfired(event).filter(|_| !declared.contains(event)) {
-                errors.push(ElementError::UnfiredEvent(format!(
-                    "{}: {refusal}",
-                    describe(arena, node)
-                )));
-            }
+    elements(arena, root)
+        .into_iter()
+        .flat_map(|node| check_element(arena, node, declared))
+        .collect()
+}
+
+/// The refusals for `node`'s tag, attributes, text and listeners.
+pub(crate) fn check_element(
+    arena: &Arena,
+    node: NodeId,
+    declared: &std::collections::BTreeSet<String>,
+) -> Vec<ElementError> {
+    let Kind::Element(element) = &arena.get(node, "check").kind else {
+        return Vec::new();
+    };
+    let mut errors: Vec<ElementError> = tags::unsupported(&element.tag)
+        .map(ElementError::UnsupportedTag)
+        .into_iter()
+        .collect();
+    errors.extend(attribute_refusals(arena, node, element));
+    errors.extend(right_to_left_text(arena, node));
+    for (event, _) in &element.listeners {
+        if let Some(refusal) = tags::unfired(event).filter(|_| !declared.contains(event)) {
+            errors.push(ElementError::UnfiredEvent(format!(
+                "{}: {refusal}",
+                describe(arena, node)
+            )));
         }
     }
     errors
@@ -103,18 +113,21 @@ fn attribute_refusals(
 pub(crate) fn style_attribute_refusals(arena: &Arena, root: NodeId) -> Vec<ElementError> {
     elements(arena, root)
         .into_iter()
-        .filter_map(|node| {
-            let element = arena.get(node, "style_attribute_refusals").element()?;
-            let error = vapors_css::parse_inline(element.attributes.get("style")?).err()?;
-            Some(ElementError::UnsupportedAttribute(format!(
-                "{}: its style attribute {}:{}: {}",
-                describe(arena, node),
-                error.position.line,
-                error.position.column,
-                error.message
-            )))
-        })
+        .filter_map(|node| style_attribute_refusal(arena, node))
         .collect()
+}
+
+/// The refusal for `node`'s `style` attribute, when it does not parse.
+pub(crate) fn style_attribute_refusal(arena: &Arena, node: NodeId) -> Option<ElementError> {
+    let element = arena.get(node, "style_attribute_refusals").element()?;
+    let error = vapors_css::parse_inline(element.attributes.get("style")?).err()?;
+    Some(ElementError::UnsupportedAttribute(format!(
+        "{}: its style attribute {}:{}: {}",
+        describe(arena, node),
+        error.position.line,
+        error.position.column,
+        error.message
+    )))
 }
 
 /// The element as errors name it: `<div class="panel">`.

@@ -42,8 +42,8 @@ fn a_document_never_updated_counts_nothing() {
 }
 
 #[test]
-fn the_style_phase_visits_every_element_on_an_update_with_nothing_changed() {
-    assert_eq!(idle_counts(&mut page()).elements_visited, 4);
+fn the_style_phase_visits_no_element_on_an_update_with_nothing_changed() {
+    assert_eq!(idle_counts(&mut page()).elements_visited, 0);
 }
 
 #[test]
