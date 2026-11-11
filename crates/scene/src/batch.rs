@@ -49,7 +49,7 @@ impl Scene {
     #[must_use]
     pub fn batches(&self, view: Rect) -> Batched {
         let clips = self.clips().iter().copied();
-        batched(self.items().iter().copied().zip(clips), view)
+        batched(self.items().iter().zip(clips), view)
     }
 }
 
@@ -59,16 +59,19 @@ impl Scene {
 /// the items either side of it can share a batch; a culled surface
 /// instead keeps its place in a batch marked [`Batch::culled`], so the
 /// painter refuses it as it refuses a clipped one.
-pub fn batched(items: impl IntoIterator<Item = (Item, Option<Rect>)>, view: Rect) -> Batched {
+pub fn batched<'a>(
+    items: impl IntoIterator<Item = (&'a Item, Option<Rect>)>,
+    view: Rect,
+) -> Batched {
     let mut batched = Batched::default();
     for (item, clip) in items {
-        if !culled(&item, clip, view) {
-            batched.push(&item, clip, false);
+        if !culled(item, clip, view) {
+            batched.push(item, clip, false);
             continue;
         }
         batched.culled += 1;
         if let Item::Surface { .. } = item {
-            batched.push(&item, clip, true);
+            batched.push(item, clip, true);
         }
     }
     batched

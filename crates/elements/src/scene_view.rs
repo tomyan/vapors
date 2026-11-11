@@ -25,12 +25,12 @@ impl<'a> SceneView<'a> {
     }
 
     /// Each item, first drawn first, with its clip (device pixels).
-    pub fn items(&self) -> impl Iterator<Item = (Item, Option<Rect>)> + 'a {
+    pub fn items(&self) -> impl Iterator<Item = (&'a Item, Option<Rect>)> + 'a {
         let boxes = self.boxes;
         self.steps.iter().flat_map(move |&step| {
             let scene = step_scene(boxes, step);
             let clips = scene.clips().iter().copied();
-            scene.items().iter().copied().zip(clips)
+            scene.items().iter().zip(clips)
         })
     }
 
@@ -47,7 +47,7 @@ impl<'a> SceneView<'a> {
         let mut scene = Scene::new();
         for (item, clip) in self.items() {
             scene.set_clip(clip);
-            scene.push(item);
+            scene.push(*item);
         }
         scene
     }
