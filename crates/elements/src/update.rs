@@ -64,10 +64,11 @@ impl Document {
         drop(style);
         let layout = tracing::trace_span!("update phase", phase = "layout").entered();
         let (slotted, built) = self.laid_out(viewport)?;
-        let from = self.painted_from(&slotted.boxes, viewport);
+        let stackings = self.stackings(&slotted.boxes);
+        let from = self.painted_from(&slotted.boxes, &stackings, viewport);
         drop(layout);
         let paint_span = tracing::trace_span!("update phase", phase = "paint").entered();
-        let mut painted = self.paint_or_keep(last, &slotted.boxes, &from, built);
+        let mut painted = self.paint_or_keep(last, (&slotted.boxes, &stackings), &from, built);
         drop(paint_span);
         self.boxes.keep(slotted, viewport.scale);
         painted.from = from;

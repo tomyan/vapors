@@ -3,7 +3,7 @@
 //! any taken subtree, and the taken slots no new box takes become
 //! vacant. Slots outside the taken subtrees are not touched.
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 use super::{Key, LayoutBox, Placed, keys, misplaced};
 
@@ -11,8 +11,8 @@ use super::{Key, LayoutBox, Placed, keys, misplaced};
 /// slot, and the slot each taken key held.
 #[derive(Default)]
 pub(crate) struct Taken {
-    pub(crate) boxes: HashMap<usize, (Key, LayoutBox)>,
-    slots: HashMap<Key, usize>,
+    pub(crate) boxes: FxHashMap<usize, (Key, LayoutBox)>,
+    slots: FxHashMap<Key, usize>,
 }
 
 impl Placed {

@@ -14,6 +14,7 @@ mod replaced;
 mod slots;
 pub(crate) use boxes::Source;
 mod text_cache;
+mod text_key;
 mod tree;
 
 use taffy::{AvailableSpace, NodeId, Size, compute_root_layout};

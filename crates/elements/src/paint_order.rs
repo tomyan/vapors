@@ -20,7 +20,7 @@
 //! an earlier box's text.
 
 use super::layout::LayoutBox;
-pub(crate) use super::stacking::{Stacking, stacking_of};
+pub(crate) use super::stacking::{Stacking, Stackings};
 
 /// One step of painting.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

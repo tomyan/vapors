@@ -1,6 +1,6 @@
 //! Which scroll containers a scroll over an element tries (F2c S9).
 
-use std::collections::HashMap;
+use crate::node_map::NodeMap;
 
 use vapors_dom::NodeId;
 
@@ -11,8 +11,8 @@ use crate::layout::{Content, LayoutBox};
 /// containing block, as clips pass (`crate::chain`).
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Chains {
-    first: HashMap<NodeId, NodeId>,
-    outer: HashMap<NodeId, NodeId>,
+    first: NodeMap<NodeId>,
+    outer: NodeMap<NodeId>,
 }
 
 impl Chains {

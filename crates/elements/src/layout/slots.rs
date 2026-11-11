@@ -4,7 +4,7 @@
 //! A slot whose box is gone holds `Content::Vacant`, which no box walk
 //! from the root reaches, until a new key takes it from the free list.
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 use vapors_dom::NodeId;
 
@@ -21,7 +21,7 @@ pub(crate) enum Key {
 /// The slot each key holds, each slot's key, and the vacant slots.
 #[derive(Default)]
 pub(crate) struct Slots {
-    of: HashMap<Key, usize>,
+    of: FxHashMap<Key, usize>,
     keys: Vec<Option<Key>>,
     /// Vacant slots, highest first, so the lowest is taken first.
     free: Vec<usize>,
@@ -91,7 +91,7 @@ impl Slots {
     /// `len` slots, `keys` in the slots `to` gives, `free` vacant.
     fn holding(keys: &[Key], to: &[usize], len: usize, free: Vec<usize>) -> Self {
         let mut slots = Self {
-            of: HashMap::with_capacity(keys.len()),
+            of: FxHashMap::with_capacity_and_hasher(keys.len(), rustc_hash::FxBuildHasher),
             keys: vec![None; len],
             free,
         };

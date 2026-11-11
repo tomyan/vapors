@@ -1,7 +1,7 @@
 //! The result of an update: what was painted, where each element is,
 //! and which elements take the pointer, in painting order.
 
-use std::collections::HashMap;
+use crate::node_map::{NodeMap, NodeSet};
 
 use vapors_dom::NodeId;
 use vapors_scene::{Color, Scene, TextId};
@@ -20,17 +20,17 @@ pub struct Painted {
     pub(crate) scale: f32,
     pub(crate) scene: Scene,
     pub(crate) texts: Vec<std::rc::Rc<Layout>>,
-    pub(crate) rects: HashMap<NodeId, BoxRect>,
+    pub(crate) rects: NodeMap<BoxRect>,
     /// Each element's padding box's top-left, for pointer offsets.
-    pub(crate) paddings: HashMap<NodeId, [f32; 2]>,
+    pub(crate) paddings: NodeMap<[f32; 2]>,
     /// The elements drawn: with a box and `visibility: visible` (focus,
     /// 3-E2a).
-    pub(crate) visible: std::collections::HashSet<NodeId>,
+    pub(crate) visible: NodeSet,
     /// Elements with a box, `visibility: visible` and `pointer-events:
     /// auto`, in painting order: a later one is drawn over an earlier.
     pub(crate) hits: Vec<(NodeId, BoxRect)>,
     /// The cursor over each element in `hits`.
-    pub(crate) cursors: HashMap<NodeId, Cursor>,
+    pub(crate) cursors: NodeMap<Cursor>,
     /// The images the scene's image items name, by `ImageId`.
     pub(crate) images: Vec<std::rc::Rc<vapors_scene::RgbaImage>>,
     /// The icons the scene's icon items name, by `IconId`.
@@ -41,9 +41,9 @@ pub struct Painted {
     /// Which scroll containers a scroll over each element tries.
     pub(crate) scroll_chains: crate::scroll_chains::Chains,
     /// Each range input's track, for the pointer (3-E3a).
-    pub(crate) ranges: HashMap<NodeId, crate::range_paint::Track>,
+    pub(crate) ranges: NodeMap<crate::range_paint::Track>,
     /// Each text field's text origin, for the pointer (E6a).
-    pub(crate) text_origins: HashMap<NodeId, [f32; 2]>,
+    pub(crate) text_origins: NodeMap<[f32; 2]>,
     /// What this was painted from (`kept_paint`).
     pub(crate) from: crate::kept_paint::PaintedFrom,
     /// Each slot's kept paint, for the next update (`kept_box.rs`).
@@ -85,17 +85,17 @@ impl Painted {
             scale,
             scene: Scene::new(),
             texts: Vec::new(),
-            rects: HashMap::new(),
-            paddings: HashMap::new(),
-            visible: std::collections::HashSet::new(),
+            rects: NodeMap::default(),
+            paddings: NodeMap::default(),
+            visible: NodeSet::default(),
             hits: Vec::new(),
-            cursors: HashMap::new(),
+            cursors: NodeMap::default(),
             scroll_chains: crate::scroll_chains::Chains::default(),
             images: Vec::new(),
             icons: Vec::new(),
             surfaces: Vec::new(),
-            ranges: HashMap::new(),
-            text_origins: HashMap::new(),
+            ranges: NodeMap::default(),
+            text_origins: NodeMap::default(),
             from: crate::kept_paint::PaintedFrom::default(),
             kept_boxes: Vec::new(),
             boxes_drawn: 0,

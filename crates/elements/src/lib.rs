@@ -51,6 +51,7 @@ mod lay_out_text;
 mod layout;
 mod media_checks;
 mod node;
+mod node_map;
 mod number;
 mod number_committed;
 mod number_input;

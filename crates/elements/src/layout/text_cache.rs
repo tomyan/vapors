@@ -13,97 +13,21 @@
 //! one.
 //! A layout no update asked for is dropped at the end of the next one.
 
-use std::collections::HashMap;
-use std::mem::{Discriminant, discriminant};
+use rustc_hash::FxHashMap;
 use std::rc::Rc;
 
-use vapors_dom::NodeId;
-use vapors_text::{Align, FontSystem, Layout, LineHeight};
+use vapors_text::{Align, FontSystem, Layout};
 
-use super::inline::{InlineRun, InlineSpan};
+use super::inline::InlineRun;
 use super::measure::text_layout;
-use crate::style::{Face, TextStyle};
-
-/// What a layout is kept by: the run's text, styles and visibility,
-/// and the width and scale, every float by its bits. Eq and Hash both
-/// derive from these, so they agree (a NaN equals itself here).
-#[derive(Clone, Hash, PartialEq, Eq)]
-pub(crate) struct Key {
-    text: String,
-    style: StyleKey,
-    visible: bool,
-    spans: Vec<SpanKey>,
-    width: Option<u32>,
-    scale: u32,
-}
-
-#[derive(Clone, Hash, PartialEq, Eq)]
-struct SpanKey {
-    node: NodeId,
-    range: std::ops::Range<usize>,
-    visible: bool,
-    style: StyleKey,
-}
-
-#[derive(Clone, Hash, PartialEq, Eq)]
-struct StyleKey {
-    face: Discriminant<Face>,
-    /// Size, weight and letter spacing.
-    numbers: [u32; 3],
-    /// Which kind of line height, and its number.
-    line_height: (u8, u32),
-    color: [u32; 4],
-    italic: bool,
-    align: Discriminant<Align>,
-}
-
-impl Key {
-    pub(crate) fn of(run: &InlineRun, width: Option<f32>, scale: f32) -> Self {
-        Self {
-            text: run.text.clone(),
-            style: StyleKey::of(&run.style),
-            visible: run.visible,
-            spans: run.spans.iter().map(SpanKey::of).collect(),
-            width: width.map(f32::to_bits),
-            scale: scale.to_bits(),
-        }
-    }
-}
-
-impl SpanKey {
-    fn of(span: &InlineSpan) -> Self {
-        Self {
-            node: span.node,
-            range: span.range.clone(),
-            visible: span.visible,
-            style: StyleKey::of(&span.style),
-        }
-    }
-}
-
-impl StyleKey {
-    fn of(style: &TextStyle) -> Self {
-        let line_height = match style.line_height {
-            LineHeight::Normal => (0, 0),
-            LineHeight::FontSizeRelative(v) => (1, v.to_bits()),
-            LineHeight::Px(v) => (2, v.to_bits()),
-        };
-        Self {
-            face: discriminant(&style.face),
-            numbers: [style.size, style.weight, style.letter_spacing].map(f32::to_bits),
-            line_height,
-            color: [style.color.r, style.color.g, style.color.b, style.color.a].map(f32::to_bits),
-            italic: style.italic,
-            align: discriminant(&style.align),
-        }
-    }
-}
+pub(crate) use super::text_key::Key;
+use crate::style::TextStyle;
 
 /// The layouts asked for this update, and those kept from the last.
 #[derive(Clone, Default)]
 pub(crate) struct TextCache {
-    current: HashMap<Key, Rc<Layout>>,
-    previous: HashMap<Key, Rc<Layout>>,
+    current: FxHashMap<Key, Rc<Layout>>,
+    previous: FxHashMap<Key, Rc<Layout>>,
     built: usize,
 }
 

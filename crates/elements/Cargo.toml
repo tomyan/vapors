@@ -24,6 +24,7 @@ vapors-css.workspace = true
 vapors-scene.workspace = true
 vapors-text.workspace = true
 taffy.workspace = true
+rustc-hash.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true

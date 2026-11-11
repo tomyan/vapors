@@ -5,7 +5,9 @@
 //! `path`s and whitespace; on a `path`, `svg_path_checks`; CSS on
 //! either, `svg_style_checks`.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
+
+use crate::node_map::NodeMap;
 
 use vapors_dom::{NodeId, SCOPE_ATTRIBUTE};
 
@@ -33,7 +35,7 @@ const ATTRIBUTES: [&str; 9] = [
 pub(crate) fn refusals(
     arena: &Arena,
     nodes: &[NodeId],
-    used: &HashMap<NodeId, Used>,
+    used: &NodeMap<Used>,
     scale: f32,
 ) -> Vec<ElementError> {
     nodes
@@ -49,7 +51,7 @@ pub(crate) fn refusals(
         .collect()
 }
 
-fn reasons(arena: &Arena, node: NodeId, used: &HashMap<NodeId, Used>, scale: f32) -> Vec<String> {
+fn reasons(arena: &Arena, node: NodeId, used: &NodeMap<Used>, scale: f32) -> Vec<String> {
     let Some(element) = arena.get(node, "svg_checks").element() else {
         return Vec::new();
     };

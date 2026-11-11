@@ -1,4 +1,9 @@
+use vapors_dom::NodeId;
+use vapors_text::LineHeight;
+
+use super::super::inline::InlineSpan;
 use super::*;
+use crate::style::Face;
 
 fn style(align: Align, letter_spacing: f32) -> TextStyle {
     TextStyle {
