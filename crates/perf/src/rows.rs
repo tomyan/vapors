@@ -30,6 +30,9 @@ pub enum RowChange {
     Text,
     /// The middle row's `marked` class added or removed: its background.
     Class,
+    /// `Class` with the pointer over the second row's button, so each
+    /// update also hit-tests the pointer's position (review v201 M2).
+    HoveredClass,
 }
 
 /// A rows page in an app, and its change.
@@ -45,6 +48,9 @@ impl Rows {
     #[must_use]
     pub fn new(count: usize, change: RowChange) -> Self {
         let page = rows_page(count);
+        if let RowChange::HoveredClass = change {
+            page.edit(Edit::Hover);
+        }
         let mut app = ElementsApp::new(Rc::clone(&page.doc));
         app.time_frames(true);
         Self { page, app, change }
@@ -66,7 +72,7 @@ impl Workload for Rows {
                 let text = format!("{:05}", 90_000 + sample % 10_000);
                 self.page.doc.borrow_mut().set_text(value, &text);
             }
-            RowChange::Class => self.page.edit(Edit::ToggleClass),
+            RowChange::Class | RowChange::HoveredClass => self.page.edit(Edit::ToggleClass),
         }
     }
 

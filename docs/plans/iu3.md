@@ -341,13 +341,20 @@ uninstrumented or single-span figures at 3000 rows.
   draw rises measurably, keeping batches across frames moves from IU4
   into this stack, and the lead decides.
 - Hit gathering (3c-3d2): the first hit test after an update gathers
-  every part's hits once (O(all hits))
-  and later tests in the same update cost O(hits at the point). With the
-  pointer over the window this is paid on each update that follows a
-  paint. The harness has no hover workload, so the cost is not
-  measured; a hovered-edit workload in `vapors-perf` would measure it.
+  every part's hits once (O(all hits)), and each test, the first
+  included, scans the gathered hits from the last (O(all hits) at
+  worst). With the pointer over the window this is paid on each update
+  that follows a paint. The review of #201 measured +0.55 ms per Class
+  update at 3000 rows with the pointer over a row; the `HoveredClass`
+  workload in `vapors-perf` tracks it. Keeping the hit list across
+  updates and patching it per changed slot is the lead's to schedule.
   Walking order per test was slower in debug on the 1000-row oracle
   test (33.5 s against 16.2 s).
+- The debug check's fresh paint (3c-3d2) is `paint_partial` with
+  nothing kept, so it compares an incremental paint with a full one
+  through the same `Repaint` code: a defect inside `Repaint::painted`
+  or `Repaint::thumbs` would appear on both sides and pass. Comparing
+  against an independent full-paint path would close that; not built.
 - Unknown until 3c-3d2 is measured: whether the slab frees and map
   patches for 7 boxes, plus the rect comparison, fit in 1 ms
   alongside painting the boxes (3c-2 measured 0.01 ms for painting
