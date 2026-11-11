@@ -76,7 +76,7 @@ pin proven by breaking what it guards.
 | 2 | Absolute and fixed boxes lent their caches; 3D 1c's IU5 check moves from "no more than idle" to 0 (`docs/plans/3d-1c.md`) | Racer HUD idle update lays out 0 boxes (19 today), pinned; a test with an absolute box whose containing block resizes matches a full update |
 | 3a | The style phase limited to changed elements: the tree check, style-attribute refusals, calcs and media checks kept per element and redone for marked ones, instead of the walk over every element in `Document::styled` | Idle `elements_visited` 0 (4,002 at 1000 rows today); style phase at 3000 rows idle near 0 (14.1 ms today) |
 | 3b | `placed`, `scroll.settle` and `Chains::of` kept, redone under changed boxes | Layout phase at 3000 rows idle near 0 |
-| 3c | Display list kept per box subtree and rebuilt under changed boxes (overlaps the brief's slice 4; scope confirmed with the lead before starting) | Idle `boxes_painted` and `scene_items_built` 0; display-list build at 3000 rows idle near 0 (19.7 ms today) |
+| 3c | Display list kept across updates, repainted only for changed boxes (design and split: "3c: kept display list" below) | Idle `boxes_painted` and `scene_items_built` 0; an edit paints only its changed boxes; display-list build at 3000 rows idle near 0 (22.1 ms after 3a) |
 
 3a to 3c each may split further once 1b's measurement shows which walk
 dominates.
@@ -96,6 +96,39 @@ Requirements from the review of #185, each with a test in its PR:
   containing block's list.
 - 3a: unmarked elements keep their `Calcs` entries, since retained
   boxes hold calc handles into them.
+
+## 3c: kept display list
+
+Scope (lead, 2026-11-11): the CPU display list only. GPU-side retention
+(paint records, buffers, the painter's per-frame work) is IU4. Culling
+(#184) works on the scene at batching and is unchanged.
+
+What one box's paint reads, and how each read is kept correct:
+
+- Its own box and style: a restyle, an edit or a move marks the
+  element and its box is built again (1b), so a rebuilt slot repaints.
+- Its rect (placed: ancestors' positions and scroll offsets), its
+  border and padding, its clip (ancestors that clip it), and for a
+  text field its first child's rect (the text origin): compared with
+  the values its kept paint was made from; any difference repaints it.
+- The canvas background: whether `html` or `body` gave the canvas its
+  colour decides whether they paint their own; compared like the rect.
+- Paint order (stacking contexts, z-index, outlines last in their
+  context, thumbs after positioned descendants): not kept per box. The
+  order is walked again on an update that repaints, and kept paint is
+  copied in that order, so a z-index change or a box moved into another
+  context reorders kept paint without repainting it.
+- Scroll thumbs: read the scroll offsets and whether thumbs are shown;
+  painted again on every update that repaints (a few items).
+- Scale: a change marks every element (1b), so everything repaints.
+
+PRs, each under about 400 lines:
+
+| PR | Content | Acceptance |
+|---|---|---|
+| 3c-1 | The last update's `Painted` is kept and used again when no box was built, no box was laid out, and the scroll offsets, scale and thumbs shown are those it was painted with. Each of those four is a path that paints again, with a test that fails without it | Idle `boxes_painted` and `scene_items_built` 0, pinned; display-list build at 3000 rows idle near 0; the oracle and Chromium comparisons unchanged |
+| 3c-2 | Paint kept per box (its items with ids local to it, its hit, cursor, texts, images, icons, surfaces, range track and text origin) with the values above it was made from; an update that repaints walks paint order, paints the boxes whose values differ or whose slot was rebuilt, and copies the rest, renumbering ids in paint order so the scene equals a full paint | Text change paints the edited label's boxes, class toggle and hover one row's, pinned in `EXPECTED_WALKS`; each compared value proven by breaking |
+| 3c-3 | If 3c-2's measurement shows the walk and copy dominate an edit: paint order, clips and the element maps kept and redone under changed boxes | Edit paint at 3000 rows recorded before and after |
 
 ## Open points
 
