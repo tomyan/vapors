@@ -19,8 +19,8 @@ the harness shows it, not when the code is believed to do it.
 | 4 | Scrolling a long list | no repaint; kept paint shifted | every moved box painted again | IU3 3c-3e |
 | 5 | Pointer over the window | no per-update walk of the tree | after 3c-3g, HoveredClass update 0.115 M instructions above Class at 3000 rows (0.043 M at 1000): `hit()`'s scan of the kept hits, about 13 µs | IU3 3c-3g (kept hit list) |
 | 6 | Idle | no update work and no frames drawn | no frames drawn; an update with no change 2.57 ms | IU3 3b, the idle fix |
-| 7 | First frame of a large page | parts the compiler proves constant have styles and shapes worked out at build time; time measured and published | not measured | the build-time analysis |
-| 8 | Memory per element | parts the compiler proves constant keep no per-element records (marks, kept styles, kept paint) | not measured | the build-time analysis |
+| 7 | First frame of a large page | the winning declarations for each template element and constant shapes worked out at build time (computed values still depend on viewport, scale and font size); time measured and published | not measured | the build-time analysis |
+| 8 | Memory per element | one style record per distinct style, not per element; per-element memory bounded by the per-box layout records | not measured | the build-time analysis |
 | 9 | HTML, SVG and 3D in one scene | the racer (3D craft, SVG markings on it, HTML on top) drawn as one scene with CSS reaching scene nodes, and no frame over 16.7 ms across a 60 s run | not built | the shape table, 3D slice 2 (PRs 4, 4b, 5) |
 
 Property 1 at 10,000 rows needs a 10,000-row workload in `vapors-perf`;
@@ -41,9 +41,15 @@ it is added with the first PR that claims property 1.
    whether to splice the row's steps, clips and chains into the kept
    order, debug builds checking every splice against the whole walk;
    (C) the insert workload measures it. Rows after the insert still
-   move, O(rows after) once 3c-3e shifts them, until IU4. The
+   move, O(rows after) once 3c-3e shifts them: layout writes every
+   row's location when the list is laid out again, and IU4 bounds only
+   the GPU side of that to the visible rows (`docs/plans/iu4.md`,
+   section 3); a layout-lane design would move the floor. The
    compiler's mark of list templates moves to item 7.
-6. IU4: GPU-side paint kept between frames (property 2).
+6. IU4 (`docs/plans/iu4.md`): GPU-side paint kept between frames,
+   parts in scroll-frame coordinates and a per-scroller visible range
+   (property 2, and the scroll remainder of property 4: after 3c-3e a
+   scroll still shifts every moved part, O(rows in the scroller)).
 7. The build-time analysis, first version (properties 7 and 8),
    with the compiler's mark of list templates whose rows cannot
    change paint order (`docs/plans/splice.md` section (d)).
