@@ -22,10 +22,12 @@ pub enum Focus {
     /// disabled, has `display: none` on it or an ancestor, or is not
     /// `visibility: visible`. Nothing happened, as in Chromium.
     NotFocusable,
-    /// Its styles cannot be computed: no update has run yet, so there
+    /// Its styles cannot be computed yet: no update has run, so there
     /// is no viewport, or a style does not compute (an unresolved
-    /// `var()`; the update reports it). Nothing happened.
-    Unresolved,
+    /// `var()`; the update reports it). The request is kept, and the
+    /// next [`Document::settle_focus`] applies it by the same rule, or
+    /// drops it with no event; a later `focus` replaces or clears it.
+    Pending,
 }
 
 impl Document {
@@ -35,7 +37,7 @@ impl Document {
             return Focus::NotFocusable;
         }
         let Some(styles) = self.chain_styles(node) else {
-            return Focus::Unresolved;
+            return Focus::Pending;
         };
         let hidden = styles
             .iter()

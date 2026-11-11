@@ -15,10 +15,16 @@ impl Document {
     /// focusable, with its commit, `blur` and `focusout`
     /// ([`Document::focus`]). A host calls this after each successful
     /// update; `ElementsApp` does. After a refused update focus stays.
+    /// A focus requested before styles could be computed
+    /// ([`Focus::Pending`]) is applied here, or dropped with no event
+    /// when the element is not focusable now.
     pub fn settle_focus(document: &Rc<RefCell<Document>>) {
-        document.borrow_mut().settle_due = false;
+        let pending = std::mem::take(&mut document.borrow_mut().settle).pending;
         if document.borrow().lost_focusability() {
             let _ = Document::focus(document, None);
+        }
+        if pending.is_some() {
+            let _ = Document::focus(document, pending);
         }
     }
 
@@ -36,6 +42,15 @@ impl Document {
     /// focusable: a host that drives its own frames forgot the settle.
     #[must_use]
     pub fn unsettled_focus(&self) -> bool {
-        self.settle_due && self.lost_focusability()
+        self.settle.due && self.lost_focusability()
     }
+}
+
+/// What the next [`Document::settle_focus`] owes.
+#[derive(Default)]
+pub(crate) struct Settle {
+    /// A successful update ran since the last settle.
+    pub(crate) due: bool,
+    /// The element a [`Focus::Pending`] focus asked for.
+    pub(crate) pending: Option<vapors_dom::NodeId>,
 }

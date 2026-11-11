@@ -24,9 +24,9 @@ pub struct Document {
     pub(crate) changes: crate::update::Changes,
     pub(crate) pointer: crate::events::Pointer,
     /// The focused element (3-E2a), `None` when the body has focus; and
-    /// whether an update succeeded since the last `settle_focus`.
+    /// what the next `settle_focus` does (`focus_fixup`).
     pub(crate) focused: Option<NodeId>,
-    pub(crate) settle_due: bool,
+    pub(crate) settle: crate::focus_fixup::Settle,
     /// Whether the window has focus (`focus_window.rs`).
     pub(crate) window: crate::focus_window::Window,
     /// Where Space went down, for its click on keyup.
@@ -82,7 +82,7 @@ impl Document {
             changes: crate::update::Changes::default(),
             pointer: crate::events::Pointer::default(),
             focused: None,
-            settle_due: false,
+            settle: crate::focus_fixup::Settle::default(),
             window: crate::focus_window::Window::Focused,
             space_on: None,
             shortcut_modifier: crate::ShortcutModifier::default(),

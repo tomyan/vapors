@@ -61,8 +61,12 @@ impl Document {
     /// events; nothing happens when it already has focus, or when it
     /// cannot take focus now ([`Focus`] says which), as in Chromium.
     pub fn focus(document: &Rc<RefCell<Document>>, node: Option<NodeId>) -> Focus {
+        document.borrow_mut().settle.pending = None;
         if let Some(node) = node {
             let now = document.borrow().focusability(node);
+            if now == Focus::Pending {
+                document.borrow_mut().settle.pending = Some(node);
+            }
             if now != Focus::Done {
                 return now;
             }

@@ -132,8 +132,11 @@ crate, and the web IME path is platform code either way.
 - `Document::focus` returns a `Focus`: `Done`; `NotFocusable` (not
   a focusable element, disabled, `display: none` on it or an ancestor,
   or `visibility` other than `visible`), when nothing happens, as
-  Chromium's `focus()` does nothing; or `Unresolved` (no update has
-  run, so there is no viewport, or a style does not compute). The
+  Chromium's `focus()` does nothing; or `Pending` (no update has run,
+  so there is no viewport, or a style does not compute): the next
+  `settle_focus` focuses it if it is focusable then, with `focus` and
+  `focusin`, or drops it with no event, and a later `focus` or blur
+  replaces or clears it, so an app can focus a field as it mounts. The
   styles are computed for the element and its ancestors from the tree
   as it is, at the last update's viewport, without layout, as
   Chromium's `focus()` forces a style update: a handler that shows a

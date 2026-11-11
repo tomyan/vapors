@@ -167,8 +167,8 @@ fn input_before_the_first_update_or_at_a_zero_scale_is_refused() {
 
 #[test]
 fn a_key_to_a_document_never_updated_is_the_hosts_and_a_pointer_event_is_refused() {
-    // Given: a button in a document never updated, which focus() leaves
-    // unfocused (no viewport to compute its styles at)
+    // Given: a button in a document never updated, whose focus() waits
+    // for the first update's settle (no viewport to compute styles at)
     let mut doc = Document::new(FontSystem::bundle_only());
     let body = doc.body();
     let button = doc.create_element("button");
@@ -197,7 +197,7 @@ fn a_key_to_a_document_never_updated_is_the_hosts_and_a_pointer_event_is_refused
     let pointer = input.give(&document, &moved(1.0, 1.0), &platform());
 
     // Then
-    assert_eq!(focused, vapors_elements::Focus::Unresolved);
+    assert_eq!(focused, vapors_elements::Focus::Pending);
     assert_eq!(routed, Ok(super::Route::Host));
     assert!(given.is_ok(), "{given:?}");
     assert_eq!(*keys.borrow(), 0);

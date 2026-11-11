@@ -112,19 +112,78 @@ fn a_blur_handler_refocusing_the_hidden_field_is_refused_and_the_page_goes_idle(
     assert!(!page.doc.borrow_mut().take_changed(), "the page goes idle");
 }
 
-#[test]
-fn focus_before_any_update_is_unresolved() {
-    // Given: a field in a document never updated, so without a viewport
+/// A field in a document never updated, focused there.
+fn focused_before_the_first_update(
+    style: &str,
+) -> (Rc<std::cell::RefCell<Document>>, vapors_dom::NodeId, Focus) {
     let mut doc = support::document();
     let body = doc.body();
     let field = doc.create_element("input");
+    doc.set_attribute(
+        field,
+        "style",
+        &format!("display: block; width: 80px; {style}"),
+    );
     doc.append(body, field);
     let doc = Rc::new(std::cell::RefCell::new(doc));
+    let result = Document::focus(&doc, Some(field));
+    (doc, field, result)
+}
+
+/// The first update, then its settle.
+fn first_frame(doc: &Rc<std::cell::RefCell<Document>>) {
+    doc.borrow_mut()
+        .update(support::viewport(400.0, 100.0))
+        .expect("updates");
+    Document::settle_focus(doc);
+}
+
+#[test]
+fn focus_before_the_first_update_is_pending_and_applied_after_it() {
+    // Given
+    let (doc, field, result) = focused_before_the_first_update("");
+    assert_eq!(result, Focus::Pending);
+    assert_eq!(doc.borrow().active_element(), None);
+    let log = support::text_page::Log::default();
+    let into = Rc::clone(&log);
+    let focused = move |e: &mut Event| into.borrow_mut().push(e.name().to_owned());
+    doc.borrow_mut().listen(field, "focus", Box::new(focused));
 
     // When
-    let result = Document::focus(&doc, Some(field));
+    first_frame(&doc);
 
     // Then
-    assert_eq!(result, Focus::Unresolved);
+    assert_eq!(doc.borrow().active_element(), Some(field));
+    assert_eq!(*log.borrow(), ["focus"]);
+}
+
+#[test]
+fn pending_focus_on_a_field_hidden_at_the_first_update_is_dropped() {
+    // Given
+    let (doc, field, result) = focused_before_the_first_update("display: none");
+    assert_eq!(result, Focus::Pending);
+
+    // When: the first frame, then the field shown and another frame
+    first_frame(&doc);
+    let after_first = doc.borrow().active_element();
+    let shown = "display: block; width: 80px";
+    doc.borrow_mut().set_attribute(field, "style", shown);
+    first_frame(&doc);
+
+    // Then: dropped, not kept for later
+    assert_eq!(after_first, None);
+    assert_eq!(doc.borrow().active_element(), None);
+}
+
+#[test]
+fn a_blur_before_the_first_update_clears_the_pending_focus() {
+    // Given
+    let (doc, _, _) = focused_before_the_first_update("");
+
+    // When
+    let _ = Document::focus(&doc, None);
+    first_frame(&doc);
+
+    // Then
     assert_eq!(doc.borrow().active_element(), None);
 }
