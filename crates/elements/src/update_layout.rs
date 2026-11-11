@@ -61,12 +61,10 @@ impl Document {
         let offsets = self
             .scroll
             .settle(boxes, &|index| stackings.scrolls(index), viewport.scale);
+        let (rects, paddings) = placed(boxes, &offsets);
         PaintedFrom {
-            rects: placed(boxes, &offsets),
-            paddings: boxes
-                .iter()
-                .map(|layout_box| layout_box.layout.padding)
-                .collect(),
+            rects,
+            paddings,
             thumbs_shown: self.thumbs_shown,
             scale: viewport.scale,
         }
