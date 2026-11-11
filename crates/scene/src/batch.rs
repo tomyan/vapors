@@ -77,8 +77,10 @@ pub fn batched<'a>(
     batched
 }
 
-/// True when nothing `item` paints falls inside `view` cut to `clip`.
-fn culled(item: &Item, clip: Option<Rect>, view: Rect) -> bool {
+/// True when nothing `item` paints falls inside `view` cut to `clip`:
+/// the rule [`batched`] culls by.
+#[must_use]
+pub fn culled(item: &Item, clip: Option<Rect>, view: Rect) -> bool {
     let region = clip.map_or(view, |clip| clip.intersection(view));
     region.is_empty() || item.bounds().is_disjoint(&region)
 }

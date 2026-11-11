@@ -45,6 +45,9 @@ mod html;
 mod images;
 mod img_checks;
 mod inline_check;
+mod kept_batches;
+#[cfg(debug_assertions)]
+mod kept_batches_check;
 mod kept_box;
 mod kept_checks;
 mod kept_clips;

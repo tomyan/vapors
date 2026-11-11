@@ -37,13 +37,9 @@ impl DrawnSteps {
     /// its part in `boxes` now holds items or not.
     pub(crate) fn patch(&mut self, slots: impl Iterator<Item = usize>, boxes: &[Option<KeptBox>]) {
         for slot in slots {
-            let Some(&places) = self.places.get(slot) else {
-                continue;
-            };
-            for (place, step) in places.into_iter().zip(steps_of(slot)) {
-                if let Some(place) = place {
-                    self.patch_step(place, step, boxes);
-                }
+            let placed: Vec<(usize, Step)> = self.places_of(slot).collect();
+            for (place, step) in placed {
+                self.patch_step(place, step, boxes);
             }
         }
     }
@@ -61,6 +57,18 @@ impl DrawnSteps {
     /// The steps that draw, in paint order.
     pub(crate) fn steps(&self) -> impl Iterator<Item = Step> + '_ {
         self.drawn.iter().map(|&(_, step)| step)
+    }
+
+    /// The steps that draw, each with its place, in paint order.
+    pub(crate) fn placed(&self) -> impl Iterator<Item = (usize, Step)> + '_ {
+        self.drawn.iter().copied()
+    }
+
+    /// Slot `slot`'s steps that are in paint order, each with its place.
+    pub(crate) fn places_of(&self, slot: usize) -> impl Iterator<Item = (usize, Step)> {
+        let places = self.places.get(slot).copied().unwrap_or_default();
+        let steps = places.into_iter().zip(steps_of(slot));
+        steps.filter_map(|(place, step)| Some((place?, step)))
     }
 }
 

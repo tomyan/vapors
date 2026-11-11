@@ -38,11 +38,9 @@ impl<'a> SceneView<'a> {
     /// Each item, first drawn first, with its clip (device pixels).
     pub fn items(&self) -> impl Iterator<Item = (&'a Item, Option<Rect>)> + 'a {
         let boxes = self.boxes;
-        self.drawn.steps().flat_map(move |step| {
-            let scene = step_scene(boxes, step);
-            let clips = scene.clips().iter().copied();
-            scene.items().iter().zip(clips)
-        })
+        self.drawn
+            .steps()
+            .flat_map(move |step| step_items(boxes, step))
     }
 
     /// The batches for a target whose drawable area is `view` (device
@@ -85,6 +83,16 @@ impl<'a> SceneView<'a> {
             Step::Thumb(_) | Step::Outline(_) => None,
         })
     }
+}
+
+/// The items `step` paints, each with its clip (device pixels).
+pub(crate) fn step_items(
+    boxes: &[Option<KeptBox>],
+    step: Step,
+) -> impl Iterator<Item = (&Item, Option<Rect>)> {
+    let scene = step_scene(boxes, step);
+    let clips = scene.clips().iter().copied();
+    scene.items().iter().zip(clips)
 }
 
 /// The items `step` paints: its slot's own part, outline or thumbs.
