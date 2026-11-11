@@ -24,7 +24,7 @@ arboard = { version = "3.7", features = ["wayland-data-control"] }
 # which rfd drives itself (no GTK to link, no async runtime); native
 # dialogs on macOS and Windows need no feature.
 [target.'cfg(target_os = "linux")'.dependencies]
-rfd = { version = "0.17.2", default-features = false, features = ["xdg-portal"] }
+rfd = { version = "0.18.0", default-features = false, features = ["xdg-portal"] }
 
 [target.'cfg(all(not(target_family = "wasm"), not(target_os = "linux")))'.dependencies]
 rfd = { version = "0.17.2", default-features = false }
