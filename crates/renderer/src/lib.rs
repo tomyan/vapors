@@ -5,6 +5,7 @@
 
 mod arena_full;
 mod clear;
+mod encoder_budget;
 mod frame_arena;
 mod frame_encoder;
 mod image;
@@ -24,6 +25,7 @@ mod work;
 
 pub use arena_full::ArenaFull;
 pub use clear::{clear, clear_target, clear_view};
+pub use encoder_budget::EncoderBudget;
 pub use frame_arena::{FrameArena, Placed};
 pub use frame_encoder::FrameEncoder;
 pub use image::ImagePipeline;

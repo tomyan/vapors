@@ -32,6 +32,6 @@ impl Target<'_> {
     /// share the pass.
     pub fn draw_pass(&self, draw: impl FnOnce(&mut wgpu::RenderPass<'_>)) {
         self.encoder
-            .draw(self.view, self.scissor, |pass| draw(pass));
+            .draw(self.queue, self.view, self.scissor, |pass| draw(pass));
     }
 }

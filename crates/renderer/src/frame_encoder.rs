@@ -8,8 +8,9 @@ use std::cell::{Cell, RefCell};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
-use crate::ArenaFull;
+use crate::encoder_budget::Spent;
 use crate::open_pass::OpenPass;
+use crate::{ArenaFull, EncoderBudget};
 
 /// Each encoder's number, so a pipeline's [`FrameArena`](crate::FrameArena)
 /// knows when a new frame starts.
@@ -35,27 +36,36 @@ static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 ///
 /// Consecutive draws on one view share one render pass. The pass ends
 /// when a draw goes to another view, on a clear, on [`FrameEncoder::record`],
-/// [`FrameEncoder::flush`] and [`FrameEncoder::submit`].
+/// [`FrameEncoder::flush`] and [`FrameEncoder::submit`]. Before a draw
+/// or clear that would pass its [`EncoderBudget`], the encoder flushes.
 pub struct FrameEncoder {
     device: wgpu::Device,
     // declared before `encoder`, so a dropped encoder ends its pass first
     pass: RefCell<Option<OpenPass>>,
     encoder: RefCell<wgpu::CommandEncoder>,
     passes: Cell<u64>,
+    spent: Spent,
     id: u64,
     open: Open,
     refusal: RefCell<Option<ArenaFull>>,
 }
 
 impl FrameEncoder {
-    /// An empty encoder on `device`.
+    /// An empty encoder on `device`, with the default budget.
     #[must_use]
     pub fn new(device: &wgpu::Device) -> Self {
+        Self::with_budget(device, EncoderBudget::default())
+    }
+
+    /// An empty encoder on `device` that flushes at `budget`.
+    #[must_use]
+    pub fn with_budget(device: &wgpu::Device, budget: EncoderBudget) -> Self {
         Self {
             device: device.clone(),
             pass: RefCell::new(None),
             encoder: RefCell::new(encoder(device)),
             passes: Cell::new(0),
+            spent: Spent::new(budget),
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             open: Open(Arc::new(AtomicBool::new(true))),
             refusal: RefCell::new(None),
@@ -88,10 +98,13 @@ impl FrameEncoder {
     /// If `draw` uses this encoder.
     pub(crate) fn draw(
         &self,
+        queue: &wgpu::Queue,
         view: &wgpu::TextureView,
         scissor: Option<vapors_scene::Scissor>,
         draw: impl FnOnce(&mut wgpu::RenderPass<'static>),
     ) {
+        self.keep_to_budget(queue);
+        self.spent.draw();
         let mut open = self.pass.borrow_mut();
         if !open.as_ref().is_some_and(|pass| pass.is_on(view)) {
             *open = None;
@@ -102,7 +115,8 @@ impl FrameEncoder {
 
     /// Clears `view` to `color` in a render pass left open for the draws
     /// on `view` that follow.
-    pub(crate) fn clear(&self, view: &wgpu::TextureView, color: wgpu::Color) {
+    pub(crate) fn clear(&self, queue: &wgpu::Queue, view: &wgpu::TextureView, color: wgpu::Color) {
+        self.keep_to_budget(queue);
         self.end_pass();
         let cleared = self.begin(view, wgpu::LoadOp::Clear(color));
         *self.pass.borrow_mut() = Some(cleared);
@@ -114,6 +128,7 @@ impl FrameEncoder {
     pub fn flush(&self, queue: &wgpu::Queue) {
         self.end_pass();
         let done = self.encoder.replace(encoder(&self.device));
+        self.spent.reset();
         submit_timed(queue, done);
     }
 
@@ -147,7 +162,14 @@ impl FrameEncoder {
 
     fn begin(&self, view: &wgpu::TextureView, load: wgpu::LoadOp<wgpu::Color>) -> OpenPass {
         self.passes.set(self.passes.get() + 1);
+        self.spent.pass();
         OpenPass::begin(&mut self.encoder.borrow_mut(), view, load)
+    }
+
+    fn keep_to_budget(&self, queue: &wgpu::Queue) {
+        if self.spent.full() {
+            self.flush(queue);
+        }
     }
 
     fn end_pass(&self) {

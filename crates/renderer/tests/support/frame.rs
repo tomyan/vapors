@@ -51,3 +51,15 @@ pub fn pixel(pixels: &[u8], side: u32, x: u32, y: u32) -> [u8; 4] {
     let at = ((y * side + x) * 4) as usize;
     pixels[at..at + 4].try_into().expect("four bytes")
 }
+
+/// The queue's next submission's index, less one. wgpu keeps the
+/// number private; its `Debug` form, `SubmissionIndex { index: N }`,
+/// is the only reading, so any other form fails here, naming it.
+pub fn last_submission(gpu: &Gpu) -> u64 {
+    let index = format!("{:?}", gpu.queue.submit([]));
+    let digits = index
+        .strip_prefix("SubmissionIndex { index: ")
+        .and_then(|rest| rest.strip_suffix(" }"))
+        .unwrap_or_else(|| panic!("unrecognised SubmissionIndex form: {index}"));
+    digits.parse().expect("a submission number")
+}
