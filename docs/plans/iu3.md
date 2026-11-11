@@ -126,7 +126,7 @@ PRs, each under about 400 lines:
 
 | PR | Content | Acceptance |
 |---|---|---|
-| 3c-1 | The last update's `Painted` is kept and used again when no box was built, no box was laid out, and the scroll offsets, scale and thumbs shown are those it was painted with. Each of those four is a path that paints again, with a test that fails without it | Idle `boxes_painted` and `scene_items_built` 0, pinned; display-list build at 3000 rows idle near 0; the oracle and Chromium comparisons unchanged |
+| 3c-1 | The last update's `Painted` is kept with what it was made from: every slot's rect (scroll offsets applied), whether thumbs are shown, and the scale. An update that built no box and has the same rects, thumbs and scale shows it and paints nothing. Each of the three comparisons and the built-box count is a path that paints again, with a test that fails without it. A debug build paints again on the kept path and asserts the two paints are equal, naming the parts that differ | Idle `boxes_painted` and `scene_items_built` 0, pinned; display-list build at 3000 rows idle near 0; the oracle and Chromium comparisons unchanged |
 | 3c-2 | Paint kept per box (its items with ids local to it, its hit, cursor, texts, images, icons, surfaces, range track and text origin) with the values above it was made from; an update that repaints walks paint order, paints the boxes whose values differ or whose slot was rebuilt, and copies the rest, renumbering ids in paint order so the scene equals a full paint | Text change paints the edited label's boxes, class toggle and hover one row's, pinned in `EXPECTED_WALKS`; each compared value proven by breaking |
 | 3c-3 | If 3c-2's measurement shows the walk and copy dominate an edit: paint order, clips and the element maps kept and redone under changed boxes | Edit paint at 3000 rows recorded before and after |
 
@@ -189,8 +189,11 @@ PRs, each under about 400 lines:
   (`style_checks.rs`), dropping flagged elements from the set the
   checks after styling and `Calcs::set` run for.
 - PR 3c-1 (perf/iu3-3c-paint): `kept_paint.rs`; `Painted` keeps the
-  rects and thumbs it was made from, and an update that built no box
-  with the same rects and thumbs shows it. Idle `boxes_painted` and
+  rects, thumbs and scale it was made from, and an update that built
+  no box with the same three shows it; a debug build paints again and
+  asserts the two paints are equal (`kept_paint_check.rs`), so every
+  debug test checks the reuse. The random oracle also changes the
+  scale and the thumbs. Idle `boxes_painted` and
   `scene_items_built` 0; idle paint at 3000 rows 21.96 → 0.05 ms
   (`docs/perf/baseline-2026-11-10.md`, "IU3 PR 3c-1"). For 3c-2: the
   text cache keeps layouts only two updates unused (`keep_previous`

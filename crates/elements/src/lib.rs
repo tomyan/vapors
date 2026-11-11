@@ -42,6 +42,7 @@ mod img_checks;
 mod inline_check;
 mod kept_checks;
 mod kept_paint;
+mod kept_paint_check;
 mod keys;
 mod lay_out_text;
 mod layout;
@@ -101,6 +102,7 @@ mod tree;
 mod typing;
 mod update;
 mod update_counts;
+mod update_paint;
 
 pub use a11y_drive::{Command, Held, Reply};
 pub use a11y_error::AxError;

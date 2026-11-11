@@ -1,14 +1,14 @@
 //! The last update's paint used again (IU3 3c-1): an update paints no
-//! box when none was built and every box's rect and the thumbs are
-//! those the kept paint shows. Each of those, changed alone, paints
-//! every box again.
+//! box when none was built and every box's rect, the thumbs and the
+//! scale are those the kept paint shows. Each of those, changed alone,
+//! paints every box again.
 
 mod support;
 
 use support::scroll_list::{at, list, scroll};
 use support::{document, element, text, viewport};
 use vapors_dom::Dom;
-use vapors_elements::{Document, UpdateCounts};
+use vapors_elements::{Document, UpdateCounts, Viewport};
 
 /// `html` > `body` > a div with text: 4 boxes; returns the text node.
 fn page() -> (Document, vapors_dom::NodeId) {
@@ -17,6 +17,24 @@ fn page() -> (Document, vapors_dom::NodeId) {
     let label = element(&mut doc, body, "div", "");
     let run = text(&mut doc, label, "label");
     (doc, run)
+}
+
+/// A page with no box: html is `display: none`.
+fn no_boxes() -> Document {
+    let mut doc = document();
+    doc.add_stylesheet("app.css", ".hidden { display: none; }")
+        .expect("parses");
+    let root = doc.root();
+    doc.set_attribute(root, "class", "hidden");
+    doc
+}
+
+fn at_scale(scale: f32) -> Viewport {
+    Viewport {
+        width: 100.0,
+        height: 100.0,
+        scale,
+    }
 }
 
 /// Boxes built, boxes laid out, boxes painted.
@@ -92,4 +110,44 @@ fn hiding_the_thumbs_alone_paints_again() {
 
     // Then
     assert_eq!(work(list.doc.update_counts()), (0, 0, 7));
+}
+
+#[test]
+fn a_scale_change_alone_paints_again() {
+    // Given
+    let (mut doc, _) = page();
+    doc.update(at_scale(1.0)).expect("updates");
+
+    // When
+    let scale = doc.update(at_scale(2.0)).expect("updates").scale();
+
+    // Then
+    assert_eq!(work(doc.update_counts()), (4, 4, 4));
+    assert!((scale - 2.0).abs() < f32::EPSILON, "scale {scale}");
+}
+
+#[test]
+fn a_scale_change_alone_paints_again_with_no_box() {
+    // Given: no box is built at either scale, and both have no rects
+    let mut doc = no_boxes();
+    doc.update(at_scale(1.0)).expect("updates");
+
+    // When
+    let scale = doc.update(at_scale(2.0)).expect("updates").scale();
+
+    // Then
+    assert!((scale - 2.0).abs() < f32::EPSILON, "scale {scale}");
+}
+
+#[test]
+fn forgetting_what_is_kept_forgets_the_paint() {
+    // Given: no box, so the next update builds none
+    let mut doc = no_boxes();
+    doc.update(at_scale(1.0)).expect("updates");
+
+    // When
+    doc.forget_kept();
+
+    // Then
+    assert!(doc.painted().is_none());
 }
