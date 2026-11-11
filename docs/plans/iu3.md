@@ -261,7 +261,7 @@ costs nothing per update; `KeptBox::text` and `TextCache::touch` go.
   the next sweep (text cache); a repainted box's freed ids are taken
   by a later box and no stale id resolves (slabs).
 - New `UpdateCounts`: `order_walks`, `chain_walks`, `clips_redone`,
-  `map_entries_patched`, `parts_read_kept`; pinned in `EXPECTED_WALKS`
+  `map_entries_patched`, `parts_visited_kept`; pinned in `EXPECTED_WALKS`
   beside `boxes_painted` and `scene_items_built`.
 
 ### #192
@@ -299,7 +299,7 @@ uninstrumented or single-span figures at 3000 rows.
 | 3c-3b | Changed slots (`rebuild` returns rebuilt and freed slots; moved found by comparing rects); `rects` and `paddings` kept and patched | `map_entries_patched` pinned (the changed element slots); `started`'s 2.0 ms gone at 3000 rows |
 | 3c-3c | Order, containing blocks and chains kept, redone on shape change; clips kept, redone under changed slots | `order_walks` and `chain_walks` 0, `clips_redone` 2 and 7 for Text and Class; a row insert `order_walks` 1; about 9 ms less at 3000 rows (order 4.4, chains 2.9, clips 1.7). Split at order and clips if over 400 lines |
 | 3c-3d1 | Slabs for texts, images, icons and surfaces; parts keep their ids, copied without renumbering; the debug check compares resolved ids | Scene items and ids equal a full paint's after resolving; harness unchanged or better |
-| 3c-3d2 | Parts kept in place; the scene view and batching over an iterator; hits by walking order; per-element maps patched | `parts_read_kept` 0; Text and Class edit paint at 3000 rows under 1 ms; at 1000 rows recorded; draw at 3000 rows recorded before and after |
+| 3c-3d2 | Parts kept in place; the scene view and batching over an iterator; hits by walking order; per-element maps patched | `parts_visited_kept` 0; Text and Class edit paint at 3000 rows under 1 ms; at 1000 rows recorded; draw at 3000 rows recorded before and after |
 | 3c-3e | Moved slots shift their kept part by the rect's change (option (a) below) in place of painting it again; a harness workload whose edit resizes a label near the top of the list, and one that scrolls the list | Resize and scroll edits at 3000 rows: `boxes_painted` only the rebuilt slots, pinned; paint recorded before and after |
 
 ### Lead decisions (2026-11-11)

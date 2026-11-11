@@ -52,7 +52,7 @@ pub(crate) fn paint_partial(
 fn restarted(mut last: Painted, started: &Painted) -> (Painted, Option<KeptOrder>) {
     let order = std::mem::take(&mut last.order);
     (last.canvas, last.canvas_from) = (started.canvas, started.canvas_from);
-    (last.boxes_drawn, last.items_built, last.parts_read_kept) = (0, 0, 0);
+    (last.boxes_drawn, last.items_built, last.parts_visited_kept) = (0, 0, 0);
     last.hits = std::cell::OnceCell::new();
     (last, Some(order))
 }
@@ -77,7 +77,7 @@ fn to_paint(
         boxes[*slot].kept && part.is_some_and(|part| part.from == *from)
     };
     let (kept, again): (Vec<_>, Vec<_>) = read.partition(kept);
-    painted.parts_read_kept = kept.len();
+    painted.parts_visited_kept = kept.len();
     again
 }
 
