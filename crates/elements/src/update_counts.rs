@@ -35,6 +35,14 @@ pub struct UpdateCounts {
     pub layout_calls: usize,
     /// Times Taffy laid a box out rather than reading its cache.
     pub boxes_laid_out: usize,
+    /// Boxes whose rect layout worked out again (IU3 3b): those Taffy
+    /// laid out or gave a new layout, those built again or scrolled,
+    /// the boxes above them, and the boxes placed in a box whose
+    /// content moved. Every box when nothing is kept.
+    pub boxes_placed: usize,
+    /// Boxes not built again whose rect or padding changed since the
+    /// last paint; 0 when nothing is kept.
+    pub boxes_moved: usize,
     /// Boxes paint drew: one per box in painting order, outlines and
     /// scroll thumbs not included. A box built again, moved, or cut by
     /// another clip is drawn; the others' kept paint stays in place

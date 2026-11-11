@@ -399,6 +399,64 @@ measured, batch in the same pass as the split when the view changed.
   alongside painting the boxes (3c-2 measured 0.01 ms for painting
   the changed boxes at 3000 rows).
 
+## 3b: kept placement
+
+Today every update settles every scroll offset (`scroll.rs`) and
+places every box (`layout::placed`): its rect is its location plus its
+containing block's content origin, that block's corner less its scroll
+offset. Both walk every slot, and `ChangedSlots::moved` and
+`PaintedFrom::shows` then compare every rect and padding.
+
+What Taffy tells us. Taffy writes a box's layout only through
+`set_unrounded_layout`, which the box that lays it out calls (its
+parent, or for an out-of-flow box its containing block in
+`compute_oof_layout`; the root in `compute_root_layout`). It lays a
+box out only through `compute_child_layout`, which `BoxTree::dispatch`
+sees on a cache miss, and it rewrites a box's hoisted list only in
+`compute_oof_layout` for a box it lays out. So the tree records, per
+update: the slots dispatched, the slots whose layout
+`set_unrounded_layout` changed (compared with what the slot held), and
+the slots whose hoisted list was written. A box under a cache hit is
+neither laid out nor written, so its layout is the one placed last
+time.
+
+Kept between updates, beside the rects and paddings in `PaintedFrom`:
+each slot's applied scroll offset, the slot whose content origin it is
+placed in (`up`), and each out-of-flow slot's containing block,
+patched from the hoisted lists written this update (a rebuilt or freed
+slot's entry is cleared first; an out-of-flow box is never lent a
+layout, so Taffy lays it out and its containing block writes its
+hoisted list again). A freed slot's `up` is cleared; a rebuilt slot
+keeps its `up`. A rebuilt subtree whose layout is unchanged is lent
+its caches and its ancestors' caches are not cleared, so nothing above
+it is laid out; the kept `up` of the subtree's top slot (which keeps
+its slot and parent) still marks the chain to the root, and the walk
+sets `up` again for every slot below it.
+
+Placement. A slot is dirty when it was dispatched, its layout changed,
+it was rebuilt, or its scroll offset was moved since the last update
+(`Offsets::scroll` notes the element). Each dirty slot marks the slots
+up its `up` chain. A walk from the root visits a slot when it or a slot
+below it is marked, or its containing block's content origin moved; it
+settles the slot's scroll offset if the slot is dirty, places its rect,
+and visits every slot placed in it when its own content origin moved,
+else only the marked ones. A scroll so moves only the scroller's
+descendants, an edit that moves a row moves the rows placed after it,
+and an idle update visits nothing. The walk reports as moved each
+visited slot, not rebuilt, whose rect or padding changed; that is
+`ChangedSlots::moved`, and `PaintedFrom::shows` becomes "nothing
+built, nothing moved, same thumbs and scale". With no kept placement
+(the first update, after a failed one, or every box built) every slot
+is dirty.
+
+Counts: `boxes_placed` (slots the walk visited) and `boxes_moved`.
+The debug check settles and places every box afresh with today's
+`settle` and `placed`, and compares the rects, paddings and offsets of
+every held slot, each held slot's `up` and containing block with a
+fresh walk (`chain::by_containing_block`), so a broken chain fails on
+the update that broke it, and the moved set with a full comparison,
+naming the first differing slot.
+
 ## Open points
 
 - Rebuilding an owner rebuilds its whole subtree: a restyle of a large

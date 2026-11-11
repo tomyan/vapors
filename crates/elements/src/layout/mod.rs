@@ -17,6 +17,7 @@ pub(crate) use boxes::Source;
 mod text_cache;
 mod text_key;
 mod tree;
+mod written;
 
 use taffy::{AvailableSpace, NodeId, Size, compute_root_layout};
 use vapors_text::FontSystem;
@@ -26,9 +27,10 @@ pub(crate) use calcs::Calcs;
 pub(crate) use inline::{InlineRun, InlineSpan};
 pub(crate) use keep::KeptBoxes;
 pub(crate) use rebuilt::Rebuilt;
-pub(crate) use slots::{Key, Placed};
+pub(crate) use slots::{Key, Placed, Slots};
 pub(crate) use text_cache::TextCache;
 use tree::BoxTree;
+pub(crate) use written::Written;
 
 /// A box's border box in document coordinates, CSS pixels.
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -66,7 +68,7 @@ pub(crate) fn lay_out(
         cache,
         scale,
         calcs,
-        laid_out: 0,
+        written: Written::default(),
         calls: 0,
     };
     let available = Size {
@@ -78,8 +80,9 @@ pub(crate) fn lay_out(
         compute_root_layout(&mut tree, NodeId::from(0usize), available);
     }
     let work = LayoutWork {
-        laid_out: tree.laid_out,
+        laid_out: tree.written.laid_out.len(),
         calls: tree.calls,
+        written: std::mem::take(&mut tree.written),
     };
     match calcs.failure() {
         Some(failure) => Err((failure, work)),
@@ -94,10 +97,12 @@ pub(crate) fn lay_out(
 }
 
 /// What one layout did: how many times Taffy laid a box out rather than
-/// reading its cache, and how many times it asked a box for its layout.
+/// reading its cache, how many times it asked a box for its layout, and
+/// the slots it laid out or wrote.
 pub(crate) struct LayoutWork {
     pub(crate) laid_out: usize,
     pub(crate) calls: usize,
+    pub(crate) written: Written,
 }
 
 /// Each out-of-flow box's containing block, by box index.

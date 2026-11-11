@@ -9,10 +9,12 @@ use vapors_dom::NodeId;
 
 use crate::layout::{Content, LayoutBox};
 
-/// The offsets, by scroll container.
-#[derive(Debug, Default)]
+/// The offsets, by scroll container, and the containers scrolled
+/// since the last update.
+#[derive(Clone, Debug, Default)]
 pub(crate) struct Offsets {
     by_node: NodeMap<Offset>,
+    scrolled: Vec<NodeId>,
 }
 
 /// One container's offset and how far it can go.
@@ -59,7 +61,41 @@ impl Offsets {
             })
             .collect();
         self.by_node = kept;
+        self.scrolled.clear();
         applied
+    }
+
+    /// Clamps the offset of `node`, the scroll container in box `index`
+    /// of `boxes`, and returns it as `settle` does.
+    pub(crate) fn settle_box(
+        &mut self,
+        node: NodeId,
+        (boxes, index): (&[LayoutBox], usize),
+        scale: f32,
+    ) -> [f32; 2] {
+        let offset = self.clamped(node, boxes, index);
+        self.by_node.insert(node, offset);
+        offset.at.map(|v| (v * scale).round() / scale)
+    }
+
+    /// Drops the offset of `node`, which no longer scrolls.
+    pub(crate) fn forget(&mut self, node: NodeId) {
+        self.by_node.remove(&node);
+    }
+
+    /// Keeps only the offsets of `nodes`.
+    pub(crate) fn keep_only(&mut self, nodes: &crate::node_map::NodeSet) {
+        self.by_node.retain(|node, _| nodes.contains(node));
+    }
+
+    /// The containers scrolled since the last call.
+    pub(crate) fn take_scrolled(&mut self) -> Vec<NodeId> {
+        std::mem::take(&mut self.scrolled)
+    }
+
+    /// Whether these offsets are `other`'s, scrolls since aside.
+    pub(crate) fn same_offsets(&self, other: &Self) -> bool {
+        self.by_node == other.by_node
     }
 
     fn clamped(&self, node: NodeId, boxes: &[LayoutBox], index: usize) -> Offset {
@@ -78,6 +114,9 @@ impl Offsets {
         };
         let (moved, changed) = offset.moved_by(delta);
         offset.at = moved;
+        if changed {
+            self.scrolled.push(node);
+        }
         changed
     }
 
