@@ -11,10 +11,13 @@ use crate::gpu_timer_slot::{Finished, SlotState};
 
 /// Frames whose timestamps may be on their way back at once. A
 /// reading not mapped when its slot comes round again, this many frames
-/// later, is missing. A window's surface keeps at most 2 frames queued
+/// later, is missing ([`GpuMissing::Deadline`] names the frames). The
+/// number is reasoned from a configuration default, not measured: a
+/// native window's surface keeps at most 2 frames queued
 /// (`desired_maximum_frame_latency`, 2 in wgpu's default configuration,
 /// which vapors-platform uses), so a frame's GPU work has finished by
-/// the time the third after it begins; 4 leaves one frame spare.
+/// the time the third after it begins; 4 leaves one frame spare. On the
+/// web the browser sets the latency, not this configuration.
 const SLOTS: usize = 4;
 
 /// Timestamp pairs one frame may write by default. The app's painter

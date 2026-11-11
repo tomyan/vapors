@@ -130,8 +130,9 @@ impl fmt::Display for GpuMissing {
             Self::MapFailed(error) => write!(f, "mapping the timestamps failed: {error}"),
             Self::Deadline { frames } => write!(
                 f,
-                "the timestamps were not read back within {frames} frames: the GPU is that \
-                 far behind, or the device is not being polled"
+                "the timestamps were not read back within {frames} frames, when the timer's \
+                 ring of {frames} slots needed the slot again: the GPU is that far behind, \
+                 or the device is not being polled"
             ),
             Self::Backwards { start, end } => {
                 write!(f, "a pass ended at tick {end}, before its start {start}")

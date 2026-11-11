@@ -62,12 +62,12 @@ impl<'g> Sampler<'g> {
         samples.gpu = gpu_clock
             .map(|clock| clock.spans(&self.gpu.device, &self.gpu.queue))
             .transpose()?;
-        samples.counts = workload.counts();
         Ok(samples)
     }
 
-    /// The warmup frames, then the timed ones, kept, on one texture,
-    /// then one more, untimed, which reads back the last one's GPU time.
+    /// The warmup frames, then the timed ones, kept with the last one's
+    /// counts, on one texture, then one more, untimed, which reads back
+    /// the last one's GPU time.
     fn timed_frames(
         &mut self,
         workload: &mut dyn Workload,
@@ -85,6 +85,7 @@ impl<'g> Sampler<'g> {
             }
             if timed.contains(&index) {
                 samples.push(frame, phases);
+                samples.counts = workload.counts();
             }
         }
         Ok(samples)
