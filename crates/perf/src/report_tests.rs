@@ -53,3 +53,21 @@ fn without_timestamp_queries_both_gpu_rows_say_so() {
         "{report}"
     );
 }
+
+#[test]
+fn the_gpu_times_resolution_is_reported_beside_them() {
+    // Given
+    let tick = std::time::Duration::from_nanos(83);
+    let samples = Samples {
+        gpu_time: Some(vec![std::time::Duration::from_micros(400)]),
+        gpu_resolution: Some(vapors_app::GpuResolution::Tick(tick)),
+        ..Samples::default()
+    };
+
+    // When
+    let report = section("rows", &samples);
+
+    // Then
+    let row = "| GPU time resolution | 83ns (the device's timestamp period) | | |";
+    assert!(report.contains(row), "{report}");
+}

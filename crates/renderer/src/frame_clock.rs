@@ -7,7 +7,7 @@ use std::cell::Cell;
 use std::rc::Rc;
 use std::sync::mpsc;
 
-use crate::gpu_time::{GpuMissing, GpuReading};
+use crate::gpu_time::{FrameReading, GpuMissing};
 use crate::gpu_timer::Slot;
 use crate::gpu_timer_slot::{SlotState, missing};
 
@@ -113,7 +113,7 @@ impl FrameClock {
 
     /// The frame's reading when there is nothing to read back: no pairs,
     /// too many, or a section's ticks never written.
-    fn unread(&self) -> Option<GpuReading> {
+    fn unread(&self) -> Option<FrameReading> {
         let (frame, pairs, capacity) = (self.frame, self.pairs.get(), self.capacity);
         let why = match (pairs, self.unsubmitted.get()) {
             (0, 0) => return Some(zero(frame)),
@@ -156,8 +156,8 @@ impl Drop for FrameClock {
     }
 }
 
-fn zero(frame: u64) -> GpuReading {
-    GpuReading {
+fn zero(frame: u64) -> FrameReading {
+    FrameReading {
         frame,
         pairs: 0,
         time: Ok(std::time::Duration::ZERO),

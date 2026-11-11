@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use vapors_app::{FrameCounts, FrameTiming};
+use vapors_app::{FrameCounts, FrameTiming, GpuResolution};
 use vapors_elements::{Document, UpdateCounts};
 use vapors_platform::{App, Next};
 
@@ -82,6 +82,8 @@ pub struct Samples {
     /// renders, from the app's `FrameTiming`, per frame; `None` without
     /// timestamp queries.
     pub gpu_time: Option<Vec<Duration>>,
+    /// The smallest step the GPU times can show; `None` without them.
+    pub gpu_resolution: Option<GpuResolution>,
     /// The last frame's counts.
     pub counts: Counts,
 }
@@ -101,10 +103,12 @@ impl Samples {
         }
     }
 
-    /// Adds one frame's GPU time; `None`, without timestamp queries, adds none.
-    pub(crate) fn push_gpu_time(&mut self, time: Option<Duration>) {
-        if let Some(time) = time {
+    /// Adds one frame's GPU time and its resolution; `None`, without
+    /// timestamp queries, adds none.
+    pub(crate) fn push_gpu_time(&mut self, time: Option<(Duration, GpuResolution)>) {
+        if let Some((time, resolution)) = time {
             self.gpu_time.get_or_insert_default().push(time);
+            self.gpu_resolution = Some(resolution);
         }
     }
 }

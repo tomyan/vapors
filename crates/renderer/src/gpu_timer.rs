@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::frame_clock::{FrameClock, PAIR_BYTES};
-use crate::gpu_time::{GpuMissing, GpuReading, GpuTime, sum_pairs};
+use crate::gpu_time::{FrameReading, GpuMissing, GpuReading, GpuResolution, GpuTime, sum_pairs};
 use crate::gpu_timer_slot::{Finished, SlotState};
 
 /// Frames whose timestamps may be on their way back at once. A
@@ -39,7 +39,8 @@ pub struct GpuTimer {
     capacity: u32,
     slots: Vec<Rc<Slot>>,
     begun: usize,
-    latest: Option<GpuReading>,
+    latest: Option<FrameReading>,
+    resolution: GpuResolution,
 }
 
 impl GpuTimer {
@@ -64,13 +65,22 @@ impl GpuTimer {
             slots: (0..SLOTS).map(|_| Rc::new(slot(device, pairs))).collect(),
             begun: 0,
             latest: None,
+            resolution: GpuResolution::of_period(queue.get_timestamp_period()),
         })
     }
 
     /// The latest frame read back, or [`GpuTime::Pending`] before one is.
     #[must_use]
     pub fn time(&self) -> GpuTime {
-        self.latest.clone().map_or(GpuTime::Pending, GpuTime::Read)
+        let reading = |latest: &FrameReading| GpuReading {
+            frame: latest.frame,
+            pairs: latest.pairs,
+            time: latest.time.clone(),
+            resolution: self.resolution,
+        };
+        self.latest
+            .as_ref()
+            .map_or(GpuTime::Pending, |latest| GpuTime::Read(reading(latest)))
     }
 
     /// The clock for the frame `index`, after reading back the frames
@@ -101,7 +111,7 @@ impl GpuTimer {
         }
     }
 
-    fn finished(&self, slot: &Slot) -> Option<GpuReading> {
+    fn finished(&self, slot: &Slot) -> Option<FrameReading> {
         let finished = slot.state.borrow_mut().take_finished();
         match finished {
             Finished::Nothing => None,
@@ -110,17 +120,17 @@ impl GpuTimer {
         }
     }
 
-    fn read(&self, slot: &Slot, frame: u64, pairs: u32) -> GpuReading {
+    fn read(&self, slot: &Slot, frame: u64, pairs: u32) -> FrameReading {
         let ticks = ticks(&slot.readable, pairs);
         slot.readable.unmap();
-        GpuReading {
+        FrameReading {
             frame,
             pairs,
             time: ticks.and_then(|ticks| sum_pairs(&ticks, self.period)),
         }
     }
 
-    fn keep(&mut self, reading: GpuReading) {
+    fn keep(&mut self, reading: FrameReading) {
         if self
             .latest
             .as_ref()

@@ -20,7 +20,7 @@ pub enum GpuTime {
     Read(GpuReading),
 }
 
-/// One frame's timestamps, read back.
+/// One frame's timestamps, read back, and how finely they resolve time.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GpuReading {
     /// The frame's index, as the app was given it (`Frame::index`).
@@ -31,6 +31,49 @@ pub struct GpuReading {
     /// The sum of the pairs' spans, or why there is none. The GPU's
     /// work outside render passes (buffer writes, copies) is not in it.
     pub time: Result<Duration, GpuMissing>,
+    /// The smallest step [`GpuReading::time`] can show.
+    pub resolution: GpuResolution,
+}
+
+/// How finely a device's timestamps resolve time.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GpuResolution {
+    /// Natively: one tick of the device's timestamp period
+    /// (`Queue::get_timestamp_period`), truncated to the nanosecond.
+    Tick(Duration),
+    /// In a browser, which quantises WebGPU timestamps: Chrome rounds
+    /// them to 100 µs unless its WebGPU developer features are on
+    /// (`chrome://flags/#enable-webgpu-developer-features`), so a frame's
+    /// passes shorter than that can read 0. Not faked finer.
+    BrowserQuantised,
+}
+
+impl GpuResolution {
+    /// The resolution of a queue whose ticks are `period` nanoseconds.
+    #[must_use]
+    pub fn of_period(period: f32) -> Self {
+        if cfg!(target_arch = "wasm32") {
+            return Self::BrowserQuantised;
+        }
+        Self::Tick(Duration::from_secs_f64(f64::from(period) / 1e9))
+    }
+}
+
+impl fmt::Display for GpuResolution {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Tick(tick) => write!(f, "{tick:?} (the device's timestamp period)"),
+            Self::BrowserQuantised => write!(f, "browser-quantised (100 µs in Chrome by default)"),
+        }
+    }
+}
+
+/// A frame's reading before its timer adds the resolution.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct FrameReading {
+    pub(crate) frame: u64,
+    pub(crate) pairs: u32,
+    pub(crate) time: Result<Duration, GpuMissing>,
 }
 
 /// Why a timed frame has no GPU time.

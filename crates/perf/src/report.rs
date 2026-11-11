@@ -37,6 +37,9 @@ pub fn section(name: &str, samples: &Samples) -> String {
         Some(times) => row(&mut out, "GPU time", times),
         None => no_timestamps(&mut out, "GPU time"),
     }
+    if let Some(resolution) = samples.gpu_resolution {
+        let _ = writeln!(out, "| GPU time resolution | {resolution} | | |");
+    }
     out
 }
 

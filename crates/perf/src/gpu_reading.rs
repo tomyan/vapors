@@ -4,15 +4,18 @@
 
 use std::time::Duration;
 
-use vapors_app::GpuTime;
+use vapors_app::{GpuResolution, GpuTime};
 
-/// Frame `frame`'s GPU time from `time`, read after the frame after it;
-/// `None` when the device has no timestamp queries.
+/// Frame `frame`'s GPU time from `time`, read after the frame after it,
+/// with its resolution; `None` when the device has no timestamp queries.
 ///
 /// # Errors
 /// No reading, a reading of another frame, or one that says why it has
 /// no time: the harness refuses to report a frame it could not time.
-pub fn frame_gpu_time(time: GpuTime, frame: usize) -> Result<Option<Duration>, String> {
+pub fn frame_gpu_time(
+    time: GpuTime,
+    frame: usize,
+) -> Result<Option<(Duration, GpuResolution)>, String> {
     let reading = match time {
         GpuTime::Unsupported => return Ok(None),
         GpuTime::NotRequested => {
@@ -32,7 +35,7 @@ pub fn frame_gpu_time(time: GpuTime, frame: usize) -> Result<Option<Duration>, S
     }
     reading
         .time
-        .map(Some)
+        .map(|took| Some((took, reading.resolution)))
         .map_err(|missing| format!("frame {frame} has no GPU time: {missing}"))
 }
 

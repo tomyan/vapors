@@ -34,7 +34,7 @@ pub use encoder_budget::EncoderBudget;
 pub use frame_arena::{FrameArena, Placed};
 pub use frame_clock::FrameClock;
 pub use frame_encoder::FrameEncoder;
-pub use gpu_time::{GpuMissing, GpuReading, GpuTime};
+pub use gpu_time::{GpuMissing, GpuReading, GpuResolution, GpuTime};
 pub use gpu_timer::{DEFAULT_PAIRS, GpuTimer};
 pub use image::ImagePipeline;
 pub use mips::{upload_rgba8_mipmapped, upload_rgba8_mipmapped_counted};

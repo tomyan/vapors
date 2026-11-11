@@ -2,22 +2,25 @@
 
 use std::time::Duration;
 
-use vapors_app::{GpuMissing, GpuReading, GpuTime};
+use vapors_app::{GpuMissing, GpuReading, GpuResolution, GpuTime};
 
 use super::frame_gpu_time;
+
+const TICK: GpuResolution = GpuResolution::Tick(Duration::from_nanos(83));
 
 fn read(frame: u64, time: Result<Duration, GpuMissing>) -> GpuTime {
     GpuTime::Read(GpuReading {
         frame,
         pairs: 2,
         time,
+        resolution: TICK,
     })
 }
 
 #[test]
 fn the_frames_own_reading_gives_its_time() {
     let time = Duration::from_micros(250);
-    assert_eq!(frame_gpu_time(read(4, Ok(time)), 4), Ok(Some(time)));
+    assert_eq!(frame_gpu_time(read(4, Ok(time)), 4), Ok(Some((time, TICK))));
 }
 
 #[test]

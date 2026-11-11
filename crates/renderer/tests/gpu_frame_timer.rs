@@ -10,7 +10,9 @@ use std::time::Duration;
 
 use frame::{quad, square, target};
 use vapors_gpu_harness::{Gpu, gpu, gpu_with};
-use vapors_renderer::{FrameEncoder, GpuMissing, GpuReading, GpuTime, GpuTimer, QuadPipeline};
+use vapors_renderer::{
+    FrameEncoder, GpuMissing, GpuReading, GpuResolution, GpuTime, GpuTimer, QuadPipeline,
+};
 
 const RED: [u8; 4] = [255, 0, 0, 255];
 
@@ -68,11 +70,15 @@ fn gpu_a_timed_frame_reads_back_one_pair_per_render_pass_once_the_gpu_finishes()
         frame: 5,
         pairs: 2,
         time: Ok(time),
+        resolution,
     }) = after
     else {
         panic!("{after:?}");
     };
     assert!(time > Duration::ZERO, "{time:?}");
+    let period = f64::from(gpu.queue.get_timestamp_period());
+    let tick = Duration::from_secs_f64(period / 1e9);
+    assert_eq!(resolution, GpuResolution::Tick(tick));
 }
 
 #[test]
@@ -101,12 +107,11 @@ fn gpu_a_frame_dropped_unsubmitted_reads_back_as_not_submitted() {
     let time = read_back(&gpu, &mut timer);
 
     // Then
-    let not_submitted = GpuReading {
-        frame: 0,
-        pairs: 1,
-        time: Err(GpuMissing::NotSubmitted),
+    let GpuTime::Read(reading) = time else {
+        panic!("{time:?}");
     };
-    assert_eq!(time, GpuTime::Read(not_submitted));
+    let not_submitted = (0, 1, Err(GpuMissing::NotSubmitted));
+    assert_eq!((reading.frame, reading.pairs, reading.time), not_submitted);
 }
 
 #[test]

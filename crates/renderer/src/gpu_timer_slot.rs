@@ -5,7 +5,7 @@
 
 use std::sync::mpsc::{Receiver, TryRecvError};
 
-use crate::gpu_time::{GpuMissing, GpuReading};
+use crate::gpu_time::{FrameReading, GpuMissing};
 
 /// The map's outcome, sent by its callback.
 pub(crate) type MapOutcome = Result<(), wgpu::BufferAsyncError>;
@@ -25,7 +25,7 @@ pub(crate) enum SlotState {
         outcome: Receiver<MapOutcome>,
     },
     /// Known without reading: missing, or no pairs written.
-    Done(GpuReading),
+    Done(FrameReading),
 }
 
 /// What a slot holds once looked at.
@@ -36,7 +36,7 @@ pub(crate) enum Finished {
     /// The read-back buffer is mapped: read `pairs` pairs, then unmap it.
     Mapped { frame: u64, pairs: u32 },
     /// The frame's reading, with nothing to read.
-    Reading(GpuReading),
+    Reading(FrameReading),
 }
 
 impl SlotState {
@@ -67,7 +67,7 @@ impl SlotState {
     /// # Panics
     /// If the slot is still being recorded into: as many encoders as the
     /// ring has slots are open at once, which no frame loop does.
-    pub(crate) fn reclaim(&mut self, frames: usize) -> Option<GpuReading> {
+    pub(crate) fn reclaim(&mut self, frames: usize) -> Option<FrameReading> {
         match std::mem::take(self) {
             Self::Free => None,
             Self::Recording { frame } => panic!(
@@ -83,8 +83,8 @@ impl SlotState {
 }
 
 /// A reading of `frame` with no time.
-pub(crate) fn missing(frame: u64, pairs: u32, why: GpuMissing) -> GpuReading {
-    GpuReading {
+pub(crate) fn missing(frame: u64, pairs: u32, why: GpuMissing) -> FrameReading {
+    FrameReading {
         frame,
         pairs,
         time: Err(why),

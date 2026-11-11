@@ -2,7 +2,7 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use super::{Finished, MapOutcome, SlotState, missing};
-use crate::gpu_time::{GpuMissing, GpuReading};
+use crate::gpu_time::{FrameReading, GpuMissing};
 
 fn mapping(frame: u64) -> (SlotState, mpsc::Sender<MapOutcome>) {
     let (sender, outcome) = mpsc::channel();
@@ -53,7 +53,7 @@ fn a_refused_map_is_a_missing_reading_naming_the_refusal() {
     let finished = slot.take_finished();
 
     // Then
-    let Finished::Reading(GpuReading {
+    let Finished::Reading(FrameReading {
         frame: 7,
         time: Err(GpuMissing::MapFailed(_)),
         ..
@@ -82,7 +82,7 @@ fn a_mapping_still_pending_when_its_slot_is_needed_is_missing_past_its_deadline(
 #[test]
 fn a_reading_known_without_mapping_is_handed_over_once() {
     // Given
-    let reading = GpuReading {
+    let reading = FrameReading {
         frame: 3,
         pairs: 0,
         time: Ok(Duration::ZERO),
