@@ -23,8 +23,25 @@ the harness shows it, not when the code is believed to do it.
 | 8 | Memory per element | one style record per distinct style, not per element; per-element memory bounded by the per-box layout records | not measured | the build-time analysis |
 | 9 | HTML, SVG and 3D in one scene | the racer (3D craft, SVG markings on it, HTML on top) drawn as one scene with CSS reaching scene nodes, and no frame over 16.7 ms across a 60 s run | not built | the shape table, 3D slice 2 (PRs 4, 4b, 5) |
 
-Property 1 at 10,000 rows needs a 10,000-row workload in `vapors-perf`;
-it is added with the first PR that claims property 1.
+Property 1 at 10,000 rows has a 10,000-row workload in `vapors-perf`.
+
+Properties 1 and 6 are judged by `vapors-perf --scaling`, per change:
+
+```
+cargo build --release -p vapors-perf
+for change in Idle Text Class HoveredClass; do
+  ./target/release/vapors-perf 60 10 --scaling $change || echo "$change grows"
+done
+```
+
+It counts instructions at 1000, 3000 and 10,000 rows and exits non-zero,
+naming the phase and its growth per extra row, when an edit's phase
+(Text, Class, HoveredClass; every phase) or an idle update's total
+(Idle; `update`) is over 2% above its 1000-row count at a larger size.
+Today every one of the four fails
+(docs/perf/baseline-2026-11-10.md, "Scaling, 1657b27"). Property 1's
+time target (under 1 ms) is still read from the timed run. `--scaling Insert` reports for property 3
+and does not judge until the splice step is built.
 
 ## Order of work
 
