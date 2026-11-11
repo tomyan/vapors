@@ -298,6 +298,19 @@ uninstrumented or single-span figures at 3000 rows.
 | 3c-3c | Order, containing blocks and chains kept, redone on shape change; clips kept, redone under changed slots | `order_walks` and `chain_walks` 0, `clips_redone` 2 and 7 for Text and Class; a row insert `order_walks` 1; about 9 ms less at 3000 rows (order 4.4, chains 2.9, clips 1.7). Split at order and clips if over 400 lines |
 | 3c-3d1 | Slabs for texts, images, icons and surfaces; parts keep their ids, copied without renumbering; the debug check compares resolved ids | Scene items and ids equal a full paint's after resolving; harness unchanged or better |
 | 3c-3d2 | Parts kept in place; the scene view and batching over an iterator; hits by walking order; per-element maps patched | `boxes_copied` 0; Text and Class edit paint at 3000 rows under 1 ms; at 1000 rows recorded; draw at 3000 rows recorded before and after |
+| 3c-3e | Moved slots shift their kept part by the rect's change (option (a) below) in place of painting it again; a harness workload whose edit resizes a label near the top of the list, and one that scrolls the list | Resize and scroll edits at 3000 rows: `boxes_painted` only the rebuilt slots, pinned; paint recorded before and after |
+
+### Lead decisions (2026-11-11)
+
+- #192 is rebased onto main and merged before 3c-3a, as a correct
+  step that is not faster; its +0.2 to 0.3 ms at 1000 rows is
+  accepted until 3c-3d2 removes the copy loop.
+- Moved boxes: option (a), as PR 3c-3e. A scroll or a resized label
+  repainting most of a 3000-row list is the scaling case this plan is
+  for, and (a) needs no change to the scene format. (b) stays in IU4.
+- Batching over steps and items per drawn frame is accepted for 3c;
+  3c-3d2 records draw at 3000 rows, and a measurable rise brings kept
+  batches into this stack.
 
 ### Open points and risks
 
