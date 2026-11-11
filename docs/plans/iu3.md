@@ -380,19 +380,14 @@ measured, batch in the same pass as the split when the view changed.
   draw rises measurably, keeping batches across frames moves from IU4
   into this stack, and the lead decides.
 - Hit gathering (3c-3d2, kept in 3c-3g): the hit list is kept across
-  updates and patched for the slots painted again, freed or holding
-  thumbs, in paint order; it is gathered afresh only after paint order
-  is walked again. The patch is O(all hits) per update that paints
-  (a retain and a sort of two sorted runs): 0.10 ms of paint at 3000
-  rows. `hit()` scans the kept hits from the last, 13 µs at 3000 rows;
-  a spatial index waits until a page makes that measurable (above
-  0.1 ms).
-- Idle update (3c-3g): 2.39 ms at 3000 rows against 2.16 before 3c-3d2.
-  Each slot's rect and padding is now compared once, but collecting the
-  paddings in `placed` costs about 0.5 M cycles per update. Not keeping
-  paddings (compare a padding only for a box with a percentage padding,
-  which follows its containing block's width) would remove it; the
-  lead decides whether to schedule it.
+  updates and patched for the slots painted again or freed: one splice
+  per patched place, its range found by binary search, so the cost is
+  O(k log n) plus the tail move when a part's hit count changes. It is
+  gathered afresh only after paint order is walked again. `hit()` scans
+  the kept hits from the last: at 3000 rows about 0.11 M instructions
+  and 13 µs per test, which is what HoveredClass's update still costs
+  above Class's and grows with the row count. A spatial index waits
+  until a page makes that measurable (above 0.1 ms).
 - The debug check's fresh paint (3c-3d2) is `paint_partial` with
   nothing kept, so it compares an incremental paint with a full one
   through the same `Repaint` code: a defect inside `Repaint::painted`
