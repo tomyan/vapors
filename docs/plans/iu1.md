@@ -151,8 +151,10 @@ averages. No synchronous GPU waits in the normal path; GPU time only
 where timestamp queries exist. Timing is reported, never asserted in CI.
 
 Done: `crates/perf` (vapors-perf). The baseline and its findings are in
-`docs/perf/baseline-2026-11-10.md`: draw is 87% to 95% of every frame,
-because the painter submits once per draw call.
+`docs/perf/baseline-2026-11-10.md`: draw is 87% to 95% of every frame.
+The painter makes an encoder, a render pass and a submit per draw call;
+measured per call, `Queue::submit` takes about 35 µs, the encoder, pass
+and bind group about 25 µs, and buffer writes about 10 µs.
 
 ## PR 5 on: the remaining workloads
 
