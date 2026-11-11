@@ -78,6 +78,10 @@ impl Document {
         let may_keep = |node| kept.may_keep_layout(node);
         let (boxes, built) = self.boxes.rebuild(&source, root, viewport.scale, &may_keep);
         self.counts.boxes_built = built;
+        debug_assert!(
+            !boxes.boxes.is_empty() || used[&root].layout.display == taffy::Display::None,
+            "no boxes built while html is shown: a box build dropped the root"
+        );
         let size = (viewport.width, viewport.height);
         let texts = (&mut self.fonts, &mut self.texts);
         let (slotted, work) =

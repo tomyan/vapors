@@ -36,7 +36,7 @@ pub(crate) struct PaintInput<'a> {
 
 /// Paints `boxes` (box 0 the root) at the rects layout gave them.
 pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> Painted {
-    let (canvas, propagated) = crate::canvas::canvas_background(boxes, input);
+    let (canvas, propagated) = crate::canvas::canvas_background(input);
     input.propagated = propagated;
     let canvas_from = crate::canvas::canvas_from(propagated, input.root);
     let mut painted = Painted {

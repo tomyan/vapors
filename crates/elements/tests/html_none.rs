@@ -1,10 +1,22 @@
-//! `html` given `display: none` by a class: no box at all. Chromium
-//! (155, headless screenshot) then paints only the default white
-//! canvas, even when html and body set backgrounds, and its
-//! accessibility tree holds no node. The same white canvas when only
-//! body is hidden. Here the update paints nothing on
-//! white, nothing is hit and the a11y tree is empty; html shown again
-//! matches a full update.
+//! `html` given `display: none` by a class: no box at all. Here the
+//! update paints nothing on the default white canvas, nothing is hit
+//! and the a11y tree is empty; html shown again matches a full update.
+//!
+//! Checked against Chromium 155.0.8059.79 (Debian), 100x100 headless
+//! screenshots, each page a `<!doctype html>` with inline styles:
+//! `env -u DBUS_SESSION_BUS_ADDRESS chromium --headless --no-sandbox
+//! --disable-gpu --window-size=100,100 --screenshot=out.png file://…/page.html`.
+//! - html `display:none; background:red`, body `background:blue`: white.
+//! - html `display:none` from a class, body `background:blue`: white.
+//! - body `display:none; background:blue`: white.
+//! - body `display:inline; background:blue`: blue.
+//! - control, html `background:red`: red.
+//!
+//! The accessibility tree: the same Chromium with
+//! `--remote-debugging-port`, `Accessibility.getFullAXTree` over CDP,
+//! unignored nodes. html hidden by a class over a body of text and a
+//! button gives only `RootWebArea` (the document, which this tree has no
+//! node for); shown, it gives the text and the button.
 
 mod support;
 
@@ -14,7 +26,7 @@ use std::rc::Rc;
 use support::oracle::assert_matches_full;
 use support::{document, element, text, viewport};
 use vapors_dom::{Dom, NodeId};
-use vapors_elements::{Document, Viewport};
+use vapors_elements::{CanvasFrom, Document, Viewport};
 use vapors_scene::Color;
 
 const CSS: &str = "html { background-color: red; } body { background-color: blue; } \
@@ -75,6 +87,23 @@ fn body_hidden_gives_the_canvas_no_colour() {
     // Then
     assert_eq!(painted.canvas(), Color::from_rgba8(255, 255, 255, 255));
     assert_eq!(painted.canvas_from(), None);
+}
+
+#[test]
+fn an_inline_body_still_gives_the_canvas_its_background() {
+    // Given: body blue and inline, holding only text
+    let mut doc = document();
+    let body = doc.body();
+    text(&mut doc, body, "hi");
+    let sheet = "body { display: inline; margin: 0; background-color: blue; }";
+    doc.add_stylesheet("app.css", sheet).expect("parses");
+
+    // When
+    let painted = doc.update(view()).expect("updates");
+
+    // Then
+    assert_eq!(painted.canvas(), Color::from_rgba8(0, 0, 255, 255));
+    assert_eq!(painted.canvas_from(), Some(CanvasFrom::Body));
 }
 
 #[test]
