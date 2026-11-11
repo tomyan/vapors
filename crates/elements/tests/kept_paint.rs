@@ -1,7 +1,7 @@
 //! The last update's paint used again (IU3 3c-1): an update paints no
 //! box when none was built and every box's rect, the thumbs and the
 //! scale are those the kept paint shows. Each of those, changed alone,
-//! paints every box again.
+//! paints again: the boxes built or moved, and the thumbs.
 
 mod support;
 
@@ -81,12 +81,12 @@ fn a_built_box_paints_again() {
     doc.set_attribute(label, "class", "on");
     doc.update(viewport(100.0, 100.0)).expect("updates");
 
-    // Then
-    assert_eq!(work(doc.update_counts()), (2, 0, 4));
+    // Then: the div and its text
+    assert_eq!(work(doc.update_counts()), (2, 0, 2));
 }
 
 #[test]
-fn a_scroll_alone_paints_again() {
+fn a_scroll_alone_paints_the_scrolled_rows_again() {
     // Given: html, body, the list and its 4 rows
     let mut list = list("overflow: auto;");
 
@@ -95,21 +95,27 @@ fn a_scroll_alone_paints_again() {
     list.doc.update(at(1.0)).expect("updates");
 
     // Then
-    assert_eq!(work(list.doc.update_counts()), (0, 0, 7));
+    assert_eq!(work(list.doc.update_counts()), (0, 0, 4));
 }
 
 #[test]
-fn hiding_the_thumbs_alone_paints_again() {
+fn hiding_the_thumbs_alone_paints_without_them() {
     // Given
     let mut list = list("overflow: auto;");
-    list.doc.update(at(1.0)).expect("updates");
+    let shown = items(&mut list.doc);
 
     // When
     list.doc.set_thumbs_shown(false);
-    list.doc.update(at(1.0)).expect("updates");
+    let hidden = items(&mut list.doc);
 
-    // Then
-    assert_eq!(work(list.doc.update_counts()), (0, 0, 7));
+    // Then: no box painted, and the thumb's item gone
+    assert_eq!(work(list.doc.update_counts()), (0, 0, 0));
+    assert!(hidden < shown, "{hidden} items hidden, {shown} shown");
+}
+
+/// How many items an update at scale 1 shows.
+fn items(doc: &mut Document) -> usize {
+    doc.update(at(1.0)).expect("updates").scene().items().len()
 }
 
 #[test]

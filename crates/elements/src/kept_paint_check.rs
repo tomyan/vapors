@@ -1,6 +1,6 @@
 //! The debug build's check on a kept paint (`kept_paint.rs`): the
 //! update paints again and compares every part of the two paints but
-//! `from`, which the update sets after.
+//! `from`, which the update sets after, the kept boxes, and the counts.
 
 use std::rc::Rc;
 
@@ -23,15 +23,16 @@ macro_rules! differing {
 pub(crate) fn assert_same(kept: &Painted, fresh: &Painted) {
     let mut parts = differing!(kept, fresh; canvas, canvas_from, scale, scene, rects,
         paddings, visible, hits, cursors, images, icons, surfaces, scroll_chains, ranges,
-        text_origins, boxes_drawn);
+        text_origins);
     if !same_layouts(&kept.texts, &fresh.texts) {
         parts.push("texts");
     }
     assert!(
         parts.is_empty(),
         "the kept paint differs from a new paint in {parts:?}: a paint input is not \
-         compared in PaintedFrom (crates/elements/src/kept_paint.rs); reproduce with \
-         `cargo xtask test`"
+         compared in PaintedFrom (crates/elements/src/kept_paint.rs) or BoxFrom \
+         (crates/elements/src/kept_box.rs), or a copy renumbers wrongly \
+         (paint_partial.rs); reproduce with `cargo xtask test`"
     );
 }
 

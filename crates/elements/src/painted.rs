@@ -46,8 +46,13 @@ pub struct Painted {
     pub(crate) text_origins: HashMap<NodeId, [f32; 2]>,
     /// What this was painted from (`kept_paint`).
     pub(crate) from: crate::kept_paint::PaintedFrom,
-    /// Boxes drawn, for `UpdateCounts`.
+    /// Each slot's kept paint, for the next update (`kept_box.rs`).
+    pub(crate) kept_boxes: Vec<Option<crate::kept_box::KeptBox>>,
+    /// Boxes painted by this update, not copied from a kept paint, for
+    /// `UpdateCounts`.
     pub(crate) boxes_drawn: usize,
+    /// Scene items this update built, not copied, for `UpdateCounts`.
+    pub(crate) items_built: usize,
 }
 
 /// Which element's background became the canvas's (CSS Backgrounds 3
@@ -72,6 +77,32 @@ impl CanvasFrom {
 }
 
 impl Painted {
+    /// A paint of nothing on `canvas` at `scale`.
+    pub(crate) fn empty(canvas: Color, canvas_from: Option<CanvasFrom>, scale: f32) -> Self {
+        Self {
+            canvas,
+            canvas_from,
+            scale,
+            scene: Scene::new(),
+            texts: Vec::new(),
+            rects: HashMap::new(),
+            paddings: HashMap::new(),
+            visible: std::collections::HashSet::new(),
+            hits: Vec::new(),
+            cursors: HashMap::new(),
+            scroll_chains: crate::scroll_chains::Chains::default(),
+            images: Vec::new(),
+            icons: Vec::new(),
+            surfaces: Vec::new(),
+            ranges: HashMap::new(),
+            text_origins: HashMap::new(),
+            from: crate::kept_paint::PaintedFrom::default(),
+            kept_boxes: Vec::new(),
+            boxes_drawn: 0,
+            items_built: 0,
+        }
+    }
+
     /// The colour under everything: what the window is cleared to.
     #[must_use]
     pub fn canvas(&self) -> Color {

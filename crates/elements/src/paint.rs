@@ -6,14 +6,13 @@
 use std::collections::HashMap;
 
 use vapors_dom::NodeId;
-use vapors_scene::{Color, Item, Quad, Rect, Scene, Shadow, TextId};
+use vapors_scene::{Rect, Scene};
 use vapors_text::FontSystem;
 
-use crate::corners;
-use crate::layout::{BoxRect, Content, InlineRun, LayoutBox};
+use crate::layout::{BoxRect, Content, LayoutBox};
 use crate::paint_order::{Step, paint_steps_with_outlines, stacking_of};
 use crate::painted::Painted;
-use crate::style::{BoxShadow, Used};
+use crate::style::Used;
 
 /// What paint reads besides the boxes.
 pub(crate) struct PaintInput<'a> {
@@ -34,31 +33,70 @@ pub(crate) struct PaintInput<'a> {
     pub(crate) thumbs_shown: bool,
 }
 
+impl<'a> PaintInput<'a> {
+    /// The input for paint made from `from`: `page` is `html` and
+    /// `body`, `text` the fonts and the text cache.
+    pub(crate) fn new(
+        used: &'a HashMap<NodeId, Used>,
+        page: (NodeId, NodeId),
+        (fonts, cache): (&'a mut FontSystem, &'a mut crate::layout::TextCache),
+        scroll: &'a crate::scroll::Offsets,
+        from: &crate::kept_paint::PaintedFrom,
+    ) -> Self {
+        Self {
+            used,
+            root: page.0,
+            body: page.1,
+            propagated: None,
+            fonts,
+            cache,
+            scale: from.scale,
+            clip: None,
+            scroll,
+            thumbs_shown: from.thumbs_shown,
+        }
+    }
+}
+
 /// Paints `boxes` (box 0 the root) at the rects layout gave them.
 pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> Painted {
+    let mut painted = started(boxes, rects, input);
+    let (steps, clips) = order(boxes, rects, input);
+    for step in steps {
+        let index = step.index();
+        clip_to(clips[index], input, &mut painted.scene);
+        match step {
+            Step::Box(_) => {
+                painted.boxes_drawn += 1;
+                paint_box(boxes, rects, index, input, &mut painted);
+            }
+            Step::Thumb(_) => crate::thumb::paint(&boxes[index], rects[index], input, &mut painted),
+            Step::Outline(_) => {
+                crate::paint_outline::paint_outline(
+                    &boxes[index],
+                    rects[index],
+                    input,
+                    &mut painted,
+                );
+            }
+        }
+    }
+    painted.items_built = painted.scene.items().len();
+    painted
+}
+
+/// A paint with the canvas and every element's border and padding box,
+/// before any box is painted; notes in `input` which element gave the
+/// canvas its colour.
+pub(crate) fn started(
+    boxes: &[LayoutBox],
+    rects: &[BoxRect],
+    input: &mut PaintInput<'_>,
+) -> Painted {
     let (canvas, propagated) = crate::canvas::canvas_background(input);
     input.propagated = propagated;
     let canvas_from = crate::canvas::canvas_from(propagated, input.root);
-    let mut painted = Painted {
-        canvas,
-        canvas_from,
-        scale: input.scale,
-        scene: Scene::new(),
-        texts: Vec::new(),
-        rects: HashMap::new(),
-        paddings: HashMap::new(),
-        visible: std::collections::HashSet::new(),
-        hits: Vec::new(),
-        cursors: HashMap::new(),
-        scroll_chains: crate::scroll_chains::Chains::default(),
-        images: Vec::new(),
-        icons: Vec::new(),
-        surfaces: Vec::new(),
-        ranges: HashMap::new(),
-        text_origins: HashMap::new(),
-        boxes_drawn: 0,
-        from: crate::kept_paint::PaintedFrom::default(),
-    };
+    let mut painted = Painted::empty(canvas, canvas_from, input.scale);
     for (index, layout_box) in boxes.iter().enumerate() {
         if let Content::Element(node) = layout_box.content {
             painted.rects.insert(node, rects[index]);
@@ -66,127 +104,50 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
             painted.paddings.insert(node, [padding.x, padding.y]);
         }
     }
+    painted
+}
+
+/// The steps of painting in order, and each box's clip.
+pub(crate) fn order(
+    boxes: &[LayoutBox],
+    rects: &[BoxRect],
+    input: &PaintInput<'_>,
+) -> (Vec<Step>, Vec<Option<BoxRect>>) {
     let steps = paint_steps_with_outlines(boxes, &|index| stacking_of(boxes, index, input.used));
     let clips = crate::clip::clips(boxes, rects, &|index| {
         crate::clip::clipping(boxes, index, input)
     });
-    for step in steps {
-        let (Step::Box(index) | Step::Thumb(index) | Step::Outline(index)) = step;
-        // Two forms of one clip, on purpose: hits are cut to it in CSS
-        // pixels, unsnapped, as border boxes are hit unsnapped, so hit
-        // testing follows layout geometry as Chromium's does; the scene
-        // gets it snapped to device pixels, as every painted edge is.
-        // They differ by under a device pixel at an edge.
-        input.clip = clips[index];
-        let device = clips[index].map(|clip| snapped(clip, input.scale));
-        painted.scene.set_clip(device);
-        match step {
-            Step::Box(_) => {
-                painted.boxes_drawn += 1;
-                paint_own(boxes, rects, index, input, &mut painted);
-                crate::images::paint(&boxes[index], rects[index], input, &mut painted);
-                crate::svg_paint::paint(&boxes[index], rects[index], input, &mut painted);
-                crate::surfaces::paint(&boxes[index], rects[index], input, &mut painted);
-                crate::range_paint::paint(&boxes[index], rects[index], input, &mut painted);
-                crate::checkbox_paint::paint(&boxes[index], rects[index], input, &mut painted);
-                crate::text_paint::paint(boxes, rects, index, input, &mut painted);
-            }
-            Step::Thumb(_) => crate::thumb::paint(&boxes[index], rects[index], input, &mut painted),
-            Step::Outline(_) => crate::paint_outline::paint_outline(
-                &boxes[index],
-                rects[index],
-                input,
-                &mut painted,
-            ),
-        }
-    }
-    painted
+    (steps, clips)
 }
 
-/// One box's own painting: an element's shadows, background and
-/// border, or a run's text; its children are painted in their turn.
-fn paint_own(
+/// Sets the clip the next step paints under.
+pub(crate) fn clip_to(clip: Option<BoxRect>, input: &mut PaintInput<'_>, scene: &mut Scene) {
+    // Two forms of one clip, on purpose: hits are cut to it in CSS
+    // pixels, unsnapped, as border boxes are hit unsnapped, so hit
+    // testing follows layout geometry as Chromium's does; the scene
+    // gets it snapped to device pixels, as every painted edge is.
+    // They differ by under a device pixel at an edge.
+    input.clip = clip;
+    scene.set_clip(clip.map(|clip| snapped(clip, input.scale)));
+}
+
+/// Box `index`'s own step: its own painting and its replaced content,
+/// range, checkbox and text field marks.
+pub(crate) fn paint_box(
     boxes: &[LayoutBox],
     rects: &[BoxRect],
     index: usize,
     input: &mut PaintInput<'_>,
     out: &mut Painted,
 ) {
-    match &boxes[index].content {
-        Content::Element(node) => paint_element(*node, rects[index], input, out),
-        Content::Text(run) => paint_text(run, rects[index], input, out),
-        Content::Vacant => unreachable!("a vacant slot is no box's child"),
-    }
-}
-
-/// The element's shadows, then its background and border, unless it is
-/// hidden; a background that became the canvas's is not painted again.
-/// Also its place among the elements the pointer can hit.
-fn paint_element(node: NodeId, rect: BoxRect, input: &PaintInput<'_>, out: &mut Painted) {
-    let used = &input.used[&node];
-    if used.visible && used.takes_pointer {
-        out.hits.push((node, crate::clip::within(input.clip, rect)));
-        out.cursors.insert(node, used.cursor);
-    }
-    if !used.visible {
-        return;
-    }
-    out.visible.insert(node);
-    let border_box = snapped(rect, input.scale);
-    let decoration = &used.decoration;
-    let radii = corners::fitted(decoration.radii.map(|r| r * input.scale), border_box);
-    for shadow in decoration.shadows.iter().rev() {
-        let item = shadow_item(shadow, border_box, radii, input.scale);
-        out.scene.push(Item::Shadow(item));
-    }
-    let background = if input.propagated == Some(node) {
-        Color::default()
-    } else {
-        used.background
-    };
-    let border = decoration.border.map(|w| w * input.scale);
-    if background.a > 0.0 || border.iter().any(|w| *w > 0.0) {
-        let quad = Quad {
-            rect: border_box,
-            background,
-            border,
-            border_colors: decoration.border_colors,
-            radii,
-        };
-        out.scene.push(Item::Quad(quad));
-    }
-}
-
-/// A CSS outer shadow as the scene draws it: the border box moved by
-/// the offset and grown by the spread, corners grown with it.
-fn shadow_item(shadow: &BoxShadow, caster: Rect, radii: [f32; 4], scale: f32) -> Shadow {
-    let [dx, dy] = shadow.offset.map(|v| v * scale);
-    let spread = shadow.spread * scale;
-    Shadow {
-        rect: Rect::new(
-            caster.left + dx - spread,
-            caster.top + dy - spread,
-            caster.right + dx + spread,
-            caster.bottom + dy + spread,
-        ),
-        radii: radii.map(|r| corners::spread(r, spread)),
-        blur: shadow.blur * scale,
-        color: shadow.color,
-        caster,
-        caster_radii: radii,
-    }
-}
-
-fn paint_text(run: &InlineRun, rect: BoxRect, input: &mut PaintInput<'_>, out: &mut Painted) {
-    let layout = input
-        .cache
-        .layout(input.fonts, input.scale, run, Some(rect.width));
-    crate::paint_inline::paint_spans(run, &layout, rect, input, out);
-    let id = TextId(u32::try_from(out.texts.len()).expect("fewer than 2^32 text runs"));
-    let origin = [rect.x * input.scale, rect.y * input.scale];
-    let (text, ink) = (id, layout.ink().offset(origin));
-    out.texts.push(layout);
-    out.scene.push(Item::Text { text, origin, ink });
+    let (layout_box, rect) = (&boxes[index], rects[index]);
+    crate::paint_own::paint_own(boxes, rects, index, input, out);
+    crate::images::paint(layout_box, rect, input, out);
+    crate::svg_paint::paint(layout_box, rect, input, out);
+    crate::surfaces::paint(layout_box, rect, input, out);
+    crate::range_paint::paint(layout_box, rect, input, out);
+    crate::checkbox_paint::paint(layout_box, rect, input, out);
+    crate::text_paint::paint(boxes, rects, index, input, out);
 }
 
 /// `rect` in device pixels, each edge rounded to the nearest pixel, so

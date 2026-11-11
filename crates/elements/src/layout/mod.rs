@@ -24,7 +24,7 @@ pub(crate) use calcs::Calcs;
 pub(crate) use inline::{InlineRun, InlineSpan};
 pub(crate) use keep::KeptBoxes;
 pub(crate) use slots::Placed;
-pub(crate) use text_cache::TextCache;
+pub(crate) use text_cache::{Key as TextKey, TextCache};
 use tree::BoxTree;
 
 /// A box's border box in document coordinates, CSS pixels.
