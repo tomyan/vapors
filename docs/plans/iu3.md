@@ -340,6 +340,14 @@ uninstrumented or single-span figures at 3000 rows.
   testing walks steps per query. 3c-3d2 records draw at 3000 rows; if
   draw rises measurably, keeping batches across frames moves from IU4
   into this stack, and the lead decides.
+- Hit gathering (3c-3d2): the first hit test after an update gathers
+  every part's hits once (O(all hits))
+  and later tests in the same update cost O(hits at the point). With the
+  pointer over the window this is paid on each update that follows a
+  paint. The harness has no hover workload, so the cost is not
+  measured; a hovered-edit workload in `vapors-perf` would measure it.
+  Walking order per test was slower in debug on the 1000-row oracle
+  test (33.5 s against 16.2 s).
 - Unknown until 3c-3d2 is measured: whether the slab frees and map
   patches for 7 boxes, plus the rect comparison, fit in 1 ms
   alongside painting the boxes (3c-2 measured 0.01 ms for painting
