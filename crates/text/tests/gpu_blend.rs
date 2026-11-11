@@ -63,7 +63,7 @@ fn render(text: &str, ink: Color, background: Color, params: BlendParams) -> Vec
     pipeline
         .draw(&render_target, &mut atlas, &layout, origin, params)
         .expect("draws");
-    encoder.submit(&gpu.queue);
+    encoder.submit(&gpu.queue).expect("no draw refused");
     read_rgba8(&gpu.device, &gpu.queue, &target)
 }
 

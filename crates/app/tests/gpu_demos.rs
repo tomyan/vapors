@@ -48,7 +48,7 @@ fn render(name: &str, spec: &Spec) -> Vec<u8> {
         .expect("Rgba8Unorm is drawn")
         .draw(&target, painted)
         .expect("paints");
-    encoder.submit(&gpu.queue);
+    encoder.submit(&gpu.queue).expect("no draw refused");
     read_rgba8(&gpu.device, &gpu.queue, &texture)
 }
 

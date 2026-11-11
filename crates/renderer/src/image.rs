@@ -7,7 +7,7 @@ use vapors_scene::{Rect, Size, Transform};
 
 use crate::frame_arena::FrameArena;
 use crate::image_setup::{bind_group_layout, render_pipeline};
-use crate::{FrameEncoder, GpuWork, Target, WorkCounter};
+use crate::{ArenaFull, FrameEncoder, GpuWork, Target, WorkCounter};
 
 use crate::quad::{VERTEX_COUNT, VERTEX_SIZE, quad_vertices, vertex_bytes};
 
@@ -79,6 +79,11 @@ impl ImagePipeline {
     /// Draw `texture` into `target` (of size `viewport`) placed by `transform`.
     /// Pixels outside the image keep whatever was in the target. Submits
     /// its own encoder: the canvas draws one image a frame.
+    ///
+    /// # Errors
+    ///
+    /// [`ArenaFull`] when the image's vertices do not fit a buffer of the
+    /// device's `max_buffer_size`; nothing is drawn then.
     pub fn draw(
         &mut self,
         device: &wgpu::Device,
@@ -87,7 +92,7 @@ impl ImagePipeline {
         viewport: Size,
         texture: &wgpu::Texture,
         transform: Transform,
-    ) {
+    ) -> Result<(), ArenaFull> {
         let image = Size {
             width: texture.width(),
             height: texture.height(),
@@ -103,7 +108,7 @@ impl ImagePipeline {
         };
         let nearest = self.nearest.clone();
         self.quad(&at, texture, transform.image_bounds(image), &nearest);
-        encoder.submit(queue);
+        encoder.submit(queue)
     }
 
     /// Draw `texture` stretched over `rect` (device pixels) in `target`,
@@ -128,9 +133,12 @@ impl ImagePipeline {
         sampler: &wgpu::Sampler,
     ) {
         let quad = vertex_bytes(&quad_vertices(bounds, target.viewport));
-        let vertices = self
+        let Some(vertices) = self
             .vertices
-            .push(target.encoder, target.queue, &self.work, &quad);
+            .push(target.encoder, target.queue, &self.work, &quad)
+        else {
+            return;
+        };
         let bind_group = self.bind_group(target.device, texture, sampler);
         target.draw_pass("image", |pass| {
             pass.set_pipeline(&self.pipeline);

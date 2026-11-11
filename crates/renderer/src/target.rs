@@ -7,7 +7,9 @@ use crate::FrameEncoder;
 
 /// Where a draw goes: the target view and its size in pixels, and the
 /// frame's encoder the draw is recorded into. Nothing reaches the view
-/// until the encoder is submitted.
+/// until the encoder is submitted. A draw whose bytes need a buffer over
+/// the device's `max_buffer_size` is not recorded; its refusal is kept
+/// on the encoder ([`FrameEncoder::take_refusal`], [`FrameEncoder::submit`]).
 #[derive(Clone, Copy)]
 pub struct Target<'a> {
     /// Device the pipeline was made on.

@@ -79,7 +79,11 @@ pub struct Rig {
 
 impl Rig {
     pub fn new() -> Self {
-        let gpu = gpu();
+        Self::on(gpu())
+    }
+
+    /// A painter on `gpu`.
+    pub fn on(gpu: Gpu) -> Self {
         let painter =
             ScenePainter::new(&gpu.device, wgpu::TextureFormat::Rgba8Unorm).expect("Rgba8Unorm");
         Self { gpu, painter }
@@ -122,7 +126,7 @@ impl Rig {
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         let encoder = FrameEncoder::new(&gpu.device);
         let drawn = draw(&mut self.painter, &target(gpu, &encoder, &view));
-        encoder.submit(&gpu.queue);
+        encoder.submit(&gpu.queue).expect("no draw refused");
         drawn?;
         Ok(read_rgba8(&gpu.device, &gpu.queue, &texture))
     }

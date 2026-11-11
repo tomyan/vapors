@@ -38,7 +38,7 @@ fn painted_tick(shown: &vapors_demos::Shown) -> Vec<u8> {
         .expect("Rgba8Unorm is drawn")
         .draw(&target, painted)
         .expect("paints");
-    encoder.submit(&gpu.queue);
+    encoder.submit(&gpu.queue).expect("no draw refused");
     let rgba = read_rgba8(&gpu.device, &gpu.queue, &texture);
     let [left, top, right, bottom] = TICK;
     (top..bottom)

@@ -2,7 +2,7 @@
 
 use vapors_scene::Color;
 
-use crate::{FrameEncoder, Target};
+use crate::Target;
 
 /// Create an `Rgba8Unorm` texture of `width` by `height` and clear it to
 /// `color`. The texture can be copied from, so tests can read it back.
@@ -40,9 +40,11 @@ pub fn clear_view(
     view: &wgpu::TextureView,
     color: Color,
 ) {
-    let encoder = FrameEncoder::new(device);
-    encoder.record(|encoder| clear_pass(encoder, view, color));
-    encoder.submit(queue);
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("clear"),
+    });
+    clear_pass(&mut encoder, view, color);
+    queue.submit([encoder.finish()]);
 }
 
 /// Record a clear of `target`'s whole view to `color` into its encoder.

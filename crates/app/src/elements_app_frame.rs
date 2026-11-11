@@ -74,8 +74,8 @@ impl ElementsApp {
     fn paint(&mut self, frame: &Frame<'_>, now: Instant) -> Result<(), String> {
         let encoder = FrameEncoder::new(frame.device);
         let painted = self.record(frame, &encoder, now);
-        encoder.submit(frame.queue);
-        painted
+        let submitted = encoder.submit(frame.queue);
+        painted.and(submitted.map_err(|refused| refused.to_string()))
     }
 
     fn record(

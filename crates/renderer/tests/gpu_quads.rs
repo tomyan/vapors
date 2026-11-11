@@ -45,7 +45,7 @@ fn draw(quads: &[Quad], width: u32, height: u32) -> Vec<u8> {
         },
         quads,
     );
-    encoder.submit(&gpu.queue);
+    encoder.submit(&gpu.queue).expect("no draw refused");
     read_rgba8(&gpu.device, &gpu.queue, &target)
 }
 

@@ -3,6 +3,7 @@
 //! GPU tests for this crate live in `tests/gpu_*.rs`, are named `gpu_*`,
 //! and run in the `gpu` tier (`cargo xtask test --tier gpu`).
 
+mod arena_full;
 mod clear;
 mod frame_arena;
 mod frame_encoder;
@@ -20,6 +21,7 @@ mod target;
 mod upload;
 mod work;
 
+pub use arena_full::ArenaFull;
 pub use clear::{clear, clear_target, clear_view};
 pub use frame_arena::{FrameArena, Placed};
 pub use frame_encoder::FrameEncoder;

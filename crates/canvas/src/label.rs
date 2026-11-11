@@ -112,7 +112,9 @@ impl LabelDraw {
         ) {
             vapors_platform::report_error(&format!("label: {error}"));
         }
-        encoder.submit(frame.queue);
+        if let Err(refused) = encoder.submit(frame.queue) {
+            vapors_platform::report_error(&format!("label: {refused}"));
+        }
     }
 }
 

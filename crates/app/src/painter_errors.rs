@@ -5,6 +5,7 @@
 use std::fmt;
 
 use vapors_elements::CanvasFrom;
+use vapors_renderer::ArenaFull;
 use vapors_text::AtlasError;
 
 use crate::surface::SurfaceError;
@@ -65,6 +66,8 @@ pub enum PaintError {
     /// A glyph could not be rasterised, or a frame's glyphs do not fit
     /// the atlas page.
     Atlas(AtlasError),
+    /// A draw's bytes need a buffer over the device's `max_buffer_size`.
+    Arena(ArenaFull),
     /// A `gpu-surface`, by name, with no renderer mounted.
     Unmounted(String),
     /// Two `gpu-surface`s in one frame share this name.
@@ -94,6 +97,12 @@ pub enum PaintError {
 impl From<AtlasError> for PaintError {
     fn from(error: AtlasError) -> Self {
         Self::Atlas(error)
+    }
+}
+
+impl From<ArenaFull> for PaintError {
+    fn from(error: ArenaFull) -> Self {
+        Self::Arena(error)
     }
 }
 

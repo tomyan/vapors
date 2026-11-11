@@ -59,7 +59,8 @@ impl Instanced {
         }
     }
 
-    /// Draws `count` instances whose attributes are `bytes`.
+    /// Draws `count` instances whose attributes are `bytes`; a draw its
+    /// arenas refuse is not recorded (the refusal is on the encoder).
     pub(crate) fn draw(&mut self, target: &Target<'_>, bytes: &[u8]) {
         let count = u32::try_from(bytes.len() as u64 / self.stride).unwrap_or_else(|_| {
             panic!(
@@ -71,9 +72,13 @@ impl Instanced {
             return;
         }
         let (frame, queue) = (target.encoder, target.queue);
-        let instances = self.instances.push(frame, queue, &self.work, bytes);
+        let Some(instances) = self.instances.push(frame, queue, &self.work, bytes) else {
+            return;
+        };
         let viewport = viewport_bytes(target.viewport);
-        let viewport = self.viewports.push(frame, queue, &self.work, &viewport);
+        let Some(viewport) = self.viewports.push(frame, queue, &self.work, &viewport) else {
+            return;
+        };
         self.record(target, count, &instances, &viewport);
     }
 

@@ -72,6 +72,34 @@ pub fn gpu() -> Gpu {
     }
 }
 
+impl Gpu {
+    /// The same adapter opened again with `max_buffer_size` lowered to
+    /// `limit`, for a test of what refuses a buffer over it.
+    ///
+    /// # Panics
+    ///
+    /// If the adapter will not open the device.
+    #[must_use]
+    pub fn with_max_buffer_size(&self, limit: u64) -> Gpu {
+        let required_limits = wgpu::Limits {
+            max_buffer_size: limit,
+            ..self.device.limits()
+        };
+        let descriptor = wgpu::DeviceDescriptor {
+            label: Some("vapors gpu test, small buffers"),
+            required_limits,
+            ..Default::default()
+        };
+        let (device, queue) = pollster::block_on(self.adapter.request_device(&descriptor))
+            .unwrap_or_else(|error| panic!("the adapter refused max_buffer_size {limit}: {error}"));
+        Gpu {
+            adapter: self.adapter.clone(),
+            device,
+            queue,
+        }
+    }
+}
+
 /// Refuse the unit tier; any other tier, or none (a test run directly
 /// with `cargo nextest run`), may open a GPU.
 ///

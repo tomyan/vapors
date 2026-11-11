@@ -41,7 +41,7 @@ fn draw(rect: Rect, scissor: Option<Scissor>) -> Vec<u8> {
         scissor,
     };
     pipeline.draw_rect(&at, &image, rect);
-    encoder.submit(&gpu.queue);
+    encoder.submit(&gpu.queue).expect("no draw refused");
     read_rgba8(&gpu.device, &gpu.queue, &target)
 }
 

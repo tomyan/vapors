@@ -32,15 +32,17 @@ impl ImageView {
         let Some(uploaded) = self.upload(frame) else {
             return Ok(());
         };
-        uploaded.pipeline.draw(
-            frame.device,
-            frame.queue,
-            &view,
-            viewport,
-            &uploaded.texture,
-            transform,
-        );
-        Ok(())
+        uploaded
+            .pipeline
+            .draw(
+                frame.device,
+                frame.queue,
+                &view,
+                viewport,
+                &uploaded.texture,
+                transform,
+            )
+            .map_err(|refused| refused.to_string())
     }
 
     fn upload(&mut self, frame: &Frame<'_>) -> Option<&mut Uploaded> {

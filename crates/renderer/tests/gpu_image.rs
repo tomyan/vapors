@@ -36,14 +36,16 @@ fn gpu_a_two_by_two_image_at_scale_two_fills_quadrants_exactly() {
         scale: 2.0,
         translate: [0.0, 0.0],
     };
-    pipeline.draw(
-        &gpu.device,
-        &gpu.queue,
-        &view,
-        viewport,
-        &texture,
-        transform,
-    );
+    pipeline
+        .draw(
+            &gpu.device,
+            &gpu.queue,
+            &view,
+            viewport,
+            &texture,
+            transform,
+        )
+        .expect("one quad fits");
     let pixels = read_rgba8(&gpu.device, &gpu.queue, &target);
 
     // Then: each quadrant is one source pixel
@@ -78,14 +80,16 @@ fn gpu_pixels_outside_the_image_keep_the_background() {
         scale: 1.0,
         translate: [2.0, 2.0],
     };
-    pipeline.draw(
-        &gpu.device,
-        &gpu.queue,
-        &view,
-        viewport,
-        &texture,
-        transform,
-    );
+    pipeline
+        .draw(
+            &gpu.device,
+            &gpu.queue,
+            &view,
+            viewport,
+            &texture,
+            transform,
+        )
+        .expect("one quad fits");
     let pixels = read_rgba8(&gpu.device, &gpu.queue, &target);
 
     // Then

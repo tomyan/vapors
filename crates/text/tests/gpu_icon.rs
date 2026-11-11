@@ -59,7 +59,7 @@ fn render(icon: &Icon, colour: Color) -> Vec<u8> {
     pipeline
         .draw_icons(&render_target, &mut atlas, &[draw])
         .expect("draws");
-    encoder.submit(&gpu.queue);
+    encoder.submit(&gpu.queue).expect("no draw refused");
     read_rgba8(&gpu.device, &gpu.queue, &target)
 }
 

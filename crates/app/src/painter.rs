@@ -109,7 +109,8 @@ impl ScenePainter {
     }
 
     /// Draws `run` with the pipeline for its kind under `target`'s
-    /// scissor, and counts the work it issued.
+    /// scissor, and counts the work it issued. A draw the pipeline's
+    /// buffers refused ends the frame here.
     fn draw_run(
         &mut self,
         target: &Target<'_>,
@@ -118,7 +119,11 @@ impl ScenePainter {
     ) -> Result<(), PaintError> {
         let result = self.issue_run(target, painted, run);
         self.count_run(run);
-        result
+        result?;
+        target
+            .encoder
+            .take_refusal()
+            .map_or(Ok(()), |refused| Err(refused.into()))
     }
 
     /// Issues `run`'s writes and draws; a refusal leaves those already

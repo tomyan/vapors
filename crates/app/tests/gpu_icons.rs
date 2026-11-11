@@ -107,7 +107,7 @@ fn on_white(draw: impl FnOnce(&vapors_gpu_harness::Gpu, &Target<'_>)) -> Vec<u8>
         scissor: None,
     };
     draw(&gpu, &target);
-    encoder.submit(&gpu.queue);
+    encoder.submit(&gpu.queue).expect("no draw refused");
     read_rgba8(&gpu.device, &gpu.queue, &texture)
 }
 

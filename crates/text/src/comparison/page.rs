@@ -16,8 +16,9 @@ use super::spec::{Block, PADDING, PAGE_HEIGHT, PAGE_WIDTH, PANEL_WIDTH, SCHEMES,
 ///
 /// # Panics
 ///
-/// If a block cannot be drawn; the message is the atlas error, and a
-/// fixed page of bundled fonts failing to draw is a bug, not an input.
+/// If a block cannot be drawn, or its vertices need a buffer over the
+/// device's `max_buffer_size`; the message is the error, and a fixed
+/// page of bundled fonts failing to draw is a bug, not an input.
 #[must_use]
 pub fn render_page(
     device: &wgpu::Device,
@@ -56,7 +57,9 @@ pub fn render_page(
             let origin = [left + px(PADDING * scale), px(block.top * scale)];
             text.draw(&render_target, &layout, origin, params);
         }
-        encoder.submit(queue);
+        encoder
+            .submit(queue)
+            .unwrap_or_else(|refused| panic!("text comparison: {refused}"));
     }
     Rgba {
         width: viewport.width,
@@ -66,6 +69,11 @@ pub fn render_page(
 }
 
 /// A `width` by 24 px strip naming the two columns of the composite.
+///
+/// # Panics
+///
+/// If the labels' vertices need a buffer over the device's
+/// `max_buffer_size`; two short labels doing so is a bug.
 #[must_use]
 pub fn render_labels(
     device: &wgpu::Device,
@@ -97,7 +105,9 @@ pub fn render_labels(
         let x = px(width / 2 * index + 8);
         text.draw(&render_target, &layout, [x, 3.0], BlendParams::default());
     }
-    encoder.submit(queue);
+    encoder
+        .submit(queue)
+        .unwrap_or_else(|refused| panic!("text comparison: {refused}"));
     Rgba {
         width,
         height: 24,

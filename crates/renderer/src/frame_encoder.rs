@@ -5,7 +5,10 @@
 //! made draw time linear in draw calls.
 
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
+use crate::ArenaFull;
 
 /// Each encoder's number, so a pipeline's [`FrameArena`](crate::FrameArena)
 /// knows when a new frame starts.
@@ -21,11 +24,19 @@ static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 /// The pipelines write each draw's data to its own place in their
 /// buffers and reuse those places from the next encoder on: submit (or
 /// drop) one encoder before drawing with the next through the same
-/// pipeline. A pipeline given an older encoder after a newer one panics.
+/// pipeline. A pipeline given a newer encoder while an older one it drew
+/// for is still open, or an older encoder after a newer one, panics.
+///
+/// A draw whose bytes would need a buffer over the device's
+/// `max_buffer_size` is not recorded; [`FrameEncoder::submit`] returns
+/// the first such refusal, and [`FrameEncoder::take_refusal`] hands it
+/// over sooner.
 pub struct FrameEncoder {
     device: wgpu::Device,
     encoder: RefCell<wgpu::CommandEncoder>,
     id: u64,
+    open: Open,
+    refusal: RefCell<Option<ArenaFull>>,
 }
 
 impl FrameEncoder {
@@ -36,6 +47,8 @@ impl FrameEncoder {
             device: device.clone(),
             encoder: RefCell::new(encoder(device)),
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
+            open: Open(Arc::new(AtomicBool::new(true))),
+            refusal: RefCell::new(None),
         }
     }
 
@@ -57,8 +70,30 @@ impl FrameEncoder {
     }
 
     /// Submits everything recorded on `queue`.
-    pub fn submit(self, queue: &wgpu::Queue) {
+    ///
+    /// # Errors
+    ///
+    /// [`ArenaFull`] when a draw was refused and not taken with
+    /// [`FrameEncoder::take_refusal`]; the draws recorded are submitted.
+    pub fn submit(self, queue: &wgpu::Queue) -> Result<(), ArenaFull> {
         queue.submit([self.encoder.into_inner().finish()]);
+        self.refusal.into_inner().map_or(Ok(()), Err)
+    }
+
+    /// The first draw refused since the last take, if any.
+    pub fn take_refusal(&self) -> Option<ArenaFull> {
+        self.refusal.borrow_mut().take()
+    }
+
+    /// Records that a draw was refused; the first refusal is kept.
+    pub(crate) fn refuse(&self, refusal: ArenaFull) {
+        self.refusal.borrow_mut().get_or_insert(refusal);
+    }
+
+    /// Whether this encoder is still open, read after it is gone: false
+    /// once it is submitted or dropped.
+    pub(crate) fn open_flag(&self) -> Arc<AtomicBool> {
+        Arc::clone(&self.open.0)
     }
 
     /// The device it records for.
@@ -69,6 +104,15 @@ impl FrameEncoder {
     /// This encoder's number: later encoders have larger ones.
     pub(crate) fn id(&self) -> u64 {
         self.id
+    }
+}
+
+/// Cleared when the encoder is submitted or dropped.
+struct Open(Arc<AtomicBool>);
+
+impl Drop for Open {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Relaxed);
     }
 }
 

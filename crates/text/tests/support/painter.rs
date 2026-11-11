@@ -1,5 +1,8 @@
 //! A text pipeline and atlas kept across draws, each into a fresh target.
 
+// each test crate including this uses a part of it
+#![allow(dead_code)]
+
 use vapors_gpu_harness::{Gpu, gpu, read_rgba8};
 use vapors_renderer::{FrameEncoder, clear};
 use vapors_scene::{Color, Size};
@@ -75,13 +78,20 @@ impl Painter {
 
     /// Draw `icon` at 16 px in black in a new frame.
     pub fn icon(&mut self, icon: &Icon) -> Drawn {
-        let draw = IconDraw {
-            icon,
-            origin: [60, 8],
-            size: [16, 16],
-            colour: BLACK,
-        };
+        let draw = icon_draw(icon);
         self.frame(|pipeline, atlas, target| pipeline.draw_icons(target, atlas, &[draw]))
+    }
+
+    /// Draw `text` as [`Painter::text`] does, then `icon` as
+    /// [`Painter::icon`] does, in one frame: two blends in one encoder.
+    pub fn text_then_icon(&mut self, text: &str, icon: &Icon) -> Drawn {
+        let style = Style::new(Family::Geist, 16.0);
+        let layout = Layout::new(&mut self.system, text, &style, &LayoutOptions::default());
+        let draw = icon_draw(icon);
+        self.frame(|pipeline, atlas, target| {
+            pipeline.draw(target, atlas, &layout, [2.0, 4.0], BlendParams::default())?;
+            pipeline.draw_icons(target, atlas, &[draw])
+        })
     }
 
     /// Run `paint` into a fresh white target as a new atlas frame.
@@ -100,7 +110,7 @@ impl Painter {
         let encoder = FrameEncoder::new(&gpu.device);
         let target = target(gpu, &encoder, &view);
         paint(&mut self.pipeline, &mut self.atlas, &target).expect("draws");
-        encoder.submit(&gpu.queue);
+        encoder.submit(&gpu.queue).expect("no draw refused");
         Drawn {
             pixels: read_rgba8(&gpu.device, &gpu.queue, &texture),
             atlas_bytes: self.pipeline.take_work().texture_bytes,
@@ -123,6 +133,16 @@ fn target<'a>(
             height: HEIGHT,
         },
         scissor: None,
+    }
+}
+
+/// `icon` at 16 px in black, right of where the text is drawn.
+fn icon_draw(icon: &Icon) -> IconDraw<'_> {
+    IconDraw {
+        icon,
+        origin: [60, 8],
+        size: [16, 16],
+        colour: BLACK,
     }
 }
 

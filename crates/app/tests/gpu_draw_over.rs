@@ -68,7 +68,7 @@ fn painted(css: &str, over: bool) -> Result<Vec<u8>, DrawOverError> {
     } else {
         painter.draw(&target, update).expect("paints");
     }
-    encoder.submit(&gpu.queue);
+    encoder.submit(&gpu.queue).expect("no draw refused");
     Ok(read_rgba8(&gpu.device, &gpu.queue, &texture))
 }
 

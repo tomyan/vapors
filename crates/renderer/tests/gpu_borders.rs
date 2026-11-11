@@ -35,7 +35,7 @@ fn render(width: u32, height: u32, draw: impl FnOnce(&wgpu::Device, &Target<'_>)
             scissor: None,
         },
     );
-    encoder.submit(&gpu.queue);
+    encoder.submit(&gpu.queue).expect("no draw refused");
     read_rgba8(&gpu.device, &gpu.queue, &target)
 }
 
