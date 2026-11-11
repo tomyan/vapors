@@ -5,6 +5,7 @@ use crate::document::Document;
 use crate::error::ElementError;
 use crate::kept_paint::PaintedFrom;
 use crate::layout::{LayoutBox, Placed, lay_out, placed};
+use crate::paint_order::Stackings;
 use crate::update::Viewport;
 
 impl Document {
@@ -50,10 +51,15 @@ impl Document {
 
     /// What paint is made from besides `boxes`: their rects, scroll
     /// offsets settled and applied, the thumbs and the scale.
-    pub(crate) fn painted_from(&mut self, boxes: &[LayoutBox], viewport: Viewport) -> PaintedFrom {
-        let used = &self.kept.as_ref().expect("styled keeps the styles").used;
-        let scrolls = crate::update_paint::scroll_containers(boxes, used);
-        let offsets = self.scroll.settle(boxes, &scrolls, viewport.scale);
+    pub(crate) fn painted_from(
+        &mut self,
+        boxes: &[LayoutBox],
+        stackings: &Stackings,
+        viewport: Viewport,
+    ) -> PaintedFrom {
+        let offsets = self
+            .scroll
+            .settle(boxes, &|index| stackings.scrolls(index), viewport.scale);
         PaintedFrom {
             rects: placed(boxes, &offsets),
             thumbs_shown: self.thumbs_shown,
