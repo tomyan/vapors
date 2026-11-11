@@ -13,18 +13,20 @@ use crate::layout::{BoxRect, Content, LayoutBox, TextCache, TextKey};
 use crate::painted::Painted;
 use crate::style::Cursor;
 
-/// What a box's paint reads besides its box and style.
+/// What a box's paint reads besides its box and style. Not here, as
+/// they change only with a rebuilt box: border widths, which come only
+/// from style (CSS has no % border); and whether its background became
+/// the canvas's, which reads only html's and body's style, whose
+/// restyle rebuilds the tree or body.
 #[derive(PartialEq)]
 pub(crate) struct BoxFrom {
     /// Its border box, scroll offsets applied.
     pub(crate) rect: BoxRect,
     /// The clip of the boxes that cut it off.
     pub(crate) clip: Option<BoxRect>,
-    /// Its border and padding widths, for its padding and content box.
-    pub(crate) border: taffy::Rect<f32>,
+    /// Its padding widths, for its padding and content box (% padding
+    /// follows the containing block's width).
     pub(crate) padding: taffy::Rect<f32>,
-    /// Whether its background became the canvas's.
-    pub(crate) canvas: bool,
     /// A text field's text origin: its text child's box.
     pub(crate) text_origin: Option<BoxRect>,
 }
@@ -57,23 +59,18 @@ pub(crate) struct Part {
 }
 
 impl BoxFrom {
-    /// What box `index`'s paint reads now; `canvas` is the element whose
-    /// background became the canvas's.
+    /// What box `index`'s paint reads now, under `clip`.
     pub(crate) fn of(
         boxes: &[LayoutBox],
         rects: &[BoxRect],
         clip: Option<BoxRect>,
         index: usize,
-        canvas: Option<NodeId>,
     ) -> Self {
-        let layout_box = &boxes[index];
         Self {
             rect: rects[index],
             clip,
-            border: layout_box.layout.border,
-            padding: layout_box.layout.padding,
-            canvas: canvas.is_some_and(|node| layout_box.element_in(index) == Some(node)),
-            text_origin: layout_box
+            padding: boxes[index].layout.padding,
+            text_origin: boxes[index]
                 .text_field
                 .then(|| crate::text_paint::text_origin(boxes, rects, index)),
         }
