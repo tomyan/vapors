@@ -65,18 +65,28 @@ fn patched_slots(
         .collect()
 }
 
-/// `painted`'s drawing steps made afresh, and its kept batches dropped,
-/// when `order` was walked again; else both patched for the `patched`
-/// slots.
+/// `painted`'s drawing steps made afresh, and its kept batches and hits
+/// dropped, when `order` was walked again; else all three patched for
+/// the `patched` slots.
 fn drawn_updated(painted: &mut Painted, order: &KeptOrder, patched: &[usize]) {
     if order.walks.order > 0 {
         painted.drawn = DrawnSteps::of(&order.steps, &painted.kept_boxes);
         painted.kept_batches = std::cell::RefCell::default();
+        painted.hits = std::cell::OnceCell::new();
         return;
     }
     painted
         .drawn
         .patch(patched.iter().copied(), &painted.kept_boxes);
+    if let Some(hits) = painted.hits.get_mut() {
+        hits.patch(patched.iter().copied(), &painted.drawn, &painted.kept_boxes);
+    }
+    batches_patched(painted, patched);
+}
+
+/// `painted`'s kept batches, if any, patched for the `patched` slots'
+/// steps.
+fn batches_patched(painted: &mut Painted, patched: &[usize]) {
     if let Some(kept) = painted.kept_batches.get_mut() {
         let steps = patched
             .iter()
@@ -85,14 +95,13 @@ fn drawn_updated(painted: &mut Painted, order: &KeptOrder, patched: &[usize]) {
     }
 }
 
-/// `last` for this update, with `started`'s canvas and scale, its counts and
-/// gathered hits cleared; and its paint order, taken.
+/// `last` for this update, with `started`'s canvas and scale and its
+/// counts cleared; and its paint order, taken.
 fn restarted(mut last: Painted, started: &Painted) -> (Painted, Option<KeptOrder>) {
     let order = std::mem::take(&mut last.order);
     (last.canvas, last.canvas_from) = (started.canvas, started.canvas_from);
     last.scale = started.scale;
     (last.boxes_drawn, last.items_built, last.parts_visited_kept) = (0, 0, 0);
-    last.hits = std::cell::OnceCell::new();
     (last, Some(order))
 }
 

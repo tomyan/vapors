@@ -1,8 +1,8 @@
 //! The debug build's check on a kept paint (`kept_paint.rs`): the
 //! update paints again and compares every part of the two paints but
 //! `from`, which the update sets after, the kept boxes, and the counts;
-//! the hits in painting order, and any hits gathered for hit testing
-//! against them; the steps that draw against ones found afresh; the scene item by item with ids
+//! the hits in painting order, and the hits kept for hit testing
+//! against a fresh gather, naming the first that differs; the steps that draw against ones found afresh; the scene item by item with ids
 //! resolved, the slabs against the kept boxes' items, and each kept
 //! part's slot against paint order (`kept_scene_check.rs`); the kept
 //! `rects` and `paddings` maps name their first differing entry.
@@ -48,7 +48,7 @@ fn differing_parts(kept: &Painted, fresh: &Painted) -> Vec<String> {
     .into_iter()
     .map(String::from)
     .collect();
-    parts.extend(differing_hits(kept, fresh).map(String::from));
+    parts.extend(differing_hits(kept, fresh));
     parts.extend(differing_drawn(kept).map(String::from));
     parts.extend(crate::kept_scene_check::first_differing_item(kept, fresh));
     parts.extend(crate::kept_scene_check::part_off_steps(kept));
@@ -65,16 +65,31 @@ fn differing_parts(kept: &Painted, fresh: &Painted) -> Vec<String> {
     parts
 }
 
-/// "hits" when `kept`'s hits are not `fresh`'s, in painting order;
-/// "gathered hits" when the hits `kept` gathered for hit testing are
-/// not its scene's.
-fn differing_hits(kept: &Painted, fresh: &Painted) -> impl Iterator<Item = &'static str> {
+/// "hits" when `kept`'s hits are not `fresh`'s, in painting order; the
+/// first kept hit for hit testing that differs from a fresh gather of
+/// `kept`'s scene. The kept hits are gathered when none are, so every
+/// later update patches them and is compared.
+fn differing_hits(kept: &Painted, fresh: &Painted) -> impl Iterator<Item = String> {
     let hits = !kept.scene().hits().eq(fresh.scene().hits());
-    let gathered = kept.hits.get();
-    let gathered = !gathered.is_none_or(|hits| hits.iter().eq(kept.scene().hits()));
-    [("hits", hits), ("gathered hits", gathered)]
-        .into_iter()
-        .filter_map(|(name, differs)| differs.then_some(name))
+    let gathered = crate::kept_hits::KeptHits::of(&kept.scene());
+    let first = first_differing_hit(kept.kept_hits(), &gathered);
+    hits.then(|| "hits".to_owned()).into_iter().chain(first)
+}
+
+/// The first place where `kept`'s hits and `gathered`'s differ, with
+/// both.
+fn first_differing_hit(
+    kept: &crate::kept_hits::KeptHits,
+    gathered: &crate::kept_hits::KeptHits,
+) -> Option<String> {
+    let (mut kept, mut gathered) = (kept.hits(), gathered.hits());
+    (0..).find_map(|at| match (kept.next(), gathered.next()) {
+        (None, None) => Some(None),
+        (k, g) if k != g => Some(Some(format!(
+            "kept hits at {at}: kept {k:?}, gathered afresh {g:?}"
+        ))),
+        _ => None,
+    })?
 }
 
 /// "drawn steps" when the steps `kept` lists as drawing are not those
