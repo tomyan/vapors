@@ -123,6 +123,7 @@ impl ImagePipeline {
         let quad = quad_vertices(bounds, target.viewport);
         self.work
             .write_buffer(target.queue, &self.vertices, 0, &vertex_bytes(&quad));
+        let encoding = tracing::trace_span!("draw step", phase = "encode").entered();
         let bind_group = self.bind_group(target.device, texture, sampler);
         let mut encoder = target
             .device
@@ -139,7 +140,10 @@ impl ImagePipeline {
             pass.set_vertex_buffer(0, self.vertices.slice(..));
             self.work.draw(&mut pass, 0..VERTEX_COUNT, 0..1);
         }
-        target.queue.submit([encoder.finish()]);
+        let commands = encoder.finish();
+        drop(encoding);
+        let _submit = tracing::trace_span!("draw step", phase = "submit").entered();
+        target.queue.submit([commands]);
     }
 
     fn bind_group(

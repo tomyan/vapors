@@ -49,16 +49,23 @@ enum Check {
 /// The counts after each edit of `EDITS`, in order, at every row count:
 /// restyled, laid out, text layouts built. The table in
 /// docs/plans/iu1.md is these numbers; a change here updates it.
-const EXPECTED: [(usize, usize, usize); 5] =
-    [(0, 5, 1), (0, 9, 2), (0, 0, 0), (4, 0, 0), (1, 0, 0)];
+const EXPECTED: [(usize, usize, usize); 6] = [
+    (0, 5, 1),
+    (0, 9, 2),
+    (0, 0, 0),
+    (4, 0, 0),
+    (1, 0, 0),
+    (4, 0, 0),
+];
 
 /// The walk after each edit of `EDITS`, by row count: elements visited,
 /// boxes built, layout calls, boxes painted, scene items built. A row is
 /// 4 elements and 7 boxes (3 text runs) and draws 4 items (the button's
-/// quad and 3 texts), 5 with the focus outline; `html` and `body` add 2
+/// quad and 3 texts), 5 with the focus outline, 6 with the outline and
+/// the marked row's background; `html` and `body` add 2
 /// elements and 2 boxes. The second table in docs/plans/iu1.md is these
 /// numbers.
-const EXPECTED_WALKS: [(usize, [[usize; 5]; 5]); 2] = [
+const EXPECTED_WALKS: [(usize, [[usize; 5]; 6]); 2] = [
     (
         100,
         [
@@ -67,6 +74,7 @@ const EXPECTED_WALKS: [(usize, [[usize; 5]; 5]); 2] = [
             [402, 702, 1, 702, 400],
             [402, 702, 1, 702, 400],
             [402, 702, 1, 702, 401],
+            [402, 702, 1, 702, 402],
         ],
     ),
     (
@@ -77,6 +85,7 @@ const EXPECTED_WALKS: [(usize, [[usize; 5]; 5]); 2] = [
             [4002, 7002, 1, 7002, 4000],
             [4002, 7002, 1, 7002, 4000],
             [4002, 7002, 1, 7002, 4001],
+            [4002, 7002, 1, 7002, 4002],
         ],
     ),
 ];

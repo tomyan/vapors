@@ -65,6 +65,7 @@ impl WorkCounter {
         offset: u64,
         data: &[u8],
     ) {
+        let _write = tracing::trace_span!("draw step", phase = "write").entered();
         queue.write_buffer(buffer, offset, data);
         self.buffer_bytes.fetch_add(len(data), Ordering::Relaxed);
     }
@@ -78,6 +79,7 @@ impl WorkCounter {
         layout: wgpu::TexelCopyBufferLayout,
         size: wgpu::Extent3d,
     ) {
+        let _write = tracing::trace_span!("draw step", phase = "write").entered();
         queue.write_texture(texture, data, layout, size);
         self.texture_bytes.fetch_add(len(data), Ordering::Relaxed);
     }
