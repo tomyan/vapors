@@ -1,8 +1,8 @@
 //! Paint that copies kept paint (IU3 3c-2, `docs/plans/iu3.md`): paint
 //! order and clips are walked again, each box kept from the last update
 //! with the values its kept paint was made from has that paint copied,
-//! ids renumbered in paint order, and every other box is painted again
-//! and its paint kept for the next update (`kept_box.rs`). Scroll
+//! its slab ids unchanged, and every other box is painted again, its
+//! old ids freed, and its paint kept for the next update (`kept_box.rs`). Scroll
 //! thumbs are painted on every update. The scene equals a full paint's
 //! (`paint.rs`), which a debug build checks (`kept_paint.rs`).
 
@@ -10,10 +10,11 @@ use crate::changed_slots::ChangedSlots;
 use crate::kept_box::{BoxFrom, KeptBox, Part};
 use crate::kept_order::KeptOrder;
 use crate::kept_paint::LastPaint;
-use crate::layout::{BoxRect, LayoutBox};
+use crate::layout::{BoxRect, Key, LayoutBox};
 use crate::paint::{PaintInput, clip_to, paint_box, started};
 use crate::paint_order::Step;
 use crate::painted::Painted;
+use crate::slab::Slabs;
 use vapors_scene::Item;
 
 /// Paints `boxes` at `rects`, copying from `last`, the last update's
@@ -27,19 +28,13 @@ pub(crate) fn paint_partial(
     changed: &ChangedSlots,
 ) -> Painted {
     let mut painted = started(input);
+    painted.slabs = last.slabs;
     crate::kept_maps::fill(&mut painted, (boxes, rects), last.maps, changed);
     let order = KeptOrder::updated(last.order, (boxes, rects), input, changed);
     let mut walk = Walk::new(boxes, rects, last.boxes, &painted);
-    for &step in &order.steps {
-        let index = step.index();
-        let clip = order.clips.own(index);
-        clip_to(clip, input, &mut painted.scene);
-        match step {
-            Step::Box(_) => walk.own(index, clip, input, &mut painted),
-            Step::Thumb(_) => thumb(&boxes[index], rects[index], input, &mut painted),
-            Step::Outline(_) => walk.outline(index, &mut painted),
-        }
-    }
+    walk.free_slots(&changed.freed, &mut painted.slabs);
+    walk.steps(&order, input, &mut painted);
+    walk.free_unvisited(&mut painted.slabs);
     painted.kept_boxes = walk.kept;
     painted.order = order;
     painted
@@ -55,7 +50,8 @@ fn thumb(layout_box: &LayoutBox, rect: BoxRect, input: &PaintInput<'_>, out: &mu
 struct Walk<'a> {
     boxes: &'a [LayoutBox],
     rects: &'a [BoxRect],
-    /// The last update's kept paint, by slot, taken as it is used.
+    /// The last update's kept paint, by slot, taken as it is used; at
+    /// least as long as `boxes`.
     last: Vec<Option<KeptBox>>,
     /// This update's, by slot.
     kept: Vec<Option<KeptBox>>,
@@ -72,7 +68,9 @@ impl<'a> Walk<'a> {
         mut last: Vec<Option<KeptBox>>,
         started: &Painted,
     ) -> Self {
-        last.resize_with(boxes.len(), || None);
+        if last.len() < boxes.len() {
+            last.resize_with(boxes.len(), || None);
+        }
         Self {
             boxes,
             rects,
@@ -82,8 +80,32 @@ impl<'a> Walk<'a> {
         }
     }
 
+    /// Each of `order`'s steps, under its clip, into `out`.
+    fn steps(&mut self, order: &KeptOrder, input: &mut PaintInput<'_>, out: &mut Painted) {
+        for &step in &order.steps {
+            let index = step.index();
+            let clip = order.clips.own(index);
+            clip_to(clip, input, &mut out.scene);
+            match step {
+                Step::Box(_) => self.own(index, clip, input, out),
+                Step::Thumb(_) => thumb(&self.boxes[index], self.rects[index], input, out),
+                Step::Outline(_) => self.outline(index, out),
+            }
+        }
+    }
+
+    /// Frees the ids of the `freed` slots' last kept paint before any
+    /// box is painted, so boxes painted after take them.
+    fn free_slots(&mut self, freed: &[(usize, Key)], slabs: &mut Slabs) {
+        for &(slot, _) in freed {
+            if let Some(gone) = self.last.get_mut(slot).and_then(Option::take) {
+                gone.free(slabs);
+            }
+        }
+    }
+
     /// Box `index`'s own step: its kept paint copied when it shows what
-    /// painting again would, else painted again.
+    /// painting again would, else its ids freed and painted again.
     fn own(
         &mut self,
         index: usize,
@@ -92,7 +114,7 @@ impl<'a> Walk<'a> {
         out: &mut Painted,
     ) {
         let from = BoxFrom::of(self.boxes, self.rects, clip, index);
-        let kept = match self.reusable(index, &from) {
+        let kept = match self.reusable(index, &from, out) {
             Some(kept) => kept,
             None => self.painted_again(index, from, input, out),
         };
@@ -101,13 +123,27 @@ impl<'a> Walk<'a> {
     }
 
     /// Box `index`'s last kept paint, when the box was kept and its
-    /// paint was made `from` what it reads now.
-    fn reusable(&mut self, index: usize, from: &BoxFrom) -> Option<KeptBox> {
+    /// paint was made `from` what it reads now; else its ids are freed
+    /// from `out`'s slabs.
+    fn reusable(&mut self, index: usize, from: &BoxFrom, out: &mut Painted) -> Option<KeptBox> {
         let last = self.last[index].take()?;
-        (self.boxes[index].kept && last.from == *from).then_some(last)
+        if self.boxes[index].kept && last.from == *from {
+            return Some(last);
+        }
+        last.free(&mut out.slabs);
+        None
     }
 
-    /// Box `index`'s own step and outline painted, kept, and counted.
+    /// Frees the ids of each last kept paint no step took: one past the
+    /// boxes, or of a box with no step.
+    fn free_unvisited(&mut self, slabs: &mut Slabs) {
+        for unvisited in self.last.drain(..).flatten() {
+            unvisited.free(slabs);
+        }
+    }
+
+    /// Box `index`'s own step and outline painted, kept, and counted;
+    /// their ids taken from `out`'s slabs.
     fn painted_again(
         &mut self,
         index: usize,
@@ -115,6 +151,7 @@ impl<'a> Walk<'a> {
         input: &mut PaintInput<'_>,
         out: &mut Painted,
     ) -> KeptBox {
+        self.scratch.slabs = std::mem::take(&mut out.slabs);
         clip_to(input.clip, input, &mut self.scratch.scene);
         paint_box(self.boxes, self.rects, index, input, &mut self.scratch);
         let kept = KeptBox {
@@ -122,6 +159,7 @@ impl<'a> Walk<'a> {
             own: Part::take(&mut self.scratch),
             outline: self.outline_again(index, input),
         };
+        out.slabs = std::mem::take(&mut self.scratch.slabs);
         out.boxes_drawn += 1;
         out.items_built += kept.items();
         kept

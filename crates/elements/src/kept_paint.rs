@@ -45,17 +45,20 @@ pub(crate) fn keep(
     input: &mut PaintInput<'_>,
 ) -> Painted {
     if cfg!(debug_assertions) {
-        crate::kept_paint_check::assert_same(&kept, &fresh(boxes, rects, input));
+        let (fresh, starts) = fresh(boxes, rects, input);
+        crate::kept_paint_check::assert_same(&kept, (&fresh, &starts));
     }
     kept
 }
 
 /// What the last paint keeps for a paint that is not the same: each
-/// slot's kept paint, the element maps (`kept_maps.rs`), and paint
-/// order and clips (`kept_order.rs`).
+/// slot's kept paint, the slabs its items name ids in (`slab.rs`), the
+/// element maps (`kept_maps.rs`), and paint order and clips
+/// (`kept_order.rs`).
 #[derive(Default)]
 pub(crate) struct LastPaint {
     pub(crate) boxes: Vec<Option<KeptBox>>,
+    pub(crate) slabs: crate::slab::Slabs,
     pub(crate) maps: Option<crate::kept_maps::ElementMaps>,
     pub(crate) order: Option<crate::kept_order::KeptOrder>,
 }
@@ -65,6 +68,7 @@ impl LastPaint {
     pub(crate) fn of(last: Option<Painted>) -> Self {
         last.map_or_else(Self::default, |last| Self {
             boxes: last.kept_boxes,
+            slabs: last.slabs,
             maps: Some((last.rects, last.paddings)),
             order: Some(last.order),
         })
@@ -83,14 +87,20 @@ pub(crate) fn paint_all(
 ) -> Painted {
     let painted = paint_partial(boxes, rects, input, last, changed);
     if cfg!(debug_assertions) {
-        crate::kept_paint_check::assert_same(&painted, &fresh(boxes, rects, input));
+        let (fresh, starts) = fresh(boxes, rects, input);
+        crate::kept_paint_check::assert_same(&painted, (&fresh, &starts));
     }
     painted
 }
 
-/// A paint of every box, for the debug build's check; the text cache is
-/// left as it was, so the check keeps no layout the update would not.
-fn fresh(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> Painted {
+/// A paint of every box and where each step's items start, for the
+/// debug build's check; the text cache is left as it was, so the check
+/// keeps no layout the update would not.
+fn fresh(
+    boxes: &[LayoutBox],
+    rects: &[BoxRect],
+    input: &mut PaintInput<'_>,
+) -> (Painted, Vec<usize>) {
     let cache = input.cache.clone();
     let painted = paint(boxes, rects, input);
     *input.cache = cache;
