@@ -64,29 +64,31 @@ const EXPECTED: [(usize, usize, usize); 6] = [
 /// quad and 3 texts), 5 with the focus outline, 6 with the outline and
 /// the marked row's background; `html` and `body` add 2
 /// elements and 2 boxes. An update that builds no box and moves none
-/// paints nothing (`kept_paint.rs`). The second table in docs/plans/iu1.md is these
-/// numbers.
+/// paints nothing (`kept_paint.rs`); any other paints only the boxes it
+/// built or moved, copying the rest (`kept_box.rs`): the longer label
+/// moves the 4 boxes after it in its row. The second table in
+/// docs/plans/iu1.md is these numbers.
 const EXPECTED_WALKS: [(usize, [[usize; 5]; 6]); 2] = [
     (
         100,
         [
-            [1, 2, 109, 702, 400],
-            [1, 2, 111, 702, 400],
+            [1, 2, 109, 2, 1],
+            [1, 2, 111, 6, 4],
             [0, 0, 1, 0, 0],
-            [4, 2, 1, 702, 400],
-            [1, 2, 1, 702, 401],
-            [4, 7, 1, 702, 402],
+            [4, 2, 1, 2, 2],
+            [1, 2, 1, 2, 3],
+            [4, 7, 1, 7, 5],
         ],
     ),
     (
         1000,
         [
-            [1, 2, 1009, 7002, 4000],
-            [1, 2, 1011, 7002, 4000],
+            [1, 2, 1009, 2, 1],
+            [1, 2, 1011, 6, 4],
             [0, 0, 1, 0, 0],
-            [4, 2, 1, 7002, 4000],
-            [1, 2, 1, 7002, 4001],
-            [4, 7, 1, 7002, 4002],
+            [4, 2, 1, 2, 2],
+            [1, 2, 1, 2, 3],
+            [4, 7, 1, 7, 5],
         ],
     ),
 ];

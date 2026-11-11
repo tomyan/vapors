@@ -10,8 +10,6 @@ use vapors_dom::NodeId;
 use crate::check::describe;
 use crate::document::Document;
 use crate::error::ElementError;
-use crate::kept_paint::PaintedFrom;
-use crate::layout::{lay_out, placed};
 use crate::painted::Painted;
 use crate::style::Refusal;
 
@@ -65,55 +63,26 @@ impl Document {
         self.styled(viewport)?;
         drop(style);
         let layout = tracing::trace_span!("update phase", phase = "layout").entered();
-        let root = self.root();
-        let text_marks = self.focused_text_marks();
-        let kept = self.kept.as_ref().expect("styled keeps the styles");
-        let used = &kept.used;
-        kept.calcs.begin();
-        let source = crate::layout::Source {
-            arena: &self.arena,
-            used,
-            images: &self.images,
-            text_marks,
-        };
-        let may_keep = |node| kept.may_keep_layout(node);
-        let (boxes, built) = self.boxes.rebuild(&source, root, viewport.scale, &may_keep);
-        self.counts.boxes_built = built;
-        debug_assert!(
-            !boxes.boxes.is_empty() || used[&root].layout.display == taffy::Display::None,
-            "no boxes built while html is shown: a box build dropped the root"
-        );
-        let size = (viewport.width, viewport.height);
-        let texts = (&mut self.fonts, &mut self.texts);
-        let (slotted, work) = lay_out(boxes, texts, viewport.scale, size, &kept.calcs).map_err(
-            |(failure, work)| {
-                (self.counts.boxes_laid_out, self.counts.layout_calls) =
-                    (work.laid_out, work.calls);
-                vec![ElementError::Layout(failure)]
-            },
-        )?;
-        let boxes = &slotted.boxes;
-        let scrolls = crate::update_paint::scroll_containers(boxes, used);
-        let offsets = self.scroll.settle(boxes, &scrolls, viewport.scale);
-        drop(scrolls);
-        let from = PaintedFrom {
-            rects: placed(boxes, &offsets),
-            thumbs_shown: self.thumbs_shown,
-            scale: viewport.scale,
-        };
+        let (slotted, built) = self.laid_out(viewport)?;
+        let from = self.painted_from(&slotted.boxes, viewport);
         drop(layout);
         let paint_span = tracing::trace_span!("update phase", phase = "paint").entered();
-        let mut painted = self.paint_or_keep(last, boxes, &from, built);
+        let mut painted = self.paint_or_keep(last, &slotted.boxes, &from, built);
         drop(paint_span);
         self.boxes.keep(slotted, viewport.scale);
         painted.from = from;
-        (self.counts.boxes_laid_out, self.counts.layout_calls) = (work.laid_out, work.calls);
+        Ok(self.shown(painted))
+    }
+
+    /// Keeps `painted` as the last update's result, and moves the hover
+    /// to what it shows.
+    fn shown(&mut self, painted: Painted) -> &Painted {
         // Cleared before the rehover: a hover it moves is a change this
         // update did not restyle, so the a11y tree refuses until the next.
         self.changes.since_update = false;
         self.settle.due = true;
         self.rehover_in(&painted);
-        Ok(self.painted.insert(painted))
+        self.painted.insert(painted)
     }
 
     /// Notes a change to anything shown, for [`Document::take_changed`]

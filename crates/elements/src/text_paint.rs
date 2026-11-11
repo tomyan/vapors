@@ -75,7 +75,7 @@ fn push(out: &mut Painted, origin: BoxRect, mark: [f32; 4], color: Color, scale:
 
 /// Where the field's text starts: its text child's box, else its
 /// content box.
-fn text_origin(boxes: &[LayoutBox], rects: &[BoxRect], index: usize) -> BoxRect {
+pub(crate) fn text_origin(boxes: &[LayoutBox], rects: &[BoxRect], index: usize) -> BoxRect {
     boxes[index].children.first().map_or_else(
         || crate::clip::content_box(&boxes[index], rects[index]),
         |child| rects[*child],

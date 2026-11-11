@@ -36,12 +36,14 @@ pub struct UpdateCounts {
     /// Times Taffy laid a box out rather than reading its cache.
     pub boxes_laid_out: usize,
     /// Boxes paint drew: one per box in painting order, outlines and
-    /// scroll thumbs not included; 0 when the update showed the last
-    /// update's paint (`kept_paint.rs`).
+    /// scroll thumbs not included. A box built again, moved, or cut by
+    /// another clip is drawn; the others' kept paint is copied
+    /// (`kept_box.rs`), and none is drawn when the update showed the
+    /// last update's paint (`kept_paint.rs`).
     pub boxes_painted: usize,
-    /// Scene items (paint records) paint built. Paint builds the scene
-    /// from empty when it paints, so this is every item in it, or 0
-    /// when the update showed the last update's paint.
+    /// Scene items (paint records) paint built: those of the boxes it
+    /// drew, their outlines, and every scroll thumb; copied items are
+    /// not counted.
     pub scene_items_built: usize,
 }
 
@@ -49,7 +51,7 @@ impl UpdateCounts {
     /// Notes what paint drew into `painted`.
     pub(crate) fn note_paint(&mut self, painted: &Painted) {
         self.boxes_painted = painted.boxes_drawn;
-        self.scene_items_built = painted.scene.items().len();
+        self.scene_items_built = painted.items_built;
     }
 }
 

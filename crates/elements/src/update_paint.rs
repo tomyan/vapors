@@ -22,24 +22,19 @@ impl Document {
         from: &PaintedFrom,
         built: usize,
     ) -> Painted {
+        let page = (self.root(), self.body());
         let used = &self.kept.as_ref().expect("styled keeps the styles").used;
         let scrolls = scroll_containers(boxes, used);
-        let mut input = PaintInput {
-            used,
-            root: self.root(),
-            body: self.body(),
-            propagated: None,
-            fonts: &mut self.fonts,
-            cache: &mut self.texts,
-            scale: from.scale,
-            clip: None,
-            scroll: &self.scroll,
-            thumbs_shown: from.thumbs_shown,
+        let text = (&mut self.fonts, &mut self.texts);
+        let mut input = PaintInput::new(used, page, text, &self.scroll, from);
+        let last = match last {
+            Some(kept) if kept.from.shows(from, built) => {
+                return keep(kept, boxes, &from.rects, &mut input, &scrolls);
+            }
+            Some(last) => last.kept_boxes,
+            None => Vec::new(),
         };
-        if let Some(kept) = last.filter(|last| last.from.shows(from, built)) {
-            return keep(kept, boxes, &from.rects, &mut input, &scrolls);
-        }
-        let painted = paint_all(boxes, &from.rects, &mut input, &scrolls);
+        let painted = paint_all(boxes, &from.rects, &mut input, &scrolls, last);
         self.counts.note_paint(&painted);
         painted
     }

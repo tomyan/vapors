@@ -35,7 +35,10 @@ pub(crate) struct KeptBoxes {
 
 impl KeptBoxes {
     /// Keeps `placed`, laid out at `scale`, for the next update.
-    pub(crate) fn keep(&mut self, placed: Placed, scale: f32) {
+    pub(crate) fn keep(&mut self, mut placed: Placed, scale: f32) {
+        for layout_box in &mut placed.boxes {
+            layout_box.kept = true;
+        }
         (self.placed, self.scale) = (placed, scale);
     }
 
