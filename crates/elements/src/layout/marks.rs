@@ -27,49 +27,89 @@ impl Marks {
         self.nodes.insert(node);
     }
 
-    /// The elements under `root` whose subtrees are built again, none
-    /// inside another. A mark on a node freed or detached since, or
-    /// under no slotted box, has no owner: the mark `remove` or
-    /// `insert_before` put on its old parent covers its old boxes.
-    pub(crate) fn owners(
+    /// What the next update builds again: every box when a mark
+    /// reaches the root with no owner on the way (the root lost its
+    /// box), or the subtrees of these elements under `root`, none
+    /// inside another, in slot order so new keys take the same slots
+    /// on every run. A mark on a node freed or detached since has no
+    /// owner: the mark `remove` or `insert_before` put on its old
+    /// parent covers its old boxes.
+    pub(crate) fn rebuild(
         &self,
         arena: &Arena,
         used: &HashMap<NodeId, Used>,
         slots: &Slots,
         root: NodeId,
-    ) -> Vec<NodeId> {
-        let owners: HashSet<NodeId> = self
-            .nodes
-            .iter()
-            .filter_map(|&node| owner(arena, used, slots, node))
-            .collect();
-        owners
-            .iter()
-            .copied()
-            .filter(|&node| placement(arena, node, &owners, root) == Placement::Outermost)
-            .collect()
+    ) -> Rebuild {
+        let mut owners = HashSet::new();
+        for &node in &self.nodes {
+            match owner(arena, used, slots, root, node) {
+                Owner::Element(owner) => _ = owners.insert(owner),
+                Owner::None => return Rebuild::Every,
+                Owner::Detached => {}
+            }
+        }
+        Rebuild::Owners(outermost(arena, slots, &owners, root))
     }
 }
 
+/// What an update builds again.
+#[derive(Debug, PartialEq)]
+pub(crate) enum Rebuild {
+    /// Every box.
+    Every,
+    /// The subtrees of these elements, in the slots they hold.
+    Owners(Vec<NodeId>),
+}
+
+/// Where a mark resolves.
+enum Owner {
+    /// To this element, which builds the marked node's boxes.
+    Element(NodeId),
+    /// To no element: the walk reached the root without one.
+    None,
+    /// Nowhere: the node is freed or not under the root.
+    Detached,
+}
+
+/// The owners under `root` with no other owner above them, by slot.
+fn outermost(arena: &Arena, slots: &Slots, owners: &HashSet<NodeId>, root: NodeId) -> Vec<NodeId> {
+    let mut outermost: Vec<NodeId> = owners
+        .iter()
+        .copied()
+        .filter(|&node| placement(arena, node, owners, root) == Placement::Outermost)
+        .collect();
+    outermost.sort_by_key(|&node| slots.of(Key::Element(node)));
+    outermost
+}
+
 /// The nearest element at or above `node` with a slot and a box of
-/// its own: not `display: none` and not inline.
+/// its own.
 fn owner(
     arena: &Arena,
     used: &HashMap<NodeId, Used>,
     slots: &Slots,
+    root: NodeId,
     node: NodeId,
-) -> Option<NodeId> {
+) -> Owner {
     let mut at = Some(node).filter(|&node| arena.contains(node));
     while let Some(node) = at {
-        let boxed = used
-            .get(&node)
-            .is_some_and(|style| style.layout.display != Display::None && !style.inline);
-        if boxed && slots.of(Key::Element(node)).is_some() {
-            return Some(node);
+        if boxed(used, node) && slots.of(Key::Element(node)).is_some() {
+            return Owner::Element(node);
+        }
+        if node == root {
+            return Owner::None;
         }
         at = arena.get(node, "owner").parent;
     }
-    None
+    Owner::Detached
+}
+
+/// Whether `node` makes a box of its own: not `display: none` and not
+/// inline.
+fn boxed(used: &HashMap<NodeId, Used>, node: NodeId) -> bool {
+    used.get(&node)
+        .is_some_and(|style| style.layout.display != Display::None && !style.inline)
 }
 
 /// Where an owner sits among the others.
@@ -97,3 +137,7 @@ fn placement(arena: &Arena, node: NodeId, owners: &HashSet<NodeId>, root: NodeId
         Placement::Detached
     }
 }
+
+#[cfg(test)]
+#[path = "marks_tests.rs"]
+mod tests;

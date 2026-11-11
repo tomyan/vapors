@@ -39,21 +39,26 @@ impl Placed {
     /// # Panics
     /// A key that holds a slot outside the taken subtrees: a box that
     /// moved without a mark on its old parent.
-    pub(crate) fn put_subtree(&mut self, mut built: Vec<LayoutBox>, taken: &mut Taken) -> usize {
+    pub(crate) fn put_subtree(&mut self, built: Vec<LayoutBox>, taken: &mut Taken) -> usize {
         let keys = keys(&built);
         let to: Vec<usize> = keys.iter().map(|key| self.slot_for(*key, taken)).collect();
-        for (layout_box, (&key, &slot)) in built.iter_mut().zip(keys.iter().zip(&to)) {
+        for (&key, &slot) in keys.iter().zip(&to) {
+            self.hold(key, slot);
+        }
+        for (mut layout_box, &slot) in built.into_iter().zip(&to) {
             for child in &mut layout_box.children {
                 *child = to[*child];
             }
-            let earlier = self.slots.of.insert(key, slot);
-            assert!(earlier.is_none(), "box key {key:?} placed twice");
-            self.slots.keys[slot] = Some(key);
-        }
-        for (layout_box, &slot) in built.into_iter().zip(&to) {
             self.boxes[slot] = layout_box;
         }
         to[0]
+    }
+
+    /// Records that `key` holds `slot`.
+    fn hold(&mut self, key: Key, slot: usize) {
+        let earlier = self.slots.of.insert(key, slot);
+        assert!(earlier.is_none(), "box key {key:?} placed twice");
+        self.slots.keys[slot] = Some(key);
     }
 
     /// The slot `key` takes, growing the boxes for a new one.

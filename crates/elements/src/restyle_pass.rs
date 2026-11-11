@@ -23,7 +23,6 @@ impl Document {
         let fresh = self.dirty.all || self.kept.as_ref().is_none_or(|k| k.viewport != viewport);
         let (roots, singles) = if fresh {
             self.kept = Some(self.fresh_kept(viewport));
-            self.boxes.marks.all = true;
             (vec![self.root()], Vec::new())
         } else {
             self.dirty_roots()
