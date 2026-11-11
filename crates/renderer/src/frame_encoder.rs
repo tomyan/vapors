@@ -4,13 +4,14 @@
 //! (docs/perf/baseline-2026-11-10.md, run 3), about half of each draw
 //! call's time when every draw submitted.
 
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell, RefCell, RefMut};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
+use crate::command_encoder::{Open, encoder, submit_timed};
 use crate::encoder_budget::Spent;
 use crate::open_pass::OpenPass;
-use crate::{ArenaFull, EncoderBudget};
+use crate::{ArenaFull, EncoderBudget, Target};
 
 /// Each encoder's number, so a pipeline's [`FrameArena`](crate::FrameArena)
 /// knows when a new frame starts.
@@ -37,7 +38,8 @@ static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 /// Consecutive draws on one view share one render pass. The pass ends
 /// when a draw goes to another view, on a clear, on [`FrameEncoder::record`],
 /// [`FrameEncoder::flush`] and [`FrameEncoder::submit`]. Before a draw
-/// or clear that would pass its [`EncoderBudget`], the encoder flushes.
+/// that would pass its [`EncoderBudget`]'s draws, or a new pass that
+/// would pass its passes, the encoder flushes.
 pub struct FrameEncoder {
     device: wgpu::Device,
     // declared before `encoder`, so a dropped encoder ends its pass first
@@ -58,8 +60,17 @@ impl FrameEncoder {
     }
 
     /// An empty encoder on `device` that flushes at `budget`.
+    ///
+    /// # Panics
+    ///
+    /// If either half of `budget` is 0: no draw could be recorded.
     #[must_use]
     pub fn with_budget(device: &wgpu::Device, budget: EncoderBudget) -> Self {
+        assert!(
+            budget.passes > 0 && budget.draws > 0,
+            "{budget:?}: a budget of 0 passes or draws leaves no room for a draw; \
+             give each at least 1, or use FrameEncoder::new for the measured default"
+        );
         Self {
             device: device.clone(),
             pass: RefCell::new(None),
@@ -89,37 +100,46 @@ impl FrameEncoder {
         self.passes.get()
     }
 
-    /// Runs `draw` in the render pass open on `view`, under `scissor`
-    /// (`None`: the whole view), beginning one that loads the view if the
-    /// open pass is on another view or none is open.
+    /// Runs `draw` in the render pass open on `target`'s view, under its
+    /// scissor (`None`: the whole viewport), beginning one that loads the
+    /// view if the open pass is on another view or none is open.
     ///
     /// # Panics
     ///
     /// If `draw` uses this encoder.
     pub(crate) fn draw(
         &self,
-        queue: &wgpu::Queue,
-        view: &wgpu::TextureView,
-        scissor: Option<vapors_scene::Scissor>,
+        target: &Target<'_>,
         draw: impl FnOnce(&mut wgpu::RenderPass<'static>),
     ) {
-        self.keep_to_budget(queue);
-        self.spent.draw();
-        let mut open = self.pass.borrow_mut();
-        if !open.as_ref().is_some_and(|pass| pass.is_on(view)) {
-            *open = None;
-            *open = Some(self.begin(view, wgpu::LoadOp::Load));
+        if self.spent.draws_full() {
+            self.flush(target.queue);
         }
-        draw(open.as_mut().expect("opened above").scissored(scissor));
+        self.spent.draw();
+        let mut open = self.pass_on(target.queue, target.view);
+        draw(open.scissored(target.scissor, target.viewport));
+    }
+
+    /// The pass open on `view`, begun if the open pass is on another
+    /// view or none is open.
+    fn pass_on(&self, queue: &wgpu::Queue, view: &wgpu::TextureView) -> RefMut<'_, OpenPass> {
+        let is_open = self
+            .pass
+            .borrow()
+            .as_ref()
+            .is_some_and(|pass| pass.is_on(view));
+        if !is_open {
+            self.begin(queue, view, wgpu::LoadOp::Load);
+        }
+        RefMut::map(self.pass.borrow_mut(), |open| {
+            open.as_mut().expect("begun above")
+        })
     }
 
     /// Clears `view` to `color` in a render pass left open for the draws
     /// on `view` that follow.
     pub(crate) fn clear(&self, queue: &wgpu::Queue, view: &wgpu::TextureView, color: wgpu::Color) {
-        self.keep_to_budget(queue);
-        self.end_pass();
-        let cleared = self.begin(view, wgpu::LoadOp::Clear(color));
-        *self.pass.borrow_mut() = Some(cleared);
+        self.begin(queue, view, wgpu::LoadOp::Clear(color));
     }
 
     /// Submits what is recorded so far and goes on recording into a new
@@ -160,16 +180,22 @@ impl FrameEncoder {
         Arc::clone(&self.open.0)
     }
 
-    fn begin(&self, view: &wgpu::TextureView, load: wgpu::LoadOp<wgpu::Color>) -> OpenPass {
-        self.passes.set(self.passes.get() + 1);
-        self.spent.pass();
-        OpenPass::begin(&mut self.encoder.borrow_mut(), view, load)
-    }
-
-    fn keep_to_budget(&self, queue: &wgpu::Queue) {
-        if self.spent.full() {
+    /// Ends the open pass and begins one on `view`, flushing first when
+    /// another pass would pass the budget.
+    fn begin(
+        &self,
+        queue: &wgpu::Queue,
+        view: &wgpu::TextureView,
+        load: wgpu::LoadOp<wgpu::Color>,
+    ) {
+        self.end_pass();
+        if self.spent.passes_full() {
             self.flush(queue);
         }
+        self.passes.set(self.passes.get() + 1);
+        self.spent.pass();
+        let pass = OpenPass::begin(&mut self.encoder.borrow_mut(), view, load);
+        *self.pass.borrow_mut() = Some(pass);
     }
 
     fn end_pass(&self) {
@@ -185,30 +211,4 @@ impl FrameEncoder {
     pub(crate) fn id(&self) -> u64 {
         self.id
     }
-}
-
-/// Cleared when the encoder is submitted or dropped.
-struct Open(Arc<AtomicBool>);
-
-impl Drop for Open {
-    fn drop(&mut self) {
-        self.0.store(false, Ordering::Relaxed);
-    }
-}
-
-/// Finishes `encoder` inside a `draw step` span with phase `encode` and
-/// submits it inside one with phase `submit`, for vapors-perf.
-fn submit_timed(queue: &wgpu::Queue, encoder: wgpu::CommandEncoder) {
-    let commands = {
-        let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
-        encoder.finish()
-    };
-    let _submit = tracing::trace_span!("draw step", phase = "submit").entered();
-    queue.submit([commands]);
-}
-
-fn encoder(device: &wgpu::Device) -> wgpu::CommandEncoder {
-    device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        label: Some("frame"),
-    })
 }

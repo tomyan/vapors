@@ -60,7 +60,7 @@ fn counts(counts: &Counts) -> String {
     format!(
         "Counts (last frame): restyled {}, text layouts {}, laid out {}, elements visited {}, \
          boxes built {}, layout calls {}, boxes painted {}, scene items {}; draw calls {}, \
-         buffer bytes {}, texture bytes {}.",
+         buffer bytes {}, texture bytes {}, render passes {}.",
         u.elements_restyled,
         counts.text_layouts,
         u.boxes_laid_out,
@@ -71,6 +71,11 @@ fn counts(counts: &Counts) -> String {
         u.scene_items_built,
         gpu.draw_calls,
         gpu.buffer_bytes,
-        gpu.texture_bytes
+        gpu.texture_bytes,
+        counts.render_passes
     )
 }
+
+#[cfg(test)]
+#[path = "report_tests.rs"]
+mod tests;

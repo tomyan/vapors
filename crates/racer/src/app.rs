@@ -74,6 +74,11 @@ impl Racer {
     pub fn frame_counts(&self) -> FrameCounts {
         self.app.frame_counts()
     }
+    /// Render passes the HUD's last frame began.
+    #[must_use]
+    pub fn render_passes(&self) -> u64 {
+        self.app.render_passes()
+    }
     /// Why the racer stopped, its own fault or the HUD's; `None` while it runs.
     #[must_use]
     pub fn error(&self) -> Option<String> {

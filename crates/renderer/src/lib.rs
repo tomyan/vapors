@@ -5,6 +5,7 @@
 
 mod arena_full;
 mod clear;
+mod command_encoder;
 mod encoder_budget;
 mod frame_arena;
 mod frame_encoder;

@@ -31,7 +31,6 @@ impl Target<'_> {
     /// and stores it, under the scissor. Consecutive draws on one view
     /// share the pass.
     pub fn draw_pass(&self, draw: impl FnOnce(&mut wgpu::RenderPass<'_>)) {
-        self.encoder
-            .draw(self.queue, self.view, self.scissor, |pass| draw(pass));
+        self.encoder.draw(self, |pass| draw(pass));
     }
 }

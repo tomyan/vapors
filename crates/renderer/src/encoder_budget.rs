@@ -4,7 +4,8 @@
 use std::cell::Cell;
 
 /// The most render passes and draws one command encoder takes; the
-/// frame's encoder flushes before a draw or clear that would pass either.
+/// frame's encoder flushes before a draw, or a new pass, that would pass
+/// its half. Neither may be 0 ([`FrameEncoder::with_budget`](crate::FrameEncoder::with_budget)).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EncoderBudget {
     /// Render passes per command encoder.
@@ -14,12 +15,15 @@ pub struct EncoderBudget {
 }
 
 impl Default for EncoderBudget {
-    /// Measured on ANV (Intel UHD 630, Mesa) with
+    /// Passes: measured on ANV (Intel UHD 630, Mesa) with
     /// `cargo run --release -p vapors-perf --example encoder_budget`
     /// (2026-11-11): `CommandEncoder::finish` failed with Out of Memory
-    /// at 8200 render passes and passed at 8000; one pass of 729,000 draws
-    /// passed, its finish and wait growing in step with the draws. Half
-    /// the passes that worked, and a seventh of the draws.
+    /// at 8200 render passes and passed at 8000. 4096 is half of 8000.
+    ///
+    /// Draws: no limit was found. One pass of 729,000 draws passed, its
+    /// finish and wait growing in step with the draws; 100,000 is a
+    /// margin chosen below that, not a measured limit. Dawn (the web),
+    /// Metal and lavapipe are not measured for either number.
     fn default() -> Self {
         Self {
             passes: 4096,
@@ -44,9 +48,14 @@ impl Spent {
         }
     }
 
-    /// Whether one more pass or draw would pass the budget.
-    pub(crate) fn full(&self) -> bool {
-        self.passes.get() >= self.budget.passes || self.draws.get() >= self.budget.draws
+    /// Whether one more pass would pass the budget.
+    pub(crate) fn passes_full(&self) -> bool {
+        self.passes.get() >= self.budget.passes
+    }
+
+    /// Whether one more draw would pass the budget.
+    pub(crate) fn draws_full(&self) -> bool {
+        self.draws.get() >= self.budget.draws
     }
 
     pub(crate) fn pass(&self) {

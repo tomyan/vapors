@@ -3028,6 +3028,7 @@ dependencies = [
 name = "vapors-renderer"
 version = "0.0.0"
 dependencies = [
+ "pollster 1.0.1",
  "tracing",
  "vapors-gpu-harness",
  "vapors-scene",

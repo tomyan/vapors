@@ -75,3 +75,56 @@ fn gpu_five_passes_with_a_budget_of_two_submit_three_encoders_and_all_land() {
     assert_eq!(submits, 3);
     assert_eq!(seen, [BLUE, BLUE]);
 }
+
+#[test]
+fn gpu_five_draws_on_one_view_with_a_budget_of_one_pass_stay_in_one_encoder() {
+    // Given
+    let gpu = gpu();
+    let (texture, view) = square(&gpu, 8);
+    let mut pipeline = QuadPipeline::new(&gpu.device, texture.format());
+    let budget = EncoderBudget {
+        passes: 1,
+        draws: 100,
+    };
+    let encoder = FrameEncoder::with_budget(&gpu.device, budget);
+    let before = last_submission(&gpu);
+
+    // When
+    for x in 0..5u8 {
+        let left = f32::from(x);
+        let on_view = target(&gpu, &encoder, &view, 8);
+        pipeline.draw(&on_view, &[quad([left, 0.0, left + 1.0, 1.0], RED)]);
+    }
+    let passes = encoder.render_passes();
+    encoder.submit(&gpu.queue).expect("no draw refused");
+
+    // Then
+    let submits = last_submission(&gpu) - before - 1;
+    assert_eq!((passes, submits), (1, 1));
+}
+
+#[test]
+#[should_panic(expected = "EncoderBudget { passes: 0, draws: 10 }: a budget of 0")]
+fn gpu_a_budget_of_no_passes_is_refused() {
+    let gpu = gpu();
+    let _ = FrameEncoder::with_budget(
+        &gpu.device,
+        EncoderBudget {
+            passes: 0,
+            draws: 10,
+        },
+    );
+}
+
+#[test]
+#[should_panic(expected = "EncoderBudget { passes: 10, draws: 0 }: a budget of 0")]
+fn gpu_a_budget_of_no_draws_is_refused() {
+    let gpu = gpu();
+    let _ = FrameEncoder::with_budget(
+        &gpu.device,
+        EncoderBudget {
+            passes: 10,
+            draws: 0,
+        },
+    );
+}

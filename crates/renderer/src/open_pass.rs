@@ -3,11 +3,12 @@
 //! pass cost about 110 µs of GPU time, and a frame of 9017 passes
 //! failed `CommandEncoder::finish` with Out of Memory (vapors #181).
 
+use vapors_scene::{Scissor, Size};
+
 /// A render pass on `view`, open until it is dropped. While it is open
 /// its encoder refuses every other command.
 pub(crate) struct OpenPass {
     view: wgpu::TextureView,
-    size: (u32, u32),
     pass: wgpu::RenderPass<'static>,
 }
 
@@ -34,10 +35,8 @@ impl OpenPass {
             occlusion_query_set: None,
             multiview_mask: None,
         });
-        let texture = view.texture();
         Self {
             view: view.clone(),
-            size: (texture.width(), texture.height()),
             pass: pass.forget_lifetime(),
         }
     }
@@ -48,16 +47,19 @@ impl OpenPass {
     }
 
     /// The pass, its scissor set to `scissor` or, for `None`, the whole
-    /// view: a scissor set by an earlier draw in the pass would
-    /// otherwise still apply. The whole view is the texture's first mip
-    /// level; the frame's views are whole textures.
+    /// `viewport` (the target's size, which for a view of a smaller mip
+    /// level is not the texture's): a scissor set by an earlier draw in
+    /// the pass would otherwise still apply.
     pub(crate) fn scissored(
         &mut self,
-        scissor: Option<vapors_scene::Scissor>,
+        scissor: Option<Scissor>,
+        viewport: Size,
     ) -> &mut wgpu::RenderPass<'static> {
         match scissor {
             Some(s) => self.pass.set_scissor_rect(s.x, s.y, s.width, s.height),
-            None => self.pass.set_scissor_rect(0, 0, self.size.0, self.size.1),
+            None => self
+                .pass
+                .set_scissor_rect(0, 0, viewport.width, viewport.height),
         }
         &mut self.pass
     }
