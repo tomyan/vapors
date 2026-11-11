@@ -41,9 +41,15 @@ it is added with the first PR that claims property 1.
    whether to splice the row's steps, clips and chains into the kept
    order, debug builds checking every splice against the whole walk;
    (C) the insert workload measures it. Rows after the insert still
-   move, O(rows after) once 3c-3e shifts them, until IU4. The
+   move, O(rows after) once 3c-3e shifts them: layout writes every
+   row's location when the list is laid out again, and IU4 bounds only
+   the GPU side of that to the visible rows (`docs/plans/iu4.md`,
+   section 3); a layout-lane design would move the floor. The
    compiler's mark of list templates moves to item 7.
-6. IU4: GPU-side paint kept between frames (property 2).
+6. IU4 (`docs/plans/iu4.md`): GPU-side paint kept between frames,
+   parts in scroll-frame coordinates and a per-scroller visible range
+   (property 2, and the scroll remainder of property 4: after 3c-3e a
+   scroll still shifts every moved part, O(rows in the scroller)).
 7. The build-time analysis, first version (properties 7 and 8),
    with the compiler's mark of list templates whose rows cannot
    change paint order (`docs/plans/splice.md` section (d)).
