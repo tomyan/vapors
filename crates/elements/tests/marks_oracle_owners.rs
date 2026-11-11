@@ -1,7 +1,7 @@
 //! Owner resolution as boxes come and go (IU3 PR 1b): an element
 //! hidden and shown, an inline element turned block and back, text
 //! inside an inline span, a parent turned flex, and a calc restyled to
-//! an equal computed style. Each matches a full update.
+//! an equal computed style, then laid out again. Each matches a full update.
 
 mod support;
 
@@ -15,7 +15,8 @@ use vapors_elements::{Document, Viewport};
 
 const CSS: &str = ".hidden { display: none; } .block { display: block; width: 50px; } \
                    .flex { display: flex; } .calc { width: calc(50% + 10px); height: 10px; } \
-                   .row { height: 40px; } .row:hover .calc { width: calc(50% + 10px); }";
+                   .shrink { position: absolute; display: flex; } \
+                   .shrink:hover .calc { width: calc(50% + 10px); }";
 
 /// A page: a block `div.item` with text, then a paragraph `div` holding
 /// text, an inline `span` with text, and text.
@@ -97,20 +98,25 @@ fn a_parent_made_flex_blockifies_its_inline_children_as_a_full_update() {
 }
 
 #[test]
-fn a_calc_restyled_to_an_equal_computed_style_matches_a_full_update() {
-    // Given: hovering the row restyles the cell to the same calc width
+fn a_calc_restyled_to_an_equal_computed_style_and_laid_out_again_matches_a_full_update() {
+    // Given: an absolute flex box holding a calc cell and a text sibling
     let mut doc = document();
     let body = doc.body();
-    let row = element(&mut doc, body, "div", "row");
-    let cell = element(&mut doc, row, "div", "calc");
+    let flex = element(&mut doc, body, "div", "shrink");
+    let cell = element(&mut doc, flex, "div", "calc");
     text(&mut doc, cell, "Cell");
+    let sibling = element(&mut doc, flex, "div", "");
+    let words = text(&mut doc, sibling, "a");
     doc.add_stylesheet("app.css", CSS).expect("parses");
     doc.update(view()).expect("updates");
     let doc = Rc::new(RefCell::new(doc));
 
-    // When
-    Document::pointer_moved(&doc, [20.0, 20.0]);
+    // When: hovering restyles the cell to the same calc width; then the
+    // sibling's text grows, so the box and the cell are laid out again
+    Document::pointer_moved(&doc, [10.0, 10.0]);
+    doc.borrow_mut().update(view()).expect("updates");
+    doc.borrow_mut().set_text(words, "a longer sibling");
 
     // Then
-    assert_matches_full(&doc, view(), "equal calc restyle");
+    assert_matches_full(&doc, view(), "equal calc restyle, laid out again");
 }
