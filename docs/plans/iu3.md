@@ -128,7 +128,204 @@ PRs, each under about 400 lines:
 |---|---|---|
 | 3c-1 | The last update's `Painted` is kept with what it was made from: every slot's rect (scroll offsets applied), whether thumbs are shown, and the scale. An update that built no box and has the same rects, thumbs and scale shows it and paints nothing. Each of the three comparisons and the built-box count is a path that paints again, with a test that fails without it. A debug build paints again on the kept path and asserts the two paints are equal, naming the parts that differ | Idle `boxes_painted` and `scene_items_built` 0, pinned; display-list build at 3000 rows idle near 0; the oracle and Chromium comparisons unchanged |
 | 3c-2 | Paint kept per box (its items with ids local to it, its hit, cursor, texts, images, icons, surfaces, range track and text origin) with the values above it was made from; an update that repaints walks paint order, paints the boxes whose values differ or whose slot was rebuilt, and copies the rest, renumbering ids in paint order so the scene equals a full paint | Text change paints the edited label's boxes, class toggle and hover one row's, pinned in `EXPECTED_WALKS`; each compared value proven by breaking |
-| 3c-3 | If 3c-2's measurement shows the walk and copy dominate an edit: paint order, clips and the element maps kept and redone under changed boxes | Edit paint at 3000 rows recorded before and after |
+| 3c-3 | Triggered by 3c-2's profile: paint order, clips, scroll chains, the element maps and the scene kept in place and redone under changed slots ("3c-3: kept paint order and an in-place scene" below) | Text and Class edit paint at 3000 rows under 1 ms |
+
+## 3c-3: kept paint order and an in-place scene
+
+Why (3c-2, #192 at b4befbc): an edit at 3000 rows paints 2 to 7
+boxes, yet paint takes 21.2 ms (22.4 on main). Where it goes
+(`docs/perf/baseline-2026-11-10.md`, "IU3 3c-2: where an edit's paint
+goes"): about 10.6 ms in four passes over every box that main runs too
+(paint steps 4.4, scroll chains 2.9, `started`'s rect and padding maps
+2.0, clips 1.7), and about 9.6 ms in the per-box copy loop
+(`TextCache::touch` hashing about 9000 keys twice; `copy_into`'s 12k
+items, 9k `Rc` clones and 36k map and vector entries; taking and
+comparing each slot). Goal (lead, 2026-11-11): an edit's paint costs
+in proportion to the slots it changes; Text and Class edits at 3000
+rows under 1 ms.
+
+### Changed slots
+
+Every kept structure below is patched from one set per update:
+
+- Rebuilt: the slots `KeptBoxes::rebuild` placed. It returns them,
+  and the slots it freed, in place of today's count;
+  `rebuild_owners` already takes each old subtree before placing the
+  new one, so it holds both.
+- Moved: the slots whose rect in `PaintedFrom::rects` differs from the
+  kept paint's. Found by comparing the two vectors, O(slots), as
+  3c-1's idle check does (the whole idle paint at 3000 rows, 21002
+  rects compared, is 0.05 ms). When 3b keeps `placed`, it reports the
+  moved slots and this comparison goes.
+- Shape changed: a slot was freed or newly taken, or a rebuilt box's
+  children, `Stacking` or whether it has an outline differ from what
+  is kept for its slot. Compared for rebuilt slots only.
+
+A scale change rebuilds every box (1b) and paints everything again, as
+today.
+
+### The scene in stable slots
+
+- `Painted` keeps each slot's part (3c-2's `Part`: items with their
+  clips, hit, cursor, visible flag, range track, text origin) in place.
+  An update takes the last `Painted`, paints the changed slots' parts
+  again, drops the freed slots' parts, and returns it. A kept part is
+  neither read nor copied.
+- Ids: texts, images, icons and surfaces are held in slabs in
+  `Painted` (a `Vec<Option<_>>` and a free list). A part's items name
+  slab ids, which stay while the part is kept; painting a box again
+  frees its old ids and takes new ones. `Painted::text(id)`, `image`,
+  `icon` and `surface` keep their signatures. Ids are no longer dense
+  or in paint order; the painter only resolves them through those
+  accessors (no cache in `crates/app` is keyed by an id).
+- Paint order is the kept `order` (below). The scene is the parts
+  walked in that order. `Painted::scene()` returns a view in place of
+  `&Scene`: `items()` iterates `(Item, Option<Rect>)` through order
+  and each part, and `batches(view)` batches that iterator.
+  `vapors_scene::Scene` stays the flat list each part is painted into
+  and the one the racer builds; batching becomes a function over an
+  iterator of items and clips that `Scene::batches` and the view both
+  call. 20 uses of `scene().items()` and `clips()` in 13 files move to
+  the iterator.
+- The painter changes only in calling the view's `batches`. Per drawn
+  frame, batching is O(steps + items) where today it is O(items): at
+  3000 rows about 21000 steps (order lists an outline step only for a
+  box with an outline, where today every box has one) and 12000
+  items. Batches kept across frames, or a per-scroller index so a
+  frame visits only visible items, is IU4.
+- Hit testing walks order backwards through each part's hit: O(steps)
+  per query, where today it is O(hits) over a list rebuilt every
+  repainting update.
+- `cursors`, `visible`, `ranges` and `text_origins` (by `NodeId`) are
+  kept: a part painted again removes its old entries and inserts its
+  new ones; a freed slot's part removes its own.
+
+### What is kept, and what redoes it
+
+| Kept | Reads | Redone when | How |
+|---|---|---|---|
+| Paint order (steps), containing blocks, thumb placement | tree shape; each box's `Stacking`; which boxes have an outline | shape changed | whole tree, as today; counted `order_walks` |
+| Scroll chains | shape, containing blocks, `Stacking::scrolls` | shape changed | `Chains::of`, as today; `chain_walks` |
+| Clips, by slot | containing blocks; each clipping box's padding box and its `clips()` | a changed slot; shape changed | own and inner clip again for each changed slot and its descendants, stopping below a slot whose own and inner clips come out equal unless a descendant is itself changed; whole tree on shape change; `clips_redone` |
+| `rects` and `paddings` maps | rect, border, padding | rebuilt, moved or freed slot | entry replaced or removed; `map_entries_patched` |
+| A slot's part | its box and style, rect, clip, padding (3c-2's `BoxFrom`) | rebuilt, or `BoxFrom` differs | painted again (3c-2's rule), compared only for changed slots and slots whose clip was redone |
+| Thumbs | scroll offsets, whether shown | every repainting update | painted again, O(scroll containers), as today |
+| Canvas | `html` and `body` style | every repainting update | O(1), as today |
+
+Whether a box clips is read from its style, so a change to it
+rebuilds the box; the body's clipping also reads the root's
+`overflow`, and a root restyle rebuilds everything.
+
+The edits in `EXPECTED_WALKS` (text, resizing label, hover, focus,
+class toggle) keep shape, so they do no whole-tree walk. An edit that
+changes shape (insert, remove, reorder, a z-index or position change)
+redoes order, chains and clips over the whole tree, about 9 ms at
+3000 rows; its build already covers the owner's subtree (1b), which
+for an insert into a list is the list.
+
+### Text cache
+
+`current` and `previous` with `begin` dropping what the last update
+did not ask for, plus `touch` and `keep_previous`, become one map
+whose entries record the update that last asked for them. A sweep
+drops entries older than the last update whose layout no kept part
+holds (`Rc::strong_count == 1`). It runs when the map has doubled
+since the last sweep, so its cost is amortised O(1) per insert and
+the map holds at most twice what the last sweep left. A kept box
+costs nothing per update; `KeptBox::text` and `TextCache::touch` go.
+
+### Loud failure
+
+- The debug build's check (`kept_paint_check::assert_same`) stays on
+  every update that paints: a full `paint` and `Chains::of`, the text
+  cache cloned and restored. It extends to the kept order against the
+  fresh steps, kept clips and containing blocks, chains, the `rects`
+  and `paddings` maps and the per-element maps, and compares the scene
+  item by item with ids resolved (texts, images and icons by
+  `Rc::ptr_eq`, surfaces by name), naming the first step and slot that
+  differ. It also checks the slabs: each live id named by exactly one
+  part, no free id named.
+- A step whose slot is vacant panics naming the slot, as `keep` and
+  `clip` do since #185.
+- One test per path, each proven by breaking it (the commit lists
+  each): a child moved before a sibling, same keys (children compare);
+  a z-index set on a rebuilt box (`Stacking` compare); position static
+  to relative (`Stacking`); an outline added by a class (outline
+  flag); a removed element has no border box, cursor or hit (freed
+  slots); a clipping container shrinks with its children kept (clip
+  descent); a changed descendant below an unchanged clip is still
+  redone (the descent's stop rule); `overflow` toggled (chains and
+  clips); a scroll (moved slots); a layout held by a kept part
+  survives updates that do not ask for it, an unheld one is gone after
+  the next sweep (text cache); a repainted box's freed ids are taken
+  by a later box and no stale id resolves (slabs).
+- New `UpdateCounts`: `order_walks`, `chain_walks`, `clips_redone`,
+  `map_entries_patched`, `boxes_copied`; pinned in `EXPECTED_WALKS`
+  beside `boxes_painted` and `scene_items_built`.
+
+### #192
+
+Of #192, the base for 3c-3: `KeptBox`, `Part`, `BoxFrom` and the rule
+for when a box paints again; `painted_again`; the `paint_own.rs` and
+`update_layout.rs` splits; `tests/kept_box_from.rs`'s proofs; the
+`EXPECTED_WALKS` pins (`boxes_painted` 2 to 7). Replaced: `touch` and
+`KeptBox::text` (3c-3a); `copy_into`, `Offsets` and `Walk`'s two slot
+vectors (3c-3d).
+
+Recommendation: rebase #192 onto main and merge it before 3c-3a, as a
+correct step that is not faster. 3c-3a to 3c-3d each change files #192
+changes (`paint.rs`, `kept_paint.rs`, `text_cache.rs`, `painted.rs`),
+so stacking them on an unmerged draft of about 870 added lines keeps four PRs
+rebasing on it; and its pins become the baseline the new counters sit
+beside. Against: until 3c-3d lands, main carries the copy loop, and
+#192's harness run had paint at 1000 rows 0.2 to 0.3 ms slower (5.62
+to 5.84 Text, 5.61 to 5.91 Class, one run each). The other option,
+closing #192 and carrying its parts into 3c-3d, puts about 870 lines
+reviewed once already into a PR that is then over 400 lines. The
+lead decides.
+
+### PR stack
+
+Each under about 400 lines; harness `vapors-perf 200 20`, 1-min load
+under 1.5, edit-frame paint at 1000 and 3000 rows before and after in
+`docs/perf/baseline-2026-11-10.md`. Expected drops are the profile's
+uninstrumented or single-span figures at 3000 rows.
+
+| PR | Content | Acceptance |
+|---|---|---|
+| 3c-3a | Text cache by age and holder | `text_layouts_built` unchanged on every `EXPECTED_WALKS` case; Text and Class paint at 3000 rows recorded (`touch` is 4.5 ms instrumented, less uninstrumented) |
+| 3c-3b | Changed slots (`rebuild` returns rebuilt and freed slots; moved found by comparing rects); `rects` and `paddings` kept and patched | `map_entries_patched` pinned (the changed element slots); `started`'s 2.0 ms gone at 3000 rows |
+| 3c-3c | Order, containing blocks and chains kept, redone on shape change; clips kept, redone under changed slots | `order_walks` and `chain_walks` 0, `clips_redone` 2 and 7 for Text and Class; a row insert `order_walks` 1; about 9 ms less at 3000 rows (order 4.4, chains 2.9, clips 1.7). Split at order and clips if over 400 lines |
+| 3c-3d1 | Slabs for texts, images, icons and surfaces; parts keep their ids, copied without renumbering; the debug check compares resolved ids | Scene items and ids equal a full paint's after resolving; harness unchanged or better |
+| 3c-3d2 | Parts kept in place; the scene view and batching over an iterator; hits by walking order; per-element maps patched | `boxes_copied` 0; Text and Class edit paint at 3000 rows under 1 ms; at 1000 rows recorded; draw at 3000 rows recorded before and after |
+
+### Open points and risks
+
+- After 3c-3, an edit's paint still compares 21002 rects at 3000 rows
+  (about 0.05 ms) until 3b reports moved slots. The update outside
+  paint stays above 1 ms until 3b: idle update at 3000 rows is 2.05 ms
+  with paint 0.05 (3c-1).
+- Moved boxes paint again. A label whose width or height changes moves
+  everything after it; a scroll moves every box in the scroller; at
+  3000 rows either can repaint most boxes. Options: (a) shift a moved
+  part's items by the rect's change in place of painting it again,
+  O(its items), no text or `Rc` work; (b) parts in scroller-local
+  coordinates with the offset applied at batching, which changes the
+  scene format, the painter and culling (IU4 territory); (c) leave both
+  as they are for 3c. The harness's Text edit keeps its width, so this
+  does not block the 1 ms target there; a resizing workload would.
+- Shape changes redo order, chains and clips over the whole tree
+  (about 9 ms at 3000 rows). Splicing a rebuilt owner's steps into
+  order, when its subtree has no positioned, scrolling or outlined box,
+  is a later step if a workload shows it.
+- Per drawn frame: batching walks steps as well as items, and hit
+  testing walks steps per query. 3c-3d2 records draw at 3000 rows; if
+  draw rises measurably, keeping batches across frames moves from IU4
+  into this stack, and the lead decides.
+- Unknown until 3c-3d2 is measured: whether the slab frees and map
+  patches for 7 boxes, plus the rect comparison, fit in 1 ms
+  alongside painting the boxes (3c-2 measured 0.01 ms for painting
+  the changed boxes at 3000 rows).
 
 ## Open points
 
