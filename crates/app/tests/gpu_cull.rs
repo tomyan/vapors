@@ -33,10 +33,10 @@ fn drawn(css: &str, text: &str) -> (Vec<u8>, FrameCounts) {
     let node = doc.create_text(text);
     doc.append(div, node);
     #[allow(clippy::cast_precision_loss)] // a small size
-    let side = SIZE as f32;
+    let edge = SIZE as f32;
     let viewport = Viewport {
-        width: side,
-        height: side,
+        width: edge,
+        height: edge,
         scale: 1.0,
     };
     let update = doc.update(viewport).expect("updates");
