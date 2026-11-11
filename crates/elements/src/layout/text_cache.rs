@@ -13,8 +13,24 @@
 //! one.
 //! An entry records the update that last asked for it. A sweep drops
 //! those older than the last update whose layout nothing else holds (a
-//! kept paint holds what it shows); it runs when the map has doubled
-//! since the last sweep, so its cost is amortised O(1) per insert.
+//! kept paint holds what it shows).
+//!
+//! A sweep runs on an insert that finds the map doubled since the last
+//! sweep, and at the start of an update when the map holds more than 4
+//! times the live set: the entries the last update asked for or the
+//! texts its paint showed, whichever is more (kept parts hold layouts
+//! without asking, so asks alone undercount it). Bound: the map holds
+//! at most twice what the last sweep left, and a document that shrinks
+//! from 3000 runs to 10 drops the 3000 it no longer shows at the next
+//! update's start.
+//!
+//! Cost: an insert sweep leaves `swept_to` entries and the next needs
+//! `swept_to` more inserts, so O(1) amortised per insert. In the steady
+//! state the map holds about the live set, under 4 times it, so no
+//! update-start sweep runs and the check is O(1) per update. One that
+//! runs keeps the last update's entries and what is held, which the
+//! last paint shows, at most twice the live set; the next needs at
+//! least twice the live set in new inserts first.
 
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
@@ -34,6 +50,8 @@ pub(crate) struct TextCache {
     update: u64,
     /// How many entries the last sweep left.
     swept_to: usize,
+    /// How many entries this update asked for or inserted.
+    asked_now: usize,
     built: usize,
 }
 
@@ -83,7 +101,10 @@ impl TextCache {
     /// The layout kept by `key`, recorded as asked for this update.
     fn asked(&mut self, key: &Key) -> Option<Rc<Layout>> {
         let entry = self.entries.get_mut(key)?;
-        entry.asked = self.update;
+        if entry.asked != self.update {
+            entry.asked = self.update;
+            self.asked_now += 1;
+        }
         Some(Rc::clone(&entry.layout))
     }
 
@@ -95,6 +116,7 @@ impl TextCache {
         }
         let asked = self.update;
         self.entries.insert(key, Entry { layout, asked });
+        self.asked_now += 1;
     }
 
     /// Drops the entries asked for before the last update whose layout
@@ -106,10 +128,16 @@ impl TextCache {
         self.swept_to = self.entries.len();
     }
 
-    /// Starts an update.
-    pub(crate) fn begin(&mut self) {
+    /// Starts an update, the last one's paint showing `shown` texts;
+    /// sweeps when the map holds more than 4 times the live set.
+    pub(crate) fn begin(&mut self, shown: usize) {
+        let live = self.asked_now.max(shown).max(1);
         self.update += 1;
         self.built = 0;
+        self.asked_now = 0;
+        if self.entries.len() > 4 * live {
+            self.sweep();
+        }
     }
 
     /// How many layouts this update built rather than kept.
