@@ -86,6 +86,8 @@ pub fn play(fixture: &Fixture, script: &Script, viewport: Viewport) -> Result<Lo
                 fixture.name, step.line
             )
         })?;
+        // and the focus fixup the app runs after it
+        Document::settle_focus(&doc);
         let (focus, focus_visible) = {
             let doc = doc.borrow();
             let focus = doc

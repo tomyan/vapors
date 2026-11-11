@@ -35,6 +35,7 @@ mod dom_impl;
 mod error;
 mod events;
 mod focus;
+mod focus_fixup;
 mod focus_window;
 mod html;
 mod images;
