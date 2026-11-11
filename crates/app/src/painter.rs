@@ -101,7 +101,7 @@ impl ScenePainter {
         let batched = painted.scene().batches(view(target));
         self.counts.culled = batched.culled;
         for batch in &batched.batches {
-            match clipped(target, batch.clip) {
+            match clipped(target, batch.clip).filter(|_| !batch.culled) {
                 Some(clipped) => self.draw_run(&clipped, painted, &batch.run)?,
                 None => self
                     .surfaces

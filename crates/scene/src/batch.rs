@@ -9,6 +9,9 @@ use crate::display::{Item, Quad, Rect, Scene, Shadow};
 pub struct Batch {
     /// The clip, device pixels; `None` draws unclipped.
     pub clip: Option<Rect>,
+    /// True for culled surfaces, kept so the painter can refuse them as
+    /// it refuses clipped ones: nothing in the batch is drawn.
+    pub culled: bool,
     /// The items.
     pub run: Run,
 }
@@ -35,20 +38,9 @@ pub enum Run {
 pub struct Batched {
     /// The batches, in painting order.
     pub batches: Vec<Batch>,
-    /// Items left out, or (surfaces) kept under [`Rect::NOWHERE`],
+    /// Items left out, or (surfaces) kept in a batch marked culled,
     /// because their bounds miss the view under their clip.
     pub culled: u64,
-}
-
-impl Rect {
-    /// A clip nothing passes: a culled surface's batch carries it, so the
-    /// painter treats the surface as clipped out of view.
-    pub const NOWHERE: Rect = Rect {
-        left: 0.0,
-        top: 0.0,
-        right: 0.0,
-        bottom: 0.0,
-    };
 }
 
 impl Scene {
@@ -56,19 +48,19 @@ impl Scene {
     /// (device pixels), in order. An item whose [`Item::bounds`] miss
     /// `view` cut to its clip is culled: left out, so the items either
     /// side of it can share a batch; a culled surface instead keeps its
-    /// place under [`Rect::NOWHERE`], so the painter refuses it as it
-    /// would in view.
+    /// place in a batch marked [`Batch::culled`], so the painter refuses
+    /// it as it refuses a clipped one.
     #[must_use]
     pub fn batches(&self, view: Rect) -> Batched {
         let mut batched = Batched::default();
         for (item, &clip) in self.items().iter().zip(self.clips()) {
             if !culled(item, clip, view) {
-                batched.push(item, clip);
+                batched.push(item, clip, false);
                 continue;
             }
             batched.culled += 1;
             if let Item::Surface { .. } = item {
-                batched.push(item, Some(Rect::NOWHERE));
+                batched.push(item, clip, true);
             }
         }
         batched
@@ -83,17 +75,18 @@ fn culled(item: &Item, clip: Option<Rect>, view: Rect) -> bool {
 
 impl Batched {
     /// Adds `item` under `clip` to the last batch when it is of the same
-    /// kind and clip, else as a new batch.
-    fn push(&mut self, item: &Item, clip: Option<Rect>) {
+    /// kind, clip and culling, else as a new batch.
+    fn push(&mut self, item: &Item, clip: Option<Rect>, culled: bool) {
         if let Some(last) = self.batches.last_mut()
             && last.clip == clip
+            && last.culled == culled
             && last.run.push(item)
         {
             return;
         }
         let mut run = Run::empty(item);
         run.push(item);
-        self.batches.push(Batch { clip, run });
+        self.batches.push(Batch { clip, culled, run });
     }
 }
 

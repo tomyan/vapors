@@ -139,7 +139,7 @@ fn a_text_above_the_view_whose_ink_reaches_into_it_is_drawn() {
 }
 
 #[test]
-fn a_culled_surface_keeps_its_place_in_a_batch_clipped_to_nowhere() {
+fn a_culled_surface_keeps_its_place_in_a_batch_marked_culled() {
     // Given: a surface right of the view, between two quads in view
     let surface = Item::Surface {
         surface: SurfaceId(0),
@@ -152,8 +152,26 @@ fn a_culled_surface_keeps_its_place_in_a_batch_clipped_to_nowhere() {
 
     // Then
     assert_eq!(kinds(&batched), [('q', 1), ('g', 1), ('q', 1)]);
-    assert_eq!(batched.batches[1].clip, Some(Rect::NOWHERE));
+    assert!(batched.batches[1].culled);
+    assert_eq!(batched.batches[1].clip, None);
     assert_eq!(batched.culled, 1);
+}
+
+#[test]
+fn a_culled_surface_does_not_share_a_batch_with_one_in_view() {
+    // Given: an unclipped surface in view, then one right of the view
+    let surface = |left| Item::Surface {
+        surface: SurfaceId(0),
+        rect: Rect::new(left, 0.0, left + 10.0, 10.0),
+    };
+    let scene = scene_of(&[surface(0.0), surface(150.0)]);
+
+    // When
+    let batched = scene.batches(VIEW);
+
+    // Then
+    let culled: Vec<bool> = batched.batches.iter().map(|batch| batch.culled).collect();
+    assert_eq!(culled, [false, true]);
 }
 
 #[test]

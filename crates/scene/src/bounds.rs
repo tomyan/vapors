@@ -72,15 +72,16 @@ impl Rect {
     }
 
     /// True when no area lies inside: an edge pair met or crossed. A
-    /// NaN edge compares false, so a rectangle that cannot be placed is
-    /// not empty and nothing is culled by it.
+    /// NaN edge compares false, so an axis with one is never empty; the
+    /// other axis still can be.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.right <= self.left || self.bottom <= self.top
     }
 
     /// True when the two share no area. A NaN edge compares false, so
-    /// such a rectangle is never disjoint.
+    /// the two are never apart on an axis where either has one; they can
+    /// still be apart on the other axis, and then are disjoint.
     #[must_use]
     pub fn is_disjoint(&self, other: &Rect) -> bool {
         self.right <= other.left
