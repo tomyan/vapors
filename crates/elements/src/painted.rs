@@ -44,6 +44,8 @@ pub struct Painted {
     pub(crate) ranges: HashMap<NodeId, crate::range_paint::Track>,
     /// Each text field's text origin, for the pointer (E6a).
     pub(crate) text_origins: HashMap<NodeId, [f32; 2]>,
+    /// What this was painted from (`kept_paint`).
+    pub(crate) from: crate::kept_paint::PaintedFrom,
     /// Boxes drawn, for `UpdateCounts`.
     pub(crate) boxes_drawn: usize,
 }

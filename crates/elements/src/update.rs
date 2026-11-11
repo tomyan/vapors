@@ -59,7 +59,7 @@ impl Document {
     /// Only on a bug in this crate: a restyle that succeeds always keeps
     /// the styles layout reads.
     pub fn update(&mut self, viewport: Viewport) -> Result<&Painted, Vec<ElementError>> {
-        let (last, painted_from) = (self.painted.take(), self.painted_from.take());
+        let last = self.painted.take();
         self.counts = crate::UpdateCounts::default();
         self.texts.begin();
         let style = tracing::trace_span!("update phase", phase = "style").entered();
@@ -106,8 +106,7 @@ impl Document {
         };
         drop(layout);
         let paint_span = tracing::trace_span!("update phase", phase = "paint").entered();
-        let shown = painted_from.is_some_and(|before| before.shows(&from, built));
-        let painted = if let Some(kept) = last.filter(|_| shown) {
+        let mut painted = if let Some(kept) = last.filter(|last| last.from.shows(&from, built)) {
             self.texts.keep_previous();
             kept
         } else {
@@ -130,7 +129,7 @@ impl Document {
         };
         drop(paint_span);
         self.boxes.keep(slotted, viewport.scale);
-        self.painted_from = Some(from);
+        painted.from = from;
         (self.counts.boxes_laid_out, self.counts.layout_calls) = (work.laid_out, work.calls);
         // Cleared before the rehover: a hover it moves is a change this
         // update did not restyle, so the a11y tree refuses until the next.

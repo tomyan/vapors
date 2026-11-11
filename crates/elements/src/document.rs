@@ -20,8 +20,6 @@ pub struct Document {
     pub(crate) sheets: Sheets,
     pub(crate) fonts: FontSystem,
     pub(crate) painted: Option<Painted>,
-    /// What `painted` was made from (`kept_paint`).
-    pub(crate) painted_from: Option<crate::kept_paint::PaintedFrom>,
     /// Whether anything shown may have changed: a tree, attribute,
     /// text, scroll or pointer-state change.
     pub(crate) changes: crate::update::Changes,
@@ -81,7 +79,6 @@ impl Document {
             sheets: Sheets::new(),
             fonts,
             painted: None,
-            painted_from: None,
             changes: crate::update::Changes::default(),
             pointer: crate::events::Pointer::default(),
             focused: None,

@@ -57,6 +57,7 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
         ranges: HashMap::new(),
         text_origins: HashMap::new(),
         boxes_drawn: 0,
+        from: crate::kept_paint::PaintedFrom::default(),
     };
     for (index, layout_box) in boxes.iter().enumerate() {
         if let Content::Element(node) = layout_box.content {
