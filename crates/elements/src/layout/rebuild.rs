@@ -128,3 +128,7 @@ fn parents(placed: &Placed) -> Vec<Option<usize>> {
     }
     parents
 }
+
+#[cfg(test)]
+#[path = "rebuild_tests.rs"]
+mod tests;
