@@ -55,3 +55,36 @@ fn a_draw_step_is_timed_under_its_phase() {
     // Then
     assert_eq!(names(&clock), ["submit"]);
 }
+
+#[test]
+fn an_update_is_counted_in_instructions_by_the_same_phases() {
+    // Given
+    let counter = crate::instructions::InstructionCounter::open().expect("perf events");
+    let clock = PhaseClock::with_instructions(counter);
+    let (document, viewport) = rows_document(10);
+
+    // When
+    tracing::subscriber::with_default(clock.clone(), || {
+        document.borrow_mut().update(viewport).expect("updates");
+    });
+
+    // Then
+    let counts = clock
+        .take_instructions()
+        .expect("reads")
+        .expect("a counter");
+    assert_eq!(
+        counts.keys().collect::<Vec<_>>(),
+        ["layout", "paint", "style"]
+    );
+    assert!(counts.values().all(|&n| n > 1000), "{counts:?}");
+    assert_eq!(
+        clock.take_instructions(),
+        Ok(Some(std::collections::BTreeMap::new()))
+    );
+}
+
+#[test]
+fn a_clock_without_a_counter_has_no_instruction_counts() {
+    assert_eq!(PhaseClock::default().take_instructions(), Ok(None));
+}

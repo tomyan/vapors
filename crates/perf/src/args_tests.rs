@@ -1,10 +1,10 @@
 //! The command line: counts within the GPU clock's capacity, and
-//! nothing more than runs and warmup.
+//! runs and warmup, `--only` with a value, `--instructions`, no other flag.
 
-use super::{MAX_RUNS, settings};
+use super::{MAX_RUNS, options};
 
 fn parsed(args: &[&str]) -> Result<(usize, usize), String> {
-    settings(args.iter().map(|&arg| arg.to_owned())).map(|s| (s.runs, s.warmup))
+    options(args.iter().map(|&arg| arg.to_owned())).map(|o| (o.settings.runs, o.settings.warmup))
 }
 
 #[test]
@@ -41,4 +41,34 @@ fn a_third_argument_is_refused_naming_it() {
 fn a_word_is_refused_as_not_a_count() {
     let error = parsed(&["many"]).expect_err("a word");
     assert!(error.starts_with("many is not a count: "), "{error}");
+}
+
+fn full(args: &[&str]) -> Result<super::Options, String> {
+    options(args.iter().map(|&arg| arg.to_owned()))
+}
+
+#[test]
+fn only_and_instructions_are_read_among_the_counts() {
+    let o = full(&["--instructions", "50", "--only", "3000 rows, Class", "5"]).expect("parsed");
+    assert_eq!((o.settings.runs, o.settings.warmup), (50, 5));
+    assert_eq!(o.only.as_deref(), Some("3000 rows, Class"));
+    assert!(o.instructions);
+}
+
+#[test]
+fn without_flags_there_is_no_filter_and_times_are_reported() {
+    let o = full(&[]).expect("parsed");
+    assert_eq!((o.only, o.instructions), (None, false));
+}
+
+#[test]
+fn an_unknown_flag_is_refused_naming_it() {
+    let error = full(&["--instruction"]).expect_err("typo");
+    assert!(error.starts_with("unknown flag --instruction: "), "{error}");
+}
+
+#[test]
+fn only_without_a_value_is_refused() {
+    let error = full(&["10", "--only"]).expect_err("no value");
+    assert!(error.starts_with("--only needs a value: "), "{error}");
 }

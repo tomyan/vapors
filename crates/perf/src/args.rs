@@ -1,4 +1,5 @@
-//! The harness's command line: `[runs] [warmup]`, 200 and 20 by default.
+//! The harness's command line: `[runs] [warmup]`, 200 and 20 by default,
+//! with `--only <substring>` and `--instructions`.
 
 use crate::run::Settings;
 
@@ -6,14 +7,49 @@ use crate::run::Settings;
 /// into one query set, which holds at most `QUERY_SET_MAX_QUERIES`.
 pub const MAX_RUNS: usize = (wgpu::QUERY_SET_MAX_QUERIES / 2) as usize;
 
-const USAGE: &str = "cargo run --release -p vapors-perf -- [runs] [warmup]";
+const USAGE: &str = "cargo run --release -p vapors-perf -- \
+                     [runs] [warmup] [--only <substring>] [--instructions]";
 
-/// The settings `args` name, without the program's name.
+/// What the command line asks for.
+#[derive(Debug)]
+pub struct Options {
+    /// Frames to run and keep.
+    pub settings: Settings,
+    /// Run only workloads whose name contains this.
+    pub only: Option<String>,
+    /// Report instructions retired per phase instead of times.
+    pub instructions: bool,
+}
+
+/// The options `args` name, without the program's name.
 ///
 /// # Errors
-/// An argument that is not a count, runs outside 1 to [`MAX_RUNS`], or
-/// a third argument; each names the usage.
-pub fn settings(mut args: impl Iterator<Item = String>) -> Result<Settings, String> {
+/// An unknown flag, `--only` without a value, an argument that is not a
+/// count, runs outside 1 to [`MAX_RUNS`], or a third count; each names
+/// the usage.
+pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String> {
+    let (mut counts, mut only, mut instructions) = (Vec::new(), None, false);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--only" => only = Some(only_value(args.next())?),
+            "--instructions" => instructions = true,
+            flag if flag.starts_with("--") => return Err(format!("unknown flag {flag}: {USAGE}")),
+            _ => counts.push(arg),
+        }
+    }
+    let settings = settings(counts.into_iter())?;
+    Ok(Options {
+        settings,
+        only,
+        instructions,
+    })
+}
+
+fn only_value(value: Option<String>) -> Result<String, String> {
+    value.ok_or_else(|| format!("--only needs a value: {USAGE}"))
+}
+
+fn settings(mut args: impl Iterator<Item = String>) -> Result<Settings, String> {
     let runs = count(args.next(), 200)?;
     let warmup = count(args.next(), 20)?;
     if let Some(extra) = args.next() {
