@@ -149,19 +149,44 @@ struct Offsets([u32; 4]);
 impl Offsets {
     fn of(out: &Painted) -> Self {
         let count = |len: usize| u32::try_from(len).expect("fewer than 2^32 of each");
-        let lens = [out.texts.len(), out.images.len(), out.icons.len(), out.surfaces.len()];
+        let lens = [
+            out.texts.len(),
+            out.images.len(),
+            out.icons.len(),
+            out.surfaces.len(),
+        ];
         Self(lens.map(count))
     }
 
     fn moved(&self, item: Item) -> Item {
         let [text, image, icon, surface] = self.0;
         match item {
-            Item::Text { text: id, origin, ink } => Item::Text { text: TextId(id.0 + text), origin, ink },
-            Item::Image { image: id, rect } => Item::Image { image: ImageId(id.0 + image), rect },
-            Item::Icon { icon: id, rect, colour } => Item::Icon { icon: IconId(id.0 + icon), rect, colour },
-            Item::Surface { surface: id, rect } => {
-                Item::Surface { surface: SurfaceId(id.0 + surface), rect }
-            }
+            Item::Text {
+                text: id,
+                origin,
+                ink,
+            } => Item::Text {
+                text: TextId(id.0 + text),
+                origin,
+                ink,
+            },
+            Item::Image { image: id, rect } => Item::Image {
+                image: ImageId(id.0 + image),
+                rect,
+            },
+            Item::Icon {
+                icon: id,
+                rect,
+                colour,
+            } => Item::Icon {
+                icon: IconId(id.0 + icon),
+                rect,
+                colour,
+            },
+            Item::Surface { surface: id, rect } => Item::Surface {
+                surface: SurfaceId(id.0 + surface),
+                rect,
+            },
             Item::Shadow(_) | Item::Quad(_) => item,
         }
     }

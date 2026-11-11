@@ -9,7 +9,6 @@ use vapors_dom::NodeId;
 use vapors_scene::{Rect, Scene};
 use vapors_text::FontSystem;
 
-
 use crate::layout::{BoxRect, Content, LayoutBox};
 use crate::paint_order::{Step, paint_steps_with_outlines, stacking_of};
 use crate::painted::Painted;
@@ -40,7 +39,7 @@ impl<'a> PaintInput<'a> {
     pub(crate) fn new(
         used: &'a HashMap<NodeId, Used>,
         page: (NodeId, NodeId),
-        text: (&'a mut FontSystem, &'a mut crate::layout::TextCache),
+        (fonts, cache): (&'a mut FontSystem, &'a mut crate::layout::TextCache),
         scroll: &'a crate::scroll::Offsets,
         from: &crate::kept_paint::PaintedFrom,
     ) -> Self {
@@ -49,8 +48,8 @@ impl<'a> PaintInput<'a> {
             root: page.0,
             body: page.1,
             propagated: None,
-            fonts: text.0,
-            cache: text.1,
+            fonts,
+            cache,
             scale: from.scale,
             clip: None,
             scroll,
@@ -73,7 +72,12 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
             }
             Step::Thumb(_) => crate::thumb::paint(&boxes[index], rects[index], input, &mut painted),
             Step::Outline(_) => {
-                crate::paint_outline::paint_outline(&boxes[index], rects[index], input, &mut painted);
+                crate::paint_outline::paint_outline(
+                    &boxes[index],
+                    rects[index],
+                    input,
+                    &mut painted,
+                );
             }
         }
     }
@@ -84,7 +88,11 @@ pub(crate) fn paint(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInp
 /// A paint with the canvas and every element's border and padding box,
 /// before any box is painted; notes in `input` which element gave the
 /// canvas its colour.
-pub(crate) fn started(boxes: &[LayoutBox], rects: &[BoxRect], input: &mut PaintInput<'_>) -> Painted {
+pub(crate) fn started(
+    boxes: &[LayoutBox],
+    rects: &[BoxRect],
+    input: &mut PaintInput<'_>,
+) -> Painted {
     let (canvas, propagated) = crate::canvas::canvas_background(input);
     input.propagated = propagated;
     let canvas_from = crate::canvas::canvas_from(propagated, input.root);

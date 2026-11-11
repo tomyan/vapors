@@ -64,7 +64,13 @@ struct Walk<'a> {
 impl Walk<'_> {
     /// Box `index`'s own step: its kept paint copied when it shows what
     /// painting again would, else painted again.
-    fn own(&mut self, index: usize, clip: Option<BoxRect>, input: &mut PaintInput<'_>, out: &mut Painted) {
+    fn own(
+        &mut self,
+        index: usize,
+        clip: Option<BoxRect>,
+        input: &mut PaintInput<'_>,
+        out: &mut Painted,
+    ) {
         let from = BoxFrom::of(self.boxes, self.rects, clip, index, input.propagated);
         let last = self.last[index].take();
         let reused = last.filter(|last| self.boxes[index].kept && last.from == from);
@@ -95,7 +101,12 @@ impl Walk<'_> {
         crate::paint_outline::paint_outline(layout_box, rect, input, &mut self.scratch);
         let outline = std::mem::take(&mut self.scratch.scene).items().to_vec();
         let text = KeptBox::text_key(layout_box, rect, input.scale);
-        let kept = KeptBox { from, own, outline, text };
+        let kept = KeptBox {
+            from,
+            own,
+            outline,
+            text,
+        };
         out.boxes_drawn += 1;
         out.items_built += kept.items();
         kept
