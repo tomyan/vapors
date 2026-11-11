@@ -2,7 +2,7 @@
 //! Geist 13 px on a 44 px strip, the touche design's bar.
 
 use vapors_platform::Frame;
-use vapors_renderer::SolidPipeline;
+use vapors_renderer::{FrameEncoder, SolidPipeline};
 use vapors_scene::{Color, Size};
 use vapors_text::{
     AtlasConfig, BlendParams, Family, FontSystem, GlyphAtlas, Layout, LayoutOptions, RenderTarget,
@@ -93,9 +93,11 @@ impl LabelDraw {
         };
         let layout = Layout::new(fonts, text, &style(), &options);
         let origin = [INSET * scale, ((strip - layout.height()) / 2.0).round()];
+        let encoder = FrameEncoder::new(frame.device);
         let target = RenderTarget {
             device: frame.device,
             queue: frame.queue,
+            encoder: &encoder,
             view: &view,
             viewport,
             scissor: None,
@@ -110,6 +112,7 @@ impl LabelDraw {
         ) {
             vapors_platform::report_error(&format!("label: {error}"));
         }
+        encoder.submit(frame.queue);
     }
 }
 

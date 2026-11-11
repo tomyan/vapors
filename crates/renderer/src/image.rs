@@ -5,8 +5,9 @@
 
 use vapors_scene::{Rect, Size, Transform};
 
+use crate::frame_arena::FrameArena;
 use crate::image_setup::{bind_group_layout, render_pipeline};
-use crate::{GpuWork, Target, WorkCounter};
+use crate::{FrameEncoder, GpuWork, Target, WorkCounter};
 
 use crate::quad::{VERTEX_COUNT, VERTEX_SIZE, quad_vertices, vertex_bytes};
 
@@ -19,7 +20,7 @@ pub struct ImagePipeline {
     nearest: wgpu::Sampler,
     /// Linear sampling, for an `img` stretched over its box.
     smooth: wgpu::Sampler,
-    vertices: wgpu::Buffer,
+    vertices: FrameArena,
     work: WorkCounter,
 }
 
@@ -59,12 +60,12 @@ impl ImagePipeline {
                 wgpu::MipmapFilterMode::Linear,
             ),
         );
-        let vertices = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("image quad"),
-            size: VERTEX_SIZE * u64::from(VERTEX_COUNT),
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let vertices = FrameArena::new(
+            device,
+            "image quad",
+            wgpu::BufferUsages::VERTEX,
+            VERTEX_SIZE,
+        );
         Self {
             pipeline,
             layout,
@@ -76,9 +77,10 @@ impl ImagePipeline {
     }
 
     /// Draw `texture` into `target` (of size `viewport`) placed by `transform`.
-    /// Pixels outside the image keep whatever was in the target.
+    /// Pixels outside the image keep whatever was in the target. Submits
+    /// its own encoder: the canvas draws one image a frame.
     pub fn draw(
-        &self,
+        &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         target: &wgpu::TextureView,
@@ -90,22 +92,27 @@ impl ImagePipeline {
             width: texture.width(),
             height: texture.height(),
         };
+        let encoder = FrameEncoder::new(device);
         let at = Target {
             device,
             queue,
+            encoder: &encoder,
             view: target,
             viewport,
             scissor: None,
         };
-        self.quad(&at, texture, transform.image_bounds(image), &self.nearest);
+        let nearest = self.nearest.clone();
+        self.quad(&at, texture, transform.image_bounds(image), &nearest);
+        encoder.submit(queue);
     }
 
     /// Draw `texture` stretched over `rect` (device pixels) in `target`,
     /// sampled smoothly, inside the target's scissor: how an `img` is
     /// drawn.
-    pub fn draw_rect(&self, target: &Target<'_>, texture: &wgpu::Texture, rect: Rect) {
+    pub fn draw_rect(&mut self, target: &Target<'_>, texture: &wgpu::Texture, rect: Rect) {
         let bounds = [[rect.left, rect.top], [rect.right, rect.bottom]];
-        self.quad(target, texture, bounds, &self.smooth);
+        let smooth = self.smooth.clone();
+        self.quad(target, texture, bounds, &smooth);
     }
 
     /// The work its draws issued since the last take; the count restarts.
@@ -114,32 +121,23 @@ impl ImagePipeline {
     }
 
     fn quad(
-        &self,
+        &mut self,
         target: &Target<'_>,
         texture: &wgpu::Texture,
         bounds: [[f32; 2]; 2],
         sampler: &wgpu::Sampler,
     ) {
-        let quad = quad_vertices(bounds, target.viewport);
-        self.work
-            .write_buffer(target.queue, &self.vertices, 0, &vertex_bytes(&quad));
+        let quad = vertex_bytes(&quad_vertices(bounds, target.viewport));
+        let vertices = self
+            .vertices
+            .push(target.encoder, target.queue, &self.work, &quad);
         let bind_group = self.bind_group(target.device, texture, sampler);
-        let mut encoder = target
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("image"),
-            });
-        {
-            let mut pass = crate::quads_setup::load_pass(&mut encoder, target.view);
-            if let Some(s) = target.scissor {
-                pass.set_scissor_rect(s.x, s.y, s.width, s.height);
-            }
+        target.draw_pass("image", |pass| {
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &bind_group, &[]);
-            pass.set_vertex_buffer(0, self.vertices.slice(..));
-            self.work.draw(&mut pass, 0..VERTEX_COUNT, 0..1);
-        }
-        target.queue.submit([encoder.finish()]);
+            pass.set_vertex_buffer(0, vertices.slice());
+            self.work.draw(pass, 0..VERTEX_COUNT, 0..1);
+        });
     }
 
     fn bind_group(

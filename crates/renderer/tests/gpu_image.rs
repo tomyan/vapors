@@ -28,7 +28,7 @@ fn gpu_a_two_by_two_image_at_scale_two_fills_quadrants_exactly() {
         4,
         Color::from_rgba8(40, 40, 40, 255),
     );
-    let pipeline = ImagePipeline::new(&gpu.device, target.format());
+    let mut pipeline = ImagePipeline::new(&gpu.device, target.format());
 
     // When: drawn at scale 2 from the origin
     let view = target.create_view(&wgpu::TextureViewDescriptor::default());
@@ -70,7 +70,7 @@ fn gpu_pixels_outside_the_image_keep_the_background() {
         4,
         Color::from_rgba8(40, 40, 40, 255),
     );
-    let pipeline = ImagePipeline::new(&gpu.device, target.format());
+    let mut pipeline = ImagePipeline::new(&gpu.device, target.format());
 
     // When: the single pixel is placed at (2,2) at scale 1
     let view = target.create_view(&wgpu::TextureViewDescriptor::default());

@@ -19,7 +19,7 @@ use vapors_app::ScenePainter;
 use vapors_elements::Document;
 use vapors_elements_corpus::paint_check::compare;
 use vapors_gpu_harness::{gpu, read_rgba8};
-use vapors_renderer::{Target, clear};
+use vapors_renderer::{FrameEncoder, Target, clear};
 use vapors_scene::{Color, Size};
 use vapors_text::comparison::{Rgba, write_png};
 
@@ -37,9 +37,11 @@ fn ours(doc: &Document, scale: u32) -> Rgba {
         Color::default(),
     );
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let encoder = FrameEncoder::new(&gpu.device);
     let target = Target {
         device: &gpu.device,
         queue: &gpu.queue,
+        encoder: &encoder,
         view: &view,
         viewport: size,
         scissor: None,
@@ -49,6 +51,7 @@ fn ours(doc: &Document, scale: u32) -> Rgba {
         .expect("Rgba8Unorm is drawn")
         .draw(&target, painted)
         .expect("paints");
+    encoder.submit(&gpu.queue);
     Rgba {
         width: size.width,
         height: size.height,

@@ -39,7 +39,7 @@ impl Textures {
     /// Draws each image item of `items` with `pipeline`.
     pub(super) fn draw(
         &mut self,
-        pipeline: &ImagePipeline,
+        pipeline: &mut ImagePipeline,
         target: &Target<'_>,
         painted: &Painted,
         items: &[Item],

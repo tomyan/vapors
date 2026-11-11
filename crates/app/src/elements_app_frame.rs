@@ -3,13 +3,10 @@
 //! its event handlers took since the last frame is the Input phase's.
 
 use std::time::Duration;
-use vapors_elements::Document;
 
+use vapors_elements::{Document, ElementError, Viewport};
 use vapors_platform::{Frame, Instant};
-
-use vapors_renderer::Target;
-
-use vapors_elements::{ElementError, Viewport};
+use vapors_renderer::{FrameEncoder, Target};
 use vapors_scene::Size;
 
 use super::ElementsApp;
@@ -72,9 +69,21 @@ impl ElementsApp {
     }
 
     /// The Draw phase: the update's scene painted into the frame, then
-    /// the tooltip shown at `now` over it.
+    /// the tooltip shown at `now` over it, in one submit. A refused
+    /// frame submits what it recorded before the refusal.
     fn paint(&mut self, frame: &Frame<'_>, now: Instant) -> Result<(), String> {
-        let size = size_of(frame);
+        let encoder = FrameEncoder::new(frame.device);
+        let painted = self.record(frame, &encoder, now);
+        encoder.submit(frame.queue);
+        painted
+    }
+
+    fn record(
+        &mut self,
+        frame: &Frame<'_>,
+        encoder: &FrameEncoder,
+        now: Instant,
+    ) -> Result<(), String> {
         let document = self.document.borrow();
         let painted = document
             .painted()
@@ -85,8 +94,9 @@ impl ElementsApp {
         let target = Target {
             device: frame.device,
             queue: frame.queue,
+            encoder,
             view: &view,
-            viewport: size,
+            viewport: size_of(frame),
             scissor: None,
         };
         if self.painter.is_none() {

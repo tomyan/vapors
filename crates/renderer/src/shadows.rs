@@ -5,7 +5,8 @@
 use vapors_scene::Shadow;
 
 use crate::GpuWork;
-use crate::instanced::{Instanced, Target, float_bytes};
+use crate::Target;
+use crate::instanced::{Instanced, float_bytes};
 use crate::quads::rgba;
 
 /// Three standard deviations: past this the Gaussian is under 0.3% of
@@ -28,7 +29,7 @@ impl ShadowPipeline {
         ))
     }
 
-    /// Draw `shadows` into `target`, in one submit.
+    /// Draw `shadows` into `target`, in one draw call.
     pub fn draw(&mut self, target: &Target<'_>, shadows: &[Shadow]) {
         let bytes = float_bytes(shadows.iter().flat_map(instance));
         self.0.draw(target, &bytes);

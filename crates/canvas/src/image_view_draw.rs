@@ -43,7 +43,7 @@ impl ImageView {
         Ok(())
     }
 
-    fn upload(&mut self, frame: &Frame<'_>) -> Option<&Uploaded> {
+    fn upload(&mut self, frame: &Frame<'_>) -> Option<&mut Uploaded> {
         let Some(Shown::Pixels(image)) = self.shown.as_ref() else {
             return None;
         };

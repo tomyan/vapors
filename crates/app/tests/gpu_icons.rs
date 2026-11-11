@@ -8,11 +8,10 @@ use vapors_app::ScenePainter;
 use vapors_dom::{Dom, NodeId};
 use vapors_elements::{Document, Viewport};
 use vapors_gpu_harness::{gpu, read_rgba8};
-use vapors_renderer::{Target, clear};
+use vapors_renderer::{FrameEncoder, Target, clear};
 use vapors_scene::{Color, Size};
 use vapors_text::{
-    AtlasConfig, FontSystem, GlyphAtlas, Icon, IconDraw, IconPath, IconStroke, RenderTarget,
-    TextPipeline,
+    AtlasConfig, FontSystem, GlyphAtlas, Icon, IconDraw, IconPath, IconStroke, TextPipeline,
 };
 
 const SIZE: u32 = 48;
@@ -73,20 +72,13 @@ fn drawn_directly(icon: &Icon, origin: [i32; 2], size: [u32; 2], colour: Color) 
         let mut atlas = GlyphAtlas::new(AtlasConfig::default());
         let format = wgpu::TextureFormat::Rgba8Unorm;
         let mut pipeline = TextPipeline::new(&gpu.device, format, &atlas);
-        let text_target = RenderTarget {
-            device: target.device,
-            queue: target.queue,
-            view: target.view,
-            viewport: target.viewport,
-            scissor: None,
-        };
         let draw = IconDraw {
             icon,
             origin,
             size,
             colour,
         };
-        let drawn = pipeline.draw_icons(&text_target, &mut atlas, &[draw]);
+        let drawn = pipeline.draw_icons(target, &mut atlas, &[draw]);
         drawn.expect("draws");
     })
 }
@@ -102,9 +94,11 @@ fn on_white(draw: impl FnOnce(&vapors_gpu_harness::Gpu, &Target<'_>)) -> Vec<u8>
         Color::from_rgba8(255, 255, 255, 255),
     );
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let encoder = FrameEncoder::new(&gpu.device);
     let target = Target {
         device: &gpu.device,
         queue: &gpu.queue,
+        encoder: &encoder,
         view: &view,
         viewport: Size {
             width: SIZE,
@@ -113,6 +107,7 @@ fn on_white(draw: impl FnOnce(&vapors_gpu_harness::Gpu, &Target<'_>)) -> Vec<u8>
         scissor: None,
     };
     draw(&gpu, &target);
+    encoder.submit(&gpu.queue);
     read_rgba8(&gpu.device, &gpu.queue, &texture)
 }
 

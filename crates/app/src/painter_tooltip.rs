@@ -9,7 +9,6 @@ use vapors_scene::{Run, Size};
 use vapors_text::{BlendParams, Family, Layout, LayoutOptions, Style};
 
 use super::ScenePainter;
-use super::text::text_target;
 use crate::Tooltip;
 use crate::tooltip_box::{TooltipBox, anchor_of, tooltip_box, wrap_width};
 use crate::tooltip_error::TooltipError;
@@ -62,7 +61,7 @@ impl ScenePainter {
         self.quads.draw(target, std::slice::from_ref(&placed.quad));
         self.count_run(&Run::Quads(vec![placed.quad]));
         let drawn = self.text.draw(
-            &text_target(target),
+            target,
             &mut self.atlas,
             layout,
             placed.text_origin,

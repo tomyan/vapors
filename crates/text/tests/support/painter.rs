@@ -1,7 +1,7 @@
 //! A text pipeline and atlas kept across draws, each into a fresh target.
 
 use vapors_gpu_harness::{Gpu, gpu, read_rgba8};
-use vapors_renderer::clear;
+use vapors_renderer::{FrameEncoder, clear};
 use vapors_scene::{Color, Size};
 use vapors_text::{
     AtlasConfig, AtlasError, BlendParams, Family, FontSystem, GlyphAtlas, Icon, IconDraw, IconPath,
@@ -97,8 +97,10 @@ impl Painter {
         self.atlas.begin_frame();
         let texture = clear(&gpu.device, &gpu.queue, WIDTH, HEIGHT, WHITE);
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let target = target(gpu, &view);
+        let encoder = FrameEncoder::new(&gpu.device);
+        let target = target(gpu, &encoder, &view);
         paint(&mut self.pipeline, &mut self.atlas, &target).expect("draws");
+        encoder.submit(&gpu.queue);
         Drawn {
             pixels: read_rgba8(&gpu.device, &gpu.queue, &texture),
             atlas_bytes: self.pipeline.take_work().texture_bytes,
@@ -106,10 +108,15 @@ impl Painter {
     }
 }
 
-fn target<'a>(gpu: &'a Gpu, view: &'a wgpu::TextureView) -> RenderTarget<'a> {
+fn target<'a>(
+    gpu: &'a Gpu,
+    encoder: &'a FrameEncoder,
+    view: &'a wgpu::TextureView,
+) -> RenderTarget<'a> {
     RenderTarget {
         device: &gpu.device,
         queue: &gpu.queue,
+        encoder,
         view,
         viewport: Size {
             width: WIDTH,
