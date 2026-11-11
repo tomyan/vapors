@@ -29,8 +29,8 @@ mod wheel_scroll;
 
 pub use document_input::{DocumentInput, Given, Route, Unplaced};
 pub use elements_app::{
-    ElementsApp, Failure, FrameDecision, FrameTimesHook, GiveError, InvalidateError, Invalidated,
-    PerFrame, SurfaceHandle,
+    ElementsApp, Failure, FrameDecision, FrameTimesHook, FrameTiming, GiveError, InvalidateError,
+    Invalidated, PerFrame, SurfaceHandle,
 };
 pub use painter::{
     DrawOverError, FrameCounts, MountError, PaintError, SUPPORTED, ScenePainter, SurfaceState,
@@ -44,4 +44,4 @@ pub use tooltip_place::{
     place_tooltip,
 };
 pub use tooltip_style::check_tooltip_style;
-pub use vapors_renderer::{GpuWork, WorkCounter};
+pub use vapors_renderer::{GpuMissing, GpuReading, GpuTime, GpuWork, WorkCounter};

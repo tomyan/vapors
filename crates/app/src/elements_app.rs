@@ -67,6 +67,8 @@ pub struct ElementsApp {
     hosting: Option<Hosting>,
     /// Render passes the last painted frame's encoder began.
     render_passes: u64,
+    /// Times frames on the GPU (`elements_app_timing.rs`).
+    timer: AppTimer,
 }
 
 /// What [`ElementsApp::with_per_frame`] calls before each update, with
@@ -101,6 +103,7 @@ impl ElementsApp {
             decision: FrameDecision::default(),
             hosting: None,
             render_passes: 0,
+            timer: AppTimer::default(),
         }
     }
 
@@ -199,3 +202,7 @@ pub(crate) use surfaces::give_one_loop_waker_to;
 mod tests;
 #[path = "elements_app_text.rs"]
 mod text;
+#[path = "elements_app_timing.rs"]
+mod timing;
+use timing::AppTimer;
+pub use timing::FrameTiming;

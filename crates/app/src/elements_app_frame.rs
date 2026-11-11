@@ -60,7 +60,7 @@ impl ElementsApp {
     /// the tooltip shown at `now` over it, in one submit. A refused
     /// frame submits what it recorded before the refusal.
     fn paint(&mut self, frame: &Frame<'_>, now: Instant) -> Result<(), String> {
-        let encoder = FrameEncoder::new(frame.device);
+        let encoder = self.timer.encoder(frame);
         let painted = self.record(frame, &encoder, now);
         self.render_passes = encoder.render_passes();
         let submitted = encoder.submit(frame.queue);

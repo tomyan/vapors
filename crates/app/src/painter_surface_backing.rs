@@ -7,7 +7,7 @@ use vapors_renderer::{Target, WorkCounter};
 use super::super::SurfaceState;
 use super::super::errors::Refusal;
 use super::scope::{Scopes, Turn};
-use super::texture::Backing;
+use super::texture::{Backing, fits};
 use crate::surface::{SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
 
 /// A renderer and its state on the painter.
@@ -188,26 +188,22 @@ fn render_into(
     work: &WorkCounter,
 ) -> Result<(), SurfaceError> {
     let mut encoder = target.device.create_command_encoder(&ENCODER);
-    renderer.render(SurfaceFrame {
-        device: target.device,
-        queue: target.queue,
-        encoder: &mut encoder,
-        view: &backing.view,
-        size: backing.size,
-        work,
-    })?;
+    // a timed frame's pair around the renderer's passes (GpuTimer)
+    target
+        .encoder
+        .time_section(&mut encoder, &backing.view, |encoder| {
+            renderer.render(SurfaceFrame {
+                device: target.device,
+                queue: target.queue,
+                encoder,
+                view: &backing.view,
+                size: backing.size,
+                work,
+            })
+        })?;
     let commands = encoder.finish();
     let _submit = tracing::trace_span!("draw step", phase = "submit").entered();
     target.queue.submit([commands]);
-    Ok(())
-}
-
-/// Refuses a backing larger than the device's largest 2D texture.
-fn fits(device: &wgpu::Device, size: SurfaceSize) -> Result<(), Refusal> {
-    let limit = device.limits().max_texture_dimension_2d;
-    if size.width > limit || size.height > limit {
-        return Err(Refusal::TooLarge { size, limit });
-    }
     Ok(())
 }
 

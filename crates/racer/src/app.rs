@@ -7,7 +7,7 @@ use crate::{
 use state::{Faults, Pacing, Run};
 use std::{cell::RefCell, rc::Rc};
 use surface::TrackSurface;
-use vapors_app::{ElementsApp, Failure, FrameCounts};
+use vapors_app::{ElementsApp, Failure, FrameCounts, FrameTiming};
 use vapors_elements::Document;
 use vapors_platform::{App, Event, Frame, Next, Platform, report_error};
 use vapors_text::FontSystem;
@@ -73,6 +73,11 @@ impl Racer {
     #[must_use]
     pub fn frame_counts(&self) -> FrameCounts {
         self.app.frame_counts()
+    }
+    /// The HUD's frame times, its track's render included.
+    #[must_use]
+    pub fn frame_timing(&self) -> FrameTiming {
+        self.app.frame_timing()
     }
     /// Render passes the HUD's last frame began.
     #[must_use]
