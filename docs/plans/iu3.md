@@ -334,6 +334,13 @@ same `Batched`. A debug build compares every batches call's result with
 `batched` over the scene view's items and names the first differing
 batch.
 
+A view that changes on every draw is slower than before this PR:
+`KeptBatches::of` tests every item for culling, allocates `hidden` (one
+`u64` per order step) and `shown`, then batching tests the shown items
+again, where `batched` was one pass. No caller draws one `Painted` at
+two views per frame; it happens during a live resize. If a resize is
+measured, batch in the same pass as the split when the view changed.
+
 ### Lead decisions (2026-11-11)
 
 - #192 is rebased onto main and merged before 3c-3a, as a correct

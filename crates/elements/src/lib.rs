@@ -79,6 +79,7 @@ mod paint_outline;
 mod paint_own;
 mod paint_partial;
 mod painted;
+mod painted_batches;
 mod painting;
 mod range;
 mod range_drag;

@@ -6,20 +6,24 @@
 //! again (`paint_partial.rs`). A debug build compares every draw's
 //! batches with [`vapors_scene::batched`] over the whole scene.
 
-use std::cell::Ref;
-
 use vapors_scene::{Batched, Item, Rect};
 
 use crate::drawn_steps::DrawnSteps;
 use crate::kept_box::KeptBox;
 use crate::paint_order::Step;
-use crate::painted::Painted;
 use crate::scene_view::step_items;
+
+#[cfg(test)]
+thread_local! {
+    /// How many times [`KeptBatches::of`] ran on this thread, for tests
+    /// that a draw reuses the kept batches.
+    pub(crate) static BUILDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
 
 /// The shown steps, hidden counts and batches for one view.
 #[derive(Debug)]
 pub(crate) struct KeptBatches {
-    view: Rect,
+    pub(crate) view: Rect,
     /// The drawing steps with an item in `view` or a surface, each with
     /// its place, ordered by place.
     shown: Vec<(usize, Step)>,
@@ -29,7 +33,7 @@ pub(crate) struct KeptBatches {
     hidden_culled: u64,
     /// The batches of `shown`'s items, `hidden_culled` added to their
     /// culled count; `None` until the next draw after a shown step changed.
-    batched: Option<Batched>,
+    pub(crate) batched: Option<Batched>,
 }
 
 impl KeptBatches {
@@ -40,6 +44,8 @@ impl KeptBatches {
         (drawn, places): (&DrawnSteps, usize),
         boxes: &[Option<KeptBox>],
     ) -> Self {
+        #[cfg(test)]
+        BUILDS.with(|builds| builds.set(builds.get() + 1));
         let mut kept = Self {
             view,
             shown: Vec::new(),
@@ -51,6 +57,21 @@ impl KeptBatches {
             kept.add(place, step, boxes);
         }
         kept
+    }
+
+    /// `slot`'s kept batches for `view`, made from `drawn` when it holds
+    /// none or holds them for another view; with their batches made.
+    pub(crate) fn for_view(
+        slot: &mut Option<Self>,
+        view: Rect,
+        drawn: (&DrawnSteps, usize),
+        boxes: &[Option<KeptBox>],
+    ) {
+        if slot.as_ref().is_some_and(|kept| kept.view != view) {
+            *slot = None;
+        }
+        slot.get_or_insert_with(|| Self::of(view, drawn, boxes))
+            .batches(boxes);
     }
 
     /// `self` with `steps`, each with its place, sorted again from their
@@ -149,36 +170,6 @@ fn hidden_items<'a>(
         count += 1;
     }
     Some(count)
-}
-
-impl Painted {
-    /// The scene's batches for a target whose drawable area is `view`
-    /// (device pixels): kept from the last draw when its view was
-    /// `view` and no step it showed was painted again since.
-    ///
-    /// # Panics
-    /// In a debug build, when they differ from batching the whole scene,
-    /// naming the first differing batch.
-    #[must_use]
-    pub fn batches(&self, view: Rect) -> Ref<'_, Batched> {
-        {
-            let mut kept = self.kept_batches.borrow_mut();
-            if kept.as_ref().is_some_and(|kept| kept.view != view) {
-                *kept = None;
-            }
-            let drawn = (&self.drawn, self.order.steps.len());
-            let kept = kept.get_or_insert_with(|| KeptBatches::of(view, drawn, &self.kept_boxes));
-            kept.batches(&self.kept_boxes);
-        }
-        let batched = Ref::map(self.kept_batches.borrow(), |kept| {
-            kept.as_ref()
-                .and_then(|kept| kept.batched.as_ref())
-                .expect("made above")
-        });
-        #[cfg(debug_assertions)]
-        crate::kept_batches_check::assert_same(&batched, &self.scene().batches(view));
-        batched
-    }
 }
 
 #[cfg(test)]
