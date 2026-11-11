@@ -19,7 +19,7 @@ impl Document {
         let Some(painted) = self.painted.as_ref() else {
             return false;
         };
-        let chain = painted.scroll_chains.from(node);
+        let chain = painted.order.chains.from(node);
         let mut rect = bounds;
         let mut moved = false;
         for container in chain.into_iter().filter(|c| *c != node) {

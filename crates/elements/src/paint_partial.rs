@@ -8,9 +8,10 @@
 
 use crate::changed_slots::ChangedSlots;
 use crate::kept_box::{BoxFrom, KeptBox, Part};
+use crate::kept_order::KeptOrder;
 use crate::kept_paint::LastPaint;
 use crate::layout::{BoxRect, LayoutBox};
-use crate::paint::{PaintInput, clip_to, order, paint_box, started};
+use crate::paint::{PaintInput, clip_to, paint_box, started};
 use crate::paint_order::Step;
 use crate::painted::Painted;
 use vapors_scene::Item;
@@ -27,18 +28,20 @@ pub(crate) fn paint_partial(
 ) -> Painted {
     let mut painted = started(input);
     crate::kept_maps::fill(&mut painted, (boxes, rects), last.maps, changed);
-    let (steps, clips) = order(boxes, rects, input);
+    let order = KeptOrder::updated(last.order, (boxes, rects), input, changed);
     let mut walk = Walk::new(boxes, rects, last.boxes, &painted);
-    for step in steps {
+    for &step in &order.steps {
         let index = step.index();
-        clip_to(clips[index], input, &mut painted.scene);
+        let clip = order.clips.own(index);
+        clip_to(clip, input, &mut painted.scene);
         match step {
-            Step::Box(_) => walk.own(index, clips[index], input, &mut painted),
+            Step::Box(_) => walk.own(index, clip, input, &mut painted),
             Step::Thumb(_) => thumb(&boxes[index], rects[index], input, &mut painted),
             Step::Outline(_) => walk.outline(index, &mut painted),
         }
     }
     painted.kept_boxes = walk.kept;
+    painted.order = order;
     painted
 }
 

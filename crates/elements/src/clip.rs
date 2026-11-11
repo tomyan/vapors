@@ -12,20 +12,21 @@ use crate::layout::{BoxRect, LayoutBox};
 use crate::paint::PaintInput;
 use crate::style::Used;
 
-/// Each box's clip, CSS pixels, `None` for none; `clipping` says
-/// whether a box cuts off its own content.
-pub(crate) fn clips(
+/// The clip box `index` gives its content, from `own`, the clip it
+/// paints under, CSS pixels, `None` for none: its padding box within
+/// `own` when it cuts off its content.
+pub(crate) fn inner(
     boxes: &[LayoutBox],
     rects: &[BoxRect],
-    clipping: &dyn Fn(usize) -> bool,
-) -> Vec<Option<BoxRect>> {
-    crate::chain::by_containing_block(boxes, None, &|index, own| {
-        if clipping(index) {
-            Some(within(own, padding_box(&boxes[index], rects[index])))
-        } else {
-            own
-        }
-    })
+    index: usize,
+    own: Option<BoxRect>,
+    input: &PaintInput<'_>,
+) -> Option<BoxRect> {
+    if clipping(boxes, index, input) {
+        Some(within(own, padding_box(&boxes[index], rects[index])))
+    } else {
+        own
+    }
 }
 
 /// `rect` cut to `clip`; an empty rect where they do not meet.

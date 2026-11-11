@@ -23,13 +23,11 @@ pub(crate) struct ChangedSlots {
     /// The kept slots whose rect differs from the last paint's.
     pub(crate) moved: Vec<usize>,
     /// A slot was freed or newly taken, or a rebuilt box's children or
-    /// `Stacking` differ. Every box has an outline step today, so no
-    /// outline flag is compared until paint order lists outlines only
-    /// for boxes that have one (3c-3c).
-    #[expect(
-        dead_code,
-        reason = "3c-3c's kept paint order reads it; untested until then"
-    )]
+    /// `Stacking` differ: paint order, containing blocks and chains are
+    /// walked again (`kept_order.rs`). `Stacking` holds what decides
+    /// containing blocks, so a box made absolute or a containing block
+    /// with its children unchanged is caught. Every box has an outline step, so whether a
+    /// box has an outline is not compared.
     pub(crate) shape_changed: bool,
 }
 
@@ -73,7 +71,10 @@ impl ChangedSlots {
     }
 }
 
-/// Whether a rebuilt slot's stacking differs from `last`'s.
+/// Whether a rebuilt slot's stacking, containing block claims or
+/// flow differ from `last`'s. A kept box's containing block changes
+/// only through a rebuilt box: itself, or an ancestor whose mark
+/// rebuilt the subtree.
 fn restacked(rebuilt: &Rebuilt, last: &Painted, stackings: &Stackings) -> bool {
     rebuilt
         .slots
