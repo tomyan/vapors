@@ -73,7 +73,7 @@ fn counts(counts: &Counts) -> String {
     let (u, gpu) = (&counts.update, counts.frame.total());
     format!(
         "Counts (last frame): restyled {}, text layouts {}, laid out {}, elements visited {}, \
-         boxes built {}, layout calls {}, boxes painted {}, scene items {}; draw calls {}, \
+         boxes built {}, layout calls {}, boxes painted {}, scene items {}, culled {}; draw calls {}, \
          buffer bytes {}, texture bytes {}, render passes {}.",
         u.elements_restyled,
         counts.text_layouts,
@@ -83,6 +83,7 @@ fn counts(counts: &Counts) -> String {
         u.layout_calls,
         u.boxes_painted,
         u.scene_items_built,
+        counts.frame.culled,
         gpu.draw_calls,
         gpu.buffer_bytes,
         gpu.texture_bytes,
