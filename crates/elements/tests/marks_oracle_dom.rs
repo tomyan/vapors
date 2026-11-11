@@ -14,7 +14,7 @@ use vapors_dom::{Dom, NodeId, PropertyValue};
 use vapors_elements::{Document, Viewport};
 use vapors_scene::{RgbaImage, Size};
 
-const CSS: &str = ".row { display: flex; height: 40px; } .cell { width: 20vw; border-top-width: 1.5px; border-top-style: solid; }";
+const CSS: &str = ".row { display: flex; height: 40px; } .cell { width: 20vw; border-top-width: 1.5px; border-top-style: solid; } .broken { width: calc(100% / (1 - 1)); }";
 
 const SVG: &[(&str, &str)] = &[
     ("viewBox", "0 0 10 10"),
@@ -132,6 +132,29 @@ fn a_scale_change_matches_a_full_update() {
         ..view()
     };
     assert_edit_matches_full(|_, _| {}, scaled, "scale");
+}
+
+/// A failed layout leaves nothing kept, so the update after it builds
+/// every box, the second row's new cell among them, whose mark the
+/// failed update took.
+#[test]
+fn an_update_after_a_failed_layout_matches_a_full_update() {
+    // Given
+    let page = page();
+    let mut doc = page.doc.borrow_mut();
+    element(&mut doc, page.rows[1], "div", "cell");
+    doc.set_attribute(page.cell, "class", "cell broken");
+    assert!(
+        doc.update(view()).is_err(),
+        "a calc dividing by zero fails layout"
+    );
+
+    // When
+    doc.set_attribute(page.cell, "class", "cell");
+    drop(doc);
+
+    // Then
+    assert_matches_full(&page.doc, view(), "after a failed layout");
 }
 
 #[test]
