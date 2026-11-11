@@ -8,7 +8,7 @@ use crate::run::Settings;
 pub const MAX_RUNS: usize = (wgpu::QUERY_SET_MAX_QUERIES / 2) as usize;
 
 const USAGE: &str = "cargo run --release -p vapors-perf -- \
-                     [runs] [warmup] [--only <substring>] [--instructions]";
+                     [runs] [warmup] [--only <substring> (once)] [--instructions]";
 
 /// What the command line asks for.
 #[derive(Debug)]
@@ -24,13 +24,14 @@ pub struct Options {
 /// The options `args` name, without the program's name.
 ///
 /// # Errors
-/// An unknown flag, `--only` without a value, an argument that is not a
+/// An unknown flag, `--only` without a value or given twice, an argument that is not a
 /// count, runs outside 1 to [`MAX_RUNS`], or a third count; each names
 /// the usage.
 pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String> {
     let (mut counts, mut only, mut instructions) = (Vec::new(), None, false);
     while let Some(arg) = args.next() {
         match arg.as_str() {
+            "--only" if only.is_some() => return Err(format!("--only given twice: {USAGE}")),
             "--only" => only = Some(only_value(args.next())?),
             "--instructions" => instructions = true,
             flag if flag.starts_with("--") => return Err(format!("unknown flag {flag}: {USAGE}")),

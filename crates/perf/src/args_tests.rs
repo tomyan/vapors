@@ -72,3 +72,10 @@ fn only_without_a_value_is_refused() {
     let error = full(&["10", "--only"]).expect_err("no value");
     assert!(error.starts_with("--only needs a value: "), "{error}");
 }
+
+#[test]
+fn a_repeated_only_is_refused_naming_it() {
+    let error = full(&["--only", "a", "--only", "b"]).expect_err("twice");
+    assert!(error.starts_with("--only given twice: "), "{error}");
+    assert!(error.contains("--only <substring> (once)"), "{error}");
+}

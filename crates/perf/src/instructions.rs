@@ -23,7 +23,8 @@ impl InstructionCounter {
     /// Instructions retired since [`Self::open`].
     ///
     /// # Errors
-    /// The read's failure.
+    /// The read's failure, or a counter that was not running for the
+    /// whole time it was enabled.
     pub fn read(&mut self) -> Result<u64, String> {
         imp::read(&mut self.0)
     }
@@ -58,9 +59,11 @@ mod imp {
     }
 
     pub fn read(counter: &mut Counter) -> Result<u64, String> {
-        counter
-            .read()
-            .map_err(|e| format!("reading the counter failed: {e}"))
+        let reading = counter
+            .read_count_and_time()
+            .map_err(|e| format!("reading the counter failed: {e}"))?;
+        crate::instructions_check::whole_time(reading.time_enabled, reading.time_running)?;
+        Ok(reading.count)
     }
 }
 
@@ -78,25 +81,5 @@ mod imp {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{InstructionCounter, refusal};
-
-    #[test]
-    fn the_refusal_names_the_sysctl_and_the_value_it_needs() {
-        let message = refusal("perf_event_open failed: denied");
-        assert!(message.contains("perf_event_paranoid"), "{message}");
-        assert!(message.contains("2 or lower"), "{message}");
-        assert!(
-            message.contains("sudo sysctl kernel.perf_event_paranoid=1"),
-            "{message}"
-        );
-    }
-
-    #[test]
-    fn the_count_rises_with_work_done() {
-        let mut counter = InstructionCounter::open().expect("perf events");
-        let before = counter.read().expect("reads");
-        std::hint::black_box((0..10_000u64).sum::<u64>());
-        assert!(counter.read().expect("reads") >= before + 10_000);
-    }
-}
+#[path = "instructions_tests.rs"]
+mod tests;

@@ -7,10 +7,11 @@ use vapors_gpu_harness::gpu_with;
 use vapors_perf::args::{Options, options};
 use vapors_perf::gpu_time::FEATURES;
 use vapors_perf::instructions::InstructionCounter;
+use vapors_perf::instructions_check::{phases_counted, self_check};
 use vapors_perf::racer::RacerFrames;
 use vapors_perf::report::{instructions_section, section};
 use vapors_perf::rows::{RowChange, Rows};
-use vapors_perf::run::{Settings, Workload};
+use vapors_perf::run::{Samples, Settings, Workload};
 use vapors_perf::sampler::Sampler;
 use vapors_perf::select::matching;
 use vapors_perf::spans::PhaseClock;
@@ -35,7 +36,7 @@ fn run() -> Result<(), String> {
     } = options(std::env::args().skip(1))?;
     let chosen = matching(workloads(), only.as_deref())?;
     let clock = if instructions {
-        PhaseClock::with_instructions(InstructionCounter::open()?)
+        PhaseClock::with_instructions(checked_counter()?)
     } else {
         PhaseClock::default()
     };
@@ -47,6 +48,7 @@ fn run() -> Result<(), String> {
             .sample(workload.as_mut(), settings)
             .map_err(|e| format!("{name}: {e}"))?;
         let report = if instructions {
+            every_phase_counted(&name, &samples)?;
             instructions_section(&name, &samples)?
         } else {
             section(&name, &samples)
@@ -55,6 +57,18 @@ fn run() -> Result<(), String> {
     }
     println!("Load average at the end: {}", load());
     Ok(())
+}
+
+fn checked_counter() -> Result<InstructionCounter, String> {
+    let mut counter = InstructionCounter::open()?;
+    self_check(&mut counter)?;
+    Ok(counter)
+}
+
+fn every_phase_counted(name: &str, samples: &Samples) -> Result<(), String> {
+    let counted = samples.instructions.as_ref().map(|kept| &kept.phases);
+    let empty = std::collections::BTreeMap::new();
+    phases_counted(&samples.phases, counted.unwrap_or(&empty)).map_err(|e| format!("{name}: {e}"))
 }
 
 fn workloads() -> Vec<(String, Box<dyn Workload>)> {

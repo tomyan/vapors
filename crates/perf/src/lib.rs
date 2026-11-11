@@ -11,6 +11,7 @@ pub mod gpu_reading;
 pub mod gpu_time;
 pub mod instruction_samples;
 pub mod instructions;
+pub mod instructions_check;
 pub mod racer;
 pub mod report;
 pub mod rows;
