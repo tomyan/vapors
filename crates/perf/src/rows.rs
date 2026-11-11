@@ -18,6 +18,7 @@ mod basics;
 #[allow(dead_code, clippy::pedantic)] // the tests' file: `edit` and its other edits are theirs
 #[path = "../../elements/tests/support/rows_page.rs"]
 mod rows_page;
+pub use rows_page::rows_in_view;
 use rows_page::{Edit, RowsPage, rows_page, rows_viewport};
 
 /// What changes before each frame.

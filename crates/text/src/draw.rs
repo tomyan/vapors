@@ -7,7 +7,7 @@ use vapors_renderer::Placed;
 use crate::atlas::{AtlasError, GlyphAtlas};
 use crate::layout::Layout;
 use crate::pipeline::{BlendParams, FLOATS_PER_VERTEX, TextPipeline};
-use crate::quads::quads;
+use crate::quads::{TextDraw, quads};
 
 /// Where a draw goes: [`vapors_renderer::Target`], under the name the
 /// text pipeline has always used.
@@ -34,7 +34,29 @@ impl TextPipeline {
         origin: [f32; 2],
         params: BlendParams,
     ) -> Result<(), AtlasError> {
-        let quads = quads(atlas, layout, origin, target.viewport)?;
+        self.draw_texts(target, atlas, &[TextDraw { layout, origin }], params)
+    }
+
+    /// Draw `texts` into `target` in one draw call, in order: where
+    /// their glyphs overlap, later ones blend over earlier ones as they
+    /// would drawn one at a time.
+    ///
+    /// # Errors
+    ///
+    /// [`AtlasError`] when a glyph cannot be rasterised or the texts'
+    /// glyphs overflow the atlas page; nothing is drawn then.
+    ///
+    /// # Panics
+    ///
+    /// As [`TextPipeline::draw`].
+    pub fn draw_texts(
+        &mut self,
+        target: &RenderTarget<'_>,
+        atlas: &mut GlyphAtlas,
+        texts: &[TextDraw<'_>],
+        params: BlendParams,
+    ) -> Result<(), AtlasError> {
+        let quads = quads(atlas, texts, target.viewport)?;
         self.record(target, atlas, &quads, params);
         Ok(())
     }

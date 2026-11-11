@@ -15,13 +15,20 @@ use super::basics::{document, element, text, viewport};
 /// other box; the label is as wide as its text. The button changes
 /// colour on hover and gains an outline on focus. A marked row has a
 /// background.
-const CSS: &str = "body { margin: 0; } \
-    .row { display: flex; height: 24px; gap: 8px; } \
-    .row.marked { background-color: #eef; } \
-    .value { width: 80px; height: 20px; overflow: hidden; } \
-    button { width: 60px; height: 20px; background-color: #ddd; } \
-    button:hover { background-color: #bbb; } \
-    button:focus { outline: 2px solid #36c; }";
+fn css() -> String {
+    format!(
+        "body {{ margin: 0; }} \
+    .row {{ display: flex; height: {ROW_HEIGHT}px; gap: 8px; }} \
+    .row.marked {{ background-color: #eef; }} \
+    .value {{ width: 80px; height: 20px; overflow: hidden; }} \
+    button {{ width: 60px; height: 20px; background-color: #ddd; }} \
+    button:hover {{ background-color: #bbb; }} \
+    button:focus {{ outline: 2px solid #36c; }}"
+    )
+}
+
+/// A row's height in pixels.
+pub const ROW_HEIGHT: u32 = 24;
 
 /// One row's nodes.
 pub struct Row {
@@ -36,7 +43,13 @@ pub struct RowsPage {
     pub rows: Vec<Row>,
 }
 
-/// The viewport the workload updates at: the first 16 rows show.
+/// The rows that intersect the viewport: the last one partly.
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // a positive height of a few hundred pixels
+pub fn rows_in_view() -> usize {
+    (rows_viewport().height as u32).div_ceil(ROW_HEIGHT) as usize
+}
+
+/// The viewport the workload updates at: 16 whole rows and part of the 17th.
 pub fn rows_viewport() -> Viewport {
     viewport(640.0, 400.0)
 }
@@ -45,7 +58,7 @@ pub fn rows_viewport() -> Viewport {
 pub fn rows_page(count: usize) -> RowsPage {
     let mut doc = document();
     let rows = (0..count).map(|index| row(&mut doc, index)).collect();
-    doc.add_stylesheet("rows.css", CSS).expect("parses");
+    doc.add_stylesheet("rows.css", &css()).expect("parses");
     doc.update(rows_viewport()).expect("updates");
     RowsPage {
         doc: Rc::new(RefCell::new(doc)),

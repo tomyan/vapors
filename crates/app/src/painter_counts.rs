@@ -26,7 +26,7 @@ pub struct FrameCounts {
     pub shadows: GpuWork,
     /// Quad runs: one draw per run, its instances and the viewport.
     pub quads: GpuWork,
-    /// Text runs: one draw per text item, its vertices and blend
+    /// Text runs: one draw per run, its vertices and blend
     /// uniform; the part of the atlas page its new glyphs changed.
     pub texts: GpuWork,
     /// Icon runs: one draw per run, its vertices and blend uniform; the

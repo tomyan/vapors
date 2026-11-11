@@ -82,7 +82,7 @@ fn gpu_a_frame_adding_one_glyph_uploads_exactly_that_glyphs_bytes() {
 }
 
 #[test]
-fn gpu_draw_calls_are_one_per_quad_or_shadow_batch_and_one_per_text_item() {
+fn gpu_draw_calls_are_one_per_quad_shadow_or_text_run() {
     // Given
     let (doc, _) = labelled("Ab");
     let mut rig = Rig::new();
@@ -97,6 +97,25 @@ fn gpu_draw_calls_are_one_per_quad_or_shadow_batch_and_one_per_text_item() {
     assert_eq!(counts.shadows.buffer_bytes, ONE_SHADOW_BYTES);
     assert_eq!(counts.texts.draw_calls, 1);
     assert_eq!(counts.total().draw_calls, 3);
+}
+
+#[test]
+fn gpu_two_text_items_in_one_run_are_one_draw() {
+    // Given
+    let (mut doc, _) = labelled("Ab");
+    let div = doc.create_element("div");
+    let body = doc.body();
+    doc.append(body, div);
+    let second = doc.create_text("Cd");
+    doc.append(div, second);
+    update(&mut doc, 1.0);
+    let mut rig = Rig::new();
+
+    // When
+    let counts = drawn(&mut rig, &doc);
+
+    // Then
+    assert_eq!(counts.texts.draw_calls, 1);
 }
 
 #[test]
