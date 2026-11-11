@@ -177,7 +177,7 @@ PRs, each under about 400 lines:
   update 18.57 → 11.05 ms; at 3000 rows layout 26.87 → 3.30 ms, update
   65.98 → 39.43 ms (`docs/perf/baseline-2026-11-10.md`, "IU3 PR 1b").
   Oracle cases per mark point: #187.
-- PR 3a (in progress, perf/iu3-3a-style): `kept_checks.rs` keeps which
+- PR 3a (#189): `kept_checks.rs` keeps which
   elements the tree checks, the `style` attribute check and the checks
   after styling last refused; `style_checks.rs` checks again only the
   elements box-marked, listener-marked, added or restyled since the
@@ -188,3 +188,11 @@ PRs, each under about 400 lines:
   never changes" would plug in at `Document::rechecked`
   (`style_checks.rs`), dropping flagged elements from the set the
   checks after styling and `Calcs::set` run for.
+- PR 3c-1 (perf/iu3-3c-paint): `kept_paint.rs`; `Painted` keeps the
+  rects and thumbs it was made from, and an update that built no box
+  with the same rects and thumbs shows it. Idle `boxes_painted` and
+  `scene_items_built` 0; idle paint at 3000 rows 21.96 → 0.05 ms
+  (`docs/perf/baseline-2026-11-10.md`, "IU3 PR 3c-1"). For 3c-2: the
+  text cache keeps layouts only two updates unused (`keep_previous`
+  covers a kept paint), so per-box kept paint must touch its layouts'
+  keys or a later repaint of a moved box counts them built again.
