@@ -5,18 +5,7 @@ use std::sync::Arc;
 
 use crate::raster::{GlyphRequest, Hinting, RasterError};
 
-/// Atlas sizing.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct AtlasConfig {
-    /// Side of each square page in pixels.
-    pub page_size: u32,
-}
-
-impl Default for AtlasConfig {
-    fn default() -> Self {
-        Self { page_size: 1024 }
-    }
-}
+pub use crate::atlas_config::AtlasConfig;
 
 /// Which page a glyph is in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -97,8 +86,10 @@ impl fmt::Display for AtlasError {
             } => write!(
                 f,
                 "atlas page of {page_size}x{page_size} is full with {glyphs_this_frame} glyphs \
-                 and {icons_this_frame} icon masks in use this frame. Fix: raise \
-                 AtlasConfig::page_size, draw less text per frame, or draw fewer or smaller icons."
+                 and {icons_this_frame} icon masks in use this frame. Fix: pass a \
+                 larger AtlasConfig (ElementsApp::with_atlas or ScenePainter::with_atlas; its \
+                 default is AtlasConfig::for_max_texture_side, up to the device's \
+                 max_texture_dimension_2d), draw less text per frame, or draw fewer or smaller icons."
             ),
             Self::TooLarge {
                 font,
