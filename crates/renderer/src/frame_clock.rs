@@ -23,6 +23,8 @@ pub struct FrameClock {
     capacity: u32,
     /// Pairs asked for, over the capacity included.
     pairs: Cell<u32>,
+    /// Sections timed whose encoders have not been submitted.
+    unsubmitted: Cell<u32>,
     submitted: bool,
 }
 
@@ -34,6 +36,7 @@ impl FrameClock {
             frame,
             capacity,
             pairs: Cell::new(0),
+            unsubmitted: Cell::new(0),
             submitted: false,
         }
     }
@@ -50,13 +53,15 @@ impl FrameClock {
     }
 
     /// Runs `record`, between an empty pass on `view` that writes a
-    /// pair's start and one that writes its end.
+    /// pair's start and one that writes its end. Until
+    /// [`FrameClock::section_submitted`], the section is unsubmitted.
     pub(crate) fn time_section<R>(
         &self,
         encoder: &mut wgpu::CommandEncoder,
         view: &wgpu::TextureView,
         record: impl FnOnce(&mut wgpu::CommandEncoder) -> R,
     ) -> R {
+        self.unsubmitted.set(self.unsubmitted.get() + 1);
         let Some(pair) = self.next_pair() else {
             return record(encoder);
         };
@@ -74,13 +79,21 @@ impl FrameClock {
         recorded
     }
 
+    /// Records that a timed section's encoder was submitted.
+    pub(crate) fn section_submitted(&self) {
+        self.unsubmitted
+            .set(self.unsubmitted.get().saturating_sub(1));
+    }
+
     /// Records the copy of the frame's timestamps into the read-back
     /// buffer, into the frame's last encoder before it is finished.
     pub(crate) fn resolve(&self, encoder: &mut wgpu::CommandEncoder) {
-        let pairs = self.pairs.get();
-        if pairs == 0 || pairs > self.capacity {
+        // only a frame whose every pair was written is read back, so
+        // no stale tick from an earlier frame is copied
+        if self.unread().is_some() {
             return;
         }
+        let pairs = self.pairs.get();
         let slot = &self.slot;
         encoder.resolve_query_set(&slot.queries, 0..pairs * 2, &slot.resolved, 0);
         let bytes = u64::from(pairs) * PAIR_BYTES;
@@ -91,20 +104,24 @@ impl FrameClock {
     /// copied, or records the reading known without it.
     pub(crate) fn submitted(mut self) {
         self.submitted = true;
-        let (frame, pairs, capacity) = (self.frame, self.pairs.get(), self.capacity);
-        let state = match pairs {
-            0 => SlotState::Done(GpuReading {
-                frame,
-                pairs,
-                time: Ok(std::time::Duration::ZERO),
-            }),
-            _ if pairs > capacity => {
-                let over = GpuMissing::OverCapacity { pairs, capacity };
-                SlotState::Done(missing(frame, pairs, over))
-            }
-            _ => self.map(),
+        let state = match self.unread() {
+            Some(reading) => SlotState::Done(reading),
+            None => self.map(),
         };
         *self.slot.state.borrow_mut() = state;
+    }
+
+    /// The frame's reading when there is nothing to read back: no pairs,
+    /// too many, or a section's ticks never written.
+    fn unread(&self) -> Option<GpuReading> {
+        let (frame, pairs, capacity) = (self.frame, self.pairs.get(), self.capacity);
+        let why = match (pairs, self.unsubmitted.get()) {
+            (0, 0) => return Some(zero(frame)),
+            (_, 0) if pairs <= capacity => return None,
+            (_, 0) => GpuMissing::OverCapacity { pairs, capacity },
+            (_, sections) => GpuMissing::SectionNotSubmitted { sections },
+        };
+        Some(missing(frame, pairs, why))
     }
 
     fn map(&self) -> SlotState {
@@ -136,6 +153,14 @@ impl Drop for FrameClock {
             let reading = missing(self.frame, self.pairs.get(), GpuMissing::NotSubmitted);
             *self.slot.state.borrow_mut() = SlotState::Done(reading);
         }
+    }
+}
+
+fn zero(frame: u64) -> GpuReading {
+    GpuReading {
+        frame,
+        pairs: 0,
+        time: Ok(std::time::Duration::ZERO),
     }
 }
 

@@ -39,11 +39,13 @@ pub struct Rows {
 }
 
 impl Rows {
-    /// `count` rows, updated once, in an app that has drawn no frame.
+    /// `count` rows, updated once, in an app that has drawn no frame and
+    /// times its frames on the GPU.
     #[must_use]
     pub fn new(count: usize, change: RowChange) -> Self {
         let page = rows_page(count);
-        let app = ElementsApp::new(Rc::clone(&page.doc));
+        let mut app = ElementsApp::new(Rc::clone(&page.doc));
+        app.time_frames(true);
         Self { page, app, change }
     }
 }

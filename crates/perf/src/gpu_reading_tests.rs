@@ -29,6 +29,7 @@ fn a_device_without_timestamp_queries_gives_no_time_and_no_error() {
 fn no_reading_another_frames_reading_or_a_missing_time_are_refused() {
     let cases = [
         (GpuTime::Pending, "no GPU time was read back"),
+        (GpuTime::NotRequested, "time_frames(true)"),
         (read(3, Ok(Duration::ZERO)), "is frame 3's"),
         (
             read(4, Err(GpuMissing::NotSubmitted)),

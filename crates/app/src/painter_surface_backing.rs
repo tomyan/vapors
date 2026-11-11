@@ -203,7 +203,7 @@ fn render_into(
         })?;
     let commands = encoder.finish();
     let _submit = tracing::trace_span!("draw step", phase = "submit").entered();
-    target.queue.submit([commands]);
+    target.encoder.submit_section(target.queue, commands);
     Ok(())
 }
 

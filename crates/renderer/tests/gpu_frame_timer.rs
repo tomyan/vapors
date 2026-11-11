@@ -149,7 +149,7 @@ fn gpu_a_timed_section_in_the_callers_encoder_adds_one_pair() {
 
     // When
     encoder.time_section(&mut own, &section_view, |_| ());
-    gpu.queue.submit([own.finish()]);
+    encoder.submit_section(&gpu.queue, own.finish());
     draw_on(&gpu, &encoder, &[&frame_view]);
     encoder.submit(&gpu.queue).expect("no draw refused");
     let time = read_back(&gpu, &mut timer);
@@ -163,4 +163,32 @@ fn gpu_a_timed_section_in_the_callers_encoder_adds_one_pair() {
     else {
         panic!("{time:?}");
     };
+}
+
+#[test]
+fn gpu_a_timed_section_left_unsubmitted_reads_back_as_section_not_submitted() {
+    // Given
+    let gpu = timed_gpu();
+    let mut timer = GpuTimer::new(&gpu.device, &gpu.queue).expect("timestamp queries");
+    let ((_, frame_view), (_, section_view)) = (square(&gpu, 4), square(&gpu, 4));
+    let encoder = FrameEncoder::timed(&gpu.device, timer.frame(0));
+    let mut own = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+
+    // When: the section's encoder is dropped, as a failed render drops it
+    encoder.time_section(&mut own, &section_view, |_| ());
+    drop(own);
+    draw_on(&gpu, &encoder, &[&frame_view]);
+    encoder.submit(&gpu.queue).expect("no draw refused");
+    let time = read_back(&gpu, &mut timer);
+
+    // Then
+    let GpuTime::Read(GpuReading {
+        time: Err(missing), ..
+    }) = time
+    else {
+        panic!("{time:?}");
+    };
+    assert_eq!(missing, GpuMissing::SectionNotSubmitted { sections: 1 });
 }

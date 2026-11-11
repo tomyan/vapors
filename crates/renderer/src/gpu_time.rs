@@ -9,6 +9,9 @@ use std::time::Duration;
 /// What is known of the GPU's time for frames drawn so far.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GpuTime {
+    /// Timing was not asked for, so no frame is timed and no query is
+    /// written, resolved or read.
+    NotRequested,
     /// The device has no `TIMESTAMP_QUERY`, so no frame is timed.
     Unsupported,
     /// No timed frame has been read back yet.
@@ -35,6 +38,13 @@ pub struct GpuReading {
 pub enum GpuMissing {
     /// The frame's encoder was dropped without being submitted.
     NotSubmitted,
+    /// Sections timed with `FrameEncoder::time_section` whose encoders
+    /// were not given to `FrameEncoder::submit_section` before the
+    /// frame's submit, so their timestamps were never written.
+    SectionNotSubmitted {
+        /// Sections not submitted.
+        sections: u32,
+    },
     /// The frame began more passes than its query set holds pairs for.
     OverCapacity {
         /// Pairs the frame needed.
@@ -63,6 +73,12 @@ impl fmt::Display for GpuMissing {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NotSubmitted => write!(f, "the frame's encoder was dropped unsubmitted"),
+            Self::SectionNotSubmitted { sections } => write!(
+                f,
+                "{sections} timed section(s) were not submitted before the frame: a \
+                 gpu-surface render that failed, or an encoder not given to \
+                 FrameEncoder::submit_section"
+            ),
             Self::OverCapacity { pairs, capacity } => write!(
                 f,
                 "the frame needed {pairs} timestamp pairs and its query set holds {capacity}; \

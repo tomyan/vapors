@@ -15,6 +15,12 @@ use vapors_app::GpuTime;
 pub fn frame_gpu_time(time: GpuTime, frame: usize) -> Result<Option<Duration>, String> {
     let reading = match time {
         GpuTime::Unsupported => return Ok(None),
+        GpuTime::NotRequested => {
+            return Err(format!(
+                "frame {frame}: the workload's app does not time its frames; call \
+                 time_frames(true) on it"
+            ));
+        }
         GpuTime::Pending => return Err(format!("frame {frame}: no GPU time was read back")),
         GpuTime::Read(reading) => reading,
     };

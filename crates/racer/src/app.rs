@@ -79,6 +79,11 @@ impl Racer {
     pub fn frame_timing(&self) -> FrameTiming {
         self.app.frame_timing()
     }
+    /// Turns timing the HUD's frames on the GPU on or off
+    /// ([`ElementsApp::time_frames`]); off by default.
+    pub fn time_frames(&mut self, on: bool) {
+        self.app.time_frames(on);
+    }
     /// Render passes the HUD's last frame began.
     #[must_use]
     pub fn render_passes(&self) -> u64 {

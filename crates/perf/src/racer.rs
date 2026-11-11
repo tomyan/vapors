@@ -25,6 +25,7 @@ impl RacerFrames {
     #[must_use]
     pub fn new(racing: bool) -> Self {
         let mut racer = Racer::new();
+        racer.time_frames(true);
         if racing {
             let platform = Platform::detached();
             racer.event(space(true), &platform);

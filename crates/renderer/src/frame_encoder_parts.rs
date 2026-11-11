@@ -19,7 +19,8 @@ impl FrameEncoder {
     }
 
     /// Runs `record` with `encoder`, a command encoder of the caller's
-    /// that is submitted before this one, timed by a pair of its own
+    /// that is given to [`FrameEncoder::submit_section`] before this one
+    /// is submitted, timed by a pair of its own
     /// written by empty passes on `view` before and after: for a
     /// `gpu-surface` renderer's passes. Untimed, it runs `record` alone.
     pub fn time_section<R>(
@@ -31,6 +32,16 @@ impl FrameEncoder {
         match &self.clock {
             Some(clock) => clock.time_section(encoder, view, record),
             None => record(encoder),
+        }
+    }
+
+    /// Submits `commands`, a timed section's encoder finished, on
+    /// `queue`. A section not submitted by the time this encoder is
+    /// makes the frame's reading [`GpuMissing::SectionNotSubmitted`](crate::GpuMissing::SectionNotSubmitted).
+    pub fn submit_section(&self, queue: &wgpu::Queue, commands: wgpu::CommandBuffer) {
+        queue.submit([commands]);
+        if let Some(clock) = &self.clock {
+            clock.section_submitted();
         }
     }
 
