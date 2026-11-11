@@ -31,10 +31,9 @@ fn chain() -> Placed {
 fn clearing_ancestors_clears_their_caches_and_hoisted_lists_and_not_the_box() {
     // Given
     let mut placed = chain();
-    let parents = parents(&placed);
 
-    // When
-    clear_ancestors(&mut placed, &parents, 2);
+    // When: node 3's ancestors, nodes 2 and 1
+    clear_ancestors(&mut placed, [NodeId(2), NodeId(1)].into_iter());
 
     // Then
     for ancestor in [0, 1] {

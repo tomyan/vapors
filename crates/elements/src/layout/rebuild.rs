@@ -9,13 +9,16 @@ use vapors_dom::NodeId;
 
 use super::boxes::{Source, build};
 use super::keep::{KeptBoxes, Lender};
+use super::marks::Rebuild;
 use super::slots::{Key, Placed, Taken};
+use crate::arena::Arena;
 use crate::text_marks::TextMarks;
 
 impl KeptBoxes {
     /// This update's boxes and how many were built: the kept boxes with
     /// each owner's subtree built again, or every box built when
-    /// everything is marked, nothing is kept or the scale changed. The
+    /// everything is marked, a mark reaches the root with no owner,
+    /// nothing is kept or the scale changed. The
     /// boxes are no longer kept until `keep` hands them back, so an
     /// update that fails builds every box next time.
     pub(crate) fn rebuild(
@@ -27,18 +30,35 @@ impl KeptBoxes {
     ) -> (Placed, usize) {
         self.mark_text_marks(source.text_marks.as_ref());
         let marks = std::mem::take(&mut self.marks);
-        if marks.all || self.placed.boxes.is_empty() || self.scale.to_bits() != scale.to_bits() {
-            let built = build(source, root);
-            let count = built.len();
-            let mut placed = self.place(built);
-            self.lend(&mut placed, scale, may_keep);
-            self.placed = Placed::default();
-            return (placed, count);
-        }
+        let every =
+            marks.all || self.placed.boxes.is_empty() || self.scale.to_bits() != scale.to_bits();
+        let rebuild = if every {
+            Rebuild::Every
+        } else {
+            marks.rebuild(source.arena, source.used, &self.placed.slots, root)
+        };
+        let Rebuild::Owners(owners) = rebuild else {
+            return self.build_every(source, root, scale, may_keep);
+        };
         let mut kept = std::mem::take(&mut self.placed);
-        let owners = marks.owners(source.arena, source.used, &kept.slots, root);
         let count = rebuild_owners(&mut kept, &owners, source, may_keep);
         (kept, count)
+    }
+
+    /// Every box built, lent the kept boxes' caches, and how many.
+    fn build_every(
+        &mut self,
+        source: &Source<'_>,
+        root: NodeId,
+        scale: f32,
+        may_keep: &dyn Fn(NodeId) -> bool,
+    ) -> (Placed, usize) {
+        let built = build(source, root);
+        let count = built.len();
+        let mut placed = self.place(built);
+        self.lend(&mut placed, scale, may_keep);
+        self.placed = Placed::default();
+        (placed, count)
     }
 
     /// Marks the field whose caret or selection the kept boxes show,
@@ -61,33 +81,43 @@ fn rebuild_owners(
     source: &Source<'_>,
     may_keep: &dyn Fn(NodeId) -> bool,
 ) -> usize {
-    let mut taken = Taken::default();
-    let slots: Vec<usize> = owners
+    let slots: Vec<usize> = owners.iter().map(|&owner| slot_of(placed, owner)).collect();
+    let mut taken = take_subtrees(placed, &slots);
+    let count = owners
         .iter()
-        .map(|&owner| {
-            placed
-                .slots
-                .of(Key::Element(owner))
-                .expect("an owner holds a slot")
-        })
-        .collect();
-    for &slot in &slots {
-        placed.take_subtree(slot, &mut taken);
-    }
-    let mut count = 0;
-    for &owner in owners {
-        let built = build(source, owner);
-        count += built.len();
-        placed.put_subtree(built, &mut taken);
-    }
+        .map(|&owner| put_owner(placed, source, owner, &mut taken))
+        .sum();
     placed.free_taken(&taken);
-    let parents = parents(placed);
-    for &slot in &slots {
+    for (&owner, &slot) in owners.iter().zip(&slots) {
         if !lend_subtree(placed, slot, &taken, may_keep) {
-            clear_ancestors(placed, &parents, slot);
+            clear_ancestors(placed, ancestors(source.arena, owner));
         }
     }
     count
+}
+
+/// Takes the subtrees at `slots` out of `placed`.
+fn take_subtrees(placed: &mut Placed, slots: &[usize]) -> Taken {
+    let mut taken = Taken::default();
+    for &slot in slots {
+        placed.take_subtree(slot, &mut taken);
+    }
+    taken
+}
+
+/// Builds `owner`'s subtree into `placed`; how many boxes.
+fn put_owner(placed: &mut Placed, source: &Source<'_>, owner: NodeId, taken: &mut Taken) -> usize {
+    let built = build(source, owner);
+    let count = built.len();
+    placed.put_subtree(built, taken);
+    count
+}
+
+fn slot_of(placed: &Placed, owner: NodeId) -> usize {
+    placed
+        .slots
+        .of(Key::Element(owner))
+        .expect("an owner holds a slot")
 }
 
 /// Lends the taken boxes' caches to the rebuilt subtree at `slot`;
@@ -108,25 +138,22 @@ fn lend_subtree(
     lender.lend_from(&mut placed.boxes, slot)
 }
 
-/// Clears the cache and hoisted list of each ancestor of `slot`.
-fn clear_ancestors(placed: &mut Placed, parents: &[Option<usize>], slot: usize) {
-    let mut at = parents[slot];
-    while let Some(ancestor) = at {
-        placed.boxes[ancestor].cache.clear();
-        placed.boxes[ancestor].hoisted.clear();
-        at = parents[ancestor];
+/// Clears the cache and hoisted list of each of `ancestors` that
+/// holds a box. Only element boxes have children, so these are every
+/// box above a rebuilt subtree.
+fn clear_ancestors(placed: &mut Placed, ancestors: impl Iterator<Item = NodeId>) {
+    for ancestor in ancestors {
+        if let Some(slot) = placed.slots.of(Key::Element(ancestor)) {
+            placed.boxes[slot].cache.clear();
+            placed.boxes[slot].hoisted.clear();
+        }
     }
 }
 
-/// Each slot's parent slot; none for the root and vacant slots.
-fn parents(placed: &Placed) -> Vec<Option<usize>> {
-    let mut parents = vec![None; placed.boxes.len()];
-    for (slot, layout_box) in placed.boxes.iter().enumerate() {
-        for &child in &layout_box.children {
-            parents[child] = Some(slot);
-        }
-    }
-    parents
+/// The elements above `node`, nearest first.
+fn ancestors(arena: &Arena, node: NodeId) -> impl Iterator<Item = NodeId> + '_ {
+    let parent = |&node: &NodeId| arena.get(node, "clear_ancestors").parent;
+    std::iter::successors(parent(&node), parent)
 }
 
 #[cfg(test)]
