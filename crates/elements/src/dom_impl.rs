@@ -15,6 +15,7 @@ impl Dom for Document {
     }
 
     fn declare_events(&mut self, names: &[&str]) {
+        self.checks.all = true;
         self.declared_events
             .extend(names.iter().map(|name| (*name).to_owned()));
     }
@@ -98,6 +99,7 @@ impl Dom for Document {
             self.boxes.marks.mark(old);
         }
         self.arena.place("insert_before", parent, child, before);
+        self.checks.added.push(child);
         self.boxes.marks.mark(parent);
         self.mark_children_changed(parent, Some(child));
     }
@@ -116,6 +118,7 @@ impl Dom for Document {
             self.boxes.marks.mark(parent);
         }
         self.drop_focus_within(node);
+        self.forget_subtree(node);
         self.arena.detach(node);
         self.arena.free_subtree(node);
         // a number or text field's editing state goes with it (3-E3c, E6a)
@@ -125,6 +128,7 @@ impl Dom for Document {
     }
 
     fn listen(&mut self, node: NodeId, event: &str, handler: Handler) {
+        self.checks.marked.insert(node);
         self.element_mut(node, "listen")
             .listeners
             .push((event.to_owned(), std::rc::Rc::from(handler)));

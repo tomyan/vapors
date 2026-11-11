@@ -7,10 +7,10 @@
 use vapors_css::cascade::Environment;
 use vapors_dom::NodeId;
 
-use crate::check::{check_tree, describe, elements, style_attribute_refusals};
+use crate::check::describe;
 use crate::document::Document;
 use crate::error::ElementError;
-use crate::layout::{Calcs, lay_out, placed};
+use crate::layout::{lay_out, placed};
 use crate::paint::{PaintInput, paint};
 use crate::painted::Painted;
 use crate::style::Refusal;
@@ -62,13 +62,14 @@ impl Document {
         self.counts = crate::UpdateCounts::default();
         self.texts.begin();
         let style = tracing::trace_span!("update phase", phase = "style").entered();
-        let calcs = self.styled(viewport)?;
+        self.styled(viewport)?;
         drop(style);
         let layout = tracing::trace_span!("update phase", phase = "layout").entered();
         let (root, body) = (self.root(), self.body());
         let text_marks = self.focused_text_marks();
         let kept = self.kept.as_ref().expect("styled keeps the styles");
         let used = &kept.used;
+        kept.calcs.begin();
         let source = crate::layout::Source {
             arena: &self.arena,
             used,
@@ -80,12 +81,13 @@ impl Document {
         self.counts.boxes_built = built;
         let size = (viewport.width, viewport.height);
         let texts = (&mut self.fonts, &mut self.texts);
-        let (slotted, work) =
-            lay_out(boxes, texts, viewport.scale, size, &calcs).map_err(|(failure, work)| {
+        let (slotted, work) = lay_out(boxes, texts, viewport.scale, size, &kept.calcs).map_err(
+            |(failure, work)| {
                 (self.counts.boxes_laid_out, self.counts.layout_calls) =
                     (work.laid_out, work.calls);
                 vec![ElementError::Layout(failure)]
-            })?;
+            },
+        )?;
         let boxes = &slotted.boxes;
         let scrolls = |index: usize| match boxes[index].content {
             crate::layout::Content::Element(node) => used[&node].scrolls(),
@@ -134,12 +136,14 @@ impl Document {
         self.painted.as_ref()
     }
 
-    /// Restyles what changed and checks the tree; the calcs layout
-    /// will ask for, collected from the kept computed styles.
-    fn styled(&mut self, viewport: Viewport) -> Result<Calcs, Vec<ElementError>> {
-        let mut errors = check_tree(&self.arena, self.root(), &self.declared_events);
+    /// Checks the tree and restyles what changed, checking again only
+    /// the elements changed since the last update (`style_checks`).
+    fn styled(&mut self, viewport: Viewport) -> Result<(), Vec<ElementError>> {
+        let touched = self.touched();
+        self.recheck_tree(&touched);
+        let mut errors = self.tree_refusals();
         errors.extend_from_slice(self.sheets.refused());
-        let unparsed = style_attribute_refusals(&self.arena, self.root());
+        let unparsed = self.style_attribute_refusals();
         if !unparsed.is_empty() {
             errors.extend(unparsed);
             return Err(errors);
@@ -148,29 +152,12 @@ impl Document {
             errors.extend(failed);
             return Err(errors);
         }
-        let live = elements(&self.arena, self.root());
-        let kept = self.kept.as_mut().expect("restyle keeps the styles");
-        let alive: std::collections::HashSet<NodeId> = live.iter().copied().collect();
-        kept.used.retain(|node, _| alive.contains(node));
-        kept.refused.retain(|node, _| alive.contains(node));
-        let kept = self.kept.as_ref().expect("restyle keeps the styles");
-        let mut calcs = Calcs::default();
-        for &node in &live {
-            self.counts.elements_visited += 1;
-            errors.extend(kept.refused.get(&node).into_iter().flatten().cloned());
-            calcs.add(kept.styles.of(node), || describe(&self.arena, node));
-            if kept.used.get(&node).is_some_and(|style| style.inline) {
-                errors.extend(self.mixed_metrics(node, &kept.used, viewport.scale));
-            }
-        }
-        errors.extend(crate::media_checks::refusals(
-            self,
-            &live,
-            &kept.used,
-            viewport.scale,
-        ));
+        let rechecked = self.rechecked(touched);
+        self.recheck_styled(&rechecked, viewport.scale);
+        self.checks.checked();
+        errors.extend(self.all_styled_refusals(viewport.scale));
         if errors.is_empty() {
-            Ok(calcs)
+            Ok(())
         } else {
             Err(errors)
         }

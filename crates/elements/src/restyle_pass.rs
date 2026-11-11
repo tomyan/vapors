@@ -69,19 +69,19 @@ impl Document {
             used: HashMap::new(),
             refused: HashMap::new(),
             restyled_nodes: HashSet::new(),
+            calcs: crate::layout::Calcs::default(),
         }
     }
 
     /// The marked subtree roots still in the tree, none inside another,
     /// and the marked elements inside none of them, parents first.
     fn dirty_roots(&self) -> (Vec<NodeId>, Vec<NodeId>) {
-        let live: HashSet<NodeId> = elements(&self.arena, self.root()).into_iter().collect();
         let marked: HashSet<NodeId> = self
             .dirty
             .roots
             .iter()
             .copied()
-            .filter(|n| live.contains(n))
+            .filter(|&n| self.attached(n))
             .collect();
         let covered = |node: NodeId, skip: usize| {
             self.chain(node)
@@ -96,7 +96,7 @@ impl Document {
             .elements
             .iter()
             .copied()
-            .filter(|n| live.contains(n) && !covered(*n, 0))
+            .filter(|&n| self.attached(n) && !covered(n, 0))
             .collect();
         singles.sort_by_key(|node| (self.chain(*node).len(), node.0));
         singles.dedup();
