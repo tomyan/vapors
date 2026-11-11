@@ -47,11 +47,12 @@ pub(crate) fn paint_partial(
     painted
 }
 
-/// `last` for this update, with `started`'s canvas, its counts and
+/// `last` for this update, with `started`'s canvas and scale, its counts and
 /// gathered hits cleared; and its paint order, taken.
 fn restarted(mut last: Painted, started: &Painted) -> (Painted, Option<KeptOrder>) {
     let order = std::mem::take(&mut last.order);
     (last.canvas, last.canvas_from) = (started.canvas, started.canvas_from);
+    last.scale = started.scale;
     (last.boxes_drawn, last.items_built, last.parts_visited_kept) = (0, 0, 0);
     last.hits = std::cell::OnceCell::new();
     (last, Some(order))

@@ -1,7 +1,8 @@
 //! Parts kept in place (IU3 3c-3d2, `docs/plans/iu3.md` "The scene in
 //! stable slots"): the scene is a view over paint order and each slot's
-//! part, hit testing walks that order backwards, and a removed
-//! element's part leaves no entry behind. A debug build also compares
+//! part, hit testing gathers the parts' hits in that order once per
+//! update and scans them backwards, and a removed element's part
+//! leaves no entry behind. A debug build also compares
 //! every update's paint, hits and maps with a full paint's
 //! (`kept_paint_check.rs`).
 
