@@ -7,7 +7,7 @@ fn a_freed_id_is_taken_by_the_next_insert() {
     let (first, second) = (slab.insert("a"), slab.insert("b"));
 
     // When
-    slab.remove(first);
+    slab.remove("text", first);
     let third = slab.insert("c");
 
     // Then
@@ -23,7 +23,7 @@ fn a_freed_id_resolves_to_nothing() {
     let id = slab.insert("a");
 
     // When
-    slab.remove(id);
+    slab.remove("text", id);
 
     // Then
     assert_eq!(slab.get(id), None);
@@ -31,13 +31,13 @@ fn a_freed_id_resolves_to_nothing() {
 }
 
 #[test]
-#[should_panic(expected = "slab id 0 freed while not held")]
+#[should_panic(expected = "text id 0 is free or was never issued")]
 fn freeing_an_id_twice_is_refused() {
     // Given
     let mut slab = Slab::default();
     let id = slab.insert("a");
-    slab.remove(id);
+    slab.remove("text", id);
 
     // When, Then
-    slab.remove(id);
+    slab.remove("text", id);
 }

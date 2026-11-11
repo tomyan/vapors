@@ -35,11 +35,15 @@ impl<T> Slab<T> {
         u32::try_from(self.entries.len() - 1).expect("fewer than 2^32 ids")
     }
 
-    /// Frees `id`. Panics, naming it, when it is not held: a part freed
-    /// twice, or an id no part took.
-    pub(crate) fn remove(&mut self, id: u32) {
+    /// Frees `id` of the `kind` slab. Panics, naming the kind and id, when
+    /// it is not held: a part freed twice, or an id no part took.
+    pub(crate) fn remove(&mut self, kind: &str, id: u32) {
         let entry = self.entries.get_mut(id as usize).and_then(Option::take);
-        assert!(entry.is_some(), "slab id {id} freed while not held");
+        assert!(
+            entry.is_some(),
+            "{kind} id {id} is free or was never issued, yet a part frees it \
+             (paint_partial.rs, slab.rs); reproduce with `cargo xtask test`"
+        );
         self.free.push(id);
     }
 
@@ -107,10 +111,10 @@ impl Slabs {
     pub(crate) fn free(&mut self, items: &[Item]) {
         for named in items.iter().filter_map(Named::of) {
             match named {
-                Named::Text(id) => self.texts.remove(id),
-                Named::Image(id) => self.images.remove(id),
-                Named::Icon(id) => self.icons.remove(id),
-                Named::Surface(id) => self.surfaces.remove(id),
+                Named::Text(id) => self.texts.remove("text", id),
+                Named::Image(id) => self.images.remove("image", id),
+                Named::Icon(id) => self.icons.remove("icon", id),
+                Named::Surface(id) => self.surfaces.remove("surface", id),
             }
         }
     }

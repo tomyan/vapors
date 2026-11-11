@@ -52,7 +52,7 @@ fn an_id_named_by_two_parts_is_caught() {
 fn a_free_id_named_is_caught() {
     // Given: surface 1 freed, yet slot 5 names it
     let (mut slabs, items) = (two_surfaces(), [surface_item(0), surface_item(1)]);
-    slabs.surfaces.remove(1);
+    slabs.surfaces.remove("surface", 1);
 
     // When
     let found = slab_difference(&slabs, [(3, &items[0]), (5, &items[1])].into_iter());

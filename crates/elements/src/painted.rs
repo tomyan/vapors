@@ -213,6 +213,8 @@ impl Painted {
 /// The value an id names, or a panic naming the id.
 fn resolved<'a, T>(value: Option<&'a T>, kind: &str, id: u32) -> &'a T {
     value.unwrap_or_else(|| {
-        panic!("{kind} id {id} is not one this update's scene names: an id from an earlier update")
+        panic!(
+            "{kind} id {id} is free or was never issued (painted.rs, slab.rs); `cargo xtask test`"
+        )
     })
 }

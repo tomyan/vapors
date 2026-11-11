@@ -92,6 +92,17 @@ fn unnamed(item: Item) -> Item {
     }
 }
 
+/// The slots naming each slab id among the kept parts' items.
+fn namers<'a>(parts: impl Iterator<Item = (usize, &'a Item)>) -> BTreeMap<Named, Vec<usize>> {
+    let mut namers: BTreeMap<Named, Vec<usize>> = BTreeMap::new();
+    for (slot, item) in parts {
+        if let Some(named) = Named::of(item) {
+            namers.entry(named).or_default().push(slot);
+        }
+    }
+    namers
+}
+
 /// The first way `slabs` and the items the kept `parts` hold (each with
 /// its slot) disagree: an id a part names that is free, or a held id
 /// not named by exactly one part.
@@ -99,12 +110,7 @@ pub(crate) fn slab_difference<'a>(
     slabs: &Slabs,
     parts: impl Iterator<Item = (usize, &'a Item)>,
 ) -> Option<String> {
-    let mut namers: BTreeMap<Named, Vec<usize>> = BTreeMap::new();
-    for (slot, item) in parts {
-        if let Some(named) = Named::of(item) {
-            namers.entry(named).or_default().push(slot);
-        }
-    }
+    let namers = namers(parts);
     let live: BTreeSet<Named> = slabs.live().collect();
     if let Some((named, slots)) = namers.iter().find(|(named, _)| !live.contains(named)) {
         return Some(format!(
