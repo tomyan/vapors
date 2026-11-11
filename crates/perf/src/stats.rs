@@ -28,6 +28,14 @@ impl Distribution {
     }
 }
 
+/// The median of `counts` by nearest rank; `None` when there are none.
+#[must_use]
+pub fn median_count(counts: &[u64]) -> Option<u64> {
+    let mut sorted = counts.to_vec();
+    sorted.sort_unstable();
+    sorted.get(rank(sorted.len(), 50)?).copied()
+}
+
 /// The zero-based index of the nearest-rank `percent` of `count` samples.
 fn rank(count: usize, percent: usize) -> Option<usize> {
     (count * percent).div_ceil(100).checked_sub(1)
@@ -68,6 +76,12 @@ mod tests {
             [one.median, one.p90, one.max],
             [Duration::from_micros(7); 3]
         );
+    }
+
+    #[test]
+    fn the_median_count_is_the_nearest_rank_sample() {
+        assert_eq!(super::median_count(&[9, 1, 5, 7]), Some(5));
+        assert_eq!(super::median_count(&[]), None);
     }
 
     #[test]
