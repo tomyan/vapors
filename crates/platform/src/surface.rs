@@ -59,6 +59,7 @@ impl Gpu {
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("vapors window"),
+                required_features: vapors_gpu::timing_features(adapter.features()),
                 required_limits,
                 ..Default::default()
             })

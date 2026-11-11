@@ -13,11 +13,13 @@ pub(crate) struct OpenPass {
 }
 
 impl OpenPass {
-    /// Begins a pass on `view` that first loads it as `load` says.
+    /// Begins a pass on `view` that first loads it as `load` says, and
+    /// writes `timestamps` at its start and end.
     pub(crate) fn begin(
         encoder: &mut wgpu::CommandEncoder,
         view: &wgpu::TextureView,
         load: wgpu::LoadOp<wgpu::Color>,
+        timestamps: Option<wgpu::RenderPassTimestampWrites<'_>>,
     ) -> Self {
         let pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("frame"),
@@ -31,7 +33,7 @@ impl OpenPass {
                 },
             })],
             depth_stencil_attachment: None,
-            timestamp_writes: None,
+            timestamp_writes: timestamps,
             occlusion_query_set: None,
             multiview_mask: None,
         });

@@ -8,6 +8,7 @@ use vapors_platform::{Frame, Next};
 use vapors_renderer::clear;
 use vapors_scene::Color;
 
+use crate::gpu_reading::frame_gpu_time;
 use crate::gpu_time::{GpuClock, wait};
 use crate::run::{Samples, Settings, Workload};
 use crate::spans::PhaseClock;
@@ -61,11 +62,12 @@ impl<'g> Sampler<'g> {
         samples.gpu = gpu_clock
             .map(|clock| clock.spans(&self.gpu.device, &self.gpu.queue))
             .transpose()?;
-        samples.counts = workload.counts();
         Ok(samples)
     }
 
-    /// The warmup frames, then the timed ones, kept, on one texture.
+    /// The warmup frames, then the timed ones, kept with the last one's
+    /// counts, on one texture, then one more, untimed, which reads back
+    /// the last one's GPU time.
     fn timed_frames(
         &mut self,
         workload: &mut dyn Workload,
@@ -74,12 +76,16 @@ impl<'g> Sampler<'g> {
     ) -> Result<Samples, String> {
         let texture = self.texture(workload.size());
         let mut samples = Samples::default();
-        for index in 0..settings.warmup + settings.runs {
-            let timed = index >= settings.warmup;
-            let clock = gpu_clock.as_deref_mut().filter(|_| timed);
+        let timed = settings.warmup..settings.warmup + settings.runs;
+        for index in 0..=timed.end {
+            let clock = gpu_clock.as_deref_mut().filter(|_| timed.contains(&index));
             let (frame, phases) = self.frame(workload, &texture, index, clock)?;
-            if timed {
+            if index > timed.start {
+                samples.push_gpu_time(frame_gpu_time(workload.timing().gpu, index - 1)?);
+            }
+            if timed.contains(&index) {
                 samples.push(frame, phases);
+                samples.counts = workload.counts();
             }
         }
         Ok(samples)

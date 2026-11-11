@@ -2,6 +2,7 @@
 //! `gpu-surface` at 1100 x 720, paused (the HUD's values unchanged) or
 //! racing (its clock and speed change every frame, and the track renders).
 
+use vapors_app::FrameTiming;
 use vapors_platform::{App, Event, Modifiers, Next, Platform};
 use vapors_racer::Racer;
 
@@ -24,6 +25,7 @@ impl RacerFrames {
     #[must_use]
     pub fn new(racing: bool) -> Self {
         let mut racer = Racer::new();
+        racer.time_frames(true);
         if racing {
             let platform = Platform::detached();
             racer.event(space(true), &platform);
@@ -69,6 +71,10 @@ impl Workload for RacerFrames {
             frame,
             self.racer.render_passes(),
         )
+    }
+
+    fn timing(&self) -> FrameTiming {
+        self.racer.frame_timing()
     }
 }
 

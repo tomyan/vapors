@@ -1,6 +1,7 @@
 //! A surface's backing texture: what its renderer draws into and the
 //! painter composites.
 
+use super::super::errors::Refusal;
 use crate::surface::{SURFACE_FORMAT, SurfaceSize};
 
 /// The texture of one active surface, and the size it was made at.
@@ -44,4 +45,13 @@ fn descriptor(size: SurfaceSize) -> wgpu::TextureDescriptor<'static> {
         usage: USAGE,
         view_formats: &[],
     }
+}
+
+/// Refuses a backing larger than the device's largest 2D texture.
+pub(super) fn fits(device: &wgpu::Device, size: SurfaceSize) -> Result<(), Refusal> {
+    let limit = device.limits().max_texture_dimension_2d;
+    if size.width > limit || size.height > limit {
+        return Err(Refusal::TooLarge { size, limit });
+    }
+    Ok(())
 }

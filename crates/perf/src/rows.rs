@@ -6,7 +6,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use vapors_app::ElementsApp;
+use vapors_app::{ElementsApp, FrameTiming};
 use vapors_dom::Dom;
 use vapors_elements::{Document, Viewport};
 use vapors_platform::{App, Next};
@@ -39,11 +39,13 @@ pub struct Rows {
 }
 
 impl Rows {
-    /// `count` rows, updated once, in an app that has drawn no frame.
+    /// `count` rows, updated once, in an app that has drawn no frame and
+    /// times its frames on the GPU.
     #[must_use]
     pub fn new(count: usize, change: RowChange) -> Self {
         let page = rows_page(count);
-        let app = ElementsApp::new(Rc::clone(&page.doc));
+        let mut app = ElementsApp::new(Rc::clone(&page.doc));
+        app.time_frames(true);
         Self { page, app, change }
     }
 }
@@ -82,6 +84,10 @@ impl Workload for Rows {
     fn counts(&self) -> Counts {
         let frame = self.app.frame_counts();
         Counts::of(&self.page.doc.borrow(), frame, self.app.render_passes())
+    }
+
+    fn timing(&self) -> FrameTiming {
+        self.app.frame_timing()
     }
 }
 
