@@ -2,7 +2,8 @@
 //! update paints again and compares every part of the two paints but
 //! `from`, which the update sets after, the kept boxes, and the counts;
 //! the hits in painting order, and the hits kept for hit testing
-//! against a fresh gather, naming the first that differs; the steps that draw against ones found afresh; the scene item by item with ids
+//! against a fresh gather, naming the first that differs; the steps
+//! that draw against ones found afresh; the scene item by item with ids
 //! resolved, the slabs against the kept boxes' items, and each kept
 //! part's slot against paint order (`kept_scene_check.rs`); the kept
 //! `rects` and `paddings` maps name their first differing entry.
@@ -33,8 +34,9 @@ pub(crate) fn assert_same(kept: &Painted, fresh: &Painted) {
         "the kept paint differs from a new paint in {parts:?}: a paint input is not \
          compared in PaintedFrom (crates/elements/src/kept_paint.rs) or BoxFrom \
          (crates/elements/src/kept_box.rs), a part's slab ids are not freed \
-         or taken once (paint_partial.rs, slab.rs), or a changed slot or shape change is missed \
-         (changed_slots.rs, kept_maps.rs, kept_order.rs); reproduce with `cargo xtask test`"
+         or taken once (paint_partial.rs, slab.rs), a changed slot or shape change is missed \
+         (changed_slots.rs, kept_maps.rs, kept_order.rs), or a slot's hits were not patched \
+         (kept_hits.rs, paint_partial.rs drawn_updated); reproduce with `cargo xtask test`"
     );
 }
 

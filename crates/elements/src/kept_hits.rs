@@ -31,25 +31,24 @@ impl KeptHits {
         }
     }
 
-    /// `self` with the hits of each of `slots`' box steps taken out and
-    /// put in again from its part in `boxes`, at the step's place in
-    /// `drawn`.
+    /// `self` with the hits of each of `slots`' box steps replaced by
+    /// its part's in `boxes`, at the step's place in `drawn`: one
+    /// splice per place, from the last, so the list stays ordered by
+    /// place as a fresh gather is.
     pub(crate) fn patch(
         &mut self,
         slots: impl Iterator<Item = usize>,
         drawn: &DrawnSteps,
         boxes: &[Option<KeptBox>],
     ) {
-        let places = box_places(slots, drawn);
-        let patched = |place: &usize| places.binary_search_by_key(place, |&(at, _)| at).is_ok();
-        self.placed.retain(|(place, _)| !patched(place));
-        self.placed.extend(places.iter().flat_map(|&(place, slot)| {
+        for (place, slot) in box_places(slots, drawn).into_iter().rev() {
+            let start = self.placed.partition_point(|&(at, _)| at < place);
+            let end = self.placed.partition_point(|&(at, _)| at <= place);
             let kept = boxes.get(slot).and_then(Option::as_ref);
-            let hits = kept.into_iter().flat_map(|kept| kept.own.hits.iter());
-            hits.map(move |&hit| (place, hit))
-        }));
-        // Stable, and two sorted runs: a merge, O(hits).
-        self.placed.sort_by_key(|&(place, _)| place);
+            let hits = kept.map_or(&[][..], |kept| &kept.own.hits);
+            let placed = hits.iter().map(|&hit| (place, hit));
+            self.placed.splice(start..end, placed);
+        }
     }
 
     /// Every hit, in painting order.

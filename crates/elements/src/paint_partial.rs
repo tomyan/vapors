@@ -7,8 +7,8 @@
 //! slab ids and removes its map entries before any part is painted, so
 //! a part painted after takes them. Scroll thumbs are painted on every
 //! update that paints. The scene is the parts of the steps that draw
-//! walked in paint order (`scene_view.rs`, `drawn_steps.rs`); it equals a full paint's, which a debug build
-//! checks (`kept_paint.rs`).
+//! walked in paint order (`scene_view.rs`, `drawn_steps.rs`); it
+//! equals a full paint's, which a debug build checks (`kept_paint.rs`).
 
 use crate::changed_slots::ChangedSlots;
 use crate::drawn_steps::DrawnSteps;
@@ -41,34 +41,39 @@ pub(crate) fn paint_partial(
     let again = to_paint(&order, (boxes, rects), (changed, kept), &mut painted);
     dropped(&again, changed, boxes.len(), &mut painted);
     crate::kept_maps::fill(&mut painted, (boxes, rects), kept, changed);
-    let patched = patched_slots(&again, changed, &order);
+    let (patched, with_hits) = patched_slots(&again, changed, &order);
     let mut repaint = Repaint::new(boxes, rects, &order);
     repaint.boxes(again, input, &mut painted);
     repaint.thumbs(input, &mut painted);
-    drawn_updated(&mut painted, &order, &patched);
+    drawn_updated(&mut painted, &order, (&patched, with_hits));
     painted.order = order;
     painted
 }
 
 /// The slots whose parts this update paints again or drops: those
-/// painted `again`, the freed and the scroll containers.
+/// painted `again` and the freed, then the scroll containers, whose
+/// thumbs add no hits; and how many come before the scroll containers.
 fn patched_slots(
     again: &[(usize, BoxFrom)],
     changed: &ChangedSlots,
     order: &KeptOrder,
-) -> Vec<usize> {
+) -> (Vec<usize>, usize) {
     let again = again.iter().map(|(slot, _)| *slot);
     let freed = changed.freed.iter().map(|(slot, _)| *slot);
-    again
-        .chain(freed)
-        .chain(order.thumbs.iter().copied())
-        .collect()
+    let mut slots: Vec<usize> = again.chain(freed).collect();
+    let with_hits = slots.len();
+    slots.extend(order.thumbs.iter().copied());
+    (slots, with_hits)
 }
 
 /// `painted`'s drawing steps made afresh, and its kept batches and hits
 /// dropped, when `order` was walked again; else all three patched for
-/// the `patched` slots.
-fn drawn_updated(painted: &mut Painted, order: &KeptOrder, patched: &[usize]) {
+/// the `patched` slots, the hits for the first `with_hits` only.
+fn drawn_updated(
+    painted: &mut Painted,
+    order: &KeptOrder,
+    (patched, with_hits): (&[usize], usize),
+) {
     if order.walks.order > 0 {
         painted.drawn = DrawnSteps::of(&order.steps, &painted.kept_boxes);
         painted.kept_batches = std::cell::RefCell::default();
@@ -79,7 +84,8 @@ fn drawn_updated(painted: &mut Painted, order: &KeptOrder, patched: &[usize]) {
         .drawn
         .patch(patched.iter().copied(), &painted.kept_boxes);
     if let Some(hits) = painted.hits.get_mut() {
-        hits.patch(patched.iter().copied(), &painted.drawn, &painted.kept_boxes);
+        let slots = patched[..with_hits].iter().copied();
+        hits.patch(slots, &painted.drawn, &painted.kept_boxes);
     }
     batches_patched(painted, patched);
 }

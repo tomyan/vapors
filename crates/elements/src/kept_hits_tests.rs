@@ -18,7 +18,8 @@ fn page() -> (Document, [NodeId; 3]) {
     let css = "body { margin: 0; } p { height: 20px; margin: 0; } \
         .sq { position: absolute; top: 40px; width: 50px; height: 50px; } \
         .a { left: 0; } .b { left: 20px; } .c { left: 40px; } \
-        .wide { width: 90px; } .red { background-color: red; } .up { z-index: 1; }";
+        .wide { width: 90px; } .red { background-color: red; } .up { z-index: 1; } \
+        .ghost { pointer-events: none; }";
     doc.add_stylesheet("app.css", css).expect("parses");
     let body = doc.body();
     for _ in 0..2 {
@@ -65,4 +66,33 @@ fn the_kept_hits_equal_a_fresh_gather_across_a_sequence_of_edits() {
     }
     doc.remove(c);
     assert_kept_equals_fresh(&mut doc, "c removed");
+}
+
+#[test]
+fn hits_patched_at_several_places_in_one_update_keep_paint_order() {
+    // Given: every square hit
+    let (mut doc, [a, b, c]) = page();
+
+    // When: the first loses its hit and the last two change size in one
+    // update, so the first splice shortens the list before the others
+    doc.set_attribute(a, "class", "sq a ghost");
+    doc.set_attribute(b, "class", "sq b wide");
+    doc.set_attribute(c, "class", "sq c wide");
+
+    // Then
+    assert_kept_equals_fresh(&mut doc, "a ghosted, b and c made wide");
+    let painted = doc.update(VIEWPORT).expect("updates");
+    assert_eq!(
+        painted.kept_hits().hit([10.0, 50.0]),
+        None,
+        "a takes no hit"
+    );
+    assert_eq!(painted.kept_hits().hit([100.0, 50.0]), Some(c));
+
+    // When: the first takes hits again and the middle one loses its own
+    doc.set_attribute(a, "class", "sq a");
+    doc.set_attribute(b, "class", "sq b ghost");
+
+    // Then
+    assert_kept_equals_fresh(&mut doc, "a back, b ghosted");
 }
