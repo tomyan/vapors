@@ -121,6 +121,16 @@ arms the new one.
 4. After the frame, call `take_tooltip_changed()` again: the frame drew
    what its update showed or hid, and the next event must not ask for
    a frame for it.
+5. Before each update, call `Document::settle_selection(&document)`:
+   it fires the `selectionchange` each text field owes. After each
+   successful update, call `Document::settle_focus(&document)`: when
+   the focused element is no longer focusable (`display: none` on it
+   or an ancestor, `visibility` other than `visible`, or disabled),
+   focus moves to nothing, with the field's `change`, `blur` and
+   `focusout`; its event handlers may change the document, so ask for
+   a frame when `take_changed()` is then true. A host that forgets it
+   gets `Unplaced::FocusNotSettled` from `give` for the next key or
+   typed text while that element has focus.
 
 An app that skips step 3 never shows a tooltip early: it shows at the
 first frame drawn at or after its deadline, which may be much later.

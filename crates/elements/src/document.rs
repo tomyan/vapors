@@ -33,8 +33,7 @@ pub struct Document {
     pub(crate) space_on: Option<NodeId>,
     /// The modifier shortcuts take (`shortcuts`).
     pub(crate) shortcut_modifier: crate::ShortcutModifier,
-    /// Each number field's last committed number and value string,
-    /// from its focus on (`number_committed`).
+    /// Each number field's last committed number and value (`number_committed`).
     pub(crate) committed: std::collections::HashMap<NodeId, crate::number_committed::Committed>,
     /// Each text field's editor (E6a).
     pub(crate) editors: crate::text_field::Editors,

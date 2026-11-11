@@ -129,6 +129,24 @@ crate, and the web IME path is platform code either way.
 - `focus`, `blur` (not bubbling), `focusin`, `focusout` (bubbling), in
   the UI Events order.
 - `:focus` is set on the element; `:focus-within` on its ancestors.
+- `Document::focus` returns a `Focus`: `Done`; `NotFocusable` (not
+  a focusable element, disabled, `display: none` on it or an ancestor,
+  or `visibility` other than `visible`), when nothing happens, as
+  Chromium's `focus()` does nothing; or `Unresolved` (no update has
+  run, so there is no viewport, or a style does not compute). The
+  styles are computed for the element and its ancestors from the tree
+  as it is, at the last update's viewport, without layout, as
+  Chromium's `focus()` forces a style update: a handler that shows a
+  panel and focuses its field focuses it. vapors does not implement
+  `inert`, so it is not part of the rule.
+- The focus fixup: `Document::settle_focus`, called after each
+  successful update (`ElementsApp` and the vapors player do), moves
+  focus to nothing when the focused element is no longer focusable by
+  that rule, with `change`, `blur` and `focusout`, as Chromium does at
+  the task after its style update. A host driving its own frames that
+  never calls it is refused by `DocumentInput::give` on the next key or
+  typed text (`Unplaced::FocusNotSettled`); see `docs/tooltips.md`
+  "For apps not using ElementsApp" for both settles.
 - As built (3-E2a): `Document::active_element`, `focus`, `key_pressed`
   and `key_released`; the platform sends `Event::Key` (the DOM's `key`
   with the modifiers held; no `code` yet) before a press's `Character`.

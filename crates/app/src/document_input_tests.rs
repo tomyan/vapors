@@ -166,8 +166,9 @@ fn input_before_the_first_update_or_at_a_zero_scale_is_refused() {
 }
 
 #[test]
-fn a_key_reaches_a_document_never_updated_and_a_pointer_event_is_still_refused() {
-    // Given: a focused button in a document never updated
+fn a_key_to_a_document_never_updated_is_the_hosts_and_a_pointer_event_is_refused() {
+    // Given: a button in a document never updated, which focus() leaves
+    // unfocused (no viewport to compute its styles at)
     let mut doc = Document::new(FontSystem::bundle_only());
     let body = doc.body();
     let button = doc.create_element("button");
@@ -180,7 +181,7 @@ fn a_key_reaches_a_document_never_updated_and_a_pointer_event_is_still_refused()
         Box::new(move |_: &mut DomEvent| *counted.borrow_mut() += 1),
     );
     let document = Rc::new(RefCell::new(doc));
-    Document::focus(&document, Some(button));
+    let focused = Document::focus(&document, Some(button));
     let mut input = DocumentInput::new();
     let key = Event::Key {
         key: "z".into(),
@@ -196,8 +197,9 @@ fn a_key_reaches_a_document_never_updated_and_a_pointer_event_is_still_refused()
     let pointer = input.give(&document, &moved(1.0, 1.0), &platform());
 
     // Then
-    assert_eq!(routed, Ok(super::Route::Document));
+    assert_eq!(focused, vapors_elements::Focus::Unresolved);
+    assert_eq!(routed, Ok(super::Route::Host));
     assert!(given.is_ok(), "{given:?}");
-    assert_eq!(*keys.borrow(), 1);
+    assert_eq!(*keys.borrow(), 0);
     assert_eq!(pointer, Err(Unplaced::NotUpdated));
 }
