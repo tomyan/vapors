@@ -58,7 +58,8 @@ impl Document {
     pub fn update(&mut self, viewport: Viewport) -> Result<&Painted, Vec<ElementError>> {
         let last = self.painted.take();
         self.counts = crate::UpdateCounts::default();
-        self.texts.begin(last.as_ref().map_or(0, |painted| painted.texts.len()));
+        self.texts
+            .begin(last.as_ref().map_or(0, |painted| painted.texts.len()));
         let style = tracing::trace_span!("update phase", phase = "style").entered();
         self.styled(viewport)?;
         drop(style);

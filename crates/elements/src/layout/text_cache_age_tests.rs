@@ -89,8 +89,17 @@ fn a_layout_reused_at_a_width_is_dropped_once_nothing_holds_it() {
     later_updates(&mut cache, &mut fonts, &|_| {});
 
     // Then
-    let first: Vec<_> = cache.entries.values().filter(|entry| entry.asked == 1).collect();
-    assert_eq!(first.len(), 0, "{} entries from update 1 survive", first.len());
+    let first: Vec<_> = cache
+        .entries
+        .values()
+        .filter(|entry| entry.asked == 1)
+        .collect();
+    assert_eq!(
+        first.len(),
+        0,
+        "{} entries from update 1 survive",
+        first.len()
+    );
 }
 
 /// A first update showing `before` runs, then one showing `after`, the
@@ -132,5 +141,8 @@ fn an_update_that_shows_what_the_map_holds_does_not_sweep_it() {
     cache.begin(31);
 
     // Then
-    assert_eq!(cache.swept_to, swept_to, "a sweep ran at the start of the update");
+    assert_eq!(
+        cache.swept_to, swept_to,
+        "a sweep ran at the start of the update"
+    );
 }

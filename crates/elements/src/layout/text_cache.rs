@@ -72,7 +72,10 @@ impl TextCache {
         width: Option<f32>,
     ) -> Rc<Layout> {
         let key = Key::of(run, width, scale);
-        if let Some(layout) = self.asked(&key).or_else(|| self.unwrapped(run, width, scale)) {
+        if let Some(layout) = self
+            .asked(&key)
+            .or_else(|| self.unwrapped(run, width, scale))
+        {
             return layout;
         }
         self.built += 1;
