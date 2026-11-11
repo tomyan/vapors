@@ -89,5 +89,12 @@ the directory:
 4. Pull request. An independent review agent reads the diff with the
    "Failure must be loud" rules and no author context; findings are
    verified before action.
-5. Auto-merge when CI is green. Squash. Branch deleted.
+5. Merge on the local gate, not GitHub CI (Tom, 2026-11-11, as touche
+   since 2026-10-23): once the review's findings are in, update the
+   branch onto current `main`, run `cargo xtask gate --pr <n>` at the
+   PR's head in a clean worktree, which posts its last lines to the PR.
+   It must end `gate: pass <head sha>`. Then merge: squash, branch
+   deleted. GitHub CI still runs on every push but is not a required
+   check; a red GitHub run on a merged head is investigated as a
+   difference between the runner and this machine.
 6. Update the plan; the PR description is the handoff.
