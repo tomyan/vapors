@@ -53,6 +53,7 @@ impl ElementsApp {
         let scale = frame.scale_factor as f32;
         let size = size_of(frame);
         let mut document = self.document.borrow_mut();
+        document.set_max_image_side(frame.device.limits().max_texture_dimension_2d);
         document
             .update(viewport(size, scale))
             .map_err(|errors| refused(&errors))?;

@@ -110,35 +110,6 @@ impl Document {
         std::mem::replace(&mut self.changes.since_asked, false)
     }
 
-    /// Registers `image` under `name` for the `img` elements whose `src`
-    /// is `name`, replacing any image of that name; they show it from
-    /// the next update.
-    ///
-    /// # Errors
-    /// An image that cannot be drawn, naming it: a side of zero, a side
-    /// over 8192 px, or pixels that do not match its size.
-    pub fn register_image(
-        &mut self,
-        name: &str,
-        image: vapors_scene::RgbaImage,
-    ) -> Result<(), String> {
-        self.images.register(name, image)?;
-        self.note_change();
-        self.boxes.marks.all = true;
-        Ok(())
-    }
-
-    /// Drops the image registered as `name`, so its pixels are freed;
-    /// the painter drops its texture after the next frame that does not
-    /// draw it.
-    ///
-    /// # Errors
-    /// No image registered as `name`, or an `img` that still names it.
-    pub fn unregister_image(&mut self, name: &str) -> Result<(), String> {
-        let nodes = crate::check::elements(&self.arena, self.root);
-        self.images.unregister(name, &self.arena, &nodes)
-    }
-
     /// The `html` element.
     #[must_use]
     pub fn root(&self) -> NodeId {
