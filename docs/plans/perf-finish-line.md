@@ -17,7 +17,7 @@ the harness shows it, not when the code is believed to do it.
 | 2 | Draw (CPU side of a frame) | under 1 ms at any row count; boxes outside the view cost nothing | 1.7 to 1.8 ms | IU3 3c-3f (kept batches), IU4 (GPU side kept) |
 | 3 | Inserting or removing a row | about the cost of an edit | redoes paint order, chains and clips over the whole tree | splice step (below) |
 | 4 | Scrolling a long list | no repaint; kept paint shifted | every moved box painted again | IU3 3c-3e |
-| 5 | Pointer over the window | no per-update walk of the tree | HoveredClass 0.85 ms above Class | IU3 3c-3g (kept hit list) |
+| 5 | Pointer over the window | no per-update walk of the tree | after 3c-3g, HoveredClass update 0.115 M instructions above Class at 3000 rows (0.043 M at 1000): `hit()`'s scan of the kept hits, about 13 µs | IU3 3c-3g (kept hit list) |
 | 6 | Idle | no update work and no frames drawn | no frames drawn; an update with no change 2.57 ms | IU3 3b, the idle fix |
 | 7 | First frame of a large page | the winning declarations for each template element and constant shapes worked out at build time (computed values still depend on viewport, scale and font size); time measured and published | not measured | the build-time analysis |
 | 8 | Memory per element | one style record per distinct style, not per element; per-element memory bounded by the per-box layout records | not measured | the build-time analysis |

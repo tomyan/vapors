@@ -379,16 +379,15 @@ measured, batch in the same pass as the split when the view changed.
   testing walks steps per query. 3c-3d2 records draw at 3000 rows; if
   draw rises measurably, keeping batches across frames moves from IU4
   into this stack, and the lead decides.
-- Hit gathering (3c-3d2): the first hit test after an update gathers
-  every part's hits once (O(all hits)), and each test, the first
-  included, scans the gathered hits from the last (O(all hits) at
-  worst). With the pointer over the window this is paid on each update
-  that follows a paint. The review of #201 measured +0.55 ms per Class
-  update at 3000 rows with the pointer over a row; the `HoveredClass`
-  workload in `vapors-perf` tracks it. Keeping the hit list across
-  updates and patching it per changed slot is the lead's to schedule.
-  Walking order per test was slower in debug on the 1000-row oracle
-  test (33.5 s against 16.2 s).
+- Hit gathering (3c-3d2, kept in 3c-3g): the hit list is kept across
+  updates and patched for the slots painted again or freed: one splice
+  per patched place, its range found by binary search, so the cost is
+  O(k log n) plus the tail move when a part's hit count changes. It is
+  gathered afresh only after paint order is walked again. `hit()` scans
+  the kept hits from the last: at 3000 rows about 0.11 M instructions
+  and 13 µs per test, which is what HoveredClass's update still costs
+  above Class's and grows with the row count. A spatial index waits
+  until a page makes that measurable (above 0.1 ms).
 - The debug check's fresh paint (3c-3d2) is `paint_partial` with
   nothing kept, so it compares an incremental paint with a full one
   through the same `Repaint` code: a defect inside `Repaint::painted`
