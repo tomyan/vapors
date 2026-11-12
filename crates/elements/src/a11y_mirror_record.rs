@@ -16,6 +16,7 @@ use crate::a11y_tree::finite;
 use crate::document::Document;
 use crate::layout::BoxRect;
 use crate::node_map::NodeMap;
+use vapors_a11y::AxRect;
 
 /// What is above a node: an `aria-hidden` ancestor, or its parent.
 #[derive(Clone, Copy)]
@@ -108,7 +109,7 @@ impl Document {
             states: self.ax_states(node),
             range: self.ax_range(node, &role),
             focusable: self.focus_candidate(node),
-            bounds,
+            bounds: rect(bounds),
             name,
             role,
         };
@@ -156,5 +157,15 @@ impl Document {
             min: number("aria-valuemin")?,
             max: number("aria-valuemax")?,
         })
+    }
+}
+
+/// `bounds` as the mirror's rect.
+fn rect(bounds: BoxRect) -> AxRect {
+    AxRect {
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
     }
 }

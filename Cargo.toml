@@ -40,6 +40,7 @@ vapors-text = { path = "crates/text", default-features = false }
 vapors-css = { path = "crates/css" }
 vapors-signals = { path = "crates/signals" }
 vapors-dom = { path = "crates/dom" }
+vapors-a11y = { path = "crates/a11y" }
 vapors-compiler = { path = "crates/compiler" }
 vapors-components = { path = "crates/components" }
 vapors-elements = { path = "crates/elements", default-features = false }

@@ -7,6 +7,7 @@
 //! one is refused too, since replacing it would lose changes silently.
 
 use vapors_elements::AxUpdate;
+use vapors_platform::Platform;
 
 use super::ElementsApp;
 
@@ -38,6 +39,13 @@ impl ElementsApp {
     #[must_use]
     pub fn ax_update(&mut self) -> Option<AxUpdate> {
         self.a11y.pending.take()
+    }
+
+    /// The last frame's update to the platform's mirror, from `drawn`.
+    pub(super) fn hand_ax_update(&mut self, platform: &Platform) {
+        if let Some(update) = self.ax_update() {
+            platform.set_ax_update(update);
+        }
     }
 
     /// The Accessibility phase's work: the document's take, kept.

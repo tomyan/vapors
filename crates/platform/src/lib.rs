@@ -5,6 +5,19 @@
 //! `vapors-gpu` rule (on the web, the browser's choice), hands every input
 //! to the app as an [`Event`] and every redraw as a [`Frame`].
 
+// the mirror's logic runs on the page, and natively in its tests
+#[cfg(any(target_family = "wasm", test))]
+mod a11y_mirror_attrs;
+#[cfg(test)]
+mod a11y_mirror_attrs_tests;
+#[cfg(any(target_family = "wasm", test))]
+mod a11y_mirror_dom;
+#[cfg(test)]
+mod a11y_mirror_fake;
+#[cfg(test)]
+mod a11y_mirror_tests;
+#[cfg(target_family = "wasm")]
+mod a11y_mirror_web;
 mod attributes;
 mod browser_platform;
 mod clicks;

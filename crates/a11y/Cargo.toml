@@ -1,0 +1,16 @@
+[package]
+name = "vapors-a11y"
+description = "The accessibility update a mirror takes: the node records, removals, placements and focus of what changed in a document's tree, keyed by node id, shared by the document that builds it and the platforms that show it."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+vapors-dom.workspace = true
+serde.workspace = true
+
+[lints]
+workspace = true

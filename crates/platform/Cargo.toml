@@ -12,6 +12,7 @@ publish = false
 wgpu.workspace = true
 winit.workspace = true
 vapors-gpu.workspace = true
+vapors-a11y.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 pollster.workspace = true
@@ -56,6 +57,7 @@ web-sys = { version = "0.3.106", features = [
     "Location",
     "Navigator",
     "Node",
+    "Text",
     "WheelEvent",
     "Window",
     "DomRect",
