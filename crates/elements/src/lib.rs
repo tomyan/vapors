@@ -148,6 +148,7 @@ pub use painted::Painted;
 pub use scene_view::SceneView;
 pub use shortcuts::ShortcutModifier;
 pub use style::{ALL_CURSORS, Cursor};
+pub use tags::FIRED as FIRED_EVENTS;
 pub use text_bridge::{TextEdit, TextInput};
 pub use update::Viewport;
 pub use update_counts::UpdateCounts;

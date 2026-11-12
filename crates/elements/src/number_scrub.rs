@@ -86,6 +86,11 @@ pub(crate) fn moved(document: &Rc<RefCell<Document>>, id: u32, point: Point) {
     let Some(scrub) = document.borrow().pointer.scrubs.get(&id).copied() else {
         return;
     };
+    // a listener removed the field: the scrub ends with it
+    if document.borrow().still_in(scrub.node).is_none() {
+        document.borrow_mut().pointer.scrubs.remove(&id);
+        return;
+    }
     let direction = crate::range_drag::decided(scrub.direction, point);
     {
         let mut doc = document.borrow_mut();

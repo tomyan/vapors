@@ -153,7 +153,9 @@ pub(crate) fn set(document: &Rc<RefCell<Document>>, node: NodeId, text: &str, nu
 /// committed number when the text is no number; `change` when it
 /// differs from the last committed.
 pub(crate) fn commit(document: &Rc<RefCell<Document>>, node: NodeId) {
-    let Some(field) = document.borrow().number_field(node) else {
+    // a listener of an earlier commit or event may have removed `node`
+    let still = document.borrow().still_in(node);
+    let Some(field) = still.and_then(|node| document.borrow().number_field(node)) else {
         return;
     };
     let last = document.borrow().last_committed(node, &field);

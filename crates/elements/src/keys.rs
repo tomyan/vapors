@@ -183,8 +183,10 @@ impl Document {
         if dispatch_bubbling(document, target, press.event("keyup")) {
             return;
         }
+        // `still_in` is `None` when a listener removed the target, and
+        // `space_on` is `None` with no press recorded: those must not match
         let still = document.borrow().still_in(target);
-        if press.key == " " && space_on == still {
+        if let Some(target) = still.filter(|t| press.key == " " && space_on == Some(*t)) {
             Self::activate(document, target, &["button", "checkbox"]);
         }
     }

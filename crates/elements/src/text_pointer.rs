@@ -141,6 +141,11 @@ pub(crate) fn moved_pointer(document: &Rc<RefCell<Document>>, id: u32, point: Po
     let Some(node) = dragged else {
         return;
     };
+    // a listener removed the field: its drag-select ends with it
+    if document.borrow().still_in(node).is_none() {
+        document.borrow_mut().pointer.text_presses.remove(&id);
+        return;
+    }
     let Some((x, y)) = document.borrow().text_point(node, point) else {
         return;
     };

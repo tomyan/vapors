@@ -78,6 +78,11 @@ pub(crate) fn moved(document: &Rc<RefCell<Document>>, id: u32, point: Point) {
     let Some(drag) = document.borrow().pointer.drags.get(&id).copied() else {
         return;
     };
+    // a listener removed the range: the drag ends with it
+    if document.borrow().still_in(drag.node).is_none() {
+        document.borrow_mut().pointer.drags.remove(&id);
+        return;
+    }
     let direction = decided(drag.direction, point);
     if direction != drag.direction {
         let mut doc = document.borrow_mut();
