@@ -2,7 +2,7 @@
 
 use taffy::{LayoutInput, RunMode};
 
-use super::tests::{ROW, Texts, changed_row, layouts, rebuild_row, rows};
+use super::tests::{ROW, Texts, changed_row, layouts, rebuild_box, rebuild_row, rows};
 use super::*;
 
 #[test]
@@ -142,4 +142,28 @@ fn a_rebuilt_row_styled_otherwise_has_its_ancestors_laid_out_again() {
         work.written.laid_out.contains(&0),
         "the root is laid out again"
     );
+}
+
+#[test]
+fn a_root_owner_is_not_compared_and_hoists_a_fixed_row_again() {
+    // Given: row 4 (slot 5) fixed, hoisted onto the root; then the root
+    // built again with the same children
+    let mut texts = Texts::new();
+    let mut placed = rows();
+    placed.boxes[5].style.position = taffy::Position::Fixed;
+    let (mut placed, _) = texts.lay_out(placed, Vec::new());
+    assert_eq!(placed.boxes[0].hoisted, [5], "hoisted onto the root");
+    let old = rebuild_box(&mut placed, 0, 1, &[1, 3, 5]);
+    let root = Changed {
+        slot: 0,
+        ancestors: Vec::new(),
+        before: Some(old),
+    };
+
+    // When
+    let (placed, work) = texts.lay_out(placed, vec![root]);
+
+    // Then
+    assert_eq!(placed.boxes[0].hoisted, [5], "hoisted onto the root again");
+    assert_eq!(work.settled.uncompared, 1);
 }

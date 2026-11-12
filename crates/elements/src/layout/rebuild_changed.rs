@@ -20,13 +20,7 @@ pub(super) fn changed_owners(
     (mut taken, may_keep): (Taken, &dyn Fn(NodeId) -> bool),
 ) -> Vec<Changed> {
     let before = |old: (Key, LayoutBox)| match old {
-        (Key::Element(_), old) => Some(Before {
-            cache: old.cache,
-            layout: old.layout,
-            asked: old.asked,
-            style: old.style,
-            natural: old.natural,
-        }),
+        (Key::Element(_), old) => Some(Before::of(old)),
         (Key::Text(..), _) => None,
     };
     changed

@@ -58,13 +58,20 @@ pub(super) fn rebuild_row(placed: &mut Placed, text: &str) -> Before {
     }
     let old = std::mem::replace(&mut placed.boxes[ROW], row.remove(0));
     placed.boxes[ROW_TEXT] = row.remove(0);
-    Before {
-        cache: old.cache,
-        layout: old.layout,
-        asked: old.asked,
-        style: old.style,
-        natural: old.natural,
-    }
+    Before::of(old)
+}
+
+/// Puts a fresh element box for `node` with `children` in `slot`; what
+/// the old box held.
+pub(super) fn rebuild_box(
+    placed: &mut Placed,
+    slot: usize,
+    node: u64,
+    children: &[usize],
+) -> Before {
+    let mut fresh = tree(&[(node, &[])]).remove(0);
+    fresh.children = children.to_vec();
+    Before::of(std::mem::replace(&mut placed.boxes[slot], fresh))
 }
 
 pub(super) fn changed_row(before: Option<Before>) -> Vec<Changed> {
