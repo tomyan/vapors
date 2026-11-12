@@ -34,6 +34,27 @@ impl Buckets {
         bucket.push(index);
     }
 
+    /// Candidate rule indices for every element a template key with
+    /// `tag` and `classes` can make: the universal, every id (an id may
+    /// be set at run time), each class and the tag, in source order.
+    /// The tag is lowercased, as `candidates` does.
+    pub(super) fn candidates_for_key(&self, tag: &str, classes: &[&str]) -> Vec<usize> {
+        let mut out = self.universal.clone();
+        out.extend(self.ids.values().flatten());
+        for class in classes {
+            out.extend(self.classes.get(*class).into_iter().flatten());
+        }
+        out.extend(
+            self.tags
+                .get(&tag.to_ascii_lowercase())
+                .into_iter()
+                .flatten(),
+        );
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
+
     /// Candidate rule indices for `element`, in source order.
     pub(super) fn candidates<E: Element>(&self, element: &E) -> Vec<usize> {
         let mut out = self.universal.clone();

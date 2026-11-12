@@ -8,12 +8,15 @@ mod matching;
 mod nth;
 mod parse;
 mod pseudo;
+mod share;
 mod specificity;
 mod structural;
 
 pub use element::Element;
 pub use matching::matches;
 pub use nth::Nth;
+pub(crate) use share::reads_siblings_or_descendants;
+pub use share::{attribute_names, state_flags};
 pub use specificity::Specificity;
 
 use crate::ast::ComponentValue;

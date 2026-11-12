@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use super::{Call, Kind, RecordingDom};
-use crate::{Dom, Handler, NodeId, PropertyValue};
+use crate::{Dom, Handler, NodeId, PropertyValue, StyleKey};
 
 impl Dom for RecordingDom {
     fn create_element(&mut self, tag: &str) -> NodeId {
@@ -12,12 +12,41 @@ impl Dom for RecordingDom {
             tag: tag.into(),
             attributes: BTreeMap::new(),
             properties: BTreeMap::new(),
+            key: None,
         });
         self.calls.push(Call::CreateElement {
             node,
             tag: tag.into(),
         });
         node
+    }
+
+    fn create_keyed_element(&mut self, key: &'static StyleKey) -> NodeId {
+        let node = self.push(Self::keyed(key));
+        self.calls.push(Call::CreateKeyedElement { node, key });
+        if let Some(refusal) = key.shape_refusal() {
+            self.refuse(node, format!("create_keyed_element: {refusal}"));
+        }
+        node
+    }
+
+    fn toggle_classes(&mut self, node: NodeId, toggles: &[(&str, bool)]) {
+        match self.toggle(node, toggles) {
+            Ok(()) => self.calls.push(Call::ToggleClasses {
+                node,
+                toggles: (toggles.iter())
+                    .map(|(name, on)| ((*name).to_owned(), *on))
+                    .collect(),
+            }),
+            Err(refusal) => self.refuse(node, format!("toggle_classes: {refusal}")),
+        }
+    }
+
+    fn style_key(&self, node: NodeId) -> Option<&'static StyleKey> {
+        match &self.record(node).kind {
+            Kind::Element { key, .. } => key.map(|(key, _)| key),
+            Kind::Text(_) => None,
+        }
     }
 
     fn create_text(&mut self, text: &str) -> NodeId {
@@ -29,7 +58,11 @@ impl Dom for RecordingDom {
         node
     }
 
+    /// Refuses an attribute the element's key fixes (`StyleKey::refusal`).
     fn set_attribute(&mut self, node: NodeId, name: &str, value: &str) {
+        if let Some(refusal) = self.style_key(node).and_then(|key| key.refusal(name)) {
+            return self.refuse(node, format!("set_attribute: {refusal}"));
+        }
         if let Kind::Element { attributes, .. } = &mut self.record_mut(node).kind {
             attributes.insert(name.into(), value.into());
         }

@@ -101,11 +101,19 @@ cover them if IU3 needs it. An edit inside one row that keeps the
 row's size makes 3 layout calls at any row count: the edited row is laid
 out in isolation (M10, `layout/isolated.rs`) and its ancestors keep their
 caches. An edit that resizes the row makes rows + 12 calls, the body
-asking each row for its layout again. This holds for a row under a
-block parent, the `sparse_updates` page; under a flex or grid parent the
-owner's replayed size query comes back without baselines or overflow, so
-the comparison almost always reads `Differs` and the ancestors are laid
-out again. The layout phase's growth after M10 (about 55 instructions
+asking each row for its layout again. A flex or grid parent asks a row for its size before laying
+it out, and a block row with a vertical margin answers with the margin,
+which Taffy's cache keeps no entry for; before M10c that owner was
+`uncompared` and the column laid out again (3 calls per row). Since M10c
+a box records what its parent reads from a size answer (`layout/
+asked.rs`) and the replay compares with that: an edit in a flex-column
+list makes 5 layout calls at any row count, margin or not
+(`sparse_updates_flex`), and `vapors-perf 60 10 --scaling FlexText`
+(the same list with the margin, 2026-11-12, this machine under load)
+has `layout` at 122.7 k / 126.0 k / 127.2 k instructions and `update`
+at 160.3 k / 163.7 k / 165.1 k at 1000 / 3000 / 10,000 rows, pass;
+without the record, 5.62 M / 16.6 M / 55.3 M, 5500 per extra row. The
+layout phase's growth after M10 (about 55 instructions
 per row at 1000 to 10000 rows) was the placement walk
 (`placement_walk.rs`): a visited box scanned its every child, and
 `visit` returned at once for each unmarked one, so the body's rows were

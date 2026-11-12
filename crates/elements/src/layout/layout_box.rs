@@ -4,8 +4,8 @@
 use taffy::{Cache, Layout, Style};
 use vapors_dom::NodeId;
 
+use super::asked::Asked;
 use super::inline::InlineRun;
-use super::isolated::Asked;
 
 /// What a box is.
 #[derive(PartialEq)]
@@ -30,6 +30,11 @@ pub(crate) struct LayoutBox {
     /// rest on: what a rebuilt box in its slot is asked in isolation
     /// (`isolated.rs`). Lent with the cache.
     pub(crate) asked: Vec<Asked>,
+    /// Whether the box was asked more ways than it records
+    /// (`tree_cache.rs` `ASKED_LIMIT`): `asked` is empty and stays so
+    /// until the cache is cleared, and a rebuilt box in its slot is
+    /// not compared.
+    pub(crate) asked_overflowed: bool,
     /// The out-of-flow (absolute and fixed) boxes this box is the
     /// containing block of, as Taffy hoists them; their layouts are
     /// relative to this box.
@@ -67,6 +72,7 @@ impl LayoutBox {
             cache: Cache::new(),
             layout: Layout::with_order(0),
             asked: Vec::new(),
+            asked_overflowed: false,
             hoisted: Vec::new(),
             natural: None,
             image: None,

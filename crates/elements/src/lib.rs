@@ -45,6 +45,7 @@ mod css_element;
 mod document;
 mod document_images;
 mod dom_impl;
+mod dom_keyed;
 mod drawn_steps;
 mod error;
 mod events;

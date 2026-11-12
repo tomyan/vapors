@@ -5,31 +5,36 @@
 //! which asked every sibling for its (cached) layout: O(rows) per
 //! edit. Now the rebuilt owner is first asked what its parent asked
 //! the box it replaced (`LayoutBox::asked`). When every answer is the
-//! one the old cache holds, its parent's cached layout still stands,
-//! the ancestors keep their caches, and the root's layout is a cache
-//! hit. Otherwise the ancestors are cleared as before.
+//! one the old box gave (a layout's from the old cache, a size query's
+//! as the old box recorded it, `asked.rs`), its parent's cached layout
+//! still stands, the ancestors keep their caches, and the root's
+//! layout is a cache hit. Otherwise the ancestors are cleared as before.
 //!
 //! Three states, never a guess: `Same` keeps the ancestors; `Differs`
-//! (the owner's size, margins or baselines changed, or it bubbles an
-//! out-of-flow box up to an ancestor) and `Unknown` (no old box, no
-//! input asked, an input the old cache no longer holds, an absolute
-//! or fixed owner, which its containing block hoists and places, a
-//! restyled owner whose style holds a calc, `keep.rs`, or the root,
-//! which no parent asks: `compute_root_layout` places the fixed boxes
-//! bubbled up to it outside the cached call, and hoists them onto it
-//! only on a cache miss) clear them. An owner styled otherwise than
-//! the box it replaced differs too: its parent reads its style to
-//! work out what to ask. Owners settle deepest first: one above
+//! (the owner's size, margins or baselines changed, it bubbles an
+//! out-of-flow box up to an ancestor, or it is styled otherwise than
+//! the box it replaced: its parent reads its style to work out what to
+//! ask) and `Unknown` (no old box, no input asked, a layout's input the
+//! old cache no longer holds, a size answer disowned or bubbling an
+//! out-of-flow box up, a box asked more ways than it records
+//! (`tree_cache.rs`), an absolute or fixed owner, which its containing
+//! block hoists and places, a restyled owner whose style holds a calc,
+//! `keep.rs`, or the root, which no parent asks: `compute_root_layout`
+//! places the fixed boxes bubbled up to it outside the cached call,
+//! and hoists them onto it only on a cache miss) clear them. Owners
+//! settle deepest first: one above
 //! another places it when laid out in isolation, which the lower
 //! one's `Same`, settled after, would undo by putting its old layout
 //! back. Debug builds check the result against a fresh layout
 //! (`layout_check.rs`).
 
 use taffy::{
-    BlockFormattingContext, Cache, Layout, LayoutInput, LayoutOutput, LayoutPartialTree, NodeId,
-    Position, RunMode, Style,
+    BlockFormattingContext, Cache, Layout, LayoutOutput, LayoutPartialTree, NodeId, Position,
+    RunMode, Style,
 };
 
+use super::asked::Answer;
+pub(crate) use super::asked::Asked;
 use super::boxes::LayoutBox;
 use super::tree::BoxTree;
 
@@ -68,15 +73,6 @@ impl Before {
             natural: old.natural,
         }
     }
-}
-
-/// One way a box was asked for its layout: the input, and whether in
-/// its parent's block formatting context (`BoxTree::lay_out` given a
-/// `BlockContext`), which a block answers differently from a root.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct Asked {
-    pub(crate) input: LayoutInput,
-    pub(crate) in_block: bool,
 }
 
 /// How the changed owners were settled, by state.
@@ -126,9 +122,11 @@ impl BoxTree<'_> {
     }
 
     /// Asks the rebuilt box at `slot` each input its parent asked the
-    /// box before; `Same` when every answer is the old cache's and none
-    /// bubbles an out-of-flow box up, with the old layout restored as
-    /// the parent would set it. `at_root`: the owner has no ancestor.
+    /// box before; `Same` when every answer is the old box's (a
+    /// layout's from its cache, a size query's as it recorded it,
+    /// `asked.rs`) and none bubbles an out-of-flow box up, with the old
+    /// layout restored as the parent would set it. `at_root`: the
+    /// owner has no ancestor.
     fn isolate(&mut self, slot: usize, at_root: bool, before: Option<Before>) -> Isolation {
         let Some(mut before) = before else {
             return Isolation::Unknown;
@@ -142,11 +140,11 @@ impl BoxTree<'_> {
             .asked
             .sort_by_key(|asked| asked.input.run_mode == RunMode::PerformLayout);
         for asked in &before.asked {
-            let Some(old) = before.cache.get(&asked.input) else {
+            let Some(old) = Answer::of(asked, &mut before.cache) else {
                 return Isolation::Unknown;
             };
             let new = self.ask(id, asked);
-            if new != old || !new.oof_candidates.is_empty() {
+            if !new.oof_candidates.is_empty() || !old.is(&new) {
                 return Isolation::Differs;
             }
         }
@@ -206,8 +204,17 @@ impl BoxTree<'_> {
 #[path = "isolated_fallback_tests.rs"]
 mod fallback_tests;
 #[cfg(test)]
+#[path = "isolated_flex_tests.rs"]
+mod flex_tests;
+#[cfg(all(test, feature = "grid"))]
+#[path = "isolated_grid_tests.rs"]
+mod grid_tests;
+#[cfg(test)]
 #[path = "isolated_order_tests.rs"]
 mod order_tests;
+#[cfg(test)]
+#[path = "isolated_record_tests.rs"]
+mod record_tests;
 #[cfg(test)]
 #[path = "isolated_tests.rs"]
 mod tests;
