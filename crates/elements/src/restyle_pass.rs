@@ -29,6 +29,12 @@ impl Document {
         } else {
             self.dirty_roots()
         };
+        // Debug builds restyle the whole document again after an element
+        // insert or remove and compare it with the narrowed result
+        // (`restyle_check.rs`): O(elements) there, though
+        // `elements_restyled` still counts the narrowed set. Release
+        // builds skip it.
+        let check_narrowed = cfg!(debug_assertions) && self.dirty.narrowed && !fresh;
         self.dirty = Dirty::default();
         self.kept
             .as_mut()
@@ -38,6 +44,9 @@ impl Document {
         match self.restyle_all(&roots, &singles, viewport) {
             Ok(count) => {
                 self.counts.elements_restyled = count;
+                if check_narrowed {
+                    self.check_narrowed_restyle(viewport);
+                }
                 Ok(())
             }
             Err(error) => {

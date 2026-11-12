@@ -6,6 +6,7 @@
 pub mod basics;
 pub mod changes;
 pub mod checkbox_page;
+pub mod column_page;
 pub mod drive;
 pub mod fixup;
 pub mod focus_page;
