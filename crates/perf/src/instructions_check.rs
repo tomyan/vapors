@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use std::hint::black_box;
 
 use crate::instructions::InstructionCounter;
+use crate::run::Samples;
 
 /// Iterations of the self-check's loop. Each retires at least one
 /// instruction, since `black_box` keeps the loop from being folded.
@@ -56,6 +57,27 @@ pub fn self_check(counter: &mut InstructionCounter) -> Result<(), String> {
     }
     let after = counter.read()?;
     rose_by_at_least(before, after, LOOP_ITERATIONS)
+}
+
+/// A counter opened and self-checked.
+///
+/// # Errors
+/// The counter cannot be opened, or fails its self-check.
+pub fn checked_counter() -> Result<InstructionCounter, String> {
+    let mut counter = InstructionCounter::open()?;
+    self_check(&mut counter)?;
+    Ok(counter)
+}
+
+/// Refuses `samples` of the workload `name` with a timed phase that has
+/// no instruction count.
+///
+/// # Errors
+/// Names the workload and the phases.
+pub fn samples_counted(name: &str, samples: &Samples) -> Result<(), String> {
+    let counted = samples.instructions.as_ref().map(|kept| &kept.phases);
+    let empty = BTreeMap::new();
+    phases_counted(&samples.phases, counted.unwrap_or(&empty)).map_err(|e| format!("{name}: {e}"))
 }
 
 /// Refuses timed phases that have no instruction count.
