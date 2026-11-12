@@ -29,6 +29,14 @@ pub trait Workload {
     fn counts(&self) -> Counts;
     /// The app's frame times, its GPU time read back by this frame.
     fn timing(&self) -> FrameTiming;
+    /// Whether the workload can run frame `sample`'s app: called after
+    /// `change`, before the frame.
+    ///
+    /// # Errors
+    /// Why not (a page that failed to mount, with its cause).
+    fn ready(&self) -> Result<(), String> {
+        Ok(())
+    }
     /// Whether the app reads each frame's GPU time back in the frame after
     /// it. A workload that makes a new app for every frame has no such
     /// frame, and says so here; the sampler then keeps no GPU time.

@@ -45,13 +45,36 @@ fn a_field_that_is_not_a_count_is_refused_naming_the_line() {
 }
 
 #[test]
-fn the_table_gives_the_growth_per_row_at_the_mount_and_after_the_frame() {
+fn the_table_gives_the_slope_between_neighbouring_sizes_and_marks_the_baseline() {
     // When
-    let table = memory_table(&[row(1000, 10, 2000)]);
+    let table =
+        memory_table(&[row(0, 0, 100), row(1000, 10, 2100), row(3000, 20, 6100)]).expect("table");
 
     // Then
     assert!(
-        table.contains("| 1000 | 1000 | 1010 | 3000 | 3005 | 10 | 2048 |"),
+        table.contains("| 0 | 1000 | 1000 | 1100 | 1105 | baseline |"),
         "{table}"
     );
+    assert!(
+        table.contains("| 1000 | 1000 | 1010 | 3100 | 3105 | 2.0 |"),
+        "{table}"
+    );
+    assert!(
+        table.contains("| 3000 | 1000 | 1020 | 7100 | 7105 | 2.0 |"),
+        "{table}"
+    );
+}
+
+#[test]
+fn a_reading_that_fell_is_refused_naming_the_row() {
+    let mut fell = row(1000, 10, 20);
+    fell.after_frame_kib = fell.after_mount_kib - 1;
+    let error = memory_table(&[fell]).expect_err("a fall");
+    assert!(error.contains("1000 rows: a reading fell"), "{error}");
+}
+
+#[test]
+fn rows_out_of_order_are_refused() {
+    let error = memory_table(&[row(3000, 1, 2), row(1000, 1, 2)]).expect_err("order");
+    assert!(error.contains("1000 rows follows 3000 rows"), "{error}");
 }

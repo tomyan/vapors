@@ -10,7 +10,7 @@ pub const MAX_RUNS: usize = (wgpu::QUERY_SET_MAX_QUERIES / 2) as usize;
 
 const USAGE: &str = "cargo run --release -p vapors-perf -- \
                      [runs] [warmup] [--only <substring> (once)] [--instructions] \
-                     [--scaling Idle|Text|Class|HoveredClass|Insert] [--mount]\n                     [--mount-memory <rows>]";
+                     [--scaling Idle|Text|Class|HoveredClass|Insert] [--mount] [--mount-memory <rows>]";
 
 /// What the command line asks for.
 #[derive(Debug)]
@@ -133,8 +133,7 @@ fn refuse_mount_with_others(modes: [(&str, bool); 5]) -> Result<(), String> {
 fn mount_rows(value: Option<String>) -> Result<usize, String> {
     value
         .and_then(|rows| rows.parse().ok())
-        .filter(|&rows| rows > 0)
-        .ok_or_else(|| format!("--mount-memory needs a row count of 1 or more: {USAGE}"))
+        .ok_or_else(|| format!("--mount-memory needs a row count: {USAGE}"))
 }
 
 fn scaling_change(value: Option<String>) -> Result<RowChange, String> {

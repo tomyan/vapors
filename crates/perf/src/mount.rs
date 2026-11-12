@@ -16,7 +16,7 @@ use vapors_signals::Signal;
 use vapors_text::FontSystem;
 
 use crate::instructions::InstructionCounter;
-use crate::rss::{peak_kib, resident_kib};
+use crate::rss::{anon_kib, peak_kib};
 use crate::run::{Counts, Workload};
 
 use crate::mount_rows::{MountRows, MountRowsProps};
@@ -31,17 +31,17 @@ pub struct Mounted {
     pub time: Duration,
     /// User-space instructions of the same call.
     pub instructions: u64,
-    /// The resident set before the mount, KiB.
+    /// The anonymous resident set before the mount, KiB.
     pub rss_before_kib: u64,
-    /// The resident set after it, KiB.
+    /// The anonymous resident set after it, KiB.
     pub rss_after_kib: u64,
 }
 
 /// The resident set after a page's first frame.
 #[derive(Clone, Copy, Debug)]
 pub struct AfterFrame {
-    /// KiB now.
-    pub resident_kib: u64,
+    /// Anonymous KiB now.
+    pub anon_kib: u64,
     /// The most KiB the process has held.
     pub peak_kib: u64,
 }
@@ -82,6 +82,13 @@ impl Mount {
         mount
     }
 
+    /// Leaves the workload as a failed mount does: no page, the cause kept.
+    /// For the sampler's test, which cannot make `/proc` unreadable.
+    pub fn fail_for_test(&mut self, cause: &str) {
+        self.page = None;
+        self.failure = Some(cause.to_owned());
+    }
+
     fn remount(&mut self) {
         self.page = None;
         match mount_page(self.count, &mut self.counter) {
@@ -94,7 +101,7 @@ impl Mount {
     }
 
     fn page(&mut self) -> &mut Page {
-        self.page.as_mut().expect("check refuses a failed mount")
+        self.page.as_mut().expect("ready refuses a failed mount")
     }
 }
 
@@ -115,11 +122,11 @@ fn mount_page(count: usize, counter: &mut InstructionCounter) -> Result<(Page, M
     let doc = Rc::new(RefCell::new(Document::new(FontSystem::bundle_only())));
     let body = doc.borrow().body();
     let rows = Signal::new(row_data(count));
-    let rss_before_kib = resident_kib()?;
+    let rss_before_kib = anon_kib()?;
     let (started, before) = (Instant::now(), counter.read()?);
     let mounted_rows = MountRows::mount(&doc, body, MountRowsProps { rows });
     let (time, after) = (started.elapsed(), counter.read()?);
-    let rss_after_kib = resident_kib()?;
+    let rss_after_kib = anon_kib()?;
     let app = ElementsApp::new(Rc::clone(&doc));
     let mounted = Mounted {
         time,
@@ -142,6 +149,16 @@ impl Workload for Mount {
         SIZE
     }
 
+    /// A failed mount is refused here, with its cause, before the sampler
+    /// asks for the app.
+    fn ready(&self) -> Result<(), String> {
+        match (&self.failure, &self.page) {
+            (Some(failure), _) => Err(failure.clone()),
+            (None, None) => Err("no page is mounted".into()),
+            (None, Some(_)) => Ok(()),
+        }
+    }
+
     fn change(&mut self, sample: usize) {
         if sample > 0 {
             self.remount();
@@ -158,7 +175,7 @@ impl Workload for Mount {
         }
         let page = self.page.as_ref().ok_or("no page is mounted")?;
         self.after_frame.borrow_mut().push(AfterFrame {
-            resident_kib: resident_kib()?,
+            anon_kib: anon_kib()?,
             peak_kib: peak_kib()?,
         });
         match (next, page.app.failure().get()) {
@@ -169,7 +186,7 @@ impl Workload for Mount {
     }
 
     fn counts(&self) -> Counts {
-        let page = self.page.as_ref().expect("check refuses a failed mount");
+        let page = self.page.as_ref().expect("ready refuses a failed mount");
         Counts::of(
             &page.doc.borrow(),
             page.app.frame_counts(),
@@ -185,7 +202,7 @@ impl Workload for Mount {
     fn timing(&self) -> FrameTiming {
         self.page
             .as_ref()
-            .expect("check refuses a failed mount")
+            .expect("ready refuses a failed mount")
             .app
             .frame_timing()
     }

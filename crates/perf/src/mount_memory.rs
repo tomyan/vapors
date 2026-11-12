@@ -21,7 +21,7 @@ const PREFIX: &str = "mount-memory";
 /// The fields of a line after its prefix, in order.
 const FIELDS: [&str; 5] = ["rows", "before", "after_mount", "after_frame", "peak"];
 
-/// A page's resident set around its mount and first frame, KiB.
+/// A page's anonymous resident set around its mount and first frame, KiB.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MemoryRow {
     /// The page's row count.
@@ -32,7 +32,7 @@ pub struct MemoryRow {
     pub after_mount_kib: u64,
     /// After the first frame.
     pub after_frame_kib: u64,
-    /// The process's peak so far, after the first frame.
+    /// The process's peak resident set so far (`VmHWM`, file pages included).
     pub peak_kib: u64,
 }
 
@@ -85,7 +85,7 @@ pub fn run_child(gpu: &Gpu, rows: usize) -> Result<MemoryRow, String> {
         rows,
         before_kib: first.rss_before_kib,
         after_mount_kib: first.rss_after_kib,
-        after_frame_kib: framed.resident_kib,
+        after_frame_kib: framed.anon_kib,
         peak_kib: framed.peak_kib,
     })
 }
@@ -117,24 +117,54 @@ fn child(exe: &std::path::Path, rows: usize) -> Result<MemoryRow, String> {
     parse_line(line.ok_or_else(|| format!("the {rows}-row process printed no {PREFIX} line"))?)
 }
 
-/// The rows as a table: the resident set at each point, the growth at
-/// the mount, and the bytes per row the whole first frame grew it by.
-#[must_use]
-pub fn memory_table(rows: &[MemoryRow]) -> String {
-    let mut out = String::from(
-        "| rows | before KiB | after mount KiB | after first frame KiB | peak KiB | mount growth KiB | bytes per row, mount and frame |\n|---|---|---|---|---|---|---|\n",
-    );
+/// The rows as a table, ascending, the first the baseline: the anonymous
+/// resident set (`RssAnon`) at each point, and the KiB per extra row
+/// between each size's after-frame reading and the one before it, so the
+/// fixed cost of the baseline and of the frame's first-use allocations is
+/// not in the slope.
+///
+/// # Errors
+/// Rows not ascending, or a reading that fell (after the mount below
+/// before it, after the frame below after the mount): the reading is
+/// not a growth, and the message names the row.
+pub fn memory_table(rows: &[MemoryRow]) -> Result<String, String> {
+    let mut out = String::from(HEADER);
+    let mut previous: Option<&MemoryRow> = None;
     for row in rows {
-        let mount = row.after_mount_kib.saturating_sub(row.before_kib);
-        let frame = row.after_frame_kib.saturating_sub(row.before_kib);
-        let per_row = frame * 1024 / row.rows.max(1) as u64;
+        let slope = slope_from(previous, row)?;
         let _ = writeln!(
             out,
-            "| {} | {} | {} | {} | {} | {mount} | {per_row} |",
+            "| {} | {} | {} | {} | {} | {slope} |",
             row.rows, row.before_kib, row.after_mount_kib, row.after_frame_kib, row.peak_kib
         );
+        previous = Some(row);
     }
-    out
+    Ok(out)
+}
+
+const HEADER: &str = "| rows | anon before KiB | anon after mount KiB | anon after first frame KiB | peak KiB (VmHWM, all pages) | KiB per extra row, after first frame |\n|---|---|---|---|---|---|\n";
+
+fn slope_from(previous: Option<&MemoryRow>, row: &MemoryRow) -> Result<String, String> {
+    let fell = row.after_mount_kib < row.before_kib || row.after_frame_kib < row.after_mount_kib;
+    if fell {
+        return Err(format!(
+            "{} rows: a reading fell, not a growth: {row:?}",
+            row.rows
+        ));
+    }
+    let Some(previous) = previous else {
+        return Ok("baseline".into());
+    };
+    if previous.rows >= row.rows {
+        return Err(format!(
+            "{} rows follows {} rows: not ascending",
+            row.rows, previous.rows
+        ));
+    }
+    let grew = row.after_frame_kib.saturating_sub(previous.after_frame_kib);
+    let rows = (row.rows - previous.rows) as u64;
+    let tenths = grew * 10 / rows;
+    Ok(format!("{}.{}", tenths / 10, tenths % 10))
 }
 
 #[cfg(test)]

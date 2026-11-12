@@ -13,6 +13,15 @@ pub fn resident_kib() -> Result<u64, String> {
     status_kib("VmRSS")
 }
 
+/// The anonymous part of the resident set in KiB (`RssAnon`): heap and
+/// stacks, without file pages (code, fonts, shader caches).
+///
+/// # Errors
+/// As [`resident_kib`], for the `RssAnon` line.
+pub fn anon_kib() -> Result<u64, String> {
+    status_kib("RssAnon")
+}
+
 /// The most the resident set has been, in KiB (`VmHWM`).
 ///
 /// # Errors

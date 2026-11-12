@@ -1,4 +1,7 @@
-//! `--mount`: the Mount workload at each size of [`SIZES`], tabled.
+//! `--mount`: the Mount workload at each size of [`SIZES`], tabled. It
+//! reports and does not judge: unlike `--scaling` it asserts no growth
+//! bound, so a regression in how the counts grow shows only in the
+//! tables, read against docs/perf/mount-2026-11-12.md.
 
 use vapors_gpu_harness::Gpu;
 
@@ -28,31 +31,43 @@ const WARMUP: usize = 1;
 /// # Errors
 /// Counts that cannot be trusted, a resident set that cannot be read,
 /// or a mount that failed.
-pub fn run(gpu: &Gpu, settings: Settings) -> Result<(), String> {
+pub fn run(gpu: &Gpu, requested: Settings) -> Result<(), String> {
     let settings = Settings {
         warmup: WARMUP,
-        runs: settings.runs.min(MAX_RUNS),
+        runs: requested.runs.min(MAX_RUNS),
     };
     println!(
-        "Mount: warmup {} (the first page of each size), runs {} (at most {MAX_RUNS}); the profile line above is the full run's, not this one's\n",
-        settings.warmup, settings.runs
+        "Mount: warmup {WARMUP} and at most {MAX_RUNS} runs, whatever the command line gave \
+         (it gave warmup {} and {} runs); {} runs kept. The profile line above is the full \
+         run's.\n",
+        requested.warmup, requested.runs, settings.runs
     );
     let mut timer = Sampler::with_clock(gpu, PhaseClock::with_instructions(checked_counter()?));
     let mut measured = Vec::new();
     for rows in SIZES {
-        let mut workload = Mount::new(rows, checked_counter()?);
-        let samples = timer
-            .sample(&mut workload, settings)
-            .map_err(|e| format!("{rows} rows, Mount: {e}"))?;
-        println!("{}", mount_times(rows, &workload, &samples, settings)?);
-        measured.push(measure(rows, &workload, &samples, settings)?);
+        measured.push(run_size(&mut timer, rows, settings)?);
     }
     println!("### Mount and first frame, median instructions\n");
     println!("{}", instructions_table(&measured)?);
-    println!("### Resident set, first mount and frame of each size, one process per size\n");
-    println!("{}", memory_table(&in_processes(&SIZES)?));
     println!("{}", dominant(&measured)?);
+    print_memory()
+}
+
+/// A process per size, and a 0-row baseline first.
+fn print_memory() -> Result<(), String> {
+    let sizes = std::iter::once(0).chain(SIZES).collect::<Vec<_>>();
+    println!("\n### Anonymous memory, first mount and frame, one process per size\n");
+    println!("{}", memory_table(&in_processes(&sizes)?)?);
     Ok(())
+}
+
+fn run_size(timer: &mut Sampler, rows: usize, settings: Settings) -> Result<Measured, String> {
+    let mut workload = Mount::new(rows, checked_counter()?);
+    let samples = timer
+        .sample(&mut workload, settings)
+        .map_err(|e| format!("{rows} rows, Mount: {e}"))?;
+    println!("{}", mount_times(rows, &workload, &samples, settings)?);
+    measure(rows, &workload, &samples, settings)
 }
 
 fn mount_times(

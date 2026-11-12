@@ -1,5 +1,5 @@
-//! The Mount tables: instructions with growth per extra row, memory
-//! per row, and the leaf phase that dominates at the largest size.
+//! The Mount tables: instructions with growth per extra row, and
+//! the leaf phase that dominates at the largest size.
 
 use super::{Measured, dominant, instructions_table};
 

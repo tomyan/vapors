@@ -1,7 +1,7 @@
 //! Prints the timing baseline (docs/perf): every workload, in a release
 //! build. `cargo run --release -p vapors-perf -- [runs] [warmup]
-//! [--only <substring>] [--instructions] [--scaling <change>] [--mount] [--mount-memory <rows>]`, 200 and
-//! 20 by default (`args.rs`).
+//! [--only <substring>] [--instructions] [--scaling <change>] [--mount]
+//! [--mount-memory <rows>]`, 200 and 20 by default (`args.rs`).
 
 use vapors_gpu_harness::gpu_with;
 use vapors_perf::args::{Options, options};

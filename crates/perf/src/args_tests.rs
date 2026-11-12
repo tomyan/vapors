@@ -162,12 +162,14 @@ fn mount_memory_takes_a_row_count() {
 }
 
 #[test]
+fn mount_memory_accepts_zero_rows_as_the_baseline() {
+    let parsed = full(&["--mount-memory", "0"]).expect("parsed");
+    assert_eq!(parsed.mount_memory, Some(0));
+}
+
+#[test]
 fn mount_memory_without_a_count_or_with_a_word_is_refused() {
-    for args in [
-        &["--mount-memory"][..],
-        &["--mount-memory", "many"],
-        &["--mount-memory", "0"],
-    ] {
+    for args in [&["--mount-memory"][..], &["--mount-memory", "many"]] {
         let error = full(args).expect_err("bad count");
         assert!(
             error.starts_with("--mount-memory needs a row count"),

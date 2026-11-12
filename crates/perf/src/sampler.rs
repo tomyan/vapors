@@ -128,6 +128,9 @@ impl<'g> Sampler<'g> {
         gpu_clock: Option<&mut GpuClock>,
     ) -> Result<Measured, String> {
         workload.change(index);
+        workload
+            .ready()
+            .map_err(|error| format!("frame {index}: {error}"))?;
         self.now += INTERVAL;
         let _ = self.clock.take();
         let _ = self.clock.take_instructions()?;

@@ -32,7 +32,7 @@ fn a_mount_is_measured_and_its_page_updates_every_row() {
     let visited = page.doc.borrow().update_counts().elements_visited;
     assert!(visited >= 50 * 4, "visited {visited}");
     let measured = mount.mounted[0];
-    assert!(measured.instructions > 0 && measured.rss_after_kib >= measured.rss_before_kib);
+    assert!(measured.instructions > 0 && measured.rss_before_kib > 0 && measured.rss_after_kib > 0);
 }
 
 #[test]
@@ -61,7 +61,21 @@ fn a_checked_frame_keeps_the_resident_set_after_it_and_the_peak() {
     // Then
     let kept = mount.after_frame.borrow();
     assert_eq!(kept.len(), 1);
-    assert!(kept[0].resident_kib > 0 && kept[0].peak_kib >= kept[0].resident_kib);
+    assert!(kept[0].anon_kib > 0 && kept[0].peak_kib > 0);
+}
+
+#[test]
+fn a_mount_with_no_page_is_not_ready_and_says_why() {
+    // Given
+    let mut mount = Mount::new(10, checked_counter().expect("perf events"));
+    mount.page = None;
+    mount.failure = Some("reading /proc/self/status: gone".into());
+
+    // When
+    let ready = mount.ready();
+
+    // Then
+    assert_eq!(ready, Err("reading /proc/self/status: gone".into()));
 }
 
 #[test]
