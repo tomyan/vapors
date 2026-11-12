@@ -132,14 +132,16 @@ fn micros(time: Duration) -> String {
     format!("{:.1}", time.as_secs_f64() * 1e6)
 }
 
-/// The last frame's counts on one line.
+/// The last frame's counts on one line, and where its styles came from
+/// on a second (analysis PR 2: shared, computed, unkeyed, unshareable;
+/// live after the update).
 fn counts(counts: &Counts) -> String {
     let (u, gpu) = (&counts.update, counts.frame.total());
     format!(
         "Counts (last frame): restyled {}, text layouts {}, laid out {}, elements visited {}, \
          boxes built {}, layout calls {}, boxes painted {}, boxes shifted {}, scene items {}, \
          culled {}; draw calls {}, buffer bytes {}, texture bytes {}, uniform writes {}, \
-         bind groups {}, render passes {}.",
+         bind groups {}, render passes {}.\n{}",
         u.elements_restyled,
         counts.text_layouts,
         u.boxes_laid_out,
@@ -155,7 +157,16 @@ fn counts(counts: &Counts) -> String {
         gpu.texture_bytes,
         gpu.uniform_writes,
         gpu.bind_groups_made,
-        counts.render_passes
+        counts.render_passes,
+        style_counts(u)
+    )
+}
+
+/// Where the last frame's restyled elements took their styles from.
+fn style_counts(u: &vapors_elements::UpdateCounts) -> String {
+    format!(
+        "Styles (last frame): shared {}, computed {}, unkeyed {}, unshareable {}; live {}.",
+        u.styles_shared, u.styles_computed, u.styles_unkeyed, u.styles_unshareable, u.styles_live
     )
 }
 

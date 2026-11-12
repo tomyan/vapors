@@ -133,12 +133,36 @@ left unvisited; a slot chained to the wrong parent is caught by the
 debug oracle only. With both, Text's
 `layout` is 86k and its `update` 123k instructions at 1000, 3000 and
 10,000 rows (`vapors-perf 60 10 --scaling Text`, 2026-11-12, this
-machine); Idle passes too. Class and HoveredClass still grow in `style`
-by about 2 instructions per row (850k at 1000 rows, 869k at 10,000:
-2.2%, just over the 2% tolerance), not located: too small for a sampled
-profile, and `Document::styled` has candidates that visit every element
-(`style_attribute_refusals`, `all_styled_refusals`, `touched`,
-`recheck_tree`); a span per step would settle it.
+machine); Idle passes too. Class and HoveredClass still grew in `style`
+by about 2 instructions per row (850k at 1000 rows, 869k at 10,000).
+At 00678dc (after the shared-styles stack, #235-#240) Class passed at
+1.7% and HoveredClass failed at 3.1% (`update` 988k / 992k / 1015k).
+The cause was two hash sets the mount fills with every element, then
+cleared with `clear`, which keeps the capacity, and iterated on every
+update, which walks the capacity: `Kept::restyled_nodes` (iterated by
+`rechecked`) and `KeptChecks::marked`, the listener marks (iterated by
+`touched`). Each is now replaced with a new set (`Kept::forget_restyled`,
+`KeptChecks::checked`), and an in-crate test per set fails when it
+keeps a 1000-row mount's capacity. After it, `style` is 847k / 850k /
+853k for Class and 840k / 848k / 850k for HoveredClass at 1000 / 3000 /
+10,000 rows (0.3 to 0.4 instructions per extra row from 3000 to
+10,000); every change passes (2026-11-12, this machine).
+
+What is left of the growth is glibc's malloc, not work over the rows.
+HoveredClass `style` still rises about 5k to 9k instructions from 1000
+rows to 3000 or 10,000 (in one review run, 4999 above the 1000-row
+count against the judge's 5000 floor; it passes on the 2% bound).
+Spans around each step of `Document::styled` (three runs, removed
+after) put all of it in `style_for`, the cascade of the edited row's
+unkeyed elements: 425k / 431k / 433k, with every other step flat to
+within 300. Nothing there walks rows (siblings are linked, the
+selectors read no siblings). With jemalloc preloaded
+(`LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2`, two runs),
+`style` is 732.8k / 733.1k / 732.9k and `style_for` 256.6k / 256.8k /
+256.8k: flat. glibc's malloc costs more per call as the heap grows,
+and is about 170k of `style_for`'s 430k. Follow-up for property 1's
+time target: fewer allocations in `Cascade::compute`, or a decision on
+the allocator.
 
 ## PR 3: GPU counters
 

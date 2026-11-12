@@ -64,6 +64,14 @@ pub(crate) struct Kept {
 }
 
 impl Kept {
+    /// Forgets which elements the last update restyled. A new set, not
+    /// `clear`: a mount restyles every element, a cleared set keeps that
+    /// capacity, and `rechecked` iterates the capacity on every update,
+    /// O(elements) per edit (docs/plans/perf-finish-line.md, property 1).
+    pub(crate) fn forget_restyled(&mut self) {
+        self.restyled_nodes = NodeSet::default();
+    }
+
     /// Whether `node`'s box may take the last update's layout: not when
     /// it was restyled and its style holds a calc handle, which compares
     /// by address (see `layout::keep`).
@@ -132,3 +140,7 @@ impl Document {
         self.dirty.everything();
     }
 }
+
+#[cfg(test)]
+#[path = "restyle_tests.rs"]
+mod tests;
