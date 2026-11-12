@@ -1,6 +1,7 @@
 use taffy::{LayoutInput, LayoutOutput, RunMode};
 use vapors_dom::NodeId;
 
+use super::changed::ancestor_slots;
 use super::*;
 use crate::layout::LayoutBox;
 use crate::layout::slots::tests::tree;
@@ -28,20 +29,15 @@ fn chain() -> Placed {
 }
 
 #[test]
-fn clearing_ancestors_clears_their_caches_and_hoisted_lists_and_not_the_box() {
+fn the_ancestor_slots_are_those_of_the_ancestors_holding_a_box_nearest_first() {
     // Given
-    let mut placed = chain();
+    let placed = chain();
 
-    // When: node 3's ancestors, nodes 2 and 1
-    clear_ancestors(&mut placed, [NodeId(2), NodeId(1)].into_iter());
+    // When: node 3's ancestors, nodes 2 and 1, and node 9 with no box
+    let slots = ancestor_slots(&placed, [NodeId(2), NodeId(9), NodeId(1)].into_iter());
 
     // Then
-    for ancestor in [0, 1] {
-        assert!(placed.boxes[ancestor].cache.is_empty(), "slot {ancestor}");
-        assert!(placed.boxes[ancestor].hoisted.is_empty(), "slot {ancestor}");
-    }
-    assert!(!placed.boxes[2].cache.is_empty());
-    assert_eq!(placed.boxes[2].hoisted, [1]);
+    assert_eq!(slots, [1, 0]);
 }
 
 /// Builds node 2's subtree again in `placed` as `built`.

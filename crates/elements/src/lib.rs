@@ -60,6 +60,8 @@ mod kept_order_check;
 mod kept_paint;
 mod kept_paint_check;
 mod kept_scene_check;
+mod kept_shift;
+mod kept_shift_items;
 mod keys;
 mod lay_out_text;
 mod layout;

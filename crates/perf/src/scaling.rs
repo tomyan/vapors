@@ -64,14 +64,14 @@ pub enum Judged {
 }
 
 impl Judged {
-    /// What `change` is judged on. `Insert` is reported only: property 3
+    /// What `change` is judged on. `Insert`, `Resize` and `Scroll` are reported only: property 3
     /// of docs/plans/perf-finish-line.md (the splice step) is not built.
     #[must_use]
     pub fn of(change: RowChange) -> Self {
         match change {
             RowChange::Idle => Self::UpdateTotal,
             RowChange::Text | RowChange::Class | RowChange::HoveredClass => Self::EveryPhase,
-            RowChange::Insert => Self::Nothing,
+            RowChange::Insert | RowChange::Resize | RowChange::Scroll => Self::Nothing,
         }
     }
 }

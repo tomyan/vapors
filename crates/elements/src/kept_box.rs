@@ -21,7 +21,7 @@ use crate::style::Cursor;
 /// which follows from its rect, padding, border and style, while a
 /// value or style change rebuilds the field. The debug check
 /// (`kept_paint_check.rs`) guards all three.
-#[derive(PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct BoxFrom {
     /// Its border box, scroll offsets applied.
     pub(crate) rect: BoxRect,
@@ -119,6 +119,13 @@ impl Part {
             ranges: painting.ranges.drain().collect(),
             text_origins: painting.text_origins.drain().collect(),
         }
+    }
+
+    /// Whether every position this part holds is in its scene and its
+    /// hits: no inline element's border box, range track or text
+    /// field's origin, which paint derives from more than the rect.
+    pub(crate) fn positions_only_in_scene_and_hits(&self) -> bool {
+        self.rects.is_empty() && self.ranges.is_empty() && self.text_origins.is_empty()
     }
 
     /// Puts this part's entries into `painted`'s maps.
