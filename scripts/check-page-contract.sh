@@ -13,8 +13,8 @@
 # after `cargo xtask web`. CI runs it in the `web` job. Needs python3
 # (the server) and a browser: $CHROME, else google-chrome, else
 # chromium. Vulkan is the browser's own SwiftShader driver, beside it.
-# The directory is removed when the check passes and kept, for its logs,
-# when it fails.
+# The directory is removed when the script exits, pass or fail; with
+# PAGE_CONTRACT_KEEP=1 it is kept, with the pages, screenshots and logs.
 set -eu
 web=${1:?usage: scripts/check-page-contract.sh target/web <new or empty dir>}
 work=${2:?usage: scripts/check-page-contract.sh target/web <new or empty dir>}
@@ -22,6 +22,20 @@ port=8731
 failed=0
 
 fail() { echo "FAIL $*" >&2; failed=1; }
+
+# tidy: on exit, stops the page server and removes $work, unless
+# PAGE_CONTRACT_KEEP=1 keeps it. Set only once $work is found new or
+# empty, so a directory the script refused is never removed.
+server=
+tidy() {
+  [ -z "$server" ] || kill "$server" 2>/dev/null || true
+  if [ "${PAGE_CONTRACT_KEEP:-}" = 1 ]; then echo "kept $work (PAGE_CONTRACT_KEEP=1)" >&2; else rm -rf "$work"; fi
+}
+if [ -e "$work" ] && [ -n "$(ls -A "$work")" ]; then
+  echo "$work: not empty; give a new or empty directory" >&2; exit 1
+fi
+trap tidy EXIT
+trap 'exit 1' HUP INT TERM
 
 # browser and vulkan_driver: the one choice of browser and its Vulkan
 # driver for every page check.
@@ -57,9 +71,6 @@ PY
 
 prepare() {
   [ -f "$web/index.html" ] || { echo "$web/index.html: missing; run cargo xtask web first" >&2; exit 1; }
-  if [ -e "$work" ] && [ -n "$(ls -A "$work")" ]; then
-    echo "$work: not empty; give a new or empty directory" >&2; exit 1
-  fi
   mkdir -p "$work"; cp "$web"/* "$work"/
   # Chromium leaves org.chromium.Chromium.* directories in TMPDIR on every
   # launch; here they go with $work.
@@ -104,11 +115,17 @@ prepare() {
   # at /vapors/: its script and wasm load from beside it.
   page hello "" "$adapter"
   # No HTML control over an elements demo's canvas: once the adapter line
-  # is written, every visible element on the canvas but #error (failures
-  # stay visible) is listed on <body> as data-overlaps.
+  # is written, every element on the canvas that may paint or take a
+  # pointer event, but #error (failures stay visible), is listed on
+  # <body> as data-overlaps.
+  measure="(function () { if (status.textContent.indexOf('adapter: ') !== 0) return false; document.body.dataset.overlaps = vaporsOverlaps(); return true; })()"
   for demo in $demos index; do
-    page "$demo-overlap" "$overlaps" "(function () { if (status.textContent.indexOf('adapter: ') !== 0) return false; document.body.dataset.overlaps = vaporsOverlaps(); return true; })()"
+    page "$demo-overlap" "$overlaps" "$measure"
   done
+  # The rule's own case: the hello demo with elements over its canvas
+  # that the rule must list (refused, below) beside one it must accept.
+  page overlap-refused "$overlaps<style>#quiet-after::after { content: \"\"; position: absolute; inset: 0; pointer-events: auto; }</style>" "$measure" \
+    's|</body>|<div id="opaque" style="position:fixed;inset:0;pointer-events:none"></div><div id="clickable" style="position:fixed;inset:0;opacity:0"></div><div id="quiet" style="position:fixed;inset:0;opacity:0;pointer-events:none"><div id="clickable-child" style="position:absolute;inset:0;pointer-events:auto"></div></div><div id="quiet-after" style="position:fixed;inset:0;opacity:0;pointer-events:none"></div></body>|'
   # One screenshot of each demo per section of its .pixels file, the
   # canvas at that section's size.
   for demo in $demos; do
@@ -152,11 +169,34 @@ query() {
 # The window shoot uses: 640x400, but for a demo section's screenshot.
 size=640,400
 
-# A script defining vaporsOverlaps(): the visible elements whose boxes
-# meet the canvas's, other than the canvas, #error, and what the page
-# copies add (style, script, the hidden hold image), as `tag#id` words,
-# or `none`.
-overlaps='<script>function vaporsOverlaps() { var c = document.getElementById("vapors").getBoundingClientRect(), found = []; document.querySelectorAll("body *").forEach(function (e) { if (e.id === "vapors" || e.id === "error" || e.tagName === "SCRIPT" || e.tagName === "STYLE") return; var r = e.getBoundingClientRect(); if (r.width === 0 || r.height === 0 || getComputedStyle(e).visibility === "hidden") return; if (r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top) found.push(e.tagName.toLowerCase() + (e.id ? "#" + e.id : "")); }); return found.join(" ") || "none"; }</script>'
+# A script defining vaporsOverlaps(): the elements whose boxes meet the
+# canvas's, other than the canvas, #error, and what the page copies add
+# (style, script, the hidden hold image), as `tag#id` words, or `none`.
+# An element is left out only when it provably neither paints nor takes
+# a pointer event: it or an ancestor has opacity 0 (no descendant can
+# paint through that), and its own computed pointer-events is none, as
+# is that of its ::before and ::after when they render (a pseudo-element
+# is listed as `tag#id::after`). The a11y mirror (#vapors-a11y, R6) is
+# such an element tree; anything else on the canvas is listed.
+overlaps='<script>function vaporsOverlaps() {
+  var c = document.getElementById("vapors").getBoundingClientRect(), found = [];
+  function meets(r) { return r.width > 0 && r.height > 0 && r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top; }
+  function unpainted(e) { for (; e && e !== document.body; e = e.parentElement) if (getComputedStyle(e).opacity === "0") return true; return false; }
+  function name(e) { return e.tagName.toLowerCase() + (e.id ? "#" + e.id : ""); }
+  function touchable(e, pseudo) { var s = getComputedStyle(e, pseudo); return (!pseudo || (s.content !== "none" && s.content !== "normal")) && s.pointerEvents !== "none"; }
+  document.querySelectorAll("body *").forEach(function (e) {
+    if (e.id === "vapors" || e.id === "error" || e.tagName === "SCRIPT" || e.tagName === "STYLE") return;
+    if (!meets(e.getBoundingClientRect()) || getComputedStyle(e).visibility === "hidden") return;
+    if (!unpainted(e) || touchable(e)) { found.push(name(e)); return; }
+    ["::before", "::after"].forEach(function (p) { if (touchable(e, p)) found.push(name(e) + p); });
+  });
+  return found.join(" ") || "none";
+}</script>'
+# What overlap-refused must list: an element with pointer-events none but
+# painted, one unpainted that takes pointer events, a pointer-taking child
+# of an unpainted, untouchable parent (#quiet, accepted), and the
+# pointer-taking ::after of another such element.
+refused="div#opaque div#clickable div#clickable-child div#quiet-after::after"
 
 # viewports <demo>: each section's size in the demo's .pixels as WxH, a
 # line each; fails, naming the file, when check_pixels cannot read it.
@@ -242,7 +282,6 @@ class Pages(http.server.SimpleHTTPRequestHandler):
         pass
 http.server.ThreadingHTTPServer(('127.0.0.1', $port), Pages).serve_forever()") >/dev/null 2>&1 &
   server=$!
-  trap 'kill $server' EXIT
   python3 -c "
 import sys, time, urllib.request
 deadline = time.time() + 10
@@ -409,15 +448,19 @@ check adapter-element '^starting$' hidden '?demo=hello'
 adapter_line=$(printf '%s' "$dom" | grep -o '<p id="adapter">[^<]*</p>' | sed 's#<[^>]*>##g' || true)
 echo "adapter-element: #adapter [$adapter_line]"
 printf '%s' "$adapter_line" | grep -q '^adapter: ' || fail "adapter-element: #adapter is [$adapter_line], wanted the start-up line"
-# overlap <demo>: no visible HTML control over the elements demo's canvas.
+# overlap <page> <query> <wanted> <fix>: the page lists [<wanted>] over
+# its canvas (see vaporsOverlaps), or fails with <fix>.
 overlap() {
-  dom=$(dump "$1-overlap" "$(query "$1")") || { fail "$1-overlap: $chrome exited non-zero or passed 60 s"; console "$1-overlap"; return; }
-  held "$1-overlap" || return
+  dom=$(dump "$1" "$2") || { fail "$1: $chrome exited non-zero or passed 60 s"; console "$1"; return; }
+  held "$1" || return
   found=$(printf '%s' "$dom" | grep -o 'data-overlaps="[^"]*"' | sed 's#data-overlaps="\(.*\)"#\1#')
-  echo "$1-overlap: HTML over the canvas: [${found:-not measured}]"
-  [ "$found" = none ] || fail "$1-overlap: [${found:-not measured}] lies over the canvas of an elements demo; hide it (vapors_platform::hide_status_line, app_draws_open) or move it off the canvas"
+  echo "$1: HTML over the canvas: [${found:-not measured}]"
+  [ "$found" = "$3" ] || fail "$1: over the canvas [${found:-not measured}], wanted [$3]; $4"
 }
-for demo in $demos index; do overlap "$demo"; done
+for demo in $demos index; do
+  overlap "$demo-overlap" "$(query "$demo")" none "an element that may paint or take pointer events lies over the canvas of an elements demo; hide it (vapors_platform::hide_status_line, app_draws_open), move it off the canvas, or give it opacity 0 and pointer-events none"
+done
+overlap overlap-refused '?demo=hello' "$refused" "vaporsOverlaps accepts or refuses the wrong elements; fix the rule in $0"
 # Each demo as Chromium shows the canvas after its clicks, held to the
 # same crates/demos/demos/<name>.pixels as the native screenshot, by the
 # same code, one screenshot per section at that section's window size;
@@ -434,6 +477,5 @@ for demo in $demos; do
     fi
   done
 done
-[ "$failed" = 0 ] || { echo "the page contract does not hold; reproduce: cargo xtask web && $0 target/web \$(mktemp -d); logs kept in $work" >&2; exit 1; }
-rm -rf "$work"
-echo "ok   the page contract holds in all eleven cases, no HTML over the canvas of: $demos index; the gradient screenshot and the screenshots:$shots"
+[ "$failed" = 0 ] || { echo "the page contract does not hold; reproduce: cargo xtask web && PAGE_CONTRACT_KEEP=1 $0 target/web \$(mktemp -d), which keeps the pages and logs" >&2; exit 1; }
+echo "ok   the page contract holds in all eleven cases, no HTML over the canvas of: $demos index (overlap-refused lists its four); the gradient screenshot and the screenshots:$shots"
