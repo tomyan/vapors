@@ -43,6 +43,10 @@ pub struct UpdateCounts {
     /// Boxes not built again whose rect or padding changed since the
     /// last paint; 0 when nothing is kept.
     pub boxes_moved: usize,
+    /// Slots whose stacking (`stacking.rs`) was made from their style:
+    /// those built again (IU3 kept stackings); every held slot when
+    /// nothing is kept.
+    pub stackings_computed: usize,
     /// Boxes paint drew: one per box in painting order, outlines and
     /// scroll thumbs not included. A box built again, moved, or cut by
     /// another clip is drawn; the others' kept paint stays in place

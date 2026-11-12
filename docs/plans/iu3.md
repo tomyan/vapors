@@ -468,6 +468,15 @@ naming the first differing slot.
 - Inserting or removing boxes keeps other slots in place, so no index
   shifts; the free list keeps the vector from growing past the largest
   tree.
+- Kept stackings (perf/iu3-kept-stackings): the Idle update at 3000
+  rows is 0.046 million instructions, layout 3323 at any row count.
+  What still grows with rows on it is `KeptBoxes::keep`, which sets
+  `kept = true` on every box after paint: about 1.4 instructions per
+  box, 9.6 per row, and one 1368-byte `LayoutBox` cache line per box.
+  Setting it only on the slots built this update would remove it; not
+  built. Draw grows by about 3 instructions per row. Text and Class
+  layout still grow by about 1250 and 55 instructions per row; not
+  profiled (`docs/perf/baseline-2026-11-10.md`, "IU3 stackings kept").
 
 ## Progress
 
