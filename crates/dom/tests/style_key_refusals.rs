@@ -26,8 +26,8 @@ static PLAIN: StyleKey = StyleKey {
     style: None,
 };
 
-/// The refusals recorded on `node`, read from the calls; the
-/// recording's own unread list is taken too, so dropping it passes.
+/// The refusals recorded on `node`, read from the calls; they are
+/// also every refusal `refusals()` returns.
 fn refusals(dom: &mut RecordingDom, node: NodeId) -> Vec<String> {
     let taken = dom.refusals();
     let on_node: Vec<String> = (dom.calls().iter())
@@ -42,6 +42,7 @@ fn refusals(dom: &mut RecordingDom, node: NodeId) -> Vec<String> {
 
 fn keyed(key: &'static StyleKey) -> (RecordingDom, NodeId) {
     let mut dom = RecordingDom::new();
+    dom.expect_refusals();
     let node = dom.create_keyed_element(key);
     (dom, node)
 }
@@ -139,6 +140,7 @@ fn toggling_on_a_key_without_directives_says_it_has_none() {
 fn toggling_on_an_unkeyed_element_is_refused_naming_the_fix() {
     // Given
     let mut dom = RecordingDom::new();
+    dom.expect_refusals();
     let div = dom.create_element("div");
 
     // When
