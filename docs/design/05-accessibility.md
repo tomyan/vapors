@@ -167,3 +167,4 @@ and touché's tokens respond through `@media`. Focus is always visible
 | A4 text | Inline text boxes, selection, text inputs | The Composer and chat text are read by character and word |
 | A5 live regions | Polite and assertive with coalescing | The streamed reply is read as it arrives |
 | A6 dialogs and landmarks | Modal, landmarks, `aria-current` | About and sheets |
+| A7 reader-driven scrolling | Scrollable elements in the web mirror, scroll actions (TalkBack's scroll gestures, `ScrollIntoView` from accessibility focus) driving a vapors scroller | The layer list and the chat scrolled by a reader |
