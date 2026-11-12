@@ -1,6 +1,6 @@
-//! `class:name={bool}` on an element: one effect sets the `class`
-//! attribute to `vapors_dom::class_names` of the literal `class` names
-//! and each directive's name and expression.
+//! `class:name={bool}` on an element: the names go in the element's
+//! `StyleKey` as its toggles, and one effect calls `toggle_classes`
+//! with each directive's name and expression.
 
 use super::emit::Emitter;
 use crate::CompileError;
@@ -13,14 +13,25 @@ pub(super) fn is_class_directive(attribute: &Attribute) -> bool {
     attribute.name.starts_with(PREFIX)
 }
 
-/// Whether `element` has a `class:` directive, so its literal `class`
-/// is set by the directives' effect.
-pub(super) fn has_class_directives(element: &Element) -> bool {
-    element.attributes.iter().any(is_class_directive)
-}
-
 impl Emitter<'_> {
-    /// The effect that sets `var`'s `class`, when `element` has directives.
+    /// Each `class:` directive's name, in template order, for the key's
+    /// toggles; a name that is not a class is refused.
+    pub(super) fn directive_names<'e>(
+        &self,
+        element: &'e Element,
+    ) -> Result<Vec<&'e str>, CompileError> {
+        element
+            .attributes
+            .iter()
+            .filter(|attribute| is_class_directive(attribute))
+            .map(|attribute| {
+                directive_name(attribute)
+                    .map_err(|message| self.source.error(attribute.offset, message))
+            })
+            .collect()
+    }
+
+    /// The effect that toggles `var`'s directives, when `element` has any.
     pub(super) fn emit_class_directives(
         &mut self,
         element: &Element,
@@ -36,24 +47,26 @@ impl Emitter<'_> {
         for (name, expr) in &directives {
             pairs.push(format!("({name:?}, {})", self.raw(expr)?));
         }
-        let literal = self.literal_class(element)?;
-        let body = class_effect_body(&literal, &pairs.join(", "), var);
+        let body = vec![format!(
+            "dom.borrow_mut().toggle_classes({var}, &[{}]);",
+            pairs.join(", ")
+        )];
         self.emit_effect(&clones, &body);
         Ok(())
     }
 
-    /// The element's literal `class` text, or none; refused when it is
-    /// an expression the directives' effect would drop, or already sets
-    /// a directive's class.
-    fn literal_class(&self, element: &Element) -> Result<String, CompileError> {
-        let Some(class) = class_attribute(element) else {
-            return Ok(String::new());
+    /// The element's literal `class` names for its key; refused when
+    /// one is also a directive's class. `class={..}` was refused before
+    /// this (`attribute_refusals`, c1b).
+    pub(super) fn literal_classes<'e>(
+        &self,
+        element: &'e Element,
+    ) -> Result<Vec<&'e str>, CompileError> {
+        let Some(class) = class_attribute(element, "class") else {
+            return Ok(Vec::new());
         };
         let AttrValue::Literal(value) = &class.value else {
-            return Err(self.source.error(
-                class.offset,
-                "`class={..}` beside `class:` directives would be dropped: the directives' effect sets `class` from the literal `class=\"..\"` only; write the names in `class=\"..\"` and toggle with `class:name={bool}`",
-            ));
+            unreachable!("`class={{..}}` is refused by attribute_refusals before the key is made")
         };
         for attribute in element.attributes.iter().filter(|a| is_class_directive(a)) {
             let name = &attribute.name[PREFIX.len()..];
@@ -64,7 +77,7 @@ impl Emitter<'_> {
                 ));
             }
         }
-        Ok(value.clone())
+        Ok(value.split_ascii_whitespace().collect())
     }
 
     fn class_directives<'e>(
@@ -83,7 +96,8 @@ impl Emitter<'_> {
         &self,
         attribute: &'e Attribute,
     ) -> Result<(&'e str, &'e Expr), CompileError> {
-        let name = &attribute.name[PREFIX.len()..];
+        let name = directive_name(attribute)
+            .map_err(|message| self.source.error(attribute.offset, message))?;
         let AttrValue::Expr(expr) = &attribute.value else {
             return Err(self.source.error(
                 attribute.offset,
@@ -92,30 +106,26 @@ impl Emitter<'_> {
                 ),
             ));
         };
-        if name.is_empty()
-            || !name
-                .chars()
-                .all(|c| c.is_alphanumeric() || matches!(c, '-' | '_'))
-        {
-            return Err(self.source.error(
-                attribute.offset,
-                format!("`{PREFIX}{name}` names class `{name}`: a class directive's name is letters, digits, `-` and `_`"),
-            ));
-        }
         Ok((name, expr))
     }
 }
 
-/// The element's `class` attribute, in any case.
-pub(super) fn class_attribute(element: &Element) -> Option<&Attribute> {
-    (element.attributes.iter()).find(|attribute| attribute.name.eq_ignore_ascii_case("class"))
+/// The directive's class name; an error message when it is not one.
+fn directive_name(attribute: &Attribute) -> Result<&str, String> {
+    let name = &attribute.name[PREFIX.len()..];
+    if name.is_empty()
+        || !name
+            .chars()
+            .all(|c| c.is_alphanumeric() || matches!(c, '-' | '_'))
+    {
+        return Err(format!(
+            "`{PREFIX}{name}` names class `{name}`: a class directive's name is letters, digits, `-` and `_`"
+        ));
+    }
+    Ok(name)
 }
 
-/// `vapors_dom::class_names` of the literal names and each directive's
-/// `(name, on)`; `on` must be a `bool`.
-fn class_effect_body(literal: &str, pairs: &str, var: &str) -> Vec<String> {
-    vec![
-        format!("let value = vapors_dom::class_names({literal:?}, &[{pairs}]);"),
-        format!("dom.borrow_mut().set_attribute_if_changed({var}, \"class\", &value);"),
-    ]
+/// The element's attribute called `name`, in any case.
+pub(super) fn class_attribute<'e>(element: &'e Element, name: &str) -> Option<&'e Attribute> {
+    (element.attributes.iter()).find(|attribute| attribute.name.eq_ignore_ascii_case(name))
 }

@@ -41,7 +41,7 @@ pub fn created(dom: &Tree, tag: &str) -> Vec<NodeId> {
         .calls()
         .iter()
         .filter_map(|call| match call {
-            Call::CreateElement { node, tag: made } if made == tag => Some(*node),
+            Call::CreateKeyedElement { node, key } if key.tag == tag => Some(*node),
             _ => None,
         })
         .collect()

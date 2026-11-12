@@ -33,6 +33,7 @@ mod shell;
 mod snippet_list;
 mod snippet_params;
 mod snippets;
+mod style_key;
 mod syn_map;
 mod tag_path;
 mod tag_props;
@@ -152,8 +153,9 @@ fn generated(
         errors: tags.errors,
         unchecked: tags.unchecked,
     };
+    let keys = std::mem::take(&mut emitter.keys);
     let body = emitter.finish();
-    let raw = shell::assemble(component, &info, &body);
+    let raw = shell::assemble(component, &info, &body, &keys);
     let formatted = format::format(&source, &raw).map_err(|err| vec![err])?;
     // A plain comment, not `//!`: the file is `include!`d into a module,
     // where inner attributes are not allowed.

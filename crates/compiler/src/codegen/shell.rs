@@ -8,7 +8,12 @@ use super::script::ScriptInfo;
 use crate::ast::Component;
 
 /// The whole generated file, before prettyplease lays it out.
-pub(crate) fn assemble(component: &Component, info: &ScriptInfo, body: &str) -> String {
+pub(crate) fn assemble(
+    component: &Component,
+    info: &ScriptInfo,
+    body: &str,
+    keys: &[String],
+) -> String {
     let name = &component.name;
     let style = component
         .style
@@ -19,6 +24,7 @@ pub(crate) fn assemble(component: &Component, info: &ScriptInfo, body: &str) -> 
     if let Some(scope) = scope {
         file.push_str(&scope_constant(scope));
     }
+    file.push_str(&super::style_key::key_statics(keys));
     file.push_str(&props_struct(name, info));
     file.push_str(&component_struct(name, info));
     file.push_str(&mount_methods(name, info, body, scope.is_some()));

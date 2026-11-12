@@ -16,6 +16,14 @@ use vapors_signals::{Effect, Memo, Owner, Signal};
 pub const STYLE: &str = "\nbutton { padding: 4px 8px; }\n";
 /// The scope [`STYLE`] is added under, set on each element as [`SCOPE_ATTRIBUTE`].
 pub const SCOPE: &str = concat!(env!("CARGO_PKG_NAME"), "/", "src/counter.wisp");
+static KEY_BUTTON0: vapors_dom::StyleKey = vapors_dom::StyleKey {
+    site: "src/counter.wisp:10",
+    scope: Some(SCOPE),
+    tag: "button",
+    classes: &[],
+    toggles: &[],
+    style: None,
+};
 /// What a parent passes to [`Counter::mount`]; each prop has a default.
 #[derive(Default)]
 pub struct CounterProps {}
@@ -65,10 +73,9 @@ impl Counter {
                 let count: Signal<i32> = Signal::named("count", 0);
                 let increment = move || count.update(|n| *n += 1);
                 let mut roots = Vec::new();
-                let button0 = dom.borrow_mut().create_element("button");
+                let button0 = dom.borrow_mut().create_keyed_element(&KEY_BUTTON0);
                 dom.borrow_mut().insert_before(parent, button0, before);
                 roots.push(Root::Node(button0));
-                dom.borrow_mut().set_attribute(button0, SCOPE_ATTRIBUTE, SCOPE);
                 {
                     #[allow(
                         clippy::clone_on_copy,
