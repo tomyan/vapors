@@ -25,6 +25,8 @@ winit = { version = "0.30", default-features = false, features = ["rwh_06", "x11
 png = "0.18"
 vapors-scene = { path = "crates/scene" }
 vapors-scene3d = { path = "crates/scene3d" }
+vapors-scene3d-gpu = { path = "crates/scene3d-gpu" }
+vapors-scene3d-components = { path = "crates/scene3d-components" }
 # Matrix maths for the 3D scene (docs/plans/3d-2.md, decision 3).
 glam = "=0.34.3"
 vapors-gpu = { path = "crates/gpu" }
