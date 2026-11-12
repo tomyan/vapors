@@ -203,3 +203,64 @@ fn gpu_bytes_kept_for_a_newer_encoder_while_an_older_is_open_panic() {
     let newer = frame.encoder();
     let _ = frame.keep(&newer, (1, 1.0, RED));
 }
+
+#[test]
+fn gpu_a_range_released_in_the_frame_that_drew_it_is_not_reused_in_that_frame() {
+    // Given: a red quad kept, drawn and released in one frame
+    let mut frame = Frame::new(gpu());
+    let encoder = frame.encoder();
+    let red = kept(frame.keep(&encoder, (1, 0.0, RED)), "red");
+    frame.draw(&encoder, &red);
+    frame.pipeline.release(red);
+
+    // When: a green one kept and drawn in the same frame
+    let green = kept(frame.keep(&encoder, (1, 1.0, GREEN)), "green");
+    frame.draw(&encoder, &green);
+    encoder.submit(&frame.gpu.queue).expect("no refusal");
+
+    // Then: the red draw read its own bytes
+    assert_eq!(frame.row(), [RED, GREEN, BACKGROUND]);
+}
+
+#[test]
+fn gpu_a_released_range_is_reused_once_a_newer_encoder_writes() {
+    // Given: a quad kept and released in one frame
+    let mut frame = Frame::new(gpu());
+    let first = frame.encoder();
+    let red = kept(frame.keep(&first, (512, 0.0, RED)), "red");
+    frame.pipeline.release(red);
+    first.submit(&frame.gpu.queue).expect("no refusal");
+
+    // When: a whole buffer's worth kept in the next
+    let second = frame.encoder();
+    let green = kept(frame.keep(&second, (512, 1.0, GREEN)), "green");
+    frame.draw(&second, &green);
+    second.submit(&frame.gpu.queue).expect("no refusal");
+
+    // Then: it fit where the first was, with no move
+    let work = frame.pipeline.take_work();
+    assert_eq!((work.retained_grown, work.retained_compacted), (0, 0));
+    assert_eq!(frame.row(), [BACKGROUND, GREEN, BACKGROUND]);
+}
+
+#[test]
+fn gpu_a_range_released_before_a_move_is_not_given_back_in_the_new_buffer() {
+    // Given: A released, then a move that packs B at the start
+    let mut frame = Frame::new(gpu());
+    let first = frame.encoder();
+    let released = kept(frame.keep(&first, (300, 3.0, RED)), "A");
+    let green = kept(frame.keep(&first, (100, 0.0, GREEN)), "B");
+    frame.pipeline.release(released);
+    let _blue = kept(frame.keep(&first, (300, 2.0, BLUE)), "C");
+    first.submit(&frame.gpu.queue).expect("no refusal");
+
+    // When: more kept in the next frame, and B drawn beside it
+    let second = frame.encoder();
+    let red = kept(frame.keep(&second, (100, 1.0, RED)), "D");
+    frame.draw(&second, &green);
+    frame.draw(&second, &red);
+    second.submit(&frame.gpu.queue).expect("no refusal");
+
+    // Then: B kept its own bytes
+    assert_eq!(frame.row(), [GREEN, RED, BACKGROUND]);
+}

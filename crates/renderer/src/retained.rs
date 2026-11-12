@@ -12,10 +12,11 @@
 //! old buffer; the copies run after them and before later draws, and
 //! every write is to a range no copy touches.
 //!
-//! A range is released only when no draw of an open encoder reads it:
-//! the caller releases a batch's range in a frame that does not draw
-//! it, and writes for a newer encoder while an older one is open panic
-//! as [`FrameArena::push`](crate::FrameArena::push) does.
+//! A released range may still be read by a draw recorded into the
+//! encoder the buffer last wrote for, so it is free for new bytes only
+//! once a newer encoder writes; writes for a newer encoder while an
+//! older one is open panic as [`FrameArena::push`](crate::FrameArena::push)
+//! does.
 
 use std::ops::Range;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -41,6 +42,9 @@ pub struct Retained {
     /// By [`KeptRange::slot`]: the range's bytes, or `None` once released.
     ranges: Vec<Option<Range<u64>>>,
     vacant: Vec<u32>,
+    /// Ranges released since the last encoder began: free once a newer
+    /// one writes.
+    released: Vec<Range<u64>>,
     live: u64,
     owner: u64,
     turn: EncoderTurn,
@@ -68,6 +72,7 @@ impl Retained {
             free: FreeRanges::new(size),
             ranges: Vec::new(),
             vacant: Vec::new(),
+            released: Vec::new(),
             live: 0,
             owner: NEXT_OWNER.fetch_add(1, Ordering::Relaxed),
             turn: EncoderTurn::new(label),
@@ -98,7 +103,11 @@ impl Retained {
              instance or vertex to 16 bytes (retained.rs)",
             self.label
         );
-        self.turn.begin(frame);
+        if self.turn.begin(frame) {
+            self.released
+                .drain(..)
+                .for_each(|range| self.free.give(range));
+        }
         let start = match self.free.take(size) {
             Some(start) => start,
             None => self.moved(frame, work, size)?,
@@ -129,7 +138,9 @@ impl Retained {
         range.end - range.start
     }
 
-    /// Gives `kept`'s bytes back for later ranges.
+    /// Gives `kept`'s bytes back, for ranges kept once a newer encoder
+    /// than the last one written for begins: a draw recorded before may
+    /// still read them.
     ///
     /// # Panics
     ///
@@ -140,7 +151,7 @@ impl Retained {
         self.ranges[kept.slot as usize] = None;
         self.vacant.push(kept.slot);
         self.live -= range.end - range.start;
-        self.free.give(range);
+        self.released.push(range);
     }
 
     /// Bytes held by kept ranges.

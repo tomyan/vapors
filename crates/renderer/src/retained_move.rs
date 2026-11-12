@@ -40,7 +40,8 @@ impl Retained {
     }
 
     /// Copies each live range into a new buffer of `size` bytes, packed
-    /// in slot order, and reads them from there.
+    /// in slot order, and reads them from there. No draw recorded so far
+    /// reads the new buffer, so all of it past the live ranges is free.
     fn move_to(&mut self, frame: &FrameEncoder, size: u64) {
         let moved = buffer(frame.device(), self.label, self.usage, size);
         let mut end = 0;
@@ -53,5 +54,7 @@ impl Retained {
             }
         });
         (self.buffer, self.free) = (moved, FreeRanges::after(end, size));
+        // The released ranges were left behind in the old buffer.
+        self.released.clear();
     }
 }
