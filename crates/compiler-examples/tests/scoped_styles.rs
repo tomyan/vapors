@@ -94,3 +94,12 @@ fn the_compiler_reserves_the_attribute_the_dom_scopes_by() {
         vapors_dom::SCOPE_ATTRIBUTE
     );
 }
+
+#[test]
+fn the_compiler_refuses_the_directives_past_what_the_dom_keeps() {
+    // Then: one number, held in two crates that do not depend on each other
+    assert_eq!(
+        vapors_compiler::MAX_CLASS_DIRECTIVES,
+        vapors_dom::MAX_TOGGLES
+    );
+}

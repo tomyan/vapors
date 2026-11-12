@@ -15,7 +15,8 @@ mod structural;
 pub use element::Element;
 pub use matching::matches;
 pub use nth::Nth;
-pub use share::{attribute_names, reads_siblings_or_descendants};
+pub(crate) use share::reads_siblings_or_descendants;
+pub use share::{attribute_names, state_flags};
 pub use specificity::Specificity;
 
 use crate::ast::ComponentValue;

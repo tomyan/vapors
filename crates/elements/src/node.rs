@@ -27,6 +27,9 @@ pub(crate) struct Element {
     pub(crate) key: Option<&'static StyleKey>,
     /// Which of the key's `class:` directives are on, as bits.
     pub(crate) toggles: u64,
+    /// The calls refused on it, each naming the site and the fix
+    /// (`dom_keyed`); every update refuses while it is in the tree.
+    pub(crate) refused: Vec<String>,
 }
 
 impl Element {
@@ -39,16 +42,20 @@ impl Element {
             states: States::NONE,
             key: None,
             toggles: 0,
+            refused: Vec::new(),
         }
     }
 
-    /// An element of `key`'s tag with the key's attributes set.
+    /// An element of `key`'s tag with the key's attributes set, and
+    /// the key's shape refusal, if any, recorded.
     pub(crate) fn keyed(key: &'static StyleKey) -> Self {
         let mut element = Self::new(key.tag);
         for (name, value) in key.attributes() {
             element.attributes.insert(name.to_owned(), value);
         }
         element.key = Some(key);
+        let refusal = key.shape_refusal();
+        (element.refused).extend(refusal.map(|r| format!("create_keyed_element: {r}")));
         element
     }
 }

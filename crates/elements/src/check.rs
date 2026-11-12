@@ -41,7 +41,8 @@ pub(crate) fn check_tree(
         .collect()
 }
 
-/// The refusals for `node`'s tag, attributes, text and listeners.
+/// The refusals for `node`'s tag, attributes, text and listeners, and
+/// the calls refused on it (`dom_keyed`).
 pub(crate) fn check_element(
     arena: &Arena,
     node: NodeId,
@@ -55,6 +56,7 @@ pub(crate) fn check_element(
         .into_iter()
         .collect();
     errors.extend(attribute_refusals(arena, node, element));
+    errors.extend(element.refused.iter().cloned().map(ElementError::Refused));
     errors.extend(right_to_left_text(arena, node));
     for (event, _) in &element.listeners {
         if let Some(refusal) = tags::unfired(event).filter(|_| !declared.contains(event)) {

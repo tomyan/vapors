@@ -8,6 +8,7 @@ use crate::{NodeId, PropertyValue, StyleKey};
 mod dispatch;
 mod dom_impl;
 mod html;
+mod keyed;
 
 /// One recorded call, with the ids involved.
 #[derive(Debug, Clone, PartialEq)]
@@ -42,6 +43,12 @@ pub enum Call {
     ToggleClasses {
         node: NodeId,
         toggles: Vec<(String, bool)>,
+    },
+    /// A call refused on `node`, naming the site and the fix; it
+    /// changed nothing (`Dom::create_keyed_element`).
+    Refused {
+        node: NodeId,
+        refusal: String,
     },
     Append {
         parent: NodeId,
