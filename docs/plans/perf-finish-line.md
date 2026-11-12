@@ -25,6 +25,11 @@ the harness shows it, not when the code is believed to do it.
 
 Property 1 at 10,000 rows has a 10,000-row workload in `vapors-perf`.
 
+Property 9's run judges every frame from the first, with no warmup
+frames excluded, unless Tom decides otherwise (`docs/plans/one-scene.md`,
+D7): `vapors-perf`'s default 20 warmup frames would leave out the
+mount, pipeline creation and first uploads.
+
 Properties 1 and 6 are judged by `vapors-perf --scaling`, per change:
 
 ```
