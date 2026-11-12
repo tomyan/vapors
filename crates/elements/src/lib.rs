@@ -61,6 +61,7 @@ mod inline_check;
 mod kept_batches;
 #[cfg(debug_assertions)]
 mod kept_batches_check;
+mod kept_batches_keys;
 mod kept_box;
 mod kept_checks;
 mod kept_clips;
@@ -167,6 +168,7 @@ pub use document::Document;
 pub use error::ElementError;
 pub use events::Point;
 pub use focus_style::Focus;
+pub use kept_batches_keys::{BatchKey, KeptBatched};
 pub use keys::{Keystroke, Modifiers};
 pub use layout::BoxRect;
 pub use number_validity::{RangeValidity, SetNumberError};

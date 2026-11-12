@@ -387,6 +387,23 @@ time recorded in `docs/perf/`, three runs, medians, at 1000, 3000 and
 | 5 | The per-frame extents index; `hidden` replaced by per-frame item counts; the candidate debug check | Resize and Scroll at 10,000 rows: `batches` instructions equal to 1000 rows' within noise; `culled` unchanged | after 4b; `kept_batches.rs`, `drawn_steps.rs` |
 | 6 | Acceptance: every rows workload at 1000, 3000 and 10,000 rows, Scroll, Insert and Resize, instruction counts, wall clock and GPU time in `docs/perf/`; property 2 and the scroll remainder of property 4 marked held or not in `perf-finish-line.md` | Draw under 1 ms and the same within noise at every row count; Scroll's update within Idle's | last |
 
+PR 2 as built (2026-11-12), split along the file seam into 2a
+(`crates/renderer`: `Retained`, the pipelines' kept ranges) and 2b
+(the painter and the keys):
+
+- `Kept` is split across crates, because `vapors-elements` does not
+  depend on the renderer. `KeptBatches` keeps a `BatchKey` per batch
+  (`kept_batches_keys.rs`), and the painter keeps each key's range,
+  viewport and debug bytes (`painter_kept_gpu.rs`).
+- Matching by place alone gave every batch after an inserted one a new
+  key, for example when a class toggle adds a background quad that
+  splits a text batch. So batches are matched by place from the start
+  up to the first difference, and by place from the end after it.
+- A released range is reused only once a newer encoder writes, because
+  a draw recorded earlier in the same frame may still read it.
+- Text batches keep keys by `TextId` (risk 8). Their bytes are not
+  kept until PR 3, which must compare the resolved layouts.
+
 Recommended order: 0, 1, 2, 3, 4a, 4b, 4c, 5, 6. PRs 0 to 3 touch no
 file the paint, splice, layout or style lanes change and can run as
 one lane beside them. 4a waits for 3c-3e (which decides what a moved
