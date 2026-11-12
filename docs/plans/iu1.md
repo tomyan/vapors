@@ -133,12 +133,20 @@ left unvisited; a slot chained to the wrong parent is caught by the
 debug oracle only. With both, Text's
 `layout` is 86k and its `update` 123k instructions at 1000, 3000 and
 10,000 rows (`vapors-perf 60 10 --scaling Text`, 2026-11-12, this
-machine); Idle passes too. Class and HoveredClass still grow in `style`
-by about 2 instructions per row (850k at 1000 rows, 869k at 10,000:
-2.2%, just over the 2% tolerance), not located: too small for a sampled
-profile, and `Document::styled` has candidates that visit every element
-(`style_attribute_refusals`, `all_styled_refusals`, `touched`,
-`recheck_tree`); a span per step would settle it.
+machine); Idle passes too. Class and HoveredClass still grew in `style`
+by about 2 instructions per row (850k at 1000 rows, 869k at 10,000).
+At 00678dc (after the shared-styles stack, #235-#240) Class passed at
+1.7% and HoveredClass failed at 3.1% (`update` 988k / 992k / 1015k).
+The cause was two hash sets the mount fills with every element, then
+cleared with `clear`, which keeps the capacity, and iterated on every
+update, which walks the capacity: `Kept::restyled_nodes` (iterated by
+`rechecked`) and `KeptChecks::marked`, the listener marks (iterated by
+`touched`). Each is now replaced with a new set (`Kept::forget_restyled`,
+`KeptChecks::checked`), and an in-crate test per set fails when it
+keeps a 1000-row mount's capacity. After it, `style` is 847k / 850k /
+853k for Class and 840k / 848k / 850k for HoveredClass at 1000 / 3000 /
+10,000 rows (0.3 to 0.4 instructions per extra row from 3000 to
+10,000); every change passes (2026-11-12, this machine).
 
 ## PR 3: GPU counters
 
