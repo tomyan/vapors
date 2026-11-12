@@ -3,7 +3,7 @@
 //! tag or event the tree does not implement yet is accepted here and
 //! refused by `update` while it is in the document (see `check`).
 
-use vapors_dom::{Dom, Handler, NodeId, PropertyValue};
+use vapors_dom::{Dom, Handler, NodeId, PropertyValue, StyleKey};
 
 use crate::document::Document;
 use crate::node::{Element, Kind, Node};
@@ -12,6 +12,17 @@ impl Dom for Document {
     fn create_element(&mut self, tag: &str) -> NodeId {
         self.arena
             .insert(Node::new(Kind::Element(Element::new(tag))))
+    }
+
+    fn create_keyed_element(&mut self, key: &'static StyleKey) -> NodeId {
+        self.arena
+            .insert(Node::new(Kind::Element(Element::keyed(key))))
+    }
+
+    fn toggle_classes(&mut self, node: NodeId, toggles: &[(&str, bool)]) {
+        if let Some(class) = self.toggled_class(node, toggles) {
+            self.write_attribute(node, "class", &class);
+        }
     }
 
     /// Every mount calls it; only an event not declared before can
@@ -42,17 +53,10 @@ impl Dom for Document {
     /// The restyle it marks covers `:invalid` following a number
     /// field's `min`, `max` or `step` (3-E3c), which
     /// `invalid_follows_a_max_narrowed_under_the_value` pins.
+    /// Refused for an attribute the element's key fixes (`dom_keyed`).
     fn set_attribute(&mut self, node: NodeId, name: &str, value: &str) {
-        self.note_change();
-        self.element_mut(node, "set_attribute")
-            .attributes
-            .insert(name.to_owned(), value.to_owned());
-        self.mark_changed(node);
-        self.boxes.marks.mark(node);
-        // a text field's editor follows its `value` attribute until the
-        // field is edited, as the DOM's value does (E6a); a number
-        // field's shown text also follows `step`, `min` and `max`
-        self.editor_from_text(node);
+        self.refuse_keyed_attribute(node, name);
+        self.write_attribute(node, name, value);
     }
 
     fn set_text(&mut self, node: NodeId, text: &str) {
@@ -172,7 +176,21 @@ impl Dom for Document {
 }
 
 impl Document {
-    fn element_mut(&mut self, node: NodeId, call: &str) -> &mut Element {
+    /// Writes the attribute and marks what follows it.
+    fn write_attribute(&mut self, node: NodeId, name: &str, value: &str) {
+        self.note_change();
+        self.element_mut(node, "set_attribute")
+            .attributes
+            .insert(name.to_owned(), value.to_owned());
+        self.mark_changed(node);
+        self.boxes.marks.mark(node);
+        // a text field's editor follows its `value` attribute until the
+        // field is edited, as the DOM's value does (E6a); a number
+        // field's shown text also follows `step`, `min` and `max`
+        self.editor_from_text(node);
+    }
+
+    pub(crate) fn element_mut(&mut self, node: NodeId, call: &str) -> &mut Element {
         match &mut self.arena.get_mut(node, call).kind {
             Kind::Element(element) => element,
             Kind::Text(text) => {

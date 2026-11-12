@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use super::{Call, Kind, RecordingDom};
-use crate::{Dom, Handler, NodeId, PropertyValue};
+use crate::{Dom, Handler, NodeId, PropertyValue, StyleKey};
 
 impl Dom for RecordingDom {
     fn create_element(&mut self, tag: &str) -> NodeId {
@@ -12,12 +12,53 @@ impl Dom for RecordingDom {
             tag: tag.into(),
             attributes: BTreeMap::new(),
             properties: BTreeMap::new(),
+            key: None,
         });
         self.calls.push(Call::CreateElement {
             node,
             tag: tag.into(),
         });
         node
+    }
+
+    fn create_keyed_element(&mut self, key: &'static StyleKey) -> NodeId {
+        let attributes = key
+            .attributes()
+            .into_iter()
+            .map(|(name, value)| (name.to_owned(), value))
+            .collect();
+        let node = self.push(Kind::Element {
+            tag: key.tag.into(),
+            attributes,
+            properties: BTreeMap::new(),
+            key: Some((key, 0)),
+        });
+        self.calls.push(Call::CreateKeyedElement { node, key });
+        node
+    }
+
+    fn toggle_classes(&mut self, node: NodeId, toggles: &[(&str, bool)]) {
+        let Kind::Element {
+            attributes,
+            key: Some((key, mask)),
+            ..
+        } = &mut self.record_mut(node).kind
+        else {
+            panic!(
+                "toggle_classes: {node:?} was not created by create_keyed_element, so it has no `class:` directives"
+            )
+        };
+        *mask = key
+            .toggled(*mask, toggles)
+            .unwrap_or_else(|refusal| panic!("{refusal}"));
+        attributes.insert("class".into(), key.class_attribute(*mask));
+        self.calls.push(Call::ToggleClasses {
+            node,
+            toggles: toggles
+                .iter()
+                .map(|(n, on)| ((*n).to_owned(), *on))
+                .collect(),
+        });
     }
 
     fn create_text(&mut self, text: &str) -> NodeId {
@@ -29,8 +70,15 @@ impl Dom for RecordingDom {
         node
     }
 
+    /// Refuses an attribute the element's key fixes (`StyleKey::refusal`).
     fn set_attribute(&mut self, node: NodeId, name: &str, value: &str) {
-        if let Kind::Element { attributes, .. } = &mut self.record_mut(node).kind {
+        if let Kind::Element {
+            attributes, key, ..
+        } = &mut self.record_mut(node).kind
+        {
+            if let Some(refusal) = key.and_then(|(key, _)| key.refusal(name)) {
+                panic!("set_attribute: {refusal}");
+            }
             attributes.insert(name.into(), value.into());
         }
         self.calls.push(Call::SetAttribute {

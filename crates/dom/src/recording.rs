@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use crate::{NodeId, PropertyValue};
+use crate::{NodeId, PropertyValue, StyleKey};
 
 mod dispatch;
 mod dom_impl;
@@ -16,6 +16,10 @@ pub enum Call {
     CreateElement {
         node: NodeId,
         tag: String,
+    },
+    CreateKeyedElement {
+        node: NodeId,
+        key: &'static StyleKey,
     },
     CreateText {
         node: NodeId,
@@ -34,6 +38,10 @@ pub enum Call {
         node: NodeId,
         name: String,
         value: PropertyValue,
+    },
+    ToggleClasses {
+        node: NodeId,
+        toggles: Vec<(String, bool)>,
     },
     Append {
         parent: NodeId,
@@ -65,6 +73,9 @@ enum Kind {
         tag: String,
         attributes: BTreeMap<String, String>,
         properties: BTreeMap<String, PropertyValue>,
+        /// The template's key, for an element made by
+        /// `create_keyed_element`, and which of its directives are on.
+        key: Option<(&'static StyleKey, u64)>,
     },
     Text(String),
 }
@@ -95,6 +106,7 @@ impl RecordingDom {
             tag: "root".into(),
             attributes: BTreeMap::new(),
             properties: BTreeMap::new(),
+            key: None,
         });
         dom
     }
