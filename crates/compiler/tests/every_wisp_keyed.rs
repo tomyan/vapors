@@ -15,6 +15,7 @@ const DIRS: &[(&str, Styles)] = &[
     ("elements-corpus/fixtures", Styles::Global),
     ("perf/ui", Styles::Scoped),
     ("racer/ui", Styles::Scoped),
+    ("scene3d-components/tests/pages", Styles::Scoped),
 ];
 
 /// Every `.rs` file under `dir`.

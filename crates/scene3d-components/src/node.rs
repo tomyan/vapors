@@ -1,13 +1,14 @@
 //! What every node component does: an inert anchor element, a scene
 //! node under the parent's, a transform effect, and its children.
 
+use crate::children::render_children;
 use crate::placement::{Placement, place, placement_of};
 use std::cell::RefCell;
 use std::fmt::Display;
 use std::rc::Rc;
 use vapors_dom::{Dom, NodeId as ElementId, Root, Snippet};
-use vapors_scene3d::{NodeId, NodeKind, Transform};
-use vapors_signals::{Effect, Owner, Signal};
+use vapors_scene3d::{NodeId, NodeKind, StoreError, Transform};
+use vapors_signals::{Effect, Owner, Signal, on_cleanup};
 
 /// The anchor's inline style: no box, so no layout, no paint and no
 /// place in the accessibility tree.
@@ -51,7 +52,8 @@ pub(crate) fn mount_node(
         let placement = Placement { node, ..above };
         place(&mut *dom.borrow_mut(), anchor, placement.clone());
         follow_transform(component, placement.clone(), transform);
-        children.render(dom, anchor, None, || ());
+        remove_on_cleanup(component, placement.clone());
+        render_children(dom, anchor, children, component);
         Mounted {
             owner,
             roots: vec![Root::Node(anchor)],
@@ -70,6 +72,22 @@ fn follow_transform(component: &'static str, placement: Placement, transform: Si
             .borrow_mut()
             .set_transform(placement.node, local);
         refuse(component, written);
+        placement.invalidate(component);
+    });
+}
+
+/// Removes the node, with its subtree, when the component's owner is
+/// disposed (an `{if}` hiding it, a `{for}` dropping its row, an
+/// unmount), and invalidates the surface. An owner's cleanups run
+/// before its children's, so a child whose ancestor's removal took it
+/// already finds it stale, and that alone is let through.
+fn remove_on_cleanup(component: &'static str, placement: Placement) {
+    on_cleanup(move || {
+        let removed = placement.scene.borrow_mut().remove(placement.node);
+        match removed {
+            Ok(_) | Err(StoreError::Stale(_)) => {}
+            Err(error) => panic!("<{component}>: {error}"),
+        }
         placement.invalidate(component);
     });
 }

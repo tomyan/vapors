@@ -27,11 +27,17 @@
 //! counts the scene's draws in `FrameCounts::surfaces`.
 //!
 //! A required prop is an `Option`, refused at mount when `None`, since
-//! a parent's props struct takes every unset prop from `Default`.
-//! Unmounting a component leaves its node in the scene until row 5
-//! (lifecycle).
+//! a parent's props struct takes every unset prop from `Default`. Markup
+//! that is not a node component, inside `<Scene>` or `<Group>`, is
+//! refused: the anchor would hide it.
+//!
+//! Disposing a component's owner (an `{if}` hiding it, a `{for}`
+//! dropping its row, `unmount`) removes its node and the subtree under
+//! it, and invalidates the surface. Keeping identity across a keyed
+//! reorder and releasing geometry are row 5.
 
 mod camera;
+mod children;
 mod component;
 mod group;
 mod mesh;

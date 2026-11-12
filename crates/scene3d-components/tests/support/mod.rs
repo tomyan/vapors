@@ -8,7 +8,7 @@ include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 use scene_page::{ScenePage, ScenePageProps};
 use std::cell::RefCell;
 use std::rc::Rc;
-use vapors_app::ElementsApp;
+use vapors_app::{ElementsApp, SurfaceHandle};
 use vapors_elements::Document;
 use vapors_scene3d::{CameraHandle, Colour, Meshes, Projection, Scene, Transform, Vec3};
 use vapors_scene3d_gpu::SceneRenderer;
@@ -17,6 +17,7 @@ use vapors_text::FontSystem;
 
 /// The page's signals, as the test writes them.
 pub struct Signals {
+    pub back: Signal<Transform>,
     pub left: Signal<Transform>,
     pub left_colour: Signal<Colour>,
     pub shown: Signal<bool>,
@@ -27,6 +28,7 @@ pub struct Rig {
     pub app: ElementsApp,
     pub scene: Rc<RefCell<Scene>>,
     pub meshes: Rc<RefCell<Meshes>>,
+    pub surface: SurfaceHandle,
     pub page: ScenePage,
     pub signals: Signals,
 }
@@ -53,6 +55,7 @@ impl Rig {
         let surface = app.mount("view", Box::new(renderer)).unwrap();
         let square = square(&meshes);
         let signals = Signals {
+            back: Signal::new(Transform::from_translation(Vec3::new(0.0, 0.0, 5.0)).unwrap()),
             left: Signal::new(Transform::IDENTITY),
             left_colour: Signal::new(red()),
             shown: Signal::new(false),
@@ -60,11 +63,11 @@ impl Rig {
         let eye = CameraHandle::new();
         let props = ScenePageProps {
             scene: Some(Rc::clone(&scene)),
-            surface: Some(surface),
+            surface: Some(surface.clone()),
             square: Some(square),
             eye: Some(eye),
             lens: Some(Projection::orthographic(4.0, 0.1, 100.0).unwrap()),
-            back: Signal::new(Transform::from_translation(Vec3::new(0.0, 0.0, 5.0)).unwrap()),
+            back: signals.back,
             left: signals.left,
             left_colour: signals.left_colour,
             right: Signal::new(at(1.0)),
@@ -78,6 +81,7 @@ impl Rig {
             app,
             scene,
             meshes,
+            surface,
             page,
             signals,
         }

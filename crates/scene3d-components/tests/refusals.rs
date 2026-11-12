@@ -35,7 +35,7 @@ fn a_mesh_without_geometry_is_refused() {
 }
 
 #[test]
-#[should_panic(expected = "<Mesh>: ")]
+#[should_panic(expected = "was removed: use an id this scene returned")]
 fn a_colour_set_on_a_removed_mesh_is_refused() {
     // Given: the mesh's node removed behind the component's back
     let rig = Rig::new();
@@ -77,4 +77,26 @@ fn a_camera_without_a_projection_is_refused() {
 
     // When
     Camera::mount(&rig.doc, anchor, props);
+}
+
+#[test]
+fn markup_inside_a_group_is_refused_naming_its_template_site() {
+    // Given
+    let rig = Rig::new();
+    let body = rig.doc.borrow().body();
+    let props = support::markup_in_group::MarkupInGroupProps {
+        scene: Some(Rc::clone(&rig.scene)),
+        surface: Some(rig.surface.clone()),
+    };
+
+    // When
+    let mount = || support::markup_in_group::MarkupInGroup::mount(&rig.doc, body, props);
+    let Err(refusal) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(mount)) else {
+        panic!("markup inside a group was mounted, not refused");
+    };
+
+    // Then
+    let message = refusal.downcast_ref::<String>().expect("a formatted panic");
+    assert!(message.contains("<Group> holds <p> at "), "{message}");
+    assert!(message.contains("markup_in_group.wisp:10:"), "{message}");
 }
