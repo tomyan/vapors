@@ -48,6 +48,7 @@ impl Emitter<'_> {
                 ),
             ));
         }
+        super::attribute_refusals::refuse_misleading(self.source, attribute)?;
         if let Some(event) = attribute
             .name
             .strip_prefix("on")

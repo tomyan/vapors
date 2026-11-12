@@ -85,7 +85,9 @@ the one difference from the brief in this slice.
 - **Attributes** come in three forms: `name="literal"`,
   `name={expr}`, and the shorthand `{name}`, which means
   `name={name}`. A bare `name` with no value is refused with the fix.
-  Each name may appear once.
+  Each name may appear once. A quoted value is text: a `{` in it is
+  refused (build the value with `name={format!(..)}`, or write
+  `&#123;`).
 - **Events:** `onclick={handler}` listens for `click`. The event name
   is the attribute name after `on`. The handler is a script closure or
   an inline closure that takes `&mut Event`. It returns `()` or
@@ -229,6 +231,13 @@ The compiler refuses:
   or named like a node the generated code creates for this template
   (`p0`, `button3`); and a raw identifier such as `r#gen`;
 - an unknown character reference, and a Rust if-expression in a hole;
+- an HTML boolean attribute (`checked`, `disabled`, `open`, ...) from
+  an expression, which would be on whatever its value, since generated
+  code cannot remove an attribute: use `bind:checked`, or the attribute
+  on an element inside `{if}`;
+- an element attribute named with `:` other than the `bind:`
+  directives (`class:x`, `style:x` and `on:click` included; a listener
+  is `onclick`);
 - `bind:` on an element that is not a control, on a property other than
   `value` or `checked`, or together with a handler for the same event;
 - a `data-wisp` attribute, which is reserved for the style scope (see
