@@ -166,8 +166,9 @@ fn a_shaping_whose_layouts_are_still_asked_for_is_kept() {
     let (mut fonts, mut cache) = (FontSystem::bundle_only(), TextCache::default());
     let runs: Vec<_> = (0..30).map(|n| other(0, n)).collect();
     let mut ask = |cache: &mut TextCache| {
-        runs.iter()
-            .for_each(|run| drop(cache.layout(&mut fonts, 1.0, run, None)));
+        for run in &runs {
+            cache.layout(&mut fonts, 1.0, run, None);
+        }
     };
     cache.begin(0);
     ask(&mut cache);
