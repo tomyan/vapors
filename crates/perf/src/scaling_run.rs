@@ -4,7 +4,7 @@
 use vapors_gpu_harness::Gpu;
 
 use crate::instructions_check::{checked_counter, samples_counted};
-use crate::report::PHASES;
+use crate::report::EVERY_PHASE;
 use crate::rows::{RowChange, Rows};
 use crate::run::{Samples, Settings};
 use crate::sampler::Sampler;
@@ -44,7 +44,7 @@ fn measure(
         .sample(workload, settings_for(Some(rows), settings))
         .map_err(|e| format!("{name}: {e}"))?;
     samples_counted(&name, &samples)?;
-    at_size(rows, &samples, &PHASES)
+    at_size(rows, &samples, &EVERY_PHASE)
 }
 
 /// The median count of the frame and of each phase `samples` recorded.

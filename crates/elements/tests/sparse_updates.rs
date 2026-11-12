@@ -68,7 +68,10 @@ const EXPECTED: [(usize, usize, usize); 6] = [
 /// entries patched (the elements built again or moved), paint order
 /// and scroll chain walks (none: no edit changes the tree's shape),
 /// clips redone (the boxes built again or moved), stackings made (the
-/// boxes built again). A row is
+/// boxes built again), slots chained before the placement walk (the
+/// in-flow children of the boxes built again or laid out: the body's
+/// rows when the body is laid out), boxes marked kept (the boxes built
+/// again). A row is
 /// 4 elements and 7 boxes (3 text runs) and draws 4 items (the button's
 /// quad and 3 texts), 5 with the focus outline, 6 with the outline and
 /// the marked row's background; `html` and `body` add 2
@@ -77,27 +80,27 @@ const EXPECTED: [(usize, usize, usize); 6] = [
 /// built or moved, keeping the rest in place (`kept_box.rs`): the longer label
 /// moves the 4 boxes after it in its row. The second table in
 /// docs/plans/iu1.md is these numbers.
-const EXPECTED_WALKS: [(usize, [[usize; 11]; 6]); 2] = [
+const EXPECTED_WALKS: [(usize, [[usize; 13]; 6]); 2] = [
     (
         100,
         [
-            [1, 2, 3, 2, 0, 1, 1, 0, 0, 2, 2],
-            [1, 2, 112, 6, 0, 4, 3, 0, 0, 6, 2],
-            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-            [4, 2, 1, 2, 0, 2, 1, 0, 0, 2, 2],
-            [1, 2, 1, 2, 0, 3, 1, 0, 0, 2, 2],
-            [4, 7, 1, 7, 0, 5, 4, 0, 0, 7, 7],
+            [1, 2, 3, 2, 0, 1, 1, 0, 0, 2, 2, 1, 2],
+            [1, 2, 112, 6, 0, 4, 3, 0, 0, 6, 2, 105, 2],
+            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [4, 2, 1, 2, 0, 2, 1, 0, 0, 2, 2, 1, 2],
+            [1, 2, 1, 2, 0, 3, 1, 0, 0, 2, 2, 1, 2],
+            [4, 7, 1, 7, 0, 5, 4, 0, 0, 7, 7, 6, 7],
         ],
     ),
     (
         1000,
         [
-            [1, 2, 3, 2, 0, 1, 1, 0, 0, 2, 2],
-            [1, 2, 1012, 6, 0, 4, 3, 0, 0, 6, 2],
-            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-            [4, 2, 1, 2, 0, 2, 1, 0, 0, 2, 2],
-            [1, 2, 1, 2, 0, 3, 1, 0, 0, 2, 2],
-            [4, 7, 1, 7, 0, 5, 4, 0, 0, 7, 7],
+            [1, 2, 3, 2, 0, 1, 1, 0, 0, 2, 2, 1, 2],
+            [1, 2, 1012, 6, 0, 4, 3, 0, 0, 6, 2, 1005, 2],
+            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [4, 2, 1, 2, 0, 2, 1, 0, 0, 2, 2, 1, 2],
+            [1, 2, 1, 2, 0, 3, 1, 0, 0, 2, 2, 1, 2],
+            [4, 7, 1, 7, 0, 5, 4, 0, 0, 7, 7, 6, 7],
         ],
     ),
 ];
@@ -158,6 +161,8 @@ fn assert_walk(rows: usize, index: usize, edit: Edit, work: &Work) {
         c.chain_walks,
         c.clips_redone,
         c.stackings_computed,
+        c.slots_chained,
+        c.boxes_kept,
     ];
     assert_eq!(
         actual, walks[index],

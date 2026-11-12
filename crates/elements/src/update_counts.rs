@@ -82,6 +82,14 @@ pub struct UpdateCounts {
     /// Boxes not built again whose rect or padding changed since the
     /// last paint; 0 when nothing is kept.
     pub boxes_moved: usize,
+    /// In-flow children chained to the slot they are placed in before
+    /// the placement walk (M10b, `placement.rs`): those of each slot
+    /// built again or laid out, each such slot once. 0 when nothing is
+    /// kept, as the walk chains every slot then.
+    pub slots_chained: usize,
+    /// Boxes marked kept for the next update (`KeptBoxes::keep`): those
+    /// built this update; every other box was kept already.
+    pub boxes_kept: usize,
     /// Slots whose stacking (`stacking.rs`) was made from their style:
     /// those built again (IU3 kept stackings); every held slot when
     /// nothing is kept.
