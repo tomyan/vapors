@@ -52,8 +52,8 @@ impl QuadPipeline {
         self.0.draw_kept(target, kept);
     }
 
-    /// Gives `kept`'s bytes back. Release a range only in a frame that
-    /// does not draw it.
+    /// Gives `kept`'s bytes back. Draws of it already recorded still
+    /// read them: they are reused once a newer encoder writes or draws.
     ///
     /// # Panics
     ///
