@@ -81,8 +81,10 @@ fn gpu_a_frame_that_does_not_render_the_surface_counts_only_its_composition() {
     // When
     let counts = drawn(&mut rig, &doc);
 
-    // Then: the placing draw alone, and no frame after it
+    // Then: the placing draw alone, from the quad kept by the first
+    // frame (IU4 PR 2), and no frame after it
     assert_eq!(counts.surfaces.draw_calls, 1);
-    assert_eq!(counts.surfaces.buffer_bytes, IMAGE_QUAD_BYTES);
+    assert_eq!(counts.surfaces.buffer_bytes, 0);
+    assert_eq!((counts.batches_written, counts.batches_kept), (0, 1));
     assert!(!rig.painter.wants_frame());
 }

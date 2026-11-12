@@ -53,10 +53,15 @@ fn gpu_the_counter_demos_idle_frame_matches_the_plan_row() {
     painter.draw(&target, scene).expect("paints");
 
     // Then
-    let idle = painter.frame_counts().total();
+    let counts = painter.frame_counts();
+    let idle = counts.total();
     assert_eq!(idle.draw_calls, 3);
-    // 2800 before IU4 PR 1: each of the 3 draws' 16-byte uniform is now kept
-    assert_eq!(idle.buffer_bytes, 2752);
+    // 2800 before IU4 PR 1: each of the 3 draws' 16-byte uniform is now
+    // kept; 2752 before IU4 PR 2: the two quad batches' 256 bytes are kept
+    assert_eq!(idle.buffer_bytes, 2496);
+    assert_eq!(counts.quads.buffer_bytes, 0);
+    assert_eq!((counts.batches_written, counts.batches_kept), (0, 2));
+    assert_eq!(counts.retained_bytes, 256);
     assert_eq!(idle.texture_bytes, 0);
 }
 

@@ -141,7 +141,7 @@ fn counts(counts: &Counts) -> String {
         "Counts (last frame): restyled {}, text layouts {}, laid out {}, elements visited {}, \
          boxes built {}, layout calls {}, boxes painted {}, boxes shifted {}, scene items {}, \
          culled {}; draw calls {}, buffer bytes {}, texture bytes {}, uniform writes {}, \
-         bind groups {}, render passes {}.\n{}",
+         bind groups {}, batches written {}, batches kept {}, retained bytes {}, render passes {}.\n{}",
         u.elements_restyled,
         counts.text_layouts,
         u.boxes_laid_out,
@@ -157,6 +157,9 @@ fn counts(counts: &Counts) -> String {
         gpu.texture_bytes,
         gpu.uniform_writes,
         gpu.bind_groups_made,
+        counts.frame.batches_written,
+        counts.frame.batches_kept,
+        counts.frame.retained_bytes,
         counts.render_passes,
         style_counts(u)
     )
