@@ -7,6 +7,8 @@
 //! than a page is refused once, logged with its size, and `.notdef`
 //! stands in from then on. Evictions, rasterisations and refusals are
 //! counted for tests. Icons share the coverage page (`atlas_icon.rs`).
+//! When one frame's glyphs do not fit, the coverage page doubles up to
+//! its largest side (`atlas_grow.rs`).
 
 use std::collections::{HashMap, HashSet};
 
@@ -14,6 +16,12 @@ use crate::atlas_page::AtlasPage;
 pub use crate::atlas_types::{AtlasConfig, AtlasError, AtlasGlyph, PageKind};
 use crate::atlas_types::{AtlasKey, GlyphKey};
 use crate::raster::{Coverage, GlyphRequest, Rasterizer};
+
+/// The colour page's largest side: nothing draws from it until colour
+/// glyphs are rasterised, so it stays at 4 MiB of RGBA whatever the
+/// coverage page's size. The pull request that rasterises colour
+/// glyphs sizes it.
+const COLOUR_PAGE: u32 = 1024;
 
 pub(crate) struct Entry {
     pub(crate) glyph: AtlasGlyph,
@@ -27,6 +35,8 @@ pub(crate) struct Entry {
 /// Rasterised glyphs packed into pages.
 pub struct GlyphAtlas {
     pub(crate) coverage: AtlasPage,
+    /// The side the coverage page grows to, and no further.
+    pub(crate) max_page: u32,
     colour: AtlasPage,
     rasterizer: Rasterizer,
     pub(crate) entries: HashMap<AtlasKey, Entry>,
@@ -38,12 +48,14 @@ pub struct GlyphAtlas {
 }
 
 impl GlyphAtlas {
-    /// Empty pages of `config.page_size`.
+    /// Empty pages of `config.page_size`; the colour page no larger
+    /// than [`COLOUR_PAGE`].
     #[must_use]
     pub fn new(config: AtlasConfig) -> Self {
         Self {
             coverage: AtlasPage::new(config.page_size, 1),
-            colour: AtlasPage::new(config.page_size, 4),
+            max_page: config.max_page_size,
+            colour: AtlasPage::new(config.page_size.min(COLOUR_PAGE), 4),
             rasterizer: Rasterizer::new(),
             entries: HashMap::new(),
             too_large: HashSet::new(),
@@ -117,7 +129,7 @@ impl GlyphAtlas {
             .rasterize(request)
             .map_err(AtlasError::Raster)?;
         self.rasterisations += 1;
-        if !self.coverage.fits(coverage.width, coverage.height) {
+        if !self.fits_largest_page(coverage.width, coverage.height) {
             return self.refuse(request, &coverage);
         }
         self.insert(key, coverage)
@@ -160,7 +172,7 @@ impl GlyphAtlas {
             glyph: request.id,
             size: request.size,
             bitmap: [coverage.width, coverage.height],
-            page_size: self.coverage.size(),
+            page_size: self.max_page,
         };
         if request.id == 0 {
             return Err(error);

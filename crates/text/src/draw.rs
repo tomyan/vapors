@@ -22,8 +22,8 @@ impl TextPipeline {
     ///
     /// # Panics
     ///
-    /// If `atlas`'s page is not the size this pipeline's texture was made
-    /// for; that is a caller bug and the message gives both sizes.
+    /// If `atlas`'s page is smaller than this pipeline's texture: it was
+    /// made for another atlas, and the message gives both sizes.
     pub fn draw(
         &mut self,
         target: &RenderTarget<'_>,
@@ -63,7 +63,7 @@ impl TextPipeline {
     ///
     /// # Panics
     ///
-    /// If `atlas`'s page is not the size this pipeline's texture was made for.
+    /// If `atlas`'s page is smaller than this pipeline's texture.
     pub(crate) fn record(
         &mut self,
         target: &RenderTarget<'_>,
@@ -71,13 +71,7 @@ impl TextPipeline {
         quads: &[f32],
         params: BlendParams,
     ) {
-        let page = atlas.coverage_page().size();
-        assert_eq!(
-            page,
-            self.atlas_texture.texture().width(),
-            "atlas page is {page} px but the text pipeline's texture is {} px",
-            self.atlas_texture.texture().width()
-        );
+        self.match_page_size(target.device, atlas);
         self.upload_page(target, atlas);
         let params = params_bytes(params);
         let Some(params) = self
@@ -87,6 +81,26 @@ impl TextPipeline {
             return;
         };
         self.draw_quads(target, quads, params);
+    }
+
+    /// A texture of the atlas page's size when the page grew; the page
+    /// is whole in its dirty rect then, so the upload fills it.
+    ///
+    /// # Panics
+    ///
+    /// If the page is smaller than the texture: pages only grow, so this
+    /// pipeline was made for another atlas.
+    fn match_page_size(&mut self, device: &wgpu::Device, atlas: &GlyphAtlas) {
+        let page = atlas.coverage_page().size();
+        let texture = self.atlas_texture.texture().width();
+        assert!(
+            page >= texture,
+            "atlas page is {page} px but the text pipeline's texture is {texture} px; pages \
+             only grow, so this pipeline was made for another atlas"
+        );
+        if page > texture {
+            self.atlas_texture.replace(device, page);
+        }
     }
 
     /// Upload the part of the atlas page that changed since the last

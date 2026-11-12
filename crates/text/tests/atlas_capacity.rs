@@ -1,8 +1,8 @@
 //! How much text one atlas page holds in one frame (review-fable-painter
 //! H1): every glyph of an 80-character sample at each subpixel step, at
-//! six sizes and two weights. A 1024 px page refuses it from 2x; the page
-//! a 16384 px device gets (`AtlasConfig::for_max_texture_side`, 4096)
-//! holds it at 3x.
+//! six sizes and two weights. A fixed 1024 px page refuses it at 3x; the
+//! pages a 16384 px device gets (`AtlasConfig::for_max_texture_side`)
+//! start at 1024 and grow to hold it.
 
 use vapors_text::{
     AtlasConfig, AtlasError, Family, FontSystem, GlyphAtlas, GlyphRequest, Hinting, Layout,
@@ -50,34 +50,42 @@ fn place_all(atlas: &mut GlyphAtlas, layouts: &[Layout], scale: f32) -> Result<(
     Ok(())
 }
 
-fn fits(page_size: u32, scale: f32) -> Result<(), AtlasError> {
+/// The coverage page's side after placing the sample at `scale`.
+fn placed_in(config: AtlasConfig, scale: f32) -> Result<u32, AtlasError> {
     let mut system = FontSystem::bundle_only();
     let layouts = layouts(&mut system, scale);
-    place_all(
-        &mut GlyphAtlas::new(AtlasConfig { page_size }),
-        &layouts,
-        scale,
-    )
+    let mut atlas = GlyphAtlas::new(config);
+    place_all(&mut atlas, &layouts, scale)?;
+    Ok(atlas.coverage_page().size())
 }
 
 #[test]
-fn the_page_a_large_device_gets_holds_the_mixed_sample_at_every_scale_to_3x() {
+fn the_pages_a_large_device_gets_hold_the_mixed_sample_at_every_scale_to_3x() {
     // Given
-    let page_size = AtlasConfig::for_max_texture_side(16384).page_size;
+    let config = AtlasConfig::for_max_texture_side(16384);
 
     for scale in [1.0, 2.0, 2.625, 3.0] {
         // When
-        let placed = fits(page_size, scale);
+        let placed = placed_in(config, scale);
 
         // Then
-        assert_eq!(placed, Ok(()), "{page_size} px page at {scale}x");
+        assert!(placed.is_ok(), "{config:?} at {scale}x: {placed:?}");
     }
 }
 
 #[test]
-fn a_1024_page_refuses_the_mixed_sample_at_3x() {
+fn the_pages_a_large_device_gets_grow_past_1024_for_the_mixed_sample_at_3x() {
     // When
-    let placed = fits(1024, 3.0);
+    let side = placed_in(AtlasConfig::for_max_texture_side(16384), 3.0);
+
+    // Then
+    assert!(matches!(side, Ok(side) if side > 1024), "{side:?}");
+}
+
+#[test]
+fn a_fixed_1024_page_refuses_the_mixed_sample_at_3x() {
+    // When
+    let placed = placed_in(AtlasConfig::fixed(1024), 3.0);
 
     // Then
     assert!(matches!(placed, Err(AtlasError::Full { .. })), "{placed:?}");

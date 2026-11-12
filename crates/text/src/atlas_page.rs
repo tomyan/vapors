@@ -17,7 +17,7 @@ pub struct AtlasPage {
 }
 
 /// Gap kept around every glyph so nearest sampling never reads a neighbour.
-const PADDING: u32 = 1;
+pub(crate) const PADDING: u32 = 1;
 
 impl AtlasPage {
     /// An empty page.

@@ -101,13 +101,13 @@ impl fmt::Display for AtlasError {
                 f,
                 "font {font} glyph {glyph} at {size} px is {}x{} and the atlas page is \
                  {page_size}x{page_size}, and .notdef cannot stand in. Fix: raise \
-                 AtlasConfig::page_size or draw this text smaller; large text as paths is later work.",
+                 AtlasConfig::max_page_size or draw this text smaller; large text as paths is later work.",
                 bitmap[0], bitmap[1]
             ),
             Self::IconTooLarge { size, page_size } => write!(
                 f,
                 "icon of {}x{} device pixels does not fit the {page_size}x{page_size} atlas page. \
-                 Fix: draw the icon smaller or raise AtlasConfig::page_size.",
+                 Fix: draw the icon smaller or raise AtlasConfig::max_page_size.",
                 size[0], size[1]
             ),
         }

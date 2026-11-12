@@ -43,6 +43,8 @@ impl Failure {
 pub struct ElementsApp {
     document: Rc<RefCell<Document>>,
     painter: Option<ScenePainter>,
+    /// The painter's atlas; `None` sizes it for the device.
+    atlas: Option<vapors_text::AtlasConfig>,
     /// Surface renderers, before and after the painter exists.
     surfaces: AppSurfaces,
     failure: Failure,
@@ -92,6 +94,7 @@ impl ElementsApp {
         Self {
             document,
             painter: None,
+            atlas: None,
             surfaces: AppSurfaces::default(),
             failure: Failure::default(),
             input: DocumentInput::new(),
@@ -179,6 +182,9 @@ fn shortcut_modifier() -> ShortcutModifier {
     }
 }
 
+#[cfg(not(target_family = "wasm"))]
+#[path = "elements_app_atlas.rs"]
+mod atlas;
 #[path = "elements_app_counts.rs"]
 mod counts;
 #[path = "elements_app_decision.rs"]
@@ -187,7 +193,6 @@ mod decision;
 mod frame_phases;
 #[path = "elements_app_give.rs"]
 mod give;
-#[cfg(not(target_family = "wasm"))]
 #[path = "elements_app_paste.rs"]
 mod paste;
 #[path = "elements_app_surface_handle.rs"]

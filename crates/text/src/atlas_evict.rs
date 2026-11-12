@@ -1,21 +1,24 @@
 //! Making room in a full page: evict the least recently used glyphs that
 //! the current frame has not asked for, repack the survivors in a fixed
-//! order, and try again until the new glyph fits.
+//! order, and try again until the new glyph fits. When every glyph left
+//! belongs to the current frame, grow the page (`atlas_grow.rs`).
 
 use crate::atlas::{Entry, GlyphAtlas, glyph_at};
 use crate::atlas_types::{AtlasError, AtlasKey};
 
 impl GlyphAtlas {
     /// Room for a `width` by `height` glyph, or [`AtlasError::Full`] when
-    /// every glyph in the page belongs to this frame.
+    /// this frame's glyphs do not fit the largest page.
     pub(crate) fn make_room(&mut self, width: u32, height: u32) -> Result<[u32; 2], AtlasError> {
         loop {
             let evicted = self.evict_least_recent(width * height);
             if evicted == 0 {
-                return Err(self.full());
+                return self.grow_until_fits(width, height);
             }
             self.evictions += evicted;
-            self.repack()?;
+            if self.repack().is_err() {
+                return self.grow_until_fits(width, height);
+            }
             if let Some(origin) = self.coverage.allocate(width, height) {
                 return Ok(origin);
             }
@@ -23,7 +26,7 @@ impl GlyphAtlas {
     }
 
     /// [`AtlasError::Full`] with what this frame has in the page.
-    fn full(&self) -> AtlasError {
+    pub(crate) fn full(&self) -> AtlasError {
         let in_frame = || {
             self.entries
                 .iter()

@@ -42,7 +42,7 @@ impl TextPipeline {
     ///
     /// # Panics
     ///
-    /// If `atlas`'s page is not the size this pipeline's texture was made for.
+    /// If `atlas`'s page is smaller than this pipeline's texture.
     pub fn draw_icons(
         &mut self,
         target: &RenderTarget<'_>,
@@ -61,13 +61,14 @@ pub(crate) fn icon_quads(
     icons: &[IconDraw<'_>],
     viewport: Size,
 ) -> Result<Vec<f32>, AtlasError> {
-    let page = atlas.coverage_page().size();
     let strokes = || {
         icons
             .iter()
             .flat_map(|d| (0..d.icon.strokes()).map(move |i| (d, i)))
     };
     let placed = placed_all(strokes, |&(draw, i)| atlas.icon(draw.icon, i, draw.size))?;
+    // read after placing: placing may grow the page
+    let page = atlas.coverage_page().size();
     let mut floats = Vec::new();
     for ((draw, _), placed) in strokes().zip(&placed) {
         if placed.is_empty() {
