@@ -1,76 +1,18 @@
 //! GPU tier: quads kept between frames (`retained.rs`): written once and
-//! drawn by later frames with no write; when no free range holds new
-//! bytes, the live ranges move, compacted when half the buffer is free
-//! and grown otherwise, and every range still draws its own quads; bytes
-//! over the device's `max_buffer_size` are refused.
+//! drawn by later frames with no write; a range released in the frame
+//! that drew it is not reused there; bytes over the device's
+//! `max_buffer_size` are refused; a range drawn by another pipeline, or
+//! kept for a newer encoder while an older is open, panics.
 
 #[path = "support/frame.rs"]
 mod frame;
+#[path = "support/retained.rs"]
+mod retained;
 
-use frame::{BACKGROUND, pixel, quad, square, target};
-use vapors_gpu_harness::{Gpu, gpu, read_rgba8};
-use vapors_renderer::{ArenaFull, FrameEncoder, KeptRange, QuadPipeline};
-
-const SIDE: u32 = 4;
-/// A quad's instance bytes.
-const QUAD_BYTES: u64 = 128;
-/// A kept buffer's first size (`FIRST_SIZE` in `retained.rs`): 512 quads.
-const FIRST_SIZE: u64 = 64 * 1024;
-const RED: [u8; 4] = [255, 0, 0, 255];
-const GREEN: [u8; 4] = [0, 255, 0, 255];
-const BLUE: [u8; 4] = [0, 0, 255, 255];
-
-/// A square to draw on, its pipeline and a frame's encoder.
-struct Frame {
-    gpu: Gpu,
-    texture: wgpu::Texture,
-    view: wgpu::TextureView,
-    pipeline: QuadPipeline,
-}
-
-impl Frame {
-    fn new(gpu: Gpu) -> Self {
-        let (texture, view) = square(&gpu, SIDE);
-        let pipeline = QuadPipeline::new(&gpu.device, texture.format());
-        Self {
-            gpu,
-            texture,
-            view,
-            pipeline,
-        }
-    }
-
-    /// `count` quads in `colour` over pixel `(x, 0)`, kept.
-    fn keep(
-        &mut self,
-        encoder: &FrameEncoder,
-        (count, x, colour): (usize, f32, [u8; 4]),
-    ) -> Option<KeptRange> {
-        let quads = vec![quad([x, 0.0, x + 1.0, 1.0], colour); count];
-        let at = target(&self.gpu, encoder, &self.view, SIDE);
-        self.pipeline.keep(&at, &QuadPipeline::bytes(&quads))
-    }
-
-    fn draw(&mut self, encoder: &FrameEncoder, kept: &KeptRange) {
-        let at = target(&self.gpu, encoder, &self.view, SIDE);
-        self.pipeline.draw_kept(&at, kept);
-    }
-
-    /// The colours of the top row's first three pixels.
-    fn row(&self) -> [[u8; 4]; 3] {
-        let rgba = read_rgba8(&self.gpu.device, &self.gpu.queue, &self.texture);
-        [0, 1, 2].map(|x| pixel(&rgba, SIDE, x, 0))
-    }
-
-    fn encoder(&self) -> FrameEncoder {
-        FrameEncoder::new(&self.gpu.device)
-    }
-}
-
-/// Kept, or a panic naming `what`.
-fn kept(range: Option<KeptRange>, what: &str) -> KeptRange {
-    range.unwrap_or_else(|| panic!("{what} refused"))
-}
+use frame::{BACKGROUND, square};
+use retained::{FIRST_SIZE, Frame, GREEN, QUAD_BYTES, RED, SIDE, kept};
+use vapors_gpu_harness::gpu;
+use vapors_renderer::{ArenaFull, QuadPipeline};
 
 #[test]
 fn gpu_kept_quads_draw_in_a_later_frame_with_nothing_written() {
@@ -96,63 +38,6 @@ fn gpu_kept_quads_draw_in_a_later_frame_with_nothing_written() {
     assert_eq!(frame.row(), [RED, BACKGROUND, BACKGROUND]);
     assert_eq!((work.buffer_bytes, work.draw_calls), (0, 1));
     assert_eq!(frame.pipeline.retained_bytes(), QUAD_BYTES);
-}
-
-#[test]
-fn gpu_a_full_buffer_half_free_compacts_and_each_range_draws_its_own_quads() {
-    // Given: the buffer filled by A, B, C and D, then A and C released,
-    // leaving two holes of 160 quads
-    let mut frame = Frame::new(gpu());
-    let filling = frame.encoder();
-    let ranges = [
-        (160, 3.0, RED),
-        (80, 0.0, GREEN),
-        (160, 3.0, RED),
-        (112, 1.0, BLUE),
-    ];
-    let [first, kept_b, third, kept_d] =
-        ranges.map(|range| kept(frame.keep(&filling, range), "fill"));
-    filling.submit(&frame.gpu.queue).expect("no refusal");
-    frame.pipeline.release(first);
-    frame.pipeline.release(third);
-    let _ = frame.pipeline.take_work();
-
-    // When: B drawn, then 240 quads kept, then D and the new range drawn
-    let encoder = frame.encoder();
-    frame.draw(&encoder, &kept_b);
-    let kept_e = kept(frame.keep(&encoder, (240, 2.0, RED)), "E");
-    frame.draw(&encoder, &kept_d);
-    frame.draw(&encoder, &kept_e);
-    encoder.submit(&frame.gpu.queue).expect("no refusal");
-
-    // Then: B's pixel came from the old buffer, D's and E's from the new
-    let work = frame.pipeline.take_work();
-    assert_eq!((work.retained_compacted, work.retained_grown), (1, 0));
-    assert_eq!(
-        frame.pipeline.retained_bytes(),
-        (80 + 112 + 240) * QUAD_BYTES
-    );
-    assert_eq!(frame.row(), [GREEN, BLUE, RED]);
-}
-
-#[test]
-fn gpu_a_full_buffer_under_half_free_grows_and_each_range_draws_its_own_quads() {
-    // Given: 400 quads kept
-    let mut frame = Frame::new(gpu());
-    let encoder = frame.encoder();
-    let first = kept(frame.keep(&encoder, (400, 0.0, RED)), "A");
-
-    // When: 200 more, past the buffer's end
-    let second = kept(frame.keep(&encoder, (200, 1.0, GREEN)), "B");
-    frame.draw(&encoder, &first);
-    frame.draw(&encoder, &second);
-    encoder.submit(&frame.gpu.queue).expect("no refusal");
-
-    // Then
-    let work = frame.pipeline.take_work();
-    assert_eq!((work.retained_grown, work.retained_compacted), (1, 0));
-    assert_eq!(frame.row(), [RED, GREEN, BACKGROUND]);
-    assert_eq!(frame.pipeline.retained_bytes(), 600 * QUAD_BYTES);
 }
 
 #[test]
@@ -220,47 +105,4 @@ fn gpu_a_range_released_in_the_frame_that_drew_it_is_not_reused_in_that_frame() 
 
     // Then: the red draw read its own bytes
     assert_eq!(frame.row(), [RED, GREEN, BACKGROUND]);
-}
-
-#[test]
-fn gpu_a_released_range_is_reused_once_a_newer_encoder_writes() {
-    // Given: a quad kept and released in one frame
-    let mut frame = Frame::new(gpu());
-    let first = frame.encoder();
-    let red = kept(frame.keep(&first, (512, 0.0, RED)), "red");
-    frame.pipeline.release(red);
-    first.submit(&frame.gpu.queue).expect("no refusal");
-
-    // When: a whole buffer's worth kept in the next
-    let second = frame.encoder();
-    let green = kept(frame.keep(&second, (512, 1.0, GREEN)), "green");
-    frame.draw(&second, &green);
-    second.submit(&frame.gpu.queue).expect("no refusal");
-
-    // Then: it fit where the first was, with no move
-    let work = frame.pipeline.take_work();
-    assert_eq!((work.retained_grown, work.retained_compacted), (0, 0));
-    assert_eq!(frame.row(), [BACKGROUND, GREEN, BACKGROUND]);
-}
-
-#[test]
-fn gpu_a_range_released_before_a_move_is_not_given_back_in_the_new_buffer() {
-    // Given: A released, then a move that packs B at the start
-    let mut frame = Frame::new(gpu());
-    let first = frame.encoder();
-    let released = kept(frame.keep(&first, (300, 3.0, RED)), "A");
-    let green = kept(frame.keep(&first, (100, 0.0, GREEN)), "B");
-    frame.pipeline.release(released);
-    let _blue = kept(frame.keep(&first, (300, 2.0, BLUE)), "C");
-    first.submit(&frame.gpu.queue).expect("no refusal");
-
-    // When: more kept in the next frame, and B drawn beside it
-    let second = frame.encoder();
-    let red = kept(frame.keep(&second, (100, 1.0, RED)), "D");
-    frame.draw(&second, &green);
-    frame.draw(&second, &red);
-    second.submit(&frame.gpu.queue).expect("no refusal");
-
-    // Then: B kept its own bytes
-    assert_eq!(frame.row(), [GREEN, RED, BACKGROUND]);
 }
