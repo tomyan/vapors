@@ -391,7 +391,13 @@ If D5 goes to (a), R2 becomes three rows: ground meshes from the
 circuit's constants, stroke dashes in `vapors-shapes` (the broken centre
 line and the alternating kerb), and the ground decal.
 
-## 5. Open decisions for Tom
+## 5. Decisions
+
+Decided by Tom, 2026-11-12, taking the lead's recommendations: D1 (a),
+D2 (a), D3 (a) per-crate tables merged by hash (a departure from the
+brief's one table for the app), D4 (d) shade times CSS colour, D5 (b)
+ground material, D6 (a) frame-to-idle, D7 (a) every frame judged, no
+warm-up. The options are kept below as the record of what was weighed.
 
 **D1. What "one scene" means.** (a) One document and one cascade: the
 3D world drawn by `SceneRenderer` into its `gpu-surface`, HTML painted
