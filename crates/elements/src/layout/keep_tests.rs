@@ -2,9 +2,10 @@ use taffy::{Dimension, Size, Style};
 
 use super::*;
 
-const HIDDEN_ASKED: crate::layout::isolated::Asked = crate::layout::isolated::Asked {
+const HIDDEN_ASKED: crate::layout::asked::Asked = crate::layout::asked::Asked {
     input: taffy::LayoutInput::HIDDEN,
     in_block: false,
+    answered: None,
 };
 
 /// One element box whose width is a calc handle at `address`.
