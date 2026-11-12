@@ -189,3 +189,7 @@ fn hidden_items(items: impl Iterator<Item = (Item, Option<Rect>)>, view: Rect) -
 #[cfg(test)]
 #[path = "kept_batches_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "kept_batches_draw_tests.rs"]
+mod draw_tests;

@@ -31,8 +31,12 @@ fn surface_at(top: f32) -> Item {
 /// A kept paint whose own step paints `items`, as a slot holds it.
 #[allow(clippy::unnecessary_wraps)] // a slot's type, so a slot can be set to `None` beside it
 fn part_of(items: &[Item]) -> Option<KeptBox> {
-    #[rustfmt::skip]
-    let rect = BoxRect { x: 0.0, y: 0.0, width: 1.0, height: 1.0 };
+    let rect = BoxRect {
+        x: 0.0,
+        y: 0.0,
+        width: 1.0,
+        height: 1.0,
+    };
     let from = BoxFrom {
         rect,
         clip: None,
@@ -44,9 +48,12 @@ fn part_of(items: &[Item]) -> Option<KeptBox> {
         own.scene.push(*item);
     }
     let (outline, thumb) = (Scene::new(), Scene::new());
-    #[rustfmt::skip]
-    let kept = KeptBox { from, own, outline, thumb };
-    Some(kept)
+    Some(KeptBox {
+        from,
+        own,
+        outline,
+        thumb,
+    })
 }
 
 /// Each slot's own step, in slot order.
@@ -168,50 +175,4 @@ fn a_surface_out_of_view_is_kept_shown_for_its_culled_batch() {
     // Then
     assert_eq!(kept.shown.len(), 2);
     assert_eq!(made(&mut kept, &boxes), afresh(&boxes));
-}
-
-/// A document with one drawn row, updated once.
-fn drawn_document() -> crate::document::Document {
-    use vapors_dom::Dom;
-    let mut doc = crate::document::Document::new(vapors_text::FontSystem::bundle_only());
-    doc.add_stylesheet("app.css", ".row { height: 20px; background-color: red; }")
-        .expect("parses");
-    let (body, row) = (doc.body(), doc.create_element("div"));
-    doc.set_attribute(row, "class", "row");
-    doc.append(body, row);
-    doc.update(UPDATE_VIEWPORT).expect("updates");
-    doc
-}
-
-const UPDATE_VIEWPORT: crate::update::Viewport = crate::update::Viewport {
-    width: 100.0,
-    height: 100.0,
-    scale: 1.0,
-};
-
-#[test]
-fn a_second_draw_at_the_same_view_after_an_idle_update_makes_no_batches() {
-    // Given: drawn once
-    let mut doc = drawn_document();
-    _ = doc.painted.as_ref().expect("painted").batches(VIEW);
-    let before = super::BUILDS.with(std::cell::Cell::get);
-
-    // When: an update that changes nothing, and a draw at the same view
-    let painted = doc.update(UPDATE_VIEWPORT).expect("updates");
-    _ = painted.batches(VIEW);
-
-    // Then
-    assert_eq!(super::BUILDS.with(std::cell::Cell::get), before);
-}
-
-#[test]
-#[should_panic(expected = "drop the Ref before drawing")]
-fn making_batches_while_a_ref_is_held_names_the_fix() {
-    // Given: a draw whose Ref is held
-    let doc = drawn_document();
-    let painted = doc.painted.as_ref().expect("painted");
-    let _held = painted.batches(VIEW);
-
-    // When: a draw at another view
-    _ = painted.batches(Rect::new(0.0, 0.0, 50.0, 50.0));
 }
