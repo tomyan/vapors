@@ -1,5 +1,5 @@
 //! A template element's `StyleKey`: `create_keyed_element` sets the
-//! element's scope attribute, `class`, `id` and `style` from it,
+//! element's scope attribute, `class` and `style` from it,
 //! `toggle_classes` turns its `class:` directives on and off, and the
 //! attributes the key fixes are refused to `set_attribute`.
 
@@ -13,7 +13,6 @@ static ROW: StyleKey = StyleKey {
     site: "crates/perf/ui/mount_row.wisp:14",
     scope: Some("vapors-perf/ui/mount_row.wisp"),
     tag: "div",
-    id: Some("first"),
     classes: &["row"],
     toggles: &["marked", "wide"],
     style: Some("height: 24px"),
@@ -23,7 +22,6 @@ static PLAIN: StyleKey = StyleKey {
     site: "src/plain.wisp:3",
     scope: None,
     tag: "span",
-    id: None,
     classes: &[],
     toggles: &[],
     style: None,
@@ -57,12 +55,11 @@ fn a_keyed_element_carries_the_keys_attributes() {
         Some("vapors-perf/ui/mount_row.wisp")
     );
     assert_eq!(dom.attribute(div, "class").as_deref(), Some("row"));
-    assert_eq!(dom.attribute(div, "id").as_deref(), Some("first"));
     assert_eq!(dom.attribute(div, "style").as_deref(), Some("height: 24px"));
 }
 
 #[test]
-fn a_key_without_scope_classes_id_or_style_sets_no_attribute() {
+fn a_key_without_scope_classes_or_style_sets_no_attribute() {
     // Given
     let dom = dom();
 
@@ -71,7 +68,7 @@ fn a_key_without_scope_classes_id_or_style_sets_no_attribute() {
 
     // Then
     let dom = dom.borrow();
-    for name in [SCOPE_ATTRIBUTE, "class", "id", "style"] {
+    for name in [SCOPE_ATTRIBUTE, "class", "style"] {
         assert_eq!(dom.attribute(span, name), None, "{name}");
     }
 }
@@ -127,16 +124,6 @@ fn setting_class_on_a_keyed_element_is_refused_naming_the_directive() {
     let dom = dom();
     let div = dom.borrow_mut().create_keyed_element(&ROW);
     dom.borrow_mut().set_attribute(div, "class", "other");
-}
-
-#[test]
-#[should_panic(
-    expected = "`id` on <div> at crates/perf/ui/mount_row.wisp:14 is set from its template; write it there"
-)]
-fn setting_id_on_a_keyed_element_is_refused() {
-    let dom = dom();
-    let div = dom.borrow_mut().create_keyed_element(&ROW);
-    dom.borrow_mut().set_attribute(div, "id", "other");
 }
 
 #[test]

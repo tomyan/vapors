@@ -15,7 +15,6 @@ static ROW: StyleKey = StyleKey {
     site: "crates/perf/ui/mount_row.wisp:14",
     scope: Some(SCOPE),
     tag: "div",
-    id: None,
     classes: &["row"],
     toggles: &["marked"],
     style: Some("width: 50px"),

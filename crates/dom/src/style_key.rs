@@ -1,11 +1,14 @@
 //! What a `.wisp` template says about one element that selectors can
-//! read: its scope, tag, `id`, literal classes, literal `style` and
-//! the names its `class:` directives toggle. The compiler emits one
-//! `static` per template element; [`crate::Dom::create_keyed_element`]
-//! takes it, sets those attributes from it, and from then on refuses
-//! `set_attribute` of any of them, so what the key says stays true
-//! and a tree can share one computed style between elements with the
-//! same key (the elements crate, analysis PR 2).
+//! read: its scope, tag, literal classes, literal `style` and the
+//! names its `class:` directives toggle. `id` is not in it: a template
+//! may set `id={expr}` (the components' ARIA ids), so the tree reads
+//! an element's `id` as it reads any other attribute. The compiler
+//! emits one `static` per template element;
+//! [`crate::Dom::create_keyed_element`] takes it, sets those
+//! attributes from it, and from then on refuses `set_attribute` of any
+//! of them, so what the key says stays true and a tree can share one
+//! computed style between elements with the same key (the elements
+//! crate, analysis PR 2).
 
 use crate::SCOPE_ATTRIBUTE;
 
@@ -20,8 +23,6 @@ pub struct StyleKey {
     pub scope: Option<&'static str>,
     /// The element's tag.
     pub tag: &'static str,
-    /// The literal `id`.
-    pub id: Option<&'static str>,
     /// The literal `class` names, in template order.
     pub classes: &'static [&'static str],
     /// Each `class:` directive's name, in template order. At most
@@ -37,7 +38,7 @@ pub const MAX_TOGGLES: usize = 64;
 impl StyleKey {
     /// The attributes an element takes from the key at creation, with
     /// no directive on: the scope attribute, `class` (when the key has
-    /// classes or directives), `id` and `style`, each when present.
+    /// classes or directives) and `style`, each when present.
     ///
     /// # Panics
     /// More than [`MAX_TOGGLES`] directives.
@@ -56,9 +57,6 @@ impl StyleKey {
         }
         if !self.classes.is_empty() || !self.toggles.is_empty() {
             out.push(("class", self.class_attribute(0)));
-        }
-        if let Some(id) = self.id {
-            out.push(("id", id.to_owned()));
         }
         if let Some(style) = self.style {
             out.push(("style", style.to_owned()));
@@ -106,7 +104,7 @@ impl StyleKey {
     pub fn refusal(&self, name: &str) -> Option<String> {
         let fix = match name {
             "class" => "toggle a class with `class:name={bool}` there",
-            "id" | "style" | SCOPE_ATTRIBUTE => "write it there",
+            "style" | SCOPE_ATTRIBUTE => "write it there",
             _ => return None,
         };
         Some(format!(

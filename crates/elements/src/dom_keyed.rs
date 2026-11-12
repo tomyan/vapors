@@ -1,6 +1,6 @@
 //! A keyed element's calls: what `create_keyed_element` fixed from the
 //! template's `StyleKey` stays as the key says. `set_attribute` of the
-//! scope attribute, `class`, `id` or `style` is refused naming the site
+//! scope attribute, `class` or `style` is refused naming the site
 //! and the fix, and a `class:` directive toggles through
 //! `toggle_classes`, which refuses a name the key does not list.
 
