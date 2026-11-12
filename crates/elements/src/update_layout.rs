@@ -145,6 +145,7 @@ impl Document {
         let done = placement.place(boxes, &mut self.scroll, &since);
         self.forget_freed(&changed.freed, slots);
         (self.counts.boxes_placed, self.counts.boxes_moved) = (done.count, done.moved.len());
+        self.counts.slots_chained = done.chained;
         self.check_placed(before, (boxes, placement), (&done.moved, changed));
         done.moved
     }

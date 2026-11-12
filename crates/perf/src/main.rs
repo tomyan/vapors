@@ -1,12 +1,14 @@
 //! Prints the timing baseline (docs/perf): every workload, in a release
 //! build. `cargo run --release -p vapors-perf -- [runs] [warmup]
-//! [--only <substring>] [--instructions] [--scaling <change>]`, 200 and
-//! 20 by default (`args.rs`).
+//! [--only <substring>] [--instructions] [--scaling <change>] [--mount]
+//! [--mount-memory <rows>]`, 200 and 20 by default (`args.rs`).
 
 use vapors_gpu_harness::gpu_with;
 use vapors_perf::args::{Options, options};
 use vapors_perf::gpu_time::FEATURES;
 use vapors_perf::instructions_check::{checked_counter, samples_counted};
+use vapors_perf::mount_memory;
+use vapors_perf::mount_run;
 use vapors_perf::report::{instructions_section, section};
 use vapors_perf::run::Settings;
 use vapors_perf::sampler::Sampler;
@@ -33,7 +35,19 @@ fn run() -> Result<(), String> {
         only,
         instructions,
         scaling,
+        mount,
+        mount_memory,
     } = options(std::env::args().skip(1))?;
+    if let Some(rows) = mount_memory {
+        let gpu = gpu_with(FEATURES);
+        println!("{}", mount_memory::run_child(&gpu, rows)?.line());
+        return Ok(());
+    }
+    if mount {
+        let gpu = gpu_with(FEATURES);
+        print_setup(&gpu, settings);
+        return mount_run::run(&gpu, settings);
+    }
     if let Some(change) = scaling {
         let gpu = gpu_with(FEATURES);
         print_setup(&gpu, settings);

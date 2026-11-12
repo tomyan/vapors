@@ -144,6 +144,28 @@ pub enum AxError {
         /// Chromium's name for it.
         chromium: String,
     },
+    /// A node whose role ARIA requires a state for that the tree does
+    /// not carry: a mirror would show a default that may be wrong (R6).
+    Unexposable {
+        /// The node's role.
+        role: String,
+        /// The node's name.
+        name: String,
+        /// What is missing, and where it comes from.
+        needs: String,
+    },
+    /// Focus is on an element the tree leaves out (no role), so a
+    /// reader would hear nothing (R6).
+    FocusOutsideTree {
+        /// The element's tag.
+        tag: String,
+    },
+    /// The mirror's placements wait on each other, which document
+    /// order cannot produce: a bug in vapors (R6).
+    PlacementCycle {
+        /// The nodes placed, as numbers.
+        nodes: Vec<u64>,
+    },
     /// The reply did not serialise: a bug in vapors.
     BadReply {
         /// The serialiser's error.

@@ -38,8 +38,11 @@ It counts instructions at 1000, 3000 and 10,000 rows and exits non-zero,
 naming the phase and its growth per extra row, when an edit's phase
 (Text, Class, HoveredClass; every phase) or an idle update's total
 (Idle; `update`) is both over 2% and over 5000 instructions above its 1000-row count at a larger size.
-Today every one of the four fails
-(docs/perf/baseline-2026-11-10.md, "Scaling, 1657b27"). Property 1's
+At 1657b27 every one of the four failed
+(docs/perf/baseline-2026-11-10.md, "Scaling, 1657b27"); after M10b
+(2026-11-12) Text and Idle pass, and Class and HoveredClass fail only
+on `style`, 2 instructions per extra row (docs/plans/iu1.md, PR 2).
+Property 1's
 time target (under 1 ms) is still read from the timed run. `--scaling Insert` reports for property 3
 and does not judge until the splice step is built.
 

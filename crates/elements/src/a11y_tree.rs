@@ -146,7 +146,7 @@ impl Document {
 }
 
 /// Refuses `bounds` with an edge that is not finite: [`AxError::NotFinite`].
-fn finite(bounds: BoxRect, role: &str, name: &str) -> Result<(), AxError> {
+pub(crate) fn finite(bounds: BoxRect, role: &str, name: &str) -> Result<(), AxError> {
     let edges = [bounds.x, bounds.y, bounds.width, bounds.height];
     if edges.iter().all(|edge| edge.is_finite()) {
         return Ok(());

@@ -1,7 +1,9 @@
 //! The walk that places boxes again (IU3 3b, `placement.rs`): from the
-//! root, into each marked slot and every slot placed in a box whose
-//! content moved, by containing block as `chain::by_containing_block`
-//! walks.
+//! root, into each marked slot (`placement_marks.rs`) and every slot
+//! placed in a box whose content moved, by containing block as
+//! `chain::by_containing_block` walks.
+
+use rustc_hash::FxHashMap;
 
 use crate::layout::{BoxRect, Content};
 use crate::node_map::NodeSet;
@@ -31,6 +33,8 @@ pub(crate) struct Walk<'a, 'b> {
     every: bool,
     /// The scroll containers settled, when `every`.
     settled: NodeSet,
+    /// The marked slots placed in each slot (`placement_marks.rs`).
+    under: &'a FxHashMap<usize, Vec<usize>>,
     placed: Placed,
 }
 
@@ -40,23 +44,28 @@ impl<'a, 'b> Walk<'a, 'b> {
         boxes: &'a LaidOut<'b>,
         scroll: &'a mut Offsets,
         every: bool,
+        under: &'a FxHashMap<usize, Vec<usize>>,
     ) -> Self {
         Self {
             kept,
             boxes,
             scroll,
             every,
+            under,
             settled: NodeSet::default(),
             placed: Placed {
                 moved: Vec::new(),
                 count: 0,
+                chained: 0,
             },
         }
     }
 
-    /// Places from the root, if there is one.
+    /// Places from the root, if there is one and it is marked, or every
+    /// slot is placed.
     pub(crate) fn place_from_root(&mut self) {
-        if !self.boxes.boxes.is_empty() {
+        let held = !self.boxes.boxes.is_empty();
+        if held && (self.every || self.kept.marks[0] != Mark::None) {
             self.visit(0, (0.0, 0.0), self.every);
         }
     }
@@ -71,16 +80,22 @@ impl<'a, 'b> Walk<'a, 'b> {
     }
 
     /// Places `slot` in content whose origin is `origin`, when its
-    /// mark or `origin_moved` says to, and the slots placed in it.
+    /// mark or `origin_moved` says to, and the slots placed in it. The
+    /// mark is cleared as it is read, so `Placement::place` can tell a
+    /// marked slot the walk did not reach.
     fn visit(&mut self, slot: usize, origin: (f32, f32), origin_moved: bool) {
         let mark = if self.every {
             Mark::Rebuilt
         } else {
-            self.kept.marks[slot]
+            std::mem::replace(&mut self.kept.marks[slot], Mark::None)
         };
-        if !origin_moved && mark == Mark::None {
-            return;
-        }
+        assert!(
+            origin_moved || mark != Mark::None,
+            "the placement walk visited slot {slot}, which is not marked and is placed in \
+             content that did not move: the walk scans a box's every child, or the marked \
+             slots under each slot (placement_marks.rs) list one that is not marked; \
+             `cargo test -p vapors-elements` reproduces it"
+        );
         self.placed.count += 1;
         let before = content_origin(self.kept.rects[slot], self.kept.offsets[slot]);
         if mark >= Mark::Dirty {
@@ -92,8 +107,13 @@ impl<'a, 'b> Walk<'a, 'b> {
     }
 
     /// Visits the slots placed in the content of `slot`, whose origin
-    /// is `inner`: its children in flow, then the boxes it hoists.
+    /// is `inner`: when the content `moved`, its children in flow, then
+    /// the boxes it hoists; else only the marked slots among them.
     fn visit_placed_in(&mut self, slot: usize, inner: (f32, f32), moved: bool) {
+        if !moved {
+            self.visit_marked_in(slot, inner);
+            return;
+        }
         let boxes = self.boxes.boxes;
         for &child in &boxes[slot].children {
             if self.kept.containing[child].is_none() {
@@ -104,6 +124,21 @@ impl<'a, 'b> Walk<'a, 'b> {
         for &child in &boxes[slot].hoisted {
             self.kept.up[child] = slot;
             self.visit(child, inner, moved);
+        }
+    }
+
+    /// Visits the marked slots placed in `slot`, whose content did not
+    /// move; each is chained to it already (`placement_marks.rs`).
+    fn visit_marked_in(&mut self, slot: usize, inner: (f32, f32)) {
+        let under = self.under;
+        for &child in under.get(&slot).map_or(&[][..], Vec::as_slice) {
+            assert!(
+                self.kept.marks[child] != Mark::None,
+                "slot {child}, listed under slot {slot} as marked, holds no mark: it was \
+                 visited already, or listed without being marked (placement_marks.rs); \
+                 `cargo test -p vapors-elements` reproduces it"
+            );
+            self.visit(child, inner, false);
         }
     }
 
