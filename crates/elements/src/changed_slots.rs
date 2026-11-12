@@ -6,6 +6,7 @@
 
 use crate::layout::{Key, Rebuilt};
 use crate::painted::Painted;
+use crate::stacking::Patched;
 
 /// What changed, by slot, since the last paint.
 #[derive(Debug)]
@@ -21,27 +22,35 @@ pub(crate) struct ChangedSlots {
     pub(crate) moved: Vec<usize>,
     /// A slot was freed or newly taken, or a rebuilt box's children or
     /// `Stacking` differ: paint order, containing blocks and chains are
-    /// walked again (`kept_order.rs`). `Stacking` holds what decides
-    /// containing blocks, so a box made absolute or a containing block
-    /// with its children unchanged is caught. Every box has an outline step, so whether a
-    /// box has an outline is not compared.
+    /// spliced (`order_splice.rs`) or walked again (`kept_order.rs`).
+    /// `Stacking` holds what decides containing blocks, so a box made
+    /// absolute or a containing block with its children unchanged is
+    /// caught. Every box has an outline step, so whether a box has an
+    /// outline is not compared.
     pub(crate) shape_changed: bool,
+    /// The rebuilt slots whose children differ from the box each
+    /// replaced, with the children it had: what the order splice reads.
+    pub(crate) reshaped: Vec<(usize, Vec<usize>)>,
+    /// What patching the stackings found: a rebuilt slot's stacking
+    /// changed, or a freed slot held one other than the default.
+    pub(crate) stackings: Patched,
 }
 
 impl ChangedSlots {
-    /// What `rebuilt` changes since `last`, moved slots aside;
-    /// `restacked` when a rebuilt slot's `Stacking` differs from the
-    /// one it held (`Stackings::patched`).
-    pub(crate) fn of(rebuilt: Rebuilt, last: Option<&Painted>, restacked: bool) -> Self {
+    /// What `rebuilt` changes since `last`, moved slots aside, and what
+    /// patching the `stackings` found (`Stackings::patched`).
+    pub(crate) fn of(rebuilt: Rebuilt, last: Option<&Painted>, stackings: Patched) -> Self {
         if rebuilt.every || last.is_none() {
             return Self::every(rebuilt);
         }
         Self {
             every: false,
             moved: Vec::new(),
-            shape_changed: rebuilt.shape_changed || restacked,
+            shape_changed: rebuilt.shape_changed || stackings.restacked,
             rebuilt: rebuilt.slots,
             freed: rebuilt.freed,
+            reshaped: rebuilt.reshaped,
+            stackings,
         }
     }
 
@@ -53,6 +62,11 @@ impl ChangedSlots {
             freed: rebuilt.freed,
             moved: Vec::new(),
             shape_changed: true,
+            reshaped: Vec::new(),
+            stackings: Patched {
+                restacked: true,
+                freed_stacked: true,
+            },
         }
     }
 

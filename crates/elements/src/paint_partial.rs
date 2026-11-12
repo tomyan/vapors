@@ -40,7 +40,8 @@ pub(crate) fn paint_partial(
         _ => (started, None),
     };
     let kept = kept_order.is_some();
-    let order = KeptOrder::updated(kept_order, (boxes, rects), input, changed);
+    let place = |step: Step| painted.drawn.place_of(step);
+    let order = KeptOrder::updated(kept_order, (boxes, rects), input, changed, &place);
     let scale = input.scale;
     let (again, shifts) = to_paint(&order, (boxes, rects), (changed, kept), &mut painted, scale);
     dropped(&again, changed, boxes.len(), &mut painted);
@@ -82,7 +83,10 @@ fn drawn_updated(
     order: &KeptOrder,
     (patched, with_hits): (&[usize], usize),
 ) {
-    if order.walks.order > 0 {
+    // A splice moves every step after it: the drawing steps, hits and
+    // batches are made afresh as after a walk until they are shifted
+    // by the splice's edits (docs/plans/splice.md, PR B's follow-up).
+    if order.walks.order > 0 || order.walks.splices > 0 {
         painted.drawn = DrawnSteps::of(&order.steps, &painted.kept_boxes);
         painted.kept_batches = std::cell::RefCell::default();
         painted.hits = std::cell::OnceCell::new();

@@ -101,6 +101,15 @@ pub struct UpdateCounts {
     /// Times the scroll chains were walked over the whole tree: 1 when
     /// the shape changed, else 0.
     pub chain_walks: usize,
+    /// Times the kept paint order, clip tree, clips and chains were
+    /// spliced for inserted and removed in-flow boxes in place of being
+    /// walked (`order_splice.rs`, `docs/plans/splice.md` (c)): 1 or 0.
+    pub order_splices: usize,
+    /// Times a shape change could not be spliced and the whole tree was
+    /// walked instead: a changed slot's children reordered, a box with
+    /// a stacking other than the default inserted or removed, or a
+    /// rebuilt box's stacking changed; 1 or 0.
+    pub splices_declined: usize,
     /// Boxes whose clip paint worked out again: those built again or
     /// moved, and below them those whose clip comes from a box whose
     /// clip changed; every slot when the shape changed.
@@ -136,6 +145,7 @@ impl UpdateCounts {
         let walks = painted.order.walks;
         (self.order_walks, self.chain_walks, self.clips_redone) =
             (walks.order, walks.chains, walks.clips);
+        (self.order_splices, self.splices_declined) = (walks.splices, walks.declined);
     }
 }
 

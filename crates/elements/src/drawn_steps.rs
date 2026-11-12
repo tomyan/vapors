@@ -64,6 +64,11 @@ impl DrawnSteps {
         self.drawn.iter().copied()
     }
 
+    /// The place of `step` in paint order, if it is in it.
+    pub(crate) fn place_of(&self, step: Step) -> Option<usize> {
+        self.places.get(step.index())?[kind(step)]
+    }
+
     /// Slot `slot`'s steps that are in paint order, each with its place.
     pub(crate) fn places_of(&self, slot: usize) -> impl Iterator<Item = (usize, Step)> {
         let places = self.places.get(slot).copied().unwrap_or_default();

@@ -36,6 +36,16 @@ impl Clips {
         (clips, redone)
     }
 
+    /// `self` for `len` slots, the `freed` ones' clips cleared: an order
+    /// splice (`order_splice.rs`); the added slots are redone after.
+    pub(crate) fn spliced(&mut self, len: usize, freed: impl Iterator<Item = usize>) {
+        self.own.resize(len, None);
+        self.inner.resize(len, None);
+        for slot in freed {
+            (self.own[slot], self.inner[slot]) = (None, None);
+        }
+    }
+
     /// Box `slot`'s own clip: the one it paints under.
     pub(crate) fn own(&self, slot: usize) -> Option<BoxRect> {
         self.own[slot]
