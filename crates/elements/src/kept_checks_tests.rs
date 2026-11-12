@@ -6,7 +6,8 @@ use crate::test_rows::{ROWS, mounted};
 
 #[test]
 fn the_listener_marks_of_a_mount_are_not_kept_at_its_capacity() {
-    // When: every row gets a listener before the mount
+    // Given: every row gets a listener before the mount
+    // When: the mount's update runs (in `mounted`)
     let (doc, _) = mounted(true);
 
     // Then: the marks `touched` iterates on the next update are empty, at no capacity

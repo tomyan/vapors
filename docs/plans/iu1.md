@@ -148,6 +148,22 @@ keeps a 1000-row mount's capacity. After it, `style` is 847k / 850k /
 10,000 rows (0.3 to 0.4 instructions per extra row from 3000 to
 10,000); every change passes (2026-11-12, this machine).
 
+What is left of the growth is glibc's malloc, not work over the rows.
+HoveredClass `style` still rises about 5k to 9k instructions from 1000
+rows to 3000 or 10,000 (in one review run, 4999 above the 1000-row
+count against the judge's 5000 floor; it passes on the 2% bound).
+Spans around each step of `Document::styled` (three runs, removed
+after) put all of it in `style_for`, the cascade of the edited row's
+unkeyed elements: 425k / 431k / 433k, with every other step flat to
+within 300. Nothing there walks rows (siblings are linked, the
+selectors read no siblings). With jemalloc preloaded
+(`LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2`, two runs),
+`style` is 732.8k / 733.1k / 732.9k and `style_for` 256.6k / 256.8k /
+256.8k: flat. glibc's malloc costs more per call as the heap grows,
+and is about 170k of `style_for`'s 430k. Follow-up for property 1's
+time target: fewer allocations in `Cascade::compute`, or a decision on
+the allocator.
+
 ## PR 3: GPU counters
 
 Upload bytes and draw calls per frame in `ScenePainter`
