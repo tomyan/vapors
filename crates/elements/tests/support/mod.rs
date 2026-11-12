@@ -10,6 +10,7 @@ pub mod checkbox_page;
 pub mod column_page;
 pub mod drive;
 pub mod fixup;
+pub mod flex_list;
 pub mod focus_page;
 pub mod hidden_page;
 pub mod mirror;

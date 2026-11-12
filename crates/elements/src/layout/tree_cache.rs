@@ -3,7 +3,7 @@
 
 use taffy::{Cache, CacheTree, LayoutInput, LayoutOutput, NodeId};
 
-use super::super::isolated::Asked;
+use super::super::asked::Asked;
 use super::BoxTree;
 
 impl BoxTree<'_> {
@@ -19,11 +19,22 @@ impl BoxTree<'_> {
 
     /// Notes `asked` among the ways the box at `id` was asked: every
     /// way misses the cache the first time, so the list is the ways
-    /// asked since the cache was cleared.
+    /// asked since the cache was cleared. A size query answered with
+    /// margins misses every time (the cache keeps no such answer), and
+    /// a box asked the same way answers the same until its cache is
+    /// cleared, which a debug build checks.
     pub(super) fn note_asked(&mut self, id: NodeId, asked: Asked) {
         let node = self.node_mut(id);
-        if !node.asked.contains(&asked) {
-            node.asked.push(asked);
+        match node.asked.iter().find(|noted| noted.same_way(&asked)) {
+            None => node.asked.push(asked),
+            Some(noted) => debug_assert_eq!(
+                noted.answered,
+                asked.answered,
+                "the box in slot {} answered the same size query otherwise since its cache was \
+                 cleared, so a layout it was kept in rests on a stale answer; \
+                 `cargo test -p vapors-elements` reproduces it",
+                usize::from(id)
+            ),
         }
     }
 }

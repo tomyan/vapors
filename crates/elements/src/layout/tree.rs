@@ -11,9 +11,9 @@ use taffy::{
 };
 use vapors_text::FontSystem;
 
+use super::asked::Asked;
 use super::boxes::{Content, LayoutBox};
 use super::calcs::Calcs;
-use super::isolated::Asked;
 use super::measure::measure_text;
 
 /// The boxes, what measuring text needs, and the calcs Taffy may ask for.
@@ -57,13 +57,7 @@ impl BoxTree<'_> {
             if inputs.run_mode == RunMode::PerformLayout {
                 compute_oof_layout(tree, id, &mut output);
             }
-            tree.note_asked(
-                id,
-                Asked {
-                    input: inputs,
-                    in_block,
-                },
-            );
+            tree.note_asked(id, Asked::of(inputs, in_block, &output));
             output
         })
     }
