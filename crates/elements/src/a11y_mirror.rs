@@ -9,6 +9,7 @@
 use vapors_dom::NodeId;
 
 use crate::a11y_error::AxError;
+use crate::a11y_mirror_record::AboveMemo;
 use crate::a11y_mirror_state::AxIndex;
 use crate::a11y_tree::AxStates;
 use crate::document::Document;
@@ -107,12 +108,7 @@ impl Document {
     /// Every node, in document order.
     fn ax_rebuild(&mut self) -> Result<AxUpdate, AxError> {
         let index = AxIndex::of(self);
-        let mut nodes = Vec::new();
-        for node in self.elements() {
-            if let Some(record) = self.ax_record(node, &index)? {
-                nodes.push(record);
-            }
-        }
+        let nodes = self.ax_every(&index)?;
         let focus = self.active_element();
         self.ax.reset(&nodes, index, focus);
         Ok(AxUpdate {
@@ -121,5 +117,19 @@ impl Document {
             focus: Some(focus),
             ..AxUpdate::default()
         })
+    }
+
+    /// Every node's record, in document order: one pass, each element's
+    /// parent in the tree carried down from its own parent's entry.
+    pub(crate) fn ax_every(&self, index: &AxIndex) -> Result<Vec<AxMirrorNode>, AxError> {
+        let mut nodes = Vec::new();
+        let mut memo = AboveMemo::default();
+        for node in self.elements() {
+            let over = memo.over(self, node);
+            let record = self.ax_record_under(node, index, over)?;
+            memo.note(self, node, over, record.is_some());
+            nodes.extend(record);
+        }
+        Ok(nodes)
     }
 }

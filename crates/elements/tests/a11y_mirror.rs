@@ -7,8 +7,9 @@ mod support;
 
 use support::mirror::{node_of, taken_page};
 use support::roles_page::page;
+use support::viewport;
 use vapors_dom::Dom;
-use vapors_elements::{AxError, AxRange};
+use vapors_elements::{AxError, AxRange, Document};
 
 #[test]
 fn the_first_take_holds_every_node_in_document_order_with_its_parent() {
@@ -92,4 +93,34 @@ fn a_take_before_an_update_is_refused() {
 
     // Then
     assert!(matches!(refused, Err(AxError::NotUpdated)), "{refused:?}");
+}
+
+#[test]
+fn the_first_take_leaves_out_what_an_aria_hidden_wrapper_holds() {
+    // Given: the group hidden from readers; the unnamed row is no node
+    let mut doc = page();
+    let find = |doc: &Document, role, name| doc.ax_find(role, name, None).expect(name).node;
+    let group = find(&doc, "group", "Tone");
+    let dialog = find(&doc, "dialog", "Levels");
+    let after = find(&doc, "button", "After");
+    doc.set_attribute(group, "aria-hidden", "true");
+    doc.update(viewport(640.0, 400.0)).expect("updates");
+
+    // When
+    let update = doc.take_ax_update().expect("updated").expect("every");
+
+    // Then
+    let names: Vec<&str> = update.nodes.iter().map(|n| n.name.as_str()).collect();
+    assert!(
+        !names
+            .iter()
+            .any(|n| ["Tone", "Amount", "Radius", "Note"].contains(n)),
+        "{names:?}"
+    );
+    let record = update
+        .nodes
+        .iter()
+        .find(|n| n.node == after)
+        .expect("After");
+    assert_eq!(record.parent, Some(dialog), "through the row with no role");
 }
