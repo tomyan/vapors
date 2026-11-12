@@ -166,6 +166,15 @@ pub enum AxError {
         /// The nodes placed, as numbers.
         nodes: Vec<u64>,
     },
+    /// A consumer owns the a11y takes, and a take elsewhere would lose
+    /// it the changes (R6).
+    Owned {
+        /// The consumer, as it named itself on attaching.
+        owner: String,
+    },
+    /// The taker given is not the one attached to this document:
+    /// another document's, or detached (R6).
+    NotTaker,
     /// The reply did not serialise: a bug in vapors.
     BadReply {
         /// The serialiser's error.

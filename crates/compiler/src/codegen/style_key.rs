@@ -6,7 +6,7 @@
 //! it. The tree sets those attributes from the key, so nothing else
 //! is emitted for them.
 
-use super::element_class::class_attribute;
+use super::element::attribute_named;
 use super::emit::Emitter;
 use crate::CompileError;
 use crate::ast::{AttrValue, Element};
@@ -37,17 +37,19 @@ impl Emitter<'_> {
 
     fn style_key(&self, element: &Element) -> Result<String, CompileError> {
         let (line, column) = self.source.position(element.offset);
-        let site = format!("{}:{line}:{column}", self.source.path);
+        // the package, as `SCOPE` names it, so two crates' `src/card.wisp` differ
+        let place = format!("{}:{line}:{column}", self.source.path);
+        let site = format!("concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {place:?})");
         let scope = if self.scoped { "Some(SCOPE)" } else { "None" };
         let classes = quoted(&self.literal_classes(element)?);
         let toggles = quoted(&self.key_directives(element)?);
-        let style = match class_attribute(element, "style").map(|a| &a.value) {
+        let style = match attribute_named(element, "style").map(|a| &a.value) {
             Some(AttrValue::Literal(text)) => format!("Some({text:?})"),
             // `style={..}` is refused before this (attribute_refusals)
             Some(AttrValue::Expr(_)) | None => "None".to_owned(),
         };
         Ok(format!(
-            "vapors_dom::StyleKey {{ site: {site:?}, scope: {scope}, tag: {:?}, classes: &[{classes}], toggles: &[{toggles}], style: {style} }}",
+            "vapors_dom::StyleKey {{ site: {site}, scope: {scope}, tag: {:?}, classes: &[{classes}], toggles: &[{toggles}], style: {style} }}",
             element.tag
         ))
     }

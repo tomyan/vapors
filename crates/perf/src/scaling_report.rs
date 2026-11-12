@@ -60,11 +60,9 @@ pub fn verdict(change: RowChange, scaling: &Scaling) -> Result<String, String> {
         ));
     }
     Ok(match judged {
-        Judged::Nothing => format!(
-            "scaling: {change:?} is reported, not judged: property 3 (the splice step) is not built"
-        ),
-        Judged::UpdateTotal => format!(
-            "scaling: pass, {change:?} update within {TOLERANCE_PERCENT}% or {MIN_GROWTH_INSTRUCTIONS} instructions of its 1000-row count"
+        Judged::AccessibilityPerRow { ceiling } => format!(
+            "scaling: pass, {change:?} accessibility within {ceiling} instructions per extra row; \
+             the other phases are reported, not judged: property 3 (the splice step) is not built"
         ),
         Judged::EveryPhase => format!(
             "scaling: pass, every {change:?} phase within {TOLERANCE_PERCENT}% or {MIN_GROWTH_INSTRUCTIONS} instructions of its 1000-row count"

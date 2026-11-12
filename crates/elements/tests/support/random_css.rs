@@ -5,8 +5,10 @@
 /// `:last-child`, `:empty`, an ancestor attribute, `:hover` on a
 /// non-subject compound, `:active`, `@media`, calc with % and em, vw,
 /// relative, absolute and fixed positioning, z-index on positioned
-/// boxes and on flex items, `overflow: hidden` and `clip`, and scroll
-/// containers (html hidden, so body can be one).
+/// boxes and on flex items, `overflow: hidden` and `clip`, scroll
+/// containers (html hidden, so body can be one), and the parents a
+/// rebuilt row is replayed under (M10c): a flex column with row
+/// margins, a grid, a wrapping row and a baseline-aligned one.
 pub const CSS: &str = "
 :root { --pad: 3px; }
 html { overflow: hidden; }
@@ -33,6 +35,11 @@ body { margin: 0; font-size: 14px; color: #222222; }
 .fix { position: fixed; right: 4px; bottom: 4px; width: 30px; height: 10px; }
 .trim { overflow: clip; height: 10px; }
 .scroller { overflow: auto; height: 8px; }
+.column { flex-direction: column; }
+.column > .box { margin: 4px 0; }
+.grid { display: grid; grid-template-columns: auto auto; }
+.wrap { flex-wrap: wrap; }
+.base { align-items: baseline; }
 ";
 
 pub const CLASSES: &[&str] = &[
@@ -53,6 +60,10 @@ pub const CLASSES: &[&str] = &[
     "row trim",
     "box scroller",
     "row scroller",
+    "row column",
+    "row grid",
+    "row wrap",
+    "row base",
     "row",
     "",
 ];

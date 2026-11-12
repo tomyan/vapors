@@ -2,6 +2,8 @@
 //! `StyleKey` as its toggles, and one effect calls `toggle_classes`
 //! with each directive's name and expression.
 
+use super::attribute_refusals::refuse_string_styling;
+use super::element::attribute_named;
 use super::emit::Emitter;
 use crate::CompileError;
 use crate::ast::{AttrValue, Attribute, Element, Expr};
@@ -62,11 +64,14 @@ impl Emitter<'_> {
         &self,
         element: &'e Element,
     ) -> Result<Vec<&'e str>, CompileError> {
-        let Some(class) = class_attribute(element, "class") else {
+        let Some(class) = attribute_named(element, "class") else {
             return Ok(Vec::new());
         };
         let AttrValue::Literal(value) = &class.value else {
-            unreachable!("`class={{..}}` is refused by attribute_refusals before the key is made")
+            // `emit_element` refuses `class={..}` first; a caller that
+            // did not still refuses here, naming the site
+            refuse_string_styling(self.source, class)?;
+            return Err(self.source.error(class.offset, "`class={..}` cannot be part of the element's style key: write class=\"name\" and class:name={condition}"));
         };
         for attribute in element.attributes.iter().filter(|a| is_class_directive(a)) {
             let name = &attribute.name[PREFIX.len()..];
@@ -123,9 +128,4 @@ fn directive_name(attribute: &Attribute) -> Result<&str, String> {
         ));
     }
     Ok(name)
-}
-
-/// The element's attribute called `name`, in any case.
-pub(super) fn class_attribute<'e>(element: &'e Element, name: &str) -> Option<&'e Attribute> {
-    (element.attributes.iter()).find(|attribute| attribute.name.eq_ignore_ascii_case(name))
 }
