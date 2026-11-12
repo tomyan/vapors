@@ -7,7 +7,7 @@ use crate::kept_paint::{PaintedFrom, keep, paint_all};
 use crate::layout::{LayoutBox, Rebuilt};
 use crate::node_map::NodeMap;
 use crate::paint::PaintInput;
-use crate::paint_order::Stackings;
+use crate::paint_order::{Patched, Stackings};
 use crate::painted::Painted;
 use crate::style::Used;
 
@@ -21,15 +21,15 @@ impl Document {
         boxes: &[LayoutBox],
         rebuilt: &Rebuilt,
         last: Option<&mut Painted>,
-    ) -> (Stackings, bool) {
+    ) -> (Stackings, Patched) {
         let used = &self.kept.as_ref().expect("styled keeps the styles").used;
         let kept = last.filter(|_| !rebuilt.every);
-        let (stackings, restacked, made) = patched_or_made(kept, boxes, used, rebuilt);
+        let (stackings, patched, made) = patched_or_made(kept, boxes, used, rebuilt);
         self.counts.stackings_computed = made;
         if cfg!(debug_assertions) {
             stackings.assert_matches(&Stackings::of(boxes, used));
         }
-        (stackings, restacked)
+        (stackings, patched)
     }
 
     /// `last` when it shows what a paint made from `from` would after
@@ -59,20 +59,23 @@ impl Document {
 }
 
 /// `last`'s stackings patched for `rebuilt`, else every slot's made
-/// from `boxes`; whether a rebuilt slot's stacking changed (always,
-/// when every one is made); and how many were made.
+/// from `boxes`; what the patch found (every slot restacked, when every
+/// one is made); and how many were made.
 fn patched_or_made(
     last: Option<&mut Painted>,
     boxes: &[LayoutBox],
     used: &NodeMap<Used>,
     rebuilt: &Rebuilt,
-) -> (Stackings, bool, usize) {
+) -> (Stackings, Patched, usize) {
     if let Some(painted) = last {
-        let (patched, restacked) =
-            std::mem::take(&mut painted.stackings).patched(boxes, used, rebuilt);
-        return (patched, restacked, rebuilt.count());
+        let (patched, found) = std::mem::take(&mut painted.stackings).patched(boxes, used, rebuilt);
+        return (patched, found, rebuilt.count());
     }
     let made = Stackings::of(boxes, used);
     let held = made.held();
-    (made, true, held)
+    let every = Patched {
+        restacked: true,
+        freed_stacked: true,
+    };
+    (made, every, held)
 }

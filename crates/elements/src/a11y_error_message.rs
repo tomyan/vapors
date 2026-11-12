@@ -95,6 +95,10 @@ impl fmt::Display for AxError {
                 f,
                 "the reply did not serialise: {error}; fix: a bug in vapors, report it with the command"
             ),
+            Self::Unexposable { role, name, needs } => write!(
+                f,
+                "{role} \"{name}\" cannot be shown to a reader: it needs {needs}"
+            ),
             Self::UpdateFailed { after, errors } => write!(
                 f,
                 "the update after {after} failed: [{}]; fix: the page's styles or layout, as the errors name",

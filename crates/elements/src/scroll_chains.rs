@@ -48,6 +48,21 @@ impl Chains {
         }
     }
 
+    /// Records where a scroll over `element`, whose new box does not
+    /// scroll and is `parent`'s box's child, goes first: where one over
+    /// `parent` does (an order splice, `order_splice.rs`).
+    pub(crate) fn joined(&mut self, element: NodeId, parent: NodeId) {
+        if let Some(first) = self.first.get(&parent).copied() {
+            self.first.insert(element, first);
+        }
+    }
+
+    /// Forgets `element`, whose box is gone.
+    pub(crate) fn left(&mut self, element: NodeId) {
+        self.first.remove(&element);
+        self.outer.remove(&element);
+    }
+
     /// The scroll containers a scroll over `element` tries, innermost
     /// first.
     pub(crate) fn from(&self, element: NodeId) -> Vec<NodeId> {

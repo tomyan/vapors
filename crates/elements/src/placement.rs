@@ -76,6 +76,8 @@ pub(crate) struct Changes<'a> {
 pub(crate) struct Placed {
     pub(crate) moved: Vec<usize>,
     pub(crate) count: usize,
+    /// In-flow children chained before the walk (`chain_children`).
+    pub(crate) chained: usize,
 }
 
 impl<'a> Changes<'a> {
@@ -108,7 +110,7 @@ impl Placement {
         if changes.every {
             *self = Self::every(boxes.boxes);
         }
-        self.patch(boxes.boxes, changes);
+        let chained = self.patch(boxes.boxes, changes);
         // The walk reads no mark when every slot is placed.
         let marked = if changes.every {
             Marked::default()
@@ -117,11 +119,24 @@ impl Placement {
         };
         let mut walk = Walk::new(self, boxes, scroll, changes.every, &marked.under);
         walk.place_from_root();
-        let placed = walk.done();
-        for slot in marked.slots {
-            self.marks[slot] = Mark::None;
-        }
+        let mut placed = walk.done();
+        placed.chained = chained;
+        self.assert_visited(&marked.slots);
         placed
+    }
+
+    /// Panics, naming the slot and the slot it is placed in, when a
+    /// marked slot still holds its mark: the walk clears a mark as it
+    /// visits, so one left is a slot the walk did not reach.
+    fn assert_visited(&self, marked: &[usize]) {
+        if let Some(&slot) = marked.iter().find(|&&slot| self.marks[slot] != Mark::None) {
+            panic!(
+                "the placement walk did not visit marked slot {slot}, placed in slot {}: the \
+                 chain to it is stale (placement.rs, `patch`); `cargo test -p vapors-elements` \
+                 reproduces it",
+                self.up[slot]
+            );
+        }
     }
 
     /// Nothing kept, for `boxes`: every slot is marked built again.
@@ -144,27 +159,36 @@ impl Placement {
     /// slots placed in a slot built again are chained to it, so a slot
     /// newly taken, or whose box moved under another parent, is marked
     /// to the root too.
-    fn patch(&mut self, boxes: &[LayoutBox], changes: &Changes<'_>) {
+    fn patch(&mut self, boxes: &[LayoutBox], changes: &Changes<'_>) -> usize {
         self.resize(boxes.len());
         for &(slot, _) in changes.freed {
             self.up[slot] = NO_SLOT;
         }
         self.patch_containing(boxes, changes);
-        self.chain_children(boxes, changes);
+        self.chain_children(boxes, changes)
     }
 
     /// Chains each in-flow child of a slot built again or laid out to
-    /// it: a slot changes the slot it is placed in only when its box is
-    /// built again under another parent, or its parent is laid out with
-    /// it newly in flow. A hoisted box is chained by `patch_containing`.
-    fn chain_children(&mut self, boxes: &[LayoutBox], changes: &Changes<'_>) {
-        for &slot in changes.rebuilt.iter().chain(&changes.written.laid_out) {
+    /// it, each such slot once (a slot laid out more than once is listed
+    /// more than once); how many children. A slot changes the slot it is
+    /// placed in only when its box is built again under another parent,
+    /// or its parent is laid out with it newly in flow. A hoisted box is
+    /// chained by `patch_containing`.
+    fn chain_children(&mut self, boxes: &[LayoutBox], changes: &Changes<'_>) -> usize {
+        let mut slots: Vec<usize> = changes.rebuilt.to_vec();
+        slots.extend_from_slice(&changes.written.laid_out);
+        slots.sort_unstable();
+        slots.dedup();
+        let mut chained = 0;
+        for slot in slots {
             for &child in &boxes[slot].children {
                 if self.containing[child].is_none() {
                     self.up[child] = slot;
+                    chained += 1;
                 }
             }
         }
+        chained
     }
 
     /// Sizes the vectors to `len` slots.

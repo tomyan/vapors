@@ -96,7 +96,7 @@ impl<'g> Sampler<'g> {
         for index in 0..=timed.end {
             let clock = gpu_clock.as_deref_mut().filter(|_| timed.contains(&index));
             let measured = self.frame(workload, &texture, index, clock)?;
-            if index > timed.start {
+            if index > timed.start && workload.times_gpu() {
                 samples.push_gpu_time(frame_gpu_time(workload.timing().gpu, index - 1)?);
             }
             if timed.contains(&index) {
@@ -128,6 +128,9 @@ impl<'g> Sampler<'g> {
         gpu_clock: Option<&mut GpuClock>,
     ) -> Result<Measured, String> {
         workload.change(index);
+        workload
+            .ready()
+            .map_err(|error| format!("frame {index}: {error}"))?;
         self.now += INTERVAL;
         let _ = self.clock.take();
         let _ = self.clock.take_instructions()?;

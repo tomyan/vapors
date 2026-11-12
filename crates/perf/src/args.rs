@@ -10,7 +10,7 @@ pub const MAX_RUNS: usize = (wgpu::QUERY_SET_MAX_QUERIES / 2) as usize;
 
 const USAGE: &str = "cargo run --release -p vapors-perf -- \
                      [runs] [warmup] [--only <substring> (once)] [--instructions] \
-                     [--scaling Idle|Text|Class|HoveredClass|Insert]";
+                     [--scaling Idle|Text|Class|HoveredClass|Insert] [--mount] [--mount-memory <rows>]";
 
 /// What the command line asks for.
 #[derive(Debug)]
@@ -24,6 +24,11 @@ pub struct Options {
     /// Run this change at each size of `scaling::SIZES`, count its
     /// instructions and judge their growth.
     pub scaling: Option<RowChange>,
+    /// Run the Mount workload at each size of `scaling::SIZES`.
+    pub mount: bool,
+    /// Run the Mount workload at one size, in this process, and print its
+    /// resident set on one line (`mount_memory`'s child mode).
+    pub mount_memory: Option<usize>,
 }
 
 /// The options `args` name, without the program's name.
@@ -42,13 +47,24 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
         only,
         instructions,
         scaling,
+        mount,
+        mount_memory,
     } = flags;
     refuse_scaling_with_others(scaling.is_some(), only.is_some(), instructions)?;
+    refuse_mount_with_others([
+        ("--only", only.is_some()),
+        ("--instructions", instructions),
+        ("--scaling", scaling.is_some()),
+        ("--mount", mount),
+        ("--mount-memory", mount_memory.is_some()),
+    ])?;
     Ok(Options {
         settings: settings(counts.into_iter())?,
         only,
         instructions,
         scaling,
+        mount,
+        mount_memory,
     })
 }
 
@@ -58,6 +74,8 @@ struct Flags {
     only: Option<String>,
     instructions: bool,
     scaling: Option<RowChange>,
+    mount: bool,
+    mount_memory: Option<usize>,
 }
 
 impl Flags {
@@ -67,6 +85,8 @@ impl Flags {
             "--only" if self.only.is_some() => return Err(format!("--only given twice: {USAGE}")),
             "--only" => self.only = Some(only_value(rest.next())?),
             "--instructions" => self.instructions = true,
+            "--mount" => self.mount = true,
+            "--mount-memory" => self.mount_memory = Some(mount_rows(rest.next())?),
             "--scaling" if self.scaling.is_some() => {
                 return Err(format!("--scaling given twice: {USAGE}"));
             }
@@ -90,6 +110,30 @@ fn refuse_scaling_with_others(scaling: bool, only: bool, instructions: bool) -> 
         ));
     }
     Ok(())
+}
+
+/// `--mount` and `--mount-memory` each replace the full run, always
+/// count instructions where they count, and use fixed sizes or one given
+/// size: nothing to select or add. `modes` is every flag that selects or
+/// replaces, with whether it was given, in the order they may follow:
+/// each of the last two is refused with the flags before it.
+fn refuse_mount_with_others(modes: [(&str, bool); 5]) -> Result<(), String> {
+    for (at, (mode, _)) in modes.iter().enumerate().skip(3) {
+        let given = modes[at].1;
+        let other = modes[..at]
+            .iter()
+            .find_map(|&(flag, on)| on.then_some(flag));
+        if let (true, Some(other)) = (given, other) {
+            return Err(format!("{mode} and {other} cannot be combined: {USAGE}"));
+        }
+    }
+    Ok(())
+}
+
+fn mount_rows(value: Option<String>) -> Result<usize, String> {
+    value
+        .and_then(|rows| rows.parse().ok())
+        .ok_or_else(|| format!("--mount-memory needs a row count: {USAGE}"))
 }
 
 fn scaling_change(value: Option<String>) -> Result<RowChange, String> {

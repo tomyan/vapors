@@ -14,28 +14,41 @@ use crate::stats::{Distribution, median_count};
 /// encoder), `write` (`Queue::write_buffer` and `write_texture`) and
 /// `submit` (`Queue::submit`: once per frame, plus once per glyph atlas
 /// repack and per `gpu-surface` that renders); the rest of draw is the
-/// painter's own work. The app's other phases are [`UNREPORTED`].
+/// painter's own work. The app's other phases are [`APP_PHASES`].
 pub const PHASES: [&str; 8] = [
     "update", "style", "layout", "paint", "draw", "encode", "write", "submit",
 ];
 
 /// The app's other frame phases: `run_frame` spans each one, so each is
-/// timed and counted, and in these workloads each does no work. They are
-/// left out of the report and of `--scaling`'s judgement; `frame (CPU)`
-/// holds them, so work one takes on at a larger size fails the judge
-/// there.
-pub const UNREPORTED: [&str; 5] = ["input", "tasks", "tick", "accessibility", "record"];
+/// timed and counted. In a steady frame each does no work today
+/// (`accessibility` builds its tree once, in the first frame), so the
+/// times table leaves them out; `--scaling` judges them like every other
+/// phase, held flat by the same rule, so one that takes on work per row
+/// fails there.
+pub const APP_PHASES: [&str; 5] = ["input", "tasks", "tick", "accessibility", "record"];
+
+/// Every phase a frame records, in frame order: [`PHASES`] and
+/// [`APP_PHASES`]. What the first frame reports and `--scaling` judges.
+pub const EVERY_PHASE: [&str; 13] = [
+    "input",
+    "tasks",
+    "tick",
+    "update",
+    "style",
+    "layout",
+    "paint",
+    "accessibility",
+    "draw",
+    "encode",
+    "write",
+    "submit",
+    "record",
+];
 
 /// `samples` of the workload `name` as a Markdown section.
 #[must_use]
 pub fn section(name: &str, samples: &Samples) -> String {
-    let mut out = format!("### {name}\n\n{}\n\n", counts(&samples.counts));
-    out.push_str("| phase | median µs | p90 µs | max µs |\n|---|---|---|---|\n");
-    row(&mut out, "frame (CPU)", &samples.frame);
-    for phase in PHASES {
-        let times = samples.phases.get(phase).map_or(&[][..], Vec::as_slice);
-        row(&mut out, phase, times);
-    }
+    let mut out = times_section(name, samples, &PHASES);
     match &samples.gpu {
         Some(spans) => row(&mut out, SPAN, spans),
         None => no_timestamps(&mut out, SPAN),
@@ -46,6 +59,20 @@ pub fn section(name: &str, samples: &Samples) -> String {
     }
     if let Some(resolution) = samples.gpu_resolution {
         let _ = writeln!(out, "| GPU time resolution | {resolution} | | |");
+    }
+    out
+}
+
+/// `section` without the GPU rows: for a workload whose frames are not
+/// timed on the GPU (`Workload::times_gpu`).
+#[must_use]
+pub fn times_section(name: &str, samples: &Samples, phases: &[&str]) -> String {
+    let mut out = format!("### {name}\n\n{}\n\n", counts(&samples.counts));
+    out.push_str("| phase | median µs | p90 µs | max µs |\n|---|---|---|---|\n");
+    row(&mut out, "frame (CPU)", &samples.frame);
+    for &phase in phases {
+        let times = samples.phases.get(phase).map_or(&[][..], Vec::as_slice);
+        row(&mut out, phase, times);
     }
     out
 }

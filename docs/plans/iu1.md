@@ -115,7 +115,14 @@ content did not move visits those only; `visit` asserts it is never
 called for a slot it will not place. The 10 instructions per row
 outside the three phase spans were `KeptBoxes::keep` setting every
 box's `kept` flag; it now sets the built boxes' only, with a debug
-assertion that every held box is kept after. With both, Text's
+assertion that every held box is kept after. Two counts pin these in
+`sparse_updates` at 100 and 1000 rows: `slots_chained` (the in-flow
+children chained to the boxes built again or laid out before the walk,
+each such box once: 1 for an edit laid out in isolation, rows + 5 when
+the body is laid out) and `boxes_kept` (the boxes built). The walk
+clears each mark as it visits, and `place` panics on a marked slot
+left unvisited; a slot chained to the wrong parent is caught by the
+debug oracle only. With both, Text's
 `layout` is 86k and its `update` 123k instructions at 1000, 3000 and
 10,000 rows (`vapors-perf 60 10 --scaling Text`, 2026-11-12, this
 machine); Idle passes too. Class and HoveredClass still grow in `style`

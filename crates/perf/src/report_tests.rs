@@ -91,3 +91,13 @@ fn the_gpu_times_resolution_is_reported_beside_them() {
     let row = "| GPU time resolution | 83ns (the device's timestamp period) | | |";
     assert!(report.contains(row), "{report}");
 }
+
+#[test]
+fn the_times_section_has_no_gpu_rows() {
+    // When
+    let report = super::times_section("mount", &Samples::default(), &["update"]);
+
+    // Then
+    assert!(report.contains("| frame (CPU) |"), "{report}");
+    assert!(!report.contains("GPU"), "{report}");
+}

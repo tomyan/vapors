@@ -56,6 +56,7 @@ impl<'a, 'b> Walk<'a, 'b> {
             placed: Placed {
                 moved: Vec::new(),
                 count: 0,
+                chained: 0,
             },
         }
     }
@@ -79,12 +80,14 @@ impl<'a, 'b> Walk<'a, 'b> {
     }
 
     /// Places `slot` in content whose origin is `origin`, when its
-    /// mark or `origin_moved` says to, and the slots placed in it.
+    /// mark or `origin_moved` says to, and the slots placed in it. The
+    /// mark is cleared as it is read, so `Placement::place` can tell a
+    /// marked slot the walk did not reach.
     fn visit(&mut self, slot: usize, origin: (f32, f32), origin_moved: bool) {
         let mark = if self.every {
             Mark::Rebuilt
         } else {
-            self.kept.marks[slot]
+            std::mem::replace(&mut self.kept.marks[slot], Mark::None)
         };
         assert!(
             origin_moved || mark != Mark::None,
@@ -129,6 +132,12 @@ impl<'a, 'b> Walk<'a, 'b> {
     fn visit_marked_in(&mut self, slot: usize, inner: (f32, f32)) {
         let under = self.under;
         for &child in under.get(&slot).map_or(&[][..], Vec::as_slice) {
+            assert!(
+                self.kept.marks[child] != Mark::None,
+                "slot {child}, listed under slot {slot} as marked, holds no mark: it was \
+                 visited already, or listed without being marked (placement_marks.rs); \
+                 `cargo test -p vapors-elements` reproduces it"
+            );
             self.visit(child, inner, false);
         }
     }
