@@ -48,9 +48,12 @@ impl KeptChecks {
     }
 
     /// Clears the marks, once the checks after styling ran for them.
+    /// `marked` is a new set, not cleared: a mount's listeners mark every
+    /// row, and `touched` iterates the capacity a cleared set keeps on
+    /// every update (docs/plans/perf-finish-line.md, property 1).
     pub(crate) fn checked(&mut self) {
         self.all = false;
-        self.marked.clear();
+        self.marked = HashSet::new();
         self.added.clear();
     }
 
@@ -63,3 +66,7 @@ impl KeptChecks {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "kept_checks_tests.rs"]
+mod tests;

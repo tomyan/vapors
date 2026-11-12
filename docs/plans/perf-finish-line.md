@@ -40,8 +40,17 @@ naming the phase and its growth per extra row, when an edit's phase
 (Idle; `update`) is both over 2% and over 5000 instructions above its 1000-row count at a larger size.
 At 1657b27 every one of the four failed
 (docs/perf/baseline-2026-11-10.md, "Scaling, 1657b27"); after M10b
-(2026-11-12) Text and Idle pass, and Class and HoveredClass fail only
-on `style`, 2 instructions per extra row (docs/plans/iu1.md, PR 2).
+(2026-11-12) Text and Idle pass, and Class and HoveredClass failed only
+on `style`, 2 instructions per extra row; they pass since the style
+phase's kept sets stopped keeping the mount's capacity (2026-11-12;
+HoveredClass `style` 843k / 847k / 870k instructions at 1,000 / 3,000 /
+10,000 rows before, 840k / 848k / 850k after, docs/plans/iu1.md, PR 2).
+The 5k to 9k instructions HoveredClass `style` still rises from 1,000
+rows (once 1 under the judge's 5000 floor, passing on 2%) are glibc's
+malloc costing more per call on a larger heap: with jemalloc preloaded
+`style` is flat at 733k, and allocation is about 170k of the cascade's
+430k (follow-up: fewer allocations in `Cascade::compute`, or an
+allocator decision; iu1.md, PR 2).
 FlexText, an edit in a flex-column list whose rows have a vertical
 margin, passes since M10c (2026-11-12; `layout` 5.6 M / 16.6 M / 55.3 M
 instructions at 1,000 / 3,000 / 10,000 rows before, 123 k / 126 k /
