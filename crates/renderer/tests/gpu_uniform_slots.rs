@@ -15,20 +15,41 @@ const RED: [u8; 4] = [255, 0, 0, 255];
 /// Slots in a new uniform buffer (`FIRST_SLOTS` in `uniform_slots.rs`).
 const FIRST_SLOTS: u32 = 16;
 
-/// One frame drawing one quad on a square of each of `sides`: the
-/// frame's work.
-fn frame_at(gpu: &Gpu, pipeline: &mut QuadPipeline, sides: &[u32]) -> GpuWork {
+/// One frame drawing a quad over the top-left pixel of a square of each
+/// of `sides`, submitted: the squares, and the frame's work.
+fn quads_at(
+    gpu: &Gpu,
+    pipeline: &mut QuadPipeline,
+    sides: &[u32],
+) -> (Vec<(u32, wgpu::Texture)>, GpuWork) {
     let encoder = FrameEncoder::new(&gpu.device);
-    let targets: Vec<_> = sides
+    let squares: Vec<_> = sides
         .iter()
         .map(|&side| (side, square(gpu, side)))
         .collect();
-    for (side, (_, view)) in &targets {
+    for (side, (_, view)) in &squares {
         let target = target(gpu, &encoder, view, *side);
         pipeline.draw(&target, &[quad([0.0, 0.0, 1.0, 1.0], RED)]);
     }
     encoder.submit(&gpu.queue).expect("no draw refused");
-    pipeline.take_work()
+    let squares = squares
+        .into_iter()
+        .map(|(side, (texture, _))| (side, texture))
+        .collect();
+    (squares, pipeline.take_work())
+}
+
+/// One frame of [`quads_at`]: its work.
+fn frame_at(gpu: &Gpu, pipeline: &mut QuadPipeline, sides: &[u32]) -> GpuWork {
+    quads_at(gpu, pipeline, sides).1
+}
+
+/// Asserts the quad covers the top-left pixel of `square` and no more:
+/// it was drawn with `square`'s own viewport.
+fn assert_drawn_at_its_size(gpu: &Gpu, (side, square): &(u32, wgpu::Texture)) {
+    let rgba = read_rgba8(&gpu.device, &gpu.queue, square);
+    assert_eq!(pixel(&rgba, *side, 0, 0), RED, "{side} px square");
+    assert_eq!(pixel(&rgba, *side, 1, 1), BACKGROUND, "{side} px square");
 }
 
 #[test]
@@ -101,24 +122,56 @@ fn gpu_each_draw_in_a_frame_reads_its_own_viewport() {
 
 #[test]
 fn gpu_a_draw_after_the_buffer_grows_reads_its_viewport_from_the_new_buffer() {
-    // Given: one more size than the first buffer holds
+    // Given
     let gpu = gpu();
     let mut pipeline = QuadPipeline::new(&gpu.device, wgpu::TextureFormat::Rgba8Unorm);
-    let encoder = FrameEncoder::new(&gpu.device);
-    let squares: Vec<_> = (1..=FIRST_SLOTS + 1)
-        .map(|side| (side, square(&gpu, side)))
-        .collect();
+    let sides: Vec<u32> = (1..=FIRST_SLOTS + 1).collect();
 
-    // When: a quad over each square's top-left pixel
-    for (side, (_, view)) in &squares {
-        let target = target(&gpu, &encoder, view, *side);
-        pipeline.draw(&target, &[quad([0.0, 0.0, 1.0, 1.0], RED)]);
-    }
-    encoder.submit(&gpu.queue).expect("no draw refused");
+    // When: one more size than the first buffer holds
+    let (squares, _) = quads_at(&gpu, &mut pipeline, &sides);
 
     // Then: the last quad, drawn after the move, covers one pixel of its square
-    let (side, (last, _)) = squares.last().expect("one square per size");
-    let rgba = read_rgba8(&gpu.device, &gpu.queue, last);
-    assert_eq!(pixel(&rgba, *side, 0, 0), RED);
-    assert_eq!(pixel(&rgba, *side, 1, 1), BACKGROUND);
+    assert_drawn_at_its_size(&gpu, squares.last().expect("one square per size"));
+}
+
+#[test]
+fn gpu_frames_each_at_a_new_size_reuse_the_slot_read_longest_ago() {
+    // Given
+    let gpu = gpu();
+    let mut pipeline = QuadPipeline::new(&gpu.device, wgpu::TextureFormat::Rgba8Unorm);
+    let mut bind_groups = 0;
+
+    // When: more frames than slots, each at a size not seen before
+    for side in 2..2 + FIRST_SLOTS * 5 {
+        let (squares, work) = quads_at(&gpu, &mut pipeline, &[side]);
+        bind_groups += work.bind_groups_made;
+
+        // Then: each draw reads its own viewport, from the first buffer
+        assert_drawn_at_its_size(&gpu, &squares[0]);
+    }
+    assert_eq!(bind_groups, 1);
+}
+
+#[test]
+fn gpu_frames_in_flight_each_evicting_every_slot_draw_their_own_viewports() {
+    // Given
+    let gpu = gpu();
+    let mut pipeline = QuadPipeline::new(&gpu.device, wgpu::TextureFormat::Rgba8Unorm);
+    let mut squares = Vec::new();
+    let mut bind_groups = 0;
+
+    // When: 4 frames of as many new sizes as slots, all submitted before any readback
+    for frame in 0..4 {
+        let first = 2 + frame * FIRST_SLOTS;
+        let sides: Vec<u32> = (first..first + FIRST_SLOTS).collect();
+        let (drawn, work) = quads_at(&gpu, &mut pipeline, &sides);
+        squares.extend(drawn);
+        bind_groups += work.bind_groups_made;
+    }
+
+    // Then
+    for square in &squares {
+        assert_drawn_at_its_size(&gpu, square);
+    }
+    assert_eq!(bind_groups, 1);
 }

@@ -8,12 +8,15 @@ mod atlas;
 mod atlas_evict;
 mod atlas_icon;
 mod atlas_page;
+mod atlas_texture;
 mod atlas_types;
 pub mod comparison;
 mod draw;
 mod draw_icon;
 mod font_system;
 pub mod fonts;
+#[cfg(test)]
+mod gpu_atlas_texture_tests;
 mod icon;
 mod icon_key;
 mod icon_miter;

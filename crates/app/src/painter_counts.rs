@@ -48,7 +48,8 @@ pub struct FrameCounts {
     /// Bind groups held after the frame: one per pipeline that has
     /// drawn (shadows, quads, text), one per image texture kept and
     /// one per surface backing. A texture dropped takes its bind group
-    /// with it, so this falls when a frame stops drawing an image.
+    /// with it, so this falls when a frame stops drawing an image. A
+    /// refused frame drops no texture and counts those still kept.
     pub bind_groups_kept: u64,
 }
 

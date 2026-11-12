@@ -3,10 +3,11 @@
 //! kept with it), the buffers it draws from and the bind group over
 //! them, kept between frames. Create once per target format.
 
-use vapors_renderer::{FrameArena, KeptBindGroup, UniformSlots, WorkCounter};
+use vapors_renderer::{FrameArena, UniformSlots, WorkCounter};
 
 use crate::GlyphAtlas;
-use crate::pipeline_gpu::{bind_group_layout, coverage_texture, render_pipeline};
+use crate::atlas_texture::AtlasTexture;
+use crate::pipeline_gpu::{bind_group_layout, render_pipeline};
 
 /// The two shader parameters. See `docs/text.md` for how they were chosen.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -39,10 +40,8 @@ pub struct TextPipeline {
     pub(crate) sampler: wgpu::Sampler,
     /// The blend parameters, one slot per distinct pair drawn with.
     pub(crate) params: UniformSlots,
-    pub(crate) texture: wgpu::Texture,
-    /// The texture's view, made with it.
-    pub(crate) view: wgpu::TextureView,
-    pub(crate) bind_group: KeptBindGroup,
+    /// The atlas texture, its view and the bind group over them.
+    pub(crate) atlas_texture: AtlasTexture,
     pub(crate) vertices: FrameArena,
     pub(crate) work: WorkCounter,
 }
@@ -62,7 +61,6 @@ impl TextPipeline {
             bind_group_layouts: &[Some(&layout)],
             immediate_size: 0,
         });
-        let texture = coverage_texture(device, atlas.coverage_page().size());
         Self {
             pipeline: render_pipeline(device, &pipeline_layout, &shader, format),
             layout,
@@ -73,9 +71,7 @@ impl TextPipeline {
                 ..Default::default()
             }),
             params: UniformSlots::new(device, "text params"),
-            view: texture.create_view(&wgpu::TextureViewDescriptor::default()),
-            texture,
-            bind_group: KeptBindGroup::NONE,
+            atlas_texture: AtlasTexture::new(device, atlas.coverage_page().size()),
             vertices: FrameArena::new(
                 device,
                 "text quads",
@@ -95,7 +91,7 @@ impl TextPipeline {
     /// The bind groups kept: one once this pipeline has drawn.
     #[must_use]
     pub fn bind_groups_kept(&self) -> u64 {
-        self.bind_group.kept()
+        self.atlas_texture.bind_groups_kept()
     }
 }
 

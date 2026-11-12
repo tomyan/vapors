@@ -74,9 +74,9 @@ impl TextPipeline {
         let page = atlas.coverage_page().size();
         assert_eq!(
             page,
-            self.texture.width(),
+            self.atlas_texture.texture().width(),
             "atlas page is {page} px but the text pipeline's texture is {} px",
-            self.texture.width()
+            self.atlas_texture.texture().width()
         );
         self.upload_page(target, atlas);
         let params = params_bytes(params);
@@ -108,7 +108,7 @@ impl TextPipeline {
             target.queue,
             wgpu::TexelCopyTextureInfo {
                 origin: wgpu::Origin3d { x, y, z: 0 },
-                ..self.texture.as_image_copy()
+                ..self.atlas_texture.texture().as_image_copy()
             },
             &page.region_pixels(rect),
             wgpu::TexelCopyBufferLayout {
@@ -144,12 +144,11 @@ impl TextPipeline {
             layout,
             sampler,
             params: slots,
-            view,
-            bind_group,
+            atlas_texture,
             work,
             ..
         } = self;
-        let bind_group = bind_group.of(slots.generation(), || {
+        let bind_group = atlas_texture.bind_group(slots.generation(), |view| {
             pipeline::bind_group(target.device, work, layout, view, sampler, slots)
         });
         target.draw_pass(|pass| {

@@ -85,6 +85,7 @@ impl ScenePainter {
 
     /// Each run of the scene, in order, under its clip. A refused frame
     /// still ends the surfaces' frame: those it did not paint are inactive.
+    /// It drops no texture, and its counts hold the bind groups still kept.
     fn paint(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
         self.begin_counts();
         self.atlas.begin_frame();
@@ -92,10 +93,11 @@ impl ScenePainter {
         self.surfaces.begin_frame();
         let runs = self.paint_runs(target, painted);
         self.surfaces.end_frame();
-        runs?;
-        self.textures.end_frame();
+        if runs.is_ok() {
+            self.textures.end_frame();
+        }
         self.end_counts();
-        Ok(())
+        runs
     }
 
     fn paint_runs(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
