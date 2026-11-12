@@ -156,11 +156,11 @@ fn every_key_the_review_reads_is_one_the_schema_accepts() {
 #[test]
 fn a_model_with_no_image_row_is_refused_naming_it_and_the_fix() {
     // When
-    let refused = read(&with("model", "gpt-6.1-sol")).expect_err("refused");
+    let refused = read(&with("model", "gpt-not-a-listed-model")).expect_err("refused");
 
     // Then
     assert!(
-        refused.contains("ux.model `gpt-6.1-sol` has no image-token row"),
+        refused.contains("ux.model `gpt-not-a-listed-model` has no image-token row"),
         "{refused}"
     );
     assert!(refused.contains("fix: add its numbers"), "{refused}");

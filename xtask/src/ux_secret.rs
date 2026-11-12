@@ -9,6 +9,9 @@ pub const RUN: usize = 12;
 /// A key that is never printed: its `Debug` shows no part of it.
 pub struct Secret {
     key: String,
+    /// The environment variable it came from, taken out of every child
+    /// process's environment (`unset_in`).
+    variable: Option<String>,
     /// Every [`RUN`]-character window of the key and of its base64.
     needles: Vec<String>,
 }
@@ -37,7 +40,32 @@ impl Secret {
             ));
         }
         let needles = needles(&key);
-        Ok(Self { key, needles })
+        Ok(Self {
+            key,
+            variable: None,
+            needles,
+        })
+    }
+
+    /// The same key, as read from `variable`.
+    #[must_use]
+    pub fn read_from(mut self, variable: &str) -> Self {
+        self.variable = Some(variable.to_owned());
+        self
+    }
+
+    /// Take the key's variable out of `command`'s environment: curl, git
+    /// and gh have no use for it.
+    pub fn unset_in(&self, command: &mut std::process::Command) {
+        if let Some(variable) = &self.variable {
+            command.env_remove(variable);
+        }
+    }
+
+    /// The request header that carries the key, for curl's stdin only
+    /// (`ux_call`), so the key is never in a command line.
+    pub fn header(&self) -> String {
+        format!("Authorization: Bearer {}\n", self.key)
     }
 
     /// `text`, when it holds no run of the key, as written, with its
