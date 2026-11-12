@@ -8,7 +8,8 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use vapors_css::selector::{Element as _, reads_siblings_or_descendants};
+use vapors_css::cascade::unshareable;
+use vapors_css::selector::Element as _;
 use vapors_dom::{NodeId, SCOPE_ATTRIBUTE, StyleKey};
 
 use crate::css_element::ElementRef;
@@ -27,8 +28,8 @@ pub(crate) enum Path {
     Computed,
     /// Computed for this element: created without a key.
     Unkeyed,
-    /// Computed for this element: its key's candidate rules read
-    /// siblings or descendants.
+    /// Computed for this element: one of its key's candidate rules
+    /// reads siblings or descendants, or sits under `@container`.
     Unshareable,
 }
 
@@ -104,7 +105,7 @@ impl Document {
         let decided = !self
             .sheets
             .rules_for_key(key.tag, &classes)
-            .any(|rule| reads_siblings_or_descendants(&rule.selector));
+            .any(|rule| unshareable(rule).is_some());
         kept.shared.shareable.insert(address, decided);
         decided
     }
