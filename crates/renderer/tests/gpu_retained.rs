@@ -1,18 +1,20 @@
 //! GPU tier: quads kept between frames (`retained.rs`): written once and
 //! drawn by later frames with no write; a range released in the frame
-//! that drew it is not reused there; bytes over the device's
-//! `max_buffer_size` are refused; a range drawn by another pipeline, or
-//! kept for a newer encoder while an older is open, panics.
+//! that drew it is not reused there, whether the frame kept bytes before
+//! the draw or not; bytes over the device's `max_buffer_size` are
+//! refused, naming the kept bytes; a range drawn by another pipeline,
+//! bytes kept for a newer encoder while an older is open, and bytes not
+//! a whole number of quads panic.
 
 #[path = "support/frame.rs"]
 mod frame;
 #[path = "support/retained.rs"]
 mod retained;
 
-use frame::{BACKGROUND, square};
+use frame::{BACKGROUND, square, target};
 use retained::{FIRST_SIZE, Frame, GREEN, QUAD_BYTES, RED, SIDE, kept};
 use vapors_gpu_harness::gpu;
-use vapors_renderer::{ArenaFull, QuadPipeline};
+use vapors_renderer::{ArenaFull, Holding, QuadPipeline};
 
 #[test]
 fn gpu_kept_quads_draw_in_a_later_frame_with_nothing_written() {
@@ -57,8 +59,10 @@ fn gpu_kept_bytes_over_the_devices_max_buffer_size_are_refused() {
         pipeline: "quads",
         size: count * QUAD_BYTES,
         limit: FIRST_SIZE,
+        holding: Holding::Kept,
     };
     assert_eq!(refused, None);
+    assert!(full.to_string().contains("release kept ranges"), "{full}");
     assert_eq!(submitted, Err(full));
     assert_eq!(frame.pipeline.retained_bytes(), 0);
 }
@@ -105,4 +109,37 @@ fn gpu_a_range_released_in_the_frame_that_drew_it_is_not_reused_in_that_frame() 
 
     // Then: the red draw read its own bytes
     assert_eq!(frame.row(), [RED, GREEN, BACKGROUND]);
+}
+
+#[test]
+fn gpu_a_range_drawn_then_released_before_its_frame_keeps_anything_is_not_reused_in_that_frame() {
+    // Given: a red quad kept in one frame
+    let mut frame = Frame::new(gpu());
+    let first = frame.encoder();
+    let red = kept(frame.keep(&first, (1, 0.0, RED)), "red");
+    first.submit(&frame.gpu.queue).expect("no refusal");
+
+    // When: the next frame draws and releases it, then keeps a green
+    // one and draws that
+    let second = frame.encoder();
+    frame.draw(&second, &red);
+    frame.pipeline.release(red);
+    let green = kept(frame.keep(&second, (1, 1.0, GREEN)), "green");
+    frame.draw(&second, &green);
+    second.submit(&frame.gpu.queue).expect("no refusal");
+
+    // Then: the red draw read its own bytes
+    assert_eq!(frame.row(), [RED, GREEN, BACKGROUND]);
+}
+
+#[test]
+#[should_panic(expected = "not a whole number of 128-byte instances")]
+fn gpu_kept_bytes_not_a_whole_number_of_quads_panic() {
+    // Given
+    let mut frame = Frame::new(gpu());
+    let encoder = frame.encoder();
+    let at = target(&frame.gpu, &encoder, &frame.view, SIDE);
+
+    // When: three 16-byte rows, part of one quad
+    let _ = frame.pipeline.keep(&at, &[0; 48]);
 }

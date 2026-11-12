@@ -2,6 +2,8 @@
 //! once into its kept buffer and drawn from it, one draw per quad with
 //! its own texture, until released (`retained.rs`).
 
+use std::ops::Range;
+
 use vapors_scene::{Rect, Size};
 
 use super::ImagePipeline;
@@ -29,7 +31,8 @@ impl ImagePipeline {
     /// refusal is on the target's encoder.
     pub fn keep(&mut self, target: &Target<'_>, bytes: &[u8]) -> Option<KeptRange> {
         let (frame, queue) = (target.encoder, target.queue);
-        self.kept.keep(frame, queue, &self.work, bytes)
+        let kept = self.kept.keep(frame, queue, &self.work, bytes)?;
+        Some(kept.on(target.viewport))
     }
 
     /// Draws `bound`'s texture over the `index`th quad `kept` holds, in
@@ -37,7 +40,8 @@ impl ImagePipeline {
     ///
     /// # Panics
     ///
-    /// If `kept` was kept by another pipeline.
+    /// If `kept` was kept by another pipeline, holds no `index`th quad,
+    /// or was kept on a target of another viewport.
     pub fn draw_kept(
         &mut self,
         target: &Target<'_>,
@@ -45,25 +49,43 @@ impl ImagePipeline {
         (kept, index): (&KeptRange, u32),
     ) {
         let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
-        let first = index * VERTEX_COUNT;
-        let held = self.kept.len(kept) / VERTEX_SIZE;
-        assert!(
-            u64::from(first + VERTEX_COUNT) <= held,
-            "image quads: quad {index} drawn from a kept range of {} quads; draw each kept \
-             range's quads by their place in it (image_kept.rs)",
-            held / u64::from(VERTEX_COUNT)
-        );
-        let vertices = self.kept.slice(kept);
+        let vertices = self.vertices(kept, index, target.viewport);
+        let slice = self.kept.slice(target.encoder, kept);
         target.draw_pass(|pass| {
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, bound.bind_group(), &[]);
-            pass.set_vertex_buffer(0, vertices);
-            self.work.draw(pass, first..first + VERTEX_COUNT, 0..1);
+            pass.set_vertex_buffer(0, slice);
+            self.work.draw(pass, vertices, 0..1);
         });
     }
 
-    /// Gives `kept`'s bytes back. Release a range only in a frame that
-    /// does not draw it.
+    /// The vertices of the `index`th quad `kept` holds, to draw on a
+    /// target of `viewport`.
+    ///
+    /// # Panics
+    ///
+    /// As [`ImagePipeline::draw_kept`].
+    fn vertices(&self, kept: &KeptRange, index: u32, viewport: Size) -> Range<u32> {
+        let quads = self.kept.len(kept) / VERTEX_SIZE / u64::from(VERTEX_COUNT);
+        assert!(
+            u64::from(index) < quads,
+            "image quads: quad {index} drawn from a kept range of {quads} quads; draw each \
+             kept range's quads by their place in it (image_kept.rs)"
+        );
+        let on = kept.viewport();
+        assert_eq!(
+            on,
+            Some(viewport),
+            "image quads: quads kept on a target of {on:?} drawn on one of {viewport:?}; their \
+             vertices are in clip space, so keep the rects again on a target of the new viewport \
+             (image_kept.rs)"
+        );
+        let first = index * VERTEX_COUNT;
+        first..first + VERTEX_COUNT
+    }
+
+    /// Gives `kept`'s bytes back. Draws of it already recorded still
+    /// read them: they are reused once a newer encoder writes or draws.
     ///
     /// # Panics
     ///

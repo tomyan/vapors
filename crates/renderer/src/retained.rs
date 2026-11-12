@@ -5,24 +5,25 @@
 //!
 //! When no free range holds a new range, the live ranges move into a
 //! new buffer, packed from offset 0 by copies recorded into the frame's
-//! encoder: compacted into one of the same size when at least half the
-//! buffer is free, else grown to twice the size (or what the bytes
+//! encoder: compacted into one of the same size when at least half of
+//! it is free after the move, else grown to twice the size (or what the bytes
 //! need), up to the device's `max_buffer_size`, past which the bytes
 //! are refused ([`ArenaFull`]). Draws recorded before the move keep the
 //! old buffer; the copies run after them and before later draws, and
 //! every write is to a range no copy touches.
 //!
 //! A released range may still be read by a draw recorded into the
-//! encoder the buffer last wrote for, so it is free for new bytes only
-//! once a newer encoder writes; writes for a newer encoder while an
-//! older one is open panic as [`FrameArena::push`](crate::FrameArena::push)
-//! does.
+//! encoder the buffer last wrote or drew for, so it is free for new
+//! bytes only once a newer encoder writes or draws; writes or draws for
+//! a newer encoder while an older one is open panic as
+//! [`FrameArena::push`](crate::FrameArena::push) does.
 
 use std::ops::Range;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::encoder_turn::EncoderTurn;
 use crate::free_ranges::FreeRanges;
+use crate::kept_range::KeptRange;
 use crate::{FrameEncoder, WorkCounter};
 
 /// Kept ranges start at multiples of this, and are multiples of it long.
@@ -43,20 +44,11 @@ pub struct Retained {
     ranges: Vec<Option<Range<u64>>>,
     vacant: Vec<u32>,
     /// Ranges released since the last encoder began: free once a newer
-    /// one writes.
+    /// one writes or draws.
     released: Vec<Range<u64>>,
     live: u64,
     owner: u64,
     turn: EncoderTurn,
-}
-
-/// A range of a [`Retained`] buffer, held until it is given back with
-/// [`Retained::release`]; read only from the buffer that kept it.
-#[derive(Debug, PartialEq, Eq)]
-#[must_use = "a kept range is held until it is released"]
-pub struct KeptRange {
-    owner: u64,
-    slot: u32,
 }
 
 impl Retained {
@@ -96,18 +88,8 @@ impl Retained {
         work: &WorkCounter,
         bytes: &[u8],
     ) -> Option<KeptRange> {
-        let size = bytes.len() as u64;
-        assert!(
-            size > 0 && size.is_multiple_of(ALIGN),
-            "{}: kept bytes are {size} long, not a non-zero multiple of {ALIGN}; pad each \
-             instance or vertex to 16 bytes (retained.rs)",
-            self.label
-        );
-        if self.turn.begin(frame) {
-            self.released
-                .drain(..)
-                .for_each(|range| self.free.give(range));
-        }
+        let size = self.aligned(bytes);
+        self.begin(frame);
         let start = match self.free.take(size) {
             Some(start) => start,
             None => self.moved(frame, work, size)?,
@@ -117,13 +99,17 @@ impl Retained {
         Some(self.hold(start..start + size))
     }
 
-    /// The kept bytes of `kept`, for `set_vertex_buffer`.
+    /// The kept bytes of `kept`, for `set_vertex_buffer` in a draw
+    /// recorded into `frame`: ranges released from now on stay unused
+    /// until a newer encoder writes or draws.
     ///
     /// # Panics
     ///
-    /// If `kept` is another buffer's range.
+    /// If `kept` is another buffer's range; as
+    /// [`FrameArena::push`](crate::FrameArena::push) for encoders.
     #[must_use]
-    pub fn slice(&self, kept: &KeptRange) -> wgpu::BufferSlice<'_> {
+    pub fn slice(&mut self, frame: &FrameEncoder, kept: &KeptRange) -> wgpu::BufferSlice<'_> {
+        self.begin(frame);
         self.buffer.slice(self.range(kept))
     }
 
@@ -139,8 +125,8 @@ impl Retained {
     }
 
     /// Gives `kept`'s bytes back, for ranges kept once a newer encoder
-    /// than the last one written for begins: a draw recorded before may
-    /// still read them.
+    /// than the last one written or drawn for begins: a draw recorded
+    /// before may still read them.
     ///
     /// # Panics
     ///
@@ -160,6 +146,31 @@ impl Retained {
         self.live
     }
 
+    /// How many `bytes` there are.
+    ///
+    /// # Panics
+    ///
+    /// If none, or not a multiple of 16.
+    fn aligned(&self, bytes: &[u8]) -> u64 {
+        let size = bytes.len() as u64;
+        assert!(
+            size > 0 && size.is_multiple_of(ALIGN),
+            "{}: kept bytes are {size} long, not a non-zero multiple of {ALIGN}; pad each \
+             instance or vertex to 16 bytes (retained.rs)",
+            self.label
+        );
+        size
+    }
+
+    /// Takes writes and draws for `frame`: when it is a newer encoder,
+    /// the ranges released for older ones are free.
+    fn begin(&mut self, frame: &FrameEncoder) {
+        if self.turn.begin(frame) {
+            let free = &mut self.free;
+            self.released.drain(..).for_each(|range| free.give(range));
+        }
+    }
+
     /// `range` held under a slot of its own.
     fn hold(&mut self, range: Range<u64>) -> KeptRange {
         let slot = self.vacant.pop().unwrap_or_else(|| {
@@ -170,6 +181,7 @@ impl Retained {
         KeptRange {
             owner: self.owner,
             slot,
+            viewport: None,
         }
     }
 
@@ -188,17 +200,4 @@ impl Retained {
 
 #[path = "retained_move.rs"]
 mod moved;
-
-fn buffer(
-    device: &wgpu::Device,
-    label: &str,
-    usage: wgpu::BufferUsages,
-    size: u64,
-) -> wgpu::Buffer {
-    device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some(label),
-        size,
-        usage,
-        mapped_at_creation: false,
-    })
-}
+use moved::buffer;

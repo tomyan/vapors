@@ -86,7 +86,19 @@ impl Instanced {
     /// Writes the instances' `bytes` into the kept buffer, for
     /// [`Instanced::draw_kept`] in this and later frames; `None` when
     /// it refuses them (the refusal is on the encoder).
+    ///
+    /// # Panics
+    ///
+    /// If `bytes` are not a whole number of instances.
     pub(crate) fn keep(&mut self, target: &Target<'_>, bytes: &[u8]) -> Option<KeptRange> {
+        let len = bytes.len() as u64;
+        assert!(
+            len.is_multiple_of(self.stride),
+            "{}: {len} kept bytes, not a whole number of {}-byte instances; keep the \
+             pipeline's bytes() of a run (instanced.rs)",
+            self.label,
+            self.stride
+        );
         let (frame, queue) = (target.encoder, target.queue);
         self.kept.keep(frame, queue, &self.work, bytes)
     }
@@ -155,7 +167,7 @@ impl Instanced {
         });
         let instances = match from {
             Instances::Placed(placed) => placed.slice(),
-            Instances::Kept(kept) => self.kept.slice(kept),
+            Instances::Kept(kept) => self.kept.slice(target.encoder, kept),
         };
         target.draw_pass(|pass| {
             pass.set_pipeline(&self.pipeline);

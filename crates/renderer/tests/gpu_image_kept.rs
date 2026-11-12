@@ -1,7 +1,8 @@
 //! GPU tier: an image pipeline's quads kept (`image_kept.rs`): a run's
 //! rects written once, each drawn by its place in the kept range with
 //! its own texture, in a later frame with nothing written; a place past
-//! the range panics.
+//! the range, however far, and a draw on a target of another viewport
+//! panic.
 
 use vapors_gpu_harness::{Gpu, gpu, read_rgba8};
 use vapors_renderer::{
@@ -52,6 +53,11 @@ impl Scene {
 
     /// Runs `frame` with a target on the grey texture, then submits.
     fn frame(&mut self, frame: impl FnOnce(&mut Self, &Target<'_>)) {
+        self.frame_on(VIEWPORT, frame);
+    }
+
+    /// As [`Scene::frame`], on a target of `viewport`.
+    fn frame_on(&mut self, viewport: Size, frame: impl FnOnce(&mut Self, &Target<'_>)) {
         let view = self
             .target
             .create_view(&wgpu::TextureViewDescriptor::default());
@@ -63,7 +69,7 @@ impl Scene {
             queue: &queue,
             encoder: &encoder,
             view: &view,
-            viewport: VIEWPORT,
+            viewport,
             scissor: None,
         };
         frame(self, &at);
@@ -114,5 +120,39 @@ fn gpu_a_kept_image_quad_past_the_range_panics() {
     scene.frame(|scene, at| {
         let kept = scene.keep_halves(at);
         scene.pipeline.draw_kept(at, &scene.red, (&kept, 2));
+    });
+}
+
+#[test]
+#[should_panic(expected = "drawn from a kept range of 2 quads")]
+fn gpu_a_kept_image_quad_far_past_the_range_panics() {
+    // Given
+    let mut scene = Scene::new();
+
+    // When: a place whose first vertex is past u32::MAX
+    scene.frame(|scene, at| {
+        let kept = scene.keep_halves(at);
+        scene
+            .pipeline
+            .draw_kept(at, &scene.red, (&kept, u32::MAX / 6 + 1));
+    });
+}
+
+#[test]
+#[should_panic(expected = "keep the rects again on a target of the new viewport")]
+fn gpu_kept_image_quads_drawn_on_a_target_of_another_viewport_panic() {
+    // Given: the halves kept on a 16 by 8 target
+    let mut scene = Scene::new();
+    let mut kept = None;
+    scene.frame(|scene, at| kept = Some(scene.keep_halves(at)));
+    let kept = kept.expect("kept");
+
+    // When: drawn on an 8 by 8 one
+    let resized = Size {
+        width: 8,
+        height: 8,
+    };
+    scene.frame_on(resized, |scene, at| {
+        scene.pipeline.draw_kept(at, &scene.red, (&kept, 0));
     });
 }

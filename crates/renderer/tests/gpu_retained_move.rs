@@ -1,17 +1,19 @@
 //! GPU tier: kept quads moved (`retained_move.rs`): when no free range
 //! holds new bytes, the live ranges are compacted when half the buffer
-//! is free and grown otherwise, and every range still draws its own
-//! quads; released ranges are reused once a newer encoder writes, and
-//! are left behind by a move.
+//! is free after the move (ranges released this frame counted) and
+//! grown otherwise, and every range still draws its own quads; the
+//! first buffer holds `FIRST_SIZE` bytes; released ranges are reused
+//! once a newer encoder writes, and are left behind by a move.
 
 #[path = "support/frame.rs"]
 mod frame;
 #[path = "support/retained.rs"]
 mod retained;
 
-use frame::BACKGROUND;
-use retained::{BLUE, Frame, GREEN, QUAD_BYTES, RED, kept};
+use frame::{BACKGROUND, quad};
+use retained::{BLUE, FIRST_SIZE, Frame, GREEN, QUAD_BYTES, RED, kept};
 use vapors_gpu_harness::gpu;
+use vapors_renderer::QuadPipeline;
 
 #[test]
 fn gpu_a_full_buffer_half_free_compacts_and_each_range_draws_its_own_quads() {
@@ -111,4 +113,47 @@ fn gpu_a_range_released_before_a_move_is_not_given_back_in_the_new_buffer() {
 
     // Then: B kept its own bytes
     assert_eq!(frame.row(), [GREEN, RED, BACKGROUND]);
+}
+
+#[test]
+fn gpu_a_full_buffer_mostly_released_in_the_frame_compacts_rather_than_grows() {
+    // Given: 400 quads kept in one frame
+    let mut frame = Frame::new(gpu());
+    let first = frame.encoder();
+    let many = kept(frame.keep(&first, (400, 2.0, RED)), "A");
+    first.submit(&frame.gpu.queue).expect("no refusal");
+    let _ = frame.pipeline.take_work();
+
+    // When: the next keeps one quad, releases the 400, then keeps 200
+    let second = frame.encoder();
+    let one = kept(frame.keep(&second, (1, 0.0, GREEN)), "B");
+    frame.pipeline.release(many);
+    let more = kept(frame.keep(&second, (200, 1.0, BLUE)), "C");
+    frame.draw(&second, &one);
+    frame.draw(&second, &more);
+    second.submit(&frame.gpu.queue).expect("no refusal");
+
+    // Then: 201 quads fit a buffer of 512, so it compacted
+    let work = frame.pipeline.take_work();
+    assert_eq!((work.retained_compacted, work.retained_grown), (1, 0));
+    assert_eq!(frame.row(), [GREEN, BLUE, BACKGROUND]);
+}
+
+#[test]
+fn gpu_the_first_kept_buffer_holds_first_size_bytes_of_quads() {
+    // Given: the support's sizes are the pipeline's
+    let one_quad = QuadPipeline::bytes(&[quad([0.0, 0.0, 1.0, 1.0], RED)]);
+    assert_eq!(one_quad.len() as u64, QUAD_BYTES);
+    let mut frame = Frame::new(gpu());
+    let encoder = frame.encoder();
+    let whole = usize::try_from(FIRST_SIZE / QUAD_BYTES).expect("a few hundred");
+
+    // When: a buffer's worth kept, then one more quad
+    let _all = kept(frame.keep(&encoder, (whole, 0.0, RED)), "all");
+    let filled = frame.pipeline.take_work();
+    let _one = kept(frame.keep(&encoder, (1, 0.0, RED)), "one");
+    let past = frame.pipeline.take_work();
+
+    // Then: the buffer's worth fit; the quad past it grew the buffer
+    assert_eq!((filled.retained_grown, past.retained_grown), (0, 1));
 }

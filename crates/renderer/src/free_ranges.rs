@@ -64,7 +64,8 @@ impl FreeRanges {
         self.insert(at, range, (before, after));
     }
 
-    /// Bytes free in all.
+    /// Bytes free in all, for the tests' view of the merges.
+    #[cfg(test)]
     pub(crate) fn free_bytes(&self) -> u64 {
         self.free.iter().map(|free| free.end - free.start).sum()
     }

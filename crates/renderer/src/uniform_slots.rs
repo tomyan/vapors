@@ -5,7 +5,7 @@
 //! made for the buffer serves every slot.
 
 use crate::encoder_turn::EncoderTurn;
-use crate::{ArenaFull, FrameEncoder, WorkCounter};
+use crate::{ArenaFull, FrameEncoder, Holding, WorkCounter};
 
 /// Bytes of one value: the viewport, or the text blend parameters.
 const VALUE_SIZE: u64 = 16;
@@ -140,6 +140,7 @@ impl UniformSlots {
                 pipeline: self.label,
                 size,
                 limit,
+                holding: Holding::OneFrame,
             });
             return None;
         }
