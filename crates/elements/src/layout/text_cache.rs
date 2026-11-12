@@ -38,8 +38,8 @@ use vapors_text::{Align, FontSystem, Layout};
 
 use super::inline::InlineRun;
 use super::measure::text_layout;
-pub(crate) use super::text_key::Key;
 use super::text_kept::Kept;
+pub(crate) use super::text_key::Key;
 use crate::style::TextStyle;
 
 /// The layouts kept, each with the update that last asked for it.
@@ -60,7 +60,10 @@ impl TextCache {
         width: Option<f32>,
     ) -> Rc<Layout> {
         let key = Key::of(run, width, scale);
-        if let Some(layout) = self.kept(&key).or_else(|| self.unwrapped(run, width, scale)) {
+        if let Some(layout) = self
+            .kept(&key)
+            .or_else(|| self.unwrapped(run, width, scale))
+        {
             return layout;
         }
         self.built += 1;
