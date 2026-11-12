@@ -8,14 +8,14 @@ use crate::rows::RowChange;
 use crate::scaling::PhaseSeries;
 
 /// The accessibility phase's ceiling for `Insert`, instructions per
-/// extra row from 1000 rows: recorded at 8698 (1000 to 10,000 rows,
+/// extra row from 1000 rows: recorded at 8701 (1000 to 10,000 rows,
 /// `docs/perf/a11y-phase-2026-11-12.md`), with 9% of room over the
 /// 0.06% repeat noise. It holds until the splice step bounds what an
 /// insert moves (property 3 of `docs/plans/perf-finish-line.md`).
 pub const INSERT_A11Y_PER_ROW: u64 = 9500;
 
 /// As [`INSERT_A11Y_PER_ROW`] for `Resize` and `Scroll`: recorded at
-/// 11,692 each.
+/// 11,700 and 11,699, with 7% of room.
 pub const MOVE_A11Y_PER_ROW: u64 = 12_500;
 
 /// Which phases a change is judged on.
