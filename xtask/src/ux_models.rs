@@ -23,6 +23,20 @@ pub enum Images {
     Tiles { base: u64, per_tile: u64 },
     /// 32 px patches, times `tenths` / 10, rounded up.
     Patches { tenths: u64, low: Fit, high: Fit },
+    /// Counted by `--measure-image-cost` for these frame sizes only,
+    /// each bound the count plus 20%; `source` holds the raw counts.
+    Measured {
+        sizes: &'static [Measured],
+        source: &'static str,
+    },
+}
+
+/// One frame size's measured bound, low and high detail.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Measured {
+    pub size: (u32, u32),
+    pub low: u64,
+    pub high: u64,
 }
 
 /// One model's row.
@@ -56,7 +70,7 @@ const fn fit(max_side: u32, budget: Option<u64>) -> Fit {
 
 /// The models the guide lists, with its numbers. The guide gives a
 /// multiplier of 1.2 for every patch-counted model here.
-const MODELS: [Model; 14] = [
+const MODELS: [Model; 16] = [
     tiles("gpt-4o", 85, 170),
     tiles("gpt-4.1", 85, 170),
     tiles("gpt-4o-mini", 2833, 5667),
@@ -71,7 +85,58 @@ const MODELS: [Model; 14] = [
     patches("gpt-5.6-terra", fit(512, None), fit(2048, Some(2500))),
     patches("gpt-5.6-luna", fit(512, None), fit(2048, Some(2500))),
     patches("gpt-6-astra", fit(512, None), fit(65_535, Some(2500))),
+    // The guide has no formula for these; counted by --measure-image-cost
+    // at the walk's frame sizes, each bound the count plus 20%.
+    Model {
+        name: "gpt-6.1-sol",
+        images: Images::Measured {
+            sizes: &[
+                Measured {
+                    size: (1440, 900),
+                    low: 232,
+                    high: 1881,
+                },
+                Measured {
+                    size: (412, 915),
+                    low: 185,
+                    high: 544,
+                },
+            ],
+            source: "--measure-image-cost 2026-10-26T08:03:17Z: 1440x900 low 210-17; 1440x900 high 1584-17; 412x915 low 171-17; 412x915 high 470-17",
+        },
+    },
+    Model {
+        name: "gpt-6-luna",
+        images: Images::Measured {
+            sizes: &[
+                Measured {
+                    size: (1440, 900),
+                    low: 232,
+                    high: 1881,
+                },
+                Measured {
+                    size: (412, 915),
+                    low: 185,
+                    high: 544,
+                },
+            ],
+            source: "--measure-image-cost 2026-10-26T08:03:33Z: 1440x900 low 210-17; 1440x900 high 1584-17; 412x915 low 171-17; 412x915 high 470-17",
+        },
+    },
 ];
+
+/// A model with no row yet, for the run that measures it: every image
+/// count is refused until its row is added. Leaked: one per process.
+pub fn unmeasured(name: &str) -> &'static Model {
+    let name: &'static str = Box::leak(name.to_owned().into_boxed_str());
+    Box::leak(Box::new(Model {
+        name,
+        images: Images::Measured {
+            sizes: &[],
+            source: "not yet measured",
+        },
+    }))
+}
 
 /// The row for `name`.
 ///

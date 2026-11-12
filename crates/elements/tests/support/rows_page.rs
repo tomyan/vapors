@@ -66,7 +66,8 @@ pub fn rows_page(count: usize) -> RowsPage {
     }
 }
 
-fn row(doc: &mut Document, index: usize) -> Row {
+/// A row appended under the body, numbered `index`.
+pub fn row(doc: &mut Document, index: usize) -> Row {
     row_before(doc, index, None)
 }
 
@@ -140,9 +141,63 @@ impl RowsPage {
     }
 
     fn toggle_marked(&self, row: NodeId) {
+        self.toggle_class(row, "marked");
+    }
+
+    /// `class` added to `row`, or removed when it has it.
+    fn toggle_class(&self, row: NodeId, class: &str) {
         let mut doc = self.doc.borrow_mut();
-        let marked = doc.attribute(row, "class") == Some("row marked");
-        doc.set_attribute(row, "class", if marked { "row" } else { "row marked" });
+        let with = format!("row {class}");
+        let has = doc.attribute(row, "class") == Some(with.as_str());
+        doc.set_attribute(row, "class", if has { "row" } else { &with });
+    }
+
+    /// Adds the rule the `Resize` workload toggles, `.row.tall` at twice
+    /// a row's height, and updates once.
+    pub fn rows_resizable(&self) {
+        let css = format!(".row.tall {{ height: {}px; }}", ROW_HEIGHT * 2);
+        self.add_css("tall.css", &css);
+    }
+
+    /// The second row's `tall` class added, or removed when it has it:
+    /// its boxes are built again, and every row after it moves.
+    pub fn toggle_tall(&self) {
+        self.toggle_class(self.rows[1].element, "tall");
+    }
+
+    /// Makes the body scroll its rows within the viewport's height (html
+    /// hides its overflow, as vapors does not scroll the viewport), and
+    /// updates once.
+    pub fn body_scrolls(&self) {
+        let height = rows_viewport().height;
+        let css =
+            format!("html {{ overflow: hidden; }} body {{ overflow: auto; height: {height}px; }}");
+        self.add_css("scroll.css", &css);
+    }
+
+    /// Scrolls the body down by `rows` rows (up when negative); false
+    /// when it cannot move that way.
+    #[allow(clippy::cast_precision_loss)] // a row height of 24
+    pub fn scroll_body(&self, rows: f32) -> bool {
+        let mut doc = self.doc.borrow_mut();
+        let body = doc.body();
+        doc.scroll_node_by(body, [0.0, rows * ROW_HEIGHT as f32])
+    }
+
+    /// Scrolls the body back to its top.
+    pub fn scroll_body_to_top(&self) {
+        let mut doc = self.doc.borrow_mut();
+        let body = doc.body();
+        assert!(
+            doc.scroll_to(body, [0.0, 0.0]),
+            "the body scrolls to its top"
+        );
+    }
+
+    fn add_css(&self, name: &str, css: &str) {
+        let mut doc = self.doc.borrow_mut();
+        doc.add_stylesheet(name, css).expect("parses");
+        doc.update(rows_viewport()).expect("updates");
     }
 
     fn set_text(&self, node: NodeId, value: &str) {

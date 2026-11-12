@@ -22,15 +22,18 @@ impl Document {
         &mut self,
         viewport: Viewport,
     ) -> Result<(Placed, Rebuilt, Written), Vec<ElementError>> {
-        let (boxes, built) = self.rebuilt(viewport.scale);
+        let (boxes, mut built) = self.rebuilt(viewport.scale);
         let kept = self.kept.as_ref().expect("styled keeps the styles");
         let size = (viewport.width, viewport.height);
         let texts = (&mut self.fonts, &mut self.texts);
-        let laid_out = lay_out(boxes, texts, viewport.scale, size, &kept.calcs);
-        let (Ok((_, work)) | Err((_, work))) = &laid_out;
-        (self.counts.boxes_laid_out, self.counts.layout_calls) = (work.laid_out, work.calls);
-        let (slotted, work) =
-            laid_out.map_err(|(failure, _)| vec![ElementError::Layout(failure)])?;
+        let changed = std::mem::take(&mut built.changed);
+        let laid_out = lay_out(boxes, texts, viewport.scale, size, &kept.calcs, changed);
+        let work = match &laid_out {
+            Ok((_, work)) => work,
+            Err(failed) => &failed.1,
+        };
+        self.counts.count_layout(work);
+        let (slotted, work) = laid_out.map_err(|failed| vec![ElementError::Layout(failed.0)])?;
         // Debug timings include this full build and layout on every
         // narrowed update; `layout_check.rs` says what would retire it.
         // A test whose own oracle compares the same layout each step

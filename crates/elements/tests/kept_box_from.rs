@@ -121,7 +121,9 @@ fn a_box_copied_over_two_updates_keeps_its_text_layout_for_a_later_move() {
     doc.set_attribute(spacer, "class", "tall");
     doc.update(viewport(200.0, 200.0)).expect("updates");
 
-    // Then: both are painted from the layouts the text cache kept
-    assert_eq!(doc.update_counts().boxes_painted, 7);
+    // Then: the spacer, html and body are painted; A, B and their texts
+    // are shifted (IU3 3c-3e), their kept layouts untouched
+    assert_eq!(doc.update_counts().boxes_painted, 3);
+    assert_eq!(doc.update_counts().boxes_shifted, 4);
     assert_eq!(doc.text_layouts_built(), 0);
 }

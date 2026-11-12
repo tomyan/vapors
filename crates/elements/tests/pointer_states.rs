@@ -3,13 +3,9 @@
 
 mod support;
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use support::pointer::{Log, SHEET, record, setup, update};
+use support::pointer::{Log, SHEET, quad_colours, record, setup, update};
 use vapors_dom::Dom;
 use vapors_elements::Document;
-use vapors_scene::Item;
 
 #[test]
 fn hover_and_active_restyle_the_chain_under_the_pointer() {
@@ -26,23 +22,7 @@ fn hover_and_active_restyle_the_chain_under_the_pointer() {
 
     // Then
     assert!(hover_changed, "a hover change asks for a frame");
-    let colours: Vec<[u8; 4]> = doc
-        .borrow()
-        .painted()
-        .expect("painted")
-        .scene()
-        .to_scene()
-        .items()
-        .iter()
-        .filter_map(|item| match item {
-            Item::Quad(quad) => Some(quad.background.to_rgba8()),
-            Item::Text { .. }
-            | Item::Shadow(_)
-            | Item::Image { .. }
-            | Item::Icon { .. }
-            | Item::Surface { .. } => None,
-        })
-        .collect();
+    let colours = quad_colours(&doc);
     assert_eq!(
         colours,
         [[255, 0, 0, 255], [0, 255, 0, 255]],
@@ -87,25 +67,6 @@ fn moving_within_the_hovered_element_changes_nothing() {
 
     // Then
     assert!(!doc.borrow_mut().take_changed());
-}
-
-fn quad_colours(doc: &Rc<RefCell<Document>>) -> Vec<[u8; 4]> {
-    doc.borrow()
-        .painted()
-        .expect("painted")
-        .scene()
-        .to_scene()
-        .items()
-        .iter()
-        .filter_map(|item| match item {
-            Item::Quad(quad) => Some(quad.background.to_rgba8()),
-            Item::Text { .. }
-            | Item::Shadow(_)
-            | Item::Image { .. }
-            | Item::Icon { .. }
-            | Item::Surface { .. } => None,
-        })
-        .collect()
 }
 
 #[test]

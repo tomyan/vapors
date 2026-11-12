@@ -3,7 +3,11 @@
 //! `cargo xtask --help` lists the commands. Each prints one line per fact and, on failure,
 //! what was expected, what was found, how to fix it and the exact command that reproduces it.
 
+mod builds;
+mod builds_config;
+mod builds_tree;
 mod ci;
+mod ci_shared;
 mod cli;
 mod command;
 mod config;
@@ -95,6 +99,7 @@ mod setup_install;
 mod stamp_page;
 mod step;
 mod steps;
+mod steps_checks;
 mod stop;
 mod stream;
 mod tailscale;
@@ -102,19 +107,28 @@ mod tools;
 mod trunk;
 mod trunk_process;
 mod twin;
+mod ux_answer;
 mod ux_base64;
+mod ux_call;
 mod ux_checklist;
 mod ux_config;
+mod ux_count;
 mod ux_estimate;
+mod ux_ledger;
+mod ux_ledger_write;
+mod ux_live;
+mod ux_measure;
+mod ux_measure_run;
 mod ux_models;
 mod ux_prompt;
+mod ux_report;
+mod ux_request;
 mod ux_review;
 mod ux_run;
-#[allow(
-    dead_code,
-    reason = "the live review uses it (U4 slice 2); its tests run now"
-)]
 mod ux_secret;
+mod ux_spend;
+#[cfg(test)]
+mod ux_stub_tests;
 mod web;
 mod web_version;
 mod xvfb;
@@ -134,6 +148,7 @@ fn main() -> ExitCode {
         Command::CheckTools => return setup::check(),
         Command::CheckFiles => return files::run(),
         Command::CheckLayers => return layers::run(),
+        Command::CheckBuilds => return builds::run(),
         Command::CheckImports => return imports::run(),
         Command::GpuInfo => return gpu_info::run(),
         Command::Screenshot {
@@ -152,11 +167,15 @@ fn main() -> ExitCode {
         Command::Web { debug } => return web::run(debug),
         Command::Serve { replace } => return serve::run(replace),
         Command::StampPage => return stamp_page::run(),
-        Command::UxReview { dry_run } => return ux_review::run(dry_run),
+        Command::UxReview {
+            dry_run,
+            pr,
+            measure_image_cost,
+        } => return ux_review::run(dry_run, pr, measure_image_cost),
         Command::CheckXtaskTwin { sibling } => return twin::run(&sibling),
         Command::Dev { keys, replace } => return dev::run(&reporter, &keys, replace),
         Command::Ci => match web::web_package() {
-            Ok(package) => return ci_sharing_the_gate_lock(&steps::ci(&package), &reporter),
+            Ok(package) => return ci_shared::run(&steps::ci(&package), &reporter),
             Err(message) => return fail("ci", &message),
         },
         Command::Wasm => match web::web_package() {
@@ -172,46 +191,6 @@ fn main() -> ExitCode {
         Command::Test { tier: Tier::Gpu } => steps::gpu_tests(),
     };
     ci::run(&steps, &reporter)
-}
-
-/// `cargo xtask ci`, sharing the gate lock so it never runs beside a gate
-/// (`gate_lock_shared.rs`). Relaxed inside a gate's step (`XTASK_GATE=1`):
-/// the gate already holds the lock, and taking a share would wait on the
-/// gate itself. It would retire if no gate step could run `ci`.
-fn ci_sharing_the_gate_lock(steps: &[steps::Step], reporter: &report::Reporter) -> ExitCode {
-    let gate_env = std::env::var(priority::GATE_ENV).ok();
-    if priority::in_gate(false, gate_env.as_deref()) {
-        return ci_with_hit_rate(steps, reporter);
-    }
-    if let Err(why) = load_wait::before("ci") {
-        return fail("ci", &why);
-    }
-    let worktree =
-        std::env::current_dir().map_or_else(|_| "?".to_owned(), |d| d.display().to_string());
-    let shared = gate_lock::dir()
-        .and_then(|dir| gate_lock_shared::acquire_shared(&dir, &worktree, gate_lock::WAIT));
-    match shared {
-        Ok(_shared) => ci_with_hit_rate(steps, reporter),
-        Err(why) => fail("ci", &why),
-    }
-}
-
-/// `cargo xtask ci`, then sccache's hit rate over the run; sccache must
-/// answer before and after.
-fn ci_with_hit_rate(steps: &[steps::Step], reporter: &report::Reporter) -> ExitCode {
-    let before = match sccache::stats() {
-        Ok(stats) => stats,
-        Err(why) => return fail("sccache", &why),
-    };
-    let code = ci::run(steps, reporter);
-    match sccache::stats() {
-        Ok(after) => match sccache::hit_rate(before, after) {
-            Ok(line) => println!("{line}"),
-            Err(why) => return fail("sccache", &why),
-        },
-        Err(why) => return fail("sccache", &why),
-    }
-    code
 }
 
 fn fail(command: &str, message: &str) -> ExitCode {

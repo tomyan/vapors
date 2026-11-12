@@ -17,6 +17,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::process::{Command, ExitCode};
 
+#[path = "gate_floor.rs"]
+mod floor;
+
 use crate::config::Config;
 use crate::gate_plan::{PlannedStep, Sources, plan};
 use crate::gate_run::{Wrap, pass_lines};
@@ -33,15 +36,10 @@ pub fn run(reporter: &Reporter) -> ExitCode {
     crate::priority::enter_gate();
     let worktree =
         std::env::current_dir().map_or_else(|_| "?".to_owned(), |d| d.display().to_string());
-    let lock = crate::gate_lock::dir()
-        .and_then(|dir| crate::gate_lock::acquire(&dir, &worktree, crate::gate_lock::WAIT));
-    let _lock = match lock {
+    let _lock = match floor::begin(&worktree) {
         Ok(held) => held,
         Err(why) => return refuse(&why),
     };
-    if let Err(why) = crate::load_wait::before("gate") {
-        return refuse(&why);
-    }
     let prepared = Config::load()
         .map_err(|e| e.to_string())
         .and_then(|config| prepare(&config));
