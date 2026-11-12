@@ -1,8 +1,9 @@
 //! One node as the mirror's record (R6): what `ax_tree` says of it
 //! (role, name, value, description, states, bounds), its range and
-//! focusability, and its parent in the tree, found by walking up to the
-//! nearest node shown; a node under an `aria-hidden` ancestor is not
-//! in the tree. Read from the last update, as `ax_tree` is.
+//! focusability, and its parent in the tree: the nearest node shown
+//! above it, carried down a document-order pass ([`AboveMemo`]); a node
+//! under an `aria-hidden` ancestor is not in the tree. Read from the last update,
+//! as `ax_tree` is.
 
 use vapors_dom::NodeId;
 
@@ -13,27 +14,55 @@ use crate::a11y_mirror_state::AxIndex;
 use crate::a11y_tree::finite;
 use crate::document::Document;
 use crate::layout::BoxRect;
+use crate::node_map::NodeMap;
 
 /// What is above a node: an `aria-hidden` ancestor, or its parent.
-enum Above {
+#[derive(Clone, Copy)]
+pub(crate) enum Above {
     Hidden,
     Under(Option<NodeId>),
 }
 
+/// What is above each element, filled in document order so that every
+/// element's entry is its parent's entry and its parent's own record:
+/// one lookup per element, never a walk.
+#[derive(Default)]
+pub(crate) struct AboveMemo(NodeMap<Above>);
+
+impl AboveMemo {
+    /// What is above `node`, from its parent's entry; the root is under
+    /// nothing.
+    pub(crate) fn over(&self, doc: &Document, node: NodeId) -> Above {
+        doc.parent(node)
+            .map_or(Above::Under(None), |parent| self.0[&parent])
+    }
+
+    /// Notes what `node`'s children are under: hidden when `node` or what
+    /// is above it hides them, `node` when it is shown, else what is
+    /// above it.
+    pub(crate) fn note(&mut self, doc: &Document, node: NodeId, over: Above, shown: bool) {
+        let entry = match over {
+            _ if doc.attribute(node, "aria-hidden") == Some("true") => Above::Hidden,
+            Above::Hidden => Above::Hidden,
+            Above::Under(_) if shown => Above::Under(Some(node)),
+            over @ Above::Under(_) => over,
+        };
+        self.0.insert(node, entry);
+    }
+}
+
 impl Document {
-    /// `node` as a record, when it is in the tree now.
-    ///
-    /// # Errors
-    /// [`AxError::Unexposable`]; [`AxError::NotFinite`].
-    pub(crate) fn ax_record(
+    /// `node` as a record, given what is above it.
+    pub(crate) fn ax_record_under(
         &self,
         node: NodeId,
         index: &AxIndex,
+        above: Above,
     ) -> Result<Option<AxMirrorNode>, AxError> {
-        let Some((bounds, role)) = self.ax_in_tree(node, index) else {
+        let Above::Under(parent) = above else {
             return Ok(None);
         };
-        let Above::Under(parent) = self.ax_above(node, index) else {
+        let Some((bounds, role)) = self.ax_in_tree(node, index) else {
             return Ok(None);
         };
         let (name, description) = self.ax_name_and_description(node, &role, &index.ids);
@@ -50,7 +79,7 @@ impl Document {
             name,
             role,
         };
-        match unexposable(&record) {
+        match unexposable(self, &record) {
             Some(needs) => Err(AxError::Unexposable {
                 role: record.role,
                 name: record.name,
@@ -75,22 +104,6 @@ impl Document {
             .filter(|_| painted.is_visible(node))?;
         let role = self.ax_role(node, &index.ids)?;
         Some((bounds, role))
-    }
-
-    /// The nearest shown ancestor of `node`, unless an ancestor hides it.
-    fn ax_above(&self, node: NodeId, index: &AxIndex) -> Above {
-        let mut parent = None;
-        let mut cursor = self.parent(node);
-        while let Some(ancestor) = cursor {
-            if self.attribute(ancestor, "aria-hidden") == Some("true") {
-                return Above::Hidden;
-            }
-            if parent.is_none() && self.ax_in_tree(ancestor, index).is_some() {
-                parent = Some(ancestor);
-            }
-            cursor = self.parent(ancestor);
-        }
-        Above::Under(parent)
     }
 
     /// A slider's or spinbutton's range: the element's, else its

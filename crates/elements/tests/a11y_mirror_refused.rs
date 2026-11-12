@@ -5,26 +5,8 @@
 
 mod support;
 
-use support::roles_page::{STYLE, labelled};
-use support::{document, element, text, viewport};
-use vapors_dom::Dom;
-use vapors_elements::{AxError, Document};
-
-/// A page holding one `role` element with `attributes`, updated.
-fn page_with(role: &str, attributes: &[(&str, &str)]) -> Document {
-    let mut doc = document();
-    let body = doc.body();
-    let row = element(&mut doc, body, "div", "row");
-    let node = labelled(&mut doc, row, "div", &[("role", role)]);
-    for (name, value) in attributes {
-        doc.set_attribute(node, name, value);
-    }
-    text(&mut doc, node, "Title");
-    element(&mut doc, row, "button", "");
-    doc.add_stylesheet("roles.css", STYLE).expect("parses");
-    doc.update(viewport(640.0, 400.0)).expect("updates");
-    doc
-}
+use support::mirror::page_with;
+use vapors_elements::AxError;
 
 #[test]
 fn a_heading_without_a_level_is_refused_naming_it() {

@@ -6,11 +6,28 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use vapors_dom::NodeId;
+use vapors_dom::{Dom, NodeId};
 use vapors_elements::{AxMirrorNode, AxUpdate, Document};
 
-use super::roles_page::page;
-use super::viewport;
+use super::roles_page::{STYLE, labelled, page};
+use super::{document, element, text, viewport};
+
+/// A page holding one `role` element with `attributes` and a button
+/// after it, updated: what a refusal test takes.
+pub fn page_with(role: &str, attributes: &[(&str, &str)]) -> Document {
+    let mut doc = document();
+    let body = doc.body();
+    let row = element(&mut doc, body, "div", "row");
+    let node = labelled(&mut doc, row, "div", &[("role", role)]);
+    for (name, value) in attributes {
+        doc.set_attribute(node, name, value);
+    }
+    text(&mut doc, node, "Title");
+    element(&mut doc, row, "button", "");
+    doc.add_stylesheet("roles.css", STYLE).expect("parses");
+    doc.update(viewport(640.0, 400.0)).expect("updates");
+    doc
+}
 
 /// The roles page, updated, with its first (`every`) update taken, so
 /// what a test changes next is what the next take holds.
