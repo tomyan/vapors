@@ -29,6 +29,12 @@ pub trait Workload {
     fn counts(&self) -> Counts;
     /// The app's frame times, its GPU time read back by this frame.
     fn timing(&self) -> FrameTiming;
+    /// Whether the app reads each frame's GPU time back in the frame after
+    /// it. A workload that makes a new app for every frame has no such
+    /// frame, and says so here; the sampler then keeps no GPU time.
+    fn times_gpu(&self) -> bool {
+        true
+    }
 }
 
 /// What the last frame did, counted: the document's update and what the

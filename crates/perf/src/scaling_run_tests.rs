@@ -2,6 +2,7 @@
 
 use super::at_size;
 use crate::instruction_samples::InstructionSamples;
+use crate::report::PHASES;
 use crate::run::Samples;
 
 fn samples(phases: &[&str]) -> Samples {
@@ -19,7 +20,7 @@ fn every_recorded_phase_is_taken_with_the_frame() {
     let samples = samples(&["update", "draw"]);
 
     // When
-    let size = at_size(1000, &samples).expect("known phases");
+    let size = at_size(1000, &samples, &PHASES).expect("known phases");
 
     // Then
     let names: Vec<_> = size.phases.keys().map(String::as_str).collect();
@@ -32,9 +33,23 @@ fn a_recorded_phase_the_judge_does_not_know_is_refused_naming_it() {
     let samples = samples(&["update", "tick"]);
 
     // When
-    let error = at_size(1000, &samples).expect_err("unknown phase");
+    let error = at_size(1000, &samples, &PHASES).expect_err("unknown phase");
 
     // Then
     assert!(error.contains("phase tick"), "{error}");
     assert!(error.contains("report::PHASES"), "{error}");
+}
+
+#[test]
+fn a_first_frame_phase_is_known_to_the_mount_list_and_not_to_the_steady_one() {
+    // Given
+    let samples = samples(&["update", "accessibility"]);
+
+    // When
+    let steady = at_size(1000, &samples, &PHASES);
+    let first = at_size(1000, &samples, &crate::mount_report::MOUNT_PHASES);
+
+    // Then
+    assert!(steady.expect_err("steady").contains("accessibility"));
+    assert!(first.is_ok());
 }

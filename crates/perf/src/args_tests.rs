@@ -126,3 +126,73 @@ fn scaling_with_instructions_is_refused() {
         "{error}"
     );
 }
+
+#[test]
+fn mount_is_read_as_a_flag() {
+    assert!(full(&["--mount", "5"]).expect("parsed").mount);
+    assert!(!full(&[]).expect("parsed").mount);
+}
+
+#[test]
+fn mount_with_only_instructions_or_scaling_is_refused_naming_it() {
+    for other in [
+        &["--only", "x"][..],
+        &["--instructions"],
+        &["--scaling", "Idle"],
+    ] {
+        let mut args = vec!["--mount"];
+        args.extend_from_slice(other);
+        let error = full(&args).expect_err("combined");
+        assert!(
+            error.starts_with(&format!("--mount and {} cannot be combined", other[0])),
+            "{error}"
+        );
+    }
+}
+
+#[test]
+fn mount_memory_takes_a_row_count() {
+    assert_eq!(
+        full(&["--mount-memory", "3000"])
+            .expect("parsed")
+            .mount_memory,
+        Some(3000)
+    );
+    assert_eq!(full(&[]).expect("parsed").mount_memory, None);
+}
+
+#[test]
+fn mount_memory_without_a_count_or_with_a_word_is_refused() {
+    for args in [
+        &["--mount-memory"][..],
+        &["--mount-memory", "many"],
+        &["--mount-memory", "0"],
+    ] {
+        let error = full(args).expect_err("bad count");
+        assert!(
+            error.starts_with("--mount-memory needs a row count"),
+            "{error}"
+        );
+    }
+}
+
+#[test]
+fn mount_memory_with_mount_or_the_other_modes_is_refused_naming_the_flag() {
+    for other in [
+        &["--mount"][..],
+        &["--only", "x"],
+        &["--instructions"],
+        &["--scaling", "Idle"],
+    ] {
+        let mut args = vec!["--mount-memory", "10"];
+        args.extend_from_slice(other);
+        let error = full(&args).expect_err("combined");
+        assert!(
+            error.starts_with(&format!(
+                "--mount-memory and {} cannot be combined",
+                other[0]
+            )),
+            "{error}"
+        );
+    }
+}

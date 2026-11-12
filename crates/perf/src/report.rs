@@ -23,13 +23,7 @@ pub const PHASES: [&str; 8] = [
 /// `samples` of the workload `name` as a Markdown section.
 #[must_use]
 pub fn section(name: &str, samples: &Samples) -> String {
-    let mut out = format!("### {name}\n\n{}\n\n", counts(&samples.counts));
-    out.push_str("| phase | median µs | p90 µs | max µs |\n|---|---|---|---|\n");
-    row(&mut out, "frame (CPU)", &samples.frame);
-    for phase in PHASES {
-        let times = samples.phases.get(phase).map_or(&[][..], Vec::as_slice);
-        row(&mut out, phase, times);
-    }
+    let mut out = times_section(name, samples, &PHASES);
     match &samples.gpu {
         Some(spans) => row(&mut out, SPAN, spans),
         None => no_timestamps(&mut out, SPAN),
@@ -40,6 +34,20 @@ pub fn section(name: &str, samples: &Samples) -> String {
     }
     if let Some(resolution) = samples.gpu_resolution {
         let _ = writeln!(out, "| GPU time resolution | {resolution} | | |");
+    }
+    out
+}
+
+/// `section` without the GPU rows: for a workload whose frames are not
+/// timed on the GPU (`Workload::times_gpu`).
+#[must_use]
+pub fn times_section(name: &str, samples: &Samples, phases: &[&str]) -> String {
+    let mut out = format!("### {name}\n\n{}\n\n", counts(&samples.counts));
+    out.push_str("| phase | median µs | p90 µs | max µs |\n|---|---|---|---|\n");
+    row(&mut out, "frame (CPU)", &samples.frame);
+    for &phase in phases {
+        let times = samples.phases.get(phase).map_or(&[][..], Vec::as_slice);
+        row(&mut out, phase, times);
     }
     out
 }
