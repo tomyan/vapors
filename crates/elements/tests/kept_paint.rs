@@ -1,7 +1,7 @@
 //! The last update's paint used again (IU3 3c-1): an update paints no
 //! box when none was built and every box's rect, the thumbs and the
 //! scale are those the kept paint shows. Each of those, changed alone,
-//! paints again: the boxes built or moved, and the thumbs.
+//! paints again: the boxes built, and the thumbs; the moved are shifted.
 
 mod support;
 
@@ -88,7 +88,7 @@ fn a_built_box_paints_again() {
 }
 
 #[test]
-fn a_scroll_alone_paints_the_scrolled_rows_again() {
+fn a_scroll_alone_shifts_the_scrolled_rows_and_paints_none() {
     // Given: html, body, the list and its 4 rows
     let mut list = list("overflow: auto;");
 
@@ -96,8 +96,10 @@ fn a_scroll_alone_paints_the_scrolled_rows_again() {
     assert!(scroll(&mut list.doc, [0.0, 30.0]));
     list.doc.update(at(1.0)).expect("updates");
 
-    // Then
-    assert_eq!(work(list.doc.update_counts()), (0, 0, 4));
+    // Then: the rows moved whole pixels, so their kept paint is
+    // shifted (IU3 3c-3e, `kept_shift.rs`)
+    assert_eq!(work(list.doc.update_counts()), (0, 0, 0));
+    assert_eq!(list.doc.update_counts().boxes_shifted, 4);
 }
 
 #[test]

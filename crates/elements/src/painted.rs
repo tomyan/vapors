@@ -55,6 +55,9 @@ pub struct Painted {
     pub(crate) kept_batches: std::cell::RefCell<Option<crate::kept_batches::KeptBatches>>,
     /// Boxes painted by this update, for `UpdateCounts`.
     pub(crate) boxes_drawn: usize,
+    /// Boxes whose kept paint this update shifted in place
+    /// (`kept_shift.rs`), for `UpdateCounts`.
+    pub(crate) boxes_shifted: usize,
     /// Kept parts this update visited without painting again (`paint_partial.rs`), for
     /// `UpdateCounts`.
     pub(crate) parts_visited_kept: usize,
@@ -90,6 +93,7 @@ impl Painted {
             drawn: crate::drawn_steps::DrawnSteps::default(),
             kept_batches: std::cell::RefCell::new(None),
             boxes_drawn: 0,
+            boxes_shifted: 0,
             parts_visited_kept: 0,
             items_built: 0,
             maps_patched: 0,

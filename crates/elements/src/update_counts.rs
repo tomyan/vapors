@@ -67,11 +67,18 @@ pub struct UpdateCounts {
     /// nothing is kept.
     pub stackings_computed: usize,
     /// Boxes paint drew: one per box in painting order, outlines and
-    /// scroll thumbs not included. A box built again, moved, or cut by
-    /// another clip is drawn; the others' kept paint stays in place
+    /// scroll thumbs not included. A box built again, or cut by
+    /// another clip, is drawn, as is a moved box whose kept paint
+    /// cannot be shifted exactly; the others' kept paint stays in place
     /// (`kept_box.rs`), and none is drawn when the update showed the
     /// last update's paint (`kept_paint.rs`).
     pub boxes_painted: usize,
+    /// Boxes that moved or were cut by another clip whose kept paint
+    /// was shifted in place of being drawn (IU3 3c-3e,
+    /// `kept_shift.rs`): the box kept its size and padding and lies on
+    /// whole device pixels before and after, its edges snapping as
+    /// they did, moved.
+    pub boxes_shifted: usize,
     /// Boxes whose kept paint paint read and kept rather than drew:
     /// those moved or whose clip was worked out again, but whose paint
     /// was made from the same rect, clip and padding (IU3 3c-3d2). The
@@ -122,6 +129,7 @@ impl UpdateCounts {
     /// Notes what paint drew into `painted`.
     pub(crate) fn note_paint(&mut self, painted: &Painted) {
         self.boxes_painted = painted.boxes_drawn;
+        self.boxes_shifted = painted.boxes_shifted;
         self.parts_visited_kept = painted.parts_visited_kept;
         self.scene_items_built = painted.items_built;
         self.map_entries_patched = painted.maps_patched;

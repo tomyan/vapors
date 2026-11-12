@@ -36,16 +36,24 @@ pub enum RowChange {
     /// Alternating frames: a row inserted before the middle row, then
     /// that row removed. Starts with an insert, warmup frames counted.
     Insert,
+    /// The second row's height, between one and two rows: its boxes
+    /// are built again and every row after it moves (IU3 3c-3e).
+    Resize,
+    /// The body, which scrolls its rows, scrolled down one row; back to
+    /// the top at the end. Every row's boxes move.
+    Scroll,
 }
 
 impl RowChange {
     /// Every change, in the order the harness lists them.
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 7] = [
         Self::Idle,
         Self::Text,
         Self::Class,
         Self::HoveredClass,
         Self::Insert,
+        Self::Resize,
+        Self::Scroll,
     ];
 
     /// The change `name` spells, as `{:?}` prints it.
@@ -72,8 +80,11 @@ impl Rows {
     #[must_use]
     pub fn new(count: usize, change: RowChange) -> Self {
         let page = rows_page(count);
-        if let RowChange::HoveredClass = change {
-            page.edit(Edit::Hover);
+        match change {
+            RowChange::HoveredClass => page.edit(Edit::Hover),
+            RowChange::Resize => page.rows_resizable(),
+            RowChange::Scroll => page.body_scrolls(),
+            RowChange::Idle | RowChange::Text | RowChange::Class | RowChange::Insert => {}
         }
         let mut app = ElementsApp::new(Rc::clone(&page.doc));
         app.time_frames(true);
@@ -119,6 +130,12 @@ impl Workload for Rows {
             }
             RowChange::Class | RowChange::HoveredClass => self.page.edit(Edit::ToggleClass),
             RowChange::Insert => self.toggle_inserted_row(),
+            RowChange::Resize => self.page.toggle_tall(),
+            RowChange::Scroll => {
+                if !self.page.scroll_body(1.0) {
+                    self.page.scroll_body_to_top();
+                }
+            }
         }
     }
 
