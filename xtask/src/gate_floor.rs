@@ -34,6 +34,16 @@ pub struct Free {
     pub bytes: u64,
 }
 
+/// Take the gate lock for `worktree`, then check the floors and the load
+/// wait; the lock is held until the returned guard is dropped.
+pub fn begin(worktree: &str) -> Result<crate::gate_lock::Held, String> {
+    let held = crate::gate_lock::dir()
+        .and_then(|dir| crate::gate_lock::acquire(&dir, worktree, crate::gate_lock::WAIT))?;
+    before()?;
+    crate::load_wait::before("gate")?;
+    Ok(held)
+}
+
 /// Refuse when the temp dir or target/ is under its floor.
 ///
 /// # Errors
