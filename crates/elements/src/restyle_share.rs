@@ -5,6 +5,7 @@
 //! element's style per element as well and panic on a difference,
 //! naming the template site.
 
+use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use vapors_css::selector::{Element as _, reads_siblings_or_descendants};
@@ -15,6 +16,7 @@ use crate::document::Document;
 use crate::error::ElementError;
 use crate::style::{Counted, ShareKey};
 use crate::update::{Viewport, environment};
+use crate::update_counts::UpdateCounts;
 
 /// Where an element's style came from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -48,6 +50,17 @@ impl Document {
         if !self.shareable(key) {
             return Ok((self.compute_own(node, viewport)?, Path::Unshareable));
         }
+        self.shared_style(node, key, viewport)
+    }
+
+    /// The share table's style for `node`'s share key, or one computed
+    /// for `node` and put there.
+    fn shared_style(
+        &mut self,
+        node: NodeId,
+        key: &'static StyleKey,
+        viewport: Viewport,
+    ) -> Result<(Rc<Counted>, Path), ElementError> {
         let share_key = self.share_key(node, key);
         let kept = self.kept.as_ref().expect("restyle sets it");
         if let Some(style) = kept.shared.take(&share_key) {
@@ -99,15 +112,30 @@ impl Document {
     /// The share key of `node`: its template key, its parent's kept
     /// style, its states, its toggles and its selected attributes.
     fn share_key(&self, node: NodeId, key: &'static StyleKey) -> ShareKey {
-        let element = ElementRef::new(&self.arena, node);
         let data = self
             .arena
             .get(node, "restyle")
             .element()
             .expect("an element");
+        ShareKey {
+            key: std::ptr::from_ref(key) as usize,
+            parent: self
+                .parent_style(node)
+                .map_or(0, |p| Rc::as_ptr(&p) as usize),
+            states: ElementRef::new(&self.arena, node).states(),
+            toggles: data.toggles,
+            attributes: self.selected_attributes(&data.attributes),
+        }
+    }
+
+    /// The attributes of `attributes` a sheet selects, but `class` and
+    /// the scope attribute, which the template key fixes.
+    fn selected_attributes(
+        &self,
+        attributes: &BTreeMap<String, String>,
+    ) -> Box<[(String, String)]> {
         let selected = self.sheets.selected_attributes();
-        let attributes = data
-            .attributes
+        attributes
             .iter()
             .filter(|(name, _)| {
                 selected.contains(*name)
@@ -115,16 +143,7 @@ impl Document {
                     && name.as_str() != SCOPE_ATTRIBUTE
             })
             .map(|(name, value)| (name.clone(), value.clone()))
-            .collect();
-        ShareKey {
-            key: std::ptr::from_ref(key) as usize,
-            parent: self
-                .parent_style(node)
-                .map_or(0, |p| Rc::as_ptr(&p) as usize),
-            states: element.states(),
-            toggles: data.toggles,
-            attributes,
-        }
+            .collect()
     }
 
     /// The oracle: `shared` must equal the style computed for `node`
@@ -146,6 +165,28 @@ impl Document {
             key.site
         );
         Ok(())
+    }
+}
+
+impl UpdateCounts {
+    /// Notes where one restyled element's style came from.
+    pub(crate) fn count_style(&mut self, path: Path) {
+        let count = match path {
+            Path::Shared => &mut self.styles_shared,
+            Path::Computed => &mut self.styles_computed,
+            Path::Unkeyed => &mut self.styles_unkeyed,
+            Path::Unshareable => &mut self.styles_unshareable,
+        };
+        *count += 1;
+    }
+
+    /// Drops a failed restyle's partial style counts, as
+    /// `elements_restyled` drops its own.
+    pub(crate) fn forget_styles(&mut self) {
+        self.styles_shared = 0;
+        self.styles_computed = 0;
+        self.styles_unkeyed = 0;
+        self.styles_unshareable = 0;
     }
 }
 

@@ -202,3 +202,16 @@ fn a_removed_elements_style_is_dropped() {
     // Then
     assert_eq!(counts.styles_live, 3);
 }
+
+#[test]
+fn a_failed_restyle_keeps_no_style_counts() {
+    // Given: every row's colour reads a variable nothing sets
+    let (mut doc, _) = page(".row { color: var(--missing); }", &ROW, 3);
+
+    // When
+    let refused = doc.update(viewport(200.0, 100.0)).is_err();
+
+    // Then
+    assert!(refused);
+    assert_eq!(styles(doc.update_counts()), (0, 0, 0, 0, 0));
+}

@@ -27,7 +27,8 @@ pub struct UpdateCounts {
     /// Restyled elements that took a computed style from the share
     /// table: keyed (`Dom::create_keyed_element`), their key shareable,
     /// and an element with the same share key restyled before them
-    /// (`restyle_share.rs`).
+    /// (`restyle_share.rs`). This and the next three are 0 when the
+    /// restyle failed, as `elements_restyled` is.
     pub styles_shared: usize,
     /// Restyled keyed, shareable elements whose style was computed and
     /// put in the share table: one per distinct share key restyled.
@@ -145,18 +146,6 @@ pub struct UpdateCounts {
 }
 
 impl UpdateCounts {
-    /// Notes where one restyled element's style came from.
-    pub(crate) fn count_style(&mut self, path: crate::restyle_share::Path) {
-        use crate::restyle_share::Path;
-        let count = match path {
-            Path::Shared => &mut self.styles_shared,
-            Path::Computed => &mut self.styles_computed,
-            Path::Unkeyed => &mut self.styles_unkeyed,
-            Path::Unshareable => &mut self.styles_unshareable,
-        };
-        *count += 1;
-    }
-
     /// Notes what layout did.
     pub(crate) fn count_layout(&mut self, work: &LayoutWork) {
         (self.boxes_laid_out, self.layout_calls) = (work.laid_out, work.calls);
