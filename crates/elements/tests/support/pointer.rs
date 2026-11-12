@@ -8,6 +8,7 @@ use std::rc::Rc;
 
 use vapors_dom::{Dom, Event, NodeId};
 use vapors_elements::Document;
+use vapors_scene::Item;
 
 use super::{document, element, viewport};
 
@@ -40,4 +41,24 @@ pub fn update(doc: &Rc<RefCell<Document>>) {
     doc.borrow_mut()
         .update(viewport(100.0, 100.0))
         .expect("updates");
+}
+
+/// The background of each quad in the last paint, in painting order.
+pub fn quad_colours(doc: &Rc<RefCell<Document>>) -> Vec<[u8; 4]> {
+    doc.borrow()
+        .painted()
+        .expect("painted")
+        .scene()
+        .to_scene()
+        .items()
+        .iter()
+        .filter_map(|item| match item {
+            Item::Quad(quad) => Some(quad.background.to_rgba8()),
+            Item::Text { .. }
+            | Item::Shadow(_)
+            | Item::Image { .. }
+            | Item::Icon { .. }
+            | Item::Surface { .. } => None,
+        })
+        .collect()
 }

@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use vapors_app::{ElementsApp, FrameTiming};
-use vapors_dom::Dom;
+use vapors_dom::{Dom, NodeId};
 use vapors_elements::{Document, Viewport};
 use vapors_platform::{App, Next};
 
@@ -19,7 +19,7 @@ mod basics;
 #[path = "../../elements/tests/support/rows_page.rs"]
 mod rows_page;
 pub use rows_page::rows_in_view;
-use rows_page::{Edit, RowsPage, rows_page, rows_viewport};
+use rows_page::{Edit, RowsPage, row, rows_page, rows_viewport};
 
 /// What changes before each frame.
 #[derive(Clone, Copy, Debug)]
@@ -33,6 +33,28 @@ pub enum RowChange {
     /// `Class` with the pointer over the second row's button, so each
     /// update also hit-tests the pointer's position (review v201 M2).
     HoveredClass,
+    /// Alternating frames: a row inserted before the middle row, then
+    /// that row removed. Starts with an insert, warmup frames counted.
+    Insert,
+}
+
+impl RowChange {
+    /// Every change, in the order the harness lists them.
+    pub const ALL: [Self; 5] = [
+        Self::Idle,
+        Self::Text,
+        Self::Class,
+        Self::HoveredClass,
+        Self::Insert,
+    ];
+
+    /// The change `name` spells, as `{:?}` prints it.
+    #[must_use]
+    pub fn named(name: &str) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|change| format!("{change:?}") == name)
+    }
 }
 
 /// A rows page in an app, and its change.
@@ -40,6 +62,8 @@ pub struct Rows {
     page: RowsPage,
     app: ElementsApp,
     change: RowChange,
+    /// The row `Insert` added and has not yet removed.
+    inserted: Option<NodeId>,
 }
 
 impl Rows {
@@ -53,7 +77,28 @@ impl Rows {
         }
         let mut app = ElementsApp::new(Rc::clone(&page.doc));
         app.time_frames(true);
-        Self { page, app, change }
+        Self {
+            page,
+            app,
+            change,
+            inserted: None,
+        }
+    }
+}
+
+impl Rows {
+    /// Removes the inserted row, or inserts one before the middle row.
+    fn toggle_inserted_row(&mut self) {
+        let mut doc = self.page.doc.borrow_mut();
+        if let Some(inserted) = self.inserted.take() {
+            doc.remove(inserted);
+            return;
+        }
+        let middle = self.page.rows[self.page.rows.len() / 2].element;
+        let added = row(&mut doc, self.page.rows.len()).element;
+        let body = doc.body();
+        doc.insert_before(body, added, Some(middle));
+        self.inserted = Some(added);
     }
 }
 
@@ -73,6 +118,7 @@ impl Workload for Rows {
                 self.page.doc.borrow_mut().set_text(value, &text);
             }
             RowChange::Class | RowChange::HoveredClass => self.page.edit(Edit::ToggleClass),
+            RowChange::Insert => self.toggle_inserted_row(),
         }
     }
 
@@ -104,3 +150,7 @@ impl Workload for Rows {
 pub fn rows_document(count: usize) -> (Rc<RefCell<Document>>, Viewport) {
     (rows_page(count).doc, rows_viewport())
 }
+
+#[cfg(test)]
+#[path = "rows_tests.rs"]
+mod tests;

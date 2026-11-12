@@ -66,7 +66,8 @@ pub fn rows_page(count: usize) -> RowsPage {
     }
 }
 
-fn row(doc: &mut Document, index: usize) -> Row {
+/// A row appended under the body, numbered `index`.
+pub fn row(doc: &mut Document, index: usize) -> Row {
     row_before(doc, index, None)
 }
 
