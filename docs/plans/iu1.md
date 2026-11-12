@@ -99,10 +99,11 @@ asks the root once and reads its cache (`layout_calls` counts only
 those calls). `KeptBoxes::lend`, `placed`, `scroll.settle` and
 `Chains::of` still walk every box on every update, and paint's rect and
 padding loop does too; none of these is counted. A later counter may
-cover them if IU3 needs it. An edit inside one row makes rows + 9
-or rows + 11 layout calls: one per row, which fits the body asking each
-row for its layout and reading its cache, plus the edited row's
-chain. The retained box tree in IU3 targets
+cover them if IU3 needs it. An edit inside one row that keeps the
+row's size makes 3 layout calls at any row count: the edited row is laid
+out in isolation (M10, `layout/isolated.rs`) and its ancestors keep their
+caches. An edit that resizes the row makes rows + 12 calls, the body
+asking each row for its layout again. The retained box tree in IU3 targets
 `boxes_built` and, with paint reuse, `boxes_painted` and
 `scene_items_built`; `elements_visited` needs the style phase to stop
 reading every element.
