@@ -12,15 +12,17 @@
 //! Three states, never a guess: `Same` keeps the ancestors; `Differs`
 //! (the owner's size, margins or baselines changed, or it bubbles an
 //! out-of-flow box up to an ancestor) and `Unknown` (no old box, no
-//! input asked, an input the old cache no longer holds, or an absolute
-//! or fixed owner, which its containing block hoists and places) clear
-//! them.
+//! input asked, an input the old cache no longer holds, an absolute
+//! or fixed owner, which its containing block hoists and places, or a
+//! restyled owner whose style holds a calc, `keep.rs`) clear them. An
+//! owner styled otherwise than the box it replaced differs too: its
+//! parent reads its style to work out what to ask.
 //! Debug builds check the result against a fresh layout
 //! (`layout_check.rs`).
 
 use taffy::{
     BlockFormattingContext, Cache, Layout, LayoutInput, LayoutOutput, LayoutPartialTree, NodeId,
-    Position,
+    Position, Style,
 };
 
 use super::tree::BoxTree;
@@ -36,12 +38,17 @@ pub(crate) struct Changed {
     pub(crate) before: Option<Before>,
 }
 
-/// What the replaced box held after its last layout.
+/// What the replaced box held after its last layout. Its style and
+/// natural size too: a parent reads a child's style to work out what
+/// to ask it, so a box styled otherwise is asked otherwise, whatever
+/// it answers to the old questions.
 #[derive(Debug)]
 pub(crate) struct Before {
     pub(crate) cache: Cache,
     pub(crate) layout: Layout,
     pub(crate) asked: Vec<Asked>,
+    pub(crate) style: Style,
+    pub(crate) natural: Option<[f32; 2]>,
 }
 
 /// One way a box was asked for its layout: the input, and whether in
@@ -104,6 +111,9 @@ impl BoxTree<'_> {
         if before.asked.is_empty() || self.hoisted_from_above(slot) {
             return Isolation::Unknown;
         }
+        if self.styled_otherwise(slot, &before) {
+            return Isolation::Differs;
+        }
         let id = NodeId::from(slot);
         for asked in &before.asked {
             let Some(old) = before.cache.get(&asked.input) else {
@@ -117,6 +127,13 @@ impl BoxTree<'_> {
         self.set_unrounded_layout(id, &before.layout);
         self.boxes[slot].asked = before.asked;
         Isolation::Same
+    }
+
+    /// Whether the box at `slot` has another style or natural size
+    /// than the box it replaced, so its parent would ask it otherwise.
+    fn styled_otherwise(&self, slot: usize, before: &Before) -> bool {
+        let layout_box = &self.boxes[slot];
+        layout_box.style != before.style || layout_box.natural != before.natural
     }
 
     /// Whether the box at `slot` is placed by a containing block above

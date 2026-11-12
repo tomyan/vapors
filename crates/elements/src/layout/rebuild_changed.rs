@@ -11,18 +11,21 @@ use crate::arena::Arena;
 
 /// Each changed owner for layout to settle: its slot, its ancestors'
 /// slots nearest first, and what the taken box of its key in its slot
-/// held.
+/// held; nothing for an owner `may_keep` refuses (restyled, with a
+/// calc in its style whose handle cannot be compared, `keep.rs`).
 pub(super) fn changed_owners(
     placed: &Placed,
     arena: &Arena,
     changed: &[(NodeId, usize)],
-    mut taken: Taken,
+    (mut taken, may_keep): (Taken, &dyn Fn(NodeId) -> bool),
 ) -> Vec<Changed> {
     let before = |old: (Key, LayoutBox)| match old {
         (Key::Element(_), old) => Some(Before {
             cache: old.cache,
             layout: old.layout,
             asked: old.asked,
+            style: old.style,
+            natural: old.natural,
         }),
         (Key::Text(..), _) => None,
     };
@@ -31,7 +34,11 @@ pub(super) fn changed_owners(
         .map(|&(owner, slot)| Changed {
             slot,
             ancestors: ancestor_slots(placed, ancestors(arena, owner)),
-            before: taken.boxes.remove(&slot).and_then(before),
+            before: taken
+                .boxes
+                .remove(&slot)
+                .filter(|_| may_keep(owner))
+                .and_then(before),
         })
         .collect()
 }

@@ -124,3 +124,22 @@ fn an_absolute_row_is_not_compared_and_has_its_ancestors_laid_out_again() {
         "the root is laid out again"
     );
 }
+
+#[test]
+fn a_rebuilt_row_styled_otherwise_has_its_ancestors_laid_out_again() {
+    // Given: row 3 built again with the same text and a set width
+    let mut texts = Texts::new();
+    let (mut placed, _) = texts.lay_out(rows(), Vec::new());
+    let old = rebuild_row(&mut placed, "text");
+    placed.boxes[ROW].style.size.width = taffy::Dimension::length(50.0);
+
+    // When
+    let (_, work) = texts.lay_out(placed, changed_row(Some(old)));
+
+    // Then
+    assert_eq!(work.settled.resized, 1);
+    assert!(
+        work.written.laid_out.contains(&0),
+        "the root is laid out again"
+    );
+}

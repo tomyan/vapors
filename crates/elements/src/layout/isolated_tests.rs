@@ -62,6 +62,8 @@ pub(super) fn rebuild_row(placed: &mut Placed, text: &str) -> Before {
         cache: old.cache,
         layout: old.layout,
         asked: old.asked,
+        style: old.style,
+        natural: old.natural,
     }
 }
 

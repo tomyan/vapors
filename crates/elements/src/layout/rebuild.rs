@@ -102,7 +102,7 @@ fn rebuild_owners(
     let mut rebuilt = Rebuilt::subtrees(&placed.boxes, put, &taken);
     let nodes: Vec<NodeId> = owners.iter().map(|owner| owner.node).collect();
     let changed = lend_owners(placed, (&nodes, &slots), &taken, may_keep);
-    rebuilt.changed = changed_owners(placed, source.arena, &changed, taken);
+    rebuilt.changed = changed_owners(placed, source.arena, &changed, (taken, may_keep));
     rebuilt
 }
 
