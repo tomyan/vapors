@@ -31,6 +31,9 @@ pub(crate) struct KeptBoxes {
     pub(crate) marks: Marks,
     /// The focused field's caret and selection the kept boxes show.
     pub(super) text_marks: Option<(NodeId, TextMarks)>,
+    /// Debug builds skip `layout_check.rs` (`Document::skip_layout_check`).
+    #[cfg(debug_assertions)]
+    pub(crate) skip_layout_check: bool,
 }
 
 impl KeptBoxes {

@@ -33,11 +33,25 @@ impl Document {
             laid_out.map_err(|(failure, _)| vec![ElementError::Layout(failure)])?;
         // Debug timings include this full build and layout on every
         // narrowed update; `layout_check.rs` says what would retire it.
+        // A test whose own oracle compares the same layout each step
+        // skips it (`skip_layout_check`).
         #[cfg(debug_assertions)]
-        if !built.every {
+        if !built.every && !self.boxes.skip_layout_check {
             self.check_layout(&slotted, viewport);
         }
         Ok((slotted, built, work.written))
+    }
+
+    /// Debug builds skip the layout check (`layout/layout_check.rs`)
+    /// on this document's updates. Only for a test whose own oracle
+    /// compares every update's layout with a full update's; it says why
+    /// where it calls this.
+    #[doc(hidden)]
+    pub fn skip_layout_check(&mut self) {
+        #[cfg(debug_assertions)]
+        {
+            self.boxes.skip_layout_check = true;
+        }
     }
 
     /// Panics when `placed`'s layout is not a fresh layout's
