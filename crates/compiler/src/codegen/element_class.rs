@@ -1,6 +1,6 @@
-//! `class:name={bool}` on an element: one effect builds the `class`
-//! attribute from the literal `class` names and each directive whose
-//! expression is true.
+//! `class:name={bool}` on an element: one effect sets the `class`
+//! attribute to `vapors_dom::class_names` of the literal `class` names
+//! and each directive's name and expression.
 
 use super::emit::Emitter;
 use crate::CompileError;
@@ -88,17 +88,11 @@ fn literal_class(element: &Element) -> String {
     }
 }
 
-/// Starts from the literal names and appends each directive's name
-/// while its expression is true; `on` must be a `bool`.
+/// `vapors_dom::class_names` of the literal names and each directive's
+/// `(name, on)`; `on` must be a `bool`.
 fn class_effect_body(literal: &str, pairs: &str, var: &str) -> Vec<String> {
     vec![
-        format!("let mut value = String::from({literal:?});"),
-        format!("for (name, on) in [{pairs}] {{"),
-        "    if on {".to_string(),
-        "        if !value.is_empty() { value.push(' '); }".to_string(),
-        "        value.push_str(name);".to_string(),
-        "    }".to_string(),
-        "}".to_string(),
+        format!("let value = vapors_dom::class_names({literal:?}, &[{pairs}]);"),
         format!("dom.borrow_mut().set_attribute_if_changed({var}, \"class\", &value);"),
     ]
 }

@@ -12,6 +12,7 @@
 //! what to create, move, update or remove.
 
 pub mod blocks;
+mod class_names;
 mod dispatcher;
 mod event;
 mod event_key;
@@ -23,6 +24,7 @@ pub mod recording;
 mod roots;
 mod snippet;
 
+pub use class_names::class_names;
 pub use dispatcher::{DispatchRefused, Dispatcher, Listeners, run_along};
 pub use event::Event;
 pub use event_pointer::{Capture, Pointer};

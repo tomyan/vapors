@@ -18,8 +18,10 @@ fn class_directives_and_literal_classes_are_set_by_one_effect() {
     );
 
     // Then
-    assert_has(&code, "let mut value = String::from(\"card\");");
-    assert_has(&code, "[(\"lit\", on.get()), (\"dim\", !on.get())]");
+    assert_has(
+        &code,
+        "let value = vapors_dom::class_names(\"card\", &[(\"lit\", on.get()), (\"dim\", !on.get())]);",
+    );
     assert_has(&code, "set_attribute_if_changed(div0, \"class\", &value);");
     assert_lacks(&code, "set_attribute(div0, \"class\", \"card\")");
     assert_eq!(code.matches("Effect::new(").count(), 1, "{code}");
@@ -31,8 +33,10 @@ fn a_class_directive_alone_starts_from_no_classes() {
     let code = generated_with(SCRIPT, "<div class:lit={on.get()}></div>");
 
     // Then
-    assert_has(&code, "let mut value = String::from(\"\");");
-    assert_has(&code, "[(\"lit\", on.get())]");
+    assert_has(
+        &code,
+        "let value = vapors_dom::class_names(\"\", &[(\"lit\", on.get())]);",
+    );
 }
 
 #[test]
