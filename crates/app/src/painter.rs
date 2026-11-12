@@ -89,6 +89,10 @@ impl ScenePainter {
     /// and no canvas colour: where no element paints, the target is
     /// left as it was. For a document over an app's own drawing.
     ///
+    /// Each call is one frame for the bytes kept between frames
+    /// (`painter_kept.rs`): draw a second document with a painter of its
+    /// own, or each call writes every batch the other released.
+    ///
     /// # Errors
     ///
     /// [`DrawOverError::CanvasBackground`], drawing nothing, when `html`

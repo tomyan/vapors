@@ -58,19 +58,24 @@ impl KeptBatched {
             .zip(now)
             .take_while(|(was, now)| was.run == now.run);
         let prefix = same.count();
-        let key = |at: usize| {
-            let from_end = (at + was.len()).checked_sub(now.len())?;
-            let matched = from_end >= prefix && was.get(from_end)?.run == now[at].run;
-            matched.then(|| self.keys[from_end])
-        };
         let keys = (0..now.len()).map(|at| {
             if at < prefix {
                 self.keys[at]
             } else {
-                key(at).unwrap_or_else(BatchKey::new)
+                let key = self.key_from_end(batched, (at, prefix));
+                key.unwrap_or_else(BatchKey::new)
             }
         });
         keys.collect()
+    }
+
+    /// `self`'s key at the place of `batched`'s `at`th counted from the
+    /// end, when that place is not before `prefix` and the runs are equal.
+    fn key_from_end(&self, batched: &Batched, (at, prefix): (usize, usize)) -> Option<BatchKey> {
+        let (was, now) = (&self.batched.batches, &batched.batches);
+        let from_end = (at + was.len()).checked_sub(now.len())?;
+        let matched = from_end >= prefix && was.get(from_end)?.run == now[at].run;
+        matched.then(|| self.keys[from_end])
     }
 }
 

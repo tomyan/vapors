@@ -2,7 +2,8 @@
 //! kept between frames (IU4 PR 2, `painter_kept.rs`): an unchanged frame
 //! writes none; an edit writes only the batches whose items changed; a
 //! batch no longer drawn has its bytes released; image quads kept for
-//! one viewport are written again for another with the same view.
+//! one viewport are written again for another with the same view; an
+//! edge that rounds to -0.0 and then to 0.0 keeps its batch's bytes.
 
 #[path = "support/surface.rs"]
 mod support;
@@ -138,6 +139,25 @@ fn gpu_image_quads_kept_for_one_viewport_are_written_again_for_another_with_the_
     assert_eq!(counts.images.buffer_bytes, 6 * 16);
     let at = |x: u32, y: u32| pixels[((y * 32 + x) * 4) as usize..][..4].to_vec();
     assert_eq!([at(14, 4), at(20, 4)], [RED.to_vec(), WHITE.to_vec()]);
+}
+
+#[test]
+fn gpu_a_box_moved_from_an_edge_rounding_to_minus_zero_to_zero_keeps_its_bytes() {
+    // Given: a red box whose top, -0.3 px, rounds to -0.0
+    let css = "div { position: absolute; left: 0; top: -0.3px; width: 8px; height: 8px; \
+               background-color: #f00; } .zero { top: 0; }";
+    let mut doc = document(css, &[(None, "div", "")]);
+    update(&mut doc, 1.0);
+    let mut rig = Rig::new();
+    drawn(&mut rig, &doc);
+
+    // When: moved to 0, which draws the same pixels
+    classed(&mut doc, 0, "zero");
+    let (pixels, counts) = drawn(&mut rig, &doc);
+
+    // Then: drawn from the kept bytes, which equal those built afresh
+    assert_eq!((counts.batches_written, counts.batches_kept), (0, 1));
+    assert_eq!(pixel(&pixels, 4, 4), RED);
 }
 
 /// `doc` drawn on a target `side` px square under `scissor`: its pixels.

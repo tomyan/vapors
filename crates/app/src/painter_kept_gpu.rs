@@ -25,9 +25,8 @@ pub(crate) struct KeptGpu {
 struct Gpu {
     range: KeptRange,
     kind: Kind,
-    /// The viewport image and surface quads are in clip space for;
-    /// `None` for shadows and quads, whose bytes are in device pixels.
-    viewport: Option<Size>,
+    /// How many bytes `range` holds.
+    len: u64,
     drawn: u64,
     /// What was written, for the debug build's compare.
     #[cfg(debug_assertions)]
@@ -57,15 +56,8 @@ impl KeptGpu {
     ) -> Option<&KeptRange> {
         let viewport = target.viewport;
         match self.entries.get(&key) {
-            Some(gpu) if gpu.viewport.is_none_or(|kept| kept == viewport) => {
-                #[cfg(debug_assertions)]
-                super::super::kept_check::assert_kept(
-                    &gpu.bytes,
-                    &run_bytes(run, viewport),
-                    (run, at),
-                );
-                #[cfg(not(debug_assertions))]
-                let _ = at; // only the debug build's compare names the batch
+            Some(gpu) if gpu.range.viewport().is_none_or(|kept| kept == viewport) => {
+                gpu.check(run, viewport, at);
                 self.kept += 1;
             }
             _ => self.write(&mut pipelines, target, (run, key))?,
@@ -92,7 +84,7 @@ impl KeptGpu {
         let gpu = Gpu {
             range,
             kind,
-            viewport: (kind == Kind::Images).then_some(target.viewport),
+            len: bytes.len() as u64,
             drawn: self.frame,
             #[cfg(debug_assertions)]
             bytes,
@@ -105,5 +97,22 @@ impl KeptGpu {
         let frame = self.frame;
         let undrawn = self.entries.extract_if(|_, gpu| gpu.drawn != frame);
         undrawn.for_each(|(_, gpu)| pipelines.release(gpu.kind, gpu.range));
+    }
+
+    /// The bytes the kept batches hold.
+    pub(super) fn held_bytes(&self) -> u64 {
+        self.entries.values().map(|gpu| gpu.len).sum()
+    }
+}
+
+impl Gpu {
+    /// In a debug build, panics when `run`'s bytes built afresh for
+    /// `viewport` differ from those kept, naming batch `at`.
+    #[cfg_attr(not(debug_assertions), allow(clippy::unused_self))]
+    fn check(&self, run: &Run, viewport: Size, at: usize) {
+        #[cfg(debug_assertions)]
+        super::super::kept_check::assert_kept(&self.bytes, &run_bytes(run, viewport), (run, at));
+        #[cfg(not(debug_assertions))]
+        let _ = (run, viewport, at); // only the debug build's compare uses them
     }
 }

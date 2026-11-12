@@ -4,8 +4,13 @@
 //! draw of its key (`vapors_elements::BatchKey`) and drawn from there
 //! while the key lasts. Image and surface quads are in clip space, so
 //! their bytes are written again on a target of another viewport (one
-//! scissored to the same view). A key
-//! a frame does not draw has its bytes released after the frame.
+//! scissored to the same view). A key a frame does not draw has its
+//! bytes released after the frame. Each `draw` or `draw_over` call is a
+//! frame, so a painter keeps the bytes of one document: a second drawn
+//! by the same painter releases the first's, and both write every batch
+//! on every call. Draw each document with a painter of its own.
+//! After each frame the pipelines' kept buffers must hold exactly the
+//! kept batches' bytes; a range dropped unreleased panics there.
 //!
 //! A debug build builds every kept batch's bytes afresh on each draw
 //! and compares them with the bytes kept (`painter_kept_check.rs`).
@@ -75,6 +80,11 @@ impl ScenePainter {
     }
 
     /// Releases the bytes of every batch the frame did not draw.
+    ///
+    /// # Panics
+    ///
+    /// When the pipelines' kept buffers then hold other than the bytes
+    /// of the batches kept: a kept range was dropped unreleased.
     pub(super) fn release_undrawn(&mut self) {
         let mut pipelines = Pipelines {
             shadows: &mut self.shadows,
@@ -82,6 +92,13 @@ impl ScenePainter {
             images: &mut self.images,
         };
         self.kept.release_undrawn(&mut pipelines);
+        let (held, retained) = (self.kept.held_bytes(), self.retained_bytes());
+        assert_eq!(
+            held, retained,
+            "the kept batches hold {held} bytes, the pipelines' kept buffers {retained}: a \
+             KeptRange was dropped without release (painter_kept_gpu.rs); reproduce with \
+             `cargo xtask test`"
+        );
     }
 
     /// Bytes held in the pipelines' kept buffers.

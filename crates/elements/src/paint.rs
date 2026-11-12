@@ -111,9 +111,15 @@ pub(crate) fn paint_box(
 /// two boxes that share an edge in CSS pixels share it on screen.
 pub(crate) fn snapped(rect: BoxRect, scale: f32) -> Rect {
     Rect::new(
-        (rect.x * scale).round(),
-        (rect.y * scale).round(),
-        ((rect.x + rect.width) * scale).round(),
-        ((rect.y + rect.height) * scale).round(),
+        whole(rect.x * scale),
+        whole(rect.y * scale),
+        whole((rect.x + rect.width) * scale),
+        whole((rect.y + rect.height) * scale),
     )
+}
+
+/// `x` rounded to the nearest whole pixel, never -0.0: runs compare
+/// -0.0 equal to 0.0, so a kept batch's bytes must not hold either.
+fn whole(x: f32) -> f32 {
+    x.round() + 0.0
 }
