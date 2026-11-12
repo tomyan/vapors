@@ -77,6 +77,10 @@ pub struct Rows {
 impl Rows {
     /// `count` rows, updated once, in an app that has drawn no frame and
     /// times its frames on the GPU.
+    ///
+    /// # Panics
+    /// The app's a11y mirror cannot attach: a bug, since the document
+    /// is new and nothing else takes from it.
     #[must_use]
     pub fn new(count: usize, change: RowChange) -> Self {
         let page = rows_page(count);
@@ -89,7 +93,7 @@ impl Rows {
         let mut app = ElementsApp::new(Rc::clone(&page.doc));
         app.time_frames(true);
         // the a11y mirror's take is judged with the other phases (R6)
-        app.mirror_a11y(true);
+        app.mirror_a11y(true).expect("one mirror per document");
         Self {
             page,
             app,

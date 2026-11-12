@@ -5,7 +5,8 @@
 
 use std::collections::BTreeMap;
 
-use crate::rows::RowChange;
+pub use crate::scaling_judged::Judged;
+use crate::scaling_judged::beyond_ceiling;
 
 /// The row counts a change is measured at, ascending.
 pub const SIZES: [usize; 3] = [1000, 3000, 10_000];
@@ -52,30 +53,6 @@ pub struct Scaling {
     pub phases: Vec<PhaseSeries>,
 }
 
-/// Which phases a change is judged on.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Judged {
-    /// The update's total only: an idle update should not depend on size.
-    UpdateTotal,
-    /// Every phase: an edit's work should not depend on size.
-    EveryPhase,
-    /// None: reported, not judged.
-    Nothing,
-}
-
-impl Judged {
-    /// What `change` is judged on. `Insert`, `Resize` and `Scroll` are reported only: property 3
-    /// of docs/plans/perf-finish-line.md (the splice step) is not built.
-    #[must_use]
-    pub fn of(change: RowChange) -> Self {
-        match change {
-            RowChange::Idle => Self::UpdateTotal,
-            RowChange::Text | RowChange::Class | RowChange::HoveredClass => Self::EveryPhase,
-            RowChange::Insert | RowChange::Resize | RowChange::Scroll => Self::Nothing,
-        }
-    }
-}
-
 impl Scaling {
     /// The series of `measured`, which must be two or more sizes in
     /// ascending order with the same phases.
@@ -101,21 +78,25 @@ impl Scaling {
     }
 
     /// The phases of `judged` that grew beyond [`TOLERANCE_PERCENT`],
-    /// one message each naming the phase, the size and the growth per
+    /// or the accessibility phase beyond its ceiling per extra row, one
+    /// message each naming the phase, the size and the growth per
     /// extra row.
     ///
     /// # Errors
     /// `judged` names a phase the series lack (never a pass).
     pub fn violations(&self, judged: Judged) -> Result<Vec<String>, String> {
-        let phases = match judged {
-            Judged::Nothing => return Ok(Vec::new()),
-            Judged::UpdateTotal => vec![self.series("update")?],
-            Judged::EveryPhase => self.phases.iter().collect(),
-        };
-        Ok(phases
-            .into_iter()
-            .flat_map(|series| self.beyond_tolerance(series))
-            .collect())
+        match judged {
+            Judged::AccessibilityPerRow { ceiling } => Ok(beyond_ceiling(
+                self.series("accessibility")?,
+                &self.rows,
+                ceiling,
+            )),
+            Judged::EveryPhase => Ok(self
+                .phases
+                .iter()
+                .flat_map(|series| self.beyond_tolerance(series))
+                .collect()),
+        }
     }
 
     fn series(&self, phase: &str) -> Result<&PhaseSeries, String> {

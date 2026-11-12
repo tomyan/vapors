@@ -2862,6 +2862,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
+name = "vapors-a11y"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "vapors-dom",
+]
+
+[[package]]
 name = "vapors-app"
 version = "0.0.0"
 dependencies = [
@@ -2973,6 +2981,7 @@ dependencies = [
  "serde_json",
  "taffy",
  "tracing",
+ "vapors-a11y",
  "vapors-compiler-examples",
  "vapors-css",
  "vapors-dom",
@@ -3059,6 +3068,7 @@ dependencies = [
  "png",
  "pollster",
  "rfd",
+ "vapors-a11y",
  "vapors-canvas",
  "vapors-gpu",
  "vapors-gpu-harness",

@@ -13,7 +13,6 @@ use crate::a11y_error::AxError;
 use crate::a11y_mirror_counts::AxTakeCounts;
 use crate::a11y_mirror_index::AxIndex;
 use crate::a11y_mirror_record::AboveMemo;
-use crate::a11y_mirror_state::AxMirror;
 use crate::document::Document;
 
 pub use vapors_a11y::{AxMirrorNode, AxPlace, AxRange, AxUpdate};
@@ -23,6 +22,8 @@ impl Document {
     /// nothing did. The first take holds every node.
     ///
     /// # Errors
+    /// [`AxError::Owned`]: a consumer is attached
+    /// ([`Document::ax_mirror_attach`]), and the take is its.
     /// [`AxError::NotUpdated`]: the document has changed since its last
     /// update, or has none. [`AxError::Unexposable`]: a node ARIA
     /// requires a state for that the tree does not carry.
@@ -30,6 +31,12 @@ impl Document {
     /// [`AxError::FocusOutsideTree`]: focus is on an element the tree
     /// leaves out. A refused take keeps what it took for the next.
     pub fn take_ax_update(&mut self) -> Result<Option<AxUpdate>, AxError> {
+        self.ax.owner.none()?;
+        self.take_ax_update_unowned()
+    }
+
+    /// The take, whoever asks.
+    pub(crate) fn take_ax_update_unowned(&mut self) -> Result<Option<AxUpdate>, AxError> {
         if self.painted.is_none() || self.changes.since_update {
             return Err(AxError::NotUpdated);
         }
@@ -38,12 +45,6 @@ impl Document {
             return self.ax_rebuild().map(Some);
         }
         self.ax_incremental()
-    }
-
-    /// The mirror went: the next take holds every node, as a first take
-    /// does, and nothing is collected until then.
-    pub fn ax_mirror_detach(&mut self) {
-        self.ax = AxMirror::default();
     }
 
     /// Every node, in document order.

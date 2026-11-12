@@ -31,10 +31,17 @@ impl Phases for AppFrame<'_, '_> {
         // the selectionchange each text field owes, once per frame, as
         // Chromium fires one per task (E6a)
         Document::settle_selection(&self.app.document);
-        self.app.update_document(self.frame)?;
-        // the focus fixup: an element the update left without a box, or
-        // disabled, loses focus before the next event can reach it
-        Document::settle_focus(&self.app.document);
+        self.app.update_and_settle(self.frame)?;
+        // the fixup's blur and the rehover under a resting pointer are
+        // changes the update did not see; one more update shows them,
+        // so the a11y take and the draw hold this frame (review-v242 H1)
+        if !self.app.document.borrow().changed_since_update() {
+            return Ok(());
+        }
+        self.app.update_and_settle(self.frame)?;
+        if self.app.document.borrow().changed_since_update() {
+            return Err(UNSETTLED.to_owned());
+        }
         Ok(())
     }
 
@@ -47,7 +54,21 @@ impl Phases for AppFrame<'_, '_> {
     }
 }
 
+/// The second update of a frame left the document changed again.
+const UNSETTLED: &str = "the document changed after each of two updates in one frame: a blur \
+    listener of the focus fixup changes the document, or a hover style moves what is under the \
+    pointer; fix: make the listener's change settle, or keep the hover style from moving boxes";
+
 impl ElementsApp {
+    /// `Document::update`, then the focus fixup: an element the update
+    /// left without a box, or disabled, loses focus before the next
+    /// event can reach it.
+    fn update_and_settle(&mut self, frame: &Frame<'_>) -> Result<(), String> {
+        self.update_document(frame)?;
+        Document::settle_focus(&self.document);
+        Ok(())
+    }
+
     /// The Update phase: `Document::update`, then the tooltip's style
     /// checked, so a bad `--tooltip-*` value fails this frame and not
     /// the first hover (seven lookups on the root's custom properties).

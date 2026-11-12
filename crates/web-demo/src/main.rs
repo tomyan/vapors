@@ -73,6 +73,6 @@ fn start() -> Result<(), String> {
     };
     let mut app = ElementsApp::new(shown.document).with_per_frame(per_frame);
     // the page's hidden DOM mirror of the a11y tree (R6)
-    app.mirror_a11y(true);
+    app.mirror_a11y(true).map_err(|e| e.to_string())?;
     run(options, app).map_err(|e| e.to_string())
 }

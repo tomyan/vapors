@@ -9,47 +9,14 @@
 #[path = "support/surface.rs"]
 mod support;
 
-use std::cell::RefCell;
 use std::rc::Rc;
 
-use support::{app_frame, document};
+use support::a11y_buttons::{buttons, mirrored_app, names};
+use support::app_frame;
 use vapors_app::ElementsApp;
-use vapors_dom::{Dom, NodeId};
-use vapors_elements::{AxUpdate, Document};
+use vapors_dom::Dom;
 use vapors_gpu_harness::gpu;
 use vapors_platform::Next;
-
-/// Buttons as flex items: the only layout vapors gives a `<button>`.
-const CSS: &str = ".page { display: flex; font-size: 4px; } \
-    button { width: 8px; height: 4px; margin: 0; padding: 0; }";
-
-/// A page with two buttons, named by their text, and the text of the first.
-fn buttons() -> (Rc<RefCell<Document>>, NodeId) {
-    let mut doc = document(CSS, &[(None, "div", "page")]);
-    let page = doc.children(doc.body())[0];
-    let first = button(&mut doc, page, "One");
-    button(&mut doc, page, "Two");
-    (Rc::new(RefCell::new(doc)), first)
-}
-
-/// A button under `page` named `name`; its text node.
-fn button(doc: &mut Document, page: NodeId, name: &str) -> NodeId {
-    let button = doc.create_element("button");
-    doc.append(page, button);
-    let text = doc.create_text(name);
-    doc.append(button, text);
-    text
-}
-
-fn mirrored_app(doc: &Rc<RefCell<Document>>) -> ElementsApp {
-    let mut app = ElementsApp::new(Rc::clone(doc));
-    app.mirror_a11y(true);
-    app
-}
-
-fn names(update: &AxUpdate) -> Vec<&str> {
-    update.nodes.iter().map(|node| node.name.as_str()).collect()
-}
 
 #[test]
 fn gpu_the_first_frame_takes_every_node_and_an_idle_frame_nothing() {
@@ -160,17 +127,52 @@ fn gpu_a_mirror_attached_again_takes_every_node_again() {
     let gpu = gpu();
     app_frame(&mut app, &gpu);
     app.ax_update().expect("the first take");
-    app.mirror_a11y(false);
+    app.mirror_a11y(false).expect("detaches");
     doc.borrow_mut().set_text(text, "Uno");
     app_frame(&mut app, &gpu);
     assert_eq!(app.ax_update(), None);
 
     // When
-    app.mirror_a11y(true);
+    app.mirror_a11y(true).expect("attaches again");
     app_frame(&mut app, &gpu);
     let update = app.ax_update().expect("the new mirror's first take");
 
     // Then
     assert!(update.every, "{update:?}");
     assert_eq!(names(&update), ["Uno", "Two"]);
+}
+
+#[test]
+fn gpu_a_take_outside_the_app_is_refused_naming_ax_update_while_attached() {
+    // Given
+    let (doc, _) = buttons();
+    let mut app = mirrored_app(&doc);
+    let gpu = gpu();
+    app_frame(&mut app, &gpu);
+
+    // When
+    let refused = doc.borrow_mut().take_ax_update().expect_err("owned");
+
+    // Then
+    assert!(
+        refused.to_string().contains("ElementsApp::ax_update"),
+        "{refused}"
+    );
+}
+
+#[test]
+fn gpu_a_second_app_on_the_document_cannot_attach_a_mirror() {
+    // Given
+    let (doc, _) = buttons();
+    let _first = mirrored_app(&doc);
+    let mut second = ElementsApp::new(Rc::clone(&doc));
+
+    // When
+    let refused = second.mirror_a11y(true).expect_err("owned");
+
+    // Then
+    assert!(
+        refused.to_string().contains("ElementsApp::ax_update"),
+        "{refused}"
+    );
 }
