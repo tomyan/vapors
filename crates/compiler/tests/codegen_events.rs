@@ -72,7 +72,7 @@ fn dynamic_attributes_are_patched_in_effects() {
     // When
     let code = generated_with(
         script,
-        "<div class={cls()} disabled={locked.get()}><span>body</span></div>",
+        "<div class={cls()} aria-disabled={locked.get()}><span>body</span></div>",
     );
 
     // Then
@@ -80,7 +80,7 @@ fn dynamic_attributes_are_patched_in_effects() {
     assert_has(&code, "let shown = &(cls());");
     assert_has(
         &code,
-        "set_attribute_if_changed(div0, \"disabled\", &value)",
+        "set_attribute_if_changed(div0, \"aria-disabled\", &value)",
     );
     assert_has(&code, "let shown = &(locked.get());");
     assert_eq!(code.matches("Effect::new(").count(), 2, "{code}");

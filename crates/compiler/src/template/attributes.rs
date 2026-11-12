@@ -35,12 +35,30 @@ impl Parser<'_> {
         }
     }
 
+    /// A component tag's attribute with a `:` other than `bind:` would
+    /// become a prop with a colon in its name.
+    pub fn refuse_component_directives(&self, attributes: &Attributes) -> Result<(), CompileError> {
+        let Some(attribute) = attributes
+            .iter()
+            .find(|attribute| attribute.name.contains(':') && !attribute.name.starts_with("bind:"))
+        else {
+            return Ok(());
+        };
+        Err(self.error(
+            attribute.offset,
+            format!(
+                "`{}` is not a prop: a component tag takes plain props and `bind:name`; `class:` directives and `on:` listeners are for elements",
+                attribute.name
+            ),
+        ))
+    }
+
     fn push_attribute(
         &self,
         attributes: &mut Attributes,
         attribute: Attribute,
     ) -> Result<(), CompileError> {
-        if attributes.get(&attribute.name).is_some() {
+        if (attributes.iter()).any(|given| given.name.eq_ignore_ascii_case(&attribute.name)) {
             return Err(self.error(
                 attribute.offset,
                 format!("attribute `{}` is given twice: keep one", attribute.name),
@@ -127,6 +145,7 @@ impl Parser<'_> {
                     ));
                 }
                 self.bump(1);
+                self.refuse_brace_in_quotes(name, offset, &value)?;
                 let decoded =
                     decode(&value).map_err(|(at, message)| self.error(offset + 1 + at, message))?;
                 Ok(AttrValue::Literal(decoded))
@@ -136,5 +155,24 @@ impl Parser<'_> {
                 format!("the value of attribute `{name}` must be \"quoted\" or {{an expression}}"),
             )),
         }
+    }
+
+    /// A `{` in quotes is text; an author expecting interpolation
+    /// would get the braces in the value.
+    fn refuse_brace_in_quotes(
+        &self,
+        name: &str,
+        offset: usize,
+        value: &str,
+    ) -> Result<(), CompileError> {
+        let Some(brace) = value.find('{') else {
+            return Ok(());
+        };
+        Err(self.error(
+            offset + 1 + brace,
+            format!(
+                "the value of attribute `{name}` has a `{{` in quotes, which is text, not an expression: write {name}={{format!(\"..\")}} to build it, or `&#123;` for a literal brace"
+            ),
+        ))
     }
 }

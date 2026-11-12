@@ -3,6 +3,7 @@
 //! listener, `bind:` a listener plus a property effect.
 
 use super::allowances::shown_text;
+use super::element_class::{has_class_directives, is_class_directive};
 use super::emit::{Emitter, Place};
 use crate::CompileError;
 use crate::ast::{AttrValue, Attribute, Element, Expr};
@@ -24,9 +25,16 @@ impl Emitter<'_> {
             .attributes
             .iter()
             .partition(|attribute| attribute.name == "bind:this");
+        let directed = has_class_directives(element);
         for attribute in rest {
+            if is_class_directive(attribute)
+                || (directed && attribute.name.eq_ignore_ascii_case("class"))
+            {
+                continue;
+            }
             self.emit_attribute(element, &var, attribute)?;
         }
+        self.emit_class_directives(element, &var)?;
         self.emit_nodes(&element.children, &Place::child_of(&var))?;
         // once the element is whole, so what reads the signal sees it built
         this.into_iter()
@@ -48,6 +56,7 @@ impl Emitter<'_> {
                 ),
             ));
         }
+        super::attribute_refusals::refuse_misleading(self.source, attribute)?;
         if let Some(event) = attribute
             .name
             .strip_prefix("on")
