@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use super::{AtSize, Judged, Scaling};
 use crate::rows::RowChange;
+use crate::scaling_judged::{INSERT_A11Y_PER_ROW, MOVE_A11Y_PER_ROW};
 
 fn size(rows: usize, phases: &[(&str, u64)]) -> AtSize {
     let phases: BTreeMap<_, _> = phases.iter().map(|&(p, n)| (p.to_owned(), n)).collect();
@@ -56,41 +57,59 @@ fn a_fall_is_not_growth() {
     assert_eq!(scaling.violations(Judged::EveryPhase), Ok(Vec::new()));
 }
 
-#[test]
-fn an_idle_update_is_judged_on_the_update_total_only() {
-    // Given: draw grows, update does not
+/// Update growing without bound, accessibility at 10 per extra row.
+fn moving_change() -> Scaling {
     let measured = [
-        size(1000, &[("update", 100_000), ("draw", 100_000)]),
-        size(3000, &[("update", 100_000), ("draw", 900_000)]),
+        size(1000, &[("update", 1), ("accessibility", 10_000)]),
+        size(3000, &[("update", 1000), ("accessibility", 30_000)]),
+        size(10_000, &[("update", 1_000_000), ("accessibility", 100_000)]),
     ];
-    let scaling = Scaling::of(&measured).expect("sizes");
+    Scaling::of(&measured).expect("sizes")
+}
 
-    // Then
-    assert_eq!(scaling.violations(Judged::UpdateTotal), Ok(Vec::new()));
-    assert_eq!(
-        scaling
-            .violations(Judged::EveryPhase)
-            .expect("judged")
-            .len(),
-        1
+#[test]
+fn a_moving_change_is_judged_on_its_accessibility_phase_alone_against_the_ceiling() {
+    // Given: 10 per extra row, at the ceiling
+    let scaling = moving_change();
+
+    // Then: the update's growth is not judged
+    let at = Judged::AccessibilityPerRow { ceiling: 10 };
+    assert_eq!(scaling.violations(at), Ok(Vec::new()));
+}
+
+#[test]
+fn accessibility_over_its_ceiling_per_row_is_named_with_the_growth_and_the_ceiling() {
+    // Given: 10 per extra row, over a ceiling of 9
+    let scaling = moving_change();
+
+    // When
+    let violations = scaling
+        .violations(Judged::AccessibilityPerRow { ceiling: 9 })
+        .expect("judged");
+
+    // Then: at 3000 rows and at 10,000
+    assert_eq!(violations.len(), 2, "{violations:?}");
+    assert!(
+        violations[0].starts_with(
+            "accessibility costs 10.0 instructions per extra row from 1000 to 3000 rows"
+        ),
+        "{}",
+        violations[0]
     );
+    assert!(violations[0].contains("ceiling of 9"), "{}", violations[0]);
 }
 
 #[test]
-fn nothing_is_judged_for_insert_which_is_reported_only() {
-    let scaling = scaling([1, 1000, 1_000_000]);
-    assert_eq!(Judged::of(RowChange::Insert), Judged::Nothing);
-    assert_eq!(scaling.violations(Judged::Nothing), Ok(Vec::new()));
-}
-
-#[test]
-fn judging_the_update_total_without_an_update_count_is_refused() {
+fn judging_the_accessibility_phase_without_its_count_is_refused() {
     let measured = [size(1000, &[("draw", 1)]), size(3000, &[("draw", 1)])];
     let scaling = Scaling::of(&measured).expect("sizes");
     let error = scaling
-        .violations(Judged::UpdateTotal)
-        .expect_err("no update");
-    assert!(error.contains("no count for phase update"), "{error}");
+        .violations(Judged::AccessibilityPerRow { ceiling: 1 })
+        .expect_err("no accessibility");
+    assert!(
+        error.contains("no count for phase accessibility"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -118,8 +137,9 @@ fn fewer_than_two_sizes_or_sizes_out_of_order_are_refused() {
 
 #[test]
 fn each_change_is_judged_as_the_brief_says() {
-    assert_eq!(Judged::of(RowChange::Idle), Judged::UpdateTotal);
+    // Idle on every phase (review-v242 L1): its counts are flat
     for change in [
+        RowChange::Idle,
         RowChange::Text,
         RowChange::FlexText,
         RowChange::Class,
@@ -127,6 +147,15 @@ fn each_change_is_judged_as_the_brief_says() {
     ] {
         assert_eq!(Judged::of(change), Judged::EveryPhase);
     }
+    let insert = Judged::AccessibilityPerRow {
+        ceiling: INSERT_A11Y_PER_ROW,
+    };
+    assert_eq!(Judged::of(RowChange::Insert), insert);
+    let moved = Judged::AccessibilityPerRow {
+        ceiling: MOVE_A11Y_PER_ROW,
+    };
+    assert_eq!(Judged::of(RowChange::Resize), moved);
+    assert_eq!(Judged::of(RowChange::Scroll), moved);
 }
 
 #[test]

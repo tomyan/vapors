@@ -71,11 +71,13 @@ pub struct ElementsApp {
     render_passes: u64,
     /// Times frames on the GPU (`elements_app_timing.rs`).
     timer: AppTimer,
+    /// The a11y mirror, when attached (`elements_app_a11y.rs`).
+    a11y: a11y::A11yMirror,
 }
 
 /// What [`ElementsApp::with_per_frame`] calls before each update, with
 /// the last frame's time per phase, by name, for the phases that do
-/// work today (input, update, draw); empty before the first frame.
+/// work today (`elements_app_shown.rs`); empty before the first frame.
 pub type PerFrame = Box<dyn FnMut(&[(&'static str, Duration)])>;
 
 /// What [`ElementsApp::with_frame_times`] calls after each frame.
@@ -107,6 +109,7 @@ impl ElementsApp {
             hosting: None,
             render_passes: 0,
             timer: AppTimer::default(),
+            a11y: a11y::A11yMirror::default(),
         }
     }
 
@@ -182,6 +185,8 @@ fn shortcut_modifier() -> ShortcutModifier {
     }
 }
 
+#[path = "elements_app_a11y.rs"]
+mod a11y;
 #[path = "elements_app_atlas.rs"]
 mod atlas;
 #[path = "elements_app_counts.rs"]
@@ -195,6 +200,8 @@ mod give;
 #[cfg(not(target_family = "wasm"))]
 #[path = "elements_app_paste.rs"]
 mod paste;
+#[path = "elements_app_shown.rs"]
+mod shown;
 #[path = "elements_app_surface_handle.rs"]
 mod surface_handle;
 #[path = "elements_app_surfaces.rs"]

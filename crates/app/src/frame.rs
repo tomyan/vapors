@@ -2,8 +2,8 @@
 //! animation tick, the update, accessibility, draw, record. Every phase
 //! is given the frame's time, read once when the frame starts, and each
 //! is timed by a [`Clock`] and wrapped in a `tracing` span named for it.
-//! A failed update or draw stops the frame; the phases after it do not
-//! run, and the error names the phase.
+//! A failed update, accessibility take or draw stops the frame; the
+//! phases after it do not run, and the error names the phase.
 
 use std::fmt;
 use std::time::Duration;
@@ -122,8 +122,14 @@ pub trait Phases {
     /// # Errors
     /// The update's refusal, which stops the frame.
     fn update(&mut self, now: Instant) -> Result<(), String>;
-    /// The accessibility tree's update (area 5).
-    fn accessibility(&mut self, _now: Instant) {}
+    /// The accessibility tree's update (area 5): the a11y mirror's take
+    /// (R6), when a mirror is attached.
+    ///
+    /// # Errors
+    /// The take's refusal, which stops the frame.
+    fn accessibility(&mut self, _now: Instant) -> Result<(), String> {
+        Ok(())
+    }
     /// The scene drawn.
     ///
     /// # Errors
@@ -167,7 +173,7 @@ fn run_phase(
         Phase::Tasks => phases.tasks(now),
         Phase::Tick => phases.tick(now),
         Phase::Update => return phases.update(now),
-        Phase::Accessibility => phases.accessibility(now),
+        Phase::Accessibility => return phases.accessibility(now),
         Phase::Draw => return phases.draw(now),
         Phase::Record => phases.record(now, times),
     }
