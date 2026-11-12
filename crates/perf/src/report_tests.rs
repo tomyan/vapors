@@ -42,6 +42,36 @@ fn the_counts_line_gives_the_items_culled_after_the_scene_items() {
 }
 
 #[test]
+fn the_styles_line_gives_where_the_last_frames_styles_came_from() {
+    // Given
+    let mut update = vapors_elements::UpdateCounts::default();
+    (update.styles_shared, update.styles_computed) = (12_000, 4);
+    (
+        update.styles_unkeyed,
+        update.styles_unshareable,
+        update.styles_live,
+    ) = (2, 0, 6);
+    let samples = Samples {
+        counts: Counts {
+            update,
+            ..Counts::default()
+        },
+        ..Samples::default()
+    };
+
+    // When
+    let report = section("rows", &samples);
+
+    // Then
+    assert!(
+        report.contains(
+            "Styles (last frame): shared 12000, computed 4, unkeyed 2, unshareable 0; live 6."
+        ),
+        "{report}"
+    );
+}
+
+#[test]
 fn the_gpu_rows_are_the_pass_time_and_the_span_labelled_an_upper_bound() {
     // Given
     let samples = Samples {
