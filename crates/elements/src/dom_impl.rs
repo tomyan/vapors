@@ -20,9 +20,15 @@ impl Dom for Document {
     }
 
     fn toggle_classes(&mut self, node: NodeId, toggles: &[(&str, bool)]) {
-        if let Some(class) = self.toggled_class(node, toggles) {
-            self.write_attribute(node, "class", &class);
+        match self.toggled_class(node, toggles) {
+            Ok(Some(class)) => self.write_attribute(node, "class", &class),
+            Ok(None) => {}
+            Err(refusal) => self.refuse(node, format!("toggle_classes: {refusal}")),
         }
+    }
+
+    fn style_key(&self, node: NodeId) -> Option<&'static StyleKey> {
+        self.arena.get(node, "style_key").element()?.key
     }
 
     /// Every mount calls it; only an event not declared before can
@@ -55,7 +61,9 @@ impl Dom for Document {
     /// `invalid_follows_a_max_narrowed_under_the_value` pins.
     /// Refused for an attribute the element's key fixes (`dom_keyed`).
     fn set_attribute(&mut self, node: NodeId, name: &str, value: &str) {
-        self.refuse_keyed_attribute(node, name);
+        if let Some(refusal) = self.style_key(node).and_then(|key| key.refusal(name)) {
+            return self.refuse(node, format!("set_attribute: {refusal}"));
+        }
         self.write_attribute(node, name, value);
     }
 

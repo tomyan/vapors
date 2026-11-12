@@ -12,21 +12,24 @@
 
 use crate::SCOPE_ATTRIBUTE;
 
-/// One template element's key. Compared by address: the compiler emits
-/// a distinct `static` per element.
-#[derive(Debug, PartialEq, Eq)]
+/// One template element's key. Compared by address, not content: the
+/// compiler emits a distinct `static` per element, and two elements
+/// with equal content are still two template sites.
+#[derive(Debug)]
 pub struct StyleKey {
-    /// `file:line` of the element in its `.wisp`, for messages.
+    /// `file:line:column` of the element in its `.wisp`, for messages.
     pub site: &'static str,
     /// The scope the component's `<style>` is added under; `None` in a
     /// component without one.
     pub scope: Option<&'static str>,
     /// The element's tag.
     pub tag: &'static str,
-    /// The literal `class` names, in template order.
+    /// The literal `class` names, in template order. Each is one name:
+    /// not empty, no whitespace ([`StyleKey::shape_refusal`]).
     pub classes: &'static [&'static str],
-    /// Each `class:` directive's name, in template order. At most
-    /// [`MAX_TOGGLES`]: a tree keeps which are on as bits.
+    /// Each `class:` directive's name, in template order: at most
+    /// [`MAX_TOGGLES`] (a tree keeps which are on as bits), each listed
+    /// once and none a literal class too.
     pub toggles: &'static [&'static str],
     /// The literal `style` text.
     pub style: Option<&'static str>,
@@ -35,22 +38,30 @@ pub struct StyleKey {
 /// How many `class:` directives one element may have.
 pub const MAX_TOGGLES: usize = 64;
 
+impl PartialEq for StyleKey {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self, other)
+    }
+}
+
+impl Eq for StyleKey {}
+
+/// The bit of the directive at `index`; 0 past [`MAX_TOGGLES`], which
+/// a key with that many directives is refused for
+/// ([`StyleKey::shape_refusal`]).
+fn bit(index: usize) -> u64 {
+    u32::try_from(index)
+        .ok()
+        .and_then(|index| 1u64.checked_shl(index))
+        .unwrap_or(0)
+}
+
 impl StyleKey {
     /// The attributes an element takes from the key at creation, with
     /// no directive on: the scope attribute, `class` (when the key has
     /// classes or directives) and `style`, each when present.
-    ///
-    /// # Panics
-    /// More than [`MAX_TOGGLES`] directives.
     #[must_use]
     pub fn attributes(&self) -> Vec<(&'static str, String)> {
-        assert!(
-            self.toggles.len() <= MAX_TOGGLES,
-            "<{}> at {} has {} `class:` directives; at most {MAX_TOGGLES} fit one element",
-            self.tag,
-            self.site,
-            self.toggles.len()
-        );
         let mut out = Vec::new();
         if let Some(scope) = self.scope {
             out.push((SCOPE_ATTRIBUTE, scope.to_owned()));
@@ -69,7 +80,7 @@ impl StyleKey {
     #[must_use]
     pub fn class_attribute(&self, mask: u64) -> String {
         let on: Vec<(&str, bool)> = (self.toggles.iter().enumerate())
-            .map(|(bit, name)| (*name, mask & (1 << bit) != 0))
+            .map(|(index, name)| (*name, mask & bit(index) != 0))
             .collect();
         crate::class_names(&self.classes.join(" "), &on)
     }
@@ -80,36 +91,14 @@ impl StyleKey {
     /// A name the key does not list, with the fix.
     pub fn toggled(&self, mut mask: u64, toggles: &[(&str, bool)]) -> Result<u64, String> {
         for (name, on) in toggles {
-            let bit = self.toggles.iter().position(|t| t == name).ok_or_else(|| {
-                let listed: Vec<String> = self.toggles.iter().map(|t| format!("`{t}`")).collect();
-                format!(
-                    "`class:{name}` is not a directive of <{}> at {}, whose directives are {}; add `class:{name}={{bool}}` there",
-                    self.tag,
-                    self.site,
-                    listed.join(", ")
-                )
-            })?;
+            let index = self.toggles.iter().position(|t| t == name);
+            let bit = bit(index.ok_or_else(|| self.unlisted(name))?);
             if *on {
-                mask |= 1 << bit;
+                mask |= bit;
             } else {
-                mask &= !(1 << bit);
+                mask &= !bit;
             }
         }
         Ok(mask)
-    }
-
-    /// Why `set_attribute` of `name` is refused on an element with this
-    /// key: `None` when it is not one the key fixes.
-    #[must_use]
-    pub fn refusal(&self, name: &str) -> Option<String> {
-        let fix = match name {
-            "class" => "toggle a class with `class:name={bool}` there",
-            "style" | SCOPE_ATTRIBUTE => "write it there",
-            _ => return None,
-        };
-        Some(format!(
-            "`{name}` on <{}> at {} is set from its template; {fix}",
-            self.tag, self.site
-        ))
     }
 }
