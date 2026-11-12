@@ -63,8 +63,8 @@ impl Phases for Recorded<'_> {
     fn update(&mut self, now: Instant) -> Result<(), String> {
         self.run(Phase::Update, now)
     }
-    fn accessibility(&mut self, now: Instant) {
-        let _ = self.run(Phase::Accessibility, now);
+    fn accessibility(&mut self, now: Instant) -> Result<(), String> {
+        self.run(Phase::Accessibility, now)
     }
     fn draw(&mut self, now: Instant) -> Result<(), String> {
         self.run(Phase::Draw, now)
@@ -141,6 +141,25 @@ fn a_failed_update_stops_the_frame_naming_the_phase() {
     assert!(error.to_string().contains("Update refused"), "{error}");
     let last = phases.ran.into_inner().last().map(|(phase, _)| *phase);
     assert_eq!(last, Some(Phase::Update));
+}
+
+#[test]
+fn a_refused_accessibility_take_stops_the_frame_before_draw() {
+    // Given
+    let clock = Stepped::new();
+    let mut phases = recorded(&clock, Some(Phase::Accessibility));
+
+    // When
+    let error = run_frame(&mut phases, clock.now(), &clock).expect_err("refused");
+
+    // Then: nothing after Accessibility ran
+    assert_eq!(error.phase, Phase::Accessibility);
+    assert!(
+        error.to_string().contains("Accessibility refused"),
+        "{error}"
+    );
+    let last = phases.ran.into_inner().last().map(|(phase, _)| *phase);
+    assert_eq!(last, Some(Phase::Accessibility));
 }
 
 #[test]

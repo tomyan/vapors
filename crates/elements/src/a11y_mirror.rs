@@ -14,6 +14,7 @@ use crate::a11y_error::AxError;
 use crate::a11y_mirror_counts::AxTakeCounts;
 use crate::a11y_mirror_index::AxIndex;
 use crate::a11y_mirror_record::AboveMemo;
+use crate::a11y_mirror_state::AxMirror;
 use crate::a11y_tree::AxStates;
 use crate::document::Document;
 use crate::layout::BoxRect;
@@ -113,6 +114,12 @@ impl Document {
             return self.ax_rebuild().map(Some);
         }
         self.ax_incremental()
+    }
+
+    /// The mirror went: the next take holds every node, as a first take
+    /// does, and nothing is collected until then.
+    pub fn ax_mirror_detach(&mut self) {
+        self.ax = AxMirror::default();
     }
 
     /// Every node, in document order.
