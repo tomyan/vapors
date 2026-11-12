@@ -3,9 +3,10 @@
 //! racing (its clock and speed change every frame, and the track renders).
 
 use vapors_app::FrameTiming;
-use vapors_platform::{App, Event, Modifiers, Next, Platform};
+use vapors_platform::{App, Next};
 use vapors_racer::Racer;
 
+use crate::racer_input::key;
 use crate::run::{Counts, Workload};
 
 /// The racer, paused or racing.
@@ -27,9 +28,8 @@ impl RacerFrames {
         let mut racer = Racer::new();
         racer.time_frames(true);
         if racing {
-            let platform = Platform::detached();
-            racer.event(space(true), &platform);
-            racer.event(space(false), &platform);
+            key(&mut racer, "Space", true);
+            key(&mut racer, "Space", false);
         }
         Self {
             racer,
@@ -65,12 +65,7 @@ impl Workload for RacerFrames {
     }
 
     fn counts(&self) -> Counts {
-        let frame = self.racer.frame_counts();
-        Counts::of(
-            &self.racer.document().borrow(),
-            frame,
-            self.racer.render_passes(),
-        )
+        racer_counts(&self.racer)
     }
 
     fn timing(&self) -> FrameTiming {
@@ -78,12 +73,8 @@ impl Workload for RacerFrames {
     }
 }
 
-fn space(pressed: bool) -> Event {
-    Event::Key {
-        key: " ".into(),
-        code: "Space".into(),
-        pressed,
-        repeat: false,
-        modifiers: Modifiers::default(),
-    }
+/// The counts of `racer`'s last frame.
+pub(crate) fn racer_counts(racer: &Racer) -> Counts {
+    let frame = racer.frame_counts();
+    Counts::of(&racer.document().borrow(), frame, racer.render_passes())
 }

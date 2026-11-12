@@ -1,5 +1,6 @@
 //! Read-only QA telemetry, requested explicitly by ?inspect=1.
 use super::Racer;
+use crate::model::{Camera, Race};
 use std::fmt::Display;
 use vapors_dom::NodeId;
 use vapors_elements::Document;
@@ -31,6 +32,17 @@ impl Fields {
 }
 
 impl Racer {
+    /// The race: the car, its laps and its clock. Read by drivers
+    /// outside a window (the 60 s run in `crates/perf`).
+    #[must_use]
+    pub fn race(&self) -> &Race {
+        &self.run.race
+    }
+    /// The camera's pose and mode.
+    #[must_use]
+    pub fn camera(&self) -> Camera {
+        self.run.camera
+    }
     /// After the app's frame: what the track's hook refused, then the status.
     pub(super) fn after_frame(&self, frame: u64) -> Result<(), String> {
         self.track

@@ -19,6 +19,8 @@ pub mod mount_memory;
 pub mod mount_report;
 pub mod mount_run;
 pub mod racer;
+pub mod racer_driven;
+pub mod racer_input;
 pub mod report;
 pub mod row_change;
 pub mod rows;
