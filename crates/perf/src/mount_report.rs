@@ -16,25 +16,10 @@ pub struct Measured {
     pub instructions: BTreeMap<String, u64>,
 }
 
-/// The phases of a first frame: `report::PHASES`, and the app's other
-/// frame phases, which a steady frame leaves out because they do no
-/// work there (`accessibility` builds its tree once, in the first
-/// frame).
-pub const MOUNT_PHASES: [&str; 13] = [
-    "input",
-    "tasks",
-    "tick",
-    "update",
-    "style",
-    "layout",
-    "paint",
-    "accessibility",
-    "draw",
-    "encode",
-    "write",
-    "submit",
-    "record",
-];
+/// The phases of a first frame: every one, as `accessibility` builds
+/// its tree there and the steady-frame table (`report::PHASES`) leaves
+/// the app's other phases out.
+pub const MOUNT_PHASES: [&str; 13] = crate::report::EVERY_PHASE;
 
 /// Phases that do not contain each other, whose sum is the work from
 /// mount to the end of the first draw. `update`'s own work is `update`

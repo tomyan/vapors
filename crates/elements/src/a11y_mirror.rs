@@ -1,16 +1,19 @@
-//! The a11y update a mirror takes (R6, `docs/plans/r6.md`): the nodes
-//! of the tree as records, each with its parent, in document order. A
-//! mirror builds itself from a take of every node by appending each
-//! record to its parent. This take is every node every time; the next
-//! slice holds only what changed since the last take (`removed`,
-//! `placed` and `focus` are its fields). A take before an update is
+//! The a11y update a mirror takes (R6, `docs/plans/r6.md`): what
+//! changed in the tree since the last take, as records of the nodes
+//! new or changed, the nodes removed, placements for the nodes new or
+//! moved, and the focused node when it moved. The first take holds
+//! every node (`every`), in document order, each with its parent; a
+//! mirror builds itself from it by appending each to its parent. After
+//! that the cost of a take follows what was touched
+//! (`a11y_mirror_state`), never the page. A take before an update is
 //! refused, as the driver's tree is.
 
 use vapors_dom::NodeId;
 
 use crate::a11y_error::AxError;
+use crate::a11y_mirror_counts::AxTakeCounts;
+use crate::a11y_mirror_index::AxIndex;
 use crate::a11y_mirror_record::AboveMemo;
-use crate::a11y_mirror_state::AxIndex;
 use crate::a11y_tree::AxStates;
 use crate::document::Document;
 use crate::layout::BoxRect;
@@ -91,25 +94,36 @@ impl AxUpdate {
 }
 
 impl Document {
-    /// The tree for a mirror: every node, in document order.
+    /// What changed in the tree since the last take; `None` when
+    /// nothing did. The first take holds every node.
     ///
     /// # Errors
     /// [`AxError::NotUpdated`]: the document has changed since its last
     /// update, or has none. [`AxError::Unexposable`]: a node ARIA
     /// requires a state for that the tree does not carry.
     /// [`AxError::NotFinite`]: a node's bounds are not finite.
+    /// [`AxError::FocusOutsideTree`]: focus is on an element the tree
+    /// leaves out. A refused take keeps what it took for the next.
     pub fn take_ax_update(&mut self) -> Result<Option<AxUpdate>, AxError> {
         if self.painted.is_none() || self.changes.since_update {
             return Err(AxError::NotUpdated);
         }
-        self.ax_rebuild().map(Some)
+        self.ax.counts = AxTakeCounts::default();
+        if self.ax.all {
+            return self.ax_rebuild().map(Some);
+        }
+        self.ax_incremental()
     }
 
     /// Every node, in document order.
     fn ax_rebuild(&mut self) -> Result<AxUpdate, AxError> {
-        let index = AxIndex::of(self);
+        let index = self.ax_scan();
         let nodes = self.ax_every(&index)?;
+        self.ax.counts.nodes_read = nodes.len();
         let focus = self.active_element();
+        if let Some(node) = focus.filter(|&node| !nodes.iter().any(|n| n.node == node)) {
+            return Err(self.ax_focus_outside(node));
+        }
         self.ax.reset(&nodes, index, focus);
         Ok(AxUpdate {
             every: true,
@@ -117,6 +131,18 @@ impl Document {
             focus: Some(focus),
             ..AxUpdate::default()
         })
+    }
+
+    /// Every node as a first take would hold it now, without taking:
+    /// what a mirror kept in step by the takes since must hold.
+    ///
+    /// # Errors
+    /// As [`Document::take_ax_update`].
+    pub fn ax_mirror_snapshot(&self) -> Result<Vec<AxMirrorNode>, AxError> {
+        if self.painted.is_none() || self.changes.since_update {
+            return Err(AxError::NotUpdated);
+        }
+        self.ax_every(&AxIndex::of(self))
     }
 
     /// Every node's record, in document order: one pass, each element's
