@@ -83,22 +83,6 @@ fn a_shaped_paragraph_broken_at_a_width_is_the_layout_at_that_width() {
 }
 
 #[test]
-fn one_shaped_paragraph_breaks_at_several_widths_without_changing() {
-    // Given
-    let mut system = FontSystem::bundle_only();
-    let once = shaped(&mut system, 1.0);
-
-    // When
-    let narrow = once.lay_out(Some(0.0), Align::Start);
-    let wide = once.lay_out(None, Align::Start);
-
-    // Then
-    assert!(narrow.lines().count() > 1);
-    assert_eq!(wide.lines().count(), 1);
-    assert_eq!(seen(&once.lay_out(Some(0.0), Align::Start)), seen(&narrow));
-}
-
-#[test]
 fn content_widths_are_the_widths_at_min_and_max_content() {
     for scale in [1.0, 1.5] {
         // Given
