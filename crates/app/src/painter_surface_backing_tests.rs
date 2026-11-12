@@ -3,6 +3,7 @@ use vapors_gpu_harness::gpu;
 use std::time::Duration;
 
 use vapors_platform::Instant;
+use vapors_renderer::ImagePipeline;
 
 use super::super::scope::{DEADLINE, LoopWaker};
 use super::{Backing, Mounted, Turn};
@@ -23,9 +24,10 @@ fn idle_mounted_with_backing() -> Mounted {
         height: 4,
         scale: 1.0,
     };
+    let pipeline = ImagePipeline::new(&gpu.device, wgpu::TextureFormat::Rgba8Unorm);
     let mut mounted = Mounted::new(Box::new(Idle));
     mounted.fresh = false;
-    mounted.backing = Some(Backing::new(&gpu.device, size));
+    mounted.backing = Some(Backing::new(&gpu.device, &pipeline, size));
     mounted
 }
 

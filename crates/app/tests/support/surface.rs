@@ -91,8 +91,13 @@ impl Rig {
 
     /// `doc` drawn into a fresh `SIZE` square target: its RGBA bytes.
     pub fn draw(&mut self, doc: &Document) -> Result<Vec<u8>, PaintError> {
+        self.draw_at(doc, square())
+    }
+
+    /// `doc` drawn into a fresh target of `size`: its RGBA bytes.
+    pub fn draw_at(&mut self, doc: &Document, size: Size) -> Result<Vec<u8>, PaintError> {
         let painted = doc.painted().expect("updated");
-        self.on_fresh_target(|painter, target| painter.draw(target, painted))
+        self.on_target_of(size, |painter, target| painter.draw(target, painted))
     }
 
     /// `doc` drawn over a fresh `SIZE` square target: its RGBA bytes.
@@ -120,24 +125,41 @@ impl Rig {
         &mut self,
         draw: impl FnOnce(&mut ScenePainter, &Target<'_>) -> Result<(), E>,
     ) -> Result<Vec<u8>, E> {
+        self.on_target_of(square(), draw)
+    }
+
+    fn on_target_of<E>(
+        &mut self,
+        size: Size,
+        draw: impl FnOnce(&mut ScenePainter, &Target<'_>) -> Result<(), E>,
+    ) -> Result<Vec<u8>, E> {
         let gpu = &self.gpu;
         let black = Color::from_rgba8(0, 0, 0, 255);
-        let texture = clear(&gpu.device, &gpu.queue, SIZE, SIZE, black);
+        let texture = clear(&gpu.device, &gpu.queue, size.width, size.height, black);
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         let encoder = FrameEncoder::new(&gpu.device);
-        let drawn = draw(&mut self.painter, &target(gpu, &encoder, &view));
+        let drawn = draw(&mut self.painter, &target(gpu, &encoder, &view, size));
         encoder.submit(&gpu.queue).expect("no draw refused");
         drawn?;
         Ok(read_rgba8(&gpu.device, &gpu.queue, &texture))
     }
 }
 
-/// The whole of `view`, a `SIZE` square, as a target on `gpu`.
-fn target<'a>(gpu: &'a Gpu, encoder: &'a FrameEncoder, view: &'a wgpu::TextureView) -> Target<'a> {
-    let size = Size {
+/// The `SIZE` square.
+fn square() -> Size {
+    Size {
         width: SIZE,
         height: SIZE,
-    };
+    }
+}
+
+/// The whole of `view`, `size` pixels, as a target on `gpu`.
+fn target<'a>(
+    gpu: &'a Gpu,
+    encoder: &'a FrameEncoder,
+    view: &'a wgpu::TextureView,
+    size: Size,
+) -> Target<'a> {
     Target {
         device: &gpu.device,
         queue: &gpu.queue,

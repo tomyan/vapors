@@ -1,13 +1,16 @@
 //! A pipeline that draws one quad per instance: the shared machinery of
 //! the box and shadow pipelines. Each instance is `vec4s` four-float
 //! attributes, in device pixels where they are positions; the viewport
-//! size is a uniform. Alpha blends over what the target holds, in
-//! instance order, in one draw recorded into the target's encoder.
+//! size is a uniform, kept per size seen and bound by its offset. Alpha
+//! blends over what the target holds, in instance order, in one draw
+//! recorded into the target's encoder.
 
 use vapors_scene::Size;
 
 use crate::frame_arena::{FrameArena, Placed};
+use crate::kept_bind_group::KeptBindGroup;
 use crate::quads_setup::{bind_group_layout, render_pipeline};
+use crate::uniform_slots::UniformSlots;
 use crate::{Target, WorkCounter};
 
 const VERTICES_PER_QUAD: u32 = 6;
@@ -16,7 +19,8 @@ pub(crate) struct Instanced {
     label: &'static str,
     pipeline: wgpu::RenderPipeline,
     layout: wgpu::BindGroupLayout,
-    viewports: FrameArena,
+    viewports: UniformSlots,
+    bind_group: KeptBindGroup,
     instances: FrameArena,
     stride: u64,
     pub(crate) work: WorkCounter,
@@ -52,7 +56,8 @@ impl Instanced {
             label,
             pipeline: render_pipeline(device, &layout, &shader, format, instance),
             layout,
-            viewports: FrameArena::uniforms(device, label),
+            viewports: UniformSlots::new(device, label),
+            bind_group: KeptBindGroup::NONE,
             instances: FrameArena::new(device, label, wgpu::BufferUsages::VERTEX, stride),
             stride,
             work: WorkCounter::default(),
@@ -76,37 +81,53 @@ impl Instanced {
             return;
         };
         let viewport = viewport_bytes(target.viewport);
-        let Some(viewport) = self.viewports.push(frame, queue, &self.work, &viewport) else {
+        let Some(viewport) = self.viewports.slot(frame, queue, &self.work, viewport) else {
             return;
         };
-        self.record(target, count, &instances, &viewport);
+        self.record(target, count, &instances, viewport);
     }
 
-    fn record(&self, target: &Target<'_>, count: u32, instances: &Placed, viewport: &Placed) {
+    /// The bind groups kept: one once this pipeline has drawn.
+    pub(crate) fn bind_groups_kept(&self) -> u64 {
+        self.bind_group.kept()
+    }
+
+    /// Records the draw with the viewport slot at `viewport`, through
+    /// the kept bind group, made for the slots' buffer on first use and
+    /// again when the buffer is replaced.
+    fn record(&mut self, target: &Target<'_>, count: u32, instances: &Placed, viewport: u32) {
         let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
-        let bind_group = target.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some(self.label),
-            layout: &self.layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: viewport.binding(),
-            }],
+        let (label, layout, work, viewports) =
+            (self.label, &self.layout, &self.work, &self.viewports);
+        let bind_group = self.bind_group.of(viewports.generation(), || {
+            work.create_bind_group(
+                target.device,
+                &wgpu::BindGroupDescriptor {
+                    label: Some(label),
+                    layout,
+                    entries: &[wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: viewports.binding(),
+                    }],
+                },
+            )
         });
         target.draw_pass(|pass| {
             pass.set_pipeline(&self.pipeline);
-            pass.set_bind_group(0, &bind_group, &[]);
+            pass.set_bind_group(0, bind_group, &[viewport]);
             pass.set_vertex_buffer(0, instances.slice());
             self.work.draw(pass, 0..VERTICES_PER_QUAD, 0..count);
         });
     }
 }
 
+/// The viewport uniform's bytes: its size as two floats, padded to 16.
 #[allow(clippy::cast_precision_loss)] // viewports are far below 2^24 pixels
-fn viewport_bytes(viewport: Size) -> Vec<u8> {
-    [viewport.width as f32, viewport.height as f32, 0.0, 0.0]
-        .iter()
-        .flat_map(|v| v.to_le_bytes())
-        .collect()
+fn viewport_bytes(viewport: Size) -> [u8; 16] {
+    let mut bytes = [0; 16];
+    bytes[..4].copy_from_slice(&(viewport.width as f32).to_le_bytes());
+    bytes[4..8].copy_from_slice(&(viewport.height as f32).to_le_bytes());
+    bytes
 }
 
 /// Little-endian bytes of `floats`, the instance buffer's layout.
