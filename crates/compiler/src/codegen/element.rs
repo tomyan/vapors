@@ -71,7 +71,7 @@ impl Emitter<'_> {
                 let clones = self.clones_for(&[expr])?;
                 let mut body = shown_text(&value).to_vec();
                 body.push(format!(
-                    "dom.borrow_mut().set_attribute({var}, {:?}, &value);",
+                    "dom.borrow_mut().set_attribute_if_changed({var}, {:?}, &value);",
                     attribute.name
                 ));
                 self.emit_effect(&clones, &body);

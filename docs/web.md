@@ -41,8 +41,14 @@ The elements the platform looks for, by id (`vapors_platform::page`):
   not cover the label strip the image app draws top left. Its click reaches the app as
   `Event::OpenRequested`, and the app answers with `pick_file` and its
   file kinds: a click is user activation in every browser, a tap on the
-  canvas is not always. A page without it is told so as an error; `o`
-  and a tap on an empty canvas still try.
+  canvas is not always. A page without it is told so as an error naming
+  the fix; `o` and a tap on an empty canvas still try. An app that draws
+  its own Open calls `vapors_platform::app_draws_open()` before `run()`:
+  the page then needs no button, nothing is reported, and a button the
+  page has is hidden. `vapors_platform::hide_status_line()` is separate:
+  it hides `#status` (and so removes it from the browser's accessibility
+  tree) for an app whose canvas the line would cover. Errors still
+  un-hide their element.
 - CSS: `html,body{margin:0;height:100%} canvas{width:100vw;height:100vh;
   display:block;touch-action:none}`. Without `touch-action:none` the
   browser scrolls instead of sending touches.
@@ -195,3 +201,16 @@ for values that are not the strip colour. `--dump-dom` in place of
 155 keeps `navigator.gpu` under every disable flag, so to see the
 no-WebGPU path add `<script>delete Navigator.prototype.gpu;</script>` to
 the head of a copy of `index.html`.
+
+## Wheel position
+
+A wheel before any pointer movement is placed by
+`crates/platform/src/wheel_position_web.rs`, which records the wheel
+event's `offsetX`/`offsetY` (read as f64, as winit reads them for its
+pointer events) when the event's target is the canvas. In a browser this
+listener is exercised only by touche's `check_idle` and
+`check_zoom_status`; vapors has no browser check that dispatches a wheel
+before a pointer move. Follow-up: add one to `scripts/` (a page under
+`?demo=` that shows the position a wheel scrolled at, driven from
+headless Chromium by `Input.dispatchMouseEvent` of type `mouseWheel`);
+it retires this gap.

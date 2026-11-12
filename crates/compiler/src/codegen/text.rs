@@ -1,5 +1,6 @@
 //! Text runs: a literal is one text node created once; a `{expr}` hole
-//! is a text node of its own with an effect that re-sets exactly it.
+//! is a text node of its own with an effect that re-sets exactly it,
+//! when its text differs from the node's (`Dom::set_text_if_changed`).
 
 use super::allowances::shown_text;
 use super::emit::{Emitter, Place};
@@ -34,7 +35,9 @@ impl Emitter<'_> {
         let value = self.unwrapped(expr)?;
         let clones = self.clones_for(&[expr])?;
         let mut body = shown_text(&value).to_vec();
-        body.push(format!("dom.borrow_mut().set_text({var}, &value);"));
+        body.push(format!(
+            "dom.borrow_mut().set_text_if_changed({var}, &value);"
+        ));
         self.emit_effect(&clones, &body);
         Ok(())
     }

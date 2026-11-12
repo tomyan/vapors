@@ -60,6 +60,7 @@ fn hover_stays_on_the_capturing_element() {
         .painted()
         .expect("painted")
         .scene()
+        .to_scene()
         .items()
         .iter()
         .filter_map(|item| match item {

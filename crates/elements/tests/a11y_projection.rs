@@ -63,6 +63,8 @@ fn node(role: &str, name: &str, properties: &[&str]) -> AxNode {
     AxNode {
         role: role.into(),
         name: name.into(),
+        value: None,
+        description: None,
         properties: properties.iter().map(|p| (*p).to_owned()).collect(),
     }
 }
@@ -87,6 +89,9 @@ fn an_open_combobox_names_its_active_option_and_listbox() {
     let (doc, input) = combobox(true);
     let doc = std::rc::Rc::new(std::cell::RefCell::new(doc));
     Document::focus(&doc, Some(input));
+    doc.borrow_mut()
+        .update(viewport(400.0, 300.0))
+        .expect("updates");
 
     // Then
     assert_eq!(
@@ -116,4 +121,19 @@ fn a_document_never_updated_is_refused() {
 
     // Then
     assert!(doc.ax_projection(&ROLES).is_err());
+}
+
+#[test]
+fn a_projection_asked_for_aria_img_is_refused_naming_chromiums_image() {
+    // Given
+    let (doc, _) = combobox(false);
+
+    // When
+    let refusal = doc.ax_projection(&["img"]).expect_err("refused");
+
+    // Then
+    assert_eq!(
+        refusal.to_string(),
+        "the projection asked for `img`, ARIA's name; fix: use `image`, Chromium's name for ARIA img"
+    );
 }

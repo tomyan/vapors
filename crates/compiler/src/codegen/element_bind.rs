@@ -55,7 +55,7 @@ impl Emitter<'_> {
         self.emit_effect(
             &[],
             &[format!(
-                "dom.borrow_mut().set_property({var}, {property:?}, {wrap}({signal}.get()));"
+                "dom.borrow_mut().set_property_if_changed({var}, {property:?}, {wrap}({signal}.get()));"
             )],
         );
         // a numeric or checked binding takes what the control's own event

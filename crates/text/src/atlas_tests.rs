@@ -8,7 +8,7 @@ use parley::fontique::Blob;
 use skrifa::MetadataProvider;
 
 use super::*;
-use crate::atlas_types::GlyphKey;
+use crate::atlas_types::{AtlasKey, GlyphKey};
 use crate::fonts::GEIST;
 use crate::raster::{GlyphRequest, Hinting};
 
@@ -38,7 +38,7 @@ fn request_at(font: &FontData, c: char, subpixel: u8, size: f32) -> GlyphRequest
 }
 
 fn atlas(page_size: u32) -> GlyphAtlas {
-    GlyphAtlas::new(AtlasConfig { page_size })
+    GlyphAtlas::new(AtlasConfig::fixed(page_size))
 }
 
 #[test]
@@ -158,7 +158,7 @@ fn eviction_takes_the_least_recently_used_glyph_first() {
     let present = |atlas: &GlyphAtlas, c| {
         atlas
             .entries
-            .contains_key(&GlyphKey::of(&request(&font, c, 0)))
+            .contains_key(&AtlasKey::Glyph(GlyphKey::of(&request(&font, c, 0))))
     };
 
     // Then: b went first; a only if more room was needed after b

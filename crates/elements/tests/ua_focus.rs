@@ -20,7 +20,7 @@ fn ring_drawn(doc: &std::rc::Rc<std::cell::RefCell<Document>>) -> bool {
     doc.borrow()
         .painted()
         .expect("painted")
-        .scene()
+        .scene().to_scene()
         .items()
         .iter()
         .any(|item| matches!(item, Item::Quad(quad) if quad.border_colors[0].to_rgba8() == RING && quad.border[0] > 0.0))

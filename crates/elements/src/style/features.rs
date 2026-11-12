@@ -1,17 +1,20 @@
 //! What the sheets' selectors use that widens a restyle (F2c S7): a
-//! change to one element can restyle its later siblings when a sibling
-//! combinator or a positional pseudo-class is used, its parent when
-//! `:empty` is, and any element when `:has()` is.
+//! change to one element can restyle its siblings when a sibling
+//! combinator or a positional pseudo-class is used (which siblings:
+//! `SiblingDeps`), its parent when `:empty` is, and any element when
+//! `:has()` is.
 
 use vapors_css::ast::Stylesheet;
-use vapors_css::selector::{Combinator, Compound, PseudoClass, Selector};
+use vapors_css::selector::{Compound, PseudoClass, Selector};
+
+use super::sibling_deps::SiblingDeps;
 
 /// The selector features of every sheet added so far.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Features {
-    /// `+`, `~`, or a pseudo-class that depends on an element's place
-    /// among its siblings (`:first-child`, `:nth-of-type()`, ...).
-    pub(crate) siblings: bool,
+    /// Which siblings of a changed element `+`, `~` and the positional
+    /// pseudo-classes (`:first-child`, `:nth-of-type()`, ...) reach.
+    pub(crate) siblings: SiblingDeps,
     /// `:empty`, which a text change can flip on the text's parent.
     pub(crate) empty: bool,
     /// `:has()`, which a change anywhere below an element can flip.
@@ -28,10 +31,12 @@ impl Features {
     }
 
     fn add_selector(&mut self, selector: &Selector) {
-        self.siblings |= selector
-            .combinators
-            .iter()
-            .any(|c| matches!(c, Combinator::NextSibling | Combinator::SubsequentSibling));
+        self.siblings.merge(SiblingDeps::of_selector(selector));
+        self.add_flags(selector);
+    }
+
+    /// `:empty` and `:has()` in `selector`, not its sibling reach.
+    fn add_flags(&mut self, selector: &Selector) {
         for compound in &selector.compounds {
             self.add_compound(compound);
         }
@@ -51,8 +56,9 @@ impl Features {
                 | PseudoClass::Is(list)
                 | PseudoClass::Where(list)
                 | PseudoClass::Global(list) => {
+                    // their sibling reach is `SiblingDeps::of_selector`'s
                     for selector in list {
-                        self.add_selector(selector);
+                        self.add_flags(selector);
                     }
                 }
                 PseudoClass::FirstChild
@@ -64,8 +70,8 @@ impl Features {
                 | PseudoClass::NthChild(_)
                 | PseudoClass::NthLastChild(_)
                 | PseudoClass::NthOfType(_)
-                | PseudoClass::NthLastOfType(_) => self.siblings = true,
-                PseudoClass::Hover
+                | PseudoClass::NthLastOfType(_)
+                | PseudoClass::Hover
                 | PseudoClass::Focus
                 | PseudoClass::FocusVisible
                 | PseudoClass::FocusWithin

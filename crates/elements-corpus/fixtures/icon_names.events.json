@@ -1,0 +1,55 @@
+{
+  "steps": [
+    {
+      "action": "Key(\"Tab\")",
+      "ax": [
+        {
+          "name": "Undo",
+          "properties": [
+            "focused=true"
+          ],
+          "role": "button"
+        },
+        {
+          "name": "Open",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "Export",
+          "properties": [],
+          "role": "image"
+        },
+        {
+          "name": "Export Go",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "Export",
+          "properties": [],
+          "role": "image"
+        },
+        {
+          "name": "Go",
+          "properties": [],
+          "role": "button"
+        }
+      ],
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#undo",
+          "type": "focusin"
+        }
+      ],
+      "focus": "button#undo",
+      "focusVisible": true,
+      "line": 5,
+      "selections": {},
+      "values": {}
+    }
+  ]
+}

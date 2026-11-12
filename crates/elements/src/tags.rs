@@ -3,8 +3,8 @@
 //! not implement is an error, never drawn as a `div`.
 
 /// Tags laid out and painted now: block-level containers, the inline
-/// elements of F2c S6, `img` (S10) and `input` (3-E3; `check` refuses
-/// the types not built yet).
+/// elements of F2c S6, `img` (S10), `gpu-surface` (docs/gpu-surface.md),
+/// the `svg` icon and its `path`s (docs/icons.md) and `input` (3-E3; `check` refuses the types not built yet).
 const SUPPORTED: &[&str] = &[
     "html",
     "body",
@@ -30,6 +30,9 @@ const SUPPORTED: &[&str] = &[
     "figcaption",
     "hr",
     "img",
+    "gpu-surface",
+    "svg",
+    "path",
     "span",
     "b",
     "strong",
@@ -77,7 +80,7 @@ pub(crate) fn unsupported(tag: &str) -> Option<String> {
 /// The events the tree fires (F2c S2; capture, 3-E1a; touches, 3-E1b;
 /// keys and focus, 3-E2a; a range's value, 3-E3a; a text field's
 /// selection, E6a; the second click in a row, for touché's card).
-pub(crate) const FIRED: &[&str] = &[
+pub const FIRED: &[&str] = &[
     "click",
     "dblclick",
     "pointerdown",

@@ -1,11 +1,12 @@
 //! A number field's box and marks (3-E3c): its text is its content,
 //! so its height is its line; a caret after the text while focused by
 //! a click, a selection under the whole text when focused by keyboard,
-//! neither when unfocused; a field without a width is refused.
+//! neither when unfocused; the caret and a selection where the keys put
+//! them; a field without a width is refused.
 
 mod support;
 
-use support::number_page::{click, key, page};
+use support::number_page::{click, key, page, shift_key};
 use support::{document, element, refusals};
 use vapors_dom::Dom;
 use vapors_scene::{Color, Item};
@@ -18,6 +19,7 @@ fn marks(page: &support::number_page::Page) -> Vec<(vapors_scene::Rect, Color)> 
         .expect("updates");
     painted
         .scene()
+        .to_scene()
         .items()
         .iter()
         .filter_map(|item| match item {
@@ -70,6 +72,31 @@ fn a_selection_covers_the_text_when_focused_by_keyboard() {
     assert!((color.a - 0.3).abs() < 0.01 && color.b > 0.8, "{color:?}");
     assert_eq!(rect.left, 3.0);
     assert!(rect.right > 15.0 && rect.right < 25.0, "{rect:?}");
+}
+
+#[test]
+fn the_caret_and_a_selection_are_painted_where_the_keys_put_them() {
+    // Given: "20" focused by a click, the caret after the 0
+    let page = page();
+    click(&page, [50.0, 12.0]);
+    let at_end = marks(&page)[0].0;
+
+    // When
+    key(&page, "ArrowLeft");
+    let caret = marks(&page);
+    shift_key(&page, "ArrowRight");
+    let selection = marks(&page);
+
+    // Then: the caret between the digits, about 8 px left of the end;
+    // the selection over the 0 alone
+    let [(bar, _)] = caret[..] else {
+        panic!("one caret, got {caret:?}");
+    };
+    assert!(at_end.left - bar.left > 5.0, "{bar:?} {at_end:?}");
+    let [(over, _)] = selection[..] else {
+        panic!("one selection, got {selection:?}");
+    };
+    assert_eq!((over.left, over.right), (bar.left, at_end.left));
 }
 
 #[test]

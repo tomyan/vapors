@@ -1,6 +1,6 @@
 //! Which scroll containers a scroll over an element tries (F2c S9).
 
-use std::collections::HashMap;
+use crate::node_map::NodeMap;
 
 use vapors_dom::NodeId;
 
@@ -9,10 +9,10 @@ use crate::layout::{Content, LayoutBox};
 /// Which scroll container a scroll over an element moves first, and
 /// which one each container passes a scroll it cannot take to: by
 /// containing block, as clips pass (`crate::chain`).
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub(crate) struct Chains {
-    first: HashMap<NodeId, NodeId>,
-    outer: HashMap<NodeId, NodeId>,
+    first: NodeMap<NodeId>,
+    outer: NodeMap<NodeId>,
 }
 
 impl Chains {
@@ -21,7 +21,7 @@ impl Chains {
     pub(crate) fn of(boxes: &[LayoutBox], scrolls: &dyn Fn(usize) -> bool) -> Self {
         let node = |index: usize| match boxes[index].content {
             Content::Element(node) => Some(node),
-            Content::Text(_) => None,
+            Content::Text(_) | Content::Vacant => None,
         };
         let around = crate::chain::by_containing_block(boxes, None, &|index, own| {
             if scrolls(index) { node(index) } else { own }

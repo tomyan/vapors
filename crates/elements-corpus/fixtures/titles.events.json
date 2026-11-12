@@ -1,0 +1,125 @@
+{
+  "steps": [
+    {
+      "action": "Key(\"Tab\")",
+      "ax": [
+        {
+          "description": "Open (o)",
+          "name": "Open",
+          "properties": [
+            "focused=true"
+          ],
+          "role": "button"
+        },
+        {
+          "name": "Undo (Ctrl+Z)",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "description": "Redo (Ctrl+Shift+Z)",
+          "name": "Redo",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "Blank",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": " Spaced out ",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "description": "By title",
+          "name": "Labelled",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "description": "Hint text",
+          "name": "Hinted",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "description": "Falls back",
+          "name": "Nohint",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "Level",
+          "properties": [],
+          "role": "slider",
+          "value": "5"
+        },
+        {
+          "description": "Export (e)",
+          "name": "Export",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "WS",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "description": "a b",
+          "name": "Desc",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "description": "Hint text",
+          "name": "Named by title",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "Fallback",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": " Padded ",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "description": " Pad ",
+          "name": "Named",
+          "properties": [],
+          "role": "button"
+        },
+        {
+          "name": "  ",
+          "properties": [],
+          "role": "button"
+        }
+      ],
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#open",
+          "type": "focusin"
+        }
+      ],
+      "focus": "button#open",
+      "focusVisible": true,
+      "line": 5,
+      "selections": {},
+      "values": {}
+    }
+  ]
+}

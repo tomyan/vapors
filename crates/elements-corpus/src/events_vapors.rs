@@ -79,6 +79,15 @@ pub fn play(fixture: &Fixture, script: &Script, viewport: Viewport) -> Result<Lo
     for step in &script.steps {
         act(&doc, &step.action, &mut held)
             .map_err(|why| format!("{}.events:{}: {why}", fixture.name, step.line))?;
+        // a frame after each step, as Chromium draws one before it is read
+        doc.borrow_mut().update(viewport).map_err(|errors| {
+            format!(
+                "{}.events:{}: the update was refused: {errors:?}",
+                fixture.name, step.line
+            )
+        })?;
+        // and the focus fixup the app runs after it
+        Document::settle_focus(&doc);
         let (focus, focus_visible) = {
             let doc = doc.borrow();
             let focus = doc
@@ -108,6 +117,9 @@ pub fn play(fixture: &Fixture, script: &Script, viewport: Viewport) -> Result<Lo
 
 fn mounted(fixture: &Fixture, viewport: Viewport) -> Result<Rc<RefCell<Document>>, String> {
     let doc = Rc::new(RefCell::new(Document::new(FontSystem::bundle_only())));
+    // the answers are Linux Chromium's: Control+A is select-all
+    doc.borrow_mut()
+        .set_shortcut_modifier(vapors_elements::ShortcutModifier::Control);
     doc.borrow_mut()
         .add_stylesheet(fixture.name, fixture.style)
         .map_err(|e| format!("{}: {e:?}", fixture.name))?;
@@ -182,7 +194,13 @@ use read::{checked, projection, selections, values};
 
 /// The event's type as the log names it, each modifier held added as the
 /// recording adds it (`events_recording::MODIFIER_KEYS`): `click+alt`.
+/// Mouse events only (`events_recording::is_mouse_event`), as the
+/// recording reads a `MouseEvent`'s modifiers alone; a key event's are
+/// not logged.
 fn logged_type(event: &vapors_dom::Event) -> String {
+    if !crate::events_recording::is_mouse_event(event.name()) {
+        return event.name().to_owned();
+    }
     let m = event.modifiers();
     let held = [m.alt, m.control, m.meta, m.shift];
     crate::events_recording::MODIFIER_KEYS

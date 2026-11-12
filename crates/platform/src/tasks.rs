@@ -7,54 +7,55 @@ use std::sync::Arc;
 use winit::event_loop::EventLoopProxy;
 use winit::window::Window;
 
-use crate::device_lost::DeviceLost;
+use crate::gpu_watch::GpuWatch;
 use crate::surface::Gpu;
 use crate::window::Message;
 
 /// Set up the GPU for `window` and send the result as [`Message::GpuReady`].
 #[cfg(not(target_family = "wasm"))]
 #[allow(clippy::needless_pass_by_value)] // same signature as the web version, which moves them
-pub fn start_gpu(window: Arc<Window>, proxy: EventLoopProxy<Message>, lost: DeviceLost) {
-    let result = pollster::block_on(Gpu::for_window(&window, &lost, proxy.clone()));
+pub fn start_gpu(window: Arc<Window>, proxy: EventLoopProxy<Message>, watch: GpuWatch) {
+    let result = pollster::block_on(Gpu::for_window(&window, &watch, &proxy));
     send(&proxy, Message::GpuReady(result));
 }
 
 /// Set up the GPU for `window` and send the result as [`Message::GpuReady`].
 #[cfg(target_family = "wasm")]
-pub fn start_gpu(window: Arc<Window>, proxy: EventLoopProxy<Message>, lost: DeviceLost) {
+pub fn start_gpu(window: Arc<Window>, proxy: EventLoopProxy<Message>, watch: GpuWatch) {
     wasm_bindgen_futures::spawn_local(async move {
-        let result = Gpu::for_window(&window, &lost, proxy.clone()).await;
+        let result = Gpu::for_window(&window, &watch, &proxy).await;
         send(&proxy, Message::GpuReady(result));
     });
 }
 
-/// What wgpu's device-lost callback calls to wake the loop with
-/// [`Message::DeviceLost`]. Natively the callback may run on another
-/// thread, and the proxy goes with it.
+/// What wgpu's device-lost and uncaptured-error callbacks call to wake
+/// the loop with [`Message::GpuStopped`]. Natively a callback may run on
+/// another thread, and the proxy goes with it.
 #[cfg(not(target_family = "wasm"))]
-pub fn lost_waker(proxy: EventLoopProxy<Message>) -> impl Fn() + Send + 'static {
-    move || send(&proxy, Message::DeviceLost)
+pub fn stop_waker(proxy: EventLoopProxy<Message>) -> impl Fn() + Send + 'static {
+    move || send(&proxy, Message::GpuStopped)
 }
 
 #[cfg(target_family = "wasm")]
 thread_local! {
-    /// The page's one thread keeps the proxy for the lost callback, which
+    /// The page's one thread keeps the proxy for the GPU callbacks, which
     /// wgpu requires to be `Send` though nothing on the web moves threads.
-    static LOST_PROXY: std::cell::RefCell<Option<EventLoopProxy<Message>>> = const { std::cell::RefCell::new(None) };
+    static STOP_PROXY: std::cell::RefCell<Option<EventLoopProxy<Message>>> = const { std::cell::RefCell::new(None) };
 }
 
-/// What wgpu's device-lost callback calls to wake the loop with
-/// [`Message::DeviceLost`]: on the web, through the thread's proxy.
+/// What wgpu's device-lost and uncaptured-error callbacks call to wake
+/// the loop with [`Message::GpuStopped`]: on the web, through the
+/// thread's proxy.
 #[cfg(target_family = "wasm")]
-pub fn lost_waker(proxy: EventLoopProxy<Message>) -> impl Fn() + Send + 'static {
-    LOST_PROXY.with(|slot| *slot.borrow_mut() = Some(proxy));
+pub fn stop_waker(proxy: EventLoopProxy<Message>) -> impl Fn() + Send + 'static {
+    STOP_PROXY.with(|slot| *slot.borrow_mut() = Some(proxy));
     || {
-        LOST_PROXY.with(|slot| match slot.borrow().as_ref() {
-            Some(proxy) => send(proxy, Message::DeviceLost),
-            // Set above before the callback can run; if it ever is not,
-            // say so: the loss still stops the loop at the next frame.
+        STOP_PROXY.with(|slot| match slot.borrow().as_ref() {
+            Some(proxy) => send(proxy, Message::GpuStopped),
+            // Set above before a callback can run; if it ever is not,
+            // say so: the failure still stops the loop at the next event.
             None => crate::report::report_error(
-                "the GPU device was lost and the event loop could not be woken (no proxy); it stops at the next frame",
+                "the GPU device was lost or a GPU call failed, and the event loop could not be woken (no proxy); it stops at the next event",
             ),
         });
     }

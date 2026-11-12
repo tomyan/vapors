@@ -5,16 +5,17 @@
 //! in tree order, and past the last focus leaves the page (nothing has
 //! focus), as in Chromium. A move fires `blur` and `focusout` on the
 //! element losing focus, then `focus` and `focusin` on the one gaining
-//! it, as Chromium orders them; `:focus` is set on the element and
-//! `:focus-within` on it and its ancestors.
+//! it, as Chromium orders them (`focus_move.rs`); `:focus` is set on
+//! the element and `:focus-within` on it and its ancestors.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use vapors_css::tree::States;
-use vapors_dom::{Event, NodeId};
+use vapors_dom::NodeId;
 
 use crate::document::Document;
+use crate::focus_style::Focus;
 
 /// Focusable without a `tabindex`.
 const INTERACTIVE: [&str; 5] = ["button", "input", "textarea", "select", "summary"];
@@ -57,39 +58,31 @@ impl Document {
     }
 
     /// Moves focus to `node` (`None`: to nothing), firing the focus
-    /// events; nothing happens when it already has focus.
-    pub fn focus(document: &Rc<RefCell<Document>>, node: Option<NodeId>) {
-        let had = document.borrow().active_element();
-        if had == node {
-            return;
-        }
-        // while the window is away focus moves silently; its return
-        // fires `focus` on what has it then (`focus_window.rs`)
-        if document.borrow().window_away() {
-            document.borrow_mut().take_focus(node);
-            return;
-        }
-        // a number or text field commits as focus leaves it, before its
-        // blur, as Chromium fires its change (3-E3c, E6a)
-        if let Some(had) = had {
-            crate::number_input::commit(document, had);
-            crate::text_input::commit(document, had);
-        }
-        document.borrow_mut().take_focus(node);
-        if let Some(had) = had {
-            fire(document, had, &["blur", "focusout"]);
-        }
+    /// events; nothing happens when it already has focus, or when it
+    /// cannot take focus now ([`Focus`] says which), as in Chromium.
+    pub fn focus(document: &Rc<RefCell<Document>>, node: Option<NodeId>) -> Focus {
+        document.borrow_mut().settle.pending = None;
         if let Some(node) = node {
-            fire(document, node, &["focus", "focusin"]);
+            let now = document.borrow().focusability(node);
+            if now == Focus::Pending {
+                document.borrow_mut().settle.pending = Some(node);
+            }
+            if now != Focus::Done {
+                return now;
+            }
         }
+        let had = document.borrow().active_element();
+        if had != node {
+            crate::focus_move::move_focus(document, had, node);
+        }
+        Focus::Done
     }
 
     /// `node` takes focus: the flags move, and a number field notes
     /// what it will commit against and selects its text on keyboard
     /// focus.
-    fn take_focus(&mut self, node: Option<NodeId>) {
+    pub(crate) fn take_focus(&mut self, node: Option<NodeId>) {
         self.focused = node;
-        self.selected_all = None;
         self.set_flag_on(States::FOCUS, node);
         let visible = node.filter(|node| self.keyboard || self.is_text_field(*node));
         self.set_flag_on(States::FOCUS_VISIBLE, visible);
@@ -104,7 +97,9 @@ impl Document {
     /// The element Tab (or, `back`, Shift+Tab) moves focus to: the next
     /// in tree order that Tab visits; past the last, `None` (focus leaves
     /// the page, as in Chromium: only a focus trap wraps), and from
-    /// `None` the first.
+    /// `None` the first. Decided by [`Document::focusability`], the rule
+    /// `focus` uses, so the two agree and the answer is always
+    /// [`Focus::Done`] (review-fable-input M2).
     pub(crate) fn next_in_tab_order(&self, back: bool) -> Option<NodeId> {
         // every element in tree order, so a focused element outside the
         // Tab order (tabindex -1) still has a place to go on from
@@ -143,21 +138,30 @@ impl Document {
     }
 
     fn tabbable(&self, node: NodeId) -> bool {
-        self.focusable(node) && self.attribute(node, "tabindex") != Some("-1")
+        self.focusability(node) == Focus::Done && self.attribute(node, "tabindex") != Some("-1")
     }
 
-    fn focusable(&self, node: NodeId) -> bool {
+    /// Whether `node` was focusable at the last update: a press's
+    /// target and an accessibility action read the painted frame, where
+    /// Tab and `focus` compute styles now (`focusability`).
+    pub(crate) fn focusable(&self, node: NodeId) -> bool {
+        let drawn = self
+            .painted
+            .as_ref()
+            .is_some_and(|painted| painted.is_visible(node));
+        drawn && self.focus_candidate(node)
+    }
+
+    /// Whether `node`'s tag and attributes let it take focus: a control,
+    /// `a` with `href` or an element with `tabindex`, and not disabled.
+    pub(crate) fn focus_candidate(&self, node: NodeId) -> bool {
         let Some(tag) = self.tag(node) else {
             return false;
         };
         let named =
             INTERACTIVE.contains(&tag) || (tag == "a" && self.attribute(node, "href").is_some());
         let indexed = matches!(self.attribute(node, "tabindex"), Some("0" | "-1"));
-        let drawn = self
-            .painted
-            .as_ref()
-            .is_some_and(|painted| painted.is_visible(node));
-        (named || indexed) && drawn && !self.is_disabled_control(node)
+        (named || indexed) && !self.is_disabled_control(node)
     }
 
     /// Whether `node` is a form control with a `disabled` attribute.
@@ -165,13 +169,6 @@ impl Document {
         self.tag(node).is_some_and(|tag| INTERACTIVE.contains(&tag))
             && self.attribute(node, "disabled").is_some()
     }
-}
-
-/// `names` on `node` in order: the first only there (it does not bubble),
-/// the second bubbling.
-pub(crate) fn fire(document: &Rc<RefCell<Document>>, node: NodeId, names: &[&str; 2]) {
-    crate::events::tree::dispatch_here(document, node, Event::new(names[0]));
-    crate::events::tree::dispatch_bubbling(document, node, Event::new(names[1]));
 }
 
 /// A `tabindex` the tree refuses: a positive one (it orders focus by

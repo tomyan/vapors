@@ -1,5 +1,7 @@
 //! The fields of an `.events` script's setup directives: `at`'s size,
-//! `listen`'s types and `page`'s file (`events_script`).
+//! `listen`'s types, `page`'s file and `project`'s roles (`events_script`).
+
+use vapors_elements::chromium_name_for_aria;
 
 /// `page`'s file: a path under `fixtures/`, never above it.
 pub(crate) fn page(file: &str) -> Result<String, String> {
@@ -26,4 +28,18 @@ pub(crate) fn listen(rest: &str) -> Result<Vec<String>, String> {
         return Err("`listen` takes event types".into());
     }
     Ok(types)
+}
+
+/// `project`'s roles, refusing one named as ARIA names it where
+/// Chromium's tree uses another: it would match nothing on either side.
+pub(crate) fn project_roles(fields: &[&str]) -> Result<Vec<String>, String> {
+    if let Some((role, chromium)) = fields
+        .iter()
+        .find_map(|f| chromium_name_for_aria(f).map(|c| (f, c)))
+    {
+        return Err(format!(
+            "`project` role `{role}` is ARIA's name; use `{chromium}`, Chromium's name"
+        ));
+    }
+    Ok(fields.iter().map(|f| (*f).to_owned()).collect())
 }

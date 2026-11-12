@@ -49,10 +49,20 @@ impl Document {
                 } else {
                     element.states.without(flag)
                 };
-                self.changed = true;
+                self.note_change();
                 self.mark_flag(node, flag);
             }
         }
+    }
+
+    /// `node` when it is still in the document after a dispatch, whose
+    /// listeners may have removed it: every default action and every
+    /// follow-on event goes through this, and does nothing for a removed
+    /// node, as Chromium carries on when a handler detaches a node (what
+    /// it fires on the detached node, nothing in the document can
+    /// observe; review-fable-input H1).
+    pub(crate) fn still_in(&self, node: NodeId) -> Option<NodeId> {
+        Some(node).filter(|node| self.contains(*node))
     }
 
     /// The nearest element that is, or holds, both `a` and `b`.
@@ -104,24 +114,29 @@ impl Document {
 
 /// Delivers `event` to `target`, then each ancestor, until a listener
 /// stops propagation; what listeners asked of the pointer's capture,
-/// with the element each listener is on.
+/// with the element each listener is on (nothing for a removed target).
 pub(super) fn dispatch(
     document: &Rc<RefCell<Document>>,
     target: NodeId,
     event: Event,
 ) -> Vec<(NodeId, Capture)> {
-    deliver(document, target, event, true).1
+    deliver(document, target, event, true).map_or_else(Vec::new, |(_, asked)| asked)
 }
 
 /// Delivers `event` to `target`, and when it `bubbles` to each ancestor
 /// until a listener stops propagation; the event as the listeners left
-/// it, and what they asked of the pointer's capture.
+/// it, and what they asked of the pointer's capture. `None` for a
+/// target no longer in the document (an earlier listener removed it):
+/// refused before any listener runs, as `Dispatcher::dispatch` refuses
+/// a removed node, so the caller's default action stops
+/// ([`Document::still_in`]).
 pub(crate) fn deliver(
     document: &Rc<RefCell<Document>>,
     target: NodeId,
     mut event: Event,
     bubbles: bool,
-) -> (Event, Vec<(NodeId, Capture)>) {
+) -> Option<(Event, Vec<(NodeId, Capture)>)> {
+    let target = document.borrow().still_in(target)?;
     event = event.at(target);
     let mut along = document.borrow().listeners_chain(target, event.name());
     if !bubbles {
@@ -131,19 +146,22 @@ pub(crate) fn deliver(
     vapors_dom::run_along(along, &mut event, |node, event| {
         asked.extend(event.take_capture().map(|capture| (node, capture)));
     });
-    (event, asked)
+    Some((event, asked))
 }
 
 /// `click` on `target`, bubbling, with its default action around it:
 /// a checkbox flips before the listeners run and fires `input` and
 /// `change` after them, unless one prevented the click (`checkbox`);
 /// other elements have none yet (a label's and a link's come with
-/// them).
+/// them). Nothing for a target no longer in the document.
 pub(crate) fn dispatch_click(document: &Rc<RefCell<Document>>, target: NodeId, event: Event) {
+    let Some(target) = document.borrow().still_in(target) else {
+        return;
+    };
     let was = crate::checkbox::before_click(document, target);
-    let (event, _) = deliver(document, target, event, true);
+    let prevented = dispatch_bubbling(document, target, event);
     if let Some(was) = was {
-        crate::checkbox::after_click(document, target, was, event.default_prevented());
+        crate::checkbox::after_click(document, target, was, prevented);
     }
 }
 
@@ -153,11 +171,11 @@ pub(crate) fn dispatch_here(document: &Rc<RefCell<Document>>, node: NodeId, even
 }
 
 /// `event` at `node` and up its ancestors; whether a listener prevented
-/// its default action.
+/// its default action (`false` for a node no longer in the document).
 pub(crate) fn dispatch_bubbling(
     document: &Rc<RefCell<Document>>,
     node: NodeId,
     event: Event,
 ) -> bool {
-    deliver(document, node, event, true).0.default_prevented()
+    deliver(document, node, event, true).is_some_and(|(event, _)| event.default_prevented())
 }

@@ -16,13 +16,23 @@ pub(super) fn projection(
         return Ok(None);
     }
     let roles: Vec<&str> = roles.iter().map(String::as_str).collect();
-    let nodes = doc.ax_projection(&roles)?;
+    let nodes = doc.ax_projection(&roles).map_err(|e| e.to_string())?;
     Ok(Some(serde_json::Value::Array(
-        nodes
-            .into_iter()
-            .map(|node| serde_json::json!({ "role": node.role, "name": node.name, "properties": node.properties }))
-            .collect(),
+        nodes.into_iter().map(ax_entry).collect(),
     )))
+}
+
+/// One node as the oracle writes Chromium's: its value and its
+/// description only when it has them.
+fn ax_entry(node: vapors_elements::AxNode) -> serde_json::Value {
+    let mut entry =
+        serde_json::json!({ "role": node.role, "name": node.name, "properties": node.properties });
+    for (key, text) in [("value", node.value), ("description", node.description)] {
+        if let Some(text) = text {
+            entry[key] = serde_json::json!(text);
+        }
+    }
+    entry
 }
 
 /// Each target's value: a target that names no element, or one that is

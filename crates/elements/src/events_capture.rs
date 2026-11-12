@@ -75,14 +75,17 @@ impl Document {
 
 /// Dispatches pointer `id`'s event and keeps what its listeners asked
 /// of the capture, for the pointer's next event; whether a listener
-/// prevented its default action.
+/// prevented its default action (`false` for a target no longer in the
+/// document).
 pub(super) fn dispatch_pointer(
     document: &Rc<RefCell<Document>>,
     id: u32,
     target: NodeId,
     event: Event,
 ) -> bool {
-    let (event, asked) = super::tree::deliver(document, target, event, true);
+    let Some((event, asked)) = super::tree::deliver(document, target, event, true) else {
+        return false;
+    };
     for (node, asked) in asked {
         let mut doc = document.borrow_mut();
         let captured = doc.pointer.captures.entry(id).or_default();

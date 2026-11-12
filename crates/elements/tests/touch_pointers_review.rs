@@ -20,6 +20,7 @@ fn active_colours(doc: &Rc<std::cell::RefCell<Document>>) -> Vec<[u8; 4]> {
         .painted()
         .expect("painted")
         .scene()
+        .to_scene()
         .items()
         .iter()
         .filter_map(|item| match item {

@@ -1,9 +1,13 @@
 //! The wgpu side of text: one pipeline drawing atlas quads with the
-//! gamma and contrast shader, the atlas texture it samples, and the
-//! buffers it draws from. Create once per target format.
+//! gamma and contrast shader, the atlas texture it samples (its view
+//! kept with it), the buffers it draws from and the bind group over
+//! them, kept between frames. Create once per target format.
+
+use vapors_renderer::{FrameArena, UniformSlots, WorkCounter};
 
 use crate::GlyphAtlas;
-use crate::pipeline_gpu::{bind_group_layout, coverage_texture, render_pipeline};
+use crate::atlas_texture::AtlasTexture;
+use crate::pipeline_gpu::{bind_group_layout, render_pipeline};
 
 /// The two shader parameters. See `docs/text.md` for how they were chosen.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -34,9 +38,12 @@ pub struct TextPipeline {
     pub(crate) pipeline: wgpu::RenderPipeline,
     pub(crate) layout: wgpu::BindGroupLayout,
     pub(crate) sampler: wgpu::Sampler,
-    pub(crate) uniforms: wgpu::Buffer,
-    pub(crate) texture: wgpu::Texture,
-    pub(crate) vertices: Option<wgpu::Buffer>,
+    /// The blend parameters, one slot per distinct pair drawn with.
+    pub(crate) params: UniformSlots,
+    /// The atlas texture, its view and the bind group over them.
+    pub(crate) atlas_texture: AtlasTexture,
+    pub(crate) vertices: FrameArena,
+    pub(crate) work: WorkCounter,
 }
 
 impl TextPipeline {
@@ -63,54 +70,63 @@ impl TextPipeline {
                 min_filter: wgpu::FilterMode::Nearest,
                 ..Default::default()
             }),
-            uniforms: device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("text params"),
-                size: 16,
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            }),
-            texture: coverage_texture(device, atlas.coverage_page().size()),
-            vertices: None,
+            params: UniformSlots::new(device, "text params"),
+            atlas_texture: AtlasTexture::new(device, atlas.coverage_page().size()),
+            vertices: FrameArena::new(
+                device,
+                "text quads",
+                wgpu::BufferUsages::VERTEX,
+                VERTEX_SIZE,
+            ),
+            work: WorkCounter::default(),
         }
     }
 
-    /// Make sure the vertex buffer holds at least `bytes`; it is reused
-    /// across frames and only grows.
-    pub(crate) fn reserve_vertices(&mut self, device: &wgpu::Device, bytes: u64) {
-        if self.vertices.as_ref().is_some_and(|b| b.size() >= bytes) {
-            return;
-        }
-        self.vertices = Some(device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("text quads"),
-            size: bytes.max(VERTEX_SIZE * 6 * 64),
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        }));
+    /// The work its draws issued since the last take, the atlas page's
+    /// uploads included; the count restarts.
+    pub fn take_work(&self) -> vapors_renderer::GpuWork {
+        self.work.take()
     }
 
-    pub(crate) fn bind_group(&self, device: &wgpu::Device) -> wgpu::BindGroup {
-        let view = self
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
+    /// The bind groups kept: one once this pipeline has drawn.
+    #[must_use]
+    pub fn bind_groups_kept(&self) -> u64 {
+        self.atlas_texture.bind_groups_kept()
+    }
+}
+
+/// The bind group over the atlas view, the sampler and the params
+/// slots' buffer, counted in `work`: made once per buffer by
+/// [`TextPipeline::draw`], which keeps it.
+pub(crate) fn bind_group(
+    device: &wgpu::Device,
+    work: &WorkCounter,
+    layout: &wgpu::BindGroupLayout,
+    view: &wgpu::TextureView,
+    sampler: &wgpu::Sampler,
+    params: &UniformSlots,
+) -> wgpu::BindGroup {
+    work.create_bind_group(
+        device,
+        &wgpu::BindGroupDescriptor {
             label: Some("text"),
-            layout: &self.layout,
+            layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&view),
+                    resource: wgpu::BindingResource::TextureView(view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                    resource: wgpu::BindingResource::Sampler(sampler),
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: self.uniforms.as_entire_binding(),
+                    resource: params.binding(),
                 },
             ],
-        })
-    }
+        },
+    )
 }
 
 #[cfg(test)]

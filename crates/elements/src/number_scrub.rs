@@ -37,7 +37,7 @@ pub(crate) struct Scrub {
 impl Document {
     /// The px per step `node`'s `data-scrub` asks for, when it is a
     /// live number field with the attribute.
-    fn scrub_px(&self, node: NodeId) -> Option<f32> {
+    pub(crate) fn scrub_px(&self, node: NodeId) -> Option<f32> {
         self.number_field(node)?;
         if self.is_disabled_control(node) {
             return None;
@@ -86,6 +86,11 @@ pub(crate) fn moved(document: &Rc<RefCell<Document>>, id: u32, point: Point) {
     let Some(scrub) = document.borrow().pointer.scrubs.get(&id).copied() else {
         return;
     };
+    // a listener removed the field: the scrub ends with it
+    if document.borrow().still_in(scrub.node).is_none() {
+        document.borrow_mut().pointer.scrubs.remove(&id);
+        return;
+    }
     let direction = crate::range_drag::decided(scrub.direction, point);
     {
         let mut doc = document.borrow_mut();
@@ -132,7 +137,8 @@ pub(crate) fn released(document: &Rc<RefCell<Document>>, id: u32) {
     let Some(scrub) = document.borrow_mut().pointer.scrubs.remove(&id) else {
         return;
     };
-    if scrub.moved && document.borrow().contains(scrub.node) {
-        crate::number_input::commit(document, scrub.node);
+    let still = document.borrow().still_in(scrub.node);
+    if let (true, Some(node)) = (scrub.moved, still) {
+        crate::number_input::commit(document, node);
     }
 }

@@ -47,12 +47,20 @@ impl Document {
             fonts.editor_driver(&mut editor.plain).select_all();
         }
         editor.pending = true;
-        self.changed = true;
+        self.note_change();
+    }
+
+    /// Focus left `node`: a composition in it ends, its text kept, as
+    /// Chromium commits one at blur.
+    pub(crate) fn end_composition(&mut self, node: NodeId) {
+        if let Some(editor) = self.editors.get_mut(&node) {
+            editor.composing = None;
+        }
     }
 
     /// Runs `act`, which moves the selection but edits nothing, on the
     /// field's editor: the open undo step closes.
-    pub(crate) fn drive(&mut self, node: NodeId, act: impl FnOnce(&mut Driver<'_>)) {
+    pub(crate) fn move_selection(&mut self, node: NodeId, act: impl FnOnce(&mut Driver<'_>)) {
         self.editor(node).history.close();
         self.drive_editor(node, act);
     }
@@ -67,7 +75,7 @@ impl Document {
         // a composition lasts only through the edits that report it
         editor.composing = None;
         editor.pending = true;
-        self.changed = true;
+        self.note_change();
     }
 }
 
@@ -102,18 +110,11 @@ pub(crate) fn key(
     match key {
         "Enter" => commit(document, node),
         "Backspace" | "Delete" => {
-            let kind = deletion_kind(&document.borrow(), node, key == "Backspace", word);
-            document
-                .borrow_mut()
-                .edit(node, kind, |d| deleted(d, key == "Backspace", word));
+            crate::text_delete::delete_key(document, node, key == "Backspace", word);
             edited(document, node);
         }
-        // the method path is not general over the driver's lifetime
-        #[allow(clippy::redundant_closure_for_method_calls)]
-        "a" | "A" if modifiers.control => document.borrow_mut().drive(node, |d| d.select_all()),
-        "z" | "Z" | "y" | "Y" if modifiers.control => {
-            crate::text_undo::history_key(document, node, key, shift);
-        }
+        _ if crate::shortcuts::selected_all(document, node, key, modifiers) => {}
+        _ if crate::text_undo::history_key(document, node, key, modifiers) => {}
         _ => {
             return moved(document, node, key, shift, word)
                 || crate::keys::types_text(key, modifiers);
@@ -122,28 +123,9 @@ pub(crate) fn key(
     true
 }
 
-/// Backspace (`back`) or Delete, by a word with `word`: a selection
-/// goes; else a cluster, or with `word` as far as Control+ArrowLeft or
-/// Control+ArrowRight moves, as Linux Chromium deletes (Parley's own
-/// word deletes skip the space after a word and take "-" with "A").
-fn deleted(d: &mut Driver<'_>, back: bool, word: bool) {
-    if word && d.editor.raw_selection().is_collapsed() {
-        if back {
-            d.select_word_left();
-        } else {
-            d.select_word_right();
-        }
-    }
-    if back {
-        d.backdelete();
-    } else {
-        d.delete();
-    }
-}
-
 /// An arrow, Home or End moves the caret, extending with `shift`, by
 /// words with `word`; another key does nothing.
-fn moved(
+pub(crate) fn moved(
     document: &Rc<RefCell<Document>>,
     node: NodeId,
     key: &str,
@@ -165,14 +147,16 @@ fn moved(
         ("End", true, _) => |d| d.select_to_line_end(),
         _ => return false,
     };
-    document.borrow_mut().drive(node, act);
+    document.borrow_mut().move_selection(node, act);
     true
 }
 
 /// Commits `node`'s text: `change` when it differs from the last
 /// committed.
 pub(crate) fn commit(document: &Rc<RefCell<Document>>, node: NodeId) {
-    if !document.borrow().is_text_input(node) {
+    // a listener of an earlier commit or event may have removed `node`
+    let still = document.borrow().still_in(node);
+    if !still.is_some_and(|node| document.borrow().is_text_input(node)) {
         return;
     }
     let changed = {
@@ -201,19 +185,4 @@ fn fire(document: &Rc<RefCell<Document>>, node: NodeId, name: &str) {
         return;
     };
     dispatch_bubbling(document, node, Event::new(name).with_value(&value));
-}
-
-/// How a Backspace (`back`) or Delete groups: a word deletion only
-/// when `word` deletes from a collapsed selection, as `deleted` does.
-fn deletion_kind(document: &Document, node: NodeId, back: bool, word: bool) -> EditKind {
-    let word = word
-        && document
-            .selection(node)
-            .is_some_and(|(start, end)| start == end);
-    match (back, word) {
-        (true, false) => EditKind::DeleteBackward,
-        (false, false) => EditKind::DeleteForward,
-        (true, true) => EditKind::DeleteWordBackward,
-        (false, true) => EditKind::DeleteWordForward,
-    }
 }

@@ -27,6 +27,7 @@ default = ["complex-script-breaks"]
 complex-script-breaks = ["parley/complex-scripts"]
 
 [dependencies]
+tracing.workspace = true
 wgpu.workspace = true
 vapors-scene.workspace = true
 vapors-renderer.workspace = true

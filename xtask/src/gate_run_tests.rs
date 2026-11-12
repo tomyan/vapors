@@ -20,15 +20,19 @@ fn planned(run: &str) -> PlannedStep {
 }
 
 #[test]
-fn a_gate_step_is_bash_with_pipefail_and_reproduces_with_its_environment() {
+fn a_gate_step_is_bash_with_pipefail_without_a_gpu_device_and_reproduces_with_its_environment() {
     // When
-    let step = step_for(&planned("cargo xtask test --tier gpu"), Path::new("/t/out"));
+    let step = step_for(
+        &planned("cargo xtask test --tier gpu"),
+        Path::new("/t/out"),
+        Wrap::HideGpuDevice,
+    );
 
     // Then
     assert_eq!(step.name, "gpu: gpu tier");
     assert_eq!(
         step.reproduce(),
-        "CI=true VAPORS_GPU_ADAPTER=llvmpipe GITHUB_OUTPUT=/t/out bash -eo pipefail -c 'cargo xtask test --tier gpu'"
+        "CI=true VAPORS_GPU_ADAPTER=llvmpipe GITHUB_OUTPUT=/t/out bwrap --dev-bind / / --tmpfs /dev/dri --die-with-parent bash -eo pipefail -c 'cargo xtask test --tier gpu'"
     );
 }
 
@@ -40,7 +44,7 @@ fn a_composite_step_reproduces_from_its_directory() {
 
     // When / Then
     assert!(
-        step_for(&composite, Path::new("/o"))
+        step_for(&composite, Path::new("/o"), Wrap::HideGpuDevice)
             .reproduce()
             .starts_with("cd .. && CI=true")
     );
@@ -74,7 +78,9 @@ fn a_step_past_its_deadline_is_killed_with_what_it_started() {
     let dir = crate::scratch::dir("gate-deadline");
     let pid_file = dir.join("child.pid");
     let script = format!("sleep 300 & echo $! > {}; wait", pid_file.display());
-    let mut step = step_for(&planned(&script), &dir.join("out"));
+    // As the gate runs it here: hidden where this machine has a /dev/dri
+    let wrap = wrap_for_this_machine();
+    let mut step = step_for(&planned(&script), &dir.join("out"), wrap);
     step.deadline = Some(Duration::from_secs(1));
 
     // When
@@ -108,6 +114,20 @@ fn a_step_past_its_deadline_is_killed_with_what_it_started() {
 }
 
 #[test]
+fn with_the_gpu_device_not_hidden_a_step_is_plain_bash() {
+    // When
+    let step = step_for(&planned("true"), Path::new("/t/out"), Wrap::SwitchedOff);
+
+    // Then
+    assert!(
+        step.reproduce()
+            .ends_with("GITHUB_OUTPUT=/t/out bash -eo pipefail -c true"),
+        "{}",
+        step.reproduce()
+    );
+}
+
+#[test]
 fn every_step_runs_with_the_runs_tmpdir_and_a_leak_fails_the_gate() {
     // Given: a step that checks its TMPDIR is the run's, then leaks a file
     let base = crate::scratch::dir("gate-tmpdir");
@@ -121,7 +141,13 @@ fn every_step_runs_with_the_runs_tmpdir_and_a_leak_fails_the_gate() {
     // When
     let reporter = crate::report::Reporter::new(false);
     let ran = crate::run_tmp::around("gate", &base, |tmp| {
-        let code = run_in(&[planned(&script)], &output, &reporter, tmp);
+        let code = run_in(
+            &[planned(&script)],
+            &output,
+            Wrap::SwitchedOff,
+            &reporter,
+            tmp,
+        );
         assert_eq!(code, ExitCode::SUCCESS, "the step saw the run's TMPDIR");
         code
     });
@@ -132,4 +158,21 @@ fn every_step_runs_with_the_runs_tmpdir_and_a_leak_fails_the_gate() {
         refusal.contains("gate left 1 entry ") && refusal.contains("left"),
         "{refusal}"
     );
+}
+
+fn wrap_for_this_machine() -> Wrap {
+    sandbox_wrap(&crate::config::Config::parse("").expect("empty")).expect("the sandbox")
+}
+
+#[test]
+fn an_unsandboxed_gate_says_so_again_just_before_its_pass_line() {
+    // When
+    let hidden = pass_lines("abc", Wrap::HideGpuDevice);
+    let plain = pass_lines("abc", Wrap::NoRenderNode);
+
+    // Then
+    assert_eq!(hidden, ["gate: pass abc"]);
+    assert_eq!(plain.len(), 2, "{plain:?}");
+    assert!(plain[0].contains("no render node"), "{plain:?}");
+    assert_eq!(plain[1], "gate: pass abc");
 }

@@ -124,7 +124,7 @@ fn checked_matches_by_click_and_by_property_restyling() {
         let painted = doc.update(VIEWPORT).expect("updates");
         let rect = painted.border_box(node).expect("a box");
         painted
-            .scene()
+            .scene().to_scene()
             .items()
             .iter()
             .any(|item| matches!(item, vapors_scene::Item::Quad(q) if (q.rect.top - rect.y).abs() < 0.5 && q.background == vapors_scene::Color::from_rgba8(255, 0, 0, 255)))

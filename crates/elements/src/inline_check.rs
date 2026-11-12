@@ -7,7 +7,7 @@
 //! on the wrong baseline. Weight and face alone change neither: the
 //! bundled faces share their vertical metrics.
 
-use std::collections::HashMap;
+use crate::node_map::NodeMap;
 
 use vapors_dom::NodeId;
 use vapors_text::{LineHeight, content_area};
@@ -25,7 +25,7 @@ impl Document {
     pub(crate) fn mixed_metrics(
         &self,
         node: NodeId,
-        used: &HashMap<NodeId, Used>,
+        used: &NodeMap<Used>,
         scale: f32,
     ) -> Option<ElementError> {
         let own = &used.get(&node)?.text;

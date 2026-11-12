@@ -7,6 +7,8 @@ wgpu on desktop and WebGPU in the browser from one implementation.
 Early. The first user is a photo editor; the framework is built one
 slice ahead of what that editor needs.
 
+Documentation: [docs/README.md](docs/README.md).
+
 ## Working in the repository
 
 ```
@@ -20,4 +22,4 @@ The toolchain is pinned in `rust-toolchain.toml`; tool versions in
 
 ## Licence
 
-MIT or Apache-2.0, at your option.
+MIT; see `LICENSE`.

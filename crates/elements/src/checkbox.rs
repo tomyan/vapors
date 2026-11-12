@@ -61,7 +61,8 @@ impl Document {
                 .properties
                 .insert("checked".to_owned(), PropertyValue::Bool(checked));
         }
-        self.changed = true;
+        self.note_change();
+        self.boxes.marks.mark(node);
         self.mark_flag(node, States::CHECKED);
         true
     }
@@ -94,9 +95,9 @@ pub(crate) fn after_click(
     was: bool,
     prevented: bool,
 ) {
-    if !document.borrow().contains(target) {
+    let Some(target) = document.borrow().still_in(target) else {
         return;
-    }
+    };
     if prevented {
         document.borrow_mut().set_checked(target, was);
         return;

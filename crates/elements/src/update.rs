@@ -1,15 +1,16 @@
 //! An update: check the tree, compute styles, read them, lay out and
 //! paint. Every refusal found on the way is returned together, and a
-//! refused update paints nothing.
+//! refused update paints nothing. Each of the three phases runs in a
+//! `tracing` span named `update phase`, its `phase` field `style`,
+//! `layout` or `paint`, for a reader of the spans (`crates/perf`).
 
 use vapors_css::cascade::Environment;
 use vapors_dom::NodeId;
 
-use crate::check::{check_tree, describe, elements, style_attribute_refusals};
+use crate::changed_slots::ChangedSlots;
+use crate::check::describe;
 use crate::document::Document;
 use crate::error::ElementError;
-use crate::layout::{Calcs, build, lay_out, placed};
-use crate::paint::{PaintInput, paint};
 use crate::painted::Painted;
 use crate::style::Refusal;
 
@@ -22,6 +23,24 @@ pub struct Viewport {
     pub height: f32,
     /// Device pixels per CSS pixel.
     pub scale: f32,
+}
+
+/// Whether anything shown may have changed since the app last asked
+/// ([`Document::take_changed`]) and since the last update; both, for a
+/// new document.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Changes {
+    pub(crate) since_asked: bool,
+    pub(crate) since_update: bool,
+}
+
+impl Default for Changes {
+    fn default() -> Self {
+        Self {
+            since_asked: true,
+            since_update: true,
+        }
+    }
 }
 
 impl Document {
@@ -38,82 +57,45 @@ impl Document {
     /// Only on a bug in this crate: a restyle that succeeds always keeps
     /// the styles layout reads.
     pub fn update(&mut self, viewport: Viewport) -> Result<&Painted, Vec<ElementError>> {
-        self.painted = None;
-        self.texts.begin();
-        let calcs = self.styled(viewport)?;
-        let (root, body) = (self.root(), self.body());
-        let number_focus = self.active_element().map(|node| {
-            let selected = self.selected_all == Some(node);
-            (node, crate::layout::NumberFocus { selected })
-        });
-        let text_marks = self.focused_text_marks();
-        let kept = self.kept.as_ref().expect("styled keeps the styles");
-        let used = &kept.used;
-        let source = crate::layout::Source {
-            arena: &self.arena,
-            used,
-            images: &self.images,
-            number_focus,
-            text_marks,
-        };
-        let boxes = build(&source, root);
-        let size = (viewport.width, viewport.height);
-        let texts = (&mut self.fonts, &mut self.texts);
-        let (boxes, laid_out) = lay_out(
-            boxes,
-            texts,
-            (&self.boxes, &|node| kept.may_keep_layout(node)),
-            viewport.scale,
-            size,
-            &calcs,
-        )
-        .map_err(|failure| vec![ElementError::Layout(failure)])?;
-        let scrolls = |index: usize| match boxes[index].content {
-            crate::layout::Content::Element(node) => used[&node].scrolls(),
-            crate::layout::Content::Text(_) => false,
-        };
-        let offsets = self.scroll.settle(&boxes, &scrolls, viewport.scale);
-        let rects = placed(&boxes, &offsets);
-        let mut input = PaintInput {
-            used,
-            root,
-            body,
-            propagated: None,
-            fonts: &mut self.fonts,
-            cache: &mut self.texts,
-            scale: viewport.scale,
-            clip: None,
-            scroll: &self.scroll,
-            thumbs_shown: self.thumbs_shown,
-        };
-        let mut painted = paint(&boxes, &rects, &mut input);
-        painted.scroll_chains = crate::scroll_chains::Chains::of(&boxes, &scrolls);
-        self.boxes.keep(boxes, viewport.scale);
-        self.laid_out = laid_out;
+        let mut last = self.painted.take();
+        self.counts = crate::UpdateCounts::default();
+        self.texts.begin(
+            last.as_ref()
+                .map_or(0, |painted| painted.slabs.texts.live()),
+        );
+        let style = tracing::trace_span!("update phase", phase = "style").entered();
+        self.styled(viewport)?;
+        drop(style);
+        let layout = tracing::trace_span!("update phase", phase = "layout").entered();
+        let (slotted, rebuilt, written) = self.laid_out(viewport)?;
+        let (stackings, restacked) = self.stackings(&slotted.boxes, &rebuilt, last.as_mut());
+        let mut changed = ChangedSlots::of(rebuilt, last.as_ref(), restacked);
+        let laid = (&slotted, &stackings);
+        let from = self.painted_from(laid, viewport, (last.as_mut(), &written), &mut changed);
+        drop(layout);
+        let paint_span = tracing::trace_span!("update phase", phase = "paint").entered();
+        let mut painted = self.paint_or_keep(last, (&slotted.boxes, &stackings), &from, &changed);
+        drop(paint_span);
+        self.boxes.keep(slotted, viewport.scale);
+        (painted.from, painted.stackings) = (from, stackings);
+        Ok(self.shown(painted))
+    }
+
+    /// Keeps `painted` as the last update's result, and moves the hover
+    /// to what it shows.
+    fn shown(&mut self, painted: Painted) -> &Painted {
+        // Cleared before the rehover: a hover it moves is a change this
+        // update did not restyle, so the a11y tree refuses until the next.
+        self.changes.since_update = false;
+        self.settle.due = true;
         self.rehover_in(&painted);
-        Ok(self.painted.insert(painted))
+        self.painted.insert(painted)
     }
 
-    /// How many elements the last update restyled: what the incremental
-    /// tests count, and what the `stress` demo shows.
-    #[must_use]
-    pub fn elements_restyled(&self) -> usize {
-        self.kept.as_ref().map_or(0, |kept| kept.restyled)
-    }
-
-    /// How many times the last update's layout laid a box out rather
-    /// than reading its cache: what the incremental tests count.
-    #[must_use]
-    pub fn boxes_laid_out(&self) -> usize {
-        self.laid_out
-    }
-
-    /// How many Parley layouts the last update built rather than kept
-    /// from the one before: what the incremental tests count, and what
-    /// the `stress` demo shows.
-    #[must_use]
-    pub fn text_layouts_built(&self) -> usize {
-        self.texts.built()
+    /// Notes a change to anything shown, for [`Document::take_changed`]
+    /// and for what reads the last update (the a11y tree).
+    pub(crate) fn note_change(&mut self) {
+        self.changes = Changes::default();
     }
 
     /// The last successful update's result, if the document has not
@@ -123,12 +105,14 @@ impl Document {
         self.painted.as_ref()
     }
 
-    /// Restyles what changed and checks the tree; the calcs layout
-    /// will ask for, collected from the kept computed styles.
-    fn styled(&mut self, viewport: Viewport) -> Result<Calcs, Vec<ElementError>> {
-        let mut errors = check_tree(&self.arena, self.root(), &self.declared_events);
+    /// Checks the tree and restyles what changed, checking again only
+    /// the elements changed since the last update (`style_checks`).
+    fn styled(&mut self, viewport: Viewport) -> Result<(), Vec<ElementError>> {
+        let touched = self.touched();
+        self.recheck_tree(&touched);
+        let mut errors = self.tree_refusals();
         errors.extend_from_slice(self.sheets.refused());
-        let unparsed = style_attribute_refusals(&self.arena, self.root());
+        let unparsed = self.style_attribute_refusals();
         if !unparsed.is_empty() {
             errors.extend(unparsed);
             return Err(errors);
@@ -137,28 +121,12 @@ impl Document {
             errors.extend(failed);
             return Err(errors);
         }
-        let live = elements(&self.arena, self.root());
-        let kept = self.kept.as_mut().expect("restyle keeps the styles");
-        let alive: std::collections::HashSet<NodeId> = live.iter().copied().collect();
-        kept.used.retain(|node, _| alive.contains(node));
-        kept.refused.retain(|node, _| alive.contains(node));
-        let kept = self.kept.as_ref().expect("restyle keeps the styles");
-        let mut calcs = Calcs::default();
-        for &node in &live {
-            errors.extend(kept.refused.get(&node).into_iter().flatten().cloned());
-            calcs.add(kept.styles.of(node), || describe(&self.arena, node));
-            if kept.used.get(&node).is_some_and(|style| style.inline) {
-                errors.extend(self.mixed_metrics(node, &kept.used, viewport.scale));
-            }
-        }
-        errors.extend(crate::img_checks::refusals(
-            &self.images,
-            &self.arena,
-            &live,
-            &kept.used,
-        ));
+        let rechecked = self.rechecked(touched);
+        self.recheck_styled(&rechecked, viewport.scale);
+        self.checks.checked();
+        errors.extend(self.all_styled_refusals(viewport.scale));
         if errors.is_empty() {
-            Ok(calcs)
+            Ok(())
         } else {
             Err(errors)
         }

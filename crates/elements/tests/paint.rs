@@ -26,8 +26,9 @@ fn a_background_is_a_quad_with_edges_snapped_to_device_pixels() {
         .expect("updates");
 
     // Then: 4.875 rounds up to 5, 20.625 up to 21, 3 stays
-    let [Item::Quad(quad)] = painted.scene().items() else {
-        panic!("one quad, got {:?}", painted.scene().items());
+    let scene = painted.scene().to_scene();
+    let [Item::Quad(quad)] = scene.items() else {
+        panic!("one quad, got {:?}", scene.items());
     };
     assert_eq!(
         (quad.rect, quad.background),
@@ -62,7 +63,8 @@ fn text_is_painted_after_its_elements_background() {
         .expect("updates");
 
     // Then
-    let items = painted.scene().items();
+    let scene = painted.scene().to_scene();
+    let items = scene.items();
     assert!(
         matches!(
             items,
@@ -100,7 +102,7 @@ fn the_bodys_background_becomes_the_canvas_when_the_roots_is_transparent() {
         painted.canvas_from(),
         Some(vapors_elements::CanvasFrom::Body)
     );
-    assert_eq!(painted.scene().items(), []);
+    assert_eq!(painted.scene().to_scene().items(), []);
 }
 
 #[test]
@@ -173,5 +175,5 @@ fn an_element_with_display_none_has_no_box_and_paints_nothing() {
 
     // Then
     assert_eq!(painted.border_box(hidden), None);
-    assert_eq!(painted.scene().items(), []);
+    assert_eq!(painted.scene().to_scene().items(), []);
 }

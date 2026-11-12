@@ -93,3 +93,31 @@ fn parse_button_label_with_expression() {
     assert_eq!(common::attr_expr(button, "onclick"), "save");
     assert_eq!(parts(&button.children[0]).len(), 2);
 }
+
+#[test]
+fn gpu_surface_is_an_html_element() {
+    // When
+    let doc = parse_ok(r#"<gpu-surface name="track"></gpu-surface>"#);
+
+    // Then
+    let surface = element(&doc.children[0]);
+    assert_eq!(surface.tag, "gpu-surface");
+    assert_eq!(common::attr_literal(surface, "name"), "track");
+}
+
+#[test]
+fn an_inline_svg_icon_parses_with_its_paths() {
+    // Given touche's undo icon (docs/icons.md)
+    let template = r#"<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M5 3L2 6l3 3M2 6h7a4 4 0 0 1 0 8H6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>"#;
+
+    // When
+    let doc = parse_ok(template);
+
+    // Then
+    let svg = element(&doc.children[0]);
+    assert_eq!(svg.tag, "svg");
+    assert_eq!(common::attr_literal(svg, "viewBox"), "0 0 16 16");
+    let path = element(&svg.children[0]);
+    assert_eq!(path.tag, "path");
+    assert_eq!(common::attr_literal(path, "stroke-width"), "1.5");
+}

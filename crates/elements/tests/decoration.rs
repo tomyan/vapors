@@ -23,6 +23,7 @@ fn painted_items(sheet: &str, scale: f32) -> Vec<Item> {
     doc.update(viewport)
         .expect("updates")
         .scene()
+        .to_scene()
         .items()
         .to_vec()
 }

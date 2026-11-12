@@ -1,5 +1,5 @@
-//! A text field's edits recorded for its undo, and Control+Z, Control+
-//! Shift+Z and Control+Y taking them back and forward (E6b), each with
+//! A text field's edits recorded for its undo, and the platform's undo
+//! and redo keys (`shortcuts`) taking them back and forward (E6b), each with
 //! `input` when the text changes, as Chromium fires `historyUndo` and
 //! `historyRedo` inputs.
 
@@ -9,6 +9,7 @@ use std::rc::Rc;
 use vapors_dom::NodeId;
 
 use crate::document::Document;
+use crate::keys::Modifiers;
 use crate::text_history::{EditKind, Snapshot};
 use crate::text_input::edited;
 
@@ -54,10 +55,18 @@ impl Document {
     }
 }
 
-/// Control with Z (undo), with Shift and Z, or Y (redo), on `node`, a
-/// live text field.
-pub(crate) fn history_key(document: &Rc<RefCell<Document>>, node: NodeId, key: &str, shift: bool) {
-    let redo = shift || key.eq_ignore_ascii_case("y");
+/// Undo or redo on `node`, a live text field, when `key` with
+/// `modifiers` is the platform's (`Document::history_shortcut`); whether
+/// it was.
+pub(crate) fn history_key(
+    document: &Rc<RefCell<Document>>,
+    node: NodeId,
+    key: &str,
+    modifiers: Modifiers,
+) -> bool {
+    let Some(redo) = document.borrow().history_shortcut(key, modifiers) else {
+        return false;
+    };
     let to = {
         let mut doc = document.borrow_mut();
         let history = &mut doc.editor(node).history;
@@ -67,6 +76,7 @@ pub(crate) fn history_key(document: &Rc<RefCell<Document>>, node: NodeId, key: &
         document.borrow_mut().restore(node, to);
         edited(document, node);
     }
+    true
 }
 
 /// The bytes `a` and `b` share from their start, on a char boundary.

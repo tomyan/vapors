@@ -20,7 +20,7 @@
 //! an earlier box's text.
 
 use super::layout::LayoutBox;
-pub(crate) use super::stacking::{Stacking, stacking_of};
+pub(crate) use super::stacking::{Stacking, Stackings};
 
 /// One step of painting.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -32,6 +32,14 @@ pub(crate) enum Step {
     /// A box's outline (3-E2b): last within its stacking context, as
     /// CSS 2 Appendix E paints outlines.
     Outline(usize),
+}
+
+impl Step {
+    /// The box the step paints.
+    pub(crate) fn index(self) -> usize {
+        let (Self::Box(index) | Self::Thumb(index) | Self::Outline(index)) = self;
+        index
+    }
 }
 
 /// The boxes, box 0 the root, in paint order, with each scroll
@@ -57,7 +65,10 @@ fn steps(boxes: &[LayoutBox], stacking: &dyn Fn(usize) -> Stacking, outlines: bo
         out: Vec::with_capacity(boxes.len()),
         outlines: outlines.then(Vec::new),
     };
-    walk.context(0);
+    // No boxes (html `display: none`): nothing to paint.
+    if !boxes.is_empty() {
+        walk.context(0);
+    }
     crate::thumb_order::thumbs_after_descendants(&walk.out, boxes)
 }
 

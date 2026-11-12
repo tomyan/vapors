@@ -66,12 +66,13 @@ impl Document {
         if snapped == range.value {
             return false;
         }
-        self.changed = true;
+        self.note_change();
         if let Some(element) = self.arena.get_mut(node, "range").element_mut() {
             element
                 .properties
                 .insert("value".to_owned(), PropertyValue::Number(snapped));
         }
+        self.boxes.marks.mark(node);
         true
     }
 
@@ -111,12 +112,18 @@ pub(crate) fn key(
     let Some(value) = stepped(&range, key, steps) else {
         return false;
     };
+    set(document, node, value);
+    // a step at the end of the range moves nothing but is still the range's
+    true
+}
+
+/// Sets `node`'s value, snapped, with `input` and `change` when it
+/// moved: a key's step, and an accessibility set-value (`a11y_set_value`).
+pub(crate) fn set(document: &Rc<RefCell<Document>>, node: NodeId, value: f64) {
     if document.borrow_mut().set_range_value(node, value) {
         fire(document, node, "input");
         fire(document, node, "change");
     }
-    // a step at the end of the range moves nothing but is still the range's
-    true
 }
 
 /// The value `key` moves `range` to, or `None` for a key that does not.
@@ -135,9 +142,15 @@ fn stepped(range: &Range, key: &str, steps: f64) -> Option<f64> {
 /// `input` or `change` on `node`, carrying its value as text and as a
 /// number.
 pub(crate) fn fire(document: &Rc<RefCell<Document>>, node: NodeId, name: &str) {
-    let Some(value) = document.borrow().value_as_number(node) else {
+    // the `input` before a `change` may have removed the range
+    let doc = document.borrow();
+    let Some(value) = doc
+        .still_in(node)
+        .and_then(|node| doc.value_as_number(node))
+    else {
         return;
     };
+    drop(doc);
     let event = Event::new(name)
         .with_value(&written(value))
         .with_value_number(value);

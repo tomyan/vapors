@@ -39,6 +39,9 @@ xvfb-run -a cargo run -p vapors-platform --example wake_window
                           Platform::waker in a window: 0 frames idle, 1 per wake
 scripts/web-wake-frames.sh target/web <new dir>
                           the same on the built page (?demo=wake)
+xvfb-run -a cargo run -p vapors-app --example surface_gradient -- --check
+                          a gpu-surface in a window: 0 frames and renders idle, 2 frames
+                          and 1 render per invalidate, LoopClosed after the loop ends
 cargo run -p vapors-elements-corpus --example layout_oracle [-- --check]
                           Chromium's boxes for the layout fixtures
 bacon                     unit tier on every save
@@ -86,5 +89,12 @@ the directory:
 4. Pull request. An independent review agent reads the diff with the
    "Failure must be loud" rules and no author context; findings are
    verified before action.
-5. Auto-merge when CI is green. Squash. Branch deleted.
+5. Merge on the local gate, not GitHub CI (Tom, 2026-11-11, as touche
+   since 2026-10-23): once the review's findings are in, update the
+   branch onto current `main`, run `cargo xtask gate --pr <n>` at the
+   PR's head in a clean worktree, which posts its last lines to the PR.
+   It must end `gate: pass <head sha>`. Then merge: squash, branch
+   deleted. GitHub CI still runs on every push but is not a required
+   check; a red GitHub run on a merged head is investigated as a
+   difference between the runner and this machine.
 6. Update the plan; the PR description is the handoff.

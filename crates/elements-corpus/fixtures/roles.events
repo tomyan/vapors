@@ -1,0 +1,18 @@
+# The roles, names, values and states the accessibility driver reads
+# (R1), as Chromium's accessibility tree has them, after each key.
+project dialog group region slider spinbutton textbox checkbox button
+listen focusin
+key Tab                       the range first
+expect focus input#amount
+key ArrowRight                one step up: its value
+expect value input#amount 51
+key Tab
+expect focus input#radius
+key Tab
+expect focus input#note
+key Tab
+expect focus input#mono
+key Space                     checked
+expect checked input#mono true
+key Tab                       past the disabled checkbox to the toggle button
+expect focus button#pin

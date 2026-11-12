@@ -97,7 +97,7 @@ impl Counter {
                             reason = "a text hole or expression attribute shows any Display value through to_string; the compiler cannot see when it is already a String"
                         )]
                         let value = shown.to_string();
-                        dom.borrow_mut().set_text(count_text2, &value);
+                        dom.borrow_mut().set_text_if_changed(count_text2, &value);
                     });
                 }
                 let text3 = dom.borrow_mut().create_text(" times");

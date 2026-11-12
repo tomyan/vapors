@@ -17,23 +17,29 @@ pub(super) fn key(document: &Rc<RefCell<Document>>, event: &Event) -> Option<boo
     }
     let Event::Key {
         key,
+        code,
         pressed,
+        repeat,
         modifiers,
-        ..
     } = event
     else {
         return None;
     };
-    let modifiers = vapors_elements::Modifiers {
-        shift: modifiers.shift,
-        control: modifiers.control,
-        alt: modifiers.alt,
-        meta: modifiers.meta,
+    let press = vapors_elements::Keystroke {
+        key,
+        code,
+        repeat: *repeat,
+        modifiers: vapors_elements::Modifiers {
+            shift: modifiers.shift,
+            control: modifiers.control,
+            alt: modifiers.alt,
+            meta: modifiers.meta,
+        },
     };
     if *pressed {
-        Some(Document::key_pressed(document, key, modifiers))
+        Some(Document::key_pressed_with(document, press))
     } else {
-        Document::key_released(document, key, modifiers);
+        Document::key_released_with(document, press);
         None
     }
 }
@@ -41,7 +47,9 @@ pub(super) fn key(document: &Rc<RefCell<Document>>, event: &Event) -> Option<boo
 /// Whether `event` is the paste shortcut going down while one of the
 /// document's text fields has focus: the field's paste, which follows as
 /// `Event::Paste`, so the key is used. The platform's own rule decides
-/// (`vapors_platform::paste_shortcut`), so the key and the paste agree.
+/// (`vapors_platform::paste_shortcut`), so the key and the paste agree,
+/// with the document's shortcut modifier (the browser's platform on the
+/// web).
 pub(super) fn field_paste_key(document: &Document, event: &Event) -> bool {
     let Event::Key {
         key,
@@ -53,6 +61,7 @@ pub(super) fn field_paste_key(document: &Document, event: &Event) -> bool {
     else {
         return false;
     };
-    vapors_platform::paste_shortcut(key, code, *modifiers, *repeat, cfg!(target_os = "macos"))
+    let command = document.shortcut_modifier() == vapors_elements::ShortcutModifier::Command;
+    vapors_platform::paste_shortcut(key, code, *modifiers, *repeat, command)
         && document.text_field_focused()
 }
