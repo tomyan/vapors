@@ -1,8 +1,7 @@
 //! The 3D scene in `.wisp` (`docs/plans/3d-2.md`, row 4 and decision
 //! 1): `<Scene>`, `<Group>`, `<Mesh>` and `<Camera>`, Rust components
 //! with typed props, mounted through the compiler's component-tag path
-//! like any child component. `<Scene>` and `<Group>` are built;
-//! `<Mesh>` and `<Camera>` come in PR 4-3.
+//! like any child component.
 //!
 //! ```html
 //! <gpu-surface name="view"></gpu-surface>
@@ -37,12 +36,16 @@
 //! it, and invalidates the surface. Keeping identity across a keyed
 //! reorder and releasing geometry are row 5.
 
+mod camera;
 mod children;
 mod component;
 mod group;
+mod mesh;
 mod node;
 mod placement;
 mod scene;
 
+pub use camera::{Camera, CameraProps};
 pub use group::{Group, GroupProps};
+pub use mesh::{Mesh, MeshProps};
 pub use scene::{Scene, SceneProps};
