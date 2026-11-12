@@ -2,8 +2,9 @@
 //! kept between frames (IU4 PR 2, `painter_kept.rs`): an unchanged frame
 //! writes none; an edit writes only the batches whose items changed; a
 //! batch no longer drawn has its bytes released; image quads kept for
-//! one viewport are written again for another with the same view; an
-//! edge that rounds to -0.0 and then to 0.0 keeps its batch's bytes.
+//! one viewport are written again for another with the same view; a
+//! box whose edge rounds to -0.0 and then to 0.0 has its batch written
+//! again (its bytes differ in the sign bit).
 
 #[path = "support/surface.rs"]
 mod support;
@@ -142,7 +143,7 @@ fn gpu_image_quads_kept_for_one_viewport_are_written_again_for_another_with_the_
 }
 
 #[test]
-fn gpu_a_box_moved_from_an_edge_rounding_to_minus_zero_to_zero_keeps_its_bytes() {
+fn gpu_a_box_moved_from_an_edge_rounding_to_minus_zero_to_zero_is_written_again() {
     // Given: a red box whose top, -0.3 px, rounds to -0.0
     let css = "div { position: absolute; left: 0; top: -0.3px; width: 8px; height: 8px; \
                background-color: #f00; } .zero { top: 0; }";
@@ -155,8 +156,8 @@ fn gpu_a_box_moved_from_an_edge_rounding_to_minus_zero_to_zero_keeps_its_bytes()
     classed(&mut doc, 0, "zero");
     let (pixels, counts) = drawn(&mut rig, &doc);
 
-    // Then: drawn from the kept bytes, which equal those built afresh
-    assert_eq!((counts.batches_written, counts.batches_kept), (0, 1));
+    // Then: written again, with no debug compare panic
+    assert_eq!((counts.batches_written, counts.batches_kept), (1, 0));
     assert_eq!(pixel(&pixels, 4, 4), RED);
 }
 

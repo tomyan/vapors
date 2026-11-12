@@ -130,3 +130,16 @@ fn a_run_equal_to_one_matched_from_the_start_is_not_matched_again_from_the_end()
     assert_eq!(again.keys[0], was.keys[0]);
     assert_ne!(again.keys[1], was.keys[0]);
 }
+
+#[test]
+fn a_batch_whose_edge_went_from_minus_zero_to_zero_gets_a_new_key() {
+    // Given: the middle quad's top at -0.0
+    let was = KeptBatched::keyed(three(quad(-0.0, 1)), None);
+
+    // When: at 0.0, a run equal under == with other bytes
+    let again = KeptBatched::keyed(three(quad(0.0, 1)), Some(&was));
+
+    // Then
+    assert_eq!((again.keys[0], again.keys[2]), (was.keys[0], was.keys[2]));
+    assert_ne!(again.keys[1], was.keys[1]);
+}

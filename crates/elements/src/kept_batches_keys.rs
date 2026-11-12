@@ -2,15 +2,19 @@
 //! painter keeps the batch's GPU bytes under. A batch made again keeps
 //! the key of the earlier batch it is matched with when their runs are
 //! equal, so its bytes are neither built nor written again; any other
-//! batch gets a new key. Batches are matched by place from the start up
-//! to the first place whose runs differ, and by place from the end
-//! after it, so a batch put in or taken out (a background added, say)
-//! leaves the batches after it their keys. Equal runs draw equal bytes,
-//! so a match is never wrong, only missed.
+//! batch gets a new key. Runs are equal when they are the same to the
+//! bit (`run_bits.rs`), as the bytes kept for them are: `==` would take
+//! -0.0 for 0.0. Batches are matched by place from the start up to the
+//! first place whose runs differ, and by place from the end after it,
+//! so a batch put in or taken out (a background added, say) leaves the
+//! batches after it their keys. Equal runs draw equal bytes, so a match
+//! is never wrong, only missed.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use vapors_scene::Batched;
+
+use crate::run_bits::same_bits;
 
 /// The next key handed out, on any thread: no two batches of any
 /// document share one.
@@ -56,7 +60,7 @@ impl KeptBatched {
         let same = was
             .iter()
             .zip(now)
-            .take_while(|(was, now)| was.run == now.run);
+            .take_while(|(was, now)| same_bits(&was.run, &now.run));
         let prefix = same.count();
         let keys = (0..now.len()).map(|at| {
             if at < prefix {
@@ -74,7 +78,7 @@ impl KeptBatched {
     fn key_from_end(&self, batched: &Batched, (at, prefix): (usize, usize)) -> Option<BatchKey> {
         let (was, now) = (&self.batched.batches, &batched.batches);
         let from_end = (at + was.len()).checked_sub(now.len())?;
-        let matched = from_end >= prefix && was.get(from_end)?.run == now[at].run;
+        let matched = from_end >= prefix && same_bits(&was.get(from_end)?.run, &now[at].run);
         matched.then(|| self.keys[from_end])
     }
 }
