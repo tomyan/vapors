@@ -1,6 +1,8 @@
 //! Shared by the a11y mirror tests (R6): the roles page in a shared
-//! document, nodes found by role and name, and an update's records as
-//! `role "name"` lines.
+//! document with a model mirror built from its first take, a step that
+//! updates, takes, applies and checks the model
+//! (`support::mirror_model`), nodes found by role and name, and an
+//! update's records as `role "name"` lines.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -8,6 +10,7 @@ use std::rc::Rc;
 use vapors_dom::{Dom, NodeId};
 use vapors_elements::{AxMirrorNode, AxUpdate, Document};
 
+use super::mirror_model::Model;
 use super::roles_page::{STYLE, labelled, page};
 use super::{document, element, text, viewport};
 
@@ -28,17 +31,18 @@ pub fn page_with(role: &str, attributes: &[(&str, &str)]) -> Document {
     doc
 }
 
-/// The roles page, updated, with its first (`every`) update taken, so
-/// what a test changes next is what the next take holds.
-pub fn taken_page() -> Rc<RefCell<Document>> {
+/// The roles page with its first take, and a model built from it: what
+/// a test changes next is what the next take holds.
+pub fn taken_model() -> (Rc<RefCell<Document>>, Model) {
     let doc = Rc::new(RefCell::new(page()));
     let first = doc
         .borrow_mut()
         .take_ax_update()
         .expect("an updated document")
         .expect("the first take holds every node");
-    assert!(first.every, "the first take is every node");
-    doc
+    let model = Model::from_every(&first);
+    model.assert_mirrors(&doc.borrow());
+    (doc, model)
 }
 
 /// Updates `doc` at the roles page's viewport and takes the update.
@@ -46,6 +50,17 @@ pub fn updated_take(doc: &Rc<RefCell<Document>>) -> Option<AxUpdate> {
     let mut doc = doc.borrow_mut();
     doc.update(viewport(640.0, 400.0)).expect("updates");
     doc.take_ax_update().expect("an updated document")
+}
+
+/// Updates `doc`, takes the update, applies it to `model` and holds the
+/// model against the document; the update, for what else a test asserts.
+pub fn step(doc: &Rc<RefCell<Document>>, model: &mut Model) -> Option<AxUpdate> {
+    let update = updated_take(doc);
+    if let Some(update) = &update {
+        model.apply(update);
+    }
+    model.assert_mirrors(&doc.borrow());
+    update
 }
 
 /// The node with `role` and `name` in `doc`'s tree.
