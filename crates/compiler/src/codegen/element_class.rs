@@ -70,7 +70,7 @@ impl Emitter<'_> {
         let AttrValue::Literal(value) = &class.value else {
             // `emit_element` refuses `class={..}` first; a caller that
             // did not still refuses here, naming the site
-            refuse_string_styling(&self.source, class)?;
+            refuse_string_styling(self.source, class)?;
             return Err(self.source.error(class.offset, "`class={..}` cannot be part of the element's style key: write class=\"name\" and class:name={condition}"));
         };
         for attribute in element.attributes.iter().filter(|a| is_class_directive(a)) {
