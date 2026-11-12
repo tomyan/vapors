@@ -1,15 +1,16 @@
 //! The wgpu side of text: one pipeline drawing atlas quads with the
 //! gamma and contrast shader, the atlas texture it samples (its view
-//! kept with it), the buffers it draws from and the bind group over
-//! them, kept between frames. Create once per target format.
+//! kept with it), the buffers it draws from (each frame's, and the
+//! kept one) and the bind group over them, kept between frames. Create
+//! once per target format.
 
-use vapors_renderer::{FrameArena, UniformSlots, WorkCounter};
+use vapors_renderer::{FrameArena, Retained, UniformSlots, WorkCounter};
 
 use crate::GlyphAtlas;
 use crate::atlas_texture::AtlasTexture;
 use crate::pipeline_gpu::{bind_group_layout, render_pipeline};
 
-/// The two shader parameters. See `docs/text.md` for how they were chosen.
+/// The two blend parameters. See `docs/text.md` for how they were chosen.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BlendParams {
     /// Exponent taking encoded channels to linear light.
@@ -43,6 +44,8 @@ pub struct TextPipeline {
     /// The atlas texture, its view and the bind group over them.
     pub(crate) atlas_texture: AtlasTexture,
     pub(crate) vertices: FrameArena,
+    /// Vertex bytes kept between frames (`draw_kept.rs`).
+    pub(crate) kept: Retained,
     pub(crate) work: WorkCounter,
 }
 
@@ -78,6 +81,7 @@ impl TextPipeline {
                 wgpu::BufferUsages::VERTEX,
                 VERTEX_SIZE,
             ),
+            kept: Retained::new(device, "text kept", wgpu::BufferUsages::VERTEX),
             work: WorkCounter::default(),
         }
     }

@@ -3,11 +3,6 @@ use crate::atlas::PageKind;
 use crate::pipeline::FLOATS_PER_VERTEX;
 use crate::{AtlasConfig, Family, FontSystem, LayoutOptions, Style};
 
-const VIEWPORT: Size = Size {
-    width: 64,
-    height: 64,
-};
-
 fn layout(system: &mut FontSystem, text: &str, size: f32) -> Layout {
     let style = Style::new(Family::Geist, size);
     Layout::new(system, text, &style, &LayoutOptions::default())
@@ -22,7 +17,7 @@ fn run_quads(atlas: &mut GlyphAtlas, layouts: &[Layout]) -> Vec<f32> {
             origin: [0.0, 40.0],
         })
         .collect();
-    quads(atlas, &texts, VIEWPORT).expect("quads")
+    quads(atlas, &texts, None).expect("quads")
 }
 
 /// A 30 px page holding a tall l (7x29) from the last frame, so that a
@@ -77,28 +72,18 @@ fn a_quad_maps_the_glyph_rect_to_its_atlas_coordinates() {
         top: 0,
         notdef: false,
     };
-    let viewport = Size {
-        width: 100,
-        height: 50,
-    };
     let mut floats = Vec::new();
 
     // When
-    push_quad(
-        &mut floats,
-        [10.0, 20.0],
-        &glyph,
-        32,
-        viewport,
-        Color::default(),
-    );
+    push_quad(&mut floats, [10.0, 20.0], &glyph, 32, Color::default());
 
-    // Then: six vertices; the first is the top-left, the fifth the bottom-right
+    // Then: six vertices in device pixels; the first is the top-left, the
+    // fifth the bottom-right
     assert_eq!(floats.len(), 6 * FLOATS_PER_VERTEX);
-    assert_close(&floats[0..4], &[-0.8, 0.2, 0.25, 0.5]);
+    assert_close(&floats[0..4], &[10.0, 20.0, 0.25, 0.5]);
     assert_close(
         &floats[4 * FLOATS_PER_VERTEX..][..4],
-        &[-0.72, 0.12, 0.375, 0.5625],
+        &[14.0, 22.0, 0.375, 0.5625],
     );
 }
 

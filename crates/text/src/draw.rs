@@ -4,7 +4,10 @@
 
 use crate::atlas::{AtlasError, GlyphAtlas};
 use crate::layout::Layout;
-use crate::pipeline::{self, BlendParams, FLOATS_PER_VERTEX, TextPipeline};
+use vapors_renderer::{KeptRange, Placed};
+use vapors_scene::Size;
+
+use crate::pipeline::{self, BlendParams, TextPipeline, VERTEX_SIZE};
 use crate::quads::{TextDraw, quads};
 
 /// Where a draw goes: [`vapors_renderer::Target`], under the name the
@@ -54,7 +57,7 @@ impl TextPipeline {
         texts: &[TextDraw<'_>],
         params: BlendParams,
     ) -> Result<(), AtlasError> {
-        let quads = quads(atlas, texts, target.viewport)?;
+        let quads = quads(atlas, texts, None)?;
         self.record(target, atlas, &quads, params);
         Ok(())
     }
@@ -71,72 +74,30 @@ impl TextPipeline {
         quads: &[f32],
         params: BlendParams,
     ) {
-        self.match_page_size(target.device, atlas);
-        self.upload_page(target, atlas);
-        let params = params_bytes(params);
-        let Some(params) = self
-            .params
-            .slot(target.encoder, target.queue, &self.work, params)
-        else {
+        let Some(params) = self.prepare(target, atlas, params) else {
             return;
         };
         self.draw_quads(target, quads, params);
     }
 
-    /// A texture of the atlas page's size when the page grew; the page
-    /// is whole in its dirty rect then, so the upload fills it.
+    /// Uploads what changed in the atlas page; the dynamic offset of the
+    /// slot holding `params` and the target's viewport, `None` when
+    /// refused (the refusal is on the encoder).
     ///
     /// # Panics
     ///
-    /// If the page is smaller than the texture: pages only grow, so this
-    /// pipeline was made for another atlas.
-    fn match_page_size(&mut self, device: &wgpu::Device, atlas: &GlyphAtlas) {
-        let page = atlas.coverage_page().size();
-        let texture = self.atlas_texture.texture().width();
-        assert!(
-            page >= texture,
-            "atlas page is {page} px but the text pipeline's texture is {texture} px; pages \
-             only grow, so this pipeline was made for another atlas"
-        );
-        if page > texture {
-            self.atlas_texture.replace(device, page);
-        }
-    }
-
-    /// Upload the part of the atlas page that changed since the last
-    /// upload: the bounding rectangle of the glyphs added, or the whole
-    /// page when it is new or was repacked. Its rows go packed tight;
-    /// `Queue::write_texture`, unlike a buffer-to-texture copy, takes
-    /// any `bytes_per_row` and pads rows itself when staging. A repack
-    /// moves glyphs that draws already recorded this frame read, so those
-    /// are submitted first: a frame that repacks submits once more.
-    fn upload_page(&self, target: &RenderTarget<'_>, atlas: &mut GlyphAtlas) {
-        let page = atlas.coverage_page_mut();
-        let Some(rect @ [x, y, width, height]) = page.dirty_rect() else {
-            return;
-        };
-        if page.cleared() {
-            target.encoder.flush(target.queue);
-        }
-        self.work.write_texture(
-            target.queue,
-            wgpu::TexelCopyTextureInfo {
-                origin: wgpu::Origin3d { x, y, z: 0 },
-                ..self.atlas_texture.texture().as_image_copy()
-            },
-            &page.region_pixels(rect),
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(width * page.bytes_per_pixel()),
-                rows_per_image: Some(height),
-            },
-            wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-        );
-        page.mark_clean();
+    /// If `atlas`'s page is smaller than this pipeline's texture.
+    pub(crate) fn prepare(
+        &mut self,
+        target: &RenderTarget<'_>,
+        atlas: &mut GlyphAtlas,
+        params: BlendParams,
+    ) -> Option<u32> {
+        self.match_page_size(target.device, atlas);
+        self.upload_page(target, atlas);
+        let params = params_bytes(params, target.viewport);
+        self.params
+            .slot(target.encoder, target.queue, &self.work, params)
     }
 
     /// Draws `quads` with the params slot at `params`.
@@ -144,14 +105,24 @@ impl TextPipeline {
         if quads.is_empty() {
             return;
         }
-        let bytes: Vec<u8> = quads.iter().flat_map(|f| f.to_le_bytes()).collect();
-        let vertex_count = u32::try_from(quads.len() / FLOATS_PER_VERTEX).expect("fits u32");
+        let bytes = vertex_bytes(quads);
         let Some(vertices) = self
             .vertices
             .push(target.encoder, target.queue, &self.work, &bytes)
         else {
             return;
         };
+        self.record_draw(target, Vertices::Placed(&vertices), params);
+    }
+
+    /// Records a draw of the vertices `from` holds with the params slot
+    /// at `params`, through the kept bind group.
+    pub(crate) fn record_draw(
+        &mut self,
+        target: &RenderTarget<'_>,
+        from: Vertices<'_>,
+        params: u32,
+    ) {
         let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
         let Self {
             pipeline,
@@ -160,24 +131,58 @@ impl TextPipeline {
             params: slots,
             atlas_texture,
             work,
+            kept,
             ..
         } = self;
+        let (vertices, count) = match from {
+            Vertices::Placed(placed) => (placed.slice(), vertex_count(placed.size)),
+            Vertices::Kept(range) => {
+                let count = vertex_count(kept.len(range));
+                (kept.slice(target.encoder, range), count)
+            }
+        };
         let bind_group = atlas_texture.bind_group(slots.generation(), |view| {
             pipeline::bind_group(target.device, work, layout, view, sampler, slots)
         });
         target.draw_pass(|pass| {
             pass.set_pipeline(pipeline);
             pass.set_bind_group(0, bind_group, &[params]);
-            pass.set_vertex_buffer(0, vertices.slice());
-            work.draw(pass, 0..vertex_count, 0..1);
+            pass.set_vertex_buffer(0, vertices);
+            work.draw(pass, 0..count, 0..1);
         });
     }
 }
 
-/// The params uniform's bytes: gamma and contrast, padded to 16.
-fn params_bytes(params: BlendParams) -> [u8; 16] {
+/// Where a draw's vertices are: this frame's arena, or kept.
+#[derive(Clone, Copy)]
+pub(crate) enum Vertices<'a> {
+    Placed(&'a Placed),
+    Kept(&'a KeptRange),
+}
+
+/// The params uniform's bytes: gamma, contrast and the viewport's width
+/// and height in device pixels.
+#[allow(clippy::cast_precision_loss)] // viewports are far below 2^24 pixels
+fn params_bytes(params: BlendParams, viewport: Size) -> [u8; 16] {
+    let floats = [
+        params.gamma,
+        params.contrast,
+        viewport.width as f32,
+        viewport.height as f32,
+    ];
     let mut bytes = [0; 16];
-    bytes[..4].copy_from_slice(&params.gamma.to_le_bytes());
-    bytes[4..8].copy_from_slice(&params.contrast.to_le_bytes());
+    for (at, float) in floats.into_iter().enumerate() {
+        bytes[at * 4..][..4].copy_from_slice(&float.to_le_bytes());
+    }
     bytes
+}
+
+/// Little-endian bytes of vertex floats.
+pub(crate) fn vertex_bytes(floats: &[f32]) -> Vec<u8> {
+    floats.iter().flat_map(|f| f.to_le_bytes()).collect()
+}
+
+/// How many vertices `bytes` bytes hold.
+pub(crate) fn vertex_count(bytes: u64) -> u32 {
+    u32::try_from(bytes / VERTEX_SIZE).expect("more text vertices in one batch than fit u32")
 }

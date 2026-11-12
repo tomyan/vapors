@@ -5,6 +5,7 @@
 use std::sync::Arc;
 
 use crate::atlas::{AtlasError, AtlasGlyph, GlyphAtlas};
+use crate::atlas_pins::AtlasPins;
 use crate::atlas_types::AtlasKey;
 use crate::icon::Icon;
 
@@ -28,19 +29,41 @@ impl GlyphAtlas {
         stroke: usize,
         size: [u32; 2],
     ) -> Result<AtlasGlyph, AtlasError> {
+        self.icon_pinned((icon, stroke, size), None)
+    }
+
+    /// As [`GlyphAtlas::icon`], pinning the entry into `pins` when given
+    /// (`atlas_pins.rs`).
+    pub(crate) fn icon_pinned(
+        &mut self,
+        (icon, stroke, size): (&Icon, usize, [u32; 2]),
+        pins: Option<&mut AtlasPins>,
+    ) -> Result<AtlasGlyph, AtlasError> {
         let key = AtlasKey::Icon {
             bits: Arc::clone(icon.bits(stroke)),
             size,
         };
-        if let Some(placed) = self.cached(&key) {
-            return Ok(placed);
-        }
+        let placed = match self.cached(&key) {
+            Some(placed) => placed,
+            None => self.icon_inserted(&key, (icon, stroke, size))?,
+        };
+        self.pin(&key, pins);
+        Ok(placed)
+    }
+
+    /// Rasterises stroke `stroke` of `icon` at `size` and packs it under
+    /// `key`.
+    fn icon_inserted(
+        &mut self,
+        key: &AtlasKey,
+        (icon, stroke, size): (&Icon, usize, [u32; 2]),
+    ) -> Result<AtlasGlyph, AtlasError> {
         if !self.fits_largest_page(size[0], size[1]) {
             let page_size = self.max_page;
             return Err(AtlasError::IconTooLarge { size, page_size });
         }
         self.rasterisations += 1;
-        self.insert(key, icon.rasterize_stroke(stroke, size))
+        self.insert(key.clone(), icon.rasterize_stroke(stroke, size))
     }
 }
 

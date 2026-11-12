@@ -89,10 +89,11 @@ fn gpu_a_resize_writes_each_pipelines_viewport_once_and_no_bind_group() {
     let taller = drawn_at(&mut rig, &doc, 32, 33);
     let back = drawn_at(&mut rig, &doc, 32, 32);
 
-    // Then: the text's blend parameters do not depend on the viewport
+    // Then: the text's viewport is in its uniform beside its blend
+    // parameters (IU4 PR 3)
     assert_eq!(taller.quads.uniform_writes, 1);
     assert_eq!(taller.shadows.uniform_writes, 1);
-    assert_eq!(taller.texts.uniform_writes, 0);
+    assert_eq!(taller.texts.uniform_writes, 1);
     assert_eq!(taller.bind_groups_made(), 0);
     assert_eq!((back.bind_groups_made(), back.uniform_writes()), (0, 0));
 }

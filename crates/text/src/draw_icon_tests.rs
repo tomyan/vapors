@@ -4,11 +4,6 @@ use crate::icon::IconStroke;
 use crate::icon_path::IconPath;
 use crate::pipeline::FLOATS_PER_VERTEX;
 
-const VIEWPORT: Size = Size {
-    width: 64,
-    height: 64,
-};
-
 fn line_icon(y: &str) -> Icon {
     let path = IconPath::parse(&format!("M0 {y}H16")).expect("parses");
     let strokes = vec![IconStroke { path, width: 2.0 }];
@@ -47,7 +42,7 @@ fn an_icon_moved_by_a_later_repack_in_the_same_call_samples_its_final_rect() {
 
     // When
     let icons = [draw(&small, [8, 8]), draw(&large, [24, 24])];
-    let floats = icon_quads(&mut atlas, &icons, VIEWPORT).expect("quads");
+    let floats = icon_quads(&mut atlas, &icons, None).expect("quads");
 
     // Then: the repack moved the small icon, and its quad samples where it is now
     assert_eq!(atlas.evictions(), 1);
