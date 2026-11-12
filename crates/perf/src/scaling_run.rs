@@ -42,19 +42,21 @@ pub fn run(gpu: &Gpu, change: RowChange, settings: Settings) -> Result<(), Strin
     Ok(())
 }
 
-/// The median count of the frame and of each reported phase `samples`
-/// entered.
+/// The median count of the frame and of each phase `samples` recorded.
+///
+/// # Errors
+/// A recorded phase that is not in [`PHASES`]: the judge does not know it.
 fn at_size(rows: usize, samples: &Samples) -> Result<AtSize, String> {
     let kept = samples
         .instructions
         .as_ref()
         .ok_or_else(|| format!("{rows} rows: no instruction counts were taken"))?;
+    if let Some(unknown) = kept.phases.keys().find(|p| !PHASES.contains(&p.as_str())) {
+        return Err(unknown_phase(rows, unknown));
+    }
+    let named = std::iter::once(("frame (CPU)", &kept.frame))
+        .chain(kept.phases.iter().map(|(p, counts)| (p.as_str(), counts)));
     let mut phases = BTreeMap::new();
-    let named = std::iter::once(("frame (CPU)", &kept.frame)).chain(
-        PHASES
-            .iter()
-            .filter_map(|&p| Some((p, kept.phases.get(p)?))),
-    );
     for (phase, counts) in named {
         let median = median_count(counts)
             .ok_or_else(|| format!("{rows} rows: no samples of phase {phase}"))?;
@@ -62,3 +64,14 @@ fn at_size(rows: usize, samples: &Samples) -> Result<AtSize, String> {
     }
     Ok(AtSize { rows, phases })
 }
+
+fn unknown_phase(rows: usize, phase: &str) -> String {
+    format!(
+        "{rows} rows: phase {phase} was recorded and is not in report::PHASES, so \
+         --scaling cannot judge it; add it to PHASES in crates/perf/src/report.rs"
+    )
+}
+
+#[cfg(test)]
+#[path = "scaling_run_tests.rs"]
+mod tests;

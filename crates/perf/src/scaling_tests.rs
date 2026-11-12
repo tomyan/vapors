@@ -60,8 +60,8 @@ fn a_fall_is_not_growth() {
 fn an_idle_update_is_judged_on_the_update_total_only() {
     // Given: draw grows, update does not
     let measured = [
-        size(1000, &[("update", 100), ("draw", 100)]),
-        size(3000, &[("update", 100), ("draw", 900)]),
+        size(1000, &[("update", 100_000), ("draw", 100_000)]),
+        size(3000, &[("update", 100_000), ("draw", 900_000)]),
     ];
     let scaling = Scaling::of(&measured).expect("sizes");
 
@@ -122,4 +122,37 @@ fn each_change_is_judged_as_the_brief_says() {
     for change in [RowChange::Text, RowChange::Class, RowChange::HoveredClass] {
         assert_eq!(Judged::of(change), Judged::EveryPhase);
     }
+}
+
+#[test]
+fn growth_over_the_percentage_and_under_the_floor_passes() {
+    // Given: +4.9% of 100,000 is 4,900, under the 5,000 floor
+    let scaling = scaling([100_000, 104_900, 104_900]);
+
+    // When
+    let violations = scaling.violations(Judged::EveryPhase).expect("judged");
+
+    // Then
+    assert!(violations.is_empty(), "{violations:?}");
+}
+
+#[test]
+fn growth_over_the_percentage_and_the_floor_fails() {
+    // Given: +5,001 is over the floor and 5.001% of 100,000
+    let scaling = scaling([100_000, 105_001, 105_001]);
+
+    // When
+    let violations = scaling.violations(Judged::EveryPhase).expect("judged");
+
+    // Then
+    assert_eq!(violations.len(), 2, "{violations:?}");
+}
+
+#[test]
+fn growth_over_the_floor_and_under_the_percentage_passes() {
+    // Given: +10,000 is over the floor and 1% of 1,000,000
+    let scaling = scaling([1_000_000, 1_010_000, 1_010_000]);
+
+    // Then
+    assert_eq!(scaling.violations(Judged::EveryPhase), Ok(Vec::new()));
 }

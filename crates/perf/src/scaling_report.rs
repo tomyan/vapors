@@ -3,7 +3,7 @@
 use std::fmt::Write;
 
 use crate::rows::RowChange;
-use crate::scaling::{Judged, Scaling, TOLERANCE_PERCENT};
+use crate::scaling::{Judged, MIN_GROWTH_INSTRUCTIONS, Scaling, TOLERANCE_PERCENT};
 
 /// The counts of every phase at each size, with the growth per extra
 /// row between neighbouring sizes.
@@ -54,10 +54,10 @@ pub fn verdict(change: RowChange, scaling: &Scaling) -> Result<String, String> {
             "scaling: {change:?} is reported, not judged: property 3 (the splice step) is not built"
         ),
         Judged::UpdateTotal => format!(
-            "scaling: pass, {change:?} update within {TOLERANCE_PERCENT}% of its 1000-row count"
+            "scaling: pass, {change:?} update within {TOLERANCE_PERCENT}% or {MIN_GROWTH_INSTRUCTIONS} instructions of its 1000-row count"
         ),
         Judged::EveryPhase => format!(
-            "scaling: pass, every {change:?} phase within {TOLERANCE_PERCENT}% of its 1000-row count"
+            "scaling: pass, every {change:?} phase within {TOLERANCE_PERCENT}% or {MIN_GROWTH_INSTRUCTIONS} instructions of its 1000-row count"
         ),
     })
 }

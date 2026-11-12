@@ -113,3 +113,16 @@ fn scaling_given_twice_or_with_only_is_refused() {
         "{error}"
     );
 }
+
+#[test]
+fn scaling_with_instructions_is_refused() {
+    // Given: --scaling always counts instructions
+    // When
+    let error = full(&["--scaling", "Text", "--instructions"]).expect_err("with instructions");
+
+    // Then
+    assert!(
+        error.starts_with("--scaling and --instructions cannot be combined"),
+        "{error}"
+    );
+}

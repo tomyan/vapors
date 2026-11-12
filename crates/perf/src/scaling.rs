@@ -18,7 +18,17 @@ pub const SIZES: [usize; 3] = [1000, 3000, 10_000];
 /// about 2 instructions per extra row.
 pub const TOLERANCE_PERCENT: u64 = 2;
 
+/// The least growth over the 1000-row count that fails a phase, in
+/// instructions, so a small phase is not failed by 2% of itself. A 2%
+/// step on a phase under 250,000 instructions is under 5000, and one
+/// extra instruction per row over 9000 extra rows is 9000: 5000 sits
+/// below that, so a phase that gains an instruction per row at 10,000
+/// rows still fails. Growth fails only when it exceeds both this and
+/// [`TOLERANCE_PERCENT`].
+pub const MIN_GROWTH_INSTRUCTIONS: u64 = 5000;
+
 /// Median instructions per phase, at one row count.
+#[derive(Debug)]
 pub struct AtSize {
     /// The page's row count.
     pub rows: usize,
@@ -119,16 +129,16 @@ impl Scaling {
         &'a self,
         series: &'a PhaseSeries,
     ) -> impl Iterator<Item = String> + 'a {
-        let ceiling = u128::from(series.counts[0]) * u128::from(100 + TOLERANCE_PERCENT);
         (1..self.rows.len())
-            .filter(move |&at| u128::from(series.counts[at]) * 100 > ceiling)
+            .filter(move |&at| grew_beyond_both(series.counts[0], series.counts[at]))
             .map(move |at| self.violation(series, at))
     }
 
     fn violation(&self, series: &PhaseSeries, at: usize) -> String {
         format!(
             "{} grows with the page: {} instructions at {} rows, {} at {} rows, \
-             {:.1} instructions per extra row (over {TOLERANCE_PERCENT}% above)",
+             {:.1} instructions per extra row (over {TOLERANCE_PERCENT}% and \
+             {MIN_GROWTH_INSTRUCTIONS} instructions above the first size)",
             series.phase,
             series.counts[0],
             self.rows[0],
@@ -147,6 +157,14 @@ impl PhaseSeries {
         let added = self.counts[to] as f64 - self.counts[from] as f64;
         added / (rows[to] - rows[from]) as f64
     }
+}
+
+/// `count` is above `first` by more than [`TOLERANCE_PERCENT`] and by
+/// more than [`MIN_GROWTH_INSTRUCTIONS`].
+fn grew_beyond_both(first: u64, count: u64) -> bool {
+    let ceiling = u128::from(first) * u128::from(100 + TOLERANCE_PERCENT);
+    let above_percent = u128::from(count) * 100 > ceiling;
+    above_percent && count.saturating_sub(first) > MIN_GROWTH_INSTRUCTIONS
 }
 
 fn series(measured: &[AtSize], phase: &str) -> Result<PhaseSeries, String> {
