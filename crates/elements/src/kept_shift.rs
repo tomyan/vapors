@@ -22,7 +22,7 @@ use vapors_scene::{Item, Rect};
 
 use crate::kept_box::{BoxFrom, KeptBox};
 use crate::kept_shift_items::{shifted_item, text_item, whole_item};
-use crate::layout::{BoxRect, Content};
+use crate::layout::{BoxRect, Content, LayoutBox};
 use crate::paint::snapped;
 use crate::painted::Painted;
 use crate::slab::Slabs;
@@ -38,6 +38,24 @@ pub(crate) struct Shift {
 }
 
 impl Shift {
+    /// The shift of `part`, slot `slot`'s kept paint of `layout_box`;
+    /// none for a checked checkbox, whose mark is placed from the
+    /// content box by a fraction of its size that `snaps_by` does not
+    /// check.
+    pub(crate) fn of_box(
+        slot: usize,
+        part: &KeptBox,
+        layout_box: &LayoutBox,
+        from: BoxFrom,
+        scale: f32,
+    ) -> Option<Self> {
+        if layout_box.checked == Some(true) {
+            return None;
+        }
+        let edges = |at| [at, crate::clip::content_box(layout_box, at)];
+        Self::of(slot, (part, &layout_box.content), from, (scale, edges))
+    }
+
     /// The shift of `part`, slot `slot` holding `content`, to show
     /// `from` at `scale`, when a shift shows it exactly; else `None`,
     /// and the slot is painted again.

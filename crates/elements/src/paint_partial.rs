@@ -175,12 +175,7 @@ fn read(slot: usize, from: BoxFrom, boxes: &[LayoutBox], painted: &Painted, scal
     if part.from == from {
         return Read::Kept;
     }
-    // A checked checkbox's mark is placed from the content box by a
-    // fraction of its size, which `snaps_by` does not check.
-    let checked = boxes[slot].checked == Some(true);
-    let edges = |at| [at, crate::clip::content_box(&boxes[slot], at)];
-    let shift = Shift::of(slot, (part, &boxes[slot].content), from, (scale, edges));
-    match shift.filter(|_| !checked) {
+    match Shift::of_box(slot, part, &boxes[slot], from, scale) {
         Some(shift) => Read::Shifted(shift),
         None => Read::Again(from),
     }
