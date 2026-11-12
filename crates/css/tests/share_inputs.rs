@@ -1,101 +1,90 @@
-//! What a computed style can be shared on (analysis PR 2): whether a
-//! selector reads an element's siblings or descendants, which attribute
-//! names selectors read, and the rules a template key's elements can
-//! match.
+//! Whether a rule blocks sharing one computed style between the
+//! elements it can match (analysis PR 2): a selector that reads
+//! siblings or descendants, or an `@container` condition, which reads
+//! layout. `@media` and `@supports` are frame-wide and do not.
 
-use std::collections::BTreeSet;
+use vapors_css::cascade::{Unshareable, unshareable};
 
-use vapors_css::cascade::Cascade;
-use vapors_css::selector::{attribute_names, parse_selector_list, reads_siblings_or_descendants};
-
-fn selector(text: &str) -> vapors_css::selector::Selector {
-    parse_selector_list(text).expect("parses").remove(0)
+/// Why the first rule of `sheet` blocks sharing.
+fn reason(sheet: &str) -> Option<Unshareable> {
+    let parsed = vapors_css::parse(sheet).unwrap_or_else(|e| panic!("{sheet}: {e}"));
+    unshareable(&parsed.rules[0])
 }
 
 #[test]
-fn ancestor_combinators_and_state_pseudo_classes_read_only_the_chain() {
-    for text in [
-        ".a .b",
-        ".a > .b",
-        "div.a:hover > .b:focus-within",
-        ".a:is(.b, .c)",
-        ".a:not(.b)",
-        "input[type=text]",
-        ":root .a",
+fn ancestor_combinators_states_and_frame_wide_conditions_do_not_block_sharing() {
+    for sheet in [
+        ".a .b {}",
+        ".a > .b {}",
+        "div.a:hover > .b:focus-within {}",
+        ".a:is(.b, .c) {}",
+        ".a:not(.b) {}",
+        ".a:where([x]) {}",
+        ":global(.g) .a {}",
+        "input[type=text]:checked:disabled {}",
+        ":root .a {}",
+        "@media (min-width: 100px) { .a { color: red } }",
+        "@supports (display: grid) { .a { color: red } }",
     ] {
-        assert!(!reads_siblings_or_descendants(&selector(text)), "{text}");
+        assert_eq!(reason(sheet), None, "{sheet}");
     }
 }
 
 #[test]
-fn sibling_combinators_positions_empty_and_has_read_beyond_the_chain() {
-    for text in [
-        ".a + .b",
-        ".a ~ .b .c",
-        ".a:first-child",
-        "li:nth-of-type(2)",
-        ".a:last-child > .b",
-        ".a:empty",
-        ".a:has(.b)",
-        ".a:not(.b + .c)",
-        ".a:is(.b:only-child)",
+fn every_sibling_or_descendant_read_blocks_sharing_wherever_it_sits() {
+    for sheet in [
+        ".a + .b {}",
+        ".a ~ .b .c {}",
+        ".a:first-child {}",
+        ".a:last-child > .b {}",
+        ".a:only-child {}",
+        "li:first-of-type {}",
+        "li:last-of-type {}",
+        "li:only-of-type {}",
+        "li:nth-child(2) {}",
+        "li:nth-last-child(2) {}",
+        "li:nth-of-type(2) {}",
+        "li:nth-last-of-type(2) {}",
+        ".a:empty {}",
+        ".a:has(.b) {}",
+        ".a:has(> .b) {}",
+        ".a:not(.b + .c) {}",
+        ".a:is(.b:only-child) {}",
+        ".a:where(.b ~ .c) {}",
+        ":global(.g:last-child) .a {}",
+        ":is(.p:last-of-type) > .q {}",
     ] {
-        assert!(reads_siblings_or_descendants(&selector(text)), "{text}");
+        assert_eq!(
+            reason(sheet),
+            Some(Unshareable::ReadsSiblingsOrDescendants),
+            "{sheet}"
+        );
     }
 }
 
 #[test]
-fn attribute_names_are_every_attribute_selected_and_id_for_an_id_selector() {
-    // Given
-    let mut names = BTreeSet::new();
-
-    // When
-    attribute_names(&selector("input[type=text]:not([disabled]) .x"), &mut names);
-    attribute_names(&selector("#main .a"), &mut names);
-    attribute_names(&selector(".b:is([hidden])"), &mut names);
-
-    // Then
-    let expected: BTreeSet<String> = ["type", "disabled", "id", "hidden"]
-        .map(str::to_owned)
-        .into_iter()
-        .collect();
-    assert_eq!(names, expected);
+fn a_rule_under_container_blocks_sharing_however_deep() {
+    for sheet in [
+        "@container (min-width: 100px) { .a { color: red } }",
+        "@media (min-width: 1px) { @container (min-width: 100px) { .a { color: red } } }",
+    ] {
+        assert_eq!(reason(sheet), Some(Unshareable::InContainer), "{sheet}");
+    }
 }
 
 #[test]
-fn a_cascade_knows_the_attribute_names_its_sheets_select() {
-    // Given
-    let cascade = Cascade::new()
-        .user_agent(
-            vapors_css::parse("[hidden] { display: none } #x { color: red }").expect("parses"),
-        )
-        .author(vapors_css::parse(".a { color: blue }").expect("parses"));
-
-    // Then
-    let names: Vec<&str> = cascade
-        .selected_attributes()
-        .iter()
-        .map(String::as_str)
-        .collect();
-    assert_eq!(names, ["hidden", "id"]);
-}
-
-#[test]
-fn the_rules_for_a_key_are_its_tag_class_universal_and_every_id_bucket() {
-    // Given
-    let sheet = ".row { } #x { } span { } * { } .other { } div .row { } div { }";
-    let cascade = Cascade::new().author(vapors_css::parse(sheet).expect("parses"));
+fn a_container_rule_a_key_can_match_is_reported_by_the_cascade() {
+    // Given: the review's probe, a key's rule under @container
+    let sheet = "@container (min-width: 100px) { .a { color: red } }";
+    let cascade =
+        vapors_css::cascade::Cascade::new().author(vapors_css::parse(sheet).expect("parses"));
 
     // When
-    let preludes: Vec<String> = cascade
-        .rules_for_key("div", &["row", "marked"])
-        .map(|rule| {
-            vapors_css::serialize::component_values(&rule.prelude)
-                .trim()
-                .to_owned()
-        })
+    let reasons: Vec<_> = cascade
+        .rules_for_key("div", &["a"])
+        .map(unshareable)
         .collect();
 
     // Then
-    assert_eq!(preludes, [".row", "#x", "*", "div .row", "div"]);
+    assert_eq!(reasons, [Some(Unshareable::InContainer)]);
 }
