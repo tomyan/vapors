@@ -235,6 +235,20 @@ batches are made afresh after a splice as after a walk
 shifts their places by the splice's edits. The clip tree's dependents
 (`grouped`) are also rebuilt, two passes over the slots.
 
+Also O(the owner's children) per update, not yet removed or measured:
+`plan` builds a hash map of the owner's old children and a set of its
+new children and walks every new child (`order_splice.rs` `Children`,
+`inserted_runs`); `Rebuilt::subtrees` clones the old children
+(`layout/rebuilt.rs`); `spliced_steps` copies the whole step vector
+(`kept_order_splice.rs`). The follow-up PR's "costs about an edit"
+claim has to remove these or report their cost.
+
+Declines carry a reason (`SpliceDecline`, in
+`UpdateCounts::splice_decline`), so a test pins the condition it names:
+`order_splice_declined.rs`, `order_splice_moved.rs` and
+`order_splice_anchors.rs` each assert theirs, and each condition was
+proven by breaking it.
+
 ## PR stack
 
 | PR | Content | Acceptance |

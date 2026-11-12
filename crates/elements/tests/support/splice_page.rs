@@ -4,7 +4,7 @@
 //! counts of an update.
 
 use vapors_dom::{Dom, NodeId};
-use vapors_elements::UpdateCounts;
+use vapors_elements::{SpliceDecline, UpdateCounts};
 
 use super::oracle::assert_matches_full;
 use super::rows_page::{RowsPage, row_before, rows_page, rows_viewport};
@@ -73,4 +73,10 @@ pub const DECLINED_WALK: (usize, usize, usize, usize) = (1, 1, 0, 1);
 
 pub fn matches_full(page: &RowsPage, context: &str) {
     assert_matches_full(&page.doc, rows_viewport(), context);
+}
+
+/// `counts` show a declined splice, walked, for `reason`.
+pub fn assert_declined(counts: UpdateCounts, reason: SpliceDecline) {
+    assert_eq!(order(counts), DECLINED_WALK);
+    assert_eq!(counts.splice_decline, Some(reason));
 }

@@ -44,7 +44,7 @@ impl Children<'_> {
             ));
         }
         if self.new.iter().any(|slot| self.kept(*slot)) {
-            return Err(Declined);
+            return Err(Declined::OnlyOutOfFlowKept);
         }
         let own = self.owner;
         Ok((
@@ -69,7 +69,7 @@ fn last_in_flow(
             continue;
         }
         if stacking.scrolls {
-            return Err(Declined);
+            return Err(Declined::ScrollInPreviousSibling);
         }
         last = slot;
         open.extend(boxes[slot].children.iter().rev());

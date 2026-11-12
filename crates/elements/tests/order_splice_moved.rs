@@ -6,9 +6,10 @@
 
 mod support;
 
-use support::splice_page::{DECLINED_WALK, inserted, matches_full, order, page, updated};
 use support::rows_page::RowsPage;
+use support::splice_page::{assert_declined, inserted, matches_full, page, updated};
 use vapors_dom::{Dom, NodeId};
+use vapors_elements::SpliceDecline;
 
 /// A row holding a row, both kept by an update of their own.
 fn wrapper_with_inner(page: &RowsPage) -> (NodeId, NodeId) {
@@ -40,7 +41,7 @@ fn a_child_of_a_removed_row_moved_into_the_owner_is_declined_and_walked() {
     let counts = updated(&page);
 
     // Then
-    assert_eq!(order(counts), DECLINED_WALK);
+    assert_declined(counts, SpliceDecline::InsertedHasPlace);
     matches_full(&page, "unwrap");
 }
 
@@ -60,6 +61,6 @@ fn a_child_of_a_removed_row_moved_into_a_new_row_is_declined_and_walked() {
     let counts = updated(&page);
 
     // Then
-    assert_eq!(order(counts), DECLINED_WALK);
+    assert_declined(counts, SpliceDecline::InsertedHasPlace);
     matches_full(&page, "into new row");
 }

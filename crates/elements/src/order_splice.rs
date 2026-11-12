@@ -20,6 +20,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::changed_slots::ChangedSlots;
 use crate::layout::{Content, LayoutBox};
 use crate::paint_order::{Stacking, Stackings, Step};
+use crate::splice_decline::SpliceDecline;
 
 /// Where a step is in the kept order, before the splice.
 pub(crate) type Place<'a> = &'a dyn Fn(Step) -> Option<usize>;
@@ -41,9 +42,9 @@ pub(crate) struct Splice {
     pub(crate) added: Vec<(usize, usize)>,
 }
 
-/// The change cannot be spliced: the whole tree is walked.
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) struct Declined;
+/// The change cannot be spliced, for this reason: the whole tree is
+/// walked.
+pub(crate) type Declined = SpliceDecline;
 
 /// The splice of the `changed` slots of `boxes`, or `Declined`.
 pub(crate) fn plan(
@@ -52,11 +53,14 @@ pub(crate) fn plan(
     changed: &ChangedSlots,
     place: Place<'_>,
 ) -> Result<Splice, Declined> {
-    if changed.stackings.restacked || changed.stackings.freed_stacked {
-        return Err(Declined);
+    if changed.stackings.restacked {
+        return Err(Declined::Restacked);
+    }
+    if changed.stackings.freed_stacked {
+        return Err(Declined::FreedStacked);
     }
     let [(owner, old)] = changed.reshaped.as_slice() else {
-        return Err(Declined);
+        return Err(Declined::NotOneOwner);
     };
     let children = Children {
         owner: *owner,
@@ -67,14 +71,14 @@ pub(crate) fn plan(
             .map(|(rank, &slot)| (slot, rank))
             .collect(),
     };
-    let mut splice = Splice {
-        edits: removals(changed, place),
-        added: Vec::new(),
-    };
+    let mut splice = Splice::default();
     for run in children.inserted_runs(boxes)? {
         let below = in_flow_subtrees(boxes, stackings, children.owner, &children.new[run.clone()])?;
-        if below.iter().any(|&(slot, _)| place(Step::Box(slot)).is_some()) {
-            return Err(Declined);
+        if below
+            .iter()
+            .any(|&(slot, _)| place(Step::Box(slot)).is_some())
+        {
+            return Err(Declined::InsertedHasPlace);
         }
         let (boxes_at, outlines_at) = children.anchors(boxes, stackings, &run, place)?;
         let steps =
@@ -91,6 +95,7 @@ pub(crate) fn plan(
         });
         splice.added.extend(below);
     }
+    splice.edits.extend(removals(changed, place));
     Ok(splice)
 }
 
@@ -111,14 +116,14 @@ impl Children<'_> {
         let moved =
             |slot: &usize| !now.contains(slot) && !matches!(boxes[*slot].content, Content::Vacant);
         if self.old.keys().any(moved) {
-            return Err(Declined);
+            return Err(Declined::Moved);
         }
         let mut runs: Vec<Range<usize>> = Vec::new();
         let mut last_rank = None;
         for (at, slot) in self.new.iter().enumerate() {
             match (self.old.get(slot), runs.last_mut()) {
                 (Some(rank), _) if last_rank < Some(rank) => last_rank = Some(rank),
-                (Some(_), _) => return Err(Declined),
+                (Some(_), _) => return Err(Declined::Reordered),
                 (None, Some(run)) if run.end == at => run.end = at + 1,
                 (None, _) => runs.push(at..at + 1),
             }
@@ -131,7 +136,8 @@ impl Children<'_> {
     }
 }
 
-/// The freed slots' box and outline steps taken out: one edit per run
+/// The freed slots' box and outline steps taken out (after every decline
+/// check, as `placed` panics on a step with no place): one edit per run
 /// of consecutive places.
 fn removals(changed: &ChangedSlots, place: Place<'_>) -> Vec<Edit> {
     let steps = |&(slot, _): &(usize, _)| [Step::Box(slot), Step::Outline(slot)];
@@ -170,7 +176,7 @@ fn in_flow_subtrees(
     let mut below = Vec::new();
     while let Some((slot, parent)) = open.pop() {
         if stackings.get(slot) != Stacking::default() {
-            return Err(Declined);
+            return Err(Declined::InsertedStacked);
         }
         below.push((slot, parent));
         open.extend(

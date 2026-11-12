@@ -16,6 +16,7 @@ use crate::order_splice::Place;
 use crate::paint::PaintInput;
 use crate::paint_order::{Step, paint_steps_with_outlines};
 use crate::scroll_chains::Chains;
+use crate::splice_decline::SpliceDecline;
 
 /// The steps of painting, where each box's clip comes from, each box's
 /// clips, and the scroll chains.
@@ -43,8 +44,8 @@ pub(crate) struct OrderWalks {
     pub(crate) clips: usize,
     /// Shape changes spliced into the kept order (`order_splice.rs`).
     pub(crate) splices: usize,
-    /// Shape changes the splice declined, walked instead.
-    pub(crate) declined: usize,
+    /// Why the splice declined a shape change, walked instead.
+    pub(crate) declined: Option<SpliceDecline>,
 }
 
 impl KeptOrder {
@@ -100,10 +101,13 @@ impl KeptOrder {
         changed: &ChangedSlots,
         place: Place<'_>,
     ) -> Self {
-        let Ok(splice) = crate::order_splice::plan(boxes, input.stackings, changed, place) else {
-            let mut walked = Self::of(boxes, rects, input);
-            walked.walks.declined = 1;
-            return walked;
+        let splice = match crate::order_splice::plan(boxes, input.stackings, changed, place) {
+            Ok(splice) => splice,
+            Err(reason) => {
+                let mut walked = Self::of(boxes, rects, input);
+                walked.walks.declined = Some(reason);
+                return walked;
+            }
         };
         self.spliced(splice, (boxes, rects), input, changed)
     }
