@@ -2,7 +2,7 @@
 //! inside the target's scissor.
 
 use vapors_gpu_harness::{gpu, read_rgba8};
-use vapors_renderer::{FrameEncoder, ImagePipeline, Target, clear, upload_rgba8};
+use vapors_renderer::{FrameEncoder, ImagePipeline, Sampling, Target, clear, upload_rgba8};
 use vapors_scene::{Color, Rect, Scissor, Size};
 
 const RED: [u8; 4] = [211, 47, 47, 255];
@@ -40,7 +40,8 @@ fn draw(rect: Rect, scissor: Option<Scissor>) -> Vec<u8> {
         },
         scissor,
     };
-    pipeline.draw_rect(&at, &image, rect);
+    let bound = pipeline.bind(&gpu.device, &image, Sampling::Smooth);
+    pipeline.draw_rect(&at, &bound, rect);
     encoder.submit(&gpu.queue).expect("no draw refused");
     read_rgba8(&gpu.device, &gpu.queue, &target)
 }

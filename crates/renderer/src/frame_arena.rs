@@ -10,9 +10,7 @@
 //! that size. A single draw larger than `max_buffer_size` is refused
 //! ([`ArenaFull`]).
 
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-
+use crate::encoder_turn::EncoderTurn;
 use crate::{ArenaFull, FrameEncoder, WorkCounter};
 
 /// Where a draw's bytes went: a buffer (kept alive by the passes that
@@ -51,8 +49,7 @@ pub struct FrameArena {
     align: u64,
     buffer: wgpu::Buffer,
     used: u64,
-    encoder: u64,
-    open: Arc<AtomicBool>,
+    turn: EncoderTurn,
 }
 
 impl FrameArena {
@@ -73,8 +70,7 @@ impl FrameArena {
             align: align.max(wgpu::COPY_BUFFER_ALIGNMENT),
             buffer: buffer(device, label, usage, first),
             used: 0,
-            encoder: 0,
-            open: Arc::new(AtomicBool::new(false)),
+            turn: EncoderTurn::new(label),
         }
     }
 
@@ -96,7 +92,7 @@ impl FrameArena {
     /// If `frame` is older than an encoder this arena already wrote for,
     /// or newer while that encoder is still open (neither submitted nor
     /// dropped): either way one encoder's bytes would overwrite the
-    /// other's.
+    /// other's ([`EncoderTurn::begin`]).
     pub fn push(
         &mut self,
         frame: &FrameEncoder,
@@ -104,7 +100,9 @@ impl FrameArena {
         work: &WorkCounter,
         bytes: &[u8],
     ) -> Option<Placed> {
-        self.begin(frame);
+        if self.turn.begin(frame) {
+            self.used = 0;
+        }
         let size = bytes.len() as u64;
         let offset = self.offset_for(frame, size)?;
         work.write_buffer(queue, &self.buffer, offset, bytes);
@@ -132,34 +130,6 @@ impl FrameArena {
                 None
             }
         }
-    }
-
-    fn begin(&mut self, frame: &FrameEncoder) {
-        assert!(
-            frame.id() >= self.encoder,
-            "{}: a draw for encoder {} after encoder {}, an older encoder after a newer one; \
-             submit each FrameEncoder before drawing with the next",
-            self.label,
-            frame.id(),
-            self.encoder
-        );
-        if frame.id() > self.encoder {
-            self.start(frame);
-        }
-    }
-
-    /// Starts again at offset 0 for `frame`, once the encoder drawn for
-    /// before is closed.
-    fn start(&mut self, frame: &FrameEncoder) {
-        assert!(
-            !self.open.load(Ordering::Relaxed),
-            "{}: a draw for encoder {} while encoder {}, which this pipeline drew for, is still open; \
-             submit or drop each FrameEncoder before drawing with the next",
-            self.label,
-            frame.id(),
-            self.encoder
-        );
-        (self.encoder, self.used, self.open) = (frame.id(), 0, frame.open_flag());
     }
 
     /// Moves to a buffer twice the size, or `at_least`, up to the

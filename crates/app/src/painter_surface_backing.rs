@@ -2,7 +2,7 @@
 //! into (`painter_surface_texture.rs`), and whether the next paint must
 //! render it.
 
-use vapors_renderer::{Target, WorkCounter};
+use vapors_renderer::{ImagePipeline, Target, TextureBinding, WorkCounter};
 
 use super::super::SurfaceState;
 use super::super::errors::Refusal;
@@ -97,22 +97,29 @@ impl Mounted {
         }
     }
 
-    /// The backing at `size`, rendered if it needs to be.
+    /// The backing at `size`, bound for `pipeline`, rendered if it
+    /// needs to be.
     pub(super) fn prepare(
         &mut self,
         target: &Target<'_>,
+        pipeline: &ImagePipeline,
         size: SurfaceSize,
         turn: Turn<'_>,
         work: &WorkCounter,
-    ) -> Result<&wgpu::Texture, Refusal> {
+    ) -> Result<&TextureBinding, Refusal> {
         self.claim(target.device, size, turn)?;
         self.seen = Seen::Painted;
         self.start(target.device, turn)?;
-        self.allocate(target.device, size, turn)?;
+        self.allocate(target.device, pipeline, size, turn)?;
         if self.stale || self.animating {
             self.render(target, turn, work)?;
         }
-        Ok(&self.backing.as_ref().expect("allocated above").texture)
+        Ok(&self.backing.as_ref().expect("allocated above").bound)
+    }
+
+    /// Whether a backing, and its binding, is held.
+    pub(super) fn backed(&self) -> bool {
+        self.backing.is_some()
     }
 
     /// Claims the surface's name for the frame at `size`: refused when
@@ -144,13 +151,14 @@ impl Mounted {
     fn allocate(
         &mut self,
         device: &wgpu::Device,
+        pipeline: &ImagePipeline,
         size: SurfaceSize,
         turn: Turn<'_>,
     ) -> Result<(), Refusal> {
         if self.backing.as_ref().is_some_and(|held| held.size == size) {
             return Ok(());
         }
-        let backing = Backing::new(device, size);
+        let backing = Backing::new(device, pipeline, size);
         let renderer = &mut self.renderer;
         self.scopes
             .run(device, turn, || renderer.resize(device, size))?;

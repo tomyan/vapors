@@ -94,6 +94,7 @@ impl ScenePainter {
         self.surfaces.end_frame();
         runs?;
         self.textures.end_frame();
+        self.end_counts();
         Ok(())
     }
 

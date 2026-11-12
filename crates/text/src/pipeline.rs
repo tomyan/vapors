@@ -1,8 +1,9 @@
 //! The wgpu side of text: one pipeline drawing atlas quads with the
-//! gamma and contrast shader, the atlas texture it samples, and the
-//! buffers it draws from. Create once per target format.
+//! gamma and contrast shader, the atlas texture it samples (its view
+//! kept with it), the buffers it draws from and the bind group over
+//! them, kept between frames. Create once per target format.
 
-use vapors_renderer::{FrameArena, Placed};
+use vapors_renderer::{FrameArena, KeptBindGroup, UniformSlots, WorkCounter};
 
 use crate::GlyphAtlas;
 use crate::pipeline_gpu::{bind_group_layout, coverage_texture, render_pipeline};
@@ -36,10 +37,14 @@ pub struct TextPipeline {
     pub(crate) pipeline: wgpu::RenderPipeline,
     pub(crate) layout: wgpu::BindGroupLayout,
     pub(crate) sampler: wgpu::Sampler,
-    pub(crate) uniforms: FrameArena,
+    /// The blend parameters, one slot per distinct pair drawn with.
+    pub(crate) params: UniformSlots,
     pub(crate) texture: wgpu::Texture,
+    /// The texture's view, made with it.
+    pub(crate) view: wgpu::TextureView,
+    pub(crate) bind_group: KeptBindGroup,
     pub(crate) vertices: FrameArena,
-    pub(crate) work: vapors_renderer::WorkCounter,
+    pub(crate) work: WorkCounter,
 }
 
 impl TextPipeline {
@@ -57,6 +62,7 @@ impl TextPipeline {
             bind_group_layouts: &[Some(&layout)],
             immediate_size: 0,
         });
+        let texture = coverage_texture(device, atlas.coverage_page().size());
         Self {
             pipeline: render_pipeline(device, &pipeline_layout, &shader, format),
             layout,
@@ -66,15 +72,17 @@ impl TextPipeline {
                 min_filter: wgpu::FilterMode::Nearest,
                 ..Default::default()
             }),
-            uniforms: FrameArena::uniforms(device, "text params"),
-            texture: coverage_texture(device, atlas.coverage_page().size()),
+            params: UniformSlots::new(device, "text params"),
+            view: texture.create_view(&wgpu::TextureViewDescriptor::default()),
+            texture,
+            bind_group: KeptBindGroup::NONE,
             vertices: FrameArena::new(
                 device,
                 "text quads",
                 wgpu::BufferUsages::VERTEX,
                 VERTEX_SIZE,
             ),
-            work: vapors_renderer::WorkCounter::default(),
+            work: WorkCounter::default(),
         }
     }
 
@@ -84,29 +92,45 @@ impl TextPipeline {
         self.work.take()
     }
 
-    pub(crate) fn bind_group(&self, device: &wgpu::Device, params: &Placed) -> wgpu::BindGroup {
-        let view = self
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
+    /// The bind groups kept: one once this pipeline has drawn.
+    #[must_use]
+    pub fn bind_groups_kept(&self) -> u64 {
+        self.bind_group.kept()
+    }
+}
+
+/// The bind group over the atlas view, the sampler and the params
+/// slots' buffer, counted in `work`: made once per buffer by
+/// [`TextPipeline::draw`], which keeps it.
+pub(crate) fn bind_group(
+    device: &wgpu::Device,
+    work: &WorkCounter,
+    layout: &wgpu::BindGroupLayout,
+    view: &wgpu::TextureView,
+    sampler: &wgpu::Sampler,
+    params: &UniformSlots,
+) -> wgpu::BindGroup {
+    work.create_bind_group(
+        device,
+        &wgpu::BindGroupDescriptor {
             label: Some("text"),
-            layout: &self.layout,
+            layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&view),
+                    resource: wgpu::BindingResource::TextureView(view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                    resource: wgpu::BindingResource::Sampler(sampler),
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
                     resource: params.binding(),
                 },
             ],
-        })
-    }
+        },
+    )
 }
 
 #[cfg(test)]

@@ -1,22 +1,26 @@
 //! A surface's backing texture: what its renderer draws into and the
-//! painter composites.
+//! painter composites, bound for the image pipeline when it is made.
+//! Another size is another backing, binding and all.
+
+use vapors_renderer::{ImagePipeline, Sampling, TextureBinding};
 
 use super::super::errors::Refusal;
 use crate::surface::{SURFACE_FORMAT, SurfaceSize};
 
-/// The texture of one active surface, and the size it was made at.
+/// The texture of one active surface, bound for compositing, and the
+/// size it was made at.
 pub(super) struct Backing {
-    pub(super) texture: wgpu::Texture,
+    pub(super) bound: TextureBinding,
     pub(super) view: wgpu::TextureView,
     pub(super) size: SurfaceSize,
 }
 
 impl Backing {
-    pub(super) fn new(device: &wgpu::Device, size: SurfaceSize) -> Self {
+    pub(super) fn new(device: &wgpu::Device, pipeline: &ImagePipeline, size: SurfaceSize) -> Self {
         let texture = device.create_texture(&descriptor(size));
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         Self {
-            texture,
+            bound: pipeline.bind(device, &texture, Sampling::Smooth),
             view,
             size,
         }

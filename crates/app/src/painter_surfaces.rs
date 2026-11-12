@@ -133,10 +133,16 @@ impl Surfaces {
     ) -> Result<(), PaintError> {
         for (name, size, rect) in surfaces(painted, items) {
             let mounted = unmounted_refused(&mut self.mounted, name)?;
-            let texture = mounted.prepare(target, size, turn(&self.waker), &self.work);
-            pipeline.draw_rect(target, texture.map_err(|r| r.named(name))?, rect);
+            let turn = turn(&self.waker);
+            let bound = mounted.prepare(target, pipeline, size, turn, &self.work);
+            pipeline.draw_rect(target, bound.map_err(|r| r.named(name))?, rect);
         }
         Ok(())
+    }
+
+    /// The bindings kept: one per surface with a backing.
+    pub(super) fn bind_groups_kept(&self) -> u64 {
+        self.mounted.values().filter(|m| m.backed()).count() as u64
     }
 
     /// The work renders issued through `SurfaceFrame::work` since the
