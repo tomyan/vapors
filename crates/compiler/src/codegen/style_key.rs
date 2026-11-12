@@ -36,11 +36,11 @@ impl Emitter<'_> {
     }
 
     fn style_key(&self, element: &Element) -> Result<String, CompileError> {
-        let (line, _) = self.source.position(element.offset);
-        let site = format!("{}:{line}", self.source.path);
+        let (line, column) = self.source.position(element.offset);
+        let site = format!("{}:{line}:{column}", self.source.path);
         let scope = if self.scoped { "Some(SCOPE)" } else { "None" };
         let classes = quoted(&self.literal_classes(element)?);
-        let toggles = quoted(&self.directive_names(element)?);
+        let toggles = quoted(&self.key_directives(element)?);
         let style = match class_attribute(element, "style").map(|a| &a.value) {
             Some(AttrValue::Literal(text)) => format!("Some({text:?})"),
             // `style={..}` is refused before this (attribute_refusals)
@@ -50,6 +50,26 @@ impl Emitter<'_> {
             "vapors_dom::StyleKey {{ site: {site:?}, scope: {scope}, tag: {:?}, classes: &[{classes}], toggles: &[{toggles}], style: {style} }}",
             element.tag
         ))
+    }
+}
+
+impl Emitter<'_> {
+    /// `element`'s directive names, refusing more than
+    /// [`crate::MAX_CLASS_DIRECTIVES`], naming the element.
+    fn key_directives<'e>(&self, element: &'e Element) -> Result<Vec<&'e str>, CompileError> {
+        let names = self.directive_names(element)?;
+        if names.len() > crate::MAX_CLASS_DIRECTIVES {
+            return Err(self.source.error(
+                element.offset,
+                format!(
+                    "<{}> has {} `class:` directives; at most {} fit one element, so move some to a child element",
+                    element.tag,
+                    names.len(),
+                    crate::MAX_CLASS_DIRECTIVES
+                ),
+            ));
+        }
+        Ok(names)
     }
 }
 

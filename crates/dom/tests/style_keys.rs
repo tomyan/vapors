@@ -10,7 +10,7 @@ use vapors_dom::recording::{Call, RecordingDom};
 use vapors_dom::{Dom, SCOPE_ATTRIBUTE, StyleKey};
 
 static ROW: StyleKey = StyleKey {
-    site: "crates/perf/ui/mount_row.wisp:14",
+    site: "crates/perf/ui/mount_row.wisp:14:5",
     scope: Some("vapors-perf/ui/mount_row.wisp"),
     tag: "div",
     classes: &["row"],
@@ -19,7 +19,7 @@ static ROW: StyleKey = StyleKey {
 };
 
 static PLAIN: StyleKey = StyleKey {
-    site: "src/plain.wisp:3",
+    site: "src/plain.wisp:3:1",
     scope: None,
     tag: "span",
     classes: &[],
@@ -133,7 +133,7 @@ fn other_attributes_of_a_keyed_element_may_be_set() {
 }
 
 static ROW_AGAIN: StyleKey = StyleKey {
-    site: "crates/perf/ui/mount_row.wisp:14",
+    site: "crates/perf/ui/mount_row.wisp:14:5",
     scope: Some("vapors-perf/ui/mount_row.wisp"),
     tag: "div",
     classes: &["row"],

@@ -11,7 +11,7 @@ use vapors_elements::Document;
 const SCOPE: &str = "vapors-perf/ui/mount_row.wisp";
 
 static ROW: StyleKey = StyleKey {
-    site: "crates/perf/ui/mount_row.wisp:14",
+    site: "crates/perf/ui/mount_row.wisp:14:5",
     scope: Some(SCOPE),
     tag: "div",
     classes: &["row"],
