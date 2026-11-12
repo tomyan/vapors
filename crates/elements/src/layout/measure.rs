@@ -3,7 +3,9 @@
 //! match what is drawn, and the size comes back in CSS pixels.
 
 use taffy::{AvailableSpace, Size};
-use vapors_text::{FontSystem, Layout, LayoutOptions, Span, Style};
+#[cfg(test)]
+use vapors_text::Layout;
+use vapors_text::{FontSystem, Shaped, Span, Style};
 
 use super::inline::InlineRun;
 
@@ -28,22 +30,22 @@ pub(crate) fn measure_text(
     }
 }
 
-/// `run` laid out at `width` CSS pixels (`None` never wraps): the
-/// block's style, each inline element's over its range. Text that is
-/// not visible is laid out in a transparent ink, so it takes its space.
+/// `run` laid out at `width` CSS pixels (`None` never wraps): shaped
+/// as [`text_shaped`], then broken.
+#[cfg(test)]
 pub(crate) fn text_layout(
     fonts: &mut FontSystem,
     scale: f32,
     run: &InlineRun,
     width: Option<f32>,
 ) -> Layout {
-    let options = LayoutOptions {
-        width,
-        scale,
-        align: run.style.align,
-        // Left to right only: right-to-left text is refused (`bidi`).
-        direction: vapors_text::parley::BaseDirection::Ltr,
-    };
+    text_shaped(fonts, scale, run).into_layout(width, run.style.align)
+}
+
+/// `run` shaped and not yet broken: the block's style, each inline
+/// element's over its range. Text that is not visible is shaped in a
+/// transparent ink, so it takes its space.
+pub(crate) fn text_shaped(fonts: &mut FontSystem, scale: f32, run: &InlineRun) -> Shaped {
     let spans: Vec<Span<'static>> = run
         .spans
         .iter()
@@ -53,7 +55,9 @@ pub(crate) fn text_layout(
         })
         .collect();
     let base = inked(run.style.for_layout(), run.visible);
-    Layout::styled(fonts, &run.text, &base, &spans, &options)
+    // Left to right only: right-to-left text is refused (`bidi`).
+    let direction = vapors_text::parley::BaseDirection::Ltr;
+    Shaped::new(fonts, &run.text, &base, &spans, scale, direction)
 }
 
 fn inked(style: Style<'static>, visible: bool) -> Style<'static> {

@@ -133,6 +133,7 @@ mod svg_path_checks;
 mod svg_style_checks;
 mod tags;
 mod text_bridge;
+mod text_counts;
 mod text_delete;
 mod text_field;
 mod text_history;

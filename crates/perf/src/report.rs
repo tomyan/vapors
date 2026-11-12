@@ -138,12 +138,13 @@ fn micros(time: Duration) -> String {
 fn counts(counts: &Counts) -> String {
     let (u, gpu) = (&counts.update, counts.frame.total());
     format!(
-        "Counts (last frame): restyled {}, text layouts {}, laid out {}, elements visited {}, \
+        "Counts (last frame): restyled {}, text layouts {}, texts shaped {}, laid out {}, elements visited {}, \
          boxes built {}, layout calls {}, boxes painted {}, boxes shifted {}, scene items {}, \
          culled {}; draw calls {}, buffer bytes {}, texture bytes {}, uniform writes {}, \
          bind groups {}, render passes {}.\n{}",
         u.elements_restyled,
         counts.text_layouts,
+        counts.texts_shaped,
         u.boxes_laid_out,
         u.elements_visited,
         u.boxes_built,

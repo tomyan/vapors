@@ -209,12 +209,4 @@ impl Document {
     pub fn boxes_laid_out(&self) -> usize {
         self.counts.boxes_laid_out
     }
-
-    /// How many Parley layouts the last update built rather than kept
-    /// from the one before: what the incremental tests count, and what
-    /// the `stress` demo shows.
-    #[must_use]
-    pub fn text_layouts_built(&self) -> usize {
-        self.texts.built()
-    }
 }

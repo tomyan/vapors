@@ -1,6 +1,10 @@
-//! Parley layouts kept between updates (F2c S7). A run laid out at a
-//! width is kept by its text, its styles and that width; measuring and
-//! painting ask for it, and only a run that changed is laid out again.
+//! Parley layouts kept between updates (F2c S7), in two maps. A run is
+//! shaped once per text, styles, visibility, span positions and scale
+//! (`text_key.rs`), whichever node holds it, so equal runs share one
+//! shaping; each layout is that shaping broken at one width, kept by
+//! the same and the width. Measuring and painting ask for layouts, and
+//! only a run that changed is shaped or broken again. A hit needs the
+//! whole key equal, not only its hash.
 //! A start-aligned run at a width its max-content layout fits in takes
 //! that layout: its lines and glyphs would be the same. Justify is
 //! left out deliberately, to be conservative. Runs with a negative or
@@ -12,8 +16,12 @@
 //! rounding may stop it firing: a performance limit, not a correctness
 //! one.
 //! An entry records the update that last asked for it. A sweep drops
-//! those older than the last update whose layout nothing else holds (a
-//! kept paint holds what it shows); `text_kept.rs` keeps the map.
+//! those older than the last update that nothing else holds (a kept
+//! paint holds the layouts it shows; nothing outside holds a shaping,
+//! a layout holds its own copy). Both maps follow the rules below
+//! (`text_kept.rs`), each counting its own entries, so the shapings
+//! kept are bounded as the layouts are; every layout has one, so they
+//! number at most the layouts the live set needs.
 //!
 //! A sweep runs on an insert that finds the map doubled since the last
 //! sweep, and at the start of an update when the map holds more than 4
@@ -34,24 +42,29 @@
 
 use std::rc::Rc;
 
-use vapors_text::{Align, FontSystem, Layout};
+use vapors_text::{Align, FontSystem, Layout, Shaped};
 
 use super::inline::InlineRun;
+#[cfg(test)]
 use super::measure::text_layout;
+use super::measure::text_shaped;
 use super::text_kept::Kept;
 pub(crate) use super::text_key::Key;
+use super::text_key::ShapeKey;
 use crate::style::TextStyle;
 
-/// The layouts kept, each with the update that last asked for it.
+/// The layouts kept, and the shaped runs they were broken from.
 #[derive(Clone, Default)]
 pub(crate) struct TextCache {
     layouts: Kept<Key, Rc<Layout>>,
+    shapes: Kept<ShapeKey, Rc<Shaped>>,
     built: usize,
+    shaped: usize,
 }
 
 impl TextCache {
-    /// `run` laid out at `width` CSS pixels at `scale`: kept, or laid
-    /// out now.
+    /// `run` laid out at `width` CSS pixels at `scale`: kept, or broken
+    /// now from its shaping, kept or done now.
     pub(crate) fn layout(
         &mut self,
         fonts: &mut FontSystem,
@@ -60,16 +73,31 @@ impl TextCache {
         width: Option<f32>,
     ) -> Rc<Layout> {
         let key = Key::of(run, width, scale);
-        if let Some(layout) = self
-            .kept(&key)
-            .or_else(|| self.unwrapped(run, width, scale))
-        {
+        if let Some(layout) = self.kept(&key).or_else(|| self.unwrapped(run, &key, width)) {
             return layout;
         }
+        let shaped = self.shaped_run(fonts, scale, run, key.shape());
         self.built += 1;
-        let layout = Rc::new(text_layout(fonts, scale, run, width));
+        let layout = Rc::new(shaped.lay_out(width, run.style.align));
         self.layouts.insert(key, Rc::clone(&layout));
         layout
+    }
+
+    /// `run` shaped at `scale`: kept by `key`, or shaped now.
+    fn shaped_run(
+        &mut self,
+        fonts: &mut FontSystem,
+        scale: f32,
+        run: &InlineRun,
+        key: &ShapeKey,
+    ) -> Rc<Shaped> {
+        if let Some(shaped) = self.shapes.asked(key) {
+            return Rc::clone(shaped);
+        }
+        self.shaped += 1;
+        let shaped = Rc::new(text_shaped(fonts, scale, run));
+        self.shapes.insert(key.clone(), Rc::clone(&shaped));
+        shaped
     }
 
     /// `run`'s max-content layout, kept, when laying it out at `width`
@@ -80,13 +108,13 @@ impl TextCache {
     /// and no line is wider than `width`, so none breaks. The layout's
     /// `layout_max_advance` and each line's `inline_max_coord` are those
     /// of the max-content layout, not of one built at `width`.
-    fn unwrapped(&mut self, run: &InlineRun, width: Option<f32>, scale: f32) -> Option<Rc<Layout>> {
+    fn unwrapped(&mut self, run: &InlineRun, key: &Key, width: Option<f32>) -> Option<Rc<Layout>> {
         let width = width?;
         if !reusable(run) {
             return None;
         }
-        let layout = self.kept(&Key::of(run, None, scale))?;
-        fits(layout.width(), width * scale).then_some(layout)
+        let layout = self.kept(&Key::at(key.shape().clone(), None))?;
+        fits(layout.width(), width * layout.scale()).then_some(layout)
     }
 
     /// The layout kept by `key`, recorded as asked for this update.
@@ -97,12 +125,19 @@ impl TextCache {
     /// Starts an update, the last one's paint showing `shown` texts.
     pub(crate) fn begin(&mut self, shown: usize) {
         self.built = 0;
+        self.shaped = 0;
         self.layouts.begin(shown);
+        self.shapes.begin(shown);
     }
 
     /// How many layouts this update built rather than kept.
     pub(crate) fn built(&self) -> usize {
         self.built
+    }
+
+    /// How many runs this update shaped rather than kept.
+    pub(crate) fn shaped(&self) -> usize {
+        self.shaped
     }
 }
 
@@ -130,3 +165,7 @@ mod tests;
 #[cfg(test)]
 #[path = "text_cache_age_tests.rs"]
 mod age_tests;
+
+#[cfg(test)]
+#[path = "text_cache_shape_tests.rs"]
+mod shape_tests;
