@@ -1,0 +1,17 @@
+# One merge-queue pass for the repository %i (touche or vapors), started
+# by queue@%i.timer. Runs in the user manager, which lingers on this box
+# (loginctl: Linger=yes), so it needs nobody logged in.
+[Unit]
+Description=merge queue pass for %i
+
+[Service]
+Type=oneshot
+ExecStart=%h/.cache/w-queue/%i-main/%i/xtask/queue-pass.sh %i
+# cargo, gh and git, without a login shell's PATH.
+Environment=PATH=%h/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+# Headless Chromium waits 120 s per load with a session bus it cannot
+# use (CLAUDE.md); the gate's browser checks run under this.
+UnsetEnvironment=DBUS_SESSION_BUS_ADDRESS
+# A pass gates at most one PR (a gate's jobs are bounded by their
+# timeout-minutes, under an hour) and publishes once (20 min).
+TimeoutStartSec=2h

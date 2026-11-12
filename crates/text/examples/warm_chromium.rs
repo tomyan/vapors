@@ -8,12 +8,14 @@ use std::process::ExitCode;
 use vapors_text::comparison::Chromium;
 
 fn main() -> ExitCode {
-    let work = std::env::temp_dir().join("vapors-warm-chromium");
-    let warmed = std::fs::create_dir_all(&work)
-        .map_err(|e| format!("{}: {e}", work.display()))
-        .and_then(|()| Chromium::find().map_err(|e| e.to_string()))
-        .and_then(|chrome| {
-            let took = chrome.warm(&work).map_err(|e| e.to_string())?;
+    let work = tempfile::Builder::new()
+        .prefix("vapors-warm-chromium-")
+        .tempdir();
+    let warmed = work
+        .map_err(|e| format!("a work directory under the temp dir: {e}"))
+        .and_then(|work| Ok((work, Chromium::find().map_err(|e| e.to_string())?)))
+        .and_then(|(work, chrome)| {
+            let took = chrome.warm(work.path()).map_err(|e| e.to_string())?;
             Ok((
                 format!("{} ({})", chrome.binary().display(), chrome.version()),
                 took,

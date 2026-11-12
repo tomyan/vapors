@@ -23,6 +23,8 @@ pub struct Serve {
     /// The served copy, which outlives any worktree.
     pub dir: PathBuf,
     pub mount: Mount,
+    /// The loopback port static-web-server listens on, behind the mount.
+    pub port: u16,
     /// A shell line run in the checkout; the build is served only when
     /// it exits 0 within `check_deadline`.
     pub check: String,
@@ -41,6 +43,7 @@ pub fn serve(config: &Config, home: &Path) -> Result<Serve, String> {
             https: port(config, "serve.https")?,
             path: path(config)?,
         },
+        port: port(config, "serve.port")?,
         check: required(config, "serve.check")?.to_owned(),
         check_deadline: Duration::from_secs(seconds(config, "serve.check_seconds")?),
     })

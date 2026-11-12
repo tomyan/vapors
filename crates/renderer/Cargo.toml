@@ -9,11 +9,13 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+tracing.workspace = true
 wgpu.workspace = true
 vapors-scene.workspace = true
 
 [dev-dependencies]
 vapors-gpu-harness.workspace = true
+pollster.workspace = true
 
 [lints]
 workspace = true

@@ -16,7 +16,9 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use vapors_elements_corpus::ax::{start, tree};
-use vapors_elements_corpus::oracle::{fixture_names, fixtures_dir, write_fonts, write_images};
+use vapors_elements_corpus::oracle::{
+    fixtures_dir, laid_out_fixture_names, write_fonts, write_images,
+};
 use vapors_elements_corpus::oracle_files::{Committed, Work, compare, refuse_orphans};
 use vapors_text::comparison::Chromium;
 
@@ -54,7 +56,7 @@ fn trees() -> Result<Vec<(String, PathBuf, String)>, String> {
     write_images(work.path())?;
     let (_live, mut session) = start(&chromium, work.path())?;
     let mut trees = Vec::new();
-    for name in fixture_names()? {
+    for name in laid_out_fixture_names()? {
         let tree = tree(&mut session, work.path(), &name)?;
         let text = serde_json::to_string_pretty(&tree).map_err(|e| e.to_string())? + "\n";
         trees.push((

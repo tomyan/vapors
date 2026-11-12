@@ -7,8 +7,6 @@ use super::emit::{Emitter, Place};
 use crate::CompileError;
 use crate::ast::{AttrValue, Attribute, Element, Expr};
 
-const BIND_CONTROLS: &[&str] = &["input", "select", "textarea"];
-
 impl Emitter<'_> {
     pub fn emit_element(&mut self, element: &Element, place: &Place) -> Result<(), CompileError> {
         let var = self.fresh(&element.tag);
@@ -22,10 +20,17 @@ impl Emitter<'_> {
                 "dom.borrow_mut().set_attribute({var}, SCOPE_ATTRIBUTE, SCOPE);"
             ));
         }
-        for attribute in element.attributes.iter() {
+        let (this, rest): (Vec<&Attribute>, Vec<&Attribute>) = element
+            .attributes
+            .iter()
+            .partition(|attribute| attribute.name == "bind:this");
+        for attribute in rest {
             self.emit_attribute(element, &var, attribute)?;
         }
-        self.emit_nodes(&element.children, &Place::child_of(&var))
+        self.emit_nodes(&element.children, &Place::child_of(&var))?;
+        // once the element is whole, so what reads the signal sees it built
+        this.into_iter()
+            .try_for_each(|attribute| self.emit_bind_this(&var, attribute))
     }
 
     fn emit_attribute(
@@ -66,7 +71,7 @@ impl Emitter<'_> {
                 let clones = self.clones_for(&[expr])?;
                 let mut body = shown_text(&value).to_vec();
                 body.push(format!(
-                    "dom.borrow_mut().set_attribute({var}, {:?}, &value);",
+                    "dom.borrow_mut().set_attribute_if_changed({var}, {:?}, &value);",
                     attribute.name
                 ));
                 self.emit_effect(&clones, &body);
@@ -99,75 +104,19 @@ impl Emitter<'_> {
         Ok(())
     }
 
-    /// A zero-argument script closure is wrapped so it receives no
-    /// event; anything else is passed as the listener itself.
+    /// The listener for a handler: a zero-argument script closure is
+    /// called with no event, anything else with the event; either may
+    /// return `()` or `Result<(), E>`, whose `Err` goes to the error
+    /// report (`vapors_dom::handle`).
     fn handler_expr(&self, expr: &Expr) -> Result<String, CompileError> {
         let code = self.raw(expr)?;
-        match self.script.handlers.get(&code) {
-            Some(0) => Ok(format!("move |_event: &mut Event| {{ {code}(); }}")),
-            _ => Ok(code),
-        }
-    }
-
-    fn emit_binding(
-        &mut self,
-        element: &Element,
-        var: &str,
-        property: &str,
-        attribute: &Attribute,
-    ) -> Result<(), CompileError> {
-        let (event, read, wrap) = match property {
-            "value" => ("input", "event.value().to_string()", "PropertyValue::Text"),
-            "checked" => ("change", "event.checked()", "PropertyValue::Bool"),
-            _ => return Err(self.source.error(attribute.offset, format!(
-                "`bind:{property}` is not a binding: elements bind `bind:value` (input, textarea, select) or `bind:checked` (checkbox, radio)"
-            ))),
-        };
-        let event = if element.tag == "select" {
-            "change"
-        } else {
-            event
-        };
-        self.refuse_bind_conflicts(element, attribute, event)?;
-        let AttrValue::Expr(signal) = &attribute.value else {
-            return Err(self.source.error(
-                attribute.offset,
-                format!("`bind:{property}` takes a signal: write bind:{property}={{name}}"),
-            ));
-        };
-        let signal = self.raw(signal)?;
-        self.emit_effect(
-            &[],
-            &[format!(
-                "dom.borrow_mut().set_property({var}, {property:?}, {wrap}({signal}.get()));"
-            )],
-        );
-        self.line(format!(
-            "dom.borrow_mut().listen({var}, {event:?}, Box::new(move |event: &mut Event| {{ {signal}.set({read}); }}));"
-        ));
-        Ok(())
-    }
-
-    fn refuse_bind_conflicts(
-        &self,
-        element: &Element,
-        attribute: &Attribute,
-        event: &str,
-    ) -> Result<(), CompileError> {
-        if !BIND_CONTROLS.contains(&element.tag.as_str()) {
-            return Err(self.source.error(attribute.offset, format!(
-                "`{}` binds a form control's value: use it on input, textarea or select, not <{}>",
-                attribute.name, element.tag
-            )));
-        }
-        let handler = format!("on{event}");
-        if element.attributes.get(&handler).is_some() {
-            return Err(self.source.error(attribute.offset, format!(
-                "`{}` already listens for `{event}`; it cannot be combined with `{handler}`: keep one, and write the other's work inside it",
-                attribute.name
-            )));
-        }
-        Ok(())
+        self.refuse_assigning_handler(expr, &code)?;
+        Ok(match self.script.handlers.get(&code) {
+            Some(0) => {
+                format!("move |_event: &mut Event| vapors_dom::handle_without_event(&{code})")
+            }
+            _ => format!("move |event: &mut Event| vapors_dom::handle(event, &{code})"),
+        })
     }
 
     /// A statement, inside a block with the clones when there are any.

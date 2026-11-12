@@ -2,8 +2,9 @@
 //! each step killed at its deadline. A job's `timeout-minutes` bounds
 //! its steps together, from when its first step starts; a step's own
 //! `timeout-minutes` bounds it alone. Every step gets `GITHUB_OUTPUT`,
-//! a file under target/, as CI gives one. Each step's line is followed
-//! by the machine's load at its start and end.
+//! a file under target/, as CI gives one, and the run's TMPDIR, and runs
+//! with `/dev/dri` hidden, as on CI (`gate_sandbox.rs`). Each step's
+//! line is followed by the machine's load at its start and end.
 
 use std::path::Path;
 use std::process::ExitCode;
@@ -14,8 +15,23 @@ use crate::gate_plan::PlannedStep;
 use crate::report::Reporter;
 use crate::steps::Step;
 
-/// Run `planned`; `output` is the `GITHUB_OUTPUT` file.
-pub fn run(planned: &[PlannedStep], output: &Path, reporter: &Reporter) -> ExitCode {
+#[path = "gate_sandbox.rs"]
+mod sandbox;
+pub use sandbox::{Wrap, wrap as sandbox_wrap};
+
+/// Run `planned`, each step with this run's own TMPDIR (`run_tmp`) and
+/// as `wrap` says; `output` is the `GITHUB_OUTPUT` file.
+pub fn run(planned: &[PlannedStep], output: &Path, wrap: Wrap, reporter: &Reporter) -> ExitCode {
+    crate::run_tmp::around_temp_dir("gate", |tmp| run_in(planned, output, wrap, reporter, tmp))
+}
+
+fn run_in(
+    planned: &[PlannedStep],
+    output: &Path,
+    wrap: Wrap,
+    reporter: &Reporter,
+    tmp: &Path,
+) -> ExitCode {
     let started = Instant::now();
     let mut job: Option<(&str, Instant)> = None;
     let mut passed = 0;
@@ -25,7 +41,7 @@ pub fn run(planned: &[PlannedStep], output: &Path, reporter: &Reporter) -> ExitC
             _ => Instant::now(),
         };
         job = Some((&planned_step.job, job_started));
-        let mut step = step_for(planned_step, output);
+        let mut step = crate::run_tmp::with_tmpdir(step_for(planned_step, output, wrap), tmp);
         step.deadline = Some(deadline(planned_step, job_started.elapsed()));
         let load_at_start = crate::load::now();
         let outcome = command::run(&step);
@@ -44,6 +60,17 @@ pub fn run(planned: &[PlannedStep], output: &Path, reporter: &Reporter) -> ExitC
     }
 }
 
+/// The gate's last lines: an unsandboxed run's notice again, then the
+/// pass line, which stays last (`gate_pr` reads it).
+#[must_use]
+pub fn pass_lines(head: &str, wrap: Wrap) -> Vec<String> {
+    let notice = wrap.notice().map(|n| format!("gate: {n}"));
+    notice
+        .into_iter()
+        .chain([format!("gate: pass {head}")])
+        .collect()
+}
+
 /// The time `planned` may take, `spent` into its job.
 #[must_use]
 pub fn deadline(planned: &PlannedStep, spent: Duration) -> Duration {
@@ -53,11 +80,16 @@ pub fn deadline(planned: &PlannedStep, spent: Duration) -> Duration {
 
 /// A step running `planned`'s script as CI does.
 #[must_use]
-pub fn step_for(planned: &PlannedStep, output: &Path) -> Step {
+pub fn step_for(planned: &PlannedStep, output: &Path, wrap: Wrap) -> Step {
+    let script = ["bash", "-eo", "pipefail", "-c", planned.run.as_str()];
+    let (program, args) = match wrap {
+        Wrap::HideGpuDevice => ("bwrap", [&sandbox::HIDE_GPU_DEVICE[..], &script].concat()),
+        Wrap::NoRenderNode | Wrap::SwitchedOff => ("bash", script[1..].to_vec()),
+    };
     let mut step = Step::new(
         &planned.name,
-        "bash",
-        &["-eo", "pipefail", "-c", &planned.run],
+        program,
+        &args,
         "fix it, then rerun `cargo xtask gate`",
     );
     step.env = planned.env.clone().into_iter().collect();

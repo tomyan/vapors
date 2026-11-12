@@ -1,0 +1,14 @@
+# The number fields after a click into the first, at 640x400 CSS px at
+# 1x. The card is at x 160..480, y 152..248; the first row y 172..196
+# with its field at x 260..360 (content from x 263), the readout at x
+# 360..420; the second row y 204..228. The click focuses the first
+# field: its ring shows and a caret stands after "40".
+click 310 184
+pixel 4 4 #e9ecef          page, top left
+pixel 300 162 #ffffff      the card, above the first row
+pixel 300 184 #ffffff      the first field's white
+pixel 258 184 #0060df      its focus ring, 1px out from its border
+ink 263 176 300 192 #ffffff the text and the caret are drawn
+ink 395 176 420 192 #ffffff the readout is drawn
+pixel 300 216 #ffffff      the second field's white
+pixel 260 216 #8f8f9d      its border

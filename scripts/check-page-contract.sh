@@ -1,16 +1,20 @@
 #!/bin/sh
 # The page contract on the built web demo, in headless Chrome: an error
 # lands in #error when the page has one and in #status when it has not;
-# a status line never lands in #error; a lost GPU device is reported in
-# #error with the fix; the demos (?demo=) draw, an unknown demo is an
-# error, the page works one directory down (/vapors/), and each demo's
-# screenshot, after the inputs its .pixels file lists, holds its pixel
-# checks. Copies of the built page; any mismatch fails naming the case.
+# a status line never lands in #error; the GPU's start-up line lands in
+# #adapter when the page has one, leaving #status as the page left it; a
+# lost GPU device is reported in #error with the fix; the demos (?demo=)
+# draw, an unknown demo is an error, the page works one directory down
+# (/vapors/), and each demo's screenshot, after the inputs its .pixels
+# file lists, holds its pixel checks. Copies of the built page; any
+# mismatch fails naming the case.
 #
 # Usage: scripts/check-page-contract.sh target/web <new or empty dir>
 # after `cargo xtask web`. CI runs it in the `web` job. Needs python3
 # (the server) and a browser: $CHROME, else google-chrome, else
 # chromium. Vulkan is the browser's own SwiftShader driver, beside it.
+# The directory is removed when the check passes and kept, for its logs,
+# when it fails.
 set -eu
 web=${1:?usage: scripts/check-page-contract.sh target/web <new or empty dir>}
 work=${2:?usage: scripts/check-page-contract.sh target/web <new or empty dir>}
@@ -57,6 +61,9 @@ prepare() {
     echo "$work: not empty; give a new or empty directory" >&2; exit 1
   fi
   mkdir -p "$work"; cp "$web"/* "$work"/
+  # Chromium leaves org.chromium.Chromium.* directories in TMPDIR on every
+  # launch; here they go with $work.
+  mkdir -p "$work/tmp"; export TMPDIR="$work/tmp"
   nogpu='<script>delete Navigator.prototype.gpu;</script>'
   # The device is destroyed 1 s after the page gets it, between frames,
   # as a GPU reset does: WebGPU's device.lost resolves with "destroyed".
@@ -87,6 +94,8 @@ prepare() {
   # elements demo hides it and the status line, and needs neither.
   page no-open-button "" "!error.hidden && $adapter" 's#<button id="open">Open</button>##'
   page no-open-button-elements "" "$adapter" 's#<button id="open">Open</button>##'
+  page own-open-no-button "" "$adapter" 's#<button id="open">Open</button>##'
+  page own-open-keeps-button "" "$adapter"
   page no-webgpu "$nogpu" ""
   page no-webgpu-no-error-element "$nogpu" "" 's#<p id="error"[^>]*></p>##'
   page device-lost "$lose" "!error.hidden"
@@ -119,6 +128,9 @@ prepare() {
   # only if the resize asks for a frame and it is drawn at 300 px.
   page resize "$counter" "(function () { var f = Number(document.body.dataset.frames) || 0; if (f >= 1 && !window.vaporsResized) { var c = document.getElementById('vapors'); c.style.width = '500px'; c.style.height = '300px'; window.vaporsResized = true; } return (Number(document.body.dataset.frameHeight) || 0) === 300; })()"
   page subpath "" "$adapter"
+  # A page with its own #adapter: the start-up line goes there and
+  # #status keeps what the page wrote ("starting").
+  page adapter-element "" 'document.getElementById("adapter").textContent.indexOf("adapter: ") === 0' 's#<p id="status">starting</p>#<p id="status">starting</p><p id="adapter"></p>#'
   ln -s . "$work/vapors"
   grep -q '<p id="error"' "$work/as-built.html" || { echo "$web/index.html: no <p id=\"error\">" >&2; exit 1; }
 }
@@ -374,8 +386,18 @@ fi
 if grep -q 'vkCreateInstance() failed' "$work/as-built.log"; then
   fail "Chromium has no Vulkan driver, so SwiftShader's WebGPU cannot present; fix: check that $VK_DRIVER_FILES loads (vulkaninfo --summary with VK_DRIVER_FILES set)"
 fi
-check no-open-button '^adapter: ' 'touch screens cannot open files' '?demo=image'
+check no-open-button '^adapter: ' 'touch screens cannot open files.*app_draws_open' '?demo=image'
 check no-open-button-elements '^adapter: ' hidden '?demo=hello'
+# An app that calls app_draws_open and not hide_status_line: no error for
+# the missing button, and #status stays shown, so it stays announced.
+check own-open-no-button '^adapter: ' hidden '?demo=own-open'
+[ -n "$status_tag" ] || fail "own-open-no-button: the page has no #status, wanted it shown"
+printf '%s' "$status_tag" | grep -q ' hidden' && fail "own-open-no-button: #status is hidden, wanted it shown"
+# The same app on a page that has the Open button: app_draws_open hides it.
+check own-open-keeps-button '^adapter: ' hidden '?demo=own-open'
+open_tag=$(printf '%s' "$dom" | grep -o '<button id="open"[^>]*>' || true)
+[ -n "$open_tag" ] || fail "own-open-keeps-button: the page has no Open button, wanted one that is hidden"
+printf '%s' "$open_tag" | grep -q ' hidden' || fail "own-open-keeps-button: Open is [$open_tag], wanted hidden"
 check no-webgpu '^starting$' '^no WebGPU adapter'
 check no-webgpu-no-error-element '^no WebGPU adapter' absent
 check device-lost '^adapter: ' '^the GPU device was lost \(Destroyed: .*\); fix: reload the page$'
@@ -383,13 +405,17 @@ check hello '^adapter: ' hidden '?demo=hello'
 check unknown-demo '^starting$' '^no demo is called `nope`' '?demo=nope'
 check subpath '^adapter: ' hidden '' vapors/
 check resize '^adapter: ' hidden '?demo=hello'
+check adapter-element '^starting$' hidden '?demo=hello'
+adapter_line=$(printf '%s' "$dom" | grep -o '<p id="adapter">[^<]*</p>' | sed 's#<[^>]*>##g' || true)
+echo "adapter-element: #adapter [$adapter_line]"
+printf '%s' "$adapter_line" | grep -q '^adapter: ' || fail "adapter-element: #adapter is [$adapter_line], wanted the start-up line"
 # overlap <demo>: no visible HTML control over the elements demo's canvas.
 overlap() {
   dom=$(dump "$1-overlap" "$(query "$1")") || { fail "$1-overlap: $chrome exited non-zero or passed 60 s"; console "$1-overlap"; return; }
   held "$1-overlap" || return
   found=$(printf '%s' "$dom" | grep -o 'data-overlaps="[^"]*"' | sed 's#data-overlaps="\(.*\)"#\1#')
   echo "$1-overlap: HTML over the canvas: [${found:-not measured}]"
-  [ "$found" = none ] || fail "$1-overlap: [${found:-not measured}] lies over the canvas of an elements demo; hide it (vapors_platform::hide_page_controls) or move it off the canvas"
+  [ "$found" = none ] || fail "$1-overlap: [${found:-not measured}] lies over the canvas of an elements demo; hide it (vapors_platform::hide_status_line, app_draws_open) or move it off the canvas"
 }
 for demo in $demos index; do overlap "$demo"; done
 # Each demo as Chromium shows the canvas after its clicks, held to the
@@ -408,5 +434,6 @@ for demo in $demos; do
     fi
   done
 done
-[ "$failed" = 0 ] || { echo "the page contract does not hold; reproduce: cargo xtask web && $0 target/web \$(mktemp -d)" >&2; exit 1; }
-echo "ok   the page contract holds in all ten cases, no HTML over the canvas of: $demos index; the gradient screenshot and the screenshots:$shots"
+[ "$failed" = 0 ] || { echo "the page contract does not hold; reproduce: cargo xtask web && $0 target/web \$(mktemp -d); logs kept in $work" >&2; exit 1; }
+rm -rf "$work"
+echo "ok   the page contract holds in all eleven cases, no HTML over the canvas of: $demos index; the gradient screenshot and the screenshots:$shots"

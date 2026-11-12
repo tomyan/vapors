@@ -6,53 +6,109 @@
 //! to the app as an [`Event`] and every redraw as a [`Frame`].
 
 mod attributes;
+mod browser_platform;
+mod clicks;
+#[cfg(target_family = "wasm")]
+mod clicks_web;
+#[cfg(not(target_family = "wasm"))]
+mod clipboard;
+#[cfg(not(target_family = "wasm"))]
+mod clipboard_reader;
+#[cfg(not(target_family = "wasm"))]
+mod clipboard_text;
 mod clock;
 mod cursor;
 mod device_lost;
 mod error;
 mod event;
+mod event_winit;
 mod file_kind;
+mod first_report;
 mod gestures;
+mod gpu_watch;
 mod handler;
+mod hidden_window;
+#[cfg(not(target_family = "wasm"))]
+mod ime;
+#[cfg(not(target_family = "wasm"))]
+mod ime_state;
+#[cfg(not(target_family = "wasm"))]
+mod ime_window;
 mod input;
+mod input_keys;
+mod key_event;
 #[cfg(not(target_family = "wasm"))]
 mod log_forward;
 pub mod page;
+mod paste_key;
 mod picker;
 #[cfg(target_family = "wasm")]
 mod picker_web;
 mod platform;
 mod redraw;
 mod report;
+mod shortcut_modifier;
 mod surface;
 mod surface_texture;
 mod tasks;
+#[cfg(target_family = "wasm")]
+mod text_bridge_web;
+mod text_field;
+mod text_keys;
+#[cfg(target_family = "wasm")]
+mod timer_web;
+mod uncaptured;
 mod waker;
 #[cfg(target_family = "wasm")]
 mod web;
 mod webgpu;
+mod wheel_position;
+#[cfg(target_family = "wasm")]
+mod wheel_position_web;
 mod window;
 
+#[cfg(not(target_family = "wasm"))]
+pub use clipboard::{
+    Clipboard, ClipboardDone, ClipboardImage, ClipboardText, DEADLINE as CLIPBOARD_DEADLINE,
+    MAX_BYTES as CLIPBOARD_MAX_BYTES, SystemClipboard,
+};
 pub use clock::Instant;
 pub use cursor::Cursor;
 pub use device_lost::{DeviceLost, Lost};
 pub use error::PlatformError;
-pub use event::{Event, LINE_PIXELS, TouchPhase};
+pub use event::{Event, LINE_PIXELS, Modifiers, TouchPhase};
 pub use file_kind::FileKind;
-pub use gestures::Gestures;
+pub use gestures::{Gestures, TAP_SLOP};
+pub use paste_key::paste_shortcut;
 pub use platform::Platform;
-pub use report::{report_error, report_status};
+pub use report::{report_error, report_startup, report_status};
+pub use shortcut_modifier::shortcut_is_command;
+pub use surface::pick_format;
+pub use text_field::TextField;
+#[cfg(target_family = "wasm")]
+pub use timer_web::{Timer, page_hidden};
+pub use uncaptured::{Uncaptured, UncapturedErrors};
 pub use waker::{LoopClosed, Waker};
 pub use window::{App, Frame, Next, WindowOptions, run};
 
-/// Hide the page's own HTML controls drawn over the canvas (the Open
-/// button and the status line), for an app that draws its own; errors
-/// are still shown, and a page without the Open button is not an error.
-/// Call it before [`run`]. Natively there is no page, so it does
-/// nothing.
-pub fn hide_page_controls() {
+/// Declare that the app draws its own Open button, so the page needs no
+/// `<button id="open">`: without this call a page lacking one is
+/// reported as an error. A button the page has is hidden. Call it before
+/// [`run`]. Natively there is no page, so it does nothing.
+pub fn app_draws_open() {
     #[cfg(target_family = "wasm")]
-    web::hide_page_controls();
+    web::app_draws_open();
+}
+
+/// Hide the page's `#status` line, for an app whose canvas the line
+/// would cover. It also leaves the browser's accessibility tree, so an
+/// app that keeps `#status` as its announced status does not call it.
+/// Errors still show: `#error`, or `#status` when the page has no
+/// `#error`, is un-hidden whenever an error is written. Call it before
+/// [`run`]. Natively there is no page, so it does nothing.
+pub fn hide_status_line() {
+    #[cfg(target_family = "wasm")]
+    web::hide_status_line();
 }
 
 /// The value of `name` in the page URL's query string (`?demo=hello`).

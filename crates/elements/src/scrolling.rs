@@ -22,7 +22,7 @@ impl Document {
     pub fn scroll_target(&self, point: [f32; 2], delta: [f32; 2]) -> Option<NodeId> {
         let painted = self.painted.as_ref()?;
         let element = painted.hit(point)?;
-        let chain = painted.scroll_chains.from(element);
+        let chain = painted.order.chains.from(element);
         chain
             .into_iter()
             .find(|container| self.scroll.can_move(*container, delta))
@@ -32,7 +32,9 @@ impl Document {
     /// whether it moved.
     pub fn scroll_node_by(&mut self, container: NodeId, delta: [f32; 2]) -> bool {
         let moved = self.scroll.scroll(container, delta);
-        self.changed |= moved;
+        if moved {
+            self.note_change();
+        }
         moved
     }
 
@@ -46,14 +48,18 @@ impl Document {
         let moved = self
             .scroll
             .scroll(element, [offset[0] - at[0], offset[1] - at[1]]);
-        self.changed |= moved;
+        if moved {
+            self.note_change();
+        }
         moved
     }
 
     /// Shows or hides every scroll container's thumbs from the next
     /// update: a touch app shows them only while a gesture scrolls.
     pub fn set_thumbs_shown(&mut self, shown: bool) {
-        self.changed |= self.thumbs_shown != shown;
+        if self.thumbs_shown != shown {
+            self.note_change();
+        }
         self.thumbs_shown = shown;
     }
 

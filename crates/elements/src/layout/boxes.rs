@@ -1,126 +1,103 @@
 //! The box tree: what Taffy lays out, derived from the document on each
 //! update. An element with `display: none` has no box. Each run of a
 //! block's consecutive inline content (text nodes and `display: inline`
-//! elements) becomes one anonymous box holding an [`InlineRun`]; a run
+//! elements) becomes one anonymous box holding an [`InlineRun`](super::inline::InlineRun); a run
 //! that collapses to nothing has no box (the empty anchors `{if}` and
 //! `{for}` leave, and the whitespace between blocks).
 
-use std::collections::HashMap;
+use crate::node_map::NodeMap;
 
-use taffy::{Cache, Display, Layout, Style};
+use rustc_hash::FxHashMap;
+use taffy::{Display, Style};
 use vapors_dom::NodeId;
 
-use super::inline::{Collector, InlineRun, InlineSpan};
+use super::inline::{Collector, InlineSpan};
+pub(crate) use super::layout_box::{Content, LayoutBox};
+use super::owners::KeptChildren;
 use crate::arena::Arena;
 use crate::node::Kind;
 use crate::style::Used;
 
-/// What a box is.
-#[derive(PartialEq)]
-pub(crate) enum Content {
-    /// An element's box; its children are boxes too.
-    Element(NodeId),
-    /// An anonymous box holding an inline run.
-    Text(InlineRun),
-}
-
-/// One box: its content, Taffy style, children, and Taffy's results.
-pub(crate) struct LayoutBox {
-    pub(crate) content: Content,
-    pub(crate) style: Style,
-    pub(crate) children: Vec<usize>,
-    pub(crate) cache: Cache,
-    pub(crate) layout: Layout,
-    /// The out-of-flow (absolute and fixed) boxes this box is the
-    /// containing block of, as Taffy hoists them; their layouts are
-    /// relative to this box.
-    pub(crate) hoisted: Vec<usize>,
-    /// The natural size of the image an `img` shows, CSS px; a kept
-    /// layout is lent only to a box with the same.
-    pub(crate) natural: Option<[f32; 2]>,
-    /// The image an `img` shows, for paint.
-    pub(crate) image: Option<std::rc::Rc<vapors_scene::RgbaImage>>,
-}
-
-impl LayoutBox {
-    pub(crate) fn new(content: Content, style: Style) -> Self {
-        Self {
-            content,
-            style,
-            children: Vec::new(),
-            cache: Cache::new(),
-            layout: Layout::with_order(0),
-            hoisted: Vec::new(),
-            natural: None,
-            image: None,
-        }
-    }
-
-    /// A box showing an image of `natural` size (CSS px), when it has
-    /// one: a replaced box, which Taffy does not stretch, measured from its
-    /// natural size and its limits (`replaced::size`).
-    pub(crate) fn replaced(
-        content: Content,
-        mut style: Style,
-        (natural, image): (
-            Option<[f32; 2]>,
-            Option<std::rc::Rc<vapors_scene::RgbaImage>>,
-        ),
-    ) -> Self {
-        if natural.is_some() {
-            style.item_is_replaced = true;
-        }
-        Self {
-            natural,
-            image,
-            ..Self::new(content, style)
-        }
-    }
-}
-
-/// What building reads: the tree and each element's used style.
-struct Source<'a> {
-    arena: &'a Arena,
-    used: &'a HashMap<NodeId, Used>,
-    images: &'a crate::images::Images,
+/// What building reads: the tree, each element's used style, the
+/// images, and the focused number field with its selection.
+pub(crate) struct Source<'a> {
+    pub(crate) arena: &'a Arena,
+    pub(crate) used: &'a NodeMap<Used>,
+    pub(crate) images: &'a crate::images::Images,
+    /// The focused text or number field's marks (E6a, 3-E3c).
+    pub(crate) text_marks: Option<(NodeId, crate::text_marks::TextMarks)>,
 }
 
 /// Builds the boxes under `root`; box 0 is the root's.
-pub(crate) fn build(
-    arena: &Arena,
-    used: &HashMap<NodeId, Used>,
-    images: &crate::images::Images,
-    root: NodeId,
-) -> Vec<LayoutBox> {
+pub(crate) fn build(source: &Source<'_>, root: NodeId) -> Vec<LayoutBox> {
     let mut boxes = Vec::new();
-    add_element(
-        &Source {
-            arena,
-            used,
-            images,
-        },
-        root,
-        &mut boxes,
-    );
+    add_element(source, root, &mut boxes, None);
     boxes
 }
 
-fn add_element(source: &Source<'_>, node: NodeId, boxes: &mut Vec<LayoutBox>) -> Option<usize> {
+/// Builds `owner`'s box and its children's, with a placeholder for
+/// each `kept` child in place of its subtree; the boxes, and each
+/// placeholder's index with the kept child's slot.
+pub(crate) fn build_shallow(
+    source: &Source<'_>,
+    owner: NodeId,
+    kept: &KeptChildren,
+) -> (Vec<LayoutBox>, FxHashMap<usize, usize>) {
+    let mut boxes = Vec::new();
+    add_element(source, owner, &mut boxes, Some(kept));
+    let placeholder = |&index: &usize| match boxes[index].content {
+        Content::Element(node) => Some((index, *kept.get(&node)?)),
+        _ => None,
+    };
+    let placeholders = boxes
+        .first()
+        .map(|owner| owner.children.iter().filter_map(placeholder));
+    let placeholders = placeholders.into_iter().flatten().collect();
+    (boxes, placeholders)
+}
+
+fn add_element(
+    source: &Source<'_>,
+    node: NodeId,
+    boxes: &mut Vec<LayoutBox>,
+    kept: Option<&KeptChildren>,
+) -> Option<usize> {
     let style = &source.used[&node];
     if style.layout.display == Display::None {
         return None;
     }
     let index = boxes.len();
-    boxes.push(LayoutBox::replaced(
+    let range = crate::range::of_element(source.arena, node);
+    let checked = source
+        .arena
+        .get(node, "build")
+        .element()
+        .and_then(crate::checkbox::checked_of);
+    let natural = source
+        .images
+        .natural(source.arena, node)
+        .or_else(|| crate::svg::natural(source.arena, node))
+        .or(range.map(|_| crate::range::NATURAL_SIZE))
+        .or(checked.map(|_| crate::checkbox::NATURAL_SIZE));
+    let mut replaced = LayoutBox::replaced(
         Content::Element(node),
-        style.layout.clone(),
-        (
-            source.images.natural(source.arena, node),
-            source.images.of(source.arena, node).cloned(),
-        ),
-    ));
+        crate::svg::layout_style(source.arena, node, &style.layout),
+        (natural, source.images.of(source.arena, node).cloned()),
+        checked.is_some(),
+    );
+    replaced.icon = crate::svg_paint::icon(source.arena, node);
+    replaced.surface = crate::surfaces::name(source.arena, node).map(Into::into);
+    replaced.range = range;
+    replaced.checked = checked;
+    let field_text = super::field_box::fill(source, node, &mut replaced);
+    boxes.push(replaced);
     let mut run = Collector::new(style.text, style.visible);
-    for child in source.arena.children(node) {
+    // a number or text field's text is its run; a blank one keeps its
+    // line with a no-break space, which paints nothing (3-E3c, E6a)
+    if let Some(text) = field_text {
+        run.push_text(if text.is_empty() { "\u{a0}" } else { &text });
+    }
+    for child in box_children(source.arena, node) {
         match &source.arena.get(child, "build").kind {
             Kind::Text(text) => run.push_text(text),
             // No box, and no break in the run around it (CSS Display 3,
@@ -130,7 +107,11 @@ fn add_element(source: &Source<'_>, node: NodeId, boxes: &mut Vec<LayoutBox>) ->
             Kind::Element(_) => {
                 let ended = std::mem::replace(&mut run, Collector::new(style.text, style.visible));
                 add_run(ended, index, boxes);
-                if let Some(child_box) = add_element(source, child, boxes) {
+                let child_box = match kept {
+                    Some(kept) if kept.contains_key(&child) => Some(placeholder(child, boxes)),
+                    _ => add_element(source, child, boxes, None),
+                };
+                if let Some(child_box) = child_box {
                     boxes[index].children.push(child_box);
                 }
             }
@@ -138,6 +119,21 @@ fn add_element(source: &Source<'_>, node: NodeId, boxes: &mut Vec<LayoutBox>) ->
     }
     add_run(run, index, boxes);
     Some(index)
+}
+
+/// A placeholder for kept `child`'s box; its index.
+fn placeholder(child: NodeId, boxes: &mut Vec<LayoutBox>) -> usize {
+    boxes.push(LayoutBox::new(Content::Element(child), Style::default()));
+    boxes.len() - 1
+}
+
+/// The children of `node` that may have boxes: none for an `svg`,
+/// whose paths are drawn as its content (docs/icons.md, Layout).
+fn box_children(arena: &Arena, node: NodeId) -> Vec<NodeId> {
+    if crate::svg::is(arena, node, "svg") {
+        return Vec::new();
+    }
+    arena.children(node)
 }
 
 /// An inline element's text into `run`, its inline descendants' too.

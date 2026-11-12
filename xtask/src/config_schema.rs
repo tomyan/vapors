@@ -18,13 +18,17 @@ const TABLES: [(&str, Keys); 17] = [
     ("dev", Keys::Only(&["port", "words", "https"])),
     (
         "serve",
-        Keys::Only(&["dir", "https", "path", "check", "check_seconds"]),
+        Keys::Only(&["dir", "https", "path", "check", "check_seconds", "port"]),
     ),
     ("files", Keys::Only(&["max_lines"])),
     ("build", Keys::Only(&["jobs"])),
+    (
+        "load",
+        Keys::Only(&["wait", "threshold", "deadline_minutes"]),
+    ),
     ("files.allow", Keys::Any),
     ("files.generated", Keys::Any),
-    ("gate", Keys::Only(&["twin"])),
+    ("gate", Keys::Only(&["twin", "hide_gpu_device"])),
     ("gate.setup", Keys::Any),
     ("gate.actions", Keys::Any),
     ("gate.pinned", Keys::Any),
@@ -33,6 +37,10 @@ const TABLES: [(&str, Keys); 17] = [
     ("server_only.builds", Keys::Any),
     ("ux", Keys::Only(&UX_KEYS)),
     ("ux.design", Keys::Any),
+    (
+        "queue",
+        Keys::Only(&["repo", "merge_on", "run", "log", "serve"]),
+    ),
 ];
 
 /// `[ux]`, read by `ux_config`.

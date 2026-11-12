@@ -9,7 +9,7 @@ The brief is `UI-FRAMEWORK-BRIEF.md` section 3 in the touche repository.
 | Concern | Crate | Pinned | Why this one |
 |---|---|---|---|
 | Font collection, fallback | fontique | 0.12.0 | Parley's own; system fonts through fontconfig (dlopen) on Linux, none on the web |
-| Shaping, bidi, line breaking | parley | 0.12.0 | Ranged styles, `complex-scripts` on |
+| Shaping, bidi, line breaking | parley | 0.12.0 | Ranged styles; `complex-scripts` behind vapors-text's `complex-script-breaks` feature (default on; crates/text/Cargo.toml says what turning it off costs) |
 | Outlines, hinting | skrifa | 0.44.0 | The release that shares fontique's read-fonts 0.41; its autohinter does the light hinting |
 | Rasterisation | zeno | 0.3.3 | The rasteriser swash wraps; used directly, so there is no extra layer and no cap on the skrifa version |
 
@@ -162,8 +162,9 @@ or `cargo nextest run -E 'test(/^gpu_/)'`, not `cargo test`.
 - Colour emoji (COLRv1 and bitmap glyphs): the RGBA8 page exists, nothing
   is rasterised into it yet.
 - Large text above about 64 px through a capped atlas size or paths.
-- Atlas uploads copy the whole page when anything changed, and the text
-  pipeline makes a bind group per draw; per-rectangle uploads and a kept
-  bind group when either shows in a profile.
+- The text pipeline makes a bind group per draw; a kept bind group when
+  it shows in a profile. (Atlas uploads already copy only the rectangle
+  bounding the glyphs added since the last upload, or the whole page when
+  it is new or was repacked.)
 - Per-platform parameters for macOS and Windows, and the native text
   view comparison the brief asks for on those platforms.

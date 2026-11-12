@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <title>vapors demos</title>
+    <link rel="icon" href="data:," />
     <link data-trunk rel="rust" />
     <style>
       html, body { margin: 0; height: 100%; background: #282828; }
@@ -15,6 +16,40 @@
   </head>
   <body>
     <canvas id="vapors"></canvas>
+    <script>
+      if (new URLSearchParams(location.search).get('demo') === 'racer') {
+        const canvas = document.getElementById('vapors');
+        const usable = (width, height) =>
+          width > 0 && height > 0 && Number.isFinite(width + height);
+        // A zero-size visualViewport (a hidden or detached page) counts as
+        // inactive: the window's size is used instead.
+        const size = () => {
+          const viewport = window.visualViewport;
+          if (viewport && usable(viewport.width, viewport.height)) {
+            return [viewport.width, viewport.height];
+          }
+          return [innerWidth, innerHeight];
+        };
+        const report = (message) => {
+          const error = document.getElementById('error');
+          if (!error) throw new Error(message);
+          error.textContent = message;
+          error.hidden = false;
+        };
+        const resize = () => {
+          const [width, height] = size();
+          if (!usable(width, height)) {
+            report(`racer viewport is ${width}x${height}; it must be finite and positive`);
+            return;
+          }
+          canvas.style.width = `${width}px`;
+          canvas.style.height = `${height}px`;
+        };
+        window.visualViewport?.addEventListener('resize', resize);
+        window.addEventListener('resize', resize);
+        resize();
+      }
+    </script>
     <button id="open">Open</button>
     <p id="status">starting</p>
     <p id="error" role="alert" hidden></p>

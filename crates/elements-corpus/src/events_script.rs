@@ -5,18 +5,36 @@
 //!
 //! - `at WxH`: the viewport, at most once.
 //! - `listen <type>…`: the event types logged, once, before any action.
-//! - Actions: `click X Y`, `tap X Y`, `press X Y`, `release X Y`,
-//!   `move X Y`, `wheel X Y DX DY` (CSS px, DOM signs), `key <Key>` with
-//!   `+`-joined modifiers (`Shift+Tab`), `type "<text>"`, `frame`.
+//! - `capture <target>…`: elements that capture the pointer on
+//!   `pointerdown` (`setPointerCapture` in Chromium), at most once.
+//! - `cancel <target>…`: elements whose `pointerdown` listener prevents
+//!   its default, at most once.
+//! - `page <file>`: Chromium plays the script on `fixtures/<file>` in
+//!   place of the fixture's page, at most once.
+//! - `project <role>…`: after each step, the a11y projection of every
+//!   node with one of these roles (`ax_projection`), at most once.
+//! - Touch: `touch-down X Y`, `touch-move X Y`, `touch-up X Y`, one finger.
+//! - Actions: `click X Y`, `double-click X Y`, `triple-click X Y`,
+//!   `tap X Y`, `press X Y`, `release X Y`, `move X Y`,
+//!   `wheel X Y DX DY` (CSS px, DOM signs), `key <Key>` with
+//!   `+`-joined modifiers (`Shift+Tab`), `type "<text>"`, `frame`;
+//!   `clipboard "<text>"` (`\n` a line break) sets the text a following
+//!   `key Control+v` pastes, and needs no expectation.
 //! - After an action, what must hold once it is done:
 //!   `expect event <type> <target>`, `expect no event <type>` (a type
 //!   that is listened for), `expect focus <target>`,
-//!   `expect focus-visible <target>`. A target is `tag#id`, else the
+//!   `expect focus-visible <target>`, `expect value <target> <text>` (a
+//!   control's `value`; quoted when empty or holding spaces, `"a b"`),
+//!   `expect checked <target>
+//!   true|false`, `expect selection <target> <start> <end>` (a text
+//!   field's selection, UTF-16 units). A target is `tag#id`, else the
 //!   full child-index path from body.
 //!
 //! Anything else is refused, naming the file and line.
 
 use crate::events_action::{action, exactly, is_action};
+use crate::events_expect::expect;
+use crate::events_fields::{at, listen, page, project_roles};
 
 /// A parsed script.
 #[derive(Debug, Default)]
@@ -25,6 +43,17 @@ pub struct Script {
     pub viewport: Option<(u32, u32)>,
     /// `listen`'s event types.
     pub listen: Vec<String>,
+    /// `capture`'s targets: each captures the pointer on `pointerdown`.
+    pub capture: Vec<String>,
+    /// `cancel`'s targets: each prevents its `pointerdown`'s default.
+    pub cancel: Vec<String>,
+    /// `page`: the file under `fixtures/` Chromium plays the script on,
+    /// in place of the fixture's own page (another page's own script,
+    /// such as APG's example, as the browser's answer).
+    pub page: Option<String>,
+    /// `project`'s roles: after each step, the a11y projection of every
+    /// node with one of them.
+    pub project: Vec<String>,
     /// The actions, each with the expectations after it.
     pub steps: Vec<Step>,
 }
@@ -40,54 +69,40 @@ pub struct Step {
     pub line: usize,
 }
 
-/// An input, in CSS px.
-#[derive(Debug, PartialEq)]
-pub enum Action {
-    /// Press and release the left button.
-    Click(f64, f64),
-    /// A touch's start and end.
-    Tap(f64, f64),
-    /// Press the left button.
-    Press(f64, f64),
-    /// Release the left button.
-    Release(f64, f64),
-    /// Move the pointer.
-    Move(f64, f64),
-    /// A wheel turn at x, y by dx, dy.
-    Wheel {
-        /// Where, across.
-        x: f64,
-        /// Where, down.
-        y: f64,
-        /// How far across, positive to the right.
-        dx: f64,
-        /// How far down, positive down.
-        dy: f64,
-    },
-    /// A key, with `+`-joined modifiers.
-    Key(String),
-    /// Text, one key per character.
-    Type(String),
-    /// Wait for the next painted frame.
-    Frame,
-}
+pub use crate::events_steps::{Action, Expect};
 
-/// What must hold after an action.
-#[derive(Debug, PartialEq)]
-pub enum Expect {
-    /// An event of `kind` at `target` was logged.
-    Event {
-        /// The event type.
-        kind: String,
-        /// Where it was dispatched.
-        target: String,
-    },
-    /// No event of this type was logged.
-    NoEvent(String),
-    /// This element has focus.
-    Focus(String),
-    /// This element has focus and matches `:focus-visible`.
-    FocusVisible(String),
+impl Script {
+    /// The controls whose `value` the script expects somewhere, sorted
+    /// and each once: every step records each one's value.
+    #[must_use]
+    pub fn value_targets(&self) -> Vec<String> {
+        self.targets(|expect| match expect {
+            Expect::Value { target, .. } => Some(target),
+            _ => None,
+        })
+    }
+
+    /// The checkboxes whose `checked` the script expects somewhere,
+    /// sorted and each once: every step records each one's state.
+    #[must_use]
+    pub fn checked_targets(&self) -> Vec<String> {
+        self.targets(|expect| match expect {
+            Expect::Checked { target, .. } => Some(target),
+            _ => None,
+        })
+    }
+
+    fn targets(&self, pick: fn(&Expect) -> Option<&String>) -> Vec<String> {
+        let mut targets: Vec<String> = self
+            .steps
+            .iter()
+            .flat_map(|step| step.expect.iter())
+            .filter_map(|(expect, _)| pick(expect).cloned())
+            .collect();
+        targets.sort();
+        targets.dedup();
+        targets
+    }
 }
 
 /// The script `text` of fixture `name`.
@@ -118,7 +133,7 @@ fn checked(name: &str, script: Script) -> Result<Script, String> {
     if let Some(step) = script
         .steps
         .iter()
-        .find(|s| s.expect.is_empty() && s.action != Action::Frame)
+        .find(|s| s.expect.is_empty() && !matches!(s.action, Action::Frame | Action::Clipboard(_)))
     {
         return Err(format!(
             "{name}.events:{}: a step with no expectation",
@@ -153,7 +168,26 @@ fn directive(script: &mut Script, line: &str, number: usize) -> Result<(), Strin
             .map(|size| script.viewport = Some(size)),
         "listen" if !script.listen.is_empty() => Err("a second `listen`".into()),
         "listen" => listen(rest).map(|types| script.listen = types),
-        "expect" => expect(script, &fields, number),
+        "cancel" if !script.cancel.is_empty() => Err("a second `cancel`".into()),
+        "cancel" if fields.is_empty() => Err("`cancel` takes targets".into()),
+        "cancel" => {
+            script.cancel = fields.iter().map(|f| (*f).to_owned()).collect();
+            Ok(())
+        }
+        "capture" if !script.capture.is_empty() => Err("a second `capture`".into()),
+        "capture" if fields.is_empty() => Err("`capture` takes targets".into()),
+        "capture" => {
+            script.capture = fields.iter().map(|f| (*f).to_owned()).collect();
+            Ok(())
+        }
+        "page" if script.page.is_some() => Err("a second `page`".into()),
+        "page" => exactly(word, &fields, 1)
+            .and_then(|()| page(fields[0]))
+            .map(|file| script.page = Some(file)),
+        "project" if !script.project.is_empty() => Err("a second `project`".into()),
+        "project" if fields.is_empty() => Err("`project` takes roles".into()),
+        "project" => project_roles(&fields).map(|roles| script.project = roles),
+        "expect" => expect(script, rest, &fields, number),
         _ if script.listen.is_empty() && is_action(word) => Err("an action before `listen`".into()),
         _ => action(word, &fields, rest).map(|action| {
             script.steps.push(Step {
@@ -165,48 +199,9 @@ fn directive(script: &mut Script, line: &str, number: usize) -> Result<(), Strin
     }
 }
 
-fn at(rest: &str) -> Result<(u32, u32), String> {
-    let size = rest.split_whitespace().next().unwrap_or_default();
-    let parsed = size
-        .split_once('x')
-        .and_then(|(w, h)| Some((w.parse::<u32>().ok()?, h.parse::<u32>().ok()?)))
-        .filter(|(w, h)| *w > 0 && *h > 0);
-    parsed.ok_or_else(|| "`at` takes WxH".to_owned())
-}
-
-fn listen(rest: &str) -> Result<Vec<String>, String> {
-    let types: Vec<String> = rest.split_whitespace().map(str::to_owned).collect();
-    if types.is_empty() {
-        return Err("`listen` takes event types".into());
-    }
-    Ok(types)
-}
-
-fn expect(script: &mut Script, fields: &[&str], number: usize) -> Result<(), String> {
-    let wanted = match fields.first().copied() {
-        Some("event" | "no") => 3,
-        Some("focus" | "focus-visible") => 2,
-        _ => fields.len(),
-    };
-    exactly("expect", fields, wanted)?;
-    let expectation = match fields {
-        ["event", kind, target] => Expect::Event { kind: (*kind).into(), target: (*target).into() },
-        ["no", "event", kind] if !script.listen.iter().any(|t| t == kind) => {
-            return Err(format!("`{kind}` is not listened for, so expecting none of it proves nothing"));
-        }
-        ["no", "event", kind] => Expect::NoEvent((*kind).into()),
-        ["focus", target] => Expect::Focus((*target).into()),
-        ["focus-visible", target] => Expect::FocusVisible((*target).into()),
-        _ => return Err("`expect` takes event <type> <target>, no event <type>, focus <target> or focus-visible <target>".into()),
-    };
-    let step = script
-        .steps
-        .last_mut()
-        .ok_or("an expectation before any action")?;
-    step.expect.push((expectation, number));
-    Ok(())
-}
-
+#[cfg(test)]
+#[path = "events_script_capture_tests.rs"]
+mod capture_tests;
 #[cfg(test)]
 #[path = "events_script_tests.rs"]
 mod tests;

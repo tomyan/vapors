@@ -3,11 +3,13 @@
 //! not implement is an error, never drawn as a `div`.
 
 /// Tags laid out and painted now: block-level containers, the inline
-/// elements of F2c S6, and `img` (S10).
+/// elements of F2c S6, `img` (S10), `gpu-surface` (docs/gpu-surface.md),
+/// the `svg` icon and its `path`s (docs/icons.md) and `input` (3-E3; `check` refuses the types not built yet).
 const SUPPORTED: &[&str] = &[
     "html",
     "body",
     "button",
+    "input",
     "div",
     "p",
     "h1",
@@ -28,6 +30,9 @@ const SUPPORTED: &[&str] = &[
     "figcaption",
     "hr",
     "img",
+    "gpu-surface",
+    "svg",
+    "path",
     "span",
     "b",
     "strong",
@@ -48,9 +53,9 @@ const LATER: &[(&str, &[&str])] = &[
     (
         "F4",
         &[
-            "input", "textarea", "select", "option", "optgroup", "label", "fieldset", "legend",
-            "ul", "ol", "li", "pre", "table", "caption", "col", "colgroup", "tbody", "thead",
-            "tfoot", "tr", "td", "th", "meter", "progress",
+            "textarea", "select", "option", "optgroup", "label", "fieldset", "legend", "ul", "ol",
+            "li", "pre", "table", "caption", "col", "colgroup", "tbody", "thead", "tfoot", "tr",
+            "td", "th", "meter", "progress",
         ],
     ),
     ("F5", &["dialog", "details", "summary"]),
@@ -72,8 +77,29 @@ pub(crate) fn unsupported(tag: &str) -> Option<String> {
     ))
 }
 
-/// The events the tree fires (F2c S2).
-pub(crate) const FIRED: &[&str] = &["click", "pointerdown", "pointermove", "pointerup"];
+/// The events the tree fires (F2c S2; capture, 3-E1a; touches, 3-E1b;
+/// keys and focus, 3-E2a; a range's value, 3-E3a; a text field's
+/// selection, E6a; the second click in a row, for touché's card).
+pub const FIRED: &[&str] = &[
+    "click",
+    "dblclick",
+    "pointerdown",
+    "pointermove",
+    "pointerup",
+    "gotpointercapture",
+    "lostpointercapture",
+    "pointercancel",
+    "keydown",
+    "keyup",
+    "focus",
+    "blur",
+    "focusin",
+    "focusout",
+    "input",
+    "change",
+    "selectionchange",
+    "paste",
+];
 
 /// `None` when the tree fires `event`; otherwise why not.
 pub(crate) fn unfired(event: &str) -> Option<String> {
@@ -81,7 +107,7 @@ pub(crate) fn unfired(event: &str) -> Option<String> {
         return None;
     }
     Some(format!(
-        "on{event}: vapors-elements never fires `{event}`; it fires {} (docs/F2c.md), so this listener would never run",
+        "on{event}: vapors-elements never fires `{event}` and no component declares it (a Dispatcher's events); it fires {} (docs/F2c.md), so this listener would never run",
         FIRED.join(", ")
     ))
 }

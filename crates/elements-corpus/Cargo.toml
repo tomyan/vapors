@@ -11,15 +11,19 @@ publish = false
 [dependencies]
 vapors-dom.workspace = true
 vapors-signals.workspace = true
-vapors-elements.workspace = true
-vapors-text.workspace = true
+vapors-elements = { workspace = true, features = ["complex-script-breaks", "grid"] }
+vapors-text = { workspace = true, features = ["complex-script-breaks"] }
 vapors-devtools.workspace = true
+vapors-components.workspace = true
 serde_json = "=1.0.154"
+# The oracles' work directory (oracle_files.rs).
+tempfile.workspace = true
 
 [dev-dependencies]
-vapors-canvas.workspace = true
+vapors-platform.workspace = true
+vapors-canvas = { workspace = true, features = ["complex-script-breaks"] }
 wgpu.workspace = true
-vapors-app.workspace = true
+vapors-app = { workspace = true, features = ["complex-script-breaks"] }
 vapors-renderer.workspace = true
 vapors-scene.workspace = true
 vapors-gpu-harness.workspace = true

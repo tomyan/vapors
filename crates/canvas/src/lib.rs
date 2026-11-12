@@ -6,13 +6,21 @@
 
 mod image_app;
 mod image_view;
+mod image_view_area;
 mod image_view_draw;
+mod image_view_input;
+mod image_view_painter;
 mod label;
 #[cfg(test)]
 mod pinch_tests;
 mod png;
+#[cfg(test)]
+mod tap_tests;
 
 pub use image_app::ImageApp;
 pub use image_view::{ImageView, RgbaImage};
+pub use image_view_area::Insets;
+pub use image_view_input::Answered;
+pub use image_view_painter::ImagePainter;
 pub use label::{INK, LabelDraw, STRIP_COLOR, STRIP_HEIGHT, label_text, strip_height};
 pub use png::decode_png;

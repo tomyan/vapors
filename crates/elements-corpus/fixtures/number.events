@@ -1,0 +1,194 @@
+# A number field by mouse and keys (3-E3c). `amount` is x 0..100, y 0..24,
+# 0..1000 by 1 at 20; `off` is x 200..300 and disabled; the button is x
+# 300..380. A typed value outside the range is kept on commit, as
+# typed; over the max a step up does nothing and a step down comes back
+# to the max (HTML's stepUp and stepDown); on `plain`, by 10 to 95, a
+# step back goes to the bound itself, and a step up at the max does
+# nothing. Control+A selects the text whole, so typing replaces it and
+# Backspace clears it. Then the caret and selection, as a text field's:
+# the arrows, Home and End move the caret, Shift extends the selection,
+# typing, Backspace and Delete act at the caret; a press places the
+# caret, a drag selects, a double click selects the number after a sign.
+# Chromium has no selectionStart on a number field, so the value says
+# where the caret was.
+listen pointerdown pointerup click input change keydown keyup focusin focusout
+click 50 12                   a click focuses amount; a text field always shows the ring
+expect event click input#amount
+expect focus-visible input#amount
+expect value input#amount 20
+type "5"                      typed after the caret, at the end: 205
+expect event input input#amount
+expect value input#amount 205
+key Backspace                 back to 20
+expect event input input#amount
+expect value input#amount 20
+type "a"                      a letter is not typed into a number field
+expect no event input
+expect value input#amount 20
+key Backspace                 2
+expect value input#amount 2
+type "7"                      27
+expect value input#amount 27
+key Enter                     commits: change
+expect event change input#amount
+expect value input#amount 27
+key Enter                     committed already: no change
+expect no event change
+key ArrowUp                   a step, with input and change
+expect event input input#amount
+expect event change input#amount
+expect value input#amount 28
+key ArrowDown
+expect value input#amount 27
+key Tab                       on to plain; the value was committed by the arrow, so no change
+expect no event change
+expect focus-visible input#plain
+key Shift+Tab                 back by keyboard: the text is selected whole
+expect focus-visible input#amount
+type "9"                      replaces it: 9
+expect event input input#amount
+expect value input#amount 9
+click 340 12                  the button: amount blurs and commits
+expect event focusout input#amount
+expect event change input#amount
+expect focus button#after
+expect value input#amount 9
+key Shift+Tab                 back past off (disabled) to plain
+expect focus-visible input#plain
+key Shift+Tab                 to amount, its text selected whole
+expect focus-visible input#amount
+type "1500"                   over the max of 1000
+expect value input#amount 1500
+key Enter                     commits as typed, with change: no clamp
+expect event change input#amount
+expect value input#amount 1500
+key ArrowUp                   over the max, a step up does nothing
+expect no event change
+expect value input#amount 1500
+key ArrowDown                 a step down comes back to the max
+expect event input input#amount
+expect event change input#amount
+expect value input#amount 1000
+key Tab                       to plain, 0..95 by 10, its text selected whole
+expect focus-visible input#plain
+type "105"                    over the max, off the steps
+expect value input#plain 105
+key Enter
+expect event change input#plain
+expect value input#plain 105
+key ArrowDown                 back to the max itself, not 105 less a step
+expect event change input#plain
+expect value input#plain 95
+key ArrowUp                   at the max, off the steps: up does nothing, not down to 90
+expect no event change
+expect value input#plain 95
+key Shift+Tab
+expect focus-visible input#amount
+key Tab                       selected whole again
+expect focus-visible input#plain
+type "-3"                     under the min
+expect value input#plain -3
+key Enter
+expect value input#plain -3
+key ArrowUp                   back to the min
+expect event change input#plain
+expect value input#plain 0
+key Control+a                 selects the text whole, as in a text field
+expect no event input
+type "4"                      replaces it: 4
+expect event input input#plain
+expect value input#plain 4
+key Control+a
+expect no event input
+key Backspace                 clears the selected text
+expect event input input#plain
+expect value input#plain ""
+type "6"                      6
+expect value input#plain 6
+key Enter                     commits 6
+expect event change input#plain
+expect value input#plain 6
+key Control+a                 selected, then a step: 6 is off the steps, up to 10
+expect no event input
+key ArrowUp
+expect event input input#plain
+expect value input#plain 10
+type "5"                      after a step the text is not selected: typed at the end
+expect value input#plain 105
+key Enter
+expect event change input#plain
+expect value input#plain 105
+key Control+Shift+a           Shift held: not select-all
+expect no event input
+type "1"                      typed at the end
+expect value input#plain 1051
+key Enter
+expect event change input#plain
+expect value input#plain 1051
+click 250 12                  off is disabled: no click, no focus
+expect event pointerdown input#off
+expect no event click
+expect focus body
+key ArrowUp                   with nothing focused, nothing steps
+expect no event input
+click 90 12                   amount again, past the text: the caret at the end
+expect focus input#amount
+key Control+a
+expect no event input
+type "12.5"                   from here, the caret and selection
+expect value input#amount 12.5
+type "4"                      12.54
+expect event input input#amount
+expect value input#amount 12.54
+key ArrowLeft                 before the 4
+expect no event input
+key ArrowLeft                 before the 5
+expect no event input
+type "0"                      12.054
+expect value input#amount 12.054
+key Backspace                 the 0 before the caret goes: 12.54
+expect value input#amount 12.54
+key Home
+expect no event input
+type "3"                      at the start: 312.54
+expect value input#amount 312.54
+key Delete                    the 1 after the caret goes: 32.54
+expect value input#amount 32.54
+key End
+expect no event input
+key Shift+ArrowLeft
+expect no event input
+key Shift+ArrowLeft           54 selected
+expect no event input
+type "7"                      typed over it: 32.7
+expect value input#amount 32.7
+key Shift+Home                all selected
+expect no event input
+type "8"                      8
+expect value input#amount 8
+key ArrowUp                   a step still steps: 9, the caret at the end
+expect event input input#amount
+expect event change input#amount
+expect value input#amount 9
+type "1"                      91
+expect value input#amount 91
+click 2 12                    a press before the text: the caret at the start
+expect no event input
+type "5"                      591
+expect value input#amount 591
+press 2 12                    a drag over the text selects it
+expect no event input
+move 90 12
+expect no event input
+release 90 12
+expect no event input
+type "6"                      6
+expect value input#amount 6
+key Control+a
+expect no event input
+type "-12.5"
+expect value input#amount -12.5
+double-click 14 12            on the 1 of 12
+expect no event input
+type "3"
+expect value input#amount -3

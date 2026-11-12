@@ -49,6 +49,7 @@ when the component mounts. Some `let` forms have a special meaning:
 | `#[prop] let label: String = "Count".into();` | a field of `CounterProps`, with that value as its default |
 | `let increment = move \|\| ..;` | a handler. A closure with no parameters is wrapped so it can take an event. |
 | `use crate::todo_item::{TodoItem, TodoItemProps};` | brings a child component into scope for its tag |
+| `#[dispatcher(pick)] let events;` | a `vapors_dom::Dispatcher` for the component's own events (doc 03, "A component's own events"); at most one, with no other attribute on that `let` |
 
 A signal or memo needs its type written out, because it becomes a struct
 field. `let count = Signal::new(0)` is refused, and the message gives
@@ -87,14 +88,27 @@ the one difference from the brief in this slice.
   Each name may appear once.
 - **Events:** `onclick={handler}` listens for `click`. The event name
   is the attribute name after `on`. The handler is a script closure or
-  an inline closure that takes `&mut Event`. Events bubble.
+  an inline closure that takes `&mut Event`. It returns `()` or
+  `Result<(), E>` with `E: Display`, so it may use `?`; an `Err` goes to
+  the app's error report. A handler is `Fn`, since a listener may run
+  again inside itself when it dispatches: it keeps its state in a
+  signal or a `Cell`, and one that assigns to a binding it captures
+  (`n += 1`, `&mut n`) is refused, naming the binding. Events bubble.
   `event.stop_propagation()` and `event.prevent_default()` work as in
   the DOM.
 - **Bindings:** `bind:value={signal}` on `input`, `textarea` and
   `select`, and `bind:checked={signal}` on a checkbox or radio. The
   signal sets the property, and the control's event (`input`, or
-  `change` for `select` and `checked`) sets the signal. A binding plus
-  a handler for the same event is refused.
+  `change` for `select` and `checked`) sets the signal. On an `input`
+  whose `type` is `range` or `number` the value is a number
+  (`Signal<f64>`, `event.value_as_number()`), elsewhere text, so the
+  `type` is written as a literal; a number field's binding updates on
+  `change` (Enter, blur, a step), since its text is a number only once
+  committed. A number set on a number field shows at its `step`
+  attribute's precision (0.5000001 by 0.01 shows "0.50"), while its
+  value keeps the full number; Chromium shows the full number
+  (`crates/elements/src/number_shown.rs`). A binding plus a handler for
+  the same event is refused.
 - **Conditionals:** `{if cond} .. {else} .. {/if}`. There is no
   `{else if}`. Nest an `{if}` inside the `{else}` instead.
 - **Loops:** `{for (i, x) in expr key=expr} .. {/for}` or
@@ -105,6 +119,44 @@ the one difference from the brief in this slice.
   same name with `Props` appended must name its props struct, so a
   plain tag needs a `use` in the script. Attributes become props, and unset props take their
   defaults. `bind:value={s}` on a component passes the signal itself.
+- **Children:** markup inside a component tag is the child's
+  `children` prop, a `Snippet`. The child declares it, `#[prop] let
+  children: Snippet = Snippet::empty();`, and places it with
+  `{render children()}`. A tag passing a prop its component does not
+  declare, children included, is refused when the component is in the
+  same directory.
+- **Snippets:** `{snippet name(param: Type, ...)} .. {/snippet}`
+  declares a piece of template, and `{render name(args)}` builds it in
+  place. A snippet is visible in the list it is declared in and in the
+  lists inside it, and may be rendered before it is declared or by a
+  snippet declared before it. A snippet declared directly inside a
+  component tag is the child's prop of that name (a `Snippet<(Type,
+  ...)>`). A local snippet passed by name in an attribute, `<List
+  row={b} />`, is passed as a clone, so `b` can still be rendered.
+- **Rendering an expression:** `{render expr(args)}`, where `expr` is
+  anything that yields a `Snippet`, an `Option<Snippet>` (`None`
+  renders nothing) or a reference to either: `cards.get(&kind)`,
+  `(if a { x.clone() } else { y.clone() })`, or the name of a signal or
+  memo holding one. It is read in an effect, and the snippet shown is
+  rebuilt when `expr` yields a different snippet. Snippets compare by
+  identity (clones of one snippet are equal; two built alike are not),
+  so create snippets once: one made inside the expression, on every
+  read, is rebuilt on every change of what the expression reads.
+  By name, in place, are local snippets and props declared `Snippet` or
+  `Snippet<..>`; anything else, an `Option<Snippet>` prop included,
+  takes the expression route, where rustc checks the type against
+  `Renderable` (in the generated file). `None` always renders nothing,
+  silently: there is no way to say a snippet was expected.
+- **Snippet parameters are reactive.** The render passes its arguments
+  as a closure, and each parameter is a `Memo` of its argument, so a
+  snippet follows its arguments as they change: a kept `{for}` row whose
+  item changes updates its snippet in place. A parameter reads as its
+  value in a hole and in a render's arguments, and as the memo in
+  attributes and conditions (`name.get()`), as a loop binding does. A
+  parameter type must be owned (`String`, not `&str`), `PartialEq` and
+  `Clone`; a `Signal<..>` or `Memo<..>` parameter is refused, since the
+  parameter is reactive already. Recursion, direct or through another
+  snippet, is refused for now.
 
 ## Reactive rules
 
@@ -173,7 +225,7 @@ The compiler refuses:
 - a signal or memo with no type annotation; a `#[prop]` with no type,
   no default, or a pattern in place of a single name;
 - a script, prop or loop binding named `dom`, `parent`, `before`,
-  `props`, `owner`, `roots` or `event`, which the generated code uses,
+  `props`, `owner`, `roots`, `event` or `snippet_args`, which the generated code uses,
   or named like a node the generated code creates for this template
   (`p0`, `button3`); and a raw identifier such as `r#gen`;
 - an unknown character reference, and a Rust if-expression in a hole;
@@ -181,8 +233,12 @@ The compiler refuses:
   `value` or `checked`, or together with a handler for the same event;
 - a `data-wisp` attribute, which is reserved for the style scope (see
   "Scoped styles");
-- deferred features: `{snippet}`/`{render}`, which parse but do not
-  generate code, and children inside a component tag.
+- snippets: a parameter without a type, with a pattern for a name,
+  that borrows, that is a `Signal<..>` or `Memo<..>`, or that has the
+  name of a script binding (both lines named); two snippets of one name
+  in a list; a snippet that renders itself; a `{render}` of nothing
+  declared where it is, or with a different number of arguments from
+  the snippet's parameters.
 
 To check one file without a build, run:
 
@@ -337,7 +393,5 @@ For example, in a component whose scope is `app/src/panel.wisp`:
   implements `Dom` over the real element tree, with layout and paint.
 - **Accessibility (F2d).** Implicit roles, ARIA attributes and the
   AccessKit tree are not generated or checked.
-- **In the compiler:** snippets and `{render}` parse but are refused at
-  code generation. Children inside a component tag are refused; they
-  will become snippets. Props passed to a child are not reactive unless
-  they are `Signal`s. There is no hot reload, LSP or inspector yet.
+- **In the compiler:** recursive snippets. Props passed to a child are
+  not reactive unless they are `Signal`s. There is no hot reload, LSP or inspector yet.

@@ -28,7 +28,7 @@ pub(super) fn unsupported_shorthand_hint(name: &str) -> Option<&'static str> {
     Some(match name {
         "font" => "write font-size, font-family, font-weight, font-style and line-height",
         "background" => "write background-color",
-        "outline" | "place-items" | "place-content" | "grid-area" | "grid-template" | "grid" => {
+        "place-items" | "place-content" | "grid-area" | "grid-template" | "grid" => {
             "write the longhands the table lists"
         }
         _ => return None,

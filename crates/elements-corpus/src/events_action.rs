@@ -6,12 +6,14 @@ use crate::events_script::Action;
 const MODIFIERS: [&str; 4] = ["Shift", "Control", "Alt", "Meta"];
 
 /// Keys a script may name besides a single printable character.
-pub const KEY_NAMES: [&str; 12] = [
+pub const KEY_NAMES: [&str; 14] = [
     "Backspace",
     "Tab",
     "Enter",
     "Escape",
     "Space",
+    "PageUp",
+    "PageDown",
     "End",
     "Home",
     "ArrowLeft",
@@ -23,7 +25,22 @@ pub const KEY_NAMES: [&str; 12] = [
 
 pub fn is_action(word: &str) -> bool {
     [
-        "click", "tap", "press", "release", "move", "wheel", "key", "type", "frame",
+        "click",
+        "double-click",
+        "triple-click",
+        "alt-click",
+        "tap",
+        "press",
+        "release",
+        "move",
+        "wheel",
+        "key",
+        "type",
+        "clipboard",
+        "frame",
+        "touch-down",
+        "touch-move",
+        "touch-up",
     ]
     .contains(&word)
 }
@@ -32,13 +49,21 @@ pub fn is_action(word: &str) -> bool {
 pub fn action(word: &str, fields: &[&str], rest: &str) -> Result<Action, String> {
     match word {
         "click" => point(word, fields).map(|(x, y)| Action::Click(x, y)),
+        "double-click" => point(word, fields).map(|(x, y)| Action::Clicks(x, y, 2)),
+        "triple-click" => point(word, fields).map(|(x, y)| Action::Clicks(x, y, 3)),
+        "quadruple-click" => point(word, fields).map(|(x, y)| Action::Clicks(x, y, 4)),
+        "alt-click" => point(word, fields).map(|(x, y)| Action::AltClick(x, y)),
         "tap" => point(word, fields).map(|(x, y)| Action::Tap(x, y)),
         "press" => point(word, fields).map(|(x, y)| Action::Press(x, y)),
         "release" => point(word, fields).map(|(x, y)| Action::Release(x, y)),
         "move" => point(word, fields).map(|(x, y)| Action::Move(x, y)),
+        "touch-down" => point(word, fields).map(|(x, y)| Action::TouchDown(x, y)),
+        "touch-move" => point(word, fields).map(|(x, y)| Action::TouchMove(x, y)),
+        "touch-up" => point(word, fields).map(|(x, y)| Action::TouchUp(x, y)),
         "wheel" => wheel(fields),
         "key" => exactly(word, fields, 1).and_then(|()| key(fields[0])),
-        "type" => quoted(rest).map(Action::Type),
+        "type" => quoted(word, rest).map(Action::Type),
+        "clipboard" => quoted(word, rest).map(|text| Action::Clipboard(text.replace("\\n", "\n"))),
         "frame" => exactly(word, fields, 0).map(|()| Action::Frame),
         _ => Err(format!("no directive `{word}`")),
     }
@@ -104,8 +129,8 @@ fn key(combination: &str) -> Result<Action, String> {
 }
 
 /// A quoted, non-empty text.
-fn quoted(rest: &str) -> Result<String, String> {
-    let refused = || "`type` takes a quoted text".to_owned();
+fn quoted(word: &str, rest: &str) -> Result<String, String> {
+    let refused = || format!("`{word}` takes a quoted text");
     let (text, after) = rest
         .strip_prefix('"')
         .and_then(|r| r.split_once('"'))
@@ -114,7 +139,9 @@ fn quoted(rest: &str) -> Result<String, String> {
         return Err(refused());
     }
     if !after.is_empty() && !after.starts_with("  ") {
-        return Err("extra fields after `type`; a note follows two spaces".into());
+        return Err(format!(
+            "extra fields after `{word}`; a note follows two spaces"
+        ));
     }
     Ok(text.to_owned())
 }

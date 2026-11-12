@@ -2,6 +2,7 @@
 //! that lists `(key, item)` pairs, and a row builder, handed to
 //! `vapors_dom::blocks::keyed` with the block's position for refusals.
 
+use super::element_bind_this::RowKey;
 use super::emit::{Emitter, Place};
 use crate::CompileError;
 use crate::ast::ForBlock;
@@ -16,9 +17,51 @@ impl Emitter<'_> {
                 self.declare_loop_binding(name, block.offset)?;
             }
         }
+        let row_scope = vec![index.trim_start_matches('_').to_string(), item.clone()];
+        let row_clones = self.row_clones(block, row_scope.clone())?;
+        let call = self.open_keyed_call(place, &row_clones);
+        self.emit_keyed_items(block, &anchor, place, &index, &item)?;
+        let signature =
+            self.builder_signature(&format!(", {index}: Signal<usize>, {item}: Signal<_>"));
+        self.push_scope(row_scope);
+        self.row_keys.push(RowKey {
+            index: index.clone(),
+            item: item.clone(),
+            key: block.key.clone(),
+        });
+        let built = self.emit_builder_with(&[], &block.children, &signature, &[]);
+        self.row_keys.pop();
+        self.pop_scope();
+        built?;
+        self.close_keyed_call(call);
+        Ok(())
+    }
+
+    /// What the row reads with the loop's names in scope, which shadow
+    /// the component's.
+    fn row_clones(
+        &mut self,
+        block: &ForBlock,
+        scope: Vec<String>,
+    ) -> Result<Vec<String>, CompileError> {
+        self.push_scope(scope);
+        let clones = self.builder_clones(&block.children);
+        self.pop_scope();
+        clones
+    }
+
+    /// The arguments before the row: the Dom, the place, the site named
+    /// in refusals, and the items closure.
+    fn emit_keyed_items(
+        &mut self,
+        block: &ForBlock,
+        anchor: &str,
+        place: &Place,
+        index: &str,
+        item: &str,
+    ) -> Result<(), CompileError> {
         let iterable = self.raw(&block.iterable)?;
         let key = block.key.as_ref().map(|key| self.raw(key)).transpose()?;
-        let handle = self.open_block_call("keyed", place);
         let site = format!(
             "{}:{}",
             self.source.path,
@@ -30,16 +73,44 @@ impl Emitter<'_> {
         let clones = self.clones_for(&read_by_items)?;
         self.emit_closure(
             &clones,
-            &[keyed_items(&iterable, &index, &item, key.as_deref())],
+            &[keyed_items(&iterable, index, item, key.as_deref())],
         );
-        let signature =
-            self.builder_signature(&format!(", {index}: Signal<usize>, {item}: Signal<_>"));
-        self.push_scope(vec![index.trim_start_matches('_').to_string(), item]);
-        let built = self.emit_builder(&block.children, &signature);
-        self.pop_scope();
-        built?;
-        self.close_block_call(handle);
         Ok(())
+    }
+
+    /// Opens the `keyed` call, with the row's clones taken before it in
+    /// a block around the call. The row closure must stay an argument
+    /// of `keyed` itself: rustc checks a block argument before the
+    /// closure arguments, and a row inside one would be checked before
+    /// the items closure tells it the item type (E0282 on `V`).
+    fn open_keyed_call(&mut self, place: &Place, row_clones: &[String]) -> KeyedCall {
+        if row_clones.is_empty() {
+            return KeyedCall::Plain(self.open_block_call("keyed", place));
+        }
+        let handle = place.roots.then(|| self.fresh("keyed_block"));
+        self.line(match &handle {
+            Some(handle) => format!("let {handle} = {{"),
+            None => "{".to_string(),
+        });
+        self.indent(1);
+        self.emit_clones(row_clones);
+        self.line("vapors_dom::blocks::keyed(");
+        self.indent(1);
+        KeyedCall::Hoisted(handle)
+    }
+
+    fn close_keyed_call(&mut self, call: KeyedCall) {
+        let handle = match call {
+            KeyedCall::Plain(handle) => return self.close_block_call(handle),
+            KeyedCall::Hoisted(handle) => handle,
+        };
+        self.dedent(1);
+        self.line(if handle.is_some() { ")" } else { ");" });
+        self.dedent(1);
+        self.line(if handle.is_some() { "};" } else { "}" });
+        if let Some(handle) = handle {
+            self.line(format!("roots.push(Root::Block({handle}));"));
+        }
     }
 
     /// `(index, item)` enumerates; `item` alone gets `_index`.
@@ -62,6 +133,13 @@ impl Emitter<'_> {
     }
 }
 
+/// A `keyed` call as opened, so it closes the same way; each holds the
+/// handle kept among the roots, when kept.
+enum KeyedCall {
+    Plain(Option<String>),
+    Hoisted(Option<String>),
+}
+
 fn is_identifier(name: &str) -> bool {
     let mut chars = name.chars();
     chars.next().is_some_and(|c| c.is_alphabetic() || c == '_')
@@ -71,6 +149,9 @@ fn is_identifier(name: &str) -> bool {
 /// The closure body listing `(key, item)` pairs. Without a key the
 /// index is the key; `enumerate` appears only when the index is read.
 fn keyed_items(iterable: &str, index: &str, item: &str, key: Option<&str>) -> String {
+    // `key=i` over `(i, item)` is `enumerate`'s own pairs: a map to them
+    // is clippy's `map_identity`
+    let key = key.filter(|key| key.trim() != index);
     match key {
         Some(key) if index.starts_with('_') => {
             format!("move || ({iterable}).into_iter().map(|{item}| (({key}), {item})).collect(),")
@@ -78,8 +159,7 @@ fn keyed_items(iterable: &str, index: &str, item: &str, key: Option<&str>) -> St
         Some(key) => format!(
             "move || ({iterable}).into_iter().enumerate().map(|({index}, {item})| (({key}), {item})).collect(),"
         ),
-        None => format!(
-            "move || ({iterable}).into_iter().enumerate().map(|({index}, {item})| ({index}, {item})).collect(),"
-        ),
+        // `enumerate`'s pairs are already `(index, item)`
+        None => format!("move || ({iterable}).into_iter().enumerate().collect(),"),
     }
 }

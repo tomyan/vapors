@@ -7,7 +7,7 @@ use vapors_scene::{Item, Quad};
 
 use crate::layout::{BoxRect, Content, LayoutBox};
 use crate::paint::{PaintInput, snapped};
-use crate::painted::Painted;
+use crate::painting::Painting;
 
 /// Space between a thumb and the padding box's edges, CSS px.
 pub(crate) const INSET: f32 = 2.0;
@@ -49,7 +49,7 @@ pub(crate) fn paint(
     layout_box: &LayoutBox,
     border_box: BoxRect,
     input: &PaintInput<'_>,
-    out: &mut Painted,
+    out: &mut Painting,
 ) {
     let Content::Element(node) = layout_box.content else {
         return;

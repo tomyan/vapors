@@ -1,5 +1,5 @@
 use super::*;
-use crate::{Color, ImageId, TextId};
+use crate::{Color, IconId, ImageId, SurfaceId, TextId};
 
 fn quad(left: f32) -> Item {
     Item::Quad(Quad::fill(
@@ -12,7 +12,13 @@ fn text(id: u32) -> Item {
     Item::Text {
         text: TextId(id),
         origin: [0.0, 0.0],
+        ink: Rect::new(0.0, 0.0, 4.0, 4.0),
     }
+}
+
+/// The scene's batches on a target that shows every item.
+fn batches(scene: &Scene) -> Vec<Batch> {
+    scene.batches(Rect::new(0.0, 0.0, 100.0, 100.0)).batches
 }
 
 #[test]
@@ -21,7 +27,7 @@ fn an_empty_scene_has_no_batches() {
     let scene = Scene::new();
 
     // When
-    let batches = scene.batches();
+    let batches = batches(&scene);
 
     // Then
     assert_eq!(batches, []);
@@ -36,7 +42,7 @@ fn consecutive_items_of_one_kind_share_a_batch_in_painting_order() {
     }
 
     // When
-    let batches = scene.batches();
+    let batches = batches(&scene);
 
     // Then
     let shape: Vec<(char, usize)> = batches
@@ -46,6 +52,8 @@ fn consecutive_items_of_one_kind_share_a_batch_in_painting_order() {
             Run::Quads(quads) => ('q', quads.len()),
             Run::Texts(texts) => ('t', texts.len()),
             Run::Images(images) => ('i', images.len()),
+            Run::Surfaces(surfaces) => ('g', surfaces.len()),
+            Run::Icons(icons) => ('v', icons.len()),
         })
         .collect();
     assert_eq!(shape, [('q', 2), ('t', 1), ('q', 1), ('t', 2)]);
@@ -59,7 +67,7 @@ fn a_batch_keeps_its_items_in_order() {
     scene.push(quad(7.0));
 
     // When
-    let batches = scene.batches();
+    let batches = batches(&scene);
 
     // Then
     let Run::Quads(quads) = &batches[0].run else {
@@ -82,7 +90,7 @@ fn a_change_of_clip_starts_a_batch_that_carries_the_clip() {
     scene.push(quad(3.0));
 
     // When
-    let batches = scene.batches();
+    let batches = batches(&scene);
 
     // Then
     let shape: Vec<(Option<Rect>, usize)> = batches
@@ -127,7 +135,7 @@ fn consecutive_images_share_a_batch_apart_from_other_kinds() {
     }
 
     // When
-    let batches = scene.batches();
+    let batches = batches(&scene);
 
     // Then
     let shape: Vec<(char, usize)> = batches
@@ -139,4 +147,66 @@ fn consecutive_images_share_a_batch_apart_from_other_kinds() {
         })
         .collect();
     assert_eq!(shape, [('i', 1), ('q', 1), ('i', 2)]);
+}
+
+fn surface(id: u32) -> Item {
+    Item::Surface {
+        surface: SurfaceId(id),
+        rect: Rect::new(0.0, 0.0, 4.0, 4.0),
+    }
+}
+
+#[test]
+fn consecutive_surfaces_share_a_batch_apart_from_images() {
+    // Given: two surfaces, an image, a surface
+    let mut scene = Scene::new();
+    for item in [surface(0), surface(1), picture(0), surface(2)] {
+        scene.push(item);
+    }
+
+    // When
+    let batches = batches(&scene);
+
+    // Then
+    let shape: Vec<(char, usize)> = batches
+        .iter()
+        .map(|batch| match &batch.run {
+            Run::Surfaces(surfaces) => ('g', surfaces.len()),
+            Run::Images(images) => ('i', images.len()),
+            other => panic!("unexpected {other:?}"),
+        })
+        .collect();
+    assert_eq!(shape, [('g', 2), ('i', 1), ('g', 1)]);
+}
+
+fn icon(id: u32) -> Item {
+    Item::Icon {
+        icon: IconId(id),
+        rect: Rect::new(0.0, 0.0, 4.0, 4.0),
+        colour: Color::from_rgba8(1, 2, 3, 255),
+    }
+}
+
+#[test]
+fn consecutive_icons_share_a_batch_apart_from_images_and_texts() {
+    // Given: two icons, an image, an icon, a text
+    let mut scene = Scene::new();
+    for item in [icon(0), icon(1), picture(0), icon(2), text(0)] {
+        scene.push(item);
+    }
+
+    // When
+    let batches = batches(&scene);
+
+    // Then
+    let shape: Vec<(char, usize)> = batches
+        .iter()
+        .map(|batch| match &batch.run {
+            Run::Icons(icons) => ('v', icons.len()),
+            Run::Images(images) => ('i', images.len()),
+            Run::Texts(texts) => ('t', texts.len()),
+            other => panic!("unexpected {other:?}"),
+        })
+        .collect();
+    assert_eq!(shape, [('v', 2), ('i', 1), ('v', 1), ('t', 1)]);
 }

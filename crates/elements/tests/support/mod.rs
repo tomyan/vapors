@@ -3,50 +3,39 @@
 
 #![allow(dead_code)] // each test file uses a subset
 
+pub mod basics;
 pub mod changes;
+pub mod checkbox_page;
+pub mod column_page;
+pub mod drive;
+pub mod fixup;
+pub mod focus_page;
+pub mod hidden_page;
+pub mod number_page;
+pub mod oracle;
 pub mod pointer;
 pub mod random_css;
+pub mod range_page;
+pub mod roles_page;
+pub mod rows_page;
 pub mod scroll_list;
+pub mod svg_page;
+pub mod sweep_page;
+pub mod sweep_paths;
+pub mod text_page;
 pub mod tree;
 
-use vapors_dom::{Dom, NodeId};
+pub use basics::{document, element, text, viewport};
 use vapors_elements::{Document, ElementError, Viewport};
-use vapors_text::FontSystem;
-
-/// An empty document laying text out with Geist and Geist Mono only.
-pub fn document() -> Document {
-    Document::new(FontSystem::bundle_only())
-}
-
-/// A 1x viewport of `width` by `height` CSS pixels.
-pub fn viewport(width: f32, height: f32) -> Viewport {
-    Viewport {
-        width,
-        height,
-        scale: 1.0,
-    }
-}
-
-/// An element with `tag` and `class`, appended to `parent`.
-pub fn element(doc: &mut Document, parent: NodeId, tag: &str, class: &str) -> NodeId {
-    let node = doc.create_element(tag);
-    if !class.is_empty() {
-        doc.set_attribute(node, "class", class);
-    }
-    doc.append(parent, node);
-    node
-}
-
-/// A text node appended to `parent`.
-pub fn text(doc: &mut Document, parent: NodeId, text: &str) -> NodeId {
-    let node = doc.create_text(text);
-    doc.append(parent, node);
-    node
-}
 
 /// The update's errors, each as its message; panics when it succeeds.
 pub fn refusals(doc: &mut Document) -> Vec<String> {
-    match doc.update(viewport(400.0, 300.0)) {
+    refusals_at(doc, viewport(400.0, 300.0))
+}
+
+/// The messages of the refusal of `doc` updated at `viewport`.
+pub fn refusals_at(doc: &mut Document, viewport: Viewport) -> Vec<String> {
+    match doc.update(viewport) {
         Ok(_) => panic!("the update succeeded; a refusal was expected"),
         Err(errors) => errors.iter().map(ElementError::to_string).collect(),
     }

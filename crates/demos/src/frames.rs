@@ -8,7 +8,7 @@ use crate::PerFrame;
 /// `per_frame`, which does nothing after its first `frames` calls.
 pub fn limited(mut per_frame: PerFrame, frames: usize) -> PerFrame {
     let mut left = frames;
-    Box::new(move |last: Option<Duration>| {
+    Box::new(move |last: &[(&'static str, Duration)]| {
         if left > 0 {
             left -= 1;
             per_frame(last);
@@ -45,7 +45,7 @@ mod tests {
 
         // When
         for _ in 0..5 {
-            hook(None);
+            hook(&[]);
         }
 
         // Then

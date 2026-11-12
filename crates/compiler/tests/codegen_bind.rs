@@ -24,9 +24,65 @@ fn bind_value_on_text_input() {
     // And the display half, from the signal
     assert_has(
         &code,
-        "set_property(input0, \"value\", PropertyValue::Text(name.get()))",
+        "set_property_if_changed(input0, \"value\", PropertyValue::Text(name.get()))",
     );
     assert_lacks(&code, "bind:value");
+}
+
+#[test]
+fn bind_value_on_a_range_binds_a_number() {
+    // Given
+    let script = "let level: Signal<f64> = Signal::new(20.0);";
+
+    // When
+    let code = generated_with(
+        script,
+        "<input type=\"range\" min=\"0\" max=\"100\" bind:value={level} />",
+    );
+
+    // Then: the input event's number sets the signal, and the signal's
+    // number sets the property
+    assert_has(
+        &code,
+        "level.set(event.value_as_number().expect(\"the input's input carries its number\"));",
+    );
+    assert_has(&code, "#[allow(clippy::missing_panics_doc");
+    assert_has(
+        &code,
+        "set_property_if_changed(input0, \"value\", PropertyValue::Number(level.get()))",
+    );
+}
+
+#[test]
+fn bind_value_on_a_number_input_binds_a_number_on_change() {
+    // When
+    let code = generated_with(
+        "let n: Signal<f64> = Signal::new(0.0);",
+        "<input type=\"Number\" bind:value={n} />",
+    );
+
+    // Then: a number field's text is a number only once committed
+    assert_has(
+        &code,
+        "listen(input0, \"change\", Box::new(move |event: &mut Event|",
+    );
+    assert_has(&code, "n.set(event.value_as_number().expect(");
+    assert_lacks(&code, "listen(input0, \"input\"");
+}
+
+#[test]
+fn bind_value_with_a_type_expression_is_refused_naming_the_fix() {
+    // When
+    let err = refusal(&format!(
+        "<script>\n{SCRIPT}\nlet kind = \"range\";\n</script>\n<input type={{kind}} bind:value={{name}} />"
+    ));
+
+    // Then
+    assert!(
+        err.message.contains("type as a literal") && err.message.contains("Signal<f64>"),
+        "{err}"
+    );
+    assert_eq!((err.line, err.col), (6, 20), "{err}");
 }
 
 #[test]
@@ -39,10 +95,14 @@ fn bind_checked_on_checkbox() {
         &code,
         "listen(input0, \"change\", Box::new(move |event: &mut Event|",
     );
-    assert_has(&code, "on.set(event.checked());");
     assert_has(
         &code,
-        "set_property(input0, \"checked\", PropertyValue::Bool(on.get()))",
+        "on.set(event.checked().expect(\"the input's change carries its state\"));",
+    );
+    assert_has(&code, "#[allow(clippy::missing_panics_doc");
+    assert_has(
+        &code,
+        "set_property_if_changed(input0, \"checked\", PropertyValue::Bool(on.get()))",
     );
 }
 
@@ -62,7 +122,7 @@ fn bind_value_on_select_uses_change() {
     assert_has(&code, "name.set(event.value().to_string());");
     assert_has(
         &code,
-        "set_property(select0, \"value\", PropertyValue::Text(name.get()))",
+        "set_property_if_changed(select0, \"value\", PropertyValue::Text(name.get()))",
     );
 }
 

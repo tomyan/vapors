@@ -8,15 +8,24 @@ the factory plan in `~/projects/touche/FACTORY.md`.
 
 ```
 cargo xtask --help        every factory command
-cargo xtask setup         install pinned tools and the pre-push hook
+cargo xtask setup         install pinned tools ([downloads] fetched and verified by hash) and the pre-push hook
 cargo xtask ci            what CI runs: tools, fmt, clippy, wasm, unit, gpu; fastest first
 cargo xtask deny          cargo-deny by deny.toml: advisories, bans, licences, sources
 cargo xtask lint          fmt and clippy only
 cargo xtask wasm          clippy for the web package on wasm32-unknown-unknown
-cargo xtask web           trunk release build of the web package into target/web
+cargo xtask web           trunk release build of the web package into target/web, with
+                          brotli (.br) and gzip (.gz) copies of its wasm, js, css, html and json
 cargo xtask serve         the release build of main on the tailnet where [serve] says (from a
                           clean checkout at origin/main after `cargo xtask web`; [serve] check
-                          first, then a copy under ~/srv); prints the URL
+                          first, then a copy under ~/srv). Restarts the user unit
+                          xtask-serve-<dir>.service: the hash-verified static-web-server
+                          ([downloads] in tools.toml) on 127.0.0.1:[serve] port, sandboxed
+                          (the copy, its config and the binary bound read-only, the rest of
+                          the home directory empty), compressed copies, hashed files immutable,
+                          the rest no-cache. It must own the port; /, every wasm and a script
+                          must come compressed with their types over the loopback before
+                          tailscale serve mounts it, and again through the tailnet URL after.
+                          Needs lingering (loginctl enable-linger); prints the URL
 cargo xtask test          one tier (default unit)
 cargo run -p vapors-app --example demo -- hello
                           an F2c demo in a window (crates/demos)
@@ -30,6 +39,9 @@ xvfb-run -a cargo run -p vapors-platform --example wake_window
                           Platform::waker in a window: 0 frames idle, 1 per wake
 scripts/web-wake-frames.sh target/web <new dir>
                           the same on the built page (?demo=wake)
+xvfb-run -a cargo run -p vapors-app --example surface_gradient -- --check
+                          a gpu-surface in a window: 0 frames and renders idle, 2 frames
+                          and 1 render per invalidate, LoopClosed after the loop ends
 cargo run -p vapors-elements-corpus --example layout_oracle [-- --check]
                           Chromium's boxes for the layout fixtures
 bacon                     unit tier on every save
@@ -77,5 +89,12 @@ the directory:
 4. Pull request. An independent review agent reads the diff with the
    "Failure must be loud" rules and no author context; findings are
    verified before action.
-5. Auto-merge when CI is green. Squash. Branch deleted.
+5. Merge on the local gate, not GitHub CI (Tom, 2026-11-11, as touche
+   since 2026-10-23): once the review's findings are in, update the
+   branch onto current `main`, run `cargo xtask gate --pr <n>` at the
+   PR's head in a clean worktree, which posts its last lines to the PR.
+   It must end `gate: pass <head sha>`. Then merge: squash, branch
+   deleted. GitHub CI still runs on every push but is not a required
+   check; a red GitHub run on a merged head is investigated as a
+   difference between the runner and this machine.
 6. Update the plan; the PR description is the handoff.

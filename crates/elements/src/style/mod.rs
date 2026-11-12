@@ -7,15 +7,24 @@ mod box_style;
 mod cursor;
 mod decoration;
 mod features;
+mod grid_gate;
+#[cfg(feature = "grid")]
 mod grid_style;
+
+pub(crate) use grid_gate::is_container;
 mod honoured;
 mod inline;
+pub(crate) mod outline;
 mod overflow;
+mod parts;
 mod position;
 mod scope;
 mod scrollbar;
+mod sibling_deps;
+pub(crate) use sibling_deps::SiblingDeps;
 mod sizes;
 mod styles;
+mod surface;
 mod text_style;
 mod used;
 mod values;
@@ -32,12 +41,13 @@ pub(crate) use box_style::box_style;
 pub use cursor::{ALL_CURSORS, Cursor};
 pub(crate) use decoration::BoxShadow;
 pub(crate) use overflow::to_viewport;
+pub(crate) use parts::Parts;
 pub(crate) use scrollbar::Scrollbar;
 pub(crate) use styles::Styles;
 pub(crate) use text_style::Face;
 pub(crate) use text_style::TextStyle;
 pub(crate) use used::{Context, Used, used};
-pub(crate) use values::{Refusal, Styles as ElementStyles};
+pub(crate) use values::{Refusal, Styles as ElementStyles, keyword};
 
 const UA_SHEET: &str = include_str!("ua.css");
 
@@ -94,14 +104,22 @@ impl Sheets {
     /// A component's style under its `scope`, added once however often
     /// it is mounted. One that does not parse is kept as a refusal for
     /// every update (see [`Sheets::refused`]): `Dom::add_style` returns
-    /// nothing, as the generated code's other calls do.
-    pub(crate) fn add_scoped(&mut self, scope: &str, text: &str) {
+    /// nothing, as the generated code's other calls do. False when the
+    /// scope was already added with this style and nothing changed.
+    pub(crate) fn add_scoped(&mut self, scope: &str, text: &str) -> bool {
+        if self.scopes.get(scope).is_some_and(|added| added == text) {
+            return false;
+        }
+        self.add_new_scoped(scope, text);
+        true
+    }
+
+    fn add_new_scoped(&mut self, scope: &str, text: &str) {
         let refuse = |error| ElementError::Css {
             sheet: scope.to_owned(),
             error,
         };
         match self.scopes.get(scope) {
-            Some(added) if added == text => return,
             Some(_) => {
                 return self.refused.push(refuse(vapors_css::Error::new(
                     vapors_css::Position { line: 1, column: 1 },
@@ -131,6 +149,22 @@ impl Sheets {
         flag: vapors_css::tree::States,
     ) -> vapors_css::cascade::RestyleScope {
         self.cascade.restyle_scope_of_selectors(flag)
+    }
+
+    /// The selectors of the rules that reach siblings, as written, each
+    /// with whether it matches `node` now: what a narrowed restyle that
+    /// went wrong missed.
+    pub(crate) fn sibling_selectors(&self, arena: &Arena, node: NodeId) -> Vec<(String, bool)> {
+        let element = ElementRef::new(arena, node);
+        self.cascade
+            .rules()
+            .filter(|rule| SiblingDeps::of_selector(&rule.selector).any())
+            .map(|rule| {
+                let text = vapors_css::serialize::component_values(&rule.prelude);
+                let matches = vapors_css::selector::matches(&rule.selector, &element);
+                (text.trim().to_owned(), matches)
+            })
+            .collect()
     }
 
     /// The scoped styles that did not parse.

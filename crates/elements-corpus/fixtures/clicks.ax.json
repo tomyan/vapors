@@ -1,0 +1,29 @@
+{
+  "tree": [
+    {
+      "depth": 0,
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "RootWebArea"
+    },
+    {
+      "depth": 1,
+      "name": "Reset",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 2,
+      "name": "Reset",
+      "role": "StaticText"
+    }
+  ],
+  "viewport": [
+    640,
+    400
+  ]
+}

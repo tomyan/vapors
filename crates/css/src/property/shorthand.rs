@@ -37,7 +37,7 @@ pub(super) fn expand(name: &str, values: &[ComponentValue], at: Position) -> Res
         "gap" | "overflow" => pair(name, &ids, values, at),
         "flex" => shorthand_layout::flex(&ids, values, at),
         "grid-row" | "grid-column" => shorthand_layout::grid_line(name, &ids, values, at),
-        "border" | "border-top" | "border-right" | "border-bottom" | "border-left" => {
+        "border" | "border-top" | "border-right" | "border-bottom" | "border-left" | "outline" => {
             shorthand_border::expand(name, &ids, values, at)
         }
         "transition" => shorthand_motion::transition(&ids, values, at),

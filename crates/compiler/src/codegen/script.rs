@@ -9,6 +9,7 @@ use syn::spanned::Spanned;
 
 use super::names::{bound_names, check_declared};
 use super::script_syntax::{binding, call_of_new, named, reactive_kind};
+use super::script_uses::{UseName, use_names};
 use super::syn_map::{offset_in, render};
 use crate::CompileError;
 use crate::ast::Section;
@@ -33,6 +34,8 @@ pub(crate) struct ScriptInfo {
     pub props: Vec<Prop>,
     /// Closure bindings and how many parameters each takes.
     pub handlers: HashMap<String, usize>,
+    /// Handlers that assign to a binding they capture, and the binding.
+    pub assigning: HashMap<String, String>,
     /// Names that read as `name.get()` in text holes.
     pub unwrappable: Vec<String>,
     /// Other bindings: cloned into each closure that reads them.
@@ -41,6 +44,10 @@ pub(crate) struct ScriptInfo {
     pub statements: Vec<String>,
     /// Every name the script binds, with its position.
     pub declared: Vec<(String, usize)>,
+    /// The names its `use` items bring in.
+    pub uses: Vec<UseName>,
+    /// The events its `#[dispatcher(…)]` declares.
+    pub events: Vec<String>,
 }
 
 /// Parses and classifies the script.
@@ -84,6 +91,9 @@ fn classify(
     info: &mut ScriptInfo,
 ) -> Result<(), CompileError> {
     let syn::Stmt::Local(local) = stmt else {
+        if let syn::Stmt::Item(syn::Item::Use(item)) = &stmt {
+            info.uses.extend(use_names(item));
+        }
         info.statements.push(render(&stmt));
         return Ok(());
     };
@@ -91,6 +101,13 @@ fn classify(
     for name in bound_names(&local.pat) {
         check_declared(source, &name, offset)?;
         info.declared.push((name, offset));
+    }
+    if let Some(attr) = local
+        .attrs
+        .iter()
+        .find(|attr| attr.path().is_ident("dispatcher"))
+    {
+        return super::script_dispatcher::classify_dispatcher(source, offset, attr, &local, info);
     }
     let is_prop = local.attrs.iter().any(|attr| attr.path().is_ident("prop"));
     let (name, ty) = binding(&local.pat);
@@ -128,6 +145,9 @@ fn classify_plain(name: Option<String>, init: Option<&syn::Expr>, info: &mut Scr
     };
     if let Some(syn::Expr::Closure(closure)) = init {
         info.handlers.insert(name.clone(), closure.inputs.len());
+        if let Some(captured) = super::handler_capture::assigned_capture(closure) {
+            info.assigning.insert(name.clone(), captured);
+        }
     }
     info.bindings.push(name);
 }

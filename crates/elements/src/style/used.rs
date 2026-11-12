@@ -32,13 +32,17 @@ pub(crate) struct Used {
     pub(crate) z_index: Option<i32>,
     /// How its thumb is drawn, when it scrolls.
     pub(crate) scrollbar: super::Scrollbar,
+    /// How its track and thumb are drawn, when it is a range (3-E3a).
+    pub(crate) parts: super::Parts,
 }
 
 /// What a used style depends on besides the element's computed styles.
+#[allow(clippy::struct_excessive_bools)] // independent facts about the element's place
 pub(crate) struct Context<'a> {
     /// Every property at its initial value.
     pub(crate) initial: &'a ComputedStyle,
-    /// The parent is a flex or grid container, which blockifies it.
+    /// The parent is a flex or grid container, which blockifies it, or
+    /// `display: none` (`restyle_pass::blockifies`).
     pub(crate) flex_item: bool,
     /// The parent is an inline element.
     pub(crate) in_inline: bool,
@@ -47,6 +51,11 @@ pub(crate) struct Context<'a> {
     pub(crate) to_viewport: bool,
     /// Device pixels per CSS pixel, for border widths.
     pub(crate) scale: f32,
+    /// The element is an `input type=number` or a text field, which
+    /// needs a width of its own (3-E3c, E6a).
+    pub(crate) text_like_field: bool,
+    /// The element is a `gpu-surface` (docs/gpu-surface.md).
+    pub(crate) surface: bool,
 }
 
 /// The used style of an element whose computed styles (its own and its
@@ -62,9 +71,23 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
     } else if context.in_inline && layout.display != taffy::Display::None {
         reader.refuse("display", inline::BLOCK_IN_INLINE.to_owned());
     }
+    // pushed directly: `Reader::refuse` leaves an undeclared value to
+    // its declarer, and `auto` here is nobody's declaration
+    if context.text_like_field && layout.size.width == taffy::Dimension::auto() {
+        reader.refusals.push(Refusal {
+            property: "width",
+            value: "auto".to_owned(),
+            reason: "is `auto` on a number or text field; vapors does not model Chromium's default width (its font and, for a number, spin button), so give it a width, such as `width: 6em`".to_owned(),
+            declared: None,
+        });
+    }
+    if context.surface {
+        super::surface::refuse(&mut reader, &layout, &decoration, inline);
+    }
     super::overflow::refuse_rounded_clip(&mut reader, &layout, &decoration);
     super::overflow::refuse_viewport_scroll(&mut reader, &layout, context.to_viewport);
-    let result = Used {
+    let mut result = Used {
+        parts: super::parts::DEFAULT,
         z_index: applied_z_index(&mut reader, &layout, context.flex_item),
         scrollbar: super::scrollbar::scrollbar(&mut reader),
         layout,
@@ -78,6 +101,8 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
     };
     let mut refusals = check_honoured(styles, context.initial);
     refusals.extend(reader.refusals);
+    let parts = super::parts::parts(styles, &mut refusals);
+    result.parts = parts;
     if refusals.is_empty() {
         Ok(result)
     } else {

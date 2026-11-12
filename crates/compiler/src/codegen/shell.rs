@@ -3,7 +3,7 @@
 
 use std::fmt::Write;
 
-use super::allowances::Allowance;
+use super::allowances::mount_allowances;
 use super::script::ScriptInfo;
 use crate::ast::Component;
 
@@ -22,6 +22,16 @@ pub(crate) fn assemble(component: &Component, info: &ScriptInfo, body: &str) -> 
     file.push_str(&props_struct(name, info));
     file.push_str(&component_struct(name, info));
     file.push_str(&mount_methods(name, info, body, scope.is_some()));
+    let uses: Vec<&String> = info
+        .statements
+        .iter()
+        .filter(|statement| statement.starts_with("use "))
+        .collect();
+    file.push_str(&super::events_decl::events_method(
+        &info.events,
+        &super::events_decl::child_types(component),
+        &uses,
+    ));
     file.push_str(&accessors());
     file
 }
@@ -31,7 +41,7 @@ fn header(path: &str, style: &str) -> String {
         "use std::cell::RefCell;
 use std::rc::Rc;
 #[allow(unused_imports)]
-use vapors_dom::{{Dom, DynDom, Event, NodeId, PropertyValue, Root, SCOPE_ATTRIBUTE, Snippet}};
+use vapors_dom::{{Dispatcher, Dom, DynDom, Event, NodeId, PropertyValue, Root, SCOPE_ATTRIBUTE, Snippet}};
 #[allow(unused_imports)]
 use vapors_signals::{{Effect, Memo, Owner, Signal}};
 
@@ -85,24 +95,6 @@ impl Default for {name}Props {{
 
 const DEFAULTS_AS_WRITTEN: &str =
     "the defaults are the #[prop] initialisers as written in the .wisp";
-/// Lints on `mount_before` that depend on types the compiler cannot see:
-/// its length, and props it does not consume, which it does not when
-/// there are none or every one is a signal or memo, which are `Copy`.
-fn mount_allowances(info: &ScriptInfo) -> String {
-    let mut allowances = format!("    {}\n", Allowance::TooManyLines.attribute());
-    let all_copy = info
-        .props
-        .iter()
-        .all(|prop| info.unwrappable.contains(&prop.name));
-    if all_copy {
-        let _ = writeln!(
-            allowances,
-            "    {}",
-            Allowance::NeedlessPassByValue.attribute()
-        );
-    }
-    allowances
-}
 
 fn component_struct(name: &str, info: &ScriptInfo) -> String {
     let mut fields = String::new();
@@ -143,7 +135,7 @@ fn field_lists(info: &ScriptInfo) -> (String, String) {
 
 fn mount_methods(name: &str, info: &ScriptInfo, body: &str, styled: bool) -> String {
     let (returned, built) = field_lists(info);
-    let allowances = mount_allowances(info);
+    let allowances = mount_allowances(info, body);
     let prop_names: Vec<&str> = info.props.iter().map(|prop| prop.name.as_str()).collect();
     let prop_names = prop_names.join(", ");
     let add_style = if styled {
@@ -171,7 +163,8 @@ fn mount_methods(name: &str, info: &ScriptInfo, body: &str, styled: bool) -> Str
         Rc<RefCell<D>>: DynDom,
     {{
         let {name}Props {{ {prop_names} }} = props;
-{add_style}        let owner = Owner::new();
+{add_style}        dom.borrow_mut().declare_events(&Self::events());
+        let owner = Owner::new();
         let {returned} = owner.with(|| {{
 {statements}            let mut roots = Vec::new();
 {body}            {returned}

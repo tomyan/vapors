@@ -1,0 +1,179 @@
+//! The document's tooltip from the input it is given (`tooltip.rs`
+//! holds when it shows): the pointer's title from the element it hits,
+//! keyboard focus's from the focused element when a key moved it and
+//! it is `:focus-visible`. Every event updates it, the host's too, so
+//! a key or press the host takes still hides it, and so does an event
+//! only observed ([`DocumentInput::observe`]). A touch never arms it.
+//! A host asks once per frame, after the document's update, for
+//! the tooltip shown ([`DocumentInput::tooltip`]) and for when to wake
+//! ([`DocumentInput::tooltip_deadline`]).
+
+use vapors_elements::{Document, Point};
+use vapors_platform::{Event, Instant};
+
+use super::{DocumentInput, Unplaced};
+use crate::pointer::Action;
+use crate::tooltip::{Titled, Tooltip, TooltipTrigger};
+
+impl DocumentInput {
+    /// The tooltip shown at `now`, after checking the one armed or shown
+    /// against `document`: the pointer's follows what is under it now
+    /// (a removed element or a changed title hides it, and a new title
+    /// arms again), a keyboard one hides when its element lost focus or
+    /// its title. Ask once per frame, after the update.
+    pub fn tooltip(&mut self, document: &Document, now: Instant) -> Option<&Tooltip> {
+        match self.tooltip.current().map(|tip| tip.trigger) {
+            Some(TooltipTrigger::Pointer) => {
+                let target = self.pointer_title(document);
+                self.tooltip.pointer_over(target, now);
+            }
+            Some(TooltipTrigger::Keyboard) if !self.keyboard_tip_holds(document) => {
+                self.tooltip.hide();
+            }
+            _ => {}
+        }
+        self.tooltip.shown_at(now, self.pointer)
+    }
+
+    /// Whether the tooltip armed or shown changed (armed, armed again,
+    /// shown or hidden) since last asked. A host that gets `true` after
+    /// an event draws a frame, so the hide is drawn and the frame's
+    /// `Next` takes the new [`DocumentInput::tooltip_deadline`].
+    pub fn take_tooltip_changed(&mut self) -> bool {
+        self.tooltip.take_changed()
+    }
+
+    /// When the armed tooltip shows: a host waits until then
+    /// (`Next::WaitUntil`) and asks again every frame until it shows,
+    /// as a frame's `Next::Continue` replaces the wait. `None` when no
+    /// tooltip is armed.
+    #[must_use]
+    pub fn tooltip_deadline(&self) -> Option<Instant> {
+        self.tooltip.deadline()
+    }
+
+    /// Where the pointer last moved, in CSS pixels. `None` before the
+    /// first move, as the position is then unknown; it stays where it
+    /// was after the pointer leaves the window.
+    #[must_use]
+    pub fn pointer(&self) -> Option<Point> {
+        self.pointer
+    }
+
+    /// Where the pointer was, in CSS pixels, when the tooltip shown
+    /// showed: a pointer tooltip's hotspot
+    /// ([`crate::ScenePainter::draw_tooltip`]), which a later move within
+    /// its title does not change, as in Chromium. `None` while no
+    /// tooltip is shown, or when it showed before the pointer first
+    /// moved.
+    #[must_use]
+    pub fn tooltip_hotspot(&self) -> Option<Point> {
+        self.tooltip.hotspot()
+    }
+
+    /// `event`, its pointer `action` if it has one, as the tooltip sees
+    /// it, after the document had it.
+    pub(super) fn tooltip_event(
+        &mut self,
+        document: &Document,
+        event: &Event,
+        action: Option<Action>,
+        now: Instant,
+    ) {
+        if let Some(action) = action {
+            self.tooltip_action(document, action, now);
+        }
+        let key = matches!(event, Event::Key { pressed: true, .. });
+        if key || matches!(event, Event::WindowFocus { focused: false }) {
+            self.tooltip.hide();
+        }
+        let target = focus_title(document).filter(|_| key);
+        self.tooltip.focus(document.active_element(), target, now);
+    }
+
+    /// Let the tooltip see `event` without giving it to `document`: a
+    /// host with several documents gives each event to the one it routes
+    /// to and observes it on the others. The tooltip reacts as when
+    /// [`DocumentInput::give`] gives it (a key or window blur hides it, a
+    /// move arms the title under the pointer); the document's focus,
+    /// hover and listeners are untouched. A move records where the
+    /// pointer is ([`DocumentInput::pointer`]), as `give` records every
+    /// move, so the tooltip's checks each frame read the window's pointer.
+    ///
+    /// # Errors
+    ///
+    /// [`Unplaced`] when it is a pointer event and the document's last
+    /// update gives no usable scale.
+    pub fn observe(
+        &mut self,
+        document: &Document,
+        event: &Event,
+        now: Instant,
+    ) -> Result<(), Unplaced> {
+        let action = self.action(document, event)?;
+        if let Some(Action::Move(point)) = action {
+            self.pointer = Some(point);
+        }
+        self.tooltip_event(document, event, action, now);
+        Ok(())
+    }
+
+    fn tooltip_action(&mut self, document: &Document, action: Action, now: Instant) {
+        match action {
+            Action::Move(point) => self.tooltip.pointer_over(title_at(document, point), now),
+            Action::Press(..) => self.tooltip.pressed(),
+            Action::Release(..) => self.tooltip.released(),
+            Action::Leave => self.tooltip.left(),
+            // the wheel and every touch
+            _ => self.tooltip.hide(),
+        }
+    }
+
+    fn pointer_title(&self, document: &Document) -> Option<Titled> {
+        title_at(document, self.pointer?)
+    }
+
+    /// The keyboard tooltip's element still has focus, its title and a
+    /// box (`display: none` hides it).
+    fn keyboard_tip_holds(&self, document: &Document) -> bool {
+        self.tooltip.current().is_some_and(|tip| {
+            document.active_element() == Some(tip.node)
+                && has_box(document, tip.node)
+                && document.tooltip_text(tip.node) == Some((tip.node, tip.text.clone()))
+        })
+    }
+}
+
+/// Whether the last update gave `node` a box.
+fn has_box(document: &Document, node: vapors_dom::NodeId) -> bool {
+    document
+        .painted()
+        .is_some_and(|painted| painted.border_box(node).is_some())
+}
+
+/// The title the element hit at `point` shows.
+fn title_at(document: &Document, point: vapors_elements::Point) -> Option<Titled> {
+    document.tooltip_text(document.hit(point)?)
+}
+
+/// The focused element's own title, while it is `:focus-visible`
+/// (Chromium's `ElementFocusedFromKeypress` reads the element's title,
+/// not an ancestor's).
+fn focus_title(document: &Document) -> Option<Titled> {
+    let active = document
+        .active_element()
+        .filter(|_| document.focus_visible())?;
+    document
+        .tooltip_text(active)
+        .filter(|(node, _)| *node == active)
+}
+
+#[cfg(test)]
+#[path = "document_input_tooltip_keys_tests.rs"]
+mod key_tests;
+#[cfg(test)]
+#[path = "document_input_tooltip_observe_tests.rs"]
+mod observe_tests;
+#[cfg(test)]
+#[path = "document_input_tooltip_tests.rs"]
+mod tests;

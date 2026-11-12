@@ -45,6 +45,11 @@ impl ImageApp {
         &self.view
     }
 
+    /// The view, to give it an image or a painter.
+    pub fn view_mut(&mut self) -> &mut ImageView {
+        &mut self.view
+    }
+
     /// What the label strip says right now.
     #[must_use]
     pub fn label(&self) -> String {
@@ -60,7 +65,12 @@ impl ImageApp {
         match event {
             Event::Character(text) => text == "o",
             Event::OpenRequested => true,
-            Event::Tap { .. } | Event::PrimaryButton { pressed: false } => !self.view.has_image(),
+            Event::Tap { .. }
+            | Event::PrimaryButton {
+                pressed: false,
+                clicks: std::num::NonZeroU32::MIN,
+                modifiers: _,
+            } => !self.view.has_image(),
             _ => false,
         }
     }
@@ -105,7 +115,9 @@ impl App for ImageApp {
     }
 
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
-        self.view.draw(frame);
+        if let Err(why) = self.view.draw(frame) {
+            vapors_platform::report_error(&why);
+        }
         let text = self.label();
         let label = self
             .label

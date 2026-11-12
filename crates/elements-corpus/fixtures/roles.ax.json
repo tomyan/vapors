@@ -1,0 +1,190 @@
+{
+  "tree": [
+    {
+      "depth": 0,
+      "properties": [
+        "focusable=true"
+      ],
+      "role": "RootWebArea"
+    },
+    {
+      "depth": 1,
+      "name": "Levels",
+      "properties": [
+        "modal=false"
+      ],
+      "role": "dialog"
+    },
+    {
+      "depth": 2,
+      "name": "Tone",
+      "role": "group"
+    },
+    {
+      "depth": 3,
+      "name": "Amount",
+      "properties": [
+        "focusable=true",
+        "invalid=false",
+        "orientation=horizontal",
+        "settable=true",
+        "valuemax=100",
+        "valuemin=0",
+        "valuetext=50"
+      ],
+      "role": "slider",
+      "value": "50"
+    },
+    {
+      "depth": 3,
+      "name": "Radius",
+      "properties": [
+        "editable=plaintext",
+        "focusable=true",
+        "invalid=false",
+        "required=false",
+        "settable=true",
+        "valuemax=10",
+        "valuemin=0",
+        "valuetext=2"
+      ],
+      "role": "spinbutton",
+      "value": "2"
+    },
+    {
+      "depth": 4,
+      "properties": [
+        "editable=plaintext"
+      ],
+      "role": "generic"
+    },
+    {
+      "depth": 5,
+      "name": "2",
+      "properties": [
+        "editable=plaintext"
+      ],
+      "role": "StaticText"
+    },
+    {
+      "depth": 3,
+      "name": "Note",
+      "properties": [
+        "editable=plaintext",
+        "focusable=true",
+        "invalid=false",
+        "multiline=false",
+        "readonly=false",
+        "required=false",
+        "settable=true"
+      ],
+      "role": "textbox",
+      "value": "hi"
+    },
+    {
+      "depth": 4,
+      "properties": [
+        "editable=plaintext"
+      ],
+      "role": "generic"
+    },
+    {
+      "depth": 5,
+      "name": "hi",
+      "properties": [
+        "editable=plaintext"
+      ],
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "name": "Options",
+      "role": "region"
+    },
+    {
+      "depth": 3,
+      "name": "Mono",
+      "properties": [
+        "checked=false",
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "checkbox"
+    },
+    {
+      "depth": 3,
+      "name": "Lock",
+      "properties": [
+        "checked=true",
+        "disabled=true",
+        "invalid=false"
+      ],
+      "role": "checkbox"
+    },
+    {
+      "depth": 3,
+      "name": "Pin",
+      "properties": [
+        "focusable=true",
+        "invalid=false",
+        "pressed=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 4,
+      "name": "Pin",
+      "role": "StaticText"
+    },
+    {
+      "depth": 3,
+      "name": "Apply",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 4,
+      "name": "Apply",
+      "role": "StaticText"
+    },
+    {
+      "depth": 3,
+      "name": "Reset",
+      "properties": [
+        "disabled=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 4,
+      "name": "Reset",
+      "role": "StaticText"
+    },
+    {
+      "depth": 2,
+      "role": "generic"
+    },
+    {
+      "depth": 3,
+      "name": "After",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
+    },
+    {
+      "depth": 4,
+      "name": "After",
+      "role": "StaticText"
+    }
+  ],
+  "viewport": [
+    640,
+    400
+  ]
+}

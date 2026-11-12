@@ -51,9 +51,8 @@ fn an_index_naming_no_page_file_is_refused() {
 }
 
 /// A workspace root under the temp dir with `config` as its factory.toml.
-fn root_with(test: &str, config: &str) -> std::path::PathBuf {
-    let root = std::env::temp_dir().join(format!("xtask-stamp-root-{test}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&root);
+fn root_with(test: &str, config: &str) -> crate::scratch::Scratch {
+    let root = crate::scratch::dir(&format!("stamp-root-{test}"));
     std::fs::create_dir_all(root.join(".config")).expect("dirs");
     std::fs::write(root.join(".config/factory.toml"), config).expect("config");
     root

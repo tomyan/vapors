@@ -14,17 +14,26 @@ use vapors_elements::Document;
 include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
 pub mod ax;
+pub mod ax_projection;
 pub mod ax_tree;
 mod ax_value;
 mod events_action;
+pub mod events_compare;
+mod events_expect;
+mod events_fields;
 pub mod events_input;
 pub mod events_oracle;
 pub mod events_play;
+mod events_recording;
 pub mod events_script;
+pub mod events_steps;
+mod events_unmet;
+pub mod events_vapors;
 pub mod oracle;
 pub mod oracle_files;
 pub mod page;
 pub mod paint_check;
+pub mod web_input;
 
 /// Mounts a fixture's component into `parent`.
 pub type Mount = fn(&Rc<RefCell<Document>>, NodeId);
@@ -60,20 +69,37 @@ fixtures![
     block_margins::BlockMargins,
     borders::Borders,
     buttons::Buttons,
+    capture::Capture,
     centred_panel::CentredPanel,
+    checkbox::Checkbox,
+    clicks::Clicks,
     clipping::Clipping,
+    combobox::Combobox,
+    cross_drag::CrossDrag,
     flex_row::FlexRow,
+    focus::Focus,
     grid_tracks::GridTracks,
     hello_box::HelloBox,
+    icon_names::IconNames,
+    icons_paint::IconsPaint,
     image_paint::ImagePaint,
     images::Images,
     inline_text::InlineText,
+    names::Names,
+    number::Number,
+    outline_paint::OutlinePaint,
     paint_boxes::PaintBoxes,
     positioned::Positioned,
+    range::Range,
+    roles::Roles,
     scrolling::Scrolling,
     shell::Shell,
     sizing::Sizing,
     stacking::Stacking,
+    text::Text,
     text_align::TextAlign,
     text_wrap::TextWrap,
+    titles::Titles,
+    undo::Undo,
+    words::Words,
 ];

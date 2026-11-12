@@ -24,7 +24,7 @@ fn order(parents: &[Option<usize>], stacking: &[(usize, Stacking)]) -> Vec<usize
         .into_iter()
         .filter_map(|step| match step {
             Step::Box(index) => Some(index),
-            Step::Thumb(_) => None,
+            Step::Thumb(_) | Step::Outline(_) => None,
         })
         .collect()
 }

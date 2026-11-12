@@ -1,0 +1,202 @@
+//! Touches as pointers (3-E1b): finger `n` is pointer `TOUCHES + n`,
+//! captured by its `pointerdown` target without asking (Pointer Events
+//! 3's implicit touch capture), so its moves and `pointerup` go there;
+//! `pointercancel` ends a touch the platform or a scroll took. A touch
+//! whose `pointerdown` listener called `set_pointer_capture` is owned by
+//! that element, which the app reads before letting a pan scroll. The
+//! click comes from the platform's tap, after the touch's own down and
+//! up, so a tap is one click.
+
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use vapors_css::tree::States;
+
+use super::capture::{
+    TOUCHES, ask_unless_asked, dispatch_pointer, process_pending, release_capture,
+};
+use super::{Asked, Point};
+use crate::document::Document;
+
+/// How a touch ended.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Ended {
+    /// The finger lifted.
+    Lifted,
+    /// The platform took it: nothing more comes for it.
+    Taken,
+    /// A pan took it: its lift still comes.
+    Panned,
+}
+
+/// Finger `finger`'s pointer id.
+pub(super) fn touch_id(finger: u64) -> u32 {
+    TOUCHES + u32::try_from(finger).unwrap_or(u32::MAX - TOUCHES)
+}
+
+impl Document {
+    /// Finger `finger` went down at `point`: its target becomes
+    /// `:active`, gets `pointerdown`, and captures the touch.
+    pub fn touch_pressed(document: &Rc<RefCell<Document>>, finger: u64, point: Point) {
+        let id = touch_id(finger);
+        let target = document.borrow().hit(point);
+        let mut doc = document.borrow_mut();
+        doc.keyboard = false;
+        // `:active` follows the first finger down only (review-v78, M1)
+        if doc.pointer.touches.is_empty() {
+            doc.set_flag_chain(States::ACTIVE, target);
+        }
+        doc.pointer.touches.push((finger, point));
+        drop(doc);
+        let Some(target) = target else { return };
+        let event = document
+            .borrow()
+            .pointer_event("pointerdown", id, target, point);
+        let prevented = dispatch_pointer(document, id, target, event);
+        document.borrow_mut().pointer.touch_down_prevented = prevented;
+        let Some(target) = document.borrow().still_in(target) else {
+            return;
+        };
+        ask_unless_asked(document, id, Asked::CaptureTo(target));
+        if !prevented {
+            crate::range_drag::pressed(document, id, target, point);
+            crate::number_scrub::pressed(document, id, target, point);
+        }
+    }
+
+    /// Finger `finger` moved to `point`: its capturing element gets
+    /// `pointermove`, and a range it drags takes the value there.
+    pub fn touch_moved(document: &Rc<RefCell<Document>>, finger: u64, point: Point) {
+        if Self::touch_event(document, finger, point, "pointermove").is_some() {
+            crate::range_drag::moved(document, touch_id(finger), point);
+            crate::number_scrub::moved(document, touch_id(finger), point);
+        }
+    }
+
+    /// Finger `finger` lifted at `point`: `pointerup`, and the capture
+    /// ends.
+    pub fn touch_released(document: &Rc<RefCell<Document>>, finger: u64, point: Point) {
+        Self::touch_ended(document, finger, point, Ended::Lifted);
+    }
+
+    /// Finger `finger` was taken by the platform (a palm, a system
+    /// gesture): `pointercancel`, the capture ends, and so does a range
+    /// it dragged, without `change`, as Chromium fires none on
+    /// `touchcancel`; no lift follows (review-v84, N1).
+    pub fn touch_cancelled(document: &Rc<RefCell<Document>>, finger: u64, point: Point) {
+        Self::touch_ended(document, finger, point, Ended::Taken);
+    }
+
+    /// Whether finger `finger` is down and a listener captured it.
+    #[must_use]
+    pub fn touch_owned(&self, finger: u64) -> bool {
+        let captured = self.captured(touch_id(finger));
+        captured.explicit && (captured.capture.is_some() || captured.pending.is_some())
+    }
+
+    /// A pan took the touches: each finger down that no listener
+    /// captured gets `pointercancel` where it last was; a range such a
+    /// finger dragged keeps its drag until the finger lifts, as
+    /// Chromium's slider fires its `change` on `touchend` after the
+    /// cancel. The app calls this at a gesture's first pan, as Chromium
+    /// cancels then.
+    pub fn cancel_unowned_touches(document: &Rc<RefCell<Document>>) {
+        let touches = document.borrow().pointer.touches.clone();
+        for (finger, point) in touches {
+            if !document.borrow().touch_owned(finger) {
+                Self::touch_ended(document, finger, point, Ended::Panned);
+            }
+        }
+    }
+
+    /// A pan of the fingers down: whether it may scroll. While a finger
+    /// is owned by a listener's capture it may not; otherwise the pan
+    /// takes the touches, each getting `pointercancel`, whether or not
+    /// anything scrolls, as Chromium does (`fixtures/capture.events`).
+    ///
+    /// RELAXED (3-E1b, the lead's decision, 2026-10-26): ownership by
+    /// `set_pointer_capture` stands in for `touch-action: none`, which
+    /// vapors does not have; Chromium cancels an owned touch too. 3-E4's
+    /// `touch-action` retires it.
+    pub fn touch_panned(document: &Rc<RefCell<Document>>) -> bool {
+        if document.borrow().any_touch_owned() {
+            return false;
+        }
+        Self::cancel_unowned_touches(document);
+        true
+    }
+
+    /// Whether any finger down now is owned by a listener's capture.
+    #[must_use]
+    pub fn any_touch_owned(&self) -> bool {
+        self.pointer
+            .touches
+            .iter()
+            .any(|(finger, _)| self.touch_owned(*finger))
+    }
+
+    fn touch_event(
+        document: &Rc<RefCell<Document>>,
+        finger: u64,
+        point: Point,
+        name: &str,
+    ) -> Option<()> {
+        let id = touch_id(finger);
+        {
+            let mut doc = document.borrow_mut();
+            let down = doc.pointer.touches.iter_mut().find(|(f, _)| *f == finger)?;
+            down.1 = point;
+        }
+        process_pending(document, id, point);
+        let target = document.borrow().pointer_target(id, point)?;
+        let event = document.borrow().pointer_event(name, id, target, point);
+        dispatch_pointer(document, id, target, event);
+        Some(())
+    }
+
+    fn touch_ended(document: &Rc<RefCell<Document>>, finger: u64, point: Point, how: Ended) {
+        let id = touch_id(finger);
+        let name = match how {
+            Ended::Lifted => "pointerup",
+            Ended::Taken | Ended::Panned => "pointercancel",
+        };
+        if Self::touch_event(document, finger, point, name).is_some() {
+            release_capture(document, id);
+            process_pending(document, id, point);
+        }
+        Self::forget_touch(document, finger, id);
+        // a finger's drag of a range ends at its lift, with `change`
+        // after the capture's `lostpointercapture`, as Chromium's slider
+        // fires it on touchend; a touch the pan took keeps its drag
+        // until its lift, which still fires the change (3-E3a's oracle);
+        // one the platform took ends it with nothing, since no lift comes
+        match how {
+            Ended::Lifted => {
+                crate::range_drag::released(document, id);
+                crate::number_scrub::released(document, id);
+            }
+            Ended::Taken => {
+                crate::range_drag::dropped(document, id);
+                crate::number_scrub::dropped(document, id);
+            }
+            Ended::Panned => {}
+        }
+    }
+
+    /// Forgets finger `finger` and its capture, whether or not its last
+    /// event found a target (review-v78, M2); the first finger takes
+    /// `:active` with it.
+    fn forget_touch(document: &Rc<RefCell<Document>>, finger: u64, id: u32) {
+        let mut doc = document.borrow_mut();
+        let primary = doc
+            .pointer
+            .touches
+            .first()
+            .is_some_and(|(first, _)| *first == finger);
+        doc.pointer.touches.retain(|(down, _)| *down != finger);
+        doc.pointer.captures.remove(&id);
+        if primary && doc.pointer.pressed.is_none() {
+            doc.set_flag_chain(States::ACTIVE, None);
+        }
+    }
+}

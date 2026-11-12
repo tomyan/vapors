@@ -1,0 +1,6 @@
+# Accessible names, values and what is left out of the tree (R1), as
+# Chromium's accessibility tree has them.
+project button slider spinbutton
+listen focusin
+key Tab                       the first button
+expect focus button#save

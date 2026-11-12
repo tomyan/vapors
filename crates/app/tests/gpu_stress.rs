@@ -4,7 +4,7 @@
 use vapors_app::ScenePainter;
 use vapors_elements::Viewport;
 use vapors_gpu_harness::{gpu, read_rgba8};
-use vapors_renderer::{Target, clear};
+use vapors_renderer::{FrameEncoder, Target, clear};
 use vapors_scene::{Color, Size};
 
 const VIEWPORT: Viewport = Viewport {
@@ -22,9 +22,11 @@ fn painted_tick(shown: &vapors_demos::Shown) -> Vec<u8> {
     let gpu = gpu();
     let texture = clear(&gpu.device, &gpu.queue, 640, 400, Color::default());
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let encoder = FrameEncoder::new(&gpu.device);
     let target = Target {
         device: &gpu.device,
         queue: &gpu.queue,
+        encoder: &encoder,
         view: &view,
         viewport: Size {
             width: 640,
@@ -33,8 +35,10 @@ fn painted_tick(shown: &vapors_demos::Shown) -> Vec<u8> {
         scissor: None,
     };
     ScenePainter::new(&gpu.device, texture.format())
+        .expect("Rgba8Unorm is drawn")
         .draw(&target, painted)
         .expect("paints");
+    encoder.submit(&gpu.queue).expect("no draw refused");
     let rgba = read_rgba8(&gpu.device, &gpu.queue, &texture);
     let [left, top, right, bottom] = TICK;
     (top..bottom)
@@ -49,11 +53,11 @@ fn gpu_the_stress_counters_ink_changes_from_one_frame_to_the_next() {
     let demo = vapors_demos::find("stress").expect("the stress demo");
     let mut shown = vapors_demos::document(&demo);
     let mut per_frame = shown.per_frame.take().expect("stress changes every frame");
-    per_frame(None);
+    per_frame(&[]);
     let first = painted_tick(&shown);
 
     // When
-    per_frame(Some(std::time::Duration::from_millis(1)));
+    per_frame(&[("update", std::time::Duration::from_millis(1))]);
     let second = painted_tick(&shown);
 
     // Then

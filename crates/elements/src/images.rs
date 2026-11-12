@@ -14,12 +14,14 @@ use vapors_scene::{ImageId, Item, RgbaImage};
 use crate::arena::Arena;
 use crate::layout::{BoxRect, Content, LayoutBox};
 use crate::paint::PaintInput;
-use crate::painted::Painted;
+use crate::painting::Painting;
 
 /// The registered images.
 #[derive(Debug, Default)]
 pub(crate) struct Images {
     by_name: HashMap<String, Rc<RgbaImage>>,
+    /// The device's longest texture side, once the app has said it.
+    max_side: Option<u32>,
 }
 
 impl Images {
@@ -27,9 +29,10 @@ impl Images {
     ///
     /// # Errors
     /// An image that cannot be drawn, naming it: a side of zero, a side
-    /// over [`MAX_SIDE`], or pixels that do not match its size.
+    /// over the device's limit (see [`side_problem`]), or pixels that do
+    /// not match its size.
     pub(crate) fn register(&mut self, name: &str, image: RgbaImage) -> Result<(), String> {
-        drawable(name, &image)?;
+        drawable(name, &image, self.max_side)?;
         self.by_name.insert(name.to_owned(), Rc::new(image));
         Ok(())
     }
@@ -58,6 +61,11 @@ impl Images {
             .ok_or(format!("no image is registered as {name:?}"))
     }
 
+    /// Check later images against `side`, the device's longest texture side.
+    pub(crate) fn set_max_side(&mut self, side: u32) {
+        self.max_side = Some(side);
+    }
+
     /// Whether an image is registered as `name`.
     pub(crate) fn has(&self, name: &str) -> bool {
         self.by_name.contains_key(name)
@@ -82,20 +90,18 @@ impl Images {
     }
 }
 
-/// The longest side an image may have: WebGPU's guaranteed
-/// `maxTextureDimension2D`, which every device vapors draws on supports.
-pub(crate) const MAX_SIDE: u32 = 8192;
+/// WebGPU's guaranteed `maxTextureDimension2D`: every device vapors
+/// draws on uploads a side this long.
+pub(crate) const GUARANTEED_SIDE: u32 = 8192;
 
-fn drawable(name: &str, image: &RgbaImage) -> Result<(), String> {
+fn drawable(name: &str, image: &RgbaImage, max_side: Option<u32>) -> Result<(), String> {
     let RgbaImage { size, rgba } = image;
     let (width, height) = (size.width, size.height);
     let wanted = width as usize * height as usize * 4;
     let problem = if width == 0 || height == 0 {
         Some("a side of zero cannot be drawn; register an image with pixels".to_owned())
-    } else if width > MAX_SIDE || height > MAX_SIDE {
-        Some(format!(
-            "a side over {MAX_SIDE} px cannot be uploaded on every device; scale it down first"
-        ))
+    } else if let Some(problem) = side_problem(width.max(height), max_side) {
+        Some(problem)
     } else if rgba.len() != wanted {
         Some(format!(
             "it has {} bytes where RGBA at that size takes {wanted} bytes",
@@ -107,6 +113,24 @@ fn drawable(name: &str, image: &RgbaImage) -> Result<(), String> {
     problem.map_or(Ok(()), |problem| {
         Err(format!("the image {name:?} is {width}x{height}: {problem}"))
     })
+}
+
+/// Why a longest side of `side` cannot be uploaded: over the device's
+/// `max_side` when it is known; over [`GUARANTEED_SIDE`] when it is not,
+/// since only that much is certain before the device is.
+fn side_problem(side: u32, max_side: Option<u32>) -> Option<String> {
+    match max_side {
+        Some(limit) if side > limit => Some(format!(
+            "a side over {limit} px is past this device's texture limit \
+             (max_texture_dimension_2d {limit}); scale it down first"
+        )),
+        None if side > GUARANTEED_SIDE => Some(format!(
+            "a side over {GUARANTEED_SIDE} px fits only some devices, and this document does not \
+             know its device's limit yet (Document::set_max_image_side, which ElementsApp calls \
+             every frame); register it after the first frame, or scale it to {GUARANTEED_SIDE} px"
+        )),
+        _ => None,
+    }
 }
 
 /// `node`'s `src`, when it is an `img`.
@@ -124,7 +148,7 @@ pub(crate) fn paint(
     layout_box: &LayoutBox,
     border_box: BoxRect,
     input: &PaintInput<'_>,
-    out: &mut Painted,
+    out: &mut Painting,
 ) {
     let (Some(image), &Content::Element(node)) = (&layout_box.image, &layout_box.content) else {
         return;
@@ -132,20 +156,8 @@ pub(crate) fn paint(
     if !input.used[&node].visible {
         return;
     }
-    let content = content_box(layout_box, border_box);
-    let id = ImageId(u32::try_from(out.images.len()).expect("fewer than 2^32 images"));
-    out.images.push(Rc::clone(image));
+    let content = crate::clip::content_box(layout_box, border_box);
+    let id = ImageId(out.slabs.images.insert(Rc::clone(image)));
     let rect = crate::paint::snapped(content, input.scale);
     out.scene.push(Item::Image { image: id, rect });
-}
-
-fn content_box(layout_box: &LayoutBox, border_box: BoxRect) -> BoxRect {
-    let padding = crate::clip::padding_box(layout_box, border_box);
-    let inner = layout_box.layout.padding;
-    BoxRect {
-        x: padding.x + inner.left,
-        y: padding.y + inner.top,
-        width: (padding.width - inner.left - inner.right).max(0.0),
-        height: (padding.height - inner.top - inner.bottom).max(0.0),
-    }
 }

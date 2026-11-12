@@ -1,6 +1,6 @@
 //! Touch gestures from raw touches: one finger pans, two fingers pinch
 //! about their midpoint and pan by its movement, a quick still press is a
-//! tap, and two taps close together are a double tap.
+//! tap, and the second of a run of taps close together is a double tap.
 //!
 //! Pure: fed each touch with a monotonic time, it returns the gestures
 //! that touch completed. The window module supplies the clock.
@@ -20,8 +20,9 @@ use crate::event::{Event, TouchPhase};
 /// A press longer than this is not a tap; it is under Android's 400 ms
 /// long press so a long press never counts.
 const TAP_TIME: Duration = Duration::from_millis(300);
-/// A press that moves further than this is not a tap.
-const TAP_SLOP: f32 = 20.0;
+/// A press that moves further than this is not a tap, and a finger pans
+/// only once it has moved further than this.
+pub const TAP_SLOP: f32 = 20.0;
 /// A second tap starting later than this after the first ended is a new tap.
 const DOUBLE_TAP_TIME: Duration = Duration::from_millis(300);
 /// A second tap further than this from the first is a new tap.
@@ -38,11 +39,6 @@ struct Press {
     started: Duration,
 }
 
-struct Tap {
-    at: [f32; 2],
-    ended: Duration,
-}
-
 /// The recogniser. One per window.
 #[derive(Default)]
 pub struct Gestures {
@@ -50,7 +46,7 @@ pub struct Gestures {
     /// The single finger that may still become a tap.
     press: Option<Press>,
     /// The last tap, until it is too old to pair with.
-    last_tap: Option<Tap>,
+    last_tap: Option<tap::Tap>,
     /// A confused stream (a repeated Started, an unknown finger) is
     /// reported once, because it repeats on every event after.
     reported: bool,
@@ -102,13 +98,17 @@ impl Gestures {
             return Vec::new();
         };
         let before = std::mem::replace(&mut self.fingers[index].at, at);
-        if let Some(press) = &self.press
-            && press.id == id
-            && distance(press.at, at) > TAP_SLOP
-        {
+        let pressed = self.press.as_ref().filter(|press| press.id == id);
+        // within the tap slop a finger is still a possible tap and pans
+        // nothing; past it the press is dropped and it pans, so a tap
+        // and a pan are exclusive, as Chromium's slop makes them
+        // (review-v78, H1)
+        let within_slop = pressed.is_some_and(|press| distance(press.at, at) <= TAP_SLOP);
+        if pressed.is_some() && !within_slop {
             self.press = None;
         }
         match self.fingers.len() {
+            1 if within_slop => Vec::new(),
             1 => vec![pan(before, at)],
             2 => pinch(self.fingers[1 - index].at, before, at),
             _ => Vec::new(),
@@ -128,21 +128,6 @@ impl Gestures {
             return Vec::new();
         }
         self.tapped(at, press.started, now)
-    }
-
-    fn tapped(&mut self, at: [f32; 2], started: Duration, now: Duration) -> Vec<Event> {
-        let [x, y] = at;
-        let mut events = vec![Event::Tap { x, y }];
-        let pairs = self.last_tap.take().is_some_and(|last| {
-            started.saturating_sub(last.ended) <= DOUBLE_TAP_TIME
-                && distance(last.at, at) <= DOUBLE_TAP_SLOP
-        });
-        if pairs {
-            events.push(Event::DoubleTap { x, y });
-        } else {
-            self.last_tap = Some(Tap { at, ended: now });
-        }
-        events
     }
 
     fn cancelled(&mut self, id: u64) -> Vec<Event> {
@@ -200,6 +185,9 @@ fn midpoint(a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
 fn distance(a: [f32; 2], b: [f32; 2]) -> f32 {
     ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2)).sqrt()
 }
+
+#[path = "gestures_tap.rs"]
+mod tap;
 
 #[cfg(test)]
 #[path = "gestures_tests.rs"]

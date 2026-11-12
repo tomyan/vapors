@@ -118,6 +118,10 @@ fn a_step_ci_runs_on_success_is_planned_and_one_only_on_failure_is_not() {
     assert!(lint(&with("always()")), "always() runs on success");
     assert!(lint(&with("success()")), "success() runs on success");
     assert!(
+        lint(&with("${{ !cancelled() }}")),
+        "!cancelled() runs on success"
+    );
+    assert!(
         !lint(&with("failure()")),
         "failure() never runs when the gate passes"
     );

@@ -150,6 +150,7 @@ fn pseudo_use(p: &PseudoClass, flag: States) -> Use {
         PseudoClass::Checked => States::CHECKED,
         PseudoClass::Disabled => States::DISABLED,
         PseudoClass::Enabled => States::ENABLED,
+        PseudoClass::Invalid => States::INVALID,
         PseudoClass::Not(list)
         | PseudoClass::Is(list)
         | PseudoClass::Where(list)

@@ -1,6 +1,11 @@
 <script>
 let tick: Signal<u32> = Signal::new(0);
-let layers: Signal<Vec<u32>> = Signal::new((1..=20).collect());
+let layers: Signal<Vec<(i32, String, i32)>> = Signal::new(
+    (1..=20_i32)
+        .zip(["Curves", "Levels", "Saturation", "Warmth"].iter().cycle().skip(1))
+        .map(|(id, kind)| (id, String::from(*kind), id * 5 - 50))
+        .collect(),
+);
 </script>
 
 <style>
@@ -20,4 +25,4 @@ button { padding: 6px 12px; border: none; border-radius: 6px; background-color: 
 </style>
 
 <div class="bar">Layers</div>
-<div class="stack">{for layer in layers.get() key=layer}<section><h2>Curves</h2><div class="body"><img class="thumb" src="sky.png"><div class="text">Layer {layer} at tick {tick}</div><button>Edit</button></div></section>{/for}</div>
+<div class="stack">{for layer in layers.get() key=layer.0}<section><h2>{layer.1.clone()}</h2><div class="body"><img class="thumb" src="sky.png"><div class="text">{layer.1.clone()} {layer.2} at tick {tick}</div><button>Edit</button></div></section>{/for}</div>

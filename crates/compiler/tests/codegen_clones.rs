@@ -46,3 +46,26 @@ fn a_builder_that_needs_clones_is_valid_rust() {
     assert_has(&code, "let label = label.clone();");
     syn::parse_file(&code).unwrap_or_else(|err| panic!("{err}\n{code}"));
 }
+
+#[test]
+fn a_render_argument_read_in_an_if_is_cloned_before_its_builder() {
+    // When: a String prop passed to a render inside an {if}, then read again
+    let code = generated_with(
+        "#[prop]\nlet label: String = String::new();",
+        "{snippet tag(text: String)}<b>{text}</b>{/snippet}{if true}{render tag(label.clone())}{/if}<p>{label}</p>",
+    );
+
+    // Then: between the {if}'s call and its builder (a later hole's
+    // clone of `label` does not count)
+    let call = code
+        .find("vapors_dom::blocks::conditional(")
+        .expect("the if");
+    let builder = call
+        + code[call..]
+            .find("dom: &Rc<RefCell<D>>")
+            .expect("the builder");
+    assert!(
+        code[call..builder].contains("let label = label.clone();"),
+        "{code}"
+    );
+}

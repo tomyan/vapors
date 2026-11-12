@@ -7,11 +7,11 @@ use std::time::{Duration, Instant};
 
 use super::*;
 
-/// A scratch lock path for one test.
-fn lock_path(name: &str) -> PathBuf {
-    let path = std::env::temp_dir().join(format!("xtask-stop-{name}-{}", std::process::id()));
-    let _ = std::fs::remove_file(&path);
-    path
+/// A lock path for one test, not yet created, in a scratch directory.
+fn lock_path(name: &str) -> (crate::scratch::Scratch, PathBuf) {
+    let scratch = crate::scratch::dir(&format!("stop-{name}"));
+    let path = scratch.join("lock");
+    (scratch, path)
 }
 
 /// `sh` running `script` with `$LOCK` set, once it has created the lock.
@@ -42,7 +42,7 @@ const IGNORES_TERM: &str = r#"trap '' TERM; touch "$LOCK"; while :; do sleep 0.0
 #[test]
 fn a_process_that_handles_term_exits_and_leaves_no_lock_behind() {
     // Given
-    let lock = lock_path("clean");
+    let (_scratch, lock) = lock_path("clean");
     let mut child = spawn_holding(&lock, CLEANS_UP_ON_TERM);
 
     // When
@@ -56,7 +56,7 @@ fn a_process_that_handles_term_exits_and_leaves_no_lock_behind() {
 #[test]
 fn a_process_that_ignores_term_is_killed_at_the_deadline() {
     // Given
-    let lock = lock_path("ignores");
+    let (_scratch, lock) = lock_path("ignores");
     let mut child = spawn_holding(&lock, IGNORES_TERM);
     let started = Instant::now();
 

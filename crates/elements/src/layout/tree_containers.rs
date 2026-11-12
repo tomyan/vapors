@@ -1,9 +1,11 @@
 //! Taffy's container traits for the box tree: every box answers with its
 //! own style, and a block child keeps its block formatting context.
 
+#[cfg(feature = "grid")]
+use taffy::LayoutGridContainer;
 use taffy::{
-    BlockContext, LayoutBlockContainer, LayoutContainingBlock, LayoutFlexboxContainer,
-    LayoutGridContainer, LayoutInput, LayoutOutput, NodeId, Style,
+    BlockContext, LayoutBlockContainer, LayoutContainingBlock, LayoutFlexboxContainer, LayoutInput,
+    LayoutOutput, NodeId, Style,
 };
 
 use super::BoxTree;
@@ -55,6 +57,7 @@ impl LayoutFlexboxContainer for BoxTree<'_> {
     }
 }
 
+#[cfg(feature = "grid")]
 impl LayoutGridContainer for BoxTree<'_> {
     type GridContainerStyle<'a>
         = &'a Style
@@ -88,6 +91,7 @@ impl LayoutContainingBlock for BoxTree<'_> {
 
     fn clear_hoisted_children(&mut self, id: NodeId) {
         self.boxes[usize::from(id)].hoisted.clear();
+        self.written.hoisting.push(usize::from(id));
     }
 
     fn add_hoisted_children(&mut self, id: NodeId, hoisted: &[NodeId]) {

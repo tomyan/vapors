@@ -1,6 +1,7 @@
 //! Playing an `.events` script in a page Chromium has loaded: each action
 //! through `Input`, then the events logged since the previous step, the
-//! focused element and whether it matches `:focus-visible`. Each step's
+//! focused element, whether it matches `:focus-visible`, and the value
+//! of each control the script expects a value of. Each step's
 //! answer is recorded; each expectation is checked against it, and an
 //! expectation whose target names more or fewer than one element is
 //! refused. Events that arrive after the last step are refused: one that
@@ -21,21 +22,35 @@ const PAGE_SIDE: &str = include_str!("events_play.js");
 const FRAMES: &str =
     "new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => done(true))))";
 
+/// One task after each input call, so a task the input queued (a text
+/// field's `selectionchange`) runs before the next input: without it
+/// Chromium fired `selectionchange` before or after the next key or
+/// `pointerup` from run to run (5 of 8 `--check` runs differed,
+/// 2026-11-01). The vapors player settles after each event to match.
+const TASK: &str = "new Promise((done) => setTimeout(() => done(true), 0))";
+
 /// Half a second after the last step, for timers and transitions a step
-/// set off.
-const SETTLE: &str = "new Promise((done) => setTimeout(() => done(true), 500))";
+/// set off. It first sets `window.__eventsSettling`, so a page can act
+/// after the last step's log is taken and be sure of the order.
+const SETTLE: &str =
+    "(window.__eventsSettling = true, new Promise((done) => setTimeout(() => done(true), 500)))";
 
 /// Two frames took 14.7 to 49.6 ms (median 33.4) over 30 waits in
 /// headless Chromium on the dev machine at load 25 (2026-10-25); 5 s is
 /// a stalled page, not a slow one.
 const FRAME_DEADLINE: Duration = Duration::from_secs(5);
 
-/// A script being played: the page's session, the call deadline, and
-/// the pointer's held button.
+/// A script being played: the page's session, the call deadline, the
+/// pointer's held button, and the controls whose values and checked
+/// states each step reads, as JSON lists.
 struct Player<'a> {
     session: &'a mut Session,
     deadline: Duration,
     pointer: Pointer,
+    values: String,
+    checked: String,
+    /// `project`'s roles.
+    project: Vec<String>,
 }
 
 /// Each step's answers, or every expectation that did not hold, as
@@ -50,14 +65,25 @@ pub fn play(
     script: &Script,
     deadline: Duration,
 ) -> Result<Value, String> {
+    let values = serde_json::to_string(&script.value_targets()).map_err(|e| e.to_string())?;
+    let checked = serde_json::to_string(&script.checked_targets()).map_err(|e| e.to_string())?;
     let mut player = Player {
         session,
         deadline,
         pointer: Pointer::default(),
+        values,
+        checked,
+        project: script.project.clone(),
     };
     let types = serde_json::to_string(&script.listen).map_err(|e| e.to_string())?;
+    let capture = serde_json::to_string(&script.capture).map_err(|e| e.to_string())?;
+    let cancel = serde_json::to_string(&script.cancel).map_err(|e| e.to_string())?;
+    let page_side = PAGE_SIDE
+        .replace("__TYPES__", &types)
+        .replace("__CAPTURE__", &capture)
+        .replace("__CANCEL__", &cancel);
     player
-        .evaluate(&PAGE_SIDE.replace("__TYPES__", &types), deadline)
+        .evaluate(&page_side, deadline)
         .map_err(|e| format!("{name}.events: {e}"))?;
     let (answers, unmet_lines) = player.steps(name, script)?;
     player
@@ -92,14 +118,42 @@ impl Player<'_> {
     /// Perform one step and read its answer.
     fn act(&mut self, step: &Step) -> Result<Value, String> {
         for (method, params) in calls(&step.action, &mut self.pointer) {
-            self.session.call(method, &params, self.deadline)?;
+            let result = self.session.call(method, &params, self.deadline)?;
+            if let Some(exception) = result.get("exceptionDetails") {
+                return Err(format!("{method} threw: {exception}"));
+            }
+            self.evaluate(TASK, FRAME_DEADLINE)?;
         }
         self.evaluate(FRAMES, FRAME_DEADLINE)?;
         let events = self.evaluate("window.__eventsDrain()", self.deadline)?;
         let focus = self.evaluate("window.__eventsFocus()", self.deadline)?;
-        Ok(
-            json!({ "line": step.line, "action": format!("{:?}", step.action), "events": events, "focus": focus["focus"], "focusVisible": focus["focusVisible"] }),
-        )
+        let values = self.evaluate(
+            &format!("window.__eventsValues({})", self.values),
+            self.deadline,
+        )?;
+        let checked = self.evaluate(
+            &format!("window.__eventsChecked({})", self.checked),
+            self.deadline,
+        )?;
+        let selections = self.evaluate("window.__eventsSelections()", self.deadline)?;
+        let ax = self.projection()?;
+        let mut answer = json!({ "line": step.line, "action": format!("{:?}", step.action), "events": events, "focus": focus["focus"], "focusVisible": focus["focusVisible"], "values": values, "checked": checked, "selections": selections });
+        if !ax.is_null() {
+            answer["ax"] = ax;
+        }
+        Ok(answer)
+    }
+
+    /// The a11y projection to `project`'s roles, or null without them.
+    fn projection(&mut self) -> Result<Value, String> {
+        if self.project.is_empty() {
+            return Ok(Value::Null);
+        }
+        let tree = self
+            .session
+            .call("Accessibility.getFullAXTree", &json!({}), self.deadline)?;
+        let reduced = crate::ax_tree::reduce(&tree)?;
+        crate::ax_projection::project(&reduced, &self.project)
     }
 
     /// After the last step, [`SETTLE`] and two more frames; any event
@@ -119,8 +173,12 @@ impl Player<'_> {
 
     /// Why `expect` does not hold, refusing a target that is not one element.
     fn check(&mut self, expect: &Expect, answer: &Value) -> Result<Option<String>, String> {
-        if let Expect::Event { target, .. } | Expect::Focus(target) | Expect::FocusVisible(target) =
-            expect
+        if let Expect::Event { target, .. }
+        | Expect::Focus(target)
+        | Expect::FocusVisible(target)
+        | Expect::Value { target, .. }
+        | Expect::Checked { target, .. }
+        | Expect::Selection { target, .. } = expect
         {
             let selector = serde_json::to_string(target).map_err(|e| e.to_string())?;
             let count =

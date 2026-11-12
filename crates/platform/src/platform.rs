@@ -3,16 +3,17 @@
 //! same code runs where the answer is a promise (the web) and where it is
 //! a blocking dialog on another thread (native).
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::sync::Arc;
 
 use winit::event_loop::EventLoopProxy;
 
-use crate::Cursor;
+use crate::{Cursor, TextField};
 
 use crate::PlatformError;
-use crate::device_lost::{DeviceLost, Lost};
+use crate::device_lost::Lost;
 use crate::file_kind::{self, FileKind};
+use crate::gpu_watch::GpuWatch;
 use crate::picker;
 use crate::redraw::RedrawFlag;
 use crate::waker::Waker;
@@ -22,9 +23,13 @@ use crate::window::Message;
 pub struct Platform {
     /// `None` for a detached platform, which has no event loop.
     proxy: Option<EventLoopProxy<Message>>,
-    lost: DeviceLost,
+    gpu_watch: GpuWatch,
     redraw: Arc<RedrawFlag>,
     cursor: Cell<Option<Cursor>>,
+    /// The focused text field the app last set, until the loop takes it.
+    // set to no field (`Some(None)`) differs from not set (`None`)
+    #[allow(clippy::option_option)]
+    text_field: RefCell<Option<Option<TextField>>>,
 }
 
 impl Platform {
@@ -42,9 +47,10 @@ impl Platform {
     pub fn detached() -> Self {
         Self {
             proxy: None,
-            lost: DeviceLost::default(),
+            gpu_watch: GpuWatch::default(),
             redraw: Arc::default(),
             cursor: Cell::new(None),
+            text_field: RefCell::new(None),
         }
     }
 
@@ -87,9 +93,26 @@ impl Platform {
         self.cursor.take()
     }
 
-    /// The state the window's device is watched into.
-    pub(crate) fn lost_state(&self) -> DeviceLost {
-        self.lost.clone()
+    /// The focused text field, for the platform's text input to mirror
+    /// (the web page's hidden textarea), or `None` when no text field
+    /// has focus. Set it after each event and frame; only a change is
+    /// carried out.
+    pub fn set_text_field(&self, field: Option<TextField>) {
+        *self.text_field.borrow_mut() = Some(field);
+    }
+
+    /// The text field set since the last take, if any: what the loop
+    /// mirrors, and a detached platform's tests read.
+    #[must_use]
+    // set to no field (`Some(None)`) differs from not set (`None`)
+    #[allow(clippy::option_option)]
+    pub fn take_text_field(&self) -> Option<Option<TextField>> {
+        self.text_field.borrow_mut().take()
+    }
+
+    /// The states the window's device is watched into.
+    pub(crate) fn gpu_watch(&self) -> GpuWatch {
+        self.gpu_watch.clone()
     }
 
     /// The window's GPU device loss, once it has happened. After a loss
@@ -101,7 +124,7 @@ impl Platform {
     /// `tests/gpu_device_lost.rs`).
     #[must_use]
     pub fn device_lost(&self) -> Option<Lost> {
-        self.lost.get()
+        self.gpu_watch.lost.get()
     }
 
     /// The loop's proxy.

@@ -1,0 +1,180 @@
+# Icons
+
+An inline `<svg>` holding stroked `<path>`s is drawn as an icon: a
+replaced box of its `width` and `height`, its paths stroked in the
+element's `color`, rasterised at device scale into the glyph atlas.
+The markup is a subset of HTML's inline SVG, so the same fixture
+renders in Chromium and the paint oracle compares the two. It is the
+primitive touche's top bar needs (touche H1); the subset is what
+touche's icons use, and nothing else is drawn approximately.
+
+```html
+<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+  <path d="M5 3L2 6l3 3M2 6h7a4 4 0 0 1 0 8H6" fill="none"
+        stroke="currentColor" stroke-width="1.5"/>
+</svg>
+```
+
+## The subset
+
+Anything outside it is refused before layout, naming the element, the
+attribute and the fix.
+
+The compiler's scoping attribute (`data-wisp`, `vapors_dom::SCOPE_ATTRIBUTE`)
+is accepted on `<svg>` and `<path>`: a component with a `<style>` has it on
+every element. It is the only `data-*` attribute accepted. It is not painted
+and not in the a11y tree, and a scoped rule such as `svg { color: red }`
+matches the svg through it (`svg_scope.rs`). Its value is not checked:
+the compiler refuses `data-wisp` written in a template, so only generated
+code sets it.
+
+`<svg>`:
+
+- `viewBox`: required, four numbers `min-x min-y width height`, width
+  and height above 0.
+- `width`, `height`: required, positive numbers with no unit (CSS px),
+  written as CSS numbers: `16.` and `1.e1` are refused, as Chromium
+  drops them. The viewBox's numbers follow the same syntax.
+  They are the box's CSS `width` and `height`, as in Chromium. Their ratio must equal the
+  viewBox's; a different ratio would letterbox under
+  `preserveAspectRatio`, which is not built.
+  Their larger value times the viewport scale may not exceed 256
+  device px (`svg_limit::MAX_DEVICE_PX`); the update refuses a larger
+  svg, naming the element, both sizes and the fix (draw it smaller, or
+  as an image), and checks again on every update, so a scale change
+  can refuse an svg that was accepted. Each path takes a mask the size
+  of the content box in the 1024 px atlas page, 9 of them at 256 px
+  fill one page (each mask is padded by 1 px), and a larger icon failed the whole frame at draw time.
+  touche's icons are 16 px, 48 px at 3x.
+- `aria-hidden="true"` (a decorative icon: not in the accessibility
+  tree, as in Chromium, so a button holding it keeps its own name), or
+  `role="img"` with a non-empty `aria-label` (a named image). One of
+  the two is required. A button holding a named image takes the
+  image's `aria-label` into its name from content, as Chromium does.
+- `id`, `class`, and `xmlns` with the SVG namespace, which is ignored.
+- Children: `<path>` elements and whitespace only.
+- CSS: sized by its attributes only, so `width`, `height`, `min-*` and
+  `max-*` in CSS are refused (in Chromium the attributes are
+  presentation hints that CSS overrides one axis at a time; vapors
+  takes the size from the attributes only). Inline is refused as for
+  `img`: give it `display: block` or make it a flex or grid item.
+  touche's ask-bar svgs are inline today (`#tools-open`,
+  `#conversation-expand`, `#ask-mic`, `#ask-voice`, `#ask-voice-mute`,
+  `#ask-send`), so touche's CSS gives them `display: block`, as it does
+  for Dictate's rect.
+  `color`, `margin`, `display`, `visibility` and `opacity` apply as to
+  any box.
+
+`<path>`:
+
+- `d`: required. Commands `M L H V A Z`, absolute and relative, with
+  implicit repeats (`l4 4-4 4`), SVG number syntax (signs, decimals,
+  exponents, `1.5.5` as two numbers), and arc flags written `0` or `1`,
+  packed or spaced. Malformed data is refused with the offset of the
+  first character not understood, naming the fix. Only whitespace may
+  follow a command letter, so `M,1 1` is refused as in Chromium. A
+  number that does not fit a 32-bit float is refused. An arc with a
+  zero radius is drawn as a line to its end point, as SVG says.
+  Curves (`C S Q T`) are not in the subset.
+- `fill="none"`: required (SVG's default fill is black).
+- `stroke="currentColor"`: required.
+- `stroke-width`: a positive number in viewBox units; 1 when absent, as
+  in SVG.
+- Nothing else: no `class`, `style`, `transform`, caps or joins. Joins
+  are miter with limit 4 and caps butt, SVG's defaults.
+- CSS: a `color` different from its svg's, `display: none`, and a
+  `visibility` different from its svg's are refused. Paint strokes
+  every path of an icon in the svg's colour and shows them with the
+  svg's visibility, so a path styled otherwise would not be drawn as
+  styled.
+
+touche's Dictate icon also uses `<rect rx>`; it is written as a path
+when that button moves, rather than widening the subset.
+
+## Layout
+
+The `svg` is a replaced box like `img`. Its `width` and `height`
+attributes are its CSS width and height, as Chromium maps them
+(presentational hints): definite, so a flex or grid container does not
+stretch it, and following `box-sizing`, so under `border-box` padding
+and border are inside the 16 px. As a flex item it grows, shrinks and
+takes a `flex-basis` on the main axis as in Chromium, which gives an
+svg no automatic minimum size, so it can shrink below its attributes
+(min size 0). `crates/elements/tests/svg_size.rs` holds Chromium 155's
+numbers. Its `path` children are not boxes.
+
+## Paint
+
+- `vapors-text` parses path data strictly (`IconPath`) into zeno
+  commands; the same parser answers the elements' refusal check, so a
+  path that passed the check rasterises.
+- The element's content box is snapped to whole device pixels, as an
+  image's is. The icon is rasterised at that device-pixel size: the
+  viewBox is scaled into it by the smaller of device width / viewBox
+  width and device height / viewBox height, and centred, as SVG's
+  default `preserveAspectRatio` (`xMidYMid meet`) does. The ratios
+  are equal by the `width`/`height` rule until snapping to device
+  pixels changes the box's, and the uniform scale keeps strokes from
+  stretching then. Each path of the
+  `<svg>` is stroked by zeno into its own 8-bit coverage mask, placed
+  in the atlas's coverage page, beside glyphs and evicted with them.
+- zeno 0.3.3 bevels every join sharper than 90 degrees whatever the
+  miter limit ([dfrg/zeno#29](https://github.com/dfrg/zeno/issues/29));
+  touche's speaker icon has a 53-degree join. `icon_miter.rs` adds the
+  missing wedge for joins between 90 degrees and SVG's limit of 4, so
+  they miter as in Chromium. Retire it when zeno fixes the issue.
+- One atlas entry per path. Its key is the path's `d` and
+  `stroke-width`, the viewBox, and the device size in pixels: one path
+  at one size and scale is rasterised once.
+- `Item::Icon { icon, rect, colour }` in the display list, one per
+  `<svg>`; the painter draws it through the text pipeline as one quad
+  per path of the atlas coverage tinted by the element's `color`, in
+  document order. Chromium paints each path separately, so where two
+  paths of a translucent colour overlap the alpha compounds
+  (`a + a(1 - a)`, 0.75 for two paths at 0.5); one quad per path gives
+  the same. Text's gamma and contrast boost are glyph-specific and not
+  applied to icons; the blend is confirmed by the paint oracle.
+- Compared with Chromium 155 in slice 3 (`fixtures/icons_paint.wisp`,
+  `tests/gpu_paint.rs`): touche's ten icons pass the paint rules every
+  fixture is held to, unchanged, at 1x and 2x. Per icon, the largest
+  difference is 46 grey levels at 1x and 74 at 2x, the mean at most
+  1.3. Four pixels of Mute at 1x (two in each of the two opaque rows) are compared
+  with exact coverage instead: Chromium draws them 133 off exact (declared in
+  `tests/paint_support/exact.rs`).
+- Open: zeno sums the coverage of overlapping strokes within one path,
+  where SVG paints their union, so a crossing comes out darker by up to
+  28 grey levels than exact (Mute's X: 45 where exact is 73). Not fixed
+  in slice 3; inside the paint rules' bounds.
+- Open: Chromium 155 (Skia) draws Mute's crossing pixels at 1x, svg
+  (11, 8) and (13, 8), off exact coverage: row 8 reads `236 206 45 206
+  236` where exact is `231 73 29 73 231` (133 off), though row 7 reads
+  `229 63 29 63 229` and the geometry is symmetric about y = 8. Those
+  pixels are compared with exact coverage instead, declared in
+  `tests/paint_support/exact.rs`; retired when Chromium is within
+  `EDGE_BOUND` of vapors there.
+- Built in 1b: `vapors_text::Icon` (view box and `IconStroke`s, checked:
+  at least one stroke, a view box with area, positive stroke widths) and
+  `Icon::rasterize_stroke` (`Icon::rasterize` combines the paths
+  source-over, what an opaque colour paints).
+  `GlyphAtlas::icon(icon, stroke, size)` refuses a path
+  larger than a page (`AtlasError::IconTooLarge`) before rasterising.
+  `TextPipeline::draw_icons(target, atlas, &[IconDraw])` takes the
+  snapped content box in device pixels and draws with `ICON_BLEND`
+  (gamma 1, contrast 0), which the text shader makes a plain blend.
+- Built in 2b: an svg's `Icon` is built with its box
+  (`elements::svg_paint`), stroke width 1 when absent. Paint pushes
+  `Item::Icon` with an `IconId` that `Painted::icon` resolves, the
+  colour the svg's used `color`, and none when the svg is not
+  `visibility: visible`. Consecutive icons under one clip are one
+  `Run::Icons`, which the painter draws in one `draw_icons` call under
+  the clip's scissor.
+
+## Slices
+
+| PR | Content |
+|---|---|
+| 1 | This doc; `vapors-text`: `IconPath` (strict parse, refusals) |
+| 1b | Path rasterisation into the atlas, `TextPipeline` drawing an icon quad; unit and GPU tests |
+| 2a | Compiler vocabulary (`svg`, `path`); elements: the refusals, replaced layout, accessibility |
+| 2b | `Item::Icon` in paint and the painter |
+| 3 | A paint fixture of touche's icons compared with Chromium at 1x and 2x, and an accessibility fixture against the oracle. Done |

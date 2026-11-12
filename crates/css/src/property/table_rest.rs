@@ -2,7 +2,8 @@
 //! grammar constants.
 
 use super::table::{
-    GAP, INSET, JUSTIFY_ITEMS, MARGIN, MAX_SIZE, OVERFLOW, PADDING, PropertyDef, SIZE, def,
+    BORDER_WIDTH, GAP, INSET, JUSTIFY_ITEMS, MARGIN, MAX_SIZE, OVERFLOW, PADDING, PropertyDef,
+    SIZE, def,
 };
 
 /// Longhands h to z.
@@ -43,6 +44,15 @@ pub(super) static SECOND_HALF: &[PropertyDef] = &[
         "1",
         "<number [0,1]> | <percentage [0,100]>",
     ),
+    def("outline-color", false, "currentcolor", "<color>"),
+    def("outline-offset", false, "0px", "<length>"),
+    def(
+        "outline-style",
+        false,
+        "none",
+        "auto | none | solid | dashed | dotted | double",
+    ),
+    def("outline-width", false, "medium", BORDER_WIDTH),
     def("overflow-x", false, "visible", OVERFLOW),
     def("overflow-y", false, "visible", OVERFLOW),
     def("padding-bottom", false, "0px", PADDING),

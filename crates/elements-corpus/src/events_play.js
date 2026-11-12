@@ -1,5 +1,6 @@
 // The .events player's page side (events_play.rs). __TYPES__ is the
-// script's `listen` list. Each event of those types is kept when it
+// script's `listen` list, __CAPTURE__ its `capture` targets. Each event
+// of those types is kept when it
 // reaches the window in the capture phase, so every one is seen once,
 // whatever stops it later; its fields are read when the log is drained,
 // after it has run, so defaultPrevented is final.
@@ -19,10 +20,34 @@
     return name(t.parentElement) + ">" + t.localName + ":nth-child(" + index + ")";
   };
   for (const type of types) window.addEventListener(type, (event) => log.push(event), true);
+  // `capture`: each target captures the pointer on pointerdown, as a
+  // vapors listener calling set_pointer_capture does; one that names
+  // more or fewer than one element stops the script.
+  for (const target of __CAPTURE__) {
+    const found = document.querySelectorAll(target);
+    if (found.length !== 1) throw new Error("capture " + target + " names " + found.length + " elements, not one");
+    found[0].addEventListener("pointerdown", (e) => e.currentTarget.setPointerCapture(e.pointerId));
+  }
+  // `cancel`: each target prevents its pointerdown's default, as a
+  // vapors listener calling prevent_default does.
+  for (const target of __CANCEL__) {
+    const found = document.querySelectorAll(target);
+    if (found.length !== 1) throw new Error("cancel " + target + " names " + found.length + " elements, not one");
+    found[0].addEventListener("pointerdown", (e) => e.preventDefault());
+  }
+  // Set by the player's settle once the last step's log is taken
+  // (events_play.rs, SETTLE); false at each injection, so a page that
+  // waits for it acts after the last step of this play only.
+  window.__eventsSettling = false;
   window.__eventsDrain = () => log.splice(0).map((e) => {
     const entry = { type: e.type, target: name(e.target), bubbles: e.bubbles, defaultPrevented: e.defaultPrevented };
     if ("pointerType" in e && e.pointerType) entry.pointerType = e.pointerType;
     if ("key" in e && e.key) entry.key = e.key;
+    // the modifiers held, recorded only when held, so recordings made
+    // before they were read stay as they are
+    for (const held of ["altKey", "ctrlKey", "metaKey", "shiftKey"]) {
+      if (e[held] === true && e instanceof MouseEvent) entry[held] = true;
+    }
     return entry;
   });
   window.__eventsFocus = () => {
@@ -30,5 +55,25 @@
     return { focus: el ? name(el) : null, focusVisible: !!el && el !== document.body && el.matches(":focus-visible") };
   };
   window.__eventsCount = (target) => target === "window" || target === "document" ? 1 : document.querySelectorAll(target).length;
+  // Each named control's value; a target that is not one element
+  // stops the script, as a vapors player with no such element would.
+  const one = (what, target) => {
+    const found = document.querySelectorAll(target);
+    if (found.length !== 1) throw new Error(what + " " + target + " names " + found.length + " elements, not one");
+    return found[0];
+  };
+  window.__eventsValues = (targets) => Object.fromEntries(targets.map((t) => [t, one("value", t).value]));
+  // Every text field's selection as [start, end], by name: each input
+  // whose selectionStart is a number (a number input's is null).
+  window.__eventsSelections = () => Object.fromEntries(
+    Array.from(document.querySelectorAll("input"))
+      .filter((field) => typeof field.selectionStart === "number")
+      .map((field) => [name(field), [field.selectionStart, field.selectionEnd]]));
+  // Each named checkbox's state; an element without one stops the script.
+  window.__eventsChecked = (targets) => Object.fromEntries(targets.map((t) => {
+    const found = one("checked", t);
+    if (typeof found.checked !== "boolean") throw new Error("checked " + t + " is not a checkbox");
+    return [t, found.checked];
+  }));
   return true;
 })()

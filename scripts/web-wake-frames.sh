@@ -2,8 +2,11 @@
 # The waker on the built page (?demo=wake) in headless Chrome in real
 # time: once the page has drawn, no frame in 2 s idle, then exactly one
 # frame for each of 3 calls to vapors_demo_wake, 300 ms apart, and one
-# or two for a burst of 5 calls with no wait between (frames counted
-# with getCurrentTexture).
+# or two for a burst of 5 calls with no wait between; then a frame that
+# returns Next::WaitUntil 600 ms ahead (vapors_demo_wait_until, then a
+# wake) gets one more frame by 900 ms, and none if a wake 100 ms later
+# drew a frame that returned Wait (frames counted with getCurrentTexture),
+# and that frame came at or after the 600 ms, not before.
 #
 # Usage: scripts/web-wake-frames.sh target/web <new or empty dir>
 # after `cargo xtask web`. Needs python3 and a browser (scripts/
@@ -14,6 +17,8 @@
 # The page posts each stage as it reaches it: script (its first script
 # ran), drew (the first frame), export (vapors_demo_wake is there),
 # counts. In CI it runs after the page contract, so Chrome is warm.
+# The directory is removed when the check passes and kept, for its logs,
+# when it fails.
 set -eu
 web=${1:?usage: scripts/web-wake-frames.sh target/web <new or empty dir>}
 work=${2:?usage: scripts/web-wake-frames.sh target/web <new or empty dir>}
@@ -21,12 +26,15 @@ work=${2:?usage: scripts/web-wake-frames.sh target/web <new or empty dir>}
 [ -f "$web/index.html" ] || { echo "$web/index.html: missing; run cargo xtask web first" >&2; exit 1; }
 if [ -e "$work" ] && [ -n "$(ls -A "$work")" ]; then echo "$work: not empty" >&2; exit 1; fi
 mkdir -p "$work"; cp "$web"/* "$work"/
+# Chromium leaves org.chromium.Chromium.* directories in TMPDIR on every
+# launch; here they go with $work.
+mkdir -p "$work/tmp"; export TMPDIR="$work/tmp"
 
 # The first frame: the page contract's wasm pages draw within its 8 s of
 # virtual time; a cold runner's first wasm compile is slower, and the
 # gpu job's cold Chrome took up to 57.9 s to its first page (COLD_START
 # in crates/text/src/comparison/chromium_warm.rs). 30 s from the page's
-# own script, then the counts take about 3 s.
+# own script, then the counts take about 5 s.
 FIRST_FRAME_MS=30000
 # The whole run: a cold Chrome's 58 s to the page, the 30 s for the first
 # frame, the counts, and margin: 120 s.
@@ -36,8 +44,8 @@ python3 - "$work/index.html" "$work/wake.html" "$FIRST_FRAME_MS" <<'PY'
 import sys
 source, target, first_ms = sys.argv[1:4]
 text = open(source).read()
-head = ('<script>var frames = 0; var current = GPUCanvasContext.prototype.getCurrentTexture;'
-        ' GPUCanvasContext.prototype.getCurrentTexture = function () { frames++; return current.apply(this, arguments); };'
+head = ('<script>var frames = 0; var lastAt = 0; var current = GPUCanvasContext.prototype.getCurrentTexture;'
+        ' GPUCanvasContext.prototype.getCurrentTexture = function () { frames++; lastAt = performance.now(); return current.apply(this, arguments); };'
         ' function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }'
         ' function stage(name) { return fetch("/stage/" + name, { method: "POST" }).catch(function () {}); }'
         ' function report(text) { var p = document.createElement("pre"); p.id = "wake"; p.textContent = text;'
@@ -58,7 +66,13 @@ head = ('<script>var frames = 0; var current = GPUCanvasContext.prototype.getCur
         ' var before = frames;'
         ' try { for (var j = 0; j < 5; j++) { window.wasmBindings.vapors_demo_wake(); } } catch (x) { report("refused: vapors_demo_wake threw " + x); return; }'
         ' await wait(300); var burst = frames - before;'
-        ' report("idle " + idle + "; per wake " + each.join(",") + "; burst " + (burst >= 1 && burst <= 2 ? "1-2" : burst)); })();</script>')
+        ' var w = window.wasmBindings; var timedAt = frames; var timedStart = performance.now();'
+        ' try { w.vapors_demo_wait_until(600); w.vapors_demo_wake(); } catch (x) { report("refused: vapors_demo_wait_until threw " + x); return; }'
+        ' await wait(900); var timed = frames - timedAt; var lateBy = lastAt - timedStart - 600; var replacedAt = frames;'
+        ' w.vapors_demo_wait_until(600); w.vapors_demo_wake(); await wait(100); w.vapors_demo_wake();'
+        ' await wait(900); var replaced = frames - replacedAt;'
+        ' report("idle " + idle + "; per wake " + each.join(",") + "; burst " + (burst >= 1 && burst <= 2 ? "1-2" : burst)'
+        ' + "; timed " + timed + (lateBy >= 0 ? "" : " (the last " + Math.round(-lateBy) + " ms early)") + "; replaced " + replaced); })();</script>')
 open(target, 'w').write(text.replace('</head>', head + '</head>').replace('</body>', '<img src="/wait" hidden></body>'))
 PY
 # The page's load waits on /wait until it posts /done, so the dump comes
@@ -104,11 +118,12 @@ counts=$(env -u DBUS_SESSION_BUS_ADDRESS timeout "$RUN_S" "$chrome" --headless=n
   | sed -n 's#.*<pre id="wake">\([^<]*\)</pre>.*#\1#p') || true
 took=$(( $(date +%s) - started ))
 case $counts in
-  "idle 0; per wake 1,1,1; burst 1-2") echo "wake: $counts ($version, ${took} s)"; exit 0 ;;
+  "idle 0; per wake 1,1,1; burst 1-2; timed 2; replaced 2") echo "wake: $counts ($version, ${took} s)"; rm -rf "$work"; exit 0 ;;
   '') echo "wake: no counts after ${took} s ($version, deadline ${RUN_S} s); the stages the page reached: $(if [ -f "$work/stages" ]; then tr '\n' ' ' < "$work/stages"; else echo 'none, not even the request for the page'; fi)" >&2 ;;
-  *) echo "wake: $counts; expected idle 0; per wake 1,1,1; burst 1-2" >&2 ;;
+  *) echo "wake: $counts; expected idle 0; per wake 1,1,1; burst 1-2; timed 2; replaced 2" >&2 ;;
 esac
 echo "  the page's console and Chrome's last lines:" >&2
 grep -E 'CONSOLE' "$work/chrome.log" | tail -10 | sed 's#^#    #' >&2
 grep -v CONSOLE "$work/chrome.log" | tail -10 | sed 's#^#    #' >&2
+echo "  logs kept in $work" >&2
 exit 1

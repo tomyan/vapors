@@ -21,8 +21,8 @@ fn a_touch_is_sent_raw_and_then_as_its_gesture() {
     let mut input = Input::new();
     input.translate(&touch(7, winit::event::TouchPhase::Started, 0.0, 0.0));
 
-    // When
-    let events = input.translate(&touch(7, winit::event::TouchPhase::Moved, 4.0, 3.0));
+    // When: past the tap slop, so the move pans
+    let events = input.translate(&touch(7, winit::event::TouchPhase::Moved, 40.0, 30.0));
 
     // Then
     assert_eq!(
@@ -31,10 +31,10 @@ fn a_touch_is_sent_raw_and_then_as_its_gesture() {
             Event::Touch {
                 id: 7,
                 phase: TouchPhase::Moved,
-                x: 4.0,
-                y: 3.0
+                x: 40.0,
+                y: 30.0
             },
-            Event::Pan { dx: 4.0, dy: 3.0 }
+            Event::Pan { dx: 40.0, dy: 30.0 }
         ]
     );
 }

@@ -1,0 +1,189 @@
+//! `Document::focus` decides focusability from styles brought up to
+//! date for the element and its ancestors, without layout, as
+//! Chromium's `focus()` forces a style update: a field unhidden and
+//! focused in one handler takes focus; a hidden, invisible or disabled
+//! one does not, and the call says so ([`Focus`]). Chromium
+//! 155.0.8059.79 (`node scripts/chromium-focus-fixup.mjs`, "blur
+//! refocuses the field"): a `blur` handler's `focus()` on the field
+//! just hidden does nothing and the body keeps focus.
+
+mod support;
+
+use std::rc::Rc;
+
+use support::fixup::{hide_field, typed_in, update_and_settle};
+use support::text_page::page;
+use vapors_dom::{Dom, Event};
+use vapors_elements::{Document, Focus};
+
+#[test]
+fn a_field_unhidden_and_focused_in_one_handler_takes_focus() {
+    // Given: the field hidden, and focus gone from it
+    let page = typed_in();
+    hide_field(&page);
+    update_and_settle(&page);
+
+    // When: shown again and focused, with no update between
+    page.doc
+        .borrow_mut()
+        .set_attribute(page.name, "style", "display: block");
+    let result = Document::focus(&page.doc, Some(page.name));
+
+    // Then
+    assert_eq!(result, Focus::Done);
+    assert_eq!(page.doc.borrow().active_element(), Some(page.name));
+}
+
+#[test]
+fn focus_refuses_a_field_hidden_since_the_last_update() {
+    // Given
+    let page = page();
+    hide_field(&page);
+
+    // When
+    let result = Document::focus(&page.doc, Some(page.name));
+
+    // Then
+    assert_eq!(result, Focus::NotFocusable);
+    assert_eq!(page.doc.borrow().active_element(), None);
+}
+
+#[test]
+fn focus_refuses_hidden_invisible_and_disabled_fields() {
+    let cases = [
+        ("body", "display: none", "an ancestor's display: none"),
+        ("field", "display: block; visibility: hidden", "visibility"),
+        ("disabled", "", "disabled"),
+    ];
+    for (target, style, why) in cases {
+        // Given
+        let page = page();
+        let node = if target == "disabled" {
+            page.off
+        } else {
+            page.name
+        };
+        let styled = if target == "body" {
+            page.doc.borrow().body()
+        } else {
+            node
+        };
+        page.doc.borrow_mut().set_attribute(styled, "style", style);
+
+        // When
+        let result = Document::focus(&page.doc, Some(node));
+
+        // Then
+        assert_eq!(result, Focus::NotFocusable, "{why}");
+        assert_eq!(page.doc.borrow().active_element(), None, "{why}");
+    }
+}
+
+#[test]
+fn a_blur_handler_refocusing_the_hidden_field_is_refused_and_the_page_goes_idle() {
+    // Given: a blur handler that focuses the field again
+    let page = typed_in();
+    let (doc, field, log) = (Rc::clone(&page.doc), page.name, Rc::clone(&page.log));
+    let refocus = move |_: &mut Event| {
+        let result = Document::focus(&doc, Some(field));
+        log.borrow_mut().push(format!("refocus {result:?}"));
+    };
+    page.doc
+        .borrow_mut()
+        .listen(page.name, "blur", Box::new(refocus));
+
+    // When: hidden, then two frames
+    hide_field(&page);
+    update_and_settle(&page);
+    let _ = page.doc.borrow_mut().take_changed();
+    update_and_settle(&page);
+
+    // Then: blurred once, refused, and nothing changed in the second frame
+    assert_eq!(page.doc.borrow().active_element(), None);
+    assert_eq!(
+        *page.log.borrow(),
+        [
+            "change \"erWarm\"",
+            "blur",
+            "refocus NotFocusable",
+            "focusout"
+        ]
+    );
+    assert!(!page.doc.borrow_mut().take_changed(), "the page goes idle");
+}
+
+/// A field in a document never updated, focused there.
+fn focused_before_the_first_update(
+    style: &str,
+) -> (Rc<std::cell::RefCell<Document>>, vapors_dom::NodeId, Focus) {
+    let mut doc = support::document();
+    let body = doc.body();
+    let field = doc.create_element("input");
+    doc.set_attribute(
+        field,
+        "style",
+        &format!("display: block; width: 80px; {style}"),
+    );
+    doc.append(body, field);
+    let doc = Rc::new(std::cell::RefCell::new(doc));
+    let result = Document::focus(&doc, Some(field));
+    (doc, field, result)
+}
+
+/// The first update, then its settle.
+fn first_frame(doc: &Rc<std::cell::RefCell<Document>>) {
+    doc.borrow_mut()
+        .update(support::viewport(400.0, 100.0))
+        .expect("updates");
+    Document::settle_focus(doc);
+}
+
+#[test]
+fn focus_before_the_first_update_is_pending_and_applied_after_it() {
+    // Given
+    let (doc, field, result) = focused_before_the_first_update("");
+    assert_eq!(result, Focus::Pending);
+    assert_eq!(doc.borrow().active_element(), None);
+    let log = support::text_page::Log::default();
+    let into = Rc::clone(&log);
+    let focused = move |e: &mut Event| into.borrow_mut().push(e.name().to_owned());
+    doc.borrow_mut().listen(field, "focus", Box::new(focused));
+
+    // When
+    first_frame(&doc);
+
+    // Then
+    assert_eq!(doc.borrow().active_element(), Some(field));
+    assert_eq!(*log.borrow(), ["focus"]);
+}
+
+#[test]
+fn pending_focus_on_a_field_hidden_at_the_first_update_is_dropped() {
+    // Given
+    let (doc, field, result) = focused_before_the_first_update("display: none");
+    assert_eq!(result, Focus::Pending);
+
+    // When: the first frame, then the field shown and another frame
+    first_frame(&doc);
+    let after_first = doc.borrow().active_element();
+    let shown = "display: block; width: 80px";
+    doc.borrow_mut().set_attribute(field, "style", shown);
+    first_frame(&doc);
+
+    // Then: dropped, not kept for later
+    assert_eq!(after_first, None);
+    assert_eq!(doc.borrow().active_element(), None);
+}
+
+#[test]
+fn a_blur_before_the_first_update_clears_the_pending_focus() {
+    // Given
+    let (doc, _, _) = focused_before_the_first_update("");
+
+    // When
+    let _ = Document::focus(&doc, None);
+    first_frame(&doc);
+
+    // Then
+    assert_eq!(doc.borrow().active_element(), None);
+}

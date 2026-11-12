@@ -2,12 +2,12 @@
 //! scroll or pinch zooms about the pointer or the fingers, a drag or a
 //! one-finger pan moves it, a double tap fits it or shows it actual size.
 
-use vapors_platform::{Event, LINE_PIXELS};
 use vapors_renderer::ImagePipeline;
 use vapors_scene::{Color, Size, Transform};
 
-/// Factor per scroll step or per `+`/`-` press.
-const ZOOM_STEP: f32 = 1.25;
+use crate::image_view_area::Insets;
+use crate::image_view_input::Steering;
+use crate::image_view_painter::Shown;
 
 pub use vapors_scene::RgbaImage;
 
@@ -19,17 +19,22 @@ pub(crate) struct Uploaded {
 
 /// An image placed in a viewport under a user-steered transform.
 pub struct ImageView {
-    pub(crate) image: Option<RgbaImage>,
+    pub(crate) shown: Option<Shown>,
     pub(crate) uploaded: Option<Uploaded>,
     pub(crate) viewport: Size,
     transform: Transform,
-    /// The last pointer position; `None` until the pointer first moves.
-    pointer: Option<[f32; 2]>,
-    dragging: bool,
+    /// The gesture in progress (`image_view_input.rs`).
+    pub(crate) steering: Steering,
     pub(crate) background: Color,
-    /// Bumped by every `set_image`: two images of the same size, fitted
+    /// Kept clear of the image's fit on each side (`image_view_area.rs`).
+    pub(crate) insets: Insets,
+    /// Bumped by every `set_image` and `set_painter`: two images of the same size, fitted
     /// the same, differ only in this.
     generation: u64,
+    /// Whether a resize keeps the zoom and position (`keep_view_on_resize`).
+    pub(crate) keep_view: bool,
+    /// Whether a resize has given the view an area with pixels yet.
+    pub(crate) sized: bool,
 }
 
 impl ImageView {
@@ -46,7 +51,7 @@ impl ImageView {
     #[must_use]
     pub fn empty(background: Color) -> Self {
         Self {
-            image: None,
+            shown: None,
             uploaded: None,
             viewport: Size {
                 width: 1,
@@ -56,17 +61,23 @@ impl ImageView {
                 scale: 1.0,
                 translate: [0.0, 0.0],
             },
-            pointer: None,
-            dragging: false,
+            steering: Steering::default(),
             background,
+            insets: Insets::default(),
             generation: 0,
+            keep_view: false,
+            sized: false,
         }
     }
 
     /// Replace what is shown with `image`, fitted.
     pub fn set_image(&mut self, image: RgbaImage) {
+        self.replace(Shown::Pixels(image));
+    }
+
+    pub(crate) fn replace(&mut self, shown: Shown) {
         self.generation += 1;
-        self.image = Some(image);
+        self.shown = Some(shown);
         self.uploaded = None;
         self.fit();
     }
@@ -81,11 +92,11 @@ impl ImageView {
     /// True once an image has been set.
     #[must_use]
     pub fn has_image(&self) -> bool {
-        self.image.is_some()
+        self.shown.is_some()
     }
 
     fn image_size(&self) -> Option<Size> {
-        self.image.as_ref().map(|image| image.size)
+        self.shown.as_ref().map(Shown::size)
     }
 
     /// The current placement of the image in the viewport.
@@ -94,18 +105,24 @@ impl ImageView {
         self.transform
     }
 
-    /// Fit the image to the viewport, centred.
+    /// Fit the image to the viewport less its insets, centred.
     pub fn fit(&mut self) {
-        if let Some(size) = self.image_size() {
-            self.transform = Transform::fit(size, self.viewport);
+        if let Some(fitted) = self.fitted() {
+            self.transform = fitted;
         }
     }
 
-    /// One image pixel per viewport pixel, centred.
+    /// One image pixel per viewport pixel, centred in the viewport less
+    /// its insets.
     pub fn actual_size(&mut self) {
         if let Some(size) = self.image_size() {
-            self.transform = Transform::actual_size(size, self.viewport);
+            self.transform = self.placed(Transform::actual_size(size, self.area_size()));
         }
+    }
+
+    fn fitted(&self) -> Option<Transform> {
+        let size = self.image_size()?;
+        Some(self.placed(Transform::fit(size, self.area_size())))
     }
 
     /// Multiply the scale by `factor`, keeping the image under `anchor` still.
@@ -119,75 +136,29 @@ impl ImageView {
         self.transform.translate[1] += dy;
     }
 
+    /// Keep the zoom and position across a resize (`keep`), as while a
+    /// phone's keyboard shortens the window under a panel the person is
+    /// typing into, or fit the image again on each resize (the default).
+    ///
+    /// Kept, the transform in frame pixels is unchanged: what lies past
+    /// the new edge is cut off, not moved in (there is no clamp, as there
+    /// is none for a pan), and a resize back shows the same picture. Until
+    /// a resize has given the view an area with pixels (a 0x0 resize
+    /// before layout does not), and while the scale is not finite and
+    /// positive, a resize still fits. Changed insets still refit
+    /// ([`ImageView::set_insets`]): a panel opening or closing places the
+    /// image again; the same insets keep it.
+    pub fn keep_view_on_resize(&mut self, keep: bool) {
+        self.keep_view = keep;
+    }
+
     /// Fit the image unless it is fitted already, then show it actual size.
     pub fn toggle_fit(&mut self) {
-        let fitted = self
-            .image_size()
-            .map(|size| Transform::fit(size, self.viewport));
-        if fitted == Some(self.transform) {
+        if self.fitted() == Some(self.transform) {
             self.actual_size();
         } else {
             self.fit();
         }
-    }
-
-    /// Answer an input event.
-    pub fn event(&mut self, event: &Event) {
-        match event {
-            Event::Resized { width, height } => {
-                self.viewport = Size {
-                    width: *width,
-                    height: *height,
-                };
-                self.fit();
-            }
-            Event::PointerMoved { x, y } => self.pointer_moved([*x, *y]),
-            Event::PointerLeft => self.pointer = None,
-            Event::PrimaryButton { pressed } => self.dragging = *pressed,
-            // a notch away from the user (one line up) zooms in a step
-            Event::Scroll { dy, .. } => {
-                self.zoom(self.scroll_anchor(), ZOOM_STEP.powf(-dy / LINE_PIXELS));
-            }
-            Event::Pinch { x, y, factor } => self.zoom([*x, *y], *factor),
-            Event::Pan { dx, dy } => self.pan(*dx, *dy),
-            Event::DoubleTap { .. } => self.toggle_fit(),
-            Event::Character(text) => self.key(text),
-            Event::Touch { .. }
-            | Event::Tap { .. }
-            | Event::OpenRequested
-            | Event::FileOpened { .. } => {}
-        }
-    }
-
-    fn pointer_moved(&mut self, to: [f32; 2]) {
-        if let (true, Some(from)) = (self.dragging, self.pointer) {
-            self.pan(to[0] - from[0], to[1] - from[1]);
-        }
-        self.pointer = Some(to);
-    }
-
-    /// The pointer, or the view centre when no pointer position is known:
-    /// winit's wheel event carries no position of its own.
-    fn scroll_anchor(&self) -> [f32; 2] {
-        self.pointer.unwrap_or_else(|| self.centre())
-    }
-
-    fn key(&mut self, text: &str) {
-        match text {
-            "0" => self.fit(),
-            "1" => self.actual_size(),
-            "+" | "=" => self.zoom(self.centre(), ZOOM_STEP),
-            "-" => self.zoom(self.centre(), 1.0 / ZOOM_STEP),
-            _ => {}
-        }
-    }
-
-    #[allow(clippy::cast_precision_loss)] // viewport sizes are far below 2^24
-    fn centre(&self) -> [f32; 2] {
-        [
-            self.viewport.width as f32 / 2.0,
-            self.viewport.height as f32 / 2.0,
-        ]
     }
 }
 
@@ -198,3 +169,7 @@ mod tests;
 #[cfg(test)]
 #[path = "image_view_pointer_tests.rs"]
 mod pointer_tests;
+
+#[cfg(test)]
+#[path = "image_view_resize_tests.rs"]
+mod resize_tests;

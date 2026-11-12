@@ -11,6 +11,8 @@
 # after `cargo xtask web`; demos default to hello counter image.
 # Needs python3 and chromium (or $CHROME). Prints one line per demo and
 # exits 1 if a page never reported (its count is missing).
+# The directory is removed when the check passes and kept, for its logs,
+# when it fails.
 set -eu
 web=${1:?usage: scripts/web-idle-frames.sh target/web <new or empty dir> [demo ...]}
 work=${2:?usage: scripts/web-idle-frames.sh target/web <new or empty dir> [demo ...]}
@@ -20,6 +22,9 @@ chrome=${CHROME:-chromium}
 [ -f "$web/index.html" ] || { echo "$web/index.html: missing; run cargo xtask web first" >&2; exit 1; }
 if [ -e "$work" ] && [ -n "$(ls -A "$work")" ]; then echo "$work: not empty" >&2; exit 1; fi
 mkdir -p "$work"; cp "$web"/* "$work"/
+# Chromium leaves org.chromium.Chromium.* directories in TMPDIR on every
+# launch; here they go with $work.
+mkdir -p "$work/tmp"; export TMPDIR="$work/tmp"
 python3 - "$work/index.html" "$work/idle.html" <<'PY'
 import sys
 source, target = sys.argv[1:3]
@@ -72,4 +77,5 @@ for demo in $demos; do
   esac
   echo "$demo: $count frames in 3 s idle"
 done
+if [ "$missing" = 0 ]; then rm -rf "$work"; else echo "logs kept in $work" >&2; fi
 exit $missing

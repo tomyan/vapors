@@ -1,0 +1,2772 @@
+{
+  "steps": [
+    {
+      "action": "Click(50.0, 12.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#amount",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#amount",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#amount",
+          "type": "click"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 15,
+      "selections": {},
+      "values": {
+        "input#amount": "20",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Type(\"5\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "5",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "5",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 19,
+      "selections": {},
+      "values": {
+        "input#amount": "205",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"Backspace\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 22,
+      "selections": {},
+      "values": {
+        "input#amount": "20",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Type(\"a\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 25,
+      "selections": {},
+      "values": {
+        "input#amount": "20",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"Backspace\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 28,
+      "selections": {},
+      "values": {
+        "input#amount": "2",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Type(\"7\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "7",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "7",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 30,
+      "selections": {},
+      "values": {
+        "input#amount": "27",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"Enter\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 32,
+      "selections": {},
+      "values": {
+        "input#amount": "27",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"Enter\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 35,
+      "selections": {},
+      "values": {
+        "input#amount": "27",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"ArrowUp\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowUp",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowUp",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 37,
+      "selections": {},
+      "values": {
+        "input#amount": "28",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"ArrowDown\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowDown",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowDown",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 41,
+      "selections": {},
+      "values": {
+        "input#amount": "27",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"Tab\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "focusout"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 43,
+      "selections": {},
+      "values": {
+        "input#amount": "27",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"Shift+Tab\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "focusout"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 46,
+      "selections": {},
+      "values": {
+        "input#amount": "27",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Type(\"9\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "9",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "9",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 48,
+      "selections": {},
+      "values": {
+        "input#amount": "9",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Click(340.0, 12.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#after",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "focusout"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#after",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#after",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "button#after",
+          "type": "click"
+        }
+      ],
+      "focus": "button#after",
+      "focusVisible": false,
+      "line": 51,
+      "selections": {},
+      "values": {
+        "input#amount": "9",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"Shift+Tab\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "button#after",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "button#after",
+          "type": "focusout"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 56,
+      "selections": {},
+      "values": {
+        "input#amount": "9",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"Shift+Tab\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "focusout"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 58,
+      "selections": {},
+      "values": {
+        "input#amount": "9",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Type(\"1500\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "1",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "1",
+          "target": "input#amount",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "5",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "5",
+          "target": "input#amount",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "0",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "0",
+          "target": "input#amount",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "0",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "0",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 60,
+      "selections": {},
+      "values": {
+        "input#amount": "1500",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"Enter\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 62,
+      "selections": {},
+      "values": {
+        "input#amount": "1500",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"ArrowUp\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowUp",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowUp",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 65,
+      "selections": {},
+      "values": {
+        "input#amount": "1500",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"ArrowDown\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowDown",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowDown",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 68,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Key(\"Tab\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "focusout"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 72,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "50"
+      }
+    },
+    {
+      "action": "Type(\"105\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "1",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "1",
+          "target": "input#plain",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "0",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "0",
+          "target": "input#plain",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "5",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "5",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 74,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "105"
+      }
+    },
+    {
+      "action": "Key(\"Enter\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 76,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "105"
+      }
+    },
+    {
+      "action": "Key(\"ArrowDown\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowDown",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowDown",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 79,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "95"
+      }
+    },
+    {
+      "action": "Key(\"ArrowUp\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowUp",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowUp",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 82,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "95"
+      }
+    },
+    {
+      "action": "Key(\"Shift+Tab\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "focusout"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 85,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "95"
+      }
+    },
+    {
+      "action": "Key(\"Tab\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "focusout"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Tab",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 87,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "95"
+      }
+    },
+    {
+      "action": "Type(\"-3\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "-",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "-",
+          "target": "input#plain",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "3",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "3",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 89,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "-3"
+      }
+    },
+    {
+      "action": "Key(\"Enter\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 91,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "-3"
+      }
+    },
+    {
+      "action": "Key(\"ArrowUp\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowUp",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowUp",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 93,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "0"
+      }
+    },
+    {
+      "action": "Key(\"Control+a\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 96,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "0"
+      }
+    },
+    {
+      "action": "Type(\"4\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "4",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "4",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 98,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "4"
+      }
+    },
+    {
+      "action": "Key(\"Control+a\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 101,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "4"
+      }
+    },
+    {
+      "action": "Key(\"Backspace\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 103,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": ""
+      }
+    },
+    {
+      "action": "Type(\"6\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "6",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "6",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 106,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "6"
+      }
+    },
+    {
+      "action": "Key(\"Enter\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 108,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "6"
+      }
+    },
+    {
+      "action": "Key(\"Control+a\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 111,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "6"
+      }
+    },
+    {
+      "action": "Key(\"ArrowUp\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowUp",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowUp",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 113,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "10"
+      }
+    },
+    {
+      "action": "Type(\"5\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "5",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "5",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 116,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "105"
+      }
+    },
+    {
+      "action": "Key(\"Enter\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 118,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "105"
+      }
+    },
+    {
+      "action": "Key(\"Control+Shift+a\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "A",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "A",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 121,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "105"
+      }
+    },
+    {
+      "action": "Type(\"1\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "1",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "1",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 123,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Key(\"Enter\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#plain",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Enter",
+          "target": "input#plain",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#plain",
+      "focusVisible": true,
+      "line": 125,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Click(250.0, 12.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#off",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#plain",
+          "type": "focusout"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#off",
+          "type": "pointerup"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 128,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Key(\"ArrowUp\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowUp",
+          "target": "body",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowUp",
+          "target": "body",
+          "type": "keyup"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 132,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Click(90.0, 12.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#amount",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "focusin"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#amount",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#amount",
+          "type": "click"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 134,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Key(\"Control+a\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 136,
+      "selections": {},
+      "values": {
+        "input#amount": "1000",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Type(\"12.5\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "1",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "1",
+          "target": "input#amount",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "2",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "2",
+          "target": "input#amount",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": ".",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": ".",
+          "target": "input#amount",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "5",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "5",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 138,
+      "selections": {},
+      "values": {
+        "input#amount": "12.5",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Type(\"4\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "4",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "4",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 140,
+      "selections": {},
+      "values": {
+        "input#amount": "12.54",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Key(\"ArrowLeft\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowLeft",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowLeft",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 143,
+      "selections": {},
+      "values": {
+        "input#amount": "12.54",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Key(\"ArrowLeft\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowLeft",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowLeft",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 145,
+      "selections": {},
+      "values": {
+        "input#amount": "12.54",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Type(\"0\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "0",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "0",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 147,
+      "selections": {},
+      "values": {
+        "input#amount": "12.054",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Key(\"Backspace\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Backspace",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 149,
+      "selections": {},
+      "values": {
+        "input#amount": "12.54",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Key(\"Home\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Home",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Home",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 151,
+      "selections": {},
+      "values": {
+        "input#amount": "12.54",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Type(\"3\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "3",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "3",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 153,
+      "selections": {},
+      "values": {
+        "input#amount": "312.54",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Key(\"Delete\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Delete",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Delete",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 155,
+      "selections": {},
+      "values": {
+        "input#amount": "32.54",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Key(\"End\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "End",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "End",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 157,
+      "selections": {},
+      "values": {
+        "input#amount": "32.54",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Key(\"Shift+ArrowLeft\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowLeft",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowLeft",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 159,
+      "selections": {},
+      "values": {
+        "input#amount": "32.54",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Key(\"Shift+ArrowLeft\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowLeft",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowLeft",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 161,
+      "selections": {},
+      "values": {
+        "input#amount": "32.54",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Type(\"7\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "7",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "7",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 163,
+      "selections": {},
+      "values": {
+        "input#amount": "32.7",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Key(\"Shift+Home\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Home",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "Home",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 165,
+      "selections": {},
+      "values": {
+        "input#amount": "32.7",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Type(\"8\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "8",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "8",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 167,
+      "selections": {},
+      "values": {
+        "input#amount": "8",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Key(\"ArrowUp\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowUp",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "change"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "ArrowUp",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 169,
+      "selections": {},
+      "values": {
+        "input#amount": "9",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Type(\"1\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "1",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "1",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 173,
+      "selections": {},
+      "values": {
+        "input#amount": "91",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Click(2.0, 12.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#amount",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#amount",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#amount",
+          "type": "click"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 175,
+      "selections": {},
+      "values": {
+        "input#amount": "91",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Type(\"5\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "5",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "5",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 177,
+      "selections": {},
+      "values": {
+        "input#amount": "591",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Press(2.0, 12.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#amount",
+          "type": "pointerdown"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 179,
+      "selections": {},
+      "values": {
+        "input#amount": "591",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Move(90.0, 12.0)",
+      "checked": {},
+      "events": [],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 181,
+      "selections": {},
+      "values": {
+        "input#amount": "591",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Release(90.0, 12.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#amount",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#amount",
+          "type": "click"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 183,
+      "selections": {},
+      "values": {
+        "input#amount": "591",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Type(\"6\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "6",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "6",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 185,
+      "selections": {},
+      "values": {
+        "input#amount": "6",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Key(\"Control+a\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "a",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 187,
+      "selections": {},
+      "values": {
+        "input#amount": "6",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Type(\"-12.5\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "-",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "-",
+          "target": "input#amount",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "1",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "1",
+          "target": "input#amount",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "2",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "2",
+          "target": "input#amount",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": ".",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": ".",
+          "target": "input#amount",
+          "type": "keyup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "5",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "5",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 189,
+      "selections": {},
+      "values": {
+        "input#amount": "-12.5",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Clicks(14.0, 12.0, 2)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#amount",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#amount",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#amount",
+          "type": "click"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#amount",
+          "type": "pointerdown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#amount",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "input#amount",
+          "type": "click"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 191,
+      "selections": {},
+      "values": {
+        "input#amount": "-12.5",
+        "input#plain": "1051"
+      }
+    },
+    {
+      "action": "Type(\"3\")",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "3",
+          "target": "input#amount",
+          "type": "keydown"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "target": "input#amount",
+          "type": "input"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "key": "3",
+          "target": "input#amount",
+          "type": "keyup"
+        }
+      ],
+      "focus": "input#amount",
+      "focusVisible": true,
+      "line": 193,
+      "selections": {},
+      "values": {
+        "input#amount": "-3",
+        "input#plain": "1051"
+      }
+    }
+  ]
+}
