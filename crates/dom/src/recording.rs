@@ -102,6 +102,9 @@ pub struct RecordingDom {
     listeners: HashMap<(NodeId, String), Vec<crate::Listener>>,
     /// Nodes `remove` took out, with their subtrees: not in the tree.
     removed: std::collections::HashSet<NodeId>,
+    /// Refusals not yet read through `refusals()`; dropping the
+    /// recording with any panics (`keyed.rs`).
+    unread: Vec<String>,
 }
 
 impl RecordingDom {

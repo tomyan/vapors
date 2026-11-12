@@ -19,11 +19,17 @@ fn with_calc(address: usize) -> Vec<LayoutBox> {
     vec![LayoutBox::new(Content::Element(NodeId(7)), style)]
 }
 
+/// Keeps `placed` at scale 1 as an update that built every box would.
+fn keep_every(kept: &mut KeptBoxes, placed: Placed) {
+    let built = crate::layout::Rebuilt::every(&placed.boxes).slots;
+    kept.keep(placed, 1.0, &built);
+}
+
 #[test]
 fn lending_to_an_update_that_built_no_box_lends_nothing() {
     // Given: kept boxes; html became display: none, so no box
     let mut kept = KeptBoxes::default();
-    kept.keep(crate::layout::slots::tests::churned(), 1.0);
+    keep_every(&mut kept, crate::layout::slots::tests::churned());
 
     // When
     let lent = kept.lend(&mut Placed::default(), 1.0, &|_| true);
@@ -39,7 +45,7 @@ fn the_kept_box_of_a_node_is_its_element_box_and_a_removed_node_has_none() {
     let mut kept = KeptBoxes::default();
 
     // When
-    kept.keep(crate::layout::slots::tests::churned(), 1.0);
+    keep_every(&mut kept, crate::layout::slots::tests::churned());
 
     // Then
     for node in [1, 12, 14].map(NodeId) {
@@ -56,7 +62,7 @@ fn a_restyled_box_holding_a_calc_is_lent_nothing_even_when_the_address_matches()
     // Given: the last update's box and this one's share a handle
     // address, as a freed and reused allocation would make them
     let mut kept = KeptBoxes::default();
-    kept.keep(Slots::default().place(with_calc(0x1000)), 1.0);
+    keep_every(&mut kept, Slots::default().place(with_calc(0x1000)));
     let mut placed = kept.place(with_calc(0x1000));
 
     // When: the element was restyled, its calc may have changed
@@ -70,7 +76,7 @@ fn a_restyled_box_holding_a_calc_is_lent_nothing_even_when_the_address_matches()
 fn an_unrestyled_box_holding_a_calc_is_lent_its_cache() {
     // Given
     let mut kept = KeptBoxes::default();
-    kept.keep(Slots::default().place(with_calc(0x1000)), 1.0);
+    keep_every(&mut kept, Slots::default().place(with_calc(0x1000)));
     let mut placed = kept.place(with_calc(0x1000));
 
     // When
@@ -86,7 +92,7 @@ fn a_lent_box_takes_the_inputs_the_kept_box_was_asked_with_its_cache() {
     let mut kept = KeptBoxes::default();
     let mut boxes = with_calc(0x1000);
     boxes[0].asked.push(HIDDEN_ASKED);
-    kept.keep(Slots::default().place(boxes), 1.0);
+    keep_every(&mut kept, Slots::default().place(boxes));
     let mut placed = kept.place(with_calc(0x1000));
 
     // When
