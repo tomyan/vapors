@@ -30,6 +30,7 @@ impl Document {
     /// when a `paste` listener kept it out); `false` when no live text
     /// field has focus, so the paste is the app's.
     pub fn text_pasted(document: &Rc<RefCell<Document>>, text: &str) -> bool {
+        Self::blur_unfocusable(document);
         let focused = document.borrow().active_element();
         let Some(node) = focused.filter(|node| document.borrow().live_text(*node)) else {
             return false;
@@ -37,6 +38,10 @@ impl Document {
         if dispatch_bubbling(document, node, Event::new("paste").with_value(text)) {
             return true;
         }
+        // the listeners may have removed the field: the paste was its
+        let Some(node) = document.borrow().still_in(node) else {
+            return true;
+        };
         let line = one_line(text);
         document.borrow_mut().edit(node, EditKind::Paste, |d| {
             d.insert_or_replace_selection(&line);

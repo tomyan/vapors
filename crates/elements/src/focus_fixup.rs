@@ -20,12 +20,25 @@ impl Document {
     /// when the element is not focusable now.
     pub fn settle_focus(document: &Rc<RefCell<Document>>) {
         let pending = std::mem::take(&mut document.borrow_mut().settle).pending;
-        if document.borrow().lost_focusability() {
-            let _ = Document::focus(document, None);
-        }
+        Self::blur_unfocusable(document);
         if pending.is_some() {
             let _ = Document::focus(document, pending);
         }
+    }
+
+    /// The fixup's blur alone: focus moves to nothing when the focused
+    /// element is no longer focusable, with its commit, `blur` and
+    /// `focusout`; a pending focus request is kept for the settle. Keys
+    /// and text run this first (review-fable-input M5): an element
+    /// hidden since the last settle takes none, as Chromium's style
+    /// update before the task would have blurred it.
+    pub(crate) fn blur_unfocusable(document: &Rc<RefCell<Document>>) {
+        if !document.borrow().lost_focusability() {
+            return;
+        }
+        let pending = document.borrow_mut().settle.pending.take();
+        let _ = Document::focus(document, None);
+        document.borrow_mut().settle.pending = pending;
     }
 
     /// Whether an element has focus that, after a successful update,
