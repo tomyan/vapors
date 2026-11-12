@@ -133,6 +133,8 @@ impl Frames {
 
     /// `item` under `clip`, device pixels in frame `frame`, on the page
     /// and under the frame's clip too.
+    // Exact: a zero shift is exactly zero.
+    #[allow(clippy::float_cmp)]
     pub(crate) fn item(
         &self,
         frame: usize,
@@ -140,12 +142,23 @@ impl Frames {
         clip: Option<Rect>,
     ) -> (Item, Option<Rect>) {
         let at = self.at(frame);
-        let clip = clip.map(|clip| clip.offset(at.shift));
+        // An unshifted frame keeps every coordinate's bits: adding 0.0
+        // turns -0.0 into 0.0, which the kept batches' keys tell apart
+        // (app tests/gpu_kept_batches.rs).
+        let unshifted = at.shift.iter().all(|&v| v == 0.0);
+        let (item, clip) = if unshifted {
+            (*item, clip)
+        } else {
+            (
+                shifted(*item, at.shift),
+                clip.map(|clip| clip.offset(at.shift)),
+            )
+        };
         let clip = match (clip, at.device_clip) {
             (Some(clip), Some(frame)) => Some(clip.intersection(frame)),
             (clip, frame) => clip.or(frame),
         };
-        (shifted(*item, at.shift), clip)
+        (item, clip)
     }
 
     /// `rect` in a frame at `at`, on the page.

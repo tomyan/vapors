@@ -138,3 +138,22 @@ fn a_frame_the_paint_does_not_hold_is_refused_by_name() {
     // When
     let _ = frames.rect(7, rect(0.0, 0.0, 1.0, 1.0));
 }
+
+#[test]
+fn an_item_in_an_unshifted_frame_keeps_a_negative_zero_edge() {
+    // Given: a quad whose top rounded to -0.0, in a frame not shifted
+    let frames = nested([0.0; 2], [0.0; 2], 1.0);
+    let quad = Item::Quad(Quad::fill(
+        Rect::new(0.0, -0.0, 8.0, 8.0),
+        Color::from_rgba8(0, 0, 0, 255),
+    ));
+
+    // When
+    let (kept, _) = frames.item(1, &quad, None);
+
+    // Then: the same bits, which the kept batches' keys compare
+    let Item::Quad(kept) = kept else {
+        panic!("a quad stays a quad")
+    };
+    assert!(kept.rect.top.is_sign_negative());
+}
