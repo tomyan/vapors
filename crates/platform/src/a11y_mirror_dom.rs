@@ -18,9 +18,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use vapors_a11y::{AxMirrorNode, AxPlace, AxUpdate, NodeId};
+use vapors_a11y::{AxMirrorNode, AxUpdate, NodeId};
 
-use crate::a11y_mirror_order::{Move, Order};
+use crate::a11y_mirror_order::Order;
 use crate::a11y_mirror_write::write;
 
 /// The DOM operations a mirror needs.
@@ -60,14 +60,14 @@ pub(crate) trait MirrorDom {
 
 /// The mirror's elements by node, under its root.
 pub(crate) struct Mirror<D: MirrorDom> {
-    root: D::Element,
+    pub(crate) root: D::Element,
     pub(crate) elements: HashMap<u64, D::Element>,
     /// The record last applied to each node's element.
     pub(crate) records: HashMap<u64, AxMirrorNode>,
     /// Where each element is.
     pub(crate) order: Order,
     /// Nodes whose element a record made and no placement has put in.
-    unplaced: Vec<NodeId>,
+    pub(crate) unplaced: Vec<NodeId>,
     /// The nodes whose element this apply made or moved, so the scroll
     /// offsets of the scroll containers in them are written again.
     pub(crate) moved: HashSet<u64>,
@@ -106,7 +106,7 @@ impl<D: MirrorDom> Mirror<D> {
         Ok(())
     }
 
-    fn increment(&mut self, dom: &mut D, update: &AxUpdate) -> Result<(), String> {
+    pub(crate) fn increment(&mut self, dom: &mut D, update: &AxUpdate) -> Result<(), String> {
         for node in &update.nodes {
             self.record(dom, node)?;
         }
@@ -121,7 +121,7 @@ impl<D: MirrorDom> Mirror<D> {
 
     /// The node's element, made if new, with what the record changed
     /// written to it.
-    fn record(&mut self, dom: &mut D, node: &AxMirrorNode) -> Result<(), String> {
+    pub(crate) fn record(&mut self, dom: &mut D, node: &AxMirrorNode) -> Result<(), String> {
         let element = self.held_or_made(dom, node.node)?;
         let last = self.records.get(&node.node.0);
         if write(dom, &element, node, last)? {
@@ -142,80 +142,6 @@ impl<D: MirrorDom> Mirror<D> {
         Ok(element)
     }
 
-    fn place(&mut self, dom: &mut D, place: &AxPlace) -> Result<(), String> {
-        let (parent, before) = (place.parent.map(|p| p.0), place.before.map(|b| b.0));
-        self.put(dom, place.node.0, parent, before)?;
-        self.order.place(place.node.0, parent, before);
-        self.unplaced.retain(|node| *node != place.node);
-        Ok(())
-    }
-
-    /// `node`'s element under `parent`'s before `before`'s, or last.
-    fn put(
-        &mut self,
-        dom: &mut D,
-        node: u64,
-        parent: Option<u64>,
-        before: Option<u64>,
-    ) -> Result<(), String> {
-        let child = self.element(NodeId(node), "places")?;
-        let parent = self.parent(parent.map(NodeId), NodeId(node))?;
-        let placed = match before {
-            Some(before) => {
-                let before = self.element(NodeId(before), "places before")?;
-                dom.insert_before(&parent, &child, &before)
-            }
-            None => dom.append(&parent, &child),
-        };
-        placed
-            .map_err(|refused| format!("the page refused to place a11y node {node}: {refused}"))?;
-        self.moved.insert(node);
-        Ok(())
-    }
-
-    fn remove(&mut self, dom: &mut D, node: NodeId) -> Result<(), String> {
-        let element = self
-            .elements
-            .remove(&node.0)
-            .ok_or_else(|| lagged("removes", node))?;
-        self.records.remove(&node.0);
-        self.order.remove(node.0);
-        dom.remove(&element);
-        Ok(())
-    }
-
-    /// Every node's record written, the elements of nodes not in
-    /// `nodes` removed, then the elements out of place moved.
-    fn reconcile(&mut self, dom: &mut D, nodes: &[AxMirrorNode]) -> Result<(), String> {
-        for node in nodes {
-            self.record(dom, node)?;
-        }
-        self.unplaced.clear();
-        let kept: HashSet<u64> = nodes.iter().map(|node| node.node.0).collect();
-        let gone: Vec<u64> = self
-            .elements
-            .keys()
-            .filter(|id| !kept.contains(id))
-            .copied()
-            .collect();
-        for id in gone {
-            self.remove(dom, NodeId(id))?;
-        }
-        let desired: Vec<(u64, Option<u64>)> = nodes
-            .iter()
-            .map(|node| (node.node.0, node.parent.map(|p| p.0)))
-            .collect();
-        for Move {
-            node,
-            parent,
-            before,
-        } in self.order.reconcile(&desired)
-        {
-            self.put(dom, node, parent, before)?;
-        }
-        Ok(())
-    }
-
     pub(crate) fn element(&self, node: NodeId, what: &str) -> Result<D::Element, String> {
         self.elements
             .get(&node.0)
@@ -224,7 +150,11 @@ impl<D: MirrorDom> Mirror<D> {
     }
 
     /// `parent`'s element, or the root for a top node.
-    fn parent(&self, parent: Option<NodeId>, node: NodeId) -> Result<D::Element, String> {
+    pub(crate) fn parent(
+        &self,
+        parent: Option<NodeId>,
+        node: NodeId,
+    ) -> Result<D::Element, String> {
         match parent {
             None => Ok(self.root.clone()),
             Some(parent) => self.elements.get(&parent.0).cloned().ok_or_else(|| {
@@ -237,7 +167,7 @@ impl<D: MirrorDom> Mirror<D> {
         }
     }
 
-    fn all_placed(&self) -> Result<(), String> {
+    pub(crate) fn all_placed(&self) -> Result<(), String> {
         if self.unplaced.is_empty() {
             return Ok(());
         }
@@ -254,7 +184,7 @@ impl<D: MirrorDom> Mirror<D> {
     }
 }
 
-fn lagged(what: &str, node: NodeId) -> String {
+pub(crate) fn lagged(what: &str, node: NodeId) -> String {
     format!(
         "the a11y update {what} node {}, which the mirror does not hold: the update lagged \
          the document",

@@ -17,6 +17,10 @@ mod a11y_mirror_fake;
 #[cfg(any(target_family = "wasm", test))]
 mod a11y_mirror_order;
 #[cfg(any(target_family = "wasm", test))]
+mod a11y_mirror_place;
+#[cfg(test)]
+mod a11y_mirror_reset_tests;
+#[cfg(any(target_family = "wasm", test))]
 mod a11y_mirror_scroll;
 #[cfg(test)]
 mod a11y_mirror_scroll_tests;
