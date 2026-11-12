@@ -37,12 +37,30 @@ pub(crate) struct KeptBoxes {
 }
 
 impl KeptBoxes {
-    /// Keeps `placed`, laid out at `scale`, for the next update.
-    pub(crate) fn keep(&mut self, mut placed: Placed, scale: f32) {
-        for layout_box in &mut placed.boxes {
-            layout_box.kept = true;
+    /// Keeps `placed`, laid out at `scale`, for the next update: the
+    /// boxes `built` this update are kept from now, and every other box
+    /// was kept already. Returns how many boxes it marked.
+    ///
+    /// # Panics
+    /// A debug build, when a held box is not kept after: `built` is not
+    /// every slot `rebuild` built.
+    pub(crate) fn keep(&mut self, mut placed: Placed, scale: f32, built: &[usize]) -> usize {
+        let mut marked = 0;
+        for &slot in built {
+            placed.boxes[slot].kept = true;
+            marked += 1;
         }
+        debug_assert!(
+            placed
+                .boxes
+                .iter()
+                .all(|b| b.kept || matches!(b.content, Content::Vacant)),
+            "a box built this update is not among the built slots, so it is not kept: \
+             `KeptBoxes::keep` is given a list other than `ChangedSlots::rebuilt`, or \
+             `rebuild` reports a slot short; `cargo test -p vapors-elements` reproduces it"
+        );
         (self.placed, self.scale) = (placed, scale);
+        marked
     }
 
     /// `built`, boxes in pre-order, placed into the kept boxes' slots

@@ -41,7 +41,7 @@ impl Emitter<'_> {
         var: &str,
         attribute: &Attribute,
     ) -> Result<(), CompileError> {
-        if attribute.name == crate::SCOPE_ATTRIBUTE {
+        if attribute.name.eq_ignore_ascii_case(crate::SCOPE_ATTRIBUTE) {
             return Err(self.source.error(
                 attribute.offset,
                 format!(
@@ -134,4 +134,10 @@ impl Emitter<'_> {
         self.dedent(1);
         self.line("}");
     }
+}
+
+/// The element's attribute called `name`, in any case, as HTML
+/// compares attribute names.
+pub(super) fn attribute_named<'e>(element: &'e Element, name: &str) -> Option<&'e Attribute> {
+    (element.attributes.iter()).find(|attribute| attribute.name.eq_ignore_ascii_case(name))
 }

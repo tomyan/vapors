@@ -110,6 +110,8 @@ fn a_component_setting_the_scope_attribute_itself_is_refused() {
     for template in [
         "<div data-wisp=\"x\"></div>",
         "<div data-wisp={name}></div>",
+        "<div Data-Wisp=\"x\"></div>",
+        "<div DATA-WISP={name}></div>",
     ] {
         // When
         let err = refusal(&format!(

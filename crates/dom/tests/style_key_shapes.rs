@@ -96,11 +96,13 @@ static TWICE: StyleKey = StyleKey {
 fn creating_an_element_from_a_malformed_key_records_the_refusal() {
     // Given
     let mut dom = RecordingDom::new();
+    dom.expect_refusals();
 
     // When
     let li = dom.create_keyed_element(&TWICE);
 
     // Then
+    assert_eq!(dom.refusals().len(), 1);
     assert_eq!(
         dom.calls()[1],
         Call::Refused {

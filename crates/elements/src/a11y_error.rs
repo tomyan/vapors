@@ -154,6 +154,18 @@ pub enum AxError {
         /// What is missing, and where it comes from.
         needs: String,
     },
+    /// Focus is on an element the tree leaves out (no role), so a
+    /// reader would hear nothing (R6).
+    FocusOutsideTree {
+        /// The element's tag.
+        tag: String,
+    },
+    /// The mirror's placements wait on each other, which document
+    /// order cannot produce: a bug in vapors (R6).
+    PlacementCycle {
+        /// The nodes placed, as numbers.
+        nodes: Vec<u64>,
+    },
     /// The reply did not serialise: a bug in vapors.
     BadReply {
         /// The serialiser's error.
