@@ -15,6 +15,7 @@ mod component_tag;
 mod element;
 mod element_bind;
 mod element_bind_this;
+mod element_class;
 mod emit;
 mod events_decl;
 mod for_block;

@@ -61,7 +61,7 @@ fn a_colon_named_attribute_that_is_not_a_directive_is_refused() {
     // Then
     assert_eq!(
         err,
-        "counter.wisp:4:6: `style:color` is not a directive: a name with `:` is a directive, and an element takes `bind:value`, `bind:checked` and `bind:this`; a listener is `onclick={handler}`, with no colon"
+        "counter.wisp:4:6: `style:color` is not a directive: a name with `:` is a directive, and an element takes `bind:value`, `bind:checked`, `bind:this` and `class:name={bool}`; a listener is `onclick={handler}`, with no colon"
     );
 }
 
