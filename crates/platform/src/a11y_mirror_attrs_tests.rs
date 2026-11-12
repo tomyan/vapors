@@ -18,7 +18,7 @@ fn set(node: &AxMirrorNode) -> Vec<String> {
 }
 
 #[test]
-fn a_slider_carries_its_value_and_range_and_a_fixed_box() {
+fn a_slider_carries_its_value_and_range_and_a_box_in_its_parent() {
     // Given
     let mut slider = node(5, None, "slider", "Radius");
     slider.value = Some("12".to_owned());
@@ -44,7 +44,7 @@ fn a_slider_carries_its_value_and_range_and_a_fixed_box() {
             "aria-valuenow=12",
             "data-node=5",
             "role=slider",
-            "style=position:fixed;left:10.5px;top:20px;width:100px;height:24px",
+            "style=position:absolute;left:10.5px;top:20px;width:100px;height:24px",
             "tabindex=-1",
         ]
     );
@@ -85,7 +85,7 @@ fn states_and_a_description_are_aria_attributes_and_live_roles_are_off() {
             "aria-label=Mono",
             "data-node=9",
             "role=checkbox",
-            "style=position:fixed;left:0px;top:0px;width:0px;height:0px",
+            "style=position:absolute;left:0px;top:0px;width:0px;height:0px",
         ]
     );
     assert!(set(&alert).contains(&"aria-live=off".to_owned()));

@@ -1,13 +1,18 @@
 //! A node's record as its mirror element's attributes and text (R6,
 //! `docs/plans/r6.md`, "Element mapping"). Every attribute the mirror
-//! may set is in the list, as a value or as none, so a state that went
-//! is removed from the element on the next record. The bounds are
-//! `position: fixed` in viewport pixels: the viewport is every
-//! element's containing block, so a child's offsets are its own, not
-//! added to its parent's. The live roles get `aria-live="off"` until
-//! slice A5 adds live regions on purpose.
+//! may set is in the list, as a value or as none, in one order, so a
+//! state that went is removed from the element on the next record and
+//! two records' lists compare attribute by attribute
+//! (`a11y_mirror_write.rs`). The bounds are `position: absolute` from
+//! the parent element's padding box, as the record holds them; a
+//! scroll container's element scrolls (`overflow: auto`) over the
+//! record's extent, which the page's rule for `data-scroll` sizes from
+//! the custom properties here. The live roles get `aria-live="off"`
+//! until slice A5 adds live regions on purpose.
 
-use vapors_a11y::{AxMirrorNode, AxRect};
+use std::fmt::Write;
+
+use vapors_a11y::{AxMirrorNode, AxRect, AxScroll};
 
 /// An attribute's name and its value, or none to remove it.
 pub(crate) type Attribute = (&'static str, Option<String>);
@@ -34,7 +39,8 @@ pub(crate) fn attributes(node: &AxMirrorNode) -> Result<Vec<Attribute>, String> 
     let mut attributes = vec![
         ("role", Some(node.role.clone())),
         ("data-node", Some(node.node.0.to_string())),
-        ("style", Some(bounds_style(&node.bounds))),
+        ("style", Some(style(&node.bounds, node.scroll.as_ref()))),
+        ("data-scroll", node.scroll.map(|_| String::new())),
         ("aria-label", non_empty(&node.name)),
         ("aria-description", node.description.clone()),
         ("aria-disabled", states.disabled.then(|| "true".to_owned())),
@@ -58,11 +64,22 @@ pub(crate) fn text(node: &AxMirrorNode) -> &str {
     }
 }
 
-fn bounds_style(bounds: &AxRect) -> String {
-    format!(
-        "position:fixed;left:{}px;top:{}px;width:{}px;height:{}px",
+/// The element's place in its parent's padding box, and its scroll
+/// extent when it scrolls.
+fn style(bounds: &AxRect, scroll: Option<&AxScroll>) -> String {
+    let mut style = format!(
+        "position:absolute;left:{}px;top:{}px;width:{}px;height:{}px",
         bounds.x, bounds.y, bounds.width, bounds.height
-    )
+    );
+    if let Some(scroll) = scroll {
+        let [width, height] = scroll.extent;
+        // writing to a String cannot fail
+        let _ = write!(
+            style,
+            ";overflow:auto;--vapors-scroll-w:{width}px;--vapors-scroll-h:{height}px"
+        );
+    }
+    style
 }
 
 fn non_empty(text: &str) -> Option<String> {

@@ -7,14 +7,17 @@
 //! [`MirrorDom`]: the logic runs on a fake natively (its tests) and on
 //! `web_sys` on the page (`a11y_mirror_web.rs`). An update the mirror
 //! cannot apply as given (a node it does not hold, a record left
-//! unplaced) is refused naming the node, never approximated. Focus
+//! unplaced) is refused naming the node, never approximated. The
+//! record last applied to each node is kept, so a record writes only
+//! what changed (`a11y_mirror_write.rs`): a scroll is one write of its
+//! container's offset, the rows under it being placed in it. Focus
 //! (`AxUpdate::focus`) is PR 6's and is not applied here.
 
 use std::collections::{HashMap, HashSet};
 
 use vapors_a11y::{AxMirrorNode, AxPlace, AxUpdate, NodeId};
 
-use crate::a11y_mirror_attrs::{attributes, text};
+use crate::a11y_mirror_write::write;
 
 /// The DOM operations a mirror needs.
 pub(crate) trait MirrorDom {
@@ -40,12 +43,16 @@ pub(crate) trait MirrorDom {
     );
     /// `element` and its subtree out of the tree.
     fn remove(&mut self, element: &Self::Element);
+    /// Scrolls `element`'s content to `offset` (`[x, y]`, CSS pixels).
+    fn set_scroll(&mut self, element: &Self::Element, offset: [f32; 2]);
 }
 
 /// The mirror's elements by node, under its root.
 pub(crate) struct Mirror<D: MirrorDom> {
     root: D::Element,
     elements: HashMap<u64, D::Element>,
+    /// The record last applied to each node's element.
+    records: HashMap<u64, AxMirrorNode>,
     /// Nodes whose element a record made and no placement has put in.
     unplaced: Vec<NodeId>,
 }
@@ -56,6 +63,7 @@ impl<D: MirrorDom> Mirror<D> {
         Self {
             root,
             elements: HashMap::new(),
+            records: HashMap::new(),
             unplaced: Vec::new(),
         }
     }
@@ -82,16 +90,12 @@ impl<D: MirrorDom> Mirror<D> {
         self.all_placed()
     }
 
-    /// The node's element, made if new, with the record's attributes.
+    /// The node's element, made if new, with what the record changed
+    /// written to it.
     fn record(&mut self, dom: &mut D, node: &AxMirrorNode) -> Result<(), String> {
         let element = self.held_or_made(dom, node.node)?;
-        for (name, value) in attributes(node)? {
-            match value {
-                Some(value) => dom.set_attribute(&element, name, &value),
-                None => dom.remove_attribute(&element, name),
-            }
-        }
-        dom.set_text(&element, text(node));
+        write(dom, &element, node, self.records.get(&node.node.0))?;
+        self.records.insert(node.node.0, node.clone());
         Ok(())
     }
 
@@ -125,6 +129,7 @@ impl<D: MirrorDom> Mirror<D> {
             .elements
             .remove(&node.0)
             .ok_or_else(|| lagged("removes", node))?;
+        self.records.remove(&node.0);
         dom.remove(&element);
         Ok(())
     }
@@ -147,6 +152,7 @@ impl<D: MirrorDom> Mirror<D> {
             .copied()
             .collect();
         for id in gone {
+            self.records.remove(&id);
             if let Some(element) = self.elements.remove(&id) {
                 dom.remove(&element);
             }

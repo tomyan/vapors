@@ -1,5 +1,7 @@
 //! A fake DOM for the mirror's tests: elements by index, each with
-//! its attributes, own text and children in order.
+//! its attributes, own text, scroll offset and children in order; the
+//! writes counted, attributes (text and scroll with them) apart from
+//! moves.
 
 use std::collections::BTreeMap;
 
@@ -9,6 +11,7 @@ use super::a11y_mirror_dom::MirrorDom;
 pub(crate) struct FakeElement {
     pub(crate) attributes: BTreeMap<String, String>,
     pub(crate) text: String,
+    pub(crate) scroll: [f32; 2],
     pub(crate) children: Vec<usize>,
     pub(crate) parent: Option<usize>,
 }
@@ -17,12 +20,18 @@ pub(crate) struct FakeElement {
 #[derive(Default)]
 pub(crate) struct FakeDom {
     pub(crate) elements: Vec<FakeElement>,
+    /// Attributes set or removed, texts and scroll offsets written.
+    pub(crate) attribute_writes: usize,
+    /// Elements appended, inserted or removed.
+    pub(crate) moves: usize,
 }
 
 impl FakeDom {
     pub(crate) fn with_root() -> Self {
         Self {
             elements: vec![FakeElement::default()],
+            attribute_writes: 0,
+            moves: 0,
         }
     }
 
@@ -47,7 +56,7 @@ impl FakeDom {
         let attrs: Vec<String> = element
             .attributes
             .iter()
-            .filter(|(name, _)| !["style", "data-node"].contains(&name.as_str()))
+            .filter(|(name, _)| !["style", "data-node", "data-scroll"].contains(&name.as_str()))
             .map(|(name, value)| format!("{name}={value}"))
             .collect();
         format!(
@@ -68,26 +77,31 @@ impl MirrorDom for FakeDom {
     }
 
     fn set_attribute(&mut self, element: &usize, name: &str, value: &str) {
+        self.attribute_writes += 1;
         self.elements[*element]
             .attributes
             .insert(name.to_owned(), value.to_owned());
     }
 
     fn remove_attribute(&mut self, element: &usize, name: &str) {
+        self.attribute_writes += 1;
         self.elements[*element].attributes.remove(name);
     }
 
     fn set_text(&mut self, element: &usize, text: &str) {
+        self.attribute_writes += 1;
         self.elements[*element].text = text.to_owned();
     }
 
     fn append(&mut self, parent: &usize, child: &usize) {
+        self.moves += 1;
         self.detach(*child);
         self.elements[*parent].children.push(*child);
         self.elements[*child].parent = Some(*parent);
     }
 
     fn insert_before(&mut self, parent: &usize, child: &usize, before: &usize) {
+        self.moves += 1;
         self.detach(*child);
         let siblings = &mut self.elements[*parent].children;
         let at = siblings
@@ -99,6 +113,12 @@ impl MirrorDom for FakeDom {
     }
 
     fn remove(&mut self, element: &usize) {
+        self.moves += 1;
         self.detach(*element);
+    }
+
+    fn set_scroll(&mut self, element: &usize, offset: [f32; 2]) {
+        self.attribute_writes += 1;
+        self.elements[*element].scroll = offset;
     }
 }
