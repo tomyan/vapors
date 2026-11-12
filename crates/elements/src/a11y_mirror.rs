@@ -11,6 +11,7 @@
 use vapors_dom::NodeId;
 
 use crate::a11y_error::AxError;
+use crate::a11y_mirror_counts::AxTakeCounts;
 use crate::a11y_mirror_index::AxIndex;
 use crate::a11y_mirror_record::AboveMemo;
 use crate::a11y_tree::AxStates;
@@ -107,6 +108,7 @@ impl Document {
         if self.painted.is_none() || self.changes.since_update {
             return Err(AxError::NotUpdated);
         }
+        self.ax.counts = AxTakeCounts::default();
         if self.ax.all {
             return self.ax_rebuild().map(Some);
         }
@@ -117,6 +119,7 @@ impl Document {
     fn ax_rebuild(&mut self) -> Result<AxUpdate, AxError> {
         let index = self.ax_scan();
         let nodes = self.ax_every(&index)?;
+        self.ax.counts.nodes_read = nodes.len();
         let focus = self.active_element();
         if let Some(node) = focus.filter(|&node| !nodes.iter().any(|n| n.node == node)) {
             return Err(self.ax_focus_outside(node));

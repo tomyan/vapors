@@ -80,7 +80,8 @@ impl Document {
         let touched = self.ax.take_touched();
         let (index, renamed) = self.ax_index(&touched);
         match self.ax_diff(&touched, &renamed, &index, focus) {
-            Ok((diff, placed)) => {
+            Ok((diff, placed, considered)) => {
+                self.ax.counts.placements_considered = considered;
                 let update = self.ax.apply(diff, placed, index, focus);
                 Ok(Some(update).filter(|update| !update.is_empty()))
             }
@@ -91,15 +92,17 @@ impl Document {
         }
     }
 
-    /// Every candidate read again, and the placements that follow.
+    /// Every candidate read again, and the placements that follow, with
+    /// the placements the ordering considered.
     fn ax_diff(
-        &self,
+        &mut self,
         touched: &Touched,
         renamed: &[NodeId],
         index: &AxIndex,
         focus: Option<NodeId>,
-    ) -> Result<(Diff, Vec<AxPlace>), AxError> {
+    ) -> Result<(Diff, Vec<AxPlace>, usize), AxError> {
         let candidates = self.ax_candidates(touched, renamed, [self.ax.focus, focus], index);
+        self.ax.counts.nodes_read = candidates.len();
         let mut diff = Diff::default();
         for node in candidates {
             self.ax_classify(node, index, &touched.replaced, &mut diff)?;
@@ -108,8 +111,8 @@ impl Document {
         {
             return Err(self.ax_focus_outside(node));
         }
-        let placed = self.ax_placements(&diff)?;
-        Ok((diff, placed))
+        let (placed, considered) = self.ax_placements(&diff)?;
+        Ok((diff, placed, considered))
     }
 
     /// Focus is on `node`, which the tree leaves out.
@@ -131,6 +134,7 @@ impl Document {
         if !self.ax_shape_changed(touched)
             && let Some(changed) = kept.patch(self, &touched.nodes)
         {
+            self.ax.counts.index_entries = touched.nodes.len();
             let renamed = kept.referrers_of(&changed);
             return (kept, renamed);
         }
@@ -147,8 +151,10 @@ impl Document {
 
     /// The index rebuilt by a scan of the document, counted.
     pub(crate) fn ax_scan(&mut self) -> AxIndex {
-        self.ax.scans += 1;
-        AxIndex::of(self)
+        let index = AxIndex::of(self);
+        self.ax.counts.index_scans += 1;
+        self.ax.counts.index_entries = index.entries();
+        index
     }
 
     /// Reads `node` again and notes what differs from its record.

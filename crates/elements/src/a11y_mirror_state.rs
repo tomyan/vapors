@@ -14,6 +14,7 @@
 use vapors_dom::NodeId;
 
 use crate::a11y_mirror::{AxMirrorNode, AxPlace, AxUpdate};
+use crate::a11y_mirror_counts::AxTakeCounts;
 use crate::a11y_mirror_diff::Diff;
 use crate::a11y_mirror_index::AxIndex;
 use crate::changed_slots::ChangedSlots;
@@ -43,8 +44,8 @@ pub(crate) struct AxMirror {
     /// The focused node as last emitted.
     pub(crate) focus: Option<NodeId>,
     index: Option<AxIndex>,
-    /// How many times the index was rebuilt by a scan of the document.
-    pub(crate) scans: usize,
+    /// What the last take did.
+    pub(crate) counts: AxTakeCounts,
 }
 
 impl Default for AxMirror {
@@ -55,7 +56,7 @@ impl Default for AxMirror {
             records: NodeMap::default(),
             focus: None,
             index: None,
-            scans: 0,
+            counts: AxTakeCounts::default(),
         }
     }
 }
@@ -163,15 +164,5 @@ impl Document {
     pub(crate) fn note_replaced(&mut self, node: NodeId) {
         self.note_change();
         self.ax.touch_replaced(node);
-    }
-
-    /// How many times the a11y mirror's index of ids was rebuilt by a
-    /// scan of the whole document: once for the first take, then once
-    /// per take that inserted or removed elements, or found an id
-    /// carried by more than one element; never for a take that only
-    /// changed, moved or restyled elements in place.
-    #[must_use]
-    pub fn ax_index_scans(&self) -> usize {
-        self.ax.scans
     }
 }

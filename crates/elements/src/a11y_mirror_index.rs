@@ -101,6 +101,11 @@ impl AxIndex {
         !old_shared && !new_shared
     }
 
+    /// How many elements put something in.
+    pub(crate) fn entries(&self) -> usize {
+        self.by_node.len()
+    }
+
     /// The ids whose element differs between `self` and `other`.
     pub(crate) fn changed_ids(&self, other: &Self) -> Vec<String> {
         let keys = self.ids.keys().chain(other.ids.keys());

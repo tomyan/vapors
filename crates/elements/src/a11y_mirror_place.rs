@@ -14,11 +14,12 @@ use crate::document::Document;
 use crate::node_map::{NodeMap, NodeSet};
 
 impl Document {
-    /// Placements for what `diff` found to place.
+    /// Placements for what `diff` found to place, ordered, with how
+    /// many the ordering considered.
     ///
     /// # Errors
     /// [`AxError::PlacementCycle`]: a bug in vapors.
-    pub(crate) fn ax_placements(&self, diff: &Diff) -> Result<Vec<AxPlace>, AxError> {
+    pub(crate) fn ax_placements(&self, diff: &Diff) -> Result<(Vec<AxPlace>, usize), AxError> {
         let pending = diff
             .to_place
             .iter()
@@ -76,12 +77,13 @@ impl Document {
 /// `pending` in an order a mirror applies one by one: a placement
 /// comes after the one placing its `before`. Each placement waits on
 /// the one its `before` names, when that is pending too; the rest are
-/// ready, and each placed releases the ones waiting on it: O(n).
+/// ready, and each placed releases the ones waiting on it: O(n), and
+/// the placements considered (each sorted once, placed once) say so.
 ///
 /// # Errors
 /// [`AxError::PlacementCycle`]: placements wait on each other, which
 /// document order cannot produce: a bug in vapors.
-fn order(pending: Vec<AxPlace>) -> Result<Vec<AxPlace>, AxError> {
+fn order(pending: Vec<AxPlace>) -> Result<(Vec<AxPlace>, usize), AxError> {
     let total = pending.len();
     let waiting: NodeSet = pending.iter().map(|place| place.node).collect();
     let mut on: NodeMap<Vec<AxPlace>> = NodeMap::default();
@@ -98,7 +100,7 @@ fn order(pending: Vec<AxPlace>) -> Result<Vec<AxPlace>, AxError> {
         out.push(place);
     }
     if out.len() == total {
-        return Ok(out);
+        return Ok((out, 2 * total));
     }
     let mut nodes: Vec<u64> = on
         .into_values()
@@ -127,11 +129,12 @@ mod tests {
         let pending = vec![place(1, Some(2)), place(2, Some(3)), place(3, None)];
 
         // When
-        let ordered = order(pending).expect("ordered");
+        let (ordered, considered) = order(pending).expect("ordered");
 
         // Then
         let nodes: Vec<u64> = ordered.iter().map(|p| p.node.0).collect();
         assert_eq!(nodes, [3, 2, 1]);
+        assert_eq!(considered, 6);
     }
 
     #[test]

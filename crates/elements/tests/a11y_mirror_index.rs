@@ -4,7 +4,8 @@
 //! carry ids costs the nodes touched, never a scan of the page. A take
 //! that inserts or removes elements scans once, as does one that finds
 //! an id carried by more than one element, since only document order
-//! says which element an id names.
+//! says which element an id names. The counts are `AxTakeCounts`;
+//! `a11y_mirror_scaling.rs` holds them across page sizes.
 
 mod support;
 
@@ -16,8 +17,9 @@ use support::{element, text};
 use vapors_dom::{Dom, NodeId};
 use vapors_elements::Document;
 
+/// Whether the last take scanned the document for its index.
 fn scans(doc: &Rc<RefCell<Document>>) -> usize {
-    doc.borrow().ax_index_scans()
+    doc.borrow().ax_take_counts().index_scans
 }
 
 #[test]
@@ -45,21 +47,20 @@ fn a_scroll_a_focus_move_and_a_state_change_scan_nothing() {
         doc.set_attribute(region, "class", "row sc");
     }
     step(&doc, &mut model);
-    let before = scans(&doc);
 
-    // When
+    // When, Then
     assert!(
         doc.borrow_mut().scroll_node_by(region, [60.0, 0.0]),
         "scrolls"
     );
     step(&doc, &mut model).expect("bounds moved");
+    assert_eq!(scans(&doc), 0, "a scroll");
     Document::focus(&doc, Some(pin));
     step(&doc, &mut model).expect("focus moved");
+    assert_eq!(scans(&doc), 0, "a focus move");
     doc.borrow_mut().set_attribute(pin, "aria-pressed", "true");
     step(&doc, &mut model).expect("a state");
-
-    // Then
-    assert_eq!(scans(&doc), before);
+    assert_eq!(scans(&doc), 0, "a state change");
 }
 
 #[test]
@@ -67,7 +68,6 @@ fn an_insert_and_a_removal_each_scan_once() {
     // Given
     let (doc, mut model) = taken_model();
     let region = node_of(&doc, "region", "Options");
-    let before = scans(&doc);
     let added = {
         let mut doc = doc.borrow_mut();
         let added = element(&mut doc, region, "button", "");
@@ -82,7 +82,7 @@ fn an_insert_and_a_removal_each_scan_once() {
     step(&doc, &mut model).expect("the removal");
 
     // Then
-    assert_eq!((after_insert, scans(&doc)), (before + 1, before + 2));
+    assert_eq!((after_insert, scans(&doc)), (1, 1));
 }
 
 /// A span `#lab` with `content` appended to `row`.
@@ -108,7 +108,6 @@ fn an_id_carried_twice_names_by_document_order_after_the_first_gives_it_up() {
     };
     let named = step(&doc, &mut model).expect("the labels");
     assert_eq!(labels(&named.nodes), ["button \"First\""]);
-    let before = scans(&doc);
     doc.borrow_mut().set_attribute(first, "id", "was-lab");
 
     // When: the first gives up the id in place, which only a scan settles
@@ -116,5 +115,5 @@ fn an_id_carried_twice_names_by_document_order_after_the_first_gives_it_up() {
 
     // Then
     assert_eq!(labels(&update.nodes), ["button \"Second\""]);
-    assert_eq!(scans(&doc), before + 1);
+    assert_eq!(scans(&doc), 1);
 }
