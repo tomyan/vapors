@@ -24,9 +24,8 @@ was run for this plan.
 - Long term, Tom wants 3D in vapors that is eventually suitable for
   games. Nothing in this plan may rule that out.
 
-Sections 1 to 6 follow the recommendation of each open decision in
-section 8; where another option would change a row, the decision says
-which.
+Sections 1 to 7 follow the decisions in section 8, which Tom took as
+recommended on 2026-11-12.
 
 ## 0. Where things stand
 
@@ -369,7 +368,15 @@ is checked against what it found.
 Critical path to the first use: C1, O1, S1 (after 3D PR 5), S2, S3,
 S4, S5, O2, M1, R1. C2 and W1 carry the web; C3 the timing.
 
-## 8. Decisions for Tom
+## 8. Decisions
+
+Decided by Tom, 2026-11-12, taking the recommendations: P0 (a) racer
+exhaust first, P1 (a) closed form, P2 (a) the oracle takes the frame
+list for moving emitters, P3 (a) 16,384 per emitter and 65,536 per
+scene, P4 (a) one lifetime per emitter, P5 (a) additive only first,
+P6 (a) `request_animation` returns a guard, P7 (a) a new crate
+`vapors-particles`. The options are kept below as the record of what
+was weighed.
 
 **P0. The first use.** (a) Racer effects: exhaust while the throttle is
 held, later sparks on contact. The racer is the one 3D app in vapors,
