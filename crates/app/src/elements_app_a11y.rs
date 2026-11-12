@@ -71,8 +71,8 @@ impl ElementsApp {
                     .to_owned(),
             );
         }
-        let taken = self.document.borrow_mut().take_ax_update_by(taker);
-        self.a11y.pending = taken.map_err(|refused| refused.to_string())?;
+        let update = self.document.borrow_mut().take_ax_update_by(taker);
+        self.a11y.pending = update.map_err(|refused| refused.to_string())?;
         Ok(())
     }
 }

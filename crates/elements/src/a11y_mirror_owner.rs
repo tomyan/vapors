@@ -67,6 +67,7 @@ impl Document {
     ///
     /// # Errors
     /// [`AxError::NotTaker`]: `taker` is not the one attached here.
+    #[allow(clippy::needless_pass_by_value)] // the taker is spent: a detached one cannot take again
     pub fn ax_mirror_detach(&mut self, taker: AxTaker) -> Result<(), AxError> {
         if !self.ax.owner.is(&taker) {
             return Err(AxError::NotTaker);
