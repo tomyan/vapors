@@ -1,12 +1,12 @@
 //! A laid-out paragraph: Parley's shaping, bidi and line breaking over
 //! the [`FontSystem`], read out as placed glyphs for the renderer.
 
-use parley::AlignmentOptions;
 use vapors_scene::{Color, Rect};
 
 use crate::font_system::FontSystem;
-use crate::layout_runs::{alignment, glyph_runs, run_offset};
+use crate::layout_runs::{glyph_runs, run_offset};
 pub use crate::layout_types::{Align, Glyph, GlyphRun, LayoutOptions, LineInfo, PlacedGlyph};
+use crate::shaped::Shaped;
 use crate::style::{Span, Style};
 
 /// A paragraph laid out by Parley, in device pixels.
@@ -39,24 +39,17 @@ impl Layout {
         spans: &[Span<'_>],
         options: &LayoutOptions,
     ) -> Self {
-        let mut builder = system.ranged_builder(text, options.scale);
-        builder.set_base_direction(options.direction);
-        for property in base.properties(options.scale) {
-            builder.push_default(property);
-        }
-        for span in spans {
-            for property in span.style.properties(options.scale) {
-                builder.push(property, span.range.clone());
-            }
-        }
-        let mut inner = builder.build(text);
-        inner.break_all_lines(options.width.map(|w| w * options.scale));
-        inner.align(alignment(options.align), AlignmentOptions::default());
+        Shaped::new(system, text, base, spans, options.scale, options.direction)
+            .into_layout(options.width, options.align)
+    }
+
+    /// A paragraph Parley has broken into lines and aligned.
+    pub(crate) fn broken(inner: parley::Layout<Color>, text: String, scale: f32) -> Self {
         let runs = glyph_runs(&inner);
         Self {
             inner,
-            text: text.to_owned(),
-            scale: options.scale,
+            text,
+            scale,
             ink: crate::layout_ink::ink(&runs),
             runs,
         }

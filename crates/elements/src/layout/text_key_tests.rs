@@ -34,7 +34,7 @@ fn run(node: u64) -> InlineRun {
 }
 
 #[test]
-fn keys_of_one_run_are_equal_and_hash_alike_and_a_span_of_another_node_is_another_key() {
+fn keys_of_one_run_are_equal_and_hash_alike_whichever_node_holds_its_span() {
     // Given
     let (first, again, other) = (run(1), run(1), run(2));
 
@@ -47,7 +47,7 @@ fn keys_of_one_run_are_equal_and_hash_alike_and_a_span_of_another_node_is_anothe
         FxBuildHasher.hash_one(&keys[0]),
         FxBuildHasher.hash_one(&keys[1])
     );
-    assert!(keys[0] != keys[2]);
+    assert!(keys[0] == keys[2]);
 }
 
 #[test]
@@ -55,7 +55,7 @@ fn keys_with_the_same_hash_and_different_parts_are_not_equal() {
     // Given
     let (first, other) = (
         Key::of(&run(1), Some(80.0), 1.0),
-        Key::of(&run(2), Some(80.0), 1.0),
+        Key::of(&run(1), Some(81.0), 1.0),
     );
     let forced = Key {
         hash: first.hash,

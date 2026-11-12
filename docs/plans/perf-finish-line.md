@@ -66,6 +66,18 @@ time target (under 1 ms) is read from the timed run; at 9b405f9
 HoveredClass and FlexText at 1,000, 3,000 and 10,000 rows. `--scaling Insert` reports for property 3
 and does not judge until the splice step is built.
 
+Text shaping (T1, vapors #253 and #254,
+`docs/perf/text-shaped-2026-11-12.md`): a run is shaped once per text,
+styles, visibility, span ranges and scale, whichever node holds it, and
+each width is a break of that shaping. Mount's layout went from 249,815
+to 205,087 instructions per row (3 shapings per row to 2). Remaining:
+Taffy's measure function still breaks a run at min- and max-content as
+well as at its final width. The widths alone can be read from the
+shaped run (`Shaped::content_widths`), but the measure function returns
+a height too, and Taffy's caches are not keyed by the requested axis.
+Follow-up: pass the axis through the measure path so an intrinsic
+width costs no break; measure what that removes from an edit's layout.
+
 ## Order of work
 
 1. IU3 3c-3f: kept batches (property 2).

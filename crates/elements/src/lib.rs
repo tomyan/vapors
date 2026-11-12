@@ -139,6 +139,7 @@ mod tags;
 #[cfg(test)]
 mod test_rows;
 mod text_bridge;
+mod text_counts;
 mod text_delete;
 mod text_field;
 mod text_history;

@@ -38,6 +38,7 @@ mod pipeline_gpu;
 mod quads;
 mod raster;
 mod raster_types;
+mod shaped;
 mod style;
 
 pub use atlas::{AtlasConfig, AtlasError, AtlasGlyph, GlyphAtlas, PageKind};
@@ -57,6 +58,7 @@ pub use quads::TextDraw;
 pub use raster::{
     Coverage, GlyphRequest, Hinting, RasterError, Rasterizer, SUBPIXEL_STEPS, subpixel_of,
 };
+pub use shaped::Shaped;
 pub use style::{Family, LineHeight, Span, Style};
 
 /// How far a synthesised italic moves x right per pixel up: Skia's fake

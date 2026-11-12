@@ -53,6 +53,8 @@ pub struct Counts {
     pub update: UpdateCounts,
     /// Text layouts the update built.
     pub text_layouts: usize,
+    /// Runs the update shaped (each layout is broken from one).
+    pub texts_shaped: usize,
     /// The painter's frame.
     pub frame: FrameCounts,
     /// Render passes the frame's encoder began, flushes included.
@@ -67,6 +69,7 @@ impl Counts {
         Self {
             update: document.update_counts(),
             text_layouts: document.text_layouts_built(),
+            texts_shaped: document.texts_shaped(),
             frame,
             render_passes,
         }

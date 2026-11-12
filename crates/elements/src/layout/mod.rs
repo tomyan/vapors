@@ -22,6 +22,7 @@ mod replaced;
 mod slots;
 pub(crate) use boxes::Source;
 mod text_cache;
+mod text_kept;
 mod text_key;
 mod tree;
 mod written;
