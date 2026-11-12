@@ -24,6 +24,13 @@ pub const RESIZE_A11Y_PER_ROW: u64 = 13_000;
 /// 10,000 rows, is less than one more node read.
 pub const SCROLL_A11Y_PER_ROW: u64 = 1;
 
+/// As [`SCROLL_A11Y_PER_ROW`] for `ScrollSize`: the body is laid out
+/// again in the frame it scrolls, and the rows the edit did not move
+/// stay scrolled, so the phase reads the middle row's nodes and the
+/// body alone. Recorded in `docs/perf/a11y-phase-2026-11-12.md`,
+/// "After PR 5a".
+pub const SCROLL_SIZE_A11Y_PER_ROW: u64 = 1;
+
 /// Which phases a change is judged on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Judged {
@@ -58,6 +65,9 @@ impl Judged {
             },
             RowChange::Scroll => Self::AccessibilityPerRow {
                 ceiling: SCROLL_A11Y_PER_ROW,
+            },
+            RowChange::ScrollSize => Self::AccessibilityPerRow {
+                ceiling: SCROLL_SIZE_A11Y_PER_ROW,
             },
         }
     }

@@ -51,11 +51,15 @@ pub enum RowChange {
     /// The body, which scrolls its rows, scrolled down one row; back to
     /// the top at the end. Every row's boxes move.
     Scroll,
+    /// `Scroll` with the middle row's label changed between a short and
+    /// a long text in the same frame: the body is laid out again while
+    /// it scrolls (review-v243 M2).
+    ScrollSize,
 }
 
 impl RowChange {
     /// Every change, in the order the harness lists them.
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::Idle,
         Self::Text,
         Self::FlexText,
@@ -64,6 +68,7 @@ impl RowChange {
         Self::Insert,
         Self::Resize,
         Self::Scroll,
+        Self::ScrollSize,
     ];
 
     /// The change `name` spells, as `{:?}` prints it.
@@ -100,7 +105,7 @@ impl Rows {
         match change {
             RowChange::HoveredClass => page.rows().edit(Edit::Hover),
             RowChange::Resize => page.rows().rows_resizable(),
-            RowChange::Scroll => page.rows().body_scrolls(),
+            RowChange::Scroll | RowChange::ScrollSize => page.rows().body_scrolls(),
             RowChange::Idle
             | RowChange::Text
             | RowChange::FlexText
@@ -137,6 +142,16 @@ impl Rows {
     }
 }
 
+impl Rows {
+    /// The body scrolled down one row, or back to the top at the end.
+    fn scroll_body(&self) {
+        let page = self.page.rows();
+        if !page.scroll_body(1.0) {
+            page.scroll_body_to_top();
+        }
+    }
+}
+
 impl Workload for Rows {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // 640 x 400 at 1x
     fn size(&self) -> (u32, u32) {
@@ -163,11 +178,17 @@ impl Workload for Rows {
             RowChange::Class | RowChange::HoveredClass => self.page.rows().edit(Edit::ToggleClass),
             RowChange::Insert => self.toggle_inserted_row(),
             RowChange::Resize => self.page.rows().toggle_tall(),
-            RowChange::Scroll => {
+            RowChange::Scroll => self.scroll_body(),
+            RowChange::ScrollSize => {
+                self.scroll_body();
                 let page = self.page.rows();
-                if !page.scroll_body(1.0) {
-                    page.scroll_body_to_top();
-                }
+                let label = page.rows[page.rows.len() / 2].label;
+                let text = if sample.is_multiple_of(2) {
+                    "A much longer label"
+                } else {
+                    "Label"
+                };
+                page.doc.borrow_mut().set_text(label, text);
             }
         }
     }
