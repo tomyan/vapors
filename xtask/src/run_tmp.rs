@@ -32,6 +32,11 @@ use crate::steps::Step;
 /// The most leftovers a refusal names; the rest are counted.
 const NAMED: usize = 20;
 
+/// Set, it keeps what a run left in its TMPDIR (until the next run's
+/// sweep), and a failing test's scratch directory (`scratch.rs`), to
+/// look at.
+pub const KEEP_ENV: &str = "XTASK_KEEP_TMP";
+
 /// A run's TMPDIR, made private and empty.
 pub struct RunTmp {
     dir: PathBuf,
@@ -62,15 +67,16 @@ impl RunTmp {
     }
 
     /// Remove the directory; when it held anything, or any of it could
-    /// not be read or removed, fail naming all of it.
+    /// not be read or removed, fail naming all of it. With `keep`, a
+    /// directory holding anything is kept to look at instead (until the
+    /// next run's sweep).
     ///
     /// # Errors
     /// Entries were left, or could not be read, or the directory could
     /// not be removed (it is then set aside, and the next run is not
     /// blocked by it).
-    pub fn finish(self, run: &str) -> Result<(), String> {
+    pub fn finish(self, run: &str, keep: bool) -> Result<(), String> {
         let walked = walk::walk(&self.dir);
-        let removed = walk::remove_or_set_aside(&self.dir);
         let mut said = Vec::new();
         if !walked.entries.is_empty() {
             said.push(refusal(run, &self.dir, &walked.entries));
@@ -80,6 +86,16 @@ impl RunTmp {
                 "{run} could not read all of its TMPDIR: {}",
                 walked.unread.join(", ")
             ));
+        }
+        if keep && !said.is_empty() {
+            return Err(format!(
+                "{}; kept, since {KEEP_ENV} is set, until the next run",
+                said.join("; and ")
+            ));
+        }
+        let removed = walk::remove_or_set_aside(&self.dir);
+        if removed.is_ok() && !said.is_empty() {
+            said.push("removed".to_owned());
         }
         said.extend(removed.err());
         if said.is_empty() {
@@ -143,7 +159,7 @@ pub fn around(
 ) -> Result<ExitCode, String> {
     let tmp = begin(base)?;
     let code = body(tmp.path());
-    tmp.finish(run)?;
+    tmp.finish(run, std::env::var_os(KEEP_ENV).is_some())?;
     Ok(code)
 }
 

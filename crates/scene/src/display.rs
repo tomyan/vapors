@@ -197,9 +197,19 @@ impl Scene {
         &self.items
     }
 
+    /// The items, to change in place; their clips stay.
+    pub fn items_mut(&mut self) -> &mut [Item] {
+        &mut self.items
+    }
+
     /// Each item's clip, in the order of [`Scene::items`].
     #[must_use]
     pub fn clips(&self) -> &[Option<Rect>] {
         &self.clips
+    }
+
+    /// Each item's clip, to change in place.
+    pub fn clips_mut(&mut self) -> &mut [Option<Rect>] {
+        &mut self.clips
     }
 }
