@@ -4,7 +4,6 @@ use super::structural;
 use super::{
     AttributeOperator, AttributeSelector, Combinator, Compound, Element, PseudoClass, Selector,
 };
-use crate::tree::States;
 
 /// Whether `selector` matches `element`.
 pub fn matches<E: Element>(selector: &Selector, element: &E) -> bool {
@@ -105,16 +104,11 @@ fn attribute<E: Element>(a: &AttributeSelector, e: &E) -> bool {
 }
 
 fn pseudo<E: Element>(p: &PseudoClass, e: &E) -> bool {
+    // one mapping from pseudo-class to flag, which sharing reads too
+    if let Some(flag) = super::share::state_flag(p) {
+        return e.states().contains(flag);
+    }
     match p {
-        PseudoClass::Hover => e.states().contains(States::HOVER),
-        PseudoClass::Focus => e.states().contains(States::FOCUS),
-        PseudoClass::FocusVisible => e.states().contains(States::FOCUS_VISIBLE),
-        PseudoClass::FocusWithin => e.states().contains(States::FOCUS_WITHIN),
-        PseudoClass::Active => e.states().contains(States::ACTIVE),
-        PseudoClass::Checked => e.states().contains(States::CHECKED),
-        PseudoClass::Disabled => e.states().contains(States::DISABLED),
-        PseudoClass::Enabled => e.states().contains(States::ENABLED),
-        PseudoClass::Invalid => e.states().contains(States::INVALID),
         PseudoClass::Empty => e.is_empty(),
         PseudoClass::Root => e.parent().is_none(),
         PseudoClass::Not(list) => !list.iter().any(|s| matches(s, e)),

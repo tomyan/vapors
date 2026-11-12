@@ -37,7 +37,8 @@ pub struct UpdateCounts {
     /// root and body), styled each for itself as before sharing.
     pub styles_unkeyed: usize,
     /// Restyled keyed elements whose key cannot share: a rule any of
-    /// its elements can match reads siblings or descendants.
+    /// its elements can match reads siblings or descendants, or sits
+    /// under `@container`.
     pub styles_unshareable: usize,
     /// Computed style allocations alive after the update: the share
     /// table's entries and every element styled for itself.
