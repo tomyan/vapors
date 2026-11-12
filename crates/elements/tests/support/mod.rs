@@ -17,6 +17,7 @@ pub mod mirror;
 pub mod mirror_model;
 pub mod number_page;
 pub mod oracle;
+pub mod parent_pages;
 pub mod pointer;
 pub mod random_css;
 pub mod range_page;
