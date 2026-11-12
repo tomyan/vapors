@@ -1,6 +1,7 @@
 //! `<Scene scene={..} surface={..} camera={..}>`: the root of a scene
 //! drawn on a `gpu-surface`.
 
+use crate::children::render_children;
 use crate::component::node_component;
 use crate::node::{Mounted, anchor};
 use crate::placement::{Placement, place};
@@ -66,12 +67,15 @@ impl Scene {
             let anchor = anchor(dom, parent, before);
             place(&mut *dom.borrow_mut(), anchor, placement.clone());
             placement.invalidate("Scene");
-            props.children.render(dom, anchor, None, || ());
+            render_children(dom, anchor, &props.children, "Scene");
             vec![Root::Node(anchor)]
         });
-        Self {
-            mounted: Mounted { roots, placement },
-        }
+        let mounted = Mounted {
+            owner,
+            roots,
+            placement,
+        };
+        Self { mounted }
     }
 }
 

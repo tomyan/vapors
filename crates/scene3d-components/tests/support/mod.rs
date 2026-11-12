@@ -8,7 +8,7 @@ include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 use scene_page::{ScenePage, ScenePageProps};
 use std::cell::RefCell;
 use std::rc::Rc;
-use vapors_app::ElementsApp;
+use vapors_app::{ElementsApp, SurfaceHandle};
 use vapors_elements::Document;
 use vapors_scene3d::{Meshes, Scene, Transform, Vec3};
 use vapors_scene3d_gpu::SceneRenderer;
@@ -25,6 +25,7 @@ pub struct Rig {
     pub doc: Rc<RefCell<Document>>,
     pub app: ElementsApp,
     pub scene: Rc<RefCell<Scene>>,
+    pub surface: SurfaceHandle,
     pub page: ScenePage,
     pub signals: Signals,
 }
@@ -50,7 +51,7 @@ impl Rig {
         };
         let props = ScenePageProps {
             scene: Some(Rc::clone(&scene)),
-            surface: Some(surface),
+            surface: Some(surface.clone()),
             outer: Signal::new(at(1.0)),
             inner: signals.inner,
             shown: signals.shown,
@@ -61,6 +62,7 @@ impl Rig {
             doc,
             app,
             scene,
+            surface,
             page,
             signals,
         }

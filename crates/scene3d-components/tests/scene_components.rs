@@ -7,6 +7,7 @@ mod support;
 use support::{Rig, at};
 use vapors_dom::{Dom, NodeId};
 use vapors_elements::{AxElement, Document, Viewport};
+use vapors_scene3d_components::{Group, GroupProps};
 
 #[test]
 fn the_page_mounts_one_node_per_component_under_its_parent() {
@@ -96,4 +97,52 @@ fn flatten(tree: &[AxElement]) -> Box<dyn Iterator<Item = &AxElement> + '_> {
         tree.iter()
             .flat_map(|node| std::iter::once(node).chain(flatten(&node.children))),
     )
+}
+
+#[test]
+fn a_group_hidden_by_its_if_leaves_the_scene_and_comes_back_once() {
+    // Given
+    let rig = Rig::new();
+    rig.signals.shown.set(true);
+
+    // When
+    rig.signals.shown.set(false);
+    let hidden = rig.scene.borrow().len();
+    rig.signals.shown.set(true);
+
+    // Then: root, outer, inner, and one if-group
+    let scene = rig.scene.borrow();
+    let outer = scene.children(scene.root()).unwrap()[0];
+    assert_eq!(hidden, 3);
+    assert_eq!(scene.children(outer).unwrap().len(), 2);
+    assert_eq!(scene.len(), 4);
+}
+
+#[test]
+fn unmounting_a_group_removes_its_node_and_its_anchor() {
+    // Given: a group mounted from Rust in the scene's anchor
+    let rig = Rig::new();
+    let anchor = rig.page.roots()[1];
+    let group = Group::mount(&rig.doc, anchor, GroupProps::default());
+    let own = group.roots()[0];
+
+    // When
+    group.unmount(&rig.doc);
+
+    // Then
+    assert_eq!(rig.scene.borrow().len(), 3);
+    assert!(!rig.doc.borrow().contains(own), "the anchor is gone");
+}
+
+#[test]
+fn unmounting_the_page_removes_every_node_but_the_root() {
+    // Given: the outer group's removal takes the inner group with it, so
+    // the inner group's own removal finds its node stale
+    let rig = Rig::new();
+
+    // When
+    rig.page.unmount(&rig.doc);
+
+    // Then
+    assert_eq!(rig.scene.borrow().len(), 1);
 }
