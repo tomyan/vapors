@@ -10,6 +10,10 @@ mod a11y_drive_json;
 mod a11y_error;
 mod a11y_error_message;
 mod a11y_find;
+mod a11y_mirror;
+mod a11y_mirror_record;
+mod a11y_mirror_roles;
+mod a11y_mirror_state;
 mod a11y_name;
 mod a11y_press;
 mod a11y_projection;
@@ -139,6 +143,7 @@ mod update_paint;
 
 pub use a11y_drive::{Command, Held, Reply};
 pub use a11y_error::AxError;
+pub use a11y_mirror::{AxMirrorNode, AxPlace, AxRange, AxUpdate};
 pub use a11y_projection::{AxNode, chromium_name_for_aria};
 pub use a11y_target::{AxTarget, AxWithin};
 pub use a11y_tree::{AxElement, AxStates};
