@@ -12,9 +12,14 @@ pub mod gpu_time;
 pub mod instruction_samples;
 pub mod instructions;
 pub mod instructions_check;
+pub mod mount;
+pub mod mount_memory;
+pub mod mount_report;
+pub mod mount_run;
 pub mod racer;
 pub mod report;
 pub mod rows;
+pub mod rss;
 pub mod run;
 pub mod sampler;
 pub mod scaling;
@@ -25,3 +30,7 @@ mod span_instructions;
 pub mod spans;
 pub mod stats;
 pub mod workloads;
+
+// The Mount workload's compiled components (ui/), at the crate root where
+// the generated `use crate::mount_row` expects them.
+include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
