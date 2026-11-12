@@ -69,9 +69,12 @@ impl Scene {
             props.children.render(dom, anchor, None, || ());
             vec![Root::Node(anchor)]
         });
-        Self {
-            mounted: Mounted { roots, placement },
-        }
+        let mounted = Mounted {
+            owner,
+            roots,
+            placement,
+        };
+        Self { mounted }
     }
 }
 

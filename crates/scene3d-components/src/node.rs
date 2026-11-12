@@ -13,9 +13,10 @@ use vapors_signals::{Effect, Owner, Signal};
 /// place in the accessibility tree.
 pub(crate) const ANCHOR_STYLE: &str = "display: none";
 
-/// A mounted node component: its one root (the anchor) and the scene
-/// node it holds.
+/// A mounted node component: its owner, its one root (the anchor) and
+/// the scene node it holds.
 pub(crate) struct Mounted {
+    pub(crate) owner: Owner,
     pub(crate) roots: Vec<Root>,
     pub(crate) placement: Placement,
 }
@@ -52,6 +53,7 @@ pub(crate) fn mount_node(
         follow_transform(component, placement.clone(), transform);
         children.render(dom, anchor, None, || ());
         Mounted {
+            owner,
             roots: vec![Root::Node(anchor)],
             placement,
         }
