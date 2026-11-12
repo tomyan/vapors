@@ -19,14 +19,14 @@ impl KeptBindGroup {
         generation: u64,
         make: impl FnOnce() -> wgpu::BindGroup,
     ) -> &wgpu::BindGroup {
-        let kept = self
+        let stale = self
             .made
             .as_ref()
-            .is_some_and(|(made_for, _)| *made_for == generation);
-        if !kept {
-            self.made = Some((generation, make()));
+            .is_none_or(|(made_for, _)| *made_for != generation);
+        if stale {
+            self.made = None;
         }
-        &self.made.as_ref().expect("made above").1
+        &self.made.get_or_insert_with(|| (generation, make())).1
     }
 
     /// How many bind groups are kept: 0 or 1.
