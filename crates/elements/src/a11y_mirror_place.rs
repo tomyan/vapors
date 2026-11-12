@@ -78,17 +78,20 @@ impl Document {
 /// comes after the one placing its `before`. Each placement waits on
 /// the one its `before` names, when that is pending too; the rest are
 /// ready, and each placed releases the ones waiting on it: O(n), and
-/// the placements considered (each sorted once, placed once) say so.
+/// the steps counted (each placement sorted once, released at most
+/// once, placed once) say so.
 ///
 /// # Errors
 /// [`AxError::PlacementCycle`]: placements wait on each other, which
 /// document order cannot produce: a bug in vapors.
 fn order(pending: Vec<AxPlace>) -> Result<(Vec<AxPlace>, usize), AxError> {
     let total = pending.len();
+    let mut steps = 0;
     let waiting: NodeSet = pending.iter().map(|place| place.node).collect();
     let mut on: NodeMap<Vec<AxPlace>> = NodeMap::default();
     let mut ready = Vec::new();
     for place in pending {
+        steps += 1;
         match place.before.filter(|before| waiting.contains(before)) {
             Some(before) => on.entry(before).or_default().push(place),
             None => ready.push(place),
@@ -96,11 +99,13 @@ fn order(pending: Vec<AxPlace>) -> Result<(Vec<AxPlace>, usize), AxError> {
     }
     let mut out = Vec::with_capacity(total);
     while let Some(place) = ready.pop() {
-        ready.extend(on.remove(&place.node).unwrap_or_default());
+        let released = on.remove(&place.node).unwrap_or_default();
+        steps += 1 + released.len();
+        ready.extend(released);
         out.push(place);
     }
     if out.len() == total {
-        return Ok((out, 2 * total));
+        return Ok((out, steps));
     }
     let mut nodes: Vec<u64> = on
         .into_values()
@@ -129,12 +134,30 @@ mod tests {
         let pending = vec![place(1, Some(2)), place(2, Some(3)), place(3, None)];
 
         // When
-        let (ordered, considered) = order(pending).expect("ordered");
+        let (ordered, steps) = order(pending).expect("ordered");
 
         // Then
         let nodes: Vec<u64> = ordered.iter().map(|p| p.node.0).collect();
         assert_eq!(nodes, [3, 2, 1]);
-        assert_eq!(considered, 6);
+        assert_eq!(steps, 8, "3 sorted, 2 released, 3 placed");
+    }
+
+    /// `count` placements, each before the next, given backwards.
+    fn chain(count: u64) -> Vec<AxPlace> {
+        (1..=count)
+            .map(|n| place(n, (n < count).then_some(n + 1)))
+            .collect()
+    }
+
+    #[test]
+    fn a_chain_four_times_as_long_takes_at_most_four_and_a_half_times_the_steps() {
+        // Given, When
+        let (_, small) = order(chain(1000)).expect("ordered");
+        let (_, large) = order(chain(4000)).expect("ordered");
+
+        // Then: linear; the round-by-round form took 4000 x 4001 / 2
+        assert!(large * 2 <= small * 9, "{small} steps, then {large}");
+        assert!(small <= 3 * 1000, "{small}");
     }
 
     #[test]

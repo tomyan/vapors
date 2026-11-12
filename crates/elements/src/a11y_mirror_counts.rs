@@ -22,9 +22,9 @@ pub struct AxTakeCounts {
     /// first take; an element inserted or removed; an id carried by
     /// more than one element), else 0.
     pub index_scans: usize,
-    /// Placements the ordering considered: each once when it is sorted
-    /// into ready or waiting, once when it is placed; at most twice
-    /// the placements.
+    /// Steps the placement ordering took: each placement sorted into
+    /// ready or waiting, released by the one it waited on, and placed;
+    /// at most three times the placements.
     pub placements_considered: usize,
 }
 
