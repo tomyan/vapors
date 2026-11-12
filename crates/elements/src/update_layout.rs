@@ -5,6 +5,8 @@ use crate::changed_slots::ChangedSlots;
 use crate::document::Document;
 use crate::error::ElementError;
 use crate::kept_paint::PaintedFrom;
+#[cfg(debug_assertions)]
+use crate::layout::layout_check::{Inputs, check_layout_against_fresh};
 use crate::layout::{Key, Placed, Rebuilt, Slots, Written, lay_out};
 use crate::paint_order::Stackings;
 use crate::painted::Painted;
@@ -29,7 +31,34 @@ impl Document {
         (self.counts.boxes_laid_out, self.counts.layout_calls) = (work.laid_out, work.calls);
         let (slotted, work) =
             laid_out.map_err(|(failure, _)| vec![ElementError::Layout(failure)])?;
+        // Debug timings include this full build and layout on every
+        // narrowed update; `layout_check.rs` says what would retire it.
+        #[cfg(debug_assertions)]
+        if !built.every {
+            self.check_layout(&slotted, viewport);
+        }
         Ok((slotted, built, work.written))
+    }
+
+    /// Panics when `placed`'s layout is not a fresh layout's
+    /// (`layout/layout_check.rs`).
+    #[cfg(debug_assertions)]
+    fn check_layout(&mut self, placed: &Placed, viewport: Viewport) {
+        let root = self.root();
+        let text_marks = self.focused_text_marks();
+        let kept = self.kept.as_ref().expect("styled keeps the styles");
+        let source = crate::layout::Source {
+            arena: &self.arena,
+            used: &kept.used,
+            images: &self.images,
+            text_marks,
+        };
+        let layout = Inputs {
+            fonts: &mut self.fonts,
+            calcs: &kept.calcs,
+            viewport,
+        };
+        check_layout_against_fresh(placed, &source, root, layout);
     }
 
     /// The boxes built again where marked, the rest kept, and the

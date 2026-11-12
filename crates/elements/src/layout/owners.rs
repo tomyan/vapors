@@ -116,11 +116,11 @@ impl Resolver<'_> {
         let fulls = full_outer
             .into_iter()
             .map(|node| Owner { node, kept: None });
-        let mut owners: Vec<Owner> = fulls.collect();
-        owners.extend(shallow_outer.into_iter().map(|node| Owner {
+        let shallows = shallow_outer.into_iter().map(|node| Owner {
             node,
             kept: shallow.remove(&node),
-        }));
+        });
+        let mut owners: Vec<Owner> = fulls.chain(shallows).collect();
         owners.sort_by_key(|owner| self.placed.slots.of(Key::Element(owner.node)));
         owners
     }

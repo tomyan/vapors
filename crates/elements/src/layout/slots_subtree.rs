@@ -34,11 +34,15 @@ impl Placed {
     }
 
     /// Takes out the box at `slot` and the subtrees of its children
-    /// other than `kept`'s, which keep their slots and boxes.
+    /// other than `kept`'s, which keep their slots and boxes. A kept
+    /// child that is an owner too may be taken already, so its key is
+    /// read from `taken` when its slot has none.
     pub(crate) fn take_shallow(&mut self, slot: usize, kept: &KeptChildren, taken: &mut Taken) {
         for child in self.take_box(slot, taken) {
             let held = |key| matches!(key, Key::Element(node) if kept.get(&node) == Some(&child));
-            if !self.slots.key(child).is_some_and(held) {
+            let key =
+                (self.slots.key(child)).or_else(|| taken.boxes.get(&child).map(|(key, _)| *key));
+            if !key.is_some_and(held) {
                 self.take_subtree(child, taken);
             }
         }
@@ -74,25 +78,41 @@ impl Placed {
         taken: &mut Taken,
     ) -> Vec<usize> {
         let keys = keys(&built);
-        let to: Vec<usize> = (keys.iter().enumerate())
+        let to = self.targets(&keys, kept, taken);
+        let mut put = Vec::with_capacity(built.len() - kept.len());
+        for (index, layout_box) in built.into_iter().enumerate() {
+            if !kept.contains_key(&index) {
+                self.put_box(layout_box, (keys[index], to[index]), &to);
+                put.push(to[index]);
+            }
+        }
+        put
+    }
+
+    /// The slot each of the boxes with `keys` goes to: a placeholder's
+    /// kept slot, else the slot its key takes.
+    fn targets(
+        &mut self,
+        keys: &[Key],
+        kept: &FxHashMap<usize, usize>,
+        taken: &mut Taken,
+    ) -> Vec<usize> {
+        (keys.iter().enumerate())
             .map(|(index, &key)| match kept.get(&index) {
                 Some(&slot) => slot,
                 None => self.slot_for(key, taken),
             })
-            .collect();
-        let mut put = Vec::with_capacity(built.len() - kept.len());
-        for (index, (mut layout_box, &slot)) in built.into_iter().zip(&to).enumerate() {
-            if kept.contains_key(&index) {
-                continue;
-            }
-            self.hold(keys[index], slot);
-            for child in &mut layout_box.children {
-                *child = to[*child];
-            }
-            self.boxes[slot] = layout_box;
-            put.push(slot);
+            .collect()
+    }
+
+    /// Puts `layout_box`, with `key`, in `slot`, its children's indices
+    /// mapped to slots by `to`.
+    fn put_box(&mut self, mut layout_box: LayoutBox, (key, slot): (Key, usize), to: &[usize]) {
+        self.hold(key, slot);
+        for child in &mut layout_box.children {
+            *child = to[*child];
         }
-        put
+        self.boxes[slot] = layout_box;
     }
 
     /// Records that `key` holds `slot`.

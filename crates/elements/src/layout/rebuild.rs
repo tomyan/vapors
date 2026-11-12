@@ -45,8 +45,11 @@ impl KeptBoxes {
         };
         let mut kept = std::mem::take(&mut self.placed);
         let built = rebuild_owners(&mut kept, &owners, source, may_keep);
+        // Debug timings include this full box build on every narrowed
+        // update; the test that would retire it is the one
+        // `layout_check.rs` names.
         #[cfg(debug_assertions)]
-        super::rebuild_check::check_against_fresh(&kept, source, root);
+        super::rebuild_check::check_against_fresh(&kept, source, root, &built.slots);
         (kept, built)
     }
 
@@ -102,18 +105,22 @@ fn rebuild_owners(
 }
 
 /// Lends the taken boxes' caches to each owner's rebuilt subtree, at
-/// its slot; clears the caches of an owner's ancestors when its subtree
-/// changed.
+/// its slot; then clears the caches of the ancestors of each owner whose
+/// subtree changed. Every owner is lent before any is cleared: an owner
+/// can sit in a shallow owner's kept child, and a shallow owner lent
+/// after that owner's clear would get its old cache back.
 fn lend_owners(
     placed: &mut Placed,
     (owners, slots): (&[NodeId], &[usize]),
     taken: &Taken,
     (arena, may_keep): (&Arena, &dyn Fn(NodeId) -> bool),
 ) {
-    for (&owner, &slot) in owners.iter().zip(slots) {
-        if !lend_subtree(placed, slot, taken, may_keep) {
-            clear_ancestors(placed, ancestors(arena, owner));
-        }
+    let changed: Vec<NodeId> = (owners.iter().zip(slots))
+        .filter(|&(_, &slot)| !lend_subtree(placed, slot, taken, may_keep))
+        .map(|(&owner, _)| owner)
+        .collect();
+    for owner in changed {
+        clear_ancestors(placed, ancestors(arena, owner));
     }
 }
 

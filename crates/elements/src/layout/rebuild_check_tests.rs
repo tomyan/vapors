@@ -29,7 +29,7 @@ fn two_divs() -> (Document, NodeId) {
     (doc, divs[1])
 }
 
-/// Checks `doc`'s kept boxes against a fresh build.
+/// Checks `doc`'s kept boxes against a fresh build; none was built.
 fn check(doc: &Document) {
     let source = Source {
         arena: &doc.arena,
@@ -37,7 +37,7 @@ fn check(doc: &Document) {
         images: &doc.images,
         text_marks: None,
     };
-    check_against_fresh(&doc.boxes.placed, &source, doc.root());
+    check_against_fresh(&doc.boxes.placed, &source, doc.root(), &[]);
 }
 
 #[test]
@@ -57,6 +57,47 @@ fn a_kept_box_whose_style_a_fresh_build_makes_differently_panics() {
     let slot = doc.boxes.placed.slots.of(Key::Element(second));
     let slot = slot.expect("holds a slot");
     doc.boxes.placed.boxes[slot].style.size.height = Dimension::length(5.0);
+
+    // When, then
+    check(&doc);
+}
+
+/// The second div's kept box, in `doc`.
+fn second_box(doc: &mut Document, second: NodeId) -> &mut crate::layout::LayoutBox {
+    let slot = doc.boxes.placed.slots.of(Key::Element(second));
+    &mut doc.boxes.placed.boxes[slot.expect("holds a slot")]
+}
+
+#[test]
+#[should_panic(expected = "is not the box a fresh build makes")]
+fn a_kept_box_with_paint_a_fresh_build_makes_differently_panics() {
+    // Given: the second div's kept box says it is a checked checkbox
+    let (mut doc, second) = two_divs();
+    second_box(&mut doc, second).checked = Some(true);
+
+    // When, then
+    check(&doc);
+}
+
+#[test]
+#[should_panic(expected = "is not the box a fresh build makes")]
+fn a_box_not_built_this_update_that_is_not_flagged_kept_panics() {
+    // Given
+    let (mut doc, second) = two_divs();
+    second_box(&mut doc, second).kept = false;
+
+    // When, then
+    check(&doc);
+}
+
+#[test]
+#[should_panic(expected = "is not the box a fresh build makes")]
+fn a_slot_whose_key_is_not_its_boxs_panics() {
+    // Given: the second div's slot holds the first text key of body
+    let (mut doc, second) = two_divs();
+    let slot = doc.boxes.placed.slots.of(Key::Element(second));
+    let body = doc.body();
+    doc.boxes.placed.slots.keys[slot.expect("holds a slot")] = Some(Key::Text(body, 0));
 
     // When, then
     check(&doc);
