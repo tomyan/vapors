@@ -5,14 +5,14 @@
 //! in tree order, and past the last focus leaves the page (nothing has
 //! focus), as in Chromium. A move fires `blur` and `focusout` on the
 //! element losing focus, then `focus` and `focusin` on the one gaining
-//! it, as Chromium orders them; `:focus` is set on the element and
-//! `:focus-within` on it and its ancestors.
+//! it, as Chromium orders them (`focus_move.rs`); `:focus` is set on
+//! the element and `:focus-within` on it and its ancestors.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use vapors_css::tree::States;
-use vapors_dom::{Event, NodeId};
+use vapors_dom::NodeId;
 
 use crate::document::Document;
 use crate::focus_style::Focus;
@@ -73,7 +73,7 @@ impl Document {
         }
         let had = document.borrow().active_element();
         if had != node {
-            move_focus(document, had, node);
+            crate::focus_move::move_focus(document, had, node);
         }
         Focus::Done
     }
@@ -81,7 +81,7 @@ impl Document {
     /// `node` takes focus: the flags move, and a number field notes
     /// what it will commit against and selects its text on keyboard
     /// focus.
-    fn take_focus(&mut self, node: Option<NodeId>) {
+    pub(crate) fn take_focus(&mut self, node: Option<NodeId>) {
         self.focused = node;
         self.set_flag_on(States::FOCUS, node);
         let visible = node.filter(|node| self.keyboard || self.is_text_field(*node));
@@ -97,7 +97,9 @@ impl Document {
     /// The element Tab (or, `back`, Shift+Tab) moves focus to: the next
     /// in tree order that Tab visits; past the last, `None` (focus leaves
     /// the page, as in Chromium: only a focus trap wraps), and from
-    /// `None` the first.
+    /// `None` the first. Decided by [`Document::focusability`], the rule
+    /// `focus` uses, so the two agree and the answer is always
+    /// [`Focus::Done`] (review-fable-input M2).
     pub(crate) fn next_in_tab_order(&self, back: bool) -> Option<NodeId> {
         // every element in tree order, so a focused element outside the
         // Tab order (tabindex -1) still has a place to go on from
@@ -136,9 +138,12 @@ impl Document {
     }
 
     fn tabbable(&self, node: NodeId) -> bool {
-        self.focusable(node) && self.attribute(node, "tabindex") != Some("-1")
+        self.focusability(node) == Focus::Done && self.attribute(node, "tabindex") != Some("-1")
     }
 
+    /// Whether `node` was focusable at the last update: a press's
+    /// target and an accessibility action read the painted frame, where
+    /// Tab and `focus` compute styles now (`focusability`).
     pub(crate) fn focusable(&self, node: NodeId) -> bool {
         let drawn = self
             .painted
@@ -164,41 +169,6 @@ impl Document {
         self.tag(node).is_some_and(|tag| INTERACTIVE.contains(&tag))
             && self.attribute(node, "disabled").is_some()
     }
-}
-
-/// Focus moves from `had` to `node`, with the events.
-fn move_focus(document: &Rc<RefCell<Document>>, had: Option<NodeId>, node: Option<NodeId>) {
-    document.borrow_mut().take_focus(node);
-    // while the window is away focus moves silently; its return
-    // fires `focus` on what has it then (`focus_window.rs`)
-    if document.borrow().window_away() {
-        return;
-    }
-    if let Some(had) = had {
-        left(document, had);
-    }
-    // a `change` or `blur` handler that moved focus on keeps it,
-    // and `node` gets no `focus`, as in Chromium
-    if let Some(node) = node.filter(|node| document.borrow().active_element() == Some(*node)) {
-        fire(document, node, &["focus", "focusin"]);
-    }
-}
-
-/// Focus has left `had`: a composition ends, a number or text field
-/// commits, with `change`, then `blur` and `focusout` fire, as Chromium
-/// orders them with focus already moved on (3-E3c, E6a).
-fn left(document: &Rc<RefCell<Document>>, had: NodeId) {
-    document.borrow_mut().end_composition(had);
-    crate::number_input::commit(document, had);
-    crate::text_input::commit(document, had);
-    fire(document, had, &["blur", "focusout"]);
-}
-
-/// `names` on `node` in order: the first only there (it does not bubble),
-/// the second bubbling.
-pub(crate) fn fire(document: &Rc<RefCell<Document>>, node: NodeId, names: &[&str; 2]) {
-    crate::events::tree::dispatch_here(document, node, Event::new(names[0]));
-    crate::events::tree::dispatch_bubbling(document, node, Event::new(names[1]));
 }
 
 /// A `tabindex` the tree refuses: a positive one (it orders focus by

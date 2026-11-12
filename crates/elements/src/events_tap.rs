@@ -27,14 +27,19 @@ impl Document {
             let focusable = hit.and_then(|node| document.borrow().focusable_holding(node));
             Self::focus(document, focusable);
         }
-        let Some(hit) = hit else { return };
+        // a focus handler may have removed the tapped element: no click,
+        // as Chromium drops the click when the mousedown node is removed
+        let Some(hit) = hit.and_then(|hit| document.borrow().still_in(hit)) else {
+            return;
+        };
         if !document.borrow().in_disabled_button(hit) {
             let event = document
                 .borrow()
                 .pointer_event("click", touch_id(0), hit, point);
             crate::events::tree::dispatch_click(document, hit, event);
         }
-        if !prevented {
+        let still = document.borrow().still_in(hit);
+        if let (false, Some(hit)) = (prevented, still) {
             crate::text_pointer::tapped(document, hit, point);
         }
     }

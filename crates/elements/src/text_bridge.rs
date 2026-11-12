@@ -69,6 +69,7 @@ impl Document {
     /// the field no longer holds, or a range falls past the text or
     /// inside a character; the field is left as it was.
     pub fn text_edited(document: &Rc<RefCell<Document>>, edit: &TextEdit) -> Result<(), String> {
+        Self::blur_unfocusable(document);
         let node = document.borrow_mut().edited_field(&edit.before)?;
         let selection = bytes(&edit.text, edit.selection, "selection")?;
         let composing = match edit.composing {

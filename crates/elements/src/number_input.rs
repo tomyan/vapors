@@ -166,6 +166,10 @@ pub(crate) fn commit(document: &Rc<RefCell<Document>>, node: NodeId) {
 /// with `change` when the string differs from the last committed's
 /// (`number_committed` cites HTML's rule).
 fn settle(document: &Rc<RefCell<Document>>, node: NodeId, value: f64) {
+    // the `input` before it may have removed the field
+    let Some(node) = document.borrow().still_in(node) else {
+        return;
+    };
     let now = shown(document, node);
     settle_against(document, node, value, now.as_deref());
 }

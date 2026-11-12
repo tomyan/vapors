@@ -132,7 +132,8 @@ pub(crate) fn released(document: &Rc<RefCell<Document>>, id: u32) {
     let Some(scrub) = document.borrow_mut().pointer.scrubs.remove(&id) else {
         return;
     };
-    if scrub.moved && document.borrow().contains(scrub.node) {
-        crate::number_input::commit(document, scrub.node);
+    let still = document.borrow().still_in(scrub.node);
+    if let (true, Some(node)) = (scrub.moved, still) {
+        crate::number_input::commit(document, node);
     }
 }

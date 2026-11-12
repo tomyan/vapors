@@ -119,9 +119,11 @@ pub(crate) fn released(document: &Rc<RefCell<Document>>, id: u32) {
     let Some(drag) = document.borrow_mut().pointer.drags.remove(&id) else {
         return;
     };
-    let now = document.borrow().value_as_number(drag.node);
-    if document.borrow().contains(drag.node) && now != Some(drag.before) {
-        fire(document, drag.node, "change");
+    let Some(node) = document.borrow().still_in(drag.node) else {
+        return;
+    };
+    if document.borrow().value_as_number(node) != Some(drag.before) {
+        fire(document, node, "change");
     }
 }
 

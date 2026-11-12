@@ -52,12 +52,12 @@ impl Document {
         };
         crate::number_input::commit(document, node);
         crate::text_input::commit(document, node);
-        crate::focus::fire(document, node, &["blur", "focusout"]);
+        crate::focus_move::fire(document, node, &["blur", "focusout"]);
     }
 
     fn window_regained(document: &Rc<RefCell<Document>>) {
         if let Some(node) = document.borrow().active_element() {
-            crate::focus::fire(document, node, &["focus", "focusin"]);
+            crate::focus_move::fire(document, node, &["focus", "focusin"]);
         }
     }
 }
