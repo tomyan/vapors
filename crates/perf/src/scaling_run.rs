@@ -4,7 +4,7 @@
 use vapors_gpu_harness::Gpu;
 
 use crate::instructions_check::{checked_counter, samples_counted};
-use crate::report::PHASES;
+use crate::report::{PHASES, UNREPORTED};
 use crate::rows::{RowChange, Rows};
 use crate::run::{Samples, Settings};
 use crate::sampler::Sampler;
@@ -47,20 +47,27 @@ fn measure(
     at_size(rows, &samples)
 }
 
-/// The median count of the frame and of each phase `samples` recorded.
+/// The median count of the frame and of each phase `samples` recorded,
+/// the [`UNREPORTED`] phases left out.
 ///
 /// # Errors
-/// A recorded phase that is not in [`PHASES`]: the judge does not know it.
+/// A recorded phase in neither [`PHASES`] nor [`UNREPORTED`]: the judge
+/// does not know it.
 fn at_size(rows: usize, samples: &Samples) -> Result<AtSize, String> {
     let kept = samples
         .instructions
         .as_ref()
         .ok_or_else(|| format!("{rows} rows: no instruction counts were taken"))?;
-    if let Some(unknown) = kept.phases.keys().find(|p| !PHASES.contains(&p.as_str())) {
+    let known = |phase: &str| PHASES.contains(&phase) || UNREPORTED.contains(&phase);
+    if let Some(unknown) = kept.phases.keys().find(|p| !known(p)) {
         return Err(unknown_phase(rows, unknown));
     }
+    let judged = kept
+        .phases
+        .iter()
+        .filter(|(p, _)| !UNREPORTED.contains(&p.as_str()));
     let named = std::iter::once(("frame (CPU)", &kept.frame))
-        .chain(kept.phases.iter().map(|(p, counts)| (p.as_str(), counts)));
+        .chain(judged.map(|(p, counts)| (p.as_str(), counts)));
     let phases = named
         .map(|(phase, counts)| Ok((phase.to_owned(), median(rows, phase, counts)?)))
         .collect::<Result<_, String>>()?;

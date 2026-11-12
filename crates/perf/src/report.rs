@@ -14,11 +14,17 @@ use crate::stats::{Distribution, median_count};
 /// encoder), `write` (`Queue::write_buffer` and `write_texture`) and
 /// `submit` (`Queue::submit`: once per frame, plus once per glyph atlas
 /// repack and per `gpu-surface` that renders); the rest of draw is the
-/// painter's own work. The app's other phases (input, tasks, tick,
-/// accessibility, record) do no work in these workloads and are left out.
+/// painter's own work. The app's other phases are [`UNREPORTED`].
 pub const PHASES: [&str; 8] = [
     "update", "style", "layout", "paint", "draw", "encode", "write", "submit",
 ];
+
+/// The app's other frame phases: `run_frame` spans each one, so each is
+/// timed and counted, and in these workloads each does no work. They are
+/// left out of the report and of `--scaling`'s judgement; `frame (CPU)`
+/// holds them, so work one takes on at a larger size fails the judge
+/// there.
+pub const UNREPORTED: [&str; 5] = ["input", "tasks", "tick", "accessibility", "record"];
 
 /// `samples` of the workload `name` as a Markdown section.
 #[must_use]
