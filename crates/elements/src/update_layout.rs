@@ -10,7 +10,7 @@ use crate::layout::layout_check::{Inputs, check_layout_against_fresh};
 use crate::layout::{Key, Placed, Rebuilt, Slots, Written, lay_out};
 use crate::paint_order::Stackings;
 use crate::painted::Painted;
-use crate::placement::{Changes, LaidOut, Placement};
+use crate::placement::{Changes, LaidOut, Placed as Placing, Placement};
 use crate::placement_check::Before;
 use crate::update::Viewport;
 
@@ -116,8 +116,8 @@ impl Document {
         let mut placement = last.map(take).unwrap_or_default();
         let scrolls = |slot| stackings.scrolls(slot);
         let boxes = LaidOut::new(&placed.boxes, &scrolls, viewport.scale);
-        let moved = self.placed(&mut placement, (&boxes, &placed.slots), (written, changed));
-        changed.moved = moved;
+        let placing = self.placed(&mut placement, (&boxes, &placed.slots), (written, changed));
+        (changed.moved, changed.scrolled) = (placing.moved, placing.scrolled);
         self.made_from(placement, viewport.scale)
     }
 
@@ -131,23 +131,25 @@ impl Document {
     }
 
     /// Places `boxes` in `placement` for `changed` and what layout
-    /// `written`, and returns the moved slots. A debug build checks
+    /// `written`, and returns what it placed. A debug build checks
     /// the result against a fresh placement (`placement_check.rs`).
     fn placed(
         &mut self,
         placement: &mut Placement,
         (boxes, slots): (&LaidOut<'_>, &Slots),
         (written, changed): (&Written, &ChangedSlots),
-    ) -> Vec<usize> {
+    ) -> Placing {
         let scrolled = self.scrolled_slots(slots);
         let since = Changes::since(changed, written, &scrolled);
         let before = cfg!(debug_assertions).then(|| Before::of(&self.scroll, placement));
         let done = placement.place(boxes, &mut self.scroll, &since);
         self.forget_freed(&changed.freed, slots);
-        (self.counts.boxes_placed, self.counts.boxes_moved) = (done.count, done.moved.len());
+        self.counts.boxes_placed = done.count;
+        self.counts.boxes_moved = done.moved.len() + done.scrolled.len();
+        self.counts.boxes_scrolled = done.scrolled.len();
         self.counts.slots_chained = done.chained;
-        self.check_placed(before, (boxes, placement), (&done.moved, changed));
-        done.moved
+        self.check_placed(before, (boxes, placement), (&done, changed));
+        done
     }
 
     /// In a debug build, panics when `placement` and the offsets are not
@@ -157,11 +159,11 @@ impl Document {
         &self,
         before: Option<Before>,
         (boxes, placement): (&LaidOut<'_>, &Placement),
-        moved: (&[usize], &ChangedSlots),
+        placed: (&Placing, &ChangedSlots),
     ) {
         if let Some(before) = before {
             let kept = (placement, &self.scroll);
-            crate::placement_check::assert_same(&before, boxes, kept, moved);
+            crate::placement_check::assert_same(&before, boxes, kept, placed);
         }
     }
 

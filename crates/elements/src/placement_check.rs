@@ -10,7 +10,7 @@ use rustc_hash::FxHashSet;
 
 use crate::changed_slots::ChangedSlots;
 use crate::layout::{BoxRect, Content, LayoutBox, containing_blocks, placed};
-use crate::placement::{LaidOut, NO_SLOT, Placement};
+use crate::placement::{LaidOut, NO_SLOT, Placed, Placement};
 use crate::scroll::Offsets;
 
 /// What placement started from: the offsets, rects and paddings.
@@ -62,13 +62,14 @@ fn held(boxes: &[LayoutBox]) -> Vec<usize> {
 }
 
 /// Panics, naming the first differing slot, when `kept` and `scroll`
-/// are not a fresh placement of `boxes` from `before`, or `moved` is not
-/// every slot not in `changed` whose rect or padding changed.
+/// are not a fresh placement of `boxes` from `before`, or `placed`'s
+/// moved and scrolled slots are not every slot not in `changed` whose
+/// rect or padding changed.
 pub(crate) fn assert_same(
     before: &Before,
     boxes: &LaidOut<'_>,
     (kept, scroll): (&Placement, &Offsets),
-    (moved, changed): (&[usize], &ChangedSlots),
+    (placed, changed): (&Placed, &ChangedSlots),
 ) {
     let (fresh, fresh_scroll) = Fresh::of(before, boxes);
     let held = held(boxes.boxes);
@@ -78,7 +79,13 @@ pub(crate) fn assert_same(
         fail("the offsets by element differ from a fresh settle");
     }
     if !changed.every {
-        assert_moved_same(before, &fresh, &held, (moved, changed));
+        let moved: Vec<usize> = placed
+            .moved
+            .iter()
+            .chain(&placed.scrolled)
+            .copied()
+            .collect();
+        assert_moved_same(before, &fresh, &held, (&moved, changed));
     }
 }
 
