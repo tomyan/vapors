@@ -8,15 +8,21 @@ use crate::rows::RowChange;
 use crate::scaling::PhaseSeries;
 
 /// The accessibility phase's ceiling for `Insert`, instructions per
-/// extra row from 1000 rows: recorded at 8698 (1000 to 10,000 rows,
-/// `docs/perf/a11y-phase-2026-11-12.md`), with 9% of room over the
-/// 0.06% repeat noise. It holds until the splice step bounds what an
-/// insert moves (property 3 of `docs/plans/perf-finish-line.md`).
+/// extra row from 1000 rows: recorded at 8859 (1000 to 10,000 rows,
+/// `docs/perf/a11y-phase-2026-11-12.md`, "After PR 5a"), with 7% of
+/// room over the 0.06% repeat noise. It holds until the splice step
+/// bounds what an insert moves (property 3 of
+/// `docs/plans/perf-finish-line.md`).
 pub const INSERT_A11Y_PER_ROW: u64 = 9500;
 
-/// As [`INSERT_A11Y_PER_ROW`] for `Resize` and `Scroll`: recorded at
-/// 11,692 each.
-pub const MOVE_A11Y_PER_ROW: u64 = 12_500;
+/// As [`INSERT_A11Y_PER_ROW`] for `Resize`: recorded at 12,021.
+pub const RESIZE_A11Y_PER_ROW: u64 = 13_000;
+
+/// As [`INSERT_A11Y_PER_ROW`] for `Scroll`: the phase is flat (6789 at
+/// every size: the take reads the scrolled container alone, its rows'
+/// bounds being from it), so one instruction per extra row, 9000 at
+/// 10,000 rows, is less than one more node read.
+pub const SCROLL_A11Y_PER_ROW: u64 = 1;
 
 /// Which phases a change is judged on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -45,8 +51,11 @@ impl Judged {
             RowChange::Insert => Self::AccessibilityPerRow {
                 ceiling: INSERT_A11Y_PER_ROW,
             },
-            RowChange::Resize | RowChange::Scroll => Self::AccessibilityPerRow {
-                ceiling: MOVE_A11Y_PER_ROW,
+            RowChange::Resize => Self::AccessibilityPerRow {
+                ceiling: RESIZE_A11Y_PER_ROW,
+            },
+            RowChange::Scroll => Self::AccessibilityPerRow {
+                ceiling: SCROLL_A11Y_PER_ROW,
             },
         }
     }
