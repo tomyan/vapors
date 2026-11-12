@@ -35,7 +35,8 @@ pub(crate) fn assert_same(kept: &Painted, fresh: &Painted) {
          compared in PaintedFrom (crates/elements/src/kept_paint.rs) or BoxFrom \
          (crates/elements/src/kept_box.rs), a part's slab ids are not freed \
          or taken once (paint_partial.rs, slab.rs), a changed slot or shape change is missed \
-         (changed_slots.rs, kept_maps.rs, kept_order.rs), or a slot's hits were not patched \
+         (changed_slots.rs, kept_maps.rs, kept_order.rs), a splice put a step at the wrong \
+         place (order_splice.rs), or a slot's hits were not patched \
          (kept_hits.rs, paint_partial.rs drawn_updated); reproduce with `cargo xtask test`"
     );
 }
