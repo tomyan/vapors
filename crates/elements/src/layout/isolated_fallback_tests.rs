@@ -92,6 +92,7 @@ fn an_input_the_old_cache_no_longer_holds_has_the_ancestors_laid_out_again() {
             ..LayoutInput::HIDDEN
         },
         in_block: false,
+        answered: None,
     });
 
     // When
