@@ -32,10 +32,21 @@ fn updated(page: &RowsPage) -> (usize, usize) {
     painted(&doc)
 }
 
+/// For a test that ends with the oracle: the debug layout check
+/// (`Document::skip_layout_check`) is skipped on its updates. The oracle
+/// compares every box with a fresh layout's, which is what the check
+/// does, and at 3000 rows the check adds 3 s of debug time to each
+/// update (measured in the PR for the load-sensitive kept_shift
+/// tests). The paint check, which pins the shifted paint, stays on.
+fn oracle_checks_layout(page: &RowsPage) {
+    page.doc.borrow_mut().skip_layout_check();
+}
+
 #[test]
 fn resizing_a_row_near_the_top_paints_its_boxes_and_the_body_and_shifts_the_rows_after() {
     // Given
     let page = rows_page(ROWS);
+    oracle_checks_layout(&page);
     page.rows_resizable();
 
     // When: the second row doubles in height
@@ -53,6 +64,7 @@ fn resizing_a_row_near_the_top_paints_its_boxes_and_the_body_and_shifts_the_rows
 fn scrolling_the_rows_paints_no_box_and_shifts_every_row() {
     // Given
     let page = rows_page(ROWS);
+    oracle_checks_layout(&page);
     page.body_scrolls();
 
     // When

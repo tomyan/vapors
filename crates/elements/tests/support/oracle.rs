@@ -62,23 +62,26 @@ pub fn snapshot(doc: &Rc<RefCell<Document>>, viewport: Viewport) -> Snapshot {
     for _ in 0..SETTLE {
         updated(&mut doc, viewport);
         if !doc.take_changed() {
-            return settled(&mut doc, viewport);
+            return settled(&doc, viewport);
         }
     }
     panic!("the document still changed after {SETTLE} updates");
 }
 
-fn updated(doc: &mut Document, viewport: Viewport) -> &Painted {
+fn updated(doc: &mut Document, viewport: Viewport) {
     doc.update(viewport)
-        .unwrap_or_else(|errors| panic!("refused: {errors:#?}"))
+        .unwrap_or_else(|errors| panic!("refused: {errors:#?}"));
 }
 
-fn settled(doc: &mut Document, viewport: Viewport) -> Snapshot {
+/// The frame the last update painted, which `snapshot` found settled:
+/// another update would only repeat it, and costs seconds at 3000 rows
+/// in a debug build (its checks paint and lay out again).
+fn settled(doc: &Document, viewport: Viewport) -> Snapshot {
     let nodes = doc.elements();
     let styles = computed_styles(doc, &nodes);
     let focus = (doc.active_element(), doc.focus_visible());
     let selections = selections(doc, &nodes);
-    let painted = updated(doc, viewport);
+    let painted = doc.painted().expect("an update settled");
     Snapshot {
         boxes: border_boxes(painted, &nodes),
         styles,
