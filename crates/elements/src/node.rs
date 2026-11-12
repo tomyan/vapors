@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 
 use vapors_css::tree::States;
-use vapors_dom::{NodeId, PropertyValue};
+use vapors_dom::{NodeId, PropertyValue, StyleKey};
 
 /// What a node is.
 pub(crate) enum Kind {
@@ -23,6 +23,13 @@ pub(crate) struct Element {
     pub(crate) listeners: Vec<(String, vapors_dom::Listener)>,
     /// The pointer's flags: `:hover` and `:active`.
     pub(crate) states: States,
+    /// The template's key, for an element `create_keyed_element` made.
+    pub(crate) key: Option<&'static StyleKey>,
+    /// Which of the key's `class:` directives are on, as bits.
+    pub(crate) toggles: u64,
+    /// The calls refused on it, each naming the site and the fix
+    /// (`dom_keyed`); every update refuses while it is in the tree.
+    pub(crate) refused: Vec<String>,
 }
 
 impl Element {
@@ -33,7 +40,23 @@ impl Element {
             properties: BTreeMap::new(),
             listeners: Vec::new(),
             states: States::NONE,
+            key: None,
+            toggles: 0,
+            refused: Vec::new(),
         }
+    }
+
+    /// An element of `key`'s tag with the key's attributes set, and
+    /// the key's shape refusal, if any, recorded.
+    pub(crate) fn keyed(key: &'static StyleKey) -> Self {
+        let mut element = Self::new(key.tag);
+        for (name, value) in key.attributes() {
+            element.attributes.insert(name.to_owned(), value);
+        }
+        element.key = Some(key);
+        let refusal = key.shape_refusal();
+        (element.refused).extend(refusal.map(|r| format!("create_keyed_element: {r}")));
+        element
     }
 }
 

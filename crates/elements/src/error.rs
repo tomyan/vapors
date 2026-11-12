@@ -15,6 +15,11 @@ pub enum ElementError {
     /// A change vapors-elements did not mark for checking again: a
     /// defect in it, which a debug build reports where it happens.
     Unmarked(String),
+    /// A call the tree refused and did not apply, naming the site and
+    /// the fix: an attribute an element's `StyleKey` fixes, a `class:`
+    /// directive its key does not list, a toggle on an element without
+    /// a key, or a key that cannot describe an element (`dom_keyed`).
+    Refused(String),
     /// An attribute the tree does not honour (`style`), or a value of one
     /// it cannot honour (`disabled="false"`).
     UnsupportedAttribute(String),
@@ -48,6 +53,7 @@ impl fmt::Display for ElementError {
             Self::UnsupportedTag(message)
             | Self::UnfiredEvent(message)
             | Self::UnsupportedAttribute(message)
+            | Self::Refused(message)
             | Self::Unmarked(message)
             | Self::Layout(message) => f.write_str(message),
             Self::Css { sheet, error } => write!(

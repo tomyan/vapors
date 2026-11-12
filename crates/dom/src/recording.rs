@@ -3,11 +3,12 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use crate::{NodeId, PropertyValue};
+use crate::{NodeId, PropertyValue, StyleKey};
 
 mod dispatch;
 mod dom_impl;
 mod html;
+mod keyed;
 
 /// One recorded call, with the ids involved.
 #[derive(Debug, Clone, PartialEq)]
@@ -16,6 +17,10 @@ pub enum Call {
     CreateElement {
         node: NodeId,
         tag: String,
+    },
+    CreateKeyedElement {
+        node: NodeId,
+        key: &'static StyleKey,
     },
     CreateText {
         node: NodeId,
@@ -34,6 +39,16 @@ pub enum Call {
         node: NodeId,
         name: String,
         value: PropertyValue,
+    },
+    ToggleClasses {
+        node: NodeId,
+        toggles: Vec<(String, bool)>,
+    },
+    /// A call refused on `node`, naming the site and the fix; it
+    /// changed nothing (`Dom::create_keyed_element`).
+    Refused {
+        node: NodeId,
+        refusal: String,
     },
     Append {
         parent: NodeId,
@@ -65,6 +80,9 @@ enum Kind {
         tag: String,
         attributes: BTreeMap<String, String>,
         properties: BTreeMap<String, PropertyValue>,
+        /// The template's key, for an element made by
+        /// `create_keyed_element`, and which of its directives are on.
+        key: Option<(&'static StyleKey, u64)>,
     },
     Text(String),
 }
@@ -84,6 +102,11 @@ pub struct RecordingDom {
     listeners: HashMap<(NodeId, String), Vec<crate::Listener>>,
     /// Nodes `remove` took out, with their subtrees: not in the tree.
     removed: std::collections::HashSet<NodeId>,
+    /// Whether the test expects refusals (`expect_refusals`); without
+    /// it a refused call panics (`keyed.rs`).
+    expecting: bool,
+    /// Refusals not yet taken through `refusals()`.
+    unread: Vec<String>,
 }
 
 impl RecordingDom {
@@ -95,6 +118,7 @@ impl RecordingDom {
             tag: "root".into(),
             attributes: BTreeMap::new(),
             properties: BTreeMap::new(),
+            key: None,
         });
         dom
     }
