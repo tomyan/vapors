@@ -76,3 +76,34 @@ pub(crate) fn check_generated(
     }
     Ok(())
 }
+
+/// `stem` as the start of a Rust name: each character outside
+/// `[A-Za-z0-9_]` (a tag's hyphen, a namespace's colon) made `_`.
+pub(crate) fn rust_stem(stem: &str) -> String {
+    let rust = |c: char| if c.is_ascii_alphanumeric() { c } else { '_' };
+    stem.chars().map(rust).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::rust_stem;
+
+    #[test]
+    fn every_character_outside_a_rust_name_becomes_an_underscore() {
+        // Given
+        let stems = [
+            ("gpu-surface", "gpu_surface"),
+            ("a:b", "a_b"),
+            ("x.y", "x_y"),
+            ("é", "_"),
+            ("h1_x", "h1_x"),
+        ];
+
+        // When
+        let made: Vec<String> = stems.iter().map(|(stem, _)| rust_stem(stem)).collect();
+
+        // Then
+        let wanted: Vec<&str> = stems.iter().map(|(_, rust)| *rust).collect();
+        assert_eq!(made, wanted);
+    }
+}

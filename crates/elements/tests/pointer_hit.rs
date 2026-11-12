@@ -35,7 +35,15 @@ fn a_hidden_element_takes_no_pointer_and_paints_nothing() {
 
     // Then
     assert_eq!(hit, Some(row));
-    assert_eq!(doc.borrow().painted().expect("painted").scene().items(), []);
+    assert_eq!(
+        doc.borrow()
+            .painted()
+            .expect("painted")
+            .scene()
+            .to_scene()
+            .items(),
+        []
+    );
 }
 
 #[test]

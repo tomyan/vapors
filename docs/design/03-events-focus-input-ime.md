@@ -129,6 +129,29 @@ crate, and the web IME path is platform code either way.
 - `focus`, `blur` (not bubbling), `focusin`, `focusout` (bubbling), in
   the UI Events order.
 - `:focus` is set on the element; `:focus-within` on its ancestors.
+- `Document::focus` returns a `Focus`: `Done`; `NotFocusable` (not
+  a focusable element, disabled, `display: none` on it or an ancestor,
+  or `visibility` other than `visible`), when nothing happens, as
+  Chromium's `focus()` does nothing; or `Pending` (no update has run,
+  so there is no viewport, or a style does not compute): the next
+  `settle_focus` focuses it if it is focusable then, with `focus` and
+  `focusin`, or drops it with no event, and a later `focus` or blur
+  replaces or clears it, so an app can focus a field as it mounts. The
+  styles are computed for the element and its ancestors from the tree
+  as it is, at the last update's viewport, without layout, as
+  Chromium's `focus()` forces a style update: a handler that shows a
+  panel and focuses its field focuses it. vapors does not implement
+  `inert`, so it is not part of the rule.
+- The focus fixup: `Document::settle_focus`, called after each
+  successful update (`ElementsApp` and the vapors player do), moves
+  focus to nothing when the focused element is no longer focusable by
+  that rule, with `change`, `blur` and `focusout`, as Chromium does at
+  the task after its style update. A host driving its own frames that
+  never calls it is refused by `DocumentInput::give` on the next key or
+  typed text (`Unplaced::FocusNotSettled`); see `docs/tooltips.md`
+  "For apps not using ElementsApp" for both settles. A hide after the
+  settle and before the next update blurs as the next key or typed
+  text arrives (M5 below).
 - As built (3-E2a): `Document::active_element`, `focus`, `key_pressed`
   and `key_released`; the platform sends `Event::Key` (the DOM's `key`
   with the modifiers held; no `code` yet) before a press's `Character`.
@@ -156,17 +179,64 @@ crate, and the web IME path is platform code either way.
   Checked against Chromium by `fixtures/focus.events` (events and focus
   at each step; `focus` and `blur` are not listened for there, as
   Chromium also sends them to the window, which vapors does not have).
-  Known gaps (review-v81): listeners see a key's `key` but not its
-  modifiers or repeat yet; winit's key names are mapped where they
+  Known gaps (review-v81): winit's key names are mapped where they
   differ from the DOM's only for Space and Super (Meta); "disabled" has
   two answers, a disabled control itself for focus and a disabled
-  button ancestor for clicks, and `fieldset disabled` neither;
-  `focus` and `blur` listeners that move focus again are not
-  re-checked between the four events; focusability reads the last
-  painted frame, so an element shown since the last update is not yet
-  focusable. A prevented `pointerdown` does not focus, as in Chromium
+  button ancestor for clicks, and `fieldset disabled` neither; a
+  press's target reads the last painted frame for focusability, where
+  Tab and `focus` compute styles now (below). A prevented `pointerdown`
+  does not focus, as in Chromium
   155 (`gpu_events_a_prevented_pointerdown_does_not_focus_in_chromium`);
   a touch tap does not focus yet.
+- As built (review-fable-input H1, M1, M2, M3, M5; 2026-11-11):
+  - A listener may remove the event's target or the focused element.
+    After any dispatch a default action or follow-on event re-resolves
+    its node through `Document::still_in` and stops when it is gone;
+    `deliver` refuses a removed target before any listener runs, as
+    `Dispatcher::dispatch` does. So: a `pointerdown` listener that
+    removes its target leaves the press focusing nothing (a removed
+    node holds nothing focusable, as Blink's detached node is not
+    focusable) and no click follows; a `pointerup` listener that
+    removes the pressed or the released element drops the click, as
+    `MouseEventManager` does when the mousedown node is removed; a
+    `click` listener that removes its target on a second press sends no
+    `dblclick`; a `keydown` listener that removes the focused element
+    runs no default action and the key is unused; a tap's `focus`
+    handler that removes the tapped element clicks nothing; a field's
+    `change` from the fixup's commit that removes the field fires no
+    `blur` or `focusout` (Chromium fires them on the detached node,
+    where nothing in the document can observe them); a range's `input`
+    that removes it fires no `change`; a `paste` listener that removes
+    the field keeps the paste. Pinned by `tests/listener_removal.rs`.
+    Open point: Chromium keeps a sequential focus navigation starting
+    point where a removed focused element was, so a Tab after the
+    removal continues from there; vapors starts from the first
+    element.
+  - A focus move holds its destination aside (`focus_move.rs`): the
+    element losing focus has no focus during its commit, `blur` and
+    `focusout` (`active_element` answers the body, as Chromium's
+    `activeElement`), and `:focus-within` stays on the common
+    ancestor. A handler that focuses something meanwhile keeps it and
+    the destination hears nothing: Chromium 155's log for a `blur`
+    handler is `blur` on the old, `focus` and `focusin` on the
+    handler's choice, `focusout` on the old. From reading Blink's
+    `Document::SetFocusedElement`, not the corpus: a destination the
+    handlers hid takes no focus, and a `focus` handler that moves on
+    blurs the element it ran on (focused while its `focus` fires), which
+    then gets no `focusin`. `tests/focus_handlers_move.rs`.
+  - Tab decides by `focusability`, the rule `focus` uses (styles
+    computed now), so an element hidden since the last update is
+    skipped and one shown since is visited, and `focus` on Tab's choice
+    is asserted to answer `Done`. `tests/tab_focusability.rs`.
+  - `keydown` and `keyup` carry the modifiers, `code` and `repeat`
+    (`Keystroke`, `Document::key_pressed_with`); the plain `key_pressed`
+    sends no code and no repeat. `tests/key_fields.rs`.
+  - A key, typed text, a paste or a text edit runs the fixup's blur
+    first (`blur_unfocusable`), so a field hidden since the last settle
+    commits and blurs and takes none, as Chromium's style update before
+    the task would have blurred it; an agent's edits arrive between
+    frames. A host that skipped the settle after an update is still
+    refused by `DocumentInput::give`. `tests/typing_after_hide.rs`.
 - As built (3-E2b): `:focus-visible` is set when focus arrives after a
   key other than a modifier alone (by Tab, or by script after a key) or
   on a text field, and not

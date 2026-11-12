@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-use vapors_platform::Cursor as Shown;
+use vapors_platform::{Cursor as Shown, Event};
 
 use super::Route;
 
@@ -31,6 +31,17 @@ pub(crate) struct Handled {
     pub(crate) unused_key: bool,
 }
 
+/// An event the document had alone (`ElementsApp`'s `App::event`).
+impl From<Handled> for Given {
+    fn from(handled: Handled) -> Self {
+        Given {
+            route: Route::Document,
+            changed: handled.changed,
+            cursor: handled.cursor,
+        }
+    }
+}
+
 /// Why an event could not be placed in the document.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Unplaced {
@@ -39,6 +50,10 @@ pub enum Unplaced {
     NotUpdated,
     /// The last update's scale is zero, negative or not a number.
     Scale(f32),
+    /// A key or typed text arrived after an update with no
+    /// `Document::settle_focus` since, while the focused element is not
+    /// focusable: a host that drives its own frames forgot the settle.
+    FocusNotSettled,
 }
 
 impl fmt::Display for Unplaced {
@@ -52,8 +67,40 @@ impl fmt::Display for Unplaced {
                 f,
                 "the document was updated at scale {scale}, which is not a positive number; pass the display's device pixels per CSS pixel in its Viewport"
             ),
+            Self::FocusNotSettled => write!(
+                f,
+                "a key or typed text arrived for a focused element that is no longer focusable, and Document::settle_focus has not run since the last update; call it after each update (ElementsApp does), see docs/tooltips.md \"For apps not using ElementsApp\""
+            ),
         }
     }
 }
 
 impl std::error::Error for Unplaced {}
+
+/// The scale of `document`'s last update, refused when there is none or
+/// it is not a positive number.
+pub(super) fn scale_of(document: &vapors_elements::Document) -> Result<f32, Unplaced> {
+    let scale = document.painted().ok_or(Unplaced::NotUpdated)?.scale();
+    if scale.is_finite() && scale > 0.0 {
+        Ok(scale)
+    } else {
+        Err(Unplaced::Scale(scale))
+    }
+}
+
+/// Refuses a key or typed text while focus is unsettled
+/// ([`Unplaced::FocusNotSettled`]); any other event passes.
+pub(super) fn settled(document: &vapors_elements::Document, event: &Event) -> Result<(), Unplaced> {
+    let typing = matches!(
+        event,
+        Event::Key { .. }
+            | Event::Character(_)
+            | Event::Paste
+            | Event::TextEdited { .. }
+            | Event::PastedText(_)
+    );
+    if typing && document.unsettled_focus() {
+        return Err(Unplaced::FocusNotSettled);
+    }
+    Ok(())
+}

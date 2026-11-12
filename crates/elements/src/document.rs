@@ -20,20 +20,20 @@ pub struct Document {
     pub(crate) sheets: Sheets,
     pub(crate) fonts: FontSystem,
     pub(crate) painted: Option<Painted>,
-    /// Whether anything shown may have changed: a tree, attribute,
-    /// text, scroll or pointer-state change.
+    /// Whether anything shown may have changed (`update::Changes`).
     pub(crate) changes: crate::update::Changes,
     pub(crate) pointer: crate::events::Pointer,
-    /// The focused element (3-E2a); `None` when the body has focus.
+    /// The focused element (3-E2a), `None` when the body has focus; and
+    /// what the next `settle_focus` does (`focus_fixup`).
     pub(crate) focused: Option<NodeId>,
+    pub(crate) settle: crate::focus_fixup::Settle,
     /// Whether the window has focus (`focus_window.rs`).
     pub(crate) window: crate::focus_window::Window,
     /// Where Space went down, for its click on keyup.
     pub(crate) space_on: Option<NodeId>,
     /// The modifier shortcuts take (`shortcuts`).
     pub(crate) shortcut_modifier: crate::ShortcutModifier,
-    /// Each number field's last committed number and value string,
-    /// from its focus on (`number_committed`).
+    /// Each number field's last committed number and value (`number_committed`).
     pub(crate) committed: std::collections::HashMap<NodeId, crate::number_committed::Committed>,
     /// Each text field's editor (E6a).
     pub(crate) editors: crate::text_field::Editors,
@@ -51,8 +51,10 @@ pub struct Document {
     pub(crate) kept: Option<crate::restyle::Kept>,
     /// The boxes the last update laid out, for the next to reuse.
     pub(crate) boxes: crate::layout::KeptBoxes,
-    /// Boxes the last update laid out rather than read from cache.
-    pub(crate) laid_out: usize,
+    /// The style phase's checks, kept between updates.
+    pub(crate) checks: crate::kept_checks::KeptChecks,
+    /// The last update's structural counts.
+    pub(crate) counts: crate::UpdateCounts,
     /// Each scroll container's offset.
     pub(crate) scroll: crate::scroll::Offsets,
     /// Whether scroll thumbs are drawn now.
@@ -80,6 +82,7 @@ impl Document {
             changes: crate::update::Changes::default(),
             pointer: crate::events::Pointer::default(),
             focused: None,
+            settle: crate::focus_fixup::Settle::default(),
             window: crate::focus_window::Window::Focused,
             space_on: None,
             shortcut_modifier: crate::ShortcutModifier::default(),
@@ -91,7 +94,8 @@ impl Document {
             dirty: crate::restyle::Dirty::default(),
             kept: None,
             boxes: crate::layout::KeptBoxes::default(),
-            laid_out: 0,
+            checks: crate::kept_checks::KeptChecks::default(),
+            counts: crate::UpdateCounts::default(),
             scroll: crate::scroll::Offsets::default(),
             thumbs_shown: true,
             images: crate::images::Images::default(),
@@ -104,34 +108,6 @@ impl Document {
     /// asks this after each event. True for a new document.
     pub fn take_changed(&mut self) -> bool {
         std::mem::replace(&mut self.changes.since_asked, false)
-    }
-
-    /// Registers `image` under `name` for the `img` elements whose `src`
-    /// is `name`, replacing any image of that name; they show it from
-    /// the next update.
-    ///
-    /// # Errors
-    /// An image that cannot be drawn, naming it: a side of zero, a side
-    /// over 8192 px, or pixels that do not match its size.
-    pub fn register_image(
-        &mut self,
-        name: &str,
-        image: vapors_scene::RgbaImage,
-    ) -> Result<(), String> {
-        self.images.register(name, image)?;
-        self.note_change();
-        Ok(())
-    }
-
-    /// Drops the image registered as `name`, so its pixels are freed;
-    /// the painter drops its texture after the next frame that does not
-    /// draw it.
-    ///
-    /// # Errors
-    /// No image registered as `name`, or an `img` that still names it.
-    pub fn unregister_image(&mut self, name: &str) -> Result<(), String> {
-        let nodes = crate::check::elements(&self.arena, self.root);
-        self.images.unregister(name, &self.arena, &nodes)
     }
 
     /// The `html` element.

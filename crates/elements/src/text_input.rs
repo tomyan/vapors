@@ -50,6 +50,14 @@ impl Document {
         self.note_change();
     }
 
+    /// Focus left `node`: a composition in it ends, its text kept, as
+    /// Chromium commits one at blur.
+    pub(crate) fn end_composition(&mut self, node: NodeId) {
+        if let Some(editor) = self.editors.get_mut(&node) {
+            editor.composing = None;
+        }
+    }
+
     /// Runs `act`, which moves the selection but edits nothing, on the
     /// field's editor: the open undo step closes.
     pub(crate) fn move_selection(&mut self, node: NodeId, act: impl FnOnce(&mut Driver<'_>)) {
@@ -146,7 +154,9 @@ pub(crate) fn moved(
 /// Commits `node`'s text: `change` when it differs from the last
 /// committed.
 pub(crate) fn commit(document: &Rc<RefCell<Document>>, node: NodeId) {
-    if !document.borrow().is_text_input(node) {
+    // a listener of an earlier commit or event may have removed `node`
+    let still = document.borrow().still_in(node);
+    if !still.is_some_and(|node| document.borrow().is_text_input(node)) {
         return;
     }
     let changed = {

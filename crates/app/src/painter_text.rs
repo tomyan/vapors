@@ -5,28 +5,21 @@
 use vapors_elements::Painted;
 use vapors_renderer::Target;
 use vapors_scene::{Item, Rect};
-use vapors_text::{AtlasError, BlendParams, IconDraw, RenderTarget};
+use vapors_text::{AtlasError, BlendParams, IconDraw, TextDraw};
 
 use super::ScenePainter;
 
 impl ScenePainter {
+    /// Draws a run's texts in one call, in document order.
     pub(super) fn draw_texts(
         &mut self,
         target: &Target<'_>,
         painted: &Painted,
         items: &[Item],
     ) -> Result<(), AtlasError> {
-        let text_target = text_target(target);
-        for item in items {
-            if let Item::Text { text, origin } = item {
-                let layout = painted.text(*text);
-                let blend = BlendParams::default();
-                let atlas = &mut self.atlas;
-                self.text
-                    .draw(&text_target, atlas, layout, *origin, blend)?;
-            }
-        }
-        Ok(())
+        let texts = text_draws(painted, items);
+        let blend = BlendParams::default();
+        self.text.draw_texts(target, &mut self.atlas, &texts, blend)
     }
 
     /// Draws a run's icons in one call, in document order.
@@ -37,9 +30,20 @@ impl ScenePainter {
         items: &[Item],
     ) -> Result<(), AtlasError> {
         let draws = icon_draws(painted, items);
-        self.text
-            .draw_icons(&text_target(target), &mut self.atlas, &draws)
+        self.text.draw_icons(target, &mut self.atlas, &draws)
     }
+}
+
+/// The draws of the text items among `items`, in order.
+fn text_draws<'a>(painted: &'a Painted, items: &[Item]) -> Vec<TextDraw<'a>> {
+    let draw = |item: &Item| match *item {
+        Item::Text { text, origin, .. } => Some(TextDraw {
+            layout: painted.text(text),
+            origin,
+        }),
+        _ => None,
+    };
+    items.iter().filter_map(draw).collect()
 }
 
 /// The draws of the icon items among `items`, in order.
@@ -59,15 +63,5 @@ fn icon_draw(icon: &vapors_text::Icon, rect: Rect, colour: vapors_scene::Color) 
         origin: [rect.left as i32, rect.top as i32],
         size: [rect.width().max(0.0) as u32, rect.height().max(0.0) as u32],
         colour,
-    }
-}
-
-fn text_target<'a>(target: &Target<'a>) -> RenderTarget<'a> {
-    RenderTarget {
-        device: target.device,
-        queue: target.queue,
-        view: target.view,
-        viewport: target.viewport,
-        scissor: target.scissor,
     }
 }

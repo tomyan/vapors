@@ -40,7 +40,7 @@ fn quad_top_left(floats: &[f32], quad: usize, page: u32) -> [u32; 2] {
 fn an_icon_moved_by_a_later_repack_in_the_same_call_samples_its_final_rect() {
     // Given: a tall icon from the last frame, then a small icon placed beside it
     // and a large one that only fits once the tall one is evicted and the page repacked
-    let mut atlas = GlyphAtlas::new(AtlasConfig { page_size: 40 });
+    let mut atlas = GlyphAtlas::new(AtlasConfig::fixed(40));
     let (tall, small, large) = (line_icon("2"), line_icon("4"), line_icon("6"));
     atlas.icon(&tall, 0, [8, 32]).expect("placed");
     atlas.begin_frame();

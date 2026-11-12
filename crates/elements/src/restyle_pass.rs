@@ -1,7 +1,9 @@
 //! The restyle pass: the marked subtrees and elements restyled against
 //! the styles kept for their parents (see `restyle`).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
+
+use crate::node_map::{NodeMap, NodeSet};
 
 use vapors_dom::NodeId;
 
@@ -27,6 +29,12 @@ impl Document {
         } else {
             self.dirty_roots()
         };
+        // Debug builds restyle the whole document again after an element
+        // insert or remove and compare it with the narrowed result
+        // (`restyle_check.rs`): O(elements) there, though
+        // `elements_restyled` still counts the narrowed set. Release
+        // builds skip it.
+        let check_narrowed = cfg!(debug_assertions) && self.dirty.narrowed && !fresh;
         self.dirty = Dirty::default();
         self.kept
             .as_mut()
@@ -35,7 +43,10 @@ impl Document {
             .clear();
         match self.restyle_all(&roots, &singles, viewport) {
             Ok(count) => {
-                self.kept.as_mut().expect("set above").restyled = count;
+                self.counts.elements_restyled = count;
+                if check_narrowed {
+                    self.check_narrowed_restyle(viewport);
+                }
                 Ok(())
             }
             Err(error) => {
@@ -66,23 +77,22 @@ impl Document {
             viewport,
             initial: crate::style::initial_style(&self.arena, self.root(), &environment(viewport)),
             styles: Styles::default(),
-            used: HashMap::new(),
-            refused: HashMap::new(),
-            restyled: 0,
-            restyled_nodes: HashSet::new(),
+            used: NodeMap::default(),
+            refused: NodeMap::default(),
+            restyled_nodes: NodeSet::default(),
+            calcs: crate::layout::Calcs::default(),
         }
     }
 
     /// The marked subtree roots still in the tree, none inside another,
     /// and the marked elements inside none of them, parents first.
     fn dirty_roots(&self) -> (Vec<NodeId>, Vec<NodeId>) {
-        let live: HashSet<NodeId> = elements(&self.arena, self.root()).into_iter().collect();
         let marked: HashSet<NodeId> = self
             .dirty
             .roots
             .iter()
             .copied()
-            .filter(|n| live.contains(n))
+            .filter(|&n| self.attached(n))
             .collect();
         let covered = |node: NodeId, skip: usize| {
             self.chain(node)
@@ -97,7 +107,7 @@ impl Document {
             .elements
             .iter()
             .copied()
-            .filter(|n| live.contains(n) && !covered(*n, 0))
+            .filter(|&n| self.attached(n) && !covered(n, 0))
             .collect();
         singles.sort_by_key(|node| (self.chain(*node).len(), node.0));
         singles.dedup();
@@ -141,6 +151,10 @@ impl Document {
         let kept = self.kept.as_mut().expect("restyle sets it");
         kept.styles.set(node, style);
         kept.restyled_nodes.insert(node);
+        // a box holding a calc handle points into the replaced style
+        if changed || !kept.may_keep_layout(node) {
+            self.boxes.marks.mark(node);
+        }
         self.keep_used(node, viewport);
         Ok(changed)
     }
@@ -156,7 +170,7 @@ impl Document {
         let parent_used = parent_node.and_then(|p| kept.used.get(&p));
         let context = Context {
             initial: &kept.initial,
-            flex_item: parent_used.is_some_and(|p| crate::style::is_container(p.layout.display)),
+            flex_item: parent_used.is_some_and(|p| blockifies(p.layout.display)),
             in_inline: parent_used.is_some_and(|p| p.inline),
             text_like_field: self.arena.get(node, "restyle").element().is_some_and(|e| {
                 e.tag == "input"
@@ -186,4 +200,13 @@ impl Document {
             Err(_) => drop(kept.used.remove(&node)),
         }
     }
+}
+
+/// Whether a parent of `display` blockifies its children: a flex or
+/// grid container does; under `display: none` the children have no box
+/// and whether the parent will be a container once shown is unknown, so
+/// they are checked as blockified, and checked again when it is shown
+/// (its computed style changes, which restyles them).
+fn blockifies(display: taffy::Display) -> bool {
+    crate::style::is_container(display) || display == taffy::Display::None
 }

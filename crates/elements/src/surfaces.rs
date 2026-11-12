@@ -12,7 +12,7 @@ use crate::check::describe;
 use crate::error::ElementError;
 use crate::layout::{BoxRect, Content, LayoutBox};
 use crate::paint::PaintInput;
-use crate::painted::Painted;
+use crate::painting::Painting;
 
 const TAG: &str = "gpu-surface";
 
@@ -22,7 +22,7 @@ pub(crate) fn paint(
     layout_box: &LayoutBox,
     border_box: BoxRect,
     input: &PaintInput<'_>,
-    out: &mut Painted,
+    out: &mut Painting,
 ) {
     let (Some(name), &Content::Element(node)) = (&layout_box.surface, &layout_box.content) else {
         return;
@@ -36,9 +36,8 @@ pub(crate) fn paint(
     }
 }
 
-fn push(out: &mut Painted, name: &str, rect: Rect) {
-    let id = SurfaceId(u32::try_from(out.surfaces.len()).expect("fewer than 2^32 surfaces"));
-    out.surfaces.push(name.to_owned());
+fn push(out: &mut Painting, name: &str, rect: Rect) {
+    let id = SurfaceId(out.slabs.surfaces.insert(name.to_owned()));
     out.scene.push(Item::Surface { surface: id, rect });
 }
 

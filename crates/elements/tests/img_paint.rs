@@ -39,6 +39,7 @@ fn images(doc: &mut Document, scale: f32) -> Vec<(Rect, Size)> {
         .expect("updates");
     painted
         .scene()
+        .to_scene()
         .items()
         .iter()
         .filter_map(|item| match item {
@@ -78,6 +79,7 @@ fn the_image_paints_after_the_imgs_background() {
     let painted = doc.update(viewport(200.0, 200.0)).expect("updates");
     let kinds: Vec<&str> = painted
         .scene()
+        .to_scene()
         .items()
         .iter()
         .map(|item| match item {

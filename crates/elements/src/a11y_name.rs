@@ -2,7 +2,7 @@
 //! corpus's `names.events` and `roles.events`): a non-empty
 //! `aria-label`; else the content of the `aria-labelledby` ids found,
 //! when not empty; else, for a role named by its content, the text it
-//! renders. `label` arrives in F4.
+//! renders; else its `title` (`a11y_title.rs`). `label` arrives in F4.
 //!
 //! Content is the text of the subtree as rendered: an element with
 //! `display: none` or `aria-hidden="true"` adds nothing, text under
@@ -22,20 +22,31 @@ const NAMED_BY_CONTENT: [&str; 3] = ["option", "button", "checkbox"];
 impl Document {
     /// `node`'s accessible name, empty for none.
     pub(crate) fn ax_name(&self, node: NodeId, role: &str, ids: &Ids) -> String {
+        let named = self.ax_name_before_title(node, role, ids);
+        if named.is_empty() {
+            return self.ax_title_name(node);
+        }
+        named
+    }
+
+    /// `node`'s accessible name from anything but its `title`, empty
+    /// for none.
+    pub(crate) fn ax_name_before_title(&self, node: NodeId, role: &str, ids: &Ids) -> String {
         let label = self.attribute(node, "aria-label").map(str::trim);
         if let Some(label) = label.filter(|label| !label.is_empty()) {
             return label.to_owned();
         }
-        let labelled = self.ax_labelled_by(node, ids);
+        let labelled = self.ax_referenced(node, "aria-labelledby", ids);
         if !labelled.is_empty() || !NAMED_BY_CONTENT.contains(&role) {
             return labelled;
         }
         self.ax_content(node)
     }
 
-    /// The content of each `aria-labelledby` id found, space separated.
-    fn ax_labelled_by(&self, node: NodeId, ids: &Ids) -> String {
-        let Some(labels) = self.attribute(node, "aria-labelledby") else {
+    /// The content of each id found in `node`'s `attribute`
+    /// (`aria-labelledby`, `aria-describedby`), space separated.
+    pub(crate) fn ax_referenced(&self, node: NodeId, attribute: &str, ids: &Ids) -> String {
+        let Some(labels) = self.attribute(node, attribute) else {
             return String::new();
         };
         let parts: Vec<String> = labels

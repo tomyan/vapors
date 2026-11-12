@@ -30,6 +30,7 @@ fn painted_texts(page: &Page) -> Vec<String> {
     let painted = doc.painted().expect("painted");
     painted
         .scene()
+        .to_scene()
         .items()
         .iter()
         .filter_map(|item| match item {

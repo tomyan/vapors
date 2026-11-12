@@ -11,8 +11,9 @@ use winit::event_loop::EventLoopProxy;
 use crate::{Cursor, TextField};
 
 use crate::PlatformError;
-use crate::device_lost::{DeviceLost, Lost};
+use crate::device_lost::Lost;
 use crate::file_kind::{self, FileKind};
+use crate::gpu_watch::GpuWatch;
 use crate::picker;
 use crate::redraw::RedrawFlag;
 use crate::waker::Waker;
@@ -22,7 +23,7 @@ use crate::window::Message;
 pub struct Platform {
     /// `None` for a detached platform, which has no event loop.
     proxy: Option<EventLoopProxy<Message>>,
-    lost: DeviceLost,
+    gpu_watch: GpuWatch,
     redraw: Arc<RedrawFlag>,
     cursor: Cell<Option<Cursor>>,
     /// The focused text field the app last set, until the loop takes it.
@@ -46,7 +47,7 @@ impl Platform {
     pub fn detached() -> Self {
         Self {
             proxy: None,
-            lost: DeviceLost::default(),
+            gpu_watch: GpuWatch::default(),
             redraw: Arc::default(),
             cursor: Cell::new(None),
             text_field: RefCell::new(None),
@@ -109,9 +110,9 @@ impl Platform {
         self.text_field.borrow_mut().take()
     }
 
-    /// The state the window's device is watched into.
-    pub(crate) fn lost_state(&self) -> DeviceLost {
-        self.lost.clone()
+    /// The states the window's device is watched into.
+    pub(crate) fn gpu_watch(&self) -> GpuWatch {
+        self.gpu_watch.clone()
     }
 
     /// The window's GPU device loss, once it has happened. After a loss
@@ -123,7 +124,7 @@ impl Platform {
     /// `tests/gpu_device_lost.rs`).
     #[must_use]
     pub fn device_lost(&self) -> Option<Lost> {
-        self.lost.get()
+        self.gpu_watch.lost.get()
     }
 
     /// The loop's proxy.

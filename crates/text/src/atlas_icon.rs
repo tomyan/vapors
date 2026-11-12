@@ -35,8 +35,8 @@ impl GlyphAtlas {
         if let Some(placed) = self.cached(&key) {
             return Ok(placed);
         }
-        if !self.coverage.fits(size[0], size[1]) {
-            let page_size = self.coverage.size();
+        if !self.fits_largest_page(size[0], size[1]) {
+            let page_size = self.max_page;
             return Err(AtlasError::IconTooLarge { size, page_size });
         }
         self.rasterisations += 1;

@@ -4,7 +4,8 @@
 //! (`Document::forget_kept`) and updates from scratch. Compared: each
 //! element's border box and computed style in tree order; the display
 //! list in paint order, each text run as its text, origin, layout size
-//! and every glyph run (size, colour, glyph ids and positions), with
+//! and every glyph run (size, colour, glyph ids and positions), each
+//! icon with its paths, with
 //! each item's clip; the element hit and the cursor at every `GRID` CSS px; focus;
 //! and each text field's selection.
 
@@ -82,7 +83,7 @@ fn settled(doc: &mut Document, viewport: Viewport) -> Snapshot {
         boxes: border_boxes(painted, &nodes),
         styles,
         items: items(painted),
-        clips: painted.scene().clips().to_vec(),
+        clips: painted.scene().to_scene().clips().to_vec(),
         hits: hits(painted, viewport),
         focus,
         selections,
@@ -115,12 +116,20 @@ fn hits(painted: &Painted, viewport: Viewport) -> Vec<(Option<NodeId>, Cursor)> 
 
 fn items(painted: &Painted) -> Vec<String> {
     let text = |item: &Item| match item {
-        Item::Text { text, origin } => {
+        Item::Text { text, origin, .. } => {
             format!("text {} at {origin:?}", layout_detail(painted.text(*text)))
         }
+        // the icon's paths, so a stale svg differs
+        Item::Icon { icon, .. } => format!("{item:?} {:?}", painted.icon(*icon)),
         other => format!("{other:?}"),
     };
-    painted.scene().items().iter().map(text).collect()
+    painted
+        .scene()
+        .to_scene()
+        .items()
+        .iter()
+        .map(text)
+        .collect()
 }
 
 /// A text layout as the string, its size and every run, so a stale

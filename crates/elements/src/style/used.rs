@@ -41,7 +41,8 @@ pub(crate) struct Used {
 pub(crate) struct Context<'a> {
     /// Every property at its initial value.
     pub(crate) initial: &'a ComputedStyle,
-    /// The parent is a flex or grid container, which blockifies it.
+    /// The parent is a flex or grid container, which blockifies it, or
+    /// `display: none` (`restyle_pass::blockifies`).
     pub(crate) flex_item: bool,
     /// The parent is an inline element.
     pub(crate) in_inline: bool,

@@ -8,7 +8,7 @@ use vapors_scene::{Item, Quad};
 
 use crate::layout::{BoxRect, Content, LayoutBox};
 use crate::paint::{PaintInput, snapped};
-use crate::painted::Painted;
+use crate::painting::Painting;
 use crate::style::Parts;
 
 /// Where a range's thumb runs: its content box's left and width, and
@@ -26,7 +26,7 @@ pub(crate) fn paint(
     layout_box: &LayoutBox,
     border_box: BoxRect,
     input: &PaintInput<'_>,
-    out: &mut Painted,
+    out: &mut Painting,
 ) {
     let (Some(range), &Content::Element(node)) = (&layout_box.range, &layout_box.content) else {
         return;
@@ -79,7 +79,7 @@ fn thumb_rect(content: BoxRect, parts: Parts, fraction: f64) -> BoxRect {
 }
 
 /// A filled rect with fully rounded ends, snapped to device pixels.
-fn push_round(out: &mut Painted, rect: BoxRect, color: vapors_scene::Color, scale: f32) {
+fn push_round(out: &mut Painting, rect: BoxRect, color: vapors_scene::Color, scale: f32) {
     if rect.width <= 0.0 || rect.height <= 0.0 || color.a <= 0.0 {
         return;
     }

@@ -3,7 +3,7 @@
 //! the last one marked (`restyle_pass`). A sheet added, a viewport other
 //! than the last, or a failed restyle restyles everything.
 
-use std::collections::HashMap;
+use crate::node_map::{NodeMap, NodeSet};
 
 use vapors_css::cascade::ComputedStyle;
 use vapors_css::tree::States;
@@ -23,6 +23,10 @@ pub(crate) struct Dirty {
     /// Elements to restyle, and their children's subtrees only if their
     /// own style changes.
     pub(crate) elements: Vec<NodeId>,
+    /// A child was inserted or removed and its siblings marked by what
+    /// the sheets reach (`restyle_children`): debug builds check the
+    /// restyle against a fresh one (`restyle_check`).
+    pub(crate) narrowed: bool,
 }
 
 impl Dirty {
@@ -47,14 +51,14 @@ pub(crate) struct Kept {
     pub(crate) viewport: Viewport,
     pub(crate) initial: ComputedStyle,
     pub(crate) styles: Styles,
-    pub(crate) used: HashMap<NodeId, Used>,
+    pub(crate) used: NodeMap<Used>,
     /// Each element's refusals, kept until it is restyled again.
-    pub(crate) refused: HashMap<NodeId, Vec<ElementError>>,
-    /// Elements restyled by the last update.
-    pub(crate) restyled: usize,
+    pub(crate) refused: NodeMap<Vec<ElementError>>,
     /// Which elements the last update restyled: their computed styles,
     /// and so the addresses their calc handles hold, are new.
-    pub(crate) restyled_nodes: std::collections::HashSet<NodeId>,
+    pub(crate) restyled_nodes: NodeSet,
+    /// The calcs of the kept styles, by the handles boxes hold.
+    pub(crate) calcs: crate::layout::Calcs,
 }
 
 impl Kept {
@@ -79,7 +83,7 @@ impl Document {
         let features = self.sheets.features;
         if features.has {
             self.dirty.everything();
-        } else if features.siblings {
+        } else if features.siblings.any() {
             self.dirty.subtree(self.parent(node).unwrap_or(node));
         } else {
             self.dirty.subtree(node);
@@ -103,18 +107,6 @@ impl Document {
             self.dirty.element(node);
         }
     }
-
-    /// Marks what a child added to or removed from `parent` restyles.
-    pub(crate) fn mark_children_changed(&mut self, parent: NodeId, added: Option<NodeId>) {
-        let features = self.sheets.features;
-        if features.has {
-            self.dirty.everything();
-        } else if features.siblings || features.empty {
-            self.dirty.subtree(parent);
-        } else if let Some(child) = added {
-            self.dirty.subtree(child);
-        }
-    }
 }
 
 impl Document {
@@ -125,14 +117,16 @@ impl Document {
         self.kept.as_ref()?.styles.get(node)
     }
 
-    /// Drops every style, layout and text layout kept between updates,
-    /// so the next update works from scratch: for tests that compare an
+    /// Drops every style, layout, text layout and paint kept between
+    /// updates, so the next update works from scratch: for tests that compare an
     /// incremental update with a full one.
     #[doc(hidden)]
     pub fn forget_kept(&mut self) {
         self.kept = None;
+        self.checks = crate::kept_checks::KeptChecks::default();
         self.boxes = crate::layout::KeptBoxes::default();
         self.texts = crate::layout::TextCache::default();
+        self.painted = None;
         self.dirty.everything();
     }
 }

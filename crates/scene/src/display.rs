@@ -156,6 +156,9 @@ pub enum Item {
         text: TextId,
         /// Top-left of the layout.
         origin: [f32; 2],
+        /// Every pixel its glyphs can ink, device pixels: the bounds
+        /// the painter culls it by.
+        ink: Rect,
     },
 }
 

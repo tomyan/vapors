@@ -9,31 +9,68 @@ use crate::layout::Layout;
 use crate::layout_types::PlacedGlyph;
 use crate::raster::{GlyphRequest, Hinting, subpixel_of};
 
-/// Vertex floats for every inked glyph of `layout`.
+/// One laid-out text to draw: its layout and where its origin goes
+/// (device pixels, y down).
+#[allow(missing_debug_implementations)] // `Layout` has no Debug
+#[derive(Clone, Copy)]
+pub struct TextDraw<'a> {
+    /// The layout.
+    pub layout: &'a Layout,
+    /// Its origin.
+    pub origin: [f32; 2],
+}
+
+/// Vertex floats for every inked glyph of `texts`, in order.
 pub(crate) fn quads(
     atlas: &mut GlyphAtlas,
-    layout: &Layout,
-    origin: [f32; 2],
+    texts: &[TextDraw<'_>],
     viewport: Size,
 ) -> Result<Vec<f32>, AtlasError> {
-    let hinting = Hinting::for_scale(layout.scale());
+    let glyphs = || texts.iter().flat_map(|text| glyphs_of(*text));
+    let placed = placed_all(glyphs, |(_, request)| atlas.get(request))?;
+    // read after placing: placing may grow the page
     let page = atlas.coverage_page().size();
-    let placed = placed_all(
-        || layout.glyphs(),
-        |glyph| atlas.get(&request(glyph, origin[0], hinting).1),
-    )?;
     let mut floats = Vec::new();
-    for (glyph, placed) in layout.glyphs().zip(&placed) {
-        if placed.is_empty() {
-            continue;
+    for ((at, _), placed) in glyphs().zip(&placed) {
+        if !placed.is_empty() {
+            push_glyph(&mut floats, &at, placed, page, viewport);
         }
-        let pixel_x = request(&glyph, origin[0], hinting).0;
-        let baseline = (origin[1] + glyph.y).round();
-        #[allow(clippy::cast_precision_loss)] // pixel positions
-        let top_left = [(pixel_x + placed.left) as f32, baseline + placed.top as f32];
-        push_quad(&mut floats, top_left, placed, page, viewport, glyph.color);
     }
     Ok(floats)
+}
+
+/// The quad of one inked glyph placed at `at`.
+fn push_glyph(floats: &mut Vec<f32>, at: &GlyphAt, placed: &AtlasGlyph, page: u32, viewport: Size) {
+    #[allow(clippy::cast_precision_loss)] // pixel positions
+    let top_left = [(at.x + placed.left) as f32, at.baseline + placed.top as f32];
+    push_quad(floats, top_left, placed, page, viewport, at.color);
+}
+
+/// Where a glyph's bitmap goes: its whole-pixel x, its baseline rounded
+/// to a whole pixel, and its colour.
+struct GlyphAt {
+    x: i32,
+    baseline: f32,
+    color: Color,
+}
+
+/// Each glyph of `text`, placed, with its atlas request.
+fn glyphs_of(text: TextDraw<'_>) -> impl Iterator<Item = (GlyphAt, GlyphRequest<'_>)> {
+    let hinting = Hinting::for_scale(text.layout.scale());
+    let [x, y] = text.origin;
+    text.layout.glyphs().map(move |glyph| {
+        let (pixel_x, request) = request(&glyph, x, hinting);
+        (glyph_at(pixel_x, y, &glyph), request)
+    })
+}
+
+/// `glyph` at whole-pixel `pixel_x`, its baseline rounded under origin `y`.
+fn glyph_at(pixel_x: i32, y: f32, glyph: &PlacedGlyph<'_>) -> GlyphAt {
+    GlyphAt {
+        x: pixel_x,
+        baseline: (y + glyph.y).round(),
+        color: glyph.color,
+    }
 }
 
 /// Where each item is in the atlas once every one is placed. Placing one
@@ -104,91 +141,5 @@ fn to_clip(point: [f32; 2], viewport: Size) -> [f32; 2] {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::atlas::PageKind;
-    use crate::pipeline::FLOATS_PER_VERTEX;
-    use crate::{AtlasConfig, Family, FontSystem, LayoutOptions, Style};
-
-    const VIEWPORT: Size = Size {
-        width: 64,
-        height: 64,
-    };
-
-    fn layout(system: &mut FontSystem, text: &str, size: f32) -> Layout {
-        let style = Style::new(Family::Geist, size);
-        Layout::new(system, text, &style, &LayoutOptions::default())
-    }
-
-    #[test]
-    fn a_glyph_moved_by_a_later_repack_in_the_same_layout_samples_its_final_rect() {
-        // Given: a tall l (7x29) from the last frame in a 30 px page; then a
-        // period (3x3) placed beside it and an M (18x17) that only fits once
-        // the l is evicted and the page repacked
-        let mut system = FontSystem::bundle_only();
-        let mut atlas = GlyphAtlas::new(AtlasConfig { page_size: 30 });
-        quads(
-            &mut atlas,
-            &layout(&mut system, "l", 40.0),
-            [0.0, 40.0],
-            VIEWPORT,
-        )
-        .expect("l");
-        atlas.begin_frame();
-
-        // When
-        let floats = quads(
-            &mut atlas,
-            &layout(&mut system, ".M", 24.0),
-            [0.0, 40.0],
-            VIEWPORT,
-        )
-        .expect("quads");
-
-        // Then: the repack moved the period to the corner, and its quad samples it there
-        assert_eq!(atlas.evictions(), 1);
-        assert_close(&floats[2..4], &[0.0, 0.0]);
-    }
-
-    #[test]
-    fn a_quad_maps_the_glyph_rect_to_its_atlas_coordinates() {
-        // Given: a 4x2 glyph at page (8, 16) in a 32 px page, placed at (10, 20)
-        let glyph = AtlasGlyph {
-            page: PageKind::Coverage,
-            rect: [8, 16, 4, 2],
-            left: 0,
-            top: 0,
-            notdef: false,
-        };
-        let viewport = Size {
-            width: 100,
-            height: 50,
-        };
-        let mut floats = Vec::new();
-
-        // When
-        push_quad(
-            &mut floats,
-            [10.0, 20.0],
-            &glyph,
-            32,
-            viewport,
-            Color::default(),
-        );
-
-        // Then: six vertices; the first is the top-left, the fifth the bottom-right
-        assert_eq!(floats.len(), 6 * FLOATS_PER_VERTEX);
-        assert_close(&floats[0..4], &[-0.8, 0.2, 0.25, 0.5]);
-        assert_close(
-            &floats[4 * FLOATS_PER_VERTEX..][..4],
-            &[-0.72, 0.12, 0.375, 0.5625],
-        );
-    }
-
-    fn assert_close(actual: &[f32], expected: &[f32]) {
-        assert_eq!(actual.len(), expected.len());
-        for (a, e) in actual.iter().zip(expected) {
-            assert!((a - e).abs() < 1e-6, "{actual:?} vs {expected:?}");
-        }
-    }
-}
+#[path = "quads_tests.rs"]
+mod tests;

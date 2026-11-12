@@ -46,6 +46,7 @@ fn a_scoped_color_rule_reaches_the_icon() {
     // Then
     let colours: Vec<Color> = painted
         .scene()
+        .to_scene()
         .items()
         .iter()
         .filter_map(|item| match item {

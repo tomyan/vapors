@@ -1,40 +1,103 @@
-//! Platform app: routes input, advances simulation, paints world and compiled HUD.
+//! Platform app: routes input, advances simulation, and shows the compiled HUD
+//! through an `ElementsApp`, the track drawn in its `gpu-surface`.
 use crate::{
     hud::{Hud, HudProps},
     model::{Camera, Race},
 };
-use state::{Faults, Gpu, Pacing, Run};
+use state::{Faults, Pacing, Run};
 use std::{cell::RefCell, rc::Rc};
-use vapors_app::DocumentInput;
+use surface::TrackSurface;
+use vapors_app::{ElementsApp, Failure, FrameCounts, FrameTiming};
 use vapors_elements::Document;
 use vapors_platform::{App, Event, Frame, Next, Platform, report_error};
 use vapors_text::FontSystem;
 
-pub(crate) struct Racer {
+/// The racer as a platform app: the HUD's document and the track's
+/// surface, paused until Space. Public for drivers outside a window
+/// (the timing harness in `crates/perf`).
+pub struct Racer {
     pub(super) document: Rc<RefCell<Document>>,
     pub(super) hud: Hud,
-    pub(super) input: DocumentInput,
+    pub(super) app: ElementsApp,
+    pub(super) track: TrackSurface,
     pub(super) run: Run,
     pub(super) pacing: Pacing,
     pub(super) faults: Faults,
-    pub(super) gpu: Gpu,
+    /// A frame has been drawn: the document has been laid out.
+    pub(super) framed: bool,
+    /// The last `prepare`'s HUD writes noted a document change, which
+    /// it takes so they ask for no next frame.
+    // RELAXED: read only by the IU5 tests (gpu_hud_iu5_tests.rs) until
+    // the inspector reports it.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(super) hud_changed: bool,
     pub(super) inspect: bool,
 }
+impl Default for Racer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl Racer {
-    pub(crate) fn new() -> Self {
+    /// A paused racer whose HUD is mounted and not yet drawn.
+    #[must_use]
+    pub fn new() -> Self {
         let document = Rc::new(RefCell::new(Document::new(FontSystem::new())));
         let body = document.borrow().body();
         let hud = Hud::mount(&document, body, HudProps {});
+        let (app, track) = TrackSurface::mount(ElementsApp::new(Rc::clone(&document)));
         Self {
             document,
             hud,
-            input: DocumentInput::new(),
+            app,
+            track,
             run: Run::default(),
             pacing: Pacing::default(),
             faults: Faults::default(),
-            gpu: Gpu::default(),
+            framed: false,
+            hud_changed: false,
             inspect: vapors_platform::query_parameter("inspect").as_deref() == Some("1"),
         }
+    }
+    /// Where the HUD's `ElementsApp` keeps why it stopped: `run` reads
+    /// it after the loop.
+    pub(crate) fn failure(&self) -> Failure {
+        self.app.failure()
+    }
+    /// The HUD's document, for its update counts.
+    #[must_use]
+    pub fn document(&self) -> Rc<RefCell<Document>> {
+        Rc::clone(&self.document)
+    }
+    /// What the HUD's last frame handed the GPU.
+    #[must_use]
+    pub fn frame_counts(&self) -> FrameCounts {
+        self.app.frame_counts()
+    }
+    /// The HUD's frame times, its track's render included.
+    #[must_use]
+    pub fn frame_timing(&self) -> FrameTiming {
+        self.app.frame_timing()
+    }
+    /// Turns timing the HUD's frames on the GPU on or off
+    /// ([`ElementsApp::time_frames`]); off by default.
+    pub fn time_frames(&mut self, on: bool) {
+        self.app.time_frames(on);
+    }
+    /// Render passes the HUD's last frame began.
+    #[must_use]
+    pub fn render_passes(&self) -> u64 {
+        self.app.render_passes()
+    }
+    /// Why the racer stopped, its own fault or the HUD's; `None` while it runs.
+    #[must_use]
+    pub fn error(&self) -> Option<String> {
+        self.faults.error.clone().or_else(|| self.failure().get())
+    }
+    fn hud_failure(&self) -> String {
+        self.failure().get().unwrap_or_else(|| {
+            "the HUD's ElementsApp ended the loop without a failure; it exits only on one".into()
+        })
     }
     pub(super) fn fail(&mut self, error: String) {
         report_error(&error);
@@ -105,25 +168,35 @@ impl App for Racer {
         if self.faults.error.is_some() {
             return Next::Wait;
         }
-        if let Err(error) = self.draw(frame) {
+        if let Err(error) = self.prepare(frame) {
             self.fail(error);
             return Next::Wait;
         }
-        if self.run.paused && !self.run.camera.moving {
-            Next::Wait
-        } else {
-            Next::Continue
+        let next = self.app.frame(frame);
+        if next == Next::Exit {
+            // the ElementsApp failed and closed its surfaces: the racer ends
+            self.fail(self.hud_failure());
+            return Next::Exit;
         }
+        self.framed = true;
+        if let Err(error) = self.after_frame(frame.index) {
+            self.fail(error);
+            return Next::Wait;
+        }
+        next
     }
     fn drawn(&mut self, platform: &Platform) {
-        crate::text_input::mirror(&self.document, platform);
+        self.app.drawn(platform);
     }
 }
 mod drawing;
 #[cfg(test)]
 mod hud_frame_tests;
 mod input;
+#[cfg(test)]
+mod input_tests;
 mod state;
+mod surface;
 
 mod inspection;
 #[cfg(test)]

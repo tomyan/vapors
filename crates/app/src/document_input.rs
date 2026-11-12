@@ -19,14 +19,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use vapors_elements::{Cursor, Document, Point};
-use vapors_platform::{Event, Platform};
+use vapors_platform::{Event, Instant, Platform};
 
 use crate::pointer::{Action, action};
 
 /// The input state for one document.
 pub struct DocumentInput {
-    /// Where the pointer last moved, in CSS pixels.
-    pointer: Point,
+    /// Where the pointer last moved, in CSS pixels; `None` before.
+    pointer: Option<Point>,
     touch: crate::touch_scroll::TouchScroll,
     wheel: crate::wheel_scroll::WheelScroll,
     /// The cursor last reported; `None` once the host showed its own.
@@ -37,6 +37,8 @@ pub struct DocumentInput {
     /// started, answered off the loop.
     #[cfg(not(target_family = "wasm"))]
     pastes: paste::Pastes,
+    /// The tooltip armed or shown (`document_input_tooltip.rs`).
+    tooltip: crate::tooltip::TooltipState,
 }
 
 impl Default for DocumentInput {
@@ -50,13 +52,14 @@ impl DocumentInput {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            pointer: [0.0, 0.0],
+            pointer: None,
             touch: crate::touch_scroll::TouchScroll::default(),
             wheel: crate::wheel_scroll::WheelScroll::default(),
             cursor: Some(Cursor::Default),
             held: route::Held::default(),
             #[cfg(not(target_family = "wasm"))]
             pastes: paste::Pastes::default(),
+            tooltip: crate::tooltip::TooltipState::default(),
         }
     }
 
@@ -82,12 +85,14 @@ impl DocumentInput {
     /// it exactly when [`Given::route`] is [`Route::Host`] or
     /// [`Route::Both`]. A paste routed to the document is read from the
     /// clipboard here (native only; see `document_input_paste.rs`).
+    /// A move, always the document's, records the pointer
+    /// ([`DocumentInput::pointer`]), as [`DocumentInput::observe`] does.
     ///
     /// # Errors
     ///
     /// [`Unplaced`], and the event is not given, when it is a pointer
-    /// event and the document's last update gives no usable scale. A key
-    /// or typed text needs no scale and is always given.
+    /// event and the document's last update gives no usable scale, or a
+    /// key or typed text while focus is unsettled ([`Unplaced::FocusNotSettled`]).
     pub fn give(
         &mut self,
         document: &Rc<RefCell<Document>>,
@@ -98,6 +103,8 @@ impl DocumentInput {
         self.deliver_pastes(document);
         let route = self.route(document, event)?;
         if route == Route::Host {
+            let action = self.action(&document.borrow(), event)?;
+            self.tooltip_event(&document.borrow(), event, action, Instant::now());
             return Ok(Given {
                 route,
                 changed: false,
@@ -135,8 +142,9 @@ impl DocumentInput {
             self.held.keys.insert(code.clone(), Route::Both);
         }
         self.paste_if(document, event, platform);
+        self.tooltip_event(&document.borrow(), event, action, Instant::now());
         let changed = document.borrow_mut().take_changed();
-        let cursor = document.borrow().cursor(self.pointer);
+        let cursor = document.borrow().cursor(self.pointer.unwrap_or_default());
         let shown = (Some(cursor) != self.cursor).then(|| {
             self.cursor = Some(cursor);
             crate::cursor::shown(cursor)
@@ -148,26 +156,16 @@ impl DocumentInput {
         })
     }
 
-    /// The pointer action for `event` at the document's scale. The
-    /// scale is read only for an event that is a pointer action (any
-    /// scale tells which), so a key or typed text is delivered by focus
-    /// even before the first update.
+    /// The pointer action for `event` at the document's scale, read only
+    /// for a pointer action (any scale tells which), so a key or typed
+    /// text is delivered by focus even before the first update.
     fn action(&self, document: &Document, event: &Event) -> Result<Option<Action>, Unplaced> {
-        if action(event, 1.0, self.pointer).is_none() {
+        types::settled(document, event)?;
+        let at = self.pointer.unwrap_or_default();
+        if action(event, 1.0, at).is_none() {
             return Ok(None);
         }
-        Ok(action(event, scale_of(document)?, self.pointer))
-    }
-}
-
-/// The scale of `document`'s last update, refused when there is none or
-/// it is not a positive number.
-fn scale_of(document: &Document) -> Result<f32, Unplaced> {
-    let scale = document.painted().ok_or(Unplaced::NotUpdated)?.scale();
-    if scale.is_finite() && scale > 0.0 {
-        Ok(scale)
-    } else {
-        Err(Unplaced::Scale(scale))
+        Ok(action(event, scale_of(document)?, at))
     }
 }
 
@@ -205,6 +203,8 @@ impl DocumentInput {
 }
 #[path = "document_input_route.rs"]
 mod route;
+#[path = "document_input_tooltip.rs"]
+mod tooltip;
 pub use route::Route;
 #[cfg(test)]
 #[path = "document_input_click_tests.rs"]
@@ -212,6 +212,7 @@ mod click_tests;
 #[path = "document_input_types.rs"]
 mod types;
 pub(crate) use types::Handled;
+use types::scale_of;
 pub use types::{Given, Unplaced};
 
 #[cfg(test)]

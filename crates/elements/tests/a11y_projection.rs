@@ -64,6 +64,7 @@ fn node(role: &str, name: &str, properties: &[&str]) -> AxNode {
         role: role.into(),
         name: name.into(),
         value: None,
+        description: None,
         properties: properties.iter().map(|p| (*p).to_owned()).collect(),
     }
 }

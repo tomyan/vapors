@@ -75,6 +75,7 @@ fixtures![
     clicks::Clicks,
     clipping::Clipping,
     combobox::Combobox,
+    cross_drag::CrossDrag,
     flex_row::FlexRow,
     focus::Focus,
     grid_tracks::GridTracks,
@@ -98,6 +99,7 @@ fixtures![
     text::Text,
     text_align::TextAlign,
     text_wrap::TextWrap,
+    titles::Titles,
     undo::Undo,
     words::Words,
 ];

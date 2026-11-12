@@ -12,7 +12,7 @@ use vapors_text::{Icon, IconPath, IconStroke};
 use crate::arena::Arena;
 use crate::layout::{BoxRect, Content, LayoutBox};
 use crate::paint::PaintInput;
-use crate::painted::Painted;
+use crate::painting::Painting;
 use crate::svg::{positive, view_box};
 
 /// The icon `node` draws when it is an `svg`; `None` for any other
@@ -54,7 +54,7 @@ pub(crate) fn paint(
     layout_box: &LayoutBox,
     border_box: BoxRect,
     input: &PaintInput<'_>,
-    out: &mut Painted,
+    out: &mut Painting,
 ) {
     let (Some(icon), &Content::Element(node)) = (&layout_box.icon, &layout_box.content) else {
         return;
@@ -68,9 +68,8 @@ pub(crate) fn paint(
 }
 
 /// One `Item::Icon` of `icon` over `content` snapped to device pixels.
-fn push_icon(icon: &Rc<Icon>, content: BoxRect, colour: Color, scale: f32, out: &mut Painted) {
-    let id = IconId(u32::try_from(out.icons.len()).expect("fewer than 2^32 icons"));
-    out.icons.push(Rc::clone(icon));
+fn push_icon(icon: &Rc<Icon>, content: BoxRect, colour: Color, scale: f32, out: &mut Painting) {
+    let id = IconId(out.slabs.icons.insert(Rc::clone(icon)));
     let rect = crate::paint::snapped(content, scale);
     out.scene.push(Item::Icon {
         icon: id,

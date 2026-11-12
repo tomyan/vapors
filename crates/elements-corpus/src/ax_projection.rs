@@ -1,6 +1,6 @@
 //! The a11y projection the events oracle compares (5-A1's start): for
 //! each node with a role the script names, in tree order, its role, its
-//! name, its value when it has one, and the properties a control's
+//! name, its value and its description when it has them, and the properties a control's
 //! state shows: `expanded`, `controls`, `activedescendant`, `selected`,
 //! `focused`, `checked`, `disabled` and `pressed`, in the oracle's
 //! reduced shape (`ax_tree`: related nodes as role and name).
@@ -40,8 +40,8 @@ pub fn project(reduced: &Value, roles: &[String]) -> Result<Value, String> {
     Ok(Value::Array(out))
 }
 
-/// One node: role, name, value when there is one, and the kept
-/// properties, sorted.
+/// One node: role, name, value and description when it has them, and
+/// the kept properties, sorted.
 fn entry(node: &Value, role: &str) -> Value {
     let properties: Vec<&str> = node["properties"]
         .as_array()
@@ -57,8 +57,10 @@ fn entry(node: &Value, role: &str) -> Value {
         })
         .collect();
     let mut entry = json!({ "role": role, "name": node["name"].as_str().unwrap_or(""), "properties": properties });
-    if let Some(value) = node["value"].as_str() {
-        entry["value"] = json!(value);
+    for key in ["value", "description"] {
+        if let Some(text) = node[key].as_str() {
+            entry[key] = json!(text);
+        }
     }
     entry
 }

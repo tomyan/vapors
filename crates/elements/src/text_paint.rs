@@ -9,9 +9,9 @@
 
 use vapors_scene::{Color, Item, Quad};
 
-use crate::layout::{BoxRect, Content, LayoutBox};
+use crate::layout::{BoxRect, LayoutBox};
 use crate::paint::{PaintInput, snapped};
-use crate::painted::Painted;
+use crate::painting::Painting;
 
 /// The selection's colour: the focus ring's blue at a third.
 const SELECTION: Color = Color {
@@ -29,9 +29,9 @@ pub(crate) fn paint(
     rects: &[BoxRect],
     index: usize,
     input: &PaintInput<'_>,
-    out: &mut Painted,
+    out: &mut Painting,
 ) {
-    let Content::Element(node) = boxes[index].content else {
+    let Some(node) = boxes[index].element_in(index) else {
         return;
     };
     if !boxes[index].text_field {
@@ -59,7 +59,7 @@ pub(crate) fn paint(
 }
 
 /// A mark `[x, y, width, height]` from the text's origin, as a quad.
-fn push(out: &mut Painted, origin: BoxRect, mark: [f32; 4], color: Color, scale: f32) {
+fn push(out: &mut Painting, origin: BoxRect, mark: [f32; 4], color: Color, scale: f32) {
     let rect = BoxRect {
         x: origin.x + mark[0],
         y: origin.y + mark[1],
@@ -75,7 +75,7 @@ fn push(out: &mut Painted, origin: BoxRect, mark: [f32; 4], color: Color, scale:
 
 /// Where the field's text starts: its text child's box, else its
 /// content box.
-fn text_origin(boxes: &[LayoutBox], rects: &[BoxRect], index: usize) -> BoxRect {
+pub(crate) fn text_origin(boxes: &[LayoutBox], rects: &[BoxRect], index: usize) -> BoxRect {
     boxes[index].children.first().map_or_else(
         || crate::clip::content_box(&boxes[index], rects[index]),
         |child| rects[*child],

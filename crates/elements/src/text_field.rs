@@ -156,6 +156,7 @@ impl Document {
                 .insert("value".to_owned(), PropertyValue::Text(text));
         }
         self.note_change();
+        self.boxes.marks.mark(node);
         true
     }
 

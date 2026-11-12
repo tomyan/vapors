@@ -4,7 +4,9 @@
 
 use vapors_scene::{Color, Quad};
 
-use crate::instanced::{Instanced, Target, float_bytes};
+use crate::GpuWork;
+use crate::Target;
+use crate::instanced::{Instanced, float_bytes};
 
 /// A pipeline that draws quads. Create once per target format.
 pub struct QuadPipeline(Instanced);
@@ -23,10 +25,21 @@ impl QuadPipeline {
     }
 
     /// Draw `quads` into `target`, later quads over earlier ones, in one
-    /// submit. Nothing is submitted for an empty slice.
+    /// draw call. Nothing is recorded for an empty slice.
     pub fn draw(&mut self, target: &Target<'_>, quads: &[Quad]) {
         let bytes = float_bytes(quads.iter().flat_map(instance));
         self.0.draw(target, &bytes);
+    }
+
+    /// The bind groups kept: one once this pipeline has drawn.
+    #[must_use]
+    pub fn bind_groups_kept(&self) -> u64 {
+        self.0.bind_groups_kept()
+    }
+
+    /// The work its draws issued since the last take; the count restarts.
+    pub fn take_work(&self) -> GpuWork {
+        self.0.work.take()
     }
 }
 

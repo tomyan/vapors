@@ -5,7 +5,7 @@
 //! rounded clip); on a `path`, a colour, `display` or visibility of its
 //! own, since all of an icon's paths are drawn in its svg's.
 
-use std::collections::HashMap;
+use crate::node_map::NodeMap;
 
 use vapors_dom::NodeId;
 
@@ -13,7 +13,7 @@ use crate::arena::Arena;
 use crate::style::Used;
 
 /// Why `node`'s used style is refused, when it is an `svg` or `path`.
-pub(crate) fn reasons(arena: &Arena, node: NodeId, used: &HashMap<NodeId, Used>) -> Vec<String> {
+pub(crate) fn reasons(arena: &Arena, node: NodeId, used: &NodeMap<Used>) -> Vec<String> {
     let Some(own) = used.get(&node) else {
         return Vec::new();
     };

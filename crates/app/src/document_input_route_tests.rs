@@ -213,7 +213,7 @@ fn keys_and_typed_text_follow_the_documents_focus() {
     Document::focus(&card.doc, Some(card.button));
     let focused = [input.route(&card.doc, &tab), input.route(&card.doc, &typed)];
 
-    // Then
-    assert_eq!(unfocused, [Ok(Route::Host); 2]);
+    // Then: Tab with nothing focused is both, to focus the first control
+    assert_eq!(unfocused, [Ok(Route::Both), Ok(Route::Host)]);
     assert_eq!(focused, [Ok(Route::Document); 2]);
 }

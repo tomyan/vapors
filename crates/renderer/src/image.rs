@@ -1,12 +1,15 @@
 //! Drawing a texture into a viewport under a [`Transform`]: the canvas
 //! surface for an image, with nearest sampling, so at any zoom the pixel
 //! under a viewport point is exactly one image pixel. And stretched over
-//! a rect inside the target's scissor, sampled smoothly: an `img`.
+//! a rect inside the target's scissor, sampled smoothly: an `img`, bound
+//! once ([`TextureBinding`]) and drawn each frame through that binding.
 
 use vapors_scene::{Rect, Size, Transform};
 
-use crate::Target;
+use crate::frame_arena::FrameArena;
+use crate::image_binding::{Sampling, TextureBinding};
 use crate::image_setup::{bind_group_layout, render_pipeline};
+use crate::{ArenaFull, FrameEncoder, GpuWork, Target, WorkCounter};
 
 use crate::quad::{VERTEX_COUNT, VERTEX_SIZE, quad_vertices, vertex_bytes};
 
@@ -19,7 +22,8 @@ pub struct ImagePipeline {
     nearest: wgpu::Sampler,
     /// Linear sampling, for an `img` stretched over its box.
     smooth: wgpu::Sampler,
-    vertices: wgpu::Buffer,
+    vertices: FrameArena,
+    work: WorkCounter,
 }
 
 impl ImagePipeline {
@@ -58,104 +62,128 @@ impl ImagePipeline {
                 wgpu::MipmapFilterMode::Linear,
             ),
         );
-        let vertices = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("image quad"),
-            size: VERTEX_SIZE * u64::from(VERTEX_COUNT),
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let vertices = FrameArena::new(
+            device,
+            "image quad",
+            wgpu::BufferUsages::VERTEX,
+            VERTEX_SIZE,
+        );
         Self {
             pipeline,
             layout,
             nearest,
             smooth,
             vertices,
+            work: WorkCounter::default(),
         }
     }
 
     /// Draw `texture` into `target` (of size `viewport`) placed by `transform`.
-    /// Pixels outside the image keep whatever was in the target.
+    /// Pixels outside the image keep whatever was in the target. Submits
+    /// its own encoder: the canvas draws one image a frame.
+    ///
+    /// # Errors
+    ///
+    /// [`ArenaFull`] when the image's vertices do not fit a buffer of the
+    /// device's `max_buffer_size`; nothing is drawn then.
     pub fn draw(
-        &self,
+        &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         target: &wgpu::TextureView,
         viewport: Size,
         texture: &wgpu::Texture,
         transform: Transform,
-    ) {
+    ) -> Result<(), ArenaFull> {
         let image = Size {
             width: texture.width(),
             height: texture.height(),
         };
+        let encoder = FrameEncoder::new(device);
         let at = Target {
             device,
             queue,
+            encoder: &encoder,
             view: target,
             viewport,
             scissor: None,
         };
-        self.quad(&at, texture, transform.image_bounds(image), &self.nearest);
+        let bound = self.bind(device, texture, Sampling::Nearest);
+        self.quad(&at, &bound, transform.image_bounds(image));
+        encoder.submit(queue)
     }
 
-    /// Draw `texture` stretched over `rect` (device pixels) in `target`,
-    /// sampled smoothly, inside the target's scissor: how an `img` is
-    /// drawn.
-    pub fn draw_rect(&self, target: &Target<'_>, texture: &wgpu::Texture, rect: Rect) {
-        let bounds = [[rect.left, rect.top], [rect.right, rect.bottom]];
-        self.quad(target, texture, bounds, &self.smooth);
-    }
-
-    fn quad(
+    /// Binds `texture` for drawing, sampled as `sampling`: one view and
+    /// one bind group, counted. Keep the binding beside the texture for
+    /// as long as it is drawn, and drop it with the texture.
+    #[must_use]
+    pub fn bind(
         &self,
-        target: &Target<'_>,
+        device: &wgpu::Device,
         texture: &wgpu::Texture,
-        bounds: [[f32; 2]; 2],
-        sampler: &wgpu::Sampler,
-    ) {
-        let quad = quad_vertices(bounds, target.viewport);
-        target
-            .queue
-            .write_buffer(&self.vertices, 0, &vertex_bytes(&quad));
-        let bind_group = self.bind_group(target.device, texture, sampler);
-        let mut encoder = target
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("image"),
-            });
-        {
-            let mut pass = crate::quads_setup::load_pass(&mut encoder, target.view);
-            if let Some(s) = target.scissor {
-                pass.set_scissor_rect(s.x, s.y, s.width, s.height);
-            }
+        sampling: Sampling,
+    ) -> TextureBinding {
+        let _binding = tracing::trace_span!("draw step", phase = "encode").entered();
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let sampler = match sampling {
+            Sampling::Nearest => &self.nearest,
+            Sampling::Smooth => &self.smooth,
+        };
+        let bind_group = self.bind_group(device, &view, sampler);
+        TextureBinding::new(texture.clone(), bind_group)
+    }
+
+    /// Draw `bound`'s texture stretched over `rect` (device pixels) in
+    /// `target`, inside the target's scissor: how an `img` is drawn.
+    pub fn draw_rect(&mut self, target: &Target<'_>, bound: &TextureBinding, rect: Rect) {
+        let bounds = [[rect.left, rect.top], [rect.right, rect.bottom]];
+        self.quad(target, bound, bounds);
+    }
+
+    /// The work its draws issued since the last take; the count restarts.
+    pub fn take_work(&self) -> GpuWork {
+        self.work.take()
+    }
+
+    fn quad(&mut self, target: &Target<'_>, bound: &TextureBinding, bounds: [[f32; 2]; 2]) {
+        let quad = vertex_bytes(&quad_vertices(bounds, target.viewport));
+        let Some(vertices) = self
+            .vertices
+            .push(target.encoder, target.queue, &self.work, &quad)
+        else {
+            return;
+        };
+        let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
+        target.draw_pass(|pass| {
             pass.set_pipeline(&self.pipeline);
-            pass.set_bind_group(0, &bind_group, &[]);
-            pass.set_vertex_buffer(0, self.vertices.slice(..));
-            pass.draw(0..VERTEX_COUNT, 0..1);
-        }
-        target.queue.submit([encoder.finish()]);
+            pass.set_bind_group(0, bound.bind_group(), &[]);
+            pass.set_vertex_buffer(0, vertices.slice());
+            self.work.draw(pass, 0..VERTEX_COUNT, 0..1);
+        });
     }
 
     fn bind_group(
         &self,
         device: &wgpu::Device,
-        texture: &wgpu::Texture,
+        view: &wgpu::TextureView,
         sampler: &wgpu::Sampler,
     ) -> wgpu::BindGroup {
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("image"),
-            layout: &self.layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(sampler),
-                },
-            ],
-        })
+        self.work.create_bind_group(
+            device,
+            &wgpu::BindGroupDescriptor {
+                label: Some("image"),
+                layout: &self.layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(sampler),
+                    },
+                ],
+            },
+        )
     }
 }

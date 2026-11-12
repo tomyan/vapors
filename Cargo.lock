@@ -306,6 +306,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
+name = "c-enum"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd17eb909a8c6a894926bfcc3400a4bb0e732f5a57d37b1f14e8b29e329bace8"
+
+[[package]]
 name = "calloop"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -702,9 +708,9 @@ checksum = "1d674e81391d1e1ab681a28d99df07927c6d4aa5b027d7da16ba32d1d21ecd99"
 
 [[package]]
 name = "flate2"
-version = "1.1.10"
+version = "1.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e634e2e0ebac1ee034020da1ca582e17ffe4e0f5e985823721e168928136dcb"
+checksum = "626d4928326b646e70f65ed36fc7cf9f206bdb68a0019ee7c6b4709da4e084c4"
 dependencies = [
  "crc32fast",
  "miniz_oxide 0.9.1",
@@ -849,6 +855,12 @@ dependencies = [
  "log",
  "xml-rs",
 ]
+
+[[package]]
+name = "glam"
+version = "0.34.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "627003914c6057c9c8f0832ee4f870b5a4f599d0cfa83f4072675114860cd0ff"
 
 [[package]]
 name = "glow"
@@ -1332,9 +1344,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.34"
+version = "0.4.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
+checksum = "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
 
 [[package]]
 name = "memchr"
@@ -1349,6 +1361,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b0ca1155a9ecc25aa12e8313a119f32edf0255fea2f44839c4ac0a12b2ac157"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "memoffset"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
+dependencies = [
+ "autocfg",
 ]
 
 [[package]]
@@ -1401,7 +1422,7 @@ dependencies = [
  "naga-types",
  "num-traits",
  "once_cell",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "spirv",
  "thiserror 2.0.21",
  "unicode-ident",
@@ -1415,7 +1436,7 @@ checksum = "590afbf58a6f4f62873cd5cff4468061844bafa1cdf399cc954537c22d768d49"
 dependencies = [
  "hashbrown 0.17.1",
  "indexmap",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "thiserror 2.0.21",
 ]
 
@@ -1924,6 +1945,41 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
+name = "perf-event-data"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "575828d9d7d205188048eb1508560607a03d21eafdbba47b8cade1736c1c28e1"
+dependencies = [
+ "bitflags 2.13.2",
+ "c-enum",
+ "perf-event-open-sys2",
+]
+
+[[package]]
+name = "perf-event-open-sys2"
+version = "5.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9c25955321465255e437600b54296983fab1feac2cd0c38958adeb26dbae49e"
+dependencies = [
+ "libc",
+ "memoffset",
+]
+
+[[package]]
+name = "perf-event2"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0939b8fad77dfaeb29ebbd35faaeaadbf833167f30975f1b8993bbba09ea0a0f"
+dependencies = [
+ "bitflags 2.13.2",
+ "c-enum",
+ "libc",
+ "memmap2",
+ "perf-event-data",
+ "perf-event-open-sys2",
+]
+
+[[package]]
 name = "petgraph"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2244,6 +2300,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 
 [[package]]
+name = "rustc-hash"
+version = "2.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b1e7f9a428571be2dc5bc0505c13fb6bf936822b894ec87abf8a08a4e51742d"
+
+[[package]]
 name = "rustc_version"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2321,6 +2383,12 @@ name = "semver"
 version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
+
+[[package]]
+name = "send_wrapper"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd0b0ec5f1c1ca621c432a25813d8d60c88abe6d3e08a3eb9cf37d97a0fe3d73"
 
 [[package]]
 name = "serde"
@@ -2792,8 +2860,10 @@ name = "vapors-app"
 version = "0.0.0"
 dependencies = [
  "png",
+ "send_wrapper",
  "tracing",
  "vapors-canvas",
+ "vapors-css",
  "vapors-demos",
  "vapors-dom",
  "vapors-elements",
@@ -2803,6 +2873,7 @@ dependencies = [
  "vapors-renderer",
  "vapors-scene",
  "vapors-text",
+ "wasm-bindgen-futures",
  "wgpu",
 ]
 
@@ -2891,9 +2962,11 @@ dependencies = [
 name = "vapors-elements"
 version = "0.0.0"
 dependencies = [
+ "rustc-hash 2.1.3",
  "serde",
  "serde_json",
  "taffy",
+ "tracing",
  "vapors-compiler-examples",
  "vapors-css",
  "vapors-dom",
@@ -2942,6 +3015,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "vapors-perf"
+version = "0.0.0"
+dependencies = [
+ "perf-event2",
+ "pollster 1.0.1",
+ "tracing",
+ "vapors-app",
+ "vapors-dom",
+ "vapors-elements",
+ "vapors-gpu-harness",
+ "vapors-platform",
+ "vapors-racer",
+ "vapors-renderer",
+ "vapors-scene",
+ "vapors-text",
+ "wgpu",
+]
+
+[[package]]
 name = "vapors-pixels"
 version = "0.0.0"
 dependencies = [
@@ -2981,6 +3073,7 @@ dependencies = [
  "vapors-components",
  "vapors-dom",
  "vapors-elements",
+ "vapors-gpu-harness",
  "vapors-platform",
  "vapors-renderer",
  "vapors-scene",
@@ -2993,6 +3086,8 @@ dependencies = [
 name = "vapors-renderer"
 version = "0.0.0"
 dependencies = [
+ "pollster 1.0.1",
+ "tracing",
  "vapors-gpu-harness",
  "vapors-scene",
  "wgpu",
@@ -3001,6 +3096,23 @@ dependencies = [
 [[package]]
 name = "vapors-scene"
 version = "0.0.0"
+
+[[package]]
+name = "vapors-scene3d"
+version = "0.0.0"
+dependencies = [
+ "glam",
+]
+
+[[package]]
+name = "vapors-scene3d-gpu"
+version = "0.0.0"
+dependencies = [
+ "vapors-app",
+ "vapors-gpu-harness",
+ "vapors-scene3d",
+ "wgpu",
+]
 
 [[package]]
 name = "vapors-signals"
@@ -3017,6 +3129,7 @@ dependencies = [
  "png",
  "skrifa",
  "tempfile",
+ "tracing",
  "vapors-gpu-harness",
  "vapors-renderer",
  "vapors-scene",
@@ -3308,7 +3421,7 @@ dependencies = [
  "portable-atomic",
  "profiling",
  "raw-window-handle",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "smallvec",
  "thiserror 2.0.21",
  "wgpu-core-deps-apple",

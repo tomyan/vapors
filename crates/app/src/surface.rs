@@ -51,6 +51,12 @@ pub struct SurfaceFrame<'a> {
     pub view: &'a wgpu::TextureView,
     /// The backing size.
     pub size: SurfaceSize,
+    /// Issue buffer and texture writes and draws through this to have
+    /// them counted: the painter adds what it counted to
+    /// [`FrameCounts::surfaces`](crate::FrameCounts::surfaces) for the
+    /// frame. Work issued on `queue` or `encoder` directly is not
+    /// counted.
+    pub work: &'a vapors_renderer::WorkCounter,
 }
 
 /// An application's renderer for one `gpu-surface`, mounted on the

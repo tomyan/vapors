@@ -2,12 +2,12 @@
 //! into (`painter_surface_texture.rs`), and whether the next paint must
 //! render it.
 
-use vapors_renderer::Target;
+use vapors_renderer::{ImagePipeline, Target, TextureBinding, WorkCounter};
 
 use super::super::SurfaceState;
 use super::super::errors::Refusal;
-use super::scope::Scopes;
-use super::texture::Backing;
+use super::scope::{Scopes, Turn};
+use super::texture::{Backing, fits};
 use crate::surface::{SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
 
 /// A renderer and its state on the painter.
@@ -28,7 +28,7 @@ pub(super) struct Mounted {
     /// What the current frame did with it.
     seen: Seen,
     /// The GPU errors of its calls not yet seen.
-    scopes: Scopes,
+    pub(super) scopes: Scopes,
 }
 
 /// What a frame did with a mounted surface.
@@ -69,8 +69,7 @@ impl Mounted {
     }
 
     pub(super) fn wants_frame(&self) -> bool {
-        self.fresh
-            || (self.backing.is_some() && (self.stale || self.animating || self.scopes.waiting()))
+        self.fresh || (self.backing.is_some() && (self.stale || self.animating))
     }
 
     pub(super) fn state(&self, name: &str) -> SurfaceState {
@@ -80,7 +79,7 @@ impl Mounted {
             stale: self.stale,
             animating: self.animating,
             backing: self.backing.is_some(),
-            waiting: self.scopes.waiting(),
+            waiting: self.scopes.waiting().is_some(),
         }
     }
 
@@ -88,27 +87,34 @@ impl Mounted {
         self.seen = Seen::Unseen;
     }
 
-    pub(super) fn end_frame(&mut self) {
+    /// Ends the frame at `now`, settling its scopes even if unpainted:
+    /// one left out of frames still gives up at its deadline.
+    pub(super) fn end_frame(&mut self, now: vapors_platform::Instant) {
+        self.scopes.settle(now);
         self.fresh = false;
         if self.seen != Seen::Painted {
             self.backing = None;
         }
     }
 
-    /// The backing at `size`, rendered if it needs to be.
+    /// The backing at `size`, bound for `pipeline`, rendered if it
+    /// needs to be.
     pub(super) fn prepare(
         &mut self,
         target: &Target<'_>,
+        pipeline: &ImagePipeline,
         size: SurfaceSize,
-    ) -> Result<&wgpu::Texture, Refusal> {
-        self.claim(target.device, size)?;
+        turn: Turn<'_>,
+        work: &WorkCounter,
+    ) -> Result<&TextureBinding, Refusal> {
+        self.claim(target.device, size, turn)?;
         self.seen = Seen::Painted;
-        self.start(target.device)?;
-        self.allocate(target.device, size)?;
+        self.start(target.device, turn)?;
+        self.allocate(target.device, pipeline, size, turn)?;
         if self.stale || self.animating {
-            self.render(target)?;
+            self.render(target, turn, work)?;
         }
-        Ok(&self.backing.as_ref().expect("allocated above").texture)
+        Ok(&self.backing.as_ref().expect("allocated above").bound)
     }
 
     /// Claims the surface's name for the frame at `size`: refused when
@@ -118,42 +124,56 @@ impl Mounted {
         &mut self,
         device: &wgpu::Device,
         size: SurfaceSize,
+        turn: Turn<'_>,
     ) -> Result<(), Refusal> {
         if std::mem::replace(&mut self.seen, Seen::Claimed) != Seen::Unseen {
             return Err(Refusal::DuplicateName);
         }
-        self.scopes.check()?;
+        self.scopes.check(turn.now)?;
         fits(device, size)
     }
 
-    fn start(&mut self, device: &wgpu::Device) -> Result<(), Refusal> {
+    fn start(&mut self, device: &wgpu::Device, turn: Turn<'_>) -> Result<(), Refusal> {
         if !self.started {
             let renderer = &mut self.renderer;
-            self.scopes.run(device, || renderer.mount(device))?;
+            self.scopes.run(device, turn, || renderer.mount(device))?;
             self.started = true;
         }
         Ok(())
     }
 
     /// A new backing when there is none at `size`; it needs a render.
-    fn allocate(&mut self, device: &wgpu::Device, size: SurfaceSize) -> Result<(), Refusal> {
+    fn allocate(
+        &mut self,
+        device: &wgpu::Device,
+        pipeline: &ImagePipeline,
+        size: SurfaceSize,
+        turn: Turn<'_>,
+    ) -> Result<(), Refusal> {
         if self.backing.as_ref().is_some_and(|held| held.size == size) {
             return Ok(());
         }
-        let backing = Backing::new(device, size);
+        let backing = Backing::new(device, pipeline, size);
         let renderer = &mut self.renderer;
-        self.scopes.run(device, || renderer.resize(device, size))?;
+        self.scopes
+            .run(device, turn, || renderer.resize(device, size))?;
         self.backing = Some(backing);
         self.stale = true;
         Ok(())
     }
 
-    /// Renders into the backing and submits it.
-    fn render(&mut self, target: &Target<'_>) -> Result<(), Refusal> {
+    /// Renders into the backing, counting through `work`, and submits it.
+    fn render(
+        &mut self,
+        target: &Target<'_>,
+        turn: Turn<'_>,
+        work: &WorkCounter,
+    ) -> Result<(), Refusal> {
         let backing = self.backing.as_ref().expect("allocated before rendering");
         let renderer = &mut self.renderer;
-        self.scopes
-            .run(target.device, || render_into(renderer, target, backing))?;
+        self.scopes.run(target.device, turn, || {
+            render_into(renderer, target, backing, work)
+        })?;
         self.stale = false;
         Ok(())
     }
@@ -168,25 +188,25 @@ fn render_into(
     renderer: &mut Box<dyn SurfaceRenderer>,
     target: &Target<'_>,
     backing: &Backing,
+    work: &WorkCounter,
 ) -> Result<(), SurfaceError> {
     let mut encoder = target.device.create_command_encoder(&ENCODER);
-    renderer.render(SurfaceFrame {
-        device: target.device,
-        queue: target.queue,
-        encoder: &mut encoder,
-        view: &backing.view,
-        size: backing.size,
-    })?;
-    target.queue.submit([encoder.finish()]);
-    Ok(())
-}
-
-/// Refuses a backing larger than the device's largest 2D texture.
-fn fits(device: &wgpu::Device, size: SurfaceSize) -> Result<(), Refusal> {
-    let limit = device.limits().max_texture_dimension_2d;
-    if size.width > limit || size.height > limit {
-        return Err(Refusal::TooLarge { size, limit });
-    }
+    // a timed frame's pair around the renderer's passes (GpuTimer)
+    target
+        .encoder
+        .time_section(&mut encoder, &backing.view, |encoder| {
+            renderer.render(SurfaceFrame {
+                device: target.device,
+                queue: target.queue,
+                encoder,
+                view: &backing.view,
+                size: backing.size,
+                work,
+            })
+        })?;
+    let commands = encoder.finish();
+    let _submit = tracing::trace_span!("draw step", phase = "submit").entered();
+    target.encoder.submit_section(target.queue, commands);
     Ok(())
 }
 
