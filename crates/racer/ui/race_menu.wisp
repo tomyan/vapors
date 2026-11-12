@@ -1,5 +1,5 @@
 <script>
-#[prop] let layout: Memo<String> = Memo::new(|| String::from("wide"));
+#[prop] let short: Signal<bool> = Signal::new(false);
 #[prop] let action: Signal<String> = Signal::new(String::new());
 #[prop] let paused: Signal<bool> = Signal::new(true);
 let pause_label: Memo<String> = Memo::new(move || if paused.get() { "Drive".into() } else { "Pause".into() });
@@ -14,7 +14,7 @@ let tune = move || action.set(String::from("tune"));
 .short .menu { right: 8px; bottom: 84px; gap: 6px; }
 </style>
 
-<div class={layout.get()}>
+<div class:short={short.get()}>
     <div class="menu">
         <button data-action="tune" onclick={tune}>Tune</button>
         <button data-action="restart" onclick={restart}>Restart</button>

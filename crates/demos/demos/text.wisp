@@ -1,10 +1,6 @@
 <script>
 let taps: Signal<i32> = Signal::new(0);
 let tap = move || taps.update(|n| *n += 1);
-let word: Memo<String> = Memo::new(move || {
-    let state = if taps.get() > 0 { "tapped" } else { "waiting" };
-    format!("tap {state}")
-});
 </script>
 
 <style>
@@ -36,5 +32,5 @@ code { font-family: "Geist Mono", monospace; background-color: #dbe4ff; }
 
 <div class="page">
   <h2>Inline text</h2>
-  <p>A paragraph with <strong>strong</strong>, <em>emphasis</em> and <code>code</code> in it, wrapping over the end of its line. <span class={word.get()} onclick={tap}>Tap this</span>, tapped {taps} times.</p>
+  <p>A paragraph with <strong>strong</strong>, <em>emphasis</em> and <code>code</code> in it, wrapping over the end of its line. <span class="tap" class:tapped={taps.get() > 0} onclick={tap}>Tap this</span>, tapped {taps} times.</p>
 </div>
