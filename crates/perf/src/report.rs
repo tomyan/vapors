@@ -138,7 +138,7 @@ fn counts(counts: &Counts) -> String {
 }
 
 /// Where the last frame's restyled elements took their styles from.
-pub(crate) fn style_counts(u: &vapors_elements::UpdateCounts) -> String {
+fn style_counts(u: &vapors_elements::UpdateCounts) -> String {
     format!(
         "Styles (last frame): shared {}, computed {}, unkeyed {}, unshareable {}; live {}.",
         u.styles_shared, u.styles_computed, u.styles_unkeyed, u.styles_unshareable, u.styles_live
