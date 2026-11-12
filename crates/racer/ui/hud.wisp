@@ -18,7 +18,7 @@ let short: Signal<bool> = Signal::new(false);
 let compact: Signal<bool> = Signal::new(false);
 let steering: Signal<f64> = Signal::new(1.0);
 let grip: Signal<f64> = Signal::new(1.0);
-let size_class: Memo<String> = Memo::new(move || if short.get() { "small short".into() } else if compact.get() { "small".into() } else { "wide".into() });
+let small: Memo<bool> = Memo::new(move || short.get() || compact.get());
 
 let left: Signal<bool> = Signal::new(false);
 let right: Signal<bool> = Signal::new(false);
@@ -41,11 +41,11 @@ let enabled: Signal<bool> = Signal::new(true);
 </style>
 
 <gpu-surface name="track" class="track"></gpu-surface>
-<div class={size_class.get()}>
-    <RaceStats layout={size_class} speed={speed} lap={lap} clock={clock} fps={fps} />
+<div class:small={small.get()} class:short={short.get()}>
+    <RaceStats small={small} short={short} speed={speed} lap={lap} clock={clock} fps={fps} />
     {if !short.get() || paused.get()}<div class="note">{message}</div>{/if}
-    {if !settings.get()}<CameraToggle layout={size_class} follow={follow} action={action} />{/if}
-    <RaceMenu layout={size_class} paused={paused} action={action} />
-    <DrivingControls layout={size_class} left={left} right={right} brake={brake} gas={gas} reset={reset} enabled={enabled} />
-    {if settings.get()}<CarSetup layout={size_class} steering={steering} grip={grip} best={best} />{/if}
+    {if !settings.get()}<CameraToggle small={small} short={short} follow={follow} action={action} />{/if}
+    <RaceMenu short={short} paused={paused} action={action} />
+    <DrivingControls small={small} short={short} left={left} right={right} brake={brake} gas={gas} reset={reset} enabled={enabled} />
+    {if settings.get()}<CarSetup short={short} steering={steering} grip={grip} best={best} />{/if}
 </div>

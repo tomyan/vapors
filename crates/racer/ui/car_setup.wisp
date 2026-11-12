@@ -1,5 +1,5 @@
 <script>
-#[prop] let layout: Memo<String> = Memo::new(|| String::from("wide"));
+#[prop] let short: Signal<bool> = Signal::new(false);
 #[prop] let steering: Signal<f64> = Signal::new(1.0);
 #[prop] let grip: Signal<f64> = Signal::new(1.0);
 #[prop] let best: Signal<String> = Signal::new(String::new());
@@ -19,7 +19,7 @@ input[type=number] { width: 70px; color: #172b30; background-color: #f3f1e8; }
 input:invalid { border: 2px solid #ee806b; }
 </style>
 
-<div class={layout.get()}>
+<div class:short={short.get()}>
     <div class="tuning">
         <h2>Car setup</h2>
         <div>Steering</div>

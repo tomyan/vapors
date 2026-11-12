@@ -236,13 +236,12 @@ For each `{for}` block, over the row template (the block's children,
 both branches of each `{if}`, and the bodies of nested `{for}`s):
 
 - Elements: each element's tag; its literal `class` and `id`; and for
-  each expression-valued `class`, `id` or other attribute, "unknown".
+  each expression-valued `id` or other attribute, "unknown". An element's
+  classes are known: the literal `class` names plus each `class:name`
+  directive's name (`class={expr}` is refused).
   States: every element can take every state pseudo-class (`:hover`,
   `:focus`, `:focus-visible`, `:focus-within`, `:active`, `:checked`,
-  `:disabled`, `:enabled`, `:invalid`). Today `class={expr}` is a
-  Rust string, so its classes are unknown; when classes come from
-  enums (`docs/briefs/NATIVE_SVG_BRIEF.md`, "One analysis") the set
-  becomes known and more rows are marked.
+  `:disabled`, `:enabled`, `:invalid`).
 - Sheets: the user-agent sheet (`elements/src/style/ua.css`) and the
   component's own `<style>`, as the runtime parses them
   (`vapors_css::parse`). A component compiled with `Styles::Global`,
