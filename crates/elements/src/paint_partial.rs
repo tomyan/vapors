@@ -91,6 +91,9 @@ fn drawn_updated(
             let slots = patched[..with_hits].iter().copied();
             HitsChanged::Known(hits.patch(slots, &painted.drawn, &painted.kept_boxes))
         }
+        // Only a release build reaches this arm: the debug check gathers
+        // the hits after every paint (`kept_paint_check.rs`). Unknown is
+        // the safe answer either way; a gather is one hit test's cost.
         None => HitsChanged::Unknown,
     };
     batches_patched(painted, patched);

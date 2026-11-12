@@ -82,7 +82,9 @@ pub struct UpdateCounts {
     /// Times the update hit tested the pointer's position after paint
     /// (`events_hit.rs`): 1 when a hit paint removed or added holds the
     /// pointer or is the hovered element's, or the hits were gathered
-    /// afresh; else 0, and the hover stands (M11).
+    /// afresh or not gathered since the last update; else 0, and the
+    /// hover stands, as it does while an element holds the mouse
+    /// capture (M11).
     pub hovers_tested: usize,
 }
 
