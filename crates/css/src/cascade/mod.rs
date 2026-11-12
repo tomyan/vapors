@@ -128,6 +128,11 @@ impl Cascade {
         self.candidate_rules(element).map(|r| &r.rule)
     }
 
+    /// Every rule of every sheet, in cascade order.
+    pub fn rules(&self) -> impl Iterator<Item = &Rule> {
+        self.rules.iter().map(|r| &r.rule)
+    }
+
     pub(crate) fn candidate_rules<E: Element>(
         &self,
         element: &E,

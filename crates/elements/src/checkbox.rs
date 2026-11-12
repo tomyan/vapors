@@ -95,9 +95,9 @@ pub(crate) fn after_click(
     was: bool,
     prevented: bool,
 ) {
-    if !document.borrow().contains(target) {
+    let Some(target) = document.borrow().still_in(target) else {
         return;
-    }
+    };
     if prevented {
         document.borrow_mut().set_checked(target, was);
         return;

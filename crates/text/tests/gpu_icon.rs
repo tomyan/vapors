@@ -34,7 +34,7 @@ fn half_covered_line() -> Icon {
 
 fn render(icon: &Icon, colour: Color) -> Vec<u8> {
     let gpu = gpu();
-    let mut atlas = GlyphAtlas::new(AtlasConfig { page_size: 64 });
+    let mut atlas = GlyphAtlas::new(AtlasConfig::fixed(64));
     let target = clear(&gpu.device, &gpu.queue, SIDE, SIDE, WHITE);
     let mut pipeline = TextPipeline::new(&gpu.device, target.format(), &atlas);
     let view = target.create_view(&wgpu::TextureViewDescriptor::default());

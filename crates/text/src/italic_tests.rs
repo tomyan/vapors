@@ -98,7 +98,7 @@ fn top_left_ink(coverage: &crate::raster::Coverage) -> i32 {
 fn a_slanted_glyph_is_its_own_atlas_entry() {
     // Given
     let font = FontData::new(Blob::new(Arc::new(GEIST)), 0);
-    let mut atlas = GlyphAtlas::new(AtlasConfig { page_size: 128 });
+    let mut atlas = GlyphAtlas::new(AtlasConfig::fixed(128));
 
     // When
     atlas.get(&request(&font, 0.0)).expect("ok");

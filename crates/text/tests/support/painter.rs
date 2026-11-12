@@ -42,8 +42,12 @@ pub struct Drawn {
 
 impl Painter {
     pub fn new(page_size: u32) -> Self {
+        Self::with_atlas(AtlasConfig::fixed(page_size))
+    }
+
+    pub fn with_atlas(config: AtlasConfig) -> Self {
         let gpu = gpu();
-        let atlas = GlyphAtlas::new(AtlasConfig { page_size });
+        let atlas = GlyphAtlas::new(config);
         let pipeline = TextPipeline::new(&gpu.device, wgpu::TextureFormat::Rgba8Unorm, &atlas);
         Self {
             gpu,

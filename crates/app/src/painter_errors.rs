@@ -6,7 +6,7 @@ use std::fmt;
 
 use vapors_elements::CanvasFrom;
 use vapors_renderer::ArenaFull;
-use vapors_text::AtlasError;
+use vapors_text::{AtlasError, AtlasSizeError};
 
 use crate::surface::SurfaceError;
 
@@ -32,6 +32,38 @@ impl fmt::Display for UnsupportedFormat {
 }
 
 impl std::error::Error for UnsupportedFormat {}
+
+/// Why a [`ScenePainter`](super::ScenePainter) could not be made.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NewPainterError {
+    /// The target format would draw wrong colours.
+    Format(UnsupportedFormat),
+    /// The device cannot hold the glyph atlas's pages.
+    Atlas(AtlasSizeError),
+}
+
+impl From<UnsupportedFormat> for NewPainterError {
+    fn from(error: UnsupportedFormat) -> Self {
+        Self::Format(error)
+    }
+}
+
+impl From<AtlasSizeError> for NewPainterError {
+    fn from(error: AtlasSizeError) -> Self {
+        Self::Atlas(error)
+    }
+}
+
+impl fmt::Display for NewPainterError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Format(error) => error.fmt(f),
+            Self::Atlas(error) => write!(f, "ScenePainter's glyph atlas: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for NewPainterError {}
 
 /// Why [`ScenePainter::draw_over`](super::ScenePainter::draw_over) drew
 /// nothing or an incomplete frame.

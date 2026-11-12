@@ -1,11 +1,13 @@
 //! Drawing a texture into a viewport under a [`Transform`]: the canvas
 //! surface for an image, with nearest sampling, so at any zoom the pixel
 //! under a viewport point is exactly one image pixel. And stretched over
-//! a rect inside the target's scissor, sampled smoothly: an `img`.
+//! a rect inside the target's scissor, sampled smoothly: an `img`, bound
+//! once ([`TextureBinding`]) and drawn each frame through that binding.
 
 use vapors_scene::{Rect, Size, Transform};
 
 use crate::frame_arena::FrameArena;
+use crate::image_binding::{Sampling, TextureBinding};
 use crate::image_setup::{bind_group_layout, render_pipeline};
 use crate::{ArenaFull, FrameEncoder, GpuWork, Target, WorkCounter};
 
@@ -106,18 +108,36 @@ impl ImagePipeline {
             viewport,
             scissor: None,
         };
-        let nearest = self.nearest.clone();
-        self.quad(&at, texture, transform.image_bounds(image), &nearest);
+        let bound = self.bind(device, texture, Sampling::Nearest);
+        self.quad(&at, &bound, transform.image_bounds(image));
         encoder.submit(queue)
     }
 
-    /// Draw `texture` stretched over `rect` (device pixels) in `target`,
-    /// sampled smoothly, inside the target's scissor: how an `img` is
-    /// drawn.
-    pub fn draw_rect(&mut self, target: &Target<'_>, texture: &wgpu::Texture, rect: Rect) {
+    /// Binds `texture` for drawing, sampled as `sampling`: one view and
+    /// one bind group, counted. Keep the binding beside the texture for
+    /// as long as it is drawn, and drop it with the texture.
+    #[must_use]
+    pub fn bind(
+        &self,
+        device: &wgpu::Device,
+        texture: &wgpu::Texture,
+        sampling: Sampling,
+    ) -> TextureBinding {
+        let _binding = tracing::trace_span!("draw step", phase = "encode").entered();
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let sampler = match sampling {
+            Sampling::Nearest => &self.nearest,
+            Sampling::Smooth => &self.smooth,
+        };
+        let bind_group = self.bind_group(device, &view, sampler);
+        TextureBinding::new(texture.clone(), bind_group)
+    }
+
+    /// Draw `bound`'s texture stretched over `rect` (device pixels) in
+    /// `target`, inside the target's scissor: how an `img` is drawn.
+    pub fn draw_rect(&mut self, target: &Target<'_>, bound: &TextureBinding, rect: Rect) {
         let bounds = [[rect.left, rect.top], [rect.right, rect.bottom]];
-        let smooth = self.smooth.clone();
-        self.quad(target, texture, bounds, &smooth);
+        self.quad(target, bound, bounds);
     }
 
     /// The work its draws issued since the last take; the count restarts.
@@ -125,13 +145,7 @@ impl ImagePipeline {
         self.work.take()
     }
 
-    fn quad(
-        &mut self,
-        target: &Target<'_>,
-        texture: &wgpu::Texture,
-        bounds: [[f32; 2]; 2],
-        sampler: &wgpu::Sampler,
-    ) {
+    fn quad(&mut self, target: &Target<'_>, bound: &TextureBinding, bounds: [[f32; 2]; 2]) {
         let quad = vertex_bytes(&quad_vertices(bounds, target.viewport));
         let Some(vertices) = self
             .vertices
@@ -140,10 +154,9 @@ impl ImagePipeline {
             return;
         };
         let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
-        let bind_group = self.bind_group(target.device, texture, sampler);
         target.draw_pass(|pass| {
             pass.set_pipeline(&self.pipeline);
-            pass.set_bind_group(0, &bind_group, &[]);
+            pass.set_bind_group(0, bound.bind_group(), &[]);
             pass.set_vertex_buffer(0, vertices.slice());
             self.work.draw(pass, 0..VERTEX_COUNT, 0..1);
         });
@@ -152,23 +165,25 @@ impl ImagePipeline {
     fn bind_group(
         &self,
         device: &wgpu::Device,
-        texture: &wgpu::Texture,
+        view: &wgpu::TextureView,
         sampler: &wgpu::Sampler,
     ) -> wgpu::BindGroup {
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("image"),
-            layout: &self.layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(sampler),
-                },
-            ],
-        })
+        self.work.create_bind_group(
+            device,
+            &wgpu::BindGroupDescriptor {
+                label: Some("image"),
+                layout: &self.layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(sampler),
+                    },
+                ],
+            },
+        )
     }
 }

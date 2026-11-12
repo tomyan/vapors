@@ -5,7 +5,7 @@
 //! is refused. `draw` still clears to the canvas colour first, and a
 //! target format the shaders do not write correctly is refused.
 
-use vapors_app::{DrawOverError, ScenePainter, UnsupportedFormat};
+use vapors_app::{DrawOverError, NewPainterError, ScenePainter, UnsupportedFormat};
 use vapors_dom::Dom;
 use vapors_elements::{CanvasFrom, Document, Viewport};
 use vapors_gpu_harness::{gpu, read_rgba8};
@@ -177,7 +177,10 @@ fn gpu_a_target_format_the_shaders_do_not_write_correctly_is_refused_naming_it()
         wgpu::TextureFormat::Rgba16Float,
     ] {
         let refused = ScenePainter::new(&gpu.device, format).err();
-        assert_eq!(refused, Some(UnsupportedFormat(format)));
+        assert_eq!(
+            refused,
+            Some(NewPainterError::Format(UnsupportedFormat(format)))
+        );
     }
     assert!(ScenePainter::new(&gpu.device, wgpu::TextureFormat::Bgra8Unorm).is_ok());
 }

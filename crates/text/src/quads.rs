@@ -26,9 +26,10 @@ pub(crate) fn quads(
     texts: &[TextDraw<'_>],
     viewport: Size,
 ) -> Result<Vec<f32>, AtlasError> {
-    let page = atlas.coverage_page().size();
     let glyphs = || texts.iter().flat_map(|text| glyphs_of(*text));
     let placed = placed_all(glyphs, |(_, request)| atlas.get(request))?;
+    // read after placing: placing may grow the page
+    let page = atlas.coverage_page().size();
     let mut floats = Vec::new();
     for ((at, _), placed) in glyphs().zip(&placed) {
         if !placed.is_empty() {

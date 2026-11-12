@@ -63,10 +63,10 @@ fn a_freed_elements_entries_are_removed() {
     doc.remove(second);
     updated(&mut doc);
 
-    // Then: body and the first block rebuilt, the second freed
+    // Then: body rebuilt, the first block kept, the second freed
     assert_eq!(painted(&doc).border_box(second), None);
     assert_eq!(painted(&doc).padding_origin(second), None);
-    assert_eq!(doc.update_counts().map_entries_patched, 3);
+    assert_eq!(doc.update_counts().map_entries_patched, 2);
 }
 
 #[test]

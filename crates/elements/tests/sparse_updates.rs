@@ -64,7 +64,8 @@ const EXPECTED: [(usize, usize, usize); 6] = [
 /// items built, map
 /// entries patched (the elements built again or moved), paint order
 /// and scroll chain walks (none: no edit changes the tree's shape),
-/// clips redone (the boxes built again or moved). A row is
+/// clips redone (the boxes built again or moved), stackings made (the
+/// boxes built again). A row is
 /// 4 elements and 7 boxes (3 text runs) and draws 4 items (the button's
 /// quad and 3 texts), 5 with the focus outline, 6 with the outline and
 /// the marked row's background; `html` and `body` add 2
@@ -73,44 +74,47 @@ const EXPECTED: [(usize, usize, usize); 6] = [
 /// built or moved, keeping the rest in place (`kept_box.rs`): the longer label
 /// moves the 4 boxes after it in its row. The second table in
 /// docs/plans/iu1.md is these numbers.
-const EXPECTED_WALKS: [(usize, [[usize; 10]; 6]); 2] = [
+const EXPECTED_WALKS: [(usize, [[usize; 11]; 6]); 2] = [
     (
         100,
         [
-            [1, 2, 109, 2, 0, 1, 1, 0, 0, 2],
-            [1, 2, 111, 6, 0, 4, 3, 0, 0, 6],
-            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-            [4, 2, 1, 2, 0, 2, 1, 0, 0, 2],
-            [1, 2, 1, 2, 0, 3, 1, 0, 0, 2],
-            [4, 7, 1, 7, 0, 5, 4, 0, 0, 7],
+            [1, 2, 109, 2, 0, 1, 1, 0, 0, 2, 2],
+            [1, 2, 111, 6, 0, 4, 3, 0, 0, 6, 2],
+            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+            [4, 2, 1, 2, 0, 2, 1, 0, 0, 2, 2],
+            [1, 2, 1, 2, 0, 3, 1, 0, 0, 2, 2],
+            [4, 7, 1, 7, 0, 5, 4, 0, 0, 7, 7],
         ],
     ),
     (
         1000,
         [
-            [1, 2, 1009, 2, 0, 1, 1, 0, 0, 2],
-            [1, 2, 1011, 6, 0, 4, 3, 0, 0, 6],
-            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-            [4, 2, 1, 2, 0, 2, 1, 0, 0, 2],
-            [1, 2, 1, 2, 0, 3, 1, 0, 0, 2],
-            [4, 7, 1, 7, 0, 5, 4, 0, 0, 7],
+            [1, 2, 1009, 2, 0, 1, 1, 0, 0, 2, 2],
+            [1, 2, 1011, 6, 0, 4, 3, 0, 0, 6, 2],
+            [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+            [4, 2, 1, 2, 0, 2, 1, 0, 0, 2, 2],
+            [1, 2, 1, 2, 0, 3, 1, 0, 0, 2, 2],
+            [4, 7, 1, 7, 0, 5, 4, 0, 0, 7, 7],
         ],
     ),
 ];
 
 fn run(rows: usize, check: Check) {
-    let page = rows_page(rows);
+    run_on(&rows_page(rows), rows, check);
+}
+
+fn run_on(page: &RowsPage, rows: usize, check: Check) {
     for (index, (edit, expected)) in EDITS.into_iter().zip(EXPECTED).enumerate() {
-        let work = edited(&page, edit);
+        let work = edited(page, edit);
         eprintln!("{rows:>5} rows  {edit:<16?} {work:?}");
         assert_counts(rows, edit, &work, expected);
         assert_walk(rows, index, edit, &work);
         if check == Check::EachEdit {
-            assert_oracle(&page, rows, &format!("{edit:?}"));
+            assert_oracle(page, rows, &format!("{edit:?}"));
         }
     }
     if check == Check::AfterSequence {
-        assert_oracle(&page, rows, &format!("{EDITS:?}"));
+        assert_oracle(page, rows, &format!("{EDITS:?}"));
     }
 }
 
@@ -150,6 +154,7 @@ fn assert_walk(rows: usize, index: usize, edit: Edit, work: &Work) {
         c.order_walks,
         c.chain_walks,
         c.clips_redone,
+        c.stackings_computed,
     ];
     assert_eq!(
         actual, walks[index],
@@ -167,7 +172,14 @@ fn a_hundred_rows_update_sparsely_and_match_a_full_update() {
 
 #[test]
 fn a_thousand_rows_update_sparsely_and_match_a_full_update() {
-    run(1000, Check::EachEdit);
+    let page = rows_page(1000);
+    // The debug layout check is skipped here: this test's oracle
+    // compares the same layout with a full update after each edit, and
+    // with both the test took 44 s of its 60 s limit (17.6 s without).
+    // Retire this when the check is cheaper, or when the oracle runs in
+    // a tier of its own.
+    page.doc.borrow_mut().skip_layout_check();
+    run_on(&page, 1000, Check::EachEdit);
 }
 
 /// The baseline run: `VAPORS_SPARSE_ROWS=3000 cargo nextest run ...`.

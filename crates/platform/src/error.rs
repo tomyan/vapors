@@ -19,6 +19,9 @@ pub enum PlatformError {
     Picker(String),
     /// The device was lost; the sentence names wgpu's reason and the fix.
     DeviceLost(String),
+    /// A GPU call failed with no error scope to catch it; the sentence
+    /// names wgpu's error and the fix.
+    UncapturedGpuError(String),
 }
 
 impl fmt::Display for PlatformError {
@@ -34,7 +37,9 @@ impl fmt::Display for PlatformError {
             Self::Device(message) => write!(f, "device: {message}"),
             Self::Surface(message) => write!(f, "surface: {message}"),
             Self::Picker(message) => write!(f, "picker: {message}"),
-            Self::DeviceLost(sentence) => write!(f, "{sentence}"),
+            Self::DeviceLost(sentence) | Self::UncapturedGpuError(sentence) => {
+                write!(f, "{sentence}")
+            }
         }
     }
 }

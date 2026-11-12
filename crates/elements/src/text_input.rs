@@ -154,7 +154,9 @@ pub(crate) fn moved(
 /// Commits `node`'s text: `change` when it differs from the last
 /// committed.
 pub(crate) fn commit(document: &Rc<RefCell<Document>>, node: NodeId) {
-    if !document.borrow().is_text_input(node) {
+    // a listener of an earlier commit or event may have removed `node`
+    let still = document.borrow().still_in(node);
+    if !still.is_some_and(|node| document.borrow().is_text_input(node)) {
         return;
     }
     let changed = {

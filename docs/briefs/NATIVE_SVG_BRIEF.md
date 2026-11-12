@@ -195,12 +195,12 @@ not a slice yet.
     source changes. Run-time change is tracked, never refused.
   There is no third state: vapors does not support a source whose effect
   cannot be determined at build time (Tom, 2026-11-10). Classes are bound
-  from enums, never strings, so every class an element can take is known.
-  A custom property set from Rust (`set_property`, as touche sets
-  `--bar-height`) reaches exactly the properties whose `var()` reads it,
-  provided its name is known at build time; the analysis slice makes the
-  API take only such names, and any other way in that it finds is closed
-  the same way, so no source of change is unknown.
+  from enums or toggled by booleans (`class:name={bool}`), never strings,
+  so every class an element can take is known. A custom property changes
+  only through a template binding whose property name is literal, so the
+  compiler knows which `var()` reads it; vapors has no API that sets one
+  by name at run time, and any way in the analysis cannot see is refused
+  (Tom, 2026-11-11; docs/decisions/2026-11-11-analysable-sources.md).
   Run-time input such as text length, viewport size and image sizes sets
   sizes and positions; it does not change which primitive a thing is.
 - **Retained layout and paint use the same analysis to skip work.** IU3
