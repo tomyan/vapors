@@ -13,6 +13,7 @@ pub mod focus_page;
 pub mod hidden_page;
 pub mod number_page;
 pub mod oracle;
+pub mod oracle_difference;
 pub mod pointer;
 pub mod random_css;
 pub mod range_page;
