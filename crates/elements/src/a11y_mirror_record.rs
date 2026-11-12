@@ -1,16 +1,17 @@
 //! One node as the mirror's record (R6): what `ax_tree` says of it
 //! (role, name, value, description, states, bounds), its range and
 //! focusability, and its parent in the tree: the nearest node shown
-//! above it, carried down a document-order pass ([`AboveMemo`]); a node
-//! under an `aria-hidden` ancestor is not in the tree. Read from the last update,
+//! above it, found by walking up for one node, or carried down a
+//! document-order pass for every node ([`AboveMemo`]); a node under an
+//! `aria-hidden` ancestor is not in the tree. Read from the last update,
 //! as `ax_tree` is.
 
 use vapors_dom::NodeId;
 
 use crate::a11y_error::AxError;
 use crate::a11y_mirror::{AxMirrorNode, AxRange};
+use crate::a11y_mirror_index::AxIndex;
 use crate::a11y_mirror_roles::unexposable;
-use crate::a11y_mirror_state::AxIndex;
 use crate::a11y_tree::finite;
 use crate::document::Document;
 use crate::layout::BoxRect;
@@ -52,6 +53,38 @@ impl AboveMemo {
 }
 
 impl Document {
+    /// `node` as a record, when it is in the tree now: what is above it
+    /// found by walking up, for one node of a take.
+    ///
+    /// # Errors
+    /// [`AxError::Unexposable`]; [`AxError::NotFinite`].
+    pub(crate) fn ax_record(
+        &self,
+        node: NodeId,
+        index: &AxIndex,
+    ) -> Result<Option<AxMirrorNode>, AxError> {
+        if !self.contains(node) {
+            return Ok(None);
+        }
+        self.ax_record_under(node, index, self.ax_above(node, index))
+    }
+
+    /// The nearest shown ancestor of `node`, unless an ancestor hides it.
+    fn ax_above(&self, node: NodeId, index: &AxIndex) -> Above {
+        let mut parent = None;
+        let mut cursor = self.parent(node);
+        while let Some(ancestor) = cursor {
+            if self.attribute(ancestor, "aria-hidden") == Some("true") {
+                return Above::Hidden;
+            }
+            if parent.is_none() && self.ax_in_tree(ancestor, index).is_some() {
+                parent = Some(ancestor);
+            }
+            cursor = self.parent(ancestor);
+        }
+        Above::Under(parent)
+    }
+
     /// `node` as a record, given what is above it.
     pub(crate) fn ax_record_under(
         &self,
