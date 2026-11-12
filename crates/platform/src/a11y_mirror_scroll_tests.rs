@@ -249,20 +249,23 @@ fn a_scroll_container_under_a_moved_node_is_scrolled_again() {
     mirror.apply(&mut dom, &first).expect("applies");
     assert_eq!(dom.elements[2].scroll, [0.0, ROW_HEIGHT]);
 
-    // When: the toolbar goes after the status
+    // When: a region arrives holding the toolbar
+    let mut toolbar = node(1, None, "toolbar", "Tools");
+    toolbar.parent = Some(vapors_a11y::NodeId(4));
     let update = AxUpdate {
         every: true,
         nodes: vec![
-            node(3, None, "status", "Ready"),
-            node(1, None, "toolbar", "Tools"),
+            node(4, None, "region", "Page"),
+            toolbar,
             list,
+            node(3, None, "status", "Ready"),
         ],
         ..AxUpdate::default()
     };
     mirror.apply(&mut dom, &update).expect("applies");
 
-    // Then: the toolbar moved (one move), and the list in it is
+    // Then: the toolbar moved under the region, and the list in it is
     // scrolled again
-    assert_eq!(dom.elements[0].children, [3, 1]);
+    assert_eq!(dom.elements[4].children, [1]);
     assert_eq!(dom.elements[2].scroll, [0.0, ROW_HEIGHT]);
 }
