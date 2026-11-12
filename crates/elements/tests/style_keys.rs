@@ -1,7 +1,6 @@
 //! A keyed element in the document: its attributes come from its
 //! `StyleKey`, its `class:` directives toggle through `toggle_classes`
-//! and restyle it, and the attributes the key fixes are refused to
-//! `set_attribute`, naming the template site.
+//! and restyle it. What it refuses: `style_key_refusals.rs`.
 
 mod support;
 
@@ -96,33 +95,6 @@ fn toggling_to_the_same_state_restyles_nothing() {
 
     // Then
     assert_eq!(doc.elements_restyled(), 0);
-}
-
-#[test]
-#[should_panic(
-    expected = "`class` on <div> at crates/perf/ui/mount_row.wisp:14 is set from its template; toggle a class with `class:name={bool}` there"
-)]
-fn setting_class_on_a_keyed_element_is_refused_naming_the_directive() {
-    let (mut doc, row) = row_page();
-    doc.set_attribute(row, "class", "other");
-}
-
-#[test]
-#[should_panic(
-    expected = "`style` on <div> at crates/perf/ui/mount_row.wisp:14 is set from its template; write it there"
-)]
-fn setting_style_on_a_keyed_element_is_refused() {
-    let (mut doc, row) = row_page();
-    doc.set_attribute(row, "style", "width: 10px");
-}
-
-#[test]
-#[should_panic(
-    expected = "`class:dim` is not a directive of <div> at crates/perf/ui/mount_row.wisp:14"
-)]
-fn toggling_a_name_the_key_does_not_list_is_refused() {
-    let (mut doc, row) = row_page();
-    doc.toggle_classes(row, &[("dim", true)]);
 }
 
 #[test]

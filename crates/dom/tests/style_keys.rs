@@ -1,7 +1,7 @@
 //! A template element's `StyleKey`: `create_keyed_element` sets the
-//! element's scope attribute, `class` and `style` from it,
-//! `toggle_classes` turns its `class:` directives on and off, and the
-//! attributes the key fixes are refused to `set_attribute`.
+//! element's scope attribute, `class` and `style` from it, and
+//! `toggle_classes` turns its `class:` directives on and off. What it
+//! refuses: `style_key_refusals.rs`.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -117,44 +117,6 @@ fn toggling_off_removes_the_name_and_leaves_the_literal_names() {
 }
 
 #[test]
-#[should_panic(
-    expected = "`class` on <div> at crates/perf/ui/mount_row.wisp:14 is set from its template; toggle a class with `class:name={bool}` there"
-)]
-fn setting_class_on_a_keyed_element_is_refused_naming_the_directive() {
-    let dom = dom();
-    let div = dom.borrow_mut().create_keyed_element(&ROW);
-    dom.borrow_mut().set_attribute(div, "class", "other");
-}
-
-#[test]
-#[should_panic(expected = "`data-wisp` on <span> at src/plain.wisp:3 is set from its template")]
-fn setting_the_scope_attribute_on_a_keyed_element_is_refused() {
-    let dom = dom();
-    let span = dom.borrow_mut().create_keyed_element(&PLAIN);
-    dom.borrow_mut().set_attribute(span, SCOPE_ATTRIBUTE, "x");
-}
-
-#[test]
-#[should_panic(
-    expected = "`class:dim` is not a directive of <div> at crates/perf/ui/mount_row.wisp:14, whose directives are `marked`, `wide`; add `class:dim={bool}` there"
-)]
-fn toggling_a_name_the_key_does_not_list_is_refused() {
-    let dom = dom();
-    let div = dom.borrow_mut().create_keyed_element(&ROW);
-    dom.borrow_mut().toggle_classes(div, &[("dim", true)]);
-}
-
-#[test]
-#[should_panic(
-    expected = "was not created by create_keyed_element, so it has no `class:` directives"
-)]
-fn toggling_on_an_unkeyed_element_is_refused() {
-    let dom = dom();
-    let div = dom.borrow_mut().create_element("div");
-    dom.borrow_mut().toggle_classes(div, &[("marked", true)]);
-}
-
-#[test]
 fn other_attributes_of_a_keyed_element_may_be_set() {
     // Given
     let dom = dom();
@@ -168,4 +130,20 @@ fn other_attributes_of_a_keyed_element_may_be_set() {
         dom.borrow().attribute(div, "title").as_deref(),
         Some("a row")
     );
+}
+
+static ROW_AGAIN: StyleKey = StyleKey {
+    site: "crates/perf/ui/mount_row.wisp:14",
+    scope: Some("vapors-perf/ui/mount_row.wisp"),
+    tag: "div",
+    classes: &["row"],
+    toggles: &["marked", "wide"],
+    style: Some("height: 24px"),
+};
+
+#[test]
+fn keys_compare_by_address_so_equal_content_is_two_keys() {
+    // Then
+    assert_eq!(&ROW, &ROW);
+    assert_ne!(&ROW, &ROW_AGAIN);
 }
