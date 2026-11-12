@@ -33,6 +33,8 @@ pub enum StoreError {
     /// A world matrix asked for before [`crate::Scene::update`] ran on
     /// the node's latest transform.
     WorldPending(NodeId),
+    /// A mesh's setter called on a group or camera.
+    NotMesh(NodeId),
 }
 
 impl fmt::Display for StoreError {
@@ -60,6 +62,10 @@ impl fmt::Display for StoreError {
             Self::WorldPending(id) => write!(
                 f,
                 "{id}'s world matrix is out of date: call Scene::update after changing transforms"
+            ),
+            Self::NotMesh(id) => write!(
+                f,
+                "{id} is not a mesh, so Scene::set_colour cannot colour it: pass a mesh node's id"
             ),
         }
     }
