@@ -63,9 +63,15 @@ impl UncapturedErrors {
         self.0.get()
     }
 
-    /// Keep the first error: a later one may be its consequence.
+    /// Keep the first error: a later one may be its consequence. A
+    /// later one is logged as a warning, so it is not lost.
     pub fn record(&self, error: Uncaptured) {
-        self.0.record(error);
+        let (kind, message) = (error.kind, error.message.clone());
+        if !self.0.record(error) {
+            log::warn!(
+                "a later uncaptured GPU error, not the one that stops the loop ({kind}: {message})"
+            );
+        }
     }
 }
 

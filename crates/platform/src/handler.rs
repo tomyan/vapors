@@ -8,10 +8,10 @@ use winit::window::Window;
 
 use crate::PlatformError;
 use crate::event::Event;
+use crate::hidden_window::{MissAction, RETRY_AFTER, after_miss};
 use crate::input::Input;
 use crate::platform::Platform;
 use crate::surface::Gpu;
-use crate::hidden_window::{MissAction, RETRY_AFTER, after_miss};
 use crate::surface_texture::acquire;
 use crate::tasks;
 use crate::window::{App, Frame, Next, WindowOptions};
