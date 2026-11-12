@@ -112,10 +112,10 @@ fn gpu_an_image_registered_again_gets_a_new_bind_group_and_draws_its_pixels() {
     let rgba = rig.draw(&doc).expect("draws");
     let replaced = rig.painter.frame_counts();
 
-    // Then: one binding, for the new texture, and the old one gone
+    // Then: the new pixels drawn; one binding, for the new texture, and the old one gone
+    assert_eq!(pixel(&rgba, 1, 1), BLUE);
     assert_eq!(idle.images.bind_groups_made, 0);
     assert_eq!(replaced.images.bind_groups_made, 1);
-    assert_eq!(pixel(&rgba, 1, 1), BLUE);
     assert_eq!((idle.bind_groups_kept, replaced.bind_groups_kept), (1, 1));
 }
 

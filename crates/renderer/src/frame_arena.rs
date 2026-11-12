@@ -74,14 +74,6 @@ impl FrameArena {
         }
     }
 
-    /// An arena for uniforms: draws start at the device's uniform
-    /// offset alignment.
-    #[must_use]
-    pub fn uniforms(device: &wgpu::Device, label: &'static str) -> Self {
-        let align = device.limits().min_uniform_buffer_offset_alignment;
-        Self::new(device, label, wgpu::BufferUsages::UNIFORM, u64::from(align))
-    }
-
     /// Writes `bytes` (a multiple of 4 long) for a draw recorded into
     /// `frame`, counting them in `work`. `None` when they would need a
     /// buffer over the device's `max_buffer_size`: the refusal is kept

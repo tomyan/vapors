@@ -98,3 +98,27 @@ fn gpu_each_draw_in_a_frame_reads_its_own_viewport() {
     assert_eq!(pixel(&large, 8, 3, 3), RED);
     assert_eq!(pixel(&large, 8, 4, 4), BACKGROUND);
 }
+
+#[test]
+fn gpu_a_draw_after_the_buffer_grows_reads_its_viewport_from_the_new_buffer() {
+    // Given: one more size than the first buffer holds
+    let gpu = gpu();
+    let mut pipeline = QuadPipeline::new(&gpu.device, wgpu::TextureFormat::Rgba8Unorm);
+    let encoder = FrameEncoder::new(&gpu.device);
+    let squares: Vec<_> = (1..=FIRST_SLOTS + 1)
+        .map(|side| (side, square(&gpu, side)))
+        .collect();
+
+    // When: a quad over each square's top-left pixel
+    for (side, (_, view)) in &squares {
+        let target = target(&gpu, &encoder, view, *side);
+        pipeline.draw(&target, &[quad([0.0, 0.0, 1.0, 1.0], RED)]);
+    }
+    encoder.submit(&gpu.queue).expect("no draw refused");
+
+    // Then: the last quad, drawn after the move, covers one pixel of its square
+    let (side, (last, _)) = squares.last().expect("one square per size");
+    let rgba = read_rgba8(&gpu.device, &gpu.queue, last);
+    assert_eq!(pixel(&rgba, *side, 0, 0), RED);
+    assert_eq!(pixel(&rgba, *side, 1, 1), BACKGROUND);
+}
