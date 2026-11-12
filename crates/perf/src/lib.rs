@@ -7,6 +7,8 @@
 //! baseline in docs/perf.
 
 pub mod args;
+pub mod circuit;
+pub mod driver;
 pub mod gpu_reading;
 pub mod gpu_time;
 pub mod instruction_samples;

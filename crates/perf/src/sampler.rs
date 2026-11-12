@@ -15,7 +15,7 @@ use crate::run::{Samples, Settings, Workload};
 use crate::spans::PhaseClock;
 
 /// The interval between frames' times, as a 60 Hz display's.
-const INTERVAL: Duration = Duration::from_millis(16);
+pub const INTERVAL: Duration = Duration::from_millis(16);
 
 /// How long the GPU may take to finish a frame. The slowest frame here
 /// (the racer on lavapipe) is under a second; ten is far beyond it.
