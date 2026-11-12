@@ -1,6 +1,7 @@
 //! The harness's command line: `[runs] [warmup]`, 200 and 20 by default,
-//! with `--only <substring>` and `--instructions`.
+//! with `--only <substring>`, `--instructions` and `--scaling <change>`.
 
+use crate::rows::RowChange;
 use crate::run::Settings;
 
 /// The most timed frames: the GPU clock writes two timestamps a frame
@@ -8,7 +9,8 @@ use crate::run::Settings;
 pub const MAX_RUNS: usize = (wgpu::QUERY_SET_MAX_QUERIES / 2) as usize;
 
 const USAGE: &str = "cargo run --release -p vapors-perf -- \
-                     [runs] [warmup] [--only <substring> (once)] [--instructions]";
+                     [runs] [warmup] [--only <substring> (once)] [--instructions] \
+                     [--scaling Idle|Text|Class|HoveredClass|Insert]";
 
 /// What the command line asks for.
 #[derive(Debug)]
@@ -19,6 +21,9 @@ pub struct Options {
     pub only: Option<String>,
     /// Report instructions retired per phase instead of times.
     pub instructions: bool,
+    /// Run this change at each size of `scaling::SIZES`, count its
+    /// instructions and judge their growth.
+    pub scaling: Option<RowChange>,
 }
 
 /// The options `args` name, without the program's name.
@@ -28,22 +33,68 @@ pub struct Options {
 /// count, runs outside 1 to [`MAX_RUNS`], or a third count; each names
 /// the usage.
 pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String> {
-    let (mut counts, mut only, mut instructions) = (Vec::new(), None, false);
+    let mut flags = Flags::default();
     while let Some(arg) = args.next() {
-        match arg.as_str() {
-            "--only" if only.is_some() => return Err(format!("--only given twice: {USAGE}")),
-            "--only" => only = Some(only_value(args.next())?),
-            "--instructions" => instructions = true,
-            flag if flag.starts_with("--") => return Err(format!("unknown flag {flag}: {USAGE}")),
-            _ => counts.push(arg),
-        }
+        flags.take(arg, &mut args)?;
     }
-    let settings = settings(counts.into_iter())?;
-    Ok(Options {
-        settings,
+    let Flags {
+        counts,
         only,
         instructions,
+        scaling,
+    } = flags;
+    refuse_scaling_with_others(scaling.is_some(), only.is_some(), instructions)?;
+    Ok(Options {
+        settings: settings(counts.into_iter())?,
+        only,
+        instructions,
+        scaling,
     })
+}
+
+#[derive(Default)]
+struct Flags {
+    counts: Vec<String>,
+    only: Option<String>,
+    instructions: bool,
+    scaling: Option<RowChange>,
+}
+
+impl Flags {
+    /// Records `arg`, taking its value from `rest` when it has one.
+    fn take(&mut self, arg: String, rest: &mut impl Iterator<Item = String>) -> Result<(), String> {
+        match arg.as_str() {
+            "--only" if self.only.is_some() => return Err(format!("--only given twice: {USAGE}")),
+            "--only" => self.only = Some(only_value(rest.next())?),
+            "--instructions" => self.instructions = true,
+            "--scaling" if self.scaling.is_some() => {
+                return Err(format!("--scaling given twice: {USAGE}"));
+            }
+            "--scaling" => self.scaling = Some(scaling_change(rest.next())?),
+            flag if flag.starts_with("--") => return Err(format!("unknown flag {flag}: {USAGE}")),
+            _ => self.counts.push(arg),
+        }
+        Ok(())
+    }
+}
+
+/// `--scaling` always counts instructions, over a fixed set of sizes and
+/// workloads, so `--only` and `--instructions` have nothing to select or add.
+fn refuse_scaling_with_others(scaling: bool, only: bool, instructions: bool) -> Result<(), String> {
+    if scaling && only {
+        return Err(format!("--scaling and --only cannot be combined: {USAGE}"));
+    }
+    if scaling && instructions {
+        return Err(format!(
+            "--scaling and --instructions cannot be combined (--scaling always counts instructions): {USAGE}"
+        ));
+    }
+    Ok(())
+}
+
+fn scaling_change(value: Option<String>) -> Result<RowChange, String> {
+    let name = value.ok_or_else(|| format!("--scaling needs a change: {USAGE}"))?;
+    RowChange::named(&name).ok_or_else(|| format!("--scaling {name} is not a change: {USAGE}"))
 }
 
 fn only_value(value: Option<String>) -> Result<String, String> {
