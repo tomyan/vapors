@@ -105,10 +105,32 @@ asking each row for its layout again. This holds for a row under a
 block parent, the `sparse_updates` page; under a flex or grid parent the
 owner's replayed size query comes back without baselines or overflow, so
 the comparison almost always reads `Differs` and the ancestors are laid
-out again. The layout phase's remaining growth (about 55 instructions
-per row at 1000 to 10000 rows) is unlocated; `KeptBoxes::rebuild`'s lend
-walk, `stackings`, `ChangedSlots::of` and `painted_from` run inside its
-span and walk every box.
+out again. The layout phase's growth after M10 (about 55 instructions
+per row at 1000 to 10000 rows) was the placement walk
+(`placement_walk.rs`): a visited box scanned its every child, and
+`visit` returned at once for each unmarked one, so the body's rows were
+scanned on every edit. Since M10b the marks record, under each slot,
+the marked slots placed in it (`placement_marks.rs`), and a box whose
+content did not move visits those only; `visit` asserts it is never
+called for a slot it will not place. The 10 instructions per row
+outside the three phase spans were `KeptBoxes::keep` setting every
+box's `kept` flag; it now sets the built boxes' only, with a debug
+assertion that every held box is kept after. Two counts pin these in
+`sparse_updates` at 100 and 1000 rows: `slots_chained` (the in-flow
+children chained to the boxes built again or laid out before the walk,
+each such box once: 1 for an edit laid out in isolation, rows + 5 when
+the body is laid out) and `boxes_kept` (the boxes built). The walk
+clears each mark as it visits, and `place` panics on a marked slot
+left unvisited; a slot chained to the wrong parent is caught by the
+debug oracle only. With both, Text's
+`layout` is 86k and its `update` 123k instructions at 1000, 3000 and
+10,000 rows (`vapors-perf 60 10 --scaling Text`, 2026-11-12, this
+machine); Idle passes too. Class and HoveredClass still grow in `style`
+by about 2 instructions per row (850k at 1000 rows, 869k at 10,000:
+2.2%, just over the 2% tolerance), not located: too small for a sampled
+profile, and `Document::styled` has candidates that visit every element
+(`style_attribute_refusals`, `all_styled_refusals`, `touched`,
+`recheck_tree`); a span per step would settle it.
 
 ## PR 3: GPU counters
 

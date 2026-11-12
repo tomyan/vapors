@@ -4,6 +4,7 @@
 #![allow(dead_code)] // each test file uses a subset
 
 pub mod basics;
+pub mod block_page;
 pub mod changes;
 pub mod checkbox_page;
 pub mod column_page;

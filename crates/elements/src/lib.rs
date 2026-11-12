@@ -95,6 +95,7 @@ mod painted_batches;
 mod painting;
 mod placement;
 mod placement_check;
+mod placement_marks;
 mod placement_walk;
 mod range;
 mod range_drag;
