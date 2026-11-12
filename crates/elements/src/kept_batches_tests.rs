@@ -31,12 +31,8 @@ fn surface_at(top: f32) -> Item {
 /// A kept paint whose own step paints `items`, as a slot holds it.
 #[allow(clippy::unnecessary_wraps)] // a slot's type, so a slot can be set to `None` beside it
 fn part_of(items: &[Item]) -> Option<KeptBox> {
-    let rect = BoxRect {
-        x: 0.0,
-        y: 0.0,
-        width: 1.0,
-        height: 1.0,
-    };
+    #[rustfmt::skip]
+    let rect = BoxRect { x: 0.0, y: 0.0, width: 1.0, height: 1.0 };
     let from = BoxFrom {
         rect,
         clip: None,
@@ -48,12 +44,9 @@ fn part_of(items: &[Item]) -> Option<KeptBox> {
         own.scene.push(*item);
     }
     let (outline, thumb) = (Scene::new(), Scene::new());
-    Some(KeptBox {
-        from,
-        own,
-        outline,
-        thumb,
-    })
+    #[rustfmt::skip]
+    let kept = KeptBox { from, own, outline, thumb };
+    Some(kept)
 }
 
 /// Each slot's own step, in slot order.
@@ -67,6 +60,11 @@ fn kept_batches(boxes: &[Option<KeptBox>]) -> (KeptBatches, DrawnSteps) {
     let drawn = DrawnSteps::of(&steps, boxes);
     let kept = KeptBatches::of(VIEW, (&drawn, steps.len()), on_page(boxes));
     (kept, drawn)
+}
+
+/// `kept`'s batches of `boxes`, made when none are current.
+fn made(kept: &mut KeptBatches, boxes: &[Option<KeptBox>]) -> Batched {
+    kept.batches(on_page(boxes)).batched.clone()
 }
 
 /// Batching every item of `boxes` afresh.
@@ -101,8 +99,8 @@ fn the_kept_batches_hold_the_shown_steps_and_count_the_hidden_ones_culled() {
 
     // Then
     assert_eq!(kept.shown, [(0, Step::Box(0)), (2, Step::Box(2))]);
-    assert_eq!(kept.batches(on_page(&boxes)).batched, afresh(&boxes));
-    assert_eq!(kept.batches(on_page(&boxes)).batched.culled, 3);
+    assert_eq!(made(&mut kept, &boxes), afresh(&boxes));
+    assert_eq!(made(&mut kept, &boxes).culled, 3);
 }
 
 #[test]
@@ -118,7 +116,7 @@ fn a_hidden_step_painted_again_out_of_view_keeps_the_batches() {
 
     // Then
     assert!(kept.holds_batches());
-    assert_eq!(kept.batches(on_page(&boxes)).batched, afresh(&boxes));
+    assert_eq!(made(&mut kept, &boxes), afresh(&boxes));
 }
 
 #[test]
@@ -136,7 +134,7 @@ fn a_step_painted_again_into_or_out_of_view_makes_the_batches_again() {
         // Then
         assert!(!kept.holds_batches(), "{before} to {after}");
         assert_eq!(
-            kept.batches(on_page(&boxes)).batched,
+            made(&mut kept, &boxes),
             afresh(&boxes),
             "{before} to {after}"
         );
@@ -155,11 +153,7 @@ fn a_freed_slot_leaves_the_kept_steps_and_its_culled_count() {
         painted_again((&mut kept, &mut drawn), &mut boxes, (1, None));
 
         // Then
-        assert_eq!(
-            kept.batches(on_page(&boxes)).batched,
-            afresh(&boxes),
-            "at {top}"
-        );
+        assert_eq!(made(&mut kept, &boxes), afresh(&boxes), "at {top}");
     }
 }
 
@@ -173,7 +167,7 @@ fn a_surface_out_of_view_is_kept_shown_for_its_culled_batch() {
 
     // Then
     assert_eq!(kept.shown.len(), 2);
-    assert_eq!(kept.batches(on_page(&boxes)).batched, afresh(&boxes));
+    assert_eq!(made(&mut kept, &boxes), afresh(&boxes));
 }
 
 /// A document with one drawn row, updated once.
