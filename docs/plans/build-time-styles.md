@@ -242,10 +242,19 @@ on the order sheets were added.
 Each time the document's sheets change (a new `Kept`, as today), the
 runtime decides per key, once, on the key's first miss:
 
-1. **Referenced sheets present and equal:** every `(SheetId, hash)` in
-   `sheets` names a registered sheet with that hash. If one is missing
-   or differs, the key takes the runtime cascade, counted in
-   `winners_runtime`.
+1. **Referenced sheets equal:** each `(SheetId, hash)` in `sheets`
+   that names a registered sheet must match that sheet's hash. A
+   mismatch refuses the element under the update-error convention
+   (`ElementError::Refused`, as `dom_keyed.rs` does): every update
+   returns the refusal while the element is in the tree, naming the
+   key's site, the sheet, both hashes and the fix (rebuild the crate
+   that registered the sheet). It runs in every build; there is no
+   fallback path. A referenced sheet that is not registered (its
+   component has not mounted) is not a mismatch: its rules are absent
+   from the document, so the runtime cascade would not apply them
+   either, and the compiled path skips them. The key's own sheet and
+   the UA sheet are always registered before its elements exist
+   (`add_style` runs before the component builds its tree).
 2. **Other reaching sheets:** the registered sheets the key does not
    reference (another crate's sheets) whose rules are candidates for
    the key (`rules_for_key`). Their candidate rules join the key's
@@ -253,7 +262,7 @@ runtime decides per key, once, on the key's first miss:
    `winners_foreign`.
 
 On a share-table miss (`restyle_share.rs` `shared_style`), a keyed
-element whose key passed check 1 builds its winners from the `base`
+element builds its winners from the `base`
 declarations, each given its real runtime standing (rank, specificity
 and the `CascadeRule::order` of the rule it points at), and then lets
 the conditional and other-sheet rules that match the element compete,
@@ -268,6 +277,36 @@ rule blocks sharing (`unshareable`).
 On a hit nothing changes: the shared `Rc<ComputedStyle>` is taken.
 Unkeyed elements (hand-built pages, tests) take today's path.
 
+### Why a compiled winner cannot differ from the runtime's
+
+The compiled path decides less than it looks. The compiler makes two
+judgements per rule and key, and nothing else:
+
+- **never:** the rule's subject compound cannot match any element of
+  the key, so it is left out;
+- **always:** the subject compound matches every element of the key,
+  so its declarations are entered without running the matcher.
+
+Both are judged only on the key's fixed parts (tag, scope, literal
+classes, literal attributes), which the runtime refuses to change on a
+keyed element (`dom_keyed.rs`), by `vapors-css`'s own matching code
+over those parts. Everything else, including every ranking, happens
+at run time with the runtime's standing and `Candidate::beats` over
+the document's real rule order, as today. Rules whose match depends on
+anything else (directives, states, expression attributes, ancestors,
+`@media`, another sheet) are tested by the runtime matcher on the real
+element.
+
+So a compiled winner differs from the runtime's only through (i) a
+sheet whose text is not what the compiler read, which check 1 refuses
+in every build, or (ii) a defect in the never/always judgement code.
+(ii) is guarded twice: the debug oracle compares every element on
+every update, over every test and demo in `cargo xtask ci`; and
+release builds verify each key's first miss per `Kept` (below), which
+turns a defect into a refusal, never into a silently wrong render.
+
+### Loud checks
+
 ### Loud checks
 
 - **Winners oracle, debug builds only:** every element that took
@@ -275,17 +314,27 @@ Unkeyed elements (hand-built pages, tests) take today's path.
   `Winners` (longhands and custom properties) must be equal; a
   difference panics naming the key's site, the property, both
   declarations and the fix (the shape of `check_shared` in
-  `restyle_share.rs`). Release builds run no comparison: what guards
-  them is the per-sheet hash check (1), which runs in every build, and
-  the debug tiers of `cargo xtask ci`, which run the oracle over every
-  test and demo.
+  `restyle_share.rs`).
+- **First-miss verification, every build:** the first share-table miss
+  of each template key in each `Kept` also runs the full candidate scan
+  and compares. A difference refuses the element under the update-error
+  convention, naming the site, the property, both declarations and the
+  fix. Cost: one extra cascade per distinct template key per sheet
+  change, not per element: 4 on a Mount page, about 0.4 M instructions
+  (section 3's estimate of 106,000 per computed style). A defect that
+  shows only for a toggle or state combination the first miss did not
+  have is caught by the debug oracle, not by this check; the never and
+  always judgements do not read toggles or states (above), which is
+  why one combination per key exercises them.
+- **Sheet hashes, every build:** check 1.
 - **Shareability, debug builds only:** today's per-key decision runs
   as well and must agree with the key's.
 - **Counts:** `UpdateCounts` gains `winners_compiled`,
-  `winners_runtime` (check 1 failed, or the key has no winners) and
-  `winners_foreign` (keys with other-sheet rules added). The Mount
-  workload, the racer and one demo page pin `winners_runtime` 0, so a
-  sheet hash that stops matching shows.
+  `winners_runtime` (keys with no winners: hand-written keys in tests)
+  and `winners_foreign` (keys with other-sheet rules added). The Mount
+  workload, the racer and one demo page pin `winners_runtime` 0, so
+  generated code that stops emitting winners shows. The counts report;
+  the checks above are what refuse.
 - **Build failures:** a component `<style>` that `vapors-css` cannot
   parse, or that holds a `:global()` the runtime refuses, fails the
   build naming `file:line:column`, where today it fails at the first
@@ -407,7 +456,8 @@ update exactly. The mark adds:
   stacking reason (`SpliceDecline::InsertedStacked`, `FreedStacked`,
   `Restacked`) means the analysis was wrong: debug builds panic naming
   the `{for}` site and the box; release builds count
-  `splice_mark_contradicted`.
+  `splice_mark_contradicted`. Nothing renders wrong in release either
+  way: the mark decides nothing at run time, the runtime conditions do.
 - **Skipping the check for unmarked lists:** possible, but the runtime
   check is O(the row's boxes) per update and splice.md (d) already says
   property 3 does not need it. Not built in this plan.
@@ -489,7 +539,7 @@ fail, and restored, stated in the commit.
 | B0 | Compiler reads sheets | `vapors-compiler` depends on `vapors-css`; `scope.rs` scoping, its `first_global` and `first_nested_global` refusals, and the UA sheet text move into `vapors-css` (the runtime calls the moved code); the compiler parses and scopes each `<style>` and refuses what the runtime refuses, naming `file:line:column` | A malformed `<style>` and a nested `:global()` each fail `compile_dir` with the position; runtime behaviour unchanged (all tiers green); refusals proven by breaking | none |
 | B1 | Classification | Per template element: candidate rules from `rules_for_key` over the UA sheet and the crate's sheets, each classified never / always / conditional with what it depends on (other sheets' rules always conditional); per longhand and custom property: constant or known-variable winner, constant or variable value; `wisp-check --styles <file>` prints both | Table-driven tests per selector shape: tag, class, directive, `:not()` over a directive class, state, structural pseudo-classes in the subject (`:first-child`, `:root`, `:empty`: conditional), attribute literal, expression, absent from the template, and case-insensitive values (`type`), descendant, `:global`, `@media`, inline `style`, `!important` across origins, `all` and a shorthand in a conditional rule over an always longhand, `var()` fed from an always rule and from a conditional one, an equal-specificity rule from another sheet; each class of result proven by breaking | B0 |
 | B2 | Emitted winners | `StyleKey::winners` (`KeyWinners`: per-sheet identity and hash, base winners for longhands and custom properties, conditional rules); the sheet hash in one function in `vapors-css`, used by both; snapshot tests of the generated keys updated | Generated code compiles for every demo and the racer; compiler and runtime hashes equal for each demo's sheets, pinned; hash proven by breaking (a changed sheet text changes it) | B1 |
-| B3a | Runtime takes compiled winners | Checks 1 and 2 per key per `Kept`; on a miss, winners from `base` at their runtime standing plus matching conditional and other-sheet rules; the debug winners oracle over longhands and custom properties; `winners_compiled`, `winners_runtime`, `winners_foreign` | Racer and one demo page mounted in two orders give equal styles; oracle proven by breaking (a forged `base` entry panics naming the site and property); Chromium comparisons and `incremental_*` unchanged | B2, R1b |
+| B3a | Runtime takes compiled winners | Checks 1 and 2 per key per `Kept`, check 1 refusing; on a miss, winners from `base` at their runtime standing plus matching conditional and other-sheet rules; the debug winners oracle and the every-build first-miss verification over longhands and custom properties; `winners_compiled`, `winners_runtime`, `winners_foreign` | Racer and one demo page mounted in two orders give equal styles; in a release-profile test, a forged `base` entry and a sheet registered with other text under the key's scope each refuse the element naming the site (not a wrong render); the debug oracle proven by breaking; Chromium comparisons and `incremental_*` unchanged | B2, R1b |
 | B3b | Shareability from the key; the report | `shareable` from the key (false when an other-sheet rule blocks sharing), with its debug oracle; the Mount report's winners line | `winners_runtime` 0 asserted on Mount at every size, the racer and one demo page; shareability oracle proven by breaking | B3a |
 | S1 | Splice mark | Section 4: the mark per `{for}` from B1's classification and splice.md (d)'s rules, passed through `keyed(..)`, kept on the owner while no other sheet reaches the row keys with a rule that matters; the debug panic, `splice_mark_contradicted`, `splice_marks_dropped`; `wisp-check` lists unmarked lists with reasons | Mount's list marked; a list whose row holds a positioned element, one with `:nth-child`, one with an inline top-level node each unmarked with its reason; a `Styles::Global` sheet with `:global(.row) { position: relative }` drops the mark at run time without a panic; the contradiction check proven by breaking (a forged mark on a positioned row panics) | B3a; splice PR B (merged) |
 | M1 | Property 7 published | Mount run per the finish-line method in a quiet window (section 5) after U2 and B3b; `docs/perf/mount-<date>.md`; the finish-line row for property 7 | Times and instructions at 1,000, 3,000, 10,000 rows, three runs, medians, load under 1.5 recorded; table row cites the file | U2, B3b |
