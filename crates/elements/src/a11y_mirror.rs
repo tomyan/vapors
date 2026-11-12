@@ -1,9 +1,11 @@
-//! The a11y update a mirror takes (R6, `docs/plans/r6.md`): the nodes
-//! of the tree as records, each with its parent, in document order. A
-//! mirror builds itself from a take of every node by appending each
-//! record to its parent. This take is every node every time; the next
-//! slice holds only what changed since the last take (`removed`,
-//! `placed` and `focus` are its fields). A take before an update is
+//! The a11y update a mirror takes (R6, `docs/plans/r6.md`): what
+//! changed in the tree since the last take, as records of the nodes
+//! new or changed, the nodes removed, placements for the nodes new or
+//! moved, and the focused node when it moved. The first take holds
+//! every node (`every`), in document order, each with its parent; a
+//! mirror builds itself from it by appending each to its parent. After
+//! that the cost of a take follows what was touched
+//! (`a11y_mirror_state`), never the page. A take before an update is
 //! refused, as the driver's tree is.
 
 use vapors_dom::NodeId;
@@ -90,7 +92,8 @@ impl AxUpdate {
 }
 
 impl Document {
-    /// The tree for a mirror: every node, in document order.
+    /// What changed in the tree since the last take; `None` when
+    /// nothing did. The first take holds every node.
     ///
     /// # Errors
     /// [`AxError::NotUpdated`]: the document has changed since its last
@@ -101,7 +104,10 @@ impl Document {
         if self.painted.is_none() || self.changes.since_update {
             return Err(AxError::NotUpdated);
         }
-        self.ax_rebuild().map(Some)
+        if self.ax.all {
+            return self.ax_rebuild().map(Some);
+        }
+        self.ax_incremental()
     }
 
     /// Every node, in document order.

@@ -11,6 +11,8 @@ mod a11y_error;
 mod a11y_error_message;
 mod a11y_find;
 mod a11y_mirror;
+mod a11y_mirror_diff;
+mod a11y_mirror_place;
 mod a11y_mirror_record;
 mod a11y_mirror_roles;
 mod a11y_mirror_state;

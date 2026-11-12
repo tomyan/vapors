@@ -1,11 +1,11 @@
-//! The a11y update a mirror takes (R6, `docs/plans/r6.md`): every node
-//! in document order, each with its parent, a slider with its range
-//! and each node with whether it takes focus; a take before an update
-//! is refused.
+//! The a11y update a mirror takes (R6, `docs/plans/r6.md`): the first
+//! take holds every node in document order, each with its parent; after
+//! that a take holds only the nodes whose record changed since the last,
+//! and nothing when none did. A take before an update is refused.
 
 mod support;
 
-use support::mirror::{node_of, taken_page};
+use support::mirror::{labels, node_of, taken_page, updated_take};
 use support::roles_page::page;
 use vapors_dom::Dom;
 use vapors_elements::{AxError, AxRange};
@@ -78,6 +78,66 @@ fn a_slider_carries_its_range_and_a_button_its_focusability() {
     );
     assert!(!by_name("Options").focusable, "a region takes no focus");
     assert_eq!(by_name("Options").range, None);
+}
+
+#[test]
+fn a_text_change_under_a_button_emits_that_buttons_record_alone() {
+    // Given
+    let doc = taken_page();
+    let apply = node_of(&doc, "button", "Apply");
+    let label = doc.borrow().children(apply)[0];
+    doc.borrow_mut().set_text(label, "Go");
+
+    // When
+    let update = updated_take(&doc).expect("a change");
+
+    // Then
+    assert!(!update.every);
+    assert_eq!(labels(&update.nodes), ["button \"Go\""]);
+    assert_eq!(update.nodes[0].node, apply);
+    assert!(update.removed.is_empty() && update.placed.is_empty());
+    assert_eq!(update.focus, None);
+}
+
+#[test]
+fn an_aria_state_set_emits_one_record_with_the_state() {
+    // Given
+    let doc = taken_page();
+    let pin = node_of(&doc, "button", "Pin");
+    doc.borrow_mut().set_attribute(pin, "aria-pressed", "true");
+
+    // When
+    let update = updated_take(&doc).expect("a change");
+
+    // Then
+    assert_eq!(labels(&update.nodes), ["button \"Pin\""]);
+    assert_eq!(update.nodes[0].states.pressed, Some(true));
+}
+
+#[test]
+fn a_change_that_touches_nothing_a11y_emits_nothing() {
+    // Given: an attribute no role, name, state or style reads
+    let doc = taken_page();
+    let group = node_of(&doc, "group", "Tone");
+    doc.borrow_mut().set_attribute(group, "data-x", "1");
+
+    // When
+    let update = updated_take(&doc);
+
+    // Then
+    assert!(update.is_none(), "{update:?}");
+}
+
+#[test]
+fn a_take_with_nothing_changed_since_the_last_is_none() {
+    // Given
+    let doc = taken_page();
+
+    // When
+    let update = updated_take(&doc);
+
+    // Then
+    assert!(update.is_none(), "{update:?}");
 }
 
 #[test]
