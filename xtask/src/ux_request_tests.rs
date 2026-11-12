@@ -9,12 +9,11 @@ use crate::ux_run::{Frame, Viewport};
 
 const CHECKLIST: &str = "- measured smallTargets: Targets.\n- judged first-screen: First screen.\n- judged next-step: Next step.\n";
 
-fn frame_file(test: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("xtask-ux-request-{test}-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("made");
+fn frame_file(test: &str) -> (crate::scratch::Scratch, PathBuf) {
+    let dir = crate::scratch::dir(&format!("ux-request-{test}"));
     let path = dir.join("01-first-open.png");
     std::fs::write(&path, b"\x89PNG not decoded here").expect("written");
-    path
+    (dir, path)
 }
 
 fn prepared(path: PathBuf) -> Prepared {
@@ -43,7 +42,8 @@ fn ux() -> UxConfig {
 #[test]
 fn the_schema_lets_the_model_name_only_judged_items_and_sent_frames() {
     // When
-    let schema = schema(&prepared(frame_file("schema")));
+    let (_dir, frame) = frame_file("schema");
+    let schema = schema(&prepared(frame));
 
     // Then
     let judgement = &schema["properties"]["judgements"]["items"]["properties"];
@@ -60,7 +60,7 @@ fn the_schema_lets_the_model_name_only_judged_items_and_sent_frames() {
 #[test]
 fn the_body_caps_output_stores_nothing_and_attaches_each_frame() {
     // Given
-    let path = frame_file("body");
+    let (_dir, path) = frame_file("body");
     let png = std::fs::read(&path).expect("read");
 
     // When

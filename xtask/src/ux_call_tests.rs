@@ -9,12 +9,12 @@ use crate::ux_stub_tests::stand_in;
 
 const KEY: &str = "sk-test-0123456789abcdefghijklmnopqrstuv";
 
-fn files(test: &str) -> (PathBuf, PathBuf) {
-    let dir = std::env::temp_dir().join(format!("xtask-ux-call-{test}-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).expect("made");
+fn files(test: &str) -> (crate::scratch::Scratch, PathBuf, PathBuf) {
+    let dir = crate::scratch::dir(&format!("ux-call-{test}"));
     let body = dir.join("body.json");
     std::fs::write(&body, r#"{"model": "m"}"#).expect("written");
-    (body, dir.join("response.json"))
+    let response = dir.join("response.json");
+    (dir, body, response)
 }
 
 fn secret() -> Secret {
@@ -25,7 +25,7 @@ fn secret() -> Secret {
 fn the_key_is_sent_as_a_header_and_the_response_is_read() {
     // Given
     let (url, seen) = stand_in("200 OK", r#"{"status": "completed"}"#);
-    let (body, response) = files("ok");
+    let (_dir, body, response) = files("ok");
 
     // When
     let answer =
@@ -68,7 +68,7 @@ fn a_status_other_than_200_is_refused_with_the_response() {
         "429 Too Many Requests",
         r#"{"error": {"message": "slow down"}}"#,
     );
-    let (body, response) = files("429");
+    let (_dir, body, response) = files("429");
 
     // When
     let refused =
@@ -87,7 +87,7 @@ fn a_response_echoing_the_key_is_refused_without_showing_it() {
         "401 Unauthorized",
         r#"{"error": {"message": "Incorrect API key provided: sk-test-0123456789abcdefghijklmnopqrstuv"}}"#,
     );
-    let (body, response) = files("echo");
+    let (_dir, body, response) = files("echo");
 
     // When
     let refused =
@@ -111,7 +111,7 @@ fn a_connection_that_fails_is_refused_with_curl_s_reason() {
         .local_addr()
         .expect("address")
         .port();
-    let (body, response) = files("refused");
+    let (_dir, body, response) = files("refused");
 
     // When
     let refused = post(
@@ -130,7 +130,7 @@ fn a_connection_that_fails_is_refused_with_curl_s_reason() {
 #[test]
 fn curl_echoing_the_key_in_its_error_is_refused_and_leaves_no_response() {
     // Given an endpoint whose host is the key, which curl's error names
-    let (body, response) = files("stderr");
+    let (_dir, body, response) = files("stderr");
     let url = format!("http://{KEY}.invalid/v1/responses");
 
     // When

@@ -4,6 +4,7 @@
 //! what was expected, what was found, how to fix it and the exact command that reproduces it.
 
 mod ci;
+mod ci_shared;
 mod cli;
 mod command;
 mod config;
@@ -169,7 +170,7 @@ fn main() -> ExitCode {
         Command::CheckXtaskTwin { sibling } => return twin::run(&sibling),
         Command::Dev { keys, replace } => return dev::run(&reporter, &keys, replace),
         Command::Ci => match web::web_package() {
-            Ok(package) => return ci_sharing_the_gate_lock(&steps::ci(&package), &reporter),
+            Ok(package) => return ci_shared::run(&steps::ci(&package), &reporter),
             Err(message) => return fail("ci", &message),
         },
         Command::Wasm => match web::web_package() {
@@ -185,46 +186,6 @@ fn main() -> ExitCode {
         Command::Test { tier: Tier::Gpu } => steps::gpu_tests(),
     };
     ci::run(&steps, &reporter)
-}
-
-/// `cargo xtask ci`, sharing the gate lock so it never runs beside a gate
-/// (`gate_lock_shared.rs`). Relaxed inside a gate's step (`XTASK_GATE=1`):
-/// the gate already holds the lock, and taking a share would wait on the
-/// gate itself. It would retire if no gate step could run `ci`.
-fn ci_sharing_the_gate_lock(steps: &[steps::Step], reporter: &report::Reporter) -> ExitCode {
-    let gate_env = std::env::var(priority::GATE_ENV).ok();
-    if priority::in_gate(false, gate_env.as_deref()) {
-        return ci_with_hit_rate(steps, reporter);
-    }
-    if let Err(why) = load_wait::before("ci") {
-        return fail("ci", &why);
-    }
-    let worktree =
-        std::env::current_dir().map_or_else(|_| "?".to_owned(), |d| d.display().to_string());
-    let shared = gate_lock::dir()
-        .and_then(|dir| gate_lock_shared::acquire_shared(&dir, &worktree, gate_lock::WAIT));
-    match shared {
-        Ok(_shared) => ci_with_hit_rate(steps, reporter),
-        Err(why) => fail("ci", &why),
-    }
-}
-
-/// `cargo xtask ci`, then sccache's hit rate over the run; sccache must
-/// answer before and after.
-fn ci_with_hit_rate(steps: &[steps::Step], reporter: &report::Reporter) -> ExitCode {
-    let before = match sccache::stats() {
-        Ok(stats) => stats,
-        Err(why) => return fail("sccache", &why),
-    };
-    let code = ci::run(steps, reporter);
-    match sccache::stats() {
-        Ok(after) => match sccache::hit_rate(before, after) {
-            Ok(line) => println!("{line}"),
-            Err(why) => return fail("sccache", &why),
-        },
-        Err(why) => return fail("sccache", &why),
-    }
-    code
 }
 
 fn fail(command: &str, message: &str) -> ExitCode {

@@ -7,10 +7,10 @@ use super::*;
 use crate::ux_answer::Usage;
 use crate::ux_ledger_write::{Entry, count, sent, settled};
 
-fn ledger(test: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("xtask-ux-ledger-{test}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    dir.join(FILE)
+fn ledger(test: &str) -> (crate::scratch::Scratch, PathBuf) {
+    let dir = crate::scratch::dir(&format!("ux-ledger-{test}"));
+    let file = dir.join(FILE);
+    (dir, file)
 }
 
 fn entry<'a>(time: &'a str, id: &'a str) -> Entry<'a> {
@@ -56,7 +56,7 @@ fn a_leap_day_and_the_epoch_are_dated_right() {
 #[test]
 fn the_day_s_spend_sums_counts_and_settled_requests_of_that_day_only() {
     // Given
-    let path = ledger("sum");
+    let (_dir, path) = ledger("sum");
     settled(&path, &entry("2026-10-25T23:59:59Z", "a"), USAGE, 0.50).expect("recorded");
     count(&path, &entry("2026-10-26T01:00:00Z", ""), 26_924, 0.054).expect("recorded");
     sent(&path, &entry("2026-10-26T01:00:01Z", "b"), 0.18).expect("recorded");
@@ -72,7 +72,7 @@ fn the_day_s_spend_sums_counts_and_settled_requests_of_that_day_only() {
 #[test]
 fn a_sent_request_never_settled_counts_at_its_worst_case() {
     // Given a request cut off before its usage was read
-    let path = ledger("unsettled");
+    let (_dir, path) = ledger("unsettled");
     sent(&path, &entry("2026-10-26T01:00:01Z", "b"), 0.18).expect("recorded");
 
     // When
@@ -84,13 +84,14 @@ fn a_sent_request_never_settled_counts_at_its_worst_case() {
 
 #[test]
 fn no_ledger_yet_means_nothing_spent() {
-    assert_eq!(spent_on(&ledger("none"), "2026-10-26"), Ok(0.0));
+    let (_dir, path) = ledger("none");
+    assert_eq!(spent_on(&path, "2026-10-26"), Ok(0.0));
 }
 
 #[test]
 fn a_line_of_no_known_kind_is_refused_naming_it() {
     // Given
-    let path = ledger("bad");
+    let (_dir, path) = ledger("bad");
     sent(&path, &entry("2026-10-26T01:00:01Z", "b"), 0.18).expect("recorded");
     let text = std::fs::read_to_string(&path).expect("read");
     std::fs::write(
@@ -112,7 +113,7 @@ fn a_line_of_no_known_kind_is_refused_naming_it() {
 #[test]
 fn a_torn_last_line_is_named_with_its_fix() {
     // Given a write cut short
-    let path = ledger("torn");
+    let (_dir, path) = ledger("torn");
     sent(&path, &entry("2026-10-26T01:00:01Z", "b"), 0.18).expect("recorded");
     let text = std::fs::read_to_string(&path).expect("read");
     std::fs::write(&path, format!("{text}{{\"time\": \"2026-10")).expect("written");
@@ -141,7 +142,7 @@ fn a_run_that_would_pass_the_daily_ceiling_is_refused_with_the_day_s_total() {
 #[test]
 fn an_old_count_line_with_no_id_reads_as_a_closed_count_at_its_cost() {
     // Given a count line as 14d6800 wrote it, before counts were booked
-    let path = ledger("old-count");
+    let (_dir, path) = ledger("old-count");
     std::fs::create_dir_all(path.parent().expect("a directory")).expect("made");
     let old = r#"{"time": "2026-10-26T08:03:13Z", "sha": "measure-image-cost", "model": "gpt-6.1-sol", "kind": "count", "input": 17, "cost": 0.25}"#;
     std::fs::write(&path, format!("{old}\n")).expect("written");
@@ -156,7 +157,7 @@ fn an_old_count_line_with_no_id_reads_as_a_closed_count_at_its_cost() {
 #[test]
 fn a_sent_or_settled_line_with_no_id_is_refused_naming_the_fix() {
     // Given
-    let path = ledger("no-id");
+    let (_dir, path) = ledger("no-id");
     std::fs::create_dir_all(path.parent().expect("a directory")).expect("made");
     std::fs::write(
         &path,

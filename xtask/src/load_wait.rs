@@ -6,7 +6,7 @@
 //! its code. An unreadable load is refused, never taken as low, naming
 //! `[load] wait = false` as the fix. A `ci` run inside a gate does not
 //! wait: the gate already did (`main.rs`, the in-gate branch of
-//! `ci_sharing_the_gate_lock`). The gate waits once it holds its lock,
+//! `ci_shared::run`). The gate waits once it holds its lock,
 //! so the load it measures is what it will run beside.
 
 use std::sync::OnceLock;

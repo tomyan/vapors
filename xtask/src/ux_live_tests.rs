@@ -2,7 +2,7 @@
 //! before the answer is judged, and nothing is sent past the day's
 //! ceiling.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde_json::json;
 
@@ -16,11 +16,8 @@ const KEY: &str = "sk-test-0123456789abcdefghijklmnopqrstuv";
 const FRAME: &str = "phone/01-first-open.png";
 pub(super) const SHA: &str = "61bfd4e945860b03ba3f2b419406c88bb8434cf8";
 
-pub(super) fn report_dir(test: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("xtask-ux-live-{test}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("made");
-    dir
+pub(super) fn report_dir(test: &str) -> crate::scratch::Scratch {
+    crate::scratch::dir(&format!("ux-live-{test}"))
 }
 
 pub(super) fn prepared(dir: &Path) -> Prepared {

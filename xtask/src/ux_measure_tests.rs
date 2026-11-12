@@ -9,9 +9,8 @@ use crate::ux_stub_tests::stand_in_many;
 
 const KEY: &str = "sk-test-0123456789abcdefghijklmnopqrstuv";
 
-fn run_dir(test: &str) -> (PathBuf, PathBuf) {
-    let root = std::env::temp_dir().join(format!("xtask-ux-measure-{test}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&root);
+fn run_dir(test: &str) -> (crate::scratch::Scratch, PathBuf, PathBuf) {
+    let root = crate::scratch::dir(&format!("ux-measure-{test}"));
     let phone = root.join("ux/phone");
     std::fs::create_dir_all(&phone).expect("made");
     let file = std::fs::File::create(phone.join("01-a.png")).expect("png");
@@ -28,17 +27,18 @@ fn run_dir(test: &str) -> (PathBuf, PathBuf) {
         r#"{"steps": [{"frame": "01-a.png", "text": "01-a.txt"}]}"#,
     )
     .expect("facts");
-    (root.join("ux"), root.join("reports"))
+    let (run, reports) = (root.join("ux"), root.join("reports"));
+    (root, run, reports)
 }
 
-fn ux(test: &str, endpoint: String) -> UxConfig {
-    let (run, reports) = run_dir(test);
+fn ux(test: &str, endpoint: String) -> (crate::scratch::Scratch, UxConfig) {
+    let (root, run, reports) = run_dir(test);
     let mut ux = crate::ux_review::tests::ux();
     ux.run_dir = run;
     ux.report_dir = reports;
     ux.endpoint = endpoint;
     ux.model = crate::ux_models::unmeasured("gpt-new");
-    ux
+    (root, ux)
 }
 
 fn counted(n: u64) -> (&'static str, String) {
@@ -64,7 +64,8 @@ fn counts_become_a_row_with_each_bound_twenty_percent_over() {
     let secret = Secret::new(KEY.to_owned()).expect("guarded");
 
     // When
-    let lines = crate::ux_measure_run::run(&ux("row", url), &secret).expect("measured");
+    let (_root, ux) = ux("row", url);
+    let lines = crate::ux_measure_run::run(&ux, &secret).expect("measured");
 
     // Then
     assert_eq!(
@@ -94,7 +95,8 @@ fn a_billed_request_that_differs_from_its_count_is_refused() {
     let secret = Secret::new(KEY.to_owned()).expect("guarded");
 
     // When
-    let refused = crate::ux_measure_run::run(&ux("differs", url), &secret).expect_err("refused");
+    let (_root, ux) = ux("differs", url);
+    let refused = crate::ux_measure_run::run(&ux, &secret).expect_err("refused");
 
     // Then
     assert!(
@@ -116,7 +118,7 @@ fn a_frame_that_counts_fewer_tokens_than_no_frame_is_refused() {
 fn a_measurement_the_day_has_no_room_for_sends_no_count() {
     // Given room for one count's bound (about $0.0003) but not all three
     // (about $0.0015)
-    let ux = ux("no-room", String::new());
+    let (_root, ux) = ux("no-room", String::new());
     let today = &crate::ux_ledger::utc(std::time::SystemTime::now())[..10];
     std::fs::create_dir_all(&ux.report_dir).expect("made");
     let line = serde_json::json!({ "time": format!("{today}T00:00:00Z"), "kind": "settled", "id": "earlier", "cost": 2.9995 });

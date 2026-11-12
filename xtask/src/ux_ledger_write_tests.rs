@@ -4,13 +4,8 @@ use std::time::Duration;
 
 use super::*;
 
-fn dir(test: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!(
-        "xtask-ux-ledger-write-{test}-{}",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_dir_all(&dir);
-    dir
+fn dir(test: &str) -> crate::scratch::Scratch {
+    crate::scratch::dir(&format!("ux-ledger-write-{test}"))
 }
 
 #[test]
