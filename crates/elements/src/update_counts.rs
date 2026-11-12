@@ -24,6 +24,23 @@ pub struct UpdateCounts {
     /// Elements the style phase restyled; 0 when the restyle failed (the
     /// partial count of a failed restyle is not kept).
     pub elements_restyled: usize,
+    /// Restyled elements that took a computed style from the share
+    /// table: keyed (`Dom::create_keyed_element`), their key shareable,
+    /// and an element with the same share key restyled before them
+    /// (`restyle_share.rs`).
+    pub styles_shared: usize,
+    /// Restyled keyed, shareable elements whose style was computed and
+    /// put in the share table: one per distinct share key restyled.
+    pub styles_computed: usize,
+    /// Restyled elements created without a key (hand-built pages, the
+    /// root and body), styled each for itself as before sharing.
+    pub styles_unkeyed: usize,
+    /// Restyled keyed elements whose key cannot share: a rule any of
+    /// its elements can match reads siblings or descendants.
+    pub styles_unshareable: usize,
+    /// Computed style allocations alive after the update: the share
+    /// table's entries and every element styled for itself.
+    pub styles_live: usize,
     /// Layout boxes built from the styled tree: one per element that
     /// is neither `display: none` nor inline (the root, block-level and
     /// replaced elements, and an `svg` as one box with none for its
@@ -128,6 +145,18 @@ pub struct UpdateCounts {
 }
 
 impl UpdateCounts {
+    /// Notes where one restyled element's style came from.
+    pub(crate) fn count_style(&mut self, path: crate::restyle_share::Path) {
+        use crate::restyle_share::Path;
+        let count = match path {
+            Path::Shared => &mut self.styles_shared,
+            Path::Computed => &mut self.styles_computed,
+            Path::Unkeyed => &mut self.styles_unkeyed,
+            Path::Unshareable => &mut self.styles_unshareable,
+        };
+        *count += 1;
+    }
+
     /// Notes what layout did.
     pub(crate) fn count_layout(&mut self, work: &LayoutWork) {
         (self.boxes_laid_out, self.layout_calls) = (work.laid_out, work.calls);

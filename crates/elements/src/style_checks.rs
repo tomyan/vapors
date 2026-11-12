@@ -144,6 +144,7 @@ impl Document {
         for node in elements(&self.arena, node) {
             self.checks.forget(node);
             if let Some(kept) = self.kept.as_mut() {
+                kept.styles.remove(node);
                 kept.used.remove(&node);
                 kept.refused.remove(&node);
                 kept.calcs.forget(node);
