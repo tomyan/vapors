@@ -5,15 +5,14 @@
 //! or its second line missing, the port not listening, no page yet.
 //! Anything else is refused at once, with its own reason.
 
-use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
-use std::net::TcpStream;
+use std::io::ErrorKind;
 use std::path::Path;
 use std::thread;
 use std::time::{Duration, Instant};
 
 use serde_json::Value;
 
-use crate::connect::left;
+use crate::discover_list::json_list;
 
 const POLL: Duration = Duration::from_millis(50);
 
@@ -119,68 +118,6 @@ fn first_page(body: &str) -> Result<Option<String>, String> {
         .as_str()
         .map(|url| Some(url.to_owned()))
         .ok_or_else(|| format!("devtools: the page has no webSocketDebuggerUrl (is another client attached?): {page}"))
-}
-
-/// `GET /json/list`; `None` while nothing listens on `port`. The body is
-/// read by its `Content-Length`: Chromium keeps the connection open.
-fn json_list(port: u16, until: Instant) -> Result<Option<String>, String> {
-    let mut stream = match TcpStream::connect_timeout(&([127, 0, 0, 1], port).into(), left(until)?)
-    {
-        Ok(stream) => stream,
-        Err(e) if e.kind() == ErrorKind::ConnectionRefused => return Ok(None),
-        Err(e) => return Err(format!("devtools: connecting to {port}: {e}")),
-    };
-    stream
-        .set_read_timeout(Some(left(until)?))
-        .map_err(|e| e.to_string())?;
-    // Chromium builds each target's WebSocket URL from this Host.
-    let request = format!("GET /json/list HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n");
-    stream
-        .write_all(request.as_bytes())
-        .map_err(|e| e.to_string())?;
-    let mut reader = BufReader::new(stream);
-    let length = head(&mut reader)?;
-    let mut body = vec![0; length];
-    reader
-        .read_exact(&mut body)
-        .map_err(|e| format!("devtools: reading /json/list: {e}"))?;
-    String::from_utf8(body)
-        .map(Some)
-        .map_err(|e| format!("devtools: /json/list is not UTF-8: {e}"))
-}
-
-/// The response head: a 200 status and its `Content-Length`.
-fn head(reader: &mut impl BufRead) -> Result<usize, String> {
-    let status = line(reader)?;
-    if !status.starts_with("HTTP/1.1 200") {
-        return Err(format!("devtools: /json/list answered `{status}`"));
-    }
-    let mut length = None;
-    loop {
-        let line = line(reader)?;
-        if line.is_empty() {
-            return length.ok_or_else(|| "devtools: /json/list had no Content-Length".to_owned());
-        }
-        if let Some((name, value)) = line.split_once(':')
-            && name.eq_ignore_ascii_case("content-length")
-        {
-            let parsed = value.trim().parse().map_err(|_| {
-                format!(
-                    "devtools: /json/list's Content-Length is `{}`",
-                    value.trim()
-                )
-            })?;
-            length = Some(parsed);
-        }
-    }
-}
-
-fn line(reader: &mut impl BufRead) -> Result<String, String> {
-    let mut line = String::new();
-    reader
-        .read_line(&mut line)
-        .map_err(|e| format!("devtools: reading /json/list: {e}"))?;
-    Ok(line.trim_end().to_owned())
 }
 
 #[cfg(test)]
