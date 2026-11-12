@@ -1,10 +1,6 @@
 <script>
 let count: Signal<i32> = Signal::new(0);
 let increment = move || count.update(|n| *n += 1);
-let strip: Memo<String> = Memo::new(move || {
-    let state = if count.get() > 0 { "counted" } else { "waiting" };
-    format!("strip {state}")
-});
 </script>
 
 <style>
@@ -34,4 +30,4 @@ button:active { background-color: #3a7bd5; }
 </style>
 
 <button onclick={increment}>Clicked {count} times</button>
-<div class={strip.get()}></div>
+<div class="strip" class:waiting={count.get() == 0} class:counted={count.get() > 0}></div>

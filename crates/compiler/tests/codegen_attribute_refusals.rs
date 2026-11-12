@@ -156,3 +156,27 @@ fn a_namespaced_attribute_is_refused_saying_namespaces_are_unsupported() {
         "{err}"
     );
 }
+
+#[test]
+fn a_class_attribute_from_an_expression_is_refused() {
+    // When
+    let err = refusal_with_flag("<div class={flag.get().to_string()}></div>");
+
+    // Then
+    assert_eq!(
+        err,
+        "counter.wisp:4:6: `class={..}` is refused: the compiler must see every class an element can have; write class=\"name\" for fixed classes and class:name={condition} for each class that toggles"
+    );
+}
+
+#[test]
+fn a_style_attribute_from_an_expression_is_refused() {
+    // When
+    let err = refusal_with_flag("<div style={flag.get().to_string()}></div>");
+
+    // Then
+    assert_eq!(
+        err,
+        "counter.wisp:4:6: `style={..}` is refused: the compiler must see every declaration an element can have; write the declarations under a class in the <style> section and toggle it with class:name={condition}"
+    );
+}

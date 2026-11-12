@@ -175,7 +175,7 @@ the one difference from the brief in this slice.
   any name that is not a signal, memo or signal-typed prop.
 - Attribute expressions, `{if}` conditions and `{for}` iterables are
   used as written, so they say `.get()` themselves:
-  `class={theme.get()}`, `{if count.get() > 0}`.
+  `title={label.get()}`, `{if count.get() > 0}`.
 - An expression attribute is its own effect, which sets that attribute
   when its signals change. A literal attribute is set once.
 - `{if}` keeps one branch built before an anchor node. It rebuilds only
@@ -238,6 +238,11 @@ The compiler refuses:
   an expression, which would be on whatever its value, since generated
   code cannot remove an attribute: use `bind:checked`, or the attribute
   on an element inside `{if}`;
+- `class={..}` and `style={..}` on an element: the compiler must see
+  every class and declaration an element can have, so a class is
+  literal (`class="name"`) or toggled (`class:name={condition}`), and
+  declarations go in the `<style>` section
+  (`docs/decisions/2026-11-11-analysable-sources.md`);
 - an element attribute named with `:` other than the `bind:` and
   `class:` directives (`style:x` and `on:click` included; a listener
   is `onclick`), and a `class:` directive with a quoted value or a

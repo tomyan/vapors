@@ -1,6 +1,7 @@
 <script>
 use vapors_components::hold_button::{HoldButton, HoldButtonProps};
-#[prop] let layout: Memo<String> = Memo::new(|| String::from("wide"));
+#[prop] let small: Memo<bool> = Memo::new(|| false);
+#[prop] let short: Signal<bool> = Signal::new(false);
 #[prop] let left: Signal<bool> = Signal::new(false);
 #[prop] let right: Signal<bool> = Signal::new(false);
 #[prop] let brake: Signal<bool> = Signal::new(false);
@@ -21,7 +22,7 @@ use vapors_components::hold_button::{HoldButton, HoldButtonProps};
 
 </style>
 
-<div class={layout.get()}>
+<div class:small={small.get()} class:short={short.get()}>
 <div class="drive">
     <div class="pair">
         <HoldButton id={String::from("left")} label={String::from("←")} on_change={vapors_components::hold_into(left)} reset={reset} enabled={enabled} />
