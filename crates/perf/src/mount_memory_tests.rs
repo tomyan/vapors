@@ -78,3 +78,15 @@ fn rows_out_of_order_are_refused() {
     let error = memory_table(&[row(3000, 1, 2), row(1000, 1, 2)]).expect_err("order");
     assert!(error.contains("1000 rows follows 3000 rows"), "{error}");
 }
+
+#[test]
+fn a_size_whose_frame_reading_is_below_the_one_before_shows_a_negative_slope() {
+    // When
+    let table = memory_table(&[row(1000, 10, 3000), row(3000, 10, 1000)]).expect("table");
+
+    // Then
+    assert!(
+        table.contains("| 3000 | 1000 | 1010 | 2000 | 2005 | -1.0 |"),
+        "{table}"
+    );
+}

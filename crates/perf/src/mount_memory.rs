@@ -161,10 +161,10 @@ fn slope_from(previous: Option<&MemoryRow>, row: &MemoryRow) -> Result<String, S
             row.rows, previous.rows
         ));
     }
-    let grew = row.after_frame_kib.saturating_sub(previous.after_frame_kib);
-    let rows = (row.rows - previous.rows) as u64;
-    let tenths = grew * 10 / rows;
-    Ok(format!("{}.{}", tenths / 10, tenths % 10))
+    let grew = i128::from(row.after_frame_kib) - i128::from(previous.after_frame_kib);
+    let tenths = grew * 10 / (row.rows - previous.rows) as i128;
+    let sign = if tenths < 0 { "-" } else { "" };
+    Ok(format!("{sign}{}.{}", tenths.abs() / 10, tenths.abs() % 10))
 }
 
 #[cfg(test)]
