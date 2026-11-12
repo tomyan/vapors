@@ -1,7 +1,8 @@
 //! What the compiler refuses or records in a `StyleKey` beyond what
-//! the element says: the site carries the column, so two elements on
-//! one line are told apart, and an element with more `class:`
-//! directives than a tree keeps as bits is refused, naming it.
+//! the element says: the site carries the package and the column, so
+//! two crates' files and two elements on one line are told apart,
+//! and an element with more `class:` directives than a tree keeps as
+//! bits is refused, naming it.
 
 #[path = "common/codegen.rs"]
 mod codegen;
@@ -14,10 +15,13 @@ fn the_site_names_the_line_and_column_of_each_element() {
     let code = generated("<p><b>a</b><i>b</i></p>");
 
     // Then
-    assert_has(&code, "site: \"counter.wisp:1:4\", scope: None, tag: \"b\"");
     assert_has(
         &code,
-        "site: \"counter.wisp:1:12\", scope: None, tag: \"i\"",
+        "site: concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:1:4\"), scope: None, tag: \"b\"",
+    );
+    assert_has(
+        &code,
+        "site: concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:1:12\"), scope: None, tag: \"i\"",
     );
 }
 

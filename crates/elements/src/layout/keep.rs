@@ -159,6 +159,7 @@ impl Lender<'_> {
         boxes[at].cache = before.cache.clone();
         boxes[at].layout = before.layout;
         boxes[at].asked.clone_from(&before.asked);
+        boxes[at].asked_overflowed = before.asked_overflowed;
         self.lent += 1;
         true
     }

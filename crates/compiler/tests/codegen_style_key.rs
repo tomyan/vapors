@@ -21,7 +21,7 @@ fn an_element_is_created_from_its_key_with_site_scope_tag_classes_and_style() {
     // Then: the <div> is at line 4, column 1 of counter.wisp
     assert_has(
         &code,
-        "static KEY_DIV0: vapors_dom::StyleKey = vapors_dom::StyleKey { site: \"counter.wisp:4:1\", scope: Some(SCOPE), tag: \"div\", classes: &[\"card\", \"wide\"], toggles: &[], style: Some(\"width: 8px\") };",
+        "static KEY_DIV0: vapors_dom::StyleKey = vapors_dom::StyleKey { site: concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:4:1\"), scope: Some(SCOPE), tag: \"div\", classes: &[\"card\", \"wide\"], toggles: &[], style: Some(\"width: 8px\") };",
     );
     assert_has(
         &code,

@@ -15,6 +15,8 @@ fn the_full_run_has_the_10000_row_edits_and_insert_at_three_sizes() {
         "10000 rows, Text",
         "10000 rows, Class",
         "10000 rows, HoveredClass",
+        "1000 rows, FlexText",
+        "10000 rows, FlexText",
         "1000 rows, Insert",
         "3000 rows, Insert",
         "10000 rows, Insert",

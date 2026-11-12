@@ -98,7 +98,7 @@ fn scaling_without_a_change_or_with_an_unknown_one_is_refused_naming_it() {
         "{error}"
     );
     assert!(
-        error.contains("Idle|Text|Class|HoveredClass|Insert"),
+        error.contains("Idle|Text|FlexText|Class|HoveredClass|Insert"),
         "{error}"
     );
 }

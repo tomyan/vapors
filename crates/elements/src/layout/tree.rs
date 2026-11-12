@@ -11,9 +11,9 @@ use taffy::{
 };
 use vapors_text::FontSystem;
 
+use super::asked::Asked;
 use super::boxes::{Content, LayoutBox};
 use super::calcs::Calcs;
-use super::isolated::Asked;
 use super::measure::measure_text;
 
 /// The boxes, what measuring text needs, and the calcs Taffy may ask for.
@@ -28,6 +28,9 @@ pub(crate) struct BoxTree<'f> {
     pub(crate) written: super::written::Written,
     /// Calls to `lay_out`, cache hits included.
     pub(crate) calls: usize,
+    /// Recorded size answers disowned: a box answered a size query
+    /// otherwise than it recorded (`tree_cache.rs`).
+    pub(crate) disowned: usize,
 }
 
 impl BoxTree<'_> {
@@ -57,13 +60,7 @@ impl BoxTree<'_> {
             if inputs.run_mode == RunMode::PerformLayout {
                 compute_oof_layout(tree, id, &mut output);
             }
-            tree.note_asked(
-                id,
-                Asked {
-                    input: inputs,
-                    in_block,
-                },
-            );
+            tree.note_asked(id, Asked::of(inputs, in_block, &output));
             output
         })
     }
@@ -200,6 +197,6 @@ impl LayoutPartialTree for BoxTree<'_> {
 }
 
 #[path = "tree_cache.rs"]
-mod cache;
+pub(super) mod cache;
 #[path = "tree_containers.rs"]
 mod containers;
