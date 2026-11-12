@@ -1,7 +1,9 @@
 //! A host that drives its own frames calls `Document::settle_focus`
 //! after each update; a key or typed text given while the focused
 //! element is not focusable and no settle has run since the update is
-//! refused, naming the call.
+//! refused, naming the call. Hidden after the settle, the element blurs
+//! as the key arrives, and the key reaches nothing (review-fable-input
+//! M5).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -93,4 +95,21 @@ fn a_key_after_a_hidden_button_is_shown_and_focused_is_given() {
     // Then
     assert_eq!(given, Ok(()));
     assert_eq!(doc.borrow().active_element(), Some(button));
+}
+
+#[test]
+fn a_key_after_a_hide_since_the_settle_blurs_the_element_first() {
+    // Given: the button focused and settled, then hidden with no update
+    let (doc, button, _) = card();
+    assert_eq!(Document::focus(&doc, Some(button)), Focus::Done);
+    Document::settle_focus(&doc);
+    doc.borrow_mut()
+        .set_attribute(button, "style", "display: none");
+
+    // When
+    let given = give(&doc, &typing()[0]);
+
+    // Then
+    assert_eq!(given, Ok(()));
+    assert_eq!(doc.borrow().active_element(), None);
 }

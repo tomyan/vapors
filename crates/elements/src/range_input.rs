@@ -142,9 +142,15 @@ fn stepped(range: &Range, key: &str, steps: f64) -> Option<f64> {
 /// `input` or `change` on `node`, carrying its value as text and as a
 /// number.
 pub(crate) fn fire(document: &Rc<RefCell<Document>>, node: NodeId, name: &str) {
-    let Some(value) = document.borrow().value_as_number(node) else {
+    // the `input` before a `change` may have removed the range
+    let doc = document.borrow();
+    let Some(value) = doc
+        .still_in(node)
+        .and_then(|node| doc.value_as_number(node))
+    else {
         return;
     };
+    drop(doc);
     let event = Event::new(name)
         .with_value(&written(value))
         .with_value_number(value);

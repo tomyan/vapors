@@ -7,9 +7,14 @@ mod field_box;
 mod inline;
 mod keep;
 mod layout_box;
+#[cfg(debug_assertions)]
+pub(crate) mod layout_check;
 mod marks;
 mod measure;
+mod owners;
 mod rebuild;
+#[cfg(debug_assertions)]
+mod rebuild_check;
 mod rebuilt;
 mod replaced;
 mod slots;

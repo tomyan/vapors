@@ -54,6 +54,9 @@ impl Document {
             .pointer_event("pointerdown", id, target, point);
         let prevented = dispatch_pointer(document, id, target, event);
         document.borrow_mut().pointer.touch_down_prevented = prevented;
+        let Some(target) = document.borrow().still_in(target) else {
+            return;
+        };
         ask_unless_asked(document, id, Asked::CaptureTo(target));
         if !prevented {
             crate::range_drag::pressed(document, id, target, point);

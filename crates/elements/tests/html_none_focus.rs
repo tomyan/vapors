@@ -2,8 +2,10 @@
 //! update, the caret and selection the platform reads, typing, an IME
 //! composition, selection keys and Tab all run without panicking over
 //! the empty box tree. These run between the update and the settle
-//! after it, while the field still has focus; the settle then moves
-//! focus to nothing (`Document::settle_focus`, `tests/focus_fixup.rs`).
+//! after it, while the field still has focus; the first key blurs it
+//! (the fixup runs before a key, review-fable-input M5), so the rest
+//! find nothing focused, as the settle would have left it
+//! (`Document::settle_focus`, `tests/focus_fixup.rs`).
 mod support;
 
 use support::text_page::{Page, click, key, page, shift, type_text};
@@ -50,6 +52,7 @@ fn typing_selecting_composing_and_tab_run_when_html_is_hidden_and_tab_focuses_no
 
     // When
     type_text(&page, "er");
+    let blurred = page.doc.borrow().active_element();
     let (left, modifiers) = shift("ArrowLeft");
     Document::key_pressed(&page.doc, left, modifiers);
     let edit = TextEdit {
@@ -62,7 +65,12 @@ fn typing_selecting_composing_and_tab_run_when_html_is_hidden_and_tab_focuses_no
     key(&page, "Tab");
     update(&page);
 
-    // Then: the edit applied, and Tab found nothing rendered to focus
-    assert_eq!(edited, Ok(()));
+    // Then: the first key blurred the hidden field, so the edit found
+    // no field, and Tab found nothing rendered to focus
+    assert_eq!(blurred, None);
+    assert_eq!(
+        edited,
+        Err("the text input was edited with no text field focused".to_owned())
+    );
     assert_eq!(page.doc.borrow().active_element(), None);
 }
