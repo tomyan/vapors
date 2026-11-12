@@ -24,6 +24,12 @@ pub struct GpuWork {
     pub uniform_writes: u64,
     /// `Device::create_bind_group` calls.
     pub bind_groups_made: u64,
+    /// Kept-byte buffers grown: their live ranges copied into a buffer
+    /// twice the size (`Retained`).
+    pub retained_grown: u64,
+    /// Kept-byte buffers compacted: their live ranges copied, packed,
+    /// into a buffer of the same size (`Retained`).
+    pub retained_compacted: u64,
 }
 
 impl GpuWork {
@@ -44,6 +50,8 @@ impl Add for GpuWork {
             draw_calls: self.draw_calls + other.draw_calls,
             uniform_writes: self.uniform_writes + other.uniform_writes,
             bind_groups_made: self.bind_groups_made + other.bind_groups_made,
+            retained_grown: self.retained_grown + other.retained_grown,
+            retained_compacted: self.retained_compacted + other.retained_compacted,
         }
     }
 }
@@ -63,6 +71,8 @@ pub struct WorkCounter {
     draw_calls: AtomicU64,
     uniform_writes: AtomicU64,
     bind_groups_made: AtomicU64,
+    retained_grown: AtomicU64,
+    retained_compacted: AtomicU64,
 }
 
 impl WorkCounter {
@@ -117,6 +127,16 @@ impl WorkCounter {
         self.texture_bytes.fetch_add(len(data), Ordering::Relaxed);
     }
 
+    /// Counts a kept-byte buffer moved: compacted, else grown.
+    pub(crate) fn retained_moved(&self, compacted: bool) {
+        let count = if compacted {
+            &self.retained_compacted
+        } else {
+            &self.retained_grown
+        };
+        count.fetch_add(1, Ordering::Relaxed);
+    }
+
     /// `pass.draw(vertices, instances)`, counting one call.
     pub fn draw(
         &self,
@@ -149,6 +169,8 @@ impl WorkCounter {
             draw_calls: self.draw_calls.swap(0, Ordering::Relaxed),
             uniform_writes: self.uniform_writes.swap(0, Ordering::Relaxed),
             bind_groups_made: self.bind_groups_made.swap(0, Ordering::Relaxed),
+            retained_grown: self.retained_grown.swap(0, Ordering::Relaxed),
+            retained_compacted: self.retained_compacted.swap(0, Ordering::Relaxed),
         }
     }
 }
