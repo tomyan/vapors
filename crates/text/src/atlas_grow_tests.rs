@@ -136,3 +136,49 @@ fn a_glyph_larger_than_the_first_page_but_not_the_largest_is_placed() {
     assert!(!placed.notdef, "{placed:?}");
     assert!(atlas.coverage_page().size() > 64);
 }
+
+#[test]
+fn a_glyph_larger_than_the_page_grows_it_without_evicting_older_glyphs() {
+    // Given: a glyph from an earlier frame in a page the new one cannot fit
+    let font = geist();
+    let mut atlas = growing(64, 512);
+    atlas.begin_frame();
+    atlas.get(&request(&font, 'a')).expect("placed");
+    atlas.begin_frame();
+    let big = GlyphRequest {
+        size: 120.0,
+        ..request(&font, 'W')
+    };
+
+    // When
+    atlas.get(&big).expect("placed");
+
+    // Then
+    assert_eq!(atlas.evictions(), 0);
+    assert_eq!(atlas.entries.len(), 2);
+}
+
+#[test]
+fn a_full_page_at_its_largest_names_the_limit_and_fixes_a_caller_can_apply() {
+    // Given
+    let font = geist();
+    let mut atlas = growing(64, 128);
+
+    // When
+    let message = place_letters(&mut atlas, &font)
+        .expect_err("full")
+        .to_string();
+
+    // Then
+    assert!(message.contains("cannot grow past 128x128"), "{message}");
+    assert!(
+        message.contains("if the device's max_texture_dimension_2d is above 128"),
+        "{message}"
+    );
+}
+
+#[test]
+#[should_panic(expected = "AtlasConfig::checked")]
+fn a_first_page_over_the_largest_is_refused_naming_the_check() {
+    growing(2048, 1024);
+}

@@ -10,6 +10,11 @@ impl GlyphAtlas {
     /// Room for a `width` by `height` glyph, or [`AtlasError::Full`] when
     /// this frame's glyphs do not fit the largest page.
     pub(crate) fn make_room(&mut self, width: u32, height: u32) -> Result<[u32; 2], AtlasError> {
+        if !self.coverage.fits(width, height) {
+            // Eviction cannot make a page larger: grow first, so the
+            // cache survives (the growth keeps every glyph).
+            return self.grow_until_fits(width, height);
+        }
         loop {
             let evicted = self.evict_least_recent(width * height);
             if evicted == 0 {
@@ -37,6 +42,7 @@ impl GlyphAtlas {
             .count();
         AtlasError::Full {
             page_size: self.coverage.size(),
+            max_page_size: self.max_page,
             glyphs_this_frame: in_frame().count() - icons_this_frame,
             icons_this_frame,
         }

@@ -7,8 +7,8 @@
 //! than a page is refused once, logged with its size, and `.notdef`
 //! stands in from then on. Evictions, rasterisations and refusals are
 //! counted for tests. Icons share the coverage page (`atlas_icon.rs`).
-//! When one frame's glyphs do not fit, the coverage page doubles up to
-//! its largest side (`atlas_grow.rs`).
+//! A frame that does not fit doubles the page up to its largest side
+//! (`atlas_grow.rs`).
 
 use std::collections::{HashMap, HashSet};
 
@@ -46,9 +46,11 @@ pub struct GlyphAtlas {
 }
 
 impl GlyphAtlas {
-    /// Empty pages of `config.page_size`, the colour page at most 1024.
+    /// Empty pages of `config.page_size`, the colour page at most 1024;
+    /// panics if `page_size` is over `max_page_size` (`AtlasConfig::checked`).
     #[must_use]
     pub fn new(config: AtlasConfig) -> Self {
+        config.assert_first_page_fits();
         Self {
             coverage: AtlasPage::new(config.page_size, 1),
             max_page: config.max_page_size,

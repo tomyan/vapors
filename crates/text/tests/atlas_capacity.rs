@@ -2,7 +2,7 @@
 //! H1): every glyph of an 80-character sample at each subpixel step, at
 //! six sizes and two weights. A fixed 1024 px page refuses it at 3x; the
 //! pages a 16384 px device gets (`AtlasConfig::for_max_texture_side`)
-//! start at 1024 and grow to hold it.
+//! start at 1024 and grow, to at most 4096, to hold it.
 
 use vapors_text::{
     AtlasConfig, AtlasError, Family, FontSystem, GlyphAtlas, GlyphRequest, Hinting, Layout,
@@ -79,7 +79,10 @@ fn the_pages_a_large_device_gets_grow_past_1024_for_the_mixed_sample_at_3x() {
     let side = placed_in(AtlasConfig::for_max_texture_side(16384), 3.0);
 
     // Then
-    assert!(matches!(side, Ok(side) if side > 1024), "{side:?}");
+    assert!(
+        matches!(side, Ok(side) if (1025..=4096).contains(&side)),
+        "{side:?}"
+    );
 }
 
 #[test]

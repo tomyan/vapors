@@ -27,10 +27,18 @@ impl Default for AtlasConfig {
 /// painter (16 MiB at 4096) before any text needs it.
 pub const FIRST_PAGE: u32 = 1024;
 
+/// The largest side a default page grows to, whatever the device allows:
+/// 16 MiB of R8 coverage, plus the same again in the texture and a copy
+/// for each whole-page upload. `atlas_capacity.rs` places the mixed
+/// sample at 1x to 3x in it; a device side above this is reached only
+/// by passing `AtlasConfig` to `with_atlas`. A page at a 16384 device's
+/// side would be 256 MiB, three times over for touche's three painters.
+pub const DEFAULT_GROWTH_LIMIT: u32 = 4096;
+
 /// The largest side whose R8 coverage bytes fit a `u32` (the colour
-/// page stays at most 1024, `atlas.rs`), for the refusal's message and
-/// the default's cap; `checked` computes the overflow itself, and a
-/// test holds the two together.
+/// page stays at most 1024, `atlas.rs`), for the refusal's message;
+/// `checked` computes the overflow itself, and a test holds the two
+/// together.
 const LARGEST_PAGE: u32 = 65_535;
 
 impl AtlasConfig {
@@ -44,15 +52,27 @@ impl AtlasConfig {
     }
 
     /// The default for a device whose `max_texture_dimension_2d` is
-    /// `max_texture_side`: a page of [`FIRST_PAGE`] (or that side, if
-    /// smaller) that grows up to that side, or 65535 px, whose bytes
-    /// are the most a `u32` counts.
+    /// `max_texture_side`: a page of [`FIRST_PAGE`] that grows up to
+    /// [`DEFAULT_GROWTH_LIMIT`]; either is at most `max_texture_side`.
     #[must_use]
     pub fn for_max_texture_side(max_texture_side: u32) -> Self {
         Self {
             page_size: max_texture_side.min(FIRST_PAGE),
-            max_page_size: max_texture_side.min(LARGEST_PAGE),
+            max_page_size: max_texture_side.min(DEFAULT_GROWTH_LIMIT),
         }
+    }
+
+    /// # Panics
+    ///
+    /// If `page_size` is over `max_page_size`: the page would refuse
+    /// glyphs the largest page holds. `checked` returns this as an error.
+    pub(crate) fn assert_first_page_fits(self) {
+        assert!(
+            self.page_size <= self.max_page_size,
+            "AtlasConfig page_size {} is over max_page_size {}; check it with AtlasConfig::checked",
+            self.page_size,
+            self.max_page_size
+        );
     }
 
     /// This config, if a device whose `max_texture_dimension_2d` is

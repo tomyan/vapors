@@ -3,18 +3,24 @@
 use super::*;
 
 #[test]
-fn the_default_page_starts_at_1024_and_grows_to_the_device_side() {
+fn the_default_page_starts_at_1024_and_grows_to_the_device_side_up_to_4096() {
     // Given
-    let cases = [(16384, 1024), (8192, 1024), (1024, 1024), (512, 512)];
+    let cases = [
+        (16384, 1024, 4096),
+        (8192, 1024, 4096),
+        (4096, 1024, 4096),
+        (2048, 1024, 2048),
+        (512, 512, 512),
+    ];
 
-    for (max_texture_side, first) in cases {
+    for (max_texture_side, first, largest) in cases {
         // When
         let config = AtlasConfig::for_max_texture_side(max_texture_side);
 
         // Then
         let expected = AtlasConfig {
             page_size: first,
-            max_page_size: max_texture_side,
+            max_page_size: largest,
         };
         assert_eq!(config, expected, "device side {max_texture_side}");
     }
