@@ -1,5 +1,6 @@
 <script>
-#[prop] let layout: Memo<String> = Memo::new(|| String::from("wide"));
+#[prop] let small: Memo<bool> = Memo::new(|| false);
+#[prop] let short: Signal<bool> = Signal::new(false);
 #[prop] let speed: Signal<String> = Signal::new(String::new());
 #[prop] let lap: Signal<String> = Signal::new(String::new());
 #[prop] let clock: Signal<String> = Signal::new(String::new());
@@ -24,7 +25,7 @@
 .short .value { font-size: 18px; }
 </style>
 
-<div class={layout.get()}>
+<div class:small={small.get()} class:short={short.get()}>
     <div class="top">
         <div class="brand">
             <div class="name">VAPORS / CIRCUIT</div>
