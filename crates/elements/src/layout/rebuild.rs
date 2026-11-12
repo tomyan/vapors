@@ -1,15 +1,18 @@
 //! Rebuild where marked (IU3 PR 1b): an update builds again only the
 //! subtrees of the marked elements' owners (`Marks::owners`), in their
 //! slots, and keeps every other box with its cache and layout. A
-//! rebuilt subtree that changed clears its ancestors' caches and
-//! hoisted lists up to the root, as Taffy's `mark_dirty` does, so they
-//! are laid out again and hoist their out-of-flow boxes afresh.
+//! rebuilt subtree that changed is handed to layout as a changed owner
+//! (`isolated.rs`), with the slots of its ancestors up to the root and
+//! what the box it replaced held, to be laid out in isolation or, as
+//! Taffy's `mark_dirty` does, to have those ancestors laid out again.
 
 use vapors_dom::NodeId;
 
 use rustc_hash::FxHashMap;
 
+use super::boxes::LayoutBox;
 use super::boxes::{Source, build, build_shallow};
+use super::isolated::{Before, Changed};
 use super::keep::{KeptBoxes, Lender};
 use super::marks::{Owner, Rebuild};
 use super::rebuilt::Rebuilt;
@@ -98,30 +101,54 @@ fn rebuild_owners(
         .flat_map(|owner| put_owner(placed, source, owner, &mut taken))
         .collect();
     placed.free_taken(&taken);
-    let rebuilt = Rebuilt::subtrees(&placed.boxes, put, &taken);
+    let mut rebuilt = Rebuilt::subtrees(&placed.boxes, put, &taken);
     let nodes: Vec<NodeId> = owners.iter().map(|owner| owner.node).collect();
-    lend_owners(placed, (&nodes, &slots), &taken, (source.arena, may_keep));
+    let changed = lend_owners(placed, (&nodes, &slots), &taken, may_keep);
+    rebuilt.changed = changed_owners(placed, source.arena, &changed, taken);
     rebuilt
 }
 
 /// Lends the taken boxes' caches to each owner's rebuilt subtree, at
-/// its slot; then clears the caches of the ancestors of each owner whose
-/// subtree changed. Every owner is lent before any is cleared: an owner
-/// can sit in a shallow owner's kept child, and a shallow owner lent
-/// after that owner's clear would get its old cache back.
+/// its slot; the owners whose subtree changed, with their slots. Every
+/// owner is lent before any is settled: an owner can sit in a shallow
+/// owner's kept child.
 fn lend_owners(
     placed: &mut Placed,
     (owners, slots): (&[NodeId], &[usize]),
     taken: &Taken,
-    (arena, may_keep): (&Arena, &dyn Fn(NodeId) -> bool),
-) {
-    let changed: Vec<NodeId> = (owners.iter().zip(slots))
+    may_keep: &dyn Fn(NodeId) -> bool,
+) -> Vec<(NodeId, usize)> {
+    (owners.iter().zip(slots))
         .filter(|&(_, &slot)| !lend_subtree(placed, slot, taken, may_keep))
-        .map(|(&owner, _)| owner)
-        .collect();
-    for owner in changed {
-        clear_ancestors(placed, ancestors(arena, owner));
-    }
+        .map(|(&owner, &slot)| (owner, slot))
+        .collect()
+}
+
+/// Each changed owner for layout to settle: its slot, its ancestors'
+/// slots nearest first, and what the taken box of its key in its slot
+/// held.
+fn changed_owners(
+    placed: &Placed,
+    arena: &Arena,
+    changed: &[(NodeId, usize)],
+    mut taken: Taken,
+) -> Vec<Changed> {
+    let before = |old: (Key, LayoutBox)| match old {
+        (Key::Element(_), old) => Some(Before {
+            cache: old.cache,
+            layout: old.layout,
+            asked: old.asked,
+        }),
+        (Key::Text(..), _) => None,
+    };
+    changed
+        .iter()
+        .map(|&(owner, slot)| Changed {
+            slot,
+            ancestors: ancestor_slots(placed, ancestors(arena, owner)),
+            before: taken.boxes.remove(&slot).and_then(before),
+        })
+        .collect()
 }
 
 /// Takes each owner's boxes, at `slots`, out of `placed`: a shallow
@@ -178,21 +205,17 @@ fn lend_subtree(
     lender.lend_from(&mut placed.boxes, slot)
 }
 
-/// Clears the cache and hoisted list of each of `ancestors` that
-/// holds a box. Only element boxes have children, so these are every
-/// box above a rebuilt subtree.
-fn clear_ancestors(placed: &mut Placed, ancestors: impl Iterator<Item = NodeId>) {
-    for ancestor in ancestors {
-        if let Some(slot) = placed.slots.of(Key::Element(ancestor)) {
-            placed.boxes[slot].cache.clear();
-            placed.boxes[slot].hoisted.clear();
-        }
-    }
+/// The slots of those of `ancestors` that hold a box. Only element
+/// boxes have children, so these are every box above a rebuilt subtree.
+fn ancestor_slots(placed: &Placed, ancestors: impl Iterator<Item = NodeId>) -> Vec<usize> {
+    ancestors
+        .filter_map(|ancestor| placed.slots.of(Key::Element(ancestor)))
+        .collect()
 }
 
 /// The elements above `node`, nearest first.
 fn ancestors(arena: &Arena, node: NodeId) -> impl Iterator<Item = NodeId> + '_ {
-    let parent = |&node: &NodeId| arena.get(node, "clear_ancestors").parent;
+    let parent = |&node: &NodeId| arena.get(node, "ancestor_slots").parent;
     std::iter::successors(parent(&node), parent)
 }
 

@@ -77,14 +77,14 @@ style attribute, a refused tag, a calc that fails at layout).
 
 | Edit | rows | elements visited | boxes built | layout calls | boxes painted | scene items |
 |---|---|---|---|---|---|---|
-| same-size value | 100 | 402 | 702 | 109 | 702 | 400 |
-| resizing label | 100 | 402 | 702 | 111 | 702 | 400 |
+| same-size value | 100 | 402 | 702 | 3 | 702 | 400 |
+| resizing label | 100 | 402 | 702 | 112 | 702 | 400 |
 | equal write | 100 | 402 | 702 | 1 | 702 | 400 |
 | hover | 100 | 402 | 702 | 1 | 702 | 400 |
 | focus | 100 | 402 | 702 | 1 | 702 | 401 |
 | class toggled | 100 | 402 | 702 | 1 | 702 | 402 |
-| same-size value | 1000 | 4002 | 7002 | 1009 | 7002 | 4000 |
-| resizing label | 1000 | 4002 | 7002 | 1011 | 7002 | 4000 |
+| same-size value | 1000 | 4002 | 7002 | 3 | 7002 | 4000 |
+| resizing label | 1000 | 4002 | 7002 | 1012 | 7002 | 4000 |
 | equal write | 1000 | 4002 | 7002 | 1 | 7002 | 4000 |
 | hover | 1000 | 4002 | 7002 | 1 | 7002 | 4000 |
 | focus | 1000 | 4002 | 7002 | 1 | 7002 | 4001 |

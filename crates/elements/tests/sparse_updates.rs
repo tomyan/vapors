@@ -50,7 +50,7 @@ enum Check {
 /// restyled, laid out, text layouts built. The table in
 /// docs/plans/iu1.md is these numbers; a change here updates it.
 const EXPECTED: [(usize, usize, usize); 6] = [
-    (0, 5, 1),
+    (0, 2, 1),
     (0, 9, 2),
     (0, 0, 0),
     (4, 0, 0),
@@ -59,7 +59,10 @@ const EXPECTED: [(usize, usize, usize); 6] = [
 ];
 
 /// The walk after each edit of `EDITS`, by row count: elements visited,
-/// boxes built, layout calls, boxes painted, boxes copied (kept parts
+/// boxes built, layout calls (the same-size edit's are constant in
+/// rows: the rebuilt value is laid out in isolation, M10,
+/// `layout/isolated.rs`; the resizing edit's are rows + 12, the body
+/// asking each row), boxes painted, boxes copied (kept parts
 /// read and kept: none, as no edit moves a box it did not build), scene
 /// items built, map
 /// entries patched (the elements built again or moved), paint order
@@ -78,8 +81,8 @@ const EXPECTED_WALKS: [(usize, [[usize; 11]; 6]); 2] = [
     (
         100,
         [
-            [1, 2, 109, 2, 0, 1, 1, 0, 0, 2, 2],
-            [1, 2, 111, 6, 0, 4, 3, 0, 0, 6, 2],
+            [1, 2, 3, 2, 0, 1, 1, 0, 0, 2, 2],
+            [1, 2, 112, 6, 0, 4, 3, 0, 0, 6, 2],
             [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
             [4, 2, 1, 2, 0, 2, 1, 0, 0, 2, 2],
             [1, 2, 1, 2, 0, 3, 1, 0, 0, 2, 2],
@@ -89,8 +92,8 @@ const EXPECTED_WALKS: [(usize, [[usize; 11]; 6]); 2] = [
     (
         1000,
         [
-            [1, 2, 1009, 2, 0, 1, 1, 0, 0, 2, 2],
-            [1, 2, 1011, 6, 0, 4, 3, 0, 0, 6, 2],
+            [1, 2, 3, 2, 0, 1, 1, 0, 0, 2, 2],
+            [1, 2, 1012, 6, 0, 4, 3, 0, 0, 6, 2],
             [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
             [4, 2, 1, 2, 0, 2, 1, 0, 0, 2, 2],
             [1, 2, 1, 2, 0, 3, 1, 0, 0, 2, 2],

@@ -2,6 +2,11 @@ use taffy::{Dimension, Size, Style};
 
 use super::*;
 
+const HIDDEN_ASKED: crate::layout::Asked = crate::layout::Asked {
+    input: taffy::LayoutInput::HIDDEN,
+    in_block: false,
+};
+
 /// One element box whose width is a calc handle at `address`.
 fn with_calc(address: usize) -> Vec<LayoutBox> {
     let style = Style {
@@ -73,4 +78,20 @@ fn an_unrestyled_box_holding_a_calc_is_lent_its_cache() {
 
     // Then
     assert_eq!(lent, 1);
+}
+
+#[test]
+fn a_lent_box_takes_the_inputs_the_kept_box_was_asked_with_its_cache() {
+    // Given: the kept box was asked once
+    let mut kept = KeptBoxes::default();
+    let mut boxes = with_calc(0x1000);
+    boxes[0].asked.push(HIDDEN_ASKED);
+    kept.keep(Slots::default().place(boxes), 1.0);
+    let mut placed = kept.place(with_calc(0x1000));
+
+    // When
+    kept.lend(&mut placed, 1.0, &|_| true);
+
+    // Then
+    assert_eq!(placed.boxes[0].asked, [HIDDEN_ASKED]);
 }
