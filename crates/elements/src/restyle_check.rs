@@ -21,7 +21,7 @@ use crate::update::{Viewport, environment};
 /// values differ (found over every longhand, so one the fresh style
 /// leaves unset while the kept style set it is named), or else the part
 /// of the style outside the longhands.
-fn differing_property(kept: Option<&ComputedStyle>, fresh: &ComputedStyle) -> String {
+pub(crate) fn differing_property(kept: Option<&ComputedStyle>, fresh: &ComputedStyle) -> String {
     let Some(kept) = kept else {
         return "no kept style".to_owned();
     };
@@ -62,6 +62,7 @@ impl Document {
                 "{}",
                 self.narrowed_restyle_mismatch(node, kept.styles.get(node), &style)
             );
+            let style = fresh.alloc(style);
             fresh.set(node, style);
         }
     }
@@ -85,7 +86,7 @@ impl Document {
     }
 
     /// `tag#id.class.class` for a message.
-    fn describe(&self, node: NodeId) -> String {
+    pub(crate) fn describe(&self, node: NodeId) -> String {
         let Some(element) = self.arena.get(node, "restyle").element() else {
             return format!("{node:?}");
         };

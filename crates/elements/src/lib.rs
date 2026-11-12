@@ -115,6 +115,7 @@ mod restyle;
 mod restyle_check;
 mod restyle_children;
 mod restyle_pass;
+mod restyle_share;
 mod scene_view;
 mod scroll;
 mod scroll_chains;

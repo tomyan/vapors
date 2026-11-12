@@ -27,6 +27,10 @@ fn gpu_mount_frames_each_draw_a_fresh_page_and_keep_no_gpu_time() {
     assert_eq!(samples.frame.len(), SETTINGS.runs);
     assert!(samples.gpu_time.is_none());
     assert!(samples.counts.update.elements_restyled >= ROWS * 4);
+    // the measured page's rows share: one style per row element, html
+    // and body their own (mount_styles_tests.rs holds it at two sizes)
+    assert_eq!(samples.counts.update.styles_computed, 4);
+    assert_eq!(samples.counts.update.styles_live, 6);
     assert_eq!(mount.mounted.len(), SETTINGS.warmup + SETTINGS.runs + 1);
 }
 
