@@ -11,6 +11,7 @@ mod a11y_error;
 mod a11y_error_message;
 mod a11y_find;
 mod a11y_mirror;
+mod a11y_mirror_bounds;
 mod a11y_mirror_counts;
 mod a11y_mirror_diff;
 mod a11y_mirror_index;
@@ -154,7 +155,7 @@ mod update_paint;
 
 pub use a11y_drive::{Command, Held, Reply};
 pub use a11y_error::AxError;
-pub use a11y_mirror::{AxMirrorNode, AxPlace, AxRange, AxUpdate};
+pub use a11y_mirror::{AxMirrorNode, AxPlace, AxRange, AxScroll, AxUpdate};
 pub use a11y_mirror_counts::AxTakeCounts;
 pub use a11y_mirror_owner::AxTaker;
 pub use a11y_projection::{AxNode, chromium_name_for_aria};

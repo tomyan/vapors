@@ -15,7 +15,7 @@ use crate::a11y_mirror_index::AxIndex;
 use crate::a11y_mirror_record::AboveMemo;
 use crate::document::Document;
 
-pub use vapors_a11y::{AxMirrorNode, AxPlace, AxRange, AxUpdate};
+pub use vapors_a11y::{AxMirrorNode, AxPlace, AxRange, AxScroll, AxUpdate};
 
 impl Document {
     /// What changed in the tree since the last take; `None` when

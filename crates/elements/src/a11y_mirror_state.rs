@@ -84,6 +84,16 @@ impl AxMirror {
         }
     }
 
+    /// Notes `node` scrolled: its offset changed, which moves no box of
+    /// its own, and the boxes it moved are left out (`Placed::scrolled`).
+    /// An offset clamped by an update is read without this: the boxes
+    /// built, moved or freed inside it reach it as their ancestor.
+    pub(crate) fn touch_node(&mut self, node: NodeId) {
+        if !self.all {
+            self.touched.nodes.insert(node);
+        }
+    }
+
     /// Notes `node` inserted: changed, and moved among its siblings.
     fn touch_replaced(&mut self, node: NodeId) {
         if self.all {

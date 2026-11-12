@@ -59,8 +59,26 @@ pub struct AxMirrorNode {
     pub range: Option<AxRange>,
     /// Whether it can take focus now (`focus_candidate`).
     pub focusable: bool,
-    /// Its border box in CSS pixels, as the last update placed it.
+    /// Its border box in CSS pixels from the border box of its parent
+    /// node (the padding box of the parent's mirror element), plus the
+    /// parent's scroll offset; from the viewport for a top node. A
+    /// node's record does not change when a container above it
+    /// scrolls.
     pub bounds: AxRect,
+    /// Its scroll, when it is a scroll container: the mirror's element
+    /// scrolls, and the nodes under it move with one write.
+    pub scroll: Option<AxScroll>,
+}
+
+/// A scroll container's offset and extent, in CSS pixels.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct AxScroll {
+    /// How far its content is scrolled, as applied: `[x, y]`.
+    pub offset: [f32; 2],
+    /// How far its content reaches from its padding box's corner,
+    /// `[width, height]`: the box's size plus how far it can scroll, so
+    /// the mirror's element scrolls as far.
+    pub extent: [f32; 2],
 }
 
 /// A node's states; `None` where Chromium leaves the state out.
@@ -117,7 +135,7 @@ pub struct AxRange {
     pub max: f64,
 }
 
-/// A border box in CSS pixels: the viewport's origin at the top left.
+/// A border box in CSS pixels, from the origin its record names.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct AxRect {
     /// Left edge.

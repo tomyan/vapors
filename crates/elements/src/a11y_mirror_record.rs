@@ -3,8 +3,9 @@
 //! focusability, and its parent in the tree: the nearest node shown
 //! above it, found by walking up for one node, or carried down a
 //! document-order pass for every node ([`AboveMemo`]); a node under an
-//! `aria-hidden` ancestor is not in the tree. Read from the last update,
-//! as `ax_tree` is.
+//! `aria-hidden` ancestor is not in the tree. A scroll container with no
+//! role is a node too (`a11y_mirror_bounds.rs`), and the bounds are
+//! from the parent node. Read from the last update, as `ax_tree` is.
 
 use vapors_dom::NodeId;
 
@@ -16,7 +17,6 @@ use crate::a11y_tree::finite;
 use crate::document::Document;
 use crate::layout::BoxRect;
 use crate::node_map::NodeMap;
-use vapors_a11y::AxRect;
 
 /// What is above a node: an `aria-hidden` ancestor, or its parent.
 #[derive(Clone, Copy)]
@@ -109,7 +109,8 @@ impl Document {
             states: self.ax_states(node),
             range: self.ax_range(node, &role),
             focusable: self.focus_candidate(node),
-            bounds: rect(bounds),
+            bounds: self.ax_relative(bounds, parent),
+            scroll: self.ax_scroll(node, bounds),
             name,
             role,
         };
@@ -136,7 +137,7 @@ impl Document {
         let bounds = painted
             .border_box(node)
             .filter(|_| painted.is_visible(node))?;
-        let role = self.ax_role(node, &index.ids)?;
+        let role = self.ax_mirror_role(node, &index.ids)?;
         Some((bounds, role))
     }
 
@@ -157,15 +158,5 @@ impl Document {
             min: number("aria-valuemin")?,
             max: number("aria-valuemax")?,
         })
-    }
-}
-
-/// `bounds` as the mirror's rect.
-fn rect(bounds: BoxRect) -> AxRect {
-    AxRect {
-        x: bounds.x,
-        y: bounds.y,
-        width: bounds.width,
-        height: bounds.height,
     }
 }

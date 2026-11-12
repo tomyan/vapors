@@ -19,6 +19,7 @@ pub(crate) fn node(id: u64, parent: Option<u64>, role: &str, name: &str) -> AxMi
         range: None,
         focusable: role == "button",
         bounds: AxRect::default(),
+        scroll: None,
     }
 }
 
