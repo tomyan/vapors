@@ -65,7 +65,12 @@ impl Stacking {
 /// a vacant slot. Kept between updates and made again only for the
 /// rebuilt slots (`patched`): a stacking comes from the used style,
 /// and an element whose computed style changes is marked and its box
-/// built again (`restyle_pass.rs`).
+/// built again (`restyle_pass.rs`). The used `z-index` also depends on
+/// the parent's used display (a flex item's z-index applies when static), which can
+/// change while the element's computed style does not; that holds
+/// because the parent is marked and a mark builds its whole subtree
+/// again (`layout/marks.rs`). A used value that depends on something
+/// outside the subtree (a sibling, the viewport) needs its own check.
 #[derive(Default)]
 pub(crate) struct Stackings(Vec<Option<Stacking>>);
 

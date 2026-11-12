@@ -105,3 +105,28 @@ fn kept_stackings_that_differ_from_fresh_ones_are_refused_naming_the_slot() {
 
     // Then: it panics, naming slot 1
 }
+
+#[test]
+fn a_selector_on_another_element_updates_the_stacking_it_raises() {
+    // Given: `a` and `b` in the body; only an element after `.x` is raised
+    let mut doc = Document::new(FontSystem::bundle_only());
+    doc.add_stylesheet("app.css", ".x + div { position: relative; z-index: 2; }")
+        .expect("parses");
+    let body = doc.body();
+    let a = doc.create_element("div");
+    doc.append(body, a);
+    let b = doc.create_element("div");
+    doc.append(body, b);
+    doc.update(VIEWPORT).expect("updates");
+    let before = kept(&doc);
+
+    // When: `a` gets the class, which restyles `b` through the sibling selector
+    doc.set_attribute(a, "class", "x");
+    doc.update(VIEWPORT).expect("updates");
+
+    // Then: one slot changed, to a positioned box with z-index 2
+    let changed = differing(&before, &kept(&doc));
+    assert_eq!(changed.len(), 1, "{changed:?}");
+    let stacking = changed[0].1.expect("an element's slot holds a stacking");
+    assert_eq!((stacking.positioned, stacking.z), (true, Some(2)));
+}
