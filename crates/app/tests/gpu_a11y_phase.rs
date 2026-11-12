@@ -9,47 +9,14 @@
 #[path = "support/surface.rs"]
 mod support;
 
-use std::cell::RefCell;
 use std::rc::Rc;
 
-use support::{app_frame, document};
+use support::a11y_buttons::{buttons, mirrored_app, names};
+use support::app_frame;
 use vapors_app::ElementsApp;
-use vapors_dom::{Dom, NodeId};
-use vapors_elements::{AxUpdate, Document};
+use vapors_dom::Dom;
 use vapors_gpu_harness::gpu;
 use vapors_platform::Next;
-
-/// Buttons as flex items: the only layout vapors gives a `<button>`.
-const CSS: &str = ".page { display: flex; font-size: 4px; } \
-    button { width: 8px; height: 4px; margin: 0; padding: 0; }";
-
-/// A page with two buttons, named by their text, and the text of the first.
-fn buttons() -> (Rc<RefCell<Document>>, NodeId) {
-    let mut doc = document(CSS, &[(None, "div", "page")]);
-    let page = doc.children(doc.body())[0];
-    let first = button(&mut doc, page, "One");
-    button(&mut doc, page, "Two");
-    (Rc::new(RefCell::new(doc)), first)
-}
-
-/// A button under `page` named `name`; its text node.
-fn button(doc: &mut Document, page: NodeId, name: &str) -> NodeId {
-    let button = doc.create_element("button");
-    doc.append(page, button);
-    let text = doc.create_text(name);
-    doc.append(button, text);
-    text
-}
-
-fn mirrored_app(doc: &Rc<RefCell<Document>>) -> ElementsApp {
-    let mut app = ElementsApp::new(Rc::clone(doc));
-    app.mirror_a11y(true);
-    app
-}
-
-fn names(update: &AxUpdate) -> Vec<&str> {
-    update.nodes.iter().map(|node| node.name.as_str()).collect()
-}
 
 #[test]
 fn gpu_the_first_frame_takes_every_node_and_an_idle_frame_nothing() {

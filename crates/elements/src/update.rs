@@ -99,6 +99,16 @@ impl Document {
         self.changes = Changes::default();
     }
 
+    /// Whether anything shown changed since the last update: the a11y
+    /// tree and the mirror's take read the last update and refuse while
+    /// this holds, so a host's own steps after an update (the focus
+    /// fixup's blur, the rehover under a resting pointer) are followed
+    /// by another update when they changed something.
+    #[must_use]
+    pub fn changed_since_update(&self) -> bool {
+        self.changes.since_update
+    }
+
     /// The last successful update's result, if the document has not
     /// failed an update since.
     #[must_use]
