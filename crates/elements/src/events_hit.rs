@@ -30,11 +30,20 @@ impl Document {
 
     /// After an update: the element under the pointer's last position may
     /// have changed with the layout, so `:hover` follows it (the next
-    /// update shows it) without an event.
+    /// update shows it) without an event. Tested only when a hit the
+    /// update changed could move it (`HitsChanged`, M11); else the hover
+    /// stands.
     pub(crate) fn rehover_in(&mut self, painted: &crate::painted::Painted) {
         let Some(point) = self.pointer.position else {
             return;
         };
+        if !painted
+            .hits_changed
+            .may_move_hover(point, self.pointer.hovered)
+        {
+            return;
+        }
+        self.counts.hovers_tested += 1;
         let target = painted.hit(point);
         if target != self.pointer.hovered {
             self.set_flag_chain(States::HOVER, target);

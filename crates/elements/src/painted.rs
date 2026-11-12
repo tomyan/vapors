@@ -32,6 +32,9 @@ pub struct Painted {
     /// on the first hit test after paint order is walked, then patched
     /// by each update (`kept_hits.rs`).
     pub(crate) hits: std::cell::OnceCell<crate::kept_hits::KeptHits>,
+    /// The hits this update removed or added, when known, for the
+    /// hover after it (`events_hit.rs`).
+    pub(crate) hits_changed: crate::kept_hits::HitsChanged,
     /// The cursor over each element that takes the pointer.
     pub(crate) cursors: NodeMap<Cursor>,
     /// Paint order, clips and which scroll containers a scroll over
@@ -77,6 +80,7 @@ impl Painted {
             paddings: NodeMap::default(),
             visible: NodeSet::default(),
             hits: std::cell::OnceCell::new(),
+            hits_changed: crate::kept_hits::HitsChanged::Unknown,
             cursors: NodeMap::default(),
             order: crate::kept_order::KeptOrder::default(),
             ranges: NodeMap::default(),

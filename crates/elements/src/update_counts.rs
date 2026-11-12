@@ -79,6 +79,11 @@ pub struct UpdateCounts {
     /// moved, and below them those whose clip comes from a box whose
     /// clip changed; every slot when the shape changed.
     pub clips_redone: usize,
+    /// Times the update hit tested the pointer's position after paint
+    /// (`events_hit.rs`): 1 when a hit paint removed or added holds the
+    /// pointer or is the hovered element's, or the hits were gathered
+    /// afresh; else 0, and the hover stands (M11).
+    pub hovers_tested: usize,
 }
 
 impl UpdateCounts {

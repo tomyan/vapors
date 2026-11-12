@@ -13,6 +13,7 @@
 use crate::changed_slots::ChangedSlots;
 use crate::drawn_steps::DrawnSteps;
 use crate::kept_box::{BoxFrom, KeptBox};
+use crate::kept_hits::HitsChanged;
 use crate::kept_order::KeptOrder;
 use crate::layout::{BoxRect, Content, LayoutBox};
 use crate::paint::{PaintInput, started};
@@ -68,7 +69,8 @@ fn patched_slots(
 
 /// `painted`'s drawing steps made afresh, and its kept batches and hits
 /// dropped, when `order` was walked again; else all three patched for
-/// the `patched` slots, the hits for the first `with_hits` only.
+/// the `patched` slots, the hits for the first `with_hits` only, noting
+/// the hits that changed.
 fn drawn_updated(
     painted: &mut Painted,
     order: &KeptOrder,
@@ -78,15 +80,19 @@ fn drawn_updated(
         painted.drawn = DrawnSteps::of(&order.steps, &painted.kept_boxes);
         painted.kept_batches = std::cell::RefCell::default();
         painted.hits = std::cell::OnceCell::new();
+        painted.hits_changed = HitsChanged::Unknown;
         return;
     }
     painted
         .drawn
         .patch(patched.iter().copied(), &painted.kept_boxes);
-    if let Some(hits) = painted.hits.get_mut() {
-        let slots = patched[..with_hits].iter().copied();
-        hits.patch(slots, &painted.drawn, &painted.kept_boxes);
-    }
+    painted.hits_changed = match painted.hits.get_mut() {
+        Some(hits) => {
+            let slots = patched[..with_hits].iter().copied();
+            HitsChanged::Known(hits.patch(slots, &painted.drawn, &painted.kept_boxes))
+        }
+        None => HitsChanged::Unknown,
+    };
     batches_patched(painted, patched);
 }
 
