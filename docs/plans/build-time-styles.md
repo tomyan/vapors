@@ -41,7 +41,7 @@ measured".
   two runtime slices for `Used`, one for the text cache, two for
   refusing Rust-added sheets beside analysed elements, five compiler
   and runtime slices for build-time winners, the splice mark, and two
-  measurement slices. Section 7 has five decisions for Tom.
+  measurement slices. Section 7 records Tom's five decisions.
 
 ## 1. What the compiler can resolve per template element
 
@@ -307,8 +307,6 @@ turns a defect into a refusal, never into a silently wrong render.
 
 ### Loud checks
 
-### Loud checks
-
 - **Winners oracle, debug builds only:** every element that took
   compiled winners also runs the full candidate scan, and the two
   `Winners` (longhands and custom properties) must be equal; a
@@ -553,7 +551,14 @@ slices touch `crates/compiler`, `crates/css`, `crates/dom`,
 `crates/elements/src/style/` and `restyle_pass.rs`; T1 touches
 `crates/elements/src/layout/text_*.rs`.
 
-## 7. Decisions for Tom
+## 7. Decisions
+
+Decided by Tom, 2026-11-12, taking the lead's recommendations: 1 (a)
+U1 and U2 at run time first; 2 (a) Rust sheets beside analysed elements
+refused, both ways; 3 (a) ancestors above a component's root at run time;
+4 (b) shapes move to the shape table, and property 7 is reworded to match;
+5 (a) property 8's bound as the record words it. The options are kept
+below as the record of what was weighed.
 
 1. **Order: U2 and U1 before B0 to B3, or after.** (a) Before:
    property 7's published time then includes the step that moves it
