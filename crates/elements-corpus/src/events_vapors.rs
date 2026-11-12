@@ -194,7 +194,13 @@ use read::{checked, projection, selections, values};
 
 /// The event's type as the log names it, each modifier held added as the
 /// recording adds it (`events_recording::MODIFIER_KEYS`): `click+alt`.
+/// Mouse events only (`events_recording::is_mouse_event`), as the
+/// recording reads a `MouseEvent`'s modifiers alone; a key event's are
+/// not logged.
 fn logged_type(event: &vapors_dom::Event) -> String {
+    if !crate::events_recording::is_mouse_event(event.name()) {
+        return event.name().to_owned();
+    }
     let m = event.modifiers();
     let held = [m.alt, m.control, m.meta, m.shift];
     crate::events_recording::MODIFIER_KEYS

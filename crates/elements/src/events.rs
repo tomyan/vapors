@@ -139,13 +139,18 @@ impl Document {
         target
     }
 
+    /// `:active` clears and the press ends; the element the click goes
+    /// to, when the pressed and released elements are both still in the
+    /// document (a `pointerup` listener may have removed either; Chromium
+    /// drops the click when the mousedown node is removed).
     fn release(&mut self, target: Option<NodeId>) -> Option<NodeId> {
         self.set_flag_chain(States::ACTIVE, None);
         let pressed = self
             .pointer
             .pressed
             .take()
-            .filter(|node| self.contains(*node));
+            .and_then(|node| self.still_in(node));
+        let target = target.and_then(|node| self.still_in(node));
         let click = match (pressed, target) {
             (Some(pressed), Some(target)) => self.common_ancestor(pressed, target),
             _ => None,

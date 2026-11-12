@@ -17,7 +17,9 @@ pub struct Event {
     pointer: Option<Pointer>,
     capture: Option<Capture>,
     target: Option<NodeId>,
-    key: Option<String>,
+    pub(crate) key: Option<String>,
+    pub(crate) code: Option<String>,
+    pub(crate) repeat: bool,
     modifiers: Modifiers,
 }
 
@@ -31,8 +33,9 @@ impl Event {
         }
     }
 
-    /// The modifier keys held with a pointer event: `pointerdown`,
-    /// `pointerup`, `click` and `dblclick` carry them.
+    /// The modifier keys held with a pointer or key event: `pointerdown`,
+    /// `pointerup`, `click`, `dblclick`, `keydown` and `keyup` carry
+    /// them.
     #[must_use]
     pub fn with_modifiers(mut self, modifiers: Modifiers) -> Event {
         self.modifiers = modifiers;
@@ -95,20 +98,6 @@ impl Event {
     #[must_use]
     pub fn offset(&self) -> [f32; 2] {
         self.pointer.map_or([0.0, 0.0], |pointer| pointer.offset)
-    }
-
-    /// Attaches the key of a `keydown` or `keyup`, as the DOM names it.
-    #[must_use]
-    pub fn with_key(mut self, key: &str) -> Event {
-        self.key = Some(key.to_owned());
-        self
-    }
-
-    /// The key of a `keydown` or `keyup` (`"Enter"`, `" "`, `"a"`), or
-    /// empty on another event.
-    #[must_use]
-    pub fn key(&self) -> &str {
-        self.key.as_deref().unwrap_or_default()
     }
 
     /// Names the node the event is dispatched to: the dispatcher sets it.

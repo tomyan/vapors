@@ -130,7 +130,9 @@ arms the new one.
    `focusout`; its event handlers may change the document, so ask for
    a frame when `take_changed()` is then true. A host that forgets it
    gets `Unplaced::FocusNotSettled` from `give` for the next key or
-   typed text while that element has focus.
+   typed text while that element has focus. An element hidden after
+   the settle and before the next update blurs the same way as the
+   next key or typed text arrives, which then reaches nothing.
 
 An app that skips step 3 never shows a tooltip early: it shows at the
 first frame drawn at or after its deadline, which may be much later.

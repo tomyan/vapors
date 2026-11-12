@@ -34,10 +34,7 @@ impl Document {
     /// noting it as reported: not for a field a listener removed, or one
     /// that is no longer a text field.
     fn selection_moved(&mut self, node: NodeId) -> bool {
-        if !self.contains(node) {
-            return false;
-        }
-        let Some(now) = self.selection(node) else {
+        let Some(now) = self.still_in(node).and_then(|node| self.selection(node)) else {
             return false;
         };
         let Some(editor) = self.editors.get_mut(&node) else {
