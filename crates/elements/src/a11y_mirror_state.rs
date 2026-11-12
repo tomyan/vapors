@@ -17,6 +17,7 @@ use crate::a11y_mirror::{AxMirrorNode, AxPlace, AxUpdate};
 use crate::a11y_mirror_counts::AxTakeCounts;
 use crate::a11y_mirror_diff::Diff;
 use crate::a11y_mirror_index::AxIndex;
+use crate::a11y_mirror_owner::Owner;
 use crate::changed_slots::ChangedSlots;
 use crate::document::Document;
 use crate::layout::{Key, Slots};
@@ -46,6 +47,8 @@ pub(crate) struct AxMirror {
     index: Option<AxIndex>,
     /// What the last take did.
     pub(crate) counts: AxTakeCounts,
+    /// The consumer that owns the takes, if attached.
+    pub(crate) owner: Owner,
 }
 
 impl Default for AxMirror {
@@ -57,6 +60,7 @@ impl Default for AxMirror {
             focus: None,
             index: None,
             counts: AxTakeCounts::default(),
+            owner: Owner::default(),
         }
     }
 }

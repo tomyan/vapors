@@ -39,11 +39,11 @@ fn frame_taken(app: &mut ElementsApp, gpu: &Gpu) -> AxUpdate {
 fn pointer_resting(app: &mut ElementsApp, gpu: &Gpu, x: f32, y: f32) {
     let platform = Platform::detached();
     app_frame(app, gpu);
-    app.ax_update();
+    let _ = app.ax_update();
     app.give(&Event::PointerMoved { x, y }, &platform)
         .expect("placed");
     app_frame(app, gpu);
-    app.ax_update();
+    let _ = app.ax_update();
 }
 
 fn record<'a>(update: &'a AxUpdate, name: &str) -> &'a vapors_elements::AxMirrorNode {
@@ -61,7 +61,7 @@ fn gpu_disabling_the_focused_button_blurs_it_and_the_frame_goes_on() {
     let mut app = mirrored_app(&doc);
     let gpu = gpu();
     app_frame(&mut app, &gpu);
-    app.ax_update();
+    let _ = app.ax_update();
     Document::focus(&doc, Some(buttons[0]));
     frame_taken(&mut app, &gpu);
     doc.borrow_mut().set_attribute(buttons[0], "disabled", "");
@@ -127,7 +127,7 @@ fn gpu_a_hover_style_that_moves_what_is_under_the_pointer_stops_the_frame_named(
     let mut app = mirrored_app(&doc);
     let gpu = gpu();
     app_frame(&mut app, &gpu);
-    app.ax_update();
+    let _ = app.ax_update();
     app.give(
         &Event::PointerMoved { x: 4.0, y: 5.0 },
         &Platform::detached(),

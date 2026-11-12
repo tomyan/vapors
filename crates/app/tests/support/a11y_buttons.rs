@@ -45,7 +45,7 @@ fn button(doc: &mut Document, page: NodeId, name: &str) -> NodeId {
 
 pub fn mirrored_app(doc: &Rc<RefCell<Document>>) -> ElementsApp {
     let mut app = ElementsApp::new(Rc::clone(doc));
-    app.mirror_a11y(true);
+    app.mirror_a11y(true).expect("one mirror per document");
     app
 }
 

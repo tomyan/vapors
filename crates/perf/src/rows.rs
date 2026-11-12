@@ -89,7 +89,7 @@ impl Rows {
         let mut app = ElementsApp::new(Rc::clone(&page.doc));
         app.time_frames(true);
         // the a11y mirror's take is judged with the other phases (R6)
-        app.mirror_a11y(true);
+        app.mirror_a11y(true).expect("one mirror per document");
         Self {
             page,
             app,

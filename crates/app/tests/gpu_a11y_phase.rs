@@ -127,17 +127,52 @@ fn gpu_a_mirror_attached_again_takes_every_node_again() {
     let gpu = gpu();
     app_frame(&mut app, &gpu);
     app.ax_update().expect("the first take");
-    app.mirror_a11y(false);
+    app.mirror_a11y(false).expect("detaches");
     doc.borrow_mut().set_text(text, "Uno");
     app_frame(&mut app, &gpu);
     assert_eq!(app.ax_update(), None);
 
     // When
-    app.mirror_a11y(true);
+    app.mirror_a11y(true).expect("attaches again");
     app_frame(&mut app, &gpu);
     let update = app.ax_update().expect("the new mirror's first take");
 
     // Then
     assert!(update.every, "{update:?}");
     assert_eq!(names(&update), ["Uno", "Two"]);
+}
+
+#[test]
+fn gpu_a_take_outside_the_app_is_refused_naming_ax_update_while_attached() {
+    // Given
+    let (doc, _) = buttons();
+    let mut app = mirrored_app(&doc);
+    let gpu = gpu();
+    app_frame(&mut app, &gpu);
+
+    // When
+    let refused = doc.borrow_mut().take_ax_update().expect_err("owned");
+
+    // Then
+    assert!(
+        refused.to_string().contains("ElementsApp::ax_update"),
+        "{refused}"
+    );
+}
+
+#[test]
+fn gpu_a_second_app_on_the_document_cannot_attach_a_mirror() {
+    // Given
+    let (doc, _) = buttons();
+    let _first = mirrored_app(&doc);
+    let mut second = ElementsApp::new(Rc::clone(&doc));
+
+    // When
+    let refused = second.mirror_a11y(true).expect_err("owned");
+
+    // Then
+    assert!(
+        refused.to_string().contains("ElementsApp::ax_update"),
+        "{refused}"
+    );
 }
