@@ -70,7 +70,9 @@ impl Judged {
     pub fn of(change: RowChange) -> Self {
         match change {
             RowChange::Idle => Self::UpdateTotal,
-            RowChange::Text | RowChange::Class | RowChange::HoveredClass => Self::EveryPhase,
+            RowChange::Text | RowChange::FlexText | RowChange::Class | RowChange::HoveredClass => {
+                Self::EveryPhase
+            }
             RowChange::Insert | RowChange::Resize | RowChange::Scroll => Self::Nothing,
         }
     }

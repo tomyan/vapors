@@ -55,7 +55,9 @@ fn row_workloads() -> Vec<(usize, RowChange)> {
         .into_iter()
         .flat_map(|count| edits.map(|change| (count, change)))
         .collect();
-    all.extend([1000, 3000, 10_000].map(|count| (count, RowChange::HoveredClass)));
+    for change in [RowChange::HoveredClass, RowChange::FlexText] {
+        all.extend([1000, 3000, 10_000].map(|count| (count, change)));
+    }
     all.extend(
         [10_000]
             .into_iter()

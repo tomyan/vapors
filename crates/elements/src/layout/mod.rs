@@ -1,6 +1,7 @@
 //! Layout: the box tree laid out by Taffy in CSS pixels, unrounded, and
 //! each box's border box in document coordinates.
 
+mod asked;
 mod boxes;
 mod calcs;
 mod field_box;
@@ -82,6 +83,7 @@ pub(crate) fn lay_out(
         calcs,
         written: Written::default(),
         calls: 0,
+        disowned: 0,
     };
     let available = Size {
         width: AvailableSpace::Definite(size.0),
@@ -95,6 +97,7 @@ pub(crate) fn lay_out(
     let work = LayoutWork {
         laid_out: tree.written.laid_out.len(),
         calls: tree.calls,
+        disowned: tree.disowned,
         settled,
         written: std::mem::take(&mut tree.written),
     };
@@ -116,6 +119,8 @@ pub(crate) fn lay_out(
 pub(crate) struct LayoutWork {
     pub(crate) laid_out: usize,
     pub(crate) calls: usize,
+    /// Recorded size answers disowned (`tree_cache.rs`).
+    pub(crate) disowned: usize,
     pub(crate) settled: Settled,
     pub(crate) written: Written,
 }
