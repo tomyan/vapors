@@ -54,6 +54,7 @@ impl Document {
             }
             Err(error) => {
                 self.dirty.everything();
+                self.counts.forget_styles();
                 Err(vec![error])
             }
         }

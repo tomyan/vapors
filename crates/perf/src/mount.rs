@@ -211,3 +211,7 @@ impl Workload for Mount {
 #[cfg(test)]
 #[path = "mount_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "mount_styles_tests.rs"]
+mod styles_tests;
