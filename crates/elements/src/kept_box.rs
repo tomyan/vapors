@@ -132,10 +132,15 @@ impl Part {
     }
 
     /// Puts this part's entries into `painted`'s maps, their positions
-    /// in scroll frame `frame`.
+    /// in scroll frame `frame`: its inline elements' frames noted here;
+    /// a range's or text field's own element's, by `kept_maps.rs`,
+    /// which owns them and must agree.
     pub(crate) fn enter(&self, painted: &mut Painted, frame: usize) {
-        for node in self.positioned() {
-            painted.node_frames.insert(node, frame);
+        for (node, _) in &self.rects {
+            painted.node_frames.insert(*node, frame);
+        }
+        for node in self.own_element_entries() {
+            assert_framed(painted, node, frame);
         }
         painted.cursors.extend(self.cursors.iter().copied());
         painted.visible.extend(self.visible.iter().copied());
@@ -152,23 +157,33 @@ impl Part {
         removed(&mut painted.rects, &self.rects);
         removed(&mut painted.ranges, &self.ranges);
         removed(&mut painted.text_origins, &self.text_origins);
-        for node in self.positioned() {
-            painted.node_frames.remove(&node);
+        for (node, _) in &self.rects {
+            painted.node_frames.remove(node);
         }
         for node in &self.visible {
             painted.visible.remove(node);
         }
     }
 
-    /// The elements whose positions this part holds: inline elements'
-    /// border boxes, range tracks and text origins.
-    fn positioned(&self) -> impl Iterator<Item = NodeId> + '_ {
-        let rects = self.rects.iter().map(|(node, _)| *node);
+    /// The elements of this part's range tracks and text origins: its
+    /// own box's element, whose frame `kept_maps.rs` notes.
+    fn own_element_entries(&self) -> impl Iterator<Item = NodeId> + '_ {
         let ranges = self.ranges.iter().map(|(node, _)| *node);
-        rects
-            .chain(ranges)
-            .chain(self.text_origins.iter().map(|(node, _)| *node))
+        ranges.chain(self.text_origins.iter().map(|(node, _)| *node))
     }
+}
+
+/// Panics, naming `node`, unless `painted` notes it in `frame`: the
+/// element's box entries are put (`kept_maps.rs`) before its part is
+/// entered (`paint_partial.rs`), in the frame its part is painted in.
+fn assert_framed(painted: &Painted, node: NodeId, frame: usize) {
+    let noted = painted.node_frames.get(&node).copied();
+    assert!(
+        noted == Some(frame),
+        "{node:?}'s part is painted in scroll frame {frame}, but its box's entries note \
+         {noted:?}: kept_maps.rs `fill` must run before the part is entered, with the \
+         frame of the same clip chain (kept_clips.rs); reproduce with `cargo xtask test`"
+    );
 }
 
 /// Removes the node of each of `entries` from `map`.

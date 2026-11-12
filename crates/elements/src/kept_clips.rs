@@ -77,6 +77,11 @@ impl Clips {
         self.own[slot]
     }
 
+    /// The slots the clips are kept for: one past the last.
+    pub(crate) fn len(&self) -> usize {
+        self.frame.len()
+    }
+
     /// Box `slot`'s inner clip: the one it gives its content.
     pub(crate) fn inner(&self, slot: usize) -> Option<BoxRect> {
         self.inner[slot]
@@ -141,17 +146,19 @@ impl Clips {
     }
 
     /// Box `slot`'s clips and frame worked out again from its clip
-    /// parent's; whether what its dependents take changed: its inner
-    /// clip, or the frame its content is in.
+    /// parent's; whether its inner clip or its frame changed, either of
+    /// which its dependents take. A box that starts or stops scrolling
+    /// is restacked, so paint order is walked again and its clips made
+    /// by `Clips::of`, never redone here.
     fn redo(&mut self, slot: usize, tree: &ClipTree, inner: Inner<'_>) -> bool {
         let parent = tree.parent(slot);
         let own = parent.and_then(|parent| self.inner[parent]);
         let frame = parent.map_or(PAGE, |parent| self.frame_inside(parent, inner));
         let new = inner.inner(slot, own);
         self.own[slot] = own;
-        let was = (self.inner[slot], self.frame_inside(slot, inner));
+        let was = (self.inner[slot], self.frame[slot]);
         (self.inner[slot], self.frame[slot]) = (new, frame);
-        was != (new, self.frame_inside(slot, inner))
+        was != (new, frame)
     }
 
     /// The frame of the content of box `slot`: its own when it scrolls,

@@ -86,6 +86,7 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
     }
     super::overflow::refuse_rounded_clip(&mut reader, &layout, &decoration);
     super::overflow::refuse_viewport_scroll(&mut reader, &layout, context.to_viewport);
+    super::overflow::refuse_scrolling_field(&mut reader, &layout, context.text_like_field);
     let mut result = Used {
         parts: super::parts::DEFAULT,
         z_index: applied_z_index(&mut reader, &layout, context.flex_item),

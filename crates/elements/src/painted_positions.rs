@@ -48,3 +48,7 @@ impl Painted {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "painted_positions_tests.rs"]
+mod tests;

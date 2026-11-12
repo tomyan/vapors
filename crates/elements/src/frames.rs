@@ -101,6 +101,18 @@ impl Frames {
         })
     }
 
+    /// Every frame but the page's shifted by `shift` more, device
+    /// pixels: what a scroll does to its container's frame, for tests
+    /// of the readers before placement scrolls frames.
+    #[cfg(test)]
+    pub(crate) fn shift_every_frame(&mut self, [dx, dy]: [f32; 2]) {
+        for (&frame, at) in &mut self.by_frame {
+            if frame != PAGE {
+                at.shift = [at.shift[0] + dx, at.shift[1] + dy];
+            }
+        }
+    }
+
     /// `rect`, CSS pixels in frame `frame`, on the page.
     pub(crate) fn rect(&self, frame: usize, rect: BoxRect) -> BoxRect {
         self.css_rect(*self.at(frame), rect)

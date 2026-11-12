@@ -43,7 +43,7 @@ pub(crate) fn paint_partial(
     let place = &|step| painted.drawn.place_of(step);
     let order = KeptOrder::updated(kept_order, (boxes, rects), input, changed, place);
     let scale = input.scale;
-    painted.frames = frames(&order, scale);
+    painted.frames = frames(&order, input);
     let (again, shifts) = to_paint(&order, (boxes, rects), (changed, kept), &mut painted, scale);
     dropped(&again, changed, boxes.len(), &mut painted);
     let shifted: Vec<usize> = shifts.iter().map(|shift| shift.slot).collect();
@@ -58,10 +58,17 @@ pub(crate) fn paint_partial(
     painted
 }
 
-/// The scroll frames of `order`'s scroll containers at `scale`.
-fn frames(order: &KeptOrder, scale: f32) -> Frames {
+/// The scroll frames of `order`'s scroll containers.
+fn frames(order: &KeptOrder, input: &PaintInput<'_>) -> Frames {
+    let scrolls = |slot| input.stackings.scrolls(slot);
+    crate::frames_check::assert_scrollers_agree(&order.thumbs, &order.clips, &scrolls);
     let depth = |slot| order.tree.depth(slot);
-    Frames::of(&order.thumbs, (&order.clips, &depth), &|_| [0.0; 2], scale)
+    Frames::of(
+        &order.thumbs,
+        (&order.clips, &depth),
+        &|_| [0.0; 2],
+        input.scale,
+    )
 }
 
 /// The slots whose parts this update paints again, shifts or drops:

@@ -55,6 +55,7 @@ mod focus_move;
 mod focus_style;
 mod focus_window;
 mod frames;
+mod frames_check;
 mod html;
 mod images;
 mod img_checks;

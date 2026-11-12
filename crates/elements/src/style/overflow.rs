@@ -54,6 +54,19 @@ pub(crate) fn refuse_viewport_scroll(reader: &mut Reader<'_>, style: &Style, to_
     }
 }
 
+/// Refuses a text or number field that scrolls: its text origin and
+/// marks come from its text child's rect, which is in the field's own
+/// scroll frame, while they are kept in the frame the field is in
+/// (`frames.rs`, IU4).
+pub(crate) fn refuse_scrolling_field(reader: &mut Reader<'_>, style: &Style, field: bool) {
+    if field && style.overflow.x == Overflow::Scroll {
+        reader.refuse(
+            "overflow-x",
+            "scrolls a text or number field, which vapors does not do: its text is placed from the field's box; use overflow: hidden or clip".to_owned(),
+        );
+    }
+}
+
 fn scheme(value: &Value) -> Result<Overflow, String> {
     match keyword(value)? {
         "visible" => Ok(Overflow::Visible),
