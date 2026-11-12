@@ -56,7 +56,7 @@ impl Painted {
             )
         });
         let drawn = (&self.drawn, self.order.steps.len());
-        KeptBatches::for_view(&mut slot, view, drawn, &self.kept_boxes);
+        KeptBatches::for_view(&mut slot, view, drawn, (&self.kept_boxes, &self.frames));
         drop(slot);
         Ref::map(self.kept_batches.borrow(), |kept| {
             kept.as_ref()

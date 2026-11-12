@@ -13,6 +13,7 @@
 
 use crate::changed_slots::ChangedSlots;
 use crate::drawn_steps::DrawnSteps;
+use crate::frames::Frames;
 use crate::kept_box::{BoxFrom, KeptBox};
 use crate::kept_hits::HitsChanged;
 use crate::kept_order::KeptOrder;
@@ -42,11 +43,12 @@ pub(crate) fn paint_partial(
     let place = &|step| painted.drawn.place_of(step);
     let order = KeptOrder::updated(kept_order, (boxes, rects), input, changed, place);
     let scale = input.scale;
+    painted.frames = frames(&order, input);
     let (again, shifts) = to_paint(&order, (boxes, rects), (changed, kept), &mut painted, scale);
     dropped(&again, changed, boxes.len(), &mut painted);
     let shifted: Vec<usize> = shifts.iter().map(|shift| shift.slot).collect();
     crate::kept_shift::apply(&mut painted, shifts, scale);
-    crate::kept_maps::fill(&mut painted, (boxes, rects), kept, changed);
+    crate::kept_maps::fill(&mut painted, (boxes, rects, &order), kept, changed);
     let (patched, with_hits) = patched_slots((&again, &shifted), changed, &order);
     let mut repaint = Repaint::new(boxes, rects, &order);
     repaint.boxes(again, input, &mut painted);
@@ -54,6 +56,19 @@ pub(crate) fn paint_partial(
     drawn_updated(&mut painted, &order, (&patched, with_hits));
     painted.order = order;
     painted
+}
+
+/// The scroll frames of `order`'s scroll containers.
+fn frames(order: &KeptOrder, input: &PaintInput<'_>) -> Frames {
+    let scrolls = |slot| input.stackings.scrolls(slot);
+    crate::frames_check::assert_scrollers_agree(&order.thumbs, &order.clips, &scrolls);
+    let depth = |slot| order.tree.depth(slot);
+    Frames::of(
+        &order.thumbs,
+        (&order.clips, &depth),
+        &|_| [0.0; 2],
+        input.scale,
+    )
 }
 
 /// The slots whose parts this update paints again, shifts or drops:
@@ -97,7 +112,8 @@ fn drawn_updated(
     painted.hits_changed = match painted.hits.get_mut() {
         Some(hits) => {
             let slots = patched[..with_hits].iter().copied();
-            HitsChanged::Known(hits.patch(slots, &painted.drawn, &painted.kept_boxes))
+            let changed = hits.patch(slots, &painted.drawn, &painted.kept_boxes);
+            HitsChanged::on_page(changed, &painted.frames)
         }
         // Only a release build reaches this arm: the debug check gathers
         // the hits after every paint (`kept_paint_check.rs`). Unknown is
@@ -114,7 +130,7 @@ fn batches_patched(painted: &mut Painted, patched: &[usize]) {
         let steps = patched
             .iter()
             .flat_map(|&slot| painted.drawn.places_of(slot));
-        kept.patch(steps, &painted.kept_boxes);
+        kept.patch(steps, (&painted.kept_boxes, &painted.frames));
     }
 }
 

@@ -22,7 +22,13 @@ pub struct Painted {
     /// The texts, images, icons and surface names the scene's items
     /// name, by id (`slab.rs`).
     pub(crate) slabs: crate::slab::Slabs,
+    /// Each element's border box, in its scroll frame (`frames.rs`).
     pub(crate) rects: NodeMap<BoxRect>,
+    /// The scroll frame of each element with an entry in `rects`,
+    /// `paddings`, `ranges` or `text_origins`, whose positions are in it.
+    pub(crate) node_frames: NodeMap<usize>,
+    /// Each scroll frame's shift and clip on the page.
+    pub(crate) frames: crate::frames::Frames,
     /// Each element's padding box's top-left, for pointer offsets.
     pub(crate) paddings: NodeMap<[f32; 2]>,
     /// The elements drawn: with a box and `visibility: visible` (focus,
@@ -80,6 +86,8 @@ impl Painted {
             scale,
             slabs: crate::slab::Slabs::default(),
             rects: NodeMap::default(),
+            node_frames: NodeMap::default(),
+            frames: crate::frames::Frames::page(scale),
             paddings: NodeMap::default(),
             visible: NodeSet::default(),
             hits: std::cell::OnceCell::new(),
@@ -123,7 +131,8 @@ impl Painted {
     /// The display list: a view over the kept paint in paint order.
     #[must_use]
     pub fn scene(&self) -> crate::SceneView<'_> {
-        crate::SceneView::new(&self.order.steps, &self.drawn, &self.kept_boxes)
+        let parts = (&self.kept_boxes[..], &self.frames);
+        crate::SceneView::new(&self.order.steps, &self.drawn, parts)
     }
 
     /// The text run a scene item names.
@@ -163,25 +172,11 @@ impl Painted {
         resolved::<String>(self.slabs.surfaces.get(id.0), "surface", id.0)
     }
 
-    /// The element's border box in CSS pixels, or `None` when it has no
-    /// box (`display: none`, or outside the document).
-    #[must_use]
-    pub fn border_box(&self, node: NodeId) -> Option<BoxRect> {
-        self.rects.get(&node).copied()
-    }
-
     /// Whether the element was drawn: it has a box and is
     /// `visibility: visible`.
     #[must_use]
     pub fn is_visible(&self, node: NodeId) -> bool {
         self.visible.contains(&node)
-    }
-
-    /// The element's padding box's top-left in CSS pixels, or `None`
-    /// when it has no box.
-    #[must_use]
-    pub fn padding_origin(&self, node: NodeId) -> Option<[f32; 2]> {
-        self.paddings.get(&node).copied()
     }
 
     /// The cursor over `point`: the one of the element it hits, the
@@ -198,7 +193,7 @@ impl Painted {
     /// holds its left and top edges, not its right and bottom.
     #[must_use]
     pub fn hit(&self, [x, y]: [f32; 2]) -> Option<NodeId> {
-        self.kept_hits().hit([x, y])
+        self.kept_hits().hit([x, y], &self.frames)
     }
 
     /// The kept hits, gathered from the scene view when none are kept.

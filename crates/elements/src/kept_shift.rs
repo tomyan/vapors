@@ -69,6 +69,7 @@ impl Shift {
         let (old, new) = (edges(part.from.rect), edges(from.rect));
         let shiftable = snaps_by(old, new, delta, scale)
             && part.from.padding == from.padding
+            && part.from.frame == from.frame
             && part.own.positions_only_in_scene_and_hits()
             && hits_shiftable(part, content)
             && items_shiftable(part, content)

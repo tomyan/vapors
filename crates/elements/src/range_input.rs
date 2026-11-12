@@ -79,7 +79,7 @@ impl Document {
     /// The value at `point` on `node`'s track: the thumb's centre runs
     /// from half a thumb in at either end, as Chromium maps a press.
     pub(crate) fn range_value_at(&self, node: NodeId, point: Point) -> Option<f64> {
-        let track = self.painted.as_ref()?.ranges.get(&node)?;
+        let track = self.painted.as_ref()?.range_track(node)?;
         let span = (track.width - track.thumb).max(0.0);
         let fraction = if span > 0.0 {
             (point[0] - track.x - track.thumb / 2.0) / span

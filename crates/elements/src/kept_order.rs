@@ -10,7 +10,7 @@
 
 use crate::changed_slots::ChangedSlots;
 use crate::clip_tree::ClipTree;
-use crate::kept_clips::Clips;
+use crate::kept_clips::{ClipInputs, Clips};
 use crate::layout::{BoxRect, LayoutBox};
 use crate::order_splice::Place;
 use crate::paint::PaintInput;
@@ -52,9 +52,14 @@ impl KeptOrder {
     /// The order of `boxes` at `rects`, every part made afresh.
     pub(crate) fn of(boxes: &[LayoutBox], rects: &[BoxRect], input: &PaintInput<'_>) -> Self {
         let tree = ClipTree::of(boxes);
-        let (clips, redone) = Clips::of(&tree, &|slot, own| {
-            crate::clip::inner(boxes, rects, slot, own, input)
-        });
+        let (clips, redone) = Clips::of(
+            &tree,
+            &BoxClips {
+                boxes,
+                rects,
+                input,
+            },
+        );
         let steps = paint_steps_with_outlines(boxes, &|index| input.stackings.get(index));
         Self {
             thumbs: thumbs(&steps),
@@ -121,16 +126,38 @@ impl KeptOrder {
     ) -> Self {
         let moved = changed.moved.iter().chain(&changed.scrolled);
         let slots = changed.rebuilt.iter().chain(moved).copied();
-        self.redone = self
-            .clips
-            .redo_under(slots.collect(), &self.tree, &|slot, own| {
-                crate::clip::inner(boxes, rects, slot, own, input)
-            });
+        self.redone = self.clips.redo_under(
+            slots.collect(),
+            &self.tree,
+            &BoxClips {
+                boxes,
+                rects,
+                input,
+            },
+        );
         self.walks = OrderWalks {
             clips: self.redone.len(),
             ..OrderWalks::default()
         };
         self
+    }
+}
+
+/// What clips read of `boxes` at `rects`: the clip each gives its
+/// content, and whether it scrolls.
+struct BoxClips<'a, 'b> {
+    boxes: &'a [LayoutBox],
+    rects: &'a [BoxRect],
+    input: &'a PaintInput<'b>,
+}
+
+impl ClipInputs for BoxClips<'_, '_> {
+    fn inner(&self, slot: usize, own: Option<BoxRect>) -> Option<BoxRect> {
+        crate::clip::inner(self.boxes, self.rects, slot, own, self.input)
+    }
+
+    fn scrolls(&self, slot: usize) -> bool {
+        self.input.stackings.scrolls(slot)
     }
 }
 

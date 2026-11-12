@@ -3,6 +3,7 @@
 mod support;
 
 use support::{document, element, refusals, text};
+use vapors_dom::Dom;
 
 #[test]
 fn what_overflow_cannot_do_yet_is_refused_naming_it() {
@@ -95,4 +96,26 @@ fn a_body_scrolls_when_the_root_takes_the_viewport() {
 
     // Then
     assert!(updated.is_ok(), "{:?}", updated.err());
+}
+
+#[test]
+fn a_text_field_that_scrolls_is_refused_naming_its_declaration() {
+    // Given: a text field given `overflow: auto`
+    let mut doc = document();
+    let body = doc.body();
+    let field = element(&mut doc, body, "input", "field");
+    doc.set_attribute(field, "type", "text");
+    doc.add_stylesheet("app.css", ".field { width: 6em; overflow: auto; }")
+        .expect("parses");
+
+    // When
+    let errors = refusals(&mut doc);
+
+    // Then
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.starts_with("app.css:1") && e.contains("overflow-x") && e.contains("field")),
+        "{errors:?}"
+    );
 }

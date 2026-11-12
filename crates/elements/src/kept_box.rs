@@ -30,6 +30,8 @@ pub(crate) struct BoxFrom {
     /// Its padding widths, for its padding and content box (% padding
     /// follows the containing block's width).
     pub(crate) padding: taffy::Rect<f32>,
+    /// The scroll frame its items, hits and entries are in (`frames.rs`).
+    pub(crate) frame: usize,
 }
 
 /// One box's kept paint.
@@ -58,17 +60,18 @@ pub(crate) struct Part {
 }
 
 impl BoxFrom {
-    /// What box `index`'s paint reads now, under `clip`.
+    /// What box `index`'s paint reads now, under `clip` in scroll
+    /// frame `frame`.
     pub(crate) fn of(
-        boxes: &[LayoutBox],
-        rects: &[BoxRect],
-        clip: Option<BoxRect>,
+        (boxes, rects): (&[LayoutBox], &[BoxRect]),
+        (clip, frame): (Option<BoxRect>, usize),
         index: usize,
     ) -> Self {
         Self {
             rect: rects[index],
             clip,
             padding: boxes[index].layout.padding,
+            frame,
         }
     }
 }
@@ -128,8 +131,17 @@ impl Part {
         self.rects.is_empty() && self.ranges.is_empty() && self.text_origins.is_empty()
     }
 
-    /// Puts this part's entries into `painted`'s maps.
-    pub(crate) fn enter(&self, painted: &mut Painted) {
+    /// Puts this part's entries into `painted`'s maps, their positions
+    /// in scroll frame `frame`: its inline elements' frames noted here;
+    /// a range's or text field's own element's, by `kept_maps.rs`,
+    /// which owns them and must agree.
+    pub(crate) fn enter(&self, painted: &mut Painted, frame: usize) {
+        for (node, _) in &self.rects {
+            painted.node_frames.insert(*node, frame);
+        }
+        for node in self.own_element_entries() {
+            assert_framed(painted, node, frame);
+        }
         painted.cursors.extend(self.cursors.iter().copied());
         painted.visible.extend(self.visible.iter().copied());
         painted.rects.extend(self.rects.iter().copied());
@@ -145,10 +157,33 @@ impl Part {
         removed(&mut painted.rects, &self.rects);
         removed(&mut painted.ranges, &self.ranges);
         removed(&mut painted.text_origins, &self.text_origins);
+        for (node, _) in &self.rects {
+            painted.node_frames.remove(node);
+        }
         for node in &self.visible {
             painted.visible.remove(node);
         }
     }
+
+    /// The elements of this part's range tracks and text origins: its
+    /// own box's element, whose frame `kept_maps.rs` notes.
+    fn own_element_entries(&self) -> impl Iterator<Item = NodeId> + '_ {
+        let ranges = self.ranges.iter().map(|(node, _)| *node);
+        ranges.chain(self.text_origins.iter().map(|(node, _)| *node))
+    }
+}
+
+/// Panics, naming `node`, unless `painted` notes it in `frame`: the
+/// element's box entries are put (`kept_maps.rs`) before its part is
+/// entered (`paint_partial.rs`), in the frame its part is painted in.
+fn assert_framed(painted: &Painted, node: NodeId, frame: usize) {
+    let noted = painted.node_frames.get(&node).copied();
+    assert!(
+        noted == Some(frame),
+        "{node:?}'s part is painted in scroll frame {frame}, but its box's entries note \
+         {noted:?}: kept_maps.rs `fill` must run before the part is entered, with the \
+         frame of the same clip chain (kept_clips.rs); reproduce with `cargo xtask test`"
+    );
 }
 
 /// Removes the node of each of `entries` from `map`.

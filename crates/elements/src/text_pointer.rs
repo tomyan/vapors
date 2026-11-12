@@ -46,7 +46,7 @@ impl Document {
 
     /// Where `point` lies in the field's text, from the text's origin.
     fn text_point(&self, node: NodeId, point: Point) -> Option<(f32, f32)> {
-        let origin = self.painted.as_ref()?.text_origins.get(&node)?;
+        let origin = self.painted.as_ref()?.text_origin(node)?;
         Some((point[0] - origin[0], point[1] - origin[1]))
     }
 }
