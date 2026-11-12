@@ -2,8 +2,8 @@
 //! marked elements are built again (`rebuild`); a rebuilt box whose
 //! style, content and children are those of the last update's box in
 //! its slot, at the same display scale, with every child unchanged too,
-//! takes that box's cache and layout, so Taffy lays out only the
-//! changed boxes and their ancestors.
+//! takes that box's cache, layout and asked inputs, so Taffy lays out
+//! only the changed boxes and their ancestors.
 //!
 //! One part of a style is not compared by value: a `calc()` with a %
 //! term is a handle, the address of a computed `Calc`. An element
@@ -140,6 +140,7 @@ impl Lender<'_> {
         }
         boxes[at].cache = before.cache.clone();
         boxes[at].layout = before.layout;
+        boxes[at].asked.clone_from(&before.asked);
         self.lent += 1;
         true
     }

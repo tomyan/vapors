@@ -3,6 +3,7 @@
 //! of each phase.
 
 use crate::document::Document;
+use crate::layout::LayoutWork;
 use crate::painted::Painted;
 
 /// Structural counts of the work the last [`Document::update`] did, for
@@ -35,6 +36,24 @@ pub struct UpdateCounts {
     pub layout_calls: usize,
     /// Times Taffy laid a box out rather than reading its cache.
     pub boxes_laid_out: usize,
+    /// Rebuilt boxes whose subtree changed and that layout laid out in
+    /// isolation (`layout/isolated.rs`): asked what their parent asked
+    /// the box they replaced, they answered the same, so their
+    /// ancestors kept their cached layouts.
+    pub owners_isolated: usize,
+    /// Rebuilt boxes whose subtree changed and that answered otherwise
+    /// (a size, margin or baseline changed, or an out-of-flow box
+    /// bubbles up), or whose style or natural size changed: their
+    /// ancestors were laid out again. A child of a flex or grid parent
+    /// almost always counts here: the replayed size query comes back
+    /// without baselines or overflow, so it differs from the full answer.
+    pub owners_resized: usize,
+    /// Rebuilt boxes whose subtree changed with nothing to compare
+    /// against: no box held the slot, it was never asked, the old
+    /// cache lost an input, it is absolute or fixed, it is restyled
+    /// with a calc, it is the root or it is a text box (see
+    /// `layout/isolated.rs`). Their ancestors were laid out again.
+    pub owners_uncompared: usize,
     /// Boxes whose rect layout worked out again (IU3 3b): those Taffy
     /// laid out or gave a new layout, those built again or scrolled,
     /// the boxes above them, and the boxes placed in a box whose
@@ -89,6 +108,17 @@ pub struct UpdateCounts {
 }
 
 impl UpdateCounts {
+    /// Notes what layout did.
+    pub(crate) fn count_layout(&mut self, work: &LayoutWork) {
+        (self.boxes_laid_out, self.layout_calls) = (work.laid_out, work.calls);
+        let settled = work.settled;
+        (
+            self.owners_isolated,
+            self.owners_resized,
+            self.owners_uncompared,
+        ) = (settled.isolated, settled.resized, settled.uncompared);
+    }
+
     /// Notes what paint drew into `painted`.
     pub(crate) fn note_paint(&mut self, painted: &Painted) {
         self.boxes_painted = painted.boxes_drawn;
