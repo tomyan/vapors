@@ -19,6 +19,11 @@ pub struct GpuWork {
     /// `RenderPass::draw` and `RenderPass::draw_indexed` calls; one call
     /// may draw many quads.
     pub draw_calls: u64,
+    /// `Queue::write_buffer` calls for a uniform value (a viewport, the
+    /// text blend parameters); their bytes are in `buffer_bytes` too.
+    pub uniform_writes: u64,
+    /// `Device::create_bind_group` calls.
+    pub bind_groups_made: u64,
 }
 
 impl GpuWork {
@@ -37,6 +42,8 @@ impl Add for GpuWork {
             buffer_bytes: self.buffer_bytes + other.buffer_bytes,
             texture_bytes: self.texture_bytes + other.texture_bytes,
             draw_calls: self.draw_calls + other.draw_calls,
+            uniform_writes: self.uniform_writes + other.uniform_writes,
+            bind_groups_made: self.bind_groups_made + other.bind_groups_made,
         }
     }
 }
@@ -54,6 +61,8 @@ pub struct WorkCounter {
     buffer_bytes: AtomicU64,
     texture_bytes: AtomicU64,
     draw_calls: AtomicU64,
+    uniform_writes: AtomicU64,
+    bind_groups_made: AtomicU64,
 }
 
 impl WorkCounter {
@@ -68,6 +77,30 @@ impl WorkCounter {
         let _write = tracing::trace_span!("draw step", phase = "write").entered();
         queue.write_buffer(buffer, offset, data);
         self.buffer_bytes.fetch_add(len(data), Ordering::Relaxed);
+    }
+
+    /// [`WorkCounter::write_buffer`] of a uniform value, counting the
+    /// write as well as `data`.
+    pub fn write_uniform(
+        &self,
+        queue: &wgpu::Queue,
+        buffer: &wgpu::Buffer,
+        offset: u64,
+        data: &[u8],
+    ) {
+        self.write_buffer(queue, buffer, offset, data);
+        self.uniform_writes.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// `device.create_bind_group(descriptor)`, counting one bind group.
+    pub fn create_bind_group(
+        &self,
+        device: &wgpu::Device,
+        descriptor: &wgpu::BindGroupDescriptor<'_>,
+    ) -> wgpu::BindGroup {
+        let _bind = tracing::trace_span!("draw step", phase = "encode").entered();
+        self.bind_groups_made.fetch_add(1, Ordering::Relaxed);
+        device.create_bind_group(descriptor)
     }
 
     /// `queue.write_texture(..)` with these arguments, counting `data`.
@@ -114,6 +147,8 @@ impl WorkCounter {
             buffer_bytes: self.buffer_bytes.swap(0, Ordering::Relaxed),
             texture_bytes: self.texture_bytes.swap(0, Ordering::Relaxed),
             draw_calls: self.draw_calls.swap(0, Ordering::Relaxed),
+            uniform_writes: self.uniform_writes.swap(0, Ordering::Relaxed),
+            bind_groups_made: self.bind_groups_made.swap(0, Ordering::Relaxed),
         }
     }
 }

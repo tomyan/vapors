@@ -3,7 +3,7 @@
 //! scrolls; and what decides containing blocks, which kept paint
 //! compares to know when to walk them again (`changed_slots.rs`).
 
-use super::layout::{Content, LayoutBox};
+use super::layout::{Content, Key, LayoutBox, Rebuilt};
 use crate::node_map::NodeMap;
 use crate::style::Used;
 
@@ -60,9 +60,17 @@ impl Stacking {
     }
 }
 
-/// Each slot's stacking, made once per update so paint order and
-/// scroll chains read a slot in place of looking its node's style up on
-/// every visit; `None` for a vacant slot.
+/// Each slot's stacking, so paint order and scroll chains read a slot
+/// in place of looking its node's style up on every visit; `None` for
+/// a vacant slot. Kept between updates and made again only for the
+/// rebuilt slots (`patched`): a stacking comes from the used style,
+/// and an element whose computed style changes is marked and its box
+/// built again (`restyle_pass.rs`). The used `z-index` also depends on
+/// the parent's used display (a flex item's z-index applies when static), which can
+/// change while the element's computed style does not; that holds
+/// because the parent is marked and a mark builds its whole subtree
+/// again (`layout/marks.rs`). A used value that depends on something
+/// outside the subtree (a sibling, the viewport) needs its own check.
 #[derive(Default)]
 pub(crate) struct Stackings(Vec<Option<Stacking>>);
 
@@ -75,6 +83,66 @@ impl Stackings {
                 .map(|layout_box| stacking_of(layout_box, used))
                 .collect(),
         )
+    }
+
+    /// `self`, the last update's stackings, with each `rebuilt` slot's
+    /// made again from `boxes` and each slot freed and not taken again
+    /// cleared; and whether a rebuilt slot's stacking differs from the
+    /// one it held. A kept box's containing block changes only through
+    /// a rebuilt box: itself, or an ancestor whose mark rebuilt the
+    /// subtree.
+    pub(crate) fn patched(
+        mut self,
+        boxes: &[LayoutBox],
+        used: &NodeMap<Used>,
+        rebuilt: &Rebuilt,
+    ) -> (Self, bool) {
+        self.0.resize(boxes.len(), None);
+        let restacked = self.make_again(boxes, used, &rebuilt.slots);
+        self.clear_freed(boxes, &rebuilt.freed);
+        (self, restacked)
+    }
+
+    /// Makes each of `slots`' stackings again from `boxes`; whether one
+    /// differs from what the slot held.
+    fn make_again(&mut self, boxes: &[LayoutBox], used: &NodeMap<Used>, slots: &[usize]) -> bool {
+        let mut restacked = false;
+        for &slot in slots {
+            let fresh = stacking_of(&boxes[slot], used);
+            restacked |= self.0[slot] != fresh;
+            self.0[slot] = fresh;
+        }
+        restacked
+    }
+
+    /// Clears each `freed` slot that no box took again.
+    fn clear_freed(&mut self, boxes: &[LayoutBox], freed: &[(usize, Key)]) {
+        for &(slot, _) in freed {
+            if matches!(boxes[slot].content, Content::Vacant) {
+                self.0[slot] = None;
+            }
+        }
+    }
+
+    /// How many slots hold a stacking.
+    pub(crate) fn held(&self) -> usize {
+        self.0.iter().flatten().count()
+    }
+
+    /// Panics, naming the first differing slot, unless `self` holds the
+    /// stackings of `fresh`: the debug check of `patched`.
+    pub(crate) fn assert_matches(&self, fresh: &Self) {
+        let slots = self.0.len().max(fresh.0.len());
+        let Some(slot) = (0..slots).find(|&slot| self.at(slot) != fresh.at(slot)) else {
+            return;
+        };
+        panic!(
+            "slot {slot}'s kept stacking is {:?}, a fresh one {:?}: a box whose stacking \
+             changed was not built again (`restyle_pass.rs` marks it); reproduce: \
+             cargo nextest run -p vapors-elements",
+            self.at(slot),
+            fresh.at(slot),
+        );
     }
 
     /// Box `index`'s stacking. Panics on a vacant slot, which is no
@@ -118,18 +186,5 @@ fn stacking_of_style(used: &Used) -> Stacking {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    #[should_panic(expected = "slot 0 is vacant, and no box's child")]
-    fn a_vacant_slots_stacking_is_refused() {
-        // Given: one vacant slot
-        let stackings = Stackings::of(&[LayoutBox::vacant()], &NodeMap::default());
-
-        // When: its stacking is asked for
-        let _ = stackings.get(0);
-
-        // Then: it panics, naming the slot
-    }
-}
+#[path = "stacking_tests.rs"]
+mod tests;

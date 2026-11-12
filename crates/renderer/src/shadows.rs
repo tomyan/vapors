@@ -31,6 +31,12 @@ impl ShadowPipeline {
         self.0.draw(target, &bytes);
     }
 
+    /// The bind groups kept: one once this pipeline has drawn.
+    #[must_use]
+    pub fn bind_groups_kept(&self) -> u64 {
+        self.0.bind_groups_kept()
+    }
+
     /// The work its draws issued since the last take; the count restarts.
     pub fn take_work(&self) -> GpuWork {
         self.0.work.take()

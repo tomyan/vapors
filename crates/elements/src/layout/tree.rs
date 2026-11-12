@@ -23,9 +23,9 @@ pub(crate) struct BoxTree<'f> {
     pub(crate) cache: &'f mut super::TextCache,
     pub(crate) scale: f32,
     pub(crate) calcs: &'f Calcs,
-    /// Boxes laid out, not read from their cache: what the incremental
-    /// tests count.
-    pub(crate) laid_out: usize,
+    /// The slots laid out or written: what the incremental tests
+    /// count, and what placement works out again (`placement.rs`).
+    pub(crate) written: super::written::Written,
     /// Calls to `lay_out`, cache hits included.
     pub(crate) calls: usize,
 }
@@ -64,7 +64,7 @@ impl BoxTree<'_> {
         inputs: LayoutInput,
         block: Option<&mut BlockContext<'_>>,
     ) -> LayoutOutput {
-        self.laid_out += 1;
+        self.written.laid_out.push(usize::from(id));
         let has_children = !self.node(id).children.is_empty();
         match (self.node(id).style.display, has_children) {
             (Display::None, _) => compute_hidden_layout(self, id),
@@ -177,7 +177,11 @@ impl LayoutPartialTree for BoxTree<'_> {
     }
 
     fn set_unrounded_layout(&mut self, id: NodeId, layout: &Layout) {
-        self.node_mut(id).layout = *layout;
+        let node = self.node_mut(id);
+        if node.layout != *layout {
+            node.layout = *layout;
+            self.written.changed.push(usize::from(id));
+        }
     }
 
     fn compute_child_layout(&mut self, id: NodeId, inputs: LayoutInput) -> LayoutOutput {

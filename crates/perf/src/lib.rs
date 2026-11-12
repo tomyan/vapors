@@ -9,10 +9,15 @@
 pub mod args;
 pub mod gpu_reading;
 pub mod gpu_time;
+pub mod instruction_samples;
+pub mod instructions;
+pub mod instructions_check;
 pub mod racer;
 pub mod report;
 pub mod rows;
 pub mod run;
 pub mod sampler;
+pub mod select;
+mod span_instructions;
 pub mod spans;
 pub mod stats;

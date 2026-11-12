@@ -5,18 +5,7 @@ use std::sync::Arc;
 
 use crate::raster::{GlyphRequest, Hinting, RasterError};
 
-/// Atlas sizing.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct AtlasConfig {
-    /// Side of each square page in pixels.
-    pub page_size: u32,
-}
-
-impl Default for AtlasConfig {
-    fn default() -> Self {
-        Self { page_size: 1024 }
-    }
-}
+pub use crate::atlas_config::AtlasConfig;
 
 /// Which page a glyph is in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -59,6 +48,8 @@ pub enum AtlasError {
     Full {
         /// Page side in pixels.
         page_size: u32,
+        /// The side the page cannot grow past (`AtlasConfig::max_page_size`).
+        max_page_size: u32,
         /// Glyphs used this frame when it overflowed.
         glyphs_this_frame: usize,
         /// Icon masks (one per path) used this frame when it overflowed.
@@ -92,13 +83,18 @@ impl fmt::Display for AtlasError {
             Self::Raster(error) => error.fmt(f),
             Self::Full {
                 page_size,
+                max_page_size,
                 glyphs_this_frame,
                 icons_this_frame,
             } => write!(
                 f,
                 "atlas page of {page_size}x{page_size} is full with {glyphs_this_frame} glyphs \
-                 and {icons_this_frame} icon masks in use this frame. Fix: raise \
-                 AtlasConfig::page_size, draw less text per frame, or draw fewer or smaller icons."
+                 and {icons_this_frame} icon masks in use this frame, and it cannot grow past \
+                 {max_page_size}x{max_page_size}. Fix: draw less text per frame, or draw fewer \
+                 or smaller icons; or, if the device's max_texture_dimension_2d is above \
+                 {max_page_size}, pass an AtlasConfig with a larger max_page_size to \
+                 ElementsApp::with_atlas or ScenePainter::with_atlas, which refuses one the \
+                 device cannot hold."
             ),
             Self::TooLarge {
                 font,
@@ -110,13 +106,13 @@ impl fmt::Display for AtlasError {
                 f,
                 "font {font} glyph {glyph} at {size} px is {}x{} and the atlas page is \
                  {page_size}x{page_size}, and .notdef cannot stand in. Fix: raise \
-                 AtlasConfig::page_size or draw this text smaller; large text as paths is later work.",
+                 AtlasConfig::max_page_size or draw this text smaller; large text as paths is later work.",
                 bitmap[0], bitmap[1]
             ),
             Self::IconTooLarge { size, page_size } => write!(
                 f,
                 "icon of {}x{} device pixels does not fit the {page_size}x{page_size} atlas page. \
-                 Fix: draw the icon smaller or raise AtlasConfig::page_size.",
+                 Fix: draw the icon smaller or raise AtlasConfig::max_page_size.",
                 size[0], size[1]
             ),
         }

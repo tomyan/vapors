@@ -17,23 +17,29 @@ pub(super) fn key(document: &Rc<RefCell<Document>>, event: &Event) -> Option<boo
     }
     let Event::Key {
         key,
+        code,
         pressed,
+        repeat,
         modifiers,
-        ..
     } = event
     else {
         return None;
     };
-    let modifiers = vapors_elements::Modifiers {
-        shift: modifiers.shift,
-        control: modifiers.control,
-        alt: modifiers.alt,
-        meta: modifiers.meta,
+    let press = vapors_elements::Keystroke {
+        key,
+        code,
+        repeat: *repeat,
+        modifiers: vapors_elements::Modifiers {
+            shift: modifiers.shift,
+            control: modifiers.control,
+            alt: modifiers.alt,
+            meta: modifiers.meta,
+        },
     };
     if *pressed {
-        Some(Document::key_pressed(document, key, modifiers))
+        Some(Document::key_pressed_with(document, press))
     } else {
-        Document::key_released(document, key, modifiers);
+        Document::key_released_with(document, press);
         None
     }
 }

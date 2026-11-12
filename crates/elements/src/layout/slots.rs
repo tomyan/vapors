@@ -22,7 +22,7 @@ pub(crate) enum Key {
 #[derive(Default)]
 pub(crate) struct Slots {
     of: FxHashMap<Key, usize>,
-    keys: Vec<Option<Key>>,
+    pub(super) keys: Vec<Option<Key>>,
     /// Vacant slots, highest first, so the lowest is taken first.
     free: Vec<usize>,
 }
@@ -174,7 +174,7 @@ fn reached(boxes: &[LayoutBox]) -> Vec<bool> {
 }
 
 /// Every box's key, by index, in boxes built in pre-order.
-fn keys(boxes: &[LayoutBox]) -> Vec<Key> {
+pub(super) fn keys(boxes: &[LayoutBox]) -> Vec<Key> {
     let mut keys = vec![Key::Text(NodeId(0), 0); boxes.len()];
     for (index, layout_box) in boxes.iter().enumerate() {
         if let Content::Element(node) = layout_box.content {

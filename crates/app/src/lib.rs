@@ -33,8 +33,8 @@ pub use elements_app::{
     Invalidated, PerFrame, SurfaceHandle,
 };
 pub use painter::{
-    DrawOverError, FrameCounts, MountError, PaintError, SUPPORTED, ScenePainter, SurfaceState,
-    UnsupportedFormat,
+    DrawOverError, FrameCounts, MountError, NewPainterError, PaintError, SUPPORTED, ScenePainter,
+    SurfaceState, UnsupportedFormat,
 };
 pub use surface::{SURFACE_FORMAT, SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
 pub use tooltip::{TOOLTIP_DELAY, Tooltip, TooltipTrigger};

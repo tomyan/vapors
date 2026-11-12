@@ -4,8 +4,9 @@
 use std::fmt::Write;
 use std::time::Duration;
 
+use crate::instruction_samples::InstructionSamples;
 use crate::run::{Counts, Samples};
-use crate::stats::Distribution;
+use crate::stats::{Distribution, median_count};
 
 /// The phases reported, in frame order: the app's `update` (which holds
 /// `style`, `layout` and `paint`) and `draw`, which holds `encode` (each
@@ -43,6 +44,36 @@ pub fn section(name: &str, samples: &Samples) -> String {
     out
 }
 
+/// `samples`' instructions as a Markdown section: the counts line, then
+/// each phase's median instructions per frame.
+///
+/// # Errors
+/// `samples` holds no instruction counts.
+pub fn instructions_section(name: &str, samples: &Samples) -> Result<String, String> {
+    let kept = samples
+        .instructions
+        .as_ref()
+        .ok_or_else(|| format!("{name}: no instruction counts were taken"))?;
+    let mut out = format!("### {name}\n\n{}\n\n", counts(&samples.counts));
+    out.push_str("| phase | median instructions |\n|---|---|\n");
+    instruction_row(&mut out, "frame (CPU)", &kept.frame);
+    for phase in PHASES {
+        instruction_row(&mut out, phase, phase_counts(kept, phase));
+    }
+    Ok(out)
+}
+
+fn phase_counts<'a>(kept: &'a InstructionSamples, phase: &str) -> &'a [u64] {
+    kept.phases.get(phase).map_or(&[][..], Vec::as_slice)
+}
+
+fn instruction_row(out: &mut String, phase: &str, counts: &[u64]) {
+    let _ = match median_count(counts) {
+        Some(median) => writeln!(out, "| {phase} | {median} |"),
+        None => writeln!(out, "| {phase} | no samples |"),
+    };
+}
+
 /// The span from before the frame's first submit to after its last.
 const SPAN: &str = "GPU span (upper bound)";
 
@@ -74,7 +105,7 @@ fn counts(counts: &Counts) -> String {
     format!(
         "Counts (last frame): restyled {}, text layouts {}, laid out {}, elements visited {}, \
          boxes built {}, layout calls {}, boxes painted {}, scene items {}, culled {}; draw calls {}, \
-         buffer bytes {}, texture bytes {}, render passes {}.",
+         buffer bytes {}, texture bytes {}, uniform writes {}, bind groups {}, render passes {}.",
         u.elements_restyled,
         counts.text_layouts,
         u.boxes_laid_out,
@@ -87,6 +118,8 @@ fn counts(counts: &Counts) -> String {
         gpu.draw_calls,
         gpu.buffer_bytes,
         gpu.texture_bytes,
+        gpu.uniform_writes,
+        gpu.bind_groups_made,
         counts.render_passes
     )
 }

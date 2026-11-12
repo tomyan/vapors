@@ -12,7 +12,6 @@ use vapors_scene::Size;
 use super::ElementsApp;
 use crate::check_tooltip_style;
 use crate::frame::{FrameTimes, Phase, Phases, SystemClock, run_frame};
-use crate::painter::ScenePainter;
 
 /// The phases that do work today, shown by a per-frame hook.
 const SHOWN: [Phase; 3] = [Phase::Input, Phase::Update, Phase::Draw];
@@ -53,6 +52,7 @@ impl ElementsApp {
         let scale = frame.scale_factor as f32;
         let size = size_of(frame);
         let mut document = self.document.borrow_mut();
+        document.set_max_image_side(frame.device.limits().max_texture_dimension_2d);
         document
             .update(viewport(size, scale))
             .map_err(|errors| refused(&errors))?;
@@ -93,7 +93,8 @@ impl ElementsApp {
             scissor: None,
         };
         if self.painter.is_none() {
-            let made = ScenePainter::new(frame.device, frame.texture.format())
+            let made = self
+                .make_painter(frame)
                 .map_err(|refused| refused.to_string())?;
             self.painter = Some(made);
         }

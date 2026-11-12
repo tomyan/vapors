@@ -40,7 +40,7 @@ fn entry(width: u32, height: u32, last_used: u64) -> Entry {
 #[test]
 fn repack_fits_the_reviewers_shape_whatever_order_the_map_holds_it_in() {
     // Given: six glyphs in a 13 px page, inserted interleaved
-    let mut atlas = GlyphAtlas::new(AtlasConfig { page_size: 13 });
+    let mut atlas = GlyphAtlas::new(AtlasConfig::fixed(13));
     for (id, (w, h)) in [(4, 1), (4, 4), (4, 1), (4, 4), (4, 4), (4, 4)]
         .into_iter()
         .enumerate()

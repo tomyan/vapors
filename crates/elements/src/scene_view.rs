@@ -1,8 +1,8 @@
 //! A paint's scene as a view over its kept paint order and each slot's
 //! kept part (IU3 3c-3d2, `docs/plans/iu3.md` "The scene in stable
 //! slots"): the items are each drawing step's part's, walked in order
-//! (`drawn_steps.rs`), so no update copies a kept part into a flat list. Hit testing reads the
-//! parts' hits in the same order (`Painted::hit`).
+//! (`drawn_steps.rs`), so no update copies a kept part into a flat list. Hit testing keeps the
+//! parts' hits in the same order (`kept_hits.rs`).
 
 use vapors_dom::NodeId;
 use vapors_scene::{Batched, Item, Rect, Scene};
@@ -38,11 +38,9 @@ impl<'a> SceneView<'a> {
     /// Each item, first drawn first, with its clip (device pixels).
     pub fn items(&self) -> impl Iterator<Item = (&'a Item, Option<Rect>)> + 'a {
         let boxes = self.boxes;
-        self.drawn.steps().flat_map(move |step| {
-            let scene = step_scene(boxes, step);
-            let clips = scene.clips().iter().copied();
-            scene.items().iter().zip(clips)
-        })
+        self.drawn
+            .steps()
+            .flat_map(move |step| step_items(boxes, step))
     }
 
     /// The batches for a target whose drawable area is `view` (device
@@ -74,17 +72,28 @@ impl<'a> SceneView<'a> {
 
     /// Every hit, in painting order.
     pub(crate) fn hits(&self) -> impl Iterator<Item = &'a (NodeId, BoxRect)> + 'a {
-        self.parts().flat_map(|part| part.hits.iter())
+        self.placed_parts().flat_map(|(_, part)| part.hits.iter())
     }
 
-    /// Each box step's part, in painting order.
-    fn parts(&self) -> impl Iterator<Item = &'a Part> + 'a {
+    /// Each box step's part with the step's place, in painting order.
+    pub(crate) fn placed_parts(&self) -> impl Iterator<Item = (usize, &'a Part)> + 'a {
         let boxes = self.boxes;
-        self.steps.iter().filter_map(move |&step| match step {
-            Step::Box(slot) => Some(&kept(boxes, slot, step).own),
+        let placed = self.steps.iter().enumerate();
+        placed.filter_map(move |(place, &step)| match step {
+            Step::Box(slot) => Some((place, &kept(boxes, slot, step).own)),
             Step::Thumb(_) | Step::Outline(_) => None,
         })
     }
+}
+
+/// The items `step` paints, each with its clip (device pixels).
+pub(crate) fn step_items(
+    boxes: &[Option<KeptBox>],
+    step: Step,
+) -> impl Iterator<Item = (&Item, Option<Rect>)> {
+    let scene = step_scene(boxes, step);
+    let clips = scene.clips().iter().copied();
+    scene.items().iter().zip(clips)
 }
 
 /// The items `step` paints: its slot's own part, outline or thumbs.

@@ -91,6 +91,7 @@ impl LayoutContainingBlock for BoxTree<'_> {
 
     fn clear_hoisted_children(&mut self, id: NodeId) {
         self.boxes[usize::from(id)].hoisted.clear();
+        self.written.hoisting.push(usize::from(id));
     }
 
     fn add_hoisted_children(&mut self, id: NodeId, hoisted: &[NodeId]) {
