@@ -54,10 +54,11 @@ pub struct UpdateCounts {
     /// (`kept_box.rs`), and none is drawn when the update showed the
     /// last update's paint (`kept_paint.rs`).
     pub boxes_painted: usize,
-    /// Boxes that moved whose kept paint was shifted by the move in
-    /// place of being drawn (IU3 3c-3e, `kept_shift.rs`): the box kept
-    /// its size, clip and padding and lies on whole device pixels
-    /// before and after.
+    /// Boxes that moved or were cut by another clip whose kept paint
+    /// was shifted in place of being drawn (IU3 3c-3e,
+    /// `kept_shift.rs`): the box kept its size and padding and lies on
+    /// whole device pixels before and after, its edges snapping as
+    /// they did, moved.
     pub boxes_shifted: usize,
     /// Boxes whose kept paint paint read and kept rather than drew:
     /// those moved or whose clip was worked out again, but whose paint

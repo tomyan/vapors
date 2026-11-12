@@ -47,7 +47,7 @@ pub(super) fn kept(mut painting: Painting, at: BoxRect) -> KeptBox {
 }
 
 pub(super) fn shift_of(kept: &KeptBox, to: BoxFrom) -> Option<Shift> {
-    Shift::of(0, (kept, &Content::Element(NODE)), to, 1.0)
+    Shift::of(0, (kept, &Content::Element(NODE)), to, (1.0, |at| [at, at]))
 }
 
 #[test]
@@ -133,7 +133,7 @@ fn a_move_at_scale_two_is_in_device_pixels() {
         0,
         (&part, &Content::Element(NODE)),
         from(rect(0.5, 1.0)),
-        2.0,
+        (2.0, |at| [at, at]),
     );
     shift
         .expect("half a CSS pixel is a whole device pixel at 2x")

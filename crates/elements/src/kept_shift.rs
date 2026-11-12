@@ -45,10 +45,12 @@ impl Shift {
         slot: usize,
         (part, content): (&KeptBox, &Content),
         from: BoxFrom,
-        scale: f32,
+        (scale, edges): (f32, impl Fn(BoxRect) -> [BoxRect; 2]),
     ) -> Option<Self> {
         let delta = whole_delta(part.from.rect, from.rect, scale)?;
-        let shiftable = part.from.padding == from.padding
+        let (old, new) = (edges(part.from.rect), edges(from.rect));
+        let shiftable = snaps_by(old, new, delta, scale)
+            && part.from.padding == from.padding
             && part.own.positions_only_in_scene_and_hits()
             && hits_shiftable(part, content)
             && items_shiftable(part, content)
@@ -122,6 +124,25 @@ fn axis_delta(old: f32, new: f32, scale: f32) -> Option<f32> {
     (from.fract() == 0.0 && to.fract() == 0.0).then_some(to - from)
 }
 
+/// Whether each of `new`'s boxes snaps (`paint.rs` `snapped`, which
+/// rounds half away from zero) to its `old` box's snapped edges moved
+/// by `delta`. Rounding is not translation-invariant at a tie that
+/// crosses zero (`round(-1.5) + 3` is 1, `round(1.5)` is 2) nor where
+/// a float sum rounds differently after a move, so a move whose edges
+/// round differently is painted again.
+fn snaps_by(old: [BoxRect; 2], new: [BoxRect; 2], delta: [f32; 2], scale: f32) -> bool {
+    old.iter().zip(&new).all(|(old, new)| {
+        let old = snapped(*old, scale);
+        let moved = Rect::new(
+            old.left + delta[0],
+            old.top + delta[1],
+            old.right + delta[0],
+            old.bottom + delta[1],
+        );
+        snapped(*new, scale) == moved
+    })
+}
+
 /// Whether `part`'s hits are made from its rect alone: an element's
 /// one hit, its border box cut to its clip, or none; a text run's are
 /// its inline elements' fragments, which are not.
@@ -157,3 +178,7 @@ mod tests;
 #[cfg(test)]
 #[path = "kept_shift_refusals_tests.rs"]
 mod refusals_tests;
+
+#[cfg(test)]
+#[path = "kept_shift_ties_tests.rs"]
+mod ties_tests;
