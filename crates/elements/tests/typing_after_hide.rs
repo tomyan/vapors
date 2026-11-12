@@ -51,7 +51,7 @@ fn a_paste_after_the_field_is_hidden_blurs_it_first_and_is_the_apps() {
 }
 
 #[test]
-fn a_text_edit_after_the_field_is_hidden_blurs_it_first_and_is_refused() {
+fn a_text_edit_after_the_field_is_hidden_blurs_it_first_and_reaches_no_field() {
     // Given
     let page = hidden_since_settle();
     let edit = TextEdit {
@@ -64,8 +64,8 @@ fn a_text_edit_after_the_field_is_hidden_blurs_it_first_and_is_refused() {
     // When
     let edited = Document::text_edited(&page.doc, &edit);
 
-    // Then
-    assert!(edited.is_err(), "{edited:?}");
+    // Then: an ordinary user action, not an error to report
+    assert_eq!(edited, Ok(()));
     assert_eq!(*page.log.borrow(), BLURRED);
     assert_eq!(value(&page, page.name), "erWarm");
 }
