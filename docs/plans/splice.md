@@ -118,6 +118,59 @@ marks are as today (`Marks::mark`).
   that the fresh build makes differently (a sibling wrongly kept)
   panics naming the slot and its key.
 
+### (b2) PR A2: the restyle narrowed on insert and remove
+
+Today `Document::mark_children_changed` dirties the parent's whole
+subtree whenever any sheet holds a sibling combinator or a positional
+pseudo-class (`Features::siblings`, one flag): O(rows) restyles per
+insert at 3000 rows, against finish-line property 3. In its place the
+sheets keep, once per sheet added (`style/sibling_deps.rs`), which
+siblings of a changed child a selector can reach, and the mark dirties
+only those:
+
+- The inserted child's subtree, always. A removed child marks nothing
+  of its own.
+- A text node inserted or removed moves no element among its siblings:
+  only `:empty` (as today, the parent's subtree) applies.
+- From each selector, the compounds joined to each other by `+` or `~`
+  form a group; a group's rightmost compound is matched against one of
+  the parent's children. The group reaches, from the changed child
+  (the inserted one in place, or the removed one before it is
+  detached): the next `k` element siblings for `k` `+` combinators,
+  one more for `:first-child` or `:only-child`; the previous sibling
+  for `:last-child` or `:only-child`; every later sibling for `~`,
+  `:nth-child()`, `:nth-of-type()`, `:first-of-type` and
+  `:only-of-type`; every earlier sibling for `:nth-last-child()`,
+  `:nth-last-of-type()`, `:last-of-type` and `:only-of-type`.
+  `previous` with a `~` in the group widens to every later sibling;
+  `earlier` with any sibling combinator widens to every child. A
+  `:not()`, `:is()`, `:where()` or `:global()` whose selector is one
+  compound counts as that compound's pseudo-classes; one with
+  combinators cannot be placed and widens to every child.
+- A group that is not the selector's last restyles each reached
+  sibling's subtree (`Dirty::subtree`); otherwise the sibling alone,
+  and its children when its own style changes (`Dirty::element`), which
+  covers what they inherit.
+- `:has()` restyles everything, as today. The reach is an
+  over-approximation, never under: what it cannot bound widens.
+
+Debug builds, after an update whose restyle was narrowed this way,
+compute every element's style afresh from the root and assert each
+equals the kept one, naming the first element that differs, the
+property, and the sheets' structural selectors that match it.
+
+Acceptance: `elements_restyled` after a middle insert, each proven by
+breaking: no structural rule → the new row's elements only; `+` → and
+the next sibling; `:nth-child(odd)` → and the siblings after;
+`:last-child` → the old and new last; `~` → the following siblings;
+`:has()` → everything; a sheet added between inserts changes the reach.
+The count for a middle insert at 3000 rows, with and without a
+structural rule: 4 (none), 5 (`.row + .row`), 6004
+(`.row:nth-child(odd)`), from one manual run of
+`assert_middle_insert_counts(3000)` (`insert_restyle_rows.rs`) on
+2026-11-11; the test itself runs 1000 rows only, as 3000 takes 22 s in
+debug.
+
 ## (c) PR B: the order splice, decided at runtime
 
 On an update whose shape changed and that is not `every`, paint

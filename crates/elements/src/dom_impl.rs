@@ -14,16 +14,25 @@ impl Dom for Document {
             .insert(Node::new(Kind::Element(Element::new(tag))))
     }
 
+    /// Every mount calls it; only an event not declared before can
+    /// change an element's refusal, so only that checks every element.
     fn declare_events(&mut self, names: &[&str]) {
-        self.checks.all = true;
+        let before = self.declared_events.len();
         self.declared_events
             .extend(names.iter().map(|name| (*name).to_owned()));
+        if self.declared_events.len() > before {
+            self.checks.all = true;
+        }
     }
 
+    /// Every mount calls it; a sheet already added changes nothing. A
+    /// new one restyles every element: which elements its rules reach
+    /// is not worked out.
     fn add_style(&mut self, scope: &str, css: &str) {
-        self.note_change();
-        self.dirty.everything();
-        self.sheets.add_scoped(scope, css);
+        if self.sheets.add_scoped(scope, css) {
+            self.note_change();
+            self.dirty.everything();
+        }
     }
 
     fn create_text(&mut self, text: &str) -> NodeId {
@@ -95,13 +104,13 @@ impl Dom for Document {
     fn insert_before(&mut self, parent: NodeId, child: NodeId, before: Option<NodeId>) {
         self.note_change();
         if let Some(old) = self.parent(child) {
-            self.mark_children_changed(old, None);
+            self.mark_children_changed(old, child, false);
             self.boxes.marks.mark(old);
         }
         self.arena.place("insert_before", parent, child, before);
         self.checks.added.push(child);
         self.boxes.marks.mark(parent);
-        self.mark_children_changed(parent, Some(child));
+        self.mark_children_changed(parent, child, true);
     }
 
     /// Detaches the node and frees it with its subtree: its id and its
@@ -114,7 +123,7 @@ impl Dom for Document {
         );
         self.note_change();
         if let Some(parent) = self.parent(node) {
-            self.mark_children_changed(parent, None);
+            self.mark_children_changed(parent, node, false);
             self.boxes.marks.mark(parent);
         }
         self.drop_focus_within(node);
