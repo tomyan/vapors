@@ -5,7 +5,7 @@
 
 mod support;
 
-use support::mirror::{labels, node_of, taken_page, updated_take};
+use support::mirror::{labels, node_of, step, taken_model};
 use support::roles_page::page;
 use support::viewport;
 use vapors_dom::Dom;
@@ -84,13 +84,13 @@ fn a_slider_carries_its_range_and_a_button_its_focusability() {
 #[test]
 fn a_text_change_under_a_button_emits_that_buttons_record_alone() {
     // Given
-    let doc = taken_page();
+    let (doc, mut model) = taken_model();
     let apply = node_of(&doc, "button", "Apply");
     let label = doc.borrow().children(apply)[0];
     doc.borrow_mut().set_text(label, "Go");
 
     // When
-    let update = updated_take(&doc).expect("a change");
+    let update = step(&doc, &mut model).expect("a change");
 
     // Then
     assert!(!update.every);
@@ -103,12 +103,12 @@ fn a_text_change_under_a_button_emits_that_buttons_record_alone() {
 #[test]
 fn an_aria_state_set_emits_one_record_with_the_state() {
     // Given
-    let doc = taken_page();
+    let (doc, mut model) = taken_model();
     let pin = node_of(&doc, "button", "Pin");
     doc.borrow_mut().set_attribute(pin, "aria-pressed", "true");
 
     // When
-    let update = updated_take(&doc).expect("a change");
+    let update = step(&doc, &mut model).expect("a change");
 
     // Then
     assert_eq!(labels(&update.nodes), ["button \"Pin\""]);
@@ -118,12 +118,12 @@ fn an_aria_state_set_emits_one_record_with_the_state() {
 #[test]
 fn a_change_that_touches_nothing_a11y_emits_nothing() {
     // Given: an attribute no role, name, state or style reads
-    let doc = taken_page();
+    let (doc, mut model) = taken_model();
     let group = node_of(&doc, "group", "Tone");
     doc.borrow_mut().set_attribute(group, "data-x", "1");
 
     // When
-    let update = updated_take(&doc);
+    let update = step(&doc, &mut model);
 
     // Then
     assert!(update.is_none(), "{update:?}");
@@ -132,10 +132,10 @@ fn a_change_that_touches_nothing_a11y_emits_nothing() {
 #[test]
 fn a_take_with_nothing_changed_since_the_last_is_none() {
     // Given
-    let doc = taken_page();
+    let (doc, mut model) = taken_model();
 
     // When
-    let update = updated_take(&doc);
+    let update = step(&doc, &mut model);
 
     // Then
     assert!(update.is_none(), "{update:?}");
@@ -144,7 +144,7 @@ fn a_take_with_nothing_changed_since_the_last_is_none() {
 #[test]
 fn a_take_before_an_update_is_refused() {
     // Given
-    let doc = taken_page();
+    let (doc, _model) = taken_model();
     let pin = node_of(&doc, "button", "Pin");
     doc.borrow_mut().set_attribute(pin, "aria-pressed", "true");
 

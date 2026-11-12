@@ -99,6 +99,14 @@ impl fmt::Display for AxError {
                 f,
                 "{role} \"{name}\" cannot be shown to a reader: it needs {needs}"
             ),
+            Self::FocusOutsideTree { tag } => write!(
+                f,
+                "focus is on a <{tag}> the a11y tree leaves out (no role), so a reader hears nothing; fix: give it a role and a name, or keep focus on a node"
+            ),
+            Self::PlacementCycle { nodes } => write!(
+                f,
+                "a11y placements wait on each other (nodes {nodes:?}): a bug in vapors; report it with the page"
+            ),
             Self::UpdateFailed { after, errors } => write!(
                 f,
                 "the update after {after} failed: [{}]; fix: the page's styles or layout, as the errors name",

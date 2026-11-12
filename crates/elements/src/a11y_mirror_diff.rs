@@ -1,15 +1,16 @@
 //! A take after the first (R6): the nodes touched since the last take
-//! and what each touch reaches (the node, its ancestors, and the nodes
-//! naming it or an ancestor by id), each read again and compared with
-//! the record last emitted.
-//! Only a difference is emitted; a node that no longer qualifies is
-//! removed, and one new or whose parent changed is placed.
+//! and what each touch reaches (`a11y_mirror_reach`), each read again
+//! and compared with the record last emitted. Only a difference is
+//! emitted; a node that no longer qualifies is removed, and one new or
+//! whose parent changed is placed. A take refused keeps what it took
+//! for the next; focus on an element the tree leaves out is refused.
 
 use vapors_dom::NodeId;
 
 use crate::a11y_error::AxError;
-use crate::a11y_mirror::{AxMirrorNode, AxUpdate};
-use crate::a11y_mirror_state::{AxIndex, REFERRING};
+use crate::a11y_mirror::{AxMirrorNode, AxPlace, AxUpdate};
+use crate::a11y_mirror_index::AxIndex;
+use crate::a11y_mirror_state::Touched;
 use crate::document::Document;
 use crate::node_map::{NodeMap, NodeSet};
 
@@ -69,95 +70,85 @@ impl Diff {
 }
 
 impl Document {
-    /// What changed since the last take; `None` for nothing.
+    /// What changed since the last take; `None` for nothing. A refusal
+    /// keeps what the take touched, so the next take holds it.
     pub(crate) fn ax_incremental(&mut self) -> Result<Option<AxUpdate>, AxError> {
         let focus = self.active_element();
-        let (touched, replaced) = self.ax.take_touched();
-        if touched.is_empty() && focus == self.ax.focus {
+        if self.ax.touched_nothing() && focus == self.ax.focus {
             return Ok(None);
         }
-        let index = self.ax_index(&touched, &replaced);
-        let candidates = self.ax_candidates(&touched, [self.ax.focus, focus], &index);
+        let touched = self.ax.take_touched();
+        let (index, renamed) = self.ax_index(&touched);
+        match self.ax_diff(&touched, &renamed, &index, focus) {
+            Ok((diff, placed)) => {
+                let update = self.ax.apply(diff, placed, index, focus);
+                Ok(Some(update).filter(|update| !update.is_empty()))
+            }
+            Err(refusal) => {
+                self.ax.keep(touched, renamed, index);
+                Err(refusal)
+            }
+        }
+    }
+
+    /// Every candidate read again, and the placements that follow.
+    fn ax_diff(
+        &self,
+        touched: &Touched,
+        renamed: &[NodeId],
+        index: &AxIndex,
+        focus: Option<NodeId>,
+    ) -> Result<(Diff, Vec<AxPlace>), AxError> {
+        let candidates = self.ax_candidates(touched, renamed, [self.ax.focus, focus], index);
         let mut diff = Diff::default();
         for node in candidates {
-            self.ax_classify(node, &index, &replaced, &mut diff)?;
+            self.ax_classify(node, index, &touched.replaced, &mut diff)?;
         }
-        let placed = self.ax_placements(&diff);
-        let update = self.ax.apply(diff, placed, index, focus);
-        Ok(Some(update).filter(|update| !update.is_empty()))
+        if let Some(node) = focus.filter(|&node| diff.after(node, &self.ax.records) == After::Gone)
+        {
+            return Err(self.ax_focus_outside(node));
+        }
+        let placed = self.ax_placements(&diff)?;
+        Ok((diff, placed))
     }
 
-    /// The index kept from the last take, unless a touch may have
-    /// changed it: a node inserted or removed, or one with an `id` or a
-    /// referring attribute.
-    fn ax_index(&mut self, touched: &NodeSet, replaced: &NodeSet) -> AxIndex {
-        let kept = self.ax.take_index();
-        let stale = !replaced.is_empty() || touched.iter().any(|&node| self.ax_names_ids(node));
-        match kept {
-            Some(index) if !stale => index,
-            _ => AxIndex::of(self),
+    /// Focus is on `node`, which the tree leaves out.
+    pub(crate) fn ax_focus_outside(&self, node: NodeId) -> AxError {
+        AxError::FocusOutsideTree {
+            tag: self.tag(node).unwrap_or("#text").to_owned(),
         }
     }
 
-    fn ax_names_ids(&self, node: NodeId) -> bool {
-        if !self.contains(node) {
-            return true;
-        }
-        self.tag(node).is_some()
-            && (self.attribute(node, "id").is_some()
-                || REFERRING
-                    .iter()
-                    .any(|attribute| self.attribute(node, attribute).is_some()))
-    }
-
-    /// Every node a touch reaches, and the nodes focus left and came to,
-    /// each once.
-    fn ax_candidates(
-        &self,
-        touched: &NodeSet,
-        focus: [Option<NodeId>; 2],
-        index: &AxIndex,
-    ) -> Vec<NodeId> {
-        let mut out = Vec::new();
-        let mut seen = NodeSet::default();
-        let mut add = |node: NodeId| {
-            if seen.insert(node) {
-                out.push(node);
-            }
+    /// The index for this take: the one kept, patched for the nodes
+    /// touched, or rebuilt by a scan when the tree's shape changed (an
+    /// element inserted or removed: its hidden descendants carry ids
+    /// without boxes, so no touch names them) or a patch could not be
+    /// certain. With it, the nodes named by an id whose element changed.
+    fn ax_index(&mut self, touched: &Touched) -> (AxIndex, Vec<NodeId>) {
+        let Some(mut kept) = self.ax.take_index() else {
+            return (self.ax_scan(), Vec::new());
         };
-        for &node in touched {
-            self.ax_reach(node, index, &mut add);
+        if !self.ax_shape_changed(touched)
+            && let Some(changed) = kept.patch(self, &touched.nodes)
+        {
+            let renamed = kept.referrers_of(&changed);
+            return (kept, renamed);
         }
-        for node in focus.into_iter().flatten() {
-            add(node);
-        }
-        out
+        let index = self.ax_scan();
+        let changed = kept.changed_ids(&index);
+        let mut renamed = kept.referrers_of(&changed);
+        renamed.extend(index.referrers_of(&changed));
+        (index, renamed)
     }
 
-    /// What a touch of `node` reaches: the node, its ancestors, and the
-    /// nodes referring by id to it or to an ancestor.
-    fn ax_reach(&self, node: NodeId, index: &AxIndex, add: &mut impl FnMut(NodeId)) {
-        add(node);
-        if !self.contains(node) {
-            return;
-        }
-        let mut cursor = Some(node);
-        while let Some(reached) = cursor {
-            self.ax_referrers(reached, index, add);
-            cursor = self.parent(reached);
-            if let Some(parent) = cursor {
-                add(parent);
-            }
-        }
+    fn ax_shape_changed(&self, touched: &Touched) -> bool {
+        !touched.replaced.is_empty() || touched.nodes.iter().any(|&node| !self.contains(node))
     }
 
-    fn ax_referrers(&self, node: NodeId, index: &AxIndex, add: &mut impl FnMut(NodeId)) {
-        let Some(id) = self.tag(node).and_then(|_| self.attribute(node, "id")) else {
-            return;
-        };
-        for &referrer in index.referrers.get(id).into_iter().flatten() {
-            add(referrer);
-        }
+    /// The index rebuilt by a scan of the document, counted.
+    pub(crate) fn ax_scan(&mut self) -> AxIndex {
+        self.ax.scans += 1;
+        AxIndex::of(self)
     }
 
     /// Reads `node` again and notes what differs from its record.
@@ -179,18 +170,5 @@ impl Document {
             (Some(_), None) => diff.gone(node),
         }
         Ok(())
-    }
-
-    /// Whether `node`, or an element between it and `parent`, was
-    /// inserted since the last take.
-    fn ax_moved(&self, node: NodeId, parent: Option<NodeId>, replaced: &NodeSet) -> bool {
-        let mut cursor = Some(node);
-        while let Some(between) = cursor.filter(|&between| Some(between) != parent) {
-            if replaced.contains(&between) {
-                return true;
-            }
-            cursor = self.parent(between);
-        }
-        false
     }
 }

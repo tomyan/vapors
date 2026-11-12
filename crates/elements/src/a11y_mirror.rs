@@ -11,8 +11,8 @@
 use vapors_dom::NodeId;
 
 use crate::a11y_error::AxError;
+use crate::a11y_mirror_index::AxIndex;
 use crate::a11y_mirror_record::AboveMemo;
-use crate::a11y_mirror_state::AxIndex;
 use crate::a11y_tree::AxStates;
 use crate::document::Document;
 use crate::layout::BoxRect;
@@ -101,6 +101,8 @@ impl Document {
     /// update, or has none. [`AxError::Unexposable`]: a node ARIA
     /// requires a state for that the tree does not carry.
     /// [`AxError::NotFinite`]: a node's bounds are not finite.
+    /// [`AxError::FocusOutsideTree`]: focus is on an element the tree
+    /// leaves out. A refused take keeps what it took for the next.
     pub fn take_ax_update(&mut self) -> Result<Option<AxUpdate>, AxError> {
         if self.painted.is_none() || self.changes.since_update {
             return Err(AxError::NotUpdated);
@@ -113,9 +115,12 @@ impl Document {
 
     /// Every node, in document order.
     fn ax_rebuild(&mut self) -> Result<AxUpdate, AxError> {
-        let index = AxIndex::of(self);
+        let index = self.ax_scan();
         let nodes = self.ax_every(&index)?;
         let focus = self.active_element();
+        if let Some(node) = focus.filter(|&node| !nodes.iter().any(|n| n.node == node)) {
+            return Err(self.ax_focus_outside(node));
+        }
         self.ax.reset(&nodes, index, focus);
         Ok(AxUpdate {
             every: true,
@@ -123,6 +128,18 @@ impl Document {
             focus: Some(focus),
             ..AxUpdate::default()
         })
+    }
+
+    /// Every node as a first take would hold it now, without taking:
+    /// what a mirror kept in step by the takes since must hold.
+    ///
+    /// # Errors
+    /// As [`Document::take_ax_update`].
+    pub fn ax_mirror_snapshot(&self) -> Result<Vec<AxMirrorNode>, AxError> {
+        if self.painted.is_none() || self.changes.since_update {
+            return Err(AxError::NotUpdated);
+        }
+        self.ax_every(&AxIndex::of(self))
     }
 
     /// Every node's record, in document order: one pass, each element's

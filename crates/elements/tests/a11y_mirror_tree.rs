@@ -7,7 +7,7 @@
 
 mod support;
 
-use support::mirror::{labels, node_of, taken_model, updated_take};
+use support::mirror::{labels, node_of, step, taken_model};
 use support::roles_page::button;
 use support::text;
 use vapors_dom::Dom;
@@ -28,8 +28,7 @@ fn a_node_inserted_is_placed_before_the_next_node_under_its_parent() {
     };
 
     // When
-    let update = updated_take(&doc).expect("a change");
-    model.apply(&update);
+    let update = step(&doc, &mut model).expect("a change");
 
     // Then: Reset moved right, so its record is emitted with new bounds
     assert_eq!(
@@ -55,8 +54,7 @@ fn a_node_appended_last_is_placed_before_nothing() {
     let added = button(&mut doc.borrow_mut(), region, "Undo", &[]);
 
     // When
-    let update = updated_take(&doc).expect("a change");
-    model.apply(&update);
+    let update = step(&doc, &mut model).expect("a change");
 
     // Then
     assert_eq!(labels(&update.nodes), ["button \"Undo\""]);
@@ -73,8 +71,7 @@ fn a_node_removed_is_removed_and_the_boxes_after_it_move() {
     doc.borrow_mut().remove(apply);
 
     // When
-    let update = updated_take(&doc).expect("a change");
-    model.apply(&update);
+    let update = step(&doc, &mut model).expect("a change");
 
     // Then
     assert_eq!(update.removed, [apply]);
@@ -107,8 +104,7 @@ fn a_subtree_hidden_by_display_none_is_removed_whole() {
     }
 
     // When
-    let update = updated_take(&doc).expect("a change");
-    model.apply(&update);
+    let update = step(&doc, &mut model).expect("a change");
 
     // Then
     let mut removed = update.removed.clone();

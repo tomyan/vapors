@@ -5,18 +5,18 @@
 
 mod support;
 
-use support::mirror::{labels, node_of, taken_page, updated_take};
+use support::mirror::{labels, node_of, step, taken_model};
 use vapors_elements::Document;
 
 #[test]
 fn focus_gained_emits_the_focused_node_and_its_record() {
     // Given
-    let doc = taken_page();
+    let (doc, mut model) = taken_model();
     let apply = node_of(&doc, "button", "Apply");
     Document::focus(&doc, Some(apply));
 
     // When
-    let update = updated_take(&doc).expect("a change");
+    let update = step(&doc, &mut model).expect("a change");
 
     // Then
     assert_eq!(update.focus, Some(Some(apply)));
@@ -27,15 +27,15 @@ fn focus_gained_emits_the_focused_node_and_its_record() {
 #[test]
 fn focus_moved_emits_both_records_and_the_new_node() {
     // Given
-    let doc = taken_page();
+    let (doc, mut model) = taken_model();
     let apply = node_of(&doc, "button", "Apply");
     let pin = node_of(&doc, "button", "Pin");
     Document::focus(&doc, Some(apply));
-    updated_take(&doc).expect("the first move");
+    step(&doc, &mut model).expect("the first move");
     Document::focus(&doc, Some(pin));
 
     // When
-    let update = updated_take(&doc).expect("a change");
+    let update = step(&doc, &mut model).expect("a change");
 
     // Then
     assert_eq!(update.focus, Some(Some(pin)));
@@ -58,14 +58,14 @@ fn focus_moved_emits_both_records_and_the_new_node() {
 #[test]
 fn focus_leaving_emits_no_node_focused() {
     // Given
-    let doc = taken_page();
+    let (doc, mut model) = taken_model();
     let apply = node_of(&doc, "button", "Apply");
     Document::focus(&doc, Some(apply));
-    updated_take(&doc).expect("the move in");
+    step(&doc, &mut model).expect("the move in");
     Document::focus(&doc, None);
 
     // When
-    let update = updated_take(&doc).expect("a change");
+    let update = step(&doc, &mut model).expect("a change");
 
     // Then
     assert_eq!(update.focus, Some(None));
@@ -76,12 +76,12 @@ fn focus_leaving_emits_no_node_focused() {
 #[test]
 fn a_refused_focus_move_emits_nothing() {
     // Given: Reset is disabled
-    let doc = taken_page();
+    let (doc, mut model) = taken_model();
     let reset = node_of(&doc, "button", "Reset");
     Document::focus(&doc, Some(reset));
 
     // When
-    let update = updated_take(&doc);
+    let update = step(&doc, &mut model);
 
     // Then
     assert!(update.is_none(), "{update:?}");

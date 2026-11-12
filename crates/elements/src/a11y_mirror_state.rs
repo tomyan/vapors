@@ -8,77 +8,55 @@
 //! (`Document::note_replaced`): its box may be built the same at a new
 //! place. Nothing is collected until the first take, which holds every
 //! node; every box built again makes the next take hold every node too.
-
-use std::collections::HashMap;
+//! A refused take is its own state: what it took is kept for the next
+//! (`keep`), so a refusal loses no change.
 
 use vapors_dom::NodeId;
 
 use crate::a11y_mirror::{AxMirrorNode, AxPlace, AxUpdate};
 use crate::a11y_mirror_diff::Diff;
-use crate::a11y_roles::Ids;
+use crate::a11y_mirror_index::AxIndex;
 use crate::changed_slots::ChangedSlots;
 use crate::document::Document;
 use crate::layout::{Key, Slots};
 use crate::node_map::{NodeMap, NodeSet};
 
-/// The attributes naming other elements by id, whose owner's name or
-/// description changes with the named element's content.
-pub(crate) const REFERRING: [&str; 2] = ["aria-labelledby", "aria-describedby"];
+/// What a take collects before it reads anything.
+#[derive(Default)]
+pub(crate) struct Touched {
+    /// The nodes whose boxes were built, moved or freed since the last
+    /// take.
+    pub(crate) nodes: NodeSet,
+    /// Nodes inserted since the last take: moved among their siblings.
+    pub(crate) replaced: NodeSet,
+    /// Nodes a refused take found named by an id whose element changed,
+    /// to read again.
+    pub(crate) renamed: NodeSet,
+}
 
 pub(crate) struct AxMirror {
     /// The next take holds every node: no take yet, or every box built.
     pub(crate) all: bool,
-    /// The nodes whose boxes were built, moved or freed since the last
-    /// take.
-    touched: NodeSet,
-    /// Nodes inserted since the last take: moved among their siblings.
-    replaced: NodeSet,
+    touched: Touched,
     /// The records last emitted, by node.
     pub(crate) records: NodeMap<AxMirrorNode>,
     /// The focused node as last emitted.
     pub(crate) focus: Option<NodeId>,
     index: Option<AxIndex>,
+    /// How many times the index was rebuilt by a scan of the document.
+    pub(crate) scans: usize,
 }
 
 impl Default for AxMirror {
     fn default() -> Self {
         Self {
             all: true,
-            touched: NodeSet::default(),
-            replaced: NodeSet::default(),
+            touched: Touched::default(),
             records: NodeMap::default(),
             focus: None,
             index: None,
+            scans: 0,
         }
-    }
-}
-
-/// Each id to its first element, and each id to the elements naming it
-/// in a [`REFERRING`] attribute.
-pub(crate) struct AxIndex {
-    pub(crate) ids: Ids,
-    pub(crate) referrers: HashMap<String, Vec<NodeId>>,
-}
-
-impl AxIndex {
-    /// The index of `doc`'s elements now.
-    pub(crate) fn of(doc: &Document) -> Self {
-        let mut index = Self {
-            ids: Ids::new(),
-            referrers: HashMap::new(),
-        };
-        for node in doc.elements() {
-            if let Some(id) = doc.attribute(node, "id") {
-                index.ids.entry(id.to_owned()).or_insert(node);
-            }
-            for attribute in REFERRING {
-                let named = doc.attribute(node, attribute).unwrap_or_default();
-                for id in named.split_whitespace() {
-                    index.referrers.entry(id.to_owned()).or_default().push(node);
-                }
-            }
-        }
-        index
     }
 }
 
@@ -87,18 +65,17 @@ impl AxMirror {
     pub(crate) fn touch_slots(&mut self, changed: &ChangedSlots, slots: &Slots) {
         if changed.every {
             self.all = true;
-            self.touched.clear();
-            self.replaced.clear();
+            self.touched = Touched::default();
         }
         if self.all {
             return;
         }
         let built = changed.rebuilt.iter().chain(&changed.moved);
         for key in built.filter_map(|&slot| slots.key(slot)) {
-            self.touched.insert(node_of(key));
+            self.touched.nodes.insert(node_of(key));
         }
         for (_, key) in &changed.freed {
-            self.touched.insert(node_of(*key));
+            self.touched.nodes.insert(node_of(*key));
         }
     }
 
@@ -107,24 +84,40 @@ impl AxMirror {
         if self.all {
             return;
         }
-        self.touched.insert(node);
-        self.replaced.insert(node);
+        self.touched.nodes.insert(node);
+        self.touched.replaced.insert(node);
     }
 
-    /// The nodes touched and the nodes inserted since the last take;
-    /// both cleared.
-    pub(crate) fn take_touched(&mut self) -> (NodeSet, NodeSet) {
-        (
-            std::mem::take(&mut self.touched),
-            std::mem::take(&mut self.replaced),
-        )
+    /// Whether nothing was touched since the last take.
+    pub(crate) fn touched_nothing(&self) -> bool {
+        self.touched.nodes.is_empty() && self.touched.renamed.is_empty()
+    }
+
+    /// What was touched since the last take; cleared.
+    pub(crate) fn take_touched(&mut self) -> Touched {
+        std::mem::take(&mut self.touched)
+    }
+
+    /// The index kept from the last take, if any.
+    pub(crate) fn take_index(&mut self) -> Option<AxIndex> {
+        self.index.take()
+    }
+
+    /// Keeps what a refused take took, for the next take: what it
+    /// touched, the nodes it found renamed, and the index it read.
+    pub(crate) fn keep(&mut self, mut touched: Touched, renamed: Vec<NodeId>, index: AxIndex) {
+        touched.renamed.extend(renamed);
+        touched.nodes.extend(self.touched.nodes.drain());
+        touched.replaced.extend(self.touched.replaced.drain());
+        touched.renamed.extend(self.touched.renamed.drain());
+        self.touched = touched;
+        self.index = Some(index);
     }
 
     /// Keeps `nodes` as the records of every node, after a take of all.
     pub(crate) fn reset(&mut self, nodes: &[AxMirrorNode], index: AxIndex, focus: Option<NodeId>) {
         self.records = nodes.iter().map(|n| (n.node, n.clone())).collect();
-        self.touched.clear();
-        self.replaced.clear();
+        self.touched = Touched::default();
         self.all = false;
         self.index = Some(index);
         self.focus = focus;
@@ -155,11 +148,6 @@ impl AxMirror {
             focus: moved,
         }
     }
-
-    /// The index kept from the last take, if any.
-    pub(crate) fn take_index(&mut self) -> Option<AxIndex> {
-        self.index.take()
-    }
 }
 
 /// The element a box's key names, or the text's element for a text run.
@@ -175,5 +163,15 @@ impl Document {
     pub(crate) fn note_replaced(&mut self, node: NodeId) {
         self.note_change();
         self.ax.touch_replaced(node);
+    }
+
+    /// How many times the a11y mirror's index of ids was rebuilt by a
+    /// scan of the whole document: once for the first take, then once
+    /// per take that inserted or removed elements, or found an id
+    /// carried by more than one element; never for a take that only
+    /// changed, moved or restyled elements in place.
+    #[must_use]
+    pub fn ax_index_scans(&self) -> usize {
+        self.ax.scans
     }
 }

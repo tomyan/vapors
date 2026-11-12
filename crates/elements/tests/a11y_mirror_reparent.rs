@@ -8,7 +8,7 @@
 mod support;
 
 use support::element;
-use support::mirror::{labels, node_of, taken_model, updated_take};
+use support::mirror::{labels, node_of, step, taken_model};
 use vapors_dom::Dom;
 
 #[test]
@@ -28,8 +28,7 @@ fn a_node_that_lost_its_role_hands_its_children_to_its_parent() {
     doc.borrow_mut().set_attribute(group, "role", "none");
 
     // When
-    let update = updated_take(&doc).expect("a change");
-    model.apply(&update);
+    let update = step(&doc, &mut model).expect("a change");
 
     // Then: a record carries its parent, so each control's record changed
     assert_eq!(update.removed, [group]);
@@ -63,13 +62,12 @@ fn a_node_that_gained_a_role_takes_its_children_from_its_parent() {
         doc.append(wrap, apply);
         wrap
     };
-    model.apply(&updated_take(&doc).expect("the wrap's placements"));
+    step(&doc, &mut model).expect("the wrap's placements");
     doc.borrow_mut().set_attribute(wrap, "role", "group");
     doc.borrow_mut().set_attribute(wrap, "aria-label", "Edit");
 
     // When
-    let update = updated_take(&doc).expect("a change");
-    model.apply(&update);
+    let update = step(&doc, &mut model).expect("a change");
 
     // Then
     assert_eq!(
@@ -92,8 +90,7 @@ fn a_node_moved_among_its_siblings_is_placed_again() {
     doc.borrow_mut().insert_before(region, reset, Some(pin));
 
     // When
-    let update = updated_take(&doc).expect("a change");
-    model.apply(&update);
+    let update = step(&doc, &mut model).expect("a change");
 
     // Then
     let placed: Vec<_> = update.placed.iter().map(|p| p.node).collect();
@@ -131,8 +128,7 @@ fn a_node_made_invisible_is_removed_and_its_children_stay_under_its_parent() {
     }
 
     // When
-    let update = updated_take(&doc).expect("a change");
-    model.apply(&update);
+    let update = step(&doc, &mut model).expect("a change");
 
     // Then
     assert_eq!(update.removed, [group]);

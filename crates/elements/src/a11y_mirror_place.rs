@@ -3,18 +3,22 @@
 //! holds after the take, found by scanning forward from the node's
 //! position and into the subtrees of elements that are not nodes. The
 //! placements are ordered so that each `before` is placed before the
-//! placement naming it.
+//! placement naming it, in one pass over them.
 
 use vapors_dom::NodeId;
 
+use crate::a11y_error::AxError;
 use crate::a11y_mirror::AxPlace;
 use crate::a11y_mirror_diff::{After, Diff};
 use crate::document::Document;
-use crate::node_map::NodeSet;
+use crate::node_map::{NodeMap, NodeSet};
 
 impl Document {
     /// Placements for what `diff` found to place.
-    pub(crate) fn ax_placements(&self, diff: &Diff) -> Vec<AxPlace> {
+    ///
+    /// # Errors
+    /// [`AxError::PlacementCycle`]: a bug in vapors.
+    pub(crate) fn ax_placements(&self, diff: &Diff) -> Result<Vec<AxPlace>, AxError> {
         let pending = diff
             .to_place
             .iter()
@@ -70,24 +74,75 @@ impl Document {
 }
 
 /// `pending` in an order a mirror applies one by one: a placement
-/// comes after the one placing its `before`.
+/// comes after the one placing its `before`. Each placement waits on
+/// the one its `before` names, when that is pending too; the rest are
+/// ready, and each placed releases the ones waiting on it: O(n).
 ///
-/// # Panics
-/// Placements that wait on each other, which document order cannot
-/// produce: a bug in vapors.
-fn order(mut pending: Vec<AxPlace>) -> Vec<AxPlace> {
-    let mut out = Vec::with_capacity(pending.len());
-    while !pending.is_empty() {
-        let waiting: NodeSet = pending.iter().map(|place| place.node).collect();
-        let (ready, rest): (Vec<AxPlace>, Vec<AxPlace>) = pending
-            .into_iter()
-            .partition(|place| place.before.is_none_or(|before| !waiting.contains(&before)));
-        assert!(
-            !ready.is_empty(),
-            "a11y placements wait on each other ({rest:?}): a bug in vapors; report it with the page"
-        );
-        out.extend(ready);
-        pending = rest;
+/// # Errors
+/// [`AxError::PlacementCycle`]: placements wait on each other, which
+/// document order cannot produce: a bug in vapors.
+fn order(pending: Vec<AxPlace>) -> Result<Vec<AxPlace>, AxError> {
+    let total = pending.len();
+    let waiting: NodeSet = pending.iter().map(|place| place.node).collect();
+    let mut on: NodeMap<Vec<AxPlace>> = NodeMap::default();
+    let mut ready = Vec::new();
+    for place in pending {
+        match place.before.filter(|before| waiting.contains(before)) {
+            Some(before) => on.entry(before).or_default().push(place),
+            None => ready.push(place),
+        }
     }
-    out
+    let mut out = Vec::with_capacity(total);
+    while let Some(place) = ready.pop() {
+        ready.extend(on.remove(&place.node).unwrap_or_default());
+        out.push(place);
+    }
+    if out.len() == total {
+        return Ok(out);
+    }
+    let mut nodes: Vec<u64> = on
+        .into_values()
+        .flatten()
+        .map(|place| place.node.0)
+        .collect();
+    nodes.sort_unstable();
+    Err(AxError::PlacementCycle { nodes })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn place(node: u64, before: Option<u64>) -> AxPlace {
+        AxPlace {
+            node: NodeId(node),
+            parent: None,
+            before: before.map(NodeId),
+        }
+    }
+
+    #[test]
+    fn a_chain_of_placements_puts_each_before_after_its_own_placement() {
+        // Given: 1 before 2, 2 before 3, 3 before nothing, given backwards
+        let pending = vec![place(1, Some(2)), place(2, Some(3)), place(3, None)];
+
+        // When
+        let ordered = order(pending).expect("ordered");
+
+        // Then
+        let nodes: Vec<u64> = ordered.iter().map(|p| p.node.0).collect();
+        assert_eq!(nodes, [3, 2, 1]);
+    }
+
+    #[test]
+    fn placements_waiting_on_each_other_are_refused_naming_them() {
+        // Given
+        let pending = vec![place(1, Some(2)), place(2, Some(1)), place(3, None)];
+
+        // When
+        let refused = order(pending).expect_err("a cycle");
+
+        // Then
+        assert_eq!(refused, AxError::PlacementCycle { nodes: vec![1, 2] });
+    }
 }
