@@ -1,0 +1,31 @@
+[package]
+name = "vapors-scene3d-components"
+description = "The 3D scene's .wisp components: Scene, Group, Mesh, Camera (docs/plans/3d-2.md)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+vapors-app.workspace = true
+vapors-dom.workspace = true
+vapors-scene3d.workspace = true
+vapors-signals.workspace = true
+
+[build-dependencies]
+vapors-compiler.workspace = true
+
+[dev-dependencies]
+vapors-elements.workspace = true
+vapors-gpu-harness.workspace = true
+vapors-platform.workspace = true
+vapors-renderer.workspace = true
+vapors-scene.workspace = true
+vapors-scene3d-gpu.workspace = true
+vapors-text.workspace = true
+wgpu.workspace = true
+
+[lints]
+workspace = true

@@ -37,50 +37,7 @@ pub struct AxElement {
     pub children: Vec<AxElement>,
 }
 
-/// A node's states; `None` where Chromium leaves the state out.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AxStates {
-    /// It has focus.
-    pub focused: bool,
-    /// A disabled control, or `aria-disabled="true"`.
-    pub disabled: bool,
-    /// A checkbox's state, or `aria-checked`.
-    pub checked: Option<bool>,
-    /// `aria-expanded`.
-    pub expanded: Option<bool>,
-    /// `aria-selected="true"`.
-    pub selected: bool,
-    /// `aria-pressed`.
-    pub pressed: Option<bool>,
-}
-
-impl AxStates {
-    /// The states Chromium writes, as `name=value`, sorted.
-    #[must_use]
-    pub fn set(&self) -> Vec<String> {
-        let mut set = Vec::new();
-        for (name, state) in [
-            ("checked", self.checked),
-            ("expanded", self.expanded),
-            ("pressed", self.pressed),
-        ] {
-            if let Some(state) = state {
-                set.push(format!("{name}={state}"));
-            }
-        }
-        for (name, state) in [
-            ("disabled", self.disabled),
-            ("focused", self.focused),
-            ("selected", self.selected),
-        ] {
-            if state {
-                set.push(format!("{name}=true"));
-            }
-        }
-        set.sort();
-        set
-    }
-}
+pub use vapors_a11y::AxStates;
 
 impl Document {
     /// The a11y tree's top nodes, each with its subtree.

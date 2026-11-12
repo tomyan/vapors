@@ -112,10 +112,11 @@ struct Gpu {
   growing buffer per pipeline with a free list of ranges (first fit,
   ranges merged on free), `COPY_DST | VERTEX` (or `UNIFORM`). Writes
   go through `WorkCounter::write_buffer` as today, so `FrameCounts`
-  still counts them. A write to a range a recorded draw of this frame
-  reads is not an issue: a batch's range is freed only when the batch
-  is dropped, and a dropped batch is not drawn in the frame that drops
-  it. When the free ranges fragment past half the buffer, the live
+  still counts them. A released range is free for new bytes only once
+  a newer encoder than the last one written or drawn for writes or
+  draws, so a write never lands on a range a draw recorded into the
+  open encoder reads, whatever the order of draws, releases and
+  writes. When the free ranges fragment past half the buffer, the live
   ranges are compacted into a new buffer in one pass (O(shown
   batches)), counted. Growth doubles, up to `max_buffer_size`
   (section 5).
@@ -386,6 +387,23 @@ time recorded in `docs/perf/`, three runs, medians, at 1000, 3000 and
 | 4c | The painter: translations in the dynamic-offset uniform; scissors from inner clip and frame clip; the shaders add the translation | Scroll at 3000 and 10,000 rows: draw instructions equal to Idle's within noise; `batches_written` only at the view's edges | with 4b, same author |
 | 5 | The per-frame extents index; `hidden` replaced by per-frame item counts; the candidate debug check | Resize and Scroll at 10,000 rows: `batches` instructions equal to 1000 rows' within noise; `culled` unchanged | after 4b; `kept_batches.rs`, `drawn_steps.rs` |
 | 6 | Acceptance: every rows workload at 1000, 3000 and 10,000 rows, Scroll, Insert and Resize, instruction counts, wall clock and GPU time in `docs/perf/`; property 2 and the scroll remainder of property 4 marked held or not in `perf-finish-line.md` | Draw under 1 ms and the same within noise at every row count; Scroll's update within Idle's | last |
+
+PR 2 as built (2026-11-12), split along the file seam into 2a
+(`crates/renderer`: `Retained`, the pipelines' kept ranges) and 2b
+(the painter and the keys):
+
+- `Kept` is split across crates, because `vapors-elements` does not
+  depend on the renderer. `KeptBatches` keeps a `BatchKey` per batch
+  (`kept_batches_keys.rs`), and the painter keeps each key's range,
+  viewport and debug bytes (`painter_kept_gpu.rs`).
+- Matching by place alone gave every batch after an inserted one a new
+  key, for example when a class toggle adds a background quad that
+  splits a text batch. So batches are matched by place from the start
+  up to the first difference, and by place from the end after it.
+- A released range is reused only once a newer encoder writes, because
+  a draw recorded earlier in the same frame may still read it.
+- Text batches keep keys by `TextId` (risk 8). Their bytes are not
+  kept until PR 3, which must compare the resolved layouts.
 
 ### 4a to 4c land together
 

@@ -4,7 +4,9 @@ use std::collections::BTreeMap;
 
 use super::{AtSize, Judged, Scaling};
 use crate::rows::RowChange;
-use crate::scaling_judged::{INSERT_A11Y_PER_ROW, MOVE_A11Y_PER_ROW};
+use crate::scaling_judged::{
+    INSERT_A11Y_PER_ROW, RESIZE_A11Y_PER_ROW, SCROLL_A11Y_PER_ROW, SCROLL_SIZE_A11Y_PER_ROW,
+};
 
 fn size(rows: usize, phases: &[(&str, u64)]) -> AtSize {
     let phases: BTreeMap<_, _> = phases.iter().map(|&(p, n)| (p.to_owned(), n)).collect();
@@ -151,11 +153,18 @@ fn each_change_is_judged_as_the_brief_says() {
         ceiling: INSERT_A11Y_PER_ROW,
     };
     assert_eq!(Judged::of(RowChange::Insert), insert);
-    let moved = Judged::AccessibilityPerRow {
-        ceiling: MOVE_A11Y_PER_ROW,
+    let resize = Judged::AccessibilityPerRow {
+        ceiling: RESIZE_A11Y_PER_ROW,
     };
-    assert_eq!(Judged::of(RowChange::Resize), moved);
-    assert_eq!(Judged::of(RowChange::Scroll), moved);
+    assert_eq!(Judged::of(RowChange::Resize), resize);
+    let scroll = Judged::AccessibilityPerRow {
+        ceiling: SCROLL_A11Y_PER_ROW,
+    };
+    assert_eq!(Judged::of(RowChange::Scroll), scroll);
+    let scroll_size = Judged::AccessibilityPerRow {
+        ceiling: SCROLL_SIZE_A11Y_PER_ROW,
+    };
+    assert_eq!(Judged::of(RowChange::ScrollSize), scroll_size);
 }
 
 #[test]

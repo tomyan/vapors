@@ -101,8 +101,8 @@ fn the_kept_batches_hold_the_shown_steps_and_count_the_hidden_ones_culled() {
 
     // Then
     assert_eq!(kept.shown, [(0, Step::Box(0)), (2, Step::Box(2))]);
-    assert_eq!(*kept.batches(on_page(&boxes)), afresh(&boxes));
-    assert_eq!(kept.batches(on_page(&boxes)).culled, 3);
+    assert_eq!(kept.batches(on_page(&boxes)).batched, afresh(&boxes));
+    assert_eq!(kept.batches(on_page(&boxes)).batched.culled, 3);
 }
 
 #[test]
@@ -118,7 +118,7 @@ fn a_hidden_step_painted_again_out_of_view_keeps_the_batches() {
 
     // Then
     assert!(kept.holds_batches());
-    assert_eq!(*kept.batches(on_page(&boxes)), afresh(&boxes));
+    assert_eq!(kept.batches(on_page(&boxes)).batched, afresh(&boxes));
 }
 
 #[test]
@@ -136,7 +136,7 @@ fn a_step_painted_again_into_or_out_of_view_makes_the_batches_again() {
         // Then
         assert!(!kept.holds_batches(), "{before} to {after}");
         assert_eq!(
-            *kept.batches(on_page(&boxes)),
+            kept.batches(on_page(&boxes)).batched,
             afresh(&boxes),
             "{before} to {after}"
         );
@@ -155,7 +155,11 @@ fn a_freed_slot_leaves_the_kept_steps_and_its_culled_count() {
         painted_again((&mut kept, &mut drawn), &mut boxes, (1, None));
 
         // Then
-        assert_eq!(*kept.batches(on_page(&boxes)), afresh(&boxes), "at {top}");
+        assert_eq!(
+            kept.batches(on_page(&boxes)).batched,
+            afresh(&boxes),
+            "at {top}"
+        );
     }
 }
 
@@ -169,7 +173,7 @@ fn a_surface_out_of_view_is_kept_shown_for_its_culled_batch() {
 
     // Then
     assert_eq!(kept.shown.len(), 2);
-    assert_eq!(*kept.batches(on_page(&boxes)), afresh(&boxes));
+    assert_eq!(kept.batches(on_page(&boxes)).batched, afresh(&boxes));
 }
 
 /// A document with one drawn row, updated once.

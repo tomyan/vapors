@@ -109,8 +109,44 @@ fn a_scroll_moves_only_the_scrollers_descendants() {
     assert!(list.doc.scroll_node_by(list.container, [0.0, 30.0]));
     let counts = updated(&mut list.doc, 200.0);
 
-    // Then: the four rows moved, and nothing else
-    assert_eq!(counts.boxes_moved, 4);
+    // Then: the four rows moved, and nothing else; each moved by the
+    // scroll alone, which the a11y mirror leaves out (R6)
+    assert_eq!((counts.boxes_moved, counts.boxes_scrolled), (4, 4));
+}
+
+#[test]
+fn a_row_moved_by_a_change_above_it_is_not_counted_as_scrolled() {
+    // Given
+    let (mut doc, texts) = rows();
+
+    // When
+    doc.set_text(texts[1], "a much longer label that wraps in 100px");
+    let counts = updated(&mut doc, 200.0);
+
+    // Then
+    assert_eq!(counts.boxes_scrolled, 0);
+}
+
+#[test]
+fn a_scrolled_row_laid_out_again_is_moved_not_scrolled() {
+    // Given: a scroll container of four rows, scrolled, with the
+    // second row made taller in the same update
+    let mut list = list("overflow: auto;");
+    updated(&mut list.doc, 200.0);
+
+    // When
+    assert!(list.doc.scroll_node_by(list.container, [0.0, 30.0]));
+    list.doc
+        .set_attribute(list.rows[1], "style", "height: 60px");
+    let counts = updated(&mut list.doc, 200.0);
+
+    // Then: the row before it scrolled; the rows after it are laid out
+    // again, so they are moved, not scrolled, whatever the scroll did
+    // to them (review-v243 M2: the container is laid out again too,
+    // and its rect is kept, so the row before it still counts as
+    // scrolled)
+    assert_eq!(counts.boxes_scrolled, 1, "{counts:?}");
+    assert!(counts.boxes_moved >= 3, "{counts:?}");
 }
 
 #[test]

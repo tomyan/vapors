@@ -3,13 +3,16 @@
 //! that show something in it, the culled count of the others, and the
 //! batches of the shown steps' items. A draw with the same view reads
 //! the kept batches; an update patches the steps of the slots it paints
-//! again (`paint_partial.rs`). A debug build compares every draw's
-//! batches with [`vapors_scene::batched`] over the whole scene.
+//! again (`paint_partial.rs`), and the batches made again after it keep
+//! the keys of those whose runs did not change (`kept_batches_keys.rs`).
+//! A debug build compares every draw's batches with
+//! [`vapors_scene::batched`] over the whole scene.
 
-use vapors_scene::{Batched, Item, Rect};
+use vapors_scene::{Item, Rect};
 
 use crate::drawn_steps::DrawnSteps;
 use crate::frames::Frames;
+use crate::kept_batches_keys::KeptBatched;
 use crate::kept_box::KeptBox;
 use crate::paint_order::Step;
 use crate::scene_view::step_items;
@@ -33,8 +36,11 @@ pub(crate) struct KeptBatches {
     /// The sum of `hidden`.
     hidden_culled: u64,
     /// The batches of `shown`'s items, `hidden_culled` added to their
-    /// culled count; `None` until the next draw after a shown step changed.
-    pub(crate) batched: Option<Batched>,
+    /// culled count, with their keys; `None` until the first draw.
+    batched: Option<KeptBatched>,
+    /// True when a shown step changed since `batched` was made: the
+    /// next draw makes them again, keeping the keys of equal runs.
+    stale: bool,
 }
 
 impl KeptBatches {
@@ -53,6 +59,7 @@ impl KeptBatches {
             hidden: vec![0; places],
             hidden_culled: 0,
             batched: None,
+            stale: false,
         };
         for (place, step) in drawn.placed() {
             kept.add(place, step, boxes);
@@ -93,20 +100,29 @@ impl KeptBatches {
     /// True when the batches are kept for the next draw.
     #[cfg(test)]
     pub(crate) fn holds_batches(&self) -> bool {
-        self.batched.is_some()
+        self.current().is_some()
     }
 
-    /// The batches, made from the shown steps' items when none are kept.
-    pub(crate) fn batches(&mut self, boxes: (&[Option<KeptBox>], &Frames)) -> &Batched {
-        self.batched.get_or_insert_with(|| {
+    /// The batches made at the last draw, when no shown step changed
+    /// since.
+    pub(crate) fn current(&self) -> Option<&KeptBatched> {
+        self.batched.as_ref().filter(|_| !self.stale)
+    }
+
+    /// The batches, made from the shown steps' items when none are kept
+    /// or a shown step changed.
+    pub(crate) fn batches(&mut self, boxes: (&[Option<KeptBox>], &Frames)) -> &KeptBatched {
+        if self.current().is_none() {
             let items = self
                 .shown
                 .iter()
                 .flat_map(|&(_, step)| step_items(boxes, step));
             let mut batched = vapors_scene::batched(items, self.view);
             batched.culled += self.hidden_culled;
-            batched
-        })
+            self.batched = Some(KeptBatched::keyed(batched, self.batched.as_ref()));
+            self.stale = false;
+        }
+        self.batched.as_ref().expect("made above")
     }
 
     /// Puts `step`, at `place`, in `shown` or `hidden` by its items.
@@ -115,7 +131,7 @@ impl KeptBatches {
             None => {
                 let at = self.shown.partition_point(|&(shown, _)| shown < place);
                 self.shown.insert(at, (place, step));
-                self.batched = None;
+                self.stale = true;
             }
             Some(culled) => {
                 self.hidden[place] = culled;
@@ -128,7 +144,7 @@ impl KeptBatches {
     fn remove(&mut self, place: usize) {
         if let Ok(at) = self.shown.binary_search_by_key(&place, |&(shown, _)| shown) {
             self.shown.remove(at);
-            self.batched = None;
+            self.stale = true;
         }
         let culled = std::mem::take(&mut self.hidden[place]);
         self.add_culled(-culled.cast_signed());
@@ -138,8 +154,8 @@ impl KeptBatches {
     /// count.
     fn add_culled(&mut self, culled: i64) {
         self.hidden_culled = added(self.hidden_culled, culled);
-        if let Some(batched) = &mut self.batched {
-            batched.culled = added(batched.culled, culled);
+        if let Some(kept) = &mut self.batched {
+            kept.batched.culled = added(kept.batched.culled, culled);
         }
     }
 }

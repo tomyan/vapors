@@ -11,7 +11,7 @@
 //! ([`ArenaFull`]).
 
 use crate::encoder_turn::EncoderTurn;
-use crate::{ArenaFull, FrameEncoder, WorkCounter};
+use crate::{ArenaFull, FrameEncoder, Holding, WorkCounter};
 
 /// Where a draw's bytes went: a buffer (kept alive by the passes that
 /// use it, though the arena moves to a larger one) and the range.
@@ -135,6 +135,7 @@ impl FrameArena {
                 pipeline: self.label,
                 size: needed,
                 limit,
+                holding: Holding::OneFrame,
             });
         }
         let size = (self.buffer.size() * 2).clamp(needed, limit);

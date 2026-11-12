@@ -72,7 +72,8 @@ fn candidates(order: &KeptOrder, changed: &ChangedSlots, fresh: bool) -> Vec<usi
         let own = |step: &Step| matches!(step, Step::Box(_)).then(|| step.index());
         return order.steps.iter().filter_map(own).collect();
     }
-    let changed = changed.rebuilt.iter().chain(&changed.moved);
+    let moved = changed.moved.iter().chain(&changed.scrolled);
+    let changed = changed.rebuilt.iter().chain(moved);
     let mut slots: Vec<usize> = changed.chain(&order.redone).copied().collect();
     slots.sort_unstable();
     slots.dedup();

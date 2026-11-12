@@ -51,6 +51,18 @@ pub struct FrameCounts {
     /// with it, so this falls when a frame stops drawing an image. A
     /// refused frame drops no texture and counts those still kept.
     pub bind_groups_kept: u64,
+    /// Shadow, quad, image and surface batches whose bytes the frame
+    /// built and wrote into their pipeline's kept buffer: on their first
+    /// draw, after their items changed, or on a target of another
+    /// viewport (`painter_kept.rs`). Text and icon batches are built
+    /// and written every frame and are not counted.
+    pub batches_written: u64,
+    /// Shadow, quad, image and surface batches drawn from bytes kept
+    /// from an earlier frame, with nothing built or written.
+    pub batches_kept: u64,
+    /// Bytes held in the pipelines' kept buffers after the frame: the
+    /// batches it drew. Those it did not draw are released.
+    pub retained_bytes: u64,
 }
 
 impl FrameCounts {
@@ -72,6 +84,20 @@ impl FrameCounts {
     #[must_use]
     pub fn uniform_writes(&self) -> u64 {
         self.total().uniform_writes
+    }
+
+    /// Kept-byte buffers grown in the frame: their live ranges copied
+    /// into a buffer twice the size.
+    #[must_use]
+    pub fn retained_grown(&self) -> u64 {
+        self.total().retained_grown
+    }
+
+    /// Kept-byte buffers compacted in the frame: their live ranges
+    /// copied, packed, into a buffer of the same size.
+    #[must_use]
+    pub fn retained_compacted(&self) -> u64 {
+        self.total().retained_compacted
     }
 
     /// Bytes of glyph atlas uploaded: by text runs and icon runs.
@@ -117,6 +143,8 @@ impl ScenePainter {
             + self.text.bind_groups_kept()
             + self.textures.bind_groups_kept()
             + self.surfaces.bind_groups_kept();
+        (self.counts.batches_written, self.counts.batches_kept) = self.kept.drawn();
+        self.counts.retained_bytes = self.retained_bytes();
     }
 
     /// Adds the work issued since the last take to `run`'s kind.
