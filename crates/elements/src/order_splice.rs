@@ -73,6 +73,9 @@ pub(crate) fn plan(
     };
     for run in children.inserted_runs(boxes)? {
         let below = in_flow_subtrees(boxes, stackings, children.owner, &children.new[run.clone()])?;
+        if below.iter().any(|&(slot, _)| place(Step::Box(slot)).is_some()) {
+            return Err(Declined);
+        }
         let (boxes_at, outlines_at) = children.anchors(boxes, stackings, &run, place)?;
         let steps =
             |step: fn(usize) -> Step| below.iter().map(move |&(slot, _)| step(slot)).collect();
@@ -155,7 +158,8 @@ fn removals(changed: &ChangedSlots, place: Place<'_>) -> Vec<Edit> {
 
 /// `roots` and the boxes below them in tree order, each with its
 /// parent (`parent` for the roots); `Declined` when one has a stacking
-/// other than the default.
+/// other than the default. (`plan` also declines when one already has
+/// a place: a box moved out of a removed row keeps its slot.)
 fn in_flow_subtrees(
     boxes: &[LayoutBox],
     stackings: &Stackings,
