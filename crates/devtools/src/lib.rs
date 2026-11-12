@@ -11,6 +11,7 @@
 
 mod connect;
 mod discover;
+mod discover_list;
 mod session;
 
 pub use discover::{page_socket, port};

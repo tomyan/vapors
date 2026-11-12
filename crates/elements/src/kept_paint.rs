@@ -38,12 +38,13 @@ impl PaintedFrom {
     }
 }
 
-/// `kept`, the last update's paint, for this update; it holds the text
-/// layouts it shows, so the text cache keeps them. A debug build paints
+/// `kept`, the last update's paint, for this update, with no hit
+/// changed; it holds the text layouts it shows, so the text cache keeps
+/// them. A debug build paints
 /// `boxes` again and panics, naming each part, when that paint differs
 /// from `kept`.
 pub(crate) fn keep(
-    kept: Painted,
+    mut kept: Painted,
     boxes: &[LayoutBox],
     rects: &[BoxRect],
     input: &mut PaintInput<'_>,
@@ -52,6 +53,7 @@ pub(crate) fn keep(
         let fresh = fresh(boxes, rects, input);
         crate::kept_paint_check::assert_same(&kept, &fresh);
     }
+    kept.hits_changed = crate::kept_hits::HitsChanged::Known(Vec::new());
     kept
 }
 
