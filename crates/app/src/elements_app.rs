@@ -182,7 +182,6 @@ fn shortcut_modifier() -> ShortcutModifier {
     }
 }
 
-#[cfg(not(target_family = "wasm"))]
 #[path = "elements_app_atlas.rs"]
 mod atlas;
 #[path = "elements_app_counts.rs"]
@@ -193,6 +192,7 @@ mod decision;
 mod frame_phases;
 #[path = "elements_app_give.rs"]
 mod give;
+#[cfg(not(target_family = "wasm"))]
 #[path = "elements_app_paste.rs"]
 mod paste;
 #[path = "elements_app_surface_handle.rs"]
