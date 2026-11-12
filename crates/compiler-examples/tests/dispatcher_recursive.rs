@@ -14,7 +14,7 @@ fn divs(dom: &Rc<RefCell<RecordingDom>>) -> usize {
     dom.borrow()
         .calls()
         .iter()
-        .filter(|call| matches!(call, Call::CreateElement { tag, .. } if tag == "div"))
+        .filter(|call| matches!(call, Call::CreateKeyedElement { key, .. } if key.tag == "div"))
         .count()
 }
 

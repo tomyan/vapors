@@ -89,10 +89,10 @@ fn dynamic_attributes_are_patched_in_effects() {
 #[test]
 fn static_attributes_are_set_once() {
     // When
-    let code = generated_with("", "<div class=\"row\" id=\"main\"></div>");
+    let code = generated_with("", "<div title=\"row\" id=\"main\"></div>");
 
     // Then
-    assert_has(&code, "set_attribute(div0, \"class\", \"row\");");
+    assert_has(&code, "set_attribute(div0, \"title\", \"row\");");
     assert_has(&code, "set_attribute(div0, \"id\", \"main\");");
     assert_lacks(&code, "_if_changed");
     assert_lacks(&code, "Effect::new(");

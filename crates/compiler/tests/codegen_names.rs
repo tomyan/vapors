@@ -134,6 +134,6 @@ fn a_hyphenated_tag_gets_a_node_name_rust_accepts() {
     // Then
     assert_has(
         &code,
-        r#"let gpu_surface0 = dom.borrow_mut().create_element("gpu-surface");"#,
+        r"let gpu_surface0 = dom.borrow_mut().create_keyed_element(&KEY_GPU_SURFACE0);",
     );
 }

@@ -23,6 +23,8 @@ mod modifiers;
 pub mod recording;
 mod roots;
 mod snippet;
+mod style_key;
+mod style_key_refusals;
 
 pub use class_names::class_names;
 pub use dispatcher::{DispatchRefused, Dispatcher, Listeners, run_along};
@@ -33,6 +35,7 @@ pub use listener_result::{ListenerResult, handle, handle_without_event, set_erro
 pub use modifiers::Modifiers;
 pub use roots::{BlockNodes, Root, current_nodes};
 pub use snippet::{Args, DynDom, Renderable, Snippet};
+pub use style_key::{MAX_TOGGLES, StyleKey};
 
 /// Identifies a node in the tree. The [`Dom`] implementation decides
 /// what the number means.
@@ -72,6 +75,27 @@ pub const SCOPE_ATTRIBUTE: &str = "data-wisp";
 pub trait Dom: Listeners {
     /// Creates an element with the given tag, attached nowhere yet.
     fn create_element(&mut self, tag: &str) -> NodeId;
+    /// Creates a template's element from its [`StyleKey`], attached
+    /// nowhere yet: the key's tag, with the attributes of
+    /// [`StyleKey::attributes`] set. From here on [`Dom::set_attribute`]
+    /// refuses those attributes on it ([`StyleKey::refusal`]), so the
+    /// key stays true of the element; a `class:` directive toggles
+    /// through [`Dom::toggle_classes`]. A key with a
+    /// [`StyleKey::shape_refusal`] is refused.
+    ///
+    /// A refusal here and in the calls below is recorded, naming the
+    /// site and the fix, and changes nothing: `vapors_elements` returns
+    /// it from every update while the element is in the tree, and
+    /// `RecordingDom` records it as a call. Neither panics.
+    fn create_keyed_element(&mut self, key: &'static StyleKey) -> NodeId;
+    /// Turns each named `class:` directive of a keyed element on or
+    /// off, and sets its `class` to [`StyleKey::class_attribute`].
+    /// Refuses a name the key does not list, and an element created
+    /// without a key, naming the fix.
+    fn toggle_classes(&mut self, node: NodeId, toggles: &[(&str, bool)]);
+    /// The key `node` was created from; `None` for an element made by
+    /// [`Dom::create_element`] and for a text node.
+    fn style_key(&self, node: NodeId) -> Option<&'static StyleKey>;
     /// Creates a text node, attached nowhere yet.
     fn create_text(&mut self, text: &str) -> NodeId;
     /// Sets (or replaces) an attribute.
@@ -124,9 +148,12 @@ pub trait Dom: Listeners {
         }
     }
     /// [`Dom::set_attribute`] unless the element already holds `value`
-    /// under `name`; called by the generated bindings.
+    /// under `name`; called by the generated bindings. An attribute the
+    /// element's key fixes always goes to `set_attribute`, which
+    /// refuses it, so the refusal does not depend on the value.
     fn set_attribute_if_changed(&mut self, node: NodeId, name: &str, value: &str) {
-        if self.current_attribute(node, name) != Some(value) {
+        let fixed = (self.style_key(node)).is_some_and(|key| key.refusal(name).is_some());
+        if fixed || self.current_attribute(node, name) != Some(value) {
             self.set_attribute(node, name, value);
         }
     }

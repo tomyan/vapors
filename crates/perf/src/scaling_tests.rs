@@ -141,6 +141,7 @@ fn each_change_is_judged_as_the_brief_says() {
     for change in [
         RowChange::Idle,
         RowChange::Text,
+        RowChange::FlexText,
         RowChange::Class,
         RowChange::HoveredClass,
     ] {

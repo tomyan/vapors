@@ -10,7 +10,7 @@ pub const MAX_RUNS: usize = (wgpu::QUERY_SET_MAX_QUERIES / 2) as usize;
 
 const USAGE: &str = "cargo run --release -p vapors-perf -- \
                      [runs] [warmup] [--only <substring> (once)] [--instructions] \
-                     [--scaling Idle|Text|Class|HoveredClass|Insert] [--mount] [--mount-memory <rows>]";
+                     [--scaling Idle|Text|FlexText|Class|HoveredClass|Insert] [--mount] [--mount-memory <rows>]";
 
 /// What the command line asks for.
 #[derive(Debug)]

@@ -171,7 +171,7 @@ fn script_statements_are_kept_in_order_before_the_template() {
     // Then
     let total = codegen::at(&code, "let total = 2;");
     let count = codegen::at(&code, "Signal::named(\"count\", total)");
-    let element = codegen::at(&code, "create_element(\"span\")");
+    let element = codegen::at(&code, "create_keyed_element(&KEY_SPAN0)");
     assert!(total < count && count < element, "{code}");
     assert_has(&code, "use std::fmt::Write as _;");
 }

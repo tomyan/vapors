@@ -45,9 +45,11 @@ impl Judged {
     #[must_use]
     pub fn of(change: RowChange) -> Self {
         match change {
-            RowChange::Idle | RowChange::Text | RowChange::Class | RowChange::HoveredClass => {
-                Self::EveryPhase
-            }
+            RowChange::Idle
+            | RowChange::Text
+            | RowChange::FlexText
+            | RowChange::Class
+            | RowChange::HoveredClass => Self::EveryPhase,
             RowChange::Insert => Self::AccessibilityPerRow {
                 ceiling: INSERT_A11Y_PER_ROW,
             },

@@ -27,8 +27,9 @@ fn hides_on_escape() -> Fixture {
             let weak = Rc::downgrade(doc);
             let hide = move |e: &mut Event| {
                 if let (Some(doc), "Escape") = (weak.upgrade(), e.key()) {
-                    doc.borrow_mut()
-                        .set_attribute(field, "style", "display: none");
+                    // `[hidden] { display: none }` (ua.css): the field is a
+                    // template element, whose `style` its key fixes
+                    doc.borrow_mut().set_attribute(field, "hidden", "");
                 }
             };
             doc.borrow_mut().listen(field, "keydown", Box::new(hide));

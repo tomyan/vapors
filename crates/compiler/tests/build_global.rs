@@ -22,7 +22,7 @@ fn a_globally_styled_component_keeps_its_style_and_scopes_nothing() {
     // Then
     let code = read(&out.join("wisp/card.rs"));
     assert!(code.contains("pub const STYLE: &str"), "{code}");
-    for scoping in ["pub const SCOPE", "add_style(", "SCOPE_ATTRIBUTE, SCOPE"] {
+    for scoping in ["pub const SCOPE", "add_style(", "scope: Some(SCOPE)"] {
         assert!(!code.contains(scoping), "{scoping} in {code}");
     }
 }
@@ -41,7 +41,7 @@ fn a_scoped_build_of_the_same_component_scopes_it() {
     for scoping in [
         "pub const SCOPE",
         "add_style(SCOPE, STYLE)",
-        "SCOPE_ATTRIBUTE, SCOPE",
+        "scope: Some(SCOPE)",
     ] {
         assert!(code.contains(scoping), "{scoping} missing from {code}");
     }

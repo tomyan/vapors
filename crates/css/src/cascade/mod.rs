@@ -20,12 +20,14 @@ mod media_feature;
 mod media_items;
 mod media_range;
 mod restyle;
+mod share;
 mod supports;
 
 pub use computed::ComputedStyle;
 pub use environment::Environment;
 pub use inline::INLINE_SHEET;
 pub use restyle::RestyleScope;
+pub use share::{Unshareable, unshareable};
 
 pub(crate) use compute::resolve_for;
 
@@ -65,6 +67,10 @@ pub struct Cascade {
     sheets: usize,
     keyframes: Vec<Keyframes>,
     buckets: buckets::Buckets,
+    /// Every attribute name a selector reads (`selector::attribute_names`).
+    selected: std::collections::BTreeSet<String>,
+    /// Every state flag a selector tests (`selector::state_flags`).
+    selected_states: crate::tree::States,
 }
 
 impl Default for Cascade {
@@ -82,6 +88,8 @@ impl Cascade {
             sheets: 0,
             keyframes: Vec::new(),
             buckets: buckets::Buckets::default(),
+            selected: std::collections::BTreeSet::new(),
+            selected_states: crate::tree::States::NONE,
         }
     }
 
@@ -102,6 +110,7 @@ impl Cascade {
             let conditions =
                 Conditions::parse(&rule.conditions).expect("the parser accepted these conditions");
             self.buckets.insert(&rule.selector, self.rules.len());
+            self.note_selected(&rule.selector);
             self.rules.push(CascadeRule {
                 origin,
                 order: self.rules.len(),

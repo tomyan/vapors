@@ -45,16 +45,22 @@ pub struct UpdateCounts {
     /// Rebuilt boxes whose subtree changed and that answered otherwise
     /// (a size, margin or baseline changed, or an out-of-flow box
     /// bubbles up), or whose style or natural size changed: their
-    /// ancestors were laid out again. A child of a flex or grid parent
-    /// almost always counts here: the replayed size query comes back
-    /// without baselines or overflow, so it differs from the full answer.
+    /// ancestors were laid out again.
     pub owners_resized: usize,
     /// Rebuilt boxes whose subtree changed with nothing to compare
     /// against: no box held the slot, it was never asked, the old
-    /// cache lost an input, it is absolute or fixed, it is restyled
-    /// with a calc, it is the root or it is a text box (see
+    /// cache lost a layout's input, its size answer bubbled an
+    /// out-of-flow box up or was disowned, it was asked more ways
+    /// than it records, it is absolute or fixed, it is restyled with
+    /// a calc, it is the root or it is a text box (see
     /// `layout/isolated.rs`). Their ancestors were laid out again.
     pub owners_uncompared: usize,
+    /// Recorded size answers disowned this update: a box answered a
+    /// size query otherwise than its record, which cannot happen
+    /// unless something under it changed without its cache being
+    /// cleared; the record is dropped so the box is not compared
+    /// (`layout/tree_cache.rs`). 0 on every update today.
+    pub size_answers_disowned: usize,
     /// Boxes whose rect layout worked out again (IU3 3b): those Taffy
     /// laid out or gave a new layout, those built again or scrolled,
     /// the boxes above them, and the boxes placed in a box whose
@@ -142,6 +148,7 @@ impl UpdateCounts {
     /// Notes what layout did.
     pub(crate) fn count_layout(&mut self, work: &LayoutWork) {
         (self.boxes_laid_out, self.layout_calls) = (work.laid_out, work.calls);
+        self.size_answers_disowned = work.disowned;
         let settled = work.settled;
         (
             self.owners_isolated,

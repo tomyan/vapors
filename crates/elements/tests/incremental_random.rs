@@ -3,9 +3,11 @@
 //! document forgets everything kept between updates and updates from
 //! scratch; `support::oracle` compares the two. CI runs `SEEDS` seeds; set
 //! `VAPORS_INCREMENTAL_SEEDS=<n>` to run more. A failure names the
-//! seed, the step and the change. Each seed runs on two pages: flex
-//! rows (`changes::page`) and block rows (`block_page`), where an
-//! edited row's ancestors are not laid out again.
+//! seed, the step and the change. Each seed runs on four pages: flex
+//! rows (`changes::page`), block rows (`block_page`), where an edited
+//! row's ancestors are not laid out again, and the flex rows under a
+//! flex column and under a grid (`parent_pages`), whose rows with
+//! margins are replayed through their own record (M10c).
 
 mod support;
 
@@ -15,6 +17,7 @@ use std::rc::Rc;
 use support::block_page::block_page;
 use support::changes::{Random, change, page};
 use support::oracle::{assert_matches_full, snapshot};
+use support::parent_pages::{column_page, grid_page};
 use support::viewport;
 use vapors_elements::Document;
 
@@ -24,7 +27,13 @@ const STEPS: usize = 40;
 type Page = fn(&mut Random) -> Rc<RefCell<Document>>;
 
 fn run(seed: u64) {
-    for (name, make) in [("flex rows", page as Page), ("block rows", block_page)] {
+    let pages = [
+        ("flex rows", page as Page),
+        ("block rows", block_page),
+        ("flex column", column_page),
+        ("grid", grid_page),
+    ];
+    for (name, make) in pages {
         run_on(seed, name, make);
     }
 }

@@ -1,6 +1,6 @@
 //! `class:name={bool}`: the element has class `name` while the
-//! expression is true, beside its literal `class` names, all set by
-//! one effect.
+//! expression is true, beside its literal `class` names: the names are
+//! the key's toggles and one effect toggles them.
 
 #[path = "common/codegen.rs"]
 mod codegen;
@@ -10,7 +10,7 @@ use codegen::{assert_has, assert_lacks, generated_with, refusal};
 const SCRIPT: &str = "let on: Signal<bool> = Signal::new(false);";
 
 #[test]
-fn class_directives_and_literal_classes_are_set_by_one_effect() {
+fn class_directives_are_toggled_by_one_effect() {
     // When
     let code = generated_with(
         SCRIPT,
@@ -20,23 +20,20 @@ fn class_directives_and_literal_classes_are_set_by_one_effect() {
     // Then
     assert_has(
         &code,
-        "let value = vapors_dom::class_names(\"card\", &[(\"lit\", on.get()), (\"dim\", !on.get())]);",
+        "toggle_classes(div0, &[(\"lit\", on.get()), (\"dim\", !on.get())]);",
     );
-    assert_has(&code, "set_attribute_if_changed(div0, \"class\", &value);");
-    assert_lacks(&code, "set_attribute(div0, \"class\", \"card\")");
+    assert_lacks(&code, "set_attribute(div0, \"class\"");
     assert_eq!(code.matches("Effect::new(").count(), 1, "{code}");
 }
 
 #[test]
-fn a_class_directive_alone_starts_from_no_classes() {
+fn a_class_directive_alone_is_a_toggle_of_a_key_without_classes() {
     // When
     let code = generated_with(SCRIPT, "<div class:lit={on.get()}></div>");
 
     // Then
-    assert_has(
-        &code,
-        "let value = vapors_dom::class_names(\"\", &[(\"lit\", on.get())]);",
-    );
+    assert_has(&code, "classes: &[], toggles: &[\"lit\"]");
+    assert_has(&code, "toggle_classes(div0, &[(\"lit\", on.get())]);");
 }
 
 #[test]
@@ -75,7 +72,7 @@ fn a_dynamic_class_beside_a_directive_is_refused() {
     // Then
     assert_eq!(
         err,
-        "counter.wisp:4:6: `class={..}` beside `class:` directives would be dropped: the directives' effect sets `class` from the literal `class=\"..\"` only; write the names in `class=\"..\"` and toggle with `class:name={bool}`"
+        "counter.wisp:4:6: `class={..}` is refused: the compiler must see every class an element can have; write class=\"name\" for fixed classes and class:name={condition} for each class that toggles"
     );
 }
 
@@ -97,10 +94,7 @@ fn a_literal_class_in_other_case_is_the_directives_literal_class() {
     let code = generated_with(SCRIPT, "<div Class=\"card\" class:lit={on.get()}></div>");
 
     // Then
-    assert_has(
-        &code,
-        "vapors_dom::class_names(\"card\", &[(\"lit\", on.get())]);",
-    );
+    assert_has(&code, "classes: &[\"card\"], toggles: &[\"lit\"]");
     assert_lacks(&code, "\"Class\"");
 }
 
