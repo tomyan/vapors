@@ -14,6 +14,7 @@ pub mod flex_list;
 pub mod focus_page;
 pub mod hidden_page;
 pub mod mirror;
+pub mod mirror_model;
 pub mod number_page;
 pub mod oracle;
 pub mod pointer;

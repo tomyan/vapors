@@ -86,3 +86,8 @@ pedantic = { level = "warn", priority = -1 }
 # in its #44 (26 GB to 8.7 GB for a full build).
 [profile.dev]
 debug = "line-tables-only"
+
+# Test builds only: the 3000-row kept_shift tests spend their time in
+# debug-build code and hit nextest's 60 s limit under load; measured in the PR.
+[profile.test]
+opt-level = 1
