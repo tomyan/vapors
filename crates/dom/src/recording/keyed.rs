@@ -1,7 +1,10 @@
 //! A keyed element in the recording: its kind made from the key, its
 //! toggles, and the refusals, recorded as `Call::Refused` with the
 //! call changing nothing, as the elements crate returns them from its
-//! update. An unread refusal panics when the recording is dropped.
+//! update. A test that does not expect refusals panics at the refused
+//! call: a test reads the calls it cares about, so a recorded refusal
+//! could pass unseen, and a recording a mounted component holds in a
+//! reference cycle is never dropped, so a check on drop would not run.
 
 use std::collections::BTreeMap;
 
@@ -43,33 +46,25 @@ impl RecordingDom {
         Ok(())
     }
 
-    /// Records `refusal` as a call on `node`, unread.
+    /// Records `refusal` as a call on `node` when the test expects
+    /// refusals; panics naming it otherwise.
     pub(super) fn refuse(&mut self, node: NodeId, refusal: String) {
+        assert!(
+            self.expecting,
+            "RecordingDom refused a call: {refusal}; fix the call, or call RecordingDom::expect_refusals() first where the test expects one and read it with refusals()"
+        );
         self.unread.push(refusal.clone());
         self.calls.push(Call::Refused { node, refusal });
     }
 
-    /// The refusals recorded since the last call, in order, now read:
-    /// a test that expects one takes it here, or the recording panics
-    /// when dropped.
+    /// From here on a refused call is recorded, as `Call::Refused` and
+    /// for [`RecordingDom::refusals`], rather than panicking.
+    pub fn expect_refusals(&mut self) {
+        self.expecting = true;
+    }
+
+    /// The refusals recorded since the last call, in order.
     pub fn refusals(&mut self) -> Vec<String> {
         std::mem::take(&mut self.unread)
-    }
-}
-
-/// An unread refusal fails the test that made it: a test reads the
-/// calls it cares about, so a refused one would pass unseen. Not while
-/// the thread already panics, so a failing test reports its own
-/// failure rather than aborting on a second panic.
-impl Drop for RecordingDom {
-    fn drop(&mut self) {
-        if self.unread.is_empty() || std::thread::panicking() {
-            return;
-        }
-        panic!(
-            "RecordingDom dropped with {} refused call(s) no test read: {}; fix the call, or take them with RecordingDom::refusals() where the test expects them",
-            self.unread.len(),
-            self.unread.join("; ")
-        );
     }
 }
