@@ -7,9 +7,8 @@
 //!
 //! Recovery (a new device, every resource rebuilt) is not done here.
 
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
-
 use crate::PlatformError;
+use crate::first_report::FirstReport;
 
 /// What wgpu said when the device was lost.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,7 +22,7 @@ pub struct Lost {
 /// Whether the window's device has been lost, shared between wgpu's
 /// callback, the frame loop and the app (`Platform::device_lost`).
 #[derive(Debug, Clone, Default)]
-pub struct DeviceLost(Arc<Mutex<Option<Lost>>>);
+pub struct DeviceLost(FirstReport<Lost>);
 
 impl DeviceLost {
     /// Record `device`'s loss here when wgpu reports it, then call
@@ -42,16 +41,12 @@ impl DeviceLost {
     /// The loss, once there has been one.
     #[must_use]
     pub fn get(&self) -> Option<Lost> {
-        self.lock().clone()
+        self.0.get()
     }
 
     /// Keep the first loss: a later report is about the same device.
     pub fn record(&self, lost: Lost) {
-        self.lock().get_or_insert(lost);
-    }
-
-    fn lock(&self) -> MutexGuard<'_, Option<Lost>> {
-        self.0.lock().unwrap_or_else(PoisonError::into_inner)
+        self.0.record(lost);
     }
 }
 

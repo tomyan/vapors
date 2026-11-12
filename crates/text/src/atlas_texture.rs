@@ -27,13 +27,6 @@ impl AtlasTexture {
 
     /// Replaces the texture with an empty one of `size` x `size` px: the
     /// only way to change it, so the view and bind group follow.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "#219 grows the atlas page through it; retire when it does"
-        )
-    )]
     pub(crate) fn replace(&mut self, device: &wgpu::Device, size: u32) {
         *self = Self::new(device, size);
     }

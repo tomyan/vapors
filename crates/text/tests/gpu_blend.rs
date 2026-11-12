@@ -44,7 +44,7 @@ fn render(text: &str, ink: Color, background: Color, params: BlendParams) -> Vec
     let layout = Layout::new(&mut system, text, &style, &LayoutOptions::default());
     let first_baseline = layout.lines().next().expect("a line").baseline;
     let origin = [BASELINE[0], BASELINE[1] - first_baseline];
-    let mut atlas = GlyphAtlas::new(AtlasConfig { page_size: 128 });
+    let mut atlas = GlyphAtlas::new(AtlasConfig::fixed(128));
     let target = clear(&gpu.device, &gpu.queue, WIDTH, HEIGHT, background);
     let mut pipeline = TextPipeline::new(&gpu.device, target.format(), &atlas);
     let view = target.create_view(&wgpu::TextureViewDescriptor::default());

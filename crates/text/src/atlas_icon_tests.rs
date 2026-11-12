@@ -10,7 +10,7 @@ fn line_icon(y: &str) -> Icon {
 }
 
 fn atlas(page_size: u32) -> GlyphAtlas {
-    GlyphAtlas::new(AtlasConfig { page_size })
+    GlyphAtlas::new(AtlasConfig::fixed(page_size))
 }
 
 #[test]

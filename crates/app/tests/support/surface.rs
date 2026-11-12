@@ -89,6 +89,14 @@ impl Rig {
         Self { gpu, painter }
     }
 
+    /// A painter whose atlas is `atlas`, on the default test device.
+    pub fn with_atlas(atlas: vapors_text::AtlasConfig) -> Self {
+        let gpu = gpu();
+        let format = wgpu::TextureFormat::Rgba8Unorm;
+        let painter = ScenePainter::with_atlas(&gpu.device, format, atlas).expect("fits");
+        Self { gpu, painter }
+    }
+
     /// `doc` drawn into a fresh `SIZE` square target: its RGBA bytes.
     pub fn draw(&mut self, doc: &Document) -> Result<Vec<u8>, PaintError> {
         self.draw_at(doc, square())

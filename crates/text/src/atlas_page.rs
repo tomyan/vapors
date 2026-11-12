@@ -17,16 +17,30 @@ pub struct AtlasPage {
 }
 
 /// Gap kept around every glyph so nearest sampling never reads a neighbour.
-const PADDING: u32 = 1;
+pub(crate) const PADDING: u32 = 1;
 
 impl AtlasPage {
     /// An empty page.
+    ///
+    /// # Panics
+    ///
+    /// When the page's bytes overflow a `u32`, naming the check that
+    /// refuses such a page first (`AtlasConfig::checked`).
     #[must_use]
     pub fn new(size: u32, bytes_per_pixel: u32) -> Self {
+        let bytes = size
+            .checked_mul(size)
+            .and_then(|pixels| pixels.checked_mul(bytes_per_pixel))
+            .unwrap_or_else(|| {
+                panic!(
+                    "an atlas page of {size} px at {bytes_per_pixel} bytes per pixel overflows \
+                     u32; refuse it first with AtlasConfig::checked"
+                )
+            });
         Self {
             size,
             bytes_per_pixel,
-            pixels: vec![0; (size * size * bytes_per_pixel) as usize],
+            pixels: vec![0; bytes as usize],
             shelf_x: 0,
             shelf_y: 0,
             shelf_height: 0,

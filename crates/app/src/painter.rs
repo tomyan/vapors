@@ -27,19 +27,39 @@ impl ScenePainter {
     /// the formats its shaders write sRGB-encoded values for (as the
     /// platform's surfaces are).
     ///
+    /// The glyph atlas is sized for the device:
+    /// `AtlasConfig::for_max_texture_side` of its
+    /// `max_texture_dimension_2d`.
+    ///
     /// # Errors
     ///
-    /// [`UnsupportedFormat`] for any other format, whose colours would
-    /// come out wrong: an sRGB format encodes twice, a float format
-    /// holds encoded values as linear ones.
+    /// [`NewPainterError::Format`] for any other format, whose colours
+    /// would come out wrong: an sRGB format encodes twice, a float format
+    /// holds encoded values as linear ones. [`NewPainterError::Atlas`]
+    /// when the device's side is zero.
     pub fn new(
         device: &wgpu::Device,
         format: wgpu::TextureFormat,
-    ) -> Result<Self, UnsupportedFormat> {
+    ) -> Result<Self, NewPainterError> {
+        let side = device.limits().max_texture_dimension_2d;
+        Self::with_atlas(device, format, AtlasConfig::for_max_texture_side(side))
+    }
+
+    /// As [`new`](Self::new), with the glyph atlas sized by `atlas`.
+    ///
+    /// # Errors
+    ///
+    /// As [`new`](Self::new); [`NewPainterError::Atlas`] when the device
+    /// cannot hold `atlas`'s pages (`AtlasConfig::checked`).
+    pub fn with_atlas(
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+        atlas: AtlasConfig,
+    ) -> Result<Self, NewPainterError> {
         if !SUPPORTED.contains(&format) {
-            return Err(UnsupportedFormat(format));
+            return Err(UnsupportedFormat(format).into());
         }
-        let atlas = GlyphAtlas::new(AtlasConfig::default());
+        let atlas = GlyphAtlas::new(atlas.checked(device.limits().max_texture_dimension_2d)?);
         Ok(Self {
             shadows: ShadowPipeline::new(device, format),
             quads: QuadPipeline::new(device, format),
@@ -169,7 +189,9 @@ mod tooltip;
 use images::Textures;
 #[path = "painter_errors.rs"]
 mod errors;
-pub use errors::{DrawOverError, MountError, PaintError, SUPPORTED, UnsupportedFormat};
+pub use errors::{
+    DrawOverError, MountError, NewPainterError, PaintError, SUPPORTED, UnsupportedFormat,
+};
 #[path = "painter_surface_state.rs"]
 mod surface_state;
 pub use surface_state::SurfaceState;

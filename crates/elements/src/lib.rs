@@ -33,6 +33,7 @@ mod clip_tree;
 mod corners;
 mod css_element;
 mod document;
+mod document_images;
 mod dom_impl;
 mod drawn_steps;
 mod error;
