@@ -171,3 +171,18 @@ fn gpu_text_too_large_for_the_glyph_atlas_is_refused_naming_the_font_size() {
     let message = drawn.expect_err("the atlas is full").to_string();
     assert!(message.contains("lower `--tooltip-font-size`"), "{message}");
 }
+
+#[test]
+fn gpu_the_same_text_draws_when_the_atlas_page_grows() {
+    // Given: the text the fixed 1024 page refuses, and a default page
+    let mut doc = document(":root { --tooltip-font-size: 900px; }", &[]);
+    update(&mut doc, 1.0);
+    let mut rig = Rig::new();
+    let tooltip = tip(&doc, "MW");
+
+    // When
+    let drawn = rig.draw_tooltip(&mut doc, &tooltip, Some([0.0, 0.0]));
+
+    // Then
+    assert!(drawn.is_ok(), "{drawn:?}");
+}
