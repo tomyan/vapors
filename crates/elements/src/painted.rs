@@ -29,9 +29,9 @@ pub struct Painted {
     /// 3-E2a).
     pub(crate) visible: NodeSet,
     /// Each part's hits in painting order, gathered from the scene view
-    /// on the first hit test after the update: one walk of paint order,
-    /// then each test reads only the hits.
-    pub(crate) hits: std::cell::OnceCell<Vec<(NodeId, BoxRect)>>,
+    /// on the first hit test after paint order is walked, then patched
+    /// by each update (`kept_hits.rs`).
+    pub(crate) hits: std::cell::OnceCell<crate::kept_hits::KeptHits>,
     /// The cursor over each element that takes the pointer.
     pub(crate) cursors: NodeMap<Cursor>,
     /// Paint order, clips and which scroll containers a scroll over
@@ -190,13 +190,13 @@ impl Painted {
     /// holds its left and top edges, not its right and bottom.
     #[must_use]
     pub fn hit(&self, [x, y]: [f32; 2]) -> Option<NodeId> {
-        let hits = self
-            .hits
-            .get_or_init(|| self.scene().hits().copied().collect());
-        hits.iter()
-            .rev()
-            .find(|(_, r)| x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height)
-            .map(|(node, _)| *node)
+        self.kept_hits().hit([x, y])
+    }
+
+    /// The kept hits, gathered from the scene view when none are kept.
+    pub(crate) fn kept_hits(&self) -> &crate::kept_hits::KeptHits {
+        self.hits
+            .get_or_init(|| crate::kept_hits::KeptHits::of(&self.scene()))
     }
 }
 
