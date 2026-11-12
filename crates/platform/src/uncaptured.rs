@@ -64,15 +64,24 @@ impl UncapturedErrors {
     }
 
     /// Keep the first error: a later one may be its consequence. A
-    /// later one is logged as a warning, so it is not lost.
+    /// later one is reported as a warning, so it is not lost.
     pub fn record(&self, error: Uncaptured) {
-        let (kind, message) = (error.kind, error.message.clone());
+        let later = format!("{}: {}", error.kind, error.message);
         if !self.0.record(error) {
-            log::warn!(
-                "a later uncaptured GPU error, not the one that stops the loop ({kind}: {message})"
-            );
+            warn_later(&later);
         }
     }
+}
+
+/// Say that a later uncaptured error was not the one that stops the
+/// loop. On the web only the console: the `#error` element holds the
+/// stop's sentence.
+fn warn_later(error: &str) {
+    let line = format!("a later uncaptured GPU error, not the one that stops the loop ({error})");
+    #[cfg(not(target_family = "wasm"))]
+    crate::report::report_error(&line);
+    #[cfg(target_family = "wasm")]
+    web_sys::console::warn_1(&wasm_bindgen::JsValue::from_str(&line));
 }
 
 /// `a GPU call failed with no error scope to catch it (<kind>: <message>); ...; fix: <fix>`.

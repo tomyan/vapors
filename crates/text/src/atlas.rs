@@ -7,8 +7,7 @@
 //! than a page is refused once, logged with its size, and `.notdef`
 //! stands in from then on. Evictions, rasterisations and refusals are
 //! counted for tests. Icons share the coverage page (`atlas_icon.rs`).
-//! A frame that does not fit doubles the page up to its largest side
-//! (`atlas_grow.rs`).
+//! A frame that does not fit grows the page (`atlas_grow.rs`).
 
 use std::collections::{HashMap, HashSet};
 
