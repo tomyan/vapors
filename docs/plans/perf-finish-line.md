@@ -29,19 +29,23 @@ Properties 1 and 6 are judged by `vapors-perf --scaling`, per change:
 
 ```
 cargo build --release -p vapors-perf
-for change in Idle Text Class HoveredClass; do
+for change in Idle Text FlexText Class HoveredClass; do
   ./target/release/vapors-perf 60 10 --scaling $change || echo "$change grows"
 done
 ```
 
 It counts instructions at 1000, 3000 and 10,000 rows and exits non-zero,
 naming the phase and its growth per extra row, when an edit's phase
-(Text, Class, HoveredClass; every phase) or an idle update's total
+(Text, FlexText, Class, HoveredClass; every phase) or an idle update's total
 (Idle; `update`) is both over 2% and over 5000 instructions above its 1000-row count at a larger size.
 At 1657b27 every one of the four failed
 (docs/perf/baseline-2026-11-10.md, "Scaling, 1657b27"); after M10b
 (2026-11-12) Text and Idle pass, and Class and HoveredClass fail only
 on `style`, 2 instructions per extra row (docs/plans/iu1.md, PR 2).
+FlexText, an edit in a flex-column list whose rows have a vertical
+margin, passes since M10c (2026-11-12; `layout` 5.6 M / 16.6 M / 55.3 M
+instructions at 1,000 / 3,000 / 10,000 rows before, 123 k / 126 k /
+127 k after, docs/plans/iu1.md).
 Property 1's
 time target (under 1 ms) is still read from the timed run. `--scaling Insert` reports for property 3
 and does not judge until the splice step is built.

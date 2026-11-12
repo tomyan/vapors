@@ -119,7 +119,12 @@ fn fewer_than_two_sizes_or_sizes_out_of_order_are_refused() {
 #[test]
 fn each_change_is_judged_as_the_brief_says() {
     assert_eq!(Judged::of(RowChange::Idle), Judged::UpdateTotal);
-    for change in [RowChange::Text, RowChange::Class, RowChange::HoveredClass] {
+    for change in [
+        RowChange::Text,
+        RowChange::FlexText,
+        RowChange::Class,
+        RowChange::HoveredClass,
+    ] {
         assert_eq!(Judged::of(change), Judged::EveryPhase);
     }
 }

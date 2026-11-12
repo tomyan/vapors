@@ -19,6 +19,7 @@ pub mod mount_run;
 pub mod racer;
 pub mod report;
 pub mod rows;
+pub mod rows_list;
 pub mod rss;
 pub mod run;
 pub mod sampler;
