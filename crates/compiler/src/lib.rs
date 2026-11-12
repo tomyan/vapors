@@ -27,6 +27,12 @@ use source::Source;
 /// in vapors-compiler-examples).
 pub const SCOPE_ATTRIBUTE: &str = "data-wisp";
 
+/// How many `class:` directives one element may have: a tree keeps
+/// which are on as bits of a `u64`. It must equal
+/// `vapors_dom::MAX_TOGGLES`, which refuses more where the element is
+/// created (checked in vapors-compiler-examples).
+pub const MAX_CLASS_DIRECTIVES: usize = 64;
+
 /// Parses the text of a `.wisp` file. `path` names the file in
 /// refusals and gives the component its name.
 ///

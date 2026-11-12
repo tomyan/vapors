@@ -1,35 +1,29 @@
-//! Elements: created, attached, then each attribute by kind: a literal
-//! set once, an expression patched in an effect, `on<event>` a
-//! listener, `bind:` a listener plus a property effect.
+//! Elements: created from their `StyleKey` (`style_key`), attached,
+//! then each attribute the key does not carry by kind: a literal set
+//! once, an expression patched in an effect, `on<event>` a listener,
+//! `bind:` a listener plus a property effect.
 
 use super::allowances::shown_text;
-use super::element_class::{has_class_directives, is_class_directive};
+use super::element_class::is_class_directive;
 use super::emit::{Emitter, Place};
+use super::style_key::carried_by_key;
 use crate::CompileError;
 use crate::ast::{AttrValue, Attribute, Element, Expr};
 
 impl Emitter<'_> {
     pub fn emit_element(&mut self, element: &Element, place: &Place) -> Result<(), CompileError> {
         let var = self.fresh(&element.tag);
-        self.line(format!(
-            "let {var} = dom.borrow_mut().create_element({:?});",
-            element.tag
-        ));
-        self.attach(&var, place);
-        if self.scoped {
-            self.line(format!(
-                "dom.borrow_mut().set_attribute({var}, SCOPE_ATTRIBUTE, SCOPE);"
-            ));
+        for attribute in &element.attributes.0 {
+            super::attribute_refusals::refuse_misleading(self.source, attribute)?;
         }
+        self.emit_keyed_create(element, &var)?;
+        self.attach(&var, place);
         let (this, rest): (Vec<&Attribute>, Vec<&Attribute>) = element
             .attributes
             .iter()
             .partition(|attribute| attribute.name == "bind:this");
-        let directed = has_class_directives(element);
         for attribute in rest {
-            if is_class_directive(attribute)
-                || (directed && attribute.name.eq_ignore_ascii_case("class"))
-            {
+            if is_class_directive(attribute) || carried_by_key(&attribute.name) {
                 continue;
             }
             self.emit_attribute(element, &var, attribute)?;
@@ -47,7 +41,7 @@ impl Emitter<'_> {
         var: &str,
         attribute: &Attribute,
     ) -> Result<(), CompileError> {
-        if attribute.name == crate::SCOPE_ATTRIBUTE {
+        if attribute.name.eq_ignore_ascii_case(crate::SCOPE_ATTRIBUTE) {
             return Err(self.source.error(
                 attribute.offset,
                 format!(
@@ -56,7 +50,6 @@ impl Emitter<'_> {
                 ),
             ));
         }
-        super::attribute_refusals::refuse_misleading(self.source, attribute)?;
         if let Some(event) = attribute
             .name
             .strip_prefix("on")
@@ -141,4 +134,10 @@ impl Emitter<'_> {
         self.dedent(1);
         self.line("}");
     }
+}
+
+/// The element's attribute called `name`, in any case, as HTML
+/// compares attribute names.
+pub(super) fn attribute_named<'e>(element: &'e Element, name: &str) -> Option<&'e Attribute> {
+    (element.attributes.iter()).find(|attribute| attribute.name.eq_ignore_ascii_case(name))
 }

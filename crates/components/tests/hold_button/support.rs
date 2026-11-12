@@ -85,7 +85,7 @@ fn button_node(calls: &[Call]) -> NodeId {
     calls
         .iter()
         .find_map(|c| match c {
-            Call::CreateElement { node, tag } if tag == "button" => Some(*node),
+            Call::CreateKeyedElement { node, key } if key.tag == "button" => Some(*node),
             _ => None,
         })
         .expect("HoldButton creates a button element")

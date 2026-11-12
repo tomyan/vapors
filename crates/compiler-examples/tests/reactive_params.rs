@@ -85,6 +85,6 @@ fn a_parameter_read_in_a_for_an_attribute_and_an_if_updates_in_place() {
         .borrow()
         .calls()
         .iter()
-        .any(|call| matches!(call, Call::CreateElement { tag, .. } if tag == "p"));
+        .any(|call| matches!(call, Call::CreateKeyedElement { key, .. } if key.tag == "p"));
     assert!(!created_p, "{:?}", dom.borrow().calls());
 }
