@@ -141,6 +141,11 @@ pub(crate) fn moved_pointer(document: &Rc<RefCell<Document>>, id: u32, point: Po
     let Some(node) = dragged else {
         return;
     };
+    // a listener removed the field: its drag-select ends with it
+    if document.borrow().still_in(node).is_none() {
+        document.borrow_mut().pointer.text_presses.remove(&id);
+        return;
+    }
     let Some((x, y)) = document.borrow().text_point(node, point) else {
         return;
     };
@@ -153,7 +158,12 @@ pub(crate) fn moved_pointer(document: &Rc<RefCell<Document>>, id: u32, point: Po
 /// where it pressed, and its press of a field ends.
 pub(crate) fn released(document: &Rc<RefCell<Document>>, id: u32) {
     let press = document.borrow_mut().pointer.text_presses.remove(&id);
-    if let Some(TextPress::InSelection(node, (x, y))) = press {
+    let Some(TextPress::InSelection(node, (x, y))) = press else {
+        return;
+    };
+    // the click's listeners may have removed the field
+    let still = document.borrow().still_in(node);
+    if let Some(node) = still {
         document
             .borrow_mut()
             .move_selection(node, |d| d.move_to_point(x, y));

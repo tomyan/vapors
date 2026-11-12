@@ -36,20 +36,24 @@ impl Document {
                 .pointer_event("pointerdown", MOUSE, target, point);
             dispatch_pointer(document, MOUSE, target, event)
         });
+        if prevented {
+            return;
+        }
+        // a listener may have removed the target: a removed one holds
+        // nothing focusable, so the press blurs, as Chromium's does
+        let target = target.and_then(|target| document.borrow().still_in(target));
         // a range takes the value at the press before focus moves, as
         // Chromium orders `input` before `focusin` (3-E3a)
-        if let (false, Some(target)) = (prevented, target) {
+        if let Some(target) = target {
             crate::range_drag::pressed(document, MOUSE, target, point);
             crate::number_scrub::pressed(document, MOUSE, target, point);
         }
         // a press focuses what it is on, or blurs, unless prevented (3-E2a)
-        if !prevented {
-            let focusable = target.and_then(|target| document.borrow().focusable_holding(target));
-            Self::focus(document, focusable);
-        }
+        let focusable = target.and_then(|target| document.borrow().focusable_holding(target));
+        Self::focus(document, focusable);
         // a text field's caret lands where the press did, after focus
         // so keyboard focus's selection does not override it (E6a)
-        if let (false, Some(target)) = (prevented, target) {
+        if let Some(target) = target.and_then(|target| document.borrow().still_in(target)) {
             crate::text_pointer::pressed(document, MOUSE, target, point, clicks);
         }
     }

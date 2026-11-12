@@ -67,8 +67,15 @@ impl Document {
     /// # Errors
     /// No live text field has focus, the edit was made against a text
     /// the field no longer holds, or a range falls past the text or
-    /// inside a character; the field is left as it was.
+    /// inside a character; the field is left as it was. Not an error:
+    /// a field hidden since the last update blurs first and the edit
+    /// reaches no field, as a typed character does natively
+    /// (`typing_after_hide.rs`).
     pub fn text_edited(document: &Rc<RefCell<Document>>, edit: &TextEdit) -> Result<(), String> {
+        if document.borrow().lost_focusability() {
+            Self::blur_unfocusable(document);
+            return Ok(());
+        }
         let node = document.borrow_mut().edited_field(&edit.before)?;
         let selection = bytes(&edit.text, edit.selection, "selection")?;
         let composing = match edit.composing {

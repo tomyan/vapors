@@ -14,6 +14,9 @@ use tracing::field::{Field, Visit};
 use tracing::span::{Attributes, Id, Record};
 use tracing::{Event, Metadata, Subscriber};
 
+use crate::instructions::InstructionCounter;
+use crate::span_instructions::InstructionMeter;
+
 /// The spans it times, by name.
 const TIMED: [&str; 3] = ["frame phase", "update phase", "draw step"];
 
@@ -27,9 +30,45 @@ struct Spans {
     phases: HashMap<u64, String>,
     entered: HashMap<u64, Instant>,
     totals: BTreeMap<String, Duration>,
+    meter: Option<InstructionMeter>,
 }
 
 impl PhaseClock {
+    /// A clock that also counts each phase's instructions with `counter`.
+    #[must_use]
+    pub fn with_instructions(counter: InstructionCounter) -> Self {
+        let spans = Spans {
+            meter: Some(InstructionMeter::new(counter)),
+            ..Spans::default()
+        };
+        Self(Arc::new(Mutex::new(spans)))
+    }
+
+    /// Each phase's instructions since the last take, by phase name;
+    /// `None` when the clock has no counter.
+    ///
+    /// # Errors
+    /// A counter read that failed since the last take.
+    pub fn take_instructions(&self) -> Result<Option<BTreeMap<String, u64>>, String> {
+        self.spans()
+            .meter
+            .as_mut()
+            .map(InstructionMeter::take)
+            .transpose()
+    }
+
+    /// The counter now; `None` when the clock has no counter.
+    ///
+    /// # Errors
+    /// The read's failure.
+    pub fn instructions_now(&self) -> Result<Option<u64>, String> {
+        self.spans()
+            .meter
+            .as_mut()
+            .map(InstructionMeter::reading)
+            .transpose()
+    }
+
     /// Each phase's time since the last take, by phase name; the times
     /// start again from none.
     #[must_use]
@@ -75,13 +114,21 @@ impl Subscriber for PhaseClock {
     }
 
     fn enter(&self, span: &Id) {
-        self.spans().entered.insert(span.into_u64(), Instant::now());
+        let mut spans = self.spans();
+        if let Some(meter) = spans.meter.as_mut() {
+            meter.enter(span.into_u64());
+        }
+        spans.entered.insert(span.into_u64(), Instant::now());
     }
 
     fn exit(&self, span: &Id) {
         let exited = Instant::now();
-        let mut spans = self.spans();
+        let mut guard = self.spans();
+        let spans = &mut *guard;
         let id = span.into_u64();
+        if let (Some(meter), Some(phase)) = (spans.meter.as_mut(), spans.phases.get(&id)) {
+            meter.exit(id, phase);
+        }
         let (Some(entered), Some(phase)) = (spans.entered.remove(&id), spans.phases.get(&id))
         else {
             return;

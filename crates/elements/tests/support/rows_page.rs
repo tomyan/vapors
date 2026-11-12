@@ -67,8 +67,16 @@ pub fn rows_page(count: usize) -> RowsPage {
 }
 
 fn row(doc: &mut Document, index: usize) -> Row {
+    row_before(doc, index, None)
+}
+
+/// A row numbered `index`, inserted before `before` under the body, or
+/// appended.
+pub fn row_before(doc: &mut Document, index: usize, before: Option<NodeId>) -> Row {
     let body = doc.body();
-    let row = element(doc, body, "div", "row");
+    let row = doc.create_element("div");
+    doc.set_attribute(row, "class", "row");
+    doc.insert_before(body, row, before);
     let label = element(doc, row, "span", "label");
     let value = element(doc, row, "span", "value");
     let button = element(doc, row, "button", "");

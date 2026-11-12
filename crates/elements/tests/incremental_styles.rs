@@ -7,50 +7,10 @@ mod support;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use support::{document, element, text, viewport};
+use support::column_page::{ALL, Page, page, restyled_after};
+use support::viewport;
 use vapors_dom::{Dom, NodeId};
 use vapors_elements::Document;
-
-const ALL: usize = 63;
-
-struct Page {
-    doc: Document,
-    rows: Vec<NodeId>,
-    cells: Vec<NodeId>,
-    texts: Vec<NodeId>,
-}
-
-/// The page under `css`, updated once.
-fn page(css: &str) -> Page {
-    let mut doc = document();
-    let body = doc.body();
-    let column = element(&mut doc, body, "div", "column");
-    let (mut rows, mut cells, mut texts) = (Vec::new(), Vec::new(), Vec::new());
-    for r in 0..10 {
-        let row = element(&mut doc, column, "div", "row");
-        rows.push(row);
-        for c in 0..5 {
-            let cell = element(&mut doc, row, "div", "cell");
-            texts.push(text(&mut doc, cell, &format!("{r}.{c}")));
-            cells.push(cell);
-        }
-    }
-    doc.add_stylesheet("app.css", css).expect("parses");
-    doc.update(viewport(400.0, 600.0)).expect("updates");
-    Page {
-        doc,
-        rows,
-        cells,
-        texts,
-    }
-}
-
-/// Updates after `change` and counts the elements restyled.
-fn restyled_after(page: &mut Page, change: impl FnOnce(&mut Page)) -> usize {
-    change(page);
-    page.doc.update(viewport(400.0, 600.0)).expect("updates");
-    page.doc.elements_restyled()
-}
 
 fn set_class(page: &mut Page, node: NodeId, class: &str) {
     page.doc.set_attribute(node, "class", class);

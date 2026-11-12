@@ -10,6 +10,7 @@ use vapors_scene::Color;
 
 use crate::gpu_reading::frame_gpu_time;
 use crate::gpu_time::{GpuClock, wait};
+use crate::instruction_samples::InstructionSamples;
 use crate::run::{Samples, Settings, Workload};
 use crate::spans::PhaseClock;
 
@@ -19,6 +20,14 @@ const INTERVAL: Duration = Duration::from_millis(16);
 /// How long the GPU may take to finish a frame. The slowest frame here
 /// (the racer on lavapipe) is under a second; ten is far beyond it.
 const FRAME_DEADLINE: Duration = Duration::from_secs(10);
+
+/// One frame's measurements: wall time and per-phase times, and, with a
+/// counter, the frame's instructions and each phase's.
+struct Measured {
+    took: Duration,
+    phases: BTreeMap<String, Duration>,
+    instructions: Option<(u64, BTreeMap<String, u64>)>,
+}
 
 /// A GPU and the phase clock frames are timed by.
 pub struct Sampler<'g> {
@@ -31,9 +40,16 @@ impl<'g> Sampler<'g> {
     /// A sampler on `gpu`.
     #[must_use]
     pub fn new(gpu: &'g Gpu) -> Self {
+        Self::with_clock(gpu, PhaseClock::default())
+    }
+
+    /// A sampler on `gpu` timing by `clock`, which counts instructions
+    /// too if it was made to.
+    #[must_use]
+    pub fn with_clock(gpu: &'g Gpu, clock: PhaseClock) -> Self {
         Self {
             gpu,
-            clock: PhaseClock::default(),
+            clock,
             now: vapors_platform::Instant::now(),
         }
     }
@@ -79,12 +95,18 @@ impl<'g> Sampler<'g> {
         let timed = settings.warmup..settings.warmup + settings.runs;
         for index in 0..=timed.end {
             let clock = gpu_clock.as_deref_mut().filter(|_| timed.contains(&index));
-            let (frame, phases) = self.frame(workload, &texture, index, clock)?;
+            let measured = self.frame(workload, &texture, index, clock)?;
             if index > timed.start {
                 samples.push_gpu_time(frame_gpu_time(workload.timing().gpu, index - 1)?);
             }
             if timed.contains(&index) {
-                samples.push(frame, phases);
+                if let Some((count, phases)) = measured.instructions {
+                    let kept = samples
+                        .instructions
+                        .get_or_insert_with(InstructionSamples::default);
+                    kept.push(count, phases);
+                }
+                samples.push(measured.took, measured.phases);
                 samples.counts = workload.counts();
             }
         }
@@ -104,17 +126,24 @@ impl<'g> Sampler<'g> {
         texture: &wgpu::Texture,
         index: usize,
         gpu_clock: Option<&mut GpuClock>,
-    ) -> Result<(Duration, BTreeMap<String, Duration>), String> {
+    ) -> Result<Measured, String> {
         workload.change(index);
         self.now += INTERVAL;
         let _ = self.clock.take();
-        let (next, took) = self.timed(workload, texture, index, gpu_clock);
+        let _ = self.clock.take_instructions()?;
+        let (next, took, frame_instructions) = self.timed(workload, texture, index, gpu_clock)?;
         let phases = self.clock.take();
+        let instructions = self.clock.take_instructions()?;
         workload
             .check(next)
             .map_err(|error| format!("frame {index}: {error}"))?;
         wait(&self.gpu.device, FRAME_DEADLINE)?;
-        Ok((took, phases))
+        let instructions = frame_instructions.zip(instructions);
+        Ok(Measured {
+            took,
+            phases,
+            instructions,
+        })
     }
 
     /// The app's frame, its wall time, between the GPU clock's marks.
@@ -124,18 +153,22 @@ impl<'g> Sampler<'g> {
         texture: &wgpu::Texture,
         index: usize,
         mut gpu_clock: Option<&mut GpuClock>,
-    ) -> (Next, Duration) {
+    ) -> Result<(Next, Duration, Option<u64>), String> {
         let (device, queue) = (&self.gpu.device, &self.gpu.queue);
         if let Some(clock) = gpu_clock.as_deref_mut() {
             clock.mark(device, queue);
         }
+        let before = self.clock.instructions_now()?;
         let started = Instant::now();
         let next = workload.app().frame(&self.frame_of(texture, index));
         let took = started.elapsed();
+        let counted = before
+            .zip(self.clock.instructions_now()?)
+            .map(|(a, b)| b - a);
         if let Some(clock) = gpu_clock {
             clock.mark(device, queue);
         }
-        (next, took)
+        Ok((next, took, counted))
     }
 
     fn frame_of<'a>(&'a self, texture: &'a wgpu::Texture, index: usize) -> Frame<'a> {

@@ -2,11 +2,9 @@
 //! quarter-pixel x step with the baseline snapped to a whole pixel, and
 //! becomes one quad; the part of the atlas page that changed is uploaded.
 
-use vapors_renderer::Placed;
-
 use crate::atlas::{AtlasError, GlyphAtlas};
 use crate::layout::Layout;
-use crate::pipeline::{BlendParams, FLOATS_PER_VERTEX, TextPipeline};
+use crate::pipeline::{self, BlendParams, FLOATS_PER_VERTEX, TextPipeline};
 use crate::quads::{TextDraw, quads};
 
 /// Where a draw goes: [`vapors_renderer::Target`], under the name the
@@ -24,8 +22,8 @@ impl TextPipeline {
     ///
     /// # Panics
     ///
-    /// If `atlas`'s page is not the size this pipeline's texture was made
-    /// for; that is a caller bug and the message gives both sizes.
+    /// If `atlas`'s page is smaller than this pipeline's texture: it was
+    /// made for another atlas, and the message gives both sizes.
     pub fn draw(
         &mut self,
         target: &RenderTarget<'_>,
@@ -65,7 +63,7 @@ impl TextPipeline {
     ///
     /// # Panics
     ///
-    /// If `atlas`'s page is not the size this pipeline's texture was made for.
+    /// If `atlas`'s page is smaller than this pipeline's texture.
     pub(crate) fn record(
         &mut self,
         target: &RenderTarget<'_>,
@@ -73,22 +71,36 @@ impl TextPipeline {
         quads: &[f32],
         params: BlendParams,
     ) {
-        let page = atlas.coverage_page().size();
-        assert_eq!(
-            page,
-            self.texture.width(),
-            "atlas page is {page} px but the text pipeline's texture is {} px",
-            self.texture.width()
-        );
+        self.match_page_size(target.device, atlas);
         self.upload_page(target, atlas);
         let params = params_bytes(params);
         let Some(params) = self
-            .uniforms
-            .push(target.encoder, target.queue, &self.work, &params)
+            .params
+            .slot(target.encoder, target.queue, &self.work, params)
         else {
             return;
         };
-        self.draw_quads(target, quads, &params);
+        self.draw_quads(target, quads, params);
+    }
+
+    /// A texture of the atlas page's size when the page grew; the page
+    /// is whole in its dirty rect then, so the upload fills it.
+    ///
+    /// # Panics
+    ///
+    /// If the page is smaller than the texture: pages only grow, so this
+    /// pipeline was made for another atlas.
+    fn match_page_size(&mut self, device: &wgpu::Device, atlas: &GlyphAtlas) {
+        let page = atlas.coverage_page().size();
+        let texture = self.atlas_texture.texture().width();
+        assert!(
+            page >= texture,
+            "atlas page is {page} px but the text pipeline's texture is {texture} px; pages \
+             only grow, so this pipeline was made for another atlas"
+        );
+        if page > texture {
+            self.atlas_texture.replace(device, page);
+        }
     }
 
     /// Upload the part of the atlas page that changed since the last
@@ -110,7 +122,7 @@ impl TextPipeline {
             target.queue,
             wgpu::TexelCopyTextureInfo {
                 origin: wgpu::Origin3d { x, y, z: 0 },
-                ..self.texture.as_image_copy()
+                ..self.atlas_texture.texture().as_image_copy()
             },
             &page.region_pixels(rect),
             wgpu::TexelCopyBufferLayout {
@@ -127,7 +139,8 @@ impl TextPipeline {
         page.mark_clean();
     }
 
-    fn draw_quads(&mut self, target: &RenderTarget<'_>, quads: &[f32], params: &Placed) {
+    /// Draws `quads` with the params slot at `params`.
+    fn draw_quads(&mut self, target: &RenderTarget<'_>, quads: &[f32], params: u32) {
         if quads.is_empty() {
             return;
         }
@@ -140,19 +153,31 @@ impl TextPipeline {
             return;
         };
         let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
-        let bind_group = self.bind_group(target.device, params);
+        let Self {
+            pipeline,
+            layout,
+            sampler,
+            params: slots,
+            atlas_texture,
+            work,
+            ..
+        } = self;
+        let bind_group = atlas_texture.bind_group(slots.generation(), |view| {
+            pipeline::bind_group(target.device, work, layout, view, sampler, slots)
+        });
         target.draw_pass(|pass| {
-            pass.set_pipeline(&self.pipeline);
-            pass.set_bind_group(0, &bind_group, &[]);
+            pass.set_pipeline(pipeline);
+            pass.set_bind_group(0, bind_group, &[params]);
             pass.set_vertex_buffer(0, vertices.slice());
-            self.work.draw(pass, 0..vertex_count, 0..1);
+            work.draw(pass, 0..vertex_count, 0..1);
         });
     }
 }
 
-fn params_bytes(params: BlendParams) -> Vec<u8> {
-    [params.gamma, params.contrast, 0.0, 0.0]
-        .iter()
-        .flat_map(|f| f.to_le_bytes())
-        .collect()
+/// The params uniform's bytes: gamma and contrast, padded to 16.
+fn params_bytes(params: BlendParams) -> [u8; 16] {
+    let mut bytes = [0; 16];
+    bytes[..4].copy_from_slice(&params.gamma.to_le_bytes());
+    bytes[4..8].copy_from_slice(&params.contrast.to_le_bytes());
+    bytes
 }

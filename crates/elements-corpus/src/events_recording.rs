@@ -83,3 +83,48 @@ pub(crate) const MODIFIER_KEYS: [(&str, &str); 4] = [
     ("metaKey", "meta"),
     ("shiftKey", "shift"),
 ];
+
+/// Whether Chromium's event of type `name` is a `MouseEvent` (a
+/// `PointerEvent` or `WheelEvent` is one), whose modifiers the recording
+/// logs (`events_play.js`); decided by type, as the recorder decides by
+/// class, so a keyboard-activated `click` counts.
+pub(crate) fn is_mouse_event(name: &str) -> bool {
+    const TYPES: [&str; 5] = ["click", "dblclick", "auxclick", "contextmenu", "wheel"];
+    TYPES.contains(&name)
+        || name.starts_with("mouse")
+        || name.starts_with("pointer")
+        || name.ends_with("pointercapture")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_mouse_event;
+
+    #[test]
+    fn mouse_event_types_are_decided_by_name() {
+        // Given
+        let mouse = [
+            "click",
+            "dblclick",
+            "pointerdown",
+            "pointermove",
+            "gotpointercapture",
+            "lostpointercapture",
+            "wheel",
+        ];
+        let other = [
+            "keydown",
+            "keyup",
+            "focus",
+            "blur",
+            "input",
+            "change",
+            "selectionchange",
+            "paste",
+        ];
+
+        // When, Then
+        assert!(mouse.iter().all(|name| is_mouse_event(name)), "{mouse:?}");
+        assert!(!other.iter().any(|name| is_mouse_event(name)), "{other:?}");
+    }
+}

@@ -55,7 +55,8 @@ fn gpu_the_counter_demos_idle_frame_matches_the_plan_row() {
     // Then
     let idle = painter.frame_counts().total();
     assert_eq!(idle.draw_calls, 3);
-    assert_eq!(idle.buffer_bytes, 2800);
+    // 2800 before IU4 PR 1: each of the 3 draws' 16-byte uniform is now kept
+    assert_eq!(idle.buffer_bytes, 2752);
     assert_eq!(idle.texture_bytes, 0);
 }
 

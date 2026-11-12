@@ -23,8 +23,11 @@ mod error;
 mod event;
 mod event_winit;
 mod file_kind;
+mod first_report;
 mod gestures;
+mod gpu_watch;
 mod handler;
+mod hidden_window;
 #[cfg(not(target_family = "wasm"))]
 mod ime;
 #[cfg(not(target_family = "wasm"))]
@@ -54,6 +57,7 @@ mod text_field;
 mod text_keys;
 #[cfg(target_family = "wasm")]
 mod timer_web;
+mod uncaptured;
 mod waker;
 #[cfg(target_family = "wasm")]
 mod web;
@@ -83,6 +87,7 @@ pub use surface::pick_format;
 pub use text_field::TextField;
 #[cfg(target_family = "wasm")]
 pub use timer_web::{Timer, page_hidden};
+pub use uncaptured::{Uncaptured, UncapturedErrors};
 pub use waker::{LoopClosed, Waker};
 pub use window::{App, Frame, Next, WindowOptions, run};
 

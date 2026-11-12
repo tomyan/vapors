@@ -301,6 +301,45 @@ uninstrumented or single-span figures at 3000 rows.
 | 3c-3d1 | Slabs for texts, images, icons and surfaces; parts keep their ids, copied without renumbering; the debug check compares resolved ids | Scene items and ids equal a full paint's after resolving; harness unchanged or better |
 | 3c-3d2 | Parts kept in place; the scene view and batching over an iterator; hits by walking order; per-element maps patched | `parts_visited_kept` 0; Text and Class edit paint at 3000 rows under 1 ms; at 1000 rows recorded; draw at 3000 rows recorded before and after |
 | 3c-3e | Moved slots shift their kept part by the rect's change (option (a) below) in place of painting it again; a harness workload whose edit resizes a label near the top of the list, and one that scrolls the list | Resize and scroll edits at 3000 rows: `boxes_painted` only the rebuilt slots, pinned; paint recorded before and after |
+| 3c-3f | Kept batches ("3c-3f: kept batches" below): the drawing steps with an item in the view, and the culled count of the others, kept for the last view and patched for the slots painted again; the batches kept until a shown step changes or the view does | Draw at 3000 rows at or below 1.0 ms for Text, Class, Idle and HoveredClass; recorded at 1000 rows; update and paint not worse; counts unchanged |
+
+### 3c-3f: kept batches
+
+3c-3d2 batches every drawing step's items on every drawn frame: 12,000
+items at 3000 rows, each read through its step's slot, though only the
+rows in the window are drawn and the rest are culled. 3c-3f keeps, in
+`Painted`, for the view of the last draw:
+
+- the drawing steps that show something in the view: an item whose
+  bounds meet the view under its clip, or a surface (a culled surface
+  keeps its place in a batch marked culled);
+- for every other drawing step, how many items it has, all culled, and
+  their sum;
+- the batches, made from the shown steps' items, with the sum added to
+  their culled count.
+
+A draw with the same view returns the kept batches; with no batches
+kept, it batches the shown steps' items only. A draw with another
+view, or the first draw after paint order is walked again, finds the
+shown steps afresh over every item. An update that paints slots again
+patches the kept steps for those slots' steps, through the places
+`DrawnSteps` holds: a step hidden before and after changes only the
+sum; a step shown before or after drops the batches. Scale changes and
+fresh paints start a new `Painted`, which keeps nothing. Thumbs are
+painted on every update and patched as any other slot.
+
+The painter takes the batches from `Painted::batches(view)` by
+reference in place of `scene().batches(view)`; what it receives is the
+same `Batched`. A debug build compares every batches call's result with
+`batched` over the scene view's items and names the first differing
+batch.
+
+A view that changes on every draw is slower than before this PR:
+`KeptBatches::of` tests every item for culling, allocates `hidden` (one
+`u64` per order step) and `shown`, then batching tests the shown items
+again, where `batched` was one pass. No caller draws one `Painted` at
+two views per frame; it happens during a live resize. If a resize is
+measured, batch in the same pass as the split when the view changed.
 
 ### Lead decisions (2026-11-11)
 
@@ -340,16 +379,15 @@ uninstrumented or single-span figures at 3000 rows.
   testing walks steps per query. 3c-3d2 records draw at 3000 rows; if
   draw rises measurably, keeping batches across frames moves from IU4
   into this stack, and the lead decides.
-- Hit gathering (3c-3d2): the first hit test after an update gathers
-  every part's hits once (O(all hits)), and each test, the first
-  included, scans the gathered hits from the last (O(all hits) at
-  worst). With the pointer over the window this is paid on each update
-  that follows a paint. The review of #201 measured +0.55 ms per Class
-  update at 3000 rows with the pointer over a row; the `HoveredClass`
-  workload in `vapors-perf` tracks it. Keeping the hit list across
-  updates and patching it per changed slot is the lead's to schedule.
-  Walking order per test was slower in debug on the 1000-row oracle
-  test (33.5 s against 16.2 s).
+- Hit gathering (3c-3d2, kept in 3c-3g): the hit list is kept across
+  updates and patched for the slots painted again or freed: one splice
+  per patched place, its range found by binary search, so the cost is
+  O(k log n) plus the tail move when a part's hit count changes. It is
+  gathered afresh only after paint order is walked again. `hit()` scans
+  the kept hits from the last: at 3000 rows about 0.11 M instructions
+  and 13 µs per test, which is what HoveredClass's update still costs
+  above Class's and grows with the row count. A spatial index waits
+  until a page makes that measurable (above 0.1 ms).
 - The debug check's fresh paint (3c-3d2) is `paint_partial` with
   nothing kept, so it compares an incremental paint with a full one
   through the same `Repaint` code: a defect inside `Repaint::painted`
@@ -360,18 +398,86 @@ uninstrumented or single-span figures at 3000 rows.
   alongside painting the boxes (3c-2 measured 0.01 ms for painting
   the changed boxes at 3000 rows).
 
+## 3b: kept placement
+
+Today every update settles every scroll offset (`scroll.rs`) and
+places every box (`layout::placed`): its rect is its location plus its
+containing block's content origin, that block's corner less its scroll
+offset. Both walk every slot, and `ChangedSlots::moved` and
+`PaintedFrom::shows` then compare every rect and padding.
+
+What Taffy tells us. Taffy writes a box's layout only through
+`set_unrounded_layout`, which the box that lays it out calls (its
+parent, or for an out-of-flow box its containing block in
+`compute_oof_layout`; the root in `compute_root_layout`). It lays a
+box out only through `compute_child_layout`, which `BoxTree::dispatch`
+sees on a cache miss, and it rewrites a box's hoisted list only in
+`compute_oof_layout` for a box it lays out. So the tree records, per
+update: the slots dispatched, the slots whose layout
+`set_unrounded_layout` changed (compared with what the slot held), and
+the slots whose hoisted list was written. A box under a cache hit is
+neither laid out nor written, so its layout is the one placed last
+time.
+
+Kept between updates, beside the rects and paddings in `PaintedFrom`:
+each slot's applied scroll offset, the slot whose content origin it is
+placed in (`up`), and each out-of-flow slot's containing block,
+patched from the hoisted lists written this update (a rebuilt or freed
+slot's entry is cleared first; an out-of-flow box is never lent a
+layout, so Taffy lays it out and its containing block writes its
+hoisted list again). A freed slot's `up` is cleared; a rebuilt slot
+keeps its `up`. A rebuilt subtree whose layout is unchanged is lent
+its caches and its ancestors' caches are not cleared, so nothing above
+it is laid out; the kept `up` of the subtree's top slot (which keeps
+its slot and parent) still marks the chain to the root, and the walk
+sets `up` again for every slot below it.
+
+Placement. A slot is dirty when it was dispatched, its layout changed,
+it was rebuilt, or its scroll offset was moved since the last update
+(`Offsets::scroll` notes the element). Each dirty slot marks the slots
+up its `up` chain. A walk from the root visits a slot when it or a slot
+below it is marked, or its containing block's content origin moved; it
+settles the slot's scroll offset if the slot is dirty, places its rect,
+and visits every slot placed in it when its own content origin moved,
+else only the marked ones. A scroll so moves only the scroller's
+descendants, an edit that moves a row moves the rows placed after it,
+and an idle update visits nothing. The walk reports as moved each
+visited slot, not rebuilt, whose rect or padding changed; that is
+`ChangedSlots::moved`, and `PaintedFrom::shows` becomes "nothing
+built, nothing moved, same thumbs and scale". With no kept placement
+(the first update, after a failed one, or every box built) every slot
+is dirty.
+
+Counts: `boxes_placed` (slots the walk visited) and `boxes_moved`.
+The debug check settles and places every box afresh with today's
+`settle` and `placed`, and compares the rects, paddings and offsets of
+every held slot, each held slot's `up` and containing block with a
+fresh walk (`chain::by_containing_block`), so a broken chain fails on
+the update that broke it, and the moved set with a full comparison,
+naming the first differing slot.
+
 ## Open points
 
 - Rebuilding an owner rebuilds its whole subtree: a restyle of a large
   container (`:hover` on a list, a class on `body`) still builds every
-  box under it, as today. Rebuilding only the owner's own box and
-  runs, reusing unmarked child subtrees, is a later step if a workload
-  shows it.
+  box under it, as today. An insert, remove or move under a container
+  builds only the container's own box and runs and the children it did
+  not have (`docs/plans/splice.md` (b)); doing the same for a box mark
+  is a later step if a workload shows it.
 - Moving an element to another parent builds its boxes again in a new
   slot; no reuse across owners.
 - Inserting or removing boxes keeps other slots in place, so no index
   shifts; the free list keeps the vector from growing past the largest
   tree.
+- Kept stackings (perf/iu3-kept-stackings): the Idle update at 3000
+  rows is 0.046 million instructions, layout 3323 at any row count.
+  What still grows with rows on it is `KeptBoxes::keep`, which sets
+  `kept = true` on every box after paint: about 1.4 instructions per
+  box, 9.6 per row, and one 1368-byte `LayoutBox` cache line per box.
+  Setting it only on the slots built this update would remove it; not
+  built. Draw grows by about 3 instructions per row. Text and Class
+  layout still grow by about 1250 and 55 instructions per row; not
+  profiled (`docs/perf/baseline-2026-11-10.md`, "IU3 stackings kept").
 
 ## Progress
 

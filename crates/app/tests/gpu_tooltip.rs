@@ -156,8 +156,25 @@ fn gpu_at_scale_2_the_default_radius_rounds_the_corners() {
 
 #[test]
 fn gpu_text_too_large_for_the_glyph_atlas_is_refused_naming_the_font_size() {
-    // Given: whether 900px text fits the 1024px atlas page depends on its
-    // glyphs and the scale, so the style check cannot know; "MW" does not
+    // Given: whether 900px text fits a 1024px atlas page depends on its
+    // glyphs and the scale, so the style check cannot know; "MW" does not.
+    // The page is fixed: a default page grows and holds it
+    let mut doc = document(":root { --tooltip-font-size: 900px; }", &[]);
+    update(&mut doc, 1.0);
+    let mut rig = Rig::with_atlas(vapors_text::AtlasConfig::fixed(1024));
+    let tooltip = tip(&doc, "MW");
+
+    // When
+    let drawn = rig.draw_tooltip(&mut doc, &tooltip, Some([0.0, 0.0]));
+
+    // Then
+    let message = drawn.expect_err("the atlas is full").to_string();
+    assert!(message.contains("lower `--tooltip-font-size`"), "{message}");
+}
+
+#[test]
+fn gpu_the_same_text_draws_when_the_atlas_page_grows() {
+    // Given: the text the fixed 1024 page refuses, and a default page
     let mut doc = document(":root { --tooltip-font-size: 900px; }", &[]);
     update(&mut doc, 1.0);
     let mut rig = Rig::new();
@@ -167,6 +184,5 @@ fn gpu_text_too_large_for_the_glyph_atlas_is_refused_naming_the_font_size() {
     let drawn = rig.draw_tooltip(&mut doc, &tooltip, Some([0.0, 0.0]));
 
     // Then
-    let message = drawn.expect_err("the atlas is full").to_string();
-    assert!(message.contains("lower `--tooltip-font-size`"), "{message}");
+    assert!(drawn.is_ok(), "{drawn:?}");
 }

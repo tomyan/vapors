@@ -7,11 +7,13 @@
 
 use crate::node_map::NodeMap;
 
+use rustc_hash::FxHashMap;
 use taffy::{Display, Style};
 use vapors_dom::NodeId;
 
 use super::inline::{Collector, InlineSpan};
 pub(crate) use super::layout_box::{Content, LayoutBox};
+use super::owners::KeptChildren;
 use crate::arena::Arena;
 use crate::node::Kind;
 use crate::style::Used;
@@ -29,11 +31,37 @@ pub(crate) struct Source<'a> {
 /// Builds the boxes under `root`; box 0 is the root's.
 pub(crate) fn build(source: &Source<'_>, root: NodeId) -> Vec<LayoutBox> {
     let mut boxes = Vec::new();
-    add_element(source, root, &mut boxes);
+    add_element(source, root, &mut boxes, None);
     boxes
 }
 
-fn add_element(source: &Source<'_>, node: NodeId, boxes: &mut Vec<LayoutBox>) -> Option<usize> {
+/// Builds `owner`'s box and its children's, with a placeholder for
+/// each `kept` child in place of its subtree; the boxes, and each
+/// placeholder's index with the kept child's slot.
+pub(crate) fn build_shallow(
+    source: &Source<'_>,
+    owner: NodeId,
+    kept: &KeptChildren,
+) -> (Vec<LayoutBox>, FxHashMap<usize, usize>) {
+    let mut boxes = Vec::new();
+    add_element(source, owner, &mut boxes, Some(kept));
+    let placeholder = |&index: &usize| match boxes[index].content {
+        Content::Element(node) => Some((index, *kept.get(&node)?)),
+        _ => None,
+    };
+    let placeholders = boxes
+        .first()
+        .map(|owner| owner.children.iter().filter_map(placeholder));
+    let placeholders = placeholders.into_iter().flatten().collect();
+    (boxes, placeholders)
+}
+
+fn add_element(
+    source: &Source<'_>,
+    node: NodeId,
+    boxes: &mut Vec<LayoutBox>,
+    kept: Option<&KeptChildren>,
+) -> Option<usize> {
     let style = &source.used[&node];
     if style.layout.display == Display::None {
         return None;
@@ -79,7 +107,11 @@ fn add_element(source: &Source<'_>, node: NodeId, boxes: &mut Vec<LayoutBox>) ->
             Kind::Element(_) => {
                 let ended = std::mem::replace(&mut run, Collector::new(style.text, style.visible));
                 add_run(ended, index, boxes);
-                if let Some(child_box) = add_element(source, child, boxes) {
+                let child_box = match kept {
+                    Some(kept) if kept.contains_key(&child) => Some(placeholder(child, boxes)),
+                    _ => add_element(source, child, boxes, None),
+                };
+                if let Some(child_box) = child_box {
                     boxes[index].children.push(child_box);
                 }
             }
@@ -87,6 +119,12 @@ fn add_element(source: &Source<'_>, node: NodeId, boxes: &mut Vec<LayoutBox>) ->
     }
     add_run(run, index, boxes);
     Some(index)
+}
+
+/// A placeholder for kept `child`'s box; its index.
+fn placeholder(child: NodeId, boxes: &mut Vec<LayoutBox>) -> usize {
+    boxes.push(LayoutBox::new(Content::Element(child), Style::default()));
+    boxes.len() - 1
 }
 
 /// The children of `node` that may have boxes: none for an `svg`,

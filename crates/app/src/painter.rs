@@ -27,19 +27,39 @@ impl ScenePainter {
     /// the formats its shaders write sRGB-encoded values for (as the
     /// platform's surfaces are).
     ///
+    /// The glyph atlas is sized for the device:
+    /// `AtlasConfig::for_max_texture_side` of its
+    /// `max_texture_dimension_2d`.
+    ///
     /// # Errors
     ///
-    /// [`UnsupportedFormat`] for any other format, whose colours would
-    /// come out wrong: an sRGB format encodes twice, a float format
-    /// holds encoded values as linear ones.
+    /// [`NewPainterError::Format`] for any other format, whose colours
+    /// would come out wrong: an sRGB format encodes twice, a float format
+    /// holds encoded values as linear ones. [`NewPainterError::Atlas`]
+    /// when the device's side is zero.
     pub fn new(
         device: &wgpu::Device,
         format: wgpu::TextureFormat,
-    ) -> Result<Self, UnsupportedFormat> {
+    ) -> Result<Self, NewPainterError> {
+        let side = device.limits().max_texture_dimension_2d;
+        Self::with_atlas(device, format, AtlasConfig::for_max_texture_side(side))
+    }
+
+    /// As [`new`](Self::new), with the glyph atlas sized by `atlas`.
+    ///
+    /// # Errors
+    ///
+    /// As [`new`](Self::new); [`NewPainterError::Atlas`] when the device
+    /// cannot hold `atlas`'s pages (`AtlasConfig::checked`).
+    pub fn with_atlas(
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+        atlas: AtlasConfig,
+    ) -> Result<Self, NewPainterError> {
         if !SUPPORTED.contains(&format) {
-            return Err(UnsupportedFormat(format));
+            return Err(UnsupportedFormat(format).into());
         }
-        let atlas = GlyphAtlas::new(AtlasConfig::default());
+        let atlas = GlyphAtlas::new(atlas.checked(device.limits().max_texture_dimension_2d)?);
         Ok(Self {
             shadows: ShadowPipeline::new(device, format),
             quads: QuadPipeline::new(device, format),
@@ -85,6 +105,7 @@ impl ScenePainter {
 
     /// Each run of the scene, in order, under its clip. A refused frame
     /// still ends the surfaces' frame: those it did not paint are inactive.
+    /// It drops no texture, and its counts hold the bind groups still kept.
     fn paint(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
         self.begin_counts();
         self.atlas.begin_frame();
@@ -92,13 +113,15 @@ impl ScenePainter {
         self.surfaces.begin_frame();
         let runs = self.paint_runs(target, painted);
         self.surfaces.end_frame();
-        runs?;
-        self.textures.end_frame();
-        Ok(())
+        if runs.is_ok() {
+            self.textures.end_frame();
+        }
+        self.end_counts();
+        runs
     }
 
     fn paint_runs(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
-        let batched = painted.scene().batches(view(target));
+        let batched = painted.batches(view(target));
         self.counts.culled = batched.culled;
         for batch in &batched.batches {
             match clipped(target, batch.clip).filter(|_| !batch.culled) {
@@ -166,7 +189,9 @@ mod tooltip;
 use images::Textures;
 #[path = "painter_errors.rs"]
 mod errors;
-pub use errors::{DrawOverError, MountError, PaintError, SUPPORTED, UnsupportedFormat};
+pub use errors::{
+    DrawOverError, MountError, NewPainterError, PaintError, SUPPORTED, UnsupportedFormat,
+};
 #[path = "painter_surface_state.rs"]
 mod surface_state;
 pub use surface_state::SurfaceState;

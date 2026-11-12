@@ -1,5 +1,12 @@
-//! A crash reproduction, kept so it is not lost. CI compiles it
-//! (`clippy --all-targets`); nothing runs it. It is a reproduction, not a
+//! A crash reproduction, kept so it is not lost. Cause: Vulkan loader
+//! 1.4.309's use-after-free between one instance's first
+//! `vkEnumeratePhysicalDevices` and another thread's
+//! `vkSetDebugUtilsObjectNameEXT` (KhronosGroup/Vulkan-Loader#1863, fixed
+//! in 1.4.345). `gpu()` now shares one instance per process, so this
+//! example no longer crashes through it; the rates below are from before
+//! that change. To see the crash again, open an instance per thread.
+//!
+//! CI compiles it (`clippy --all-targets`); nothing runs it. It is a reproduction, not a
 //! check.
 //!
 //! `cargo run -p vapors-gpu-harness --example parallel_devices -- [threads]`

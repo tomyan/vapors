@@ -23,6 +23,10 @@ pub(crate) struct Dirty {
     /// Elements to restyle, and their children's subtrees only if their
     /// own style changes.
     pub(crate) elements: Vec<NodeId>,
+    /// A child was inserted or removed and its siblings marked by what
+    /// the sheets reach (`restyle_children`): debug builds check the
+    /// restyle against a fresh one (`restyle_check`).
+    pub(crate) narrowed: bool,
 }
 
 impl Dirty {
@@ -79,7 +83,7 @@ impl Document {
         let features = self.sheets.features;
         if features.has {
             self.dirty.everything();
-        } else if features.siblings {
+        } else if features.siblings.any() {
             self.dirty.subtree(self.parent(node).unwrap_or(node));
         } else {
             self.dirty.subtree(node);
@@ -101,18 +105,6 @@ impl Document {
             self.dirty.subtree(node);
         } else if scope.element {
             self.dirty.element(node);
-        }
-    }
-
-    /// Marks what a child added to or removed from `parent` restyles.
-    pub(crate) fn mark_children_changed(&mut self, parent: NodeId, added: Option<NodeId>) {
-        let features = self.sheets.features;
-        if features.has {
-            self.dirty.everything();
-        } else if features.siblings || features.empty {
-            self.dirty.subtree(parent);
-        } else if let Some(child) = added {
-            self.dirty.subtree(child);
         }
     }
 }

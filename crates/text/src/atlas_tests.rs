@@ -38,7 +38,7 @@ fn request_at(font: &FontData, c: char, subpixel: u8, size: f32) -> GlyphRequest
 }
 
 fn atlas(page_size: u32) -> GlyphAtlas {
-    GlyphAtlas::new(AtlasConfig { page_size })
+    GlyphAtlas::new(AtlasConfig::fixed(page_size))
 }
 
 #[test]

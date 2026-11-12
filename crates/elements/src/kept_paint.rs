@@ -14,15 +14,14 @@ use crate::layout::{BoxRect, LayoutBox};
 use crate::paint::{PaintInput, paint};
 use crate::paint_partial::paint_partial;
 use crate::painted::Painted;
+use crate::placement::Placement;
 
 /// What the kept paint was made from, besides the boxes.
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct PaintedFrom {
-    /// Each slot's border box, scroll offsets applied (`placed`).
-    pub(crate) rects: Vec<BoxRect>,
-    /// Each slot's padding widths: a `%` padding follows its containing
-    /// block's width, which can change with its border box unchanged.
-    pub(crate) paddings: Vec<taffy::Rect<f32>>,
+    /// Each slot's border box, scroll offsets applied, and what placing
+    /// it again needs (`placement.rs`).
+    pub(crate) placement: Placement,
     pub(crate) thumbs_shown: bool,
     /// Device pixels per CSS pixel. A scale change builds every box,
     /// but with no box (html `display: none`) none is built.
@@ -31,9 +30,11 @@ pub(crate) struct PaintedFrom {
 
 impl PaintedFrom {
     /// Whether paint made from `self` shows what a paint made from `now`
-    /// would, after an update that built `built` boxes.
-    pub(crate) fn shows(&self, now: &Self, built: usize) -> bool {
-        built == 0 && self == now
+    /// would, after an update that changed the `changed` slots: some
+    /// kept, none built or moved, and the same thumbs and scale.
+    pub(crate) fn shows(&self, now: &Self, changed: &ChangedSlots) -> bool {
+        let same = (self.thumbs_shown, self.scale) == (now.thumbs_shown, now.scale);
+        same && !changed.every && changed.built() == 0 && changed.moved.is_empty()
     }
 }
 

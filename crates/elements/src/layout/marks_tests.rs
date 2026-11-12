@@ -74,7 +74,7 @@ fn a_mark_on_a_root_that_lost_its_box_rebuilds_every_box() {
     let rebuild = doc
         .boxes
         .marks
-        .rebuild(&doc.arena, used, &doc.boxes.placed.slots, root);
+        .rebuild(&doc.arena, used, &doc.boxes.placed, root);
 
     // Then
     assert_eq!(rebuild, Rebuild::Every);

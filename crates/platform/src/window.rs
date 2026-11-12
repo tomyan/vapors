@@ -128,10 +128,11 @@ pub(crate) enum Message {
         /// Its contents.
         bytes: Vec<u8>,
     },
-    /// wgpu reported the window's device lost; the loss is in the
-    /// platform's state. Sent so the loop stops now, not at the next
-    /// frame, which a backgrounded tab may never draw.
-    DeviceLost,
+    /// wgpu reported the window's device lost, or an error no scope
+    /// caught; it is in the platform's [`GpuWatch`](crate::gpu_watch::GpuWatch).
+    /// Sent so the loop stops now, not at the next frame, which a
+    /// backgrounded tab may never draw.
+    GpuStopped,
     /// A [`Waker`](crate::Waker) asked for a frame from outside `event`.
     Wake,
     /// Input from the page's own elements (the web's text input).

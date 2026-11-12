@@ -29,7 +29,7 @@ fn run_quads(atlas: &mut GlyphAtlas, layouts: &[Layout]) -> Vec<f32> {
 /// period (3x3) fits beside it and an M (18x17) only once the l is
 /// evicted and the page repacked.
 fn page_holding_a_tall_l(system: &mut FontSystem) -> GlyphAtlas {
-    let mut atlas = GlyphAtlas::new(AtlasConfig { page_size: 30 });
+    let mut atlas = GlyphAtlas::new(AtlasConfig::fixed(30));
     run_quads(&mut atlas, &[layout(system, "l", 40.0)]);
     atlas.begin_frame();
     atlas

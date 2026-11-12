@@ -5,15 +5,20 @@
 //! and run in the `gpu` tier (`cargo xtask test --tier gpu`).
 
 mod atlas;
+mod atlas_config;
 mod atlas_evict;
+mod atlas_grow;
 mod atlas_icon;
 mod atlas_page;
+mod atlas_texture;
 mod atlas_types;
 pub mod comparison;
 mod draw;
 mod draw_icon;
 mod font_system;
 pub mod fonts;
+#[cfg(test)]
+mod gpu_atlas_texture_tests;
 mod icon;
 mod icon_key;
 mod icon_miter;
@@ -36,6 +41,7 @@ mod raster_types;
 mod style;
 
 pub use atlas::{AtlasConfig, AtlasError, AtlasGlyph, GlyphAtlas, PageKind};
+pub use atlas_config::{AtlasSizeError, FIRST_PAGE};
 pub use atlas_page::AtlasPage;
 pub use draw::RenderTarget;
 pub use draw_icon::{ICON_BLEND, IconDraw};
