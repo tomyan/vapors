@@ -79,3 +79,50 @@ fn a_repeated_only_is_refused_naming_it() {
     assert!(error.starts_with("--only given twice: "), "{error}");
     assert!(error.contains("--only <substring> (once)"), "{error}");
 }
+
+#[test]
+fn scaling_names_a_change_and_counts_still_come_before_or_after_it() {
+    let o = full(&["60", "--scaling", "Insert", "10"]).expect("parsed");
+    assert!(matches!(o.scaling, Some(crate::rows::RowChange::Insert)));
+    assert_eq!((o.settings.runs, o.settings.warmup), (60, 10));
+    assert!(full(&[]).expect("parsed").scaling.is_none());
+}
+
+#[test]
+fn scaling_without_a_change_or_with_an_unknown_one_is_refused_naming_it() {
+    let error = full(&["--scaling"]).expect_err("no value");
+    assert!(error.starts_with("--scaling needs a change: "), "{error}");
+    let error = full(&["--scaling", "Hover"]).expect_err("unknown");
+    assert!(
+        error.starts_with("--scaling Hover is not a change: "),
+        "{error}"
+    );
+    assert!(
+        error.contains("Idle|Text|Class|HoveredClass|Insert"),
+        "{error}"
+    );
+}
+
+#[test]
+fn scaling_given_twice_or_with_only_is_refused() {
+    let error = full(&["--scaling", "Text", "--scaling", "Class"]).expect_err("twice");
+    assert!(error.starts_with("--scaling given twice: "), "{error}");
+    let error = full(&["--scaling", "Text", "--only", "Text"]).expect_err("with only");
+    assert!(
+        error.starts_with("--scaling and --only cannot be combined: "),
+        "{error}"
+    );
+}
+
+#[test]
+fn scaling_with_instructions_is_refused() {
+    // Given: --scaling always counts instructions
+    // When
+    let error = full(&["--scaling", "Text", "--instructions"]).expect_err("with instructions");
+
+    // Then
+    assert!(
+        error.starts_with("--scaling and --instructions cannot be combined"),
+        "{error}"
+    );
+}
