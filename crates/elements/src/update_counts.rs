@@ -8,12 +8,10 @@ use crate::painted::Painted;
 use crate::splice_decline::SpliceDecline;
 
 /// Structural counts of the work the last [`Document::update`] did, for
-/// diagnostics and tests. They count units of work, not time.
-///
-/// Every count is reset to 0 when an update starts, and each phase sets
-/// its own as it runs, so a refused update reports the phases it ran
-/// and 0 for those after the refusal. Before the first update, all are
-/// 0.
+/// diagnostics and tests: units of work, not time. Every count resets
+/// to 0 when an update starts and each phase sets its own as it runs,
+/// so a refused update reports the phases it ran and 0 for those after
+/// the refusal; before the first update, all are 0.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct UpdateCounts {
@@ -88,8 +86,7 @@ pub struct UpdateCounts {
     /// Boxes not built again whose rect or padding changed since the
     /// last paint; 0 when nothing is kept.
     pub boxes_moved: usize,
-    /// Of `boxes_moved`, those moved by scrolls of containers above
-    /// them alone, their layout kept (`Placed::scrolled`).
+    /// Of `boxes_moved`, those scrolled alone (`Placed::scrolled`).
     pub boxes_scrolled: usize,
     /// In-flow children chained to the slot they are placed in before
     /// the placement walk (M10b, `placement.rs`): those of each slot
