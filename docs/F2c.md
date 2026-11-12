@@ -71,7 +71,9 @@ Failure handling:
 - `listen` for an event name the document never fires is refused the
   same way. F2c fires `click`, `pointerdown`, `pointerup`,
   `pointermove`, `pointerenter` and `pointerleave`. Otherwise
-  `onmouseover` would compile and silently never run.
+  `onmouseover` would compile and silently never run. Later slices add
+  to the list, which `FIRED` in `crates/elements/src/tags.rs` holds;
+  `dblclick`, after the second click or tap in a row, is one.
 
 `Document::update(env) -> Result<(), Vec<ElementError>>` runs restyle,
 then layout, then paint. `ElementsApp` reports any error with
@@ -545,10 +547,10 @@ differs from the plan.
   job.
 - **Page controls.** The demo page's own Open button and status line
   sat over an elements demo's canvas. An elements demo now calls
-  `vapors_platform::hide_page_controls()`. That hides both, and the
-  page then needs no Open button. Errors still show: `#error`, or
-  `#status` when the page has no `#error`, is un-hidden whenever an
-  error is written to it. The page contract checks that no visible
+  `vapors_platform::app_draws_open()` and `hide_status_line()`. They
+  hide both, and the page then needs no Open button. Errors still show:
+  `#error`, or `#status` when the page has no `#error`, is un-hidden
+  whenever an error is written to it. The page contract checks that no visible
   element other than `#error` overlaps the canvas of each elements demo
   and the index. It also checks that only the image demo refuses a page
   without the Open button.
@@ -921,8 +923,10 @@ differs from the plan.
   registers an image for the `img` elements whose `src` is `name`.
   - `RgbaImage` moved to vapors-scene, and vapors-canvas re-exports it.
   - An image that cannot be drawn is refused at registration, naming
-    it: a side of zero, a side over 8192 (WebGPU's guaranteed
-    `maxTextureDimension2D`), or pixels that do not match its size.
+    it: a side of zero, a side over the device's
+    `max_texture_dimension_2d` (`Document::set_max_image_side`, which
+    `ElementsApp` calls every frame; until then 8192, WebGPU's
+    guaranteed minimum), or pixels that do not match its size.
   - `Document::unregister_image(name)` frees one. It is refused while an
     `img` still names it. The painter drops the texture after the next
     frame that does not draw the image, so a thumbnail scrolled back

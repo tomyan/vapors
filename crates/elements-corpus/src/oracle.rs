@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use serde_json::Value;
 use vapors_text::comparison::{Chromium, FONT_FILES};
 
+use crate::oracle_files::write_whole;
 use crate::page::{FixtureViewport, Source, boxes_from_dom, framed, split};
 
 /// The fixtures directory of this crate.
@@ -34,6 +35,40 @@ pub fn fixture_names() -> Result<Vec<String>, String> {
         .collect();
     names.sort();
     Ok(names)
+}
+
+/// The fixtures laid out by Chromium from their own `.wisp`, sorted: all
+/// but those whose `.events` script names another page (`page`), which
+/// are compared by that script alone (a component played against APG's
+/// own example, whose markup is not the fixture's); each one left out is
+/// printed.
+///
+/// # Errors
+/// When the directory cannot be read, or a script does not parse.
+pub fn laid_out_fixture_names() -> Result<Vec<String>, String> {
+    let mut names = Vec::new();
+    for name in fixture_names()? {
+        match another_page(&name)? {
+            Some(page) => println!(
+                "skip {name}: compared on {page} by {name}.events, not laid out from its .wisp"
+            ),
+            None => names.push(name),
+        }
+    }
+    Ok(names)
+}
+
+/// The other page `name`'s `.events` script plays on, if it has a script
+/// that names one.
+///
+/// # Errors
+/// A script that does not parse.
+pub fn another_page(name: &str) -> Result<Option<String>, String> {
+    let path = fixtures_dir().join(format!("{name}.events"));
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return Ok(None);
+    };
+    Ok(crate::events_script::parse(name, &text)?.page)
 }
 
 /// Chromium's boxes for fixture `name` at each of its viewports, as the
@@ -120,8 +155,7 @@ fn check_scale(name: &str, page: &Value, scale: f64) -> Result<(), String> {
 /// When a file cannot be written.
 pub fn write_fonts(work: &Path) -> Result<(), String> {
     for (file, bytes) in FONT_FILES {
-        let path = work.join(file);
-        std::fs::write(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))?;
+        write_whole(&work.join(file), bytes)?;
     }
     Ok(())
 }
@@ -155,8 +189,7 @@ pub fn image_files() -> Result<Vec<(String, Vec<u8>)>, String> {
 /// When one cannot be read or written.
 pub fn write_images(work: &Path) -> Result<(), String> {
     for (name, bytes) in image_files()? {
-        let path = work.join(name);
-        std::fs::write(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))?;
+        write_whole(&work.join(name), &bytes)?;
     }
     Ok(())
 }

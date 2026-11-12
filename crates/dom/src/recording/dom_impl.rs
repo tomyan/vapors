@@ -1,6 +1,5 @@
 //! The `Dom` implementation: each call is recorded and applied to the tree.
 
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
@@ -76,6 +75,7 @@ impl Dom for RecordingDom {
 
     fn remove(&mut self, node: NodeId) {
         self.detach(node);
+        self.mark_removed(node);
         self.calls.push(Call::Remove { node });
     }
 
@@ -83,11 +83,17 @@ impl Dom for RecordingDom {
         self.listeners
             .entry((node, event.into()))
             .or_default()
-            .push(Rc::new(RefCell::new(handler)));
+            .push(Rc::from(handler));
         self.calls.push(Call::Listen {
             node,
             event: event.into(),
         });
+    }
+
+    fn declare_events(&mut self, names: &[&str]) {
+        self.calls.push(Call::DeclareEvents(
+            names.iter().map(|name| (*name).to_owned()).collect(),
+        ));
     }
 
     fn add_style(&mut self, scope: &str, css: &str) {
@@ -95,5 +101,26 @@ impl Dom for RecordingDom {
             scope: scope.into(),
             css: css.into(),
         });
+    }
+
+    fn current_text(&self, node: NodeId) -> Option<&str> {
+        match &self.record(node).kind {
+            Kind::Text(text) => Some(text),
+            Kind::Element { .. } => None,
+        }
+    }
+
+    fn current_attribute(&self, node: NodeId, name: &str) -> Option<&str> {
+        match &self.record(node).kind {
+            Kind::Element { attributes, .. } => attributes.get(name).map(String::as_str),
+            Kind::Text(_) => None,
+        }
+    }
+
+    fn current_property(&self, node: NodeId, name: &str) -> Option<&PropertyValue> {
+        match &self.record(node).kind {
+            Kind::Element { properties, .. } => properties.get(name),
+            Kind::Text(_) => None,
+        }
     }
 }

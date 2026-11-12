@@ -6,16 +6,25 @@
 //! judge the function itself: `needless_pass_by_value` is about its
 //! `props` parameter, which no script code can touch, and
 //! `too_many_lines` is about its length, which follows the template's
-//! size. Neither can hide another lint. A type-aware generator would
+//! size; a third, `missing_panics_doc`, when a numeric or checked
+//! binding's listener expects what its control's own event always
+//! carries (a missing one is a bug in the tree, said loudly). None can hide
+//! another lint. A type-aware generator would
 //! retire the first four; building each template node in its own
 //! function would retire `too_many_lines`. Generated node names need no
 //! allowance: their counters share one width per component, so clippy's
 //! `similar_names` never sees two that differ by an inserted digit.
 
+use std::fmt::Write;
+
+use super::script::ScriptInfo;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Allowance {
     CloneOnCopy,
+    CloneOnCopyKey,
     ImplicitClone,
+    MissingPanicsDoc,
     NeedlessPassByValue,
     NeedlessUpdate,
     TooManyLines,
@@ -24,8 +33,9 @@ pub(crate) enum Allowance {
 impl Allowance {
     fn lint(self) -> &'static str {
         match self {
-            Allowance::CloneOnCopy => "clippy::clone_on_copy",
+            Allowance::CloneOnCopy | Allowance::CloneOnCopyKey => "clippy::clone_on_copy",
             Allowance::ImplicitClone => "clippy::implicit_clone",
+            Allowance::MissingPanicsDoc => "clippy::missing_panics_doc",
             Allowance::NeedlessPassByValue => "clippy::needless_pass_by_value",
             Allowance::NeedlessUpdate => "clippy::needless_update",
             Allowance::TooManyLines => "clippy::too_many_lines",
@@ -37,8 +47,14 @@ impl Allowance {
             Allowance::CloneOnCopy => {
                 "a closure gets a clone of each binding it captures; the compiler cannot see which are Copy"
             }
+            Allowance::CloneOnCopyKey => {
+                "a row's key is cloned into the map and kept for the cleanup; the compiler cannot see a Copy key"
+            }
             Allowance::ImplicitClone => {
                 "a text hole or expression attribute shows any Display value through to_string; the compiler cannot see when it is already a String"
+            }
+            Allowance::MissingPanicsDoc => {
+                "a numeric or checked binding's listener expects what its control's own input or change event always carries; a missing one is a bug in the tree"
             }
             Allowance::NeedlessPassByValue => {
                 "every component takes its props struct by value, empty or not, so parents mount them alike"
@@ -68,4 +84,32 @@ pub(crate) fn shown_text(expr: &str) -> [String; 3] {
         Allowance::ImplicitClone.attribute(),
         "let value = shown.to_string();".to_string(),
     ]
+}
+
+/// Lints on `mount_before` that depend on types the compiler cannot see:
+/// its length, props it does not consume, which it does not when there
+/// are none or every one is a signal or memo, which are `Copy`, and the
+/// expectation a numeric binding's listener makes (`element_bind`).
+pub(crate) fn mount_allowances(info: &ScriptInfo, body: &str) -> String {
+    let mut allowances = format!("    {}\n", Allowance::TooManyLines.attribute());
+    if body.contains("event.value_as_number().expect(") || body.contains("event.checked().expect(")
+    {
+        let _ = writeln!(
+            allowances,
+            "    {}",
+            Allowance::MissingPanicsDoc.attribute()
+        );
+    }
+    let all_copy = info
+        .props
+        .iter()
+        .all(|prop| info.unwrappable.contains(&prop.name));
+    if all_copy {
+        let _ = writeln!(
+            allowances,
+            "    {}",
+            Allowance::NeedlessPassByValue.attribute()
+        );
+    }
+    allowances
 }

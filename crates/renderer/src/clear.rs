@@ -2,6 +2,8 @@
 
 use vapors_scene::Color;
 
+use crate::Target;
+
 /// Create an `Rgba8Unorm` texture of `width` by `height` and clear it to
 /// `color`. The texture can be copied from, so tests can read it back.
 #[must_use]
@@ -31,7 +33,7 @@ pub fn clear(
     texture
 }
 
-/// Clear an existing render target to `color`.
+/// Clear an existing render target to `color`, in a submit of its own.
 pub fn clear_view(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
@@ -41,6 +43,19 @@ pub fn clear_view(
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
         label: Some("clear"),
     });
+    clear_pass(&mut encoder, view, color);
+    queue.submit([encoder.finish()]);
+}
+
+/// Record a clear of `target`'s whole view to `color` into its encoder,
+/// in the render pass the draws on that view that follow share.
+pub fn clear_target(target: &Target<'_>, color: Color) {
+    target
+        .encoder
+        .clear(target.queue, target.view, to_wgpu(color));
+}
+
+fn clear_pass(encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView, color: Color) {
     encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         label: Some("clear"),
         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -57,7 +72,6 @@ pub fn clear_view(
         occlusion_query_set: None,
         multiview_mask: None,
     });
-    queue.submit([encoder.finish()]);
 }
 
 fn to_wgpu(color: Color) -> wgpu::Color {

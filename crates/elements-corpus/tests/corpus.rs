@@ -13,7 +13,8 @@ use std::rc::Rc;
 
 use serde_json::Value;
 use vapors_elements::{BoxRect, Document, Viewport};
-use vapors_elements_corpus::oracle::{fixture_names, fixtures_dir};
+use vapors_elements_corpus::oracle::{another_page, fixture_names, fixtures_dir};
+use vapors_elements_corpus::page::NOT_A_BOX;
 use vapors_elements_corpus::{Fixture, all};
 use vapors_text::FontSystem;
 
@@ -100,6 +101,7 @@ fn our_boxes(fixture: &Fixture, viewport: Viewport) -> Vec<(String, BoxRect)> {
     let painted = doc.painted().expect("painted");
     doc.elements()
         .into_iter()
+        .filter(|node| doc.tag(*node) != Some(NOT_A_BOX))
         .map(|node| {
             let tag = doc.tag(node).expect("an element").to_owned();
             // An element with no box (display: none, or inside one) is
@@ -168,6 +170,13 @@ fn every_fixture_lays_out_as_chromium_does() {
     );
     let mut failures = Vec::new();
     for fixture in fixtures {
+        // a fixture compared on another page by its script has no boxes
+        if another_page(fixture.name)
+            .expect("its script parses")
+            .is_some()
+        {
+            continue;
+        }
         for (viewport, theirs) in chromium_boxes(fixture.name) {
             // When
             let ours = our_boxes(&fixture, viewport);

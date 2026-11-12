@@ -1,7 +1,8 @@
 //! Every one of Svelte 5's 54 `runtime-runes/samples/snippet-*`
 //! (checked 2026-10-26 in `~/projects/svelte`) is either ported, in
 //! `svelte_snippets.rs` and `svelte_snippets_components.rs`, or skipped
-//! here with the feature a `.wisp` lacks.
+//! here with the feature a `.wisp` lacks. `snippet-expressions` and
+//! `snippet-prop-reactive` are ported in `svelte_snippets_values.rs` (R1d).
 
 use std::collections::HashSet;
 
@@ -49,12 +50,19 @@ const PORTED: &[(&str, &str, &str)] = &[
     ),
     ("snippet-scope", "scope", "snippet_scope"),
     ("snippet-whitespace", "whitespace", "snippet_whitespace"),
+    ("snippet-expressions", "expressions", "snippet_expressions"),
+    (
+        "snippet-prop-reactive",
+        "prop_reactive",
+        "snippet_prop_reactive",
+    ),
 ];
 
 /// The test files the ported samples' functions are in.
-const TESTS: [&str; 2] = [
+const TESTS: [&str; 3] = [
     include_str!("svelte_snippets.rs"),
     include_str!("svelte_snippets_components.rs"),
+    include_str!("svelte_snippets_values.rs"),
 ];
 
 /// Skipped, with why.
@@ -93,10 +101,6 @@ const SKIPPED: &[(&str, &str)] = &[
     ("snippet-const-same-block", "{@const}"),
     ("snippet-default-arg", "default parameter values"),
     ("snippet-destructure-array", "destructured parameters"),
-    (
-        "snippet-expressions",
-        "rendering a snippet held in a value (`{render expr()}`)",
-    ),
     ("snippet-hoisted-module", "<script module> exports"),
     ("snippet-hoisted-module-2", "<script module> exports"),
     ("snippet-hoisting", "the script reads a template snippet"),
@@ -116,10 +120,6 @@ const SKIPPED: &[(&str, &str)] = &[
         "snippet-optional-arguments-defaults",
         "default parameter values",
     ),
-    (
-        "snippet-prop-reactive",
-        "rendering a snippet held in a value (`{render expr()}`)",
-    ),
     ("snippet-raw", "createRawSnippet"),
     (
         "snippet-raw-component",
@@ -127,13 +127,10 @@ const SKIPPED: &[(&str, &str)] = &[
     ),
     ("snippet-raw-component-ssr-dev", "createRawSnippet, SSR"),
     ("snippet-raw-teardown", "createRawSnippet"),
-    (
-        "snippet-reactive",
-        "rendering a snippet held in a value (`{render expr()}`)",
-    ),
+    ("snippet-reactive", "the script reads a template snippet"),
     (
         "snippet-reactive-args",
-        "rendering a snippet held in a value, destructuring and spread",
+        "the script reads a template snippet; destructuring and spread",
     ),
     ("snippet-ref", "bind:this"),
     ("snippet-select", "spread props and <select> value"),
@@ -153,10 +150,7 @@ const SKIPPED: &[(&str, &str)] = &[
         "snippet-typescript",
         "optional, default and destructured parameters",
     ),
-    (
-        "snippet-undefined",
-        "rendering a snippet held in a value (`{render expr()}`)",
-    ),
+    ("snippet-undefined", "the script reads a template snippet"),
 ];
 
 /// Svelte's sample names, vendored with the commit they were read from.

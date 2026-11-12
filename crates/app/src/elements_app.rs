@@ -8,14 +8,18 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use vapors_elements::{Cursor, Document, ElementError, Point, Viewport};
-use vapors_platform::{App, Event, Frame, Instant, Next, Platform, report_error};
+use vapors_elements::{Document, ShortcutModifier};
+use vapors_platform::{App, Event, Frame, Next, Platform, report_error};
 
 use crate::frame::FrameTimes;
-use vapors_scene::Size;
 
+use crate::document_input::{DocumentInput, Unplaced};
 use crate::painter::ScenePainter;
-use crate::pointer::action;
+pub use decision::FrameDecision;
+pub use give::GiveError;
+use give::Hosting;
+pub use surface_handle::{InvalidateError, Invalidated, SurfaceHandle};
+use surfaces::AppSurfaces;
 
 /// Why the app stopped, once it has: shared with whoever ran it.
 #[derive(Clone, Default)]
@@ -33,19 +37,24 @@ impl Failure {
     }
 }
 
-/// Shows a document in the window.
+/// Shows a document in the window. Events come through `App::event`,
+/// or through [`ElementsApp::give`] for an app that wraps this one; one
+/// instance takes them one way only (a debug build refuses the mix).
 pub struct ElementsApp {
     document: Rc<RefCell<Document>>,
     painter: Option<ScenePainter>,
+    /// The painter's atlas; `None` sizes it for the device.
+    atlas: Option<vapors_text::AtlasConfig>,
+    /// Surface renderers, before and after the painter exists.
+    surfaces: AppSurfaces,
     failure: Failure,
-    /// The last frame's display scale, for input in physical pixels.
-    scale: f32,
-    /// Where the pointer last moved, in CSS pixels.
-    pointer: Point,
-    touch: crate::touch_scroll::TouchScroll,
-    wheel: crate::wheel_scroll::WheelScroll,
-    /// The cursor last shown.
-    cursor: Cursor,
+    /// Input given to the document, at its last update's scale.
+    input: DocumentInput,
+    /// The text field last set for the platform; `None` before the
+    /// first, or when it must be set again.
+    // set to no field (`Some(None)`) differs from never set (`None`)
+    #[allow(clippy::option_option)]
+    mirrored: Option<Option<vapors_platform::TextField>>,
     /// Called before each update with the last frame's phase times.
     per_frame: Option<PerFrame>,
     /// Called after each frame with its phase times.
@@ -54,6 +63,14 @@ pub struct ElementsApp {
     last_times: Option<FrameTimes>,
     /// Time spent handling events since the last frame: the Input phase.
     input_spent: Duration,
+    /// Why the last frame asked for the next (`elements_app_decision.rs`).
+    decision: FrameDecision,
+    /// Whether events came through `App::event` or `give`; `None` before the first.
+    hosting: Option<Hosting>,
+    /// Render passes the last painted frame's encoder began.
+    render_passes: u64,
+    /// Times frames on the GPU (`elements_app_timing.rs`).
+    timer: AppTimer,
 }
 
 /// What [`ElementsApp::with_per_frame`] calls before each update, with
@@ -65,22 +82,31 @@ pub type PerFrame = Box<dyn FnMut(&[(&'static str, Duration)])>;
 pub type FrameTimesHook = Box<dyn FnMut(&FrameTimes)>;
 
 impl ElementsApp {
-    /// Shows `document`.
+    /// Shows `document`, its shortcuts taking the platform's modifier
+    /// (`vapors_platform::shortcut_is_command`).
     #[must_use]
     pub fn new(document: Rc<RefCell<Document>>) -> Self {
+        // a listener's `Err` (`vapors_dom::ListenerResult`) is shown
+        vapors_dom::set_error_report("vapors_platform::report_error", report_error);
+        document
+            .borrow_mut()
+            .set_shortcut_modifier(shortcut_modifier());
         Self {
             document,
             painter: None,
+            atlas: None,
+            surfaces: AppSurfaces::default(),
             failure: Failure::default(),
-            scale: 1.0,
-            pointer: [0.0, 0.0],
-            touch: crate::touch_scroll::TouchScroll::default(),
-            wheel: crate::wheel_scroll::WheelScroll::default(),
-            cursor: Cursor::Default,
+            input: DocumentInput::new(),
+            mirrored: None,
             per_frame: None,
             frame_times: None,
             last_times: None,
             input_spent: Duration::ZERO,
+            decision: FrameDecision::default(),
+            hosting: None,
+            render_passes: 0,
+            timer: AppTimer::default(),
         }
     }
 
@@ -102,14 +128,6 @@ impl ElementsApp {
         self
     }
 
-    /// Takes input as if the display scale were `scale`, until the first
-    /// frame says what it is: for driving `event` without a window.
-    #[must_use]
-    pub fn with_scale(mut self, scale: f32) -> Self {
-        self.scale = scale;
-        self
-    }
-
     /// Where the app's failure is kept; clone it before `run` takes the app.
     #[must_use]
     pub fn failure(&self) -> Failure {
@@ -117,82 +135,79 @@ impl ElementsApp {
     }
 }
 
-impl ElementsApp {
-    /// What to do after a frame: draw again at once if the document
-    /// changed since it was last asked (by something outside an event,
-    /// or by the update itself), else wait for the next change.
-    pub fn next_after_frame(&mut self) -> Next {
-        if self.document.borrow_mut().take_changed() {
-            Next::Continue
-        } else {
-            Next::Wait
-        }
-    }
-}
-
 /// Draws only when the document changed: an idle document draws no
 /// frames.
 impl App for ElementsApp {
     fn event(&mut self, event: Event, platform: &Platform) {
-        let started = Instant::now();
-        self.handle(&event, platform);
-        self.input_spent += started.elapsed();
+        match self.deliver(&event, platform, Hosting::Alone) {
+            // Before the first frame nothing is on screen, so the event
+            // was aimed at nothing; it is dropped.
+            Ok(_) | Err(GiveError::Unplaced(Unplaced::NotUpdated)) => {}
+            Err(GiveError::Unplaced(unplaced)) => {
+                report_error(&unplaced.to_string());
+                self.failure.set(&unplaced.to_string());
+            }
+            // refused text input is reported and the app goes on
+            Err(refused) => report_error(&refused.to_string()),
+        }
     }
 
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
-        match self.run_phases(frame) {
+        #[cfg(not(target_family = "wasm"))]
+        self.deliver_pastes();
+        match self.run_phases(frame).and_then(|()| self.sync_animating()) {
             Ok(()) => self.next_after_frame(),
             Err(message) => {
                 report_error(&message);
                 self.failure.set(&message);
+                self.surfaces.close();
                 Next::Exit
             }
         }
     }
-}
 
-impl ElementsApp {
-    /// An event, dispatched as it arrives (design 02, 2-S1).
-    fn handle(&mut self, event: &Event, platform: &Platform) {
-        if let Some(action) = action(event, self.scale, self.pointer) {
-            self.act(action);
-        }
-        if self.document.borrow_mut().take_changed() {
-            platform.request_redraw();
-        }
-        let cursor = self.document.borrow().cursor(self.pointer);
-        if cursor != self.cursor {
-            self.cursor = cursor;
-            platform.set_cursor(crate::cursor::shown(cursor));
-        }
+    fn drawn(&mut self, platform: &Platform) {
+        self.surfaces.keep_waker(platform);
+        self.surfaces.give_waker(self.painter.as_mut());
+        self.mirror_text_field(platform);
     }
 }
 
-#[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)] // window sizes and scales are small
-fn viewport(size: Size, scale: f32) -> Viewport {
-    Viewport {
-        width: size.width as f32 / scale,
-        height: size.height as f32 / scale,
-        scale,
+/// The modifier the platform's shortcuts take.
+fn shortcut_modifier() -> ShortcutModifier {
+    if vapors_platform::shortcut_is_command() {
+        ShortcutModifier::Command
+    } else {
+        ShortcutModifier::Control
     }
 }
 
-fn size_of(frame: &Frame<'_>) -> Size {
-    Size {
-        width: frame.texture.width(),
-        height: frame.texture.height(),
-    }
-}
-
-fn refused(errors: &[ElementError]) -> String {
-    let lines: Vec<String> = errors.iter().map(|error| format!("  {error}")).collect();
-    format!(
-        "the document was refused, so nothing is drawn:\n{}",
-        lines.join("\n")
-    )
-}
-
-#[path = "elements_app_act.rs"]
-mod act;
+#[path = "elements_app_atlas.rs"]
+mod atlas;
+#[path = "elements_app_counts.rs"]
+mod counts;
+#[path = "elements_app_decision.rs"]
+mod decision;
 #[path = "elements_app_frame.rs"]
 mod frame_phases;
+#[path = "elements_app_give.rs"]
+mod give;
+#[cfg(not(target_family = "wasm"))]
+#[path = "elements_app_paste.rs"]
+mod paste;
+#[path = "elements_app_surface_handle.rs"]
+mod surface_handle;
+#[path = "elements_app_surfaces.rs"]
+mod surfaces;
+// For the root `gpu_` test module (the tier split needs a gpu_ id).
+#[cfg(test)]
+pub(crate) use surfaces::give_one_loop_waker_to;
+#[cfg(test)]
+#[path = "elements_app_tests.rs"]
+mod tests;
+#[path = "elements_app_text.rs"]
+mod text;
+#[path = "elements_app_timing.rs"]
+mod timing;
+use timing::AppTimer;
+pub use timing::FrameTiming;

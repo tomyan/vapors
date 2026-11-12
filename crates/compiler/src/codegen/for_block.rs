@@ -2,6 +2,7 @@
 //! that lists `(key, item)` pairs, and a row builder, handed to
 //! `vapors_dom::blocks::keyed` with the block's position for refusals.
 
+use super::element_bind_this::RowKey;
 use super::emit::{Emitter, Place};
 use crate::CompileError;
 use crate::ast::ForBlock;
@@ -23,7 +24,13 @@ impl Emitter<'_> {
         let signature =
             self.builder_signature(&format!(", {index}: Signal<usize>, {item}: Signal<_>"));
         self.push_scope(row_scope);
+        self.row_keys.push(RowKey {
+            index: index.clone(),
+            item: item.clone(),
+            key: block.key.clone(),
+        });
         let built = self.emit_builder_with(&[], &block.children, &signature, &[]);
+        self.row_keys.pop();
         self.pop_scope();
         built?;
         self.close_keyed_call(call);
@@ -142,6 +149,9 @@ fn is_identifier(name: &str) -> bool {
 /// The closure body listing `(key, item)` pairs. Without a key the
 /// index is the key; `enumerate` appears only when the index is read.
 fn keyed_items(iterable: &str, index: &str, item: &str, key: Option<&str>) -> String {
+    // `key=i` over `(i, item)` is `enumerate`'s own pairs: a map to them
+    // is clippy's `map_identity`
+    let key = key.filter(|key| key.trim() != index);
     match key {
         Some(key) if index.starts_with('_') => {
             format!("move || ({iterable}).into_iter().map(|{item}| (({key}), {item})).collect(),")

@@ -136,6 +136,7 @@ fn state_pseudo_classes_follow_the_element_flags() {
         (":checked", States::CHECKED),
         (":disabled", States::DISABLED),
         (":enabled", States::ENABLED),
+        (":invalid", States::INVALID),
     ] {
         // Given
         let mut tree = Tree::new("root");

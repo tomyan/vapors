@@ -12,10 +12,9 @@ pub const STATUS_ID: &str = "status";
 /// The id errors are written to when the page has such an element; its
 /// `hidden` attribute is removed when an error is written.
 pub const ERROR_ID: &str = "error";
-
-/// The page's own controls, drawn over the canvas. An app that draws
-/// its own (an elements demo) hides them; see `hide_page_controls`.
-pub const PAGE_CONTROL_IDS: [&str; 2] = [OPEN_ID, STATUS_ID];
+/// The id the GPU's start-up line is written to when the page has such
+/// an element, so the status line stays the page's own.
+pub const ADAPTER_ID: &str = "adapter";
 
 /// What kind of line is being reported.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,16 +23,20 @@ pub enum Report {
     Error,
     /// A line that is not a failure, from `report_status`.
     Status,
+    /// The GPU's start-up line (adapter and limits), from `report_startup`.
+    Startup,
 }
 
-/// The id of the element a `report` line is written to: an error goes
-/// to [`ERROR_ID`] when the page has that element and to [`STATUS_ID`]
-/// otherwise; a status line always goes to [`STATUS_ID`].
+/// The id of the element a `report` line is written to, given which ids
+/// the page has: an error goes to [`ERROR_ID`] and the start-up line to
+/// [`ADAPTER_ID`] when the page has that element, and each to
+/// [`STATUS_ID`] otherwise; a status line always goes to [`STATUS_ID`].
 #[must_use]
-pub fn element_for(report: Report, page_has_error_element: bool) -> &'static str {
+pub fn element_for(report: Report, page_has: impl Fn(&str) -> bool) -> &'static str {
     match report {
-        Report::Error if page_has_error_element => ERROR_ID,
-        Report::Error | Report::Status => STATUS_ID,
+        Report::Error if page_has(ERROR_ID) => ERROR_ID,
+        Report::Startup if page_has(ADAPTER_ID) => ADAPTER_ID,
+        Report::Error | Report::Startup | Report::Status => STATUS_ID,
     }
 }
 
@@ -84,40 +87,45 @@ mod tests {
     }
 
     #[test]
-    fn an_error_goes_to_the_error_element_only_when_the_page_has_one() {
-        // Given
+    fn each_line_goes_to_its_own_element_only_when_the_page_has_one() {
+        // Given: the report, the one optional element the page has, and
+        // where the line lands
         let cases = [
-            (Report::Error, true, "error"),
-            (Report::Error, false, "status"),
-            (Report::Status, true, "status"),
-            (Report::Status, false, "status"),
+            (Report::Error, Some(ERROR_ID), "error"),
+            (Report::Error, None, "status"),
+            (Report::Error, Some(ADAPTER_ID), "status"),
+            (Report::Status, Some(ERROR_ID), "status"),
+            (Report::Status, Some(ADAPTER_ID), "status"),
+            (Report::Status, None, "status"),
+            (Report::Startup, Some(ADAPTER_ID), "adapter"),
+            (Report::Startup, Some(ERROR_ID), "status"),
+            (Report::Startup, None, "status"),
         ];
 
-        for (report, has_error_element, expected) in cases {
+        for (report, present, expected) in cases {
             // When
-            let id = element_for(report, has_error_element);
+            let id = element_for(report, |id| Some(id) == present);
 
             // Then
-            assert_eq!(
-                id, expected,
-                "{report:?} with #error present: {has_error_element}"
-            );
+            assert_eq!(id, expected, "{report:?} with {present:?} present");
         }
     }
 
     #[test]
     fn an_error_is_shown_wherever_it_is_written_and_a_status_line_is_not() {
         // Given: an error written to #status on a page without #error,
-        // where the page controls (#status among them) are hidden
-        let hidden = PAGE_CONTROL_IDS;
+        // where the app hid the status line (`hide_status_line`)
+        let hidden = [STATUS_ID];
 
         // When
         let error_shown = shows_target(Report::Error);
         let status_shown = shows_target(Report::Status);
+        let startup_shown = shows_target(Report::Startup);
 
         // Then
-        assert!(hidden.contains(&element_for(Report::Error, false)));
+        assert!(hidden.contains(&element_for(Report::Error, |_| false)));
         assert!(error_shown);
         assert!(!status_shown);
+        assert!(!startup_shown);
     }
 }

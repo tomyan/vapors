@@ -2,6 +2,7 @@
   "steps": [
     {
       "action": "Click(50.0, 24.0)",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -26,10 +27,13 @@
       ],
       "focus": "button#save",
       "focusVisible": false,
-      "line": 4
+      "line": 4,
+      "selections": {},
+      "values": {}
     },
     {
       "action": "Key(\"Tab\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -54,10 +58,13 @@
       ],
       "focus": "button#cancel",
       "focusVisible": true,
-      "line": 8
+      "line": 8,
+      "selections": {},
+      "values": {}
     },
     {
       "action": "Key(\"Enter\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -82,10 +89,13 @@
       ],
       "focus": "button#cancel",
       "focusVisible": true,
-      "line": 10
+      "line": 10,
+      "selections": {},
+      "values": {}
     },
     {
       "action": "Key(\"Space\")",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -110,10 +120,13 @@
       ],
       "focus": "button#cancel",
       "focusVisible": true,
-      "line": 12
+      "line": 12,
+      "selections": {},
+      "values": {}
     },
     {
       "action": "Click(250.0, 24.0)",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -125,10 +138,13 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 14
+      "line": 14,
+      "selections": {},
+      "values": {}
     },
     {
       "action": "Wheel { x: 100.0, y: 90.0, dx: 0.0, dy: 40.0 }",
+      "checked": {},
       "events": [
         {
           "bubbles": true,
@@ -145,7 +161,9 @@
       ],
       "focus": "body",
       "focusVisible": false,
-      "line": 17
+      "line": 17,
+      "selections": {},
+      "values": {}
     }
   ]
 }

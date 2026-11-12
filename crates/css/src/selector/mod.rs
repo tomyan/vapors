@@ -109,6 +109,8 @@ pub enum PseudoClass {
     Disabled,
     /// `:enabled`
     Enabled,
+    /// `:invalid`
+    Invalid,
     /// `:empty`
     Empty,
     /// `:root`

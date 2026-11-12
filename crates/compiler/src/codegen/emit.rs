@@ -41,6 +41,9 @@ pub(crate) struct Emitter<'a> {
     /// The snippets declared so far: a closure that reads one gets a
     /// clone of it, as of a script binding.
     pub snippets: Vec<super::snippet_list::LocalSnippet>,
+    /// The `{for}` rows being built, outermost first: `bind:this` binds
+    /// under the row's key.
+    pub row_keys: Vec<super::element_bind_this::RowKey>,
 }
 
 impl<'a> Emitter<'a> {
@@ -59,6 +62,7 @@ impl<'a> Emitter<'a> {
             dom_type: "D",
             tags: super::tag_props::TagCheck::default(),
             snippets: Vec::new(),
+            row_keys: Vec::new(),
         }
     }
 
@@ -107,8 +111,10 @@ impl<'a> Emitter<'a> {
         self.counter
     }
 
-    /// A fresh variable name with the given stem.
+    /// A fresh variable name with the given stem made a Rust name
+    /// (`names::rust_stem`: `gpu-surface` is `gpu_surface`).
     pub fn fresh(&mut self, stem: &str) -> String {
+        let stem = super::names::rust_stem(stem);
         let name = format!("{stem}{:0width$}", self.counter, width = self.width);
         self.counter += 1;
         self.reserve(&name);
@@ -171,6 +177,11 @@ impl<'a> Emitter<'a> {
             names.extend(scope.iter().cloned());
         }
         names
+    }
+
+    /// Whether `name` is a loop binding in scope here.
+    pub fn is_loop_name(&self, name: &str) -> bool {
+        self.scopes.iter().flatten().any(|bound| bound == name)
     }
 
     pub fn push_scope(&mut self, names: Vec<String>) {

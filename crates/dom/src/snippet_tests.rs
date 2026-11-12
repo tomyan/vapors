@@ -98,3 +98,21 @@ fn a_snippet_reads_its_arguments_when_they_change() {
     // Then: the same node, its text the new argument
     assert_eq!(dom.borrow().to_html(), "after");
 }
+
+#[test]
+fn a_snippet_is_renderable_owned_borrowed_or_optional() {
+    // Given
+    let one = paragraph();
+
+    // Then: the same snippet back, or none
+    assert_eq!(Renderable::snippet(&one), Some(one.clone()));
+    assert_eq!(Renderable::snippet(&&one), Some(one.clone()));
+    assert_eq!(Renderable::snippet(&Some(&one)), Some(one.clone()));
+    assert!(Renderable::<()>::snippet(&None::<Snippet>).is_none());
+}
+
+#[test]
+fn two_snippets_built_alike_are_not_equal() {
+    // Then: equality is identity
+    assert_ne!(paragraph(), paragraph());
+}

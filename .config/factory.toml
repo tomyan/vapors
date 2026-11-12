@@ -25,10 +25,27 @@ check = "d=$(mktemp -d) && scripts/check-page-contract.sh target/web $d; s=$?; r
 # The page contract took 41 s on the runner (run 40036623884, 2026-10-23);
 # four times that, for a loaded box.
 check_seconds = "180"
+# The loopback port static-web-server serves the copy on, behind the
+# mount (serve_static.rs); touche's is 8790.
+port = "8791"
 
 [dev]
 # The https port `cargo xtask dev` serves trunk's debug page on, at /.
 https = "8446"
+
+# `cargo xtask ci` and `cargo xtask gate` wait first while the one-minute
+# load is over `threshold`, and go on at `deadline_minutes` saying so
+# (xtask/src/load_wait.rs; why it goes on rather than fails:
+# docs/decisions/2026-11-01-load-wait-deadline.md). Unset, the threshold
+# is the machine's core count as std::thread::available_parallelism reads
+# it (12 on the dev machine, 2026-11-01): over that, runs queue for CPUs.
+# The deadline defaults to 10 minutes, the wait agents did by hand before.
+# `wait = "false"` turns the wait off, said on every run, for a machine
+# without /proc/loadavg. None is set here; to change them:
+# [load]
+# wait = "true"
+# threshold = "12"
+# deadline_minutes = "10"
 
 [files]
 # The file-length rule as a check (the `files` step of `lint` and `ci`).
@@ -39,6 +56,7 @@ max_lines = "220"
 # Files allowed over the limit, each with its reason. `cargo xtask check-files`
 # and `lint --verbose` print them; the `files` step shows only refusals.
 [files.allow]
+"crates/elements-corpus/fixtures/apg/combobox-autocomplete.js" = "APG's own example script, copied as published (fixtures/apg/NOTICE.md)"
 
 # Files not written by hand; left out of the check.
 [files.generated]
@@ -48,6 +66,10 @@ max_lines = "220"
 # (`cargo xtask check-layers`, the `layers` step of lint and ci). vapors
 # sets none; touche keeps its document, engine and runtime clear of UI
 # crates.
+[layers.forbid]
+# vapors-components: any `Dom` mounts them, so they reach the tree only
+# through vapors-dom (doc 03, "A component's own events").
+"vapors-components" = "vapors-elements, vapors-platform, vapors-app, vapors-renderer, vapors-gpu, vapors-canvas, vapors-text, vapors-css"
 
 # `[gate] twin` names a sibling checkout whose xtask must equal this
 # one's (xtask/src/gate_twin.rs). vapors sets none: xtask changes land
@@ -79,9 +101,20 @@ max_lines = "220"
 "Swatinem/rust-cache" = "a cache of target/; the local target directory is already there"
 "cargo-bins/cargo-binstall" = "installs cargo-binstall, which cargo xtask setup --ci needs; that line is setup"
 "actions/upload-artifact" = "uploads files for people to read; nothing is checked"
+"actions/download-artifact" = "fetches the web job's target/web for the gpu job; the gate runs the web job first in this worktree, so target/web is already its build"
 
 # web_sys, the browser's API, only in the platform layer; every other
 # crate reaches the browser through vapors-platform
 # (`cargo xtask check-imports`, the `imports` step).
 [imports.web_sys]
 "crates/platform/" = "vapors-platform: the window, input and file picker on the web"
+
+# The merge queue (`cargo xtask queue`, a systemd user timer): vapors
+# merges when GitHub's checks are all green and a review clear holds
+# (xtask/src/queue.rs). It rebases and updates in its own worktree,
+# never an agent's, and logs every decision for the foreman.
+[queue]
+repo = "tomyan/vapors"
+merge_on = "checks"
+run = "~/.cache/w-queue/vapors-run/vapors"
+log = "~/.cache/queue/vapors.log"

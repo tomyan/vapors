@@ -4,12 +4,9 @@ use std::path::{Path, PathBuf};
 
 use super::*;
 
-/// A tree under the temp dir holding `files` (path, text), target/ included.
-fn tree(test: &str, side: &str, files: &[(&str, &str)]) -> PathBuf {
-    let root = std::env::temp_dir()
-        .join(format!("xtask-twin-{test}-{}", std::process::id()))
-        .join(side);
-    let _ = std::fs::remove_dir_all(&root);
+/// A tree `side` in `scratch` holding `files` (path, text), target/ included.
+fn tree(scratch: &Path, side: &str, files: &[(&str, &str)]) -> PathBuf {
+    let root = scratch.join(side);
     for (path, text) in files {
         let file = root.join(path);
         std::fs::create_dir_all(file.parent().expect("a parent")).expect("dirs");
@@ -21,13 +18,14 @@ fn tree(test: &str, side: &str, files: &[(&str, &str)]) -> PathBuf {
 #[test]
 fn identical_trees_have_no_differences_and_target_is_not_compared() {
     // Given
+    let scratch = crate::scratch::dir("twin-same");
     let ours = tree(
-        "same",
+        &scratch,
         "a",
         &[("src/main.rs", "fn main() {}"), ("target/x", "1")],
     );
     let theirs = tree(
-        "same",
+        &scratch,
         "b",
         &[("src/main.rs", "fn main() {}"), ("target/x", "2")],
     );
@@ -39,13 +37,14 @@ fn identical_trees_have_no_differences_and_target_is_not_compared() {
 #[test]
 fn each_differing_or_missing_file_is_named() {
     // Given
+    let scratch = crate::scratch::dir("twin-diff");
     let ours = tree(
-        "diff",
+        &scratch,
         "a",
         &[("src/main.rs", "1"), ("src/only_here.rs", "x")],
     );
     let theirs = tree(
-        "diff",
+        &scratch,
         "b",
         &[("src/main.rs", "2"), ("src/only_there.rs", "y")],
     );
@@ -76,8 +75,9 @@ fn a_missing_sibling_is_refused_naming_it() {
 #[test]
 fn a_symlink_in_either_tree_is_refused_naming_it() {
     // Given
-    let ours = tree("link", "a", &[("src/main.rs", "1")]);
-    let theirs = tree("link", "b", &[("src/main.rs", "1")]);
+    let scratch = crate::scratch::dir("twin-link");
+    let ours = tree(&scratch, "a", &[("src/main.rs", "1")]);
+    let theirs = tree(&scratch, "b", &[("src/main.rs", "1")]);
     std::os::unix::fs::symlink(theirs.join("src/main.rs"), ours.join("src/linked.rs"))
         .expect("symlink");
 
@@ -94,8 +94,9 @@ const PIN: (&str, &str) = (".config/vapors-rev", "abc\n");
 #[test]
 fn the_fix_names_this_repositorys_pin_when_it_has_one() {
     // Given
-    let here = tree("pin-here", "touche", &[PIN]);
-    let sibling = tree("pin-here", "vapors", &[]);
+    let scratch = crate::scratch::dir("twin-pin-here");
+    let here = tree(&scratch, "touche", &[PIN]);
+    let sibling = tree(&scratch, "vapors", &[]);
 
     // When
     let fix = fix_line(&here, &sibling);
@@ -111,8 +112,9 @@ fn the_fix_names_this_repositorys_pin_when_it_has_one() {
 #[test]
 fn the_fix_names_the_siblings_pin_when_it_has_one() {
     // Given
-    let here = tree("pin-there", "vapors", &[]);
-    let sibling = tree("pin-there", "touche", &[PIN]);
+    let scratch = crate::scratch::dir("twin-pin-there");
+    let here = tree(&scratch, "vapors", &[]);
+    let sibling = tree(&scratch, "touche", &[PIN]);
 
     // When
     let fix = fix_line(&here, &sibling);
@@ -128,8 +130,9 @@ fn the_fix_names_the_siblings_pin_when_it_has_one() {
 #[test]
 fn the_fix_names_no_pin_when_neither_has_one() {
     // Given
-    let here = tree("pin-none", "a", &[]);
-    let sibling = tree("pin-none", "b", &[]);
+    let scratch = crate::scratch::dir("twin-pin-none");
+    let here = tree(&scratch, "a", &[]);
+    let sibling = tree(&scratch, "b", &[]);
 
     // When
     let fix = fix_line(&here, &sibling);

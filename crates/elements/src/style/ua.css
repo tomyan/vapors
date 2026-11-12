@@ -4,7 +4,7 @@
    Geist is the face vapors bundles (docs/text.md). */
 
 html, body, div, p, h1, h2, h3, h4, h5, h6, section, header, footer,
-main, nav, aside, article, blockquote, figure, figcaption {
+main, nav, aside, article, blockquote, figure, figcaption, gpu-surface {
   display: block;
 }
 
@@ -37,16 +37,57 @@ code, kbd, samp { font-family: monospace; }
 mark { background-color: yellow; color: black; }
 
 /* A vapors button, not Chromium's native one (whose look is the
-   platform's): a light fill, a 1px grey border, small radii.
+   platform's): a light fill, a 1px grey border, small radii. Its size
+   includes its padding and border, as Chromium's buttons do.
    Inline-block, so it is laid out only where it is blockified (a flex
    item; grid arrives in S4) until inline layout arrives (S6). */
 button {
   display: inline-block;
+  box-sizing: border-box;
   padding: 1px 6px;
   border: 1px solid #8f8f9d;
   border-radius: 3px;
   background-color: #e9e9ed;
   color: #000000;
+}
+
+/* A range input (3-E3a): a replaced box of Chromium's default size
+   (129 x 16 px) with Chromium's 2px margin; its track and thumb are
+   drawn from the --vapors-thumb-size, --vapors-thumb-color,
+   --vapors-track-height and --vapors-track-color custom properties,
+   whose user-agent values are in style/parts.rs so an ancestor's
+   declaration (an app's tokens) inherits over them. Inline-block, laid
+   out where it is blockified, as a button is. */
+input { display: inline-block; }
+input[type=range] { margin: 2px; }
+
+/* A checkbox (3-E3b): Chromium's margins, and its 13 x 13 px size
+   from checkbox.rs (a size of its own, so a flex row stretches it as
+   Chromium does), with a vapors look (a 1px grey border, a small
+   radius, white), not the platform's; its mark when checked is drawn in
+   --vapors-mark-color (style/parts.rs), inset a quarter of the box. */
+input[type=checkbox] {
+  box-sizing: border-box;
+  margin: 3px 3px 3px 4px;
+  border: 1px solid #8f8f9d;
+  border-radius: 2px;
+  background-color: #ffffff;
+}
+
+/* A number field (3-E3c) and a text field (E6a, `input` without a type
+   is one): Chromium's padding, with a vapors look (a
+   1px grey border, white, square: a rounded clip is refused); its text
+   is laid out as its content, so its height is its line, and text
+   past its width is clipped; it needs a `width` of its own (Chromium's
+   default width comes from its font and spin button, which vapors does
+   not model), so one sized by `flex: 1` or a grid track alone is
+   refused too. Its caret and selection are painted by number_paint.rs. */
+input[type=number], input[type=text], input:not([type]) {
+  box-sizing: border-box;
+  padding: 1px 2px;
+  border: 1px solid #8f8f9d;
+  background-color: #ffffff;
+  overflow: hidden;
 }
 
 /* Chromium draws an hr's 1px border `inset` (two greys); vapors draws
@@ -57,3 +98,15 @@ hr {
   margin-bottom: 0.5em;
   border: 1px solid #c0c0c0;
 }
+
+/* The focus ring (3-E2b): vapors' default, a solid 2px ring 1px out
+   in blue, not Chromium's native `auto` ring, which vapors does not
+   draw. An app overrides it with its own :focus-visible rule (touché's
+   from its accent token). It shows where focus arrived by a key
+   (:focus-visible), not by a press. Inline elements get no ring until
+   inline elements have element boxes of their own (S6). */
+:focus-visible { outline: 2px solid #0060df; outline-offset: 1px; }
+
+/* The `hidden` attribute, as Chromium's sheet has it; an author's
+   `display` wins over it. `hidden=until-found` is not modelled. */
+[hidden] { display: none; }

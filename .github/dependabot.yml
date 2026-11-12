@@ -5,6 +5,16 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # skrifa and read-fonts move with parley_engine, which pins skrifa
+    # ^0.44 (parley_engine 0.12). crates/text/Cargo.toml requires its
+    # crates to agree on read-fonts, and a bump of skrifa alone puts two
+    # versions of each in the tree (vapors #89, closed; review at
+    # https://github.com/tomyan/vapors/pull/89#issuecomment-6561661852).
+    # Retire these two entries when a Parley release depends on the newer
+    # skrifa; then take the bump in one pull request with Parley.
+    ignore:
+      - dependency-name: skrifa
+      - dependency-name: read-fonts
   - package-ecosystem: github-actions
     directory: /
     schedule:

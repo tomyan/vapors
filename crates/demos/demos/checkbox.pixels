@@ -1,0 +1,14 @@
+# The checkboxes after one click on the second, at 640x400 CSS px at
+# 1x. The card is at x 160..480, y 176..224; the first row y 176..200
+# with its 18 px box at x 180..198, y 179..197, checked from the start;
+# the second row y 200..224 with its box at y 203..221. A click on the
+# second checks it: its box turns blue with a white mark inset a
+# quarter (x 184.5..193.5, y 207.5..216.5), and its readout says true.
+click 189 212
+pixel 4 4 #e9ecef          page, top left
+pixel 300 190 #ffffff      the card
+pixel 182 188 #3a7bd5      the first box's fill, checked from the start
+pixel 189 188 #ffffff      the first box's mark
+pixel 182 212 #3a7bd5      the second box's fill after the click
+pixel 189 212 #ffffff      the second box's mark
+ink 290 203 340 221 #ffffff the second readout is drawn

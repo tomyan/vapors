@@ -8,7 +8,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 #[allow(unused_imports)]
 use vapors_dom::{
-    Dom, DynDom, Event, NodeId, PropertyValue, Root, SCOPE_ATTRIBUTE, Snippet,
+    Dispatcher, Dom, DynDom, Event, NodeId, PropertyValue, Root, SCOPE_ATTRIBUTE, Snippet,
 };
 #[allow(unused_imports)]
 use vapors_signals::{Effect, Memo, Owner, Signal};
@@ -58,6 +58,7 @@ impl Counter {
     {
         let CounterProps {} = props;
         dom.borrow_mut().add_style(SCOPE, STYLE);
+        dom.borrow_mut().declare_events(&Self::events());
         let owner = Owner::new();
         let (count, roots) = owner
             .with(|| {
@@ -78,9 +79,9 @@ impl Counter {
                         .listen(
                             button0,
                             "click",
-                            Box::new(move |_event: &mut Event| {
-                                increment();
-                            }),
+                            Box::new(move |_event: &mut Event| vapors_dom::handle_without_event(
+                                &increment,
+                            )),
                         );
                 }
                 let text1 = dom.borrow_mut().create_text("Clicked ");
@@ -96,7 +97,7 @@ impl Counter {
                             reason = "a text hole or expression attribute shows any Display value through to_string; the compiler cannot see when it is already a String"
                         )]
                         let value = shown.to_string();
-                        dom.borrow_mut().set_text(count_text2, &value);
+                        dom.borrow_mut().set_text_if_changed(count_text2, &value);
                     });
                 }
                 let text3 = dom.borrow_mut().create_text(" times");
@@ -104,6 +105,22 @@ impl Counter {
                 (count, roots)
             });
         Counter { count, owner, roots }
+    }
+    /// The events this component type dispatches itself, its child
+    /// components' included, which `mount` declares to the tree.
+    #[must_use]
+    pub fn events() -> Vec<&'static str> {
+        let mut events = Vec::new();
+        Self::events_into(&mut std::collections::BTreeSet::new(), &mut events);
+        events
+    }
+    /// [`Self::events`] onto `events`, unless this type is in `seen`
+    /// already: a component that uses itself is listed once.
+    pub fn events_into(
+        seen: &mut std::collections::BTreeSet<&'static str>,
+        _events: &mut Vec<&'static str>,
+    ) {
+        seen.insert(std::any::type_name::<Self>());
     }
     /// The top-level nodes now, in order, including those of a block
     /// or child component at the top level.

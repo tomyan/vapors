@@ -2,18 +2,22 @@
 //! font, size, variation, subpixel offset and hinting. Coverage goes to
 //! an R8 page, colour glyphs to an RGBA8 page (not rasterised yet; the
 //! page exists so the renderer's shape is settled). When a page fills,
-//! the least recently used glyphs not needed by the current frame are
-//! evicted until the new one fits (`atlas_evict.rs`). A glyph larger
-//! than a page is refused once, logged with its size, and `.notdef`
-//! stands in from then on. Evictions, rasterisations and refusals are
-//! counted for tests.
+//! the least recently used glyphs not in the current frame are evicted
+//! until the new one fits (`atlas_evict.rs`), or the page grows
+//! (`atlas_grow.rs`). A glyph larger than a page is refused once, logged
+//! with its size, and `.notdef` stands in from then on. Icons share
+//! the coverage page (`atlas_icon.rs`).
 
 use std::collections::{HashMap, HashSet};
 
 use crate::atlas_page::AtlasPage;
-use crate::atlas_types::GlyphKey;
 pub use crate::atlas_types::{AtlasConfig, AtlasError, AtlasGlyph, PageKind};
+use crate::atlas_types::{AtlasKey, GlyphKey};
 use crate::raster::{Coverage, GlyphRequest, Rasterizer};
+
+/// The colour page's largest side, 4 MiB of RGBA: nothing draws from it
+/// until colour glyphs land, which sizes it.
+const COLOUR_PAGE: u32 = 1024;
 
 pub(crate) struct Entry {
     pub(crate) glyph: AtlasGlyph,
@@ -27,23 +31,28 @@ pub(crate) struct Entry {
 /// Rasterised glyphs packed into pages.
 pub struct GlyphAtlas {
     pub(crate) coverage: AtlasPage,
+    /// The side the coverage page grows to, and no further.
+    pub(crate) max_page: u32,
     colour: AtlasPage,
     rasterizer: Rasterizer,
-    pub(crate) entries: HashMap<GlyphKey, Entry>,
+    pub(crate) entries: HashMap<AtlasKey, Entry>,
     too_large: HashSet<GlyphKey>,
     pub(crate) frame: u64,
     stamp: u64,
     pub(crate) evictions: u64,
-    rasterisations: u64,
+    pub(crate) rasterisations: u64,
 }
 
 impl GlyphAtlas {
-    /// Empty pages of `config.page_size`.
+    /// Empty pages of `config.page_size`, the colour page at most 1024;
+    /// panics if `page_size` is over `max_page_size` (`AtlasConfig::checked`).
     #[must_use]
     pub fn new(config: AtlasConfig) -> Self {
+        config.assert_first_page_fits();
         Self {
             coverage: AtlasPage::new(config.page_size, 1),
-            colour: AtlasPage::new(config.page_size, 4),
+            max_page: config.max_page_size,
+            colour: AtlasPage::new(config.page_size.min(COLOUR_PAGE), 4),
             rasterizer: Rasterizer::new(),
             entries: HashMap::new(),
             too_large: HashSet::new(),
@@ -104,43 +113,55 @@ impl GlyphAtlas {
     /// [`AtlasError`] when it cannot be rasterised, the frame's glyphs
     /// overflow a page, or `.notdef` itself is larger than a page.
     pub fn get(&mut self, request: &GlyphRequest<'_>) -> Result<AtlasGlyph, AtlasError> {
-        let key = GlyphKey::of(request);
-        if self.too_large.contains(&key) {
+        let glyph_key = GlyphKey::of(request);
+        if self.too_large.contains(&glyph_key) {
             return self.notdef_for(request);
         }
-        self.stamp += 1;
-        if let Some(entry) = self.entries.get_mut(&key) {
-            entry.last_used = self.stamp;
-            entry.frame = self.frame;
-            return Ok(entry.glyph);
+        let key = AtlasKey::Glyph(glyph_key);
+        if let Some(placed) = self.cached(&key) {
+            return Ok(placed);
         }
         let coverage = self
             .rasterizer
             .rasterize(request)
             .map_err(AtlasError::Raster)?;
         self.rasterisations += 1;
-        if !self.coverage.fits(coverage.width, coverage.height) {
-            return self.refuse(request, key, &coverage);
+        if !self.fits_largest_page(coverage.width, coverage.height) {
+            return self.refuse(request, &coverage);
         }
-        let glyph = self.place(&coverage)?;
-        self.entries.insert(key, self.entry(glyph, coverage));
-        Ok(glyph)
+        self.insert(key, coverage)
     }
 
-    fn entry(&self, glyph: AtlasGlyph, coverage: Coverage) -> Entry {
-        Entry {
+    /// The entry under `key`, marked used by this frame.
+    pub(crate) fn cached(&mut self, key: &AtlasKey) -> Option<AtlasGlyph> {
+        self.stamp += 1;
+        let entry = self.entries.get_mut(key)?;
+        entry.last_used = self.stamp;
+        entry.frame = self.frame;
+        Some(entry.glyph)
+    }
+
+    /// Pack `coverage` and remember it under `key`.
+    pub(crate) fn insert(
+        &mut self,
+        key: AtlasKey,
+        coverage: Coverage,
+    ) -> Result<AtlasGlyph, AtlasError> {
+        let glyph = self.place(&coverage)?;
+        let entry = Entry {
             glyph,
             coverage,
             last_used: self.stamp,
             frame: self.frame,
-        }
+        };
+        self.entries.insert(key, entry);
+        Ok(glyph)
     }
 
     /// Log the oversized glyph once, remember it, and answer with `.notdef`.
     fn refuse(
         &mut self,
         request: &GlyphRequest<'_>,
-        key: GlyphKey,
         coverage: &Coverage,
     ) -> Result<AtlasGlyph, AtlasError> {
         let error = AtlasError::TooLarge {
@@ -148,13 +169,13 @@ impl GlyphAtlas {
             glyph: request.id,
             size: request.size,
             bitmap: [coverage.width, coverage.height],
-            page_size: self.coverage.size(),
+            page_size: self.max_page,
         };
         if request.id == 0 {
             return Err(error);
         }
         log::error!("{error}; drawing .notdef");
-        self.too_large.insert(key);
+        self.too_large.insert(GlyphKey::of(request));
         self.notdef_for(request)
     }
 

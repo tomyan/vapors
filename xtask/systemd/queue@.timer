@@ -1,0 +1,10 @@
+# A merge-queue pass for %i every 2 minutes after the last one ended.
+[Unit]
+Description=merge queue for %i
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+
+[Install]
+WantedBy=timers.target

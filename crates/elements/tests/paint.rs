@@ -26,8 +26,9 @@ fn a_background_is_a_quad_with_edges_snapped_to_device_pixels() {
         .expect("updates");
 
     // Then: 4.875 rounds up to 5, 20.625 up to 21, 3 stays
-    let [Item::Quad(quad)] = painted.scene().items() else {
-        panic!("one quad, got {:?}", painted.scene().items());
+    let scene = painted.scene().to_scene();
+    let [Item::Quad(quad)] = scene.items() else {
+        panic!("one quad, got {:?}", scene.items());
     };
     assert_eq!(
         (quad.rect, quad.background),
@@ -62,7 +63,8 @@ fn text_is_painted_after_its_elements_background() {
         .expect("updates");
 
     // Then
-    let items = painted.scene().items();
+    let scene = painted.scene().to_scene();
+    let items = scene.items();
     assert!(
         matches!(
             items,
@@ -96,7 +98,39 @@ fn the_bodys_background_becomes_the_canvas_when_the_roots_is_transparent() {
 
     // Then: the canvas takes it, and body paints no quad of its own
     assert_eq!(painted.canvas(), Color::from_rgba8(0xe9, 0xec, 0xef, 255));
-    assert_eq!(painted.scene().items(), []);
+    assert_eq!(
+        painted.canvas_from(),
+        Some(vapors_elements::CanvasFrom::Body)
+    );
+    assert_eq!(painted.scene().to_scene().items(), []);
+}
+
+#[test]
+fn the_roots_background_becomes_the_canvas_and_says_it_came_from_html() {
+    // Given
+    let mut doc = document();
+    doc.add_stylesheet(
+        "app.css",
+        "html { background-color: #1c1c1c; } body { background-color: #e9ecef; }",
+    )
+    .expect("parses");
+
+    // When
+    let painted = doc
+        .update(Viewport {
+            width: 100.0,
+            height: 50.0,
+            scale: 2.0,
+        })
+        .expect("updates");
+
+    // Then
+    assert_eq!(
+        painted.canvas_from(),
+        Some(vapors_elements::CanvasFrom::Root)
+    );
+    assert_eq!(painted.canvas(), Color::from_rgba8(0x1c, 0x1c, 0x1c, 255));
+    assert!((painted.scale() - 2.0).abs() < f32::EPSILON);
 }
 
 #[test]
@@ -115,6 +149,7 @@ fn the_canvas_is_white_when_neither_root_nor_body_has_a_background() {
 
     // Then
     assert_eq!(painted.canvas(), Color::from_rgba8(255, 255, 255, 255));
+    assert_eq!(painted.canvas_from(), None);
 }
 
 #[test]
@@ -140,5 +175,5 @@ fn an_element_with_display_none_has_no_box_and_paints_nothing() {
 
     // Then
     assert_eq!(painted.border_box(hidden), None);
-    assert_eq!(painted.scene().items(), []);
+    assert_eq!(painted.scene().to_scene().items(), []);
 }

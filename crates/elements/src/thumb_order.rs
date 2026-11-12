@@ -20,12 +20,13 @@ pub(crate) fn thumbs_after_descendants(steps: &[Step], boxes: &[LayoutBox]) -> V
             Step::Thumb(container) => {
                 Some((last_inside(steps, &parents, container).max(at), *step))
             }
-            Step::Box(_) => None,
+            Step::Box(_) | Step::Outline(_) => None,
         })
         .collect();
     let mut out = Vec::with_capacity(steps.len());
     for (at, step) in steps.iter().enumerate() {
-        if let Step::Box(_) = step {
+        // boxes and outlines keep their places; thumbs move
+        if !matches!(step, Step::Thumb(_)) {
             out.push(*step);
         }
         out.extend(

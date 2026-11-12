@@ -36,6 +36,7 @@ fn simple(name: &str, at: Position) -> Result<PseudoClass> {
         "checked" => PseudoClass::Checked,
         "disabled" => PseudoClass::Disabled,
         "enabled" => PseudoClass::Enabled,
+        "invalid" => PseudoClass::Invalid,
         "empty" => PseudoClass::Empty,
         "root" => PseudoClass::Root,
         "first-child" => PseudoClass::FirstChild,

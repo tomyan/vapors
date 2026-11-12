@@ -1,10 +1,11 @@
-//! An `.events` action as `DevTools` `Input` calls, and an expectation
-//! checked against what Chromium logged after it. `frame` makes no Input
-//! call: the player waits for two animation frames instead.
+//! An `.events` action as `DevTools` `Input` calls (an expectation is
+//! checked against what Chromium logged by `events_unmet`). `frame`
+//! makes no Input call: the player waits for two animation frames
+//! instead.
 
 use serde_json::{Value, json};
 
-use crate::events_script::{Action, Expect};
+use crate::events_script::Action;
 
 /// `Input` modifier bits, by the names `key` takes.
 const MODIFIER_BITS: [(&str, u8); 4] = [("Alt", 1), ("Control", 2), ("Meta", 4), ("Shift", 8)];
@@ -12,12 +13,14 @@ const MODIFIER_BITS: [(&str, u8); 4] = [("Alt", 1), ("Control", 2), ("Meta", 4),
 /// Named keys: what Chromium calls each, its `code`, and its Windows
 /// virtual key code, which Chromium needs to act on it (Tab to move
 /// focus); Enter types a carriage return, which activates a button.
-const NAMED_KEYS: [(&str, &str, &str, u8); 12] = [
+const NAMED_KEYS: [(&str, &str, &str, u8); 14] = [
     ("Backspace", "Backspace", "Backspace", 8),
     ("Tab", "Tab", "Tab", 9),
     ("Enter", "Enter", "Enter", 13),
     ("Escape", "Escape", "Escape", 27),
     ("Space", " ", "Space", 32),
+    ("PageUp", "PageUp", "PageUp", 33),
+    ("PageDown", "PageDown", "PageDown", 34),
     ("End", "End", "End", 35),
     ("Home", "Home", "Home", 36),
     ("ArrowLeft", "ArrowLeft", "ArrowLeft", 37),
@@ -36,10 +39,17 @@ pub struct Pointer {
 /// The `Input` calls that perform `action`, in order.
 pub fn calls(action: &Action, pointer: &mut Pointer) -> Vec<(&'static str, Value)> {
     match action {
-        Action::Click(x, y) => vec![
-            mouse("mousePressed", *x, *y),
-            mouse("mouseReleased", *x, *y),
-        ],
+        Action::Click(x, y) => clicks(*x, *y, 1),
+        Action::Clicks(x, y, count) => clicks(*x, *y, *count),
+        Action::AltClick(x, y) => ["mousePressed", "mouseReleased"]
+            .into_iter()
+            .map(|kind| {
+                let (method, mut params) = mouse(kind, *x, *y);
+                // CDP's modifier bits: Alt 1, Control 2, Meta 4, Shift 8
+                params["modifiers"] = json!(1);
+                (method, params)
+            })
+            .collect(),
         Action::Press(x, y) => {
             pointer.held = true;
             vec![mouse("mousePressed", *x, *y)]
@@ -50,6 +60,9 @@ pub fn calls(action: &Action, pointer: &mut Pointer) -> Vec<(&'static str, Value
         }
         Action::Move(x, y) => vec![moved(*x, *y, pointer.held)],
         Action::Tap(x, y) => tap(*x, *y),
+        Action::TouchDown(x, y) => vec![touch("touchStart", Some((*x, *y)))],
+        Action::TouchMove(x, y) => vec![touch("touchMove", Some((*x, *y)))],
+        Action::TouchUp(..) => vec![touch("touchEnd", None)],
         Action::Wheel { x, y, dx, dy } => {
             vec![(
                 "Input.dispatchMouseEvent",
@@ -62,13 +75,34 @@ pub fn calls(action: &Action, pointer: &mut Pointer) -> Vec<(&'static str, Value
             .flat_map(|c| key_calls(&c.to_string()))
             .collect(),
         Action::Frame => Vec::new(),
+        Action::Clipboard(text) => vec![(
+            "Runtime.evaluate",
+            json!({ "expression": format!("navigator.clipboard.writeText({})", json!(text)), "awaitPromise": true, "userGesture": true }),
+        )],
     }
 }
 
+/// `count` presses and releases at one point, each counting one more.
+fn clicks(x: f64, y: f64, count: u32) -> Vec<(&'static str, Value)> {
+    (1..=count)
+        .flat_map(|nth| {
+            [
+                mouse_nth("mousePressed", x, y, nth),
+                mouse_nth("mouseReleased", x, y, nth),
+            ]
+        })
+        .collect()
+}
+
 fn mouse(kind: &str, x: f64, y: f64) -> (&'static str, Value) {
+    mouse_nth(kind, x, y, 1)
+}
+
+/// A left button event, the `nth` click in a row.
+fn mouse_nth(kind: &str, x: f64, y: f64, nth: u32) -> (&'static str, Value) {
     (
         "Input.dispatchMouseEvent",
-        json!({ "type": kind, "x": x, "y": y, "button": "left", "clickCount": 1 }),
+        json!({ "type": kind, "x": x, "y": y, "button": "left", "clickCount": nth }),
     )
 }
 
@@ -77,6 +111,18 @@ fn moved(x: f64, y: f64, held: bool) -> (&'static str, Value) {
     (
         "Input.dispatchMouseEvent",
         json!({ "type": "mouseMoved", "x": x, "y": y, "button": button, "buttons": buttons }),
+    )
+}
+
+/// One finger's touch event: where it is, or none once it lifted.
+fn touch(kind: &str, at: Option<(f64, f64)>) -> (&'static str, Value) {
+    let points: Vec<Value> = at
+        .map(|(x, y)| json!({ "x": x, "y": y }))
+        .into_iter()
+        .collect();
+    (
+        "Input.dispatchTouchEvent",
+        json!({ "type": kind, "touchPoints": points }),
     )
 }
 
@@ -155,49 +201,12 @@ fn character(name: &str, bits: u8) -> Value {
     fields
 }
 
-/// Why `expect` does not hold for a step's `answer`, or `None` when it does.
-#[must_use]
-pub fn unmet(expect: &Expect, answer: &Value) -> Option<String> {
-    let events = answer["events"].as_array().cloned().unwrap_or_default();
-    let focus = answer["focus"].as_str().unwrap_or("(nothing)");
-    match expect {
-        Expect::Event { kind, target } => {
-            let found = events
-                .iter()
-                .any(|e| e["type"] == kind.as_str() && e["target"] == target.as_str());
-            (!found).then(|| format!("no {kind} at {target}; logged: [{}]", logged(&events)))
-        }
-        Expect::NoEvent(kind) => {
-            let found = events.iter().any(|e| e["type"] == kind.as_str());
-            found.then(|| format!("a {kind} was logged: [{}]", logged(&events)))
-        }
-        Expect::Focus(target) => {
-            (focus != target).then(|| format!("focus is on {focus}, not {target}"))
-        }
-        Expect::FocusVisible(target) => focus_visible(target, focus, &answer["focusVisible"]),
-    }
-}
-
-fn focus_visible(target: &str, focus: &str, visible: &Value) -> Option<String> {
-    let shown = focus == target && *visible == true;
-    (!shown).then(|| {
-        format!(
-            "{target} does not show focus-visible; focus is on {focus}, focus-visible {visible}"
-        )
-    })
-}
-
-fn logged(events: &[Value]) -> String {
-    let each = events.iter().map(|e| {
-        format!(
-            "{} at {}",
-            e["type"].as_str().unwrap_or("?"),
-            e["target"].as_str().unwrap_or("?")
-        )
-    });
-    each.collect::<Vec<_>>().join(", ")
-}
+pub use crate::events_unmet::unmet;
 
 #[cfg(test)]
 #[path = "events_input_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "events_input_click_tests.rs"]
+mod click_tests;

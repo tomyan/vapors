@@ -2,7 +2,8 @@
 //!
 //! The file is two flat tables, `[tools]` (crate name to version) and
 //! `[binaries]` (crate name to binary name, for crates whose binary is
-//! named differently). Any other shape is refused with the line number.
+//! named differently), and `[downloads]`, which `downloads.rs` reads.
+//! Any other shape is refused with the line number.
 
 use std::fmt;
 
@@ -36,6 +37,7 @@ enum Table {
     None,
     Tools,
     Binaries,
+    Downloads,
 }
 
 /// Parse the tools file. Refuses anything that is not a comment, a
@@ -53,6 +55,7 @@ pub fn parse(text: &str) -> Result<Vec<Tool>, ParseError> {
         match line {
             "[tools]" => table = Table::Tools,
             "[binaries]" => table = Table::Binaries,
+            "[downloads]" => table = Table::Downloads,
             _ => {
                 let (key, value) = key_value(line, number)?;
                 match table {
@@ -62,6 +65,7 @@ pub fn parse(text: &str) -> Result<Vec<Tool>, ParseError> {
                         version: value,
                     }),
                     Table::Binaries => binaries.push((key, value)),
+                    Table::Downloads => {}
                     Table::None => {
                         return Err(ParseError {
                             line: number,

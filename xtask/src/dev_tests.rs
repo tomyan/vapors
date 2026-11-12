@@ -106,9 +106,9 @@ fn a_missing_trunk_is_refused_naming_the_setup_command() {
 }
 
 /// A key file named for the test, with `mode`.
-fn key_file(test: &str, mode: u32) -> std::path::PathBuf {
+fn key_file(test: &str, mode: u32) -> tempfile::TempPath {
     use std::os::unix::fs::PermissionsExt;
-    let path = std::env::temp_dir().join(format!("xtask-dev-{test}-{}", std::process::id()));
+    let path = crate::scratch::file(&format!("dev-{test}"));
     std::fs::write(&path, "sk-test-dev-key-0001").expect("temporary key file");
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode)).expect("its mode");
     path
@@ -126,7 +126,6 @@ fn a_key_file_others_can_read_stops_dev_before_anything_starts() {
     let why = refused.expect_err("mode 644");
     assert!(why.contains("chmod 600"), "{why}");
     assert!(!why.contains("sk-test-dev-key-0001"), "{why}");
-    let _ = std::fs::remove_file(file);
 }
 
 #[test]
@@ -150,7 +149,6 @@ fn checked_keys_keep_each_provider_and_file_in_order() {
         .map(|k| k.provider)
         .collect();
     assert_eq!(providers, ["anthropic", "openai"]);
-    let _ = std::fs::remove_file(file);
 }
 
 #[test]

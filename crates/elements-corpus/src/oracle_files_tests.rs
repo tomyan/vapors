@@ -2,11 +2,18 @@
 
 use super::*;
 
-fn file(test: &str, contents: Option<&str>) -> std::path::PathBuf {
-    let path = std::env::temp_dir().join(format!("ax-compare-{test}-{}.json", std::process::id()));
-    let _ = std::fs::remove_file(&path);
-    if let Some(contents) = contents {
-        std::fs::write(&path, contents).expect("file");
+/// A file holding `contents`, or no file at all, removed when dropped.
+fn file(test: &str, contents: Option<&str>) -> tempfile::TempPath {
+    let made = tempfile::Builder::new()
+        .prefix(&format!("ax-compare-{test}-"))
+        .suffix(".json")
+        .tempfile();
+    let path = made
+        .expect("a scratch file under the temp dir")
+        .into_temp_path();
+    match contents {
+        Some(contents) => std::fs::write(&path, contents).expect("file"),
+        None => std::fs::remove_file(&path).expect("no file"),
     }
     path
 }
@@ -57,4 +64,31 @@ fn each_outcome_is_reported_with_its_fix() {
             .report("buttons")
             .contains("buttons: line 3: committed `a`, Chromium `b`")
     );
+}
+
+#[test]
+fn a_reader_never_sees_part_of_a_file_being_rewritten() {
+    // Given
+    let dir = tempfile::tempdir().expect("a scratch directory");
+    let path = dir.path().join("tall.png");
+    let bytes = vec![7_u8; 4096];
+    write_whole(&path, &bytes).expect("first write");
+
+    // When
+    let writer = {
+        let (path, bytes) = (path.clone(), bytes.clone());
+        std::thread::spawn(move || {
+            for _ in 0..2000 {
+                write_whole(&path, &bytes).expect("rewrite");
+            }
+        })
+    };
+    let lengths: Vec<usize> = (0..2000)
+        .map(|_| std::fs::read(&path).expect("read").len())
+        .collect();
+    writer.join().expect("writer");
+
+    // Then
+    let short = lengths.iter().filter(|&&n| n != bytes.len()).count();
+    assert_eq!(short, 0, "{short} of 2000 reads saw part of the file");
 }

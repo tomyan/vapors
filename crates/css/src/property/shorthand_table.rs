@@ -105,6 +105,10 @@ pub static SHORTHANDS: &[(&str, &[&str])] = &[
         "margin",
         &["margin-top", "margin-right", "margin-bottom", "margin-left"],
     ),
+    (
+        "outline",
+        &["outline-width", "outline-style", "outline-color"],
+    ),
     ("overflow", &["overflow-x", "overflow-y"]),
     (
         "padding",

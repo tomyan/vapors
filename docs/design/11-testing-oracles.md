@@ -161,7 +161,7 @@ never asserted in CI.
 
 | Slice | Delivers | Pulled by |
 |---|---|---|
-| Q1 DevTools in the oracle runner | Events, focus, a11y tree, virtual time | Area 3's E1 and area 5's A1 |
+| Q1 DevTools in the oracle runner | Events, focus, a11y tree, virtual time. As built for events (#59, and 3-E1's capture oracle): `.events` scripts played in Chromium (`events_oracle`), and the same script played on vapors (`events_vapors`), whose log of each step's events and targets must equal Chromium's; the vapors player takes pointer and touch actions so far and refuses others by line | Area 3's E1 and area 5's A1 |
 | Q2 WPT reftests as paint comparisons | The skip list, the runner, the first directories | Area 9's T1 and area 6's A6 |
 | Q3 stepped clock and manual executor | | Area 1's R2 and area 6's A1 |
 | Q4 scenario tier | Replay against a build, judged | Area 10's C4 |

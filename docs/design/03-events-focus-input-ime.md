@@ -63,6 +63,25 @@ or a key) panics, naming the event, as the web throws
 Moves are dispatched as they arrive and layout waits for the frame, so
 many moves between frames are one update (`elements_app_drag.rs`).
 
+As built (3-E1b): finger `n` is pointer `2 + n`, captured by its
+`pointerdown` target without asking; its moves and `pointerup` go
+there, and `pointercancel` ends it. The click is still the platform's
+tap, after the touch's own down and up, so one tap is one click; its
+event carries pointer id 2 whichever finger tapped. A finger pans only
+once it has moved past the tap slop (20 px), so a tap and a pan are
+exclusive, as Chromium's slop makes them (review-v78). Until 3-E4's
+`touch-action`, ownership is RELAXED (the lead's decision): while a
+touch whose `pointerdown` listener called `set_pointer_capture` is
+down, no pan scrolls (Chromium cancels such a touch all the same: only
+`touch-action: none` stops that); otherwise the first pan cancels the
+touches no listener owns, whether or not anything scrolls, as Chromium
+does (checked by `fixtures/capture.events`). `:active` follows the
+first finger down only and clears when it lifts (or when the mouse
+button is released). `Pointer` has no `pointer_type` or `is_primary`
+yet: a listener tells a touch by `id >= 2`. A finger is forgotten when
+it lifts or is cancelled even if its event found no element; nothing
+sends `pointercancel` for window loss yet.
+
 Drag of a slider thumb or a curve point: `pointerdown` captures, each
 `pointermove` carries full-precision coordinates to the captured
 target whether or not the pointer is over it, `pointerup` releases.
@@ -110,6 +129,128 @@ crate, and the web IME path is platform code either way.
 - `focus`, `blur` (not bubbling), `focusin`, `focusout` (bubbling), in
   the UI Events order.
 - `:focus` is set on the element; `:focus-within` on its ancestors.
+- `Document::focus` returns a `Focus`: `Done`; `NotFocusable` (not
+  a focusable element, disabled, `display: none` on it or an ancestor,
+  or `visibility` other than `visible`), when nothing happens, as
+  Chromium's `focus()` does nothing; or `Pending` (no update has run,
+  so there is no viewport, or a style does not compute): the next
+  `settle_focus` focuses it if it is focusable then, with `focus` and
+  `focusin`, or drops it with no event, and a later `focus` or blur
+  replaces or clears it, so an app can focus a field as it mounts. The
+  styles are computed for the element and its ancestors from the tree
+  as it is, at the last update's viewport, without layout, as
+  Chromium's `focus()` forces a style update: a handler that shows a
+  panel and focuses its field focuses it. vapors does not implement
+  `inert`, so it is not part of the rule.
+- The focus fixup: `Document::settle_focus`, called after each
+  successful update (`ElementsApp` and the vapors player do), moves
+  focus to nothing when the focused element is no longer focusable by
+  that rule, with `change`, `blur` and `focusout`, as Chromium does at
+  the task after its style update. A host driving its own frames that
+  never calls it is refused by `DocumentInput::give` on the next key or
+  typed text (`Unplaced::FocusNotSettled`); see `docs/tooltips.md`
+  "For apps not using ElementsApp" for both settles. A hide after the
+  settle and before the next update blurs as the next key or typed
+  text arrives (M5 below).
+- As built (3-E2a): `Document::active_element`, `focus`, `key_pressed`
+  and `key_released`; the platform sends `Event::Key` (the DOM's `key`
+  with the modifiers held; no `code` yet) before a press's `Character`.
+  Tab past the last focusable element leaves the page (nothing has
+  focus), as in Chromium, rather than wrapping. A press focuses the
+  nearest focusable element, or blurs, unless `pointerdown` is
+  prevented. `blur`, `focusout`, `focus`, `focusin` fire in Chromium's
+  order. A positive or non-integer `tabindex` is refused by name.
+  The window losing focus (`Event::WindowFocus`, from winit's
+  `Focused`) commits a number or text field, then fires `blur` and
+  `focusout` on the focused element, which stays the active element;
+  regaining it fires `focus` and `focusin` (`Document::window_focus`).
+  While the window is away a focus move fires nothing, and the return
+  focuses what has focus then, once, as Chromium. The loss cancels every
+  pointer held (`pointercancel`, a drag ending with no `change`), and
+  `DocumentInput` forgets its held key, press and touch routes; it
+  routes `WindowFocus` to the host too, which drops its own holds. On
+  the web the window is the canvas: focusing the page's own HTML
+  (touché's Ask field) is a loss, and blurs the card.
+  Headless Chromium never moves focus between windows, so the order
+  was probed in headed Chromium 155 under Xvfb
+  (`crates/elements-corpus/probes/window-focus.mjs`, a number and a
+  text field) and is pinned by `tests/focus_window.rs` and
+  `tests/focus_window_held.rs`.
+  Checked against Chromium by `fixtures/focus.events` (events and focus
+  at each step; `focus` and `blur` are not listened for there, as
+  Chromium also sends them to the window, which vapors does not have).
+  Known gaps (review-v81): winit's key names are mapped where they
+  differ from the DOM's only for Space and Super (Meta); "disabled" has
+  two answers, a disabled control itself for focus and a disabled
+  button ancestor for clicks, and `fieldset disabled` neither; a
+  press's target reads the last painted frame for focusability, where
+  Tab and `focus` compute styles now (below). A prevented `pointerdown`
+  does not focus, as in Chromium
+  155 (`gpu_events_a_prevented_pointerdown_does_not_focus_in_chromium`);
+  a touch tap does not focus yet.
+- As built (review-fable-input H1, M1, M2, M3, M5; 2026-11-11):
+  - A listener may remove the event's target or the focused element.
+    After any dispatch a default action or follow-on event re-resolves
+    its node through `Document::still_in` and stops when it is gone;
+    `deliver` refuses a removed target before any listener runs, as
+    `Dispatcher::dispatch` does. So: a `pointerdown` listener that
+    removes its target leaves the press focusing nothing (a removed
+    node holds nothing focusable, as Blink's detached node is not
+    focusable) and no click follows; a `pointerup` listener that
+    removes the pressed or the released element drops the click, as
+    `MouseEventManager` does when the mousedown node is removed; a
+    `click` listener that removes its target on a second press sends no
+    `dblclick`; a `keydown` listener that removes the focused element
+    runs no default action and the key is unused; a tap's `focus`
+    handler that removes the tapped element clicks nothing; a field's
+    `change` from the fixup's commit that removes the field fires no
+    `blur` or `focusout` (Chromium fires them on the detached node,
+    where nothing in the document can observe them); a range's `input`
+    that removes it fires no `change`; a `paste` listener that removes
+    the field keeps the paste. Pinned by `tests/listener_removal.rs`.
+    Open point: Chromium keeps a sequential focus navigation starting
+    point where a removed focused element was, so a Tab after the
+    removal continues from there; vapors starts from the first
+    element.
+  - A focus move holds its destination aside (`focus_move.rs`): the
+    element losing focus has no focus during its commit, `blur` and
+    `focusout` (`active_element` answers the body, as Chromium's
+    `activeElement`), and `:focus-within` stays on the common
+    ancestor. A handler that focuses something meanwhile keeps it and
+    the destination hears nothing: Chromium 155's log for a `blur`
+    handler is `blur` on the old, `focus` and `focusin` on the
+    handler's choice, `focusout` on the old. From reading Blink's
+    `Document::SetFocusedElement`, not the corpus: a destination the
+    handlers hid takes no focus, and a `focus` handler that moves on
+    blurs the element it ran on (focused while its `focus` fires), which
+    then gets no `focusin`. `tests/focus_handlers_move.rs`.
+  - Tab decides by `focusability`, the rule `focus` uses (styles
+    computed now), so an element hidden since the last update is
+    skipped and one shown since is visited, and `focus` on Tab's choice
+    is asserted to answer `Done`. `tests/tab_focusability.rs`.
+  - `keydown` and `keyup` carry the modifiers, `code` and `repeat`
+    (`Keystroke`, `Document::key_pressed_with`); the plain `key_pressed`
+    sends no code and no repeat. `tests/key_fields.rs`.
+  - A key, typed text, a paste or a text edit runs the fixup's blur
+    first (`blur_unfocusable`), so a field hidden since the last settle
+    commits and blurs and takes none, as Chromium's style update before
+    the task would have blurred it; an agent's edits arrive between
+    frames. A host that skipped the settle after an update is still
+    refused by `DocumentInput::give`. `tests/typing_after_hide.rs`.
+- As built (3-E2b): `:focus-visible` is set when focus arrives after a
+  key other than a modifier alone (by Tab, or by script after a key) or
+  on a text field, and not
+  after a press, matching Chromium at every step of
+  `fixtures/focus.events`. `outline` (width, style, colour, offset and
+  the shorthand) draws a solid ring outside the border box, painted
+  with its own layer (after its normal-flow content, before the
+  positioned layers above it, as Blink paints it), following rounded
+  corners, clamped at zero for a negative offset; `auto` and dashed,
+  dotted and double outlines are refused. Checked against Chromium's
+  pixels by `fixtures/outline_paint`. The UA sheet's ring is vapors'
+  own: `:focus-visible { outline: 2px solid #0060df; outline-offset:
+  1px }` (not Chromium's native `auto` ring); buttons are
+  `box-sizing: border-box`, as Chromium's are.
   `:focus-visible` follows the HTML heuristic: set when focus arrived by
   keyboard or by script after a keyboard interaction, not when it
   arrived by pointer, except on text inputs where it is always set.
@@ -129,8 +270,8 @@ user-agent behaviour and an implicit ARIA role (area 5).
 | Element | Pointer | Keyboard | Events | Notes |
 |---|---|---|---|---|
 | `button` | Press shows `:active`; `click` on release over the common ancestor | Enter and Space activate (Space on keyup, as browsers do) | `click` | Built, plus keyboard |
-| `input type=range` | Press anywhere on the track sets the value and captures; drag changes it; `step` snaps | Arrow keys by `step`, Page keys by ten steps, Home and End; Shift for ten steps | `input` on every change, `change` on release | Scrub to change, `value_as_number`. The thumb and track are UA parts styled through prefixed custom properties the UA sheet reads (`--vapors-thumb-size`, `--vapors-thumb-color`, `--vapors-track-height`, `--vapors-track-color`), so tokens apply; `::part()` comes later (Q1, decided 2026-10-25) |
-| `input type=number` | Click focuses; drag on the field scrubs when `data-scrub` says so (touché's readout behaviour) | Digits, arrows by `step`, Enter commits | `input`, `change` | A value outside `min`..`max` is clamped on commit and the field says so through `:invalid` |
+| `input type=range` | Press anywhere on the track sets the value and captures; drag changes it; `step` snaps | Arrow keys by `step`, Page keys by a tenth of the range, Home and End; Shift for ten steps | `input` on every change, `change` on release | Scrub to change, `value_as_number`. The thumb and track are UA parts styled through prefixed custom properties the UA sheet reads (`--vapors-thumb-size`, `--vapors-thumb-color`, `--vapors-track-height`, `--vapors-track-color`), so tokens apply; `::part()` comes later (Q1, decided 2026-10-25) |
+| `input type=number` | Click focuses; drag on the field scrubs when `data-scrub` says so (touché's readout behaviour) | Digits, arrows by `step`, Enter commits | `input`, `change` | A value outside `min`..`max` is `:invalid` and kept on commit, as Chromium keeps it; `Document::range_validity` says under or over |
 | `input type=checkbox`, `type=radio`, `switch` role | Click toggles | Space toggles; arrows move within a radio group | `input`, `change` with `checked` | `bind:checked` exists |
 | `select` | Opens a listbox popover (area 3 owns the popover primitive) | Arrows, type-ahead, Enter, Escape | `change` | Deferred until touché has one; the model choice uses it |
 | `input type=text`, `textarea` | Click places the caret; drag selects; double click selects a word | The editing model below | `beforeinput`, `input`, `change`, `selectionchange` | |
@@ -138,6 +279,332 @@ user-agent behaviour and an implicit ARIA role (area 5).
 | `details`/`summary` | Toggles | Enter, Space | `toggle` | For collapsible cards |
 | `dialog` | `show_modal()` traps focus, `inert` elsewhere, Escape closes | | `close`, `cancel` | F5 |
 | `popover` attribute | Light dismiss on outside click or Escape | | `toggle` | F5 |
+
+As built (3-E3a, 2026-10-27): `input type=range` is an element; the
+other input types are refused naming their slice (checkbox E3b,
+number E3c, text E6). Its numbers follow HTML's sanitization (`min` 0,
+`max` 100, `step` 1, `any` for none, the step base `min` else the
+`value` attribute; the value clamped and snapped, the middle without
+one); the live value is the `value` property once set (`bind:value`
+on a range or number input binds a `Signal<f64>` through
+`PropertyValue::Number` and `Event::value_as_number()`), else the
+attribute. A press takes the value where the thumb's centre would be
+(half a thumb in at either end, as Chromium maps it) before focus
+moves, captures the pointer to the input and drags; `input` fires on
+each change, `change` at the release when the value differs from the
+press's, after `pointerup` and before `lostpointercapture`. A finger
+takes the value where it lands and decides at its first move, as
+Chromium's `SliderContainerElement` does: moved further along the
+range than across it, the range owns the touch (the RELAXED rule's
+ownership, so no pan takes it; equal counts as along, as Chromium's
+`GetDirection` has it); further across, the touch is the pan's and the
+range takes no more of its moves. A finger's drag ends at its lift,
+with `change` after `lostpointercapture` (the mouse's comes before it)
+and even after the pan's `pointercancel`, as Chromium's slider fires it
+on touchend; a finger the platform takes (`touch_cancelled`: a palm, a
+system gesture) ends its drag with nothing, as Chromium fires no
+`change` on `touchcancel`. Each pointer drags on its own, so two
+fingers on two ranges drag both. Arrow keys step by one step (`step="any"`: a
+hundredth of the range), Page keys by a tenth of the range or one
+step when larger, Home and End to the ends, each with `input` then
+`change`; these match Chromium step by step
+(`fixtures/range.events`, with `expect value` checking each range's
+`value` after every step). Shift with an arrow steps by ten steps,
+vapors' own default action (`2026-10-27-direct-tools-first`, 3):
+Chromium steps by one, so it is pinned by `tests/range_keys.rs`, not
+the oracle. A key pressed while an element is focused sets
+`:focus-visible` on it, as Chromium does after a press focused it. A
+disabled range gets its `pointerdown` and `pointerup` and no click, no
+focus and no value, as Chromium. The parts are read from the four
+custom properties wherever they are set (an ancestor's, so tokens,
+inherit; the user-agent values are in `style/parts.rs`, not the UA
+sheet, so an inherited declaration wins); a value of another shape is
+refused where it is declared. The look differs from Chromium's native
+slider on purpose (Q1), so the fixture is not paint-compared; the
+`slider` demo's `.pixels` pins vapors' own. Without a size a range is
+Chromium's 129 x 16 px with its 2 px margin (`fixtures/range.boxes.json`).
+Not built: `data-scrub` (E3c), `:invalid`, a vertical range, `list`
+tick marks, and `pointercancel` for window loss ends a drag without
+`change`.
+
+As built (3-E3b, 2026-10-27): `input type=checkbox`. Checked by its
+`checked` property once set (`bind:checked`, a `Signal<bool>`), else
+its `checked` attribute; `Document::checked`. A click flips it before
+the click's listeners run, as HTML's legacy pre-activation behaviour
+has it (a listener reads the new state, as on the web), flips it back
+when a listener prevents the click, and otherwise fires `input` and
+`change` carrying `checked` (`Event::checked()`, `Some` on those
+events only), in Chromium's order (pointerdown, focusin, pointerup,
+click, input, change); Space clicks it on keyup,
+Enter does nothing; a disabled one gets its pointerdown and pointerup
+and no click, focus or change. `:checked` follows the state, by click
+or by property (`set_property` marks the restyle). The box is the
+element's own (the UA sheet: a 1 px grey border, a 2 px radius, white,
+Chromium's `3px 3px 3px 4px` margins), styled as any element; the mark
+when checked is a rounded square in `--vapors-mark-color` inset a
+quarter of the content box (no path primitive yet: F3 brings paths,
+and a check glyph can replace it then). Without a size it is Chromium's
+13 x 13 px (its content 11 px plus the UA sheet's 1 px border, so an
+app that sets `border: 0` gets 11 px where Chromium stays 13), and as
+a flex item it stretches across the line as Chromium's does
+(`fixtures/checkbox.boxes.json`), so it is a measured leaf, not a
+replaced box. Checked step by step against Chromium by
+`fixtures/checkbox.events` with `expect checked`. Not built: `radio`,
+`indeterminate`, `label` association (`label` is not an element yet).
+
+As built (3-E3c, 2026-10-27): `input type=number`, the least editing
+that takes a typed exact value before E6's editor. Its text is the
+`value` property once set (a number written, or a text as typed), else
+the `value` attribute; the DOM's `value` is the text when it is a
+valid floating-point number, else empty, and `valueAsNumber` NaN then.
+The caret is always at the end: typed characters a number takes
+(digits, signs, the point, `e`; Chromium drops the rest) go there, or
+replace the whole text when it is selected; focus by keyboard selects
+it, as Chromium does, and a click does not; Backspace deletes the last
+character; `input` fires with each edit. Enter and blur commit: a
+number outside `min`..`max` is clamped into it and text that is no
+number reverts to the last committed number (vapors' own rule:
+Chromium keeps the text), so `change` always carries a number, and
+fires only when the commit differs from the last; the blur's `change`
+comes before its `focusout`, as Chromium orders it. ArrowUp and
+ArrowDown step by `step` (1 for `any`), in decimal (a step of 0.1 from
+0.2 is 0.3, as Chromium's `AlignValueForStep` keeps it), each with
+`input` and `change`; Shift by ten, vapors' own (Chromium steps by
+one), pinned by `tests/number_input.rs`. `:invalid` while the text is
+no number or out of range (a step mismatch is not flagged), following
+a later `min`, `max` or `step` too.
+
+Two differences from the web, decided with the lead (2026-10-27):
+(1) `bind:value` on a number field updates on `change`, not `input` as
+Svelte's and the web's bindings do, so the app's `Signal<f64>` never
+takes NaN mid-typing; pinned by `codegen_bind.rs:
+bind_value_on_a_number_input_binds_a_number_on_change`. (2) On commit
+a number outside `min`..`max` is kept as typed, as Chromium keeps it
+(the corpus's `number.events`), and the app refuses or accepts it;
+over the max a step up does nothing and a step down goes to the max
+itself (under the min, the mirror), as HTML's `stepUp` and `stepDown`
+and Chromium's keyboard step; a step inside the range stops at the last
+step at or under the max; a scrub follows the same rule. A host that
+refuses a committed number puts its own back with
+`Document::set_committed_number`, so the same number typed again fires
+`change` again (`tests/number_host.rs`). Text that is no number, an emptied
+field included, reverts to the last committed number, where Chromium
+keeps the text (and `""`) and matches `:invalid` after the commit too;
+pinned by `tests/number_input.rs:
+enter_commits_an_out_of_range_number_as_typed_with_one_change`,
+`text_that_is_no_number_has_an_empty_value_and_no_number_until_committed`
+and `invalid_matches_while_the_text_is_no_number_or_out_of_range`. With `data-scrub`, a drag along the field steps the number
+by one `step` per 2 CSS px (`data-scrub="4"`: per 4 px), `input` per
+step and `change` at the release, counting from the text's number or
+the last committed one; the press still focuses; a finger decides at
+its first move whether it scrubs or scrolls, as a range's does; a
+`data-scrub` of another shape, or on another input, is refused. The field's text is laid out as its content (its height is its
+line, a blank field keeps it with a no-break space); the caret (1 px,
+the text's colour) and selection (the ring's blue at a third) are
+painted by `number_paint.rs`; a field needs a width of its own, since
+Chromium's default (185 x 24 px at 14 px, from its font and spin
+button) is not modelled: `width: auto` is refused naming the fix. The
+`Character` platform event reaches `Document::character_typed`.
+Checked step by step against Chromium by `fixtures/number.events`
+(typing, Backspace, a dropped letter, Enter, arrows, Tab's selection,
+blur by a click). Not built: caret movement and selection by pointer
+or Home/End (E6), the spin buttons, `step` mismatch as `:invalid`,
+a locale's decimal separator.
+
+As built (E6a, 2026-11-01): `input type=text` (an `input` without a
+type is one), the editing model's first half, on Parley 0.12's
+`PlainEditor`: one editor per field, made when the field is first
+pressed or focused, given the field's text style whenever it changes
+so its geometry is the painted text's. The text is the `value` property,
+written on every edit and read back when a signal sets it (the caret
+then at its end, as Chromium's `value =` puts it). A press puts the caret where it lands; on a
+disabled field it leaves the selection where it was and fires
+`selectionchange`, as Chromium does; a drag extends the selection under
+capture; focus by keyboard selects the text whole. By touch, a tap
+focuses the field and places the caret after its `click`, and a finger
+down or dragging moves nothing (a drag pans), as Chromium's touch does.
+A `value` attribute written before the field is edited reaches the
+editor; once edited, the property holds, as the DOM's dirty value
+does. Typed text replaces
+the selection; Backspace and Delete remove the selection or a cluster,
+with Control as far as Control and the arrow would move (Linux
+Chromium: Control+Delete leaves the space after a word, Control+
+Backspace takes "-" alone; Parley's own word deletes differ); the
+arrows move by cluster, a word with Control,
+Home and End to the ends, each extending with Shift; Control+A selects
+all; Enter and blur commit (`change` when the text differs from the
+last commit, the blur's before `focusout`). `input` fires per edit with
+the value. `selectionchange` fires on the field once per
+`Document::settle_selection` when the selection moved (the app settles
+before each update, the vapors player after each event), as Chromium
+queues one per task: two keys in one frame are one, a key that moves
+nothing none, focus arriving in a field one even where the caret was.
+`Document::selection` answers in UTF-16 units, as `selectionStart`/`selectionEnd` count. The caret (1 px, the
+text's colour) and selection (the ring's blue at a third) come from
+the editor's geometry, painted in the field's step under its text. A
+field needs a width of its own, as a number field does. Checked step
+by step against Chromium 155 by `fixtures/text.events`, every text
+field's selection after every step; the Chromium player waits a task after each input call,
+and the vapors player settles after each event, because Chromium's
+queued `selectionchange` otherwise lands before or after the next key
+from run to run. Clicks in a row (E6a, the second pull request): the
+platform counts each press of the primary button and carries the count
+on the press itself (`Event::PrimaryButton`'s `clicks`, a release its
+press's), so nothing waits for a count that may not come; the document
+places the caret, selects a word or the whole text with the press
+(`Document::pointer_pressed_clicks`), as Chromium does on `mousedown`.
+A press with no known pointer position starts a new row, and so does
+a press of another button (Chromium counts one button's presses). A
+touch's taps are counted by the platform's gestures in runs of 1, 2, 3
+then again (`Event::Tap`'s `clicks`), as desktop headless Chromium 155
+counts CDP touch taps (the corpus's `clicks.events`: of five quick taps
+the 2nd and the 5th send `dblclick`); the second of a run sends
+`dblclick`. Chrome on Android on a page without double-tap zoom is
+assumed to do the same, not yet measured on the Pixel. The photo's
+double tap (`Event::DoubleTap`, `ImageView`'s fit toggle) pairs taps
+instead, every second quick tap, as photo apps do (the lead,
+review-v100 R2). A mouse press and a tap never share a row. The platform counts on every
+target, the web included: winit cancels `pointerdown` (so the canvas
+selects no text), which in Chromium suppresses `mousedown` and with it
+the browser's own count (probed, Chromium 155: `pointerdown`'s `detail`
+is 0, and only `click` and `dblclick` carry the count, after release).
+The interval and distance are stated fallbacks: GTK's defaults on Linux
+(400 ms, 5 px, as Linux Chromium reads), Windows' (500 ms, 4 px),
+macOS's (500 ms; no distance setting, so 4 px), Android's double-tap
+timeout (300 ms, with GTK's 5 px); on the web, the one the
+browser's platform names (`navigator.userAgentData`, else the user
+agent). No build compiles a reader for the systems' own settings yet;
+a CI target that does retires the fallbacks. RELAXED: winit 0.30 gives
+events no timestamp, so a press is stamped when winit hands it to the
+platform, and presses queued behind a slow frame are stamped together;
+retired when winit exposes event times. A double click
+selects the word after the caret position nearest the point, as
+Chromium does (just past a word, the space after it; past the text,
+the last word), a triple click the whole text, neither starting a
+drag. A press inside a selection, ends included, places the caret on
+release, as Chromium waits to see whether the press drags the text.
+Checked by `fixtures/words.events`, whose field sets its font and
+border, which Chromium's field does not take from the page. A known
+difference: words are Parley's (UAX 29), which keep a "." between
+letters inside a word, so a double click in "e.g." selects "e.g" where
+Chromium selects the "." alone; "3.5" and "don't" agree. A press inside
+the selection moves the caret after its `click`, so a `click` listener
+reads the selection held, as in Chromium. Not built: `detail`, a
+text field's own use of `dblclick`, dragging by word or line after a double or
+triple click, dragging selected text, IME, `beforeinput`,
+`placeholder`, `maxlength`, scrolling a long text to the caret, the
+blinking caret (area 6), vertical selection in a `textarea`.
+
+As built (E6b, 2026-11-01): a field's own undo and paste. Each field
+keeps an undo stack, grouped as Chromium 155 groups a field's edits:
+
+- a run of typing is one step;
+- a run of Backspace is one step, and a Delete joins it; a run of
+  Delete is one step, and a Backspace does not join it;
+- a word deletion (Control+Backspace, Control+Delete) always starts a
+  step, which Backspaces or Deletes in its direction and typing then
+  join;
+- typing after a deletion joins it, and a deletion after typing does
+  not;
+- a paste is a step alone, and anything that moves the selection other
+  than an edit ends the run.
+
+Control+Z undoes to the text and selection before the step,
+Control+Shift+Z and Control+Y redo to those after it, each with
+`input`, and with a `selectionchange` when the selection differs or
+the text changes before the caret (which moves it in the DOM even
+where it ends where it was), as Chromium fires. A new edit drops
+what could be redone; a signal setting the text drops the stack. A
+field keeps at most 1000 steps, the oldest going first, as Blink's
+`kMaximumUndoStackDepth`.
+
+A paste (`Document::text_pasted`) fires `paste` on the focused field,
+bubbling, carrying the text as copied (`Event::value`, as
+`clipboardData.getData("text")`); a listener that prevents its default
+keeps the text out. Else it replaces the selection, its trailing line
+breaks dropped and each other a space. On the desktop the platform
+sends `Event::Paste` whatever has focus, and `ElementsApp` hands it to
+a focused text field first. The clipboard is read off the event loop
+(`Clipboard::read_text`): the answer, or why there is none once the
+deadline passes (`CLIPBOARD_DEADLINE`, 3 s, reported with
+`report_error`), wakes the loop, and the next frame pastes it into the
+field it was read for, or reports that the field lost focus. With no
+text field focused the clipboard is not read. Checked by
+`fixtures/undo.events`, whose `clipboard` step writes Chromium's
+clipboard. Chromium's undo stack is the page's, not the field's: an
+undo in one field after edits in another differs, and is not compared.
+Not built: copy and cut, the web page's paste (with the web input
+path), Command for Control on macOS, `beforeinput`'s `historyUndo`.
+
+As built (E6, the web's text input, 2026-11-01): a hidden `<textarea>`
+mirrors the focused text field, chosen over EditContext because one
+path serves Chrome, Safari, Firefox and Android's keyboards, doc 03
+needs it as the fallback anyway, and headless Chromium drives it with
+`Input.insertText` and `Input.imeSetComposition`; EditContext can
+follow as Chromium's path. The app sets the field
+(`Platform::set_text_field`: text, UTF-16 selection, caret area) after
+each event and frame when it changed; the textarea takes it, moves to
+the caret (transparent, 16 px so a phone does not zoom, no pointer
+events) and takes DOM focus when the app handles the press or tap,
+so that a phone may open its keyboard, which needs focus inside the
+user's gesture (not checked headless). Its `input` and composition events come back as
+`Event::TextEdited` (its whole state, and the text it was made
+against); the field takes the difference, composing text included,
+underlined, with `input`, and refuses an edit made against a text it
+no longer holds, reporting it and setting the field again. Its keys
+come back as `Event::Key`; it acts itself only on printable
+characters, any key while an IME composes, and Control or Command with
+C, V or X, and every other key's default is prevented, so the field's
+own keys (arrows, Backspace, Enter, Tab, undo) act. Its `paste` comes
+back as `Event::PastedText`, through `Document::text_pasted`; a paste
+with no clipboard data, a `getData` that fails, a listener the page
+refuses, and a paste that arrives with no field focused are each
+reported, never dropped. A press on the canvas takes DOM focus from the
+textarea; while a field is mirrored it goes back in the same press, so
+the keys and pastes after it reach the field. When the field loses
+focus (Tab, a click elsewhere) while the textarea holds DOM focus, the
+canvas takes it, not `<body>`, since winit hears keys on the canvas. Checked by
+`scripts/web-text-input.sh`: typed text, a composition and its commit,
+Backspace, an arrow, a composition in the middle, Shift+Home, a double
+click, a paste of "a\nb\n" (#92's line breaks: "a b"), and keys
+after leaving the field by Tab and by a click, on
+Chromium's own `<input>` and on the built page's field demo, the text
+and selection equal after each. Not checked headless: a real
+phone keyboard (Gboard's autocorrect and its Backspace on composed
+words), the keyboard opening on a tap, the candidate window's place.
+Not built: EditContext, copy and cut, the a11y mirror's ownership of
+the textarea (area 5).
+
+As built (E6c, native IME, 2026-11-01): while a text field has focus
+the window allows the system IME (`set_ime_allowed`) and places its
+candidate window at the field's caret (`set_ime_cursor_area`, from the
+field the app sets for the text input). winit's `Ime` events become the
+same `Event::TextEdited` the web's textarea sends, kept against that
+field: a preedit replaces the selection when it starts and its own
+range after, in the value while it composes and underlined, its caret
+where the IME puts it; a commit replaces the composing range and ends
+it, in one edit, so one Control+Z goes back to the text before the
+composition, as on the web (winit's empty preedit before each commit is
+held until the next event, which takes it in or applies it; any event
+but the IME's own applies it first, a redraw and the loop's messages
+included, so no stale preedit is drawn or read); `Disabled`
+clears a composition; another field, the field set with another text,
+or a selection moved out of the composing range (a click elsewhere in
+the field, which Chromium's `<input>` commits on) ends it with its text
+kept, and the IME is told by losing and regaining focus. A field set
+before the window opens is allowed the IME at the window's first event. So the web and
+the desktop agree with Chromium's `<input>`. Checked by unit tests on
+winit's own documented sequences (pinyin, a dead key over a selection),
+whose edits the field's undo test takes too (`ime_cases.rs`), and what
+happens before each event by `ImeState`'s tests; the handler's one-line
+calls into `ImeState` are not tested, since they need winit's event
+loop. Not checked with a real IME, which needs a desktop session (macOS, Windows,
+Linux with IBus or Fcitx) at the sign-off, including whether a platform
+also sends a key's text alongside its commit, and macOS's input-source
+switch in the middle of a composition, which sends `Disabled` and so
+removes the preedit where Chromium likely commits it, and that each
+backend sends an event when the window opens: one that sent none would
+leave the IME disallowed for a field set before it.
 
 ## Text editing and IME
 
@@ -169,9 +636,12 @@ the clipboard, caret painting and the DOM events. Rules:
   area 10 records it, because the hidden textarea has known gaps
   (composition in some IMEs, the caret rectangle) that the brief
   accepts for the secondary target.
-- Preedit text is shown inline with an underline and is not in the
-  value until commit; `beforeinput` is not fired for preedit changes
-  (as in browsers), `compositionupdate` is.
+- Preedit text is shown inline with an underline and is in the value
+  while it composes, with `input` per update, as Chromium's own
+  `<input>` holds it (the lead's decision, 2026-11-01: the web follows
+  the browser, and native winit IME matches it, so the two agree; the
+  launcher's list filters as you compose). `beforeinput` is not fired
+  for preedit changes (as in browsers), `compositionupdate` is.
 - Clipboard through area 7: `paste` carries text and images; the
   Composer's image paste is an event with `files`.
 - Undo inside a field is its own stack, separate from the app's
@@ -179,6 +649,130 @@ the clipboard, caret painting and the DOM events. Rules:
 - `user-select` for read-only text (agent replies): selection across
   elements is a range over the inline runs, copy serialises the text
   with newlines at block boundaries.
+
+## A component's own events
+
+As built (the listbox slice's first part, 2026-11-01): a component
+dispatches events of its own, such as a combobox's `comboboxopen`,
+with `#[dispatcher(comboboxopen, optionchoose)] let events;` in its
+script. The compiler makes it a `vapors_dom::Dispatcher` for those
+names. A script has at most one `#[dispatcher]`, and nothing else is
+attached to that `let`; the compiler refuses either.
+
+Names are declared per component type: the compiler generates
+`events()` for each component, its own names and those of every
+component its template uses, and declares them to the tree when the
+component mounts, before its children. The elements document refuses
+a listener for an event it never fires unless it is declared, so an
+ancestor's `onoptionchoose` is accepted before the combobox inside an
+`{if}` has mounted.
+
+`events.dispatch(node, Event::new("optionchoose"))` runs the
+listeners on `node` and then its ancestors at once, as the DOM's
+`dispatchEvent` does, and answers `Ok(true)` unless a listener
+prevented the default, so the component runs its default action only
+then. The listener lists for the whole path are taken at the start,
+before any listener runs: a listener added or removed during the
+dispatch takes effect from the next one. A listener may dispatch again (re-entry),
+since listeners are `Rc<dyn Fn>` and none is borrowed while it runs.
+`Rc` assumes one thread, as every vapors tree is today; a tree shared
+between threads would need `Arc` and a lock, and that change retires
+the assumption.
+
+A dispatch is refused, not dropped, with `DispatchRefused` naming the
+event and node:
+
+- before any listener runs: a name the dispatcher does not declare, a
+  node no longer in the tree (removed), or the tree borrowed (from
+  inside a `Dom` call). `cancelled()` is `None`.
+- after every listener ran: a listener that asked for pointer capture,
+  which only a pointer event carries. The message says how many
+  listeners it was dispatched to, and `cancelled()` keeps their
+  answer.
+
+`events.emit(..)` is `dispatch` for a component that cannot be refused
+except by its own bug; it panics with the refusal. A listener returns
+`()` or `Result<(), E>` with `E: Display`, so it may use `?`; an `Err`
+goes to the platform's error report (`report_error`, which the page
+shows), which the app installs with `vapors_dom::set_error_report`.
+With none installed (a test without an app) it panics with the
+message. A thread has one report: installing a report under another
+name panics, naming both, so `ElementsApp::new` after a test's own
+report refuses rather than taking its errors; the same name again is
+kept.
+
+A component type's `events()` lists its own names, then each child
+type's, through `events_into`, which skips a type already listed: a
+component that uses itself, directly or through another, is listed
+once and its mount ends.
+
+Taken from the DOM: synchronous, bubbling, cancelable, the return
+value of `dispatchEvent`, delivered to listeners on elements, so an app
+listens with `on<name>` on any ancestor. Differs from the DOM: no
+capture phase and no `CustomEvent.detail` yet (the target and the
+component's bound signals carry the data); names are declared; the
+DOM copies each node's listener list when the event reaches that node,
+so a listener added to an ancestor during the dispatch runs there and
+not here. Differs
+from Svelte: Svelte 4's `createEventDispatcher` sends a component event
+to its parent's `on:` handler only, not bubbling through the DOM and
+not cancelable unless asked, and Svelte 5 replaced it with callback
+props; vapors' events are DOM events on the component's elements,
+which is what the APG's patterns and their default actions need.
+
+## Library components: the combobox
+
+As built (the listbox slice, 2026-11-01): vapors ships components in
+`vapors-components`, written in `.wisp` and compiled by its `build.rs`;
+they depend only on `vapors-dom` and `vapors-signals` (the layers check
+holds this), so any `Dom` mounts them, and an app uses one by its path,
+`<vapors_components::combobox::Combobox ... />`. A component owns its
+behaviour's state as signals and renders the aria attributes from them,
+so there is one owner and the data flow stays reactive; each default
+action follows a cancelable, bubbling event (`Dispatcher`).
+
+`Combobox` is the WAI-ARIA APG's "Editable Combobox With List
+Autocomplete" example's keyboard behaviour: a text field (role
+`combobox`, `aria-controls`, `aria-expanded`, `aria-activedescendant`)
+and a listbox of options (`aria-selected` on the active one), shown
+while expanded. ArrowDown and ArrowUp on a closed list fire
+`comboboxopen` and, unless cancelled, open it on the first (last)
+option; on an open list they move the active option, wrapping, as the
+APG example's do. Home and End move the caret, the field's own, and
+leave no option active: a typing field keeps them (the lead's decision,
+2026-11-01, over the select-only pattern's first and last option).
+Enter with an option active fires `optionchoose` at the option and,
+unless cancelled, the field takes its text and the list closes; with
+none active, the list closes. Escape fires `comboboxdismiss` and,
+unless cancelled, closes an open list or clears the field. When the
+app's options change, an active option no longer at its place is
+cleared, with `aria-activedescendant`, as the example resets it while
+filtering. A refused dispatch, or a choice that cannot be resolved (an
+active option with no element), is the key listener's `Err`, which goes
+to the app's error report; it is never taken for a cancel. Props:
+`options`, `value`, `expanded`, `active` (bindable), `id`, `label`,
+`list_label`; `id` defaults to one no other combobox has
+(`vapors_components::unique_id`), so two on their defaults never share
+the ids `aria-controls` and `aria-activedescendant` name. Checked by `fixtures/combobox.events`, played in Chromium
+on APG's own example (`fixtures/apg/`, copied with its W3C licence
+notice) and on vapors with the component: after every key, the
+projection of the combobox, listbox and options (role, name,
+`expanded`, `controls`, `activedescendant`, `selected`, `focused`;
+5-A1's first slice, `Document::ax_projection`), focus, values and
+selections are equal. A fixture whose script plays on another page
+(`page`) is compared by that script alone, not laid out.
+
+Differs from the APG example: typing and filtering the options are the
+app's (it sets `options`), so the example's autocomplete-on-typing is
+not the component's; the example's arrow button, clicks on options and
+closing on blur are not built; the events are vapors' own (the example
+has none); Alt+ArrowDown, which in the example opens the list with no
+option active, is a plain ArrowDown here; Enter with no option active
+closes the list without a cancelable event. The DOM has no combobox element; this is the pattern, as the
+APG writes it.
+
+A tap whose `pointerdown` a listener cancelled still clicks, but moves
+neither focus nor a caret, as in Chromium (`fixtures/focus.events`).
 
 ## Synthetic input
 

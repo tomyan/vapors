@@ -2,7 +2,7 @@
 //! the [`FontSystem`], read out as placed glyphs for the renderer.
 
 use parley::AlignmentOptions;
-use vapors_scene::Color;
+use vapors_scene::{Color, Rect};
 
 use crate::font_system::FontSystem;
 use crate::layout_runs::{alignment, glyph_runs, run_offset};
@@ -15,6 +15,7 @@ pub struct Layout {
     text: String,
     scale: f32,
     runs: Vec<GlyphRun>,
+    ink: Rect,
 }
 
 impl Layout {
@@ -56,6 +57,7 @@ impl Layout {
             inner,
             text: text.to_owned(),
             scale: options.scale,
+            ink: crate::layout_ink::ink(&runs),
             runs,
         }
     }
@@ -76,6 +78,13 @@ impl Layout {
     #[must_use]
     pub fn height(&self) -> f32 {
         self.inner.height()
+    }
+
+    /// Every pixel the glyphs can ink, device pixels from the layout
+    /// origin: wider than the ink, never narrower (`layout_ink`).
+    #[must_use]
+    pub fn ink(&self) -> Rect {
+        self.ink
     }
 
     /// The lines, top to bottom.
@@ -148,6 +157,10 @@ impl Layout {
 #[cfg(test)]
 #[path = "layout_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "layout_breaks_tests.rs"]
+mod breaks_tests;
 
 #[cfg(test)]
 #[path = "fallback_tests.rs"]

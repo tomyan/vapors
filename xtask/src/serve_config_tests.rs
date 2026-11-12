@@ -6,7 +6,7 @@ fn config(text: &str) -> Config {
     Config::parse(text).expect("parses")
 }
 
-const SERVE: &str = "[serve]\ndir = \"srv/touche\"\nhttps = \"443\"\npath = \"/\"\ncheck = \"true\"\ncheck_seconds = \"60\"\n";
+const SERVE: &str = "[serve]\ndir = \"srv/touche\"\nhttps = \"443\"\npath = \"/\"\ncheck = \"true\"\ncheck_seconds = \"60\"\nport = \"8790\"\n";
 
 #[test]
 fn serve_is_read_with_its_dir_under_home() {

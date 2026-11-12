@@ -6,6 +6,7 @@ use std::process::{Child, Command, Stdio};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
+use crate::step::TmpDir;
 use crate::steps::Step;
 
 /// What happened when a step ran.
@@ -59,6 +60,7 @@ fn spawn(step: &Step) -> Result<Child, String> {
     if let Some(dir) = &step.dir {
         command.current_dir(dir);
     }
+    set_tmpdir(&mut command, &step.tmpdir);
     command.spawn().map_err(|error| {
         let started = command.get_program().to_string_lossy();
         format!(
@@ -66,6 +68,19 @@ fn spawn(step: &Step) -> Result<Child, String> {
             step.program
         )
     })
+}
+
+/// Give `command` the TMPDIR `tmpdir` says.
+pub fn set_tmpdir(command: &mut std::process::Command, tmpdir: &TmpDir) {
+    match tmpdir {
+        TmpDir::Inherit => {}
+        TmpDir::Set(tmp) => {
+            command.env("TMPDIR", tmp);
+        }
+        TmpDir::Unset => {
+            command.env_remove("TMPDIR");
+        }
+    }
 }
 
 fn finish(mut child: Child, deadline: Option<Duration>) -> (bool, String) {
@@ -107,12 +122,22 @@ fn wait(child: &mut Child, deadline: Option<Duration>) -> Result<bool, String> {
 /// 40006425576, where the gate's deadline test took 21 s, and likewise vapors
 /// #30. The kill's own failure is returned to be reported.
 pub(crate) fn kill_group(child: &mut Child) -> Result<(), String> {
-    let group = format!("-{}", child.id());
+    let killed = kill_group_id(child.id());
+    let _ = child.kill();
+    let _ = child.wait();
+    killed
+}
+
+/// Kill process group `group`; a group already gone counts as killed.
+///
+/// # Errors
+///
+/// `kill` could not run, or refused for another reason.
+pub(crate) fn kill_group_id(group: u32) -> Result<(), String> {
+    let group = format!("-{group}");
     let killed = Command::new("kill")
         .args(["-s", "KILL", "--", &group])
         .output();
-    let _ = child.kill();
-    let _ = child.wait();
     match killed {
         Ok(out) if out.status.success() => Ok(()),
         // ESRCH: every process of the group had exited by the kill.

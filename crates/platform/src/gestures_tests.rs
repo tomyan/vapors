@@ -36,16 +36,21 @@ fn pans_and_pinches_follow_the_fingers() {
     // Given
     let cases: &[(&str, &[Step], &[Event])] = &[
         (
-            "one finger moving pans by its own movement",
+            "one finger past the tap slop pans by its own movement",
             &[
                 (0, Started, 0.0, 0.0, 0),
-                (0, Moved, 10.0, 5.0, 16),
-                (0, Moved, 13.0, 5.0, 32),
+                (0, Moved, 25.0, 5.0, 16),
+                (0, Moved, 28.0, 5.0, 32),
             ],
             &[
-                Event::Pan { dx: 10.0, dy: 5.0 },
+                Event::Pan { dx: 25.0, dy: 5.0 },
                 Event::Pan { dx: 3.0, dy: 0.0 },
             ],
+        ),
+        (
+            "one finger within the tap slop pans nothing",
+            &[(0, Started, 0.0, 0.0, 0), (0, Moved, 10.0, 5.0, 16)],
+            &[],
         ),
         (
             "two fingers pinch about their midpoint and pan by its movement",
@@ -90,8 +95,9 @@ fn a_repeated_started_replaces_the_finger_instead_of_adding_one() {
     // When
     let events = play(script);
 
-    // Then: a pan from the second start, no phantom pinch
-    assert_eq!(events, [Event::Pan { dx: 10.0, dy: 0.0 }]);
+    // Then: within the tap slop of the second start, so no pan, and no
+    // phantom pinch
+    assert_eq!(events, []);
 }
 
 #[test]

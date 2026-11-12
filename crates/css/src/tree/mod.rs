@@ -38,6 +38,8 @@ impl States {
     /// `:enabled`: a form control that is not disabled. Set by the tree
     /// layer for form controls only, as the specification matches it.
     pub const ENABLED: Self = Self(1 << 7);
+    /// `:invalid`: a form control whose value fails its constraints.
+    pub const INVALID: Self = Self(1 << 8);
 
     /// Whether every flag in `other` is set.
     #[must_use]

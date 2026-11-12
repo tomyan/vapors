@@ -32,6 +32,8 @@ pub(crate) struct Decoration {
     pub(crate) radii: [f32; 4],
     /// In the order declared: the first is drawn on top.
     pub(crate) shadows: Vec<BoxShadow>,
+    /// Its outline, if it draws one (3-E2b).
+    pub(crate) outline: Option<super::outline::Outline>,
 }
 
 /// The decoration of the element `reader` reads, at `scale` device
@@ -46,6 +48,7 @@ pub(crate) fn decoration(reader: &mut Reader<'_>, scale: f32, current: Rgba) -> 
         out.radii[i] = reader.read(corner_property(corner), radius, 0.0);
     }
     out.shadows = reader.read("box-shadow", |v| shadows(v, current), Vec::new());
+    out.outline = super::outline::outline(reader, scale);
     refuse_elliptical_inner_corners(reader, &out);
     out
 }
@@ -112,7 +115,7 @@ fn border_style(value: &Value) -> Result<bool, String> {
 }
 
 #[allow(clippy::cast_possible_truncation)] // CSS lengths are far inside f32
-fn width_px(value: &Value) -> Result<f32, String> {
+pub(crate) fn width_px(value: &Value) -> Result<f32, String> {
     match value {
         Value::Keyword(k) if k == "thin" => Ok(1.0),
         Value::Keyword(k) if k == "medium" => Ok(3.0),

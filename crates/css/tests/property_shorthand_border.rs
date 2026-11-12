@@ -54,3 +54,34 @@ fn a_side_shorthand_fills_omitted_parts_and_refuses_a_fourth() {
     let error = refused.expect_err("a fourth part is refused");
     assert!(error.message.contains("border-left"), "{}", error.message);
 }
+
+#[test]
+fn the_outline_shorthand_sets_its_width_style_and_colour() {
+    // When
+    let got = longhands("outline: 2px solid red");
+    let none = longhands("outline: none");
+
+    // Then (3-E2b)
+    assert_eq!(
+        got,
+        [
+            "outline-width: 2px",
+            "outline-style: solid",
+            "outline-color: rgb(255 0 0)"
+        ]
+    );
+    assert_eq!(
+        none,
+        [
+            "outline-width: medium",
+            "outline-style: none",
+            "outline-color: currentcolor"
+        ]
+    );
+}
+
+#[test]
+fn outline_offset_is_a_length() {
+    // Then
+    assert_eq!(longhands("outline-offset: 2px"), ["outline-offset: 2px"]);
+}

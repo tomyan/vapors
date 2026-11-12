@@ -8,14 +8,22 @@ use super::{Input, Key};
 use crate::event::Event;
 use crate::paste_key::Press;
 
-fn press(input: &mut Input, logical: &Logical, state: ElementState) -> Option<Vec<Event>> {
-    input.key(Key::Press(Press {
+/// What follows the press's own `Event::Key`: a paste, its character, or
+/// nothing.
+fn press(input: &mut Input, logical: &Logical, state: ElementState) -> Vec<Event> {
+    let events = input.key(Key::Press(Press {
         state,
         repeat: false,
         logical,
         physical: PhysicalKey::Code(KeyCode::KeyV),
         modifiers: ModifiersState::empty(),
-    }))
+        text: Some("v"),
+    }));
+    assert!(
+        matches!(events.first(), Some(Event::Key { .. })),
+        "{events:?}"
+    );
+    events[1..].to_vec()
 }
 
 #[test]
@@ -29,8 +37,8 @@ fn control_held_then_v_pressed_is_a_paste() {
     let pressed = press(&mut input, &v, ElementState::Pressed);
 
     // Then
-    assert_eq!(changed, Some(Vec::new()));
-    assert_eq!(pressed, Some(vec![Event::Paste]));
+    assert_eq!(changed, Vec::<Event>::new());
+    assert_eq!(pressed, [Event::Paste]);
 }
 
 #[test]
@@ -44,8 +52,11 @@ fn v_without_control_or_released_is_not_a_paste() {
     input.key(Key::Modifiers(ModifiersState::CONTROL));
     let released = press(&mut input, &v, ElementState::Released);
 
-    // Then
-    assert_eq!((alone, released), (None, None));
+    // Then: its character, and nothing on the release
+    assert_eq!(
+        (alone, released),
+        (vec![Event::Character("v".into())], Vec::new())
+    );
 }
 
 #[test]
@@ -60,13 +71,19 @@ fn losing_focus_forgets_a_held_control() {
     let pressed = press(&mut input, &v, ElementState::Pressed);
 
     // Then
-    assert_eq!(pressed, None);
+    assert_eq!(pressed, [Event::Character("v".into())]);
 }
 
 #[test]
-#[ignore = "F4: text inputs. Until then a paste goes to the app whatever has focus (RELAXED in input.rs); this test is written when a focused input exists to take Ctrl+V first"]
-fn paste_while_a_text_field_has_focus_goes_to_it() {
-    panic!(
-        "no element takes typed text yet; F4 writes this test and retires the RELAXED guard in Input::key"
-    );
+fn the_window_losing_and_regaining_focus_is_sent_as_window_focus() {
+    // Given
+    let mut input = Input::new();
+
+    // When
+    let lost = input.key(Key::Focus(false));
+    let regained = input.key(Key::Focus(true));
+
+    // Then
+    assert_eq!(lost, [Event::WindowFocus { focused: false }]);
+    assert_eq!(regained, [Event::WindowFocus { focused: true }]);
 }

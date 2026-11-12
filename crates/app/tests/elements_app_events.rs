@@ -45,14 +45,22 @@ fn setup() -> (Rc<RefCell<Document>>, Rc<RefCell<u32>>) {
 fn a_press_and_release_in_physical_pixels_click_the_button_at_2x() {
     // Given: the button covers CSS x 0..100, so physical x 150 is CSS 75
     let (doc, clicks) = setup();
-    let mut app = ElementsApp::new(Rc::clone(&doc)).with_scale(2.0);
+    let mut app = ElementsApp::new(Rc::clone(&doc));
     let platform = Platform::detached();
 
     // When
     for event in [
         Event::PointerMoved { x: 150.0, y: 10.0 },
-        Event::PrimaryButton { pressed: true },
-        Event::PrimaryButton { pressed: false },
+        Event::PrimaryButton {
+            pressed: true,
+            clicks: std::num::NonZeroU32::MIN,
+            modifiers: vapors_platform::Modifiers::default(),
+        },
+        Event::PrimaryButton {
+            pressed: false,
+            clicks: std::num::NonZeroU32::MIN,
+            modifiers: vapors_platform::Modifiers::default(),
+        },
     ] {
         app.event(event, &platform);
     }
@@ -69,14 +77,22 @@ fn a_press_and_release_in_physical_pixels_click_the_button_at_2x() {
 fn a_press_outside_the_button_at_2x_clicks_nothing() {
     // Given: physical x 250 is CSS 125, past the button's 100
     let (doc, clicks) = setup();
-    let mut app = ElementsApp::new(Rc::clone(&doc)).with_scale(2.0);
+    let mut app = ElementsApp::new(Rc::clone(&doc));
     let platform = Platform::detached();
 
     // When
     for event in [
         Event::PointerMoved { x: 250.0, y: 10.0 },
-        Event::PrimaryButton { pressed: true },
-        Event::PrimaryButton { pressed: false },
+        Event::PrimaryButton {
+            pressed: true,
+            clicks: std::num::NonZeroU32::MIN,
+            modifiers: vapors_platform::Modifiers::default(),
+        },
+        Event::PrimaryButton {
+            pressed: false,
+            clicks: std::num::NonZeroU32::MIN,
+            modifiers: vapors_platform::Modifiers::default(),
+        },
     ] {
         app.event(event, &platform);
     }
@@ -89,7 +105,7 @@ fn a_press_outside_the_button_at_2x_clicks_nothing() {
 fn an_event_that_changes_nothing_asks_for_no_frame() {
     // Given
     let (doc, _) = setup();
-    let mut app = ElementsApp::new(Rc::clone(&doc)).with_scale(2.0);
+    let mut app = ElementsApp::new(Rc::clone(&doc));
     let platform = Platform::detached();
 
     // When: a key the document does not take
@@ -97,4 +113,34 @@ fn an_event_that_changes_nothing_asks_for_no_frame() {
 
     // Then
     assert!(!platform.take_redraw_request());
+}
+
+#[test]
+fn a_tab_key_moves_focus_to_the_button_and_enter_clicks_it() {
+    // Given
+    let (doc, clicks) = setup();
+    let mut app = ElementsApp::new(Rc::clone(&doc));
+    let platform = Platform::detached();
+    // Tab and Enter are each one key, so their code is their name
+    let key = |key: &str, pressed| Event::Key {
+        key: key.to_owned(),
+        code: key.to_owned(),
+        pressed,
+        repeat: false,
+        modifiers: vapors_platform::Modifiers::default(),
+    };
+
+    // When
+    for event in [
+        key("Tab", true),
+        key("Tab", false),
+        key("Enter", true),
+        key("Enter", false),
+    ] {
+        app.event(event, &platform);
+    }
+
+    // Then
+    assert!(doc.borrow().active_element().is_some());
+    assert_eq!(*clicks.borrow(), 1);
 }

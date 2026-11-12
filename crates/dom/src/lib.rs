@@ -12,14 +12,25 @@
 //! what to create, move, update or remove.
 
 pub mod blocks;
+mod dispatcher;
 mod event;
+mod event_key;
+mod event_pointer;
+mod listener;
+mod listener_result;
+mod modifiers;
 pub mod recording;
 mod roots;
 mod snippet;
 
-pub use event::{Capture, Event, Handler, Pointer};
+pub use dispatcher::{DispatchRefused, Dispatcher, Listeners, run_along};
+pub use event::Event;
+pub use event_pointer::{Capture, Pointer};
+pub use listener::{Handler, Listener};
+pub use listener_result::{ListenerResult, handle, handle_without_event, set_error_report};
+pub use modifiers::Modifiers;
 pub use roots::{BlockNodes, Root, current_nodes};
-pub use snippet::{Args, DynDom, Snippet};
+pub use snippet::{Args, DynDom, Renderable, Snippet};
 
 /// Identifies a node in the tree. The [`Dom`] implementation decides
 /// what the number means.
@@ -37,12 +48,26 @@ pub enum PropertyValue {
     Number(f64),
 }
 
+/// Whether writing `new` over `current` changes nothing. Numbers compare
+/// by `to_bits`, not `==`: `0.0 == -0.0` would skip a visible change, and
+/// a NaN is only equal to the NaN with the same bits, which is not a
+/// reason to skip the write either.
+fn property_unchanged(current: &PropertyValue, new: &PropertyValue) -> bool {
+    match (current, new) {
+        (PropertyValue::Number(a), PropertyValue::Number(b)) => {
+            !a.is_nan() && !b.is_nan() && a.to_bits() == b.to_bits()
+        }
+        _ => current == new,
+    }
+}
+
 /// The attribute a component's `mount` sets on each element it creates,
 /// to the scope its `<style>` was added under (see [`Dom::add_style`]).
 pub const SCOPE_ATTRIBUTE: &str = "data-wisp";
 
-/// The tree a component mounts into.
-pub trait Dom {
+/// The tree a component mounts into; its listeners are reachable for a
+/// component's own events ([`Dispatcher`]).
+pub trait Dom: Listeners {
     /// Creates an element with the given tag, attached nowhere yet.
     fn create_element(&mut self, tag: &str) -> NodeId;
     /// Creates a text node, attached nowhere yet.
@@ -68,4 +93,52 @@ pub trait Dom {
     /// only those elements. Each mount calls it; a scope already added
     /// is not added again.
     fn add_style(&mut self, scope: &str, css: &str);
+    /// Names events a component dispatches itself ([`Dispatcher`]), so a
+    /// tree that refuses listeners for events it never fires takes
+    /// listeners for these.
+    fn declare_events(&mut self, names: &[&str]);
+    /// A text node's text; `None` for an element. The `_if_changed`
+    /// setters read this: `None` means absent or the wrong kind, and
+    /// they then call the plain setter, which refuses the wrong kind
+    /// loudly.
+    fn current_text(&self, node: NodeId) -> Option<&str>;
+    /// An element's attribute; `None` when it has none of that name or
+    /// `node` is a text node (absent or wrong kind: the `_if_changed`
+    /// setter then calls the plain setter, which refuses the wrong kind
+    /// loudly).
+    fn current_attribute(&self, node: NodeId, name: &str) -> Option<&str>;
+    /// An element's property as it stands now, including what the
+    /// person's own edits wrote (a typed `value`, a toggled `checked`);
+    /// `None` when it has none of that name or `node` is a text node
+    /// (absent or wrong kind, handled as for [`Dom::current_attribute`]).
+    fn current_property(&self, node: NodeId, name: &str) -> Option<&PropertyValue>;
+
+    /// [`Dom::set_text`] unless the node already holds `text`. The
+    /// bindings the compiler generates call this, so an equal signal
+    /// write changes nothing; a direct `set_text` always writes.
+    fn set_text_if_changed(&mut self, node: NodeId, text: &str) {
+        if self.current_text(node) != Some(text) {
+            self.set_text(node, text);
+        }
+    }
+    /// [`Dom::set_attribute`] unless the element already holds `value`
+    /// under `name`; called by the generated bindings.
+    fn set_attribute_if_changed(&mut self, node: NodeId, name: &str, value: &str) {
+        if self.current_attribute(node, name) != Some(value) {
+            self.set_attribute(node, name, value);
+        }
+    }
+    /// [`Dom::set_property`] unless the element's current property is
+    /// `value`: numbers compare by bit pattern, so a NaN number and a
+    /// change between 0.0 and -0.0 are written (a range formats them
+    /// "NaN", "0" and "-0"); other kinds compare by `PartialEq`. Called
+    /// by the generated bindings.
+    fn set_property_if_changed(&mut self, node: NodeId, name: &str, value: PropertyValue) {
+        if !self
+            .current_property(node, name)
+            .is_some_and(|current| property_unchanged(current, &value))
+        {
+            self.set_property(node, name, value);
+        }
+    }
 }

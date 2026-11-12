@@ -51,7 +51,26 @@ impl<A: 'static> Snippet<A> {
         before: Option<NodeId>,
         args: impl Fn() -> A + 'static,
     ) -> Vec<Root> {
-        (self.0)(&dom.dyn_dom(), parent, before, Rc::new(args))
+        self.render_args(dom, parent, before, Rc::new(args))
+    }
+
+    /// [`Snippet::render`] with the arguments already shared.
+    pub fn render_args(
+        &self,
+        dom: &impl DynDom,
+        parent: NodeId,
+        before: Option<NodeId>,
+        args: Args<A>,
+    ) -> Vec<Root> {
+        (self.0)(&dom.dyn_dom(), parent, before, args)
+    }
+}
+
+/// Snippets are equal when they are the same snippet: clones of one
+/// `Snippet::new`, not two built alike.
+impl<A> PartialEq for Snippet<A> {
+    fn eq(&self, other: &Snippet<A>) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
     }
 }
 
@@ -70,6 +89,38 @@ impl<A: 'static> Default for Snippet<A> {
 impl<A> fmt::Debug for Snippet<A> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("Snippet")
+    }
+}
+
+/// What `{render expr()}` accepts as `expr`: a snippet, or none to
+/// render nothing, owned or borrowed (`map.get(key)` gives an
+/// `Option<&Snippet>`).
+pub trait Renderable<A> {
+    /// The snippet to render, if any.
+    fn snippet(&self) -> Option<Snippet<A>>;
+}
+
+impl<A> Renderable<A> for Snippet<A> {
+    fn snippet(&self) -> Option<Snippet<A>> {
+        Some(self.clone())
+    }
+}
+
+impl<A> Renderable<A> for Option<Snippet<A>> {
+    fn snippet(&self) -> Option<Snippet<A>> {
+        self.clone()
+    }
+}
+
+impl<A> Renderable<A> for Option<&Snippet<A>> {
+    fn snippet(&self) -> Option<Snippet<A>> {
+        self.cloned()
+    }
+}
+
+impl<A, T: Renderable<A> + ?Sized> Renderable<A> for &T {
+    fn snippet(&self) -> Option<Snippet<A>> {
+        (**self).snippet()
     }
 }
 

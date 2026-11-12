@@ -10,7 +10,7 @@ use vapors_text::{Layout, content_area};
 
 use crate::layout::{BoxRect, InlineRun, InlineSpan};
 use crate::paint::{PaintInput, snapped};
-use crate::painted::Painted;
+use crate::painting::Painting;
 
 /// Records and paints `run`'s inline elements, laid out as `layout` in
 /// the text box at `origin`. Call before the run's text is pushed.
@@ -19,7 +19,7 @@ pub(crate) fn paint_spans(
     layout: &Layout,
     origin: BoxRect,
     input: &PaintInput<'_>,
-    out: &mut Painted,
+    out: &mut Painting,
 ) {
     for span in &run.spans {
         let fragments = fragments(span, run, layout, origin, input.scale);

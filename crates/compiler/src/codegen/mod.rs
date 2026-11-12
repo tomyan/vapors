@@ -8,16 +8,23 @@
 //! `{for}` an anchor and a call into `vapors_dom::blocks`.
 
 mod allowances;
+mod bind_this_shape;
 mod blocks;
 mod component_tag;
 mod element;
+mod element_bind;
+mod element_bind_this;
 mod emit;
+mod events_decl;
 mod for_block;
 mod format;
+mod handler_capture;
 mod names;
 mod prop_suggestion;
 mod props_index;
+mod render_dynamic;
 mod script;
+mod script_dispatcher;
 mod script_syntax;
 mod script_uses;
 mod shell;

@@ -5,7 +5,7 @@
 //! padding, which its measure does not resolve; and the `width`,
 //! `height` and `srcset` attributes, which are not read.
 
-use std::collections::HashMap;
+use crate::node_map::NodeMap;
 
 use vapors_dom::NodeId;
 
@@ -20,7 +20,7 @@ pub(crate) fn refusals(
     images: &Images,
     arena: &Arena,
     nodes: &[NodeId],
-    used: &HashMap<NodeId, Used>,
+    used: &NodeMap<Used>,
 ) -> Vec<ElementError> {
     let imgs = nodes.iter().copied().filter(|&node| is_img(arena, node));
     imgs.flat_map(|node| {
@@ -100,6 +100,6 @@ fn percentages(style: &taffy::Style) -> Vec<String> {
         .collect()
 }
 
-fn relative(raw: taffy::CompactLength) -> bool {
+pub(crate) fn relative(raw: taffy::CompactLength) -> bool {
     raw.tag() == taffy::CompactLength::PERCENT_TAG || raw.is_plain_calc()
 }

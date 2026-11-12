@@ -1,0 +1,83 @@
+{
+  "steps": [
+    {
+      "action": "Move(50.0, 20.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "div#a",
+          "type": "pointermove"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 5,
+      "selections": {},
+      "values": {}
+    },
+    {
+      "action": "Press(50.0, 20.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "div#a",
+          "type": "pointerdown"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 7,
+      "selections": {},
+      "values": {}
+    },
+    {
+      "action": "Move(150.0, 20.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "div#b",
+          "type": "pointermove"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 9,
+      "selections": {},
+      "values": {}
+    },
+    {
+      "action": "Release(150.0, 20.0)",
+      "checked": {},
+      "events": [
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "div#b",
+          "type": "pointerup"
+        },
+        {
+          "bubbles": true,
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "target": "div#wrap",
+          "type": "click"
+        }
+      ],
+      "focus": "body",
+      "focusVisible": false,
+      "line": 11,
+      "selections": {},
+      "values": {}
+    }
+  ]
+}

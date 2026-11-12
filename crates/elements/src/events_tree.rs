@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use vapors_css::tree::States;
-use vapors_dom::{Capture, Event, Handler, NodeId};
+use vapors_dom::{Capture, Event, NodeId};
 
 use crate::document::Document;
 use crate::node::Kind;
@@ -25,6 +25,18 @@ impl Document {
     /// other element, marking the document changed when any flag moved.
     pub(crate) fn set_flag_chain(&mut self, flag: States, target: Option<NodeId>) {
         let chain = target.map(|node| self.chain(node)).unwrap_or_default();
+        self.set_flag_only(flag, &chain);
+    }
+
+    /// Sets `flag` on `target` alone and clears it on every other element
+    /// (`:focus`, which its ancestors do not share).
+    pub(crate) fn set_flag_on(&mut self, flag: States, target: Option<NodeId>) {
+        self.set_flag_only(flag, &target.into_iter().collect::<Vec<_>>());
+    }
+
+    /// Sets `flag` on the elements of `chain` and clears it on every
+    /// other, marking the document changed when any flag moved.
+    fn set_flag_only(&mut self, flag: States, chain: &[NodeId]) {
         for node in self.elements() {
             let Kind::Element(element) = &mut self.arena.get_mut(node, "set_flag_chain").kind
             else {
@@ -37,10 +49,20 @@ impl Document {
                 } else {
                     element.states.without(flag)
                 };
-                self.changed = true;
+                self.note_change();
                 self.mark_flag(node, flag);
             }
         }
+    }
+
+    /// `node` when it is still in the document after a dispatch, whose
+    /// listeners may have removed it: every default action and every
+    /// follow-on event goes through this, and does nothing for a removed
+    /// node, as Chromium carries on when a handler detaches a node (what
+    /// it fires on the detached node, nothing in the document can
+    /// observe; review-fable-input H1).
+    pub(crate) fn still_in(&self, node: NodeId) -> Option<NodeId> {
+        Some(node).filter(|node| self.contains(*node))
     }
 
     /// The nearest element that is, or holds, both `a` and `b`.
@@ -49,24 +71,29 @@ impl Document {
         self.chain(a).into_iter().find(|node| of_b.contains(node))
     }
 
-    /// Whether `node` is, or is inside, a `<button disabled>`.
+    /// Whether `node` is, or is inside, a `<button disabled>`, or is an
+    /// `<input disabled>`: neither is clicked (3-E3a: Chromium sends a
+    /// disabled input its `pointerdown` and `pointerup`, not the click).
     pub(crate) fn in_disabled_button(&self, node: NodeId) -> bool {
         self.chain(node).into_iter().any(|n| {
             self.arena
                 .get(n, "in_disabled_button")
                 .element()
-                .is_some_and(|e| e.tag == "button" && e.attributes.contains_key("disabled"))
+                .is_some_and(|e| {
+                    matches!(e.tag.as_str(), "button" | "input")
+                        && e.attributes.contains_key("disabled")
+                })
         })
     }
 
     /// The listeners for `name` on each node of `target`'s chain, target
     /// first, with their node, cloned so none is called with the
     /// document borrowed.
-    fn listeners_along(
+    pub(crate) fn listeners_chain(
         &self,
         target: NodeId,
         name: &str,
-    ) -> Vec<(NodeId, Vec<Rc<RefCell<Handler>>>)> {
+    ) -> Vec<(NodeId, Vec<vapors_dom::Listener>)> {
         self.chain(target)
             .into_iter()
             .map(|node| match &self.arena.get(node, "dispatch").kind {
@@ -87,22 +114,68 @@ impl Document {
 
 /// Delivers `event` to `target`, then each ancestor, until a listener
 /// stops propagation; what listeners asked of the pointer's capture,
-/// with the element each listener is on.
+/// with the element each listener is on (nothing for a removed target).
 pub(super) fn dispatch(
     document: &Rc<RefCell<Document>>,
     target: NodeId,
-    mut event: Event,
+    event: Event,
 ) -> Vec<(NodeId, Capture)> {
-    let along = document.borrow().listeners_along(target, event.name());
-    let mut asked = Vec::new();
-    for (node, listeners) in along {
-        for listener in listeners {
-            (listener.borrow_mut())(&mut event);
-            asked.extend(event.take_capture().map(|capture| (node, capture)));
-        }
-        if event.propagation_stopped() {
-            break;
-        }
+    deliver(document, target, event, true).map_or_else(Vec::new, |(_, asked)| asked)
+}
+
+/// Delivers `event` to `target`, and when it `bubbles` to each ancestor
+/// until a listener stops propagation; the event as the listeners left
+/// it, and what they asked of the pointer's capture. `None` for a
+/// target no longer in the document (an earlier listener removed it):
+/// refused before any listener runs, as `Dispatcher::dispatch` refuses
+/// a removed node, so the caller's default action stops
+/// ([`Document::still_in`]).
+pub(crate) fn deliver(
+    document: &Rc<RefCell<Document>>,
+    target: NodeId,
+    mut event: Event,
+    bubbles: bool,
+) -> Option<(Event, Vec<(NodeId, Capture)>)> {
+    let target = document.borrow().still_in(target)?;
+    event = event.at(target);
+    let mut along = document.borrow().listeners_chain(target, event.name());
+    if !bubbles {
+        along.truncate(1);
     }
-    asked
+    let mut asked = Vec::new();
+    vapors_dom::run_along(along, &mut event, |node, event| {
+        asked.extend(event.take_capture().map(|capture| (node, capture)));
+    });
+    Some((event, asked))
+}
+
+/// `click` on `target`, bubbling, with its default action around it:
+/// a checkbox flips before the listeners run and fires `input` and
+/// `change` after them, unless one prevented the click (`checkbox`);
+/// other elements have none yet (a label's and a link's come with
+/// them). Nothing for a target no longer in the document.
+pub(crate) fn dispatch_click(document: &Rc<RefCell<Document>>, target: NodeId, event: Event) {
+    let Some(target) = document.borrow().still_in(target) else {
+        return;
+    };
+    let was = crate::checkbox::before_click(document, target);
+    let prevented = dispatch_bubbling(document, target, event);
+    if let Some(was) = was {
+        crate::checkbox::after_click(document, target, was, prevented);
+    }
+}
+
+/// `event` at `node` only: an event that does not bubble (`focus`).
+pub(crate) fn dispatch_here(document: &Rc<RefCell<Document>>, node: NodeId, event: Event) {
+    deliver(document, node, event, false);
+}
+
+/// `event` at `node` and up its ancestors; whether a listener prevented
+/// its default action (`false` for a node no longer in the document).
+pub(crate) fn dispatch_bubbling(
+    document: &Rc<RefCell<Document>>,
+    node: NodeId,
+    event: Event,
+) -> bool {
+    deliver(document, node, event, true).is_some_and(|(event, _)| event.default_prevented())
 }

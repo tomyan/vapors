@@ -3,7 +3,7 @@
 //! pixel to what is behind.
 
 use vapors_gpu_harness::{gpu, read_rgba8};
-use vapors_renderer::{QuadPipeline, ShadowPipeline, Target, clear};
+use vapors_renderer::{FrameEncoder, QuadPipeline, ShadowPipeline, Target, clear};
 use vapors_scene::{Color, Quad, Rect, Shadow, Size};
 
 const BACK: [u8; 4] = [40, 40, 40, 255];
@@ -23,16 +23,19 @@ fn render(width: u32, height: u32, draw: impl FnOnce(&wgpu::Device, &Target<'_>)
     let target = clear(&gpu.device, &gpu.queue, width, height, colour(BACK));
     let view = target.create_view(&wgpu::TextureViewDescriptor::default());
     let viewport = Size { width, height };
+    let encoder = FrameEncoder::new(&gpu.device);
     draw(
         &gpu.device,
         &Target {
             device: &gpu.device,
             queue: &gpu.queue,
+            encoder: &encoder,
             view: &view,
             viewport,
             scissor: None,
         },
     );
+    encoder.submit(&gpu.queue).expect("no draw refused");
     read_rgba8(&gpu.device, &gpu.queue, &target)
 }
 

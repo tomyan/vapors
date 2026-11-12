@@ -1,46 +1,27 @@
 //! The event a listener receives.
 
+use crate::{Capture, Modifiers, NodeId, Pointer};
+
 /// An event delivered to a listener. The payload fields are set by
-/// the kind of event: `input` and `change` carry `value`, `change` on
-/// a checkbox carries `checked`.
+/// the kind of event: `input` and `change` carry `value`, and on a
+/// range or number input the value as a number too; `change` on a
+/// checkbox carries `checked`.
 #[derive(Debug, Clone, Default)]
 pub struct Event {
     name: String,
     value: Option<String>,
+    value_number: Option<f64>,
     checked: Option<bool>,
     propagation_stopped: bool,
     default_prevented: bool,
     pointer: Option<Pointer>,
     capture: Option<Capture>,
+    target: Option<NodeId>,
+    pub(crate) key: Option<String>,
+    pub(crate) code: Option<String>,
+    pub(crate) repeat: bool,
+    modifiers: Modifiers,
 }
-
-/// Where a pointer event happened, and which pointer: positions in CSS
-/// px, unrounded.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct Pointer {
-    /// From the viewport's top-left.
-    pub client: [f32; 2],
-    /// From the target's padding box's top-left.
-    pub offset: [f32; 2],
-    /// 1 for the mouse; each touch has its own (3-E1b).
-    pub id: u32,
-    /// Whether a button or finger is down for this event, so a listener
-    /// may capture the pointer: on `pointerdown` and on `pointermove`
-    /// while pressed.
-    pub pressed: bool,
-}
-
-/// What a listener asked of the pointer's capture.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Capture {
-    /// `set_pointer_capture`.
-    Set,
-    /// `release_pointer_capture`.
-    Release,
-}
-
-/// A listener: boxed so the tree can store it.
-pub type Handler = Box<dyn FnMut(&mut Event)>;
 
 impl Event {
     /// An event of the given kind with no payload.
@@ -52,11 +33,43 @@ impl Event {
         }
     }
 
+    /// The modifier keys held with a pointer or key event: `pointerdown`,
+    /// `pointerup`, `click`, `dblclick`, `keydown` and `keyup` carry
+    /// them.
+    #[must_use]
+    pub fn with_modifiers(mut self, modifiers: Modifiers) -> Event {
+        self.modifiers = modifiers;
+        self
+    }
+
+    /// The modifier keys held: the DOM's altKey, ctrlKey, metaKey and
+    /// shiftKey.
+    #[must_use]
+    pub fn modifiers(&self) -> Modifiers {
+        self.modifiers
+    }
+
     /// Attaches the `value` payload.
     #[must_use]
     pub fn with_value(mut self, value: &str) -> Event {
         self.value = Some(value.to_string());
         self
+    }
+
+    /// Attaches the value as a number, on an `input` or `change` from a
+    /// range or number input.
+    #[must_use]
+    pub fn with_value_number(mut self, value: f64) -> Event {
+        self.value_number = Some(value);
+        self
+    }
+
+    /// The control's value as a number, on a range or number input's
+    /// `input` or `change`; `None` on an event that carries none (where
+    /// the DOM's `valueAsNumber` would answer NaN).
+    #[must_use]
+    pub fn value_as_number(&self) -> Option<f64> {
+        self.value_number
     }
 
     /// Attaches the `checked` payload.
@@ -85,6 +98,20 @@ impl Event {
     #[must_use]
     pub fn offset(&self) -> [f32; 2] {
         self.pointer.map_or([0.0, 0.0], |pointer| pointer.offset)
+    }
+
+    /// Names the node the event is dispatched to: the dispatcher sets it.
+    #[must_use]
+    pub fn at(mut self, target: NodeId) -> Event {
+        self.target = Some(target);
+        self
+    }
+
+    /// The node the event was dispatched to (the DOM's `target`), which
+    /// stays the same as it bubbles; `None` before dispatch.
+    #[must_use]
+    pub fn target(&self) -> Option<NodeId> {
+        self.target
     }
 
     /// The pointer's data, on a pointer event.
@@ -134,10 +161,11 @@ impl Event {
         self.value.as_deref().unwrap_or_default()
     }
 
-    /// The control's checked state, or `false` when the event carries none.
+    /// The control's checked state, on a checkbox's `input` or `change`;
+    /// `None` on an event that carries none.
     #[must_use]
-    pub fn checked(&self) -> bool {
-        self.checked.unwrap_or(false)
+    pub fn checked(&self) -> Option<bool> {
+        self.checked
     }
 
     /// Keeps the event from listeners further up the tree.

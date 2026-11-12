@@ -31,11 +31,16 @@ fn hover_and_active_restyle_the_chain_under_the_pointer() {
         .painted()
         .expect("painted")
         .scene()
+        .to_scene()
         .items()
         .iter()
         .filter_map(|item| match item {
             Item::Quad(quad) => Some(quad.background.to_rgba8()),
-            Item::Text { .. } | Item::Shadow(_) | Item::Image { .. } => None,
+            Item::Text { .. }
+            | Item::Shadow(_)
+            | Item::Image { .. }
+            | Item::Icon { .. }
+            | Item::Surface { .. } => None,
         })
         .collect();
     assert_eq!(
@@ -59,7 +64,15 @@ fn leaving_the_window_clears_hover() {
     update(&doc);
 
     // Then
-    assert_eq!(doc.borrow().painted().expect("painted").scene().items(), []);
+    assert_eq!(
+        doc.borrow()
+            .painted()
+            .expect("painted")
+            .scene()
+            .to_scene()
+            .items(),
+        []
+    );
 }
 
 #[test]
@@ -81,11 +94,16 @@ fn quad_colours(doc: &Rc<RefCell<Document>>) -> Vec<[u8; 4]> {
         .painted()
         .expect("painted")
         .scene()
+        .to_scene()
         .items()
         .iter()
         .filter_map(|item| match item {
             Item::Quad(quad) => Some(quad.background.to_rgba8()),
-            Item::Text { .. } | Item::Shadow(_) | Item::Image { .. } => None,
+            Item::Text { .. }
+            | Item::Shadow(_)
+            | Item::Image { .. }
+            | Item::Icon { .. }
+            | Item::Surface { .. } => None,
         })
         .collect()
 }

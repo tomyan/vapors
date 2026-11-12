@@ -10,6 +10,7 @@ fn press(logical: &Key, physical: KeyCode, modifiers: ModifiersState) -> Press<'
         logical,
         physical: PhysicalKey::Code(physical),
         modifiers,
+        text: None,
     }
 }
 
@@ -117,6 +118,66 @@ fn the_control_character_ctrl_v_can_produce_pastes_by_the_physical_key() {
     let control = Key::Character("\u{16}".into());
     assert!(is_paste(
         &press(&control, KeyCode::KeyV, ModifiersState::CONTROL),
+        false
+    ));
+}
+
+#[test]
+fn the_shortcut_as_the_dom_names_it_is_the_platforms_by_the_v_place() {
+    // Given
+    use crate::event::Modifiers;
+    use crate::paste_key::paste_shortcut;
+    let control = Modifiers {
+        control: true,
+        ..Modifiers::default()
+    };
+    let command = Modifiers {
+        meta: true,
+        ..Modifiers::default()
+    };
+
+    // Then: Control off macOS, Command on it; a Cyrillic layout by its place
+    assert!(paste_shortcut("v", "KeyV", control, false, false));
+    assert!(paste_shortcut("м", "KeyV", control, false, false));
+    assert!(paste_shortcut("v", "KeyV", command, false, true));
+    assert!(
+        !paste_shortcut("v", "KeyV", command, false, false),
+        "Meta+V off macOS"
+    );
+    assert!(
+        !paste_shortcut("v", "KeyV", control, false, true),
+        "Control+V on macOS"
+    );
+    assert!(
+        !paste_shortcut("v", "KeyV", control, true, false),
+        "a repeat"
+    );
+}
+
+#[test]
+fn a_named_or_dead_key_at_the_v_place_is_v_by_its_place() {
+    // Given
+    use crate::event::Modifiers;
+    use crate::paste_key::paste_shortcut;
+    let control = Modifiers {
+        control: true,
+        ..Modifiers::default()
+    };
+
+    // Then: not a letter, so the key at the V place decides
+    assert!(paste_shortcut(
+        "Unidentified",
+        "KeyV",
+        control,
+        false,
+        false
+    ));
+    assert!(paste_shortcut("Dead", "KeyV", control, false, false));
+    assert!(!paste_shortcut(
+        "Unidentified",
+        "KeyB",
+        control,
+        false,
         false
     ));
 }

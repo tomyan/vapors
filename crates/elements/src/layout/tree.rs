@@ -2,11 +2,13 @@
 //! containing-block traits, and the dispatch from a box's display type
 //! to Taffy's block, flex and leaf algorithms.
 
+#[cfg(feature = "grid")]
+use taffy::compute_grid_layout;
 use taffy::{
     BlockContext, Cache, CacheTree, Display, Layout, LayoutInput, LayoutOutput, LayoutPartialTree,
     NodeId, RunMode, Style, TraversePartialTree, TraverseTree, compute_block_layout,
-    compute_cached_layout, compute_flexbox_layout, compute_grid_layout, compute_hidden_layout,
-    compute_leaf_layout, compute_oof_layout,
+    compute_cached_layout, compute_flexbox_layout, compute_hidden_layout, compute_leaf_layout,
+    compute_oof_layout,
 };
 use vapors_text::FontSystem;
 
@@ -21,9 +23,11 @@ pub(crate) struct BoxTree<'f> {
     pub(crate) cache: &'f mut super::TextCache,
     pub(crate) scale: f32,
     pub(crate) calcs: &'f Calcs,
-    /// Boxes laid out, not read from their cache: what the incremental
-    /// tests count.
-    pub(crate) laid_out: usize,
+    /// The slots laid out or written: what the incremental tests
+    /// count, and what placement works out again (`placement.rs`).
+    pub(crate) written: super::written::Written,
+    /// Calls to `lay_out`, cache hits included.
+    pub(crate) calls: usize,
 }
 
 impl BoxTree<'_> {
@@ -41,6 +45,7 @@ impl BoxTree<'_> {
         inputs: LayoutInput,
         block: Option<&mut BlockContext<'_>>,
     ) -> LayoutOutput {
+        self.calls += 1;
         if inputs.run_mode == RunMode::PerformHiddenLayout {
             return compute_hidden_layout(self, id);
         }
@@ -59,12 +64,13 @@ impl BoxTree<'_> {
         inputs: LayoutInput,
         block: Option<&mut BlockContext<'_>>,
     ) -> LayoutOutput {
-        self.laid_out += 1;
+        self.written.laid_out.push(usize::from(id));
         let has_children = !self.node(id).children.is_empty();
         match (self.node(id).style.display, has_children) {
             (Display::None, _) => compute_hidden_layout(self, id),
             (Display::Block, true) => compute_block_layout(self, id, inputs, block),
             (Display::Flex, true) => compute_flexbox_layout(self, id, inputs),
+            #[cfg(feature = "grid")]
             (Display::Grid, true) => compute_grid_layout(self, id, inputs),
             (_, false) => self.leaf(id, inputs),
             (display, true) => unreachable!("{display:?} is refused when styles are read"),
@@ -92,11 +98,35 @@ impl BoxTree<'_> {
             |handle, basis| calcs.resolve(handle, basis),
             |known, available| match &node.content {
                 Content::Text(run) => measure_text((fonts, cache), scale, run, known, available),
+                Content::Vacant => unreachable!("a vacant slot is no box's child"),
                 Content::Element(_) => node.natural.map_or(taffy::Size::ZERO, |natural| {
-                    super::replaced::measure(&node.style, inputs.parent_size, known, natural)
+                    if node.style.item_is_replaced {
+                        super::replaced::measure(&node.style, inputs.parent_size, known, natural)
+                    } else {
+                        control_size(&node.style, known, natural)
+                    }
                 }),
             },
         )
+    }
+}
+
+/// The content size of a control with a natural size that is not a
+/// replaced box (a checkbox): each axis what layout already knows
+/// (a border-box size, less its padding and border), else the natural
+/// size; no aspect ratio, so a stretched checkbox keeps its width.
+fn control_size(
+    style: &taffy::Style,
+    known: taffy::Size<Option<f32>>,
+    natural: [f32; 2],
+) -> taffy::Size<f32> {
+    let inset = super::replaced::inset(style);
+    let content = |outer: Option<f32>, axis: usize| {
+        outer.map_or(natural[axis], |outer| (outer - inset[axis]).max(0.0))
+    };
+    taffy::Size {
+        width: content(known.width, 0),
+        height: content(known.height, 1),
     }
 }
 
@@ -147,7 +177,11 @@ impl LayoutPartialTree for BoxTree<'_> {
     }
 
     fn set_unrounded_layout(&mut self, id: NodeId, layout: &Layout) {
-        self.node_mut(id).layout = *layout;
+        let node = self.node_mut(id);
+        if node.layout != *layout {
+            node.layout = *layout;
+            self.written.changed.push(usize::from(id));
+        }
     }
 
     fn compute_child_layout(&mut self, id: NodeId, inputs: LayoutInput) -> LayoutOutput {

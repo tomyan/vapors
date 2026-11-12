@@ -10,7 +10,9 @@ mod wake;
 
 use vapors_app::ElementsApp;
 use vapors_canvas::{ImageApp, decode_png};
-use vapors_platform::{WindowOptions, hide_page_controls, query_parameter, report_error, run};
+use vapors_platform::{
+    WindowOptions, app_draws_open, hide_status_line, query_parameter, report_error, run,
+};
 use vapors_scene::Color;
 
 const GRADIENT: &[u8] = include_bytes!("../../platform/examples/fixtures/gradient.png");
@@ -38,6 +40,9 @@ fn start() -> Result<(), String> {
         width: 640,
         height: 400,
     };
+    if name == "racer" {
+        return vapors_racer::run();
+    }
     if name == "image" {
         let image = decode_png(GRADIENT).map_err(|message| format!("gradient.png: {message}"))?;
         let app = ImageApp::showing("gradient.png", image, BACKGROUND);
@@ -46,9 +51,17 @@ fn start() -> Result<(), String> {
     if name == "wake" {
         return run(options, wake::WakeApp).map_err(|e| e.to_string());
     }
-    let demo = vapors_demos::find(&name)?;
+    // `own-open` is `hello` with the page's status line left as it is: the
+    // page check's case for an app that draws its own Open and keeps `#status`.
+    // A test hook for scripts/check-page-contract.sh only; like `wake`, it is
+    // not in `vapors_demos`, so no demo list or error message names it.
+    let keeps_status = name == "own-open";
+    let demo = vapors_demos::find(if keeps_status { "hello" } else { &name })?;
     // An elements demo draws its own controls; the page's would cover them.
-    hide_page_controls();
+    app_draws_open();
+    if !keeps_status {
+        hide_status_line();
+    }
     let shown = vapors_demos::document(&demo);
     // `ticks=N` stops a demo that changes every frame after N frames, so
     // a headless page goes idle for its screenshot (the page contract).
