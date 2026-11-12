@@ -17,10 +17,8 @@ pub use crate::atlas_types::{AtlasConfig, AtlasError, AtlasGlyph, PageKind};
 use crate::atlas_types::{AtlasKey, GlyphKey};
 use crate::raster::{Coverage, GlyphRequest, Rasterizer};
 
-/// The colour page's largest side: nothing draws from it until colour
-/// glyphs are rasterised, so it stays at 4 MiB of RGBA whatever the
-/// coverage page's size. The pull request that rasterises colour
-/// glyphs sizes it.
+/// The colour page's largest side, 4 MiB of RGBA: nothing draws from it
+/// until colour glyphs are rasterised, and that pull request sizes it.
 const COLOUR_PAGE: u32 = 1024;
 
 pub(crate) struct Entry {
@@ -48,8 +46,7 @@ pub struct GlyphAtlas {
 }
 
 impl GlyphAtlas {
-    /// Empty pages of `config.page_size`; the colour page no larger
-    /// than [`COLOUR_PAGE`].
+    /// Empty pages of `config.page_size`, the colour page at most 1024.
     #[must_use]
     pub fn new(config: AtlasConfig) -> Self {
         Self {
