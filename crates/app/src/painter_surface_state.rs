@@ -29,3 +29,10 @@ impl ScenePainter {
         self.surfaces.states()
     }
 }
+
+impl super::surfaces::Surfaces {
+    /// The bindings kept: one per surface holding a backing.
+    pub(super) fn bind_groups_kept(&self) -> u64 {
+        self.states().iter().filter(|state| state.backing).count() as u64
+    }
+}

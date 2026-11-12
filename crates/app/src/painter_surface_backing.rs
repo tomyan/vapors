@@ -117,11 +117,6 @@ impl Mounted {
         Ok(&self.backing.as_ref().expect("allocated above").bound)
     }
 
-    /// Whether a backing, and its binding, is held.
-    pub(super) fn backed(&self) -> bool {
-        self.backing.is_some()
-    }
-
     /// Claims the surface's name for the frame at `size`: refused when
     /// another surface claimed it, or when `size` is over the device's
     /// limit.

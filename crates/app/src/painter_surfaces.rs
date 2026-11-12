@@ -140,11 +140,6 @@ impl Surfaces {
         Ok(())
     }
 
-    /// The bindings kept: one per surface with a backing.
-    pub(super) fn bind_groups_kept(&self) -> u64 {
-        self.mounted.values().filter(|m| m.backed()).count() as u64
-    }
-
     /// The work renders issued through `SurfaceFrame::work` since the
     /// last take, and the count back to 0.
     pub(super) fn take_work(&self) -> GpuWork {
