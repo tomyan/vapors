@@ -84,7 +84,7 @@ impl Rows {
             RowChange::HoveredClass => page.edit(Edit::Hover),
             RowChange::Resize => page.rows_resizable(),
             RowChange::Scroll => page.body_scrolls(),
-            RowChange::Idle | RowChange::Text | RowChange::Class => {}
+            RowChange::Idle | RowChange::Text | RowChange::Class | RowChange::Insert => {}
         }
         let mut app = ElementsApp::new(Rc::clone(&page.doc));
         app.time_frames(true);
