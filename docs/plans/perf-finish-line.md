@@ -25,6 +25,11 @@ the harness shows it, not when the code is believed to do it.
 
 Property 1 at 10,000 rows has a 10,000-row workload in `vapors-perf`.
 
+Property 9's run judges every frame from the first, with no warmup
+frames excluded, unless Tom decides otherwise (`docs/plans/one-scene.md`,
+D7): `vapors-perf`'s default 20 warmup frames would leave out the
+mount, pipeline creation and first uploads.
+
 Properties 1 and 6 are judged by `vapors-perf --scaling`, per change:
 
 ```
@@ -86,7 +91,8 @@ and does not judge until the splice step is built.
 7. The build-time analysis, first version (properties 7 and 8),
    with the compiler's mark of list templates whose rows cannot
    change paint order (`docs/plans/splice.md` section (d)).
-8. The shape table and the one-scene proof with 3D slice 2 (property 9).
+8. The shape table and the one-scene proof with 3D slice 2 (property 9;
+   `docs/plans/one-scene.md`).
 
 ## After the line
 
