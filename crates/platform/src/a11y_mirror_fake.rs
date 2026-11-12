@@ -1,7 +1,9 @@
 //! A fake DOM for the mirror's tests: elements by index, each with
 //! its attributes, own text, scroll offset and children in order; the
 //! writes counted, attributes (text and scroll with them) apart from
-//! moves.
+//! moves. As Chromium: an element appended or inserted, in place or
+//! not, and its subtree read a scroll offset of 0 after, and a scroll
+//! set on a detached element is lost.
 
 use std::collections::BTreeMap;
 
@@ -39,6 +41,27 @@ impl FakeDom {
         if let Some(parent) = self.elements[child].parent.take() {
             self.elements[parent].children.retain(|&c| c != child);
         }
+        self.reset_scroll(child);
+    }
+
+    /// `element` and its subtree scrolled to 0, as a move leaves them.
+    fn reset_scroll(&mut self, element: usize) {
+        self.elements[element].scroll = [0.0, 0.0];
+        for child in self.elements[element].children.clone() {
+            self.reset_scroll(child);
+        }
+    }
+
+    /// Whether `element` is under the root.
+    fn attached(&self, element: usize) -> bool {
+        let mut cursor = Some(element);
+        while let Some(at) = cursor {
+            if at == 0 {
+                return true;
+            }
+            cursor = self.elements[at].parent;
+        }
+        false
     }
 
     /// The tree under `element` as lines, one per element, indented by
@@ -93,23 +116,30 @@ impl MirrorDom for FakeDom {
         self.elements[*element].text = text.to_owned();
     }
 
-    fn append(&mut self, parent: &usize, child: &usize) {
+    fn append(&mut self, parent: &usize, child: &usize) -> Result<(), String> {
         self.moves += 1;
         self.detach(*child);
         self.elements[*parent].children.push(*child);
         self.elements[*child].parent = Some(*parent);
+        Ok(())
     }
 
-    fn insert_before(&mut self, parent: &usize, child: &usize, before: &usize) {
+    fn insert_before(
+        &mut self,
+        parent: &usize,
+        child: &usize,
+        before: &usize,
+    ) -> Result<(), String> {
         self.moves += 1;
         self.detach(*child);
         let siblings = &mut self.elements[*parent].children;
         let at = siblings
             .iter()
             .position(|c| c == before)
-            .expect("before is a child of parent");
+            .ok_or_else(|| format!("element {before} is not a child of element {parent}"))?;
         siblings.insert(at, *child);
         self.elements[*child].parent = Some(*parent);
+        Ok(())
     }
 
     fn remove(&mut self, element: &usize) {
@@ -119,6 +149,8 @@ impl MirrorDom for FakeDom {
 
     fn set_scroll(&mut self, element: &usize, offset: [f32; 2]) {
         self.attribute_writes += 1;
-        self.elements[*element].scroll = offset;
+        if self.attached(*element) {
+            self.elements[*element].scroll = offset;
+        }
     }
 }

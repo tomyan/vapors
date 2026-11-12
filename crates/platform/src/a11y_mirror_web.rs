@@ -92,12 +92,23 @@ impl MirrorDom for WebDom {
         }
     }
 
-    fn append(&mut self, parent: &Element, child: &Element) {
-        drop(parent.append_child(child));
+    fn append(&mut self, parent: &Element, child: &Element) -> Result<(), String> {
+        parent
+            .append_child(child)
+            .map(drop)
+            .map_err(|error| format!("{error:?}"))
     }
 
-    fn insert_before(&mut self, parent: &Element, child: &Element, before: &Element) {
-        drop(parent.insert_before(child, Some(before)));
+    fn insert_before(
+        &mut self,
+        parent: &Element,
+        child: &Element,
+        before: &Element,
+    ) -> Result<(), String> {
+        parent
+            .insert_before(child, Some(before))
+            .map(drop)
+            .map_err(|error| format!("{error:?}"))
     }
 
     fn remove(&mut self, element: &Element) {

@@ -1,8 +1,9 @@
-//! What a record writes to its element (R6 PR 5a): the attributes,
-//! text and scroll offset that differ from the record the mirror last
-//! applied to the node, so a record changed in one attribute is one
-//! write, a scroll is one write of its container's offset, and a
-//! reconcile of unchanged records writes nothing.
+//! What a record writes to its element (R6 PR 5a): the attributes and
+//! text that differ from the record the mirror last applied to the
+//! node, so a record changed in one attribute is one write and a
+//! reconcile of unchanged records writes nothing. A changed scroll
+//! offset is reported, not written: the mirror writes offsets once
+//! every element is in place (`a11y_mirror_scroll.rs`).
 
 use vapors_a11y::AxMirrorNode;
 
@@ -10,7 +11,7 @@ use crate::a11y_mirror_attrs::{attributes, text};
 use crate::a11y_mirror_dom::MirrorDom;
 
 /// Writes what `node` changed since `last` to `element`; everything,
-/// for a new element.
+/// for a new element. Whether the scroll offset changed (or is new).
 ///
 /// # Errors
 /// The record has no attributes in the mapping (`attributes`), or the
@@ -21,7 +22,7 @@ pub(crate) fn write<D: MirrorDom>(
     element: &D::Element,
     node: &AxMirrorNode,
     last: Option<&AxMirrorNode>,
-) -> Result<(), String> {
+) -> Result<bool, String> {
     let now = attributes(node)?;
     let before = last.map(attributes).transpose()?;
     if let Some(before) = &before
@@ -46,8 +47,7 @@ pub(crate) fn write<D: MirrorDom>(
         }
     }
     write_text(dom, element, node, last);
-    write_scroll(dom, element, node, last);
-    Ok(())
+    Ok(scroll_changed(node, last))
 }
 
 fn write_text<D: MirrorDom>(
@@ -63,22 +63,15 @@ fn write_text<D: MirrorDom>(
     }
 }
 
-/// A new element is at `[0, 0]`; a scroll container's offset is written
-/// when it differs from that or from the last record's.
-fn write_scroll<D: MirrorDom>(
-    dom: &mut D,
-    element: &D::Element,
-    node: &AxMirrorNode,
-    last: Option<&AxMirrorNode>,
-) {
+/// Whether `node`'s scroll offset differs from `last`'s, or from the
+/// `[0, 0]` a new element reads.
+fn scroll_changed(node: &AxMirrorNode, last: Option<&AxMirrorNode>) -> bool {
     let Some(scroll) = node.scroll else {
-        return;
+        return false;
     };
     let before = last
         .and_then(|last| last.scroll)
         .map_or([0.0, 0.0], |scroll| scroll.offset);
     // exact: any change of the offset is one to write
-    if scroll.offset.map(f32::to_bits) != before.map(f32::to_bits) {
-        dom.set_scroll(element, scroll.offset);
-    }
+    scroll.offset.map(f32::to_bits) != before.map(f32::to_bits)
 }
