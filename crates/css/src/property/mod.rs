@@ -4,6 +4,7 @@
 
 mod declaration;
 mod declaration_check;
+pub mod longhands;
 mod names;
 mod shorthand;
 mod shorthand_border;
@@ -47,6 +48,24 @@ impl PropertyId {
             .map(Self::at)
     }
 
+    /// The id of the longhand `name`, worked out at compile time when
+    /// assigned to a constant (as [`longhands`] does), so a name the
+    /// table does not list stops the build at the constant naming it.
+    ///
+    /// # Panics
+    /// When the table has no longhand `name`: a shorthand, or a typo.
+    #[must_use]
+    pub const fn named(name: &str) -> Self {
+        match position_in(table::FIRST_HALF, name) {
+            Some(index) => Self(index),
+            None => match position_in(table_rest::SECOND_HALF, name) {
+                #[allow(clippy::cast_possible_truncation)] // about a hundred entries
+                Some(index) => Self(table::FIRST_HALF.len() as u16 + index),
+                None => panic!("not a longhand in vapors-css's table"),
+            },
+        }
+    }
+
     /// Every longhand, in table order.
     pub fn all() -> impl Iterator<Item = Self> {
         (0..PROPERTIES.len()).map(Self::at)
@@ -88,6 +107,34 @@ impl PropertyId {
         &GRAMMARS.get_or_init(|| PROPERTIES.iter().map(|d| parse_grammar(d.syntax)).collect())
             [self.index()]
     }
+}
+
+/// Where `name` is in `defs`, at compile time.
+const fn position_in(defs: &[PropertyDef], name: &str) -> Option<u16> {
+    let mut index = 0;
+    while index < defs.len() {
+        if bytes_equal(defs[index].name.as_bytes(), name.as_bytes()) {
+            #[allow(clippy::cast_possible_truncation)] // about a hundred entries
+            return Some(index as u16);
+        }
+        index += 1;
+    }
+    None
+}
+
+/// `a == b`, which a `const fn` cannot write for slices yet.
+const fn bytes_equal(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut index = 0;
+    while index < a.len() {
+        if a[index] != b[index] {
+            return false;
+        }
+        index += 1;
+    }
+    true
 }
 
 /// A property name as the table spells it: lowercased, unless custom.

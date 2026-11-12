@@ -1,6 +1,10 @@
 //! An element's computed text properties as the text crate's style: the
 //! face, size, weight, line height and ink of the text runs it holds.
 
+use vapors_css::property::longhands::{
+    COLOR, FONT_FAMILY, FONT_SIZE, FONT_STYLE, FONT_WEIGHT, LETTER_SPACING, LINE_HEIGHT,
+    TEXT_ALIGN, WHITE_SPACE,
+};
 use vapors_css::value::{Color, LengthUnit, Value};
 use vapors_scene::Color as Rgba;
 use vapors_text::{Align, Family, LineHeight, Style};
@@ -52,17 +56,17 @@ impl TextStyle {
 /// The text style of the element `reader` reads.
 #[allow(clippy::cast_possible_truncation)] // font sizes are far inside f32
 pub(crate) fn text_style(reader: &mut Reader<'_>) -> TextStyle {
-    reader.read("white-space", white_space, ());
-    let size = reader.read("font-size", font_size, 16.0);
+    reader.read(WHITE_SPACE, white_space, ());
+    let size = reader.read(FONT_SIZE, font_size, 16.0);
     TextStyle {
-        face: reader.read("font-family", face, Face::Geist),
+        face: reader.read(FONT_FAMILY, face, Face::Geist),
         size,
-        weight: reader.read("font-weight", weight, 400.0),
-        line_height: reader.read("line-height", line_height, LineHeight::Normal),
-        color: reader.read("color", color, Rgba::default()),
-        letter_spacing: reader.read("letter-spacing", letter_spacing, 0.0),
-        align: reader.read("text-align", align, Align::Start),
-        italic: reader.read("font-style", italic, false),
+        weight: reader.read(FONT_WEIGHT, weight, 400.0),
+        line_height: reader.read(LINE_HEIGHT, line_height, LineHeight::Normal),
+        color: reader.read(COLOR, color, Rgba::default()),
+        letter_spacing: reader.read(LETTER_SPACING, letter_spacing, 0.0),
+        align: reader.read(TEXT_ALIGN, align, Align::Start),
+        italic: reader.read(FONT_STYLE, italic, false),
     }
 }
 

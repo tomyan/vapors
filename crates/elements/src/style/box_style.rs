@@ -8,6 +8,12 @@ use taffy::{
     AlignContent, AlignItems, BoxSizing, Dimension, Display, FlexDirection, FlexWrap,
     LengthPercentage, LengthPercentageAuto, Rect, Size, Style,
 };
+use vapors_css::property::longhands::{
+    ALIGN_CONTENT, ALIGN_ITEMS, ALIGN_SELF, ASPECT_RATIO, BOX_SIZING, COLUMN_GAP, DISPLAY,
+    FLEX_BASIS, FLEX_DIRECTION, FLEX_GROW, FLEX_SHRINK, FLEX_WRAP, HEIGHT, JUSTIFY_CONTENT,
+    MARGIN_BOTTOM, MARGIN_LEFT, MARGIN_RIGHT, MARGIN_TOP, MAX_HEIGHT, MAX_WIDTH, MIN_HEIGHT,
+    MIN_WIDTH, PADDING_BOTTOM, PADDING_LEFT, PADDING_RIGHT, PADDING_TOP, ROW_GAP, WIDTH,
+};
 use vapors_css::value::Value;
 
 use super::box_align::{align_content, align_items, align_self};
@@ -21,21 +27,21 @@ use super::values::{Amount, Reader, amount, keyword, shape, unknown};
 pub(crate) fn box_style(reader: &mut Reader<'_>, flex_item: bool, border: [f32; 4]) -> Style {
     let display = if flex_item { blockified } else { display };
     let mut style = Style {
-        display: reader.read("display", display, Display::Block),
-        box_sizing: reader.read("box-sizing", box_sizing, BoxSizing::ContentBox),
+        display: reader.read(DISPLAY, display, Display::Block),
+        box_sizing: reader.read(BOX_SIZING, box_sizing, BoxSizing::ContentBox),
         size: Size {
-            width: reader.read("width", dimension, Dimension::auto()),
-            height: reader.read("height", dimension, Dimension::auto()),
+            width: reader.read(WIDTH, dimension, Dimension::auto()),
+            height: reader.read(HEIGHT, dimension, Dimension::auto()),
         },
         min_size: Size {
-            width: reader.read("min-width", min_size, LengthPercentageAuto::auto()),
-            height: reader.read("min-height", min_size, LengthPercentageAuto::auto()),
+            width: reader.read(MIN_WIDTH, min_size, LengthPercentageAuto::auto()),
+            height: reader.read(MIN_HEIGHT, min_size, LengthPercentageAuto::auto()),
         },
         max_size: Size {
-            width: reader.read("max-width", none_or_amount, LengthPercentageAuto::auto()),
-            height: reader.read("max-height", none_or_amount, LengthPercentageAuto::auto()),
+            width: reader.read(MAX_WIDTH, none_or_amount, LengthPercentageAuto::auto()),
+            height: reader.read(MAX_HEIGHT, none_or_amount, LengthPercentageAuto::auto()),
         },
-        aspect_ratio: reader.read("aspect-ratio", aspect_ratio, None),
+        aspect_ratio: reader.read(ASPECT_RATIO, aspect_ratio, None),
         margin: margins(reader),
         padding: paddings(reader),
         border: Rect {
@@ -55,38 +61,38 @@ pub(crate) fn box_style(reader: &mut Reader<'_>, flex_item: bool, border: [f32; 
 }
 
 fn flex(reader: &mut Reader<'_>, style: &mut Style) {
-    style.flex_direction = reader.read("flex-direction", flex_direction, FlexDirection::Row);
-    style.flex_wrap = reader.read("flex-wrap", flex_wrap, FlexWrap::NoWrap);
-    style.flex_grow = reader.read("flex-grow", number, 0.0);
-    style.flex_shrink = reader.read("flex-shrink", number, 1.0);
-    style.flex_basis = reader.read("flex-basis", flex_basis, Dimension::auto());
-    style.align_items = reader.read("align-items", align_items, AlignItems::NORMAL);
-    style.align_self = reader.read("align-self", align_self, None);
-    style.align_content = reader.read("align-content", align_content, AlignContent::NORMAL);
-    style.justify_content = reader.read("justify-content", align_content, AlignContent::NORMAL);
+    style.flex_direction = reader.read(FLEX_DIRECTION, flex_direction, FlexDirection::Row);
+    style.flex_wrap = reader.read(FLEX_WRAP, flex_wrap, FlexWrap::NoWrap);
+    style.flex_grow = reader.read(FLEX_GROW, number, 0.0);
+    style.flex_shrink = reader.read(FLEX_SHRINK, number, 1.0);
+    style.flex_basis = reader.read(FLEX_BASIS, flex_basis, Dimension::auto());
+    style.align_items = reader.read(ALIGN_ITEMS, align_items, AlignItems::NORMAL);
+    style.align_self = reader.read(ALIGN_SELF, align_self, None);
+    style.align_content = reader.read(ALIGN_CONTENT, align_content, AlignContent::NORMAL);
+    style.justify_content = reader.read(JUSTIFY_CONTENT, align_content, AlignContent::NORMAL);
     style.gap = Size {
-        width: reader.read("column-gap", gap, LengthPercentage::length(0.0)),
-        height: reader.read("row-gap", gap, LengthPercentage::length(0.0)),
+        width: reader.read(COLUMN_GAP, gap, LengthPercentage::length(0.0)),
+        height: reader.read(ROW_GAP, gap, LengthPercentage::length(0.0)),
     };
 }
 
 fn margins(reader: &mut Reader<'_>) -> Rect<LengthPercentageAuto> {
     let zero = LengthPercentageAuto::length(0.0);
     Rect {
-        left: reader.read("margin-left", auto_or_amount, zero),
-        right: reader.read("margin-right", auto_or_amount, zero),
-        top: reader.read("margin-top", auto_or_amount, zero),
-        bottom: reader.read("margin-bottom", auto_or_amount, zero),
+        left: reader.read(MARGIN_LEFT, auto_or_amount, zero),
+        right: reader.read(MARGIN_RIGHT, auto_or_amount, zero),
+        top: reader.read(MARGIN_TOP, auto_or_amount, zero),
+        bottom: reader.read(MARGIN_BOTTOM, auto_or_amount, zero),
     }
 }
 
 fn paddings(reader: &mut Reader<'_>) -> Rect<LengthPercentage> {
     let zero = LengthPercentage::length(0.0);
     Rect {
-        left: reader.read("padding-left", length_percentage, zero),
-        right: reader.read("padding-right", length_percentage, zero),
-        top: reader.read("padding-top", length_percentage, zero),
-        bottom: reader.read("padding-bottom", length_percentage, zero),
+        left: reader.read(PADDING_LEFT, length_percentage, zero),
+        right: reader.read(PADDING_RIGHT, length_percentage, zero),
+        top: reader.read(PADDING_TOP, length_percentage, zero),
+        bottom: reader.read(PADDING_BOTTOM, length_percentage, zero),
     }
 }
 

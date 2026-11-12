@@ -7,7 +7,7 @@ use super::table::{
 };
 
 /// Longhands h to z.
-pub(super) static SECOND_HALF: &[PropertyDef] = &[
+pub(super) const SECOND_HALF: &[PropertyDef] = &[
     def("height", false, "auto", SIZE),
     def(
         "justify-content",

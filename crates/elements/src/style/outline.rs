@@ -3,6 +3,9 @@
 //! focus ring) and the dashed, dotted and double styles are refused, as
 //! vapors draws solid lines only.
 
+use vapors_css::property::longhands::{
+    OUTLINE_COLOR, OUTLINE_OFFSET, OUTLINE_STYLE, OUTLINE_WIDTH,
+};
 use vapors_css::value::Value;
 use vapors_scene::Color as Rgba;
 
@@ -23,10 +26,10 @@ pub(crate) struct Outline {
 /// The outline of the element `reader` reads, at `scale` device pixels
 /// per CSS pixel; `None` when its style is `none` or its width zero.
 pub(crate) fn outline(reader: &mut Reader<'_>, scale: f32) -> Option<Outline> {
-    let drawn = reader.read("outline-style", outline_style, false);
-    let width = snap_width(reader.read("outline-width", width_px, 0.0), scale);
-    let offset = reader.read("outline-offset", offset_px, 0.0);
-    let color = reader.read("outline-color", color, Rgba::default());
+    let drawn = reader.read(OUTLINE_STYLE, outline_style, false);
+    let width = snap_width(reader.read(OUTLINE_WIDTH, width_px, 0.0), scale);
+    let offset = reader.read(OUTLINE_OFFSET, offset_px, 0.0);
+    let color = reader.read(OUTLINE_COLOR, color, Rgba::default());
     (drawn && width > 0.0).then_some(Outline {
         width,
         offset,

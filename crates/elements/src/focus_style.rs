@@ -7,6 +7,8 @@
 //! nowhere, so the next update restyles what it would have anyway.
 
 use vapors_css::cascade::ComputedStyle;
+use vapors_css::property::PropertyId;
+use vapors_css::property::longhands::{DISPLAY, VISIBILITY};
 use vapors_dom::NodeId;
 
 use crate::document::Document;
@@ -41,10 +43,10 @@ impl Document {
         };
         let hidden = styles
             .iter()
-            .any(|style| keyword_of(style, "display") == "none");
+            .any(|style| keyword_of(style, DISPLAY) == "none");
         let visible = styles
             .last()
-            .is_some_and(|style| keyword_of(style, "visibility") == "visible");
+            .is_some_and(|style| keyword_of(style, VISIBILITY) == "visible");
         if hidden || !visible {
             Focus::NotFocusable
         } else {
@@ -70,9 +72,6 @@ impl Document {
 }
 
 /// `property`'s keyword in `style`; empty when it is not a keyword.
-fn keyword_of<'a>(style: &'a ComputedStyle, property: &str) -> &'a str {
-    style
-        .get_by_name(property)
-        .and_then(|value| crate::style::keyword(value).ok())
-        .unwrap_or("")
+fn keyword_of(style: &ComputedStyle, property: PropertyId) -> &str {
+    crate::style::keyword(style.get(property)).unwrap_or("")
 }

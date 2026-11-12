@@ -34,14 +34,12 @@ impl Styles<'_> {
     /// The refusal for `property` at this element, or `None` when the
     /// value is the parent's, inherited without a declaration here: the
     /// ancestor that declared it reports it.
-    pub(crate) fn refusal(&self, property: &'static str, reason: String) -> Option<Refusal> {
-        let id = PropertyId::from_name(property)
-            .unwrap_or_else(|| panic!("`{property}` is not a longhand in vapors-css's table"));
+    pub(crate) fn refusal(&self, id: PropertyId, reason: String) -> Option<Refusal> {
         let declared = self.own.declared_in(id).zip(self.own.declared_at(id));
         let inherited =
             declared.is_none() && self.parent.is_some_and(|p| p.get(id) == self.own.get(id));
         (!inherited).then(|| Refusal {
-            property,
+            property: id.name(),
             value: self.own.get(id).to_css(),
             reason,
             declared,
@@ -69,7 +67,7 @@ impl<'a> Reader<'a> {
     /// and returns `stand_in`.
     pub(crate) fn read<T>(
         &mut self,
-        property: &'static str,
+        property: PropertyId,
         read: impl FnOnce(&Value) -> Result<T, String>,
         stand_in: T,
     ) -> T {
@@ -85,18 +83,13 @@ impl<'a> Reader<'a> {
 
     /// Records a refusal of `property`'s value for `reason` (unless the
     /// value is inherited unchanged, which its declarer reports).
-    pub(crate) fn refuse(&mut self, property: &'static str, reason: String) {
+    pub(crate) fn refuse(&mut self, property: PropertyId, reason: String) {
         self.refusals.extend(self.styles.refusal(property, reason));
     }
 
     /// The computed value of `property`.
-    ///
-    /// # Panics
-    /// When the CSS crate has no such longhand: a typo in this crate.
-    pub(crate) fn value(&self, property: &'static str) -> &'a Value {
-        self.style
-            .get_by_name(property)
-            .unwrap_or_else(|| panic!("`{property}` is not a longhand in vapors-css's table"))
+    pub(crate) fn value(&self, property: PropertyId) -> &'a Value {
+        self.style.get(property)
     }
 }
 

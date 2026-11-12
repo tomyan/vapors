@@ -154,36 +154,37 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
 
 /// The deferred properties of `styles.own` that are not at their
 /// initial value in `initial`, each reported at the element that
-/// declared it.
+/// declared it. `TABLE` is in vapors-css's table order (its test holds
+/// them together), so each entry's id is its position: nothing is
+/// looked up by name, and nothing is allocated when nothing is refused.
 pub(crate) fn check_honoured(styles: Styles<'_>, initial: &ComputedStyle) -> Vec<Refusal> {
     TABLE
         .iter()
-        .filter_map(|(name, treatment)| match treatment {
-            Deferred(slice) => in_use(styles, initial, name, || {
+        .zip(PropertyId::all())
+        .filter_map(|((_, treatment), id)| match treatment {
+            Deferred(slice) => in_use(styles, initial, id, || {
                 format!(
                     "is not implemented by vapors-elements yet: it {}",
                     later(slice)
                 )
             }),
-            Off(why) => in_use(styles, initial, name, || (*why).to_owned()),
+            Off(why) => in_use(styles, initial, id, || (*why).to_owned()),
             Read => None,
         })
         .collect()
 }
 
-/// A refusal for `name` when it is set other than its initial value.
+/// A refusal for `id` when it is set other than its initial value.
 fn in_use(
     styles: Styles<'_>,
     initial: &ComputedStyle,
-    name: &'static str,
+    id: PropertyId,
     reason: impl FnOnce() -> String,
 ) -> Option<Refusal> {
-    let id = PropertyId::from_name(name)
-        .unwrap_or_else(|| panic!("`{name}` is not in vapors-css's table"));
     if styles.own.get(id) == initial.get(id) {
         return None;
     }
-    styles.refusal(name, reason())
+    styles.refusal(id, reason())
 }
 
 #[cfg(test)]
