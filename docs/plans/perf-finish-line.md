@@ -77,7 +77,8 @@ and does not judge until the splice step is built.
 7. The build-time analysis, first version (properties 7 and 8),
    with the compiler's mark of list templates whose rows cannot
    change paint order (`docs/plans/splice.md` section (d)).
-8. The shape table and the one-scene proof with 3D slice 2 (property 9).
+8. The shape table and the one-scene proof with 3D slice 2 (property 9;
+   `docs/plans/one-scene.md`).
 
 ## After the line
 
