@@ -96,3 +96,37 @@ fn hits_patched_at_several_places_in_one_update_keep_paint_order() {
     // Then
     assert_kept_equals_fresh(&mut doc, "a back, b ghosted");
 }
+
+#[test]
+fn the_patch_records_the_hits_removed_and_added() {
+    // Given: every square hit
+    let (mut doc, [a, b, c]) = page();
+
+    // When: the first loses its hit and the last grows, in one update
+    doc.set_attribute(a, "class", "sq a ghost");
+    doc.set_attribute(c, "class", "sq c wide");
+    let painted = doc.update(VIEWPORT).expect("updates");
+
+    // Then: a's removed rect, c's removed and added rects, nothing else
+    let changed = &painted.hits_changed;
+    assert!(
+        changed.may_move_hover([10.0, 50.0], None),
+        "a's removed hit holds the point"
+    );
+    assert!(
+        changed.may_move_hover([120.0, 50.0], None),
+        "c's added hit holds the point"
+    );
+    assert!(
+        changed.may_move_hover([150.0, 150.0], Some(a)),
+        "a's hit was removed"
+    );
+    assert!(
+        !changed.may_move_hover([10.0, 10.0], None),
+        "the block above is untouched"
+    );
+    assert!(
+        !changed.may_move_hover([150.0, 150.0], Some(b)),
+        "b is untouched"
+    );
+}

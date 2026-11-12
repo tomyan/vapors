@@ -5,6 +5,7 @@ mod boxes;
 mod calcs;
 mod field_box;
 mod inline;
+mod isolated;
 mod keep;
 mod layout_box;
 #[cfg(debug_assertions)]
@@ -30,6 +31,7 @@ use vapors_text::FontSystem;
 pub(crate) use boxes::{Content, LayoutBox};
 pub(crate) use calcs::Calcs;
 pub(crate) use inline::{InlineRun, InlineSpan};
+pub(crate) use isolated::{Changed, Settled};
 pub(crate) use keep::KeptBoxes;
 pub(crate) use rebuilt::Rebuilt;
 pub(crate) use slots::{Key, Placed, Slots};
@@ -56,16 +58,21 @@ pub struct BoxRect {
 /// (`KeptBoxes::rebuild`) is not laid out again. Returns
 /// them and what Taffy did (`LayoutWork`); `placed` gives their
 /// border boxes. An empty tree (html `display: none`) lays out nothing.
+/// Each of `changed`, a rebuilt owner whose subtree changed, is first
+/// settled (`isolated.rs`): laid out in isolation when that answers as
+/// the box it replaced did, else its ancestors are laid out again.
 ///
 /// # Errors
-/// A `calc()` that did not resolve (see `Calcs`), with what Taffy did.
+/// A `calc()` that did not resolve (see `Calcs`), with what Taffy did
+/// (boxed: the pair is wider than clippy's `Err` limit).
 pub(crate) fn lay_out(
     placed: Placed,
     texts: (&mut FontSystem, &mut TextCache),
     scale: f32,
     size: (f32, f32),
     calcs: &Calcs,
-) -> Result<(Placed, LayoutWork), (String, LayoutWork)> {
+    changed: Vec<Changed>,
+) -> Result<(Placed, LayoutWork), Box<(String, LayoutWork)>> {
     let (fonts, cache) = texts;
     let mut tree = BoxTree {
         boxes: placed.boxes,
@@ -80,6 +87,7 @@ pub(crate) fn lay_out(
         width: AvailableSpace::Definite(size.0),
         height: AvailableSpace::Definite(size.1),
     };
+    let settled = tree.settle(changed);
     // With html `display: none` there is no box, so no root to lay out.
     if !tree.boxes.is_empty() {
         compute_root_layout(&mut tree, NodeId::from(0usize), available);
@@ -87,10 +95,11 @@ pub(crate) fn lay_out(
     let work = LayoutWork {
         laid_out: tree.written.laid_out.len(),
         calls: tree.calls,
+        settled,
         written: std::mem::take(&mut tree.written),
     };
     match calcs.failure() {
-        Some(failure) => Err((failure, work)),
+        Some(failure) => Err(Box::new((failure, work))),
         None => Ok((
             Placed {
                 boxes: tree.boxes,
@@ -102,11 +111,12 @@ pub(crate) fn lay_out(
 }
 
 /// What one layout did: how many times Taffy laid a box out rather than
-/// reading its cache, how many times it asked a box for its layout, and
-/// the slots it laid out or wrote.
+/// reading its cache, how many times it asked a box for its layout, how
+/// the changed owners were settled, and the slots it laid out or wrote.
 pub(crate) struct LayoutWork {
     pub(crate) laid_out: usize,
     pub(crate) calls: usize,
+    pub(crate) settled: Settled,
     pub(crate) written: Written,
 }
 

@@ -5,15 +5,15 @@
 #[cfg(feature = "grid")]
 use taffy::compute_grid_layout;
 use taffy::{
-    BlockContext, Cache, CacheTree, Display, Layout, LayoutInput, LayoutOutput, LayoutPartialTree,
-    NodeId, RunMode, Style, TraversePartialTree, TraverseTree, compute_block_layout,
-    compute_cached_layout, compute_flexbox_layout, compute_hidden_layout, compute_leaf_layout,
-    compute_oof_layout,
+    BlockContext, Display, Layout, LayoutInput, LayoutOutput, LayoutPartialTree, NodeId, RunMode,
+    Style, TraversePartialTree, TraverseTree, compute_block_layout, compute_cached_layout,
+    compute_flexbox_layout, compute_hidden_layout, compute_leaf_layout, compute_oof_layout,
 };
 use vapors_text::FontSystem;
 
 use super::boxes::{Content, LayoutBox};
 use super::calcs::Calcs;
+use super::isolated::Asked;
 use super::measure::measure_text;
 
 /// The boxes, what measuring text needs, and the calcs Taffy may ask for.
@@ -39,7 +39,9 @@ impl BoxTree<'_> {
         &mut self.boxes[usize::from(id)]
     }
 
-    fn lay_out(
+    /// A box's layout for `inputs`, from its cache or laid out; a
+    /// miss notes how the box was asked (`LayoutBox::asked`).
+    pub(super) fn lay_out(
         &mut self,
         id: NodeId,
         inputs: LayoutInput,
@@ -49,11 +51,19 @@ impl BoxTree<'_> {
         if inputs.run_mode == RunMode::PerformHiddenLayout {
             return compute_hidden_layout(self, id);
         }
+        let in_block = block.is_some();
         compute_cached_layout(self, id, inputs, |tree, id, inputs| {
             let mut output = tree.dispatch(id, inputs, block);
             if inputs.run_mode == RunMode::PerformLayout {
                 compute_oof_layout(tree, id, &mut output);
             }
+            tree.note_asked(
+                id,
+                Asked {
+                    input: inputs,
+                    in_block,
+                },
+            );
             output
         })
     }
@@ -189,19 +199,7 @@ impl LayoutPartialTree for BoxTree<'_> {
     }
 }
 
-impl CacheTree for BoxTree<'_> {
-    fn cache_get(&mut self, id: NodeId, inputs: &LayoutInput) -> Option<LayoutOutput> {
-        self.node_mut(id).cache.get(inputs)
-    }
-
-    fn cache_store(&mut self, id: NodeId, inputs: &LayoutInput, output: LayoutOutput) {
-        self.node_mut(id).cache.store(inputs, output);
-    }
-
-    fn cache_clear(&mut self, id: NodeId) {
-        self.node_mut(id).cache = Cache::new();
-    }
-}
-
+#[path = "tree_cache.rs"]
+mod cache;
 #[path = "tree_containers.rs"]
 mod containers;

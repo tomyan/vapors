@@ -62,6 +62,9 @@ fn row_workloads() -> Vec<(usize, RowChange)> {
             .flat_map(|count| edits.map(|change| (count, change))),
     );
     all.extend([1000, 3000, 10_000].map(|count| (count, RowChange::Insert)));
+    for change in [RowChange::Resize, RowChange::Scroll] {
+        all.extend([1000, 3000].map(|count| (count, change)));
+    }
     all
 }
 

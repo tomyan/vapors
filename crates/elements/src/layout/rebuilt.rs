@@ -4,6 +4,7 @@
 //! Paint patches what it keeps from these (`changed_slots.rs`).
 
 use super::boxes::{Content, LayoutBox};
+use super::isolated::Changed;
 use super::slots::{Key, Taken};
 
 /// The slots `KeptBoxes::rebuild` placed and freed.
@@ -18,6 +19,9 @@ pub(crate) struct Rebuilt {
     /// A slot was freed or newly taken, or a rebuilt box's children
     /// differ from the box it replaced.
     pub(crate) shape_changed: bool,
+    /// The owners whose rebuilt subtree changed, for layout to settle
+    /// (`isolated.rs`); none when every box was built.
+    pub(crate) changed: Vec<Changed>,
 }
 
 impl Rebuilt {
@@ -31,6 +35,7 @@ impl Rebuilt {
             slots: boxes.iter().enumerate().filter_map(held).collect(),
             freed: Vec::new(),
             shape_changed: true,
+            changed: Vec::new(),
         }
     }
 
@@ -45,6 +50,7 @@ impl Rebuilt {
             slots,
             freed,
             shape_changed,
+            changed: Vec::new(),
         }
     }
 
