@@ -50,7 +50,7 @@ fn fresh_layout(source: &Source<'_>, root: NodeId, layout: Inputs<'_>) -> Placed
     let texts = (layout.fonts, &mut TextCache::default());
     let size = (viewport.width, viewport.height);
     let laid = lay_out(fresh, texts, viewport.scale, size, layout.calcs, Vec::new());
-    laid.unwrap_or_else(|(failure, _)| panic!("a fresh layout failed: {failure}"))
+    laid.unwrap_or_else(|failed| panic!("a fresh layout failed: {}", failed.0))
         .0
 }
 

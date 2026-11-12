@@ -28,10 +28,12 @@ impl Document {
         let texts = (&mut self.fonts, &mut self.texts);
         let changed = std::mem::take(&mut built.changed);
         let laid_out = lay_out(boxes, texts, viewport.scale, size, &kept.calcs, changed);
-        let (Ok((_, work)) | Err((_, work))) = &laid_out;
+        let work = match &laid_out {
+            Ok((_, work)) => work,
+            Err(failed) => &failed.1,
+        };
         self.counts.count_layout(work);
-        let (slotted, work) =
-            laid_out.map_err(|(failure, _)| vec![ElementError::Layout(failure)])?;
+        let (slotted, work) = laid_out.map_err(|failed| vec![ElementError::Layout(failed.0)])?;
         // Debug timings include this full build and layout on every
         // narrowed update; `layout_check.rs` says what would retire it.
         // A test whose own oracle compares the same layout each step

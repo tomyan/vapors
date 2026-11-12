@@ -1,4 +1,4 @@
-use taffy::{Layout, LayoutInput, RunMode};
+use taffy::{Layout, RunMode};
 use vapors_text::FontSystem;
 
 use super::*;
@@ -7,10 +7,10 @@ use crate::layout::{Calcs, Content, LayoutWork, Placed, TextCache, lay_out};
 
 /// Root 1 holding rows 2, 3 and 4, each with a text run: slots 0 to 6,
 /// row 3 at slot 3 with its text at slot 4.
-const ROW: usize = 3;
-const ROW_TEXT: usize = 4;
+pub(super) const ROW: usize = 3;
+pub(super) const ROW_TEXT: usize = 4;
 
-fn rows() -> Placed {
+pub(super) fn rows() -> Placed {
     let spec: &[(u64, &[usize])] = &[
         (1, &[1, 3, 5]),
         (2, &[2]),
@@ -23,14 +23,18 @@ fn rows() -> Placed {
     Placed::default().slots.place(tree(spec))
 }
 
-struct Texts(FontSystem, TextCache);
+pub(super) struct Texts(FontSystem, TextCache);
 
 impl Texts {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self(FontSystem::bundle_only(), TextCache::default())
     }
 
-    fn lay_out(&mut self, placed: Placed, changed: Vec<Changed>) -> (Placed, LayoutWork) {
+    pub(super) fn lay_out(
+        &mut self,
+        placed: Placed,
+        changed: Vec<Changed>,
+    ) -> (Placed, LayoutWork) {
         let texts = (&mut self.0, &mut self.1);
         lay_out(
             placed,
@@ -40,13 +44,13 @@ impl Texts {
             &Calcs::default(),
             changed,
         )
-        .unwrap_or_else(|(error, _)| panic!("refused: {error}"))
+        .unwrap_or_else(|failed| panic!("refused: {}", failed.0))
     }
 }
 
 /// Puts fresh boxes for row 3 and its text, the text `text`, in their
 /// slots; what the row's old box held.
-fn rebuild_row(placed: &mut Placed, text: &str) -> Before {
+pub(super) fn rebuild_row(placed: &mut Placed, text: &str) -> Before {
     let mut row = tree(&[(3, &[1]), (TEXT, &[])]);
     row[0].children = vec![ROW_TEXT];
     if let Content::Text(run) = &mut row[1].content {
@@ -61,7 +65,7 @@ fn rebuild_row(placed: &mut Placed, text: &str) -> Before {
     }
 }
 
-fn changed_row(before: Option<Before>) -> Vec<Changed> {
+pub(super) fn changed_row(before: Option<Before>) -> Vec<Changed> {
     vec![Changed {
         slot: ROW,
         ancestors: vec![0],
@@ -69,11 +73,11 @@ fn changed_row(before: Option<Before>) -> Vec<Changed> {
     }]
 }
 
-fn layouts(placed: &Placed) -> Vec<Layout> {
+pub(super) fn layouts(placed: &Placed) -> Vec<Layout> {
     placed.boxes.iter().map(|b| b.layout).collect()
 }
 
-fn sorted(mut slots: Vec<usize>) -> Vec<usize> {
+pub(super) fn sorted(mut slots: Vec<usize>) -> Vec<usize> {
     slots.sort_unstable();
     slots.dedup();
     slots
@@ -131,125 +135,5 @@ fn a_rebuilt_row_that_answers_as_before_is_laid_out_alone_and_the_root_keeps_its
     assert_eq!(
         placed.boxes[ROW].asked, asked,
         "the row keeps what it was asked"
-    );
-}
-
-#[test]
-fn a_rebuilt_row_that_answers_otherwise_has_its_ancestors_laid_out_again() {
-    // Given: row 3 built again with a longer text, and a fresh tree
-    // with that text for the layout to match
-    let mut texts = Texts::new();
-    let (mut placed, _) = texts.lay_out(rows(), Vec::new());
-    let old = rebuild_row(&mut placed, "a much longer text than before");
-    let mut fresh = rows();
-    rebuild_row(&mut fresh, "a much longer text than before");
-    let (fresh, _) = texts.lay_out(fresh, Vec::new());
-
-    // When
-    let (placed, work) = texts.lay_out(placed, changed_row(Some(old)));
-
-    // Then
-    let expected = Settled {
-        resized: 1,
-        ..Settled::default()
-    };
-    assert_eq!(work.settled, expected);
-    assert!(
-        work.written.laid_out.contains(&0),
-        "the root is laid out again"
-    );
-    assert_eq!(
-        layouts(&placed),
-        layouts(&fresh),
-        "the layout of a fresh tree"
-    );
-}
-
-#[test]
-fn a_rebuilt_row_with_nothing_to_compare_against_has_its_ancestors_laid_out_again() {
-    // Given: row 3 built again, and what its slot held is not known
-    let mut texts = Texts::new();
-    let (mut placed, _) = texts.lay_out(rows(), Vec::new());
-    let before = layouts(&placed);
-    rebuild_row(&mut placed, "text");
-
-    // When
-    let (placed, work) = texts.lay_out(placed, changed_row(None));
-
-    // Then
-    let expected = Settled {
-        uncompared: 1,
-        ..Settled::default()
-    };
-    assert_eq!(work.settled, expected);
-    assert!(
-        work.written.laid_out.contains(&0),
-        "the root is laid out again"
-    );
-    assert_eq!(layouts(&placed), before);
-}
-
-#[test]
-fn a_rebuilt_row_whose_old_box_was_never_asked_has_its_ancestors_laid_out_again() {
-    // Given: the old box's cache holds nothing it was asked
-    let mut texts = Texts::new();
-    let (mut placed, _) = texts.lay_out(rows(), Vec::new());
-    let mut old = rebuild_row(&mut placed, "text");
-    old.asked.clear();
-
-    // When
-    let (_, work) = texts.lay_out(placed, changed_row(Some(old)));
-
-    // Then
-    assert_eq!(work.settled.uncompared, 1);
-    assert!(
-        work.written.laid_out.contains(&0),
-        "the root is laid out again"
-    );
-}
-
-#[test]
-fn an_input_the_old_cache_no_longer_holds_has_the_ancestors_laid_out_again() {
-    // Given: the old box was asked an input its cache does not hold
-    let mut texts = Texts::new();
-    let (mut placed, _) = texts.lay_out(rows(), Vec::new());
-    let mut old = rebuild_row(&mut placed, "text");
-    old.asked.push(Asked {
-        input: LayoutInput {
-            run_mode: RunMode::PerformLayout,
-            ..LayoutInput::HIDDEN
-        },
-        in_block: false,
-    });
-
-    // When
-    let (_, work) = texts.lay_out(placed, changed_row(Some(old)));
-
-    // Then
-    assert_eq!(work.settled.uncompared, 1);
-    assert!(
-        work.written.laid_out.contains(&0),
-        "the root is laid out again"
-    );
-}
-
-#[test]
-fn an_absolute_row_is_not_compared_and_has_its_ancestors_laid_out_again() {
-    // Given: row 3 is absolutely positioned, before and after
-    let mut texts = Texts::new();
-    let mut placed = rows();
-    placed.boxes[ROW].style.position = taffy::Position::Absolute;
-    let (mut placed, _) = texts.lay_out(placed, Vec::new());
-    let old = rebuild_row(&mut placed, "text");
-    placed.boxes[ROW].style.position = taffy::Position::Absolute;
-
-    // When
-    let (_, work) = texts.lay_out(placed, changed_row(Some(old)));
-
-    // Then
-    assert_eq!(work.settled.uncompared, 1);
-    assert!(
-        work.written.laid_out.contains(&0),
-        "the root is laid out again"
     );
 }

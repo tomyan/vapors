@@ -157,5 +157,8 @@ impl BoxTree<'_> {
 }
 
 #[cfg(test)]
+#[path = "isolated_fallback_tests.rs"]
+mod fallback_tests;
+#[cfg(test)]
 #[path = "isolated_tests.rs"]
 mod tests;

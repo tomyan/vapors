@@ -31,7 +31,7 @@ use vapors_text::FontSystem;
 pub(crate) use boxes::{Content, LayoutBox};
 pub(crate) use calcs::Calcs;
 pub(crate) use inline::{InlineRun, InlineSpan};
-pub(crate) use isolated::{Asked, Changed, Settled};
+pub(crate) use isolated::{Changed, Settled};
 pub(crate) use keep::KeptBoxes;
 pub(crate) use rebuilt::Rebuilt;
 pub(crate) use slots::{Key, Placed, Slots};
@@ -63,7 +63,8 @@ pub struct BoxRect {
 /// the box it replaced did, else its ancestors are laid out again.
 ///
 /// # Errors
-/// A `calc()` that did not resolve (see `Calcs`), with what Taffy did.
+/// A `calc()` that did not resolve (see `Calcs`), with what Taffy did
+/// (boxed: the pair is wider than clippy's `Err` limit).
 pub(crate) fn lay_out(
     placed: Placed,
     texts: (&mut FontSystem, &mut TextCache),
@@ -71,7 +72,7 @@ pub(crate) fn lay_out(
     size: (f32, f32),
     calcs: &Calcs,
     changed: Vec<Changed>,
-) -> Result<(Placed, LayoutWork), (String, LayoutWork)> {
+) -> Result<(Placed, LayoutWork), Box<(String, LayoutWork)>> {
     let (fonts, cache) = texts;
     let mut tree = BoxTree {
         boxes: placed.boxes,
@@ -98,7 +99,7 @@ pub(crate) fn lay_out(
         written: std::mem::take(&mut tree.written),
     };
     match calcs.failure() {
-        Some(failure) => Err((failure, work)),
+        Some(failure) => Err(Box::new((failure, work))),
         None => Ok((
             Placed {
                 boxes: tree.boxes,

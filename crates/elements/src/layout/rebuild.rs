@@ -10,15 +10,13 @@ use vapors_dom::NodeId;
 
 use rustc_hash::FxHashMap;
 
-use super::boxes::LayoutBox;
 use super::boxes::{Source, build, build_shallow};
-use super::isolated::{Before, Changed};
 use super::keep::{KeptBoxes, Lender};
 use super::marks::{Owner, Rebuild};
 use super::rebuilt::Rebuilt;
 use super::slots::{Key, Placed, Taken};
-use crate::arena::Arena;
 use crate::text_marks::TextMarks;
+use changed::changed_owners;
 
 impl KeptBoxes {
     /// This update's boxes and the slots built and freed: the kept
@@ -124,33 +122,6 @@ fn lend_owners(
         .collect()
 }
 
-/// Each changed owner for layout to settle: its slot, its ancestors'
-/// slots nearest first, and what the taken box of its key in its slot
-/// held.
-fn changed_owners(
-    placed: &Placed,
-    arena: &Arena,
-    changed: &[(NodeId, usize)],
-    mut taken: Taken,
-) -> Vec<Changed> {
-    let before = |old: (Key, LayoutBox)| match old {
-        (Key::Element(_), old) => Some(Before {
-            cache: old.cache,
-            layout: old.layout,
-            asked: old.asked,
-        }),
-        (Key::Text(..), _) => None,
-    };
-    changed
-        .iter()
-        .map(|&(owner, slot)| Changed {
-            slot,
-            ancestors: ancestor_slots(placed, ancestors(arena, owner)),
-            before: taken.boxes.remove(&slot).and_then(before),
-        })
-        .collect()
-}
-
 /// Takes each owner's boxes, at `slots`, out of `placed`: a shallow
 /// owner's own box and the subtrees of the children it does not keep.
 fn take_owners(placed: &mut Placed, owners: &[Owner], slots: &[usize]) -> Taken {
@@ -205,19 +176,8 @@ fn lend_subtree(
     lender.lend_from(&mut placed.boxes, slot)
 }
 
-/// The slots of those of `ancestors` that hold a box. Only element
-/// boxes have children, so these are every box above a rebuilt subtree.
-fn ancestor_slots(placed: &Placed, ancestors: impl Iterator<Item = NodeId>) -> Vec<usize> {
-    ancestors
-        .filter_map(|ancestor| placed.slots.of(Key::Element(ancestor)))
-        .collect()
-}
-
-/// The elements above `node`, nearest first.
-fn ancestors(arena: &Arena, node: NodeId) -> impl Iterator<Item = NodeId> + '_ {
-    let parent = |&node: &NodeId| arena.get(node, "ancestor_slots").parent;
-    std::iter::successors(parent(&node), parent)
-}
+#[path = "rebuild_changed.rs"]
+mod changed;
 
 #[cfg(test)]
 #[path = "rebuild_tests.rs"]

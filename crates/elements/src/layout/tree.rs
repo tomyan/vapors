@@ -5,10 +5,9 @@
 #[cfg(feature = "grid")]
 use taffy::compute_grid_layout;
 use taffy::{
-    BlockContext, Cache, CacheTree, Display, Layout, LayoutInput, LayoutOutput, LayoutPartialTree,
-    NodeId, RunMode, Style, TraversePartialTree, TraverseTree, compute_block_layout,
-    compute_cached_layout, compute_flexbox_layout, compute_hidden_layout, compute_leaf_layout,
-    compute_oof_layout,
+    BlockContext, Display, Layout, LayoutInput, LayoutOutput, LayoutPartialTree, NodeId, RunMode,
+    Style, TraversePartialTree, TraverseTree, compute_block_layout, compute_cached_layout,
+    compute_flexbox_layout, compute_hidden_layout, compute_leaf_layout, compute_oof_layout,
 };
 use vapors_text::FontSystem;
 
@@ -67,16 +66,6 @@ impl BoxTree<'_> {
             );
             output
         })
-    }
-
-    /// Notes `asked` among the ways the box at `id` was asked: every
-    /// way misses the cache the first time, so the list is the ways
-    /// asked since the cache was cleared.
-    fn note_asked(&mut self, id: NodeId, asked: Asked) {
-        let node = self.node_mut(id);
-        if !node.asked.contains(&asked) {
-            node.asked.push(asked);
-        }
     }
 
     fn dispatch(
@@ -210,21 +199,7 @@ impl LayoutPartialTree for BoxTree<'_> {
     }
 }
 
-impl CacheTree for BoxTree<'_> {
-    fn cache_get(&mut self, id: NodeId, inputs: &LayoutInput) -> Option<LayoutOutput> {
-        self.node_mut(id).cache.get(inputs)
-    }
-
-    fn cache_store(&mut self, id: NodeId, inputs: &LayoutInput, output: LayoutOutput) {
-        self.node_mut(id).cache.store(inputs, output);
-    }
-
-    fn cache_clear(&mut self, id: NodeId) {
-        let node = self.node_mut(id);
-        node.cache = Cache::new();
-        node.asked.clear();
-    }
-}
-
+#[path = "tree_cache.rs"]
+mod cache;
 #[path = "tree_containers.rs"]
 mod containers;

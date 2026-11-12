@@ -2,7 +2,7 @@ use taffy::{Dimension, Size, Style};
 
 use super::*;
 
-const HIDDEN_ASKED: crate::layout::Asked = crate::layout::Asked {
+const HIDDEN_ASKED: crate::layout::isolated::Asked = crate::layout::isolated::Asked {
     input: taffy::LayoutInput::HIDDEN,
     in_block: false,
 };

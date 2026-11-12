@@ -20,7 +20,7 @@ fn an_empty_box_tree_lays_out_nothing() {
     );
 
     // Then
-    let (placed, work) = result.unwrap_or_else(|(error, _)| panic!("refused: {error}"));
+    let (placed, work) = result.unwrap_or_else(|failed| panic!("refused: {}", failed.0));
     assert!(placed.boxes.is_empty());
     assert_eq!((work.laid_out, work.calls), (0, 0));
 }

@@ -140,7 +140,7 @@ impl Lender<'_> {
         }
         boxes[at].cache = before.cache.clone();
         boxes[at].layout = before.layout;
-        boxes[at].asked = before.asked.clone();
+        boxes[at].asked.clone_from(&before.asked);
         self.lent += 1;
         true
     }
