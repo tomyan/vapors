@@ -211,6 +211,44 @@ and chains afresh on every update that paints) and panic naming the
 first differing step and its slot. A difference is a defect in the
 splice or the conditions.
 
+### As built (PR B, 2026-11-12)
+
+`order_splice.rs` decides and plans, `kept_order_splice.rs` applies.
+Read: `Rebuilt::reshaped` (each rebuilt slot's old children, from the
+taken boxes), `Stackings::patched` (`restacked`, and `freed_stacked`
+for condition 2 on removed slots, whose stackings are cleared before
+paint runs), and the slot-to-step index the drawing steps already
+keep (`DrawnSteps::place_of`), so no second index is kept. Condition 1
+is read as: exactly one reshaped slot, and its kept children in their
+old order; more than one reshaped slot in an update is declined and
+counted (two lists changed at once), a follow-up if it shows in a
+workload. An inserted run's anchor is the next kept in-flow sibling's
+step; with none, the last in-flow box of the previous kept sibling's
+subtree (declined when that subtree holds a scroll container, whose
+thumb's place is not read); with no kept children, the owner's own
+step. Kept children all out of flow is declined. Removal needs no
+anchor: the freed slots' box and outline steps are taken out by place.
+
+Not yet shifted by the splice: the drawing steps, kept hits and kept
+batches are made afresh after a splice as after a walk
+(`paint_partial.rs` `drawn_updated`), O(steps) each; the follow-up PR
+shifts their places by the splice's edits. The clip tree's dependents
+(`grouped`) are also rebuilt, two passes over the slots.
+
+Also O(the owner's children) per update, not yet removed or measured:
+`plan` builds a hash map of the owner's old children and a set of its
+new children and walks every new child (`order_splice.rs` `Children`,
+`inserted_runs`); `Rebuilt::subtrees` clones the old children
+(`layout/rebuilt.rs`); `spliced_steps` copies the whole step vector
+(`kept_order_splice.rs`). The follow-up PR's "costs about an edit"
+claim has to remove these or report their cost.
+
+Declines carry a reason (`SpliceDecline`, in
+`UpdateCounts::splice_decline`), so a test pins the condition it names:
+`order_splice_declined.rs`, `order_splice_moved.rs` and
+`order_splice_anchors.rs` each assert theirs, and each condition was
+proven by breaking it.
+
 ## PR stack
 
 | PR | Content | Acceptance |

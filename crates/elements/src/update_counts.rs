@@ -5,6 +5,7 @@
 use crate::document::Document;
 use crate::layout::LayoutWork;
 use crate::painted::Painted;
+use crate::splice_decline::SpliceDecline;
 
 /// Structural counts of the work the last [`Document::update`] did, for
 /// diagnostics and tests. They count units of work, not time.
@@ -101,6 +102,18 @@ pub struct UpdateCounts {
     /// Times the scroll chains were walked over the whole tree: 1 when
     /// the shape changed, else 0.
     pub chain_walks: usize,
+    /// Times the kept paint order, clip tree, clips and chains were
+    /// spliced for inserted and removed in-flow boxes in place of being
+    /// walked (`order_splice.rs`, `docs/plans/splice.md` (c)): 1 or 0.
+    pub order_splices: usize,
+    /// Times a shape change could not be spliced and the whole tree was
+    /// walked instead: a changed slot's children reordered, a box with
+    /// a stacking other than the default inserted or removed, or a
+    /// rebuilt box's stacking changed; 1 or 0.
+    pub splices_declined: usize,
+    /// The condition that declined the splice when `splices_declined`
+    /// is 1, else `None`.
+    pub splice_decline: Option<SpliceDecline>,
     /// Boxes whose clip paint worked out again: those built again or
     /// moved, and below them those whose clip comes from a box whose
     /// clip changed; every slot when the shape changed.
@@ -136,6 +149,9 @@ impl UpdateCounts {
         let walks = painted.order.walks;
         (self.order_walks, self.chain_walks, self.clips_redone) =
             (walks.order, walks.chains, walks.clips);
+        self.order_splices = walks.splices;
+        self.splices_declined = usize::from(walks.declined.is_some());
+        self.splice_decline = walks.declined;
     }
 }
 

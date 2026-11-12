@@ -35,6 +35,28 @@ impl ClipTree {
         }
     }
 
+    /// `self` for `len` slots with each of `added` (slot, parent),
+    /// parents first, put below its parent and each of `freed` taken
+    /// out: an order splice (`order_splice.rs`), where every added box
+    /// is in flow, so its clip parent is its parent.
+    pub(crate) fn spliced(
+        &mut self,
+        len: usize,
+        added: &[(usize, usize)],
+        freed: impl Iterator<Item = usize>,
+    ) {
+        self.parent.resize(len, None);
+        self.depth.resize(len, 0);
+        for &(slot, parent) in added {
+            self.parent[slot] = Some(parent);
+            self.depth[slot] = self.depth[parent] + 1;
+        }
+        for slot in freed {
+            (self.parent[slot], self.depth[slot]) = (None, 0);
+        }
+        (self.first, self.dependents) = grouped(&self.parent);
+    }
+
     /// The slots in the tree: one past the last.
     pub(crate) fn len(&self) -> usize {
         self.parent.len()

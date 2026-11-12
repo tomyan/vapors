@@ -87,41 +87,49 @@ impl Stackings {
 
     /// `self`, the last update's stackings, with each `rebuilt` slot's
     /// made again from `boxes` and each slot freed and not taken again
-    /// cleared; and whether a rebuilt slot's stacking differs from the
-    /// one it held. A kept box's containing block changes only through
-    /// a rebuilt box: itself, or an ancestor whose mark rebuilt the
-    /// subtree.
+    /// cleared; and what that found. A kept box's containing block
+    /// changes only through a rebuilt box: itself, or an ancestor whose
+    /// mark rebuilt the subtree.
     pub(crate) fn patched(
         mut self,
         boxes: &[LayoutBox],
         used: &NodeMap<Used>,
         rebuilt: &Rebuilt,
-    ) -> (Self, bool) {
+    ) -> (Self, Patched) {
         self.0.resize(boxes.len(), None);
         let restacked = self.make_again(boxes, used, &rebuilt.slots);
-        self.clear_freed(boxes, &rebuilt.freed);
-        (self, restacked)
+        let freed_stacked = self.clear_freed(boxes, &rebuilt.freed);
+        (
+            self,
+            Patched {
+                restacked,
+                freed_stacked,
+            },
+        )
     }
 
     /// Makes each of `slots`' stackings again from `boxes`; whether one
-    /// differs from what the slot held.
+    /// differs from what the slot held (a newly taken slot held none).
     fn make_again(&mut self, boxes: &[LayoutBox], used: &NodeMap<Used>, slots: &[usize]) -> bool {
         let mut restacked = false;
         for &slot in slots {
             let fresh = stacking_of(&boxes[slot], used);
-            restacked |= self.0[slot] != fresh;
+            restacked |= self.0[slot].is_some_and(|held| Some(held) != fresh);
             self.0[slot] = fresh;
         }
         restacked
     }
 
-    /// Clears each `freed` slot that no box took again.
-    fn clear_freed(&mut self, boxes: &[LayoutBox], freed: &[(usize, Key)]) {
+    /// Clears each `freed` slot that no box took again; whether one
+    /// held a stacking other than the default.
+    fn clear_freed(&mut self, boxes: &[LayoutBox], freed: &[(usize, Key)]) -> bool {
+        let mut stacked = false;
         for &(slot, _) in freed {
             if matches!(boxes[slot].content, Content::Vacant) {
-                self.0[slot] = None;
+                stacked |= self.0[slot].take() != Some(Stacking::default());
             }
         }
+        stacked
     }
 
     /// How many slots hold a stacking.
@@ -160,6 +168,17 @@ impl Stackings {
     pub(crate) fn scrolls(&self, index: usize) -> bool {
         self.get(index).scrolls
     }
+}
+
+/// What [`Stackings::patched`] found, read by the order splice
+/// (`order_splice.rs`): either true declines it.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct Patched {
+    /// A rebuilt slot's stacking differs from the one it held.
+    pub(crate) restacked: bool,
+    /// A freed slot held a stacking other than the default, so its
+    /// steps were not in its parent's flow run.
+    pub(crate) freed_stacked: bool,
 }
 
 /// A box's stacking, from its element's used style; `None` when vacant.

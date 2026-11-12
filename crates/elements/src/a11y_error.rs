@@ -144,6 +144,16 @@ pub enum AxError {
         /// Chromium's name for it.
         chromium: String,
     },
+    /// A node whose role ARIA requires a state for that the tree does
+    /// not carry: a mirror would show a default that may be wrong (R6).
+    Unexposable {
+        /// The node's role.
+        role: String,
+        /// The node's name.
+        name: String,
+        /// What is missing, and where it comes from.
+        needs: String,
+    },
     /// The reply did not serialise: a bug in vapors.
     BadReply {
         /// The serialiser's error.

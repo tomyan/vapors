@@ -61,6 +61,8 @@ pub struct Document {
     pub(crate) thumbs_shown: bool,
     /// The images `img` elements show, by name.
     pub(crate) images: crate::images::Images,
+    /// What the a11y mirror keeps between takes (R6).
+    pub(crate) ax: crate::a11y_mirror_state::AxMirror,
 }
 
 impl Document {
@@ -99,6 +101,7 @@ impl Document {
             scroll: crate::scroll::Offsets::default(),
             thumbs_shown: true,
             images: crate::images::Images::default(),
+            ax: crate::a11y_mirror_state::AxMirror::default(),
         }
     }
 
