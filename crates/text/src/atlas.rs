@@ -3,11 +3,11 @@
 //! an R8 page, colour glyphs to an RGBA8 page (not rasterised yet; the
 //! page exists so the renderer's shape is settled). When a page fills,
 //! the least recently used glyphs not in the current frame are evicted
-//! until the new one fits (`atlas_evict.rs`). A glyph larger
-//! than a page is refused once, logged with its size, and `.notdef`
-//! stands in from then on. Evictions, rasterisations and refusals are
-//! counted for tests. Icons share the coverage page (`atlas_icon.rs`).
-//! A frame that does not fit grows the page (`atlas_grow.rs`).
+//! until the new one fits (`atlas_evict.rs`), or the page grows
+//! (`atlas_grow.rs`). A glyph larger than a page is refused once, logged
+//! with its size, and `.notdef` stands in from then on. Evictions,
+//! rasterisations and refusals are counted for tests. Icons share the
+//! coverage page (`atlas_icon.rs`).
 
 use std::collections::{HashMap, HashSet};
 
