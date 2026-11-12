@@ -147,3 +147,36 @@ fn an_update_that_shows_what_the_map_holds_does_not_sweep_it() {
         "a sweep ran at the start of the update"
     );
 }
+
+#[test]
+fn shapings_a_shrunk_document_no_longer_shows_are_dropped_at_the_next_update() {
+    // Given
+    let (_fonts, mut cache) = shown_then(30, 2);
+
+    // When
+    cache.begin(2);
+
+    // Then
+    assert_eq!(cache.shapes.entries.len(), 2);
+}
+
+#[test]
+fn a_shaping_whose_layouts_are_still_asked_for_is_kept() {
+    // Given: 30 runs shaped, then asked for again from their layouts
+    let (mut fonts, mut cache) = (FontSystem::bundle_only(), TextCache::default());
+    let runs: Vec<_> = (0..30).map(|n| other(0, n)).collect();
+    let mut ask = |cache: &mut TextCache| {
+        runs.iter()
+            .for_each(|run| drop(cache.layout(&mut fonts, 1.0, run, None)));
+    };
+    cache.begin(0);
+    ask(&mut cache);
+    cache.begin(30);
+    ask(&mut cache);
+
+    // When: the next update, the last paint having shown one of them
+    cache.begin(1);
+
+    // Then
+    assert_eq!(cache.shapes.entries.len(), 30);
+}

@@ -1,12 +1,11 @@
 # Text shaped once per run content, 2026-11-12
 
-Slice T1 of `docs/plans/build-time-styles.md` (#245), as measured
-rather than as planned. The plan's T1 row expected the text cache to be
-keyed by node, so that the 10,000 "Edit" buttons on Mount would each be
-shaped. They were not: the cache key already held the run's text,
-styles, width and scale, and the node only through the run's inline
-elements (`SpanKey::node`), which Mount's runs do not have. "Edit" was
-shaped twice per page, at two widths.
+Slice T1 of `docs/plans/build-time-styles.md` (#245). The plan's T1
+row expected the text cache to be keyed by node, so that the 10,000
+"Edit" buttons on Mount would each be shaped. They were not: the cache
+key already held the run's text, styles, width and scale, and the node
+only through the run's inline elements (`SpanKey::node`), which Mount's
+runs do not have. "Edit" was shaped twice per page, at two widths.
 
 What did repeat per row was shaping one run at several widths. Taffy
 measures each row's label, a flex item, at max-content (no wrap) and

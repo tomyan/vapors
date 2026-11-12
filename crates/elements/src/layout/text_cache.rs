@@ -20,8 +20,9 @@
 //! paint holds the layouts it shows; nothing outside holds a shaping,
 //! a layout holds its own copy). Both maps follow the rules below
 //! (`text_kept.rs`), each counting its own entries, so the shapings
-//! kept are bounded as the layouts are; every layout has one, so they
-//! number at most the layouts the live set needs.
+//! kept are bounded as the layouts are. A layout asked for marks its
+//! shaping asked too, so a shaping lives as long as a layout of it is
+//! asked for, and a later width breaks it without shaping again.
 //!
 //! A sweep runs on an insert that finds the map doubled since the last
 //! sweep, and at the start of an update when the map holds more than 4
@@ -74,6 +75,8 @@ impl TextCache {
     ) -> Rc<Layout> {
         let key = Key::of(run, width, scale);
         if let Some(layout) = self.kept(&key).or_else(|| self.unwrapped(run, &key, width)) {
+            // a live layout keeps its shaping live, for the next width
+            self.shapes.asked(key.shape());
             return layout;
         }
         let shaped = self.shaped_run(fonts, scale, run, key.shape());
