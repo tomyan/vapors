@@ -108,6 +108,7 @@ mod painting;
 mod placement;
 mod placement_changes;
 mod placement_check;
+mod placement_check_page;
 mod placement_marks;
 mod placement_walk;
 mod range;

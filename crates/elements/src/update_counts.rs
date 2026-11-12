@@ -83,8 +83,6 @@ pub struct UpdateCounts {
     /// Boxes not built again whose rect or padding changed since the
     /// last paint; 0 when nothing is kept.
     pub boxes_moved: usize,
-    /// Of `boxes_moved`, those scrolled alone (`Placed::scrolled`).
-    pub boxes_scrolled: usize,
     /// In-flow children chained to the slot they are placed in before
     /// the placement walk (M10b, `placement.rs`): those of each slot
     /// built again or laid out, each such slot once. 0 when nothing is

@@ -111,9 +111,30 @@ pub(crate) fn paint_box(
 /// two boxes that share an edge in CSS pixels share it on screen.
 pub(crate) fn snapped(rect: BoxRect, scale: f32) -> Rect {
     Rect::new(
-        (rect.x * scale).round(),
-        (rect.y * scale).round(),
-        ((rect.x + rect.width) * scale).round(),
-        ((rect.y + rect.height) * scale).round(),
+        half_up(rect.x * scale),
+        half_up(rect.y * scale),
+        half_up((rect.x + rect.width) * scale),
+        half_up((rect.y + rect.height) * scale),
     )
 }
+
+/// `v` rounded to the nearest whole number, a half up, as Chromium's
+/// `LayoutUnit::Round` rounds: unlike rounding half away from zero,
+/// `half_up(v - n)` is `half_up(v) - n` for a whole `n`, so an edge
+/// snapped in its scroll frame and shifted by a whole offset is where
+/// it snaps on the page (`docs/plans/iu4.md` section 3).
+/// Not `(v + 0.5).floor()`, whose sum rounds 0.49999997 up to 1.
+// Exact: `v - v.round()` is exact for a float and its nearest whole.
+#[allow(clippy::float_cmp)]
+fn half_up(v: f32) -> f32 {
+    let nearest = v.round();
+    if v - nearest == 0.5 {
+        nearest + 1.0
+    } else {
+        nearest
+    }
+}
+
+#[cfg(test)]
+#[path = "paint_tests.rs"]
+mod tests;

@@ -20,10 +20,9 @@ pub(crate) struct ChangedSlots {
     /// The kept slots whose rect or padding differs from the last
     /// paint's, as placement reports them; none until it runs.
     pub(crate) moved: Vec<usize>,
-    /// The kept slots moved by scrolls of containers above them alone
-    /// (`Placed::scrolled`): paint treats them as moved, and the a11y
-    /// mirror, whose bounds are relative, leaves them out.
-    pub(crate) scrolled: Vec<usize>,
+    /// The scroll containers whose offset as applied changed: their
+    /// frames' shifts change, and no slot moves (`frames.rs`).
+    pub(crate) offsets_moved: Vec<usize>,
     /// A slot was freed or newly taken, or a rebuilt box's children or
     /// `Stacking` differ: paint order, containing blocks and chains are
     /// spliced (`order_splice.rs`) or walked again (`kept_order.rs`).
@@ -50,7 +49,7 @@ impl ChangedSlots {
         Self {
             every: false,
             moved: Vec::new(),
-            scrolled: Vec::new(),
+            offsets_moved: Vec::new(),
             shape_changed: rebuilt.shape_changed || stackings.restacked,
             rebuilt: rebuilt.slots,
             freed: rebuilt.freed,
@@ -66,7 +65,7 @@ impl ChangedSlots {
             rebuilt: rebuilt.slots,
             freed: rebuilt.freed,
             moved: Vec::new(),
-            scrolled: Vec::new(),
+            offsets_moved: Vec::new(),
             shape_changed: true,
             reshaped: Vec::new(),
             stackings: Patched {

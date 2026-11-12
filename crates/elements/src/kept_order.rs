@@ -124,8 +124,7 @@ impl KeptOrder {
         input: &PaintInput<'_>,
         changed: &ChangedSlots,
     ) -> Self {
-        let moved = changed.moved.iter().chain(&changed.scrolled);
-        let slots = changed.rebuilt.iter().chain(moved).copied();
+        let slots = changed.rebuilt.iter().chain(&changed.moved).copied();
         self.redone = self.clips.redo_under(
             slots.collect(),
             &self.tree,

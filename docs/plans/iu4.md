@@ -181,6 +181,18 @@ scroller moving on the page O(1), snap relative to a possibly
 fractional origin and can differ from Chromium by a pixel; option 2 in
 section 8.)
 
+Rounding (lead decision, 2026-11-12). The argument above holds only for
+a rounding that commutes with a whole shift. `paint::snapped` rounded
+half away from zero, which does not at a tie below zero: a row whose
+top is at 37.5 device pixels in its frame, scrolled by 39, snaps to
+38 - 39 = -1 through its frame but to round(-1.5) = -2 on the page (a
+fractional scale; 4-ii's on-page placement check caught it). Edges now
+snap half up, `half_up(v)` = the nearest whole number, a half up, as
+Chromium's `LayoutUnit::Round` rounds; `half_up(v) + n == half_up(v +
+n)` for every whole `n`. Pixels change only for an edge at exactly a
+negative half device pixel, which needs a fractional scale; the moves
+`kept_shift.rs` refused across zero at such a tie are now shifted.
+
 What this changes:
 
 - Placement (PR 4a, the layout lane). `Placement` keeps each slot's
@@ -432,12 +444,16 @@ what each PR can hold alone:
   shift or clip changes. Acceptance is 4a's and 4b's.
 - 4-iii: the translation moves from the CPU (where 4-i applies it as
   batches are made) into the dynamic-offset uniform, so kept GPU bytes
-  survive a scroll. It pays only once PR 2 keeps GPU bytes, so it
-  follows PR 2.
+  survive a scroll. It pays only once PR 2 keeps GPU bytes, so it is
+  its own PR after IU4 PR 2 merges (lead, 2026-11-12).
 
 The a11y mirror reads border boxes from moved slots: with 4-ii a
-scroll moves none, so the mirror's bounds must be relative to the
-scroll container (R6 PR 5a, #243) before 4-ii merges.
+scroll moves none, so 4-ii is built on R6 PR 5a (#243), whose mirror
+bounds are relative to the scroll container, and lands after it; no
+interim touch of the scrolled rows (lead, 2026-11-12). #243's
+`scrolled` set (rows moved by a scroll alone) is always empty once a
+scroll moves no row, so 4-ii removes it; placement reports the
+containers whose offset moved instead (`ChangedSlots::offsets_moved`).
 
 Recommended order: 0, 1, 2, 3, 4a, 4b, 4c, 5, 6. PRs 0 to 3 touch no
 file the paint, splice, layout or style lanes change and can run as

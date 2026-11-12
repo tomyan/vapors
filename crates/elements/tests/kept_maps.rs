@@ -109,7 +109,7 @@ fn an_update_that_paints_but_changes_no_slot_patches_no_entry() {
 }
 
 #[test]
-fn a_scroll_patches_each_scrolled_childs_entries() {
+fn a_scroll_patches_no_entry_and_the_children_read_where_they_show() {
     // Given: a scroller of five blocks, two in view
     let mut doc = document();
     doc.add_stylesheet("app.css", CSS).expect("parses");
@@ -124,10 +124,11 @@ fn a_scroll_patches_each_scrolled_childs_entries() {
     assert!(doc.scroll_to(scroller, [0.0, 10.0]), "scrolls");
     updated(&mut doc);
 
-    // Then: every child moved up by the scroll, nothing else changed
+    // Then: the children's entries are in the scroller's frame, which
+    // the scroll shifted (IU4, `frames.rs`), so none is patched
     let rect = painted(&doc).border_box(children[1]).expect("has a box");
     assert_eq!(rect.y, 0.0);
-    assert_eq!(doc.update_counts().map_entries_patched, 5);
+    assert_eq!(doc.update_counts().map_entries_patched, 0);
 }
 
 /// A paragraph holding a span and text, updated once.
