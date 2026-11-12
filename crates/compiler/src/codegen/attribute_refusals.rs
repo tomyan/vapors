@@ -68,7 +68,10 @@ pub(super) fn refuse_misleading(
 
 /// `class={..}` and `style={..}` hide from the style analysis which
 /// classes and declarations an element can have.
-fn refuse_string_styling(source: &Source, attribute: &Attribute) -> Result<(), CompileError> {
+pub(super) fn refuse_string_styling(
+    source: &Source,
+    attribute: &Attribute,
+) -> Result<(), CompileError> {
     if !matches!(attribute.value, AttrValue::Expr(_)) {
         return Ok(());
     }

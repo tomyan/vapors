@@ -17,7 +17,7 @@ pub const STYLE: &str = "\nbutton { padding: 4px 8px; }\n";
 /// The scope [`STYLE`] is added under, set on each element as [`SCOPE_ATTRIBUTE`].
 pub const SCOPE: &str = concat!(env!("CARGO_PKG_NAME"), "/", "src/counter.wisp");
 static KEY_BUTTON0: vapors_dom::StyleKey = vapors_dom::StyleKey {
-    site: "src/counter.wisp:10:1",
+    site: concat!(env!("CARGO_PKG_NAME"), "/", "src/counter.wisp:10:1"),
     scope: Some(SCOPE),
     tag: "button",
     classes: &[],
