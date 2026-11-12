@@ -11,7 +11,7 @@ use crate::frame_arena::{FrameArena, Placed};
 use crate::kept_bind_group::KeptBindGroup;
 use crate::quads_setup::{bind_group_layout, render_pipeline};
 use crate::uniform_slots::UniformSlots;
-use crate::{Target, WorkCounter};
+use crate::{KeptRange, Retained, Target, WorkCounter};
 
 const VERTICES_PER_QUAD: u32 = 6;
 
@@ -22,6 +22,7 @@ pub(crate) struct Instanced {
     viewports: UniformSlots,
     bind_group: KeptBindGroup,
     instances: FrameArena,
+    kept: Retained,
     stride: u64,
     pub(crate) work: WorkCounter,
 }
@@ -59,20 +60,16 @@ impl Instanced {
             viewports: UniformSlots::new(device, label),
             bind_group: KeptBindGroup::NONE,
             instances: FrameArena::new(device, label, wgpu::BufferUsages::VERTEX, stride),
+            kept: Retained::new(device, label, wgpu::BufferUsages::VERTEX),
             stride,
             work: WorkCounter::default(),
         }
     }
 
-    /// Draws `count` instances whose attributes are `bytes`; a draw its
+    /// Draws the instances whose attributes are `bytes`; a draw its
     /// arenas refuse is not recorded (the refusal is on the encoder).
     pub(crate) fn draw(&mut self, target: &Target<'_>, bytes: &[u8]) {
-        let count = u32::try_from(bytes.len() as u64 / self.stride).unwrap_or_else(|_| {
-            panic!(
-                "{}: more instances in one batch than fit one draw",
-                self.label
-            )
-        });
+        let count = self.count(bytes.len() as u64);
         if count == 0 {
             return;
         }
@@ -80,11 +77,50 @@ impl Instanced {
         let Some(instances) = self.instances.push(frame, queue, &self.work, bytes) else {
             return;
         };
-        let viewport = viewport_bytes(target.viewport);
-        let Some(viewport) = self.viewports.slot(frame, queue, &self.work, viewport) else {
+        let Some(viewport) = self.viewport_slot(target) else {
             return;
         };
-        self.record(target, count, &instances, viewport);
+        self.record(target, count, Instances::Placed(&instances), viewport);
+    }
+
+    /// Writes the instances' `bytes` into the kept buffer, for
+    /// [`Instanced::draw_kept`] in this and later frames; `None` when
+    /// it refuses them (the refusal is on the encoder).
+    ///
+    /// # Panics
+    ///
+    /// If `bytes` are not a whole number of instances.
+    pub(crate) fn keep(&mut self, target: &Target<'_>, bytes: &[u8]) -> Option<KeptRange> {
+        let len = bytes.len() as u64;
+        assert!(
+            len.is_multiple_of(self.stride),
+            "{}: {len} kept bytes, not a whole number of {}-byte instances; keep the \
+             pipeline's bytes() of a run (instanced.rs)",
+            self.label,
+            self.stride
+        );
+        let (frame, queue) = (target.encoder, target.queue);
+        self.kept.keep(frame, queue, &self.work, bytes)
+    }
+
+    /// Draws the instances `kept` holds; not when the viewport slot is
+    /// refused (the refusal is on the encoder).
+    pub(crate) fn draw_kept(&mut self, target: &Target<'_>, kept: &KeptRange) {
+        let count = self.count(self.kept.len(kept));
+        let Some(viewport) = self.viewport_slot(target) else {
+            return;
+        };
+        self.record(target, count, Instances::Kept(kept), viewport);
+    }
+
+    /// Gives `kept`'s bytes back to the kept buffer.
+    pub(crate) fn release(&mut self, kept: KeptRange) {
+        self.kept.release(kept);
+    }
+
+    /// Bytes held in the kept buffer.
+    pub(crate) fn retained_bytes(&self) -> u64 {
+        self.kept.live_bytes()
     }
 
     /// The bind groups kept: one once this pipeline has drawn.
@@ -92,10 +128,27 @@ impl Instanced {
         self.bind_group.kept()
     }
 
+    /// How many instances `bytes` bytes hold.
+    fn count(&self, bytes: u64) -> u32 {
+        u32::try_from(bytes / self.stride).unwrap_or_else(|_| {
+            panic!(
+                "{}: more instances in one batch than fit one draw",
+                self.label
+            )
+        })
+    }
+
+    /// The dynamic offset of the target's viewport in the slots.
+    fn viewport_slot(&mut self, target: &Target<'_>) -> Option<u32> {
+        let viewport = viewport_bytes(target.viewport);
+        let (frame, queue) = (target.encoder, target.queue);
+        self.viewports.slot(frame, queue, &self.work, viewport)
+    }
+
     /// Records the draw with the viewport slot at `viewport`, through
     /// the kept bind group, made for the slots' buffer on first use and
     /// again when the buffer is replaced.
-    fn record(&mut self, target: &Target<'_>, count: u32, instances: &Placed, viewport: u32) {
+    fn record(&mut self, target: &Target<'_>, count: u32, from: Instances<'_>, viewport: u32) {
         let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
         let (label, layout, work, viewports) =
             (self.label, &self.layout, &self.work, &self.viewports);
@@ -112,13 +165,24 @@ impl Instanced {
                 },
             )
         });
+        let instances = match from {
+            Instances::Placed(placed) => placed.slice(),
+            Instances::Kept(kept) => self.kept.slice(target.encoder, kept),
+        };
         target.draw_pass(|pass| {
             pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, bind_group, &[viewport]);
-            pass.set_vertex_buffer(0, instances.slice());
+            pass.set_vertex_buffer(0, instances);
             self.work.draw(pass, 0..VERTICES_PER_QUAD, 0..count);
         });
     }
+}
+
+/// Where a draw's instances are: this frame's arena, or kept.
+#[derive(Clone, Copy)]
+enum Instances<'a> {
+    Placed(&'a Placed),
+    Kept(&'a KeptRange),
 }
 
 /// The viewport uniform's bytes: its size as two floats, padded to 16.

@@ -9,7 +9,7 @@ use vapors_scene::{Rect, Size, Transform};
 use crate::frame_arena::FrameArena;
 use crate::image_binding::{Sampling, TextureBinding};
 use crate::image_setup::{bind_group_layout, render_pipeline};
-use crate::{ArenaFull, FrameEncoder, GpuWork, Target, WorkCounter};
+use crate::{ArenaFull, FrameEncoder, GpuWork, Retained, Target, WorkCounter};
 
 use crate::quad::{VERTEX_COUNT, VERTEX_SIZE, quad_vertices, vertex_bytes};
 
@@ -23,6 +23,7 @@ pub struct ImagePipeline {
     /// Linear sampling, for an `img` stretched over its box.
     smooth: wgpu::Sampler,
     vertices: FrameArena,
+    kept: Retained,
     work: WorkCounter,
 }
 
@@ -74,6 +75,7 @@ impl ImagePipeline {
             nearest,
             smooth,
             vertices,
+            kept: Retained::new(device, "image quads", wgpu::BufferUsages::VERTEX),
             work: WorkCounter::default(),
         }
     }
@@ -187,3 +189,6 @@ impl ImagePipeline {
         )
     }
 }
+
+#[path = "image_kept.rs"]
+mod kept;

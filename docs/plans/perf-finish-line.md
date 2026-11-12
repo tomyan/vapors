@@ -19,11 +19,16 @@ the harness shows it, not when the code is believed to do it.
 | 4 | Scrolling a long list | no repaint; kept paint shifted | every moved box painted again | IU3 3c-3e |
 | 5 | Pointer over the window | no per-update walk of the tree | after 3c-3g, HoveredClass update 0.115 M instructions above Class at 3000 rows (0.043 M at 1000): `hit()`'s scan of the kept hits, about 13 µs | IU3 3c-3g (kept hit list) |
 | 6 | Idle | no update work and no frames drawn | no frames drawn; an update with no change 2.57 ms | IU3 3b, the idle fix |
-| 7 | First frame of a large page | the winning declarations for each template element and constant shapes worked out at build time (computed values still depend on viewport, scale and font size); time measured and published | not measured | the build-time analysis |
+| 7 | First frame of a large page | the winning declarations for each template element worked out at build time (computed values still depend on viewport, scale and font size), and constant shapes once the shape table (item 8) lands; time measured and published | not measured | the build-time analysis; shapes by the shape table (Tom, 2026-11-12) |
 | 8 | Memory per element | one style record per distinct style, not per element; per-element memory bounded by the per-box layout records | not measured | the build-time analysis |
 | 9 | HTML, SVG and 3D in one scene | the racer (3D craft, SVG markings on it, HTML on top) drawn as one scene with CSS reaching scene nodes, and no frame over 16.7 ms across a 60 s run | not built | the shape table, 3D slice 2 (PRs 4, 4b, 5) |
 
 Property 1 at 10,000 rows has a 10,000-row workload in `vapors-perf`.
+
+Property 9's run judges every frame from the first, with no warmup
+frames excluded, unless Tom decides otherwise (`docs/plans/one-scene.md`,
+D7): `vapors-perf`'s default 20 warmup frames would leave out the
+mount, pipeline creation and first uploads.
 
 Properties 1 and 6 are judged by `vapors-perf --scaling`, per change:
 
@@ -40,8 +45,17 @@ naming the phase and its growth per extra row, when an edit's phase
 (Idle; `update`) is both over 2% and over 5000 instructions above its 1000-row count at a larger size.
 At 1657b27 every one of the four failed
 (docs/perf/baseline-2026-11-10.md, "Scaling, 1657b27"); after M10b
-(2026-11-12) Text and Idle pass, and Class and HoveredClass fail only
-on `style`, 2 instructions per extra row (docs/plans/iu1.md, PR 2).
+(2026-11-12) Text and Idle pass, and Class and HoveredClass failed only
+on `style`, 2 instructions per extra row; they pass since the style
+phase's kept sets stopped keeping the mount's capacity (2026-11-12;
+HoveredClass `style` 843k / 847k / 870k instructions at 1,000 / 3,000 /
+10,000 rows before, 840k / 848k / 850k after, docs/plans/iu1.md, PR 2).
+The 5k to 9k instructions HoveredClass `style` still rises from 1,000
+rows (once 1 under the judge's 5000 floor, passing on 2%) are glibc's
+malloc costing more per call on a larger heap: with jemalloc preloaded
+`style` is flat at 733k, and allocation is about 170k of the cascade's
+430k (follow-up: fewer allocations in `Cascade::compute`, or an
+allocator decision; iu1.md, PR 2).
 FlexText, an edit in a flex-column list whose rows have a vertical
 margin, passes since M10c (2026-11-12; `layout` 5.6 M / 16.6 M / 55.3 M
 instructions at 1,000 / 3,000 / 10,000 rows before, 123 k / 126 k /
@@ -77,7 +91,8 @@ and does not judge until the splice step is built.
 7. The build-time analysis, first version (properties 7 and 8),
    with the compiler's mark of list templates whose rows cannot
    change paint order (`docs/plans/splice.md` section (d)).
-8. The shape table and the one-scene proof with 3D slice 2 (property 9).
+8. The shape table and the one-scene proof with 3D slice 2 (property 9;
+   `docs/plans/one-scene.md`).
 
 ## After the line
 
