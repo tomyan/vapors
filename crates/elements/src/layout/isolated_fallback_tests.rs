@@ -4,6 +4,7 @@ use taffy::{LayoutInput, RunMode};
 
 use super::tests::{ROW, Texts, changed_row, layouts, rebuild_box, rebuild_row, rows};
 use super::*;
+use crate::layout::{LayoutBox, LayoutWork, Placed};
 
 #[test]
 fn a_rebuilt_row_that_answers_otherwise_has_its_ancestors_laid_out_again() {
@@ -142,6 +143,44 @@ fn a_rebuilt_row_styled_otherwise_has_its_ancestors_laid_out_again() {
         work.written.laid_out.contains(&0),
         "the root is laid out again"
     );
+}
+
+/// A row built again with the same text, then styled by `restyle`
+/// before it is laid out: the owner's answers to the old inputs are
+/// unchanged, so only the style check can tell it differs.
+fn settle_restyled_row(restyle: impl FnOnce(&mut LayoutBox)) -> (Placed, LayoutWork) {
+    let mut texts = Texts::new();
+    let (mut placed, _) = texts.lay_out(rows(), Vec::new());
+    let old = rebuild_row(&mut placed, "text");
+    restyle(&mut placed.boxes[ROW]);
+    texts.lay_out(placed, changed_row(Some(old)))
+}
+
+#[test]
+fn a_row_with_only_a_margin_changed_has_its_ancestors_laid_out_again() {
+    // Given / When: row 3 gains a left margin; its answers to the old
+    // inputs stay the same, the parent's known width and offset do not
+    let (placed, work) = settle_restyled_row(|row| {
+        row.style.margin.left = taffy::LengthPercentageAuto::length(10.0);
+    });
+
+    // Then: the layout is a fresh tree's with the margin
+    let mut texts = Texts::new();
+    let mut fresh = rows();
+    rebuild_row(&mut fresh, "text");
+    fresh.boxes[ROW].style.margin.left = taffy::LengthPercentageAuto::length(10.0);
+    let (fresh, _) = texts.lay_out(fresh, Vec::new());
+    assert_eq!(work.settled.resized, 1);
+    assert_eq!(layouts(&placed), layouts(&fresh));
+}
+
+#[test]
+fn a_row_with_only_its_natural_size_changed_has_its_ancestors_laid_out_again() {
+    // Given / When
+    let (_, work) = settle_restyled_row(|row| row.natural = Some([10.0, 10.0]));
+
+    // Then
+    assert_eq!(work.settled.resized, 1);
 }
 
 #[test]

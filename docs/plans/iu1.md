@@ -73,40 +73,42 @@ increment per unit:
 with nothing changed and at 0 behind an earlier refusal (an unparsed
 style attribute, a refused tag, a calc that fails at layout).
 `sparse_updates.rs` asserts them per edit at 100 and 1000 rows
-(`EXPECTED_WALKS`). Counts on this machine (2026-11-10):
+(`EXPECTED_WALKS`). Counts on this machine (2026-11-12):
 
 | Edit | rows | elements visited | boxes built | layout calls | boxes painted | scene items |
 |---|---|---|---|---|---|---|
-| same-size value | 100 | 402 | 702 | 3 | 702 | 400 |
-| resizing label | 100 | 402 | 702 | 112 | 702 | 400 |
-| equal write | 100 | 402 | 702 | 1 | 702 | 400 |
-| hover | 100 | 402 | 702 | 1 | 702 | 400 |
-| focus | 100 | 402 | 702 | 1 | 702 | 401 |
-| class toggled | 100 | 402 | 702 | 1 | 702 | 402 |
-| same-size value | 1000 | 4002 | 7002 | 3 | 7002 | 4000 |
-| resizing label | 1000 | 4002 | 7002 | 1012 | 7002 | 4000 |
-| equal write | 1000 | 4002 | 7002 | 1 | 7002 | 4000 |
-| hover | 1000 | 4002 | 7002 | 1 | 7002 | 4000 |
-| focus | 1000 | 4002 | 7002 | 1 | 7002 | 4001 |
-| class toggled | 1000 | 4002 | 7002 | 1 | 7002 | 4002 |
+| same-size value | 100 | 1 | 2 | 3 | 2 | 1 |
+| resizing label | 100 | 1 | 2 | 112 | 6 | 4 |
+| equal write | 100 | 0 | 0 | 1 | 0 | 0 |
+| hover | 100 | 4 | 2 | 1 | 2 | 2 |
+| focus | 100 | 1 | 2 | 1 | 2 | 3 |
+| class toggled | 100 | 4 | 7 | 1 | 7 | 5 |
+| same-size value | 1000 | 1 | 2 | 3 | 2 | 1 |
+| resizing label | 1000 | 1 | 2 | 1012 | 6 | 4 |
+| equal write | 1000 | 0 | 0 | 1 | 0 | 0 |
+| hover | 1000 | 4 | 2 | 1 | 2 | 2 |
+| focus | 1000 | 1 | 2 | 1 | 2 | 3 |
+| class toggled | 1000 | 4 | 7 | 1 | 7 | 5 |
 
-A row is 4 elements and 7 boxes and draws 4 items. What the counts show
-about the idle update (the equal write, where nothing is restyled, laid
-out or rebuilt as text): the style phase visits every element, `build`
-makes every box again and paint draws every box and rebuilds every
-item, all linear in rows. Taffy's calls are not part of that walk: it
-asks the root once and reads its cache (`layout_calls` counts only
-those calls). `KeptBoxes::lend`, `placed`, `scroll.settle` and
+A row is 4 elements and 7 boxes and draws 4 items. The style, build
+and paint phases now touch only what an edit changes (the equal write
+visits, builds and paints nothing), so those counts do not grow with
+rows. Taffy's calls are not part of that walk: it asks the root once and
+reads its cache (`layout_calls` counts only those calls). `KeptBoxes::lend`, `placed`, `scroll.settle` and
 `Chains::of` still walk every box on every update, and paint's rect and
 padding loop does too; none of these is counted. A later counter may
 cover them if IU3 needs it. An edit inside one row that keeps the
 row's size makes 3 layout calls at any row count: the edited row is laid
 out in isolation (M10, `layout/isolated.rs`) and its ancestors keep their
 caches. An edit that resizes the row makes rows + 12 calls, the body
-asking each row for its layout again. The retained box tree in IU3 targets
-`boxes_built` and, with paint reuse, `boxes_painted` and
-`scene_items_built`; `elements_visited` needs the style phase to stop
-reading every element.
+asking each row for its layout again. This holds for a row under a
+block parent, the `sparse_updates` page; under a flex or grid parent the
+owner's replayed size query comes back without baselines or overflow, so
+the comparison almost always reads `Differs` and the ancestors are laid
+out again. The layout phase's remaining growth (about 55 instructions
+per row at 1000 to 10000 rows) is unlocated; `KeptBoxes::rebuild`'s lend
+walk, `stackings`, `ChangedSlots::of` and `painted_from` run inside its
+span and walk every box.
 
 ## PR 3: GPU counters
 

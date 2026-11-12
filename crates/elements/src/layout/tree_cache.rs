@@ -7,6 +7,16 @@ use super::super::isolated::Asked;
 use super::BoxTree;
 
 impl BoxTree<'_> {
+    /// Clears the cache, hoisted list and asked inputs of each slot.
+    pub(crate) fn clear(&mut self, slots: &[usize]) {
+        for &slot in slots {
+            let layout_box = &mut self.boxes[slot];
+            layout_box.cache.clear();
+            layout_box.hoisted.clear();
+            layout_box.asked.clear();
+        }
+    }
+
     /// Notes `asked` among the ways the box at `id` was asked: every
     /// way misses the cache the first time, so the list is the ways
     /// asked since the cache was cleared.

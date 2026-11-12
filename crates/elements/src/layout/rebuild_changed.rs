@@ -19,9 +19,10 @@ pub(super) fn changed_owners(
     changed: &[(NodeId, usize)],
     (mut taken, may_keep): (Taken, &dyn Fn(NodeId) -> bool),
 ) -> Vec<Changed> {
-    let before = |old: (Key, LayoutBox)| match old {
-        (Key::Element(_), old) => Some(Before::of(old)),
+    let before = |owner: NodeId, old: (Key, LayoutBox)| match old {
+        (Key::Element(node), old) if node == owner => Some(Before::of(old)),
         (Key::Text(..), _) => None,
+        (key, _) => panic!("the box taken for owner {owner:?} was keyed {key:?}"),
     };
     changed
         .iter()
@@ -32,7 +33,7 @@ pub(super) fn changed_owners(
                 .boxes
                 .remove(&slot)
                 .filter(|_| may_keep(owner))
-                .and_then(before),
+                .and_then(|old| before(owner, old)),
         })
         .collect()
 }

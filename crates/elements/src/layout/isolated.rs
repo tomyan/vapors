@@ -27,7 +27,7 @@
 
 use taffy::{
     BlockFormattingContext, Cache, Layout, LayoutInput, LayoutOutput, LayoutPartialTree, NodeId,
-    Position, Style,
+    Position, RunMode, Style,
 };
 
 use super::boxes::LayoutBox;
@@ -137,6 +137,10 @@ impl BoxTree<'_> {
             return settled;
         }
         let id = NodeId::from(slot);
+        // Size queries first, PerformLayout last: the order a parent asks.
+        before
+            .asked
+            .sort_by_key(|asked| asked.input.run_mode == RunMode::PerformLayout);
         for asked in &before.asked {
             let Some(old) = before.cache.get(&asked.input) else {
                 return Isolation::Unknown;
@@ -195,16 +199,6 @@ impl BoxTree<'_> {
         let mut root = formatting.root_block_context();
         let mut context = root.sub_context(0.0, [0.0, 0.0]);
         self.lay_out(id, asked.input, Some(&mut context))
-    }
-
-    /// Clears the cache, hoisted list and asked inputs of each slot.
-    pub(crate) fn clear(&mut self, slots: &[usize]) {
-        for &slot in slots {
-            let layout_box = &mut self.boxes[slot];
-            layout_box.cache.clear();
-            layout_box.hoisted.clear();
-            layout_box.asked.clear();
-        }
     }
 }
 

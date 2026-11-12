@@ -43,11 +43,16 @@ pub struct UpdateCounts {
     pub owners_isolated: usize,
     /// Rebuilt boxes whose subtree changed and that answered otherwise
     /// (a size, margin or baseline changed, or an out-of-flow box
-    /// bubbles up): their ancestors were laid out again.
+    /// bubbles up), or whose style or natural size changed: their
+    /// ancestors were laid out again. A child of a flex or grid parent
+    /// almost always counts here: the replayed size query comes back
+    /// without baselines or overflow, so it differs from the full answer.
     pub owners_resized: usize,
     /// Rebuilt boxes whose subtree changed with nothing to compare
-    /// against (no box held the slot, or it was never asked): their
-    /// ancestors were laid out again.
+    /// against: no box held the slot, it was never asked, the old
+    /// cache lost an input, it is absolute or fixed, it is restyled
+    /// with a calc, it is the root or it is a text box (see
+    /// `layout/isolated.rs`). Their ancestors were laid out again.
     pub owners_uncompared: usize,
     /// Boxes whose rect layout worked out again (IU3 3b): those Taffy
     /// laid out or gave a new layout, those built again or scrolled,
