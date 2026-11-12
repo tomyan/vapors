@@ -3,12 +3,20 @@
 use std::fmt::Write;
 
 use crate::rows::RowChange;
-use crate::scaling::{Judged, MIN_GROWTH_INSTRUCTIONS, Scaling, TOLERANCE_PERCENT};
+use crate::scaling::{Judged, MIN_GROWTH_INSTRUCTIONS, PhaseSeries, Scaling, TOLERANCE_PERCENT};
 
 /// The counts of every phase at each size, with the growth per extra
 /// row between neighbouring sizes.
 #[must_use]
 pub fn scaling_section(change: RowChange, scaling: &Scaling) -> String {
+    let mut out = header(change, scaling);
+    for series in &scaling.phases {
+        out.push_str(&phase_row(series, &scaling.rows));
+    }
+    out
+}
+
+fn header(change: RowChange, scaling: &Scaling) -> String {
     let mut out = format!("### Scaling, {change:?} (median instructions per frame)\n\n| phase |");
     for rows in &scaling.rows {
         let _ = write!(out, " {rows} rows |");
@@ -19,16 +27,18 @@ pub fn scaling_section(change: RowChange, scaling: &Scaling) -> String {
     out.push('\n');
     out.push_str(&"|---".repeat(scaling.rows.len() * 2));
     out.push_str("|\n");
-    for series in &scaling.phases {
-        let _ = write!(out, "| {} |", series.phase);
-        for count in &series.counts {
-            let _ = write!(out, " {count} |");
-        }
-        for at in 1..scaling.rows.len() {
-            let _ = write!(out, " {:.1} |", series.per_row(&scaling.rows, at - 1, at));
-        }
-        out.push('\n');
+    out
+}
+
+fn phase_row(series: &PhaseSeries, rows: &[usize]) -> String {
+    let mut out = format!("| {} |", series.phase);
+    for count in &series.counts {
+        let _ = write!(out, " {count} |");
     }
+    for at in 1..rows.len() {
+        let _ = write!(out, " {:.1} |", series.per_row(rows, at - 1, at));
+    }
+    out.push('\n');
     out
 }
 

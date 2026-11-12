@@ -1,8 +1,6 @@
 //! `--scaling <change>`: the change at each size of [`SIZES`], counted
 //! in instructions, tabled and judged.
 
-use std::collections::BTreeMap;
-
 use vapors_gpu_harness::Gpu;
 
 use crate::instructions_check::{checked_counter, samples_counted};
@@ -24,22 +22,29 @@ use crate::workloads::settings_for;
 /// beyond the tolerance.
 pub fn run(gpu: &Gpu, change: RowChange, settings: Settings) -> Result<(), String> {
     let mut timer = Sampler::with_clock(gpu, PhaseClock::with_instructions(checked_counter()?));
-    let mut measured = Vec::new();
-    for rows in SIZES {
-        let name = format!("{rows} rows, {change:?}");
-        let samples = timer
-            .sample(
-                &mut Rows::new(rows, change),
-                settings_for(Some(rows), settings),
-            )
-            .map_err(|e| format!("{name}: {e}"))?;
-        samples_counted(&name, &samples)?;
-        measured.push(at_size(rows, &samples)?);
-    }
+    let measured = SIZES
+        .iter()
+        .map(|&rows| measure(&mut timer, rows, change, settings))
+        .collect::<Result<Vec<_>, _>>()?;
     let scaling = Scaling::of(&measured)?;
     println!("{}", scaling_section(change, &scaling));
     println!("{}", verdict(change, &scaling)?);
     Ok(())
+}
+
+fn measure(
+    timer: &mut Sampler,
+    rows: usize,
+    change: RowChange,
+    settings: Settings,
+) -> Result<AtSize, String> {
+    let name = format!("{rows} rows, {change:?}");
+    let workload = &mut Rows::new(rows, change);
+    let samples = timer
+        .sample(workload, settings_for(Some(rows), settings))
+        .map_err(|e| format!("{name}: {e}"))?;
+    samples_counted(&name, &samples)?;
+    at_size(rows, &samples)
 }
 
 /// The median count of the frame and of each phase `samples` recorded.
@@ -56,13 +61,14 @@ fn at_size(rows: usize, samples: &Samples) -> Result<AtSize, String> {
     }
     let named = std::iter::once(("frame (CPU)", &kept.frame))
         .chain(kept.phases.iter().map(|(p, counts)| (p.as_str(), counts)));
-    let mut phases = BTreeMap::new();
-    for (phase, counts) in named {
-        let median = median_count(counts)
-            .ok_or_else(|| format!("{rows} rows: no samples of phase {phase}"))?;
-        phases.insert(phase.to_owned(), median);
-    }
+    let phases = named
+        .map(|(phase, counts)| Ok((phase.to_owned(), median(rows, phase, counts)?)))
+        .collect::<Result<_, String>>()?;
     Ok(AtSize { rows, phases })
+}
+
+fn median(rows: usize, phase: &str, counts: &[u64]) -> Result<u64, String> {
+    median_count(counts).ok_or_else(|| format!("{rows} rows: no samples of phase {phase}"))
 }
 
 fn unknown_phase(rows: usize, phase: &str) -> String {
