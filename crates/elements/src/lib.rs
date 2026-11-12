@@ -134,6 +134,8 @@ mod svg_paint;
 mod svg_path_checks;
 mod svg_style_checks;
 mod tags;
+#[cfg(test)]
+mod test_rows;
 mod text_bridge;
 mod text_delete;
 mod text_field;

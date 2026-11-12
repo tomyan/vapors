@@ -39,8 +39,7 @@ impl Document {
         self.kept
             .as_mut()
             .expect("set above or by an earlier update")
-            .restyled_nodes
-            .clear();
+            .forget_restyled();
         match self.restyle_all(&roots, &singles, viewport) {
             Ok(count) => {
                 self.counts.elements_restyled = count;
