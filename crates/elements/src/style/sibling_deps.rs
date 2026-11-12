@@ -72,7 +72,9 @@ struct Group {
     previous: bool,
     later: bool,
     earlier: bool,
-    unbounded: bool,
+    /// What `:is()`, `:not()`, `:where()` and `:global()` selectors of
+    /// several compounds reach (`of_selector` on each).
+    nested: SiblingDeps,
 }
 
 impl Group {
@@ -118,12 +120,14 @@ impl Group {
     }
 
     /// A nested selector of one compound uses what that compound uses;
-    /// one with combinators cannot be placed.
+    /// one with combinators reaches what it reaches on its own. This is
+    /// the only place nested selectors are read (`Features` does not
+    /// walk them for siblings).
     fn add_nested(&mut self, list: &[Selector]) {
         for selector in list {
             match selector.compounds.as_slice() {
                 [compound] => self.add_compound(compound),
-                _ => self.unbounded = true,
+                _ => self.nested.merge(SiblingDeps::of_selector(selector)),
             }
         }
     }
@@ -135,24 +139,29 @@ impl Group {
     fn resolve(self, descendants: bool) -> SiblingDeps {
         let combinators = self.plus > 0 || self.tilde;
         let uses = self.first || self.previous || self.later || self.earlier;
-        if !combinators && !uses && !self.unbounded {
-            return SiblingDeps::default();
+        let mut nested = self.nested;
+        nested.descendants |= descendants && nested.any();
+        if !combinators && !uses {
+            return nested;
         }
-        if self.unbounded || (self.earlier && combinators) {
-            return SiblingDeps {
+        let mut deps = if self.earlier && combinators {
+            SiblingDeps {
                 later: true,
                 earlier: true,
                 descendants,
                 ..SiblingDeps::default()
-            };
-        }
-        SiblingDeps {
-            next: self.plus + usize::from(self.first),
-            previous: self.previous,
-            later: self.tilde || self.later,
-            earlier: self.earlier,
-            descendants,
-        }
+            }
+        } else {
+            SiblingDeps {
+                next: self.plus + usize::from(self.first),
+                previous: self.previous,
+                later: self.tilde || self.later,
+                earlier: self.earlier,
+                descendants,
+            }
+        };
+        deps.merge(nested);
+        deps
     }
 }
 

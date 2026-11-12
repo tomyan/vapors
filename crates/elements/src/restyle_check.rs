@@ -3,6 +3,10 @@
 //! sheets reach, every element's style computed afresh from the root
 //! equals the kept one. A difference names the element, the property,
 //! and the sheets' sibling-reaching selectors that match it.
+//!
+//! Debug builds only, and O(elements) per such update: it would be
+//! sampled or dropped once the narrowing has run in the corpus tests
+//! for a while with no mismatch.
 
 use vapors_css::cascade::ComputedStyle;
 use vapors_dom::NodeId;
@@ -11,6 +15,34 @@ use crate::check::elements;
 use crate::document::Document;
 use crate::style::Styles;
 use crate::update::{Viewport, environment};
+
+/// What differs between the kept style of an element and its fresh
+/// one, for the message: a missing kept style, the first longhand whose
+/// values differ (found over every longhand, so one the fresh style
+/// leaves unset while the kept style set it is named), or else the part
+/// of the style outside the longhands.
+fn differing_property(kept: Option<&ComputedStyle>, fresh: &ComputedStyle) -> String {
+    let Some(kept) = kept else {
+        return "no kept style".to_owned();
+    };
+    fresh
+        .iter()
+        .find(|(id, value)| kept.get(*id) != *value)
+        .map_or_else(
+            || {
+                "the longhands are equal; the custom properties, font size, colour or the winning declarations differ"
+                    .to_owned()
+            },
+            |(id, value)| {
+                format!(
+                    "`{}` is {} fresh, {} kept",
+                    id.name(),
+                    value.to_css(),
+                    kept.get(id).to_css()
+                )
+            },
+        )
+}
 
 impl Document {
     /// Panics on the first element whose kept style differs from a
@@ -40,13 +72,7 @@ impl Document {
         kept: Option<&ComputedStyle>,
         fresh: &ComputedStyle,
     ) -> String {
-        let differing = fresh
-            .iter()
-            .find(|(id, value)| kept.is_none_or(|kept| kept.get(*id) != *value))
-            .map_or_else(
-                || "no kept style".to_owned(),
-                |(id, value)| format!("`{}` is {} fresh", id.name(), value.to_css()),
-            );
+        let differing = differing_property(kept, fresh);
         let selectors = self.sheets.sibling_selectors(&self.arena, node);
         let (matching, other): (Vec<_>, Vec<_>) = selectors.into_iter().partition(|s| s.1);
         let named = |list: Vec<(String, bool)>| list.into_iter().map(|s| s.0).collect::<Vec<_>>();
@@ -80,3 +106,7 @@ impl Document {
         format!("<{}{id}{classes}> ({node:?})", element.tag)
     }
 }
+
+#[cfg(test)]
+#[path = "restyle_check_tests.rs"]
+mod tests;

@@ -32,6 +32,11 @@ impl Features {
 
     fn add_selector(&mut self, selector: &Selector) {
         self.siblings.merge(SiblingDeps::of_selector(selector));
+        self.add_flags(selector);
+    }
+
+    /// `:empty` and `:has()` in `selector`, not its sibling reach.
+    fn add_flags(&mut self, selector: &Selector) {
         for compound in &selector.compounds {
             self.add_compound(compound);
         }
@@ -51,8 +56,9 @@ impl Features {
                 | PseudoClass::Is(list)
                 | PseudoClass::Where(list)
                 | PseudoClass::Global(list) => {
+                    // their sibling reach is `SiblingDeps::of_selector`'s
                     for selector in list {
-                        self.add_selector(selector);
+                        self.add_flags(selector);
                     }
                 }
                 PseudoClass::FirstChild

@@ -1,7 +1,8 @@
 //! The elements restyled by a middle insert on the rows workload
 //! (`support::rows_page`), with and without a structural rule: pinned
-//! at 1000 rows, and at the count in `VAPORS_SPARSE_ROWS` (3000 for
-//! the record in splice.md (b2)) when it asks, as `sparse_updates.rs`.
+//! at 1000 rows. The 3000-row counts are recorded in splice.md (b2),
+//! from one run of `assert_middle_insert_counts(3000)`, 22 s in debug
+//! under load: too slow to run on every `cargo xtask ci`.
 
 mod support;
 
@@ -46,16 +47,4 @@ fn assert_middle_insert_counts(rows: usize) {
 #[test]
 fn a_middle_insert_at_a_thousand_rows_restyles_only_what_the_sheets_reach() {
     assert_middle_insert_counts(1000);
-}
-
-/// The record: `VAPORS_SPARSE_ROWS=3000 cargo nextest run -p vapors-elements --test insert_restyle_rows`.
-#[test]
-fn a_middle_insert_at_the_requested_rows_restyles_only_what_the_sheets_reach() {
-    let Some(rows) = std::env::var("VAPORS_SPARSE_ROWS").ok() else {
-        return;
-    };
-    let rows: usize = rows
-        .parse()
-        .unwrap_or_else(|_| panic!("VAPORS_SPARSE_ROWS={rows:?} is not a row count"));
-    assert_middle_insert_counts(rows);
 }

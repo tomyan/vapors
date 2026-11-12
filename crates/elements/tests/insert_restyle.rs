@@ -157,3 +157,15 @@ fn an_inserted_text_node_reaches_no_sibling() {
     // Then
     assert_eq!(count, 0);
 }
+
+#[test]
+fn a_nested_selector_with_an_ancestor_group_reaches_the_next_rows_cells() {
+    // Given
+    let mut page = page(".cell:is(.on + .row .cell) { color: red; }");
+
+    // When
+    let count = restyled_after(&mut page, |p| insert_row(p, 5));
+
+    // Then: the new row, and the next row with its cells
+    assert_eq!(count, 1 + ROW);
+}

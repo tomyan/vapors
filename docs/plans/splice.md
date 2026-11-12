@@ -165,7 +165,11 @@ the next sibling; `:nth-child(odd)` → and the siblings after;
 `:last-child` → the old and new last; `~` → the following siblings;
 `:has()` → everything; a sheet added between inserts changes the reach.
 The count for a middle insert at 3000 rows, with and without a
-structural rule, recorded in the PR.
+structural rule: 4 (none), 5 (`.row + .row`), 6004
+(`.row:nth-child(odd)`), from one manual run of
+`assert_middle_insert_counts(3000)` (`insert_restyle_rows.rs`) on
+2026-11-11; the test itself runs 1000 rows only, as 3000 takes 22 s in
+debug.
 
 ## (c) PR B: the order splice, decided at runtime
 

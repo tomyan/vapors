@@ -55,7 +55,23 @@ fn uses_before_a_sibling_combinator_widen() {
 }
 
 #[test]
-fn a_nested_selector_of_one_compound_counts_and_one_with_combinators_widens() {
+fn a_nested_selector_of_one_compound_counts_and_one_with_combinators_reaches_its_own() {
     assert_eq!(deps(".row:not(:first-child)").next, 1);
-    assert_eq!(deps(".row:is(.a + .b)"), all(false));
+    assert_eq!(
+        deps(".row:is(.a + .b)"),
+        SiblingDeps {
+            next: 1,
+            ..SiblingDeps::default()
+        }
+    );
+}
+
+#[test]
+fn a_nested_selector_with_an_ancestor_group_reaches_subtrees_of_the_subject() {
+    // `.cell:is(.a + .b .cell)`: the cells of the row after `.a`
+    let own = deps(".cell:is(.a + .b .cell)");
+    let before_subject = deps(".x + .y .cell:is(.a + .b)");
+
+    assert_eq!((own.next, own.descendants), (1, true));
+    assert_eq!((before_subject.next, before_subject.descendants), (1, true));
 }
