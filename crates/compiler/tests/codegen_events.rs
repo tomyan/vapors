@@ -72,11 +72,11 @@ fn dynamic_attributes_are_patched_in_effects() {
     // When
     let code = generated_with(
         script,
-        "<div class={cls()} aria-disabled={locked.get()}><span>body</span></div>",
+        "<div title={cls()} aria-disabled={locked.get()}><span>body</span></div>",
     );
 
     // Then
-    assert_has(&code, "set_attribute_if_changed(div0, \"class\", &value)");
+    assert_has(&code, "set_attribute_if_changed(div0, \"title\", &value)");
     assert_has(&code, "let shown = &(cls());");
     assert_has(
         &code,
