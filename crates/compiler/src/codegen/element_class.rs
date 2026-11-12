@@ -36,9 +36,35 @@ impl Emitter<'_> {
         for (name, expr) in &directives {
             pairs.push(format!("({name:?}, {})", self.raw(expr)?));
         }
-        let body = class_effect_body(&literal_class(element), &pairs.join(", "), var);
+        let literal = self.literal_class(element)?;
+        let body = class_effect_body(&literal, &pairs.join(", "), var);
         self.emit_effect(&clones, &body);
         Ok(())
+    }
+
+    /// The element's literal `class` text, or none; refused when it is
+    /// an expression the directives' effect would drop, or already sets
+    /// a directive's class.
+    fn literal_class(&self, element: &Element) -> Result<String, CompileError> {
+        let Some(class) = class_attribute(element) else {
+            return Ok(String::new());
+        };
+        let AttrValue::Literal(value) = &class.value else {
+            return Err(self.source.error(
+                class.offset,
+                "`class={..}` beside `class:` directives would be dropped: the directives' effect sets `class` from the literal `class=\"..\"` only; write the names in `class=\"..\"` and toggle with `class:name={bool}`",
+            ));
+        };
+        for attribute in element.attributes.iter().filter(|a| is_class_directive(a)) {
+            let name = &attribute.name[PREFIX.len()..];
+            if value.split_ascii_whitespace().any(|set| set == name) {
+                return Err(self.source.error(
+                    attribute.offset,
+                    format!("`{PREFIX}{name}` toggles a class the literal `class` already sets: remove `{name}` from `class=\"...\"`"),
+                ));
+            }
+        }
+        Ok(value.clone())
     }
 
     fn class_directives<'e>(
@@ -80,12 +106,9 @@ impl Emitter<'_> {
     }
 }
 
-/// The element's literal `class` text, or none.
-fn literal_class(element: &Element) -> String {
-    match element.attributes.get("class") {
-        Some(AttrValue::Literal(value)) => value.clone(),
-        _ => String::new(),
-    }
+/// The element's `class` attribute, in any case.
+pub(super) fn class_attribute(element: &Element) -> Option<&Attribute> {
+    (element.attributes.iter()).find(|attribute| attribute.name.eq_ignore_ascii_case("class"))
 }
 
 /// `vapors_dom::class_names` of the literal names and each directive's

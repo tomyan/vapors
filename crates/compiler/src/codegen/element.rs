@@ -27,7 +27,9 @@ impl Emitter<'_> {
             .partition(|attribute| attribute.name == "bind:this");
         let directed = has_class_directives(element);
         for attribute in rest {
-            if is_class_directive(attribute) || (directed && attribute.name == "class") {
+            if is_class_directive(attribute)
+                || (directed && attribute.name.eq_ignore_ascii_case("class"))
+            {
                 continue;
             }
             self.emit_attribute(element, &var, attribute)?;

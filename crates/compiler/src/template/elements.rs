@@ -84,6 +84,7 @@ impl Parser<'_> {
 
     fn parse_component(&mut self, name: String, offset: usize) -> Result<Node, CompileError> {
         let attributes = self.parse_attributes(&name)?;
+        self.refuse_component_directives(&attributes)?;
         let children = if self.starts_with("/>") {
             self.bump(2);
             Vec::new()

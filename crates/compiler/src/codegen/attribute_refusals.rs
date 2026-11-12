@@ -8,16 +8,22 @@ use crate::CompileError;
 use crate::ast::{AttrValue, Attribute};
 use crate::source::Source;
 
-/// The HTML boolean attributes: on by being present, whatever the value.
+/// The HTML boolean attributes, including those of elements vapors does
+/// not implement: on by being present, whatever the value.
 const BOOLEAN_ATTRIBUTES: &[&str] = &[
     "allowfullscreen",
+    "alpha",
     "async",
     "autofocus",
     "autoplay",
     "checked",
+    "compact",
     "controls",
+    "declare",
     "default",
     "defer",
+    "disablepictureinpicture",
+    "disableremoteplayback",
     "disabled",
     "formnovalidate",
     "hidden",
@@ -28,13 +34,21 @@ const BOOLEAN_ATTRIBUTES: &[&str] = &[
     "multiple",
     "muted",
     "nomodule",
+    "noresize",
+    "noshade",
     "novalidate",
+    "nowrap",
     "open",
     "playsinline",
     "readonly",
     "required",
     "reversed",
     "selected",
+    "shadowrootclonable",
+    "shadowrootdelegatesfocus",
+    "shadowrootserializable",
+    "truespeed",
+    "typemustmatch",
 ];
 
 /// The directive prefixes an element takes.
@@ -46,13 +60,24 @@ pub(super) fn refuse_misleading(
     attribute: &Attribute,
 ) -> Result<(), CompileError> {
     refuse_unknown_directive(source, attribute)?;
+    refuse_boolean_literal_false(source, attribute)?;
     refuse_boolean_expression(source, attribute)
 }
+
+const NAMESPACES: &[&str] = &["xlink:", "xml:", "xmlns:"];
 
 fn refuse_unknown_directive(source: &Source, attribute: &Attribute) -> Result<(), CompileError> {
     let name = &attribute.name;
     if !name.contains(':') || DIRECTIVES.iter().any(|prefix| name.starts_with(prefix)) {
         return Ok(());
+    }
+    if NAMESPACES.iter().any(|prefix| name.starts_with(prefix)) {
+        return Err(source.error(
+            attribute.offset,
+            format!(
+                "`{name}` is a namespaced attribute: namespaced attributes such as `xlink:href`, `xml:lang` and `xmlns:*` are not supported; use the plain form (`href`) where the element accepts it"
+            ),
+        ));
     }
     Err(source.error(
         attribute.offset,
@@ -62,12 +87,33 @@ fn refuse_unknown_directive(source: &Source, attribute: &Attribute) -> Result<()
     ))
 }
 
+fn refuse_boolean_literal_false(
+    source: &Source,
+    attribute: &Attribute,
+) -> Result<(), CompileError> {
+    let name = &attribute.name;
+    let AttrValue::Literal(value) = &attribute.value else {
+        return Ok(());
+    };
+    if !is_boolean_attribute(name) || !value.eq_ignore_ascii_case("false") {
+        return Ok(());
+    }
+    Err(source.error(
+        attribute.offset,
+        format!(
+            "`{name}=\"{value}\"` is on: an HTML boolean attribute is on by being present, whatever its value; omit it, or write `{name}=\"\"` on an element inside `{{if ..}}`"
+        ),
+    ))
+}
+
+fn is_boolean_attribute(name: &str) -> bool {
+    BOOLEAN_ATTRIBUTES.contains(&name.to_ascii_lowercase().as_str())
+}
+
 fn refuse_boolean_expression(source: &Source, attribute: &Attribute) -> Result<(), CompileError> {
     let name = &attribute.name;
     let lowercase = name.to_ascii_lowercase();
-    if !matches!(attribute.value, AttrValue::Expr(_))
-        || !BOOLEAN_ATTRIBUTES.contains(&lowercase.as_str())
-    {
+    if !matches!(attribute.value, AttrValue::Expr(_)) || !is_boolean_attribute(name) {
         return Ok(());
     }
     let binding = if lowercase == "checked" {

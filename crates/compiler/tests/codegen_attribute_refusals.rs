@@ -88,3 +88,71 @@ fn a_brace_in_a_quoted_attribute_value_is_refused() {
         "counter.wisp:5:15: the value of attribute `title` has a `{` in quotes, which is text, not an expression: write title={format!(\"..\")} to build it, or `&#123;` for a literal brace"
     );
 }
+
+#[test]
+fn a_boolean_attribute_with_the_literal_false_is_refused() {
+    // When
+    let err = refusal_with_flag("<button disabled=\"False\">x</button>");
+
+    // Then
+    assert_eq!(
+        err,
+        "counter.wisp:4:9: `disabled=\"False\"` is on: an HTML boolean attribute is on by being present, whatever its value; omit it, or write `disabled=\"\"` on an element inside `{if ..}`"
+    );
+}
+
+#[test]
+fn a_boolean_attribute_with_another_literal_value_is_accepted() {
+    // When
+    let code = codegen::generated("<button disabled=\"disabled\" hidden=\"\">x</button>");
+
+    // Then
+    assert!(code.contains("\"disabled\""), "{code}");
+}
+
+#[test]
+fn a_less_common_boolean_attribute_is_refused_from_an_expression() {
+    // When
+    let err = refusal_with_flag("<div nowrap={flag.get()}></div>");
+
+    // Then
+    assert!(err.contains("`nowrap={..}` would always be on"), "{err}");
+}
+
+#[test]
+fn an_attribute_given_twice_in_other_case_is_refused() {
+    // When
+    let err = refusal_with_flag("<div title=\"a\" Title=\"b\"></div>");
+
+    // Then
+    assert_eq!(
+        err,
+        "counter.wisp:4:16: attribute `Title` is given twice: keep one"
+    );
+}
+
+#[test]
+fn a_colon_name_on_a_component_is_refused_naming_the_fix() {
+    // When
+    let err = refusal_with_flag("<Card class:lit={flag.get()} />");
+
+    // Then
+    assert_eq!(
+        err,
+        "counter.wisp:4:7: `class:lit` is not a prop: a component tag takes plain props and `bind:name`; `class:` directives and `on:` listeners are for elements"
+    );
+}
+
+#[test]
+fn a_namespaced_attribute_is_refused_saying_namespaces_are_unsupported() {
+    // When
+    let err = refusal_with_flag("<div xlink:href=\"#a\"></div>");
+
+    // Then
+    assert!(
+        err.contains(
+            "namespaced attributes such as `xlink:href`, `xml:lang` and `xmlns:*` are not supported"
+        ),
+        "{err}"
+    );
+}

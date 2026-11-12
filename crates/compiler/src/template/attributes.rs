@@ -35,12 +35,30 @@ impl Parser<'_> {
         }
     }
 
+    /// A component tag's attribute with a `:` other than `bind:` would
+    /// become a prop with a colon in its name.
+    pub fn refuse_component_directives(&self, attributes: &Attributes) -> Result<(), CompileError> {
+        let Some(attribute) = attributes
+            .iter()
+            .find(|attribute| attribute.name.contains(':') && !attribute.name.starts_with("bind:"))
+        else {
+            return Ok(());
+        };
+        Err(self.error(
+            attribute.offset,
+            format!(
+                "`{}` is not a prop: a component tag takes plain props and `bind:name`; `class:` directives and `on:` listeners are for elements",
+                attribute.name
+            ),
+        ))
+    }
+
     fn push_attribute(
         &self,
         attributes: &mut Attributes,
         attribute: Attribute,
     ) -> Result<(), CompileError> {
-        if attributes.get(&attribute.name).is_some() {
+        if (attributes.iter()).any(|given| given.name.eq_ignore_ascii_case(&attribute.name)) {
             return Err(self.error(
                 attribute.offset,
                 format!("attribute `{}` is given twice: keep one", attribute.name),
