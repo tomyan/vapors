@@ -61,7 +61,9 @@ margin, passes since M10c (2026-11-12; `layout` 5.6 M / 16.6 M / 55.3 M
 instructions at 1,000 / 3,000 / 10,000 rows before, 123 k / 126 k /
 127 k after, docs/plans/iu1.md).
 Property 1's
-time target (under 1 ms) is still read from the timed run. `--scaling Insert` reports for property 3
+time target (under 1 ms) is read from the timed run; at 9b405f9
+(2026-11-12, docs/perf/timed-2026-11-12.md) it holds for Text, Class,
+HoveredClass and FlexText at 1,000, 3,000 and 10,000 rows. `--scaling Insert` reports for property 3
 and does not judge until the splice step is built.
 
 ## Order of work
