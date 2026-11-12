@@ -19,6 +19,10 @@ pub(crate) struct Rebuilt {
     /// A slot was freed or newly taken, or a rebuilt box's children
     /// differ from the box it replaced.
     pub(crate) shape_changed: bool,
+    /// The slots whose box has other children than the box taken from
+    /// it, each with the children it had: what the order splice reads
+    /// (`order_splice.rs`).
+    pub(crate) reshaped: Vec<(usize, Vec<usize>)>,
     /// The owners whose rebuilt subtree changed, for layout to settle
     /// (`isolated.rs`); none when every box was built.
     pub(crate) changed: Vec<Changed>,
@@ -35,6 +39,7 @@ impl Rebuilt {
             slots: boxes.iter().enumerate().filter_map(held).collect(),
             freed: Vec::new(),
             shape_changed: true,
+            reshaped: Vec::new(),
             changed: Vec::new(),
         }
     }
@@ -43,13 +48,17 @@ impl Rebuilt {
     /// out, once every subtree is put.
     pub(crate) fn subtrees(boxes: &[LayoutBox], slots: Vec<usize>, taken: &Taken) -> Self {
         let freed = taken.unclaimed();
-        let shape_changed =
-            !freed.is_empty() || slots.iter().any(|&slot| reshaped(boxes, slot, taken));
+        let newly_taken = slots.iter().any(|slot| !taken.boxes.contains_key(slot));
+        let reshaped: Vec<(usize, Vec<usize>)> = slots
+            .iter()
+            .filter_map(|&slot| reshaped(boxes, slot, taken).map(|old| (slot, old.to_vec())))
+            .collect();
         Self {
             every: false,
+            shape_changed: !freed.is_empty() || newly_taken || !reshaped.is_empty(),
             slots,
             freed,
-            shape_changed,
+            reshaped,
             changed: Vec::new(),
         }
     }
@@ -60,12 +69,11 @@ impl Rebuilt {
     }
 }
 
-/// Whether the box at `slot` newly took it, or has other children than
-/// the box taken from it. A kept key keeps its slot, so equal children
-/// are the same boxes in the same order.
-fn reshaped(boxes: &[LayoutBox], slot: usize, taken: &Taken) -> bool {
-    taken
-        .boxes
-        .get(&slot)
-        .is_none_or(|(_, old)| old.children != boxes[slot].children)
+/// The children the box taken from `slot` had, when the box at `slot`
+/// has other children; `None` when they are the same or the slot is
+/// newly taken. A kept key keeps its slot, so equal children are the
+/// same boxes in the same order.
+fn reshaped<'a>(boxes: &[LayoutBox], slot: usize, taken: &'a Taken) -> Option<&'a [usize]> {
+    let (_, old) = taken.boxes.get(&slot)?;
+    (old.children != boxes[slot].children).then_some(old.children.as_slice())
 }

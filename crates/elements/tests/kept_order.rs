@@ -1,7 +1,8 @@
 //! Paint order, containing blocks and scroll chains kept across updates
 //! and walked again over the whole tree only when its shape changes
 //! (IU3 3c-3c, `docs/plans/iu3.md`): a box added or moved among its
-//! siblings, or a rebuilt box's stacking changed. A debug build also
+//! siblings, or a rebuilt box's stacking changed; an in-flow box added
+//! or removed is spliced in (`order_splice.rs`). A debug build also
 //! compares what is kept with what a fresh walk makes on every update
 //! that paints (`kept_paint_check.rs`), so a missed shape change fails
 //! there too. Clips: `kept_clips.rs`.
@@ -129,7 +130,7 @@ fn position_static_to_relative_walks_order_again() {
 }
 
 #[test]
-fn an_inserted_block_walks_order_and_chains_again() {
+fn an_inserted_block_is_spliced_into_the_order_and_chains() {
     // Given
     let (mut doc, _, _) = overlapping_blocks();
 
@@ -139,7 +140,8 @@ fn an_inserted_block_walks_order_and_chains_again() {
     updated(&mut doc);
 
     // Then
-    assert_eq!(walks(&doc), (1, 1));
+    assert_eq!(walks(&doc), (0, 0));
+    assert_eq!(doc.update_counts().order_splices, 1);
     assert_eq!(hit(&doc, [1.0, 16.0]), Some(third));
 }
 
