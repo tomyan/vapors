@@ -11,6 +11,7 @@ use winit::window::WindowId;
 
 use super::Handler;
 use crate::event::Event;
+use crate::hidden_window::shows_window;
 use crate::window::Message;
 
 impl ApplicationHandler<Message> for Handler {
@@ -77,6 +78,9 @@ impl ApplicationHandler<Message> for Handler {
             && let Some(gpu) = self.gpu.as_mut()
         {
             gpu.resize(size.width, size.height);
+            self.platform.request_redraw();
+        }
+        if shows_window(&event) {
             self.platform.request_redraw();
         }
         if let WindowEvent::ScaleFactorChanged { .. } = event {

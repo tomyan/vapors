@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use winit::event_loop::ActiveEventLoop;
+use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::window::Window;
 
 use crate::PlatformError;
@@ -11,7 +11,8 @@ use crate::event::Event;
 use crate::input::Input;
 use crate::platform::Platform;
 use crate::surface::Gpu;
-use crate::surface_texture::{Miss, acquire};
+use crate::hidden_window::{MissAction, RETRY_AFTER, after_miss};
+use crate::surface_texture::acquire;
 use crate::tasks;
 use crate::window::{App, Frame, Next, WindowOptions};
 
@@ -158,6 +159,20 @@ impl Handler {
         true
     }
 
+    fn after_miss(&mut self, event_loop: &ActiveEventLoop, action: MissAction) {
+        match action {
+            MissAction::Wait => event_loop
+                .set_control_flow(ControlFlow::WaitUntil(crate::Instant::now() + RETRY_AFTER)),
+            MissAction::Count(missed) => self.missed = missed,
+            MissAction::Fail(outcome) => {
+                let error = PlatformError::Surface(format!(
+                    "no frame for {MISSED_LIMIT} redraws in a row; the last outcome was {outcome}"
+                ));
+                self.fail(event_loop, error);
+            }
+        }
+    }
+
     fn redraw(&mut self, event_loop: &ActiveEventLoop) {
         let now = crate::Instant::now();
         if self.stop_if_gpu_failed(event_loop) {
@@ -168,15 +183,9 @@ impl Handler {
         };
         let surface_texture = match acquire(window, gpu) {
             Ok(texture) => texture,
-            Err(Miss::Waiting(_)) => return,
-            Err(Miss::Failed(outcome)) => {
-                self.missed += 1;
-                if self.missed >= MISSED_LIMIT {
-                    let error = PlatformError::Surface(format!(
-                        "no frame for {MISSED_LIMIT} redraws in a row; the last outcome was {outcome}"
-                    ));
-                    self.fail(event_loop, error);
-                }
+            Err(miss) => {
+                let action = after_miss(miss, self.missed, MISSED_LIMIT);
+                self.after_miss(event_loop, action);
                 return;
             }
         };

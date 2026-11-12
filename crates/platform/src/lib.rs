@@ -27,6 +27,7 @@ mod first_report;
 mod gestures;
 mod gpu_watch;
 mod handler;
+mod hidden_window;
 #[cfg(not(target_family = "wasm"))]
 mod ime;
 #[cfg(not(target_family = "wasm"))]

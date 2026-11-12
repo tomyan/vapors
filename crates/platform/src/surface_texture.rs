@@ -35,8 +35,9 @@ pub fn texture_of(outcome: wgpu::CurrentSurfaceTexture) -> Result<wgpu::SurfaceT
     }
 }
 
-/// The next surface texture, or why there is none, after reconfiguring
-/// a failed surface and asking for another redraw.
+/// The next surface texture, or why there is none. A failed surface is
+/// reconfigured and another redraw requested; a hidden window requests
+/// none (see `hidden_window`).
 pub fn acquire(window: &Window, gpu: &mut Gpu) -> Result<wgpu::SurfaceTexture, Miss> {
     let miss = match texture_of(gpu.surface.get_current_texture()) {
         Ok(texture) => return Ok(texture),
@@ -45,8 +46,8 @@ pub fn acquire(window: &Window, gpu: &mut Gpu) -> Result<wgpu::SurfaceTexture, M
     if let Miss::Failed(_) = miss {
         let size = window.inner_size();
         gpu.resize(size.width, size.height);
+        window.request_redraw();
     }
-    window.request_redraw();
     Err(miss)
 }
 
