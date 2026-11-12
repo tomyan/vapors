@@ -36,7 +36,7 @@ fn updated(page: &RowsPage) -> (usize, usize) {
 /// (`Document::skip_layout_check`) is skipped on its updates. The oracle
 /// compares every box with a fresh layout's, which is what the check
 /// does, and at 3000 rows the check adds 3 s of debug time to each
-/// update (measured in the PR for the load-sensitive kept_shift
+/// update (measured in the PR for the load-sensitive `kept_shift`
 /// tests). The paint check, which pins the shifted paint, stays on.
 fn oracle_checks_layout(page: &RowsPage) {
     page.doc.borrow_mut().skip_layout_check();
