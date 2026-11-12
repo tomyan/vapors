@@ -5,26 +5,24 @@
 //! which asked every sibling for its (cached) layout: O(rows) per
 //! edit. Now the rebuilt owner is first asked what its parent asked
 //! the box it replaced (`LayoutBox::asked`). When every answer is the
-//! one the old box gave (a layout's, from the old cache; a size
-//! query's, as the old box recorded it: a flex or grid parent asks a
-//! child for its size before laying it out, and Taffy's cache keeps
-//! no size answer carrying margins, `asked.rs`), its parent's cached
-//! layout still stands, the ancestors keep their caches, and the
-//! root's layout is a cache hit. Otherwise the ancestors are cleared
-//! as before.
+//! one the old box gave (a layout's from the old cache, a size query's
+//! as the old box recorded it, `asked.rs`), its parent's cached layout
+//! still stands, the ancestors keep their caches, and the root's
+//! layout is a cache hit. Otherwise the ancestors are cleared as before.
 //!
 //! Three states, never a guess: `Same` keeps the ancestors; `Differs`
-//! (the owner's size, margins or baselines changed, or it bubbles an
-//! out-of-flow box up to an ancestor) and `Unknown` (no old box, no
-//! input asked, a layout's input the old cache no longer holds, a size
-//! answer that bubbled an out-of-flow box up, an absolute
-//! or fixed owner, which its containing block hoists and places, a
-//! restyled owner whose style holds a calc, `keep.rs`, or the root,
-//! which no parent asks: `compute_root_layout` places the fixed boxes
-//! bubbled up to it outside the cached call, and hoists them onto it
-//! only on a cache miss) clear them. An owner styled otherwise than
-//! the box it replaced differs too: its parent reads its style to
-//! work out what to ask. Owners settle deepest first: one above
+//! (the owner's size, margins or baselines changed, it bubbles an
+//! out-of-flow box up to an ancestor, or it is styled otherwise than
+//! the box it replaced: its parent reads its style to work out what to
+//! ask) and `Unknown` (no old box, no input asked, a layout's input the
+//! old cache no longer holds, a size answer disowned or bubbling an
+//! out-of-flow box up, a box asked more ways than it records
+//! (`tree_cache.rs`), an absolute or fixed owner, which its containing
+//! block hoists and places, a restyled owner whose style holds a calc,
+//! `keep.rs`, or the root, which no parent asks: `compute_root_layout`
+//! places the fixed boxes bubbled up to it outside the cached call,
+//! and hoists them onto it only on a cache miss) clear them. Owners
+//! settle deepest first: one above
 //! another places it when laid out in isolation, which the lower
 //! one's `Same`, settled after, would undo by putting its old layout
 //! back. Debug builds check the result against a fresh layout
@@ -208,6 +206,9 @@ mod fallback_tests;
 #[cfg(test)]
 #[path = "isolated_flex_tests.rs"]
 mod flex_tests;
+#[cfg(all(test, feature = "grid"))]
+#[path = "isolated_grid_tests.rs"]
+mod grid_tests;
 #[cfg(test)]
 #[path = "isolated_order_tests.rs"]
 mod order_tests;

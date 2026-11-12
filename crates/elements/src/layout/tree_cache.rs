@@ -4,6 +4,7 @@
 use taffy::{Cache, CacheTree, LayoutInput, LayoutOutput, NodeId};
 
 use super::super::asked::Asked;
+use super::super::boxes::LayoutBox;
 use super::BoxTree;
 
 impl BoxTree<'_> {
@@ -14,6 +15,7 @@ impl BoxTree<'_> {
             layout_box.cache.clear();
             layout_box.hoisted.clear();
             layout_box.asked.clear();
+            layout_box.asked_overflowed = false;
         }
     }
 
@@ -22,21 +24,43 @@ impl BoxTree<'_> {
     /// asked since the cache was cleared. A size query answered with
     /// margins misses every time (the cache keeps no such answer), and
     /// a box asked the same way answers the same until its cache is
-    /// cleared, which a debug build checks.
+    /// cleared; one that answers otherwise has its recorded answer
+    /// disowned (`Unknown` on replay) and counted. A box asked more
+    /// than `ASKED_LIMIT` ways records none until its cache is cleared.
     pub(super) fn note_asked(&mut self, id: NodeId, asked: Asked) {
         let node = self.node_mut(id);
-        match node.asked.iter().find(|noted| noted.same_way(&asked)) {
-            None => node.asked.push(asked),
-            Some(noted) => debug_assert_eq!(
-                noted.answered,
-                asked.answered,
-                "the box in slot {} answered the same size query otherwise since its cache was \
-                 cleared, so a layout it was kept in rests on a stale answer; \
-                 `cargo test -p vapors-elements` reproduces it",
-                usize::from(id)
-            ),
+        if node.asked_overflowed {
+            return;
+        }
+        match node.asked.iter_mut().find(|noted| noted.same_way(&asked)) {
+            Some(noted) if noted.answered != asked.answered => {
+                noted.answered = None;
+                self.disowned += 1;
+            }
+            Some(_) => {}
+            None => note_new_way(node, asked),
         }
     }
+}
+
+/// The most ways a box records being asked. Each way is about 92
+/// bytes; a 400-width drag asked a flex-column row 1,201 ways (3 per
+/// width: two size queries and a layout; `isolated_record_tests.rs`),
+/// about 110 KB per row. Taffy's cache keeps 10 entries (9 size
+/// queries, 1 layout), so the replay of a way beyond those reads
+/// `Unknown` in any case; 16 holds five passes of a flex row.
+pub(in crate::layout) const ASKED_LIMIT: usize = 16;
+
+/// Notes `asked`, a way `node` was not asked before, or abandons the
+/// record at the limit: the ways already asked stay load-bearing for
+/// the parent's layout, so a shorter record could not be replayed.
+fn note_new_way(node: &mut LayoutBox, asked: Asked) {
+    if node.asked.len() < ASKED_LIMIT {
+        node.asked.push(asked);
+        return;
+    }
+    node.asked.clear();
+    node.asked_overflowed = true;
 }
 
 impl CacheTree for BoxTree<'_> {
@@ -52,5 +76,6 @@ impl CacheTree for BoxTree<'_> {
         let node = self.node_mut(id);
         node.cache = Cache::new();
         node.asked.clear();
+        node.asked_overflowed = false;
     }
 }

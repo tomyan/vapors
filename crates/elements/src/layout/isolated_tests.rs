@@ -23,7 +23,7 @@ pub(super) fn rows() -> Placed {
     Placed::default().slots.place(tree(spec))
 }
 
-pub(super) struct Texts(FontSystem, TextCache);
+pub(super) struct Texts(pub(super) FontSystem, pub(super) TextCache);
 
 impl Texts {
     pub(super) fn new() -> Self {

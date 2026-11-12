@@ -13,7 +13,8 @@ use crate::layout::Placed;
 use crate::layout::asked::SizeAnswer;
 
 /// Wraps at the 200px the tests lay out in, so the row grows taller.
-const LONGER: &str = "a text long enough to wrap onto a second line in the width laid out";
+pub(super) const LONGER: &str =
+    "a text long enough to wrap onto a second line in the width laid out";
 
 /// The vertical margin of a row of `column_with_margins`: a block
 /// answers a size query with its margins, which Taffy's cache keeps no
@@ -22,7 +23,7 @@ const MARGIN: f32 = 4.0;
 
 /// The `rows` tree with block rows under a root of `display`, laid
 /// out as a column.
-fn column(display: Display) -> Placed {
+pub(super) fn column(display: Display) -> Placed {
     let mut placed = rows();
     placed.boxes[0].style.display = display;
     placed.boxes[0].style.flex_direction = FlexDirection::Column;
@@ -60,7 +61,7 @@ fn rebuild_block_row(placed: &mut Placed, text: &str) -> Before {
 
 /// Row 3 of `column` built again with `text`; what it settled as, the
 /// slots laid out, and the layouts before and after.
-fn rebuilt(
+pub(super) fn rebuilt(
     column: Placed,
     text: &str,
 ) -> (
@@ -81,7 +82,7 @@ fn rebuilt(
 }
 
 /// The layouts of a fresh `column` whose row 3 holds `text`.
-fn fresh(mut column: Placed, text: &str) -> Vec<taffy::Layout> {
+pub(super) fn fresh(mut column: Placed, text: &str) -> Vec<taffy::Layout> {
     let mut texts = Texts::new();
     rebuild_block_row(&mut column, text);
     layouts(&texts.lay_out(column, Vec::new()).0)
@@ -89,7 +90,7 @@ fn fresh(mut column: Placed, text: &str) -> Vec<taffy::Layout> {
 
 /// What `settled` must be for a row laid out alone, which lays out
 /// only the row and its text and leaves every layout as it was.
-fn assert_laid_out_alone(
+pub(super) fn assert_laid_out_alone(
     (settled, laid_out, (before, after)): (
         Settled,
         Vec<usize>,
@@ -183,38 +184,6 @@ fn a_rebuilt_row_with_a_vertical_margin_under_a_flex_column_that_grows_has_the_c
     assert_eq!(
         after,
         fresh(column_with_margins(Display::Flex), LONGER),
-        "the layout of a fresh tree"
-    );
-}
-
-#[cfg(feature = "grid")]
-#[test]
-fn a_rebuilt_block_row_under_a_grid_that_answers_as_before_is_laid_out_alone() {
-    // When: row 3 of a one-column grid is built again with the same text
-    // Then
-    assert_laid_out_alone(rebuilt(column(Display::Grid), "text"));
-}
-
-#[cfg(feature = "grid")]
-#[test]
-fn a_rebuilt_row_with_a_vertical_margin_under_a_grid_that_answers_as_before_is_laid_out_alone() {
-    // When: row 3 is built again with the same text
-    // Then
-    assert_laid_out_alone(rebuilt(column_with_margins(Display::Grid), "text"));
-}
-
-#[cfg(feature = "grid")]
-#[test]
-fn a_rebuilt_block_row_under_a_grid_that_grows_has_the_grid_laid_out_again() {
-    // When: row 3 is built again with a text that wraps
-    let (settled, laid_out, (_, after)) = rebuilt(column(Display::Grid), LONGER);
-
-    // Then
-    assert_eq!(settled.isolated, 0, "{settled:?}");
-    assert!(laid_out.contains(&0), "the root is laid out again");
-    assert_eq!(
-        after,
-        fresh(column(Display::Grid), LONGER),
         "the layout of a fresh tree"
     );
 }

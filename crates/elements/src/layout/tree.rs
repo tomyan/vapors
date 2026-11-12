@@ -28,6 +28,9 @@ pub(crate) struct BoxTree<'f> {
     pub(crate) written: super::written::Written,
     /// Calls to `lay_out`, cache hits included.
     pub(crate) calls: usize,
+    /// Recorded size answers disowned: a box answered a size query
+    /// otherwise than it recorded (`tree_cache.rs`).
+    pub(crate) disowned: usize,
 }
 
 impl BoxTree<'_> {
@@ -194,6 +197,6 @@ impl LayoutPartialTree for BoxTree<'_> {
 }
 
 #[path = "tree_cache.rs"]
-mod cache;
+pub(super) mod cache;
 #[path = "tree_containers.rs"]
 mod containers;
