@@ -47,10 +47,14 @@ impl Document {
                 if check_narrowed {
                     self.check_narrowed_restyle(viewport);
                 }
+                let kept = self.kept.as_mut().expect("set above");
+                kept.shared.sweep();
+                self.counts.styles_live = kept.styles.live();
                 Ok(())
             }
             Err(error) => {
                 self.dirty.everything();
+                self.counts.forget_styles();
                 Err(vec![error])
             }
         }
@@ -81,6 +85,7 @@ impl Document {
             refused: NodeMap::default(),
             restyled_nodes: NodeSet::default(),
             calcs: crate::layout::Calcs::default(),
+            shared: crate::style::Shared::default(),
         }
     }
 
@@ -139,16 +144,16 @@ impl Document {
         Ok(count)
     }
 
-    /// Computes and keeps `node`'s styles; whether its computed style
-    /// changed.
+    /// Finds and keeps `node`'s styles (`restyle_share`); whether its
+    /// computed style changed.
     fn restyle_one(&mut self, node: NodeId, viewport: Viewport) -> Result<bool, ElementError> {
-        let kept = self.kept.as_ref().expect("restyle sets it");
-        let parent = self.parent(node).map(|p| kept.styles.of(p));
-        let style =
-            self.sheets
-                .compute_element(&self.arena, node, parent, &environment(viewport))?;
-        let changed = kept.styles.get(node) != Some(&style);
+        let (style, path) = self.style_for(node, viewport)?;
+        self.counts.count_style(path);
         let kept = self.kept.as_mut().expect("restyle sets it");
+        let changed = match kept.styles.rc(node) {
+            Some(old) if std::rc::Rc::ptr_eq(old, &style) => false,
+            old => old.map(|o| &***o) != Some(&**style),
+        };
         kept.styles.set(node, style);
         kept.restyled_nodes.insert(node);
         // a box holding a calc handle points into the replaced style

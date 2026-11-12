@@ -59,6 +59,8 @@ pub(crate) struct Kept {
     pub(crate) restyled_nodes: NodeSet,
     /// The calcs of the kept styles, by the handles boxes hold.
     pub(crate) calcs: crate::layout::Calcs,
+    /// The styles keyed elements share (`restyle_share`).
+    pub(crate) shared: crate::style::Shared,
 }
 
 impl Kept {
