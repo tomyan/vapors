@@ -57,7 +57,7 @@ impl Offsets {
                 }
                 let offset = self.clamped(node, boxes, index);
                 kept.insert(node, offset);
-                offset.at.map(|v| (v * scale).round() / scale)
+                applied(offset.at, scale)
             })
             .collect();
         self.by_node = kept;
@@ -75,7 +75,7 @@ impl Offsets {
     ) -> [f32; 2] {
         let offset = self.clamped(node, boxes, index);
         self.by_node.insert(node, offset);
-        offset.at.map(|v| (v * scale).round() / scale)
+        applied(offset.at, scale)
     }
 
     /// Drops the offset of `node`, which no longer scrolls.
@@ -135,6 +135,13 @@ impl Offset {
         let moved = [0, 1].map(|axis| (self.at[axis] + delta[axis]).clamp(0.0, self.max[axis]));
         (moved, moved.map(f32::to_bits) != self.at.map(f32::to_bits))
     }
+}
+
+/// An offset `at` as paint applies it: rounded to whole device pixels
+/// at `scale`, in CSS pixels. The a11y mirror reads the same
+/// (`a11y_mirror_bounds.rs`).
+pub(crate) fn applied(at: [f32; 2], scale: f32) -> [f32; 2] {
+    at.map(|v| (v * scale).round() / scale)
 }
 
 /// How far box `index` scrolls on each axis: its content's extent past

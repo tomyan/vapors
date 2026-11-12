@@ -17,8 +17,11 @@ pub(crate) enum Mark {
     None,
     /// A slot below it is marked.
     Below,
-    /// Laid out, given a new layout or scrolled: its scroll offset is
-    /// settled again.
+    /// Scrolled, and nothing else: its scroll offset is settled again,
+    /// and the slots placed in its content move by the scroll alone.
+    Scrolled,
+    /// Laid out or given a new layout: its scroll offset is settled
+    /// again.
     Dirty,
     /// Built again: settled, its content taken as moved, and never
     /// reported as moved.
@@ -55,6 +58,7 @@ impl<'a, 'b> Walk<'a, 'b> {
             settled: NodeSet::default(),
             placed: Placed {
                 moved: Vec::new(),
+                scrolled: Vec::new(),
                 count: 0,
                 chained: 0,
             },
@@ -66,7 +70,7 @@ impl<'a, 'b> Walk<'a, 'b> {
     pub(crate) fn place_from_root(&mut self) {
         let held = !self.boxes.boxes.is_empty();
         if held && (self.every || self.kept.marks[0] != Mark::None) {
-            self.visit(0, (0.0, 0.0), self.every);
+            self.visit(0, (0.0, 0.0), self.every, false);
         }
     }
 
@@ -82,8 +86,10 @@ impl<'a, 'b> Walk<'a, 'b> {
     /// Places `slot` in content whose origin is `origin`, when its
     /// mark or `origin_moved` says to, and the slots placed in it. The
     /// mark is cleared as it is read, so `Placement::place` can tell a
-    /// marked slot the walk did not reach.
-    fn visit(&mut self, slot: usize, origin: (f32, f32), origin_moved: bool) {
+    /// marked slot the walk did not reach. `by_scroll`: the origin
+    /// moved by scrolls alone, so a slot not laid out again moved by
+    /// them alone too.
+    fn visit(&mut self, slot: usize, origin: (f32, f32), origin_moved: bool, by_scroll: bool) {
         let mark = if self.every {
             Mark::Rebuilt
         } else {
@@ -98,18 +104,24 @@ impl<'a, 'b> Walk<'a, 'b> {
         );
         self.placed.count += 1;
         let before = content_origin(self.kept.rects[slot], self.kept.offsets[slot]);
-        if mark >= Mark::Dirty {
+        if mark >= Mark::Scrolled {
             self.kept.offsets[slot] = self.settled_offset(slot);
         }
-        self.put(slot, origin, mark);
+        let kept_layout = mark <= Mark::Scrolled;
+        let rect_kept = !self.put(slot, origin, mark, by_scroll && kept_layout);
         let inner = content_origin(self.kept.rects[slot], self.kept.offsets[slot]);
-        self.visit_placed_in(slot, inner, mark == Mark::Rebuilt || inner != before);
+        // its content moves by its own move and its scroll: by scrolls
+        // alone when its rect is kept (laid out again or not), or its
+        // layout is kept and its own move was by scrolls
+        let placed_by_scroll = rect_kept || (kept_layout && by_scroll);
+        let moved = mark == Mark::Rebuilt || inner != before;
+        self.visit_placed_in(slot, inner, moved, placed_by_scroll);
     }
 
     /// Visits the slots placed in the content of `slot`, whose origin
     /// is `inner`: when the content `moved`, its children in flow, then
     /// the boxes it hoists; else only the marked slots among them.
-    fn visit_placed_in(&mut self, slot: usize, inner: (f32, f32), moved: bool) {
+    fn visit_placed_in(&mut self, slot: usize, inner: (f32, f32), moved: bool, by_scroll: bool) {
         if !moved {
             self.visit_marked_in(slot, inner);
             return;
@@ -118,12 +130,12 @@ impl<'a, 'b> Walk<'a, 'b> {
         for &child in &boxes[slot].children {
             if self.kept.containing[child].is_none() {
                 self.kept.up[child] = slot;
-                self.visit(child, inner, moved);
+                self.visit(child, inner, moved, by_scroll);
             }
         }
         for &child in &boxes[slot].hoisted {
             self.kept.up[child] = slot;
-            self.visit(child, inner, moved);
+            self.visit(child, inner, moved, by_scroll);
         }
     }
 
@@ -138,13 +150,14 @@ impl<'a, 'b> Walk<'a, 'b> {
                  visited already, or listed without being marked (placement_marks.rs); \
                  `cargo test -p vapors-elements` reproduces it"
             );
-            self.visit(child, inner, false);
+            self.visit(child, inner, false, false);
         }
     }
 
     /// Writes the rect and padding of `slot`, noting it as moved when
-    /// either changed and it was not built again.
-    fn put(&mut self, slot: usize, origin: (f32, f32), mark: Mark) {
+    /// either changed and it was not built again: as scrolled when
+    /// `by_scroll`, else as moved. Whether either changed.
+    fn put(&mut self, slot: usize, origin: (f32, f32), mark: Mark, by_scroll: bool) -> bool {
         let layout = &self.boxes.boxes[slot].layout;
         let rect = BoxRect {
             x: origin.0 + layout.location.x,
@@ -154,9 +167,14 @@ impl<'a, 'b> Walk<'a, 'b> {
         };
         let changed = rect != self.kept.rects[slot] || layout.padding != self.kept.paddings[slot];
         if changed && mark != Mark::Rebuilt {
-            self.placed.moved.push(slot);
+            if by_scroll {
+                self.placed.scrolled.push(slot);
+            } else {
+                self.placed.moved.push(slot);
+            }
         }
         (self.kept.rects[slot], self.kept.paddings[slot]) = (rect, layout.padding);
+        changed
     }
 
     /// The scroll offset of `slot` as applied, settled again: none for

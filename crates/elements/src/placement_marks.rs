@@ -50,8 +50,11 @@ impl Placement {
         let written = &changes.written;
         let dirty = written.laid_out.iter().chain(&written.changed);
         let mut marked = Marked::default();
-        for &slot in dirty.chain(changes.scrolled) {
+        for &slot in dirty {
             self.mark_up(slot, Mark::Dirty, &mut marked);
+        }
+        for &slot in changes.scrolled {
+            self.mark_up(slot, Mark::Scrolled, &mut marked);
         }
         for &slot in changes.rebuilt {
             self.mark_up(slot, Mark::Rebuilt, &mut marked);

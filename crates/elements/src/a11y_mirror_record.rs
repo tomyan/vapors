@@ -3,8 +3,9 @@
 //! focusability, and its parent in the tree: the nearest node shown
 //! above it, found by walking up for one node, or carried down a
 //! document-order pass for every node ([`AboveMemo`]); a node under an
-//! `aria-hidden` ancestor is not in the tree. Read from the last update,
-//! as `ax_tree` is.
+//! `aria-hidden` ancestor is not in the tree. A scroll container with no
+//! role is a node too (`a11y_mirror_bounds.rs`), and the bounds are
+//! from the parent node. Read from the last update, as `ax_tree` is.
 
 use vapors_dom::NodeId;
 
@@ -100,6 +101,8 @@ impl Document {
         };
         let (name, description) = self.ax_name_and_description(node, &role, &index.ids);
         finite(bounds, &role, &name)?;
+        let scroll = self.ax_scroll(node, bounds);
+        let (bounds, hoisted) = self.ax_relative(node, bounds, parent);
         let record = AxMirrorNode {
             node,
             parent,
@@ -108,7 +111,9 @@ impl Document {
             states: self.ax_states(node),
             range: self.ax_range(node, &role),
             focusable: self.focus_candidate(node),
+            scroll,
             bounds,
+            hoisted,
             name,
             role,
         };
@@ -135,7 +140,7 @@ impl Document {
         let bounds = painted
             .border_box(node)
             .filter(|_| painted.is_visible(node))?;
-        let role = self.ax_role(node, &index.ids)?;
+        let role = self.ax_mirror_role(node, &index.ids)?;
         Some((bounds, role))
     }
 

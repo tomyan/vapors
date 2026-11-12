@@ -46,7 +46,11 @@ fn patch(
         .iter()
         .filter(|(_, key)| remove(painted, *key))
         .count();
-    let slots = changed.rebuilt.iter().chain(&changed.moved);
+    let slots = changed
+        .rebuilt
+        .iter()
+        .chain(&changed.moved)
+        .chain(&changed.scrolled);
     removed
         + slots
             .filter(|slot| put(painted, boxes, rects, **slot))
