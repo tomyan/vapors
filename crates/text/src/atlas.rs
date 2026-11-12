@@ -5,9 +5,8 @@
 //! the least recently used glyphs not in the current frame are evicted
 //! until the new one fits (`atlas_evict.rs`), or the page grows
 //! (`atlas_grow.rs`). A glyph larger than a page is refused once, logged
-//! with its size, and `.notdef` stands in from then on. Evictions,
-//! rasterisations and refusals are counted for tests. Icons share the
-//! coverage page (`atlas_icon.rs`).
+//! with its size, and `.notdef` stands in from then on. Icons share
+//! the coverage page (`atlas_icon.rs`).
 
 use std::collections::{HashMap, HashSet};
 
