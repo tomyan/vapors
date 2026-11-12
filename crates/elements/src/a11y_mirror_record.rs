@@ -101,6 +101,8 @@ impl Document {
         };
         let (name, description) = self.ax_name_and_description(node, &role, &index.ids);
         finite(bounds, &role, &name)?;
+        let scroll = self.ax_scroll(node, bounds);
+        let (bounds, hoisted) = self.ax_relative(node, bounds, parent);
         let record = AxMirrorNode {
             node,
             parent,
@@ -109,8 +111,9 @@ impl Document {
             states: self.ax_states(node),
             range: self.ax_range(node, &role),
             focusable: self.focus_candidate(node),
-            bounds: self.ax_relative(bounds, parent),
-            scroll: self.ax_scroll(node, bounds),
+            scroll,
+            bounds,
+            hoisted,
             name,
             role,
         };

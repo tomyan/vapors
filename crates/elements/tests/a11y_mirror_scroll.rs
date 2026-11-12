@@ -161,3 +161,21 @@ fn an_update_that_clamps_a_scrollers_offset_emits_the_new_offset() {
         record(&page.doc, body).scroll.expect("scrolls").offset
     );
 }
+
+#[test]
+fn a_scroll_with_a_size_change_in_the_same_frame_reads_the_rows_the_change_moved_alone() {
+    // Given
+    let (page, mut model) = scrolling_rows();
+
+    // When: the body scrolls and the middle row's label grows, in one
+    // frame (review-v243 M2)
+    assert!(page.scroll_body(1.0));
+    page.edit(support::rows_page::Edit::SizeChangingText);
+    step(&page.doc, &mut model).expect("the changes");
+
+    // Then: the rows moved by the scroll alone are not read although
+    // the body was laid out again; the middle row's nodes are (the
+    // label grows in width, so no row after it moves)
+    let counts = page.doc.borrow().ax_take_counts();
+    assert!(counts.nodes_read <= 8, "{counts:?}");
+}

@@ -13,11 +13,13 @@ use crate::layout::{BoxRect, Content, LayoutBox, containing_blocks, placed};
 use crate::placement::{LaidOut, NO_SLOT, Placed, Placement};
 use crate::scroll::Offsets;
 
-/// What placement started from: the offsets, rects and paddings.
+/// What placement started from: the offsets, rects, paddings and each
+/// slot's applied offset.
 pub(crate) struct Before {
     scroll: Offsets,
     rects: Vec<BoxRect>,
     paddings: Vec<taffy::Rect<f32>>,
+    offsets: Vec<[f32; 2]>,
 }
 
 /// A fresh placement: each slot's rect, padding and offset.
@@ -34,6 +36,7 @@ impl Before {
             scroll: scroll.clone(),
             rects: kept.rects.clone(),
             paddings: kept.paddings.clone(),
+            offsets: kept.offsets.clone(),
         }
     }
 }
@@ -86,6 +89,7 @@ pub(crate) fn assert_same(
             .copied()
             .collect();
         assert_moved_same(before, &fresh, &held, (&moved, changed));
+        assert_scrolled_by_scrolls(before, &fresh, kept, &placed.scrolled);
     }
 }
 
@@ -156,4 +160,47 @@ fn fail(what: &str) -> ! {
          layout/written.rs), or the walk does not reach it (placement_walk.rs); reproduce \
          with `cargo xtask test`"
     )
+}
+
+/// Fails on the first `scrolled` slot whose rect moved by other than
+/// the offset deltas of the scroll containers it is placed in (the
+/// chain `up`), so a slot moved by layout and reported as scrolled is
+/// caught.
+fn assert_scrolled_by_scrolls(
+    before: &Before,
+    fresh: &Fresh,
+    kept: &Placement,
+    scrolled: &[usize],
+) {
+    for &slot in scrolled {
+        let moved = [
+            fresh.rects[slot].x - before.rects[slot].x,
+            fresh.rects[slot].y - before.rects[slot].y,
+        ];
+        let by_scrolls = scrolls_above(before, fresh, kept, slot);
+        // sums of applied offsets against a rect the walk summed
+        let same =
+            (moved[0] - by_scrolls[0]).abs() < 1e-3 && (moved[1] - by_scrolls[1]).abs() < 1e-3;
+        if !same {
+            fail(&format!(
+                "slot {slot} reported scrolled moved by {moved:?}, its containers' scrolls by {by_scrolls:?}"
+            ));
+        }
+    }
+}
+
+/// How far the scrolls of the containers `slot` is placed in moved its
+/// content between `before` and `fresh`.
+fn scrolls_above(before: &Before, fresh: &Fresh, kept: &Placement, slot: usize) -> [f32; 2] {
+    let mut by_scrolls = [0.0_f32, 0.0];
+    let mut up = kept.up[slot];
+    while up != NO_SLOT {
+        let (was, now) = (before.offsets[up], fresh.offsets[up]);
+        by_scrolls = [
+            by_scrolls[0] + was[0] - now[0],
+            by_scrolls[1] + was[1] - now[1],
+        ];
+        up = kept.up[up];
+    }
+    by_scrolls
 }

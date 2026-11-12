@@ -65,6 +65,11 @@ pub struct AxMirrorNode {
     /// node's record does not change when a container above it
     /// scrolls.
     pub bounds: AxRect,
+    /// Its box is placed outside its parent node's box (an absolutely
+    /// positioned popover or toast whose containing block is above the
+    /// parent), so it does not move with the parent: `bounds` are from
+    /// the viewport, and the mirror's element is `position: fixed`.
+    pub hoisted: bool,
     /// Its scroll, when it is a scroll container: the mirror's element
     /// scrolls, and the nodes under it move with one write.
     pub scroll: Option<AxScroll>,

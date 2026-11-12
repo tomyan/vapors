@@ -37,6 +37,13 @@ pub(crate) struct KeptBoxes {
 }
 
 impl KeptBoxes {
+    /// The slot `node`'s element box holds, if it has one.
+    pub(crate) fn slot_of(&self, node: NodeId) -> Option<usize> {
+        self.placed.slots.of(super::Key::Element(node))
+    }
+}
+
+impl KeptBoxes {
     /// Keeps `placed`, laid out at `scale`, for the next update: the
     /// boxes `built` this update are kept from now, and every other box
     /// was kept already. Returns how many boxes it marked.

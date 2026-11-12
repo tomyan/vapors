@@ -140,9 +140,12 @@ fn a_scrolled_row_laid_out_again_is_moved_not_scrolled() {
         .set_attribute(list.rows[1], "style", "height: 60px");
     let counts = updated(&mut list.doc, 200.0);
 
-    // Then: the rows after it are laid out again, so they are moved,
-    // not scrolled, whatever the scroll did to them
-    assert!(counts.boxes_scrolled <= 1, "{counts:?}");
+    // Then: the row before it scrolled; the rows after it are laid out
+    // again, so they are moved, not scrolled, whatever the scroll did
+    // to them (review-v243 M2: the container is laid out again too,
+    // and its rect is kept, so the row before it still counts as
+    // scrolled)
+    assert_eq!(counts.boxes_scrolled, 1, "{counts:?}");
     assert!(counts.boxes_moved >= 3, "{counts:?}");
 }
 

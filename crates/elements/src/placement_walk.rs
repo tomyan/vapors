@@ -108,11 +108,12 @@ impl<'a, 'b> Walk<'a, 'b> {
             self.kept.offsets[slot] = self.settled_offset(slot);
         }
         let kept_layout = mark <= Mark::Scrolled;
-        self.put(slot, origin, mark, by_scroll && kept_layout);
+        let rect_kept = !self.put(slot, origin, mark, by_scroll && kept_layout);
         let inner = content_origin(self.kept.rects[slot], self.kept.offsets[slot]);
         // its content moves by its own move and its scroll: by scrolls
-        // alone when its layout is kept and its own move was
-        let placed_by_scroll = kept_layout && (!origin_moved || by_scroll);
+        // alone when its rect is kept (laid out again or not), or its
+        // layout is kept and its own move was by scrolls
+        let placed_by_scroll = rect_kept || (kept_layout && by_scroll);
         let moved = mark == Mark::Rebuilt || inner != before;
         self.visit_placed_in(slot, inner, moved, placed_by_scroll);
     }
@@ -155,8 +156,8 @@ impl<'a, 'b> Walk<'a, 'b> {
 
     /// Writes the rect and padding of `slot`, noting it as moved when
     /// either changed and it was not built again: as scrolled when
-    /// `by_scroll`, else as moved.
-    fn put(&mut self, slot: usize, origin: (f32, f32), mark: Mark, by_scroll: bool) {
+    /// `by_scroll`, else as moved. Whether either changed.
+    fn put(&mut self, slot: usize, origin: (f32, f32), mark: Mark, by_scroll: bool) -> bool {
         let layout = &self.boxes.boxes[slot].layout;
         let rect = BoxRect {
             x: origin.0 + layout.location.x,
@@ -173,6 +174,7 @@ impl<'a, 'b> Walk<'a, 'b> {
             }
         }
         (self.kept.rects[slot], self.kept.paddings[slot]) = (rect, layout.padding);
+        changed
     }
 
     /// The scroll offset of `slot` as applied, settled again: none for
