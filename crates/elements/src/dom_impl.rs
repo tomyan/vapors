@@ -105,11 +105,11 @@ impl Dom for Document {
         self.note_change();
         if let Some(old) = self.parent(child) {
             self.mark_children_changed(old, child, false);
-            self.boxes.marks.mark(old);
+            self.boxes.marks.mark_children(old);
         }
         self.arena.place("insert_before", parent, child, before);
         self.checks.added.push(child);
-        self.boxes.marks.mark(parent);
+        self.boxes.marks.mark_children(parent);
         self.mark_children_changed(parent, child, true);
     }
 
@@ -124,7 +124,7 @@ impl Dom for Document {
         self.note_change();
         if let Some(parent) = self.parent(node) {
             self.mark_children_changed(parent, node, false);
-            self.boxes.marks.mark(parent);
+            self.boxes.marks.mark_children(parent);
         }
         self.drop_focus_within(node);
         self.forget_subtree(node);
