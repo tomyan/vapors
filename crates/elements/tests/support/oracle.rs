@@ -21,13 +21,13 @@ use vapors_text::Layout;
 /// What the oracle compares.
 #[derive(Debug, PartialEq)]
 pub struct Snapshot {
-    pub(super) boxes: Vec<(NodeId, Option<BoxRect>)>,
-    pub(super) styles: Vec<Option<ComputedStyle>>,
-    pub(super) items: Vec<String>,
-    pub(super) clips: Vec<Option<Rect>>,
-    pub(super) hits: Vec<(Option<NodeId>, Cursor)>,
-    pub(super) focus: (Option<NodeId>, bool),
-    pub(super) selections: Vec<(NodeId, (usize, usize))>,
+    boxes: Vec<(NodeId, Option<BoxRect>)>,
+    styles: Vec<Option<ComputedStyle>>,
+    items: Vec<String>,
+    clips: Vec<Option<Rect>>,
+    hits: Vec<(Option<NodeId>, Cursor)>,
+    focus: (Option<NodeId>, bool),
+    selections: Vec<(NodeId, (usize, usize))>,
 }
 
 /// The spacing of the hit grid, CSS px.
@@ -37,50 +37,18 @@ const GRID: usize = 10;
 /// hover the first moved.
 const SETTLE: usize = 3;
 
-/// Whether a snapshot runs one more update after finding the frame
-/// settled, and compares that update's frame.
-#[derive(Clone, Copy)]
-enum Repeat {
-    /// The repeat runs, with the debug checks it brings.
-    Run,
-    /// The settle update's frame is compared, as the repeat would only
-    /// reproduce it; for tests where each update costs seconds.
-    Skip,
-}
-
 /// Fails, naming `context`, when the settled incremental result differs
 /// from a full recomputation of the same state. The document is left
 /// updated from scratch.
 pub fn assert_matches_full(doc: &Rc<RefCell<Document>>, viewport: Viewport, context: &str) {
-    assert_matches_full_with(doc, viewport, context, Repeat::Run);
-}
-
-/// [`assert_matches_full`] without the repeat update of each snapshot:
-/// the 3000-row `kept_shift` tests, where each update takes seconds in a
-/// debug build. Retire this when those tests' updates take well under a
-/// second (the test profile's `opt-level`, measured in vapors #233).
-pub fn assert_matches_full_without_repeat(
-    doc: &Rc<RefCell<Document>>,
-    viewport: Viewport,
-    context: &str,
-) {
-    assert_matches_full_with(doc, viewport, context, Repeat::Skip);
-}
-
-fn assert_matches_full_with(
-    doc: &Rc<RefCell<Document>>,
-    viewport: Viewport,
-    context: &str,
-    repeat: Repeat,
-) {
-    let kept = snapshot_with(doc, viewport, repeat);
+    let kept = snapshot(doc, viewport);
     doc.borrow_mut().forget_kept();
-    let fresh = snapshot_with(doc, viewport, repeat);
+    let fresh = snapshot(doc, viewport);
     assert!(
         kept == fresh,
         "{context}: the incremental update differs from a full one (left: incremental, \
          right: full)\n{}",
-        crate::support::oracle_difference::first_difference(&kept, &fresh)
+        first_difference(&kept, &fresh)
     );
 }
 
@@ -89,16 +57,12 @@ fn assert_matches_full_with(
 /// for another frame), so this updates until no change is pending; at
 /// most `SETTLE` times, or the test fails.
 pub fn snapshot(doc: &Rc<RefCell<Document>>, viewport: Viewport) -> Snapshot {
-    snapshot_with(doc, viewport, Repeat::Run)
-}
-
-fn snapshot_with(doc: &Rc<RefCell<Document>>, viewport: Viewport, repeat: Repeat) -> Snapshot {
     let mut doc = doc.borrow_mut();
     doc.take_changed();
     for _ in 0..SETTLE {
         updated(&mut doc, viewport);
         if !doc.take_changed() {
-            return settled(&mut doc, viewport, repeat);
+            return settled(&mut doc, viewport);
         }
     }
     panic!("the document still changed after {SETTLE} updates");
@@ -109,16 +73,12 @@ fn updated(doc: &mut Document, viewport: Viewport) -> &Painted {
         .unwrap_or_else(|errors| panic!("refused: {errors:#?}"))
 }
 
-fn settled(doc: &mut Document, viewport: Viewport, repeat: Repeat) -> Snapshot {
+fn settled(doc: &mut Document, viewport: Viewport) -> Snapshot {
     let nodes = doc.elements();
     let styles = computed_styles(doc, &nodes);
     let focus = (doc.active_element(), doc.focus_visible());
     let selections = selections(doc, &nodes);
-    let painted = match repeat {
-        Repeat::Run => updated(doc, viewport),
-        // `snapshot_with` calls this after a successful update
-        Repeat::Skip => doc.painted().expect("the settle update succeeded"),
-    };
+    let painted = updated(doc, viewport);
     Snapshot {
         boxes: border_boxes(painted, &nodes),
         styles,
@@ -199,4 +159,37 @@ fn grid(viewport: Viewport) -> impl Iterator<Item = [f32; 2]> {
     (0..height)
         .step_by(GRID)
         .flat_map(move |y| (0..width).step_by(GRID).map(move |x| [x as f32, y as f32]))
+}
+
+/// The first differing entry of each part, so a failure on thousands of
+/// rows names what differs rather than printing both snapshots.
+fn first_difference(kept: &Snapshot, fresh: &Snapshot) -> String {
+    [
+        differ("boxes", &kept.boxes, &fresh.boxes),
+        differ("styles", &kept.styles, &fresh.styles),
+        differ("items", &kept.items, &fresh.items),
+        differ("clips", &kept.clips, &fresh.clips),
+        differ("hits", &kept.hits, &fresh.hits),
+        differ("focus", &[kept.focus], &[fresh.focus]),
+        differ("selections", &kept.selections, &fresh.selections),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>()
+    .join("\n")
+}
+
+fn differ<T: PartialEq + std::fmt::Debug>(part: &str, kept: &[T], fresh: &[T]) -> Option<String> {
+    if kept.len() != fresh.len() {
+        return Some(format!(
+            "{part}: {} entries, {} full",
+            kept.len(),
+            fresh.len()
+        ));
+    }
+    let at = kept.iter().zip(fresh).position(|(k, f)| k != f)?;
+    Some(format!(
+        "{part}[{at}]: {:?}\n  full: {:?}",
+        kept[at], fresh[at]
+    ))
 }

@@ -9,7 +9,7 @@
 
 mod support;
 
-use support::oracle::assert_matches_full_without_repeat;
+use support::oracle::assert_matches_full;
 use support::rows_page::{RowsPage, rows_page, rows_viewport};
 use support::scroll_list::{at, list, scroll};
 use vapors_elements::Document;
@@ -32,36 +32,6 @@ fn updated(page: &RowsPage) -> (usize, usize) {
     painted(&doc)
 }
 
-/// Runs `edit`, updates, and checks the result against a full update
-/// (the oracle), for the 3000-row tests, with two debug checks relaxed
-/// because each costs seconds there:
-/// - The debug layout check (`Document::skip_layout_check`) is skipped
-///   from here on for this page's updates; the rows build and anything
-///   before this call keep it. The oracle compares every element's box
-///   with a fresh layout's: a layout error that leaves the counters and
-///   the placement unchanged fails it (shown in vapors #233 by moving
-///   the box of the last slot laid out).
-/// - The oracle runs no repeat update per snapshot
-///   (`assert_matches_full_without_repeat`).
-///
-/// Retire both once `[profile.test] opt-level = 1` (the workspace
-/// `Cargo.toml`) is in: the three tests then ran in 3.1, 3.2 and 2.5 s
-/// alone with the checks on, against 14.7, 14.6 and 15.3 s at opt-level 0
-/// (measured 2026-11-12 at load ~12); or when the layout check is
-/// cheaper. The skip and the oracle are one call, so one cannot be
-/// removed without the other.
-fn updated_and_matched_to_full(
-    page: &RowsPage,
-    context: &str,
-    edit: impl FnOnce(&RowsPage),
-) -> (usize, usize) {
-    page.doc.borrow_mut().skip_layout_check();
-    edit(page);
-    let work = updated(page);
-    assert_matches_full_without_repeat(&page.doc, rows_viewport(), context);
-    work
-}
-
 #[test]
 fn resizing_a_row_near_the_top_paints_its_boxes_and_the_body_and_shifts_the_rows_after() {
     // Given
@@ -69,14 +39,14 @@ fn resizing_a_row_near_the_top_paints_its_boxes_and_the_body_and_shifts_the_rows
     page.rows_resizable();
 
     // When: the second row doubles in height
-    let work = updated_and_matched_to_full(&page, "3000 rows, tall row", |page| {
-        page.toggle_tall();
-    });
+    page.toggle_tall();
+    let work = updated(&page);
 
     // Then: the row's 7 boxes built again, and html and body, which
     // grew; every row after the second shifted
     let rows_after = ROWS - 2;
     assert_eq!(work, (BOXES_PER_ROW + 2, rows_after * BOXES_PER_ROW));
+    assert_matches_full(&page.doc, rows_viewport(), "3000 rows, tall row");
 }
 
 #[test]
@@ -86,12 +56,12 @@ fn scrolling_the_rows_paints_no_box_and_shifts_every_row() {
     page.body_scrolls();
 
     // When
-    let work = updated_and_matched_to_full(&page, "3000 rows, scrolled a row", |page| {
-        assert!(page.scroll_body(1.0), "the body scrolls");
-    });
+    assert!(page.scroll_body(1.0), "the body scrolls");
+    let work = updated(&page);
 
     // Then: every row's boxes shifted, none painted
     assert_eq!(work, (0, ROWS * BOXES_PER_ROW));
+    assert_matches_full(&page.doc, rows_viewport(), "3000 rows, scrolled a row");
 }
 
 #[test]
