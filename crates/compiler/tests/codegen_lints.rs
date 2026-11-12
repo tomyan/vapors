@@ -82,7 +82,7 @@ fn an_expression_attribute_allows_only_the_generated_to_string() {
     let script = "let theme: Signal<String> = Signal::new(String::new());";
 
     // When
-    let code = generated_with(script, "<div class={theme.get()}></div>");
+    let code = generated_with(script, "<div title={theme.get()}></div>");
 
     // Then
     assert_has(&code, "let shown = &(theme.get());");

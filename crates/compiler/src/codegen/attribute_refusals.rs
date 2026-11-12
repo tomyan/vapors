@@ -2,7 +2,8 @@
 //! they say: a boolean attribute from an expression, which is on even
 //! when the expression is false, and a colon-named attribute that is
 //! not a directive, which would become an attribute with a colon in
-//! its name.
+//! its name; and `class={..}` or `style={..}`, a string the style
+//! analysis cannot see into.
 
 use crate::CompileError;
 use crate::ast::{AttrValue, Attribute};
@@ -60,8 +61,27 @@ pub(super) fn refuse_misleading(
     attribute: &Attribute,
 ) -> Result<(), CompileError> {
     refuse_unknown_directive(source, attribute)?;
+    refuse_string_styling(source, attribute)?;
     refuse_boolean_literal_false(source, attribute)?;
     refuse_boolean_expression(source, attribute)
+}
+
+/// `class={..}` and `style={..}` hide from the style analysis which
+/// classes and declarations an element can have.
+fn refuse_string_styling(source: &Source, attribute: &Attribute) -> Result<(), CompileError> {
+    if !matches!(attribute.value, AttrValue::Expr(_)) {
+        return Ok(());
+    }
+    let message = match attribute.name.to_ascii_lowercase().as_str() {
+        "class" => {
+            "`class={..}` is refused: the compiler must see every class an element can have; write class=\"name\" for fixed classes and class:name={condition} for each class that toggles"
+        }
+        "style" => {
+            "`style={..}` is refused: the compiler must see every declaration an element can have; write the declarations under a class in the <style> section and toggle it with class:name={condition}"
+        }
+        _ => return Ok(()),
+    };
+    Err(source.error(attribute.offset, message))
 }
 
 const NAMESPACES: &[&str] = &["xlink:", "xml:", "xmlns:"];
