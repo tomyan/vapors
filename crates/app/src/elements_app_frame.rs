@@ -1,6 +1,8 @@
 //! An [`ElementsApp`] frame as design 02's phases (2-S1): the document's
-//! update and its paint are the Update and Draw phases, and the time
-//! its event handlers took since the last frame is the Input phase's.
+//! update and its paint are the Update and Draw phases, the a11y
+//! mirror's take (`elements_app_a11y.rs`) the Accessibility phase, and
+//! the time its event handlers took since the last frame is the Input
+//! phase's.
 
 use std::time::Duration;
 
@@ -10,11 +12,9 @@ use vapors_renderer::{FrameEncoder, Target};
 use vapors_scene::Size;
 
 use super::ElementsApp;
+use super::shown::shown_times;
 use crate::check_tooltip_style;
-use crate::frame::{FrameTimes, Phase, Phases, SystemClock, run_frame};
-
-/// The phases that do work today, shown by a per-frame hook.
-const SHOWN: [Phase; 3] = [Phase::Input, Phase::Update, Phase::Draw];
+use crate::frame::{Phases, SystemClock, run_frame};
 
 /// One frame of an app.
 struct AppFrame<'a, 'f> {
@@ -31,11 +31,22 @@ impl Phases for AppFrame<'_, '_> {
         // the selectionchange each text field owes, once per frame, as
         // Chromium fires one per task (E6a)
         Document::settle_selection(&self.app.document);
-        self.app.update_document(self.frame)?;
-        // the focus fixup: an element the update left without a box, or
-        // disabled, loses focus before the next event can reach it
-        Document::settle_focus(&self.app.document);
+        self.app.update_and_settle(self.frame)?;
+        // the fixup's blur and the rehover under a resting pointer are
+        // changes the update did not see; one more update shows them,
+        // so the a11y take and the draw hold this frame (review-v242 H1)
+        if !self.app.document.borrow().changed_since_update() {
+            return Ok(());
+        }
+        self.app.update_and_settle(self.frame)?;
+        if self.app.document.borrow().changed_since_update() {
+            return Err(UNSETTLED.to_owned());
+        }
         Ok(())
+    }
+
+    fn accessibility(&mut self, _now: Instant) -> Result<(), String> {
+        self.app.take_a11y()
     }
 
     fn draw(&mut self, now: Instant) -> Result<(), String> {
@@ -43,7 +54,21 @@ impl Phases for AppFrame<'_, '_> {
     }
 }
 
+/// The second update of a frame left the document changed again.
+const UNSETTLED: &str = "the document changed after each of two updates in one frame: a blur \
+    listener of the focus fixup changes the document, or a hover style moves what is under the \
+    pointer; fix: make the listener's change settle, or keep the hover style from moving boxes";
+
 impl ElementsApp {
+    /// `Document::update`, then the focus fixup: an element the update
+    /// left without a box, or disabled, loses focus before the next
+    /// event can reach it.
+    fn update_and_settle(&mut self, frame: &Frame<'_>) -> Result<(), String> {
+        self.update_document(frame)?;
+        Document::settle_focus(&self.document);
+        Ok(())
+    }
+
     /// The Update phase: `Document::update`, then the tooltip's style
     /// checked, so a bad `--tooltip-*` value fails this frame and not
     /// the first hover (seven lookups on the root's custom properties).
@@ -146,18 +171,6 @@ impl ElementsApp {
     }
 }
 
-/// `times` for the shown phases, by name; empty before the first frame.
-pub(super) fn shown_times(times: Option<&FrameTimes>) -> Vec<(&'static str, Duration)> {
-    times
-        .map(|times| {
-            SHOWN
-                .iter()
-                .map(|phase| (phase.name(), times.of(*phase)))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
 #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)] // window sizes and scales are small
 fn viewport(size: Size, scale: f32) -> Viewport {
     Viewport {
@@ -180,34 +193,4 @@ fn refused(errors: &[ElementError]) -> String {
         "the document was refused, so nothing is drawn:\n{}",
         lines.join("\n")
     )
-}
-
-#[cfg(test)]
-mod tests {
-    use std::time::Duration;
-
-    use super::shown_times;
-    use crate::frame::{FrameTimes, Phase};
-
-    #[test]
-    fn the_shown_times_are_input_update_and_draw_once_there_is_a_frame() {
-        // Given
-        let times = FrameTimes::default();
-
-        // Then
-        assert_eq!(shown_times(None), Vec::new());
-        let names: Vec<&str> = shown_times(Some(&times))
-            .iter()
-            .map(|(name, _)| *name)
-            .collect();
-        assert_eq!(
-            names,
-            [Phase::Input, Phase::Update, Phase::Draw].map(Phase::name)
-        );
-        assert!(
-            shown_times(Some(&times))
-                .iter()
-                .all(|(_, time)| *time == Duration::ZERO)
-        );
-    }
 }

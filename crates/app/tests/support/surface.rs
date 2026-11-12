@@ -5,6 +5,8 @@
 // each test crate including this uses a part of it
 #![allow(dead_code, unused_imports)]
 
+#[path = "a11y_buttons.rs"]
+pub mod a11y_buttons;
 #[path = "app_frame.rs"]
 mod app_frame;
 #[path = "misfit.rs"]

@@ -107,6 +107,14 @@ impl fmt::Display for AxError {
                 f,
                 "a11y placements wait on each other (nodes {nodes:?}): a bug in vapors; report it with the page"
             ),
+            Self::Owned { owner } => write!(
+                f,
+                "the a11y updates are taken by {owner}, and a take elsewhere would lose it the changes; fix: take them through {owner}, or detach it first"
+            ),
+            Self::NotTaker => write!(
+                f,
+                "the a11y taker given is not the one attached to this document (another document's, or detached): a bug in the host; fix: keep the taker with the document it came from"
+            ),
             Self::UpdateFailed { after, errors } => write!(
                 f,
                 "the update after {after} failed: [{}]; fix: the page's styles or layout, as the errors name",
