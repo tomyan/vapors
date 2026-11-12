@@ -4,10 +4,9 @@
 
 use vapors_scene::Shadow;
 
-use crate::GpuWork;
-use crate::Target;
 use crate::instanced::{Instanced, float_bytes};
 use crate::quads::rgba;
+use crate::{GpuWork, KeptRange, Target};
 
 /// A pipeline that draws shadows. Create once per target format.
 pub struct ShadowPipeline(Instanced);
@@ -27,8 +26,46 @@ impl ShadowPipeline {
 
     /// Draw `shadows` into `target`, in one draw call.
     pub fn draw(&mut self, target: &Target<'_>, shadows: &[Shadow]) {
-        let bytes = float_bytes(shadows.iter().flat_map(instance));
-        self.0.draw(target, &bytes);
+        self.0.draw(target, &Self::bytes(shadows));
+    }
+
+    /// The instance bytes of `shadows`, as a draw writes them.
+    #[must_use]
+    pub fn bytes(shadows: &[Shadow]) -> Vec<u8> {
+        float_bytes(shadows.iter().flat_map(instance))
+    }
+
+    /// Writes `bytes` ([`ShadowPipeline::bytes`] of a run) into the kept buffer,
+    /// for [`ShadowPipeline::draw_kept`] in this and later frames. `None`
+    /// when the buffer they need is over the device's `max_buffer_size`:
+    /// the refusal is on the target's encoder.
+    pub fn keep(&mut self, target: &Target<'_>, bytes: &[u8]) -> Option<KeptRange> {
+        self.0.keep(target, bytes)
+    }
+
+    /// Draws the shadows `kept` holds into `target`, in one draw call.
+    ///
+    /// # Panics
+    ///
+    /// If `kept` was kept by another pipeline.
+    pub fn draw_kept(&mut self, target: &Target<'_>, kept: &KeptRange) {
+        self.0.draw_kept(target, kept);
+    }
+
+    /// Gives `kept`'s bytes back. Draws of it already recorded still
+    /// read them: they are reused once a newer encoder writes or draws.
+    ///
+    /// # Panics
+    ///
+    /// If `kept` was kept by another pipeline.
+    pub fn release(&mut self, kept: KeptRange) {
+        self.0.release(kept);
+    }
+
+    /// Bytes held in the kept buffer.
+    #[must_use]
+    pub fn retained_bytes(&self) -> u64 {
+        self.0.retained_bytes()
     }
 
     /// The bind groups kept: one once this pipeline has drawn.

@@ -112,10 +112,11 @@ struct Gpu {
   growing buffer per pipeline with a free list of ranges (first fit,
   ranges merged on free), `COPY_DST | VERTEX` (or `UNIFORM`). Writes
   go through `WorkCounter::write_buffer` as today, so `FrameCounts`
-  still counts them. A write to a range a recorded draw of this frame
-  reads is not an issue: a batch's range is freed only when the batch
-  is dropped, and a dropped batch is not drawn in the frame that drops
-  it. When the free ranges fragment past half the buffer, the live
+  still counts them. A released range is free for new bytes only once
+  a newer encoder than the last one written or drawn for writes or
+  draws, so a write never lands on a range a draw recorded into the
+  open encoder reads, whatever the order of draws, releases and
+  writes. When the free ranges fragment past half the buffer, the live
   ranges are compacted into a new buffer in one pass (O(shown
   batches)), counted. Growth doubles, up to `max_buffer_size`
   (section 5).

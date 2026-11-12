@@ -7,7 +7,7 @@ mod frame;
 
 use frame::{BACKGROUND, pixel, quad, square, target};
 use vapors_gpu_harness::{gpu, read_rgba8};
-use vapors_renderer::{ArenaFull, FrameEncoder, QuadPipeline};
+use vapors_renderer::{ArenaFull, FrameEncoder, Holding, QuadPipeline};
 
 /// The lowered `max_buffer_size`: twice the arena's first buffer.
 const LIMIT: u64 = 128 * 1024;
@@ -36,6 +36,7 @@ fn gpu_a_draw_over_the_devices_max_buffer_size_is_refused_and_not_recorded() {
         pipeline: "quads",
         size: count * QUAD_BYTES,
         limit: LIMIT,
+        holding: Holding::OneFrame,
     };
     let pixels = read_rgba8(&gpu.device, &gpu.queue, &texture);
     assert_eq!(submitted, Err(refused), "the refusal");
