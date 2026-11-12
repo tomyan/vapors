@@ -14,16 +14,25 @@ impl Dom for Document {
             .insert(Node::new(Kind::Element(Element::new(tag))))
     }
 
+    /// Every mount calls it; only an event not declared before can
+    /// change an element's refusal, so only that checks every element.
     fn declare_events(&mut self, names: &[&str]) {
-        self.checks.all = true;
+        let before = self.declared_events.len();
         self.declared_events
             .extend(names.iter().map(|name| (*name).to_owned()));
+        if self.declared_events.len() > before {
+            self.checks.all = true;
+        }
     }
 
+    /// Every mount calls it; a sheet already added changes nothing. A
+    /// new one restyles every element: which elements its rules reach
+    /// is not worked out.
     fn add_style(&mut self, scope: &str, css: &str) {
-        self.note_change();
-        self.dirty.everything();
-        self.sheets.add_scoped(scope, css);
+        if self.sheets.add_scoped(scope, css) {
+            self.note_change();
+            self.dirty.everything();
+        }
     }
 
     fn create_text(&mut self, text: &str) -> NodeId {

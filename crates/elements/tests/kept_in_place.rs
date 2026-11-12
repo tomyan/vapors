@@ -1,7 +1,7 @@
 //! Parts kept in place (IU3 3c-3d2, `docs/plans/iu3.md` "The scene in
 //! stable slots"): the scene is a view over paint order and each slot's
-//! part, hit testing gathers the parts' hits in that order once per
-//! update and scans them backwards, and a removed element's part
+//! part, hit testing scans the parts' hits, kept in that order
+//! (`kept_hits.rs`), backwards, and a removed element's part
 //! leaves no entry behind. A debug build also compares
 //! every update's paint, hits and maps with a full paint's
 //! (`kept_paint_check.rs`).
@@ -16,7 +16,7 @@ use vapors_scene::Rect;
 
 /// Two 50px squares at the top left, the second 20px right of the
 /// first; `under` with z-index 1, `over` with z-index 2; hit tested
-/// once, so a later update's hits are gathered again.
+/// once, so a later update's hits are kept and patched.
 fn overlapping() -> (Document, NodeId, NodeId) {
     let mut doc = document();
     let css = "body { margin: 0; } \

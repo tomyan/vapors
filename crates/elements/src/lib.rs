@@ -51,6 +51,7 @@ mod kept_batches_check;
 mod kept_box;
 mod kept_checks;
 mod kept_clips;
+mod kept_hits;
 mod kept_maps;
 mod kept_order;
 mod kept_order_check;
