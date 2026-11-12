@@ -98,6 +98,38 @@ fn no_page_by_the_deadline_is_refused_quoting_the_last_list() {
     assert!(refusal.contains("[]"), "{refusal}");
 }
 
+/// Answers the first request with `[]`, then accepts the next and
+/// never answers it, as a Chromium stalled at the deadline would.
+fn answers_once_then_stalls() -> u16 {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("a port");
+    let port = listener.local_addr().expect("address").port();
+    thread::spawn(move || {
+        let Ok((mut first, _)) = listener.accept() else {
+            return;
+        };
+        let _ = first.read(&mut [0u8; 1024]);
+        let _ = first.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n[]");
+        let Ok((_stalled, _)) = listener.accept() else {
+            return;
+        };
+        thread::sleep(Duration::from_secs(5));
+    });
+    port
+}
+
+#[test]
+fn a_list_request_still_unanswered_at_the_deadline_is_the_deadline_refusal() {
+    // Given: the first list read answered, the next request never answered
+    let port = answers_once_then_stalls();
+
+    // When
+    let refusal = page_socket(port, SHORT).expect_err("no page");
+
+    // Then: the refusal is the deadline's, quoting the last list read
+    assert!(refusal.contains("no page target"), "{refusal}");
+    assert!(refusal.contains("[]"), "{refusal}");
+}
+
 #[test]
 fn the_host_sent_carries_the_port_as_chromium_builds_its_urls_from_it() {
     // Given: a server that, as Chromium does, puts the request's Host in the URL
