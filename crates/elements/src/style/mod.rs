@@ -102,14 +102,22 @@ impl Sheets {
     /// A component's style under its `scope`, added once however often
     /// it is mounted. One that does not parse is kept as a refusal for
     /// every update (see [`Sheets::refused`]): `Dom::add_style` returns
-    /// nothing, as the generated code's other calls do.
-    pub(crate) fn add_scoped(&mut self, scope: &str, text: &str) {
+    /// nothing, as the generated code's other calls do. False when the
+    /// scope was already added with this style and nothing changed.
+    pub(crate) fn add_scoped(&mut self, scope: &str, text: &str) -> bool {
+        if self.scopes.get(scope).is_some_and(|added| added == text) {
+            return false;
+        }
+        self.add_new_scoped(scope, text);
+        true
+    }
+
+    fn add_new_scoped(&mut self, scope: &str, text: &str) {
         let refuse = |error| ElementError::Css {
             sheet: scope.to_owned(),
             error,
         };
         match self.scopes.get(scope) {
-            Some(added) if added == text => return,
             Some(_) => {
                 return self.refused.push(refuse(vapors_css::Error::new(
                     vapors_css::Position { line: 1, column: 1 },
