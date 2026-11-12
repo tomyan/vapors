@@ -2,8 +2,8 @@
 //! font, size, variation, subpixel offset and hinting. Coverage goes to
 //! an R8 page, colour glyphs to an RGBA8 page (not rasterised yet; the
 //! page exists so the renderer's shape is settled). When a page fills,
-//! the least recently used glyphs not needed by the current frame are
-//! evicted until the new one fits (`atlas_evict.rs`). A glyph larger
+//! the least recently used glyphs not in the current frame are evicted
+//! until the new one fits (`atlas_evict.rs`). A glyph larger
 //! than a page is refused once, logged with its size, and `.notdef`
 //! stands in from then on. Evictions, rasterisations and refusals are
 //! counted for tests. Icons share the coverage page (`atlas_icon.rs`).
@@ -17,7 +17,7 @@ use crate::atlas_types::{AtlasKey, GlyphKey};
 use crate::raster::{Coverage, GlyphRequest, Rasterizer};
 
 /// The colour page's largest side, 4 MiB of RGBA: nothing draws from it
-/// until colour glyphs are rasterised, and that pull request sizes it.
+/// until colour glyphs land, which sizes it.
 const COLOUR_PAGE: u32 = 1024;
 
 pub(crate) struct Entry {
