@@ -61,6 +61,15 @@ fn differing_parts(kept: &Painted, fresh: &Painted) -> Vec<String> {
     ));
     parts.extend(first_differing("rects", &kept.rects, &fresh.rects));
     parts.extend(first_differing("paddings", &kept.paddings, &fresh.paddings));
+    parts.extend(first_differing(
+        "node frames",
+        &kept.node_frames,
+        &fresh.node_frames,
+    ));
+    parts.extend(
+        (kept.frames != fresh.frames)
+            .then(|| format!("frames: kept {:?}, fresh {:?}", kept.frames, fresh.frames)),
+    );
     parts.extend(crate::kept_order_check::differing(
         &kept.order,
         &fresh.order,

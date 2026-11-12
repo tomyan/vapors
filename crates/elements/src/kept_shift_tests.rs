@@ -23,6 +23,7 @@ pub(super) fn from(at: BoxRect) -> BoxFrom {
         rect: at,
         clip: None,
         padding: taffy::Rect::zero(),
+        frame: crate::frames::PAGE,
     }
 }
 

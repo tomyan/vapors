@@ -48,7 +48,7 @@ impl Document {
     /// mirrors it; `None` when none has focus or it is not painted yet.
     pub fn text_input(&mut self) -> Option<TextInput> {
         let node = self.active_element().filter(|node| self.live_text(*node))?;
-        let origin = *self.painted.as_ref()?.text_origins.get(&node)?;
+        let origin = self.painted.as_ref()?.text_origin(node)?;
         let selection = self.selection(node)?;
         let text = self.editor(node).plain.raw_text().to_owned();
         let (_, marks) = self.focused_text_marks()?;

@@ -30,6 +30,8 @@ pub(crate) struct BoxFrom {
     /// Its padding widths, for its padding and content box (% padding
     /// follows the containing block's width).
     pub(crate) padding: taffy::Rect<f32>,
+    /// The scroll frame its items, hits and entries are in (`frames.rs`).
+    pub(crate) frame: usize,
 }
 
 /// One box's kept paint.
@@ -58,17 +60,18 @@ pub(crate) struct Part {
 }
 
 impl BoxFrom {
-    /// What box `index`'s paint reads now, under `clip`.
+    /// What box `index`'s paint reads now, under `clip` in scroll
+    /// frame `frame`.
     pub(crate) fn of(
-        boxes: &[LayoutBox],
-        rects: &[BoxRect],
-        clip: Option<BoxRect>,
+        (boxes, rects): (&[LayoutBox], &[BoxRect]),
+        (clip, frame): (Option<BoxRect>, usize),
         index: usize,
     ) -> Self {
         Self {
             rect: rects[index],
             clip,
             padding: boxes[index].layout.padding,
+            frame,
         }
     }
 }
@@ -128,8 +131,12 @@ impl Part {
         self.rects.is_empty() && self.ranges.is_empty() && self.text_origins.is_empty()
     }
 
-    /// Puts this part's entries into `painted`'s maps.
-    pub(crate) fn enter(&self, painted: &mut Painted) {
+    /// Puts this part's entries into `painted`'s maps, their positions
+    /// in scroll frame `frame`.
+    pub(crate) fn enter(&self, painted: &mut Painted, frame: usize) {
+        for node in self.positioned() {
+            painted.node_frames.insert(node, frame);
+        }
         painted.cursors.extend(self.cursors.iter().copied());
         painted.visible.extend(self.visible.iter().copied());
         painted.rects.extend(self.rects.iter().copied());
@@ -145,9 +152,22 @@ impl Part {
         removed(&mut painted.rects, &self.rects);
         removed(&mut painted.ranges, &self.ranges);
         removed(&mut painted.text_origins, &self.text_origins);
+        for node in self.positioned() {
+            painted.node_frames.remove(&node);
+        }
         for node in &self.visible {
             painted.visible.remove(node);
         }
+    }
+
+    /// The elements whose positions this part holds: inline elements'
+    /// border boxes, range tracks and text origins.
+    fn positioned(&self) -> impl Iterator<Item = NodeId> + '_ {
+        let rects = self.rects.iter().map(|(node, _)| *node);
+        let ranges = self.ranges.iter().map(|(node, _)| *node);
+        rects
+            .chain(ranges)
+            .chain(self.text_origins.iter().map(|(node, _)| *node))
     }
 }
 

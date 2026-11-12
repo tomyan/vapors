@@ -387,6 +387,40 @@ time recorded in `docs/perf/`, three runs, medians, at 1000, 3000 and
 | 5 | The per-frame extents index; `hidden` replaced by per-frame item counts; the candidate debug check | Resize and Scroll at 10,000 rows: `batches` instructions equal to 1000 rows' within noise; `culled` unchanged | after 4b; `kept_batches.rs`, `drawn_steps.rs` |
 | 6 | Acceptance: every rows workload at 1000, 3000 and 10,000 rows, Scroll, Insert and Resize, instruction counts, wall clock and GPU time in `docs/perf/`; property 2 and the scroll remainder of property 4 marked held or not in `perf-finish-line.md` | Draw under 1 ms and the same within noise at every row count; Scroll's update within Idle's | last |
 
+### 4a to 4c land together
+
+4a cannot land alone: once placement moves no slot on a scroll, paint
+is told of no moved part, and until paint is in frame coordinates
+nothing shifts the scrolled rows, so the page would not scroll on
+screen (today a scroll keeps `boxes_painted` at 0 by shifting every
+row, `tests/kept_shift.rs`). So 4a, 4b and 4c are one stack, each PR
+reviewed on its own and kept green with pixels unchanged at its head,
+merged together as a train (lead, 2026-11-12). The stack splits along
+what each PR can hold alone:
+
+- 4-i: parts, map entries and hits name their scroll frame
+  (`frames.rs`; `BoxFrom::frame`, `Painted::node_frames`), and every
+  reader puts them on the page as it reads (the scene's items and
+  batches, hits, `border_box`, `padding_origin`, text origins, range
+  tracks). Each frame's clip is its scroll container's content clip on
+  the page. Every shift is zero at this PR's head, since placement is
+  still on the page.
+- 4-ii: placement and paint in frame coordinates: a scroll settles the
+  container's offset and moves no content origin; each frame's shift
+  is the container's rounded offset added to its outer frame's; clips
+  split at a frame (a box inside a scroll container starts with no
+  clip in its frame, the frame's clip is applied on read); the kept
+  batches made again, and the hover tested again, when a frame's
+  shift or clip changes. Acceptance is 4a's and 4b's.
+- 4-iii: the translation moves from the CPU (where 4-i applies it as
+  batches are made) into the dynamic-offset uniform, so kept GPU bytes
+  survive a scroll. It pays only once PR 2 keeps GPU bytes, so it
+  follows PR 2.
+
+The a11y mirror reads border boxes from moved slots: with 4-ii a
+scroll moves none, so the mirror's bounds must be relative to the
+scroll container (R6 PR 5a, #243) before 4-ii merges.
+
 Recommended order: 0, 1, 2, 3, 4a, 4b, 4c, 5, 6. PRs 0 to 3 touch no
 file the paint, splice, layout or style lanes change and can run as
 one lane beside them. 4a waits for 3c-3e (which decides what a moved

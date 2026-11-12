@@ -6,20 +6,26 @@
 //! debug build compares it with a fresh gather on every update and
 //! names the first differing hit (`kept_paint_check.rs`). The patch
 //! records the hits it removed and added (`HitsChanged`), which decides
-//! whether the hover is tested again after the update.
+//! whether the hover is tested again after the update. Each hit is kept
+//! in its part's scroll frame and put on the page as it is tested
+//! (`frames.rs`).
 
 use vapors_dom::NodeId;
 
 use crate::drawn_steps::DrawnSteps;
+use crate::frames::Frames;
 use crate::kept_box::KeptBox;
 use crate::layout::BoxRect;
 use crate::paint_order::Step;
+
+/// A hit in its scroll frame: the frame, the element and its rect.
+pub(crate) type FramedHit = (usize, (NodeId, BoxRect));
 
 /// Every hit with its box step's place, ordered by place; a part's hits
 /// in the order it painted them.
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct KeptHits {
-    placed: Vec<(usize, (NodeId, BoxRect))>,
+    placed: Vec<(usize, FramedHit)>,
 }
 
 impl KeptHits {
@@ -27,7 +33,7 @@ impl KeptHits {
     pub(crate) fn of(scene: &crate::SceneView<'_>) -> Self {
         let placed = scene
             .placed_parts()
-            .flat_map(|(place, part)| part.hits.iter().map(move |&hit| (place, hit)));
+            .flat_map(|(place, kept)| framed(kept).map(move |hit| (place, hit)));
         Self {
             placed: placed.collect(),
         }
@@ -37,39 +43,45 @@ impl KeptHits {
     /// its part's in `boxes`, at the step's place in `drawn`: one
     /// splice per place, from the last, so the list stays ordered by
     /// place as a fresh gather is.
-    /// Returns the hits removed and added, in no order.
+    /// Returns the hits removed and added, in no order, each in its
+    /// frame.
     pub(crate) fn patch(
         &mut self,
         slots: impl Iterator<Item = usize>,
         drawn: &DrawnSteps,
         boxes: &[Option<KeptBox>],
-    ) -> Vec<(NodeId, BoxRect)> {
+    ) -> Vec<FramedHit> {
         let mut changed = Vec::new();
         for (place, slot) in box_places(slots, drawn).into_iter().rev() {
             let start = self.placed.partition_point(|&(at, _)| at < place);
             let end = self.placed.partition_point(|&(at, _)| at <= place);
             let kept = boxes.get(slot).and_then(Option::as_ref);
-            let hits = kept.map_or(&[][..], |kept| &kept.own.hits);
-            changed.extend_from_slice(hits);
-            let placed = hits.iter().map(|&hit| (place, hit));
+            let hits: Vec<FramedHit> = kept.into_iter().flat_map(framed).collect();
+            changed.extend_from_slice(&hits);
+            let placed = hits.into_iter().map(|hit| (place, hit));
             changed.extend(self.placed.splice(start..end, placed).map(|(_, hit)| hit));
         }
         changed
     }
 
-    /// Every hit, in painting order.
-    pub(crate) fn hits(&self) -> impl DoubleEndedIterator<Item = &(NodeId, BoxRect)> {
+    /// Every hit with its frame, in painting order.
+    pub(crate) fn hits(&self) -> impl DoubleEndedIterator<Item = &FramedHit> {
         self.placed.iter().map(|(_, hit)| hit)
     }
 
-    /// The last hit whose rect holds `[x, y]`: its left and top edges,
-    /// not its right and bottom.
-    pub(crate) fn hit(&self, point: [f32; 2]) -> Option<NodeId> {
+    /// The last hit whose rect on the page holds `[x, y]`: its left and
+    /// top edges, not its right and bottom.
+    pub(crate) fn hit(&self, point: [f32; 2], frames: &Frames) -> Option<NodeId> {
         self.hits()
             .rev()
-            .find(|(_, rect)| holds(rect, point))
-            .map(|(node, _)| *node)
+            .find(|(frame, (_, rect))| holds(&frames.hit(*frame, *rect), point))
+            .map(|(_, (node, _))| *node)
     }
+}
+
+/// `kept`'s own hits, each with its frame.
+fn framed(kept: &KeptBox) -> impl Iterator<Item = FramedHit> + '_ {
+    kept.own.hits.iter().map(|&hit| (kept.from.frame, hit))
 }
 
 /// Whether `rect` holds `[x, y]`: its left and top edges, not its right
@@ -88,11 +100,20 @@ pub(crate) enum HitsChanged {
     /// differ.
     #[default]
     Unknown,
-    /// The hits removed and added, in no order.
+    /// The hits removed and added, in no order, on the page.
     Known(Vec<(NodeId, BoxRect)>),
 }
 
 impl HitsChanged {
+    /// The `changed` hits, put on the page by `frames`.
+    pub(crate) fn on_page(changed: Vec<FramedHit>, frames: &Frames) -> Self {
+        let hits = changed.into_iter();
+        Self::Known(
+            hits.map(|(frame, (node, rect))| (node, frames.hit(frame, rect)))
+                .collect(),
+        )
+    }
+
     /// Whether a hit test at `point` may name another element than
     /// `hovered`: when unknown, and when a changed hit holds `point` or
     /// is `hovered`'s.

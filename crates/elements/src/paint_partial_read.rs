@@ -38,7 +38,8 @@ pub(crate) fn to_paint(
         .filter(|&slot| !matches!(boxes[slot].content, Content::Vacant));
     let (mut again, mut shifts) = (Vec::new(), Vec::new());
     for slot in shown {
-        let from = BoxFrom::of(boxes, rects, order.clips.own(slot), slot);
+        let clip = (order.clips.own(slot), order.clips.frame(slot));
+        let from = BoxFrom::of((boxes, rects), clip, slot);
         match read(slot, from, boxes, painted, scale) {
             Read::Kept => painted.parts_visited_kept += 1,
             Read::Shifted(shift) => shifts.push(shift),

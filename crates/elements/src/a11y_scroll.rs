@@ -50,7 +50,7 @@ impl Document {
     /// The padding box of `container` in the last update: where its
     /// scrolled content shows.
     fn scrollport(&self, container: NodeId) -> Option<BoxRect> {
-        let rect = *self.painted.as_ref()?.rects.get(&container)?;
+        let rect = self.painted.as_ref()?.border_box(container)?;
         Some(padding_box(self.boxes.element(container)?, rect))
     }
 }

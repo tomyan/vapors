@@ -30,6 +30,7 @@ fn kept(own: bool, outline: bool, thumb: bool) -> KeptBox {
         rect,
         clip: None,
         padding: taffy::Rect::zero(),
+        frame: crate::frames::PAGE,
     };
     let mut own_part = Part::default();
     own_part.scene = scene(own);

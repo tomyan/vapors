@@ -1,6 +1,8 @@
 //! Runs of the scene's items that one pipeline draws under one clip,
 //! with the items that would change no visible pixel culled.
 
+use std::borrow::Borrow;
+
 use crate::display::{Item, Quad, Rect, Scene, Shadow};
 
 /// Consecutive items of one kind under one clip: what a painter draws
@@ -59,12 +61,13 @@ impl Scene {
 /// the items either side of it can share a batch; a culled surface
 /// instead keeps its place in a batch marked [`Batch::culled`], so the
 /// painter refuses it as it refuses a clipped one.
-pub fn batched<'a>(
-    items: impl IntoIterator<Item = (&'a Item, Option<Rect>)>,
+pub fn batched<I: Borrow<Item>>(
+    items: impl IntoIterator<Item = (I, Option<Rect>)>,
     view: Rect,
 ) -> Batched {
     let mut batched = Batched::default();
     for (item, clip) in items {
+        let item = item.borrow();
         if !culled(item, clip, view) {
             batched.push(item, clip, false);
             continue;

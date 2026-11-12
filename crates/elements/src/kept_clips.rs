@@ -5,21 +5,34 @@
 //! comes from a box whose inner clip came out different. A changed
 //! slot below one whose inner came out equal is redone as its own
 //! start. Starts go shallowest first, so a box is redone after the box
-//! its clip comes from.
+//! its clip comes from. Each box's scroll frame (`frames.rs`) is kept
+//! beside its clips: its clip parent's when that does not scroll, else
+//! the clip parent itself.
 
 use rustc_hash::FxHashSet;
 
 use crate::clip_tree::ClipTree;
+use crate::frames::PAGE;
 use crate::layout::BoxRect;
 
-/// What a box gives its content, from its own clip: `inner(slot, own)`.
-pub(crate) type Inner<'a> = &'a dyn Fn(usize, Option<BoxRect>) -> Option<BoxRect>;
+/// What clips read of each box.
+pub(crate) trait ClipInputs {
+    /// What box `slot` gives its content, from `own`, its own clip.
+    fn inner(&self, slot: usize, own: Option<BoxRect>) -> Option<BoxRect>;
+    /// Whether box `slot` scrolls, so its content is a frame of its own.
+    fn scrolls(&self, slot: usize) -> bool;
+}
 
-/// Each slot's own and inner clip, CSS pixels, `None` for none.
+/// The boxes' clip inputs.
+pub(crate) type Inner<'a> = &'a dyn ClipInputs;
+
+/// Each slot's own and inner clip, CSS pixels, `None` for none, and its
+/// scroll frame.
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Clips {
     own: Vec<Option<BoxRect>>,
     inner: Vec<Option<BoxRect>>,
+    frame: Vec<usize>,
 }
 
 impl Clips {
@@ -28,6 +41,7 @@ impl Clips {
         let mut clips = Self {
             own: vec![None; tree.len()],
             inner: vec![None; tree.len()],
+            frame: vec![PAGE; tree.len()],
         };
         let mut redone = Vec::new();
         if tree.len() > 0 {
@@ -41,14 +55,37 @@ impl Clips {
     pub(crate) fn spliced(&mut self, len: usize, freed: impl Iterator<Item = usize>) {
         self.own.resize(len, None);
         self.inner.resize(len, None);
+        self.frame.resize(len, PAGE);
         for slot in freed {
-            (self.own[slot], self.inner[slot]) = (None, None);
+            (self.own[slot], self.inner[slot], self.frame[slot]) = (None, None, PAGE);
+        }
+    }
+
+    /// Clips of slots with these `inner` clips in these frames, for
+    /// tests.
+    #[cfg(test)]
+    pub(crate) fn with(inner: Vec<Option<BoxRect>>, frame: Vec<usize>) -> Self {
+        Self {
+            own: vec![None; inner.len()],
+            inner,
+            frame,
         }
     }
 
     /// Box `slot`'s own clip: the one it paints under.
     pub(crate) fn own(&self, slot: usize) -> Option<BoxRect> {
         self.own[slot]
+    }
+
+    /// Box `slot`'s inner clip: the one it gives its content.
+    pub(crate) fn inner(&self, slot: usize) -> Option<BoxRect> {
+        self.inner[slot]
+    }
+
+    /// Box `slot`'s scroll frame: the slot of the scroll container its
+    /// part is painted in, or `PAGE`.
+    pub(crate) fn frame(&self, slot: usize) -> usize {
+        self.frame[slot]
     }
 
     /// Redoes the clips of the `changed` slots and below them where an
@@ -103,24 +140,44 @@ impl Clips {
         true
     }
 
-    /// Box `slot`'s clips worked out again from its clip parent's
-    /// inner; whether its inner changed.
+    /// Box `slot`'s clips and frame worked out again from its clip
+    /// parent's; whether what its dependents take changed: its inner
+    /// clip, or the frame its content is in.
     fn redo(&mut self, slot: usize, tree: &ClipTree, inner: Inner<'_>) -> bool {
-        let own = tree.parent(slot).and_then(|parent| self.inner[parent]);
-        let new = inner(slot, own);
+        let parent = tree.parent(slot);
+        let own = parent.and_then(|parent| self.inner[parent]);
+        let frame = parent.map_or(PAGE, |parent| self.frame_inside(parent, inner));
+        let new = inner.inner(slot, own);
         self.own[slot] = own;
-        std::mem::replace(&mut self.inner[slot], new) != new
+        let was = (self.inner[slot], self.frame_inside(slot, inner));
+        (self.inner[slot], self.frame[slot]) = (new, frame);
+        was != (new, self.frame_inside(slot, inner))
+    }
+
+    /// The frame of the content of box `slot`: its own when it scrolls,
+    /// else the one it is in.
+    fn frame_inside(&self, slot: usize, inner: Inner<'_>) -> usize {
+        if inner.scrolls(slot) {
+            slot
+        } else {
+            self.frame[slot]
+        }
     }
 
     /// The first slot whose clips differ from `other`'s, with both.
     pub(crate) fn first_differing(&self, other: &Self) -> Option<String> {
         let at = |clips: &Self, slot: usize| {
-            (clips.own.get(slot).copied(), clips.inner.get(slot).copied())
+            let get = |clips: &[Option<BoxRect>]| clips.get(slot).copied();
+            (
+                get(&clips.own),
+                get(&clips.inner),
+                clips.frame.get(slot).copied(),
+            )
         };
         let slots = self.own.len().max(other.own.len());
         let slot = (0..slots).find(|&slot| at(self, slot) != at(other, slot))?;
         Some(format!(
-            "clips at slot {slot}: kept (own, inner) {:?}, fresh {:?}",
+            "clips at slot {slot}: kept (own, inner, frame) {:?}, fresh {:?}",
             at(self, slot),
             at(other, slot)
         ))

@@ -41,7 +41,7 @@ impl<'a> Repaint<'a> {
     ) {
         for (slot, from) in again {
             let kept = self.painted(slot, from, input, painted);
-            kept.own.enter(painted);
+            kept.own.enter(painted, kept.from.frame);
             painted.boxes_drawn += 1;
             painted.items_built += kept.items();
             painted.kept_boxes[slot] = Some(kept);

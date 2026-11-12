@@ -9,6 +9,7 @@
 use vapors_scene::{Batched, Item, Rect};
 
 use crate::drawn_steps::DrawnSteps;
+use crate::frames::Frames;
 use crate::kept_box::KeptBox;
 use crate::paint_order::Step;
 use crate::scene_view::step_items;
@@ -42,7 +43,7 @@ impl KeptBatches {
     pub(crate) fn of(
         view: Rect,
         (drawn, places): (&DrawnSteps, usize),
-        boxes: &[Option<KeptBox>],
+        boxes: (&[Option<KeptBox>], &Frames),
     ) -> Self {
         #[cfg(test)]
         BUILDS.with(|builds| builds.set(builds.get() + 1));
@@ -65,7 +66,7 @@ impl KeptBatches {
         slot: &mut Option<Self>,
         view: Rect,
         drawn: (&DrawnSteps, usize),
-        boxes: &[Option<KeptBox>],
+        boxes: (&[Option<KeptBox>], &Frames),
     ) {
         if slot.as_ref().is_some_and(|kept| kept.view != view) {
             *slot = None;
@@ -79,11 +80,11 @@ impl KeptBatches {
     pub(crate) fn patch(
         &mut self,
         steps: impl Iterator<Item = (usize, Step)>,
-        boxes: &[Option<KeptBox>],
+        boxes: (&[Option<KeptBox>], &Frames),
     ) {
         for (place, step) in steps {
             self.remove(place);
-            if boxes.get(step.index()).is_some_and(Option::is_some) {
+            if boxes.0.get(step.index()).is_some_and(Option::is_some) {
                 self.add(place, step, boxes);
             }
         }
@@ -96,7 +97,7 @@ impl KeptBatches {
     }
 
     /// The batches, made from the shown steps' items when none are kept.
-    pub(crate) fn batches(&mut self, boxes: &[Option<KeptBox>]) -> &Batched {
+    pub(crate) fn batches(&mut self, boxes: (&[Option<KeptBox>], &Frames)) -> &Batched {
         self.batched.get_or_insert_with(|| {
             let items = self
                 .shown
@@ -109,7 +110,7 @@ impl KeptBatches {
     }
 
     /// Puts `step`, at `place`, in `shown` or `hidden` by its items.
-    fn add(&mut self, place: usize, step: Step, boxes: &[Option<KeptBox>]) {
+    fn add(&mut self, place: usize, step: Step, boxes: (&[Option<KeptBox>], &Frames)) {
         match hidden_items(step_items(boxes, step), self.view) {
             None => {
                 let at = self.shown.partition_point(|&(shown, _)| shown < place);
@@ -157,14 +158,11 @@ fn added(count: u64, change: i64) -> u64 {
 /// How many `items` there are when every one is culled in `view` and
 /// none is a surface (a culled surface keeps its place in a batch);
 /// `None` when one shows.
-fn hidden_items<'a>(
-    items: impl Iterator<Item = (&'a Item, Option<Rect>)>,
-    view: Rect,
-) -> Option<u64> {
+fn hidden_items(items: impl Iterator<Item = (Item, Option<Rect>)>, view: Rect) -> Option<u64> {
     let mut count = 0;
     for (item, clip) in items {
         let surface = matches!(item, Item::Surface { .. });
-        if surface || !vapors_scene::culled(item, clip, view) {
+        if surface || !vapors_scene::culled(&item, clip, view) {
             return None;
         }
         count += 1;
