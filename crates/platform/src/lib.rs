@@ -86,6 +86,7 @@ pub use surface::pick_format;
 pub use text_field::TextField;
 #[cfg(target_family = "wasm")]
 pub use timer_web::{Timer, page_hidden};
+pub use uncaptured::{Uncaptured, UncapturedErrors};
 pub use waker::{LoopClosed, Waker};
 pub use window::{App, Frame, Next, WindowOptions, run};
 
