@@ -13,7 +13,7 @@
 //! one.
 //! An entry records the update that last asked for it. A sweep drops
 //! those older than the last update whose layout nothing else holds (a
-//! kept paint holds what it shows).
+//! kept paint holds what it shows); `text_kept.rs` keeps the map.
 //!
 //! A sweep runs on an insert that finds the map doubled since the last
 //! sweep, and at the start of an update when the map holds more than 4
@@ -32,7 +32,6 @@
 //! last paint shows, at most twice the live set; the next needs at
 //! least twice the live set in new inserts first.
 
-use rustc_hash::FxHashMap;
 use std::rc::Rc;
 
 use vapors_text::{Align, FontSystem, Layout};
@@ -40,25 +39,14 @@ use vapors_text::{Align, FontSystem, Layout};
 use super::inline::InlineRun;
 use super::measure::text_layout;
 pub(crate) use super::text_key::Key;
+use super::text_kept::Kept;
 use crate::style::TextStyle;
 
 /// The layouts kept, each with the update that last asked for it.
 #[derive(Clone, Default)]
 pub(crate) struct TextCache {
-    entries: FxHashMap<Key, Entry>,
-    /// The update under way, counting from 1 (`begin`).
-    update: u64,
-    /// How many entries the last sweep left.
-    swept_to: usize,
-    /// How many entries this update asked for or inserted.
-    asked_now: usize,
+    layouts: Kept<Key, Rc<Layout>>,
     built: usize,
-}
-
-#[derive(Clone)]
-struct Entry {
-    layout: Rc<Layout>,
-    asked: u64,
 }
 
 impl TextCache {
@@ -72,75 +60,41 @@ impl TextCache {
         width: Option<f32>,
     ) -> Rc<Layout> {
         let key = Key::of(run, width, scale);
-        if let Some(layout) = self
-            .asked(&key)
-            .or_else(|| self.unwrapped(run, width, scale))
-        {
+        if let Some(layout) = self.kept(&key).or_else(|| self.unwrapped(run, width, scale)) {
             return layout;
         }
         self.built += 1;
         let layout = Rc::new(text_layout(fonts, scale, run, width));
-        self.insert(key, Rc::clone(&layout));
+        self.layouts.insert(key, Rc::clone(&layout));
         layout
     }
 
     /// `run`'s max-content layout, kept, when laying it out at `width`
     /// would give the same. It is not kept again by the width: two map
     /// entries holding one layout would each count as a holder of the
-    /// other, and a sweep would never drop either. The conditions: the run is start-aligned, so its lines do
-    /// not move within the width, and no line is wider than `width`, so
-    /// none breaks. The layout's `layout_max_advance` and each line's
-    /// `inline_max_coord` are those of the max-content layout, not of
-    /// one built at `width`.
+    /// other, and a sweep would never drop either. The conditions: the
+    /// run is start-aligned, so its lines do not move within the width,
+    /// and no line is wider than `width`, so none breaks. The layout's
+    /// `layout_max_advance` and each line's `inline_max_coord` are those
+    /// of the max-content layout, not of one built at `width`.
     fn unwrapped(&mut self, run: &InlineRun, width: Option<f32>, scale: f32) -> Option<Rc<Layout>> {
         let width = width?;
         if !reusable(run) {
             return None;
         }
-        let layout = self.asked(&Key::of(run, None, scale))?;
+        let layout = self.kept(&Key::of(run, None, scale))?;
         fits(layout.width(), width * scale).then_some(layout)
     }
 
     /// The layout kept by `key`, recorded as asked for this update.
-    fn asked(&mut self, key: &Key) -> Option<Rc<Layout>> {
-        let entry = self.entries.get_mut(key)?;
-        if entry.asked != self.update {
-            entry.asked = self.update;
-            self.asked_now += 1;
-        }
-        Some(Rc::clone(&entry.layout))
+    fn kept(&mut self, key: &Key) -> Option<Rc<Layout>> {
+        self.layouts.asked(key).map(Rc::clone)
     }
 
-    /// Keeps `layout` by `key`, sweeping first when the map has doubled
-    /// since the last sweep.
-    fn insert(&mut self, key: Key, layout: Rc<Layout>) {
-        if self.entries.len() >= 2 * self.swept_to.max(1) {
-            self.sweep();
-        }
-        let asked = self.update;
-        self.entries.insert(key, Entry { layout, asked });
-        self.asked_now += 1;
-    }
-
-    /// Drops the entries asked for before the last update whose layout
-    /// nothing else holds.
-    fn sweep(&mut self) {
-        let since = self.update.saturating_sub(1);
-        self.entries
-            .retain(|_, entry| entry.asked >= since || Rc::strong_count(&entry.layout) > 1);
-        self.swept_to = self.entries.len();
-    }
-
-    /// Starts an update, the last one's paint showing `shown` texts;
-    /// sweeps when the map holds more than 4 times the live set.
+    /// Starts an update, the last one's paint showing `shown` texts.
     pub(crate) fn begin(&mut self, shown: usize) {
-        let live = self.asked_now.max(shown).max(1);
-        self.update += 1;
         self.built = 0;
-        self.asked_now = 0;
-        if self.entries.len() > 4 * live {
-            self.sweep();
-        }
+        self.layouts.begin(shown);
     }
 
     /// How many layouts this update built rather than kept.

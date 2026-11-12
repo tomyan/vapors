@@ -16,7 +16,7 @@ fn other(update: usize, n: usize) -> InlineRun {
 fn later_updates(cache: &mut TextCache, fonts: &mut FontSystem, check: &dyn Fn(&TextCache)) {
     for update in 1..4 {
         cache.begin(0);
-        for n in 0..=cache.entries.len() {
+        for n in 0..=cache.layouts.entries.len() {
             cache.layout(fonts, 1.0, &other(update, n), None);
             check(cache);
         }
@@ -67,11 +67,11 @@ fn the_map_never_holds_more_than_twice_what_the_last_sweep_left() {
 
     // When, Then
     later_updates(&mut cache, &mut fonts, &|cache| {
-        let bound = 2 * cache.swept_to.max(1);
+        let bound = 2 * cache.layouts.swept_to.max(1);
         assert!(
-            cache.entries.len() <= bound,
+            cache.layouts.entries.len() <= bound,
             "{} > {bound}",
-            cache.entries.len()
+            cache.layouts.entries.len()
         );
     });
 }
@@ -90,6 +90,7 @@ fn a_layout_reused_at_a_width_is_dropped_once_nothing_holds_it() {
 
     // Then
     let first: Vec<_> = cache
+        .layouts
         .entries
         .values()
         .filter(|entry| entry.asked == 1)
@@ -128,21 +129,21 @@ fn layouts_a_shrunk_document_no_longer_shows_are_dropped_at_the_next_update() {
     cache.begin(2);
 
     // Then
-    assert_eq!(cache.entries.len(), 2);
+    assert_eq!(cache.layouts.entries.len(), 2);
 }
 
 #[test]
 fn an_update_that_shows_what_the_map_holds_does_not_sweep_it() {
     // Given
     let (_fonts, mut cache) = shown_then(30, 1);
-    let swept_to = cache.swept_to;
+    let swept_to = cache.layouts.swept_to;
 
     // When
     cache.begin(31);
 
     // Then
     assert_eq!(
-        cache.swept_to, swept_to,
+        cache.layouts.swept_to, swept_to,
         "a sweep ran at the start of the update"
     );
 }
