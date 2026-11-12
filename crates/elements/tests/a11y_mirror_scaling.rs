@@ -3,8 +3,8 @@
 //! `AxTakeCounts` across page sizes, as `UpdateCounts` holds an
 //! update's. A focus move and a state change read the same nodes on a
 //! page of 100 rows and of 400, patch the index for the nodes touched
-//! and scan nothing; a scroll touches the rows it moved (the cost the
-//! plan names) and scans nothing; a role removed over K children orders
+//! and scan nothing; a scroll reads the scrolled container alone, its
+//! rows' bounds being from it, and scans nothing; a role removed over K children orders
 //! its K placements in steps that grow with K, not K squared.
 
 mod support;
@@ -91,18 +91,18 @@ fn a_state_change_reads_the_same_nodes_on_a_page_four_times_the_size() {
 }
 
 #[test]
-fn a_scroll_touches_the_rows_it_moved_and_scans_nothing() {
+fn a_scroll_reads_the_scrolled_container_alone_and_scans_nothing() {
     // Given
     let (small, large) = (taken_rows(100), taken_rows(400));
 
     // When
     let (a, b) = (scroll(&small), scroll(&large));
 
-    // Then: every row's four elements moved, the cost the plan names,
-    // each read with body and html above; the index patched for them,
-    // never scanned
-    assert_eq!((a.nodes_read, b.nodes_read), (4 * 100 + 2, 4 * 400 + 2));
-    assert_eq!((a.index_entries, b.index_entries), (4 * 100, 4 * 400));
+    // Then: the rows moved by the scroll alone are left out; the body
+    // is read with html above it, the index patched for it, never
+    // scanned
+    assert_eq!((a.nodes_read, b.nodes_read), (2, 2));
+    assert_eq!((a.index_entries, b.index_entries), (1, 1));
     assert_eq!((a.index_scans, b.index_scans), (0, 0));
 }
 

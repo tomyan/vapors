@@ -107,9 +107,10 @@ fn gpu_scrolling_under_a_resting_pointer_rehovers_and_the_frame_goes_on() {
     // When: the second row moves under the pointer
     let update = frame_taken(&mut app, &gpu);
 
-    // Then: every row moved
-    assert_eq!(update.nodes.len(), 20, "{update:?}");
-    assert_eq!(record(&update, "Row 2").bounds.y, 0.0, "{update:?}");
+    // Then: the body scrolled; its rows' bounds are from it, unchanged
+    assert_eq!(update.nodes.len(), 1, "{update:?}");
+    let body = update.nodes[0].scroll.expect("the body scrolls");
+    assert_eq!(body.offset, [0.0, 4.0], "{update:?}");
 }
 
 fn scroll_body(doc: &Rc<RefCell<Document>>, by: f32) {

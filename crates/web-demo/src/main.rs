@@ -71,6 +71,8 @@ fn start() -> Result<(), String> {
             .map(|hook| vapors_demos::limited(hook, frames)),
         None => shown.per_frame,
     };
-    let app = ElementsApp::new(shown.document).with_per_frame(per_frame);
+    let mut app = ElementsApp::new(shown.document).with_per_frame(per_frame);
+    // the page's hidden DOM mirror of the a11y tree (R6)
+    app.mirror_a11y(true).map_err(|e| e.to_string())?;
     run(options, app).map_err(|e| e.to_string())
 }

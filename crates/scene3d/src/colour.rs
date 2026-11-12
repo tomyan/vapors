@@ -13,6 +13,9 @@ pub struct Colour {
 }
 
 impl Colour {
+    /// Every channel 0: CSS's initial `color`.
+    pub const BLACK: Self = Self { rgb: [0.0; 3] };
+
     /// sRGB-encoded red, green and blue, each from 0 to 1.
     ///
     /// # Errors

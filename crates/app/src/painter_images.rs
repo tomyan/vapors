@@ -1,5 +1,6 @@
 //! The painter's images: each uploaded and bound once, while frames
-//! keep drawing it, and drawn stretched over its item's rect. The
+//! keep drawing it, and drawn stretched over its item's rect, from the
+//! run's quads kept in the image pipeline (`painter_kept.rs`). The
 //! binding is kept with the texture and dropped with it: an image
 //! registered again is another texture with its own binding.
 
@@ -7,7 +8,7 @@ use std::rc::Rc;
 
 use vapors_elements::Painted;
 use vapors_renderer::{
-    GpuWork, ImagePipeline, Sampling, Target, TextureBinding, WorkCounter,
+    GpuWork, ImagePipeline, KeptRange, Sampling, Target, TextureBinding, WorkCounter,
     upload_rgba8_mipmapped_counted,
 };
 use vapors_scene::{Item, RgbaImage};
@@ -45,18 +46,19 @@ impl Textures {
         self.uploaded.len() as u64
     }
 
-    /// Draws each image item of `items` with `pipeline`.
-    pub(super) fn draw(
+    /// Draws each image item of `items` with `pipeline`, over the quad
+    /// at its place in `kept`.
+    pub(super) fn draw_kept(
         &mut self,
         pipeline: &mut ImagePipeline,
         target: &Target<'_>,
         painted: &Painted,
-        items: &[Item],
+        (items, kept): (&[Item], &KeptRange),
     ) {
-        for item in items {
-            if let Item::Image { image, rect } = item {
+        for (place, item) in (0..).zip(items) {
+            if let Item::Image { image, .. } = item {
                 let bound = self.bound(pipeline, target, painted.image(*image));
-                pipeline.draw_rect(target, bound, *rect);
+                pipeline.draw_kept(target, bound, (kept, place));
             }
         }
     }

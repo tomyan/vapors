@@ -18,6 +18,7 @@ use crate::picker;
 use crate::redraw::RedrawFlag;
 use crate::waker::Waker;
 use crate::window::Message;
+use vapors_a11y::AxUpdate;
 
 /// Given to the app with every event.
 pub struct Platform {
@@ -30,6 +31,8 @@ pub struct Platform {
     // set to no field (`Some(None)`) differs from not set (`None`)
     #[allow(clippy::option_option)]
     text_field: RefCell<Option<Option<TextField>>>,
+    /// The a11y updates the app set, in order, until the loop takes them.
+    ax_updates: RefCell<Vec<AxUpdate>>,
 }
 
 impl Platform {
@@ -51,6 +54,7 @@ impl Platform {
             redraw: Arc::default(),
             cursor: Cell::new(None),
             text_field: RefCell::new(None),
+            ax_updates: RefCell::new(Vec::new()),
         }
     }
 
@@ -108,6 +112,21 @@ impl Platform {
     #[allow(clippy::option_option)]
     pub fn take_text_field(&self) -> Option<Option<TextField>> {
         self.text_field.borrow_mut().take()
+    }
+
+    /// An a11y update for the platform's mirror (the web page's hidden
+    /// DOM subtree, R6): set it after each frame that took one, from
+    /// `drawn`; the loop applies them in order. Natively no mirror
+    /// exists yet (R7), and an update set there stops the loop, named.
+    pub fn set_ax_update(&self, update: AxUpdate) {
+        self.ax_updates.borrow_mut().push(update);
+    }
+
+    /// The a11y updates set since the last take, in order: what the
+    /// loop applies, and a detached platform's tests read.
+    #[must_use]
+    pub fn take_ax_updates(&self) -> Vec<AxUpdate> {
+        std::mem::take(&mut *self.ax_updates.borrow_mut())
     }
 
     /// The states the window's device is watched into.

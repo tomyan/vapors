@@ -20,6 +20,7 @@ grid = ["taffy/grid"]
 
 [dependencies]
 vapors-dom.workspace = true
+vapors-a11y.workspace = true
 vapors-css.workspace = true
 vapors-scene.workspace = true
 vapors-text.workspace = true

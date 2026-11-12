@@ -33,7 +33,7 @@ impl Document {
     pub fn scroll_node_by(&mut self, container: NodeId, delta: [f32; 2]) -> bool {
         let moved = self.scroll.scroll(container, delta);
         if moved {
-            self.note_change();
+            self.note_scrolled(container);
         }
         moved
     }
@@ -49,9 +49,16 @@ impl Document {
             .scroll
             .scroll(element, [offset[0] - at[0], offset[1] - at[1]]);
         if moved {
-            self.note_change();
+            self.note_scrolled(element);
         }
         moved
+    }
+
+    /// Notes `container` scrolled: a change, and the a11y mirror reads
+    /// the container's offset at its next take.
+    fn note_scrolled(&mut self, container: NodeId) {
+        self.note_change();
+        self.ax.touch_node(container);
     }
 
     /// Shows or hides every scroll container's thumbs from the next

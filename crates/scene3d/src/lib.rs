@@ -29,6 +29,7 @@
 //! [`Meshes`] that validates them and holds them for each scene
 //! renderer (`vapors-scene3d-gpu`) to upload once.
 
+mod appearance;
 mod camera;
 mod colour;
 mod error;

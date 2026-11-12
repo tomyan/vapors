@@ -1,0 +1,99 @@
+//! The test page (`pages/scene_page.wisp`) mounted in a document, with
+//! its scene drawn by a `SceneRenderer` mounted on an `ElementsApp`.
+
+#![allow(dead_code)] // each test file uses part of it
+
+include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
+
+use scene_page::{ScenePage, ScenePageProps};
+use std::cell::RefCell;
+use std::rc::Rc;
+use vapors_app::{ElementsApp, SurfaceHandle};
+use vapors_elements::Document;
+use vapors_scene3d::{CameraHandle, Colour, Meshes, Projection, Scene, Transform, Vec3};
+use vapors_scene3d_gpu::SceneRenderer;
+use vapors_signals::Signal;
+use vapors_text::FontSystem;
+
+/// The page's signals, as the test writes them.
+pub struct Signals {
+    pub back: Signal<Transform>,
+    pub left: Signal<Transform>,
+    pub left_colour: Signal<Colour>,
+    pub shown: Signal<bool>,
+}
+
+pub struct Rig {
+    pub doc: Rc<RefCell<Document>>,
+    pub app: ElementsApp,
+    pub scene: Rc<RefCell<Scene>>,
+    pub meshes: Rc<RefCell<Meshes>>,
+    pub surface: SurfaceHandle,
+    pub page: ScenePage,
+    pub signals: Signals,
+}
+
+pub fn red() -> Colour {
+    Colour::srgb(1.0, 0.0, 0.0).unwrap()
+}
+
+pub fn at(x: f32) -> Transform {
+    Transform::from_translation(Vec3::new(x, 0.0, 0.0)).unwrap()
+}
+
+impl Rig {
+    /// The page mounted: a camera 5 units back looking at a red square
+    /// 1 unit wide at the origin, through an orthographic view 4 high.
+    pub fn new() -> Self {
+        let doc = Rc::new(RefCell::new(Document::new(FontSystem::bundle_only())));
+        let sheet = "html, body { margin: 0; background-color: #ffffff; }";
+        doc.borrow_mut().add_stylesheet("app.css", sheet).unwrap();
+        let mut app = ElementsApp::new(Rc::clone(&doc));
+        let scene = Rc::new(RefCell::new(Scene::new()));
+        let meshes = Rc::new(RefCell::new(Meshes::new()));
+        let renderer = SceneRenderer::new(Rc::clone(&scene), Rc::clone(&meshes));
+        let surface = app.mount("view", Box::new(renderer)).unwrap();
+        let square = square(&meshes);
+        let signals = Signals {
+            back: Signal::new(Transform::from_translation(Vec3::new(0.0, 0.0, 5.0)).unwrap()),
+            left: Signal::new(Transform::IDENTITY),
+            left_colour: Signal::new(red()),
+            shown: Signal::new(false),
+        };
+        let eye = CameraHandle::new();
+        let props = ScenePageProps {
+            scene: Some(Rc::clone(&scene)),
+            surface: Some(surface.clone()),
+            square: Some(square),
+            eye: Some(eye),
+            lens: Some(Projection::orthographic(4.0, 0.1, 100.0).unwrap()),
+            back: signals.back,
+            left: signals.left,
+            left_colour: signals.left_colour,
+            right: Signal::new(at(1.0)),
+            shown: signals.shown,
+            ..ScenePageProps::default()
+        };
+        let body = doc.borrow().body();
+        let page = ScenePage::mount(&doc, body, props);
+        Self {
+            doc,
+            app,
+            scene,
+            meshes,
+            surface,
+            page,
+            signals,
+        }
+    }
+}
+
+/// A square 1 unit wide in the XY plane, centred on the origin.
+pub fn square(meshes: &Rc<RefCell<Meshes>>) -> vapors_scene3d::GeometryId {
+    let corners = [(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)];
+    let positions = corners.map(|(x, y)| Vec3::new(x, y, 0.0)).to_vec();
+    meshes
+        .borrow_mut()
+        .geometry(positions, vec![0, 1, 2, 0, 2, 3])
+        .unwrap()
+}

@@ -7,7 +7,6 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::window::Window;
 
 use crate::PlatformError;
-use crate::event::Event;
 use crate::hidden_window::{MissAction, RETRY_AFTER, after_miss};
 use crate::input::Input;
 use crate::platform::Platform;
@@ -32,6 +31,9 @@ pub struct Handler {
     /// The page's text input, once the window is open (the web).
     #[cfg(target_family = "wasm")]
     text_bridge: Option<crate::text_bridge_web::TextBridge>,
+    /// The page's a11y mirror, once the window is open (the web).
+    #[cfg(target_family = "wasm")]
+    a11y: Option<a11y::WebMirror>,
     /// The system IME's composition over the focused field (native).
     #[cfg(not(target_family = "wasm"))]
     ime: std::cell::RefCell<crate::ime_state::ImeState>,
@@ -58,6 +60,8 @@ impl Handler {
             stopped_for_gpu: false,
             #[cfg(target_family = "wasm")]
             text_bridge: None,
+            #[cfg(target_family = "wasm")]
+            a11y: None,
             #[cfg(not(target_family = "wasm"))]
             ime: std::cell::RefCell::default(),
         }
@@ -85,40 +89,9 @@ impl Handler {
         {
             let proxy = self.platform.proxy();
             self.text_bridge = Some(crate::text_bridge_web::TextBridge::new(&proxy)?);
+            self.a11y = Some(a11y::WebMirror::new()?);
         }
         Ok(())
-    }
-
-    fn gpu_ready(&mut self, gpu: Gpu) {
-        let limits = gpu.limits();
-        crate::report::report_startup(&format!(
-            "adapter: {}; max texture {} px, max buffer {} MiB",
-            gpu.adapter_summary(),
-            limits.max_texture_dimension_2d,
-            limits.max_buffer_size >> 20
-        ));
-        self.gpu = Some(gpu);
-        if let Some(window) = &self.window {
-            let size = window.inner_size();
-            self.app.event(
-                Event::Resized {
-                    width: size.width,
-                    height: size.height,
-                },
-                &self.platform,
-            );
-            window.request_redraw();
-        }
-    }
-
-    /// A lost device or an error no scope caught stops the loop before
-    /// the next frame: no GPU call is made on it again, and the failure
-    /// is reported with the fix.
-    fn gpu_stop(&self) -> Option<PlatformError> {
-        let target = crate::device_lost::Target::this_build();
-        self.platform
-            .gpu_watch()
-            .stop(target, crate::report::app_name())
     }
 
     /// Carries out what the app asked for while it handled the events
@@ -141,22 +114,6 @@ impl Handler {
         crate::report::fatal(&error);
         self.error = Some(error);
         event_loop.exit();
-    }
-
-    /// Stop the loop with the GPU watch's error, if it has one: the GPU
-    /// is dropped so nothing calls it again, and the failure is reported
-    /// once however many paths see it. True when stopped.
-    fn stop_if_gpu_failed(&mut self, event_loop: &ActiveEventLoop) -> bool {
-        if self.stopped_for_gpu {
-            return true;
-        }
-        let Some(error) = self.gpu_stop() else {
-            return false;
-        };
-        self.stopped_for_gpu = true;
-        self.gpu = None;
-        self.fail(event_loop, error);
-        true
     }
 
     fn after_miss(&mut self, event_loop: &ActiveEventLoop, action: MissAction) {
@@ -210,11 +167,19 @@ impl Handler {
             Next::Wait | Next::WaitUntil(_) => {}
             Next::Exit => event_loop.exit(),
         }
+        // the frame's a11y update to the page's mirror; a refusal stops the loop
+        if let Err(error) = self.apply_ax_updates() {
+            self.fail(event_loop, error);
+        }
     }
 }
 
+#[path = "handler_a11y.rs"]
+mod a11y;
 #[path = "handler_events.rs"]
 mod events;
+#[path = "handler_gpu.rs"]
+mod gpu;
 
 #[path = "handler_text.rs"]
 mod text;

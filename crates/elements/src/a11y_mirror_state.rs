@@ -68,7 +68,11 @@ impl Default for AxMirror {
 impl AxMirror {
     /// Notes the boxes an update built, moved or freed, by their nodes.
     pub(crate) fn touch_slots(&mut self, changed: &ChangedSlots, slots: &Slots) {
-        if changed.every {
+        // a box made or unmade a containing block, or a positioned box
+        // freed, can change which parent node a node's box is placed in
+        // (hoisted or not) without moving it, so nothing touches it:
+        // every node is read again
+        if changed.every || changed.stackings.restacked {
             self.all = true;
             self.touched = Touched::default();
         }
@@ -81,6 +85,16 @@ impl AxMirror {
         }
         for (_, key) in &changed.freed {
             self.touched.nodes.insert(node_of(*key));
+        }
+    }
+
+    /// Notes `node` scrolled: its offset changed, which moves no box of
+    /// its own, and the boxes it moved are left out (`Placed::scrolled`).
+    /// An offset clamped by an update is read without this: the boxes
+    /// built, moved or freed inside it reach it as their ancestor.
+    pub(crate) fn touch_node(&mut self, node: NodeId) {
+        if !self.all {
+            self.touched.nodes.insert(node);
         }
     }
 

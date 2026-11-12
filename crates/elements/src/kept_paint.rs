@@ -34,7 +34,10 @@ impl PaintedFrom {
     /// kept, none built or moved, and the same thumbs and scale.
     pub(crate) fn shows(&self, now: &Self, changed: &ChangedSlots) -> bool {
         let same = (self.thumbs_shown, self.scale) == (now.thumbs_shown, now.scale);
-        same && !changed.every && changed.built() == 0 && changed.moved.is_empty()
+        same && !changed.every
+            && changed.built() == 0
+            && changed.moved.is_empty()
+            && changed.scrolled.is_empty()
     }
 }
 

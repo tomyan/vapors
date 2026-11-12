@@ -2,18 +2,13 @@
 //! tests hold (restyled, laid out, text built) and the structural work
 //! of each phase.
 
-use crate::document::Document;
-use crate::layout::LayoutWork;
-use crate::painted::Painted;
 use crate::splice_decline::SpliceDecline;
 
 /// Structural counts of the work the last [`Document::update`] did, for
-/// diagnostics and tests. They count units of work, not time.
-///
-/// Every count is reset to 0 when an update starts, and each phase sets
-/// its own as it runs, so a refused update reports the phases it ran
-/// and 0 for those after the refusal. Before the first update, all are
-/// 0.
+/// diagnostics and tests: units of work, not time. Every count resets
+/// to 0 when an update starts and each phase sets its own as it runs,
+/// so a refused update reports the phases it ran and 0 for those after
+/// the refusal; before the first update, all are 0.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct UpdateCounts {
@@ -88,6 +83,8 @@ pub struct UpdateCounts {
     /// Boxes not built again whose rect or padding changed since the
     /// last paint; 0 when nothing is kept.
     pub boxes_moved: usize,
+    /// Of `boxes_moved`, those scrolled alone (`Placed::scrolled`).
+    pub boxes_scrolled: usize,
     /// In-flow children chained to the slot they are placed in before
     /// the placement walk (M10b, `placement.rs`): those of each slot
     /// built again or laid out, each such slot once. 0 when nothing is
@@ -158,55 +155,4 @@ pub struct UpdateCounts {
     /// hover stands, as it does while an element holds the mouse
     /// capture (M11).
     pub hovers_tested: usize,
-}
-
-impl UpdateCounts {
-    /// Notes what layout did.
-    pub(crate) fn count_layout(&mut self, work: &LayoutWork) {
-        (self.boxes_laid_out, self.layout_calls) = (work.laid_out, work.calls);
-        self.size_answers_disowned = work.disowned;
-        let settled = work.settled;
-        (
-            self.owners_isolated,
-            self.owners_resized,
-            self.owners_uncompared,
-        ) = (settled.isolated, settled.resized, settled.uncompared);
-    }
-
-    /// Notes what paint drew into `painted`.
-    pub(crate) fn note_paint(&mut self, painted: &Painted) {
-        self.boxes_painted = painted.boxes_drawn;
-        self.boxes_shifted = painted.boxes_shifted;
-        self.parts_visited_kept = painted.parts_visited_kept;
-        self.scene_items_built = painted.items_built;
-        self.map_entries_patched = painted.maps_patched;
-        let walks = painted.order.walks;
-        (self.order_walks, self.chain_walks, self.clips_redone) =
-            (walks.order, walks.chains, walks.clips);
-        self.order_splices = walks.splices;
-        self.splices_declined = usize::from(walks.declined.is_some());
-        self.splice_decline = walks.declined;
-    }
-}
-
-impl Document {
-    /// The structural counts of the last update: see [`UpdateCounts`].
-    #[must_use]
-    pub fn update_counts(&self) -> UpdateCounts {
-        self.counts
-    }
-
-    /// How many elements the last update restyled: what the incremental
-    /// tests count, and what the `stress` demo shows.
-    #[must_use]
-    pub fn elements_restyled(&self) -> usize {
-        self.counts.elements_restyled
-    }
-
-    /// How many times the last update's layout laid a box out rather
-    /// than reading its cache: what the incremental tests count.
-    #[must_use]
-    pub fn boxes_laid_out(&self) -> usize {
-        self.counts.boxes_laid_out
-    }
 }

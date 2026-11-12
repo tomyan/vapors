@@ -11,9 +11,8 @@ use std::time::Duration;
 use vapors_elements::{Document, ShortcutModifier};
 use vapors_platform::{App, Event, Frame, Next, Platform, report_error};
 
-use crate::frame::FrameTimes;
-
 use crate::document_input::{DocumentInput, Unplaced};
+use crate::frame::FrameTimes;
 use crate::painter::ScenePainter;
 pub use decision::FrameDecision;
 pub use give::GiveError;
@@ -173,6 +172,7 @@ impl App for ElementsApp {
         self.surfaces.keep_waker(platform);
         self.surfaces.give_waker(self.painter.as_mut());
         self.mirror_text_field(platform);
+        self.hand_ax_update(platform);
     }
 }
 

@@ -5,7 +5,7 @@
 //! are culled when the scene is batched; a run clipped to nothing is not
 //! drawn, though its surfaces are refused as they would be in view.
 
-use vapors_elements::Painted;
+use vapors_elements::{BatchKey, Painted};
 use vapors_renderer::{ImagePipeline, QuadPipeline, ShadowPipeline, Target, clear_target};
 use vapors_scene::Run;
 use vapors_text::{AtlasConfig, GlyphAtlas, TextPipeline};
@@ -19,6 +19,7 @@ pub struct ScenePainter {
     images: ImagePipeline,
     textures: Textures,
     surfaces: Surfaces,
+    kept: KeptGpu,
     counts: FrameCounts,
 }
 
@@ -68,6 +69,7 @@ impl ScenePainter {
             images: ImagePipeline::new(device, format),
             textures: Textures::default(),
             surfaces: Surfaces::default(),
+            kept: KeptGpu::default(),
             counts: FrameCounts::default(),
         })
     }
@@ -86,6 +88,10 @@ impl ScenePainter {
     /// Draws the scene over what `target` already holds, with no clear
     /// and no canvas colour: where no element paints, the target is
     /// left as it was. For a document over an app's own drawing.
+    ///
+    /// Each call is one frame for the bytes kept between frames
+    /// (`painter_kept.rs`): draw a second document with a painter of its
+    /// own, or each call writes every batch the other released.
     ///
     /// # Errors
     ///
@@ -106,26 +112,29 @@ impl ScenePainter {
     /// Each run of the scene, in order, under its clip. A refused frame
     /// still ends the surfaces' frame: those it did not paint are inactive.
     /// It drops no texture, and its counts hold the bind groups still kept.
+    /// Every frame releases the kept bytes of the batches it did not draw.
     fn paint(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
         self.begin_counts();
         self.atlas.begin_frame();
         self.textures.begin_frame();
         self.surfaces.begin_frame();
+        self.kept.begin_frame();
         let runs = self.paint_runs(target, painted);
         self.surfaces.end_frame();
         if runs.is_ok() {
             self.textures.end_frame();
         }
+        self.release_undrawn();
         self.end_counts();
         runs
     }
 
     fn paint_runs(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
-        let batched = painted.batches(view(target));
-        self.counts.culled = batched.culled;
-        for batch in &batched.batches {
+        let kept = painted.kept_batches(view(target));
+        self.counts.culled = kept.batched.culled;
+        for (at, (batch, &key)) in kept.batched.batches.iter().zip(&kept.keys).enumerate() {
             match clipped(target, batch.clip).filter(|_| !batch.culled) {
-                Some(clipped) => self.draw_run(&clipped, painted, &batch.run)?,
+                Some(clipped) => self.draw_run(&clipped, painted, (&batch.run, key, at))?,
                 None => self
                     .surfaces
                     .check_clipped(target.device, painted, &batch.run)?,
@@ -141,9 +150,12 @@ impl ScenePainter {
         &mut self,
         target: &Target<'_>,
         painted: &Painted,
-        run: &Run,
+        (run, key, at): (&Run, BatchKey, usize),
     ) -> Result<(), PaintError> {
-        let result = self.issue_run(target, painted, run);
+        let result = match KeptKind::of_run(run) {
+            Some(_) => self.draw_retained(target, painted, (run, key, at)),
+            None => self.issue_run(target, painted, run),
+        };
         self.count_run(run);
         result?;
         target
@@ -152,8 +164,8 @@ impl ScenePainter {
             .map_or(Ok(()), |refused| Err(refused.into()))
     }
 
-    /// Issues `run`'s writes and draws; a refusal leaves those already
-    /// issued for the caller to count.
+    /// Issues a text or icon `run`'s writes and draws; a refusal leaves
+    /// those already issued for the caller to count.
     fn issue_run(
         &mut self,
         target: &Target<'_>,
@@ -161,14 +173,9 @@ impl ScenePainter {
         run: &Run,
     ) -> Result<(), PaintError> {
         match run {
-            Run::Shadows(shadows) => self.shadows.draw(target, shadows),
-            Run::Quads(quads) => self.quads.draw(target, quads),
             Run::Texts(items) => self.draw_texts(target, painted, items)?,
             Run::Icons(items) => self.draw_icons(target, painted, items)?,
-            Run::Images(items) => self.textures.draw(&mut self.images, target, painted, items),
-            Run::Surfaces(items) => self
-                .surfaces
-                .draw(&mut self.images, target, painted, items)?,
+            kept => unreachable!("{kept:?} is drawn from kept bytes (painter_kept.rs)"),
         }
         Ok(())
     }
@@ -179,6 +186,12 @@ mod region;
 use region::{clipped, view};
 #[path = "painter_counts.rs"]
 mod counts;
+#[path = "painter_kept.rs"]
+mod kept;
+use kept::{KeptGpu, Kind as KeptKind};
+#[cfg(debug_assertions)]
+#[path = "painter_kept_check.rs"]
+mod kept_check;
 pub use counts::FrameCounts;
 #[path = "painter_images.rs"]
 mod images;
