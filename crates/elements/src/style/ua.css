@@ -110,3 +110,9 @@ hr {
 /* The `hidden` attribute, as Chromium's sheet has it; an author's
    `display` wins over it. `hidden=until-found` is not modelled. */
 [hidden] { display: none; }
+
+/* The anchors of the 3D scene components (vapors-scene3d-components):
+   each is a keyed element in the document, for the cascade, with no
+   box, no paint and no place in the accessibility tree
+   (docs/plans/css-for-3d.md, section 4.1). */
+scene, group, mesh, camera, decal { display: none; }
