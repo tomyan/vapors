@@ -17,8 +17,9 @@ pub const BUDGET: Duration = Duration::from_micros(16_700);
 /// The most 1-minute load the run accepts: on a busy machine the times
 /// measure the other work. The limit is the finish line's method
 /// (docs/perf/timed-2026-11-12.md). Measured on the dev machine in the
-/// window of docs/perf/scene-run-2026-11-13.md: 0.73 to 0.82 at the
-/// starts and ends of three runs, so the run's own load stays below it.
+/// window of docs/perf/scene-run-2026-11-13/log.txt: 0.87 to 1.19 at
+/// the starts and ends of six back-to-back runs, so the run's own load
+/// stays below it.
 const MAX_LOAD: f64 = 1.5;
 
 /// How to run it again.
