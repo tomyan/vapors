@@ -14,8 +14,7 @@ use super::child_edits::Edits;
 use super::slots::{Key, Placed};
 use crate::arena::Arena;
 use crate::edit_decline::EditDecline;
-use crate::node_map::NodeMap;
-use crate::style::Used;
+use crate::style::UsedMap;
 
 /// A shallow owner's kept children: each element child whose box was a
 /// child of the owner's kept box and which still makes a box, with its
@@ -75,7 +74,7 @@ pub(super) enum Resolved {
 /// What resolving reads: the tree, the used styles, the kept boxes.
 pub(super) struct Resolver<'a> {
     pub(super) arena: &'a Arena,
-    pub(super) used: &'a NodeMap<Used>,
+    pub(super) used: &'a UsedMap,
     pub(super) placed: &'a Placed,
     pub(super) root: NodeId,
 }
@@ -187,7 +186,7 @@ enum Placement {
 
 /// Whether `node` makes a box of its own: not `display: none` and not
 /// inline.
-fn boxed(used: &NodeMap<Used>, node: NodeId) -> bool {
+fn boxed(used: &UsedMap, node: NodeId) -> bool {
     used.get(&node)
         .is_some_and(|style| style.layout.display != Display::None && !style.inline)
 }

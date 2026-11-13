@@ -12,11 +12,13 @@ pub mod cascade;
 pub mod error;
 pub mod parse;
 pub mod property;
+pub mod scope;
 pub mod selector;
 pub mod serialize;
 pub mod syntax;
 pub mod token;
 pub mod tree;
+pub mod user_agent;
 pub mod value;
 
 pub use error::{Error, Position, Result};

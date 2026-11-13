@@ -349,8 +349,8 @@ breaking.
 | `align-content` on the container other than `normal` or `start` | declined | shifts every child by the free space |
 | `direction: rtl`, `text-align`, `justify-items` | lane | cross-axis per child |
 | `writing-mode` vertical | declined | vapors does not lay it out |
-| Flex column, `flex-wrap: nowrap`, every item `flex-grow: 0`, `flex-shrink: 0` or the container's main size auto, `justify-content` `flex-start` or `normal`, no `order` | lane (PR 6) | the sum-plus-gaps fold; `align-items` is cross-axis per item |
-| Flex row (a horizontal list) | lane (PR 6, same code, axis swapped) | |
+| Flex column, `flex-wrap: nowrap`, every item `flex-grow: 0`, `flex-shrink: 0` or the container's main size auto, `justify-content` `flex-start` or `normal` | lane (PR 3f; every flex case in section 10.3) | the sum-plus-gaps fold; `align-items` is cross-axis per item |
+| Flex row (a horizontal list) | lane (PR 6, same code, axis swapped; section 10.6) | |
 | Flex with grow, shrink against a definite main size, `justify-content` centring or spacing, `order`, `flex-wrap: wrap` | declined | every item's size or position depends on the total |
 | Grid | declined, not planned | tracks are shared by several items; an insert moves items by cell |
 | `position: sticky` | n/a | refused by `style/position.rs:31` |
@@ -486,20 +486,21 @@ rows in `docs/perf/`, three runs, medians.
 
 | PR | Content | Accepted when | Owner, order |
 |---|---|---|---|
-| 0 | Measurement: `--scaling Insert` reports insert and remove frames apart (two medians per phase; the judge reads the worse); a `Remove` workload is not needed. Section 1.4 filled with the per-phase split and the counts | `docs/perf/splice-layout-<date>.md` with the split; no code change beyond the harness | this plan's author; first |
+| 0 | Measurement: `--scaling Insert` reports insert and remove frames apart (two medians per phase; the judge reads the worse); a `Remove` workload is not needed. Section 1.4 filled with the per-phase split and the counts | `docs/perf/splice-layout-<date>.md` with the split; no code change beyond the harness | this plan's author; first; #270 |
 | 1 | Built as 1a (layout: an insert or remove edits the owner's box children in place, `layout/child_edits.rs`, `slots_edit.rs`) and 1b (paint: the rest of this row). The splice follow-up (`docs/plans/splice.md` "As built"): `build_shallow` builds the owner's children from the kept box's children with the inserted slots put in after their previous element sibling's slot and the removed ones dropped (the children mark carries the nodes, `Marks::mark_child_inserted`), no walk over the DOM children; `Rebuilt::subtrees` keeps a count, not a clone; `plan` reads the old children by rank from the kept order; `spliced_steps` edits in place; drawn steps, hits and batches patched by the splice's edits instead of made afresh; `ClipTree::spliced` regroups the touched parents only | Insert at 3000 rows: `boxes_built` unchanged, build-phase and paint-phase instructions within an edit's except the shift (counted); `rebuild_check` and `kept_order_check` green | splice lane; before PR 3's acceptance number, not before its code |
-| 2 | `layout/lane_tree.rs`: the sum tree (B-tree, fanout 16, handles, parent links): insert after, insert first, remove, set, `start`, `between`, `total`, in-order iteration; the block fold of section 2.1 as a `Summary` type with `combine`; a property test over random edits against a sequential fold; the collapse-through join declined and tested | Unit tests; `cargo xtask lint`'s file sizes; no behaviour change | layout lane; with PR 0 |
-| 3 | The block lane in layout: `LaneDecline` from the used styles at build; `LayoutBox::lane: Option<Lane>` on the container, lent with its cache; `lane_block.rs`, the per-child layout mirroring taffy `block.rs`; `dispatch` routes a lane container to it; a lane child's `Layout.location` on the axis is zero and `BoxTree::location(slot)` derives it; `written.changed` not pushed for lane children whose summary is unchanged; `settle` updates a lane ancestor in place of clearing it; the layout check's tolerance; counts `lanes`, `lanes_declined`; a decline test per row of section 4 | Insert at 3000 rows: `layout_calls` the new row's plus a constant, `boxes_laid_out` the same; `--scaling Insert` `layout` phase within 2% across sizes; the Chromium layout fixtures unchanged; every decline reason tested | layout lane; after 2 |
+| 2 | `layout/lane_tree.rs`: the sum tree (B-tree, fanout 16, handles, parent links): insert after, insert first, remove, set, `start`, `between`, `total`, in-order iteration; generic over a `Summary` with `combine(left, right, gap)` and `start_of` (section 10.1); `BlockSummary` (the fold of section 2.1) and `FlexSummary` (10.2), each with a property test over random edits against a sequential fold; the collapse-through join declined and tested | Unit tests; `cargo xtask lint`'s file sizes; no behaviour change | layout lane; with PR 0 |
+| 3 | The block lane in layout: `LaneDecline` from the used styles at build; `LayoutBox::lane: Option<Lane>` on the container, lent with its cache; `lane_block.rs`, the per-child layout mirroring taffy `block.rs`; `dispatch` routes a lane container to it; a lane child's `Layout.location` on the axis is zero and `BoxTree::location(slot)` derives it; `written.changed` not pushed for lane children whose summary is unchanged; `settle` updates a lane ancestor in place of clearing it; the layout check's tolerance; counts `lanes`, `lanes_declined`; a decline test per row of section 4; flex containers declined as `FlexLaneNotBuilt` (10.6) | Insert at 3000 rows: `layout_calls` the new row's plus a constant, `boxes_laid_out` the same; `--scaling Insert` `layout` phase within 2% across sizes; the Chromium layout fixtures unchanged; every decline reason tested | layout lane; after 2 |
+| 3f | The flex column lane (section 10): `lane_flex.rs`, the per-item layout mirroring taffy `flexbox.rs` (10.5); a decline test per row of 10.3; `FlexInsert` on `rows_list.rs` | FlexInsert at 3000 rows: `layout_calls` the new row's plus a constant; `--scaling FlexInsert` `layout` within 2% across sizes; the Chromium layout fixtures unchanged | layout lane; after 3, before 4 |
 | 3b | The collapse-through join in the fold, with its test; absolute children of a lane container from the tree | the two declines of section 4 become lanes, each with a Chromium fixture | layout lane; any time after 3 |
 | 4 | Derived positions: `Placement` leaves a lane child's axis coordinate unstored and `rect(slot)` adds the chain's starts; the walk does not enter a lane child whose summary is unchanged; `moved` empty for them; a `restacked` set reported to the a11y take until PR 5 (5.3); parts, entries and hits of a lane child in its frame (its slot), on #248's naming; `Frames::at` lazy and memoised (5.4); `between(view)` for culling and for hit tests inside a lane (5.2) | Insert at 3000 rows: `boxes_placed` the new row's boxes plus the chain to the root, `boxes_moved` 0, `boxes_shifted` 0; `--scaling Insert` every phase but `accessibility` within 2% across sizes; pixels unchanged (the Chromium paint comparisons, the kept-paint debug check with translations); hit tests on the rows page unchanged (`sparse_updates` hover) | layout lane with the paint lane for `paint*.rs`, `kept_*.rs`; after 3 and IU4 4-ii |
 | 5 | The mirror in flow for lane children (5.3): `AxBounds::Stacked`, the mirror's `position: static` elements, the touched set after an insert; `--scaling Insert` judged `EveryPhase` | `accessibility` within 2% across sizes for Insert; the 5b oracle's bounds unchanged; `a11y_mirror_scroll.rs`-style tests for an insert | R6 owner; after 4, or in parallel on `vapors-a11y` and `vapors-platform` with the elements side stubbed |
-| 6 | Flex lanes: column and row, the sum-plus-gaps fold, the flex per-item layout (base size, hypothetical main size, stretch cross size) for the no-grow, no-shrink, nowrap case; `FlexInsert` workload on `rows_list.rs` | `--scaling FlexInsert` passes every phase; `sparse_updates_flex` counts | layout lane; after 4 |
+| 6 | Flex rows (a horizontal list): 3f's summary and per-item code on the other axis; the stretched-height refusal or `lane_relaid` count of 10.6 | a horizontal-list insert's `layout` within 2% across sizes; `sparse_updates_flex` counts | layout lane; after 4 |
 | 7 | Acceptance: Insert, Remove and Resize at 1000, 3000 and 10,000 rows, instruction counts, wall clock, in `docs/perf/`; property 3 marked held or not in `perf-finish-line.md`; `splice.md` (e) and `iu4.md` 8.5 closed | `--scaling Insert` and `Resize` pass `EveryPhase`; update under 1 ms at every size | last |
 
 Order: 0, 2, 3 can start now (2 and 3 touch `crates/elements/src/
 layout/` only, no file #248, #243 or the splice follow-up change); 1 is
 the splice lane's; 4 waits for IU4 4-ii's frame coordinates; 5 waits
-for 4 on the elements side; 6 after 4; 7 last. The estimates in
+for 4 on the elements side; 3f after 3 and before 4 (section 10.6); 6 after 4; 7 last. The estimates in
 section 6 assume PR 1 lands before PR 4's acceptance run.
 
 ## 8. Decisions for Tom
@@ -573,3 +574,193 @@ handles not indices (section 2 (b)).
 6. `--scaling Insert`'s median over alternating kinds hid the
    costlier kind (section 1.1); PR 0 (#270) reports each kind apart,
    with the split in `docs/perf/splice-layout-2026-11-13.md`.
+## 10. Block and flex in one lane
+
+Tom's decision 4 (2026-11-13): block and flex lanes designed together,
+so that the sum tree and derived positions serve both, with the flex
+cases that grow or shrink refused loudly and laid out by Taffy. This
+section is that design; it changes PRs 2, 3 and 6 of section 7 (10.6).
+Taffy line numbers are from the 0.15.1 pinned in `Cargo.toml`
+(`compute/flexbox.rs`, `compute/block.rs`).
+
+### 10.1 What the two share
+
+Everything outside the per-child layout and the fold:
+
+- **The tree.** One `LaneTree<S: Summary>` (`lane_tree.rs`, section 2
+  (b)): handles, parent links, fanout 16, `start`, `between`, `total`,
+  in-order iteration. `Summary` has `combine(left, right, gap) -> Self`
+  with `Default` as its identity; the tree holds the container's main-axis gap as one
+  `f64` and passes it to every `combine`, 0 for a block container
+  (`row-gap` does not apply to block layout). A change of gap is a
+  change to the container's style, which rebuilds the container's box
+  and with it the tree.
+- **Derived positions.** `start(handle)` is the child's border-box
+  offset along the axis in the container's content box. The tree folds
+  the leaves to the left of the handle (O(log n)) and calls
+  `S::start_of(left, leaf, gap)`, which each summary defines (10.2).
+  Placement, `Frames::at`, hits, culling and the extents index (5.2 to
+  5.4) read `start` and `between` and never ask which algorithm made
+  them.
+- **The cross-axis position**, stored per child as today: from the
+  container's inner cross size and the child's own size, margins and
+  alignment, never from its siblings.
+- **The container's answer.** `LaneAnswer` from the root's summary: the
+  content size along the axis, the first baseline, the min- and
+  max-content cross contributions (for the container's intrinsic
+  width), and the scrollable reach along the axis. Block adds the
+  collapsible margin sets the container passes to its parent (10.4).
+  Each algorithm turns its root summary into one `LaneAnswer`, and the
+  container's `LayoutOutput` is built from that in one place.
+- **`settle`** updates a lane ancestor in place of clearing it (section
+  2 (d)), for either kind of lane.
+- **`LaneDecline`**: one enum, one variant per refused case of either
+  algorithm (10.3 and section 4), counted in
+  `UpdateCounts::lanes_declined` by reason. A declined container is
+  laid out by Taffy, as today.
+- **The extents index.** A lane in a scroll frame is one entry in its
+  frame's index (IU4 PR 5, `docs/plans/iu4.md` section 4) holding the
+  lane's total extent and the largest overflow reach of its children;
+  the lane's visible children come from `between(view)`. An insert or
+  remove in the lane updates that one entry (its extent) and the tree;
+  the index is never rebuilt for a lane edit. Lead's requirement,
+  2026-11-13; built in PR 4.
+
+### 10.2 What differs: the summary and the per-child layout
+
+| | Block container | Flex column |
+|---|---|---|
+| Leaf summary | top margin set, border-box height, bottom margin set, collapses through, first baseline, overflow reach, min/max-content width | margin-box height, item count (1), base-size contribution, content contribution, first baseline, overflow reach, min/max-content width |
+| `combine` | section 2.1: heights added with the collapsed margin between L's bottom set and R's top set | heights added, plus one gap when both sides are non-empty; contributions added; counts added |
+| `start_of(left, leaf)` | `left`'s height, plus the margin collapsed from `left`'s bottom set and the leaf's top set; for the first child, its top margin unless it collapses with the container's (10.4) | `left`'s margin-box height, plus one gap per child in `left`, plus the leaf's top margin |
+| Content size along the axis | the root's height and the outer margins kept inside the container (10.4) | the definite-space branch: the root's base-size contribution plus gaps; the min- or max-content branch: the root's content contribution plus gaps (taffy `determine_container_main_size`, 1420-1560); either clamped by the container's min and max height |
+| Per-child layout | the non-float, same-BFC branch of `perform_final_layout_on_in_flow_children` (section 2 (a)) | the per-item steps of `compute_preliminary` for one item (10.5) |
+
+The reach and baseline folds are the same shape for both: the first
+baseline is the left side's if it has one, else the right side's moved
+by the left side's extent; the reach is the larger of the left side's
+reach and the right side's moved by the left side's extent (a max-plus
+fold, associative).
+
+The flex leaf carries two contributions because Taffy sizes a column
+container whose height is auto in two ways: with definite available
+height, the sum of each item's `max(flex_basis, min_height)` plus its
+margins, floored at its padding and border; with min- or max-content
+available height, the sum of each item's content contribution. Both
+are per item, so both are sums; the container picks the branch from
+its inputs as Taffy does.
+
+### 10.3 Flex cases
+
+The flex lane is a flex column whose items' sizes and positions do not
+depend on the total. Taffy lays out every case the lane refuses.
+
+| Case | Lane | Why |
+|---|---|---|
+| `flex-direction: column`, `flex-wrap: nowrap` | lane | one line; positions are a sum |
+| Every item `flex-grow: 0` | lane | the default; with grow above 0, positive free space (a definite height, a `min-height`, an item's max below its basis) is shared by every item |
+| Any item `flex-grow` above 0 | declined | as above |
+| Container height auto with no `max-height` | lane, whatever `flex-shrink` is | Taffy sizes the column at the sum of its items' contributions, each at least the item's flex base size (`max(flex_basis, min_height)` with definite available height; `inner.max(flex_basis)` for a column under min- or max-content), so free space is not negative and shrink does nothing. The debug layout check compares with Taffy on every test update, and PR 3f has a test with a `flex-basis` above the content and the default shrink |
+| Container definite `height` or a `max-height`, every item `flex-shrink: 0` | lane | shrink is off, so overflow leaves sizes alone |
+| Container definite `height` or a `max-height`, any item `flex-shrink` above 0 | declined in the first slice | an item shrinks when the total exceeds the height: depends on the total. This includes the scrolling list `height: 400px; overflow: auto` with the default `flex-shrink: 1`; the follow-up is in 10.6 |
+| `justify-content` `normal`, `flex-start`, `start`, `stretch` | lane | items packed from the start |
+| `justify-content` `flex-end`, `end`, `center`, `space-*` | declined | every item is moved by the free space |
+| `row-gap` (length or percentage) | lane | the gap is the container's; a percentage resolves against the container's inner height when definite, else to 0, as Taffy |
+| Main-axis `auto` margins on an item (`margin-top` or `margin-bottom: auto`) | declined | they take a share of the free space |
+| `align-items` or `align-self` `start`, `end`, `center`, `flex-start`, `flex-end`, `stretch`; cross-axis `auto` margins | lane | the cross position is per item, against the container's inner width |
+| `align-self: baseline` | declined | Taffy aligns participating items to the line's largest baseline (`calculate_children_base_lines`, 2046), which depends on every item |
+| `flex-basis` (any), item `min-height`, `max-height`, `aspect-ratio`, `%` sizes | lane | per item; a `%` resolves against the container's inner size only when that size is definite and not derived from the container's content (taffy `generate_anonymous_flex_items`, 783-789), a property of the container |
+| `position: relative` on an item | lane | the inset moves that item only |
+| Container `padding`, `border`, `min-height`, `overflow: scroll` or `auto` (with height auto) | lane | the container's own answer |
+| Container width not definite (the column is itself a row item or shrink-to-fit) with stretched items | lane, with a full relayout when the widest item changes | items stretch to the container's width, which is the widest item's contribution (a max fold). An insert that changes the max lays every item out again: correct and O(n), counted as `lane_relaid`; one that does not is O(log n). Block containers in shrink-to-fit width behave the same |
+| `flex-direction: column-reverse` | declined | positions run from the container's end, so every item moves when the total changes |
+| `flex-direction: row`, `row-reverse` | declined until PR 6 | 10.6 |
+| `flex-wrap: wrap`, `wrap-reverse` | declined | lines are formed from the running total |
+| Text or inline children, `display: contents` | declined | anonymous flex items, as for block (section 4) |
+| `position: absolute` children | declined, as block (section 4) | their static position is from the container's alignment |
+| `order` | n/a | not a property vapors reads (`crates/css/src/property/longhands.rs`); Taffy keeps tree order |
+
+### 10.4 Margins
+
+Block: margins collapse between siblings by the fold of section 2.1,
+and a child that collapses through is declined until PR 3b. The
+container's own top margin collapses with its first child's when the
+container has no top padding or border and does not establish a block
+formatting context (taffy `block.rs`, `own_margins_collapse_with_
+children`), and the same at the bottom. The root summary's top and
+bottom margin sets are then the container's collapsible margin sets in
+its `LayoutOutput`, and the first child's `start_of` leaves its top
+margin out; otherwise the first child's top margin is inside the
+container. Both cases are in PR 3's tests.
+
+Flex: margins never collapse. A flex container establishes a flex
+formatting context, so its margins do not collapse with its items',
+and items' margins do not collapse with each other's. An item's leaf
+height is its margin-top, border-box height and margin-bottom.
+
+In both, percentage margins and paddings resolve against the
+container's inner width (taffy `generate_anonymous_flex_items`,
+800-806, and `block.rs`'s `generate_item_list`), which an insert does
+not change; a width change marks every child, as in section 2 (a).
+
+### 10.5 The flex per-item layout
+
+Mirrored from taffy `compute/flexbox.rs` for one item, in the order
+`compute_preliminary` runs them, with the multi-item parts left out:
+
+1. The item's fields as `generate_anonymous_flex_items` (777-895) makes
+   them: sizes, min and max resolved against the percentage basis
+   above, margins, padding, border, `align-self`, `flex-basis`.
+2. Its flex base size and hypothetical main size
+   (`determine_flex_base_size`, 947-1231), with the container's
+   available space from `determine_available_space` (896-946),
+   computed once per container layout.
+3. Its target main size: the hypothetical main size, since grow is 0
+   and shrink does not apply in the lane's cases
+   (`resolve_flexible_lengths`, 1747, does nothing else for them).
+4. Its hypothetical cross size (`determine_hypothetical_cross_size`,
+   1945) and its used cross size, stretched to the container's inner
+   width when `is_stretched` (`determine_used_cross_size`, 2228-2281).
+   With one line and a definite container width the line's cross size
+   is that width (`calculate_cross_size`, 2128).
+5. Its cross-axis offset (`align_flex_items_along_cross_axis`, 2410,
+   and `resolve_cross_axis_auto_margins`, 2355, for one item).
+6. Its final layout (`calculate_flex_item`, 2557): `perform_child_
+   layout` with the target sizes, and its baseline and overflow for
+   the leaf.
+
+The mirrored lines carry Taffy's MIT copyright and licence notice and
+name the functions and lines they mirror, as `lane_block.rs` does for
+`block.rs` (decision 1).
+
+### 10.6 Effect on section 7
+
+- **PR 2** builds `LaneTree<S>` with both summaries, `BlockSummary` and
+  `FlexSummary`, each with a property test: random inserts, removes and
+  size changes fold to what a sequential pass over the children gives
+  (Taffy's running sum for block margins; the sum plus gaps for flex).
+- **PR 3** is the block lane and `LaneDecline` with every reason of
+  section 4 and 10.3; flex containers are declined in PR 3 with the
+  reason `FlexLaneNotBuilt`, so the count says what is not yet a lane.
+- **PR 3f** (new, after 3, before 4): the flex column lane, `lane_flex.
+  rs` (10.5), its declines each tested, and `FlexInsert` on the
+  flex-column list (`rows_list.rs`). Accepted as PR 3: `layout_calls`
+  the new row's plus a constant, `--scaling FlexInsert` `layout` within
+  2% across sizes. PR 4's derived positions then land on both kinds of
+  lane at once.
+- **PR 6** becomes flex rows (a horizontal list): the same summary and
+  per-item code on the other axis. Its extra refusal: a container whose
+  height is auto with stretched items, since every item's height is
+  the tallest item's (the max fold), so an insert of a taller item lays
+  out every item; accepted with `lane_relaid` counted, or declined if
+  the measurement shows the relayout common.
+- **PR 3s** (next after 3f, before 4; lead, 2026-11-13: scrolling
+  lists are a real-app case): the scrolling flex list with
+  shrinking items (10.3). An item shrinks only when the total exceeds
+  the container's height and the item's minimum main size is below
+  its hypothetical size, which is per item. The leaf would carry
+  "can shrink" (an OR fold), and a lane whose total exceeds its
+  definite height and whose fold says some item can shrink hands that
+  layout to Taffy, counted as a runtime decline. Rows with `overflow:
+  visible` and an auto height have a minimum equal to their content,
+  so in the usual list nothing can shrink and the lane holds.

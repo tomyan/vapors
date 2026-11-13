@@ -10,8 +10,6 @@ use std::collections::HashSet;
 
 use rustc_hash::FxHashMap;
 
-use crate::node_map::NodeMap;
-
 use vapors_dom::NodeId;
 
 use super::child_edits::ChildEdits;
@@ -20,7 +18,7 @@ use super::owners::{Resolved, Resolver};
 use super::slots::Placed;
 use crate::arena::Arena;
 use crate::edit_decline::EditDecline::MarkedInside;
-use crate::style::Used;
+use crate::style::UsedMap;
 
 /// What changed since the last update: every box, the boxes of these
 /// elements, or the children of these.
@@ -63,7 +61,7 @@ impl Marks {
     pub(crate) fn rebuild(
         &self,
         arena: &Arena,
-        used: &NodeMap<Used>,
+        used: &UsedMap,
         placed: &Placed,
         root: NodeId,
     ) -> Rebuild {
