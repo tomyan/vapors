@@ -119,10 +119,7 @@ impl ElementsApp {
         };
         self.check_format(frame.texture.format())?;
         if self.painter.is_none() {
-            let made = self
-                .make_painter(frame.device, frame.texture.format())
-                .map_err(|refused| refused.to_string())?;
-            self.painter = Some(made);
+            self.painter = Some(self.unstarted_painter(frame)?);
         }
         let scene_painter = self.painter.as_mut().expect("made above");
         self.surfaces

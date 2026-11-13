@@ -17,12 +17,7 @@ impl Handler {
             limits.max_texture_dimension_2d,
             limits.max_buffer_size >> 20
         ));
-        let started = self.start_app(&gpu);
         self.gpu = Some(gpu);
-        if let Err(error) = started {
-            self.fail(event_loop, error);
-            return;
-        }
         if let Some(window) = &self.window {
             let size = window.inner_size();
             self.app.event(
@@ -34,21 +29,23 @@ impl Handler {
             );
             window.request_redraw();
         }
+        self.start_when_sized(event_loop);
     }
 
-    /// The app's start on `gpu`, at the window's size, before the first
-    /// frame; refused when the window has no size yet.
-    fn start_app(&mut self, gpu: &Gpu) -> Result<(), PlatformError> {
-        let window = self
-            .window
-            .as_ref()
-            .ok_or_else(|| no_size("there is no window"))?;
+    /// The app's start, once: when the GPU is ready and the window has a
+    /// size, before the first frame (a window minimised at launch, or a
+    /// web canvas not yet laid out, starts at its first non-zero
+    /// resize). A refused start stops the loop.
+    pub(super) fn start_when_sized(&mut self, event_loop: &ActiveEventLoop) {
+        if self.started {
+            return;
+        }
+        let (Some(window), Some(gpu)) = (&self.window, &self.gpu) else {
+            return;
+        };
         let size = window.inner_size();
         if size.width == 0 || size.height == 0 {
-            return Err(no_size(&format!(
-                "the window is {}x{}",
-                size.width, size.height
-            )));
+            return;
         }
         let start = Start {
             adapter: &gpu.adapter,
@@ -59,7 +56,16 @@ impl Handler {
             height: size.height,
             scale_factor: window.scale_factor(),
         };
-        self.app.start(&start).map_err(PlatformError::Start)
+        let began = crate::Instant::now();
+        let started = self.app.start(&start);
+        self.started = true;
+        match started {
+            Ok(()) => crate::report::report_startup(&format!(
+                "start (before the first frame): {:.1} ms",
+                began.elapsed().as_secs_f64() * 1e3
+            )),
+            Err(message) => self.fail(event_loop, PlatformError::Start(message)),
+        }
     }
 
     /// A lost device or an error no scope caught stops the loop before
@@ -87,12 +93,4 @@ impl Handler {
         self.fail(event_loop, error);
         true
     }
-}
-
-/// The app cannot start: `why` the window's size is unknown.
-fn no_size(why: &str) -> PlatformError {
-    PlatformError::Start(format!(
-        "{why} when the GPU is ready, so the first frame's size is unknown; fix: give the \
-         window (on the web, the canvas) a size before the page loads the app"
-    ))
 }

@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use vapors_app::{ElementsApp, Invalidated, SurfaceHandle};
-use vapors_platform::{App, Event, Frame, Next, Platform, Waker};
+use vapors_platform::{App, Event, Frame, Next, Platform, Start, Waker};
 
 use super::script::script;
 use super::trace::Trace;
@@ -167,6 +167,10 @@ impl Checked {
 }
 
 impl App for Checked {
+    fn start(&mut self, start: &Start<'_>) -> Result<(), String> {
+        self.app.start(start)
+    }
+
     fn event(&mut self, event: Event, platform: &Platform) {
         self.waker.get_or_insert_with(|| platform.waker());
         self.app.event(event, platform);

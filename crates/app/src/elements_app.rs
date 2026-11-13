@@ -154,10 +154,9 @@ impl App for ElementsApp {
     }
 
     fn start(&mut self, start: &Start<'_>) -> Result<(), String> {
-        self.start_on(start).inspect_err(|message| {
-            report_error(message);
-            self.failure.set(message);
-        })
+        // the platform reports a refused start; the failure keeps it
+        self.start_on(start)
+            .inspect_err(|message| self.failure.set(message))
     }
 
     fn drawn(&mut self, platform: &Platform) {

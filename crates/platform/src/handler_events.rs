@@ -79,6 +79,7 @@ impl ApplicationHandler<Message> for Handler {
         {
             gpu.resize(size.width, size.height);
             self.platform.request_redraw();
+            self.start_when_sized(event_loop);
         }
         if shows_window(&event) {
             self.platform.request_redraw();

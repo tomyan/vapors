@@ -18,7 +18,7 @@ use std::rc::Rc;
 use vapors_app::ElementsApp;
 use vapors_elements::Document;
 use vapors_pixels::{DEFAULT_VIEWPORT, Image, Spec, failures, parse, section};
-use vapors_platform::{App, Event, Frame, Next, Platform, WindowOptions, run};
+use vapors_platform::{App, Event, Frame, Next, Platform, Start, WindowOptions, run};
 
 fn main() -> ExitCode {
     match start() {
@@ -122,6 +122,10 @@ impl Shot {
 }
 
 impl App for Shot {
+    fn start(&mut self, start: &Start<'_>) -> Result<(), String> {
+        self.app.start(start)
+    }
+
     fn event(&mut self, event: Event, platform: &Platform) {
         self.app.event(event, platform);
     }

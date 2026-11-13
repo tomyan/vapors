@@ -111,7 +111,26 @@ fn gpu_a_frame_in_another_format_than_the_start_is_refused_naming_both() {
     // Then
     let failure = app.failure().get().unwrap_or_default();
     assert!(
-        failure.contains("Rgba8Unorm") && failure.contains("Bgra8Unorm"),
+        failure.contains("Rgba8Unorm")
+            && failure.contains("Bgra8Unorm")
+            && failure.contains("fix: give App::start the format"),
         "{failure}"
+    );
+}
+
+#[test]
+fn gpu_a_second_start_is_refused_naming_the_fix() {
+    // Given
+    let (mut app, _, gpu) = rig();
+    start(&mut app, &gpu).expect("starts");
+
+    // When
+    let again = start(&mut app, &gpu);
+
+    // Then
+    let error = again.expect_err("started twice");
+    assert!(
+        error.contains("after the app's painter was made") && error.contains("fix:"),
+        "{error}"
     );
 }
