@@ -1,25 +1,30 @@
-//! An icon's path: the subset of SVG path data docs/icons.md lists
-//! (`M L H V A Z`, absolute and relative, with implicit repeats), read
-//! strictly into zeno's commands. Anything else is refused at the first
-//! character not understood, never drawn approximately.
+//! SVG path data in the subset docs/icons.md lists (`M L H V C Q A Z`,
+//! absolute and relative, with implicit repeats), read strictly into
+//! absolute [`Segment`]s, and from those zeno's commands for the icon
+//! route. Anything else is refused at the first character not
+//! understood, never drawn approximately. The smooth curves `S` and `T`
+//! come with docs/plans/svg-support.md V1.
 
-use zeno::{Angle, ArcSize, ArcSweep, Command, PathBuilder, Point};
+use zeno::{Command, Point};
 
 use crate::path_lex::Cursor;
 pub use crate::path_lex::PathError;
+use crate::segment::{Segment, to_zeno};
 
-/// Path data that parsed, as zeno commands in viewBox units.
+/// Path data that parsed: its segments, absolute, in viewBox units,
+/// and zeno's commands for them.
 #[derive(Clone, Debug, PartialEq)]
 pub struct IconPath {
+    segments: Vec<Segment>,
     commands: Vec<Command>,
 }
 
 impl IconPath {
-    /// Reads `data`, an SVG `d` attribute in the icon subset.
+    /// Reads `data`, an SVG `d` attribute in the subset.
     ///
     /// # Errors
     /// [`PathError`] at the first character not understood: empty data,
-    /// data not starting with a move, a command outside `M L H V A Z`,
+    /// data not starting with a move, a command outside `M L H V C Q A Z`,
     /// or a missing or malformed number or arc flag.
     pub fn parse(data: &str) -> Result<Self, PathError> {
         let mut cursor = Cursor::new(data);
@@ -33,18 +38,54 @@ impl IconPath {
             return Err(cursor
                 .error("path data must start with M or m; write M x y before the first command"));
         }
-        let mut commands = Vec::new();
+        let mut pen = Pen::default();
         while !cursor.at_end() {
-            segment(&mut cursor, &mut commands)?;
+            command(&mut cursor, &mut pen)?;
             cursor.skip_space();
         }
-        Ok(Self { commands })
+        let commands = to_zeno(&pen.segments);
+        Ok(Self {
+            segments: pen.segments,
+            commands,
+        })
     }
 
-    /// The commands, in viewBox units.
+    /// The segments, absolute, in viewBox units.
+    #[must_use]
+    pub fn segments(&self) -> &[Segment] {
+        &self.segments
+    }
+
+    /// zeno's commands for the segments (arcs as curves), in viewBox
+    /// units.
     #[must_use]
     pub fn commands(&self) -> &[Command] {
         &self.commands
+    }
+}
+
+/// The segments so far and where the pen is: the current point, which
+/// relative commands add to, and the subpath's start, where a close
+/// returns it.
+#[derive(Default)]
+struct Pen {
+    segments: Vec<Segment>,
+    current: Point,
+    start: Point,
+}
+
+impl Pen {
+    fn push(&mut self, segment: Segment) {
+        self.current = match segment {
+            Segment::Move(p) => {
+                self.start = p;
+                p
+            }
+            Segment::Line(p) | Segment::Quad(_, p) | Segment::Cubic(_, _, p) => p,
+            Segment::Arc { to, .. } => to,
+            Segment::Close => self.start,
+        };
+        self.segments.push(segment);
     }
 }
 
@@ -55,6 +96,8 @@ enum Verb {
     Line,
     Horizontal,
     Vertical,
+    Cubic,
+    Quadratic,
     Arc,
     Close,
 }
@@ -67,6 +110,8 @@ impl Verb {
             b'L' => Self::Line,
             b'H' => Self::Horizontal,
             b'V' => Self::Vertical,
+            b'C' => Self::Cubic,
+            b'Q' => Self::Quadratic,
             b'A' => Self::Arc,
             b'Z' => Self::Close,
             _ => return None,
@@ -77,17 +122,18 @@ impl Verb {
 
 /// One command letter and its argument groups, repeated while numbers
 /// follow (a move's repeats are lines).
-fn segment(cursor: &mut Cursor<'_>, out: &mut Vec<Command>) -> Result<(), PathError> {
+fn command(cursor: &mut Cursor<'_>, pen: &mut Pen) -> Result<(), PathError> {
     let letter = cursor.peek().expect("not at the end");
     let (mut verb, relative) = Verb::of(letter).ok_or_else(|| cursor.error(unknown(cursor)))?;
     cursor.advance();
     if verb == Verb::Close {
-        out.close();
+        pen.push(Segment::Close);
         return Ok(());
     }
     cursor.refuse_comma_after_command()?;
     loop {
-        group(cursor, verb, relative, out)?;
+        let from = if relative { pen.current } else { Point::ZERO };
+        pen.push(group(cursor, verb, from, pen.current)?);
         if verb == Verb::Move {
             verb = Verb::Line;
         }
@@ -100,83 +146,57 @@ fn segment(cursor: &mut Cursor<'_>, out: &mut Vec<Command>) -> Result<(), PathEr
 /// Why the character at the cursor is not a command of the subset.
 fn unknown(cursor: &Cursor<'_>) -> String {
     let found = cursor.found();
-    if matches!(
-        cursor.peek(),
-        Some(b'C' | b'c' | b'S' | b's' | b'Q' | b'q' | b'T' | b't')
-    ) {
+    if matches!(cursor.peek(), Some(b'S' | b's' | b'T' | b't')) {
         return format!(
-            "{found} (a curve) is not in the icon subset, which draws M L H V A Z; draw it with lines (L) and arcs (A)"
+            "{found} (a smooth curve) is not in the subset, which draws M L H V C Q A Z; write it as C or Q with the reflected control point"
         );
     }
     format!(
-        "expected a command, one of M L H V A Z (lower case for relative), found {found}; write the segment with those commands"
+        "expected a command, one of M L H V C Q A Z (lower case for relative), found {found}; write the segment with those commands"
     )
 }
 
-/// One argument group of `verb`, added to `out`.
+/// One argument group of `verb`: its points are added to `from` (the
+/// current point when the command is relative, else zero); `current`
+/// supplies the coordinate an `H` or `V` keeps.
 fn group(
     cursor: &mut Cursor<'_>,
     verb: Verb,
-    relative: bool,
-    out: &mut Vec<Command>,
-) -> Result<(), PathError> {
-    let from = if relative {
-        out.current_point()
-    } else {
-        Point::ZERO
-    };
-    match verb {
-        Verb::Move => out.move_to(point(cursor)? + from),
-        Verb::Line => out.line_to(point(cursor)? + from),
-        Verb::Horizontal => axis_line(out, [Some(cursor.number()? + from.x), None]),
-        Verb::Vertical => axis_line(out, [None, Some(cursor.number()? + from.y)]),
-        Verb::Arc => arc(cursor, from, out)?,
+    from: Point,
+    current: Point,
+) -> Result<Segment, PathError> {
+    Ok(match verb {
+        Verb::Move => Segment::Move(point(cursor)? + from),
+        Verb::Line => Segment::Line(point(cursor)? + from),
+        Verb::Horizontal => Segment::Line(Point::new(cursor.number()? + from.x, current.y)),
+        Verb::Vertical => Segment::Line(Point::new(current.x, cursor.number()? + from.y)),
+        Verb::Quadratic => Segment::Quad(point(cursor)? + from, point(cursor)? + from),
+        Verb::Cubic => Segment::Cubic(
+            point(cursor)? + from,
+            point(cursor)? + from,
+            point(cursor)? + from,
+        ),
+        Verb::Arc => arc(cursor, from)?,
         Verb::Close => unreachable!("a close takes no arguments"),
-    };
-    Ok(())
+    })
 }
 
 fn point(cursor: &mut Cursor<'_>) -> Result<Point, PathError> {
     Ok(Point::new(cursor.number()?, cursor.number()?))
 }
 
-/// A line to `[x, y]`, keeping the current coordinate where one is `None`.
-fn axis_line(out: &mut Vec<Command>, [x, y]: [Option<f32>; 2]) -> &mut Vec<Command> {
-    let current = out.current_point();
-    out.line_to(Point::new(x.unwrap_or(current.x), y.unwrap_or(current.y)))
-}
-
-/// An arc to its end point. A zero radius is a straight line (SVG 2
-/// 9.5.1), which zeno would turn into NaN; zeno takes negative radii as
-/// absolute, scales radii too small up, and skips an end point equal to
-/// the current point, as SVG says.
-fn arc<'a>(
-    cursor: &mut Cursor<'_>,
-    from: Point,
-    out: &'a mut Vec<Command>,
-) -> Result<&'a mut Vec<Command>, PathError> {
-    let (rx, ry, angle) = (cursor.number()?, cursor.number()?, cursor.number()?);
-    let (size, sweep) = (arc_size(cursor)?, arc_sweep(cursor)?);
+/// An arc: radii, rotation, the two flags and the end point.
+fn arc(cursor: &mut Cursor<'_>, from: Point) -> Result<Segment, PathError> {
+    let radii = [cursor.number()?, cursor.number()?];
+    let rotation = cursor.number()?;
+    let (large, sweep) = (cursor.flag()?, cursor.flag()?);
     let to = point(cursor)? + from;
-    if rx == 0.0 || ry == 0.0 {
-        return Ok(out.line_to(to));
-    }
-    Ok(out.arc_to(rx, ry, Angle::from_degrees(angle), size, sweep, to))
-}
-
-fn arc_size(cursor: &mut Cursor<'_>) -> Result<ArcSize, PathError> {
-    Ok(if cursor.flag()? {
-        ArcSize::Large
-    } else {
-        ArcSize::Small
-    })
-}
-
-fn arc_sweep(cursor: &mut Cursor<'_>) -> Result<ArcSweep, PathError> {
-    Ok(if cursor.flag()? {
-        ArcSweep::Positive
-    } else {
-        ArcSweep::Negative
+    Ok(Segment::Arc {
+        radii,
+        rotation,
+        large,
+        sweep,
+        to,
     })
 }
 
@@ -187,6 +207,10 @@ mod tests;
 #[cfg(test)]
 #[path = "path_arc_tests.rs"]
 mod arc_tests;
+
+#[cfg(test)]
+#[path = "path_curve_tests.rs"]
+mod curve_tests;
 
 #[cfg(test)]
 #[path = "path_refusals_tests.rs"]
