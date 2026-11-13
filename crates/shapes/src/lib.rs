@@ -8,8 +8,10 @@
 mod geometry;
 mod path;
 mod path_lex;
+mod shape_id;
 mod table;
+mod table_error;
 
 pub use geometry::{Geometry, MeshVertex, check_geometry};
 pub use path::{IconPath, PathError};
-pub use table::{ShapeEntry, ShapeId, ShapeTable, TableError};
+pub use table::{ShapeEntry, ShapeId, ShapeIndex, ShapeTable, TABLE_FORMAT, TableError};

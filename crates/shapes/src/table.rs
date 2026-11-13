@@ -7,34 +7,24 @@
 //! registry checks each at the merge; nothing is drawn from a table
 //! that fails.
 
-use std::fmt;
+use std::collections::HashMap;
 
 use crate::geometry::{Geometry, check_geometry};
+pub use crate::shape_id::{ShapeId, ShapeIndex};
+use crate::table_error::EMITTER;
+pub use crate::table_error::TableError;
 
-/// A shape the process registry has taken from a crate's table: the
-/// index into the registry's merged entries. Issued by the registry
-/// alone, once per distinct shape in the process.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct ShapeId(u32);
-
-impl ShapeId {
-    /// The id of the registry's entry `index`.
-    #[must_use]
-    pub const fn new(index: u32) -> Self {
-        Self(index)
-    }
-
-    /// The index into the registry's merged entries.
-    #[must_use]
-    pub const fn index(self) -> u32 {
-        self.0
-    }
-}
+/// The format of a table's canonical bytes and geometry. A table built
+/// by a compiler with another format is refused at the merge: equal
+/// canonical bytes must mean equal geometry across crates (D3), and a
+/// changed flattening tolerance or tessellator changes this number.
+pub const TABLE_FORMAT: u32 = 1;
 
 /// One crate's shapes, emitted by the compiler as a `static`.
 #[derive(Debug)]
 pub struct ShapeTable {
     crate_name: &'static str,
+    format: u32,
     entries: &'static [ShapeEntry],
 }
 
@@ -48,46 +38,25 @@ pub struct ShapeEntry {
     /// change the mesh. Two entries with equal bytes are one shape.
     pub canonical: &'static [u8],
     /// The hash of `canonical`; equal hashes are compared by bytes at
-    /// the registry's merge.
+    /// the registry's merge. Unverified until S2 brings the hash
+    /// function, when [`ShapeTable::check`] recomputes it.
     pub hash: u64,
     /// What is drawn.
     pub geometry: Geometry,
 }
 
-/// Why a table was refused: which crate's, which entry, and what is
-/// wrong. The table is the compiler's output, so the fix is there.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct TableError {
-    /// The crate whose table it is.
-    pub crate_name: &'static str,
-    /// The refused entry's site, or `None` for a lookup past the end.
-    pub site: Option<&'static str>,
-    /// What is wrong.
-    pub reason: String,
-}
-
-impl fmt::Display for TableError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "shape table of crate {}", self.crate_name)?;
-        if let Some(site) = self.site {
-            write!(f, ", entry at {site}")?;
-        }
-        write!(
-            f,
-            ": {}; the table is emitted by vapors-compiler from the crate's templates, so fix the emitter",
-            self.reason
-        )
-    }
-}
-
-impl std::error::Error for TableError {}
-
 impl ShapeTable {
-    /// The table of `crate_name` holding `entries`.
+    /// The table of `crate_name` holding `entries`, in `format`
+    /// ([`TABLE_FORMAT`] of the compiler that emitted it).
     #[must_use]
-    pub const fn new(crate_name: &'static str, entries: &'static [ShapeEntry]) -> Self {
+    pub const fn new(
+        crate_name: &'static str,
+        format: u32,
+        entries: &'static [ShapeEntry],
+    ) -> Self {
         Self {
             crate_name,
+            format,
             entries,
         }
     }
@@ -98,8 +67,7 @@ impl ShapeTable {
         self.crate_name
     }
 
-    /// Every entry, in the compiler's order; an element's emitted code
-    /// names its shape by index here.
+    /// Every entry, in the compiler's order.
     #[must_use]
     pub const fn entries(&self) -> &'static [ShapeEntry] {
         self.entries
@@ -109,56 +77,110 @@ impl ShapeTable {
     ///
     /// # Errors
     /// [`TableError`] when `index` is past the end, naming the crate.
-    pub fn entry(&self, index: usize) -> Result<&'static ShapeEntry, TableError> {
-        self.entries.get(index).ok_or_else(|| TableError {
-            crate_name: self.crate_name,
-            site: None,
-            reason: format!(
-                "entry {index} was named but the table holds {}",
-                self.entries.len()
-            ),
-        })
+    pub fn entry(&self, index: ShapeIndex) -> Result<&'static ShapeEntry, TableError> {
+        self.entries
+            .get(index.get() as usize)
+            .ok_or_else(|| TableError {
+                crate_name: self.crate_name,
+                site: None,
+                reason: format!(
+                    "entry {} was named but the table holds {}",
+                    index.get(),
+                    self.entries.len()
+                ),
+                fix: EMITTER,
+            })
     }
 
-    /// Whether every entry can be drawn and the table holds each shape
-    /// once: the first entry that cannot is refused, naming it.
+    /// Whether the table is in this crate's format, every entry can be
+    /// drawn and names its site and bytes, and the table holds each
+    /// shape once: the first fault is refused, naming it. One pass
+    /// over the entries (1.3: the merge is O(entries)).
     ///
     /// # Errors
-    /// [`TableError`] for a geometry that cannot be drawn
-    /// ([`check_geometry`]), or for two entries with one hash: the same
+    /// [`TableError`] for another [`TABLE_FORMAT`], an empty crate
+    /// name, site or canonical bytes, a geometry that cannot be drawn
+    /// ([`check_geometry`]), or two entries with one hash: the same
     /// bytes (the compiler deduplicates, so a repeat is its bug) or
     /// different bytes (a collision the registry would also refuse).
     pub fn check(&self) -> Result<(), TableError> {
+        self.check_format()?;
+        let mut seen: HashMap<u64, usize> = HashMap::with_capacity(self.entries.len());
         for (index, entry) in self.entries.iter().enumerate() {
-            check_geometry(&entry.geometry).map_err(|reason| self.refuse(entry, reason))?;
-            if let Some(earlier) = self.entries[..index].iter().find(|e| e.hash == entry.hash) {
-                return Err(self.refuse(entry, hash_shared(earlier, entry)));
+            check_entry(entry).map_err(|reason| self.refuse(entry, reason, EMITTER))?;
+            if let Some(earlier) = seen.insert(entry.hash, index) {
+                return Err(self.hash_shared(&self.entries[earlier], entry));
             }
         }
         Ok(())
     }
 
-    fn refuse(&self, entry: &ShapeEntry, reason: String) -> TableError {
+    fn check_format(&self) -> Result<(), TableError> {
+        if self.crate_name.is_empty() {
+            return Err(self.refuse_table("the crate name is empty".to_owned(), EMITTER));
+        }
+        if self.format != TABLE_FORMAT {
+            return Err(self.refuse_table(
+                format!(
+                    "is in table format {} and this vapors-shapes reads format {TABLE_FORMAT}",
+                    self.format
+                ),
+                "build every crate with one vapors-compiler, the one this runtime matches",
+            ));
+        }
+        Ok(())
+    }
+
+    /// Why `entry`, whose hash `earlier` already has, is refused.
+    fn hash_shared(&self, earlier: &ShapeEntry, entry: &ShapeEntry) -> TableError {
+        if earlier.canonical == entry.canonical {
+            let reason = format!(
+                "is the same shape as the entry at {}; one crate's table holds each shape once",
+                earlier.site
+            );
+            return self.refuse(entry, reason, EMITTER);
+        }
+        let reason = format!(
+            "has the hash {:#x} of the entry at {} with different canonical bytes; a hash names one shape",
+            entry.hash, earlier.site
+        );
+        self.refuse(
+            entry,
+            reason,
+            "change one shape's canonical bytes (another stroke width, or a point added to the path), or widen the hash",
+        )
+    }
+
+    fn refuse(&self, entry: &ShapeEntry, reason: String, fix: &'static str) -> TableError {
         TableError {
             crate_name: self.crate_name,
             site: Some(entry.site),
             reason,
+            fix,
+        }
+    }
+
+    fn refuse_table(&self, reason: String, fix: &'static str) -> TableError {
+        TableError {
+            crate_name: self.crate_name,
+            site: None,
+            reason,
+            fix,
         }
     }
 }
 
-/// Why `entry`, whose hash `earlier` already has, is refused.
-fn hash_shared(earlier: &ShapeEntry, entry: &ShapeEntry) -> String {
-    if earlier.canonical == entry.canonical {
-        return format!(
-            "is the same shape as the entry at {}; one crate's table holds each shape once",
-            earlier.site
+/// Why `entry` is wrong on its own, if it is.
+fn check_entry(entry: &ShapeEntry) -> Result<(), String> {
+    if entry.site.is_empty() {
+        return Err("the site is empty; an entry names where its shape was written".to_owned());
+    }
+    if entry.canonical.is_empty() {
+        return Err(
+            "the canonical bytes are empty; an entry carries its shape's canonical form".to_owned(),
         );
     }
-    format!(
-        "has the hash {:#x} of the entry at {} with different canonical bytes; a hash names one shape",
-        entry.hash, earlier.site
-    )
+    check_geometry(&entry.geometry)
 }
 
 #[cfg(test)]
