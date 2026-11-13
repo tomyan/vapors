@@ -7,6 +7,7 @@
 //! baseline in docs/perf.
 
 pub mod args;
+pub mod args_off_path;
 pub mod circuit;
 pub mod driver;
 pub mod gpu_reading;
@@ -18,6 +19,10 @@ pub mod mount;
 pub mod mount_memory;
 pub mod mount_report;
 pub mod mount_run;
+pub mod off_path;
+pub mod off_path_kinds;
+pub mod off_path_page;
+pub mod off_path_scrollers;
 pub mod racer;
 pub mod racer_driven;
 pub mod racer_input;
