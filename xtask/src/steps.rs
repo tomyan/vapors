@@ -4,7 +4,7 @@
 //! show within the first minute.
 
 pub use crate::step::Step;
-use crate::steps_checks::{builds, files, imports, layers};
+use crate::steps_checks::{builds, files, imports, layers, nightly, nightly_issues};
 
 #[path = "steps_tiers.rs"]
 mod tiers;
@@ -124,6 +124,8 @@ pub fn ci(web_package: &str) -> Vec<Step> {
         layers(),
         builds(),
         imports(),
+        nightly(),
+        nightly_issues(),
         deny(),
         clippy(),
         wasm(web_package),
@@ -145,7 +147,16 @@ pub fn deny_check() -> Vec<Step> {
 
 /// Formatting and lints only.
 pub fn lint() -> Vec<Step> {
-    vec![fmt(), files(), layers(), builds(), imports(), clippy()]
+    vec![
+        fmt(),
+        files(),
+        layers(),
+        builds(),
+        imports(),
+        nightly(),
+        nightly_issues(),
+        clippy(),
+    ]
 }
 
 /// The unit tier.

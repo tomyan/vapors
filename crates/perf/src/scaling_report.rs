@@ -96,6 +96,11 @@ pub fn verdict(change: RowChange, title: &str, scaling: &Scaling) -> Result<Stri
         Judged::EveryPhase => format!(
             "scaling: pass, every {title} phase within {TOLERANCE_PERCENT}% or {MIN_GROWTH_INSTRUCTIONS} instructions of its 1000-row count"
         ),
+        Judged::EveryPhaseRelaxed { phase, percent } => format!(
+            "scaling: pass, every {title} phase within {TOLERANCE_PERCENT}% ({phase} {percent}%, \
+             relaxed: crates/perf/src/scaling_judged.rs) or {MIN_GROWTH_INSTRUCTIONS} instructions \
+             of its 1000-row count"
+        ),
     })
 }
 

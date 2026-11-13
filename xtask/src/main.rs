@@ -52,6 +52,19 @@ mod lock_owner;
 mod pixels;
 mod precompress;
 mod priority;
+mod quality;
+mod quality_attrs;
+mod quality_chains;
+mod quality_clippy;
+mod quality_collect;
+mod quality_complexity;
+mod quality_distributions;
+mod quality_join;
+mod quality_lines;
+mod quality_macros;
+mod quality_measure;
+mod quality_stats;
+mod quality_thresholds;
 mod queue;
 mod queue_act;
 mod queue_checks;
@@ -83,6 +96,7 @@ mod report;
 #[path = "report_timeout_tests.rs"]
 mod report_timeout_tests;
 mod run_tmp;
+mod scaling;
 mod sccache;
 #[cfg(test)]
 mod scratch;
@@ -140,6 +154,7 @@ use clap::Parser;
 
 use cli::{Cli, Command, Tier};
 
+#[allow(clippy::too_many_lines)] // the command dispatch, one arm per command
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let reporter = report::Reporter::new(cli.verbose);
@@ -147,6 +162,10 @@ fn main() -> ExitCode {
         Command::Setup { ci } => return setup::run(ci),
         Command::CheckTools => return setup::check(),
         Command::CheckFiles => return files::run(),
+        Command::Quality {
+            distributions,
+            list,
+        } => return quality::run(distributions, list),
         Command::CheckLayers => return layers::run(),
         Command::CheckBuilds => return builds::run(),
         Command::CheckImports => return imports::run(),
@@ -185,6 +204,7 @@ fn main() -> ExitCode {
         Command::Gate { pr: None } => return gate::run(&reporter),
         Command::Gate { pr: Some(number) } => return gate_pr_real::run(number),
         Command::Queue { dry_run } => return queue::run(dry_run),
+        Command::Scaling => return scaling::run(&reporter),
         Command::Lint => steps::lint(),
         Command::Deny => steps::deny_check(),
         Command::Test { tier: Tier::Unit } => steps::unit_tests(),

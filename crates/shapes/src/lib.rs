@@ -8,10 +8,12 @@
 mod geometry;
 mod path;
 mod path_lex;
+mod segment;
 mod shape_id;
 mod table;
 mod table_error;
 
 pub use geometry::{Geometry, MeshVertex, check_geometry};
 pub use path::{IconPath, PathError};
+pub use segment::{Pen, Segment, to_zeno};
 pub use table::{ShapeEntry, ShapeId, ShapeIndex, ShapeTable, TABLE_FORMAT, TableError};

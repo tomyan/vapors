@@ -13,10 +13,20 @@ use crate::scaling::PhaseSeries;
 /// room over the 0.06% repeat noise. It holds until the splice step
 /// bounds what an insert moves (property 3 of
 /// `docs/plans/perf-finish-line.md`).
-pub const INSERT_A11Y_PER_ROW: u64 = 9500;
+///
+/// Relaxed from 9500 (2026-11-13): main measured 9538, 9541.5 and 9542
+/// per row, the accessibility mirror's per-row cost since #258 tracks
+/// hoisted nodes; 9600 is that rounded up to the next hundred, ten
+/// times the repeat noise. Layout-lane PR 5 (the accessibility mirror
+/// in flow, `docs/plans/splice-layout.md`) retires it, restoring 9500.
+pub const INSERT_A11Y_PER_ROW: u64 = 9600;
 
 /// As [`INSERT_A11Y_PER_ROW`] for `Resize`: recorded at 12,021.
-pub const RESIZE_A11Y_PER_ROW: u64 = 13_000;
+///
+/// Relaxed from 13,000 (2026-11-13) for the same reason: main measured
+/// 13,443 and 13,446.3 per row. Layout-lane PR 5 retires it, restoring
+/// 13,000.
+pub const RESIZE_A11Y_PER_ROW: u64 = 13_500;
 
 /// As [`INSERT_A11Y_PER_ROW`] for `Scroll`: the phase is flat (6789 at
 /// every size: the take reads the scrolled container alone, its rows'
@@ -31,11 +41,30 @@ pub const SCROLL_A11Y_PER_ROW: u64 = 1;
 /// "After PR 5a".
 pub const SCROLL_SIZE_A11Y_PER_ROW: u64 = 1;
 
+/// The tolerance for `FlexText`'s `frame (CPU)`, in percent, in place of
+/// [`crate::scaling::TOLERANCE_PERCENT`].
+///
+/// Relaxed from 2% (2026-11-13, lead decision): a one-time step from
+/// 1,000 to 3,000 rows, then flat; about 60% is glibc malloc on a larger
+/// heap (2.0-2.3% under glibc, 0.9% under jemalloc), the remaining
+/// ~2.9k instructions unidentified. Retired when the residual's source
+/// is found and the allocator part is removed (style-allocations S1 or
+/// an allocator decision), then 2% again.
+pub const FLEX_TEXT_FRAME_PERCENT: u64 = 3;
+
 /// Which phases a change is judged on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Judged {
     /// Every phase: an edit's work should not depend on size.
     EveryPhase,
+    /// [`Judged::EveryPhase`], with `phase` held to `percent` in place of
+    /// the tolerance: a declared relaxation, its reason at its constant.
+    EveryPhaseRelaxed {
+        /// The phase whose tolerance is relaxed.
+        phase: &'static str,
+        /// Its tolerance, in percent.
+        percent: u64,
+    },
     /// The accessibility phase alone, held to `ceiling` instructions
     /// per extra row: the change moves every row below it, and the
     /// mirror's take reads each moved row (`docs/plans/r6.md`, "Known
@@ -55,11 +84,13 @@ impl Judged {
     #[must_use]
     pub fn of(change: RowChange) -> Self {
         match change {
-            RowChange::Idle
-            | RowChange::Text
-            | RowChange::FlexText
-            | RowChange::Class
-            | RowChange::HoveredClass => Self::EveryPhase,
+            RowChange::FlexText => Self::EveryPhaseRelaxed {
+                phase: "frame (CPU)",
+                percent: FLEX_TEXT_FRAME_PERCENT,
+            },
+            RowChange::Idle | RowChange::Text | RowChange::Class | RowChange::HoveredClass => {
+                Self::EveryPhase
+            }
             // style flat since docs/perf/insert-style-2026-11-13.md
             RowChange::Insert => Self::AccessibilityPerRow {
                 ceiling: INSERT_A11Y_PER_ROW,
