@@ -60,15 +60,15 @@ pub(crate) struct Blocks<T> {
 
 impl<T> Blocks<T> {
     /// The list of `items`, already in order.
-    pub(crate) fn from_sorted(mut items: Vec<T>) -> Self {
+    /// Each block is made with a block's slots: splitting the list's
+    /// own `Vec` would leave each head with the capacity of everything
+    /// after it, n²/256 slots in all (395,632 for 10,000 items).
+    pub(crate) fn from_sorted(items: Vec<T>) -> Self {
         let len = items.len();
         let mut chunks = Vec::with_capacity(len.div_ceil(CAP));
-        while items.len() > CAP {
-            let rest = items.split_off(CAP);
-            chunks.push(std::mem::replace(&mut items, rest));
-        }
-        if !items.is_empty() {
-            chunks.push(items);
+        let mut items = items.into_iter();
+        while items.len() > 0 {
+            chunks.push(items.by_ref().take(CAP).collect());
         }
         Self {
             chunks,
@@ -88,6 +88,12 @@ impl<T> Blocks<T> {
     /// How many blocks hold the items.
     pub(crate) fn block_count(&self) -> usize {
         self.chunks.len()
+    }
+
+    /// Slots the blocks hold, used or not.
+    #[cfg(test)]
+    pub(crate) fn capacity(&self) -> usize {
+        self.chunks.iter().map(Vec::capacity).sum()
     }
 
     /// Items moved by every insert and remove so far.
