@@ -17,7 +17,7 @@
 use rustc_hash::FxHashMap;
 use vapors_scene::Item;
 
-use crate::blocks::{Blocks, Pos};
+use crate::blocks::Blocks;
 use crate::drawn_steps::DrawnSteps;
 use crate::kept_box::KeptBox;
 use crate::paint_order::Step;
@@ -61,11 +61,14 @@ struct FrameIndex {
 type At = (usize, f32, bool);
 
 /// Every frame's index, and where each place's entry is.
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default)]
 pub(crate) struct Extents {
     frames: FxHashMap<usize, FrameIndex>,
     /// By place: where the step's entry is, if it draws.
     at: Vec<Option<At>>,
+    /// Times a patch made the index afresh since the last take, for
+    /// `UpdateCounts`.
+    rebuilds: usize,
 }
 
 impl Extents {
@@ -83,6 +86,7 @@ impl Extents {
         let mut extents = Self {
             frames: FxHashMap::default(),
             at: vec![None; places],
+            rebuilds: 0,
         };
         let mut short: FxHashMap<usize, Vec<Entry>> = FxHashMap::default();
         for (frame, entry) in entries {
@@ -112,7 +116,9 @@ impl Extents {
     ) {
         let entries: usize = self.frames.values().map(|index| index.entries.len()).sum();
         if steps.len() > REBUILD.max(entries / 16) {
+            let rebuilds = self.rebuilds + 1;
             *self = Self::of(drawn, places, boxes);
+            self.rebuilds = rebuilds;
             return;
         }
         assert_eq!(
@@ -136,16 +142,6 @@ impl Extents {
     /// How many items every drawing step paints.
     pub(crate) fn items(&self) -> u64 {
         self.frames.values().map(|index| index.items).sum()
-    }
-}
-
-impl FrameIndex {
-    /// Takes `entries`, in any order, as the short entries, each with
-    /// its reach.
-    fn sorted(&mut self, mut entries: Vec<Entry>) {
-        entries.sort_unstable_by(order);
-        self.entries = Blocks::from_sorted(entries);
-        self.reach_from(Pos::default(), usize::MAX);
     }
 }
 

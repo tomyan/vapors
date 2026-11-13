@@ -9,13 +9,14 @@
 mod support;
 
 use support::rows_page::{Edit, rows_page, rows_viewport};
+use vapors_elements::UpdateCounts;
 
-/// `blocks.rs` `CAP`, the most entries one index moves per patch; two
-/// indexes are patched.
-const BLOCK: usize = 128;
+/// The most entries one index moves per patch; two indexes are patched.
+const BLOCK: usize = UpdateCounts::INDEX_BLOCK;
 
 /// Toggles the middle row's class on `rows` rows, once each way, and
-/// holds the entries moved under two blocks each time.
+/// holds the entries moved under two blocks each time, by a patch (no
+/// order walk, no rebuild of the extents index) that moved something.
 fn assert_moves_at_most_two_blocks(rows: usize) {
     // Given
     let page = rows_page(rows);
@@ -23,18 +24,34 @@ fn assert_moves_at_most_two_blocks(rows: usize) {
     for kind in ["added", "removed"] {
         // When: the middle row's background comes and goes
         page.edit(Edit::ToggleClass);
-        let moved = {
+        let counts = {
             let mut doc = page.doc.borrow_mut();
             doc.update(rows_viewport()).expect("updates");
-            doc.update_counts().index_entries_moved
+            doc.update_counts()
         };
 
         // Then
+        let case = format!("{rows} rows, class {kind}");
+        assert_eq!(
+            (counts.order_walks, counts.index_rebuilds),
+            (0, 0),
+            "{case}: the indexes were made afresh, not patched (paint_partial.rs \
+             drawn_updated, frame_extents.rs REBUILD); the count of entries moved says \
+             nothing then"
+        );
+        let moved = counts.index_entries_moved;
         assert!(
-            moved <= 2 * BLOCK,
-            "{rows} rows, class {kind}: the indexes moved {moved} entries, over two blocks \
-             of {BLOCK}; a patch moved an index's tail (blocks.rs, drawn_steps.rs, \
-             frame_extents_patch.rs)"
+            moved > 0,
+            "{case}: the patches moved no entry, so the step did not change the indexes \
+             (drawn_steps.rs, frame_extents_patch.rs)"
+        );
+        let most = 2 * BLOCK + counts.index_blocks;
+        assert!(
+            moved <= most,
+            "{case}: the indexes moved {moved} entries, over two blocks of {BLOCK} and \
+             their {} block pointers; a patch moved an index's tail (blocks.rs, \
+             drawn_steps.rs, frame_extents_patch.rs)",
+            counts.index_blocks
         );
     }
 }

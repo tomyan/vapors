@@ -3,21 +3,27 @@
 //! where it sorts to the same position, else taken out and put back,
 //! and the reaches after it are made again until one is unchanged.
 
-use super::{Entry, Extents, FrameIndex, entry, missing, order};
-use crate::blocks::Pos;
+use super::{Blocks, Entry, Extents, FrameIndex, entry, missing, order};
+use crate::blocks::{IndexCounts, Pos};
 use crate::drawn_steps::draws;
 use crate::kept_box::KeptBox;
 use crate::paint_order::Step;
 
 impl Extents {
-    /// The entries the patches since the last take moved (`blocks.rs`),
-    /// for `UpdateCounts`; a frame dropped with its last entry takes
-    /// its count with it.
-    pub(crate) fn take_moved(&mut self) -> usize {
-        self.frames
-            .values_mut()
-            .map(|index| index.entries.take_moved())
-            .sum()
+    /// What the patches since the last take did (`blocks.rs`
+    /// `IndexCounts`): entries moved (a frame dropped with its last
+    /// entry takes its count with it), rebuilds, and the blocks held.
+    pub(crate) fn take_counts(&mut self) -> IndexCounts {
+        let indexes = self.frames.values_mut();
+        let (moved, blocks) = indexes.fold((0, 0), |(moved, blocks), index| {
+            let entries = &mut index.entries;
+            (moved + entries.take_moved(), blocks + entries.block_count())
+        });
+        IndexCounts {
+            moved,
+            rebuilds: std::mem::take(&mut self.rebuilds),
+            blocks,
+        }
     }
 
     /// The entry at `place` made again from `step`'s part in `boxes`:
@@ -135,5 +141,22 @@ impl FrameIndex {
             }
             (entry.reach, reach) = (now, now);
         }
+    }
+}
+
+impl PartialEq for Extents {
+    /// The same entries in the same frames, whatever the patches did.
+    fn eq(&self, other: &Self) -> bool {
+        self.frames == other.frames && self.at == other.at
+    }
+}
+
+impl FrameIndex {
+    /// Takes `entries`, in any order, as the short entries, each with
+    /// its reach.
+    pub(super) fn sorted(&mut self, mut entries: Vec<Entry>) {
+        entries.sort_unstable_by(order);
+        self.entries = Blocks::from_sorted(entries);
+        self.reach_from(Pos::default(), usize::MAX);
     }
 }

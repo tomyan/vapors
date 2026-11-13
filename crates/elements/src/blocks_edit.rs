@@ -31,7 +31,7 @@ impl<T> Blocks<T> {
     /// it falls in.
     fn split(&mut self, pos: Pos) -> Pos {
         let upper = self.chunks[pos.block].split_off(CAP / 2);
-        self.moved += upper.len();
+        self.moved += upper.len() + (self.chunks.len() - pos.block - 1);
         self.chunks.insert(pos.block + 1, upper);
         if pos.at <= CAP / 2 {
             return pos;
@@ -45,13 +45,13 @@ impl<T> Blocks<T> {
     /// Puts `item` after the last, in the last block when it has room;
     /// where it is.
     fn push_last(&mut self, item: T) -> Pos {
-        let last = self.chunks.len().saturating_sub(1);
+        let block = self.chunks.len().saturating_sub(1);
         match self.chunks.last_mut() {
-            Some(block) if block.len() < CAP => {
-                block.push(item);
+            Some(last) if last.len() < CAP => {
+                last.push(item);
                 Pos {
-                    block: last,
-                    at: block.len() - 1,
+                    block,
+                    at: last.len() - 1,
                 }
             }
             _ => {
@@ -64,8 +64,9 @@ impl<T> Blocks<T> {
         }
     }
 
-    /// Takes the item at `pos` out, dropping a block it empties; the
-    /// item and the position of the one after it.
+    /// Takes the item at `pos` out, dropping a block it empties (which
+    /// moves the block pointers after it); the item and the position
+    /// of the one after it.
     ///
     /// # Panics
     /// When `pos` holds no item.
@@ -77,15 +78,20 @@ impl<T> Blocks<T> {
         self.moved += tail;
         if emptied {
             self.chunks.remove(pos.block);
+            self.moved += self.chunks.len() - pos.block;
         }
-        let next = match self.chunks.get(pos.block) {
+        (item, self.after_removal(pos))
+    }
+
+    /// The position of the item after one just removed at `pos`.
+    fn after_removal(&self, pos: Pos) -> Pos {
+        match self.chunks.get(pos.block) {
             Some(block) if pos.at < block.len() => pos,
             Some(_) => Pos {
                 block: pos.block + 1,
                 at: 0,
             },
             None => self.end(),
-        };
-        (item, next)
+        }
     }
 }

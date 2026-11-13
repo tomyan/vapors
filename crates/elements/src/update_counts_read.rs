@@ -7,6 +7,10 @@ use crate::painted::Painted;
 use crate::update_counts::UpdateCounts;
 
 impl UpdateCounts {
+    /// The most entries one of paint's ordered indexes moves per patch
+    /// besides block pointers: `blocks.rs` `CAP`, the block size.
+    pub const INDEX_BLOCK: usize = crate::blocks::CAP;
+
     /// Notes what layout did.
     pub(crate) fn count_layout(&mut self, work: &LayoutWork) {
         (self.boxes_laid_out, self.layout_calls) = (work.laid_out, work.calls);
@@ -26,7 +30,9 @@ impl UpdateCounts {
         self.parts_visited_kept = painted.parts_visited_kept;
         self.scene_items_built = painted.items_built;
         self.map_entries_patched = painted.maps_patched;
-        self.index_entries_moved = painted.index_entries_moved;
+        let indexes = painted.index_counts;
+        (self.index_entries_moved, self.index_rebuilds) = (indexes.moved, indexes.rebuilds);
+        self.index_blocks = indexes.blocks;
         let walks = painted.order.walks;
         (self.order_walks, self.chain_walks, self.clips_redone) =
             (walks.order, walks.chains, walks.clips);

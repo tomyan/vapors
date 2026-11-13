@@ -23,9 +23,9 @@ fn a_step_that_starts_drawing_among_many_moves_at_most_a_block_of_entries() {
         &mut boxes,
         (middle, part(PAGE, &[row(at(middle))])),
     );
-    let put_in = patched.take_moved();
+    let put_in = patched.take_counts().moved;
     painted_again(&mut patched, &mut boxes, (middle, part(PAGE, &[])));
-    let taken_out = patched.take_moved();
+    let taken_out = patched.take_counts().moved;
 
     // Then
     assert!(put_in <= crate::blocks::CAP, "put in moved {put_in}");

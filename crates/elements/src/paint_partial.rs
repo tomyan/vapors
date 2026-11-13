@@ -11,6 +11,7 @@
 //! walked in paint order (`scene_view.rs`, `drawn_steps.rs`); it
 //! equals a full paint's, which a debug build checks (`kept_paint.rs`).
 
+use crate::blocks::IndexCounts;
 use crate::changed_slots::ChangedSlots;
 use crate::drawn_steps::DrawnSteps;
 use crate::frame_extents::Extents;
@@ -157,7 +158,8 @@ fn drawn_updated(
         None => HitsChanged::Unknown,
     };
     batches_patched(painted, patched);
-    painted.index_entries_moved = painted.drawn.take_moved() + painted.extents.take_moved();
+    let drawn = painted.drawn.take_counts();
+    painted.index_counts = drawn.and(painted.extents.take_counts());
 }
 
 /// `painted`'s extents index patched for the `patched` slots' steps.
@@ -188,7 +190,7 @@ fn restarted(mut last: Painted, started: &Painted) -> (Painted, Option<KeptOrder
     (last.canvas, last.canvas_from) = (started.canvas, started.canvas_from);
     last.scale = started.scale;
     (last.boxes_drawn, last.items_built, last.parts_visited_kept) = (0, 0, 0);
-    (last.boxes_shifted, last.index_entries_moved) = (0, 0);
+    (last.boxes_shifted, last.index_counts) = (0, IndexCounts::default());
     (last, Some(order))
 }
 

@@ -6,7 +6,7 @@
 //! The drawing steps are kept in blocks (`blocks.rs`), so a step put
 //! in or taken out moves at most a block's tail, not the page's.
 
-use crate::blocks::Blocks;
+use crate::blocks::{Blocks, IndexCounts};
 use crate::kept_box::KeptBox;
 use crate::paint_order::Step;
 
@@ -60,10 +60,14 @@ impl DrawnSteps {
         }
     }
 
-    /// The entries the patches since the last take moved (`blocks.rs`),
-    /// for `UpdateCounts`.
-    pub(crate) fn take_moved(&mut self) -> usize {
-        self.drawn.take_moved()
+    /// The entries the patches since the last take moved and the blocks
+    /// held (`blocks.rs` `IndexCounts`), for `UpdateCounts`.
+    pub(crate) fn take_counts(&mut self) -> IndexCounts {
+        IndexCounts {
+            moved: self.drawn.take_moved(),
+            rebuilds: 0,
+            blocks: self.drawn.block_count(),
+        }
     }
 
     /// The steps that draw, in paint order.

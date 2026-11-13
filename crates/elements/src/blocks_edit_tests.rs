@@ -90,7 +90,7 @@ fn removing_every_item_leaves_no_block() {
 }
 
 #[test]
-fn an_insert_or_remove_moves_at_most_a_block_of_items() {
+fn an_insert_or_remove_moves_at_most_a_block_of_items_and_the_block_pointers() {
     // Given
     let mut blocks = counted(40 * CAP);
 
@@ -102,10 +102,45 @@ fn an_insert_or_remove_moves_at_most_a_block_of_items() {
     let after_remove = blocks.moved() - after_insert;
 
     // Then
-    assert!(after_insert <= CAP, "insert moved {after_insert} items");
-    assert!(after_remove <= CAP, "remove moved {after_remove} items");
+    let most = CAP + blocks.block_count();
+    assert!(after_insert <= most, "insert moved {after_insert} items");
+    assert!(after_remove <= most, "remove moved {after_remove} items");
     assert!(
         after_insert > 0 && after_remove > 0,
         "a middle insert moves the block's tail"
     );
+}
+
+#[test]
+fn a_split_counts_the_block_pointers_moved_after_it() {
+    // Given: three full blocks
+    let mut blocks = counted(3 * CAP);
+
+    // When: an item goes in at the front of the first, which splits
+    blocks.insert(Pos::default(), usize::MAX);
+
+    // Then: the upper half, the two block pointers after the first
+    // block, and the lower half's tail after the item
+    assert_eq!(blocks.block_count(), 4);
+    assert_eq!(blocks.moved(), CAP / 2 + 2 + CAP / 2);
+}
+
+#[test]
+fn an_emptied_block_counts_the_block_pointers_moved_after_it() {
+    // Given: three full blocks, the middle one down to one item
+    let mut blocks = counted(3 * CAP);
+    let first_of_middle = blocks.partition_point(|&item| item < CAP);
+    for _ in 1..CAP {
+        blocks.remove(first_of_middle);
+    }
+    assert_eq!(blocks.block_count(), 3);
+    let before = blocks.moved();
+
+    // When: its last item goes
+    let (gone, next) = blocks.remove(first_of_middle);
+
+    // Then: no tail, one block pointer (the last block's) moved
+    assert_eq!(gone, 2 * CAP - 1);
+    assert_eq!(blocks.get(next), Some(&(2 * CAP)));
+    assert_eq!(blocks.moved() - before, 1);
 }

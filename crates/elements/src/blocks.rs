@@ -12,9 +12,9 @@
 //! position after the last block. The layout lane's sum tree
 //! (`docs/plans/splice-layout.md`) may converge with this type later.
 
-/// The most items in a block: 128 entries of 48 bytes are 6 KB, under
-/// a page of 10,000 rows' half (360 KB) by sixty times, and a split
-/// copies half of it.
+/// The most items in a block: 128 entries of 48 bytes are 6 KB,
+/// against 240 KB for half of 10,000 rows' entries, and a split copies
+/// half of it.
 pub(crate) const CAP: usize = 128;
 
 /// A place in the list: the block and the offset within it. The
@@ -25,13 +25,36 @@ pub(crate) struct Pos {
     at: usize,
 }
 
+/// What an update's patches did to the two indexes kept in blocks,
+/// for `UpdateCounts`: entries moved (block pointers counted as one),
+/// times the extents index was made afresh inside a patch, and the
+/// blocks both hold after it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct IndexCounts {
+    pub(crate) moved: usize,
+    pub(crate) rebuilds: usize,
+    pub(crate) blocks: usize,
+}
+
+impl IndexCounts {
+    /// Both indexes' counts together.
+    pub(crate) fn and(self, other: Self) -> Self {
+        Self {
+            moved: self.moved + other.moved,
+            rebuilds: self.rebuilds + other.rebuilds,
+            blocks: self.blocks + other.blocks,
+        }
+    }
+}
+
 /// The list; see the module.
 #[derive(Debug)]
 pub(crate) struct Blocks<T> {
     chunks: Vec<Vec<T>>,
     len: usize,
-    /// Items moved by every insert and remove so far, for the tests
-    /// that pin the per-row work.
+    /// Items moved by every insert and remove so far, a block pointer
+    /// moved in the block list counting as one, for the tests that pin
+    /// the per-row work.
     moved: usize,
 }
 
@@ -63,7 +86,6 @@ impl<T> Blocks<T> {
     }
 
     /// How many blocks hold the items.
-    #[cfg(test)]
     pub(crate) fn block_count(&self) -> usize {
         self.chunks.len()
     }

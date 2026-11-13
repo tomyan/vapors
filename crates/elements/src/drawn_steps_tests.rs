@@ -111,10 +111,10 @@ fn a_step_put_in_among_many_moves_at_most_a_block_of_entries() {
     // When
     boxes[middle] = Some(kept(true, false, false));
     drawn.patch([middle].into_iter(), &boxes);
-    let put_in = drawn.take_moved();
+    let put_in = drawn.take_counts().moved;
     boxes[middle] = Some(kept(false, false, false));
     drawn.patch([middle].into_iter(), &boxes);
-    let taken_out = drawn.take_moved();
+    let taken_out = drawn.take_counts().moved;
 
     // Then
     assert!(put_in <= crate::blocks::CAP, "put in moved {put_in}");
