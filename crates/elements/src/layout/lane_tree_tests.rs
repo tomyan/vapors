@@ -37,7 +37,8 @@ fn each_child_starts_after_those_before_it_and_their_gaps() {
 
     // Then
     for (index, &handle) in handles.iter().enumerate() {
-        assert_eq!(tree.start(handle), 12.0 * index as f64, "child {index}");
+        let index_f64 = f64::from(u32::try_from(index).expect("100 children"));
+        assert_eq!(tree.start(handle), 12.0 * index_f64, "child {index}");
     }
     assert_eq!(tree.total().outer(2.0), 100.0 * 12.0 - 2.0);
     assert_eq!(tree.handles(), handles);
@@ -84,7 +85,10 @@ fn a_remove_closes_the_gap_and_frees_emptied_nodes() {
     // Then
     assert_eq!(tree.start(handles[38]), 0.0);
     assert_eq!(tree.start(handles[39]), 12.0);
-    assert!(tree.nodes[tree.root].leaf, "a root with one child is dropped");
+    assert!(
+        tree.nodes[tree.root].leaf,
+        "a root with one child is dropped"
+    );
 }
 
 #[test]

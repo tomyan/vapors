@@ -87,8 +87,9 @@ impl BlockSummary {
 
     /// The run's height with its first top and last bottom margins.
     pub(crate) fn outer(&self) -> f64 {
-        self.0
-            .map_or(0.0, |run| run.top.resolve() + run.inner + run.bottom.resolve())
+        self.0.map_or(0.0, |run| {
+            run.top.resolve() + run.inner + run.bottom.resolve()
+        })
     }
 }
 

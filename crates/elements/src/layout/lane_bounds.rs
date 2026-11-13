@@ -41,3 +41,7 @@ impl Bounds {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "lane_bounds_tests.rs"]
+mod tests;

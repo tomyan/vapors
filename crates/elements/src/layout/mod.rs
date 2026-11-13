@@ -9,7 +9,8 @@ mod inline;
 mod isolated;
 mod keep;
 // The lane's tree and folds (docs/plans/splice-layout.md, PR 2); layout
-// reads them from PR 3, so until then only the tests do.
+// reads them from PR 3, so until then only the tests do; PR 3 removes these
+// allows.
 #[allow(dead_code)]
 mod lane_block_summary;
 #[allow(dead_code)]

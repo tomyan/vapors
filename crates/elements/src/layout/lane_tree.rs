@@ -131,7 +131,9 @@ impl<S: Summary> LaneTree<S> {
         let mut left = self.fold(&self.nodes[node].sums[..at]);
         while let Some(parent) = self.nodes[node].parent {
             let at = self.child_at(parent, node);
-            left = self.fold(&self.nodes[parent].sums[..at]).combine(&left, self.gap);
+            left = self
+                .fold(&self.nodes[parent].sums[..at])
+                .combine(&left, self.gap);
             node = parent;
         }
         left
@@ -146,7 +148,10 @@ impl<S: Summary> LaneTree<S> {
     fn locate(&self, handle: Handle) -> (usize, usize) {
         let leaf = self.leaf_of.get(handle.0 as usize).copied().flatten();
         let leaf = leaf.unwrap_or_else(|| panic!("lane handle {handle:?} is not in the tree"));
-        let at = self.nodes[leaf].children.iter().position(|&h| h == handle.0);
+        let at = self.nodes[leaf]
+            .children
+            .iter()
+            .position(|&h| h == handle.0);
         (leaf, at.expect("a leaf holds the handles that name it"))
     }
 
@@ -196,6 +201,9 @@ impl<S: Summary> LaneTree<S> {
 #[path = "lane_tree_shape.rs"]
 mod shape;
 
+#[cfg(test)]
+#[path = "lane_tree_random_tests.rs"]
+mod random_tests;
 #[cfg(test)]
 #[path = "lane_tree_tests.rs"]
 mod tests;

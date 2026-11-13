@@ -76,7 +76,9 @@ impl<S: Summary> LaneTree<S> {
     /// refolds above, and drops a root with one child.
     pub(super) fn prune(&mut self, mut node: usize) {
         while self.nodes[node].children.is_empty() && node != self.root {
-            let parent = self.nodes[node].parent.expect("a node other than the root has one");
+            let parent = self.nodes[node]
+                .parent
+                .expect("a node other than the root has one");
             let at = self.child_at(parent, node);
             self.nodes[parent].children.remove(at);
             self.nodes[parent].sums.remove(at);

@@ -54,7 +54,8 @@ impl FlexSummary {
     /// The run's main size: its items' margin boxes and the gaps
     /// between them.
     pub(crate) fn outer(&self, gap: f64) -> f64 {
-        self.0.map_or(0.0, |run| run.outer + gaps(gap, run.count - 1))
+        self.0
+            .map_or(0.0, |run| run.outer + gaps(gap, run.count - 1))
     }
 
     /// The base-size and content sums with their gaps.
@@ -86,7 +87,9 @@ impl Summary for FlexSummary {
 
     fn start_of(left: &Self, run: &Self, gap: f64) -> f64 {
         let leading = run.0.map_or(0.0, |run| run.leading);
-        let before = left.0.map_or(0.0, |left| left.outer + gaps(gap, left.count));
+        let before = left
+            .0
+            .map_or(0.0, |left| left.outer + gaps(gap, left.count));
         before + leading
     }
 

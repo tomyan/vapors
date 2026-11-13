@@ -32,7 +32,10 @@ fn margins_add_and_a_gap_sits_between_neighbours() {
 #[test]
 fn the_contributions_sum_with_their_gaps() {
     let run = item([0.0, 0.0], 10.0).combine(&item([0.0, 0.0], 20.0), 4.0);
-    assert_eq!(run.contributions(4.0), [11.0 + 21.0 + 4.0, 12.0 + 22.0 + 4.0]);
+    assert_eq!(
+        run.contributions(4.0),
+        [11.0 + 21.0 + 4.0, 12.0 + 22.0 + 4.0]
+    );
 }
 
 #[test]
