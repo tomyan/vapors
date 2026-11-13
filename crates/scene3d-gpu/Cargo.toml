@@ -10,6 +10,7 @@ publish = false
 
 [dependencies]
 vapors-app.workspace = true
+vapors-renderer.workspace = true
 vapors-scene3d.workspace = true
 wgpu.workspace = true
 

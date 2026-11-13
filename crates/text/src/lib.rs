@@ -27,8 +27,6 @@ mod gpu_atlas_texture_tests;
 mod icon;
 mod icon_key;
 mod icon_miter;
-mod icon_path;
-mod icon_path_lex;
 #[cfg(test)]
 mod italic_tests;
 mod layout;
@@ -54,7 +52,6 @@ pub use draw::RenderTarget;
 pub use draw_icon::{ICON_BLEND, IconDraw};
 pub use font_system::FontSystem;
 pub use icon::{Icon, IconError, IconStroke};
-pub use icon_path::{IconPath, PathError};
 pub use layout::{Align, Glyph, GlyphRun, Layout, LayoutOptions, LineInfo, PlacedGlyph};
 pub use layout_ranges::Fragment;
 pub use line_metrics::content_area;

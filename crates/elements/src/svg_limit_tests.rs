@@ -1,4 +1,5 @@
-use vapors_text::{AtlasConfig, AtlasError, GlyphAtlas, Icon, IconPath, IconStroke};
+use vapors_shapes::IconPath;
+use vapors_text::{AtlasConfig, AtlasError, GlyphAtlas, Icon, IconStroke};
 
 use super::*;
 

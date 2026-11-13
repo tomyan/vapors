@@ -1,8 +1,8 @@
 //! The methods a parent's generated code calls on a component, the same
 //! for every node component (`docs/components.md`, "Child components").
 
-/// Implements `mount`, `events_into`, `root_entries`, `roots`, `unmount`
-/// and `node` for
+/// Implements `mount`, `events_into`, `root_entries`, `roots`, `unmount`,
+/// `anchor_element` and `node` for
 /// `$name`, a struct holding `mounted: crate::node::Mounted` and mounted
 /// by its own `mount_before`.
 macro_rules! node_component {
@@ -47,6 +47,13 @@ macro_rules! node_component {
                 for node in nodes {
                     dom.borrow_mut().remove(node);
                 }
+            }
+
+            /// Its anchor element, made from the `anchor` key: a tag's
+            /// `class:` directives toggle it.
+            #[must_use]
+            pub fn anchor_element(&self) -> vapors_dom::NodeId {
+                self.mounted.anchor
             }
 
             /// The scene node it holds.
