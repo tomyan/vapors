@@ -55,7 +55,7 @@ pub fn winners(page: &Page) -> vapors_css::analysis::KeyWinners {
         .style
         .map(|style| vapors_css::parse_inline(style).expect("inline"))
         .unwrap_or_default();
-    analyse(&sheets, &facts(page.style), &inline)
+    analyse(&sheets, &facts(page.style), &inline).unwrap_or_else(|e| panic!("{e}"))
 }
 
 pub fn longhand(page: &Page, name: &str) -> Winner {

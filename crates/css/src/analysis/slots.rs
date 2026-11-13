@@ -10,7 +10,7 @@ use super::standing::{Slot, Standing};
 use super::value::is_constant;
 use super::winners::{ClassifiedRule, Constancy, Place, Winner};
 use crate::ast::Declaration;
-use crate::cascade::{INLINE_SHEET, INLINE_SPECIFICITY, Origin, rank};
+use crate::cascade::{INLINE_SHEET, INLINE_SPECIFICITY, Origin, initial, is_parent_relative, rank};
 use crate::property::{PROPERTIES, PropertyId, Specified, contains_var};
 
 pub(super) struct Slots {
@@ -89,7 +89,7 @@ impl Slots {
                 let undeclared = if id.inherited() {
                     Constancy::FromParent
                 } else {
-                    Constancy::Constant
+                    initial_constancy(id)
                 };
                 slot.decide(|value| specified_constancy(value, id), undeclared)
             })
@@ -108,12 +108,29 @@ impl Slots {
     }
 }
 
+/// `bolder` and `lighter` compute from the parent's weight
+/// (`cascade::font_weight`); every other value by its own shape.
 fn specified_constancy(value: &Specified, id: PropertyId) -> Constancy {
     match value {
+        Specified::Value(value) if id.name() == "font-weight" && is_parent_relative(value) => {
+            Constancy::FromParent
+        }
         Specified::Value(value) if is_constant(value) => Constancy::Constant,
         Specified::Value(_) | Specified::Pending { .. } => Constancy::Variable,
         Specified::Inherit => Constancy::FromParent,
         Specified::Unset if id.inherited() => Constancy::FromParent,
-        Specified::Initial | Specified::Unset => Constancy::Constant,
+        Specified::Initial | Specified::Unset => initial_constancy(id),
+    }
+}
+
+/// The constancy of `id`'s initial value, which `initial`, `unset` on
+/// a non-inherited property and no declaration all compute to: a
+/// `currentcolor` initial (the border and outline colours) reads the
+/// element's `color`.
+fn initial_constancy(id: PropertyId) -> Constancy {
+    if is_constant(initial(id)) {
+        Constancy::Constant
+    } else {
+        Constancy::Variable
     }
 }

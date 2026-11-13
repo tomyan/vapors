@@ -6,7 +6,7 @@
 mod support;
 
 use support::{constant, longhand, page, winners};
-use vapors_css::analysis::{Constancy, Match, Winner};
+use vapors_css::analysis::{Constancy, Match, Sheet, Winner, analyse};
 
 #[test]
 fn var_values_are_variable_and_the_custom_property_has_its_own_winner() {
@@ -74,7 +74,7 @@ fn undeclared_properties_are_initial_or_from_the_parent() {
 fn value_constancy_follows_units_keywords_and_colours() {
     let page = page(
         "",
-        ".card { width: 2em; height: 50%; color: inherit; top: unset; left: initial; background-color: currentcolor; opacity: unset }",
+        ".card { width: 2em; height: 50%; color: inherit; top: unset; left: initial; background-color: currentcolor; opacity: unset; border-top-color: initial; outline-color: unset; font-weight: bolder }",
         &[],
     );
     let value = |name: &str| match longhand(&page, name) {
@@ -88,6 +88,39 @@ fn value_constancy_follows_units_keywords_and_colours() {
     assert_eq!(value("left"), Constancy::Constant);
     assert_eq!(value("background-color"), Constancy::Variable);
     assert_eq!(value("opacity"), Constancy::Constant);
+    // the initial border and outline colours are `currentcolor`
+    assert_eq!(value("border-top-color"), Constancy::Variable);
+    assert_eq!(value("outline-color"), Constancy::Variable);
+    assert_eq!(value("font-weight"), Constancy::FromParent);
+    assert_eq!(
+        longhand(&page, "border-left-color"),
+        Winner::Undeclared {
+            value: Constancy::Variable
+        }
+    );
+}
+
+#[test]
+fn two_own_sheets_of_one_origin_are_refused_naming_both() {
+    // Given: an other sheet marked own
+    let page = page("", ".card { color: red }", &[".card { color: blue }"]);
+    let sheets: Vec<Sheet<'_>> = (page.ids.iter().zip(&page.sheets))
+        .map(|(id, rules)| Sheet {
+            id,
+            rules,
+            own: true,
+        })
+        .collect();
+
+    // When
+    let refusal = analyse(&sheets, &support::facts(None), &[]).expect_err("refused");
+
+    // Then
+    assert!(
+        refusal.contains("\"s\"") && refusal.contains("other0"),
+        "{refusal}"
+    );
+    assert!(refusal.contains("own: false"), "{refusal}");
 }
 
 #[test]

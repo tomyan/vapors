@@ -40,7 +40,11 @@ pub struct Place {
     pub declaration: usize,
 }
 
-/// Whether a winner's value needs context to compute.
+/// Whether a winner's value needs context to compute: the constancy
+/// of the cascade's computed value. A transition or a `@keyframes`
+/// animation moves a value whatever the cascade says, so a reader that
+/// skips work on `Constant` must also know the key's candidate rules
+/// declare no `transition-property` or `animation-name`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Constancy {
     /// The same under every parent, viewport, font size and scheme.
@@ -96,8 +100,17 @@ pub struct KeyWinners {
 /// `facts`, over `sheets` (the user-agent sheet, the key's own scoped
 /// sheet, and the crate's other sheets) and the literal `style`'s
 /// declarations `inline`.
-#[must_use]
-pub fn analyse(sheets: &[Sheet<'_>], facts: &KeyFacts<'_>, inline: &[Declaration]) -> KeyWinners {
+///
+/// # Errors
+/// Two `own` sheets of one origin: their always declarations would be
+/// ordered by rule index across sheets, which the runtime does not do
+/// (`standing.rs`, `beats`). The message names both and the fix.
+pub fn analyse(
+    sheets: &[Sheet<'_>],
+    facts: &KeyFacts<'_>,
+    inline: &[Declaration],
+) -> Result<KeyWinners, String> {
+    refuse_own_twice(sheets)?;
     let classes: Vec<&str> = facts.classes.iter().chain(facts.toggles).copied().collect();
     let mut rules = Vec::new();
     let mut shareable = true;
@@ -112,12 +125,29 @@ pub fn analyse(sheets: &[Sheet<'_>], facts: &KeyFacts<'_>, inline: &[Declaration
     }
     slots.consider_inline(inline);
     let (longhands, custom) = slots.decide();
-    KeyWinners {
+    Ok(KeyWinners {
         rules,
         longhands,
         custom,
         shareable,
+    })
+}
+
+/// At most one `own` sheet per origin: the user-agent sheet and the
+/// key's own scoped sheet.
+fn refuse_own_twice(sheets: &[Sheet<'_>]) -> Result<(), String> {
+    let own: Vec<&Sheet<'_>> = sheets.iter().filter(|sheet| sheet.own).collect();
+    for (index, sheet) in own.iter().enumerate() {
+        if let Some(other) = own[..index].iter().find(|o| o.origin() == sheet.origin()) {
+            return Err(format!(
+                "sheets {:?} and {:?} are both the key's own with origin {:?}: the analysis orders always rules within one sheet per origin; mark every sheet but the user-agent sheet and the key's own scoped sheet `own: false`",
+                other.id,
+                sheet.id,
+                sheet.origin()
+            ));
+        }
     }
+    Ok(())
 }
 
 fn classify_in(

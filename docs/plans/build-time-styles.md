@@ -126,7 +126,9 @@ Then two facts per longhand, kept apart:
   conditional rules that can override it.
 - **Constant value:** a constant winner whose value needs no context:
   not `inherit`, `unset` or `revert`, no `var()`,
-  no `em`, `rem`, `%`, viewport unit or `currentcolor`, no
+  no `em`, `rem`, percentage length, `ch` or viewport unit, no
+  `currentcolor` (the initial border and outline colours), `bolder` or
+  `lighter`, no
   `light-dark()`. A longhand with no winner at all is a constant value
   when it does not inherit; an inherited one is a constant value only
   when the parent's is, which the compiler can say for parents inside

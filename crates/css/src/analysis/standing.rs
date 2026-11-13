@@ -105,7 +105,9 @@ impl<V> Slot<V> {
     }
 }
 
-/// Rules in order, each once (a rule declaring a property twice).
+/// Rules in order, each once. A rule's declarations are considered one
+/// after another and `may_beat` keeps or drops them together, so the
+/// repeats of one rule are consecutive and `Vec::dedup` is enough.
 fn dedup(places: impl Iterator<Item = (usize, usize)>) -> Vec<(usize, usize)> {
     let mut out: Vec<(usize, usize)> = places.collect();
     out.dedup();

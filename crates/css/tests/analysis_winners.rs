@@ -106,6 +106,8 @@ fn the_literal_style_beats_every_normal_rule_and_loses_to_an_important_condition
     beaten.style = Some("color: green");
     let mut overridden = page("", ".open { color: red !important }", &[]);
     overridden.style = Some("color: green");
+    let mut important = page("", ".open { color: red !important }", &[]);
+    important.style = Some("color: green !important");
 
     assert_eq!(
         longhand(&beaten, "color"),
@@ -113,6 +115,11 @@ fn the_literal_style_beats_every_normal_rule_and_loses_to_an_important_condition
     );
     assert!(
         matches!(longhand(&overridden, "color"), Winner::Variable { base: Some(Place { sheet: INLINE_SHEET, .. }), overriders } if overriders == [(1, 0)])
+    );
+    // equal rank: INLINE_SPECIFICITY decides
+    assert_eq!(
+        longhand(&important, "color"),
+        constant(INLINE_SHEET, 0, 0, Constancy::Constant)
     );
 }
 
