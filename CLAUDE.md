@@ -37,6 +37,9 @@ scripts/nightly-scaling.sh [--install]
 scripts/nightly-scaling-check.sh
                           its guards with a fake git and gh: network deadlines, the lock,
                           the runner's error quoted in its issue
+scripts/nightly-scaling-issues-check.sh
+                          its issues and run markers against scripts/fixtures/
+                          nightly-scaling.log, with a fake gh
 cargo run -p vapors-app --example demo -- hello
                           an F2c demo in a window (crates/demos)
 cargo xtask screenshot demo target/hello.png -- hello
