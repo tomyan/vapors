@@ -34,7 +34,7 @@ pub struct KeyFacts<'a> {
 impl KeyFacts<'_> {
     /// The shape `StyleKey::shape_refusal` and the fields above promise,
     /// judged as `StyleKey::attribute_misplaced` judges it.
-    fn check_shape(&self) {
+    pub(super) fn check_shape(&self) {
         debug_assert!(
             self.toggles.iter().all(|t| !self.classes.contains(t)),
             "a directive is also a literal class: {self:?}"
