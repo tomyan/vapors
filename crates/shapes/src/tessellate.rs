@@ -5,10 +5,8 @@
 //! distances, normals and shifts the fragment shader takes coverage
 //! from after the transform.
 
-use lyon_tessellation::geom::{CubicBezierSegment, SvgArc};
 use lyon_tessellation::geometry_builder::{BuffersBuilder, VertexBuffers};
-use lyon_tessellation::math::{Angle, Point as LyonPoint, point, vector};
-use lyon_tessellation::path::{ArcFlags, LineCap, LineJoin, Path};
+use lyon_tessellation::path::{LineCap, LineJoin, Path};
 use lyon_tessellation::{
     FillOptions, FillRule as LyonRule, FillTessellator, FillVertex, StrokeOptions,
     StrokeTessellator, StrokeVertex,
@@ -18,7 +16,7 @@ use crate::canonical::{FillRule, Paint};
 use crate::mesh::MeshVertex;
 use crate::mesh_edges::triangles_with_edges;
 use crate::path::IconPath;
-use crate::segment::Segment;
+use crate::tessellate_path::lyon_path;
 
 /// Triangles with their edge distances, three vertices each, and the
 /// tolerance they were flattened at.
@@ -112,77 +110,6 @@ fn stroke(path: &Path, width: f32, tolerance: f32, out: &mut Buffers) -> Result<
     StrokeTessellator::new()
         .tessellate_path(path, &options, &mut builder)
         .map_err(|e| e.to_string())
-}
-
-/// `segments` as a lyon path, each arc as cubics (within 2.7e-4 of
-/// its radius per 90 degrees; lyon's own `arc_to` goes through 45
-/// degree quadratics, 0.31% of the radius out, which no tolerance
-/// bounds).
-fn lyon_path(segments: &[Segment]) -> Path {
-    let mut builder = Path::svg_builder();
-    let mut current = point(0.0, 0.0);
-    for segment in segments {
-        current = match *segment {
-            Segment::Move(p) => {
-                builder.move_to(point(p.x, p.y));
-                point(p.x, p.y)
-            }
-            Segment::Line(p) => {
-                builder.line_to(point(p.x, p.y));
-                point(p.x, p.y)
-            }
-            Segment::Quad(c, p) => {
-                builder.quadratic_bezier_to(point(c.x, c.y), point(p.x, p.y));
-                point(p.x, p.y)
-            }
-            Segment::Cubic(a, b, p) => {
-                builder.cubic_bezier_to(point(a.x, a.y), point(b.x, b.y), point(p.x, p.y));
-                point(p.x, p.y)
-            }
-            Segment::Arc {
-                radii,
-                rotation,
-                large,
-                sweep,
-                to,
-            } => arc_as_cubics(&mut builder, current, radii, rotation, [large, sweep], to),
-            Segment::Close => {
-                builder.close();
-                current
-            }
-        };
-    }
-    builder.build()
-}
-
-fn arc_as_cubics(
-    builder: &mut lyon_tessellation::path::builder::WithSvg<
-        lyon_tessellation::path::path::BuilderImpl,
-    >,
-    from: LyonPoint,
-    radii: [f32; 2],
-    rotation: f32,
-    [large, sweep]: [bool; 2],
-    to: zeno::Point,
-) -> LyonPoint {
-    assert!(
-        radii[0] > 0.0 && radii[1] > 0.0,
-        "an arc with radii {radii:?} reached the tessellator; Pen::push makes a zero-radius arc a line"
-    );
-    let arc = SvgArc {
-        from,
-        to: point(to.x, to.y),
-        radii: vector(radii[0], radii[1]),
-        x_rotation: Angle::degrees(rotation),
-        flags: ArcFlags {
-            large_arc: large,
-            sweep,
-        },
-    };
-    arc.for_each_cubic_bezier(&mut |c: &CubicBezierSegment<f32>| {
-        builder.cubic_bezier_to(c.ctrl1, c.ctrl2, c.to);
-    });
-    point(to.x, to.y)
 }
 
 #[cfg(test)]

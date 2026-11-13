@@ -19,6 +19,7 @@ mod shape_id;
 mod table;
 mod table_error;
 mod tessellate;
+mod tessellate_path;
 
 pub use canonical::{Canonical, FillRule, Paint, hash_bytes};
 pub use classify::{Classified, classify};
