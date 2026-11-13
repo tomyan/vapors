@@ -25,9 +25,9 @@ pub struct ElementFacts {
     pub style: Option<String>,
     /// Every other literal attribute.
     pub literal_attributes: Vec<(String, String)>,
-    /// Every `name={expr}` attribute's name. Listeners (`on*`) and
-    /// bindings (`bind:*`) set no attribute, as `codegen/element.rs`
-    /// treats them.
+    /// Every `name={expr}` attribute's name, a run-time input the key
+    /// does not fix. Listeners (`on*`) and bindings (`bind:*`) set no
+    /// attribute, as `codegen/element.rs` treats them.
     pub expression_attributes: Vec<String>,
     /// The literal `style`'s declarations.
     pub inline: Vec<Declaration>,
@@ -89,9 +89,6 @@ impl ElementFacts {
         let literal: Vec<(&str, &str)> = (self.literal_attributes.iter())
             .map(|(name, value)| (name.as_str(), value.as_str()))
             .collect();
-        let expression: Vec<&str> = (self.expression_attributes.iter())
-            .map(String::as_str)
-            .collect();
         with(&KeyFacts {
             tag: &self.tag,
             scope_attribute: crate::SCOPE_ATTRIBUTE,
@@ -100,7 +97,6 @@ impl ElementFacts {
             toggles: &toggles,
             style: self.style.as_deref(),
             literal_attributes: &literal,
-            expression_attributes: &expression,
         })
     }
 }
