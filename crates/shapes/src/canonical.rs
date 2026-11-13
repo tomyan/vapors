@@ -3,6 +3,18 @@
 //! segments, absolute in viewBox units, after the paint's fill rule or
 //! the stroke parameters that change the mesh. Paint colour is per
 //! item and not here.
+//!
+//! The form folds the parser's rewrites (relative commands, `H` and
+//! `V`, implicit repeats, the arc corrections, `-0`) and nothing
+//! drawn-equal beyond them: `M0.3 0.1l0.6 0` and `M0.3 0.1L0.9 0.1`
+//! are two entries (0.3 + 0.6 is not 0.9 in f32), as are a filled
+//! open subpath and its closed twin. Each costs an entry, never a
+//! wrong draw. Equality is per build target: a scaled, rotated arc's
+//! radii pass through `sin_cos`, whose last bit differs between the
+//! host's libm and wasm32's, so a run-time parse (svg-support S4a)
+//! compares bytes on a hash hit and takes a miss as a cache miss. A
+//! change to the verb bytes, the arc encoding or the paint prefix
+//! bumps [`crate::TABLE_FORMAT`].
 
 use zeno::Point;
 
@@ -111,16 +123,26 @@ fn write_segment(segment: &Segment, out: &mut Vec<u8>) {
             large,
             sweep,
             to,
-        } => {
-            out.push(b'A');
-            write_number(radii[0], out);
-            write_number(radii[1], out);
-            write_number(rotation, out);
-            out.push(u8::from(large) | (u8::from(sweep) << 1));
-            write_points(b'>', &[to], out);
-        }
+        } => write_arc(radii, rotation, [large, sweep], to, out),
         Segment::Close => out.push(b'Z'),
     }
+}
+
+/// `A`, the radii, the rotation, the two flags in one byte (large in
+/// bit 0, sweep in bit 1), then `>` and the end point.
+fn write_arc(
+    radii: [f32; 2],
+    rotation: f32,
+    [large, sweep]: [bool; 2],
+    to: Point,
+    out: &mut Vec<u8>,
+) {
+    out.push(b'A');
+    write_number(radii[0], out);
+    write_number(radii[1], out);
+    write_number(rotation, out);
+    out.push(u8::from(large) | (u8::from(sweep) << 1));
+    write_points(b'>', &[to], out);
 }
 
 fn write_points(verb: u8, points: &[Point], out: &mut Vec<u8>) {
@@ -131,9 +153,19 @@ fn write_points(verb: u8, points: &[Point], out: &mut Vec<u8>) {
     }
 }
 
-/// A finite number's bits, little-endian. The lexer reads `-0` as `0`,
-/// so `M-0 0` and `M0 0` arrive as one shape.
+/// A finite number's bits, little-endian. The parser refuses a
+/// non-finite coordinate and the lexer reads `-0` as `0`, so `M-0 0`
+/// and `M0 0` arrive as one shape; both are asserted here so the two
+/// modules stay tied.
 fn write_number(value: f32, out: &mut Vec<u8>) {
+    debug_assert!(
+        value.is_finite(),
+        "{value} reached the canonical form; the parser refuses it"
+    );
+    debug_assert!(
+        value != 0.0 || value.to_bits() == 0,
+        "-0 reached the canonical form; the lexer reads it as 0"
+    );
     out.extend_from_slice(&value.to_le_bytes());
 }
 

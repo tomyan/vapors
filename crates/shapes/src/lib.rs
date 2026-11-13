@@ -9,6 +9,7 @@ mod canonical;
 mod geometry;
 mod path;
 mod path_lex;
+mod path_verb;
 mod segment;
 mod shape_id;
 mod table;
