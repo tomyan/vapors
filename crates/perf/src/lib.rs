@@ -22,6 +22,7 @@ pub mod mount_run;
 pub mod off_path;
 pub mod off_path_kinds;
 pub mod off_path_layouts;
+pub mod off_path_moved;
 pub mod off_path_page;
 pub mod off_path_scrollers;
 pub mod racer;

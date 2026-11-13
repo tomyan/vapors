@@ -56,6 +56,11 @@ fn gpu_the_paragraphs_page_runs_its_frames() {
 }
 
 #[test]
+fn gpu_the_translated_items_page_runs_its_frames() {
+    runs_each_change(Kind::Translated);
+}
+
+#[test]
 fn every_kind_has_a_gpu_test_here() {
-    assert_eq!(Kind::ALL.len(), 5, "add a gpu_ test above for the new kind");
+    assert_eq!(Kind::ALL.len(), 6, "add a gpu_ test above for the new kind");
 }

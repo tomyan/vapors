@@ -10,6 +10,7 @@ use vapors_app::{ElementsApp, FrameTiming};
 use vapors_platform::{App, Next};
 
 pub use crate::off_path_kinds::{Kind, off_path_workloads};
+use crate::off_path_moved::animate;
 use crate::off_path_page::{UnitPage, page_viewport};
 use crate::run::{Counts, Workload};
 
@@ -29,6 +30,9 @@ pub enum OffPathChange {
     /// Alternating frames: a unit inserted before the middle unit, then
     /// that unit removed.
     Insert,
+    /// The container's offset moved to the next of eight fractional
+    /// offsets (`off_path_moved.rs`): the whole subtree moves every frame.
+    Animate,
 }
 
 /// An off-path page in an app, and its change.
@@ -80,6 +84,7 @@ impl Workload for OffPath {
             OffPathChange::Scroll => self.page.scroll_body(SCROLL_STEP),
             OffPathChange::ScrollInner => self.page.scroll_inner(SCROLL_STEP),
             OffPathChange::Insert => self.page.toggle_inserted(),
+            OffPathChange::Animate => animate(&self.page, sample),
         }
     }
 

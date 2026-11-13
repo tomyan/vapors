@@ -4,11 +4,12 @@
 
 use crate::off_path::{OffPath, OffPathChange};
 use crate::off_path_layouts::{GRID_CELLS, MIXED_TEXT, WRAPPED_CARDS};
+use crate::off_path_moved::TRANSLATED;
 use crate::off_path_page::Shape;
 use crate::off_path_scrollers::{CODE_BLOCKS, NESTED_SCROLLERS};
 use crate::workloads::Make;
 
-use OffPathChange::{Edit, Insert, Scroll, ScrollInner};
+use OffPathChange::{Animate, Edit, Insert, Scroll, ScrollInner};
 
 /// The unit counts every kind runs at.
 pub const SIZES: [usize; 3] = [1000, 3000, 10_000];
@@ -26,16 +27,19 @@ pub enum Kind {
     GridCells,
     /// Paragraphs of varied lengths with inline spans, wrapping.
     MixedText,
+    /// Rows inside a container at a fractional offset, which moves.
+    Translated,
 }
 
 impl Kind {
     /// Every kind, in the order the run lists them.
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::NestedScrollers,
         Self::CodeBlocks,
         Self::WrappedCards,
         Self::GridCells,
         Self::MixedText,
+        Self::Translated,
     ];
 
     /// What the page's units are called in a workload's name. None has
@@ -48,6 +52,7 @@ impl Kind {
             Self::WrappedCards => "wrapped cards",
             Self::GridCells => "grid cells",
             Self::MixedText => "paragraphs",
+            Self::Translated => "translated items",
         }
     }
 
@@ -57,6 +62,7 @@ impl Kind {
         match self {
             Self::NestedScrollers | Self::CodeBlocks => &[Edit, Scroll, ScrollInner, Insert],
             Self::WrappedCards | Self::GridCells | Self::MixedText => &[Edit, Scroll, Insert],
+            Self::Translated => &[Edit, Scroll, Insert, Animate],
         }
     }
 
@@ -69,6 +75,7 @@ impl Kind {
             Self::WrappedCards => WRAPPED_CARDS,
             Self::GridCells => GRID_CELLS,
             Self::MixedText => MIXED_TEXT,
+            Self::Translated => TRANSLATED,
         }
     }
 }
