@@ -40,24 +40,50 @@ impl Frames {
     /// `self` with the frames of the scroll containers `changed`, and
     /// of those nested in a frame that came out different, worked out
     /// again; whether any frame came out different, and how many were
-    /// worked out. The scroll containers must be those `self` was made
-    /// for.
+    /// worked out. A scroll container `self` was not made for is
+    /// refused, naming it: its frame would be in no frame's nested list,
+    /// so a scroll of its outer frame would never reach it.
     pub(crate) fn update(&mut self, changed: &[usize], inputs: &FrameInputs<'_>) -> (bool, usize) {
         let mut starts = changed.to_vec();
         starts.sort_by_key(|&slot| (inputs.depth)(slot));
         let mut done = FxHashSet::default();
         let mut moved = false;
         for start in starts {
-            let mut open = vec![start];
-            while let Some(slot) = open.pop() {
-                if !done.insert(slot) || !self.work_out(slot, inputs) {
-                    continue;
-                }
-                moved = true;
-                open.extend(self.nested.get(&slot).into_iter().flatten().copied());
-            }
+            moved |= self.descend(start, inputs, &mut done);
         }
         (moved, done.len())
+    }
+
+    /// Works out `start` and, below each frame that came out different,
+    /// the frames nested in it, each once (`done`); whether any did.
+    fn descend(
+        &mut self,
+        start: usize,
+        inputs: &FrameInputs<'_>,
+        done: &mut FxHashSet<usize>,
+    ) -> bool {
+        let mut moved = false;
+        let mut open = vec![start];
+        while let Some(slot) = open.pop() {
+            self.assert_held(slot);
+            if !done.insert(slot) || !self.work_out(slot, inputs) {
+                continue;
+            }
+            moved = true;
+            open.extend(self.nested.get(&slot).into_iter().flatten().copied());
+        }
+        moved
+    }
+
+    /// Panics, naming `slot`, when these frames were not made for it.
+    fn assert_held(&self, slot: usize) {
+        assert!(
+            self.by_frame.contains_key(&slot),
+            "scroll container slot {slot} is updated but the kept frames were not made for it: \
+             the kept frames and the stackings disagree on the scroll containers (paint_frames.rs \
+             makes them afresh whenever paint order is walked or spliced); reproduce with \
+             `cargo xtask test`"
+        );
     }
 
     /// Works out frame `slot` from the frame it is in; whether it came
@@ -77,6 +103,12 @@ impl Frames {
     /// both, or the scroll containers nested in a frame when those
     /// differ.
     pub(crate) fn first_differing(&self, other: &Self) -> Option<String> {
+        if self.scale.to_bits() != other.scale.to_bits() {
+            return Some(format!(
+                "the scale: kept {}, fresh {}",
+                self.scale, other.scale
+            ));
+        }
         let frames = self.by_frame.keys().chain(other.by_frame.keys());
         let mut slots: Vec<usize> = frames.copied().collect();
         slots.sort_unstable();

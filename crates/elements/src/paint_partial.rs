@@ -111,7 +111,7 @@ fn drawn_updated(
 ) {
     // After a splice the drawing steps, hits and batches are made afresh
     // as after a walk, until a follow-up shifts them by the splice's edits.
-    if order.walks.order > 0 || order.walks.splices > 0 {
+    if order.walks.reshaped() {
         painted.drawn = DrawnSteps::of(&order.steps, &painted.kept_boxes);
         let places = order.steps.len();
         painted.extents = Extents::of(&painted.drawn, places, &painted.kept_boxes);

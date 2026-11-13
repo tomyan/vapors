@@ -64,11 +64,9 @@ pub struct Painted {
     pub(crate) kept_batches: std::cell::RefCell<Option<crate::kept_batches::KeptBatches>>,
     /// Boxes painted by this update, for `UpdateCounts`.
     pub(crate) boxes_drawn: usize,
-    /// Boxes whose kept paint this update shifted in place
-    /// (`kept_shift.rs`), for `UpdateCounts`.
+    /// Boxes this update shifted in place (`kept_shift.rs`), for `UpdateCounts`.
     pub(crate) boxes_shifted: usize,
-    /// Kept parts this update visited without painting again (`paint_partial.rs`), for
-    /// `UpdateCounts`.
+    /// Kept parts this update read without painting (`paint_partial.rs`), for `UpdateCounts`.
     pub(crate) parts_visited_kept: usize,
     /// Scroll frames this update worked out (`paint_frames.rs`).
     pub(crate) frames_worked: usize,
@@ -79,8 +77,7 @@ pub struct Painted {
     pub(crate) maps_patched: usize,
     /// What this update's patches did to `drawn` and `extents` (`blocks.rs`).
     pub(crate) index_counts: crate::blocks::IndexCounts,
-    /// Each slot's stacking, for the next update's shape comparison
-    /// (`changed_slots.rs`).
+    /// Each slot's stacking, for the next update's shape comparison (`changed_slots.rs`).
     pub(crate) stackings: crate::paint_order::Stackings,
 }
 

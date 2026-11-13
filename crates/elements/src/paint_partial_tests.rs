@@ -151,6 +151,8 @@ fn an_edit_inside_a_scroll_container_works_out_no_scroll_frame() {
 
     // Then
     assert_eq!(painted.frames_worked, 0);
+}
+
 /// A 104 px scroll container at the top of the page whose content is
 /// 1,000 px taller, and a text after it, updated once: its thumb is 24
 /// px long on a 100 px track, so it moves 0.076 px per px scrolled.

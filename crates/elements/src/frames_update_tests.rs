@@ -106,3 +106,16 @@ fn a_frame_named_twice_or_also_reached_from_its_outer_frame_is_worked_out_once()
     assert_eq!(worked, 2);
     assert_eq!(frames, made(&clips, [0.0, -30.0]));
 }
+
+#[test]
+#[should_panic(
+    expected = "scroll container slot 500 is updated but the kept frames were not made for it"
+)]
+fn updating_a_container_the_frames_were_not_made_for_is_refused_naming_it() {
+    // Given
+    let clips = page_clips();
+    let mut frames = made(&clips, [0.0; 2]);
+
+    // When
+    updated(&mut frames, &clips, &[500], [0.0; 2]);
+}
