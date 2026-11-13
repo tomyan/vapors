@@ -105,6 +105,48 @@ fn a_build_dependency_is_not_a_layering_dependency() {
 }
 
 #[test]
+fn a_dependency_that_is_both_normal_and_build_counts() {
+    // Given: cargo lists one kind per use of the crate
+    let metadata = json!({
+        "packages": [{ "id": "engine", "name": "engine" }, { "id": "platform", "name": "platform" }],
+        "resolve": { "nodes": [
+            { "id": "engine", "deps": [{ "pkg": "platform", "dep_kinds": [{ "kind": "build" }, { "kind": null }] }] },
+            { "id": "platform", "deps": [] }
+        ] }
+    });
+    let graph = parse(&metadata).expect("graph");
+
+    // When / Then
+    assert_eq!(
+        violations(&graph, &[rule("engine", &["platform"])]),
+        Ok(vec![
+            "engine depends on platform: engine -> platform".to_owned()
+        ])
+    );
+}
+
+#[test]
+fn a_dependency_kind_cargo_does_not_emit_is_refused_naming_it() {
+    // Given
+    let metadata = json!({
+        "packages": [{ "id": "engine", "name": "engine" }, { "id": "platform", "name": "platform" }],
+        "resolve": { "nodes": [
+            { "id": "engine", "deps": [{ "pkg": "platform", "dep_kinds": [{ "kind": "optional" }] }] },
+            { "id": "platform", "deps": [] }
+        ] }
+    });
+
+    // When
+    let refusal = parse(&metadata).expect_err("refused");
+
+    // Then
+    assert!(
+        refusal.contains("platform") && refusal.contains("\"optional\""),
+        "{refusal}"
+    );
+}
+
+#[test]
 fn a_rule_naming_a_crate_not_in_the_graph_is_refused_naming_it() {
     // Given
     let graph = parse(&metadata(&[("engine", &[])])).expect("graph");

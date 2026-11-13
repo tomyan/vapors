@@ -16,6 +16,7 @@ pub(crate) fn check(
     section: &Section,
     styles: Styles,
 ) -> Result<(), CompileError> {
+    refuse_other_line_breaks(source, section)?;
     let in_file = |error| positioned(source, section, error);
     let sheet = vapors_css::parse(&section.text).map_err(in_file)?;
     match styles {
@@ -23,6 +24,28 @@ pub(crate) fn check(
         Styles::Global => vapors_css::scope::refuse_global(&sheet),
     }
     .map_err(in_file)
+}
+
+/// vapors-css counts a lone carriage return and a form feed as line
+/// breaks (CSS Syntax 3.3); editors and `Source` count `\n` only, so a
+/// position after one would name the wrong line. Refused, naming it.
+fn refuse_other_line_breaks(source: &Source, section: &Section) -> Result<(), CompileError> {
+    let text = section.text.as_bytes();
+    let found = text.iter().enumerate().find(|(index, byte)| match byte {
+        b'\x0c' => true,
+        b'\r' => text.get(index + 1) != Some(&b'\n'),
+        _ => false,
+    });
+    match found {
+        Some((index, byte)) => Err(source.error(
+            section.offset + index,
+            format!(
+                "the <style> holds a {} here, which CSS reads as a line break and editors do not; replace it with a newline",
+                if *byte == b'\r' { "lone carriage return" } else { "form feed" }
+            ),
+        )),
+        None => Ok(()),
+    }
 }
 
 /// A refusal positioned in the section's text, moved to the file: the

@@ -409,7 +409,8 @@ For example, in a component whose scope is `app/src/panel.wisp`:
   cannot honour, fails the build (`compile_dir` and `wisp-check`),
   naming `file:line:col`; the compiler reads it with `vapors-css`, the
   runtime's own parser and scoping (`vapors_css::scope`), so the two
-  refuse the same things. A style the runtime is given by hand
+  give the same parse and `:global()` refusals (the runtime's
+  per-element value refusals still happen at run time). A style the runtime is given by hand
   (`add_style`) is refused by the next update, naming the scope, line
   and column.
 - A crate whose components' styles the app adds as global sheets uses

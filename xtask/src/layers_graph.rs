@@ -85,14 +85,29 @@ fn name_of(names: &BTreeMap<String, String>, id: &str) -> Result<String, String>
         .ok_or_else(|| format!("cargo metadata: node {id} is not among the packages"))
 }
 
-/// A dependency linked into the crate: normal (`kind` null in the
-/// metadata), not dev or build.
+/// A dependency linked into the crate: listed as normal (`kind` null
+/// in the metadata) under at least one of its kinds. `dev` and `build`
+/// are not linked; any other kind is refused, naming the dependency,
+/// since cargo emits only these three.
 fn layering(dep: &Value, owner: &str) -> Result<bool, String> {
     let kinds = dep["dep_kinds"]
         .as_array()
         .filter(|kinds| !kinds.is_empty())
         .ok_or_else(|| format!("cargo metadata: a dependency of {owner} has no `dep_kinds`"))?;
-    Ok(kinds.iter().any(|kind| kind["kind"].is_null()))
+    let mut linked = false;
+    for kind in kinds {
+        match kind["kind"].as_str() {
+            None if kind["kind"].is_null() => linked = true,
+            Some("dev" | "build") => {}
+            other => {
+                return Err(format!(
+                    "cargo metadata: dependency {} of {owner} has kind {other:?}, which is not null, \"dev\" or \"build\"; fix: teach xtask/src/layers_graph.rs the new kind",
+                    dep["pkg"].as_str().unwrap_or("?")
+                ));
+            }
+        }
+    }
+    Ok(linked)
 }
 
 /// One line per forbidden crate reached, with the path to it.

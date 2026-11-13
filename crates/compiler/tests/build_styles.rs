@@ -95,6 +95,21 @@ fn any_global_fails_a_global_build_naming_the_fix() {
 }
 
 #[test]
+fn a_form_feed_or_lone_carriage_return_in_a_style_is_refused_at_its_place() {
+    // Given: CSS would count the form feed as a line break; the file does not
+    let text = "<style>\np { color: red; }\x0cp { colr: red; }\n</style>\n<p>Card</p>";
+
+    // When
+    let (file, refusal) = one_refusal("style_form_feed", text, Styles::Scoped);
+
+    // Then
+    assert!(refusal.starts_with(&format!("{file}:2:18: ")), "{refusal}");
+    assert!(refusal.contains("form feed"), "{refusal}");
+    let crlf = "<style>\r\np { color: red; }\r\n</style>\r\n<p>Card</p>";
+    compiles("style_crlf", crlf, Styles::Scoped);
+}
+
+#[test]
 fn wisp_check_refuses_a_style_that_does_not_parse() {
     // Given
     let (src, _) = dirs("style_wisp_check");

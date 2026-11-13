@@ -11,7 +11,7 @@ pub const TEXT: &str = include_str!("ua.css");
 ///
 /// # Panics
 /// When `ua.css` does not parse, naming the position: a defect in this
-/// crate, which `cargo test -p vapors-css` reproduces.
+/// crate, which `cargo test -p vapors-css --test user_agent` reproduces.
 #[must_use]
 pub fn sheet() -> Stylesheet {
     crate::parse(TEXT).unwrap_or_else(|error| {
