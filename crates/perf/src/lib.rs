@@ -11,6 +11,7 @@ pub mod args_off_path;
 pub mod circuit;
 pub mod driver;
 pub mod element_memory;
+pub mod element_memory_run;
 pub mod frame_kinds;
 pub mod gpu_reading;
 pub mod gpu_time;

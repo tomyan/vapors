@@ -28,6 +28,11 @@ vapors-shapes = { path = "crates/shapes" }
 vapors-scene3d = { path = "crates/scene3d" }
 vapors-scene3d-gpu = { path = "crates/scene3d-gpu" }
 vapors-scene3d-components = { path = "crates/scene3d-components" }
+# Counting global allocator for vapors-perf-memory's live heap bytes
+# (finish-line property 8): the workspace forbids unsafe code, and a
+# global allocator is an unsafe impl. Pinned exactly: the counts it keeps
+# are what the memory records read.
+stats_alloc = "=0.1.10"
 # Matrix maths for the 3D scene (docs/plans/3d-2.md, decision 3).
 glam = "=0.34.3"
 vapors-gpu = { path = "crates/gpu" }
