@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use super::Sampler;
+use super::{Measured, Sampler};
 use crate::gpu_reading::frame_gpu_time;
 use crate::run::{Counts, Workload};
 
@@ -48,25 +48,39 @@ impl Sampler<'_> {
         workload: &mut dyn Workload,
         frames: usize,
     ) -> Result<Vec<JudgedFrame>, String> {
+        if frames == 0 {
+            return Err("a judged run of 0 frames judges nothing; give it at least one".into());
+        }
         let texture = self.texture(workload.size());
-        let mut kept: Vec<JudgedFrame> = Vec::with_capacity(frames);
+        let (mut kept, mut waiting) = (Vec::with_capacity(frames), None);
         for index in 0..=frames {
             let measured = self.frame(workload, &texture, index, None)?;
-            if let Some(before) = kept.last_mut() {
-                before.gpu = gpu_reading(workload, before.index)?;
+            if let Some((before, counts)) = waiting.take() {
+                kept.push(judged(
+                    before,
+                    &counts,
+                    gpu_reading(workload, index - 1)?,
+                    index - 1,
+                ));
             }
             if index < frames {
-                kept.push(JudgedFrame {
-                    index,
-                    cpu: measured.took,
-                    gpu: Duration::ZERO,
-                    idle: measured.idle,
-                    phases: measured.phases,
-                    counts: workload.counts(),
-                });
+                waiting = Some((measured, workload.counts()));
             }
         }
         Ok(kept)
+    }
+}
+
+/// Frame `index`, kept once its GPU reading `gpu` has come back: a
+/// frame is never kept without one.
+fn judged(measured: Measured, counts: &Counts, gpu: Duration, index: usize) -> JudgedFrame {
+    JudgedFrame {
+        index,
+        cpu: measured.took,
+        gpu,
+        idle: measured.idle,
+        phases: measured.phases,
+        counts: *counts,
     }
 }
 

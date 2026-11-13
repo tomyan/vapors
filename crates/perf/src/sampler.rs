@@ -139,13 +139,15 @@ impl<'g> Sampler<'g> {
         let _ = self.clock.take_instructions()?;
         let (next, started, took, frame_instructions) =
             self.timed(workload, texture, index, gpu_clock)?;
+        // frame-to-idle ends here, before the harness's own bookkeeping;
+        // gpu_judged_frames.rs holds it at or above the frame's GPU time
+        wait(&self.gpu.device, FRAME_DEADLINE)?;
+        let idle = started.elapsed();
         let phases = self.clock.take();
         let instructions = self.clock.take_instructions()?;
         workload
             .check(next)
             .map_err(|error| format!("frame {index}: {error}"))?;
-        wait(&self.gpu.device, FRAME_DEADLINE)?;
-        let idle = started.elapsed();
         let instructions = frame_instructions.zip(instructions);
         Ok(Measured {
             took,
