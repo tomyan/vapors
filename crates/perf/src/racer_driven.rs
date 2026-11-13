@@ -1,19 +1,17 @@
 //! The racer driven by the script (`driver.rs`) through a player's
 //! input: the controls as held keys, Space to start again after three
 //! laps, and a click on the HUD's camera button. Each scripted change
-//! is checked to have happened; one that did not ends the run.
+//! is checked to have happened, and every frame that the racer races
+//! under the keys sent (`racer_driven_workload.rs`); one that did not
+//! ends the run.
 
 use std::collections::BTreeSet;
 
-use vapors_app::FrameTiming;
-use vapors_platform::{App, Next};
 use vapors_racer::Racer;
 use vapors_racer::model::Controls;
 
 use crate::driver::{Scripted, controls, restart_due, scripted};
-use crate::racer::racer_counts;
 use crate::racer_input::{centre_of, click, focused, key};
-use crate::run::{Counts, Workload};
 
 /// The racer, racing from its first frame, driven by the script.
 pub struct DrivenRacer {
@@ -56,7 +54,7 @@ impl DrivenRacer {
         }
         for change in scripted(frame) {
             match change {
-                Scripted::CameraSwitch => self.switch_camera()?,
+                Scripted::Camera { follow } => self.set_camera(follow)?,
                 Scripted::Livery => livery(),
             }
         }
@@ -70,27 +68,28 @@ impl DrivenRacer {
         key(&mut self.racer, "Space", true);
         key(&mut self.racer, "Space", false);
         self.held.clear();
-        match self.racer.race().progress.laps {
-            0 => Ok(()),
-            laps => Err(format!(
-                "Space after three laps left the race at {laps} laps; it should start a new race"
-            )),
+        let (laps, paused) = (self.racer.race().progress.laps, self.racer.paused());
+        if laps == 0 && !paused {
+            return Ok(());
         }
+        Err(format!(
+            "Space after three laps left the race at {laps} laps, paused {paused}; \
+             it should start a new race, running"
+        ))
     }
 
-    /// A click on the HUD's camera button, then one on the track, which
-    /// takes focus off the button so Space reaches the race.
-    fn switch_camera(&mut self) -> Result<(), String> {
-        let follow = self.racer.camera().follow;
-        let (button, track) = (
-            centre_of(&self.racer, "data-action", "camera")?,
-            centre_of(&self.racer, "name", "track")?,
-        );
-        click(&mut self.racer, button);
-        click(&mut self.racer, track);
-        if self.racer.camera().follow == follow {
+    /// The camera in the mode named, through the HUD's button when it is
+    /// in the other. The racer takes no time in the frame after a switch
+    /// (`toggle_camera` clears the last frame's time), so the car stands
+    /// still for that frame, which the schedule's model does not count.
+    fn set_camera(&mut self, follow: bool) -> Result<(), String> {
+        if self.racer.camera().follow != follow {
+            self.click_camera_then_track()?;
+        }
+        let now = self.racer.camera().follow;
+        if now != follow {
             return Err(format!(
-                "a click on the camera button left the camera's follow at {follow}"
+                "the camera's follow is {now} after the switch to {follow}"
             ));
         }
         if focused(&self.racer) {
@@ -98,6 +97,16 @@ impl DrivenRacer {
                         so Space would go to it, not the race"
                 .into());
         }
+        Ok(())
+    }
+
+    /// A click on the camera button, then one on the track, which takes
+    /// focus off the button so Space reaches the race.
+    fn click_camera_then_track(&mut self) -> Result<(), String> {
+        let button = centre_of(&self.racer, "data-action", "camera")?;
+        let track = centre_of(&self.racer, "name", "track")?;
+        click(&mut self.racer, button);
+        click(&mut self.racer, track);
         Ok(())
     }
 
@@ -131,46 +140,5 @@ fn keys_for(controls: Controls) -> BTreeSet<&'static str> {
     .collect()
 }
 
-impl Workload for DrivenRacer {
-    fn size(&self) -> (u32, u32) {
-        (1100, 720)
-    }
-
-    fn change(&mut self, sample: usize) {
-        if self.fault.is_none() {
-            self.fault = self.drive(sample).err();
-        }
-    }
-
-    fn app(&mut self) -> &mut dyn App {
-        &mut self.racer
-    }
-
-    fn ready(&self) -> Result<(), String> {
-        self.fault.clone().map_or(Ok(()), Err)
-    }
-
-    /// Every frame asks for the next, but the one that finished the
-    /// race: the racer pauses there, and the next frame's input starts
-    /// it again.
-    fn check(&self, next: Next) -> Result<(), String> {
-        if let Some(error) = self.racer.error() {
-            return Err(error);
-        }
-        match next {
-            Next::Continue => Ok(()),
-            Next::Wait if restart_due(self.racer.race()) => Ok(()),
-            other => Err(format!(
-                "the driven race stopped: the frame asked for {other:?}"
-            )),
-        }
-    }
-
-    fn counts(&self) -> Counts {
-        racer_counts(&self.racer)
-    }
-
-    fn timing(&self) -> FrameTiming {
-        self.racer.frame_timing()
-    }
-}
+#[path = "racer_driven_workload.rs"]
+mod workload;

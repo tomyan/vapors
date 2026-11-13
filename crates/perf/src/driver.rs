@@ -1,8 +1,9 @@
 //! The scripted driver of the 60 s run (docs/plans/one-scene.md, 3.2):
 //! deterministic, from the race's state and the frame's index alone.
 //! The gas held, steering toward a point ahead on the centre line,
-//! braking into the bends; a camera switch every 10 s of the frame
-//! clock and a livery change at 30 s; a restart after three laps.
+//! braking into the bends; the camera set to Follow, then Fixed, in
+//! turn every 10 s of the frame clock; a livery change at 30 s; a
+//! restart after three laps.
 
 use std::f32::consts::{PI, TAU};
 use std::time::Duration;
@@ -12,8 +13,16 @@ use vapors_racer::model::{Controls, Race};
 use crate::circuit::{BEND_STARTS, LAP, distance_of, point_at};
 use crate::sampler::INTERVAL;
 
-/// The run's frames: 60 s of the frame clock at its step.
-pub const RUN_FRAMES: usize = 3750;
+/// The run's length on the frame clock.
+const RUN_LENGTH: Duration = Duration::from_secs(60);
+
+/// The run's frames: [`RUN_LENGTH`] at the frame clock's step, 3,750.
+#[allow(clippy::cast_possible_truncation)] // 60 s / 16 ms, checked below
+pub const RUN_FRAMES: usize = (RUN_LENGTH.as_millis() / INTERVAL.as_millis()) as usize;
+const _: () = assert!(
+    RUN_LENGTH.as_millis().is_multiple_of(INTERVAL.as_millis()),
+    "the run's length must be a whole number of frames"
+);
 
 /// How far ahead on the centre line the driver steers toward.
 const LOOK_AHEAD: f32 = 60.0;
@@ -36,8 +45,12 @@ const LIVERY_AT: Duration = Duration::from_secs(30);
 /// A change the script makes at a moment of the run, beside driving.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Scripted {
-    /// Fixed to Follow, or back.
-    CameraSwitch,
+    /// The camera set to Follow (`true`) or Fixed. Named, not toggled:
+    /// a restart puts the racer's camera back to Fixed.
+    Camera {
+        /// Whether the camera follows the car.
+        follow: bool,
+    },
     /// The craft's livery changes.
     Livery,
 }
@@ -51,8 +64,11 @@ pub fn scripted(frame: usize) -> Vec<Scripted> {
     };
     let (from, to) = (frame_time(before), frame_time(frame));
     let mut due = Vec::new();
-    if from.as_millis() / CAMERA_EVERY.as_millis() != to.as_millis() / CAMERA_EVERY.as_millis() {
-        due.push(Scripted::CameraSwitch);
+    let mark = |time: Duration| time.as_millis() / CAMERA_EVERY.as_millis();
+    if mark(from) != mark(to) {
+        due.push(Scripted::Camera {
+            follow: mark(to) % 2 == 1,
+        });
     }
     if from < LIVERY_AT && LIVERY_AT <= to {
         due.push(Scripted::Livery);
@@ -61,9 +77,14 @@ pub fn scripted(frame: usize) -> Vec<Scripted> {
 }
 
 /// Frame `frame`'s time on the frame clock, from the first frame.
+///
+/// # Panics
+/// `frame` is past `u32::MAX`, 2.2 years of frames: no run reaches it.
 #[must_use]
 pub fn frame_time(frame: usize) -> Duration {
-    INTERVAL * u32::try_from(frame).unwrap_or(u32::MAX)
+    let frame =
+        u32::try_from(frame).expect("a frame index past u32::MAX: no run has that many frames");
+    INTERVAL * frame
 }
 
 /// Whether the race has finished and is to start again.
