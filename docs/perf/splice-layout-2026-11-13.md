@@ -2,7 +2,8 @@
 
 PR 0 of `docs/plans/splice-layout.md`. `--scaling Insert` alternates an
 insert and a remove each frame, `Resize` a taller and a shorter second
-row, `ScrollSize` a longer and a shorter label. Before this change the
+row, `ScrollSize` a longer and a shorter label, `Class` and `HoveredClass`
+the middle row's `marked` class added and removed. Before this change the
 table was one median over both kinds, which is the cheaper kind's
 slowest frame. `--scaling` now prints a table per kind and judges each.
 
@@ -61,8 +62,28 @@ Both runs exit non-zero on main before this change and after it, on
 the accessibility ceilings of `crates/perf/src/scaling_judged.rs`:
 Insert's (9500 per extra row) at 9,538 one median (9,591 insert frames,
 9,554 remove frames, 1000 to 10,000 rows), and Resize's (13,000) at
-13,197 and 13,443 one median. The ceilings were set over the
+13,197 (1000 to 3000 rows) and 13,443 (1000 to 10,000 rows) one median, 13,470 (1000 to 10,000) for both taller and shorter frames. The ceilings were set over the
 per-row costs recorded on 2026-11-12 (`docs/perf/a11y-phase-2026-11-12.md`:
 8,859 and 12,021); the take's cost per row has grown by about 8% and
 12% since, past the room the ceilings left. This change does not move them; the lane's PR 5
 (the mirror in flow) replaces both with `EveryPhase`.
+
+## Class and HoveredClass: the add frames grow with the page
+
+Split the same way (review of #270, M1), `--scaling Class` and
+`--scaling HoveredClass` fail, where the one median passed: adding the
+`marked` class costs `paint` 13.6 more instructions per extra row
+(Class: 67,987 / 95,434 / 190,397 at 1000 / 3000 / 10,000 rows;
+HoveredClass: 74,979 / 102,650 / 198,088), and `update` and `frame
+(CPU)` with it. Removing it is flat (Class `paint` 53,954 / 54,452 /
+54,895). The one median was the remove frames'. Which paint step reads
+something per row when a class is added is not located here; property
+1 of `docs/plans/perf-finish-line.md` is judged by these runs and does
+not hold for the add frames.
+
+| Class | 1000 rows | 3000 rows | 10,000 rows | per extra row, 3000 to 10,000 |
+|---|---|---|---|---|
+| update, add | 760,533 | 787,720 | 883,613 | 13.7 |
+| update, remove | 745,721 | 746,360 | 747,653 | 0.2 |
+| paint, add | 67,987 | 95,434 | 190,397 | 13.6 |
+| paint, remove | 53,954 | 54,452 | 54,895 | 0.1 |

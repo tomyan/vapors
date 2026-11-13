@@ -73,7 +73,12 @@ fn insert_names_its_frames_in_the_order_it_makes_them() {
 
 #[test]
 fn a_change_whose_frames_are_alike_has_one_kind() {
-    for change in [RowChange::Text, RowChange::Scroll] {
+    for change in [
+        RowChange::Idle,
+        RowChange::Text,
+        RowChange::FlexText,
+        RowChange::Scroll,
+    ] {
         assert_eq!(change.frame_kinds().len(), 1, "{change:?}");
     }
 }
@@ -125,4 +130,37 @@ fn scroll_size_names_its_frames_in_the_order_it_makes_them() {
         (kinds[1], text(&rows).as_deref()),
         ("shorter label", Some("Label"))
     );
+    assert_eq!(kinds.len(), 2);
+}
+
+#[test]
+fn class_and_hovered_class_name_their_frames_in_the_order_they_make_them() {
+    for change in [RowChange::Class, RowChange::HoveredClass] {
+        // Given
+        let mut rows = Rows::new(10, change);
+        let middle = rows.page.rows().rows[5].element;
+        let kinds = change.frame_kinds();
+        let class = |rows: &Rows| {
+            rows.page
+                .doc()
+                .borrow()
+                .attribute(middle, "class")
+                .map(str::to_owned)
+        };
+
+        // When / Then: frame 0 adds `marked`, frame 1 removes it
+        rows.change(0);
+        assert_eq!(
+            (kinds[0], class(&rows).as_deref()),
+            ("add", Some("row marked")),
+            "{change:?}"
+        );
+        rows.change(1);
+        assert_eq!(
+            (kinds[1], class(&rows).as_deref()),
+            ("remove", Some("row")),
+            "{change:?}"
+        );
+        assert_eq!(kinds.len(), 2, "{change:?}");
+    }
 }

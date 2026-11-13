@@ -5,11 +5,11 @@ use vapors_gpu_harness::Gpu;
 
 use crate::instruction_samples::InstructionSamples;
 use crate::instructions_check::{checked_counter, samples_counted};
-use crate::report::EVERY_PHASE;
 use crate::rows::{RowChange, Rows};
 use crate::run::{Samples, Settings};
 use crate::sampler::Sampler;
-use crate::scaling::{AtSize, SIZES, Scaling};
+use crate::scaling::{AtSize, SIZES};
+use crate::scaling_kinds::{by_kind, enough_frames, per_kind};
 use crate::scaling_report::{scaling_section, verdicts};
 use crate::spans::PhaseClock;
 use crate::stats::median_count;
@@ -46,58 +46,12 @@ fn measure(
     let name = format!("{rows} rows, {change:?}");
     let workload = &mut Rows::new(rows, change);
     let settings = settings_for(Some(rows), settings);
+    enough_frames(change, settings.runs)?;
     let samples = timer
         .sample(workload, settings)
         .map_err(|e| format!("{name}: {e}"))?;
     samples_counted(&name, &samples)?;
-    by_kind(rows, &samples, change.frame_kinds().len(), settings.warmup)
-}
-
-/// The medians of each of `kinds` kinds of frame in `samples`, whose
-/// first kept frame is frame `warmup`: frame `i` is of kind `i % kinds`.
-///
-/// # Errors
-/// As [`at_size`], for any kind.
-pub(crate) fn by_kind(
-    rows: usize,
-    samples: &Samples,
-    kinds: usize,
-    warmup: usize,
-) -> Result<Vec<AtSize>, String> {
-    let kept = kept_counts(rows, samples)?;
-    let first_of = |kind: usize| (kind + kinds - warmup % kinds) % kinds;
-    (0..kinds)
-        .map(|kind| medians(rows, &kept.every_nth(first_of(kind), kinds), &EVERY_PHASE))
-        .collect()
-}
-
-/// Each kind of frame's title and its series across sizes, from
-/// `measured`, a list of kinds per size.
-fn per_kind(
-    change: RowChange,
-    measured: Vec<Vec<AtSize>>,
-) -> Result<Vec<(String, Scaling)>, String> {
-    let kinds = change.frame_kinds();
-    let mut by_kind: Vec<Vec<AtSize>> = kinds.iter().map(|_| Vec::new()).collect();
-    for size in measured {
-        by_kind
-            .iter_mut()
-            .zip(size)
-            .for_each(|(sizes, at)| sizes.push(at));
-    }
-    kinds
-        .iter()
-        .zip(by_kind)
-        .map(|(kind, sizes)| Ok((title(change, kind), Scaling::of(&sizes)?)))
-        .collect()
-}
-
-/// `change`'s name, and the kind of frame when it makes more than one.
-fn title(change: RowChange, kind: &str) -> String {
-    if change.frame_kinds().len() == 1 {
-        return format!("{change:?}");
-    }
-    format!("{change:?}, {kind} frames")
+    by_kind(rows, &samples, change.frame_kinds(), settings.warmup)
 }
 
 /// The median count of the frame and of each phase `samples` recorded.
@@ -108,14 +62,18 @@ pub(crate) fn at_size(rows: usize, samples: &Samples, known: &[&str]) -> Result<
     medians(rows, kept_counts(rows, samples)?, known)
 }
 
-fn kept_counts(rows: usize, samples: &Samples) -> Result<&InstructionSamples, String> {
+pub(crate) fn kept_counts(rows: usize, samples: &Samples) -> Result<&InstructionSamples, String> {
     samples
         .instructions
         .as_ref()
         .ok_or_else(|| format!("{rows} rows: no instruction counts were taken"))
 }
 
-fn medians(rows: usize, kept: &InstructionSamples, known: &[&str]) -> Result<AtSize, String> {
+pub(crate) fn medians(
+    rows: usize,
+    kept: &InstructionSamples,
+    known: &[&str],
+) -> Result<AtSize, String> {
     if let Some(unknown) = kept.phases.keys().find(|p| !known.contains(&p.as_str())) {
         return Err(unknown_phase(rows, unknown));
     }

@@ -158,3 +158,31 @@ fn every_kind_passing_gives_a_pass_line_per_kind() {
         "{lines}"
     );
 }
+
+#[test]
+fn the_first_kind_failing_fails_the_run_too() {
+    // Given: insert frames over the ceiling, remove frames within
+    let kinds = [
+        (
+            "Insert, insert frames".to_owned(),
+            moving(INSERT_A11Y_PER_ROW + 1),
+        ),
+        ("Insert, remove frames".to_owned(), moving(1)),
+    ];
+
+    // When
+    let error = verdicts(RowChange::Insert, &kinds).expect_err("insert frames over");
+
+    // Then
+    assert!(error.contains("Insert, insert frames does work"), "{error}");
+    assert!(
+        !error.contains("Insert, remove frames does work"),
+        "{error}"
+    );
+}
+
+#[test]
+fn no_kinds_is_refused_never_a_pass() {
+    let error = verdicts(RowChange::Insert, &[]).expect_err("nothing judged");
+    assert!(error.contains("no kind of Insert frame"), "{error}");
+}

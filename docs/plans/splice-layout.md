@@ -51,7 +51,10 @@ count (`docs/plans/iu1.md`, PR 2). An insert's update is 97 edits at
 half of it. `--scaling Insert` alternates an insert and a remove per
 frame, and the median over both kinds is the cheaper kind's slowest
 frame (`docs/perf/baseline-2026-11-10.md`, "Insert"), so these are one
-kind's numbers; section 7's PR 0 reports the two apart. Section 1.4
+kind's numbers (the remove frames'); section 7's PR 0 reports the two
+apart, and `docs/perf/splice-layout-2026-11-13.md` has the split: an insert
+costs about 630,000 instructions more than a remove at every size, in
+`style`, and the same per extra row. Section 1.4
 splits the phases.
 
 ### 1.2 Read from the code: where every row is touched
@@ -555,6 +558,6 @@ handles not indices (section 2 (b)).
 5. The a11y oracle (5b) is not built; PR 5's bounds are checked by
    `DOM.getBoxModel` once it is. Until then PR 5 is checked by the
    fake DOM's counts and by vapors' own bounds.
-6. `--scaling Insert`'s median over alternating kinds hides the
-   costlier kind (section 1.1); PR 0 fixes the reporting before any
-   acceptance number is read from it.
+6. `--scaling Insert`'s median over alternating kinds hid the
+   costlier kind (section 1.1); PR 0 (#270) reports each kind apart,
+   with the split in `docs/perf/splice-layout-2026-11-13.md`.

@@ -46,8 +46,14 @@ fn phase_row(series: &PhaseSeries, rows: &[usize]) -> String {
 /// judges one, so the run passes only when its costlier kind does.
 ///
 /// # Errors
-/// Every kind's failure, each naming its kind.
+/// Every kind's failure, each naming its kind; no kinds at all.
 pub fn verdicts(change: RowChange, kinds: &[(String, Scaling)]) -> Result<String, String> {
+    if kinds.is_empty() {
+        return Err(format!(
+            "scaling: no kind of {change:?} frame was measured, so nothing can be judged; \
+             RowChange::frame_kinds names at least one (crates/perf/src/row_change.rs)"
+        ));
+    }
     let judged: Vec<_> = kinds
         .iter()
         .map(|(title, scaling)| verdict(change, title, scaling))

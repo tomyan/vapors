@@ -65,12 +65,8 @@ impl RowChange {
             Self::Insert => &["insert", "remove"],
             Self::Resize => &["taller", "shorter"],
             Self::ScrollSize => &["longer label", "shorter label"],
-            Self::Idle
-            | Self::Text
-            | Self::FlexText
-            | Self::Class
-            | Self::HoveredClass
-            | Self::Scroll => &["every"],
+            Self::Class | Self::HoveredClass => &["add", "remove"],
+            Self::Idle | Self::Text | Self::FlexText | Self::Scroll => &["every"],
         }
     }
 }
