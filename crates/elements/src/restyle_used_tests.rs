@@ -1,6 +1,6 @@
 //! Keyed rows with one computed style share one used style; a row
-//! whose place differs (forged here by writing the arena, as no call
-//! can) derives its own; and the oracle: a used style the table holds
+//! forged into a gpu-surface (by writing the arena, as no call can)
+//! derives its own; and the oracle: a used style the table holds
 //! that differs from the one an element derives (forged in the table)
 //! names the template site and the field.
 
@@ -59,6 +59,12 @@ fn rows_with_one_computed_style_hold_one_used_style() {
     assert!(Rc::ptr_eq(&used[&rows[0]], &used[&rows[1]]));
 }
 
+/// Pins the `surface` bit of the key only. The other place bits cannot
+/// be told apart in a document calls can make: `flex_item` and
+/// `in_inline` follow from the parent's `Used`, already in the key;
+/// `to_viewport` differs only for the unkeyed root and body; and
+/// `text_like_field` follows from the tag and `type`, both in the share
+/// key. Even `surface` needs the forged tag.
 #[test]
 fn a_row_whose_place_differs_derives_its_own_used_style() {
     // Given: padded rows, the second forged into a gpu-surface, whose

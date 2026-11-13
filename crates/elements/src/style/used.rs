@@ -65,17 +65,22 @@ impl Context<'_> {
     /// The facts about the element's place as bits, for the used-style
     /// table's key (`used_share`).
     pub(crate) fn bits(&self) -> u8 {
-        let facts = [
-            self.flex_item,
-            self.in_inline,
-            self.text_like_field,
-            self.surface,
-            self.to_viewport,
-        ];
+        // every field named, so a fact added to `Context` fails to
+        // compile here until it is in the key; one `Kept` fixes these two
+        let Context {
+            initial: _,
+            scale: _,
+            flex_item,
+            in_inline,
+            text_like_field,
+            surface,
+            to_viewport,
+        } = self;
+        let facts = [flex_item, in_inline, text_like_field, surface, to_viewport];
         facts
             .iter()
             .enumerate()
-            .fold(0, |bits, (at, &fact)| bits | (u8::from(fact) << at))
+            .fold(0, |bits, (at, &&fact)| bits | (u8::from(fact) << at))
     }
 }
 
@@ -142,18 +147,33 @@ impl Used {
     /// The first field in which `self` and `other` differ, for the
     /// used-style oracle (`restyle_used`).
     pub(crate) fn differing_field(&self, other: &Self) -> Option<&'static str> {
+        // every field named, so a field added to `Used` fails to compile
+        // here until the oracle compares it
+        let Used {
+            layout,
+            text,
+            background,
+            decoration,
+            cursor,
+            visible,
+            takes_pointer,
+            inline,
+            z_index,
+            scrollbar,
+            parts,
+        } = self;
         [
-            ("layout", self.layout == other.layout),
-            ("text", self.text == other.text),
-            ("background", self.background == other.background),
-            ("decoration", self.decoration == other.decoration),
-            ("cursor", self.cursor == other.cursor),
-            ("visible", self.visible == other.visible),
-            ("takes_pointer", self.takes_pointer == other.takes_pointer),
-            ("inline", self.inline == other.inline),
-            ("z_index", self.z_index == other.z_index),
-            ("scrollbar", self.scrollbar == other.scrollbar),
-            ("parts", self.parts == other.parts),
+            ("layout", *layout == other.layout),
+            ("text", *text == other.text),
+            ("background", *background == other.background),
+            ("decoration", *decoration == other.decoration),
+            ("cursor", *cursor == other.cursor),
+            ("visible", *visible == other.visible),
+            ("takes_pointer", *takes_pointer == other.takes_pointer),
+            ("inline", *inline == other.inline),
+            ("z_index", *z_index == other.z_index),
+            ("scrollbar", *scrollbar == other.scrollbar),
+            ("parts", *parts == other.parts),
         ]
         .into_iter()
         .find(|(_, same)| !same)

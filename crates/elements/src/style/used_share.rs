@@ -32,6 +32,12 @@ impl UsedKey {
             context: context.bits(),
         }
     }
+
+    /// Whether this key's addresses are those of `style` and `parent`.
+    fn names(&self, style: &Rc<Counted>, parent: Option<&Rc<Used>>) -> bool {
+        let parent_address = parent.map_or(0, |p| Rc::as_ptr(p) as usize);
+        self.style == Rc::as_ptr(style) as usize && self.parent == parent_address
+    }
 }
 
 struct Entry {
@@ -54,7 +60,9 @@ impl SharedUsed {
         self.entries.get(key).map(|entry| Rc::clone(&entry.used))
     }
 
-    /// Keeps `used` for `key`, pinning `style` and `parent`.
+    /// Keeps `used` for `key`, pinning `style` and `parent`, which
+    /// must be what `key`'s addresses name: a pin of anything else would
+    /// let a named address be reused while the entry can still be hit.
     pub(crate) fn insert(
         &mut self,
         key: UsedKey,
@@ -62,6 +70,10 @@ impl SharedUsed {
         style: Rc<Counted>,
         parent: Option<Rc<Used>>,
     ) {
+        assert!(
+            key.names(&style, parent.as_ref()),
+            "a used-style entry pins a style or parent its key does not name; restyle_used.rs keep_found looked them up apart from find_used's key. Reproduce with `cargo xtask test`"
+        );
         let entry = Entry {
             used,
             _style: style,

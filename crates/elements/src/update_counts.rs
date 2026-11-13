@@ -46,7 +46,10 @@ pub struct UpdateCounts {
     pub used_shared: usize,
     /// Restyled elements whose used style was derived: one per distinct
     /// entry of the used-style table, and every element whose computed
-    /// style is its own or whose used style is refused.
+    /// style is its own or whose used style is refused. An element
+    /// vapors does not implement (`check::implemented`) has no used
+    /// style and is counted in neither, so the two can add up to less
+    /// than `elements_restyled`.
     pub used_derived: usize,
     /// Layout boxes built from the styled tree: one per element that
     /// is neither `display: none` nor inline (the root, block-level and
