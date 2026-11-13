@@ -7,6 +7,7 @@
 
 mod canonical;
 mod classify;
+mod classify_near;
 mod geometry;
 mod path;
 mod path_lex;
