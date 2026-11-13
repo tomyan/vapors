@@ -37,10 +37,13 @@ impl ImagePipeline {
     /// Build the pipeline for targets of `format`.
     #[must_use]
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("image"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("image.wgsl").into()),
-        });
+        let shader = crate::pipelines::shader_module(
+            device,
+            wgpu::ShaderModuleDescriptor {
+                label: Some("image"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("image.wgsl").into()),
+            },
+        );
         let (layout, view_layout) = (bind_group_layout(device), view_layout(device));
         let pipeline = render_pipeline(device, (&layout, &view_layout), &shader, format);
         let (nearest, smooth) = samplers(device);

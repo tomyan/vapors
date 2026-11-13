@@ -59,10 +59,13 @@ impl TextPipeline {
     /// `atlas`'s coverage page.
     #[must_use]
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat, atlas: &GlyphAtlas) -> Self {
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("text"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("text.wgsl").into()),
-        });
+        let shader = vapors_renderer::pipelines::shader_module(
+            device,
+            wgpu::ShaderModuleDescriptor {
+                label: Some("text"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("text.wgsl").into()),
+            },
+        );
         let layout = bind_group_layout(device);
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("text"),
