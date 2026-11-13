@@ -43,6 +43,12 @@ pub trait Workload {
     fn times_gpu(&self) -> bool {
         true
     }
+    /// The kinds of frame the change alternates between, in the order
+    /// it makes them from frame 0 (warmup counted): the full run
+    /// reports each apart (`frame_kinds.rs`). One kind by default.
+    fn frame_kinds(&self) -> &'static [&'static str] {
+        &["every"]
+    }
 }
 
 /// What the last frame did, counted: the document's update and what the
@@ -107,6 +113,9 @@ pub struct Samples {
     pub instructions: Option<InstructionSamples>,
     /// The last frame's counts.
     pub counts: Counts,
+    /// Frames run before the first kept one: kept frame `j` is frame
+    /// `warmup + j`, which names its kind (`frame_kinds.rs`).
+    pub warmup: usize,
 }
 
 impl Samples {

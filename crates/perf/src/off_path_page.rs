@@ -155,7 +155,9 @@ impl UnitPage {
         }
         let why = match doc.scroll_offset(node) {
             None => "is not a scroll container",
-            Some(_) => "has nothing to scroll: its content fits; give the page more units",
+            Some(_) => {
+                "has nothing to scroll that way: its content fits (for the body, give the page more units)"
+            }
         };
         panic!(
             "the scroller {node:?} neither moves by {delta:?} nor back to its start: it {why} \

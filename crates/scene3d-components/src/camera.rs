@@ -3,7 +3,8 @@
 
 use crate::component::node_component;
 use crate::node::{Mounted, mount_node};
-use vapors_dom::{DynDom, NodeId as ElementId, Snippet};
+use crate::own_keys;
+use vapors_dom::{DynDom, NodeId as ElementId, Snippet, StyleKey};
 use vapors_scene3d::{CameraHandle, NodeKind, Projection, Transform};
 use vapors_signals::Signal;
 
@@ -16,6 +17,14 @@ pub struct CameraProps {
     /// Where it sits in its parent, looking down its own -Z; a change
     /// writes the camera's uniform alone.
     pub transform: Signal<Transform>,
+    /// The anchor's key, which the compiler passes for a tag carrying
+    /// `class`, `class:` or `style`; `None` takes the component's own.
+    pub anchor: Option<&'static StyleKey>,
+}
+
+impl CameraProps {
+    /// Its anchor's tag, which the compiler puts in the key it passes.
+    pub const ANCHOR_TAG: &'static str = "camera";
 }
 
 impl Default for CameraProps {
@@ -24,6 +33,7 @@ impl Default for CameraProps {
             handle: None,
             projection: None,
             transform: Signal::new(Transform::IDENTITY),
+            anchor: None,
         }
     }
 }
@@ -55,7 +65,8 @@ impl Camera {
         let (Some(handle), Some(projection)) = (props.handle, props.projection) else {
             panic!("<Camera> needs handle={{Some(..)}} and projection={{Some(..)}}: pass both")
         };
-        let kind = ("Camera", NodeKind::Camera { handle, projection });
+        let key = own_keys::anchor_key("Camera", props.anchor, &own_keys::CAMERA);
+        let kind = ("Camera", key, NodeKind::Camera { handle, projection });
         let mounted = mount_node(
             dom,
             (parent, before),
