@@ -44,43 +44,74 @@ fn a_changed_stroke_width_fill_rule_or_point_is_another_shape() {
     assert_ne!(others[1].hash(), others[2].hash());
 }
 
+/// `numbers` as little-endian f32 bits.
+fn bits(numbers: &[f32]) -> Vec<u8> {
+    numbers.iter().flat_map(|n| n.to_le_bytes()).collect()
+}
+
 #[test]
-fn the_bytes_are_the_paint_then_each_command_with_its_numbers() {
+fn the_bytes_start_with_the_paint() {
     // When
-    let stroke = canonical("M1 2C3 4 5 6 7 8Q9 10 11 12Z", STROKE);
-    let fill = canonical("M0 0", Paint::Fill(FillRule::NonZero));
+    let stroke = canonical("M0 0", STROKE);
+    let non_zero = canonical("M0 0", Paint::Fill(FillRule::NonZero));
+    let even_odd = canonical("M0 0", Paint::Fill(FillRule::EvenOdd));
 
     // Then
-    let mut expected = vec![b'S'];
-    expected.extend_from_slice(&1.5f32.to_le_bytes());
-    expected.push(b'M');
-    for n in [1.0f32, 2.0] {
-        expected.extend_from_slice(&n.to_le_bytes());
-    }
-    expected.push(b'C');
-    for n in [3.0f32, 4.0, 5.0, 6.0, 7.0, 8.0] {
-        expected.extend_from_slice(&n.to_le_bytes());
-    }
-    expected.push(b'Q');
-    for n in [9.0f32, 10.0, 11.0, 12.0] {
-        expected.extend_from_slice(&n.to_le_bytes());
-    }
-    expected.push(b'Z');
+    assert_eq!(&stroke.bytes()[..5], [&b"S"[..], &bits(&[1.5])].concat());
+    assert_eq!(non_zero.bytes()[0], b'F');
+    assert_eq!(even_odd.bytes()[0], b'E');
+    assert_eq!(non_zero.bytes().len(), 1 + 1 + 8);
+}
+
+#[test]
+fn each_command_is_its_verb_byte_then_its_numbers() {
+    // When
+    let stroke = canonical("M1 2C3 4 5 6 7 8Q9 10 11 12L13 14Z", STROKE);
+
+    // Then
+    let expected = [
+        &b"S"[..],
+        &bits(&[1.5]),
+        b"M",
+        &bits(&[1.0, 2.0]),
+        b"C",
+        &bits(&[3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+        b"Q",
+        &bits(&[9.0, 10.0, 11.0, 12.0]),
+        b"L",
+        &bits(&[13.0, 14.0]),
+        b"Z",
+    ]
+    .concat();
     assert_eq!(stroke.bytes(), expected);
-    // radii large enough for the chord, so the pen leaves them as written
+}
+
+#[test]
+fn an_arc_is_its_radii_rotation_flags_and_end() {
+    // When: radii large enough for the chord, so the pen leaves them
     let arc = canonical("M0 0A8 9 30 1 0 4 4", Paint::Fill(FillRule::NonZero));
-    let mut expected = vec![b'F', b'M', 0, 0, 0, 0, 0, 0, 0, 0, b'A'];
-    for n in [8.0f32, 9.0, 30.0] {
-        expected.extend_from_slice(&n.to_le_bytes());
-    }
-    expected.push(0b01);
-    expected.push(b'>');
-    for n in [4.0f32, 4.0] {
-        expected.extend_from_slice(&n.to_le_bytes());
-    }
+
+    // Then: the flags share one byte, large in bit 0 and sweep in bit 1
+    let expected = [
+        &b"FM"[..],
+        &bits(&[0.0, 0.0]),
+        b"A",
+        &bits(&[8.0, 9.0, 30.0]),
+        b"\x01>",
+        &bits(&[4.0, 4.0]),
+    ]
+    .concat();
     assert_eq!(arc.bytes(), expected);
-    assert_eq!(fill.bytes()[0], b'F');
-    assert_eq!(fill.bytes().len(), 1 + 1 + 8);
+}
+
+#[test]
+fn the_form_folds_the_parsers_rewrites_and_nothing_beyond_f32_arithmetic() {
+    // Then: 0.3 + 0.6 is not 0.9 in f32, so these are two entries (a
+    // cost, never a wrong draw); the module doc says so
+    assert_ne!(
+        canonical("M0.3 0.1l0.6 0", STROKE),
+        canonical("M0.3 0.1L0.9 0.1", STROKE)
+    );
 }
 
 #[test]
