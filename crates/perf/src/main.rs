@@ -1,6 +1,6 @@
 //! Prints the timing baseline (docs/perf): every workload, in a release
 //! build. `cargo run --release -p vapors-perf -- [runs] [warmup]
-//! [--only <substring>] [--instructions] [--scaling <change>] [--mount]
+//! [--only <substring>] [--instructions] [--scaling all|<change>] [--mount]
 //! [--mount-memory <rows>] [--scene-run]`, 200 and 20 by default
 //! (`args.rs`).
 
@@ -13,7 +13,7 @@ use vapors_perf::mount_run;
 use vapors_perf::report::{instructions_section, section};
 use vapors_perf::run::Settings;
 use vapors_perf::sampler::Sampler;
-use vapors_perf::scaling_run;
+use vapors_perf::scaling_all;
 use vapors_perf::scene_run;
 use vapors_perf::select::matching;
 use vapors_perf::spans::PhaseClock;
@@ -58,10 +58,10 @@ fn run() -> Result<(), String> {
         print_setup(&gpu, settings);
         return mount_run::run(&gpu, settings);
     }
-    if let Some(change) = scaling {
+    if let Some(changes) = scaling {
         let gpu = gpu_with(FEATURES);
         print_setup(&gpu, settings);
-        return scaling_run::run(&gpu, change, settings);
+        return scaling_all::run(&gpu, &changes, settings);
     }
     let chosen = matching(workloads(), only.as_deref())?;
     let clock = if instructions {

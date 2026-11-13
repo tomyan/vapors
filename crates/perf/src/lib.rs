@@ -29,6 +29,7 @@ pub mod rss;
 pub mod run;
 pub mod sampler;
 pub mod scaling;
+pub mod scaling_all;
 pub mod scaling_judged;
 pub mod scaling_report;
 pub mod scaling_run;

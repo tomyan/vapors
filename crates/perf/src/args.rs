@@ -11,7 +11,7 @@ pub const MAX_RUNS: usize = (wgpu::QUERY_SET_MAX_QUERIES / 2) as usize;
 
 const USAGE: &str = "cargo run --release -p vapors-perf -- \
                      [runs] [warmup] [--only <substring> (once)] [--instructions] \
-                     [--scaling Idle|Text|FlexText|Class|HoveredClass|Insert] [--mount] [--mount-memory <rows>] \
+                     [--scaling all|Idle|Text|FlexText|Class|HoveredClass|Insert|Resize|Scroll|ScrollSize] [--mount] [--mount-memory <rows>] \
                      [--scene-run]";
 
 /// What the command line asks for.
@@ -23,9 +23,10 @@ pub struct Options {
     pub only: Option<String>,
     /// Report instructions retired per phase instead of times.
     pub instructions: bool,
-    /// Run this change at each size of `scaling::SIZES`, count its
-    /// instructions and judge their growth.
-    pub scaling: Option<RowChange>,
+    /// Run these changes, each at each size of `scaling::SIZES`, count
+    /// their instructions and judge their growth: one named change, or
+    /// every change of [`RowChange::ALL`] for `--scaling all`.
+    pub scaling: Option<Vec<RowChange>>,
     /// Run the Mount workload at each size of `scaling::SIZES`.
     pub mount: bool,
     /// Run the Mount workload at one size, in this process, and print its
@@ -82,7 +83,7 @@ struct Flags {
     counts: Vec<String>,
     only: Option<String>,
     instructions: bool,
-    scaling: Option<RowChange>,
+    scaling: Option<Vec<RowChange>>,
     mount: bool,
     mount_memory: Option<usize>,
     scene_run: bool,
@@ -158,9 +159,15 @@ fn mount_rows(value: Option<String>) -> Result<usize, String> {
         .ok_or_else(|| format!("--mount-memory needs a row count: {USAGE}"))
 }
 
-fn scaling_change(value: Option<String>) -> Result<RowChange, String> {
+fn scaling_change(value: Option<String>) -> Result<Vec<RowChange>, String> {
     let name = value.ok_or_else(|| format!("--scaling needs a change: {USAGE}"))?;
-    RowChange::named(&name).ok_or_else(|| format!("--scaling {name} is not a change: {USAGE}"))
+    if name == "all" {
+        return Ok(RowChange::ALL.to_vec());
+    }
+    let change = RowChange::named(&name);
+    change
+        .map(|change| vec![change])
+        .ok_or_else(|| format!("--scaling {name} is not a change: {USAGE}"))
 }
 
 fn only_value(value: Option<String>) -> Result<String, String> {

@@ -83,6 +83,7 @@ mod report;
 #[path = "report_timeout_tests.rs"]
 mod report_timeout_tests;
 mod run_tmp;
+mod scaling;
 mod sccache;
 #[cfg(test)]
 mod scratch;
@@ -185,6 +186,7 @@ fn main() -> ExitCode {
         Command::Gate { pr: None } => return gate::run(&reporter),
         Command::Gate { pr: Some(number) } => return gate_pr_real::run(number),
         Command::Queue { dry_run } => return queue::run(dry_run),
+        Command::Scaling => return scaling::run(&reporter),
         Command::Lint => steps::lint(),
         Command::Deny => steps::deny_check(),
         Command::Test { tier: Tier::Unit } => steps::unit_tests(),

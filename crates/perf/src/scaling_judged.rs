@@ -13,10 +13,20 @@ use crate::scaling::PhaseSeries;
 /// room over the 0.06% repeat noise. It holds until the splice step
 /// bounds what an insert moves (property 3 of
 /// `docs/plans/perf-finish-line.md`).
-pub const INSERT_A11Y_PER_ROW: u64 = 9500;
+///
+/// Relaxed from 9500 (2026-11-13): main measured 9538, 9541.5 and 9542
+/// per row, the accessibility mirror's per-row cost since #258 tracks
+/// hoisted nodes; 9600 is that rounded up to the next hundred, ten
+/// times the repeat noise. Layout-lane PR 5 (the accessibility mirror
+/// in flow, `docs/plans/splice-layout.md`) retires it, restoring 9500.
+pub const INSERT_A11Y_PER_ROW: u64 = 9600;
 
 /// As [`INSERT_A11Y_PER_ROW`] for `Resize`: recorded at 12,021.
-pub const RESIZE_A11Y_PER_ROW: u64 = 13_000;
+///
+/// Relaxed from 13,000 (2026-11-13) for the same reason: main measured
+/// 13,443 and 13,446.3 per row. Layout-lane PR 5 retires it, restoring
+/// 13,000.
+pub const RESIZE_A11Y_PER_ROW: u64 = 13_500;
 
 /// As [`INSERT_A11Y_PER_ROW`] for `Scroll`: the phase is flat (6789 at
 /// every size: the take reads the scrolled container alone, its rows'
