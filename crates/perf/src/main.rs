@@ -1,7 +1,8 @@
 //! Prints the timing baseline (docs/perf): every workload, in a release
 //! build. `cargo run --release -p vapors-perf -- [runs] [warmup]
 //! [--only <substring>] [--instructions] [--scaling <change>] [--mount]
-//! [--mount-memory <rows>]`, 200 and 20 by default (`args.rs`).
+//! [--mount-memory <rows>] [--scene-run]`, 200 and 20 by default
+//! (`args.rs`).
 
 use vapors_gpu_harness::gpu_with;
 use vapors_perf::args::{Options, options};
@@ -13,6 +14,7 @@ use vapors_perf::report::{instructions_section, section};
 use vapors_perf::run::Settings;
 use vapors_perf::sampler::Sampler;
 use vapors_perf::scaling_run;
+use vapors_perf::scene_run;
 use vapors_perf::select::matching;
 use vapors_perf::spans::PhaseClock;
 use vapors_perf::workloads::{settings_for, workloads};
@@ -37,7 +39,15 @@ fn run() -> Result<(), String> {
         scaling,
         mount,
         mount_memory,
+        scene_run,
     } = options(std::env::args().skip(1))?;
+    if scene_run {
+        return scene_run::run(|| {
+            let gpu = gpu_with(FEATURES);
+            print_adapter(&gpu);
+            gpu
+        });
+    }
     if let Some(rows) = mount_memory {
         let gpu = gpu_with(FEATURES);
         println!("{}", mount_memory::run_child(&gpu, rows)?.line());
@@ -79,6 +89,15 @@ fn run() -> Result<(), String> {
 }
 
 fn print_setup(gpu: &vapors_gpu_harness::Gpu, settings: Settings) {
+    print_adapter(gpu);
+    println!(
+        "Profile: release; scale 1; warmup {}; runs {}",
+        settings.warmup, settings.runs
+    );
+    println!("Load average at the start: {}\n", load());
+}
+
+fn print_adapter(gpu: &vapors_gpu_harness::Gpu) {
     let info = gpu.adapter.get_info();
     println!(
         "Adapter: {} ({:?}, {} {})",
@@ -88,11 +107,6 @@ fn print_setup(gpu: &vapors_gpu_harness::Gpu, settings: Settings) {
         "Timestamp queries: {}",
         gpu.device.features().contains(FEATURES)
     );
-    println!(
-        "Profile: release; scale 1; warmup {}; runs {}",
-        settings.warmup, settings.runs
-    );
-    println!("Load average at the start: {}\n", load());
 }
 
 /// The first three fields of /proc/loadavg, or why they could not be read.

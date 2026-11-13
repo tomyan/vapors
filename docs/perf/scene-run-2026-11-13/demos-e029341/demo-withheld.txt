@@ -1,0 +1,6 @@
+Adapter: Intel(R) UHD Graphics 630 (CML GT2) (Vulkan, Intel open-source Mesa driver Mesa 25.0.7-2+deb13u1)
+Timestamp queries: true
+Frames: 3750, every one judged, no warmup; load average at the start 1.12
+
+vapors: racer ready
+FAIL perf: frame 200: no GPU time was read back

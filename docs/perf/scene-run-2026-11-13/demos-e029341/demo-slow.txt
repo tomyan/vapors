@@ -1,0 +1,49 @@
+Adapter: Intel(R) UHD Graphics 630 (CML GT2) (Vulkan, Intel open-source Mesa driver Mesa 25.0.7-2+deb13u1)
+Timestamp queries: true
+Frames: 3750, every one judged, no warmup; load average at the start 0.80
+
+vapors: racer ready
+### racer, one scene, 60 s
+
+Frames 3750 (3750 planned); over 16.7 ms to idle: 2. Load average (1 minute) at the start 0.80, at the end 1.12.
+
+| time | median µs | p99 µs | max µs |
+|---|---|---|---|
+| frame (CPU) | 2510.9 | 3249.0 | 22476.2 |
+| GPU time | 5104.2 | 5483.3 | 6155.8 |
+| frame to idle | 7233.0 | 7651.5 | 24371.2 |
+
+| per frame | median | max |
+|---|---|---|
+| draw calls | 25 | 25 |
+| buffer bytes | 33344 | 34304 |
+| texture bytes (atlas pages and images) | 0 | 1092268 |
+
+| first frames | CPU µs | GPU µs | to idle µs |
+|---|---|---|---|
+| 0 | 22249.7 | 4465.8 | 24371.2 |
+| 1 | 3717.5 | 4516.3 | 7573.9 |
+| 2 | 1564.2 | 4442.5 | 6061.2 |
+| 3 | 1033.5 | 4502.1 | 5747.1 |
+| 4 | 1179.2 | 4481.9 | 5760.1 |
+| 5 | 1074.8 | 4518.7 | 5793.6 |
+| 6 | 1142.7 | 4496.5 | 5749.0 |
+| 7 | 1175.4 | 4443.6 | 5998.0 |
+| 8 | 2731.1 | 4467.0 | 6542.7 |
+| 9 | 2578.0 | 4398.3 | 6675.0 |
+| 10 | 2604.0 | 4396.5 | 6652.5 |
+| 11 | 2500.8 | 4392.6 | 6396.9 |
+| 12 | 2499.6 | 4391.5 | 6560.6 |
+| 13 | 2642.3 | 4428.8 | 6584.2 |
+| 14 | 2649.2 | 4396.5 | 6415.1 |
+| 15 | 2513.6 | 4400.1 | 6581.7 |
+| 16 | 2506.5 | 4401.4 | 6639.8 |
+| 17 | 2697.5 | 4439.0 | 6799.4 |
+| 18 | 2620.4 | 4398.6 | 6669.1 |
+| 19 | 2719.6 | 4398.8 | 6726.2 |
+
+FAIL perf: 2 frames over 16.7ms from the start of App::frame to the GPU idle:
+frame 0 at 0.000 s: to idle 24371.2 µs, CPU 22249.7 µs, GPU 4465.8 µs; phases (µs) accessibility 0.2, draw 16523.2, encode 271.3, input 0.6, layout 3087.5, paint 74.9, record 0.1, style 2361.6, submit 5843.6, tasks 0.1, tick 0.1, update 5675.6, write 1355.5; draw calls 25, buffer bytes 34304, texture bytes 1092268, restyled 40, scene items 33
+frame 100 at 1.600 s: to idle 22773.6 µs, CPU 22476.2 µs, GPU 5017.2 µs; phases (µs) accessibility 0.7, draw 1752.4, encode 364.4, input 1.0, layout 404.8, paint 84.3, record 0.5, style 25.6, submit 326.2, tasks 0.4, tick 0.4, update 530.9, write 170.8; draw calls 25, buffer bytes 33344, texture bytes 0, restyled 0, scene items 7
+
+reproduce: cargo run --release -p vapors-perf -- --scene-run

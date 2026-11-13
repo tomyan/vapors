@@ -7,6 +7,8 @@
 //! baseline in docs/perf.
 
 pub mod args;
+pub mod circuit;
+pub mod driver;
 pub mod gpu_reading;
 pub mod gpu_time;
 pub mod instruction_samples;
@@ -17,6 +19,8 @@ pub mod mount_memory;
 pub mod mount_report;
 pub mod mount_run;
 pub mod racer;
+pub mod racer_driven;
+pub mod racer_input;
 pub mod report;
 pub mod row_change;
 pub mod rows;
@@ -28,7 +32,11 @@ pub mod scaling;
 pub mod scaling_judged;
 pub mod scaling_report;
 pub mod scaling_run;
+pub mod scene_judge;
+pub mod scene_report;
+pub mod scene_run;
 pub mod select;
+pub mod shader_cache;
 mod span_instructions;
 pub mod spans;
 pub mod stats;

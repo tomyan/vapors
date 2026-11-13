@@ -1,0 +1,3 @@
+Adapter: Intel(R) UHD Graphics 630 (CML GT2) (Vulkan, Intel open-source Mesa driver Mesa 25.0.7-2+deb13u1)
+Timestamp queries: true
+FAIL perf: the 1-minute load average is 2.00 at the start; the run needs under 1.5: wait until `uptime` shows it, then cargo run --release -p vapors-perf -- --scene-run

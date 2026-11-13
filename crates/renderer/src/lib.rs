@@ -42,7 +42,7 @@ pub use frame_arena::{FrameArena, Placed};
 pub use frame_clock::FrameClock;
 pub use frame_encoder::FrameEncoder;
 pub use gpu_time::{GpuMissing, GpuReading, GpuResolution, GpuTime};
-pub use gpu_timer::{DEFAULT_PAIRS, GpuTimer};
+pub use gpu_timer::{DEFAULT_PAIRS, GpuTimer, TIMER_FEATURES};
 pub use image::ImagePipeline;
 pub use image_binding::{Sampling, TextureBinding};
 pub use kept_bind_group::KeptBindGroup;

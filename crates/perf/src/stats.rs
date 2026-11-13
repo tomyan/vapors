@@ -28,6 +28,21 @@ impl Distribution {
     }
 }
 
+/// The nearest-rank `percent` of `samples`; `None` when there are none.
+///
+/// # Panics
+/// `percent` is outside 1 to 100: a caller's mistake, not an empty set.
+#[must_use]
+pub fn nearest_rank(samples: &[Duration], percent: usize) -> Option<Duration> {
+    assert!(
+        (1..=100).contains(&percent),
+        "nearest_rank of percent {percent}: give 1 to 100"
+    );
+    let mut sorted = samples.to_vec();
+    sorted.sort_unstable();
+    sorted.get(rank(sorted.len(), percent)?).copied()
+}
+
 /// The median of `counts` by nearest rank; `None` when there are none.
 #[must_use]
 pub fn median_count(counts: &[u64]) -> Option<u64> {
@@ -82,6 +97,20 @@ mod tests {
     fn the_median_count_is_the_nearest_rank_sample() {
         assert_eq!(super::median_count(&[9, 1, 5, 7]), Some(5));
         assert_eq!(super::median_count(&[]), None);
+    }
+
+    #[test]
+    fn the_99th_percentile_of_200_samples_is_the_198th() {
+        let samples: Vec<u64> = (1..=200).collect();
+        let p99 = super::nearest_rank(&micros(&samples), 99);
+        assert_eq!(p99, Some(Duration::from_micros(198)));
+        assert_eq!(super::nearest_rank(&[], 99), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "give 1 to 100")]
+    fn a_percent_over_100_is_refused_not_read_as_no_samples() {
+        let _ = super::nearest_rank(&micros(&[1]), 101);
     }
 
     #[test]

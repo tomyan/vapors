@@ -1,5 +1,6 @@
 //! The harness's command line: `[runs] [warmup]`, 200 and 20 by default,
-//! with `--only <substring>`, `--instructions` and `--scaling <change>`.
+//! with `--only <substring>`, `--instructions` and `--scaling <change>`,
+//! or one of the modes that replace the full run.
 
 use crate::rows::RowChange;
 use crate::run::Settings;
@@ -10,7 +11,8 @@ pub const MAX_RUNS: usize = (wgpu::QUERY_SET_MAX_QUERIES / 2) as usize;
 
 const USAGE: &str = "cargo run --release -p vapors-perf -- \
                      [runs] [warmup] [--only <substring> (once)] [--instructions] \
-                     [--scaling Idle|Text|FlexText|Class|HoveredClass|Insert] [--mount] [--mount-memory <rows>]";
+                     [--scaling Idle|Text|FlexText|Class|HoveredClass|Insert] [--mount] [--mount-memory <rows>] \
+                     [--scene-run]";
 
 /// What the command line asks for.
 #[derive(Debug)]
@@ -29,6 +31,9 @@ pub struct Options {
     /// Run the Mount workload at one size, in this process, and print its
     /// resident set on one line (`mount_memory`'s child mode).
     pub mount_memory: Option<usize>,
+    /// Run the racer for 60 s of frames, every one judged
+    /// (`scene_run`): no counts, no other flag.
+    pub scene_run: bool,
 }
 
 /// The options `args` name, without the program's name.
@@ -49,6 +54,7 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
         scaling,
         mount,
         mount_memory,
+        scene_run,
     } = flags;
     refuse_scaling_with_others(scaling.is_some(), only.is_some(), instructions)?;
     refuse_mount_with_others([
@@ -57,7 +63,9 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
         ("--scaling", scaling.is_some()),
         ("--mount", mount),
         ("--mount-memory", mount_memory.is_some()),
+        ("--scene-run", scene_run),
     ])?;
+    refuse_counts_with_scene_run(scene_run, &counts)?;
     Ok(Options {
         settings: settings(counts.into_iter())?,
         only,
@@ -65,6 +73,7 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
         scaling,
         mount,
         mount_memory,
+        scene_run,
     })
 }
 
@@ -76,6 +85,7 @@ struct Flags {
     scaling: Option<RowChange>,
     mount: bool,
     mount_memory: Option<usize>,
+    scene_run: bool,
 }
 
 impl Flags {
@@ -86,6 +96,7 @@ impl Flags {
             "--only" => self.only = Some(only_value(rest.next())?),
             "--instructions" => self.instructions = true,
             "--mount" => self.mount = true,
+            "--scene-run" => self.scene_run = true,
             "--mount-memory" => self.mount_memory = Some(mount_rows(rest.next())?),
             "--scaling" if self.scaling.is_some() => {
                 return Err(format!("--scaling given twice: {USAGE}"));
@@ -112,12 +123,12 @@ fn refuse_scaling_with_others(scaling: bool, only: bool, instructions: bool) -> 
     Ok(())
 }
 
-/// `--mount` and `--mount-memory` each replace the full run, always
-/// count instructions where they count, and use fixed sizes or one given
-/// size: nothing to select or add. `modes` is every flag that selects or
-/// replaces, with whether it was given, in the order they may follow:
-/// each of the last two is refused with the flags before it.
-fn refuse_mount_with_others(modes: [(&str, bool); 5]) -> Result<(), String> {
+/// `--mount`, `--mount-memory` and `--scene-run` each replace the full
+/// run with fixed sizes or one given size: nothing to select or add.
+/// `modes` is every flag that selects or replaces, with whether it was
+/// given, in the order they may follow: each from the fourth is refused
+/// with the flags before it.
+fn refuse_mount_with_others(modes: [(&str, bool); 6]) -> Result<(), String> {
     for (at, (mode, _)) in modes.iter().enumerate().skip(3) {
         let given = modes[at].1;
         let other = modes[..at]
@@ -128,6 +139,17 @@ fn refuse_mount_with_others(modes: [(&str, bool); 5]) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// The 60 s run has a fixed length and judges every frame from the
+/// first, so it takes neither runs nor warmup.
+fn refuse_counts_with_scene_run(scene_run: bool, counts: &[String]) -> Result<(), String> {
+    match counts.first() {
+        Some(count) if scene_run => Err(format!(
+            "--scene-run takes no counts (it runs 3750 frames, no warmup), but {count} was given: {USAGE}"
+        )),
+        _ => Ok(()),
+    }
 }
 
 fn mount_rows(value: Option<String>) -> Result<usize, String> {
@@ -167,3 +189,7 @@ fn count(arg: Option<String>, default: usize) -> Result<usize, String> {
 #[cfg(test)]
 #[path = "args_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "args_scene_run_tests.rs"]
+mod scene_run_tests;
