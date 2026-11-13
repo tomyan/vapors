@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use vapors_scene::Color as Rgba;
 
+use super::declared::Declared;
 use crate::ast::ComponentValue;
 use crate::property::PropertyId;
 use crate::value::Value;
@@ -19,6 +20,8 @@ pub struct ComputedStyle {
     pub(crate) color: Rgba,
     /// The sheet and position of each longhand's winning declaration.
     pub(crate) positions: Vec<Option<(usize, crate::Position)>>,
+    /// Which longhands a declaration reached (`declared`).
+    pub(crate) declared: Declared,
 }
 
 impl ComputedStyle {
@@ -72,6 +75,19 @@ impl ComputedStyle {
     #[must_use]
     pub fn declared_in(&self, id: PropertyId) -> Option<usize> {
         self.positions[id.index()].map(|(sheet, _)| sheet)
+    }
+
+    /// Whether a declaration reached `id`'s value: one on this element,
+    /// or on an ancestor for an inherited property. When none did, the
+    /// value is the initial one.
+    #[must_use]
+    pub fn declared(&self, id: PropertyId) -> bool {
+        self.declared.has(id)
+    }
+
+    /// The longhands a declaration reached (`declared`), in table order.
+    pub fn declared_ids(&self) -> impl Iterator<Item = PropertyId> {
+        self.declared.ids()
     }
 
     /// Every longhand with its computed value, in table order.

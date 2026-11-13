@@ -10,7 +10,7 @@ use vapors_scene::Color;
 use super::box_style;
 use super::cursor::{Cursor, cursor};
 use super::decoration::{Decoration, decoration};
-use super::honoured::check_honoured;
+use super::honoured_check::check_honoured;
 use super::inline;
 use super::text_style::{TextStyle, color, text_style};
 use super::values::{Reader, Refusal, Styles, keyword};

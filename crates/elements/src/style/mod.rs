@@ -13,6 +13,7 @@ mod grid_style;
 
 pub(crate) use grid_gate::is_container;
 mod honoured;
+mod honoured_check;
 mod inline;
 pub(crate) mod outline;
 mod overflow;

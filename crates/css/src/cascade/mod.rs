@@ -11,6 +11,7 @@ mod compute;
 mod compute_resolve;
 mod computed;
 mod conditions;
+mod declared;
 mod environment;
 mod font_weight;
 mod inline;

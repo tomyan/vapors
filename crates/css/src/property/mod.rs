@@ -72,7 +72,7 @@ impl PropertyId {
     }
 
     #[allow(clippy::cast_possible_truncation)] // the table has about a hundred entries
-    fn at(index: usize) -> Self {
+    pub(crate) fn at(index: usize) -> Self {
         Self(index as u16)
     }
 
