@@ -14,13 +14,6 @@ use std::process::ExitCode;
 use crate::config::Config;
 use crate::files_walk::{count_lines, workspace_files};
 
-/// The hard limit; the guideline of about 200 is `[quality] file_lines`
-/// and the band between them is for review. 320 is the p99 a lognormal
-/// fit gives the file sizes of main on 2026-11-13 from their median and
-/// p90, the part the old cap of 220 did not squash
-/// (docs/decisions/2026-11-13-quality-thresholds.md).
-pub const DEFAULT_MAX_LINES: usize = 320;
-
 /// The rule as configured.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Rule {
@@ -48,14 +41,15 @@ impl Rule {
     ///
     /// # Errors
     ///
-    /// A message when `max_lines` is not a number.
+    /// A message when `max_lines` is missing or not a number: the limit
+    /// lives in one place, with its reason, and has no default here.
     pub fn from_config(config: &Config) -> Result<Self, String> {
-        let max_lines = match config.get("files.max_lines") {
-            None => DEFAULT_MAX_LINES,
-            Some(text) => text.parse().map_err(|_| {
-                format!(".config/factory.toml: [files] max_lines = \"{text}\" is not a number")
-            })?,
-        };
+        let text = config.get("files.max_lines").ok_or_else(|| {
+            ".config/factory.toml: [files] max_lines is not set; fix: set it, with the measurement it comes from".to_owned()
+        })?;
+        let max_lines = text.parse().map_err(|_| {
+            format!(".config/factory.toml: [files] max_lines = \"{text}\" is not a number")
+        })?;
         Ok(Self {
             max_lines,
             generated: config.entries_under("files.generated."),

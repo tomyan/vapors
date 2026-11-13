@@ -1,24 +1,32 @@
 //! `cargo xtask quality`: the quality signals, advisory and never
 //! failing on what they find. The hard checks sit at the tail of each
 //! distribution (clippy's `too_many_lines` and `cognitive_complexity`
-//! at clippy.toml's thresholds, `[files] max_lines`); the band between
-//! the guideline (`[quality]` in .config/factory.toml) and the hard
-//! limit is for review, and this prints its worst offenders so a
-//! reviewer sees them without counting. `--distributions` prints what
-//! the thresholds were set from: median, p90, p99 and max with the ten
-//! worst, code and tests apart
+//! at clippy.toml's thresholds, `[files] max_lines`, all in `lint` and
+//! `ci`); the band between the guideline (`[quality]` in
+//! .config/factory.toml) and the hard limit is for review, and this
+//! prints the band's worst so a reviewer sees them without counting.
+//! What is over a hard limit is clippy's or check-files' business,
+//! allowed at its site or failing, and is not listed. The nightly run
+//! (`.github/workflows/nightly.yml`) prints it; it is not a step of
+//! `lint` or `ci`, which stay checks that fail loud
 //! (docs/decisions/2026-11-13-quality-thresholds.md).
 //!
-//! The command fails only when it cannot measure: a file that does not
-//! parse, or a threshold it cannot read.
+//! `--distributions` prints the measurement the thresholds were set
+//! from (`quality_distributions.rs`) and fails when xtask's counts have
+//! drifted from clippy's; `--list` prints every sample. The command
+//! fails when it cannot measure: a file that does not parse, a
+//! threshold it cannot read.
 
 use std::path::Path;
 use std::process::ExitCode;
 
 use crate::config::Config;
 use crate::files::Rule;
-use crate::quality_collect::{Collected, Split, collect};
-use crate::quality_stats::{band_lines, summary_lines};
+use crate::quality_clippy::collect_clippy;
+use crate::quality_collect::{Collected, collect};
+use crate::quality_distributions::{Report, distribution_report};
+use crate::quality_join::join;
+use crate::quality_stats::band_lines;
 use crate::quality_thresholds::{Guideline, Hard};
 
 /// What to print.
@@ -26,9 +34,9 @@ use crate::quality_thresholds::{Guideline, Hard};
 pub enum Mode {
     /// The advisory signals.
     Signals,
-    /// The distributions behind the thresholds.
+    /// The distributions behind the thresholds, with clippy's counts.
     Distributions,
-    /// Every sample, for checking against clippy.
+    /// Every sample.
     List,
 }
 
@@ -45,34 +53,47 @@ impl Mode {
 
 /// Run from the workspace root with the command's flags.
 pub fn run(distributions: bool, list: bool) -> ExitCode {
-    match lines(Path::new("."), Mode::from_flags(distributions, list)) {
-        Ok(lines) => {
-            for line in lines {
-                println!("{line}");
-            }
-            ExitCode::SUCCESS
-        }
-        Err(message) => {
+    let report = match report(Path::new("."), Mode::from_flags(distributions, list)) {
+        Ok(report) => report,
+        Err(message) => Report {
+            lines: Vec::new(),
+            refusal: Some(message),
+        },
+    };
+    for line in &report.lines {
+        println!("{line}");
+    }
+    match report.refusal {
+        None => ExitCode::SUCCESS,
+        Some(message) => {
             println!("error: {message}");
             ExitCode::FAILURE
         }
     }
 }
 
-fn lines(root: &Path, mode: Mode) -> Result<Vec<String>, String> {
+fn report(root: &Path, mode: Mode) -> Result<Report, String> {
     let config = Config::load_from(root).map_err(|e| e.to_string())?;
     let collected = collect(root, &Rule::from_config(&config)?.generated)?;
-    match mode {
-        Mode::Distributions => return Ok(distribution_lines(&collected)),
-        Mode::List => return Ok(list_lines(&collected)),
-        Mode::Signals => {}
-    }
-    let guideline = Guideline::from_config(&config)?;
-    let hard = Hard::read(root, &config)?;
-    Ok(signal_lines(&collected, &guideline, &hard))
+    let lines = match mode {
+        Mode::Distributions => {
+            let joined = join(&collected, &collect_clippy(root)?);
+            return Ok(distribution_report(&collected, &joined));
+        }
+        Mode::List => list_lines(&collected),
+        Mode::Signals => {
+            let guideline = Guideline::from_config(&config)?;
+            let hard = Hard::read(root, &config)?;
+            signal_lines(&collected, &guideline, &hard)
+        }
+    };
+    Ok(Report {
+        lines,
+        refusal: None,
+    })
 }
 
-/// The advisory section: four signals, each a count and its worst.
+/// The advisory section: four signals, each the band's count and its worst.
 pub fn signal_lines(collected: &Collected, guideline: &Guideline, hard: &Hard) -> Vec<String> {
     let mut lines = vec![
         "quality signals (advisory; the band from the guideline to the hard limit; `cargo xtask quality`)"
@@ -110,30 +131,6 @@ pub fn signal_lines(collected: &Collected, guideline: &Guideline, hard: &Hard) -
     lines
 }
 
-/// The measurement behind the thresholds.
-pub fn distribution_lines(collected: &Collected) -> Vec<String> {
-    let mut lines = Vec::new();
-    for (name, split) in [
-        ("file lines", &collected.files),
-        (
-            "function code lines (clippy's too_many_lines count)",
-            &collected.function_lines,
-        ),
-        (
-            "cognitive complexity (clippy's count)",
-            &collected.complexity,
-        ),
-    ] {
-        lines.extend(split_lines(name, split));
-    }
-    lines.extend(summary_lines(
-        "field chain hops, code",
-        &collected.chains,
-        10,
-    ));
-    lines
-}
-
 /// Every sample as `<metric>\t<value>\t<where>`.
 pub fn list_lines(collected: &Collected) -> Vec<String> {
     let mut lines = Vec::new();
@@ -149,12 +146,6 @@ pub fn list_lines(collected: &Collected) -> Vec<String> {
                 .map(|s| format!("{metric}\t{}\t{}", s.value, s.label)),
         );
     }
-    lines
-}
-
-fn split_lines(name: &str, split: &Split) -> Vec<String> {
-    let mut lines = summary_lines(&format!("{name}, code"), &split.code, 10);
-    lines.extend(summary_lines(&format!("{name}, tests"), &split.tests, 10));
     lines
 }
 

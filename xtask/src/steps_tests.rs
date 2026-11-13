@@ -92,22 +92,13 @@ fn the_deny_step_checks_every_section_within_its_deadline() {
 }
 
 #[test]
-fn lint_checks_layers_builds_and_imports_after_files_and_ends_with_the_signals() {
+fn lint_checks_layers_builds_and_imports_after_files_and_before_clippy() {
     // When
-    let steps = lint();
-    let names: Vec<&str> = steps.iter().map(|s| s.name.as_str()).collect();
+    let names: Vec<String> = lint().into_iter().map(|s| s.name).collect();
 
     // Then
     assert_eq!(
         names,
-        [
-            "fmt", "files", "layers", "builds", "imports", "clippy", "quality"
-        ]
-    );
-    let quality = steps.last().expect("a step");
-    assert!(quality.advisory, "the signals are printed on a pass");
-    assert!(
-        steps[..6].iter().all(|s| !s.advisory),
-        "every check fails loud"
+        ["fmt", "files", "layers", "builds", "imports", "clippy"]
     );
 }

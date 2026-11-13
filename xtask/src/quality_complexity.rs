@@ -35,9 +35,9 @@ pub fn complexity(body: &syn::Block, output: &ReturnType) -> usize {
     }
 }
 
-/// Whether the declared return type's last segment is `Result`; a
-/// type alias hiding one is not seen, and is counted as clippy's
-/// "not Result" would not be. None has been found on main.
+/// Whether the declared return type's last segment is `Result`. A type
+/// alias of `Result` (`JsResult`, `MapOutcome` on main) is not seen:
+/// clippy resolves it, this does not, a declared gap (module doc).
 fn returns_result(output: &ReturnType) -> bool {
     let ReturnType::Type(_, ty) = output else {
         return false;

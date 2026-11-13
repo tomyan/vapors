@@ -2,11 +2,12 @@
 
 What the review agent in step 4 of the slice loop (CLAUDE.md) judges,
 beyond the "Failure must be loud" rules. The checks measure the tail
-(`cargo xtask lint`: clippy's `too_many_lines` and
+(`cargo xtask lint` and `ci`: clippy's `too_many_lines` and
 `cognitive_complexity` at clippy.toml's thresholds, `[files] max_lines`);
 the band below each hard limit is for the reviewer, and `cargo xtask
-lint` ends with a "quality signals" section listing the worst of it so
-the reviewer does not count. The numbers and where they came from:
+quality` (run before a review, and nightly) lists the worst of it so
+the reviewer does not count; what is over a hard limit is not listed,
+since it is allowed at its site or failing. The numbers and where they came from:
 `docs/decisions/2026-11-13-quality-thresholds.md`.
 
 ## Single responsibility

@@ -36,9 +36,6 @@ pub struct Step {
     /// Its TMPDIR. Not in [`Step::reproduce`]: a run's own is removed
     /// when the run ends.
     pub tmpdir: TmpDir,
-    /// Its output is shown when it passes too: a step that prints
-    /// signals for a reader rather than checking something.
-    pub advisory: bool,
 }
 
 impl Step {
@@ -52,7 +49,6 @@ impl Step {
             dir: None,
             deadline: None,
             tmpdir: TmpDir::Inherit,
-            advisory: false,
         }
     }
 

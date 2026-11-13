@@ -82,6 +82,38 @@ fn test_code_is_flagged_under_cfg_test_and_on_test_functions() {
 }
 
 #[test]
+fn allows_on_the_function_or_an_enclosing_item_are_read() {
+    // Given
+    let source = "\
+#[allow(clippy::cognitive_complexity)]
+mod m {
+    #[allow(clippy::too_many_lines)] // one table
+    pub fn both() {}
+    pub fn complexity_only() {}
+}
+fn neither() {}
+";
+
+    // When
+    let allowed: Vec<(String, bool, bool)> = measure_source(source)
+        .expect("parses")
+        .functions
+        .into_iter()
+        .map(|f| (f.name, f.allowed.lines, f.allowed.complexity))
+        .collect();
+
+    // Then
+    assert_eq!(
+        allowed,
+        [
+            ("both".to_owned(), true, true),
+            ("complexity_only".to_owned(), false, true),
+            ("neither".to_owned(), false, false),
+        ]
+    );
+}
+
+#[test]
 fn a_file_that_is_not_rust_is_refused_naming_the_line() {
     // Given
     let source = "fn ok() {}\nfn broken( {\n";

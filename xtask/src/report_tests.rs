@@ -70,26 +70,6 @@ summary
 }
 
 #[test]
-fn an_advisory_step_that_passed_prints_its_whole_output_with_indentation() {
-    // Given
-    let mut step = Step::new("quality", "cargo", &["xtask", "quality"], "fix");
-    step.advisory = true;
-    let outcome = Outcome {
-        passed: true,
-        output: "signals\n      40  a.rs:1 f\n".to_owned(),
-        duration: Duration::from_secs(1),
-    };
-    let plain = Step::new("fmt", "cargo", &["fmt"], "fix");
-
-    // When / Then
-    assert_eq!(
-        lines_to_print(&step, &outcome),
-        ["signals", "      40  a.rs:1 f"]
-    );
-    assert_eq!(lines_to_print(&plain, &outcome), Vec::<&str>::new());
-}
-
-#[test]
 fn passing_output_has_no_failure_lines() {
     // Given
     let output = "    Finished `dev` profile\n        PASS [   0.01s] xtask steps::tests::x\n";

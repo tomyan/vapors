@@ -27,6 +27,10 @@ fn collected() -> Collected {
     collected.chains.push(sample(2, "a.rs:1 s.a.b"));
     collected.chains.push(sample(4, "a.rs:2 s.a.b.c.d"));
     collected
+        .function_lines
+        .code
+        .push(sample(124, "a.rs:90 allowed_over_the_hard_limit"));
+    collected
 }
 
 fn thresholds() -> (Guideline, Hard) {
@@ -62,6 +66,7 @@ fn the_signals_fit_in_fifteen_lines_with_counts_and_the_worst() {
     );
     assert_eq!(lines[1], "functions over 15 code lines (hard limit 50): 20");
     assert_eq!(lines[2], "      35  a.rs:19 f19");
+    assert_eq!(lines[5], "complexity over 6 (hard limit 12): 20");
     assert!(lines.contains(&"complexity over 6 (hard limit 12): 20".to_owned()));
     assert!(lines.contains(&"files over 220 lines (hard limit 320): 1".to_owned()));
     assert!(lines.contains(&"field chains of 3+ hops: 1".to_owned()));
@@ -69,30 +74,10 @@ fn the_signals_fit_in_fifteen_lines_with_counts_and_the_worst() {
 }
 
 #[test]
-fn the_distributions_cover_each_metric_for_code_and_tests() {
-    // Given / When
-    let lines = distribution_lines(&collected());
-
-    // Then
-    let heads: Vec<&String> = lines.iter().filter(|l| !l.starts_with(' ')).collect();
-    assert_eq!(heads.len(), 7, "{heads:?}");
-    assert!(
-        heads[0].starts_with("file lines, code: n=1 median=230"),
-        "{}",
-        heads[0]
-    );
-    assert!(
-        heads[6].starts_with("field chain hops, code: n=2"),
-        "{}",
-        heads[6]
-    );
-}
-
-#[test]
 fn the_list_is_one_sample_per_line_with_its_metric() {
     let lines = list_lines(&collected());
     assert_eq!(lines[0], "file_lines\t230\ta.rs");
-    assert_eq!(lines.len(), 2 + 20 + 20 + 2);
+    assert_eq!(lines.len(), 2 + 21 + 20 + 2);
 }
 
 #[test]

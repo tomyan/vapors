@@ -29,8 +29,8 @@ impl Reporter {
         println!("{status} {:<8} {}", step.name, seconds(outcome.duration));
         if self.verbose {
             print!("{}", outcome.output);
-        } else {
-            for line in lines_to_print(step, outcome) {
+        } else if !outcome.passed {
+            for line in lines_to_show(&outcome.output) {
                 println!("     {line}");
             }
         }
@@ -66,19 +66,6 @@ fn seconds(duration: Duration) -> String {
 /// What to print for a failing step: its classified lines (diagnostics,
 /// failures, panics) when there are any; otherwise every non-empty
 /// line, because a failing step's cause must never be hidden.
-/// Without `--verbose`: a failure's lines worth reading; an advisory
-/// step's whole output as printed, its indentation kept, since its
-/// lines are for a reader and none is a failure; nothing for a pass.
-pub fn lines_to_print<'a>(step: &Step, outcome: &'a Outcome) -> Vec<&'a str> {
-    if !outcome.passed {
-        return lines_to_show(&outcome.output);
-    }
-    if step.advisory {
-        return outcome.output.lines().map(str::trim_end).collect();
-    }
-    Vec::new()
-}
-
 pub fn lines_to_show(output: &str) -> Vec<&str> {
     let classified = failure_lines(output);
     if !classified.is_empty() {

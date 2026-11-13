@@ -38,8 +38,11 @@ pub fn summary_lines(name: &str, samples: &[Sample], worst: usize) -> Vec<String
     lines
 }
 
-/// The samples over `guideline`: `head`, the hard limit when there is
-/// one, and the count on one line, then the `worst` largest.
+/// The samples in the band, over `guideline` and within `hard` when
+/// there is one (what is over the hard limit is the check's business,
+/// allowed at its site or failing, and would otherwise head every list
+/// on every run): `head`, the hard limit and the count on one line,
+/// then the `worst` largest.
 pub fn band_lines(
     head: &str,
     samples: &[Sample],
@@ -49,13 +52,32 @@ pub fn band_lines(
 ) -> Vec<String> {
     let over: Vec<Sample> = samples
         .iter()
-        .filter(|s| s.value > guideline)
+        .filter(|s| s.value > guideline && hard.is_none_or(|h| s.value <= h))
         .cloned()
         .collect();
     let limit = hard.map_or(String::new(), |h| format!(" (hard limit {h})"));
     let mut lines = vec![format!("{head}{limit}: {}", over.len())];
     lines.extend(worst_lines(&over, worst));
     lines
+}
+
+/// The p99 of a lognormal through the sample's median and p90: the
+/// tail a cap has cut off, read from the part under it. sigma is
+/// ln(p90/median) / 1.2816 (the standard normal's 90th percentile) and
+/// p99 is median * exp(2.3263 * sigma). 0 for an empty sample.
+#[allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)] // line counts are small integers; the fit is rounded back to one
+pub fn fitted_p99(values: &[usize]) -> usize {
+    let median = percentile(values, 50) as f64;
+    let p90 = percentile(values, 90) as f64;
+    if median <= 0.0 || p90 <= 0.0 {
+        return 0;
+    }
+    let sigma = (p90 / median).ln() / 1.2816;
+    (median * (2.3263 * sigma).exp()).round() as usize
 }
 
 /// The `count` largest samples as `    <value>  <label>`, largest first;

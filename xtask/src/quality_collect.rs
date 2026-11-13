@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use crate::files_walk::{count_lines, workspace_files};
-use crate::quality_measure::measure_source;
+use crate::quality_measure::{Function, measure_source};
 use crate::quality_stats::Sample;
 
 /// The measurement, code and tests apart.
@@ -22,6 +22,32 @@ pub struct Collected {
     pub complexity: Split,
     /// Hops per field chain, code only.
     pub chains: Vec<Sample>,
+    /// Every function with where it is, for the join against clippy.
+    pub functions: Vec<Located>,
+}
+
+/// A function and the file it is in.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Located {
+    /// Path from the workspace root.
+    pub path: String,
+    /// The function.
+    pub function: Function,
+    /// In test code, by path or by attribute.
+    pub test: bool,
+}
+
+impl Located {
+    /// A sample of `value` labelled `path:line name`.
+    pub fn sample(&self, value: usize) -> Sample {
+        Sample {
+            value,
+            label: format!(
+                "{}:{} {}",
+                self.path, self.function.line, self.function.name
+            ),
+        }
+    }
 }
 
 /// Samples from code and from tests.
@@ -34,7 +60,8 @@ pub struct Split {
 }
 
 impl Split {
-    fn push(&mut self, test: bool, sample: Sample) {
+    /// Add `sample` to tests or to code.
+    pub fn push(&mut self, test: bool, sample: Sample) {
         if test {
             self.tests.push(sample);
         } else {
@@ -73,7 +100,7 @@ fn add_file(collected: &mut Collected, root: &Path, path: &str) -> Result<(), St
     let full = root.join(path);
     let text = std::fs::read_to_string(&full).map_err(|e| format!("{path}: {e}"))?;
     let measure = measure_source(&text).map_err(|e| {
-        format!("{path}: {e}; fix: make it parse, or list it under [files.generated]")
+        format!("{path}: {e}; fix: make it parse; a hand-written file is never listed as generated")
     })?;
     let test_file = is_test_path(path);
     collected.files.push(
@@ -84,22 +111,18 @@ fn add_file(collected: &mut Collected, root: &Path, path: &str) -> Result<(), St
         },
     );
     for function in measure.functions {
-        let label = format!("{path}:{} {}", function.line, function.name);
-        let is_test = test_file || function.test;
-        collected.function_lines.push(
-            is_test,
-            Sample {
-                value: function.code_lines,
-                label: label.clone(),
-            },
-        );
-        collected.complexity.push(
-            is_test,
-            Sample {
-                value: function.complexity,
-                label,
-            },
-        );
+        let located = Located {
+            path: path.to_owned(),
+            test: test_file || function.test,
+            function,
+        };
+        collected
+            .function_lines
+            .push(located.test, located.sample(located.function.code_lines));
+        collected
+            .complexity
+            .push(located.test, located.sample(located.function.complexity));
+        collected.functions.push(located);
     }
     if !test_file {
         collected

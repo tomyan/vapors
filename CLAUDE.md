@@ -77,9 +77,10 @@ the directory:
   `.config/factory.toml`, clippy's `too_many_lines` and
   `cognitive_complexity` at clippy.toml's thresholds; over one, fix it
   or allow it at the site with a comment naming the one concept it
-  holds). The band below is judged in review (`docs/review.md`); the
-  "quality signals" section `cargo xtask lint` prints lists its worst.
-  A split made only to pass a number is a review finding.
+  holds). The band below is judged in review (`docs/review.md`);
+  `cargo xtask quality` lists its worst, nightly and on demand, and
+  never fails on a finding. A split made only to pass a number is a
+  review finding.
 - Warnings are errors in CI (`-D warnings`, clippy pedantic).
 - Every failure message names the fix and the reproducing command.
 - Where a service asks for a contact address (a crates.io User-Agent,

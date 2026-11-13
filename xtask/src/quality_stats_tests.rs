@@ -23,6 +23,17 @@ fn a_percentile_is_the_value_at_the_nearest_rank() {
 }
 
 #[test]
+fn the_fitted_p99_reads_the_tail_from_the_median_and_p90() {
+    // Given: main's code files on 2026-11-13, median 104 and p90 193
+    let mut values = vec![104; 50];
+    values.extend(vec![193; 50]);
+
+    // When / Then: sigma 0.482, p99 104 * exp(1.121) = 319
+    assert_eq!(fitted_p99(&values), 319);
+    assert_eq!(fitted_p99(&[]), 0);
+}
+
+#[test]
 fn the_worst_come_first_with_ties_in_label_order() {
     // Given
     let samples = [
@@ -55,20 +66,30 @@ fn a_summary_line_holds_the_count_and_percentiles() {
 #[test]
 fn a_band_line_counts_only_what_is_over_the_guideline_and_names_the_hard_limit() {
     // Given
-    let samples = [sample(15, "at"), sample(16, "over"), sample(40, "far")];
+    let samples = [
+        sample(15, "at"),
+        sample(16, "over"),
+        sample(40, "far"),
+        sample(50, "at the hard limit"),
+        sample(80, "allowed over it"),
+    ];
 
     // When
     let with_hard = band_lines("functions over 15 code lines", &samples, 15, Some(50), 5);
     let without = band_lines("field chains of 3+ hops", &samples, 15, None, 1);
 
-    // Then
+    // Then: what is over the hard limit is not in the band
     assert_eq!(
         with_hard,
         [
-            "functions over 15 code lines (hard limit 50): 2",
+            "functions over 15 code lines (hard limit 50): 3",
+            "      50  at the hard limit",
             "      40  far",
             "      16  over"
         ]
     );
-    assert_eq!(without, ["field chains of 3+ hops: 2", "      40  far"]);
+    assert_eq!(
+        without,
+        ["field chains of 3+ hops: 4", "      80  allowed over it"]
+    );
 }

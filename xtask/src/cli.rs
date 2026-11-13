@@ -38,10 +38,12 @@ pub enum Command {
     #[command(hide = true)]
     CheckFiles,
     /// Print the quality signals: functions, complexity, files and field
-    /// chains in the band from the guideline to the hard limit (the
-    /// `quality` step of lint; advisory, never failing on a finding).
+    /// chains in the band from the guideline to the hard limit (nightly
+    /// and on demand; advisory, never failing on a finding).
     Quality {
-        /// Print the distributions the thresholds were set from instead.
+        /// Print the measurement the thresholds were set from instead:
+        /// clippy's counts (a clippy run at threshold 1), the file-cap
+        /// fit, and the agreement of this command's counts with clippy's.
         #[arg(long)]
         distributions: bool,
         /// Print every sample, one per line as `<metric>\t<value>\t<where>`,

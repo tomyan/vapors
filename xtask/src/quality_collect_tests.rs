@@ -75,7 +75,7 @@ fn a_file_that_does_not_parse_is_refused_naming_it_and_the_fix() {
     // Then
     assert!(error.starts_with("crates/a/src/bad.rs: line 1:"), "{error}");
     assert!(
-        error.ends_with("fix: make it parse, or list it under [files.generated]"),
+        error.ends_with("fix: make it parse; a hand-written file is never listed as generated"),
         "{error}"
     );
 }
