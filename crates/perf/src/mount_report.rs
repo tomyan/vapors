@@ -19,7 +19,7 @@ pub struct Measured {
 /// The phases of a first frame: every one, as `accessibility` builds
 /// its tree there and the steady-frame table (`report::PHASES`) leaves
 /// the app's other phases out.
-pub const MOUNT_PHASES: [&str; 13] = crate::report::EVERY_PHASE;
+pub const MOUNT_PHASES: [&str; 14] = crate::report::EVERY_PHASE;
 
 /// Phases that do not contain each other, whose sum is the work from
 /// mount to the end of the first draw. `update`'s own work is `update`

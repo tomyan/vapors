@@ -11,18 +11,20 @@ use crate::run::{Counts, Samples};
 use crate::stats::{Distribution, median_count};
 
 /// The phases reported, in frame order: the app's `update` (which holds
-/// `style`, `layout` and `paint`) and `draw`, which holds `encode` (each
+/// `style`, `layout` and `paint`) and `draw`, which holds `batches` (the
+/// painter reading or making the scene's batches for the view), `encode` (each
 /// draw call's bind group and render pass, and `finish` on the frame's
 /// encoder), `write` (`Queue::write_buffer` and `write_texture`) and
 /// `submit` (`Queue::submit`: once per frame, plus once per glyph atlas
 /// repack and per `gpu-surface` that renders); the rest of draw is the
 /// painter's own work. The app's other phases are [`APP_PHASES`].
-pub const PHASES: [&str; 8] = [
+pub const PHASES: [&str; 9] = [
     "update",
     "style",
     "layout",
     "paint",
     "draw",
+    "batches",
     "encode",
     WRITE_PHASE,
     "submit",
@@ -38,7 +40,7 @@ pub const APP_PHASES: [&str; 5] = ["input", "tasks", "tick", "accessibility", "r
 
 /// Every phase a frame records, in frame order: [`PHASES`] and
 /// [`APP_PHASES`]. What the first frame reports and `--scaling` judges.
-pub const EVERY_PHASE: [&str; 13] = [
+pub const EVERY_PHASE: [&str; 14] = [
     "input",
     "tasks",
     "tick",
@@ -48,6 +50,7 @@ pub const EVERY_PHASE: [&str; 13] = [
     "paint",
     "accessibility",
     "draw",
+    "batches",
     "encode",
     WRITE_PHASE,
     "submit",

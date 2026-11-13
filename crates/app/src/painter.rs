@@ -133,7 +133,9 @@ impl ScenePainter {
     }
 
     fn paint_runs(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
+        let batching = tracing::trace_span!("draw step", phase = "batches").entered();
         let kept = painted.kept_batches(view(target));
+        drop(batching);
         self.counts.culled = kept.batched.culled;
         for (at, (batch, &key)) in kept.batched.batches.iter().zip(&kept.keys).enumerate() {
             match clipped(target, batch.clip).filter(|_| !batch.culled) {
