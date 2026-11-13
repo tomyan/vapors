@@ -69,6 +69,11 @@ pub(crate) struct Extents {
     /// Times a patch made the index afresh since the last take, for
     /// `UpdateCounts`.
     rebuilds: usize,
+    /// Entries the patches moved since the last take, and the blocks
+    /// every frame's entries hold: running totals, so no update sums
+    /// over the frames (`IndexCounts`).
+    moved: usize,
+    blocks: usize,
 }
 
 impl Extents {
@@ -87,6 +92,8 @@ impl Extents {
             frames: FxHashMap::default(),
             at: vec![None; places],
             rebuilds: 0,
+            moved: 0,
+            blocks: 0,
         };
         let mut short: FxHashMap<usize, Vec<Entry>> = FxHashMap::default();
         for (frame, entry) in entries {
@@ -100,7 +107,9 @@ impl Extents {
             }
         }
         for (frame, entries) in short {
-            extents.frames.entry(frame).or_default().sorted(entries);
+            let index = extents.frames.entry(frame).or_default();
+            index.sorted(entries);
+            extents.blocks += index.entries.block_count();
         }
         extents
     }

@@ -11,19 +11,21 @@ use crate::paint_order::Step;
 
 impl Extents {
     /// What the patches since the last take did (`blocks.rs`
-    /// `IndexCounts`): entries moved (a frame dropped with its last
-    /// entry takes its count with it), rebuilds, and the blocks held.
+    /// `IndexCounts`): entries moved, rebuilds, and the blocks held.
     pub(crate) fn take_counts(&mut self) -> IndexCounts {
-        let indexes = self.frames.values_mut();
-        let (moved, blocks) = indexes.fold((0, 0), |(moved, blocks), index| {
-            let entries = &mut index.entries;
-            (moved + entries.take_moved(), blocks + entries.block_count())
-        });
         IndexCounts {
-            moved,
+            moved: std::mem::take(&mut self.moved),
             rebuilds: std::mem::take(&mut self.rebuilds),
-            blocks,
+            blocks: self.blocks,
         }
+    }
+
+    /// Adds what frame `frame`'s entries just did to the running
+    /// totals: the entries moved, and its blocks against `blocks_were`.
+    fn noted(&mut self, frame: usize, blocks_were: usize) {
+        let index = self.frames.get_mut(&frame).expect("a frame just patched");
+        self.moved += index.entries.take_moved();
+        self.blocks = self.blocks + index.entries.block_count() - blocks_were;
     }
 
     /// The entry at `place` made again from `step`'s part in `boxes`:
@@ -76,6 +78,7 @@ impl Extents {
             .frames
             .get_mut(&frame)
             .expect("a frame for every entry");
+        let blocks_were = index.entries.block_count();
         if tall {
             index.items -= index.tall.remove(index.tall_position(place)).items;
         } else {
@@ -83,7 +86,9 @@ impl Extents {
             index.items -= gone.items;
             index.reach_from(next, 0);
         }
-        if index.entries.is_empty() && index.tall.is_empty() {
+        let empty = index.entries.is_empty() && index.tall.is_empty();
+        self.noted(frame, blocks_were);
+        if empty {
             self.frames.remove(&frame);
         }
     }
@@ -98,9 +103,11 @@ impl Extents {
             index.tall.insert(at, entry);
             return;
         }
+        let blocks_were = index.entries.block_count();
         let at = index.entries.partition_point(|e| order(e, &entry).is_lt());
         let at = index.entries.insert(at, entry);
         index.reach_from(at, 1);
+        self.noted(frame, blocks_were);
     }
 }
 
