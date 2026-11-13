@@ -1,16 +1,7 @@
-//! Each geometry the check refuses, and the ones it passes.
+//! Each closed form the check refuses, and the ones it passes; meshes
+//! are checked in `mesh_tests.rs`.
 
 use super::*;
-
-const fn vertex(position: [f32; 2], edges: [f32; 3]) -> MeshVertex {
-    MeshVertex { position, edges }
-}
-
-const TRIANGLE: [MeshVertex; 3] = [
-    vertex([0.0, 0.0], [2.8, 0.0, 0.0]),
-    vertex([4.0, 0.0], [0.0, 4.0, 0.0]),
-    vertex([0.0, 4.0], [0.0, 0.0, 4.0]),
-];
 
 fn rect(size: [f32; 2], radius: [f32; 2]) -> Geometry {
     Geometry::Rect {
@@ -39,9 +30,6 @@ fn drawable_geometries_pass() {
         rect([2.0, 3.0], [0.0, 0.0]),
         rect([2.0, 3.0], [1.0, 1.0]),
         ellipse([8.0, 8.0], [3.0, 3.0]),
-        Geometry::Mesh {
-            triangles: &[TRIANGLE],
-        },
     ];
 
     // When, Then
@@ -124,52 +112,4 @@ fn a_corner_radius_the_box_shader_cannot_draw_is_refused() {
     for (geometry, reason) in &cases {
         refused(geometry, reason);
     }
-}
-
-#[test]
-fn a_mesh_with_no_triangles_is_refused() {
-    // When, Then
-    refused(
-        &Geometry::Mesh { triangles: &[] },
-        "a mesh with no triangles draws nothing",
-    );
-}
-
-#[test]
-fn a_vertex_that_is_not_finite_or_has_a_negative_edge_distance_is_refused_naming_its_place() {
-    // Given
-    static NAN_POSITION: [[MeshVertex; 3]; 2] = [
-        TRIANGLE,
-        [TRIANGLE[0], vertex([f32::NAN, 1.0], [0.0; 3]), TRIANGLE[2]],
-    ];
-    static INFINITE_EDGE: [[MeshVertex; 3]; 1] = [[
-        TRIANGLE[0],
-        TRIANGLE[1],
-        vertex([0.0, 4.0], [0.0, 0.0, f32::INFINITY]),
-    ]];
-    static NEGATIVE_EDGE: [[MeshVertex; 3]; 1] = [[
-        vertex([0.0, 0.0], [-1.0, 0.0, 0.0]),
-        TRIANGLE[1],
-        TRIANGLE[2],
-    ]];
-
-    // When, Then
-    refused(
-        &Geometry::Mesh {
-            triangles: &NAN_POSITION,
-        },
-        "triangle 1 corner 1 MeshVertex { position: [NaN, 1.0], edges: [0.0, 0.0, 0.0] } is not finite or has a negative edge distance",
-    );
-    refused(
-        &Geometry::Mesh {
-            triangles: &INFINITE_EDGE,
-        },
-        "triangle 0 corner 2 MeshVertex { position: [0.0, 4.0], edges: [0.0, 0.0, inf] } is not finite or has a negative edge distance",
-    );
-    refused(
-        &Geometry::Mesh {
-            triangles: &NEGATIVE_EDGE,
-        },
-        "triangle 0 corner 0 MeshVertex { position: [0.0, 0.0], edges: [-1.0, 0.0, 0.0] } is not finite or has a negative edge distance",
-    );
 }
