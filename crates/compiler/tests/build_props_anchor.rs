@@ -47,3 +47,26 @@ fn a_class_directive_and_a_style_are_refused_alike() {
         errors[1]
     );
 }
+
+#[test]
+fn a_wisp_component_declaring_an_anchor_prop_is_still_refused() {
+    // Given: a generated component has no anchor element to make from
+    // the key, whatever props it declares
+    let (src, out) = build::dirs("declared_anchor");
+    build::write(&src, "card.wisp", CARD_WITH_ANCHOR);
+    let page = "<script>\nuse crate::card::{Card, CardProps};\n</script>\n\n<Card class=\"x\" />";
+    build::write(&src, "page.wisp", page);
+
+    // When
+    let errors = props::shown(vapors_compiler::build::compile_dir_into(&src, &out));
+
+    // Then
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(
+        errors[0].contains("`<Card>` takes no `class`"),
+        "{}",
+        errors[0]
+    );
+}
+
+const CARD_WITH_ANCHOR: &str = "<script>\n#[prop]\nlet anchor: Option<&'static vapors_dom::StyleKey> = None;\n</script>\n\n<p>card</p>";

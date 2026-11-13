@@ -126,13 +126,16 @@ the one difference from the brief in this slice.
   defaults. `bind:value={s}` on a component passes the signal itself.
   `class`, `class:name={bool}` and `style` on a component tag are not
   props: the tag gets a style key as an element does, passed as the
-  generated prop `anchor: Some(&KEY)`, and the component creates its
+  generated prop `anchor: Some(&KEY)`, with the tag its props type
+  declares (`CardProps::ANCHOR_TAG`), and the component creates its
   one anchor element from it (`Dom::create_keyed_element`); the
-  directives toggle the element its `anchor_element()` returns. The
-  3D scene components take them (`docs/plans/css-for-3d.md`, C1). A
-  component in the same directory that declares no `anchor` prop is
-  refused at each such attribute; another crate's component without
-  the field fails in rustc at its props struct, naming `anchor`.
+  directives toggle the element its `anchor_element()` returns
+  (`docs/plans/css-for-3d.md`, C1). The 3D scene components take
+  them. Only a Rust component can have an
+  anchor: on a `.wisp` component in the same directory they are
+  refused at each attribute, and another crate's component without the
+  field fails in rustc at its props struct, naming `anchor`. Writing
+  `anchor={..}` on a tag is refused.
 - **Children:** markup inside a component tag is the child's
   `children` prop, a `Snippet`. The child declares it, `#[prop] let
   children: Snippet = Snippet::empty();`, and places it with

@@ -19,11 +19,11 @@ fn a_component_tag_with_classes_passes_its_key_as_the_anchor_prop() {
         "<Mesh class=\"body\" class:braking={on.get()} style=\"color: red\" />",
     );
 
-    // Then: the tag is at line 4, column 1; its key's tag is the
-    // component's name in lower case
+    // Then: the tag is at line 4, column 1; its key's tag is the one
+    // the component's props type declares
     assert_has(
         &code,
-        "static KEY_MESH0: vapors_dom::StyleKey = vapors_dom::StyleKey { site: concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:4:1\"), scope: None, tag: \"mesh\", classes: &[\"body\"], toggles: &[\"braking\"], style: Some(\"color: red\") };",
+        "static KEY_MESH0: vapors_dom::StyleKey = vapors_dom::StyleKey { site: concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:4:1\"), scope: None, tag: MeshProps::ANCHOR_TAG, classes: &[\"body\"], toggles: &[\"braking\"], style: Some(\"color: red\") };",
     );
     assert_has(&code, "anchor: Some(&KEY_MESH0),");
     assert_lacks(&code, "braking:");
@@ -56,18 +56,87 @@ fn a_component_tag_in_a_scoped_component_carries_the_scope() {
     // Then
     assert_has(
         &code,
-        "scope: Some(SCOPE), tag: \"mesh\", classes: &[\"body\"]",
+        "scope: Some(SCOPE), tag: MeshProps::ANCHOR_TAG, classes: &[\"body\"]",
     );
 }
 
 #[test]
-fn a_path_tag_is_keyed_by_its_last_segment() {
-    // When
-    let code = generated("<scene3d::Mesh class=\"body\" />");
+fn the_keys_tag_comes_from_the_props_type_the_tag_names() {
+    // When: a path, and an alias (`use ..::{Group as Section, GroupProps
+    // as SectionProps}`) whose spelling is not the component's tag
+    let path = generated("<scene3d::Mesh class=\"body\" />");
+    let alias = generated("<Section class=\"craft\" />");
 
     // Then
-    assert_has(&code, "tag: \"mesh\", classes: &[\"body\"]");
-    assert_has(&code, "anchor: Some(&KEY_MESH0),");
+    assert_has(
+        &path,
+        "tag: scene3d::MeshProps::ANCHOR_TAG, classes: &[\"body\"]",
+    );
+    assert_has(&path, "anchor: Some(&KEY_MESH0),");
+    assert_has(
+        &alias,
+        "tag: SectionProps::ANCHOR_TAG, classes: &[\"craft\"]",
+    );
+}
+
+#[test]
+fn a_component_inside_an_element_toggles_through_an_unprefixed_binding() {
+    // When: not at the root, where the binding would otherwise be `_mesh1`
+    let code = generated_with(SCRIPT, "<div><Mesh class:braking={on.get()} /></div>");
+
+    // Then
+    assert_has(&code, "let mesh1 = Mesh::mount_before(");
+    assert_has(&code, "let mesh1_anchor = mesh1.anchor_element();");
+    assert_lacks(&code, "_mesh1");
+}
+
+#[test]
+fn a_style_from_an_expression_on_a_component_tag_is_refused() {
+    // When
+    let err = refusal(&format!(
+        "<script>\n{SCRIPT}\n</script>\n<Mesh class=\"body\" style={{css}} />"
+    ))
+    .to_string();
+
+    // Then
+    assert_eq!(
+        err,
+        "counter.wisp:4:20: `style={..}` is refused: the compiler must see every declaration an element can have; write the declarations under a class in the <style> section and toggle it with class:name={condition}"
+    );
+}
+
+#[test]
+fn an_anchor_attribute_on_a_component_tag_is_refused() {
+    // When
+    let err = refusal("<Mesh class=\"body\" anchor={key} />").to_string();
+
+    // Then
+    assert_eq!(
+        err,
+        "counter.wisp:1:20: `anchor` is generated from the tag's `class`, `class:` and `style`: remove `anchor={..}` and style the component with those"
+    );
+}
+
+#[test]
+fn a_component_tag_with_more_directives_than_fit_is_refused_naming_its_component() {
+    // Given
+    let each: Vec<String> = (0..65)
+        .map(|i| format!("class:d{i}={{on.get()}}"))
+        .collect();
+    let text = format!("<script>\n{SCRIPT}\n</script>\n<Mesh {} />", each.join(" "));
+
+    // When
+    let err = refusal(&text).to_string();
+
+    // Then
+    assert!(
+        err.starts_with("counter.wisp:4:1: <Mesh> has 65 `class:` directives"),
+        "{err}"
+    );
+    assert!(
+        err.contains("move some to an element inside <Mesh>"),
+        "{err}"
+    );
 }
 
 #[test]

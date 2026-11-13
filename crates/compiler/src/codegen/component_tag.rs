@@ -8,6 +8,7 @@
 
 use super::allowances::Allowance;
 use super::component_anchor::styles_anchor;
+use super::element_class::is_class_directive;
 use super::emit::{Emitter, Place};
 use crate::CompileError;
 use crate::ast::{AttrValue, ComponentTag, Node};
@@ -93,7 +94,9 @@ impl Emitter<'_> {
 
     /// Mounts the component; returns the binding that holds it.
     fn emit_mount(&mut self, tag: &ComponentTag, var: &str, place: &Place) -> String {
-        let binding = if place.roots {
+        // the anchor toggles read the binding after the mount
+        let read = place.roots || tag.attributes.iter().any(is_class_directive);
+        let binding = if read {
             var.to_string()
         } else {
             format!("_{var}")
