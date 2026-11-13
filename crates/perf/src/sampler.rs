@@ -21,10 +21,13 @@ pub const INTERVAL: Duration = Duration::from_millis(16);
 /// (the racer on lavapipe) is under a second; ten is far beyond it.
 const FRAME_DEADLINE: Duration = Duration::from_secs(10);
 
-/// One frame's measurements: wall time and per-phase times, and, with a
-/// counter, the frame's instructions and each phase's.
+/// One frame's measurements: wall time, the time from the start of the
+/// app's frame to the return of the GPU wait after it (frame-to-idle),
+/// per-phase times, and, with a counter, the frame's instructions and
+/// each phase's.
 struct Measured {
     took: Duration,
+    idle: Duration,
     phases: BTreeMap<String, Duration>,
     instructions: Option<(u64, BTreeMap<String, u64>)>,
 }
@@ -134,29 +137,33 @@ impl<'g> Sampler<'g> {
         self.now += INTERVAL;
         let _ = self.clock.take();
         let _ = self.clock.take_instructions()?;
-        let (next, took, frame_instructions) = self.timed(workload, texture, index, gpu_clock)?;
+        let (next, started, took, frame_instructions) =
+            self.timed(workload, texture, index, gpu_clock)?;
         let phases = self.clock.take();
         let instructions = self.clock.take_instructions()?;
         workload
             .check(next)
             .map_err(|error| format!("frame {index}: {error}"))?;
         wait(&self.gpu.device, FRAME_DEADLINE)?;
+        let idle = started.elapsed();
         let instructions = frame_instructions.zip(instructions);
         Ok(Measured {
             took,
+            idle,
             phases,
             instructions,
         })
     }
 
-    /// The app's frame, its wall time, between the GPU clock's marks.
+    /// The app's frame, when it started and its wall time, between the
+    /// GPU clock's marks.
     fn timed(
         &self,
         workload: &mut dyn Workload,
         texture: &wgpu::Texture,
         index: usize,
         mut gpu_clock: Option<&mut GpuClock>,
-    ) -> Result<(Next, Duration, Option<u64>), String> {
+    ) -> Result<(Next, Instant, Duration, Option<u64>), String> {
         let (device, queue) = (&self.gpu.device, &self.gpu.queue);
         if let Some(clock) = gpu_clock.as_deref_mut() {
             clock.mark(device, queue);
@@ -171,7 +178,7 @@ impl<'g> Sampler<'g> {
         if let Some(clock) = gpu_clock {
             clock.mark(device, queue);
         }
-        Ok((next, took, counted))
+        Ok((next, started, took, counted))
     }
 
     fn frame_of<'a>(&'a self, texture: &'a wgpu::Texture, index: usize) -> Frame<'a> {
@@ -186,3 +193,7 @@ impl<'g> Sampler<'g> {
         }
     }
 }
+
+#[path = "sampler_judged.rs"]
+mod judged;
+pub use judged::JudgedFrame;
