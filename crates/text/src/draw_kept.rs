@@ -4,7 +4,7 @@
 //! the atlas (`atlas_pins.rs`), written into the pipeline's kept buffer
 //! and drawn from it on targets of any viewport, until released. Bytes
 //! built at an atlas generation behind the atlas's name moved glyphs:
-//! build them again.
+//! drawing them panics; build them again.
 
 use vapors_renderer::KeptRange;
 
@@ -14,6 +14,18 @@ use crate::draw::{RenderTarget, Vertices, vertex_bytes};
 use crate::draw_icon::{IconDraw, icon_quads};
 use crate::pipeline::{BlendParams, TextPipeline};
 use crate::quads::{TextDraw, quads};
+
+/// `floats` built with `pins` taken, the pins marked with the atlas
+/// generation the build ended at. A failed build fails in its first
+/// pass, before any pin is taken.
+fn built(
+    atlas: &GlyphAtlas,
+    floats: Result<Vec<f32>, AtlasError>,
+    pins: &mut AtlasPins,
+) -> Result<Vec<f32>, AtlasError> {
+    pins.generation = atlas.generation();
+    floats
+}
 
 impl TextPipeline {
     /// The vertex bytes of `texts` as [`TextPipeline::draw_texts`] draws
@@ -27,8 +39,8 @@ impl TextPipeline {
         texts: &[TextDraw<'_>],
     ) -> Result<(Vec<u8>, AtlasPins), AtlasError> {
         let mut pins = atlas.new_pins();
-        let floats = quads(atlas, texts, Some(&mut pins))?;
-        Ok((vertex_bytes(&floats), pins))
+        let floats = quads(atlas, texts, Some(&mut pins));
+        Ok((vertex_bytes(&built(atlas, floats, &mut pins)?), pins))
     }
 
     /// The vertex bytes of `icons` as [`TextPipeline::draw_icons`] draws
@@ -42,8 +54,8 @@ impl TextPipeline {
         icons: &[IconDraw<'_>],
     ) -> Result<(Vec<u8>, AtlasPins), AtlasError> {
         let mut pins = atlas.new_pins();
-        let floats = icon_quads(atlas, icons, Some(&mut pins))?;
-        Ok((vertex_bytes(&floats), pins))
+        let floats = icon_quads(atlas, icons, Some(&mut pins));
+        Ok((vertex_bytes(&built(atlas, floats, &mut pins)?), pins))
     }
 
     /// Writes `bytes` ([`TextPipeline::text_bytes`] or
@@ -56,25 +68,39 @@ impl TextPipeline {
     ///
     /// If `bytes` is empty: a batch with no ink has nothing to keep.
     pub fn keep(&mut self, target: &RenderTarget<'_>, bytes: &[u8]) -> Option<KeptRange> {
+        assert!(
+            !bytes.is_empty(),
+            "text: kept bytes of a batch with no ink; keep its pins and draw nothing \
+             (draw_kept.rs); reproduce with `cargo xtask test`"
+        );
         let (frame, queue) = (target.encoder, target.queue);
         self.kept.keep(frame, queue, &self.work, bytes)
     }
 
     /// Uploads what changed in `atlas`'s page and draws the vertices
-    /// `kept` holds into `target` with `params`, in one draw call; not
-    /// when the params slot is refused (the refusal is on the encoder).
+    /// `kept` holds, built with `pins`, into `target` with `params`, in
+    /// one draw call; not when the params slot is refused (the refusal
+    /// is on the encoder).
     ///
     /// # Panics
     ///
-    /// If `kept` was kept by another pipeline, or as
-    /// [`TextPipeline::draw`] for the atlas.
+    /// If the atlas's generation moved on since the bytes were built
+    /// (their glyphs may have moved: build them again), if `kept` was
+    /// kept by another pipeline, or as [`TextPipeline::draw`] for the
+    /// atlas.
     pub fn draw_kept(
         &mut self,
         target: &RenderTarget<'_>,
         atlas: &mut GlyphAtlas,
-        kept: &KeptRange,
+        (kept, pins): (&KeptRange, &AtlasPins),
         params: BlendParams,
     ) {
+        let (built, now) = (pins.generation(), atlas.generation());
+        assert_eq!(
+            built, now,
+            "text: kept bytes built at atlas generation {built} drawn at {now}; build them again \
+             when the generation moves on (draw_kept.rs); reproduce with `cargo xtask test`"
+        );
         let Some(params) = self.prepare(target, atlas, params) else {
             return;
         };

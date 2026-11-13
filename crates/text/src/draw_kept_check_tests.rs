@@ -19,7 +19,7 @@ fn placed_bytes_are_the_built_bytes_and_look_nothing_up() {
     let mut system = FontSystem::bundle_only();
     let layout = hello(&mut system);
     let mut atlas = GlyphAtlas::new(AtlasConfig::fixed(256));
-    let (built, _pins) = TextPipeline::text_bytes(&mut atlas, &[draw(&layout)]).expect("built");
+    let (built, pins) = TextPipeline::text_bytes(&mut atlas, &[draw(&layout)]).expect("built");
     let lookups = atlas.lookups();
 
     // When
@@ -28,6 +28,7 @@ fn placed_bytes_are_the_built_bytes_and_look_nothing_up() {
     // Then
     assert_eq!(placed, Some(built));
     assert_eq!(atlas.lookups(), lookups);
+    atlas.unpin(pins);
 }
 
 #[test]

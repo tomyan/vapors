@@ -63,7 +63,7 @@ fn pins_on(atlas: &GlyphAtlas, id: u32) -> Option<u32> {
 #[test]
 fn a_pinned_glyph_is_kept_and_the_least_recent_unpinned_one_evicted() {
     // Given: the least recently used glyph is pinned
-    let (mut atlas, _pins) = page_of_two(true, false);
+    let (mut atlas, pins) = page_of_two(true, false);
 
     // When
     atlas.make_room(4, 12).expect("room");
@@ -72,6 +72,7 @@ fn a_pinned_glyph_is_kept_and_the_least_recent_unpinned_one_evicted() {
     assert_eq!(pins_on(&atlas, 1), Some(1));
     assert_eq!(pins_on(&atlas, 2), None);
     assert_eq!(atlas.evictions(), 1);
+    atlas.unpin(pins);
 }
 
 #[test]
@@ -148,6 +149,7 @@ fn each_glyph_of_a_text_is_pinned_once_on_the_second_pass_and_lookups_are_counte
     assert_eq!(pins.len(), 2);
     assert_eq!(atlas.lookups(), 4);
     assert!(atlas.entries.values().all(|entry| entry.pins == 1));
+    atlas.unpin(pins);
 }
 
 #[test]
@@ -156,7 +158,13 @@ fn pins_made_before_a_clear_and_taken_after_it_are_given_back() {
     // when a build's first pass clears them
     let (mut atlas, held) = page_of_two(true, false);
     let mut pins = atlas.new_pins();
+    let generation = atlas.generation();
     assert!(atlas.unpin_all());
+    assert_eq!(
+        atlas.generation(),
+        generation + 1,
+        "the clear moves it on itself"
+    );
 
     // When
     atlas.pin(&key(2), Some(&mut pins));
@@ -165,4 +173,14 @@ fn pins_made_before_a_clear_and_taken_after_it_are_given_back() {
     // Then
     assert_eq!(pins_on(&atlas, 2), Some(0));
     atlas.unpin(held); // void: taken before the clear
+}
+
+#[test]
+#[should_panic(expected = "1 atlas pins dropped without GlyphAtlas::unpin")]
+fn pins_dropped_without_being_given_back_panic_in_a_debug_build() {
+    // Given
+    let (_atlas, pins) = page_of_two(true, false);
+
+    // When
+    drop(pins);
 }

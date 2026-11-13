@@ -184,5 +184,10 @@ pub(crate) fn vertex_bytes(floats: &[f32]) -> Vec<u8> {
 
 /// How many vertices `bytes` bytes hold.
 pub(crate) fn vertex_count(bytes: u64) -> u32 {
-    u32::try_from(bytes / VERTEX_SIZE).expect("more text vertices in one batch than fit u32")
+    u32::try_from(bytes / VERTEX_SIZE).unwrap_or_else(|_| {
+        panic!(
+            "{bytes} bytes of text vertices in one draw, more vertices than fit u32: split the \
+             run into smaller batches (draw.rs); reproduce with `cargo xtask test`"
+        )
+    })
 }
