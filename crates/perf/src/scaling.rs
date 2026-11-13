@@ -91,11 +91,14 @@ impl Scaling {
                 &self.rows,
                 ceiling,
             )),
-            Judged::EveryPhase => Ok(self
-                .phases
-                .iter()
-                .flat_map(|series| self.beyond_tolerance(series))
-                .collect()),
+            Judged::EveryPhase => Ok(self.beyond_tolerances(|_| TOLERANCE_PERCENT)),
+            Judged::EveryPhaseRelaxed { phase, percent } => Ok(self.beyond_tolerances(|named| {
+                if named == phase {
+                    percent
+                } else {
+                    TOLERANCE_PERCENT
+                }
+            })),
         }
     }
 
@@ -106,19 +109,28 @@ impl Scaling {
             .ok_or_else(|| format!("scaling: no count for phase {phase}, so it cannot be judged"))
     }
 
+    /// Every phase's violations, each phase held to `percent_of(phase)`.
+    fn beyond_tolerances(&self, percent_of: impl Fn(&str) -> u64) -> Vec<String> {
+        self.phases
+            .iter()
+            .flat_map(|series| self.beyond_tolerance(series, percent_of(&series.phase)))
+            .collect()
+    }
+
     fn beyond_tolerance<'a>(
         &'a self,
         series: &'a PhaseSeries,
+        percent: u64,
     ) -> impl Iterator<Item = String> + 'a {
         (1..self.rows.len())
-            .filter(move |&at| grew_beyond_both(series.counts[0], series.counts[at]))
-            .map(move |at| self.violation(series, at))
+            .filter(move |&at| grew_beyond_both(series.counts[0], series.counts[at], percent))
+            .map(move |at| self.violation(series, at, percent))
     }
 
-    fn violation(&self, series: &PhaseSeries, at: usize) -> String {
+    fn violation(&self, series: &PhaseSeries, at: usize, percent: u64) -> String {
         format!(
             "{} grows with the page: {} instructions at {} rows, {} at {} rows, \
-             {:.1} instructions per extra row (over {TOLERANCE_PERCENT}% and \
+             {:.1} instructions per extra row (over {percent}% and \
              {MIN_GROWTH_INSTRUCTIONS} instructions above the first size)",
             series.phase,
             series.counts[0],
@@ -140,10 +152,10 @@ impl PhaseSeries {
     }
 }
 
-/// `count` is above `first` by more than [`TOLERANCE_PERCENT`] and by
-/// more than [`MIN_GROWTH_INSTRUCTIONS`].
-fn grew_beyond_both(first: u64, count: u64) -> bool {
-    let ceiling = u128::from(first) * u128::from(100 + TOLERANCE_PERCENT);
+/// `count` is above `first` by more than `percent` and by more than
+/// [`MIN_GROWTH_INSTRUCTIONS`].
+fn grew_beyond_both(first: u64, count: u64, percent: u64) -> bool {
+    let ceiling = u128::from(first) * u128::from(100 + percent);
     let above_percent = u128::from(count) * 100 > ceiling;
     above_percent && count.saturating_sub(first) > MIN_GROWTH_INSTRUCTIONS
 }
@@ -175,3 +187,7 @@ fn extra_phase(first: &AtSize, size: &AtSize) -> Option<String> {
 #[cfg(test)]
 #[path = "scaling_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "scaling_relaxed_tests.rs"]
+mod relaxed_tests;
