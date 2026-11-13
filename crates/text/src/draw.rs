@@ -4,7 +4,7 @@
 
 use crate::atlas::{AtlasError, GlyphAtlas};
 use crate::layout::Layout;
-use vapors_renderer::{KeptRange, Placed};
+use vapors_renderer::{KeptRange, Placed, Shift};
 use vapors_scene::Size;
 
 use crate::pipeline::{self, BlendParams, PARAMS_SIZE, TextPipeline, VERTEX_SIZE};
@@ -74,7 +74,7 @@ impl TextPipeline {
         quads: &[f32],
         params: BlendParams,
     ) {
-        let Some(params) = self.prepare(target, atlas, (params, [0.0; 2])) else {
+        let Some(params) = self.prepare(target, atlas, (params, Shift::NONE)) else {
             return;
         };
         self.draw_quads(target, quads, params);
@@ -91,7 +91,7 @@ impl TextPipeline {
         &mut self,
         target: &RenderTarget<'_>,
         atlas: &mut GlyphAtlas,
-        (params, shift): (BlendParams, [f32; 2]),
+        (params, shift): (BlendParams, Shift),
     ) -> Option<u32> {
         self.match_page_size(target.device, atlas);
         self.upload_page(target, atlas);
@@ -163,7 +163,8 @@ pub(crate) enum Vertices<'a> {
 /// The params uniform's bytes: gamma, contrast, the viewport's width
 /// and height and `shift`, in device pixels.
 #[allow(clippy::cast_precision_loss)] // viewports are far below 2^24 pixels
-fn params_bytes(params: BlendParams, viewport: Size, [dx, dy]: [f32; 2]) -> [u8; PARAMS_SIZE] {
+fn params_bytes(params: BlendParams, viewport: Size, shift: Shift) -> [u8; PARAMS_SIZE] {
+    let [dx, dy] = shift.pixels();
     let floats = [
         params.gamma,
         params.contrast,

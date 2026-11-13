@@ -19,6 +19,11 @@ use vapors_scene::{Batch, Batched};
 use crate::frames_draw::BatchFrame;
 use crate::run_bits::same_bits;
 
+/// How many of the new batches after the common prefix are looked for
+/// among the old ones: a scroll by one row or a row put in drops or adds
+/// a few batches before the first that stayed.
+const OFFSET_SEARCH: usize = 8;
+
 /// The next key handed out, on any thread: no two batches of any
 /// document share one.
 static NEXT: AtomicU64 = AtomicU64::new(1);
@@ -94,7 +99,9 @@ impl KeptBatched {
     /// one of `self`'s there has, to that one; else the difference in
     /// their counts, which matches them by place from the end. A scroll
     /// drops batches at one edge and adds them at the other; a batch put
-    /// in or taken out moves those after it.
+    /// in or taken out moves those after it. Only the first
+    /// `OFFSET_SEARCH` batches after the prefix are looked for, so the
+    /// search is O(shown batches) when nothing matches (a reflow).
     fn offset_after(&self, batched: &Batched, prefix: usize) -> isize {
         let (was, now) = (&self.batched.batches, &batched.batches);
         let in_was = |batch: &Batch| {
@@ -102,10 +109,8 @@ impl KeptBatched {
             after.iter().position(|was| same_bits(&was.run, &batch.run))
         };
         let after = now.get(prefix..).unwrap_or_default();
-        let first = after
-            .iter()
-            .enumerate()
-            .find_map(|(at, now)| Some((at, in_was(now)?)));
+        let mut searched = after.iter().take(OFFSET_SEARCH).enumerate();
+        let first = searched.find_map(|(at, now)| Some((at, in_was(now)?)));
         first.map_or_else(
             || count(was.len()) - count(now.len()),
             |(now, was)| count(was) - count(now),

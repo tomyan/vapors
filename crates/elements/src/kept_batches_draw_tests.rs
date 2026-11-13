@@ -35,12 +35,12 @@ const UPDATE_VIEWPORT: crate::update::Viewport = crate::update::Viewport {
 fn a_second_draw_at_the_same_view_after_an_idle_update_makes_no_batches() {
     // Given: drawn once
     let mut doc = drawn_document();
-    _ = doc.painted.as_ref().expect("painted").batches(VIEW);
+    _ = doc.painted.as_ref().expect("painted").kept_batches(VIEW);
     let before = crate::kept_batches::BUILDS.with(std::cell::Cell::get);
 
     // When: an update that changes nothing, and a draw at the same view
     let painted = doc.update(UPDATE_VIEWPORT).expect("updates");
-    _ = painted.batches(VIEW);
+    _ = painted.kept_batches(VIEW);
 
     // Then
     assert_eq!(
@@ -55,8 +55,8 @@ fn making_batches_while_a_ref_is_held_names_the_fix() {
     // Given: a draw whose Ref is held
     let doc = drawn_document();
     let painted = doc.painted.as_ref().expect("painted");
-    let _held = painted.batches(VIEW);
+    let _held = painted.kept_batches(VIEW);
 
     // When: a draw at another view
-    _ = painted.batches(Rect::new(0.0, 0.0, 50.0, 50.0));
+    _ = painted.kept_batches(Rect::new(0.0, 0.0, 50.0, 50.0));
 }

@@ -12,7 +12,7 @@ use crate::frame_arena::{FrameArena, Placed};
 use crate::kept_bind_group::KeptBindGroup;
 use crate::quads_setup::{bind_group_layout, render_pipeline};
 use crate::uniform_slots::UniformSlots;
-use crate::{KeptRange, Retained, Target, WorkCounter};
+use crate::{KeptRange, Retained, Shift, Target, WorkCounter};
 
 const VERTICES_PER_QUAD: u32 = 6;
 
@@ -78,7 +78,7 @@ impl Instanced {
         let Some(instances) = self.instances.push(frame, queue, &self.work, bytes) else {
             return;
         };
-        let Some(viewport) = self.viewport_slot(target, [0.0; 2]) else {
+        let Some(viewport) = self.viewport_slot(target, Shift::NONE) else {
             return;
         };
         self.record(target, count, Instances::Placed(&instances), viewport);
@@ -107,7 +107,7 @@ impl Instanced {
     /// Draws the instances `kept` holds, moved by `shift` (device
     /// pixels); not when the viewport slot is refused (the refusal is on
     /// the encoder).
-    pub(crate) fn draw_kept(&mut self, target: &Target<'_>, kept: &KeptRange, shift: [f32; 2]) {
+    pub(crate) fn draw_kept(&mut self, target: &Target<'_>, kept: &KeptRange, shift: Shift) {
         let count = self.count(self.kept.len(kept));
         let Some(viewport) = self.viewport_slot(target, shift) else {
             return;
@@ -142,7 +142,7 @@ impl Instanced {
 
     /// The dynamic offset of the target's viewport and `shift` in the
     /// slots.
-    fn viewport_slot(&mut self, target: &Target<'_>, shift: [f32; 2]) -> Option<u32> {
+    fn viewport_slot(&mut self, target: &Target<'_>, shift: Shift) -> Option<u32> {
         let viewport = viewport_bytes(target.viewport, shift);
         let (frame, queue) = (target.encoder, target.queue);
         self.viewports.slot(frame, queue, &self.work, viewport)
@@ -190,7 +190,8 @@ enum Instances<'a> {
 
 /// The viewport uniform's bytes: its size and `shift`, two floats each.
 #[allow(clippy::cast_precision_loss)] // viewports are far below 2^24 pixels
-pub(crate) fn viewport_bytes(viewport: Size, [dx, dy]: [f32; 2]) -> [u8; 16] {
+pub(crate) fn viewport_bytes(viewport: Size, shift: Shift) -> [u8; 16] {
+    let [dx, dy] = shift.pixels();
     let floats = [viewport.width as f32, viewport.height as f32, dx, dy];
     let mut bytes = [0; 16];
     for (at, float) in floats.into_iter().enumerate() {

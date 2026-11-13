@@ -13,7 +13,7 @@ use std::rc::Rc;
 
 use vapors_elements::Painted;
 use vapors_platform::Instant;
-use vapors_renderer::{GpuWork, ImagePipeline, KeptRange, Target, WorkCounter};
+use vapors_renderer::{GpuWork, ImagePipeline, KeptRange, Shift, Target, WorkCounter};
 use vapors_scene::{Item, Rect, Run};
 
 use super::errors::{MountError, PaintError};
@@ -130,7 +130,7 @@ impl Surfaces {
         pipeline: &mut ImagePipeline,
         target: &Target<'_>,
         painted: &Painted,
-        (items, kept, shift): (&[Item], &KeptRange, [f32; 2]),
+        (items, kept, shift): (&[Item], &KeptRange, Shift),
     ) -> Result<(), PaintError> {
         for (place, (name, size, _)) in (0..).zip(surfaces(painted, items)) {
             let mounted = unmounted_refused(&mut self.mounted, name)?;

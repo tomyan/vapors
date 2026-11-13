@@ -463,15 +463,23 @@ keys):
   offset finds no match, keys are matched from the end, unless the
   offset already gave that old batch's key to another batch. The offset
   keeps a scroll's batches. Matching from the end keeps Resize's
-  batches in place. The search compares O(shown batches²) runs at worst,
-  each comparison stopping at the first difference.
+  batches in place. The search looks for the first 8 new batches after
+  the prefix only, so it compares O(shown batches) runs when nothing
+  matches (a reflow, review of #267 L4).
 - The debug build checks the kept batches against a fresh batching in
   frames. It also checks that their items, put on the page by their
   frames, are the items batching the page draws, in the same order
   (`kept_batches_check.rs`).
+- `Painted::batches` is gone: batches in frame coordinates mean
+  nothing without their frames, so callers read `Painted::kept_batches`.
 - Measured (`docs/perf/iu4-4c-2026-11-13.md`): Scroll writes 5 of 53
-  batches. Its draw is still O(rows) through the `batches` step until
+  batches. An insert outside the view writes none; one inside it moves
+  the rows below it in their frame, and their batches are written. Its draw is still O(rows) through the `batches` step until
   PR 5.
+4c-i (review at 015ead5, L5): the painter passes `Shift::NONE` at
+4c-i's head, so its forwarding of each frame's shift is pinned only in
+4c-ii. 4c-ii must include a pixel test that only the correct shift
+passes, at a scale other than 1.
 
 PR 5 as built (2026-11-13):
 
