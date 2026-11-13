@@ -70,6 +70,9 @@ max_lines = "220"
 # vapors-components: any `Dom` mounts them, so they reach the tree only
 # through vapors-dom (doc 03, "A component's own events").
 "vapors-components" = "vapors-elements, vapors-platform, vapors-app, vapors-renderer, vapors-gpu, vapors-canvas, vapors-text, vapors-css"
+# vapors-shapes: no GPU and no text dependency (docs/plans/one-scene.md
+# 1.1), so the compiler can take it without building wgpu or the fonts.
+"vapors-shapes" = "vapors-text, vapors-renderer, vapors-gpu, vapors-scene, vapors-platform, vapors-app, vapors-canvas, vapors-elements, wgpu, parley, fontique, skrifa"
 
 # `[gate] twin` names a sibling checkout whose xtask must equal this
 # one's (xtask/src/gate_twin.rs). vapors sets none: xtask changes land

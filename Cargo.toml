@@ -40,6 +40,10 @@ vapors-canvas = { path = "crates/canvas", default-features = false }
 # crates turn it on, so an app can turn it off (crates/text/Cargo.toml
 # says what that costs).
 vapors-text = { path = "crates/text", default-features = false }
+# Pinned exactly: vapors-shapes parses path data into zeno's commands and
+# vapors-text strokes them, so the two must be one zeno; and the
+# rasteriser's output is what the comparison page signed off.
+zeno = { version = "=0.3.3", default-features = false, features = ["std", "eval"] }
 vapors-css = { path = "crates/css" }
 vapors-signals = { path = "crates/signals" }
 vapors-dom = { path = "crates/dom" }
