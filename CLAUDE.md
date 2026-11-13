@@ -30,9 +30,9 @@ cargo xtask test          one tier (default unit)
 cargo xtask scaling       vapors-perf's scaling judge (`--scaling all`, every change) in
                           release on a clean tree; ends `scaling: pass|fail <sha>`
 scripts/nightly-scaling.sh [--install]
-                          that judge on origin/main in ~/.cache/w-nightly/vapors, failures
-                          in one GitHub issue, closed on a pass; --install writes the
-                          systemd --user timer (03:00) and does not enable it:
+                          that judge on origin/main in ~/.cache/w-nightly/vapors, a GitHub
+                          issue per failing change, closed when it passes; --install writes
+                          the systemd --user timer (03:00) and does not enable it:
                           systemctl --user enable --now vapors-nightly-scaling.timer
 cargo run -p vapors-app --example demo -- hello
                           an F2c demo in a window (crates/demos)
