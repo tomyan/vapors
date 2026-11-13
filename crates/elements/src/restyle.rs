@@ -100,6 +100,28 @@ impl Document {
         }
     }
 
+    /// Marks what moving `child` out of `old` to `parent` redoes: `old`'s
+    /// children, and, when `parent` is not under the root, nothing kept
+    /// for the subtree stays: a refusal kept for a node no walk of the
+    /// tree finds would refuse the next update as unmarked
+    /// (`style_checks.rs`, `walked`).
+    pub(crate) fn mark_moved_out(&mut self, old: NodeId, child: NodeId, parent: NodeId) {
+        self.mark_children_changed(old, child, false);
+        self.boxes.marks.mark_children(old);
+        if !self.attached(parent) {
+            self.forget_subtree(child);
+        }
+    }
+
+    /// Marks what a change to the text node `node` redoes: its own
+    /// check (right-to-left text, `check.rs`) and its parent's box.
+    pub(crate) fn mark_text_changed(&mut self, node: NodeId) {
+        self.checks.marked.insert(node);
+        if let Some(parent) = self.arena.get(node, "set_text").parent {
+            self.boxes.marks.mark(parent);
+        }
+    }
+
     /// Marks what `flag` flipping on `node` restyles, as the sheets'
     /// selectors use it (`Cascade::restyle_scope_of_selectors`): a flag
     /// only on a subject compound restyles the element alone, and its

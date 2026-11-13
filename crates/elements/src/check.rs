@@ -1,6 +1,8 @@
 //! The refusals that follow from the tree itself: tags and listeners
 //! the elements crate does not implement yet, for elements under the
-//! root. Asked of the tree on each update, so removing the element
+//! root, and right-to-left text, for text nodes. Each is a node's own,
+//! read from that node alone, so a node is checked without reading its
+//! children. Asked of the tree on each update, so removing the node
 //! removes the refusal.
 
 use std::fmt::Write;
@@ -29,58 +31,85 @@ pub(crate) fn elements(arena: &Arena, root: NodeId) -> Vec<NodeId> {
     out
 }
 
-/// The refusals for tags and listeners under `root`.
+/// Every node under `root`, root first, in document order.
+pub(crate) fn nodes(arena: &Arena, root: NodeId) -> Vec<NodeId> {
+    let mut out = Vec::new();
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        out.push(node);
+        stack.extend(arena.children(node).into_iter().rev());
+    }
+    out
+}
+
+/// The refusals for tags, listeners and text under `root`.
 pub(crate) fn check_tree(
     arena: &Arena,
     root: NodeId,
     declared: &std::collections::BTreeSet<String>,
 ) -> Vec<ElementError> {
-    elements(arena, root)
+    nodes(arena, root)
         .into_iter()
-        .flat_map(|node| check_element(arena, node, declared))
+        .flat_map(|node| check_node(arena, node, declared))
         .collect()
 }
 
-/// The refusals for `node`'s tag, attributes, text and listeners, and
-/// the calls refused on it (`dom_keyed`).
-pub(crate) fn check_element(
+/// The refusals for `node` alone: an element's (`check_element`), or
+/// a text node's right-to-left text, named for its parent. The checks
+/// are given the node's own data and a name for messages, not the
+/// arena, so none can read its children: a parent whose children
+/// changed is checked in constant time
+/// (`docs/perf/insert-style-2026-11-13.md`).
+pub(crate) fn check_node(
     arena: &Arena,
     node: NodeId,
     declared: &std::collections::BTreeSet<String>,
 ) -> Vec<ElementError> {
-    let Kind::Element(element) = &arena.get(node, "check").kind else {
-        return Vec::new();
-    };
+    let found = arena.get(node, "check");
+    match &found.kind {
+        Kind::Element(element) => check_element(element, &|| describe(arena, node), declared),
+        Kind::Text(text) => {
+            let parent = found.parent.unwrap_or(node);
+            right_to_left_text(text, &|| describe(arena, parent))
+                .into_iter()
+                .collect()
+        }
+    }
+}
+
+/// The refusals for `element`'s tag, attributes and listeners, and the
+/// calls refused on it (`dom_keyed`); `named` describes it in messages.
+fn check_element(
+    element: &crate::node::Element,
+    named: &dyn Fn() -> String,
+    declared: &std::collections::BTreeSet<String>,
+) -> Vec<ElementError> {
     let mut errors: Vec<ElementError> = tags::unsupported(&element.tag)
         .map(ElementError::UnsupportedTag)
         .into_iter()
         .collect();
-    errors.extend(attribute_refusals(arena, node, element));
+    errors.extend(attribute_refusals(element, named));
     errors.extend(element.refused.iter().cloned().map(ElementError::Refused));
-    errors.extend(right_to_left_text(arena, node));
     for (event, _) in &element.listeners {
         if let Some(refusal) = tags::unfired(event).filter(|_| !declared.contains(event)) {
             errors.push(ElementError::UnfiredEvent(format!(
                 "{}: {refusal}",
-                describe(arena, node)
+                named()
             )));
         }
     }
     errors
 }
 
-/// A refusal when a text child of `node` holds right-to-left text,
-/// which is not laid out right to left yet.
-fn right_to_left_text(arena: &Arena, node: NodeId) -> Option<ElementError> {
-    let found = arena.children(node).into_iter().find_map(|child| {
-        match &arena.get(child, "check").kind {
-            Kind::Text(text) => text.chars().find(|c| crate::bidi::right_to_left(*c)),
-            Kind::Element(_) => None,
-        }
-    })?;
+/// A refusal when `text`, a text node's, has right-to-left text, which
+/// is not laid out right to left yet; `named` describes the node's
+/// parent. One per text node: an element with two such children is
+/// named twice.
+fn right_to_left_text(text: &str, named: &dyn Fn() -> String) -> Option<ElementError> {
+    let found = text.chars().find(|c| crate::bidi::right_to_left(*c))?;
     Some(ElementError::UnsupportedAttribute(format!(
         "{}: its text holds {found:?} (U+{:04X}), from a script written right to left; vapors-elements lays text out left to right only (not scheduled in docs/F2c.md)",
-        describe(arena, node),
+        named(),
         u32::from(found)
     )))
 }
@@ -88,9 +117,8 @@ fn right_to_left_text(arena: &Arena, node: NodeId) -> Option<ElementError> {
 /// The attributes of `element` the tree refuses: a `disabled` that
 /// would mean something other than it says.
 fn attribute_refusals(
-    arena: &Arena,
-    node: NodeId,
     element: &crate::node::Element,
+    named: &dyn Fn() -> String,
 ) -> Vec<ElementError> {
     let mut found = Vec::new();
     found.extend(disabled_value(
@@ -103,9 +131,7 @@ fn attribute_refusals(
     found.extend(input_refusal(element));
     found
         .into_iter()
-        .map(|refusal| {
-            ElementError::UnsupportedAttribute(format!("{}: {refusal}", describe(arena, node)))
-        })
+        .map(|refusal| ElementError::UnsupportedAttribute(format!("{}: {refusal}", named())))
         .collect()
 }
 
@@ -132,10 +158,15 @@ pub(crate) fn style_attribute_refusal(arena: &Arena, node: NodeId) -> Option<Ele
     )))
 }
 
-/// The element as errors name it: `<div class="panel">`.
+/// The element as errors name it: `<div class="panel">`; a text node
+/// by its id under its parent.
 pub(crate) fn describe(arena: &Arena, node: NodeId) -> String {
-    let Some(element) = arena.get(node, "describe").element() else {
-        return format!("text node {node:?}");
+    let found = arena.get(node, "describe");
+    let Some(element) = found.element() else {
+        return match found.parent {
+            Some(parent) => format!("text node {node:?} under {}", describe(arena, parent)),
+            None => format!("text node {node:?}"),
+        };
     };
     let mut out = format!("<{}", element.tag);
     for name in ["id", "class"] {

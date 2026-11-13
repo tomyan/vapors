@@ -32,6 +32,7 @@ mod a11y_title;
 mod a11y_tree;
 mod arena;
 mod bidi;
+mod blocks;
 mod canvas;
 mod chain;
 mod changed_slots;

@@ -69,8 +69,10 @@ Every build xtask starts compiles through sccache: one cache for every
 worktree at `~/.cache/sccache` (50 GB). In CI each runner starts with
 an empty cache (a GitHub Actions cache gave no gain over rust-cache's
 target, #35). xtask refuses to build without it (`cargo xtask setup` installs it).
-Incremental compilation is off for xtask's builds, which sccache needs; a
-plain `cargo build` keeps it. A worktree's `target` lives under
+Incremental compilation is off for every build (`.cargo/config.toml`;
+`CARGO_INCREMENTAL` set in the environment overrides it): xtask's builds
+go through sccache, which needs it off, and an incremental target of a
+plain build reached 104 GB. A worktree's `target` lives under
 `~/.cache`, never the `/tmp` tmpfs. When its PR merges, empty it and keep
 the directory:
 `find <target dir> -mindepth 1 -maxdepth 1 -exec rm -rf {} +`.
