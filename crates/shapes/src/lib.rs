@@ -5,6 +5,7 @@
 //! element tree refuses what it does not, so a path that passes the
 //! check rasterises. No GPU and no text dependency.
 
+mod canonical;
 mod geometry;
 mod path;
 mod path_lex;
@@ -13,6 +14,7 @@ mod shape_id;
 mod table;
 mod table_error;
 
+pub use canonical::{Canonical, FillRule, Paint, hash_bytes};
 pub use geometry::{Geometry, MeshVertex, check_geometry};
 pub use path::{IconPath, PathError};
 pub use segment::{Pen, Segment, to_zeno};
