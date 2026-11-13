@@ -56,6 +56,7 @@ pub(crate) fn keep(
         crate::kept_paint_check::assert_same(&kept, &fresh);
     }
     kept.hits_changed = crate::kept_hits::HitsChanged::Known(Vec::new());
+    kept.frames_worked = 0;
     kept
 }
 

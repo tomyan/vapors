@@ -139,3 +139,16 @@ fn an_edit_inside_a_scroll_container_paints_no_other_containers_thumbs() {
     // Then
     assert_eq!(built_with_many, built_with_one);
 }
+
+#[test]
+fn an_edit_inside_a_scroll_container_works_out_no_scroll_frame() {
+    // Given
+    let (mut doc, text) = scrollers(5);
+
+    // When
+    doc.set_text(text, "54321");
+    let painted = doc.update(VIEWPORT).expect("updates");
+
+    // Then
+    assert_eq!(painted.frames_worked, 0);
+}

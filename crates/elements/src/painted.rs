@@ -70,6 +70,8 @@ pub struct Painted {
     /// Kept parts this update visited without painting again (`paint_partial.rs`), for
     /// `UpdateCounts`.
     pub(crate) parts_visited_kept: usize,
+    /// Scroll frames this update worked out (`paint_frames.rs`).
+    pub(crate) frames_worked: usize,
     /// Scene items this update built, for `UpdateCounts`.
     pub(crate) items_built: usize,
     /// Elements whose `rects` and `paddings` entries this update put or
@@ -108,6 +110,7 @@ impl Painted {
             boxes_shifted: 0,
             parts_visited_kept: 0,
             items_built: 0,
+            frames_worked: 0,
             maps_patched: 0,
             stackings: crate::paint_order::Stackings::default(),
         }
