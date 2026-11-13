@@ -31,6 +31,12 @@ impl Handler {
             );
             window.request_redraw();
         }
+        // RELAXED: no windowless test; a real window is the only caller.
+        // Caught today, though not by name: without this call no app
+        // starts and no frame is drawn, so the gate's demo screenshot
+        // steps fail ("`demo` did not finish within 120s; it never wrote
+        // its screenshot", shown with the call removed). Retired by a
+        // handler test with a fake window, which winit does not offer.
         self.start_when_sized(event_loop);
     }
 
@@ -45,6 +51,10 @@ impl Handler {
         match self.start_gate.step(size, crate::Instant::now()) {
             Step::Start => self.start_app(event_loop),
             Step::WaitUntil(at) => event_loop.set_control_flow(ControlFlow::WaitUntil(at)),
+            // RELAXED: the refusal itself is pinned (start_gate_tests.rs);
+            // that it stops the loop is not, as `fail` needs a real event
+            // loop, and no gate step has a window without a size. Retired
+            // by a handler test with a fake event loop.
             Step::Refuse(message) => self.fail(event_loop, PlatformError::Start(message)),
             Step::Wait | Step::Started => {}
         }

@@ -33,7 +33,13 @@ impl ApplicationHandler<Message> for Handler {
             // at once. Unproven: no test can make the acquire fail, and
             // `Handler` needs a real `ActiveEventLoop`.
             event_loop.set_control_flow(ControlFlow::Wait);
-            // the start gate's deadline, while the window has no size
+            // the start gate's deadline, while the window has no size.
+            // RELAXED: no test reaches it; only a window without a size
+            // waits, and no gate step makes one, so removing this call
+            // would leave such a window waiting silently with nothing
+            // catching it. The gate's decision is pinned in
+            // start_gate_tests.rs. Retired by a handler test with a fake
+            // window and event loop.
             self.start_when_sized(event_loop);
             self.platform.request_redraw();
             self.redraw_if_asked();
@@ -81,6 +87,9 @@ impl ApplicationHandler<Message> for Handler {
         {
             gpu.resize(size.width, size.height);
             self.platform.request_redraw();
+            // RELAXED: the start at the first non-zero size; no test reaches
+            // it, for the reason at the deadline's call above, and no gate
+            // step starts unsized. Retired the same way.
             self.start_when_sized(event_loop);
         }
         if shows_window(&event) {

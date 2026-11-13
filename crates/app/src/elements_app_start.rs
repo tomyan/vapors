@@ -64,6 +64,9 @@ impl ElementsApp {
     /// The painter for the first frame of an app that was not started,
     /// with the status line saying so.
     pub(super) fn unstarted_painter(&self, frame: &Frame<'_>) -> Result<ScenePainter, String> {
+        // RELAXED: the state beside it is pinned (gpu_app_start.rs); this
+        // line is not, as the platform's report has no test sink. Retired
+        // when report_status can be captured in a test.
         report_status(UNSTARTED);
         let made = self.make_painter(frame.device, frame.texture.format());
         made.map_err(|refused| refused.to_string())

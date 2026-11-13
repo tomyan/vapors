@@ -185,6 +185,8 @@ impl App for Racer {
         }
         next
     }
+    // pinned by vapors-perf's gpu_the_driven_racer_builds_every_pipeline_
+    // before_frame_0, which fails at frame 0 without this forward
     fn start(&mut self, start: &Start<'_>) -> Result<(), String> {
         self.app.start(start)
     }
