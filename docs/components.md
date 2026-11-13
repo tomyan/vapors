@@ -87,7 +87,12 @@ the one difference from the brief in this slice.
   `name={name}`. A bare `name` with no value is refused with the fix.
   Each name may appear once. A quoted value is text: a `{` in it is
   refused (build the value with `name={format!(..)}`, or write
-  `&#123;`).
+  `&#123;`). A literal attribute is part of the element's style key:
+  the tree sets it at creation and refuses `set_attribute` of it
+  afterwards, naming `name={expr}`, as it refuses `class` and `style`,
+  so the build-time analysis can read it (the analysable-sources
+  decision, `docs/decisions/2026-11-11-analysable-sources.md`); an
+  expression attribute is a run-time input.
 - **Events:** `onclick={handler}` listens for `click`. The event name
   is the attribute name after `on`. The handler is a script closure or
   an inline closure that takes `&mut Event`. It returns `()` or

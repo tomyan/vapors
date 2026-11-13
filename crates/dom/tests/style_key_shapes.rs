@@ -1,7 +1,8 @@
 //! A `StyleKey` a tree cannot keep true is refused where an element is
 //! created from it, naming the site and the fix: a class or directive
 //! name that is empty or holds whitespace, a directive listed twice or
-//! also a literal class, more than `MAX_TOGGLES` directives.
+//! also a literal class, more than `MAX_TOGGLES` directives, an
+//! attribute its own fields carry or one listed twice.
 
 use vapors_dom::recording::{Call, RecordingDom};
 use vapors_dom::{Dom, MAX_TOGGLES, StyleKey};
@@ -65,6 +66,45 @@ fn a_malformed_key_is_refused_naming_the_site_and_the_fix() {
 }
 
 #[test]
+fn an_attribute_a_field_carries_or_listed_twice_is_refused() {
+    for (attributes, problem) in [
+        (
+            &[("Class", "x")][..],
+            "lists `Class` under `attributes`, which its own field carries",
+        ),
+        (
+            &[("style", "x")],
+            "lists `style` under `attributes`, which its own field carries",
+        ),
+        (
+            &[("title", "a"), ("Title", "b")],
+            "lists attribute `Title` twice",
+        ),
+    ] {
+        // Given
+        let key = StyleKey {
+            attributes,
+            ..key(&[], &[])
+        };
+
+        // Then
+        assert_eq!(
+            key.shape_refusal(),
+            Some(format!("the StyleKey of <li> at row.wisp:2:3 {problem}")),
+            "{attributes:?}"
+        );
+    }
+    assert_eq!(
+        StyleKey {
+            attributes: &[("title", "a"), ("type", "b")],
+            ..key(&[], &[])
+        }
+        .shape_refusal(),
+        None
+    );
+}
+
+#[test]
 fn more_directives_than_fit_the_mask_are_refused() {
     // Then
     assert_eq!(key(&[], directives(MAX_TOGGLES)).shape_refusal(), None);
@@ -89,6 +129,7 @@ static TWICE: StyleKey = StyleKey {
     tag: "li",
     classes: &[],
     toggles: &["on", "on"],
+    attributes: &[],
     style: None,
 };
 

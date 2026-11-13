@@ -21,17 +21,31 @@ fn an_element_is_created_from_its_key_with_site_scope_tag_classes_and_style() {
     // Then: the <div> is at line 4, column 1 of counter.wisp
     assert_has(
         &code,
-        "static KEY_DIV0: vapors_dom::StyleKey = vapors_dom::StyleKey { site: concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:4:1\"), scope: Some(SCOPE), tag: \"div\", classes: &[\"card\", \"wide\"], toggles: &[], style: Some(\"width: 8px\") };",
+        "static KEY_DIV0: vapors_dom::StyleKey = vapors_dom::StyleKey { site: concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:4:1\"), scope: Some(SCOPE), tag: \"div\", classes: &[\"card\", \"wide\"], toggles: &[], style: Some(\"width: 8px\"), attributes: &[(\"title\", \"t\")] };",
     );
     assert_has(
         &code,
         "let div0 = dom.borrow_mut().create_keyed_element(&KEY_DIV0);",
     );
-    assert_has(&code, "set_attribute(div0, \"title\", \"t\");");
     assert_lacks(&code, "create_element(");
-    for fixed in ["\"class\"", "\"style\"", "SCOPE_ATTRIBUTE, SCOPE"] {
+    for fixed in ["\"class\"", "\"style\"", "\"title\"", "SCOPE_ATTRIBUTE, SCOPE"] {
         assert_lacks(&code, &format!("set_attribute(div0, {fixed}"));
     }
+}
+
+#[test]
+fn only_literal_attributes_go_in_the_key_the_rest_are_set_as_before() {
+    // Given: a literal, an expression, a listener and a binding
+    let code = generated_with(
+        "let x: Signal<String> = Signal::new(String::new());\nlet f = || {};",
+        "<input type=\"text\" id={x} onclick={f} bind:value={x} />",
+    );
+
+    // Then
+    assert_has(&code, "attributes: &[(\"type\", \"text\")]");
+    assert_lacks(&code, "set_attribute(input0, \"type\"");
+    assert_has(&code, "set_attribute_if_changed(input0, \"id\", &value);");
+    assert_has(&code, "listen(input0, \"click\"");
 }
 
 #[test]

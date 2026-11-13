@@ -6,7 +6,7 @@
 use super::allowances::shown_text;
 use super::element_class::is_class_directive;
 use super::emit::{Emitter, Place};
-use super::style_key::carried_by_key;
+use super::style_key::{carried_by_key, fixed_by_key};
 use crate::CompileError;
 use crate::ast::{AttrValue, Attribute, Attributes, Element, Expr};
 
@@ -23,7 +23,10 @@ impl Emitter<'_> {
             .iter()
             .partition(|attribute| attribute.name == "bind:this");
         for attribute in rest {
-            if is_class_directive(attribute) || carried_by_key(&attribute.name) {
+            if is_class_directive(attribute)
+                || carried_by_key(&attribute.name)
+                || fixed_by_key(attribute)
+            {
                 continue;
             }
             self.emit_attribute(element, &var, attribute)?;

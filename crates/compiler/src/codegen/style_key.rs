@@ -1,12 +1,13 @@
 //! Each template element's `vapors_dom::StyleKey`: a file-level
 //! `static` named after the element's node (`KEY_DIV0` for `div0`)
 //! holding what the template says about it (its site, scope, tag,
-//! literal classes, `class:` directive names and literal `style`), and
-//! the `create_keyed_element(&KEY_DIV0)` that builds the element from
-//! it. The tree sets those attributes from the key, so nothing else
-//! is emitted for them. A component tag carrying `class`, `class:` or
+//! literal classes, `class:` directive names, literal `style` and every
+//! other literal attribute), and the `create_keyed_element(&KEY_DIV0)`
+//! that builds the element from it. The tree sets those attributes
+//! from the key and refuses a change to them, so nothing else is
+//! emitted for them. A component tag carrying `class`, `class:` or
 //! `style` gets a key the same way, which it passes to the component
-//! (`component_anchor`).
+//! (`component_anchor`); its other attributes are props, not carried.
 
 use super::attribute_refusals::refuse_string_styling;
 use std::fmt::Write;
@@ -28,6 +29,9 @@ pub(super) struct Keyed<'e> {
     pub(super) elsewhere: String,
     /// The tag names a type the script's `use` items bring in.
     pub(super) reads_uses: bool,
+    /// Whether the key carries the literal attributes (an element's;
+    /// a component tag's are props).
+    pub(super) carries_attributes: bool,
     pub(super) attributes: &'e Attributes,
     pub(super) offset: usize,
 }
@@ -39,6 +43,7 @@ impl<'e> Keyed<'e> {
             name: &element.tag,
             elsewhere: "a child element".to_owned(),
             reads_uses: false,
+            carries_attributes: true,
             attributes: &element.attributes,
             offset: element.offset,
         }
@@ -50,16 +55,31 @@ impl<'e> Keyed<'e> {
             name: &tag.name,
             elsewhere: format!("an element inside <{}>", tag.name),
             reads_uses: true,
+            carries_attributes: false,
             attributes: &tag.attributes,
             offset: tag.offset,
         }
     }
 }
 
-/// Whether `name` is an attribute the key carries, so the element
-/// emits no `set_attribute` for it.
+/// Whether `name` is `class` or `style`, which a key carries as its
+/// own fields, so no `set_attribute` is emitted for it.
 pub(super) fn carried_by_key(name: &str) -> bool {
     name.eq_ignore_ascii_case("class") || name.eq_ignore_ascii_case("style")
+}
+
+/// Whether an element's key fixes `attribute` under `attributes`: a
+/// literal that is not a listener, a binding, a `class:` directive,
+/// `class`, `style` or the scope attribute (refused at its own site).
+pub(super) fn fixed_by_key(attribute: &Attribute) -> bool {
+    let name = attribute.name.as_str();
+    let listener = name.strip_prefix("on").is_some_and(|rest| !rest.is_empty());
+    matches!(attribute.value, AttrValue::Literal(_))
+        && !listener
+        && !name.starts_with("bind:")
+        && !name.starts_with("class:")
+        && !carried_by_key(name)
+        && !name.eq_ignore_ascii_case(crate::SCOPE_ATTRIBUTE)
 }
 
 impl Emitter<'_> {
@@ -110,8 +130,9 @@ impl Emitter<'_> {
         let classes = quoted(&self.literal_classes(keyed.attributes)?);
         let toggles = quoted(&self.key_directives(keyed)?);
         let style = self.key_style(keyed)?;
+        let attributes = key_attributes(keyed);
         Ok(format!(
-            "vapors_dom::StyleKey {{ site: {site}, scope: {scope}, tag: {}, classes: &[{classes}], toggles: &[{toggles}], style: {style} }}",
+            "vapors_dom::StyleKey {{ site: {site}, scope: {scope}, tag: {}, classes: &[{classes}], toggles: &[{toggles}], style: {style}, attributes: &[{attributes}] }}",
             keyed.tag
         ))
     }
@@ -169,6 +190,22 @@ pub(super) fn key_statics(keys: &[String]) -> String {
     let mut out = keys.join("\n");
     out.push_str("\n\n");
     out
+}
+
+/// `("title", "t"), ..` for the key's `attributes`: the element's fixed
+/// literal attributes in template order; none for a component tag.
+fn key_attributes(keyed: &Keyed) -> String {
+    if !keyed.carries_attributes {
+        return String::new();
+    }
+    let each: Vec<String> = (keyed.attributes.iter())
+        .filter(|attribute| fixed_by_key(attribute))
+        .filter_map(|attribute| {
+            let value = attribute.value.literal()?;
+            Some(format!("({:?}, {value:?})", attribute.name))
+        })
+        .collect();
+    each.join(", ")
 }
 
 /// `"a", "b"` for a slice literal.
