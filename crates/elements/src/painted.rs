@@ -75,8 +75,7 @@ pub struct Painted {
     /// Elements whose `rects` and `paddings` entries this update put or
     /// removed (`kept_maps.rs`), for `UpdateCounts`.
     pub(crate) maps_patched: usize,
-    /// Entries of `drawn` and `extents` this update's patches moved
-    /// (`blocks.rs`), for `UpdateCounts`.
+    /// Entries the patches of `drawn` and `extents` moved (`blocks.rs`).
     pub(crate) index_entries_moved: usize,
     /// Each slot's stacking, for the next update's shape comparison
     /// (`changed_slots.rs`).

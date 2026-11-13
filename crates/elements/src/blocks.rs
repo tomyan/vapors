@@ -179,3 +179,7 @@ mod edit;
 #[cfg(test)]
 #[path = "blocks_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "blocks_edit_tests.rs"]
+mod edit_tests;
