@@ -1,11 +1,16 @@
 //! The scripted driver's controls, and its schedule against simulated
 //! time with the race model stepped as the racer steps it.
 
+use std::collections::BTreeSet;
+use std::time::Duration;
+
 use super::{RUN_FRAMES, Scripted, controls, restart_due, scripted};
 use crate::circuit::{BEND_STARTS, point_at};
-use vapors_racer::model::{ROAD, Race, Settings, road_distance};
+use crate::sampler::INTERVAL;
+use vapors_racer::model::{Controls, ROAD, Race, Settings, road_distance};
 
-/// The racer's fixed step (`app/drawing.rs`, `step_fixed`).
+/// The racer's fixed step (`app/drawing.rs`, `step_fixed`), a literal
+/// there with no constant to read.
 const STEP: f32 = 1.0 / 120.0;
 
 /// A race at `distance` along the centre line, heading along it.
@@ -55,52 +60,104 @@ struct Run {
     scripted: Vec<(usize, Scripted)>,
     restarts: Vec<usize>,
     furthest_off_line: f32,
+    /// Each lap that braked, as (races finished before it, its lap).
+    braking_laps: BTreeSet<(usize, u8)>,
+    /// The steering values the driver held.
+    steering: BTreeSet<i8>,
 }
 
-/// The run as the racer steps it: before each frame the driver's
-/// restart and controls; each frame's elapsed time added to the fixed
-/// step's remainder, 0 on the first frame after a start (`resume` clears
-/// the last frame's time; `pause` clears the remainder).
+/// The race model stepped as the racer steps it: each frame's elapsed
+/// time added to the fixed step's remainder, 0 on the first frame after
+/// a start (`resume` clears the last frame's time; `pause` clears the
+/// remainder).
+struct Stepped {
+    race: Race,
+    remainder: f32,
+    started: bool,
+}
+
+impl Stepped {
+    fn new() -> Self {
+        Self {
+            race: Race::default(),
+            remainder: 0.0,
+            started: true,
+        }
+    }
+
+    /// One frame under `held`.
+    fn frame(&mut self, held: Controls) {
+        self.remainder += if std::mem::take(&mut self.started) {
+            0.0
+        } else {
+            INTERVAL.as_secs_f32()
+        };
+        while self.remainder >= STEP {
+            self.race
+                .step(STEP, held, Settings::default())
+                .expect("a valid step");
+            self.remainder -= STEP;
+        }
+    }
+}
+
+/// The run: before each frame the script's changes, its restart and
+/// its controls, then the frame.
 fn drive() -> Run {
-    let (mut race, mut run, mut remainder, mut started) =
-        (Race::default(), Run::default(), 0.0, true);
+    let (mut stepped, mut run) = (Stepped::new(), Run::default());
     for frame in 0..RUN_FRAMES {
         run.scripted
             .extend(scripted(frame).into_iter().map(|s| (frame, s)));
-        if restart_due(&race) {
-            assert_eq!(race.progress.laps, 3, "a restart only after three laps");
-            (race, remainder, started) = (Race::default(), 0.0, true);
+        if restart_due(&stepped.race) {
+            assert_eq!(
+                stepped.race.progress.laps, 3,
+                "a restart only after three laps"
+            );
+            stepped = Stepped::new();
             run.restarts.push(frame);
         }
-        remainder += if std::mem::take(&mut started) {
-            0.0
-        } else {
-            0.016
-        };
-        let held = controls(&race);
-        while remainder >= STEP {
-            race.step(STEP, held, Settings::default())
-                .expect("a valid step");
-            remainder -= STEP;
-        }
-        run.furthest_off_line = run.furthest_off_line.max(road_distance(race.position));
+        let held = controls(&stepped.race);
+        run.note(&stepped.race, held);
+        stepped.frame(held);
+        run.furthest_off_line = run
+            .furthest_off_line
+            .max(road_distance(stepped.race.position));
     }
     run
 }
 
+impl Run {
+    #[allow(clippy::cast_possible_truncation)] // -1, 0 or 1
+    fn note(&mut self, race: &Race, held: Controls) {
+        if held.brake > 0.0 {
+            self.braking_laps
+                .insert((self.restarts.len(), race.progress.laps));
+        }
+        self.steering.insert(held.steer as i8);
+    }
+}
+
 #[test]
-fn the_schedule_switches_camera_every_10_s_and_livery_at_30_s() {
+fn the_schedule_names_the_camera_every_10_s_and_changes_livery_at_30_s() {
     let run = drive();
-    let camera = |frame| (frame, Scripted::CameraSwitch);
+    let camera = |frame, follow| (frame, Scripted::Camera { follow });
     let expected = vec![
-        camera(625),
-        camera(1250),
-        camera(1875),
+        camera(625, true),
+        camera(1250, false),
+        camera(1875, true),
         (1875, Scripted::Livery),
-        camera(2500),
-        camera(3125),
+        camera(2500, false),
+        camera(3125, true),
     ];
     assert_eq!(run.scripted, expected);
+}
+
+#[test]
+fn the_run_is_60_s_of_the_frame_clock() {
+    assert_eq!(
+        INTERVAL * u32::try_from(RUN_FRAMES).expect("small"),
+        Duration::from_secs(60)
+    );
 }
 
 #[test]
@@ -118,4 +175,17 @@ fn the_driver_finishes_three_laps_on_the_road_and_the_race_restarts() {
         "{} off the line",
         run.furthest_off_line
     );
+}
+
+#[test]
+fn every_finished_lap_brakes_and_the_driver_steers_both_ways() {
+    let run = drive();
+    for lap in (0..run.restarts.len()).flat_map(|race| (0..3).map(move |lap| (race, lap))) {
+        assert!(
+            run.braking_laps.contains(&lap),
+            "lap {lap:?} never braked: {:?}",
+            run.braking_laps
+        );
+    }
+    assert_eq!(run.steering, BTreeSet::from([-1, 0, 1]));
 }
