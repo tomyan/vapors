@@ -47,29 +47,35 @@ impl SurfaceRenderer for Misfit {
 fn pipeline(device: &wgpu::Device, format: wgpu::TextureFormat) -> wgpu::RenderPipeline {
     let module = module(device);
     let targets = [Some(format.into())];
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("misfit"),
-        layout: None,
-        vertex: wgpu::VertexState {
-            module: &module,
-            entry_point: Some("vs"),
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[],
+    vapors_renderer::pipelines::render_pipeline(
+        device,
+        &wgpu::RenderPipelineDescriptor {
+            label: Some("misfit"),
+            layout: None,
+            vertex: wgpu::VertexState {
+                module: &module,
+                entry_point: Some("vs"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                buffers: &[],
+            },
+            fragment: Some(fragment(&module, &targets)),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
         },
-        fragment: Some(fragment(&module, &targets)),
-        primitive: wgpu::PrimitiveState::default(),
-        depth_stencil: None,
-        multisample: wgpu::MultisampleState::default(),
-        multiview_mask: None,
-        cache: None,
-    })
+    )
 }
 
 fn module(device: &wgpu::Device) -> wgpu::ShaderModule {
-    device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("misfit"),
-        source: wgpu::ShaderSource::Wgsl(SHADER.into()),
-    })
+    vapors_renderer::pipelines::shader_module(
+        device,
+        wgpu::ShaderModuleDescriptor {
+            label: Some("misfit"),
+            source: wgpu::ShaderSource::Wgsl(SHADER.into()),
+        },
+    )
 }
 
 fn fragment<'a>(

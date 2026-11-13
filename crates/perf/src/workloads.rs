@@ -63,6 +63,12 @@ fn row_workloads() -> Vec<(usize, RowChange)> {
             .into_iter()
             .flat_map(|count| edits.map(|change| (count, change))),
     );
+    // Relaxed: the full run takes one median over Insert's, Resize's,
+    // ScrollSize's, Class's and HoveredClass's alternating kinds of
+    // frame (`RowChange::frame_kinds`), which is the cheaper kind's
+    // slowest frame. `--scaling` reports each kind apart, and acceptance
+    // numbers (docs/plans/splice-layout.md, section 7) are read from it.
+    // Retired when the full run's report splits kinds the same way.
     for change in [RowChange::Insert, RowChange::Resize, RowChange::Scroll] {
         all.extend([1000, 3000, 10_000].map(|count| (count, change)));
     }
