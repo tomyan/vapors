@@ -9,8 +9,8 @@ use zeno::{Cap, Command, Fill, Format, Join, Mask, Origin, Stroke, Style, Transf
 
 use crate::icon_key::key_bits;
 use crate::icon_miter::missing_wedges;
-use crate::icon_path::IconPath;
 use crate::raster::Coverage;
+use vapors_shapes::IconPath;
 
 /// One `<path>`: its data and stroke width, in view box units.
 #[derive(Clone, Debug, PartialEq)]

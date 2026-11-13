@@ -2886,6 +2886,7 @@ dependencies = [
  "vapors-platform",
  "vapors-renderer",
  "vapors-scene",
+ "vapors-shapes",
  "vapors-text",
  "wasm-bindgen-futures",
  "wgpu",
@@ -2986,6 +2987,7 @@ dependencies = [
  "vapors-css",
  "vapors-dom",
  "vapors-scene",
+ "vapors-shapes",
  "vapors-signals",
  "vapors-text",
 ]
@@ -3153,6 +3155,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "vapors-shapes"
+version = "0.0.0"
+dependencies = [
+ "zeno",
+]
+
+[[package]]
 name = "vapors-signals"
 version = "0.0.0"
 
@@ -3171,6 +3180,7 @@ dependencies = [
  "vapors-gpu-harness",
  "vapors-renderer",
  "vapors-scene",
+ "vapors-shapes",
  "wgpu",
  "zeno",
 ]

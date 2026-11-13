@@ -1,0 +1,17 @@
+[package]
+name = "vapors-shapes"
+description = "Shapes: the SVG path-data parser shared by the icon route, the element tree's checks and, later, the compiler's shape table. No GPU and no text dependency."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+# Pinned exactly, as in vapors-text: the parser's output is zeno's
+# commands, which the icon route strokes; one zeno in the tree.
+zeno = { version = "=0.3.3", default-features = false, features = ["std", "eval"] }
+
+[lints]
+workspace = true

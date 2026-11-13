@@ -30,6 +30,7 @@ complex-script-breaks = ["parley/complex-scripts"]
 tracing.workspace = true
 wgpu.workspace = true
 vapors-scene.workspace = true
+vapors-shapes.workspace = true
 vapors-renderer.workspace = true
 parley = { version = "=0.12.0", default-features = false, features = ["std"] }
 fontique = { version = "=0.12.0", default-features = false, features = ["std"] }
