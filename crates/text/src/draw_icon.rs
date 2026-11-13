@@ -4,9 +4,10 @@
 //! draw with gamma 1 and contrast 0, which the shader makes a plain blend
 //! of coverage.
 
-use vapors_scene::{Color, Size};
+use vapors_scene::Color;
 
-use crate::atlas::{AtlasError, GlyphAtlas};
+use crate::atlas::{AtlasError, AtlasGlyph, GlyphAtlas};
+use crate::atlas_pins::AtlasPins;
 use crate::draw::RenderTarget;
 use crate::icon::Icon;
 use crate::pipeline::{BlendParams, TextPipeline};
@@ -49,36 +50,54 @@ impl TextPipeline {
         atlas: &mut GlyphAtlas,
         icons: &[IconDraw<'_>],
     ) -> Result<(), AtlasError> {
-        let floats = icon_quads(atlas, icons, target.viewport)?;
+        let floats = icon_quads(atlas, icons, None)?;
         self.record(target, atlas, &floats, ICON_BLEND);
         Ok(())
     }
 }
 
-/// Vertex floats for every inked icon of `icons`.
+/// Vertex floats for every inked icon of `icons`, each mask pinned into
+/// `pins` when given.
 pub(crate) fn icon_quads(
     atlas: &mut GlyphAtlas,
     icons: &[IconDraw<'_>],
-    viewport: Size,
+    pins: Option<&mut AtlasPins>,
 ) -> Result<Vec<f32>, AtlasError> {
-    let strokes = || {
-        icons
-            .iter()
-            .flat_map(|d| (0..d.icon.strokes()).map(move |i| (d, i)))
+    let strokes = || strokes_of(icons);
+    let fetch = |&(draw, i): &(&IconDraw<'_>, usize), pins: Option<&mut AtlasPins>| {
+        atlas.icon_pinned((draw.icon, i, draw.size), pins)
     };
-    let placed = placed_all(strokes, |&(draw, i)| atlas.icon(draw.icon, i, draw.size))?;
+    let placed = placed_all(strokes, pins, fetch)?;
     // read after placing: placing may grow the page
     let page = atlas.coverage_page().size();
+    Ok(icon_floats(
+        strokes().map(|(draw, _)| draw).zip(&placed),
+        page,
+    ))
+}
+
+/// Each path of each of `icons`, by its index in its icon.
+pub(crate) fn strokes_of<'a, 'b>(
+    icons: &'a [IconDraw<'b>],
+) -> impl Iterator<Item = (&'a IconDraw<'b>, usize)> {
+    icons
+        .iter()
+        .flat_map(|d| (0..d.icon.strokes()).map(move |i| (d, i)))
+}
+
+/// Vertex floats for each inked mask of `placed`, over its icon's box,
+/// on a page of `page` pixels.
+pub(crate) fn icon_floats<'a, 'b: 'a>(
+    placed: impl Iterator<Item = (&'a IconDraw<'b>, &'a AtlasGlyph)>,
+    page: u32,
+) -> Vec<f32> {
     let mut floats = Vec::new();
-    for ((draw, _), placed) in strokes().zip(&placed) {
-        if placed.is_empty() {
-            continue;
-        }
+    for (draw, placed) in placed.filter(|(_, placed)| !placed.is_empty()) {
         #[allow(clippy::cast_precision_loss)] // pixel positions
         let top_left = draw.origin.map(|n| n as f32);
-        push_quad(&mut floats, top_left, placed, page, viewport, draw.colour);
+        push_quad(&mut floats, top_left, placed, page, draw.colour);
     }
-    Ok(floats)
+    floats
 }
 
 #[cfg(test)]

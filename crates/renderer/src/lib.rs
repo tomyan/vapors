@@ -56,4 +56,4 @@ pub use solid::SolidPipeline;
 pub use target::Target;
 pub use uniform_slots::UniformSlots;
 pub use upload::upload_rgba8;
-pub use work::{GpuWork, WorkCounter};
+pub use work::{GpuWork, WRITE_PHASE, WorkCounter};

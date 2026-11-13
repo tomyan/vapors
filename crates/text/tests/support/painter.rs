@@ -99,7 +99,7 @@ impl Painter {
     }
 
     /// Run `paint` into a fresh white target as a new atlas frame.
-    fn frame(
+    pub fn frame(
         &mut self,
         paint: impl FnOnce(
             &mut TextPipeline,
@@ -119,6 +119,12 @@ impl Painter {
             pixels: read_rgba8(&gpu.device, &gpu.queue, &texture),
             atlas_bytes: self.pipeline.take_work().texture_bytes,
         }
+    }
+
+    /// `text` laid out as [`Painter::text`] draws it.
+    pub fn layout(&mut self, text: &str) -> Layout {
+        let style = Style::new(Family::Geist, 16.0);
+        Layout::new(&mut self.system, text, &style, &LayoutOptions::default())
     }
 }
 

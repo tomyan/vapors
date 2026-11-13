@@ -1,10 +1,12 @@
 //! One quad per inked glyph: fetched from the atlas at its quarter-pixel
-//! x step with the baseline rounded to a whole pixel, then mapped to
-//! clip space with its atlas coordinates and colour.
+//! x step with the baseline rounded to a whole pixel, in device pixels
+//! with its atlas coordinates and colour; the shader maps it to clip
+//! space by the viewport in its uniform.
 
-use vapors_scene::{Color, Size};
+use vapors_scene::Color;
 
 use crate::atlas::{AtlasError, AtlasGlyph, GlyphAtlas};
+use crate::atlas_pins::AtlasPins;
 use crate::layout::Layout;
 use crate::layout_types::PlacedGlyph;
 use crate::raster::{GlyphRequest, Hinting, subpixel_of};
@@ -20,42 +22,48 @@ pub struct TextDraw<'a> {
     pub origin: [f32; 2],
 }
 
-/// Vertex floats for every inked glyph of `texts`, in order.
+/// Vertex floats for every inked glyph of `texts`, in order, each glyph
+/// pinned into `pins` when given.
 pub(crate) fn quads(
     atlas: &mut GlyphAtlas,
     texts: &[TextDraw<'_>],
-    viewport: Size,
+    pins: Option<&mut AtlasPins>,
 ) -> Result<Vec<f32>, AtlasError> {
     let glyphs = || texts.iter().flat_map(|text| glyphs_of(*text));
-    let placed = placed_all(glyphs, |(_, request)| atlas.get(request))?;
+    let fetch = |(_, request): &(GlyphAt, GlyphRequest<'_>), pins: Option<&mut AtlasPins>| {
+        atlas.get_pinned(request, pins)
+    };
+    let placed = placed_all(glyphs, pins, fetch)?;
     // read after placing: placing may grow the page
     let page = atlas.coverage_page().size();
-    let mut floats = Vec::new();
-    for ((at, _), placed) in glyphs().zip(&placed) {
-        if !placed.is_empty() {
-            push_glyph(&mut floats, &at, placed, page, viewport);
-        }
-    }
-    Ok(floats)
+    Ok(glyph_floats(glyphs().map(|(at, _)| at).zip(&placed), page))
 }
 
-/// The quad of one inked glyph placed at `at`.
-fn push_glyph(floats: &mut Vec<f32>, at: &GlyphAt, placed: &AtlasGlyph, page: u32, viewport: Size) {
-    #[allow(clippy::cast_precision_loss)] // pixel positions
-    let top_left = [(at.x + placed.left) as f32, at.baseline + placed.top as f32];
-    push_quad(floats, top_left, placed, page, viewport, at.color);
+/// Vertex floats for each inked glyph of `placed`, on a page of `page`
+/// pixels.
+pub(crate) fn glyph_floats<'a>(
+    placed: impl Iterator<Item = (GlyphAt, &'a AtlasGlyph)>,
+    page: u32,
+) -> Vec<f32> {
+    let mut floats = Vec::new();
+    for (at, placed) in placed.filter(|(_, placed)| !placed.is_empty()) {
+        #[allow(clippy::cast_precision_loss)] // pixel positions
+        let top_left = [(at.x + placed.left) as f32, at.baseline + placed.top as f32];
+        push_quad(&mut floats, top_left, placed, page, at.color);
+    }
+    floats
 }
 
 /// Where a glyph's bitmap goes: its whole-pixel x, its baseline rounded
 /// to a whole pixel, and its colour.
-struct GlyphAt {
+pub(crate) struct GlyphAt {
     x: i32,
     baseline: f32,
     color: Color,
 }
 
 /// Each glyph of `text`, placed, with its atlas request.
-fn glyphs_of(text: TextDraw<'_>) -> impl Iterator<Item = (GlyphAt, GlyphRequest<'_>)> {
+pub(crate) fn glyphs_of(text: TextDraw<'_>) -> impl Iterator<Item = (GlyphAt, GlyphRequest<'_>)> {
     let hinting = Hinting::for_scale(text.layout.scale());
     let [x, y] = text.origin;
     text.layout.glyphs().map(move |glyph| {
@@ -75,15 +83,19 @@ fn glyph_at(pixel_x: i32, y: f32, glyph: &PlacedGlyph<'_>) -> GlyphAt {
 
 /// Where each item is in the atlas once every one is placed. Placing one
 /// can evict and repack, moving those placed before it, so all are
-/// fetched first and their rects read in a second pass of cache hits.
+/// fetched first and their rects read in a second pass of cache hits,
+/// which pins each into `pins` when given.
 pub(crate) fn placed_all<T, I: Iterator<Item = T>>(
     items: impl Fn() -> I,
-    mut fetch: impl FnMut(&T) -> Result<AtlasGlyph, AtlasError>,
+    mut pins: Option<&mut AtlasPins>,
+    mut fetch: impl FnMut(&T, Option<&mut AtlasPins>) -> Result<AtlasGlyph, AtlasError>,
 ) -> Result<Vec<AtlasGlyph>, AtlasError> {
     for item in items() {
-        fetch(&item)?;
+        fetch(&item, None)?;
     }
-    items().map(|item| fetch(&item)).collect()
+    items()
+        .map(|item| fetch(&item, pins.as_deref_mut()))
+        .collect()
 }
 
 /// The glyph's whole-pixel x and its request at the quarter-pixel step.
@@ -105,13 +117,14 @@ fn request<'a>(
     (pixel_x, request)
 }
 
-#[allow(clippy::cast_precision_loss)] // atlas and viewport sizes are far below 2^24
+/// The six vertices of `glyph`'s quad with its top-left at `top_left`
+/// (device pixels), sampling its rect in a page of `page` pixels.
+#[allow(clippy::cast_precision_loss)] // atlas sizes are far below 2^24
 pub(crate) fn push_quad(
     floats: &mut Vec<f32>,
     top_left: [f32; 2],
     glyph: &AtlasGlyph,
     page: u32,
-    viewport: Size,
     color: Color,
 ) {
     let [x, y, w, h] = glyph.rect;
@@ -120,8 +133,7 @@ pub(crate) fn push_quad(
     let (left, top) = (top_left[0], top_left[1]);
     let (right, bottom) = (left + w as f32, top + h as f32);
     let mut corner = |px: f32, py: f32, u: f32, v: f32| {
-        let [cx, cy] = to_clip([px, py], viewport);
-        floats.extend_from_slice(&[cx, cy, u, v, color.r, color.g, color.b, color.a]);
+        floats.extend_from_slice(&[px, py, u, v, color.r, color.g, color.b, color.a]);
     };
     corner(left, top, u0, v0);
     corner(right, top, u1, v0);
@@ -129,15 +141,6 @@ pub(crate) fn push_quad(
     corner(right, top, u1, v0);
     corner(right, bottom, u1, v1);
     corner(left, bottom, u0, v1);
-}
-
-/// Viewport pixels (origin top-left, y down) to clip space (-1..1, y up).
-#[allow(clippy::cast_precision_loss)] // pixel counts are far below 2^24
-fn to_clip(point: [f32; 2], viewport: Size) -> [f32; 2] {
-    [
-        point[0] / viewport.width as f32 * 2.0 - 1.0,
-        1.0 - point[1] / viewport.height as f32 * 2.0,
-    ]
 }
 
 #[cfg(test)]

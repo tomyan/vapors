@@ -154,7 +154,7 @@ impl ScenePainter {
     ) -> Result<(), PaintError> {
         let result = match KeptKind::of_run(run) {
             Some(_) => self.draw_retained(target, painted, (run, key, at)),
-            None => self.issue_run(target, painted, run),
+            None => self.draw_kept_text(target, painted, (run, key, at)),
         };
         self.count_run(run);
         result?;
@@ -162,22 +162,6 @@ impl ScenePainter {
             .encoder
             .take_refusal()
             .map_or(Ok(()), |refused| Err(refused.into()))
-    }
-
-    /// Issues a text or icon `run`'s writes and draws; a refusal leaves
-    /// those already issued for the caller to count.
-    fn issue_run(
-        &mut self,
-        target: &Target<'_>,
-        painted: &Painted,
-        run: &Run,
-    ) -> Result<(), PaintError> {
-        match run {
-            Run::Texts(items) => self.draw_texts(target, painted, items)?,
-            Run::Icons(items) => self.draw_icons(target, painted, items)?,
-            kept => unreachable!("{kept:?} is drawn from kept bytes (painter_kept.rs)"),
-        }
-        Ok(())
     }
 }
 

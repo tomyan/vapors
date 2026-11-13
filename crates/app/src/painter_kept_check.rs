@@ -11,32 +11,34 @@ pub(super) fn assert_kept(kept: &[u8], fresh: &[u8], (run, at): (&Run, usize)) {
     if kept == fresh {
         return;
     }
-    let (kind, stride, part) = described(run);
+    let (kind, stride, (part, part_size)) = described(run);
     let mut pairs = kept.iter().zip(fresh);
     let first = pairs.position(|(kept, fresh)| kept != fresh);
     let byte = first.unwrap_or_else(|| kept.len().min(fresh.len()));
     panic!(
         "batch {at} ({kind}) drew kept bytes that differ from its bytes built afresh at \
          instance {}, {part} {} (byte {byte}; {} bytes kept, {} afresh): a key was kept for \
-         a batch whose run changed (kept_batches_keys.rs), or bytes were kept for another \
-         viewport (painter_kept.rs); reproduce with `cargo xtask test`",
+         a batch whose run changed (kept_batches_keys.rs), bytes were kept for another \
+         viewport (painter_kept.rs), or text bytes for moved glyphs or another layout \
+         (painter_kept_text.rs); reproduce with `cargo xtask test`",
         byte / stride,
-        byte % stride / 16,
+        byte % stride / part_size,
         kept.len(),
         fresh.len()
     );
 }
 
 /// `run`'s kind, the bytes of one instance (a quad's six vertices for
-/// images and surfaces), and what each 16 bytes of one are.
-fn described(run: &Run) -> (&'static str, usize, &'static str) {
+/// images, surfaces, glyphs and icon masks), and what the parts of one
+/// are and their bytes.
+fn described(run: &Run) -> (&'static str, usize, (&'static str, usize)) {
     match run {
-        Run::Shadows(_) => ("shadows", 112, "attribute"),
-        Run::Quads(_) => ("quads", 128, "attribute"),
-        Run::Images(_) => ("images", 96, "vertex"),
-        Run::Surfaces(_) => ("surfaces", 96, "vertex"),
-        Run::Texts(_) => ("texts", 1, "byte"),
-        Run::Icons(_) => ("icons", 1, "byte"),
+        Run::Shadows(_) => ("shadows", 112, ("attribute", 16)),
+        Run::Quads(_) => ("quads", 128, ("attribute", 16)),
+        Run::Images(_) => ("images", 96, ("vertex", 16)),
+        Run::Surfaces(_) => ("surfaces", 96, ("vertex", 16)),
+        Run::Texts(_) => ("texts", 192, ("vertex", 32)),
+        Run::Icons(_) => ("icons", 192, ("vertex", 32)),
     }
 }
 
@@ -91,6 +93,21 @@ mod tests {
 
         // When
         assert_kept(&kept, &fresh, (&Run::Images(Vec::new()), 1));
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "batch 2 (texts) drew kept bytes that differ from its bytes \
+                               built afresh at instance 1, vertex 1 (byte 224;"
+    )]
+    fn a_text_runs_first_differing_byte_is_named_by_glyph_and_vertex() {
+        // Given: two glyph quads, the second's second vertex differs
+        let kept = vec![7; 384];
+        let mut fresh = kept.clone();
+        fresh[224] = 8;
+
+        // When
+        assert_kept(&kept, &fresh, (&Run::Texts(Vec::new()), 2));
     }
 
     #[test]

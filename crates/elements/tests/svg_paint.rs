@@ -75,7 +75,7 @@ fn an_svg_paints_its_paths_as_one_icon_item() {
     // Then: the item names the svg's view box and its two paths
     let found = icons(painted);
     assert_eq!(found.len(), 1, "{found:?}");
-    assert_eq!(painted.icon(found[0].0), &undo_icon());
+    assert_eq!(**painted.icon(found[0].0), undo_icon());
 }
 
 #[test]
@@ -175,5 +175,5 @@ fn a_path_without_a_stroke_width_strokes_one_unit_wide() {
         width: 1.0,
     };
     let expected = Icon::new([0.0, 0.0, 16.0, 16.0], vec![stroke]).expect("a valid icon");
-    assert_eq!(painted.icon(found[0].0), &expected);
+    assert_eq!(**painted.icon(found[0].0), expected);
 }

@@ -17,7 +17,7 @@ fn only_icon(painted: &Painted) -> (&Icon, Color) {
     let found: Vec<_> = items
         .iter()
         .filter_map(|item| match *item {
-            Item::Icon { icon, colour, .. } => Some((painted.icon(icon), colour)),
+            Item::Icon { icon, colour, .. } => Some((&**painted.icon(icon), colour)),
             _ => None,
         })
         .collect();

@@ -34,6 +34,7 @@ fn entry(width: u32, height: u32, last_used: u64) -> Entry {
         coverage,
         last_used,
         frame: 1,
+        pins: 0,
     }
 }
 
