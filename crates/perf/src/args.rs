@@ -27,9 +27,8 @@ pub struct Options {
     pub instructions: bool,
     /// Which workloads the full run runs.
     pub set: WorkloadSet,
-    /// Run these changes, each at each size of `scaling::SIZES`, count
-    /// their instructions and judge their growth: one named change, or
-    /// every change of [`RowChange::ALL`] for `--scaling all`.
+    /// Run these changes at each size of `scaling::SIZES` and judge their
+    /// growth: one named change, or [`RowChange::ALL`] for `--scaling all`.
     pub scaling: Option<Vec<RowChange>>,
     /// Run the Mount workload at each size of `scaling::SIZES`.
     pub mount: bool,
@@ -178,13 +177,11 @@ fn mount_rows(value: Option<String>) -> Result<usize, String> {
 
 fn scaling_change(value: Option<String>) -> Result<Vec<RowChange>, String> {
     let name = value.ok_or_else(|| format!("--scaling needs a change: {USAGE}"))?;
-    if name == "all" {
-        return Ok(RowChange::ALL.to_vec());
+    match RowChange::named(&name) {
+        _ if name == "all" => Ok(RowChange::ALL.to_vec()),
+        Some(change) => Ok(vec![change]),
+        None => Err(format!("--scaling {name} is not a change: {USAGE}")),
     }
-    let change = RowChange::named(&name);
-    change
-        .map(|change| vec![change])
-        .ok_or_else(|| format!("--scaling {name} is not a change: {USAGE}"))
 }
 
 fn only_value(value: Option<String>) -> Result<String, String> {
