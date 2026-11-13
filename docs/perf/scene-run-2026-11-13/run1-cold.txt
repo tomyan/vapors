@@ -1,0 +1,50 @@
+Adapter: Intel(R) UHD Graphics 630 (CML GT2) (Vulkan, Intel open-source Mesa driver Mesa 25.0.7-2+deb13u1)
+Timestamp queries: true
+Revision: 4eed56ac7463
+Shader cache: docs/perf/scene-run-2026-11-13/cache-1, empty at the start (cold)
+Frames: 3750, every one judged, no warmup; load average at the start 1.03
+
+vapors: racer ready
+### racer, one scene, 60 s
+
+Frames 3750 (3750 planned); over 16.7 ms to idle: 1. Load average (1 minute) at the start 1.03, at the end 1.06.
+
+| time | median µs | p99 µs | max µs |
+|---|---|---|---|
+| frame (CPU) | 2509.5 | 3018.9 | 96002.1 |
+| GPU time | 5105.8 | 5589.2 | 6503.7 |
+| frame to idle | 7241.1 | 7637.4 | 98186.4 |
+
+| per frame | median | max |
+|---|---|---|
+| draw calls | 25 | 25 |
+| buffer bytes | 33344 | 34304 |
+| texture bytes (atlas pages and images) | 0 | 1092268 |
+
+| first frames | CPU µs | GPU µs | to idle µs |
+|---|---|---|---|
+| 0 | 96002.1 | 4406.2 | 98186.4 |
+| 1 | 1335.2 | 4442.1 | 6024.3 |
+| 2 | 804.3 | 4484.2 | 5633.3 |
+| 3 | 710.7 | 4489.1 | 5580.8 |
+| 4 | 773.7 | 4451.8 | 5461.3 |
+| 5 | 778.1 | 4934.3 | 6026.0 |
+| 6 | 954.9 | 4569.8 | 5693.9 |
+| 7 | 830.7 | 4523.6 | 5755.5 |
+| 8 | 689.1 | 4479.3 | 5585.5 |
+| 9 | 641.3 | 4561.2 | 5634.2 |
+| 10 | 718.5 | 4554.6 | 5673.4 |
+| 11 | 760.4 | 4522.2 | 5662.3 |
+| 12 | 862.5 | 4512.2 | 5680.1 |
+| 13 | 1027.1 | 4464.6 | 5743.6 |
+| 14 | 1138.0 | 4495.8 | 5878.2 |
+| 15 | 1389.7 | 4493.9 | 5902.7 |
+| 16 | 1768.5 | 4462.7 | 6260.8 |
+| 17 | 2091.4 | 4402.2 | 6318.6 |
+| 18 | 2187.2 | 4405.2 | 6425.4 |
+| 19 | 2365.6 | 4405.8 | 6551.1 |
+
+FAIL perf: 1 frames over 16.7ms from the start of App::frame to the GPU idle:
+frame 0 at 0.000 s: to idle 98186.4 µs, CPU 96002.1 µs, GPU 4406.2 µs; phases (µs) accessibility 0.2, draw 92875.2, encode 275.6, input 0.5, layout 1344.7, paint 71.9, record 0.1, style 1654.4, submit 5709.2, tasks 0.1, tick 0.1, update 3084.0, write 2186.4; draw calls 25, buffer bytes 34304, texture bytes 1092268, restyled 40, scene items 33
+
+reproduce: cargo run --release -p vapors-perf -- --scene-run
