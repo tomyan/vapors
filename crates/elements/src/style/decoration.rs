@@ -3,14 +3,14 @@
 //! Blink snaps them (a width under one device pixel becomes one, any
 //! other is floored), so layout and paint use the same widths.
 
+use vapors_css::property::PropertyId;
+use vapors_css::property::longhands::BOX_SHADOW;
 use vapors_css::value::{Color, Value};
 use vapors_scene::Color as Rgba;
 
+use super::sides::{BORDER_COLORS, BORDER_RADII, BORDER_STYLES, BORDER_WIDTHS};
 use super::text_style::color;
 use super::values::{Amount, Reader, amount, keyword, later, shape};
-
-const SIDES: [&str; 4] = ["top", "right", "bottom", "left"];
-const CORNERS: [&str; 4] = ["top-left", "top-right", "bottom-right", "bottom-left"];
 
 /// One outer box shadow, in CSS pixels.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -40,14 +40,18 @@ pub(crate) struct Decoration {
 /// pixels per CSS pixel; `current` is its `color`.
 pub(crate) fn decoration(reader: &mut Reader<'_>, scale: f32, current: Rgba) -> Decoration {
     let mut out = Decoration::default();
-    for (i, side) in SIDES.iter().enumerate() {
-        out.border[i] = border_width(reader, side, scale);
-        out.border_colors[i] = reader.read(side_property(side, "color"), color, Rgba::default());
+    let edges = BORDER_STYLES
+        .into_iter()
+        .zip(BORDER_WIDTHS)
+        .zip(BORDER_COLORS);
+    for (i, ((style, width), colour)) in edges.enumerate() {
+        out.border[i] = border_width(reader, [style, width], scale);
+        out.border_colors[i] = reader.read(colour, color, Rgba::default());
     }
-    for (i, corner) in CORNERS.iter().enumerate() {
-        out.radii[i] = reader.read(corner_property(corner), radius, 0.0);
+    for (slot, corner) in out.radii.iter_mut().zip(BORDER_RADII) {
+        *slot = reader.read(corner, radius, 0.0);
     }
-    out.shadows = reader.read("box-shadow", |v| shadows(v, current), Vec::new());
+    out.shadows = reader.read(BOX_SHADOW, |v| shadows(v, current), Vec::new());
     out.outline = super::outline::outline(reader, scale);
     refuse_elliptical_inner_corners(reader, &out);
     out
@@ -63,7 +67,7 @@ fn refuse_elliptical_inner_corners(reader: &mut Reader<'_>, decoration: &Decorat
         let (wa, wb) = (decoration.border[a], decoration.border[b]);
         if decoration.radii[i] > 0.0 && (wa - wb).abs() > f32::EPSILON {
             reader.refuse(
-                corner_property(CORNERS[i]),
+                BORDER_RADII[i],
                 format!(
                     "rounds a corner where a {wa}px and a {wb}px border meet, which makes an elliptical inner corner; vapors draws circular corners, so give the two borders one width, or this corner no radius"
                 ),
@@ -72,9 +76,10 @@ fn refuse_elliptical_inner_corners(reader: &mut Reader<'_>, decoration: &Decorat
     }
 }
 
-fn border_width(reader: &mut Reader<'_>, side: &str, scale: f32) -> f32 {
-    let drawn = reader.read(side_property(side, "style"), border_style, false);
-    let width = reader.read(side_property(side, "width"), width_px, 0.0);
+/// The used width of the side whose border style and width are `side`.
+fn border_width(reader: &mut Reader<'_>, side: [PropertyId; 2], scale: f32) -> f32 {
+    let drawn = reader.read(side[0], border_style, false);
+    let width = reader.read(side[1], width_px, 0.0);
     if drawn { snap_width(width, scale) } else { 0.0 }
 }
 
@@ -90,17 +95,6 @@ pub(crate) fn snap_width(width: f32, scale: f32) -> f32 {
     } else {
         device.floor() / scale
     }
-}
-
-fn side_property(side: &str, what: &str) -> &'static str {
-    let name = format!("border-{side}-{what}");
-    vapors_css::property::PropertyId::from_name(&name)
-        .unwrap_or_else(|| panic!("`{name}` is not a longhand"))
-        .name()
-}
-
-fn corner_property(corner: &str) -> &'static str {
-    side_property(corner, "radius")
 }
 
 fn border_style(value: &Value) -> Result<bool, String> {

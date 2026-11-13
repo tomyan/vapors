@@ -51,18 +51,26 @@ pub struct FrameCounts {
     /// with it, so this falls when a frame stops drawing an image. A
     /// refused frame drops no texture and counts those still kept.
     pub bind_groups_kept: u64,
-    /// Shadow, quad, image and surface batches whose bytes the frame
-    /// built and wrote into their pipeline's kept buffer: on their first
-    /// draw, after their items changed, or on a target of another
-    /// viewport (`painter_kept.rs`). Text and icon batches are built
-    /// and written every frame and are not counted.
+    /// Batches whose bytes the frame built and wrote into their
+    /// pipeline's kept buffer: on their first draw, after their items
+    /// changed, for images and surfaces on a target of another viewport
+    /// (`painter_kept.rs`), and for text and icons after the atlas moved
+    /// glyphs or an item resolved to another layout or icon
+    /// (`painter_kept_text.rs`).
     pub batches_written: u64,
-    /// Shadow, quad, image and surface batches drawn from bytes kept
-    /// from an earlier frame, with nothing built or written.
+    /// Batches drawn from bytes kept from an earlier frame, with nothing
+    /// built or written.
     pub batches_kept: u64,
     /// Bytes held in the pipelines' kept buffers after the frame: the
     /// batches it drew. Those it did not draw are released.
     pub retained_bytes: u64,
+    /// Glyph and icon lookups in the atlas: 0 on a frame whose text and
+    /// icon batches are all kept.
+    pub atlas_lookups: u64,
+    /// Times the atlas cleared every pin to make room
+    /// (`vapors_text::AtlasPins`): each makes every kept text and icon
+    /// batch built again on its next draw.
+    pub atlas_pin_clears: u64,
 }
 
 impl FrameCounts {
@@ -127,7 +135,11 @@ impl ScenePainter {
 
     /// Starts a frame's counts at 0.
     pub(super) fn begin_counts(&mut self) {
-        self.counts = FrameCounts::default();
+        self.counts = FrameCounts {
+            atlas_lookups: self.atlas.lookups(),
+            atlas_pin_clears: self.atlas.pin_clears(),
+            ..FrameCounts::default()
+        };
         let leftover = self.take_work();
         debug_assert_eq!(
             leftover,
@@ -145,6 +157,8 @@ impl ScenePainter {
             + self.surfaces.bind_groups_kept();
         (self.counts.batches_written, self.counts.batches_kept) = self.kept.drawn();
         self.counts.retained_bytes = self.retained_bytes();
+        self.counts.atlas_lookups = self.atlas.lookups() - self.counts.atlas_lookups;
+        self.counts.atlas_pin_clears = self.atlas.pin_clears() - self.counts.atlas_pin_clears;
     }
 
     /// Adds the work issued since the last take to `run`'s kind.

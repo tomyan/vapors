@@ -4,6 +4,10 @@
 use std::ops::{Add, AddAssign};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+/// The `draw step` phase of every buffer write: the harness reports it
+/// by this name (`vapors_perf::report::PHASES`).
+pub const WRITE_PHASE: &str = "write";
+
 /// Bytes written to the GPU and draw calls issued. Structural: it counts
 /// what was handed to wgpu, not how long the GPU took. wgpu's internal
 /// row padding is not included.
@@ -84,7 +88,7 @@ impl WorkCounter {
         offset: u64,
         data: &[u8],
     ) {
-        let _write = tracing::trace_span!("draw step", phase = "write").entered();
+        let _write = tracing::trace_span!("draw step", phase = WRITE_PHASE).entered();
         queue.write_buffer(buffer, offset, data);
         self.buffer_bytes.fetch_add(len(data), Ordering::Relaxed);
     }
@@ -122,7 +126,7 @@ impl WorkCounter {
         layout: wgpu::TexelCopyBufferLayout,
         size: wgpu::Extent3d,
     ) {
-        let _write = tracing::trace_span!("draw step", phase = "write").entered();
+        let _write = tracing::trace_span!("draw step", phase = WRITE_PHASE).entered();
         queue.write_texture(texture, data, layout, size);
         self.texture_bytes.fetch_add(len(data), Ordering::Relaxed);
     }

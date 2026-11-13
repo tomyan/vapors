@@ -101,6 +101,12 @@ impl Frames {
         })
     }
 
+    /// Each frame but the page's, by its scroll container's slot.
+    pub(crate) fn scrollers(&self) -> impl Iterator<Item = (usize, &FrameAt)> {
+        let frames = self.by_frame.iter().filter(|&(&frame, _)| frame != PAGE);
+        frames.map(|(&frame, at)| (frame, at))
+    }
+
     /// Every frame but the page's shifted by `shift` more, device
     /// pixels: what a scroll does to its container's frame, for tests
     /// of the readers before placement scrolls frames.

@@ -1,36 +1,42 @@
-//! The painter's runs through the text pipeline and its glyph atlas:
-//! text runs at their layout origins, and icons (docs/icons.md, Paint)
-//! over their snapped content boxes, one quad per path.
+//! The bytes of the painter's runs through the text pipeline and its
+//! glyph atlas: text runs at their layout origins, and icons
+//! (docs/icons.md, Paint) over their snapped content boxes, one quad per
+//! path.
 
 use vapors_elements::Painted;
-use vapors_renderer::Target;
-use vapors_scene::{Item, Rect};
-use vapors_text::{AtlasError, BlendParams, IconDraw, TextDraw};
+use vapors_scene::{Item, Rect, Run};
+use vapors_text::{AtlasError, AtlasPins, GlyphAtlas, IconDraw, TextDraw, TextPipeline};
 
-use super::ScenePainter;
-
-impl ScenePainter {
-    /// Draws a run's texts in one call, in document order.
-    pub(super) fn draw_texts(
-        &mut self,
-        target: &Target<'_>,
-        painted: &Painted,
-        items: &[Item],
-    ) -> Result<(), AtlasError> {
-        let texts = text_draws(painted, items);
-        let blend = BlendParams::default();
-        self.text.draw_texts(target, &mut self.atlas, &texts, blend)
+/// The vertex bytes of text or icon `run` and the pins on what they
+/// name (`painter_kept_text.rs`).
+///
+/// # Errors
+///
+/// [`AtlasError`] when its glyphs or icon masks cannot be placed.
+pub(super) fn run_bytes(
+    atlas: &mut GlyphAtlas,
+    painted: &Painted,
+    run: &Run,
+) -> Result<(Vec<u8>, AtlasPins), AtlasError> {
+    match run {
+        Run::Texts(items) => TextPipeline::text_bytes(atlas, &text_draws(painted, items)),
+        Run::Icons(items) => TextPipeline::icon_bytes(atlas, &icon_draws(painted, items)),
+        other => unreachable!("{other:?} is not a text or icon run"),
     }
+}
 
-    /// Draws a run's icons in one call, in document order.
-    pub(super) fn draw_icons(
-        &mut self,
-        target: &Target<'_>,
-        painted: &Painted,
-        items: &[Item],
-    ) -> Result<(), AtlasError> {
-        let draws = icon_draws(painted, items);
-        self.text.draw_icons(target, &mut self.atlas, &draws)
+/// The bytes [`run_bytes`] would build now from where `atlas` holds the
+/// glyphs, with no lookup; `None` when one is not held.
+#[cfg(debug_assertions)]
+pub(super) fn run_placed_bytes(
+    atlas: &GlyphAtlas,
+    painted: &Painted,
+    run: &Run,
+) -> Option<Vec<u8>> {
+    match run {
+        Run::Texts(items) => TextPipeline::placed_text_bytes(atlas, &text_draws(painted, items)),
+        Run::Icons(items) => TextPipeline::placed_icon_bytes(atlas, &icon_draws(painted, items)),
+        other => unreachable!("{other:?} is not a text or icon run"),
     }
 }
 

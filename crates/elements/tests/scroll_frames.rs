@@ -105,3 +105,76 @@ fn a_list_that_starts_to_scroll_paints_its_rows_as_a_full_paint_does() {
     // Then
     assert_matches_full(&doc, at(1.0), "a list that starts to scroll");
 }
+
+#[test]
+fn a_row_on_a_half_device_pixel_scrolled_across_the_top_snaps_as_the_page_does() {
+    // Given: 25 px rows at 1.5x, so the second's top is 37.5 device px
+    let mut list = list("overflow: auto;");
+    list.doc
+        .add_stylesheet("rows.css", ".row { height: 25px; }")
+        .expect("parses");
+    let at_1_5 = vapors_elements::Viewport {
+        scale: 1.5,
+        ..at(1.0)
+    };
+    list.doc.update(at_1_5).expect("updates");
+
+    // When: scrolled 26 px, 39 device px, the second row's top is at
+    // -1.5 device px on the page
+    list.doc.scroll_node_by(list.container, [0.0, 26.0]);
+    list.doc.update(at_1_5).expect("updates");
+
+    // Then: the placement check (debug builds) holds, and the row is
+    // where it is on the page
+    let second = list
+        .doc
+        .painted()
+        .expect("painted")
+        .border_box(list.rows[1]);
+    assert_eq!(second.map(|rect| rect.y), Some(-1.0));
+}
+
+#[test]
+fn a_scroll_not_whole_in_css_pixels_puts_a_half_device_pixel_edge_where_paint_does() {
+    // Given: 25 px rows at 1.5x, the third's bottom at 112.5 device px
+    let mut list = list("overflow: auto;");
+    let rows_css = ".row { height: 25px; background-color: blue; }";
+    list.doc
+        .add_stylesheet("rows.css", rows_css)
+        .expect("parses");
+    let at_1_5 = vapors_elements::Viewport {
+        scale: 1.5,
+        ..at(1.0)
+    };
+    list.doc.update(at_1_5).expect("updates");
+
+    // When: scrolled 0.5 px, applied as 1 device px, which is no f32
+    // number of CSS px (0.6666667)
+    list.doc.scroll_node_by(list.container, [0.0, 0.5]);
+    list.doc.update(at_1_5).expect("updates");
+
+    // Then: the placement check (debug builds) holds, and the third
+    // row's bottom snaps to 113 device px less the 1 scrolled
+    let quads = row_quads(list.doc.painted().expect("painted"));
+    let third = quads[2].0;
+    assert_eq!((third.top, third.bottom), (74.0, 112.0));
+}
+
+#[test]
+fn a_draw_after_a_scroll_batches_the_rows_where_they_show() {
+    // Given: a draw, which keeps its batches
+    let mut list = scrolled("overflow: auto;", 0.0);
+    let view = Rect::new(0.0, 0.0, 200.0, 200.0);
+    drop(list.doc.painted().expect("painted").batches(view));
+
+    // When: the list scrolls, which paints no part
+    list.doc.scroll_node_by(list.container, [0.0, 30.0]);
+    let painted = list.doc.update(at(1.0)).expect("updates");
+
+    // Then: the batches are made again, with the rows where they show
+    // (a debug build compares them with the whole scene's)
+    let batched = painted.batches(view).clone();
+    assert_eq!(batched, painted.scene().batches(view));
+    let quads = row_quads(painted);
+    assert_eq!(quads[1].0, Rect::new(0.0, 10.0, 100.0, 50.0));
+}

@@ -1,6 +1,7 @@
-//! The painter's batches kept on the GPU (IU4 PR 2, `docs/plans/iu4.md`
-//! section 2): each shadow, quad, image and surface batch's instance or
-//! vertex bytes, written into its pipeline's kept buffer on the first
+//! The painter's batches kept on the GPU (IU4 PR 2 and 3,
+//! `docs/plans/iu4.md` section 2): each shadow, quad, image and surface
+//! batch's instance or vertex bytes (text and icon batches':
+//! `painter_kept_text.rs`), written into its pipeline's kept buffer on the first
 //! draw of its key (`vapors_elements::BatchKey`) and drawn from there
 //! while the key lasts. Image and surface quads are in clip space, so
 //! their bytes are written again on a target of another viewport (one
@@ -18,6 +19,7 @@
 use vapors_elements::{BatchKey, Painted};
 use vapors_renderer::{ImagePipeline, KeptRange, QuadPipeline, ShadowPipeline, Target};
 use vapors_scene::{Item, Rect, Run, Size};
+use vapors_text::{BlendParams, GlyphAtlas, ICON_BLEND, TextPipeline};
 
 use super::ScenePainter;
 use super::errors::PaintError;
@@ -35,11 +37,14 @@ pub(super) enum Kind {
     Images,
 }
 
-/// The pipelines whose buffers hold kept bytes.
+/// The pipelines whose buffers hold kept bytes, and the atlas the text
+/// pipeline's name.
 pub(super) struct Pipelines<'a> {
     pub(super) shadows: &'a mut ShadowPipeline,
     pub(super) quads: &'a mut QuadPipeline,
     pub(super) images: &'a mut ImagePipeline,
+    pub(super) text: &'a mut TextPipeline,
+    pub(super) atlas: &'a mut GlyphAtlas,
 }
 
 impl ScenePainter {
@@ -57,6 +62,8 @@ impl ScenePainter {
             shadows: &mut self.shadows,
             quads: &mut self.quads,
             images: &mut self.images,
+            text: &mut self.text,
+            atlas: &mut self.atlas,
         };
         let Some(range) = self.kept.range(pipelines, target, (run, key, at)) else {
             return Ok(());
@@ -79,6 +86,28 @@ impl ScenePainter {
         Ok(())
     }
 
+    /// Draws `run`, a text or icon batch keyed `key`, from its kept
+    /// bytes, building and writing them first when none are current
+    /// (`painter_kept_text.rs`). Nothing is drawn for a batch with no
+    /// ink, or when the write is refused (the refusal is on the
+    /// target's encoder).
+    pub(super) fn draw_kept_text(
+        &mut self,
+        target: &Target<'_>,
+        painted: &Painted,
+        (run, key, at): (&Run, BatchKey, usize),
+    ) -> Result<(), PaintError> {
+        let parts = (&mut self.text, &mut self.atlas);
+        let kept = self
+            .kept
+            .text_range(parts, (target, painted), (run, key, at))?;
+        if let Some(kept) = kept {
+            self.text
+                .draw_kept(target, &mut self.atlas, kept, blend(run));
+        }
+        Ok(())
+    }
+
     /// Releases the bytes of every batch the frame did not draw.
     ///
     /// # Panics
@@ -90,6 +119,8 @@ impl ScenePainter {
             shadows: &mut self.shadows,
             quads: &mut self.quads,
             images: &mut self.images,
+            text: &mut self.text,
+            atlas: &mut self.atlas,
         };
         self.kept.release_undrawn(&mut pipelines);
         let (held, retained) = (self.kept.held_bytes(), self.retained_bytes());
@@ -103,8 +134,16 @@ impl ScenePainter {
 
     /// Bytes held in the pipelines' kept buffers.
     pub(super) fn retained_bytes(&self) -> u64 {
-        let images = self.images.retained_bytes();
-        self.shadows.retained_bytes() + self.quads.retained_bytes() + images
+        let (images, text) = (self.images.retained_bytes(), self.text.retained_bytes());
+        self.shadows.retained_bytes() + self.quads.retained_bytes() + images + text
+    }
+}
+
+/// Gives the kept text pins back, which debug builds require of every
+/// `AtlasPins` (`vapors_text::AtlasPins`).
+impl Drop for ScenePainter {
+    fn drop(&mut self) {
+        self.kept.release_texts(&mut self.text, &mut self.atlas);
     }
 }
 
@@ -128,7 +167,7 @@ impl Pipelines<'_> {
 
 impl Kind {
     /// The pipeline that keeps `run`'s bytes; `None` for text and icon
-    /// runs, which are drawn as each frame builds them.
+    /// runs, kept by the text pipeline (`painter_kept_text.rs`).
     pub(super) fn of_run(run: &Run) -> Option<Self> {
         match run {
             Run::Shadows(_) => Some(Self::Shadows),
@@ -153,6 +192,14 @@ pub(super) fn run_bytes(run: &Run, viewport: Size) -> Vec<u8> {
             ImagePipeline::rect_bytes(viewport, items.iter().map(item_rect))
         }
         Run::Texts(_) | Run::Icons(_) => unreachable!("text and icon runs are not kept"),
+    }
+}
+
+/// The blend a text or icon run draws with.
+fn blend(run: &Run) -> BlendParams {
+    match run {
+        Run::Icons(_) => ICON_BLEND,
+        _ => BlendParams::default(),
     }
 }
 

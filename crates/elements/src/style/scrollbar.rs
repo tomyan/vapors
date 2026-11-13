@@ -3,6 +3,7 @@
 //! the content, taking no space, so `scrollbar-color`'s track colour
 //! must be transparent; another is refused rather than not drawn.
 
+use vapors_css::property::longhands::{SCROLLBAR_COLOR, SCROLLBAR_WIDTH};
 use vapors_css::value::Value;
 use vapors_scene::Color;
 
@@ -35,8 +36,8 @@ pub(crate) struct Scrollbar {
 /// Reads both properties.
 pub(crate) fn scrollbar(reader: &mut Reader<'_>) -> Scrollbar {
     Scrollbar {
-        thumb: reader.read("scrollbar-color", thumb, AUTO_THUMB),
-        width: reader.read("scrollbar-width", width, AUTO_WIDTH),
+        thumb: reader.read(SCROLLBAR_COLOR, thumb, AUTO_THUMB),
+        width: reader.read(SCROLLBAR_WIDTH, width, AUTO_WIDTH),
     }
 }
 

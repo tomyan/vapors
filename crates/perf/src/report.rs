@@ -4,6 +4,8 @@
 use std::fmt::Write;
 use std::time::Duration;
 
+use vapors_renderer::WRITE_PHASE;
+
 use crate::instruction_samples::InstructionSamples;
 use crate::run::{Counts, Samples};
 use crate::stats::{Distribution, median_count};
@@ -16,7 +18,14 @@ use crate::stats::{Distribution, median_count};
 /// repack and per `gpu-surface` that renders); the rest of draw is the
 /// painter's own work. The app's other phases are [`APP_PHASES`].
 pub const PHASES: [&str; 8] = [
-    "update", "style", "layout", "paint", "draw", "encode", "write", "submit",
+    "update",
+    "style",
+    "layout",
+    "paint",
+    "draw",
+    "encode",
+    WRITE_PHASE,
+    "submit",
 ];
 
 /// The app's other frame phases: `run_frame` spans each one, so each is
@@ -40,7 +49,7 @@ pub const EVERY_PHASE: [&str; 13] = [
     "accessibility",
     "draw",
     "encode",
-    "write",
+    WRITE_PHASE,
     "submit",
     "record",
 ];
@@ -141,7 +150,8 @@ fn counts(counts: &Counts) -> String {
         "Counts (last frame): restyled {}, text layouts {}, texts shaped {}, laid out {}, elements visited {}, \
          boxes built {}, layout calls {}, boxes painted {}, boxes shifted {}, scene items {}, \
          culled {}; draw calls {}, buffer bytes {}, texture bytes {}, uniform writes {}, \
-         bind groups {}, batches written {}, batches kept {}, retained bytes {}, render passes {}.\n{}",
+         bind groups {}, batches written {}, batches kept {}, retained bytes {}, atlas lookups {}, \
+         render passes {}.\n{}",
         u.elements_restyled,
         counts.text_layouts,
         counts.texts_shaped,
@@ -161,6 +171,7 @@ fn counts(counts: &Counts) -> String {
         counts.frame.batches_written,
         counts.frame.batches_kept,
         counts.frame.retained_bytes,
+        counts.frame.atlas_lookups,
         counts.render_passes,
         style_counts(u)
     )

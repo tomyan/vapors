@@ -11,6 +11,6 @@ fn every_css_longhand_has_exactly_one_treatment() {
     // Then: the same names, in the same (sorted) order, none twice
     assert_eq!(
         ours, css,
-        "vapors-elements' honoured table and vapors-css's property table disagree; add or remove entries in crates/elements/src/style/honoured.rs"
+        "vapors-elements' honoured table and vapors-css's property table disagree; add, remove or reorder entries in crates/elements/src/style/honoured.rs so the two tables match, in order"
     );
 }

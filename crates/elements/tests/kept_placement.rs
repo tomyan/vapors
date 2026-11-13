@@ -98,7 +98,7 @@ fn a_resize_places_every_box_again() {
 }
 
 #[test]
-fn a_scroll_moves_only_the_scrollers_descendants() {
+fn a_scroll_moves_no_box() {
     // Given: a scroll container of four rows, with a box after it
     let mut list = list("overflow: auto;");
     let body = list.doc.body();
@@ -109,44 +109,27 @@ fn a_scroll_moves_only_the_scrollers_descendants() {
     assert!(list.doc.scroll_node_by(list.container, [0.0, 30.0]));
     let counts = updated(&mut list.doc, 200.0);
 
-    // Then: the four rows moved, and nothing else; each moved by the
-    // scroll alone, which the a11y mirror leaves out (R6)
-    assert_eq!((counts.boxes_moved, counts.boxes_scrolled), (4, 4));
+    // Then: the rows are placed in the scroller's frame, which a
+    // scroll shifts as paint reads it (IU4, `frames.rs`)
+    assert_eq!(counts.boxes_moved, 0);
 }
 
 #[test]
-fn a_row_moved_by_a_change_above_it_is_not_counted_as_scrolled() {
-    // Given
-    let (mut doc, texts) = rows();
-
-    // When
-    doc.set_text(texts[1], "a much longer label that wraps in 100px");
-    let counts = updated(&mut doc, 200.0);
-
-    // Then
-    assert_eq!(counts.boxes_scrolled, 0);
-}
-
-#[test]
-fn a_scrolled_row_laid_out_again_is_moved_not_scrolled() {
-    // Given: a scroll container of four rows, scrolled, with the
-    // second row made taller in the same update
+fn a_scroll_with_a_row_made_taller_moves_only_the_rows_after_it() {
+    // Given: a scroll container of four rows
     let mut list = list("overflow: auto;");
     updated(&mut list.doc, 200.0);
 
-    // When
+    // When: it scrolls, and its second row grows, in one update
     assert!(list.doc.scroll_node_by(list.container, [0.0, 30.0]));
     list.doc
         .set_attribute(list.rows[1], "style", "height: 60px");
     let counts = updated(&mut list.doc, 200.0);
 
-    // Then: the row before it scrolled; the rows after it are laid out
-    // again, so they are moved, not scrolled, whatever the scroll did
-    // to them (review-v243 M2: the container is laid out again too,
-    // and its rect is kept, so the row before it still counts as
-    // scrolled)
-    assert_eq!(counts.boxes_scrolled, 1, "{counts:?}");
-    assert!(counts.boxes_moved >= 3, "{counts:?}");
+    // Then: the two rows after it moved in the scroller's frame; the
+    // scroll moved none (the placement check, in debug builds,
+    // compares each with a fresh placement on the page)
+    assert_eq!(counts.boxes_moved, 2, "{counts:?}");
 }
 
 #[test]

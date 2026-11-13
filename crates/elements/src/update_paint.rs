@@ -46,14 +46,18 @@ impl Document {
         let used = &self.kept.as_ref().expect("styled keeps the styles").used;
         let text = (&mut self.fonts, &mut self.texts);
         let mut input = PaintInput::new((used, stackings), page, text, &self.scroll, from);
-        let last = match last {
+        let painted = match last {
             Some(kept) if kept.from.shows(from, changed) => {
-                return keep(kept, boxes, &from.placement.rects, &mut input);
+                keep(kept, boxes, &from.placement.rects, &mut input)
             }
-            last => last,
+            last => {
+                let painted = paint_all(boxes, &from.placement.rects, &mut input, (last, changed));
+                self.counts.note_paint(&painted);
+                painted
+            }
         };
-        let painted = paint_all(boxes, &from.placement.rects, &mut input, (last, changed));
-        self.counts.note_paint(&painted);
+        let scrolls = |slot| stackings.scrolls(slot);
+        crate::frames_check::assert_frames_follow_placement(&painted.frames, from, &scrolls);
         painted
     }
 }

@@ -5,6 +5,7 @@
 //! F2c builds it.
 
 use taffy::{LengthPercentageAuto, Position, Rect, Style};
+use vapors_css::property::longhands::{BOTTOM, LEFT, POSITION, RIGHT, TOP};
 use vapors_css::value::Value;
 
 use super::box_style::auto_or_amount;
@@ -12,13 +13,13 @@ use super::values::{Reader, keyword, unknown};
 
 /// Reads `position` and `top`, `right`, `bottom` and `left` into `style`.
 pub(crate) fn position(reader: &mut Reader<'_>, style: &mut Style) {
-    style.position = reader.read("position", scheme, Position::Static);
+    style.position = reader.read(POSITION, scheme, Position::Static);
     let auto = LengthPercentageAuto::auto();
     style.inset = Rect {
-        top: reader.read("top", auto_or_amount, auto),
-        right: reader.read("right", auto_or_amount, auto),
-        bottom: reader.read("bottom", auto_or_amount, auto),
-        left: reader.read("left", auto_or_amount, auto),
+        top: reader.read(TOP, auto_or_amount, auto),
+        right: reader.read(RIGHT, auto_or_amount, auto),
+        bottom: reader.read(BOTTOM, auto_or_amount, auto),
+        left: reader.read(LEFT, auto_or_amount, auto),
     };
 }
 

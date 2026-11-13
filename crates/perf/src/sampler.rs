@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use vapors_gpu_harness::Gpu;
 use vapors_platform::{Frame, Next};
-use vapors_renderer::clear;
+use vapors_renderer::{WRITE_PHASE, clear};
 use vapors_scene::Color;
 
 use crate::gpu_reading::frame_gpu_time;
@@ -122,7 +122,10 @@ impl<'g> Sampler<'g> {
     }
 
     /// One frame: the change, then the timed frame between timestamps,
-    /// then the untimed wait for the GPU.
+    /// then the untimed wait for the GPU. A frame that writes no buffer
+    /// (every batch kept, IU4) enters no `write` span; it is recorded as
+    /// 0 rather than left out. Every other phase runs in every frame, so
+    /// its absence still fails the harness shape test.
     fn frame(
         &mut self,
         workload: &mut dyn Workload,
@@ -143,8 +146,12 @@ impl<'g> Sampler<'g> {
         // gpu_judged_frames.rs holds it at or above the frame's GPU time
         wait(&self.gpu.device, FRAME_DEADLINE)?;
         let idle = started.elapsed();
-        let phases = self.clock.take();
-        let instructions = self.clock.take_instructions()?;
+        let mut phases = self.clock.take();
+        let mut instructions = self.clock.take_instructions()?;
+        phases.entry(WRITE_PHASE.into()).or_default();
+        if let Some(counts) = &mut instructions {
+            counts.entry(WRITE_PHASE.into()).or_default();
+        }
         workload
             .check(next)
             .map_err(|error| format!("frame {index}: {error}"))?;

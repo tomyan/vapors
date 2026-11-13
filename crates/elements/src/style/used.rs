@@ -2,6 +2,9 @@
 //! or every refusal its computed style earns.
 
 use vapors_css::cascade::ComputedStyle;
+use vapors_css::property::longhands::{
+    BACKGROUND_COLOR, CURSOR, DISPLAY, POINTER_EVENTS, VISIBILITY, Z_INDEX,
+};
 use vapors_scene::Color;
 
 use super::box_style;
@@ -69,7 +72,7 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
     if inline {
         inline::refuse_box_edges(&mut reader, &layout);
     } else if context.in_inline && layout.display != taffy::Display::None {
-        reader.refuse("display", inline::BLOCK_IN_INLINE.to_owned());
+        reader.refuse(DISPLAY, inline::BLOCK_IN_INLINE.to_owned());
     }
     // pushed directly: `Reader::refuse` leaves an undeclared value to
     // its declarer, and `auto` here is nobody's declaration
@@ -94,11 +97,11 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
         layout,
         inline,
         text,
-        background: reader.read("background-color", color, Color::default()),
+        background: reader.read(BACKGROUND_COLOR, color, Color::default()),
         decoration,
-        cursor: reader.read("cursor", cursor, Cursor::Default),
-        visible: reader.read("visibility", |v| keyword(v).map(|k| k == "visible"), true),
-        takes_pointer: reader.read("pointer-events", |v| keyword(v).map(|k| k == "auto"), true),
+        cursor: reader.read(CURSOR, cursor, Cursor::Default),
+        visible: reader.read(VISIBILITY, |v| keyword(v).map(|k| k == "visible"), true),
+        takes_pointer: reader.read(POINTER_EVENTS, |v| keyword(v).map(|k| k == "auto"), true),
     };
     let mut refusals = check_honoured(styles, context.initial);
     refusals.extend(reader.refusals);
@@ -127,7 +130,7 @@ impl Used {
 /// CSS 2 9.9.1 gives `z-index` to positioned boxes; CSS Flexbox 4.3
 /// and Grid 9 give it to their items too, positioned or not.
 fn applied_z_index(reader: &mut Reader<'_>, layout: &taffy::Style, item: bool) -> Option<i32> {
-    let z = reader.read("z-index", z_index, None);
+    let z = reader.read(Z_INDEX, z_index, None);
     z.filter(|_| item || layout.position != taffy::Position::Static)
 }
 

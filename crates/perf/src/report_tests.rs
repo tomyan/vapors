@@ -133,14 +133,15 @@ fn the_times_section_has_no_gpu_rows() {
 }
 
 #[test]
-fn the_counts_line_gives_the_batches_written_and_kept_and_the_bytes_kept() {
+fn the_counts_line_gives_the_batches_written_and_kept_the_bytes_kept_and_the_atlas_lookups() {
     // Given
     let mut frame = vapors_app::FrameCounts::default();
     (
         frame.batches_written,
         frame.batches_kept,
         frame.retained_bytes,
-    ) = (2, 17, 2176);
+        frame.atlas_lookups,
+    ) = (2, 17, 2176, 9);
     let samples = Samples {
         counts: Counts {
             frame,
@@ -153,6 +154,7 @@ fn the_counts_line_gives_the_batches_written_and_kept_and_the_bytes_kept() {
     let report = section("rows", &samples);
 
     // Then
-    let expected = "batches written 2, batches kept 17, retained bytes 2176, render passes";
+    let expected =
+        "batches written 2, batches kept 17, retained bytes 2176, atlas lookups 9, render passes";
     assert!(report.contains(expected), "{report}");
 }

@@ -144,11 +144,10 @@ fn axis_delta(old: f32, new: f32, scale: f32) -> Option<f32> {
 }
 
 /// Whether each of `new`'s boxes snaps (`paint.rs` `snapped`, which
-/// rounds half away from zero) to its `old` box's snapped edges moved
-/// by `delta`. Rounding is not translation-invariant at a tie that
-/// crosses zero (`round(-1.5) + 3` is 1, `round(1.5)` is 2) nor where
-/// a float sum rounds differently after a move, so a move whose edges
-/// round differently is painted again.
+/// rounds half up) to its `old` box's snapped edges moved by `delta`.
+/// Half-up rounding moves with a whole delta, but a float sum can
+/// round differently after a move, so a move whose edges round
+/// differently is painted again.
 fn snaps_by(old: [BoxRect; 2], new: [BoxRect; 2], delta: [f32; 2], scale: f32) -> bool {
     old.iter().zip(&new).all(|(old, new)| {
         let old = snapped(*old, scale);

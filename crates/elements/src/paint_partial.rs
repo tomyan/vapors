@@ -43,7 +43,7 @@ pub(crate) fn paint_partial(
     let place = &|step| painted.drawn.place_of(step);
     let order = KeptOrder::updated(kept_order, (boxes, rects), input, changed, place);
     let scale = input.scale;
-    painted.frames = frames(&order, input);
+    let frames_were = std::mem::replace(&mut painted.frames, frames(&order, boxes, input));
     let (again, shifts) = to_paint(&order, (boxes, rects), (changed, kept), &mut painted, scale);
     dropped(&again, changed, boxes.len(), &mut painted);
     let shifted: Vec<usize> = shifts.iter().map(|shift| shift.slot).collect();
@@ -54,21 +54,44 @@ pub(crate) fn paint_partial(
     repaint.boxes(again, input, &mut painted);
     repaint.thumbs(input, &mut painted);
     drawn_updated(&mut painted, &order, (&patched, with_hits));
+    if painted.frames != frames_were {
+        frames_moved(&mut painted);
+    }
     painted.order = order;
     painted
 }
 
-/// The scroll frames of `order`'s scroll containers.
-fn frames(order: &KeptOrder, input: &PaintInput<'_>) -> Frames {
+/// After a frame's shift or clip changed: every item and hit in it is
+/// elsewhere on the page, so the kept batches are made again at the
+/// next draw and the hover is tested again.
+fn frames_moved(painted: &mut Painted) {
+    painted.kept_batches = std::cell::RefCell::default();
+    painted.hits_changed = HitsChanged::Unknown;
+}
+
+/// The scroll frames of `order`'s scroll containers, each shifted by
+/// its offset in `input` as `scroll::frame_shift` gives it.
+fn frames(order: &KeptOrder, boxes: &[LayoutBox], input: &PaintInput<'_>) -> Frames {
     let scrolls = |slot| input.stackings.scrolls(slot);
     crate::frames_check::assert_scrollers_agree(&order.thumbs, &order.clips, &scrolls);
     let depth = |slot| order.tree.depth(slot);
-    Frames::of(
-        &order.thumbs,
-        (&order.clips, &depth),
-        &|_| [0.0; 2],
-        input.scale,
-    )
+    let shift =
+        |slot| crate::scroll::frame_shift(scroll_offset(boxes, slot, input.scroll), input.scale);
+    Frames::of(&order.thumbs, (&order.clips, &depth), &shift, input.scale)
+}
+
+/// The scroll offset of the scroll container at `slot`, or a panic
+/// naming it: placement settles every scroll container's offset
+/// before paint.
+fn scroll_offset(boxes: &[LayoutBox], slot: usize, scroll: &crate::scroll::Offsets) -> [f32; 2] {
+    let node = boxes[slot].element_in(slot);
+    node.and_then(|node| scroll.get(node)).unwrap_or_else(|| {
+        panic!(
+            "scroll container slot {slot} ({node:?}) has no settled offset: placement \
+             settles every scroll container's (placement_walk.rs `settled_offset`); \
+             reproduce with `cargo xtask test`"
+        )
+    })
 }
 
 /// The slots whose parts this update paints again, shifts or drops:

@@ -48,7 +48,6 @@ fn patch(painted: &mut Painted, placed: Placed<'_>, changed: &ChangedSlots) -> u
         .filter(|(_, key)| remove(painted, *key))
         .count();
     let slots = changed.rebuilt.iter().chain(&changed.moved);
-    let slots = slots.chain(&changed.scrolled);
     removed + slots.filter(|slot| put(painted, placed, **slot)).count()
 }
 

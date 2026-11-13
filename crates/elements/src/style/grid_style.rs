@@ -8,6 +8,11 @@ use taffy::{
     GridAutoFlow, GridPlacement, GridTemplateComponent, GridTemplateRepetition, Line,
     MaxTrackSizingFunction, MinTrackSizingFunction, RepetitionCount, Style, TrackSizingFunction,
 };
+use vapors_css::property::longhands::{
+    GRID_AUTO_COLUMNS, GRID_AUTO_FLOW, GRID_AUTO_ROWS, GRID_COLUMN_END, GRID_COLUMN_START,
+    GRID_ROW_END, GRID_ROW_START, GRID_TEMPLATE_COLUMNS, GRID_TEMPLATE_ROWS, JUSTIFY_ITEMS,
+    JUSTIFY_SELF,
+};
 use vapors_css::value::{LengthUnit, Value};
 
 use super::box_align::{align_items, align_self};
@@ -15,21 +20,21 @@ use super::values::{Reader, keyword, shape, unknown};
 
 /// Sets the grid fields of `style` from the element `reader` reads.
 pub(crate) fn grid(reader: &mut Reader<'_>, style: &mut Style) {
-    style.grid_template_columns = reader.read("grid-template-columns", template, Vec::new());
-    style.grid_template_rows = reader.read("grid-template-rows", template, Vec::new());
-    style.grid_auto_columns = reader.read("grid-auto-columns", auto_tracks, Vec::new());
-    style.grid_auto_rows = reader.read("grid-auto-rows", auto_tracks, Vec::new());
-    style.grid_auto_flow = reader.read("grid-auto-flow", auto_flow, GridAutoFlow::Row);
+    style.grid_template_columns = reader.read(GRID_TEMPLATE_COLUMNS, template, Vec::new());
+    style.grid_template_rows = reader.read(GRID_TEMPLATE_ROWS, template, Vec::new());
+    style.grid_auto_columns = reader.read(GRID_AUTO_COLUMNS, auto_tracks, Vec::new());
+    style.grid_auto_rows = reader.read(GRID_AUTO_ROWS, auto_tracks, Vec::new());
+    style.grid_auto_flow = reader.read(GRID_AUTO_FLOW, auto_flow, GridAutoFlow::Row);
     style.grid_column = Line {
-        start: reader.read("grid-column-start", placement, GridPlacement::Auto),
-        end: reader.read("grid-column-end", placement, GridPlacement::Auto),
+        start: reader.read(GRID_COLUMN_START, placement, GridPlacement::Auto),
+        end: reader.read(GRID_COLUMN_END, placement, GridPlacement::Auto),
     };
     style.grid_row = Line {
-        start: reader.read("grid-row-start", placement, GridPlacement::Auto),
-        end: reader.read("grid-row-end", placement, GridPlacement::Auto),
+        start: reader.read(GRID_ROW_START, placement, GridPlacement::Auto),
+        end: reader.read(GRID_ROW_END, placement, GridPlacement::Auto),
     };
-    style.justify_items = reader.read("justify-items", justify_items, taffy::AlignItems::NORMAL);
-    style.justify_self = reader.read("justify-self", justify_self, None);
+    style.justify_items = reader.read(JUSTIFY_ITEMS, justify_items, taffy::AlignItems::NORMAL);
+    style.justify_self = reader.read(JUSTIFY_SELF, justify_self, None);
 }
 
 fn template(value: &Value) -> Result<Vec<GridTemplateComponent<String>>, String> {

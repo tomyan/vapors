@@ -140,8 +140,8 @@ impl Painted {
     /// # Panics
     /// When `id` is not one this update's scene names.
     #[must_use]
-    pub fn text(&self, id: TextId) -> &Layout {
-        resolved::<std::rc::Rc<Layout>>(self.slabs.texts.get(id.0), "text", id.0)
+    pub fn text(&self, id: TextId) -> &std::rc::Rc<Layout> {
+        resolved(self.slabs.texts.get(id.0), "text", id.0)
     }
 
     /// The image a scene item names.
@@ -158,8 +158,8 @@ impl Painted {
     /// # Panics
     /// When `id` is not one this update's scene names.
     #[must_use]
-    pub fn icon(&self, id: vapors_scene::IconId) -> &vapors_text::Icon {
-        resolved::<std::rc::Rc<vapors_text::Icon>>(self.slabs.icons.get(id.0), "icon", id.0)
+    pub fn icon(&self, id: vapors_scene::IconId) -> &std::rc::Rc<vapors_text::Icon> {
+        resolved(self.slabs.icons.get(id.0), "icon", id.0)
     }
 
     /// The name of the surface a scene item names: its `gpu-surface`'s

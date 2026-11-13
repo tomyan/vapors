@@ -116,8 +116,8 @@ impl Document {
         let mut placement = last.map(take).unwrap_or_default();
         let scrolls = |slot| stackings.scrolls(slot);
         let boxes = LaidOut::new(&placed.boxes, &scrolls, viewport.scale);
-        let placing = self.placed(&mut placement, (&boxes, &placed.slots), (written, changed));
-        (changed.moved, changed.scrolled) = (placing.moved, placing.scrolled);
+        let done = self.placed(&mut placement, (&boxes, &placed.slots), (written, changed));
+        (changed.moved, changed.offsets_moved) = (done.moved, done.offsets_moved);
         self.made_from(placement, viewport.scale)
     }
 
@@ -145,8 +145,7 @@ impl Document {
         let done = placement.place(boxes, &mut self.scroll, &since);
         self.forget_freed(&changed.freed, slots);
         self.counts.boxes_placed = done.count;
-        self.counts.boxes_moved = done.moved.len() + done.scrolled.len();
-        self.counts.boxes_scrolled = done.scrolled.len();
+        self.counts.boxes_moved = done.moved.len();
         self.counts.slots_chained = done.chained;
         self.check_placed(before, (boxes, placement), (&done, changed));
         done
