@@ -7,9 +7,11 @@
 //! baseline in docs/perf.
 
 pub mod args;
+pub mod args_measure;
 pub mod args_off_path;
 pub mod circuit;
 pub mod counter_samples;
+pub mod counters_report;
 pub mod driver;
 pub mod frame_counts;
 pub mod frame_kinds;

@@ -9,7 +9,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::instructions_check::samples_counted;
+use crate::args::Measure;
+use crate::counters_report::counters_section;
+use crate::instructions_check::{phases_counted, samples_counted};
 use crate::report::{instructions_section, section};
 use crate::run::Samples;
 use crate::scaling_kinds::MIN_FRAMES_PER_KIND;
@@ -102,15 +104,16 @@ impl Samples {
 ///
 /// # Errors
 /// Fewer than [`MIN_FRAMES_PER_KIND`] kept frames of a kind, naming the
-/// fix; or, counting `instructions`, a phase without a count.
+/// fix; or, counting instructions or hardware events, a phase without
+/// a count.
 pub fn sections(
     name: &str,
     samples: &Samples,
     kinds: &[&str],
-    instructions: bool,
+    measure: Measure,
 ) -> Result<Vec<String>, String> {
     if kinds.len() < 2 {
-        return Ok(vec![one_section(name, samples, instructions)?]);
+        return Ok(vec![one_section(name, samples, measure)?]);
     }
     enough_frames(name, samples.frame.len(), kinds)?;
     kinds
@@ -118,17 +121,25 @@ pub fn sections(
         .enumerate()
         .map(|(at, kind)| {
             let title = format!("{name}, {kind} frames");
-            one_section(&title, &samples.of_kind(at, kinds.len())?, instructions)
+            one_section(&title, &samples.of_kind(at, kinds.len())?, measure)
         })
         .collect()
 }
 
-fn one_section(name: &str, samples: &Samples, instructions: bool) -> Result<String, String> {
-    if !instructions {
-        return Ok(section(name, samples));
+fn one_section(name: &str, samples: &Samples, measure: Measure) -> Result<String, String> {
+    match measure {
+        Measure::Times => Ok(section(name, samples)),
+        Measure::Instructions => {
+            samples_counted(name, samples)?;
+            instructions_section(name, samples)
+        }
+        Measure::Counters => {
+            let counted = samples.counters.as_ref().map(|kept| &kept.phases);
+            phases_counted(&samples.phases, counted.unwrap_or(&BTreeMap::new()))
+                .map_err(|e| format!("{name}: {e}"))?;
+            counters_section(name, samples)
+        }
     }
-    samples_counted(name, samples)?;
-    instructions_section(name, samples)
 }
 
 fn enough_frames(name: &str, runs: usize, kinds: &[&str]) -> Result<(), String> {

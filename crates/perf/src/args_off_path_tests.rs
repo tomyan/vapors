@@ -19,7 +19,7 @@ fn off_path_is_read_with_only_instructions_and_the_counts() {
     ])
     .expect("parsed");
     assert_eq!(o.set, WorkloadSet::OffPath);
-    assert!(o.instructions);
+    assert_eq!(o.measure, super::Measure::Instructions);
     assert_eq!(o.only.as_deref(), Some("code blocks"));
     assert_eq!((o.settings.runs, o.settings.warmup), (60, 10));
     assert_eq!(full(&[]).expect("parsed").set, WorkloadSet::Main);
