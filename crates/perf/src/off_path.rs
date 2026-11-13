@@ -3,6 +3,10 @@
 //! timed and counted like them so their costs show as numbers. They
 //! report; `--scaling` never judges them. Each is a [`UnitPage`] of
 //! one [`Kind`] and a change made before each frame.
+//!
+//! The 10,000-unit Insert frames of the scroller kinds take seconds of
+//! CPU each, so a run at the default counts takes tens of minutes:
+//! choose with `--only` and give small counts.
 
 use std::rc::Rc;
 
@@ -13,21 +17,30 @@ pub use crate::off_path_kinds::{Kind, off_path_workloads};
 use crate::off_path_page::{UnitPage, page_viewport};
 use crate::run::{Counts, Workload};
 
+/// The line an `--off-path` run prints after its setup, so its output
+/// names itself wherever it is pasted.
+pub const OFF_PATH_SETUP: &str = "Workloads: off-path, reported only (--scaling does not judge \
+     them); the 10,000-unit Insert frames take seconds each, so choose with --only and small counts";
+
 /// The pixels a scroll change moves its scroller by each frame.
 const SCROLL_STEP: f32 = 24.0;
 
 /// What changes before each frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OffPathChange {
-    /// The middle unit's value, to a new five-digit text.
+    /// The middle unit's value, to a new five-digit text. The middle
+    /// unit is out of view at every size, as the rows page's Text edit
+    /// is: an off-screen edit.
     Edit,
     /// The body scrolled down 24 px; back to the top at the end.
     Scroll,
     /// The second unit's own scroller scrolled right 24 px; back to its
-    /// start at the end.
+    /// start at the end. Only the x axis is driven, though a code block
+    /// can scroll down too.
     ScrollInner,
     /// Alternating frames: a unit inserted before the middle unit, then
-    /// that unit removed.
+    /// that unit removed. The report has a section for each kind of frame
+    /// (`frame_kinds.rs`).
     Insert,
 }
 
@@ -102,6 +115,13 @@ impl Workload for OffPath {
 
     fn timing(&self) -> FrameTiming {
         self.app.frame_timing()
+    }
+
+    fn frame_kinds(&self) -> &'static [&'static str] {
+        match self.change {
+            OffPathChange::Insert => &["insert", "remove"],
+            OffPathChange::Edit | OffPathChange::Scroll | OffPathChange::ScrollInner => &["every"],
+        }
     }
 }
 

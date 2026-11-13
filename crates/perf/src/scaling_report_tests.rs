@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use super::{scaling_section, verdict};
+use super::{scaling_section, verdict, verdicts};
 use crate::rows::RowChange;
 use crate::scaling::{AtSize, Scaling};
 use crate::scaling_judged::INSERT_A11Y_PER_ROW;
@@ -24,7 +24,7 @@ fn the_table_has_a_count_per_size_and_a_growth_per_extra_row_per_interval() {
     let scaling = scaling([1000, 3000, 10_000]);
 
     // When
-    let table = scaling_section(RowChange::Text, &scaling);
+    let table = scaling_section("Text", &scaling);
 
     // Then
     assert!(table.starts_with("### Scaling, Text"), "{table}");
@@ -37,7 +37,8 @@ fn the_table_has_a_count_per_size_and_a_growth_per_extra_row_per_interval() {
 
 #[test]
 fn growth_fails_naming_the_change_the_phase_and_the_command() {
-    let error = verdict(RowChange::Text, &scaling([1000, 3000, 10_000])).expect_err("grows");
+    let error =
+        verdict(RowChange::Text, "Text", &scaling([1000, 3000, 10_000])).expect_err("grows");
     assert!(
         error.contains("Text does work that depends on the page's size"),
         "{error}"
@@ -51,7 +52,7 @@ fn growth_fails_naming_the_change_the_phase_and_the_command() {
 
 #[test]
 fn constant_counts_pass() {
-    let line = verdict(RowChange::Class, &scaling([1000, 1000, 1000])).expect("flat");
+    let line = verdict(RowChange::Class, "Class", &scaling([1000, 1000, 1000])).expect("flat");
     assert!(line.starts_with("scaling: pass"), "{line}");
 }
 
@@ -74,7 +75,8 @@ fn moving(per_row: u64) -> Scaling {
 
 #[test]
 fn insert_is_judged_on_its_accessibility_phase_alone_and_the_line_says_why() {
-    let line = verdict(RowChange::Insert, &moving(INSERT_A11Y_PER_ROW)).expect("at the ceiling");
+    let line =
+        verdict(RowChange::Insert, "Insert", &moving(INSERT_A11Y_PER_ROW)).expect("at the ceiling");
     assert!(line.starts_with("scaling: pass"), "{line}");
     assert!(
         line.contains(&format!(
@@ -87,10 +89,100 @@ fn insert_is_judged_on_its_accessibility_phase_alone_and_the_line_says_why() {
 
 #[test]
 fn insert_accessibility_over_its_ceiling_fails_naming_the_phase() {
-    let error = verdict(RowChange::Insert, &moving(INSERT_A11Y_PER_ROW + 1)).expect_err("over");
+    let error = verdict(
+        RowChange::Insert,
+        "Insert",
+        &moving(INSERT_A11Y_PER_ROW + 1),
+    )
+    .expect_err("over");
     assert!(error.contains("accessibility costs"), "{error}");
     assert!(
         error.contains("vapors-perf 60 10 --scaling Insert"),
         "{error}"
     );
+}
+
+#[test]
+fn a_kinds_table_is_titled_with_the_change_and_the_kind() {
+    let table = scaling_section("Insert, remove frames", &scaling([1000, 1000, 1000]));
+    assert!(
+        table.starts_with("### Scaling, Insert, remove frames (median"),
+        "{table}"
+    );
+}
+
+#[test]
+fn every_kind_is_judged_and_the_worse_fails_naming_its_kind() {
+    // Given: insert frames at the ceiling, remove frames over it
+    let kinds = [
+        (
+            "Insert, insert frames".to_owned(),
+            moving(INSERT_A11Y_PER_ROW),
+        ),
+        (
+            "Insert, remove frames".to_owned(),
+            moving(INSERT_A11Y_PER_ROW + 1),
+        ),
+    ];
+
+    // When
+    let error = verdicts(RowChange::Insert, &kinds).expect_err("remove frames over");
+
+    // Then
+    assert!(error.contains("Insert, remove frames does work"), "{error}");
+    assert!(
+        !error.contains("Insert, insert frames does work"),
+        "{error}"
+    );
+    assert!(error.contains("--scaling Insert"), "{error}");
+}
+
+#[test]
+fn every_kind_passing_gives_a_pass_line_per_kind() {
+    // Given
+    let kinds = [
+        (
+            "Insert, insert frames".to_owned(),
+            moving(INSERT_A11Y_PER_ROW),
+        ),
+        ("Insert, remove frames".to_owned(), moving(1)),
+    ];
+
+    // When
+    let lines = verdicts(RowChange::Insert, &kinds).expect("both within");
+
+    // Then
+    assert_eq!(lines.lines().count(), 2, "{lines}");
+    assert!(
+        lines.contains("pass, Insert, remove frames accessibility"),
+        "{lines}"
+    );
+}
+
+#[test]
+fn the_first_kind_failing_fails_the_run_too() {
+    // Given: insert frames over the ceiling, remove frames within
+    let kinds = [
+        (
+            "Insert, insert frames".to_owned(),
+            moving(INSERT_A11Y_PER_ROW + 1),
+        ),
+        ("Insert, remove frames".to_owned(), moving(1)),
+    ];
+
+    // When
+    let error = verdicts(RowChange::Insert, &kinds).expect_err("insert frames over");
+
+    // Then
+    assert!(error.contains("Insert, insert frames does work"), "{error}");
+    assert!(
+        !error.contains("Insert, remove frames does work"),
+        "{error}"
+    );
+}
+
+#[test]
+fn no_kinds_is_refused_never_a_pass() {
+    let error = verdicts(RowChange::Insert, &[]).expect_err("nothing judged");
+    assert!(error.contains("no kind of Insert frame"), "{error}");
 }

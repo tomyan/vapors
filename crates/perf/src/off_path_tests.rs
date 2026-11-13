@@ -28,3 +28,11 @@ fn an_edit_reaches_the_documents_middle_unit() {
     // Then
     assert_eq!(workload.page.doc.borrow().text(value), Some("90007"));
 }
+
+#[test]
+fn insert_alternates_insert_and_remove_frames_and_the_rest_one_kind() {
+    let insert = OffPath::new(Kind::CodeBlocks, 200, OffPathChange::Insert);
+    assert_eq!(insert.frame_kinds(), ["insert", "remove"]);
+    let edit = OffPath::new(Kind::CodeBlocks, 200, OffPathChange::Edit);
+    assert_eq!(edit.frame_kinds(), ["every"]);
+}
