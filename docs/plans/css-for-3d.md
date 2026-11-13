@@ -571,6 +571,11 @@ each other once C3 is in; C6 waits for the build-time stack.
 
 ## 6. Decisions
 
+Decided by Tom, 2026-11-13: D5 (b), PR 4b is built as slices C1 to C4
+(component tags carrying `class` get a compiler-emitted `StyleKey`;
+scene nodes take the build-time path), not unkeyed and reworked later.
+The other decisions below are still open.
+
 Each with options, the trade-off and a recommendation.
 
 **D1. How a scene anchor gets a `StyleKey`.**
