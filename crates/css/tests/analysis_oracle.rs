@@ -15,6 +15,7 @@ use std::collections::BTreeMap;
 
 use oracle::{Situation, judged, named_inputs};
 use vapors_css::analysis::Match;
+use vapors_css::ast::Rule;
 
 /// Every selector shape the classifier judges, over the key.
 const SELECTORS: &[&str] = &[
@@ -62,23 +63,28 @@ const SELECTORS: &[&str] = &[
     "*",
 ];
 
-/// Each selector as written and as a component's sheet scopes it.
-fn forms() -> Vec<String> {
+/// Each selector as written and as a component's sheet scopes it
+/// (`scope::scoped` changes the rule's selector, not its text), each
+/// with a label for messages.
+fn forms() -> Vec<(String, Rule)> {
     SELECTORS
         .iter()
         .flat_map(|selector| {
-            let raw = format!("{selector} {{ color: red }}");
-            let sheet = vapors_css::parse(&raw).expect("parses");
-            let scoped = vapors_css::scope::scoped(sheet, "data-wisp", "s").to_css();
-            [raw, scoped]
+            let css = format!("{selector} {{ color: red }}");
+            let raw = vapors_css::parse(&css).expect("parses");
+            let scoped = vapors_css::scope::scoped(raw.clone(), "data-wisp", "s");
+            [
+                (css.clone(), raw.rules[0].clone()),
+                (format!("{css} scoped"), scoped.rules[0].clone()),
+            ]
         })
         .collect()
 }
 
 #[test]
 fn always_matches_every_situation_never_matches_none_and_conditional_follows_its_inputs() {
-    for css in forms() {
-        let (verdict, outcomes) = judged(&css);
+    for (css, rule) in forms() {
+        let (verdict, outcomes) = judged(&rule);
         match verdict {
             Match::Always => assert!(
                 outcomes.iter().all(|(_, m)| *m),
@@ -107,7 +113,7 @@ fn always_matches_every_situation_never_matches_none_and_conditional_follows_its
 fn the_table_has_each_verdict_and_each_situation_bit_changes_some_outcome() {
     // Given
     let judged: Vec<(Match, Vec<(Situation, bool)>)> =
-        forms().iter().map(|css| judged(css)).collect();
+        forms().iter().map(|(_, rule)| judged(rule)).collect();
 
     // Then: all three verdicts occur, and every situation bit flips
     // some outcome, so no bit is vacuous

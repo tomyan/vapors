@@ -16,11 +16,13 @@ pub const CARD: KeyFacts<'static> = KeyFacts {
     literal_attributes: &[("type", "Text")],
 };
 
-/// `css` with its subject scoped as `scope::scoped` scopes a component's
-/// sheet for scope `s`.
-pub fn scoped(css: &str) -> String {
+/// `css` classified after `scope::scoped` scoped it for scope `s`, as
+/// the runtime holds a component's sheet (the scoped selector is in
+/// the rule, not in its text).
+pub fn classified_scoped(css: &str, facts: &KeyFacts<'_>) -> Match {
     let sheet = vapors_css::parse(css).unwrap_or_else(|e| panic!("{css}: {e}"));
-    vapors_css::scope::scoped(sheet, "data-wisp", "s").to_css()
+    let scoped = vapors_css::scope::scoped(sheet, "data-wisp", "s");
+    classify(&scoped.rules[0], facts)
 }
 
 pub fn classified(css: &str, facts: &KeyFacts<'_>) -> Match {

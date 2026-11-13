@@ -6,6 +6,7 @@
 #![allow(dead_code)] // each test binary uses a subset
 
 use vapors_css::analysis::{Depends, KeyFacts, Match, classify};
+use vapors_css::ast::Rule;
 use vapors_css::selector::matches;
 use vapors_css::tree::{NodeId, States, Tree};
 
@@ -158,9 +159,7 @@ pub fn named_inputs(depends: &Depends, situation: Situation) -> Vec<bool> {
 }
 
 /// The rule's verdict and each situation's outcome.
-pub fn judged(css: &str) -> (Match, Vec<(Situation, bool)>) {
-    let sheet = vapors_css::parse(css).unwrap_or_else(|e| panic!("{css}: {e}"));
-    let rule = &sheet.rules[0];
+pub fn judged(rule: &Rule) -> (Match, Vec<(Situation, bool)>) {
     let outcomes = situations()
         .into_iter()
         .map(|situation| {
