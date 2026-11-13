@@ -80,3 +80,7 @@ impl Allowed {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "quality_attrs_tests.rs"]
+mod tests;
