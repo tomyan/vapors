@@ -21,6 +21,9 @@ const INTERVAL: Duration = Duration::from_millis(16);
 /// (the racer on lavapipe) is under a second; ten is far beyond it.
 const FRAME_DEADLINE: Duration = Duration::from_secs(10);
 
+/// The `draw step` phase of buffer writes (`WorkCounter::write_buffer`).
+const WRITE: &str = "write";
+
 /// One frame's measurements: wall time and per-phase times, and, with a
 /// counter, the frame's instructions and each phase's.
 struct Measured {
@@ -119,7 +122,10 @@ impl<'g> Sampler<'g> {
     }
 
     /// One frame: the change, then the timed frame between timestamps,
-    /// then the untimed wait for the GPU.
+    /// then the untimed wait for the GPU. A frame that writes no buffer
+    /// (every batch kept, IU4) enters no `write` span; it is recorded as
+    /// 0 rather than left out. Every other phase runs in every frame, so
+    /// its absence still fails the harness shape test.
     fn frame(
         &mut self,
         workload: &mut dyn Workload,
@@ -135,8 +141,12 @@ impl<'g> Sampler<'g> {
         let _ = self.clock.take();
         let _ = self.clock.take_instructions()?;
         let (next, took, frame_instructions) = self.timed(workload, texture, index, gpu_clock)?;
-        let phases = self.clock.take();
-        let instructions = self.clock.take_instructions()?;
+        let mut phases = self.clock.take();
+        let mut instructions = self.clock.take_instructions()?;
+        phases.entry(WRITE.into()).or_default();
+        if let Some(counts) = &mut instructions {
+            counts.entry(WRITE.into()).or_default();
+        }
         workload
             .check(next)
             .map_err(|error| format!("frame {index}: {error}"))?;

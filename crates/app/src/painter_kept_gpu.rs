@@ -1,5 +1,5 @@
 //! Each kept batch's bytes by its key, and which frame last drew it
-//! (`painter_kept.rs`).
+//! (`painter_kept.rs`; text and icon batches in `painter_kept_text.rs`).
 
 use std::collections::HashMap;
 
@@ -9,10 +9,16 @@ use vapors_scene::{Run, Size};
 
 use super::{Kind, Pipelines, run_bytes};
 
+#[path = "painter_kept_text.rs"]
+mod text;
+use text::TextGpu;
+
 /// The kept bytes of each batch drawn, by key.
 #[derive(Default)]
 pub(crate) struct KeptGpu {
     entries: HashMap<BatchKey, Gpu>,
+    /// Text and icon batches' bytes, by key.
+    texts: HashMap<BatchKey, TextGpu>,
     /// Counts the frames: an entry drawn in this one has it as `drawn`.
     frame: u64,
     /// Batches whose bytes were built and written this frame.
@@ -97,11 +103,15 @@ impl KeptGpu {
         let frame = self.frame;
         let undrawn = self.entries.extract_if(|_, gpu| gpu.drawn != frame);
         undrawn.for_each(|(_, gpu)| pipelines.release(gpu.kind, gpu.range));
+        let undrawn = self.texts.extract_if(|_, gpu| gpu.drawn != frame);
+        let text = (&mut *pipelines.text, &mut *pipelines.atlas);
+        undrawn.for_each(|(_, gpu)| gpu.release((&mut *text.0, &mut *text.1)));
     }
 
     /// The bytes the kept batches hold.
     pub(super) fn held_bytes(&self) -> u64 {
-        self.entries.values().map(|gpu| gpu.len).sum()
+        let texts: u64 = self.texts.values().map(TextGpu::len).sum();
+        self.entries.values().map(|gpu| gpu.len).sum::<u64>() + texts
     }
 }
 

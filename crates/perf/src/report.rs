@@ -141,7 +141,8 @@ fn counts(counts: &Counts) -> String {
         "Counts (last frame): restyled {}, text layouts {}, texts shaped {}, laid out {}, elements visited {}, \
          boxes built {}, layout calls {}, boxes painted {}, boxes shifted {}, scene items {}, \
          culled {}; draw calls {}, buffer bytes {}, texture bytes {}, uniform writes {}, \
-         bind groups {}, batches written {}, batches kept {}, retained bytes {}, render passes {}.\n{}",
+         bind groups {}, batches written {}, batches kept {}, retained bytes {}, atlas lookups {}, \
+         render passes {}.\n{}",
         u.elements_restyled,
         counts.text_layouts,
         counts.texts_shaped,
@@ -161,6 +162,7 @@ fn counts(counts: &Counts) -> String {
         counts.frame.batches_written,
         counts.frame.batches_kept,
         counts.frame.retained_bytes,
+        counts.frame.atlas_lookups,
         counts.render_passes,
         style_counts(u)
     )

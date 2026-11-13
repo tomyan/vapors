@@ -57,11 +57,12 @@ fn gpu_the_counter_demos_idle_frame_matches_the_plan_row() {
     let idle = counts.total();
     assert_eq!(idle.draw_calls, 3);
     // 2800 before IU4 PR 1: each of the 3 draws' 16-byte uniform is now
-    // kept; 2752 before IU4 PR 2: the two quad batches' 256 bytes are kept
-    assert_eq!(idle.buffer_bytes, 2496);
-    assert_eq!(counts.quads.buffer_bytes, 0);
-    assert_eq!((counts.batches_written, counts.batches_kept), (0, 2));
-    assert_eq!(counts.retained_bytes, 256);
+    // kept; 2752 before IU4 PR 2: the two quad batches' 256 bytes are kept;
+    // 2496 before IU4 PR 3: the text batch's 13 glyphs' 2496 bytes are kept
+    assert_eq!(idle.buffer_bytes, 0);
+    assert_eq!((counts.batches_written, counts.batches_kept), (0, 3));
+    assert_eq!(counts.retained_bytes, 256 + 2496);
+    assert_eq!(counts.atlas_lookups, 0);
     assert_eq!(idle.texture_bytes, 0);
 }
 

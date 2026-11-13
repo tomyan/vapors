@@ -51,6 +51,12 @@ impl GlyphAtlas {
         self.generation
     }
 
+    /// How many times every pin was cleared so far.
+    #[must_use]
+    pub fn pin_clears(&self) -> u64 {
+        self.pin_epoch
+    }
+
     /// Cache lookups so far, by glyph or icon.
     #[must_use]
     pub fn lookups(&self) -> u64 {
