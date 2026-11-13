@@ -15,8 +15,14 @@ const CARD: KeyFacts<'static> = KeyFacts {
     toggles: &["open"],
     style: Some("color: red"),
     literal_attributes: &[("type", "Text")],
-    expression_attributes: &["id"],
 };
+
+/// `css` with its subject scoped as `scope::scoped` scopes a component's
+/// sheet for scope `s`.
+fn scoped(css: &str) -> String {
+    let sheet = vapors_css::parse(css).unwrap_or_else(|e| panic!("{css}: {e}"));
+    vapors_css::scope::scoped(sheet, "data-wisp", "s").to_css()
+}
 
 fn classified(css: &str, facts: &KeyFacts<'_>) -> Match {
     let sheet = vapors_css::parse(css).unwrap_or_else(|e| panic!("{css}: {e}"));
@@ -93,7 +99,7 @@ fn a_state_is_conditional_on_its_flag() {
 
 #[test]
 fn run_time_attributes_are_conditional_on_their_name() {
-    // Given: `id` is an expression; `hidden` is not in the template
+    // Given: `id` and `hidden` are not literal in the template
     for (css, name) in [
         ("#main { color: red }", "id"),
         ("[id] { color: red }", "id"),
@@ -185,9 +191,49 @@ fn an_unscoped_key_never_matches_a_scoped_rule() {
         ..CARD
     };
     assert_eq!(
-        classified("button[data-wisp=\"s\"] { color: red }", &unscoped),
+        classified(&scoped("button { color: red }"), &unscoped),
         Match::Never
     );
+}
+
+#[test]
+fn scoped_rules_are_judged_in_the_form_the_runtime_scopes_them() {
+    // Given: the subject gains the attribute bare, the rest inside :where()
+    assert_eq!(classified(&scoped(".card { color: red }"), &CARD), Match::Always);
+    assert_eq!(classified(&scoped(".other { color: red }"), &CARD), Match::Never);
+    assert_eq!(
+        classified(&scoped(":global(.dark) .card { color: red }"), &CARD),
+        depends(|d| d.ancestors = true)
+    );
+    assert_eq!(
+        classified(&scoped(".panel :global(button) { color: red }"), &CARD),
+        depends(|d| d.ancestors = true)
+    );
+    assert_eq!(
+        classified(&scoped(":is(.open, .card) { color: red }"), &CARD),
+        Match::Always
+    );
+}
+
+#[test]
+fn state_names_round_trip_through_every_state_pseudo_class() {
+    for name in [
+        ":hover",
+        ":focus",
+        ":focus-visible",
+        ":focus-within",
+        ":active",
+        ":checked",
+        ":disabled",
+        ":enabled",
+        ":invalid",
+    ] {
+        let Match::Conditional(depends) = classified(&format!("{name} {{ color: red }}"), &CARD)
+        else {
+            panic!("{name}: conditional");
+        };
+        assert_eq!(depends.to_string(), name);
+    }
 }
 
 #[test]
@@ -200,6 +246,6 @@ fn dependencies_display_as_a_list() {
     };
     assert_eq!(
         depends.to_string(),
-        "class:open, states States(1), [hidden], ancestors, @media/@supports/@container"
+        "class:open, :hover, [hidden], ancestors, @media/@supports/@container"
     );
 }

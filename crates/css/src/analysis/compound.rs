@@ -4,7 +4,7 @@
 //! where the key leaves it to run time.
 
 use super::{Depends, KeyFacts, Match};
-use crate::selector::{AttributeSelector, Compound, PseudoClass, matching::attribute_matches};
+use crate::selector::{AttributeSelector, Compound, PseudoClass, Reads, Selector, matching::attribute_matches, reads};
 
 /// Whether a key's elements satisfy `compound`, without its context.
 pub(super) fn judge(compound: &Compound, facts: &KeyFacts<'_>) -> Match {
@@ -106,53 +106,32 @@ fn attribute_selector(attribute: &AttributeSelector, facts: &KeyFacts<'_>) -> Ma
     }
 }
 
-/// Every pseudo-class the matcher knows, each placed: a state flag or
-/// structure is run time; `:root` is the mount site's; the lists
-/// combine their arguments as the matcher does.
+/// Every pseudo-class by what the matcher reads for it (`share::reads`,
+/// one exhaustive list): a state flag or structure is run time;
+/// `:root` is the mount site's; the lists combine their arguments as
+/// the matcher does.
 fn pseudo_class(pseudo: &PseudoClass, facts: &KeyFacts<'_>) -> Match {
-    if let Some(flag) = crate::selector::state_flag(pseudo) {
-        return Match::depends(Depends {
+    match reads(pseudo) {
+        Reads::State(flag) => Match::depends(Depends {
             states: flag,
             ..Depends::default()
-        });
-    }
-    match pseudo {
-        PseudoClass::Root => Match::depends(Depends {
+        }),
+        Reads::Root => Match::depends(Depends {
             ancestors: true,
             ..Depends::default()
         }),
-        PseudoClass::Not(list) => list
-            .iter()
-            .map(|selector| super::selector(selector, facts))
-            .fold(Match::Never, Match::or)
-            .not(),
-        PseudoClass::Is(list) | PseudoClass::Where(list) | PseudoClass::Global(list) => list
-            .iter()
-            .map(|selector| super::selector(selector, facts))
-            .fold(Match::Never, Match::or),
-        PseudoClass::Empty
-        | PseudoClass::Has(_)
-        | PseudoClass::FirstChild
-        | PseudoClass::LastChild
-        | PseudoClass::OnlyChild
-        | PseudoClass::FirstOfType
-        | PseudoClass::LastOfType
-        | PseudoClass::OnlyOfType
-        | PseudoClass::NthChild(_)
-        | PseudoClass::NthLastChild(_)
-        | PseudoClass::NthOfType(_)
-        | PseudoClass::NthLastOfType(_) => Match::depends(Depends {
+        Reads::Negated(list) => any_of(list, facts).not(),
+        Reads::Nested(list) => any_of(list, facts),
+        Reads::Relative(_) | Reads::Structure => Match::depends(Depends {
             structure: true,
             ..Depends::default()
         }),
-        PseudoClass::Hover
-        | PseudoClass::Focus
-        | PseudoClass::FocusVisible
-        | PseudoClass::FocusWithin
-        | PseudoClass::Active
-        | PseudoClass::Checked
-        | PseudoClass::Disabled
-        | PseudoClass::Enabled
-        | PseudoClass::Invalid => unreachable!("state_flag places every state pseudo-class"),
     }
+}
+
+/// `:is()`'s rule: any argument may match.
+fn any_of(list: &[Selector], facts: &KeyFacts<'_>) -> Match {
+    list.iter()
+        .map(|selector| super::selector(selector, facts))
+        .fold(Match::Never, Match::or)
 }

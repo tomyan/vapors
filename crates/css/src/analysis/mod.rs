@@ -18,7 +18,13 @@ use crate::ast::Rule;
 use crate::selector::{Combinator, Selector};
 use crate::tree::States;
 
-/// What a template key fixes about every element it makes.
+/// What a template key fixes about every element it makes, built from
+/// a key that passed `StyleKey::shape_refusal` (each class and
+/// directive one name, no name in both). `literal_attributes` holds
+/// neither `class`, `style` nor the scope attribute: those are the
+/// fields above, which [`classify`] checks in debug builds. Every
+/// attribute not listed here is a run-time input: `set_attribute` may
+/// set it.
 #[derive(Clone, Copy, Debug)]
 pub struct KeyFacts<'a> {
     /// The element's tag.
@@ -33,10 +39,27 @@ pub struct KeyFacts<'a> {
     pub toggles: &'a [&'a str],
     /// The literal `style` text.
     pub style: Option<&'a str>,
-    /// Every other literal attribute, by name as written.
+    /// Every other literal attribute, by name as written, which the key
+    /// fixes at run time as it fixes `class` and `style`.
     pub literal_attributes: &'a [(&'a str, &'a str)],
-    /// Every `name={expr}` attribute's name: set at run time.
-    pub expression_attributes: &'a [&'a str],
+}
+
+impl KeyFacts<'_> {
+    /// The shape `StyleKey::shape_refusal` and the fields above promise.
+    fn check_shape(&self) {
+        debug_assert!(
+            self.toggles.iter().all(|t| !self.classes.contains(t)),
+            "a directive is also a literal class: {self:?}"
+        );
+        debug_assert!(
+            self.literal_attributes.iter().all(|(name, _)| {
+                !name.eq_ignore_ascii_case("class")
+                    && !name.eq_ignore_ascii_case("style")
+                    && *name != self.scope_attribute
+            }),
+            "class, style and the scope attribute are the key's own fields: {self:?}"
+        );
+    }
 }
 
 /// The run-time inputs a conditional match depends on.
@@ -117,6 +140,7 @@ impl Match {
 /// Classifies `rule` against the elements `facts` describes.
 #[must_use]
 pub fn classify(rule: &Rule, facts: &KeyFacts<'_>) -> Match {
+    facts.check_shape();
     let conditions = if rule.conditions.is_empty() {
         Match::Always
     } else {
@@ -159,9 +183,11 @@ impl fmt::Display for Depends {
         for toggle in &self.toggles {
             parts.push(format!("class:{toggle}"));
         }
-        if self.states != States::NONE {
-            parts.push(format!("states {:?}", self.states));
-        }
+        parts.extend(
+            crate::selector::state_names(self.states)
+                .into_iter()
+                .map(str::to_owned),
+        );
         for attribute in &self.attributes {
             parts.push(format!("[{attribute}]"));
         }
