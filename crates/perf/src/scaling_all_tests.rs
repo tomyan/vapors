@@ -47,7 +47,7 @@ fn each_change_ends_with_a_line_naming_it_and_its_result() {
     );
 }
 
-/// The log `scripts/nightly-scaling-check.sh` parses: its lines must be
+/// The log `scripts/nightly-scaling-issues-check.sh` parses: its lines must be
 /// the ones this harness prints, so a change of wording fails here.
 const FIXTURE: &str = include_str!("../../../scripts/fixtures/nightly-scaling.log");
 

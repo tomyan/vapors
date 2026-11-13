@@ -122,10 +122,10 @@ report_retired() {
   done < <(open_issues "$change_prefix")
 }
 
-# The run at revision $2 did not judge every change: log $1; $3 names the
-# changes with no result.
+# The run at revision $2 failed other than by a change failing: log $1;
+# $3 says how.
 report_unjudged() {
-  file_issue "$runner_title" "$runner_title" "The run at $2 did not judge every change ($(date -u +%FT%TZ)): ${3:-no scaling-changes line, so the build failed, the judge did not start, or the lines vapors-perf prints changed}.
+  file_issue "$runner_title" "$runner_title" "The run at $2 failed other than by a change failing ($(date -u +%FT%TZ)): $3.
 
 \`\`\`
 $({ if grep -q 'FAIL perf:' "$1"; then sed -n '/FAIL perf:/,$p' "$1"; else tail -n 40 "$1"; fi; } | head -c 50000)
@@ -153,10 +153,14 @@ report_results() {
   failing=$(changes_that "$1" fail)
   for change in $failing; do report_change_failure "$change" "$1" "$2"; done
   missing=$(comm -23 <(echo "$expected") <(changes_that "$1" '(pass|fail)') | xargs)
-  if [ -z "$expected" ] || [ -n "$missing" ] || { [ "$3" -ne 0 ] && [ -z "$failing" ]; }; then
-    report_unjudged "$1" "$2" "${missing:+no result for $missing}"
-    return 0
+  if [ -z "$expected" ]; then
+    report_unjudged "$1" "$2" "no scaling-changes line, so the build failed, the judge did not start, or the lines vapors-perf prints changed"
+  elif [ -n "$missing" ]; then
+    report_unjudged "$1" "$2" "no result for $missing"
+  elif [ "$3" -ne 0 ] && [ -z "$failing" ]; then
+    report_unjudged "$1" "$2" "the judge exited $3 with every change judged and none failing"
+  else
+    report_retired "$expected" "$2"
+    [ "$3" -ne 0 ] || close_issue "$runner_title" "\`cargo xtask scaling\` passed at $2; closing."
   fi
-  report_retired "$expected" "$2"
-  [ "$3" -ne 0 ] || close_issue "$runner_title" "\`cargo xtask scaling\` passed at $2; closing."
 }

@@ -76,6 +76,9 @@ report_results "$work/pass.log" abc 0
 check "an unreported run gets its own issue" "$(calls "title $unreported_title")" 1
 check "and a pass closes the runner issue only" "$(calls 'issue close')$(calls 'issue close 14')" 11
 
+reset; report_results "$work/pass.log" abc 1
+check "a failed run with every change passing names that" "$(calls 'every change judged and none failing')" 1
+
 # The marker functions, from the runner.
 source <(sed -n '/^record_stale_marker() {/,/^}/p; /^unit_failed() {/,/^}/p' "$here/nightly-scaling.sh") ||
   { echo "FAIL sourcing the marker functions"; exit 1; }
