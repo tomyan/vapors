@@ -29,8 +29,9 @@ pub use environment::Environment;
 pub use inline::INLINE_SHEET;
 pub use restyle::RestyleScope;
 pub use share::{Unshareable, rule_indices_for_key, unshareable};
-pub(crate) use {collect::rank, inline::INLINE_SPECIFICITY};
-pub(crate) use {compute::initial, font_weight::is_parent_relative};
+pub(crate) use {
+    collect::rank, compute::initial, font_weight::is_parent_relative, inline::INLINE_SPECIFICITY,
+};
 
 pub(crate) use compute::resolve_for;
 
