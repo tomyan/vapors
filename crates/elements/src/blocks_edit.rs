@@ -6,10 +6,10 @@ use super::{Blocks, CAP, Pos};
 
 impl<T> Blocks<T> {
     /// Puts `item` at `pos`, splitting the block first when it is
-    /// full; where it is now. Moves at most `CAP` items: a split's
-    /// upper half and the tail of the half the item goes in. The block
-    /// list's own tail moves too when a block splits: one pointer per
-    /// block after it, not counted in `moved`.
+    /// full; where it is now. Moves at most `CAP` items, a split's
+    /// upper half and the tail of the half the item goes in, plus the
+    /// block list's own tail when a block splits, one pointer per block
+    /// after it; all counted in `moved`.
     pub(crate) fn insert(&mut self, pos: Pos, item: T) -> Pos {
         self.len += 1;
         if pos.block >= self.chunks.len() {
@@ -45,22 +45,15 @@ impl<T> Blocks<T> {
     /// Puts `item` after the last, in the last block when it has room;
     /// where it is.
     fn push_last(&mut self, item: T) -> Pos {
-        let block = self.chunks.len().saturating_sub(1);
-        match self.chunks.last_mut() {
-            Some(last) if last.len() < CAP => {
-                last.push(item);
-                Pos {
-                    block,
-                    at: last.len() - 1,
-                }
-            }
-            _ => {
-                self.chunks.push(vec![item]);
-                Pos {
-                    block: self.chunks.len() - 1,
-                    at: 0,
-                }
-            }
+        if self.chunks.last().is_none_or(|last| last.len() == CAP) {
+            self.chunks.push(Vec::with_capacity(CAP / 2));
+        }
+        let block = self.chunks.len() - 1;
+        let last = &mut self.chunks[block];
+        last.push(item);
+        Pos {
+            block,
+            at: last.len() - 1,
         }
     }
 

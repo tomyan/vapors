@@ -1,8 +1,24 @@
 //! The extents index's patches move at most a block of entries
 //! (`blocks.rs`), whatever the frame's size.
 
+use super::Extents;
 use super::tests::{extents, painted_again, part, row};
 use crate::frames::PAGE;
+
+/// Panics when `extents`' running block total is not the blocks its
+/// frames' entries hold.
+pub(super) fn assert_blocks_total(extents: &mut Extents) {
+    let held: usize = extents
+        .frames
+        .values()
+        .map(|index| index.entries.block_count())
+        .sum();
+    assert_eq!(
+        extents.take_counts().blocks,
+        held,
+        "the running block total is not the blocks held (frame_extents_patch.rs `noted`)"
+    );
+}
 
 #[test]
 fn a_step_that_starts_drawing_among_many_moves_at_most_a_block_of_entries() {
@@ -38,4 +54,10 @@ fn a_step_that_starts_drawing_among_many_moves_at_most_a_block_of_entries() {
         "a middle entry moves a block's tail"
     );
     assert_eq!(patched, extents(&boxes));
+    assert_blocks_total(&mut patched);
+    assert_eq!(
+        patched.take_counts().blocks,
+        4,
+        "three full blocks, one split by the step put in"
+    );
 }
