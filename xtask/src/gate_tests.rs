@@ -130,3 +130,28 @@ fn the_ci_job_runs_lint_wasm_and_unit_as_three_steps_so_the_log_times_each() {
         "{WORKFLOW}: one command per step, in this order"
     );
 }
+
+#[test]
+fn the_lint_wasm_and_unit_steps_have_no_if_so_a_failure_stops_the_rest_as_and_did() {
+    // Given (`continue-on-error` is refused by the gate's step keys)
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let text = std::fs::read_to_string(root.join(WORKFLOW)).expect("ci.yml");
+    let workflow = crate::gate_yaml::parse(&text, WORKFLOW).expect("yaml");
+    let commands = [
+        "cargo xtask lint",
+        "cargo xtask wasm",
+        "cargo xtask test --tier unit",
+    ];
+
+    // When
+    let conditional: Vec<&serde_json::Value> = workflow["jobs"]["ci"]["steps"]
+        .as_array()
+        .expect("the ci job's steps")
+        .iter()
+        .filter(|step| commands.contains(&step["run"].as_str().unwrap_or_default().trim()))
+        .filter(|step| step.get("if").is_some())
+        .collect();
+
+    // Then
+    assert!(conditional.is_empty(), "{WORKFLOW}: {conditional:?}");
+}

@@ -1,6 +1,10 @@
 # Factory throughput: where gate and ci time goes, and the cuts
 
-Design only; nothing here is built. Written 2026-11-13 from
+Status: slice 0 is built (#308): the step this document calls "lint,
+wasm lint and unit" is now three steps, `lint`, `wasm lint` and
+`unit`, and the ci.yml line numbers below are as they were before it.
+
+Written as a design, before anything was built, on 2026-11-13 from
 `origin/main` at 00dbc38b, the 65 gate logs in `~/.cache/handoffs`
 (`gate-v*.log` and `gate-batch-*.log`, 2026-11-11 21:05 to 2026-11-13
 18:27, every one run in `~/.cache/w-gate204/vapors`, whose target
@@ -510,7 +514,7 @@ Smallest first; each under 400 lines; each proved as its cut says.
 
 | slice | cut | lines | what it proves before the next |
 |---|---|---|---|
-| 0 | split ci.yml's "lint, wasm lint and unit" into three steps, `cargo xtask lint`, `cargo xtask wasm`, `cargo xtask test --tier unit`, same order, same env (the gate stops at the first failure as `&&` did) | about 15 | the gate log measures lint, wasm and unit apart; the baselines for 2 and 4 |
+| 0 (done, #308) | split ci.yml's "lint, wasm lint and unit" into three steps, `cargo xtask lint`, `cargo xtask wasm`, `cargo xtask test --tier unit`, same order, same env (the gate stops at the first failure as `&&` did) | about 15 | the gate log measures lint, wasm and unit apart; the baselines for 2 and 4 |
 | 1 | C1, the timings step without test targets | 3 | 60 s a gate; the next gate's timings file has no `(test)` units |
 | 2 | C3, the load wait reads runnable tasks | about 100 | wait lines in the next gates |
 | 3 | C4, three ci slots, `[build] jobs = 4` for plain cargo | about 150 + 10 | ci hold times and gate lock waits in the next day's logs |
