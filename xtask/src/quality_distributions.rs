@@ -58,6 +58,10 @@ pub fn distribution_report(collected: &Collected, joined: &Joined) -> Report {
         FLOOR_COMPLEXITY_PER_MILLE,
     ));
     lines.extend(worst_lines(&joined.mismatches, 10));
+    lines.push(format!(
+        "not compared, as the host run did not compile them: {} functions",
+        joined.not_compiled
+    ));
     Report {
         lines,
         refusal: refusal(joined),

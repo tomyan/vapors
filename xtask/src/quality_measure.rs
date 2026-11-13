@@ -6,6 +6,8 @@
 use syn::visit::{self, Visit};
 use syn::{Item, Type};
 
+pub use crate::quality_attrs::{Allowed, is_test_attr, is_test_item};
+use crate::quality_attrs::{is_gated, item_attrs};
 use crate::quality_chains::{Chain, chains};
 use crate::quality_complexity::complexity;
 use crate::quality_lines::{LineIndex, code_lines};
@@ -26,31 +28,9 @@ pub struct Function {
     /// Lints allowed on it or an enclosing item, which clippy then says
     /// nothing about.
     pub allowed: Allowed,
-}
-
-/// Which of clippy's two counts are allowed at the site.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct Allowed {
-    /// `#[allow(clippy::too_many_lines)]` or `expect`.
-    pub lines: bool,
-    /// `#[allow(clippy::cognitive_complexity)]` or `expect`.
-    pub complexity: bool,
-}
-
-impl Allowed {
-    /// What `attrs` allow, on top of `outer`.
-    pub fn with(outer: Self, attrs: &[syn::Attribute]) -> Self {
-        let names: String = attrs
-            .iter()
-            .filter(|a| a.path().is_ident("allow") || a.path().is_ident("expect"))
-            .filter_map(|a| a.meta.require_list().ok())
-            .map(|list| list.tokens.to_string())
-            .collect();
-        Self {
-            lines: outer.lines || names.contains("too_many_lines"),
-            complexity: outer.complexity || names.contains("cognitive_complexity"),
-        }
-    }
+    /// Under a `#[cfg(..)]` other than `test` (a target, a feature), on
+    /// it or an enclosing item: a host clippy run may not compile it.
+    pub gated: bool,
 }
 
 /// What one file measures.
@@ -80,6 +60,7 @@ pub fn measure_source(text: &str) -> Result<FileMeasure, String> {
         impl_of: Vec::new(),
         in_test: Vec::new(),
         allowed: vec![Allowed::with(Allowed::default(), &file.attrs)],
+        gated: vec![is_gated(&file.attrs)],
         functions: Vec::new(),
     };
     walker.visit_file(&file);
@@ -89,54 +70,12 @@ pub fn measure_source(text: &str) -> Result<FileMeasure, String> {
     })
 }
 
-/// Whether an item is test-only: `#[cfg(test)]` on it, or a `#[test]` fn.
-pub fn is_test_item(item: &Item) -> bool {
-    item_attrs(item).iter().any(is_test_attr)
-}
-
-/// An item's outer attributes; none for the kinds that carry none here.
-fn item_attrs(item: &Item) -> &[syn::Attribute] {
-    match item {
-        Item::Mod(m) => &m.attrs,
-        Item::Fn(f) => &f.attrs,
-        Item::Impl(i) => &i.attrs,
-        Item::Struct(s) => &s.attrs,
-        Item::Enum(e) => &e.attrs,
-        Item::Const(c) => &c.attrs,
-        Item::Static(s) => &s.attrs,
-        Item::Trait(t) => &t.attrs,
-        Item::Use(u) => &u.attrs,
-        _ => &[],
-    }
-}
-
-/// `#[test]`, or a `#[cfg(...)]` naming `test` anywhere in it
-/// (`cfg(test)`, `cfg(all(test, feature = "x"))`). `cfg_attr(test, ..)`
-/// is not test-only code and is not matched.
-pub fn is_test_attr(attr: &syn::Attribute) -> bool {
-    if attr.path().is_ident("test") {
-        return true;
-    }
-    attr.path().is_ident("cfg")
-        && attr
-            .meta
-            .require_list()
-            .is_ok_and(|list| names_test(list.tokens.clone()))
-}
-
-fn names_test(tokens: proc_macro2::TokenStream) -> bool {
-    tokens.into_iter().any(|tree| match tree {
-        proc_macro2::TokenTree::Ident(ident) => ident == "test",
-        proc_macro2::TokenTree::Group(group) => names_test(group.stream()),
-        _ => false,
-    })
-}
-
 struct Walker<'a> {
     index: LineIndex<'a>,
     impl_of: Vec<String>,
     in_test: Vec<bool>,
     allowed: Vec<Allowed>,
+    gated: Vec<bool>,
     functions: Vec<Function>,
 }
 
@@ -147,6 +86,10 @@ impl Walker<'_> {
 
     fn allowed(&self) -> Allowed {
         self.allowed.last().copied().unwrap_or_default()
+    }
+
+    fn gated(&self) -> bool {
+        self.gated.last().copied().unwrap_or(false)
     }
 
     fn record(&mut self, sig: &syn::Signature, body: &syn::Block, attrs: &[syn::Attribute]) {
@@ -164,6 +107,7 @@ impl Walker<'_> {
             complexity: complexity(body, &sig.output),
             test: self.in_test() || is_test_fn || attrs.iter().any(is_test_attr),
             allowed: Allowed::with(self.allowed(), attrs),
+            gated: self.gated() || is_gated(attrs),
         });
     }
 }
@@ -173,7 +117,9 @@ impl<'ast> Visit<'ast> for Walker<'_> {
         self.in_test.push(self.in_test() || is_test_item(node));
         self.allowed
             .push(Allowed::with(self.allowed(), item_attrs(node)));
+        self.gated.push(self.gated() || is_gated(item_attrs(node)));
         visit::visit_item(self, node);
+        self.gated.pop();
         self.allowed.pop();
         self.in_test.pop();
     }

@@ -17,10 +17,14 @@ many small files meant more merge conflicts.
 
 Each metric has a guideline (the rule as written), a hard limit at the
 tail of main's distribution, and a band between them that review
-judges (`docs/review.md`). `cargo xtask lint` ends with a "quality
-signals" section listing the worst of the band; it never fails on a
-finding. `cargo xtask quality --distributions` prints the measurement
-below again; `--list` prints every sample.
+judges (`docs/review.md`). The hard limits are checks in `lint` and
+`ci`. `cargo xtask quality` prints the band's worst (what is over a
+hard limit is not listed: it is allowed at its site or failing); the
+nightly run (`.github/workflows/nightly.yml`) prints it and a reviewer
+runs it by hand; it is not a step of `lint` or `ci` and never fails on
+a finding. `cargo xtask quality --distributions` runs the measurement
+below again (clippy's counts, the file-cap fit, the agreement) and
+`--list` prints every sample.
 
 | metric | guideline (`[quality]`) | hard limit | where |
 |---|---|---|---|
@@ -36,8 +40,15 @@ clippy's own counts, collected by running clippy with both thresholds
 at 1 (`CLIPPY_CONF_DIR` pointing at a `clippy.toml` with
 `too-many-lines-threshold = 1` and `cognitive-complexity-threshold = 1`,
 `cargo clippy --workspace --all-targets --no-deps --message-format=json
--- -W clippy::cognitive_complexity -W clippy::too_many_lines`). Test
-code is files named `*_tests.rs` or `tests.rs` or under `tests/`.
+-- -W clippy::cognitive_complexity -W clippy::too_many_lines`), which
+is what `cargo xtask quality --distributions` now runs
+(`xtask/src/quality_clippy.rs`), joined to every function xtask finds
+(`quality_join.rs`): a function clippy did not report counts as 1, so
+the command's n is every function the host run compiled, where the
+first measurement's n for complexity below counted only the functions
+clippy reported (those over 1); its medians and p90s are lower by
+that. Test code is files named `*_tests.rs` or `tests.rs` or under
+`tests/`.
 
 Lines per `.rs` file (code 949 files, tests 863):
 
@@ -49,9 +60,11 @@ Lines per `.rs` file (code 949 files, tests 863):
 Six code files sit at exactly 220 and 5% of them within 10 lines of
 it: the distribution is cut off by the old cap, so its p99 is the cap.
 The hard limit is read from the part the cap did not squash: a
-lognormal through the median and p90 gives sigma 0.48 for code and
-0.50 for tests, and p99 of 319 (code) and 313 (tests). 320 for both;
-the two distributions do not differ enough for two caps.
+lognormal through the median and p90 (`fitted_p99` in
+`xtask/src/quality_stats.rs`, printed by `--distributions`) gives sigma
+0.48 for code and 0.50 for tests, and p99 of 319 (code) and 313
+(tests). 320 for both; the two distributions do not differ enough for
+two caps.
 
 Lines of code in a function body (clippy's count: the body between
 its braces, blank and comment-only lines left out):
@@ -112,16 +125,32 @@ a11y mirror and `painted.from.placement.*`.
 
 The signals are printed by xtask, which reads the source with syn and
 reproduces clippy's two counts so the band and the hard limit measure
-the same thing. Checked on every function of main: lines agree on
-9349 of 9353 functions (99.96%; the four differ by 2, all `async fn`s,
-whose body clippy reads from the desugared coroutine). Complexity
-agrees on 10667 of 10936 (97.5%); the rest are third-party macros whose
-expansions hold branches (`tracing::trace_span!`), `return`s inside
-closures, and two return-type aliases of `Result`. Each rule of the
-count was confirmed on a probe crate, including that `#[test]`
-functions count, `let ... else` is not a branch, closures are separate
-bodies and macro arguments are walked. The differences are declared in
-`xtask/src/quality_complexity.rs`; the hard check is clippy's own.
+the same thing. Two things hold them together:
+
+- `cargo xtask quality --distributions` joins xtask's count of every
+  function to clippy's and fails under the floors in
+  `xtask/src/quality_clippy.rs` (lines 99.9%, complexity 97.0%), so a
+  toolchain bump that moves clippy's rules is found when it next runs.
+  On main at adb3b677, compared by hand the same way: lines agree on
+  9349 of 9353 functions (99.96%; the four differ by 2, all `async
+  fn`s, whose body clippy reads from the desugared coroutine),
+  complexity on 10667 of 10936 (97.5%); the rest are third-party
+  macros whose expansions hold branches (`tracing::trace_span!`),
+  `return`s inside closures, and two return-type aliases of `Result`.
+  A count allowed at its site is not compared, since clippy says
+  nothing about it; what the host run did not compile (a `#[cfg]` for
+  another target or a feature, a test in an example) is left out and
+  its number printed. The figures the command printed on this branch
+  are in the pull request.
+- A fixture of the constructs the count models,
+  `xtask/fixtures/quality_probe.rs.txt`, with clippy's counts for each
+  function in `quality_probe.clippy.tsv` from
+  `scripts/quality-probe-clippy.sh`; the unit test
+  `every_fixture_function_counts_as_clippy_counted_it` holds xtask to
+  them exactly. That is where `#[test]` functions counting,
+  `let ... else` not being a branch, closures being separate bodies and
+  macro arguments being walked were confirmed. The declared gaps are in
+  `xtask/src/quality_complexity.rs`; the hard check is clippy's own.
 
 ## Retiring this
 
@@ -129,3 +158,6 @@ When the band's worst offenders are gone from the signals for a month,
 the hard limits can come down toward the guidelines, measured again
 with `cargo xtask quality --distributions`; the same command says when
 a limit has become the cap that shapes the distribution, as 220 did.
+On a toolchain or clippy bump: run `--distributions` and
+`scripts/quality-probe-clippy.sh`; a drift fails the first and shows
+in the second's diff.

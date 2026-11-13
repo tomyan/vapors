@@ -3,10 +3,13 @@
 //! did not report has a count of "not over 1": the thresholds were 1.
 //! A function allowed at its site (`#[allow(clippy::too_many_lines)]`,
 //! or the complexity lint, on it or an enclosing item) is one clippy
-//! says nothing about, so that count is not compared. A file clippy
-//! never compiled (behind a cfg, a `#[cfg(test)]` module of an example)
-//! is left out. The agreement is what holds xtask's band to clippy's
-//! hard limit (`quality_clippy.rs` has the floors).
+//! says nothing about, so that count is not compared. What the host
+//! clippy run did not compile is left out: a file with no report at
+//! all, a function under a `#[cfg(..)]` other than `test`, test code in
+//! an example (`--all-targets` builds examples without their tests);
+//! how many were left out is reported, so a drift cannot hide there.
+//! The agreement is what holds xtask's band to clippy's hard limit
+//! (`quality_clippy.rs` has the floors).
 
 use std::collections::BTreeSet;
 
@@ -46,6 +49,8 @@ pub struct Joined {
     pub complexity_agreement: Agreement,
     /// Each mismatch, its value the distance, labelled with both counts.
     pub mismatches: Vec<Sample>,
+    /// Functions left out as not compiled by the host clippy run.
+    pub not_compiled: usize,
 }
 
 /// Join every function clippy compiled to its counts.
@@ -58,11 +63,18 @@ pub fn join(collected: &Collected, clippy: &ClippyCounts) -> Joined {
         .collect();
     let mut joined = Joined::default();
     for located in &collected.functions {
-        if compiled.contains(located.path.as_str()) {
-            join_one(&mut joined, located, clippy);
+        if !compiled.contains(located.path.as_str()) || not_compiled(located) {
+            joined.not_compiled += 1;
+            continue;
         }
+        join_one(&mut joined, located, clippy);
     }
     joined
+}
+
+/// Under a cfg the host build may not take, or a test in an example.
+fn not_compiled(located: &Located) -> bool {
+    located.function.gated || (located.test && located.path.contains("/examples/"))
 }
 
 fn join_one(joined: &mut Joined, located: &Located, clippy: &ClippyCounts) {

@@ -114,6 +114,41 @@ fn neither() {}
 }
 
 #[test]
+fn a_cfg_other_than_test_gates_the_function_and_what_it_encloses() {
+    // Given
+    let source = "\
+#[cfg(target_family = \"wasm\")]
+mod web {
+    pub fn inside() {}
+}
+#[cfg(not(feature = \"x\"))]
+fn direct() {}
+#[cfg(test)]
+fn test_only() {}
+fn plain() {}
+";
+
+    // When
+    let gated: Vec<(String, bool)> = measure_source(source)
+        .expect("parses")
+        .functions
+        .into_iter()
+        .map(|f| (f.name, f.gated))
+        .collect();
+
+    // Then
+    assert_eq!(
+        gated,
+        [
+            ("inside".to_owned(), true),
+            ("direct".to_owned(), true),
+            ("test_only".to_owned(), false),
+            ("plain".to_owned(), false),
+        ]
+    );
+}
+
+#[test]
 fn a_file_that_is_not_rust_is_refused_naming_the_line() {
     // Given
     let source = "fn ok() {}\nfn broken( {\n";

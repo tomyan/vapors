@@ -53,6 +53,7 @@ mod pixels;
 mod precompress;
 mod priority;
 mod quality;
+mod quality_attrs;
 mod quality_chains;
 mod quality_clippy;
 mod quality_collect;

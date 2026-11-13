@@ -16,6 +16,7 @@ fn located(path: &str, line: usize, code_lines: usize, complexity: usize) -> Loc
             complexity,
             test: false,
             allowed: Allowed::default(),
+            gated: false,
         },
         test: false,
     }
@@ -65,6 +66,30 @@ fn the_join_takes_clippys_counts_treats_unreported_as_not_over_one_and_skips_unc
         "{}",
         joined.mismatches[0].label
     );
+}
+
+#[test]
+fn what_the_host_run_did_not_compile_is_left_out_and_counted() {
+    // Given: a gated function, and a test in an example
+    let mut gated = located("a.rs", 10, 80, 9);
+    gated.function.gated = true;
+    let mut example_test = located("crates/x/examples/e.rs", 1, 30, 5);
+    example_test.test = true;
+    let mut collected = Collected::default();
+    collected.functions.push(gated);
+    collected.functions.push(example_test);
+    let mut clippy = clippy();
+    clippy
+        .lines
+        .insert(("crates/x/examples/e.rs".to_owned(), 90), 3);
+
+    // When
+    let joined = join(&collected, &clippy);
+
+    // Then
+    assert_eq!(joined.not_compiled, 2);
+    assert_eq!(joined.lines_agreement, Agreement::default());
+    assert_eq!(joined.mismatches, []);
 }
 
 #[test]
