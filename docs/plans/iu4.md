@@ -473,6 +473,30 @@ keys):
   batches. Its draw is still O(rows) through the `batches` step until
   PR 5.
 
+PR 5 as built (2026-11-13):
+
+- The index lives in `Painted` beside the drawing steps
+  (`frame_extents.rs`), keyed by frame. It is made afresh when paint
+  order is walked, and patched with the drawing steps otherwise. A step
+  whose new entry sorts to the same position is overwritten in place,
+  and the reaches after it are made again until one is unchanged. So
+  an edit costs O(1) on a page of disjoint rows. Patching more steps
+  than 64 or a sixteenth of the entries makes the index afresh.
+- A step with a surface, or a bound that is not a number, spans every
+  view. Candidates are the entries with `bottom > view.top` and
+  `top < view.bottom`, which is `Rect::is_disjoint`'s rule, so a step
+  the index leaves out has every item culled.
+- `hidden` and `hidden_culled` are gone. The culled count is every
+  drawing step's items, less the shown steps' items, plus those culled
+  inside the shown steps.
+- Debug checks: the index equals one made afresh after every paint
+  (`kept_paint_check.rs`). The steps found for a view equal testing
+  every step (`kept_batches_check.rs` `assert_candidates`).
+- Measured (`docs/perf/iu4-pr5-2026-11-13.md`): `batches` is flat in
+  the rows for Scroll and Resize. Remaking the index adds 2,100 to
+  2,700 instructions per row to Insert's and Resize's updates, which
+  were already O(rows).
+
 ### 4a to 4c land together
 
 4a cannot land alone: once placement moves no slot on a scroll, paint

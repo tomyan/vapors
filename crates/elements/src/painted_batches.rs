@@ -5,7 +5,7 @@ use std::cell::Ref;
 
 use vapors_scene::{Batched, Rect};
 
-use crate::kept_batches::KeptBatches;
+use crate::kept_batches::{KeptBatches, Sources};
 use crate::kept_batches_keys::KeptBatched;
 use crate::painted::Painted;
 
@@ -61,6 +61,16 @@ impl Painted {
         crate::kept_batches_check::assert_on_page(kept, &self.frames, &page);
     }
 
+    /// What the kept batches are sorted and made from.
+    pub(crate) fn batch_sources(&self) -> Sources<'_> {
+        Sources {
+            drawn: &self.drawn,
+            extents: &self.extents,
+            boxes: &self.kept_boxes,
+            frames: &self.frames,
+        }
+    }
+
     /// The kept batches made for `view`, then read.
     fn make_batches(&self, view: Rect) -> Ref<'_, KeptBatched> {
         let mut slot = self.kept_batches.try_borrow_mut().unwrap_or_else(|_| {
@@ -70,8 +80,7 @@ impl Painted {
                  update; reproduce with `cargo xtask test`"
             )
         });
-        let drawn = (&self.drawn, self.order.steps.len());
-        KeptBatches::for_view(&mut slot, view, drawn, (&self.kept_boxes, &self.frames));
+        KeptBatches::for_view(&mut slot, view, self.batch_sources());
         drop(slot);
         Ref::map(self.kept_batches.borrow(), |kept| {
             kept.as_ref()

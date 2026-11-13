@@ -3,12 +3,15 @@
 //! afresh in its frames (`framed_batches.rs`); and their items, put on
 //! the page by their frames' shifts and clips, are the items batching
 //! the scene on the page draws, in the same order, so the frames put
-//! every item where the page has it.
+//! every item where the page has it. And the steps the extents index
+//! finds showing in a view are those testing every step finds.
 
 use vapors_scene::{Batched, Item, Run};
 
+use crate::framed_batches::hidden_items;
 use crate::frames::Frames;
 use crate::frames_draw::BatchFrame;
+use crate::kept_batches::{Shown, Sources};
 use crate::kept_batches_keys::KeptBatched;
 
 /// Panics, naming the first differing batch, frame or the culled
@@ -62,6 +65,32 @@ pub(crate) fn assert_on_page(kept: &KeptBatched, frames: &Frames, page: &Batched
         page_items.get(at),
         culled.0,
         culled.1
+    );
+}
+
+/// Panics, naming the first step one has and the other does not, when
+/// the steps `shown` in `view` through the extents index are not the
+/// steps of `sources` testing every one shows: a step's extent is wrong
+/// or a reach was not kept (`frame_extents.rs`).
+pub(crate) fn assert_candidates(shown: &[Shown], view: vapors_scene::Rect, sources: Sources<'_>) {
+    let boxes = (sources.boxes, sources.frames);
+    let in_view =
+        |&(_, step): &(usize, crate::paint_order::Step)| hidden_items(step, boxes, view).is_none();
+    let every: Vec<_> = sources.drawn.placed().filter(in_view).collect();
+    let found: Vec<_> = shown
+        .iter()
+        .map(|&(place, step, _)| (place, step))
+        .collect();
+    let longest = every.len().max(found.len());
+    let Some(at) = (0..longest).find(|&at| every.get(at) != found.get(at)) else {
+        return;
+    };
+    panic!(
+        "the extents index found {:?} showing at {at} in view {view:?} where testing every step \
+         finds {:?}: a step's extent is wrong or a reach was not kept (frame_extents.rs, \
+         paint_partial.rs drawn_updated); reproduce with `cargo xtask test`",
+        found.get(at),
+        every.get(at)
     );
 }
 

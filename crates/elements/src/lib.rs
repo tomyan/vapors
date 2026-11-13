@@ -55,6 +55,7 @@ mod focus_fixup;
 mod focus_move;
 mod focus_style;
 mod focus_window;
+mod frame_extents;
 mod framed_batches;
 mod frames;
 mod frames_check;

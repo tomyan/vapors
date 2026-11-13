@@ -53,6 +53,7 @@ fn differing_parts(kept: &Painted, fresh: &Painted) -> Vec<String> {
     .collect();
     parts.extend(differing_hits(kept, fresh));
     parts.extend(differing_drawn(kept).map(String::from));
+    parts.extend(differing_extents(kept).map(String::from));
     parts.extend(crate::kept_scene_check::first_differing_item(kept, fresh));
     parts.extend(crate::kept_scene_check::part_off_steps(kept));
     parts.extend(crate::kept_scene_check::slab_difference(
@@ -102,6 +103,14 @@ fn first_differing_hit(
         ))),
         _ => None,
     })?
+}
+
+/// "extents index" when `kept`'s extents index is not the one made
+/// afresh from its drawing steps.
+fn differing_extents(kept: &Painted) -> Option<&'static str> {
+    let places = kept.order.steps.len();
+    let afresh = crate::frame_extents::Extents::of(&kept.drawn, places, &kept.kept_boxes);
+    (kept.extents != afresh).then_some("extents index")
 }
 
 /// "drawn steps" when the steps `kept` lists as drawing are not those
