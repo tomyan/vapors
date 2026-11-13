@@ -176,7 +176,7 @@ impl Document {
 }
 
 /// The refusals a walk over the tree finds, when the kept checks say
-/// some element refuses, or always in a debug build, which panics when
+/// some node refuses, or always in a debug build, which panics when
 /// the two disagree. A missed mark causes that; a release build, which
 /// walks only when the kept checks say some element refuses, refuses
 /// the update naming the element when the walk finds nothing.
@@ -201,11 +201,11 @@ fn walked(
     }
 }
 
-/// The refusal when the kept checks say `element` refuses and a walk
-/// over the tree finds no refusal.
-fn unmarked(element: &str, checks: &str) -> ElementError {
+/// The refusal when the kept checks say `node` refuses and a walk over
+/// the tree finds no refusal.
+fn unmarked(node: &str, checks: &str) -> ElementError {
     ElementError::Unmarked(format!(
-        "{element}: the kept {checks} checks say it refuses and a check of the whole tree finds nothing: a change was not marked (docs/plans/iu3.md, PR 3a); reproduce in a debug build, which checks every update and panics at the change"
+        "{node}: the kept {checks} checks say it refuses and a check of the whole tree finds nothing: a change was not marked (docs/plans/iu3.md, PR 3a); reproduce in a debug build, which checks every update and panics at the change"
     ))
 }
 

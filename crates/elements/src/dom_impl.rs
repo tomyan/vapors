@@ -114,8 +114,7 @@ impl Dom for Document {
     fn insert_before(&mut self, parent: NodeId, child: NodeId, before: Option<NodeId>) {
         self.note_replaced(child);
         if let Some(old) = self.parent(child) {
-            self.mark_children_changed(old, child, false);
-            self.boxes.marks.mark_children(old);
+            self.mark_moved_out(old, child, parent);
         }
         self.arena.place("insert_before", parent, child, before);
         self.checks.added.push(child);

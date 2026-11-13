@@ -55,53 +55,61 @@ pub(crate) fn check_tree(
 }
 
 /// The refusals for `node` alone: an element's (`check_element`), or
-/// a text node's right-to-left text.
+/// a text node's right-to-left text, named for its parent. The checks
+/// are given the node's own data and a name for messages, not the
+/// arena, so none can read its children: a parent whose children
+/// changed is checked in constant time
+/// (`docs/perf/insert-style-2026-11-13.md`).
 pub(crate) fn check_node(
     arena: &Arena,
     node: NodeId,
     declared: &std::collections::BTreeSet<String>,
 ) -> Vec<ElementError> {
-    match &arena.get(node, "check").kind {
-        Kind::Element(_) => check_element(arena, node, declared),
-        Kind::Text(text) => right_to_left_text(arena, node, text).into_iter().collect(),
+    let found = arena.get(node, "check");
+    match &found.kind {
+        Kind::Element(element) => check_element(element, &|| describe(arena, node), declared),
+        Kind::Text(text) => {
+            let parent = found.parent.unwrap_or(node);
+            right_to_left_text(text, &|| describe(arena, parent))
+                .into_iter()
+                .collect()
+        }
     }
 }
 
-/// The refusals for `node`'s tag, attributes and listeners, and the
-/// calls refused on it (`dom_keyed`).
-pub(crate) fn check_element(
-    arena: &Arena,
-    node: NodeId,
+/// The refusals for `element`'s tag, attributes and listeners, and the
+/// calls refused on it (`dom_keyed`); `named` describes it in messages.
+fn check_element(
+    element: &crate::node::Element,
+    named: &dyn Fn() -> String,
     declared: &std::collections::BTreeSet<String>,
 ) -> Vec<ElementError> {
-    let Kind::Element(element) = &arena.get(node, "check").kind else {
-        return Vec::new();
-    };
     let mut errors: Vec<ElementError> = tags::unsupported(&element.tag)
         .map(ElementError::UnsupportedTag)
         .into_iter()
         .collect();
-    errors.extend(attribute_refusals(arena, node, element));
+    errors.extend(attribute_refusals(element, named));
     errors.extend(element.refused.iter().cloned().map(ElementError::Refused));
     for (event, _) in &element.listeners {
         if let Some(refusal) = tags::unfired(event).filter(|_| !declared.contains(event)) {
             errors.push(ElementError::UnfiredEvent(format!(
                 "{}: {refusal}",
-                describe(arena, node)
+                named()
             )));
         }
     }
     errors
 }
 
-/// A refusal when `text`, the text node `node` holds, has right-to-left
-/// text, which is not laid out right to left yet; named for its parent.
-fn right_to_left_text(arena: &Arena, node: NodeId, text: &str) -> Option<ElementError> {
+/// A refusal when `text`, a text node's, has right-to-left text, which
+/// is not laid out right to left yet; `named` describes the node's
+/// parent. One per text node: an element with two such children is
+/// named twice.
+fn right_to_left_text(text: &str, named: &dyn Fn() -> String) -> Option<ElementError> {
     let found = text.chars().find(|c| crate::bidi::right_to_left(*c))?;
-    let named = arena.get(node, "check").parent.unwrap_or(node);
     Some(ElementError::UnsupportedAttribute(format!(
         "{}: its text holds {found:?} (U+{:04X}), from a script written right to left; vapors-elements lays text out left to right only (not scheduled in docs/F2c.md)",
-        describe(arena, named),
+        named(),
         u32::from(found)
     )))
 }
@@ -109,9 +117,8 @@ fn right_to_left_text(arena: &Arena, node: NodeId, text: &str) -> Option<Element
 /// The attributes of `element` the tree refuses: a `disabled` that
 /// would mean something other than it says.
 fn attribute_refusals(
-    arena: &Arena,
-    node: NodeId,
     element: &crate::node::Element,
+    named: &dyn Fn() -> String,
 ) -> Vec<ElementError> {
     let mut found = Vec::new();
     found.extend(disabled_value(
@@ -124,9 +131,7 @@ fn attribute_refusals(
     found.extend(input_refusal(element));
     found
         .into_iter()
-        .map(|refusal| {
-            ElementError::UnsupportedAttribute(format!("{}: {refusal}", describe(arena, node)))
-        })
+        .map(|refusal| ElementError::UnsupportedAttribute(format!("{}: {refusal}", named())))
         .collect()
 }
 
@@ -153,10 +158,15 @@ pub(crate) fn style_attribute_refusal(arena: &Arena, node: NodeId) -> Option<Ele
     )))
 }
 
-/// The element as errors name it: `<div class="panel">`.
+/// The element as errors name it: `<div class="panel">`; a text node
+/// by its id under its parent.
 pub(crate) fn describe(arena: &Arena, node: NodeId) -> String {
-    let Some(element) = arena.get(node, "describe").element() else {
-        return format!("text node {node:?}");
+    let found = arena.get(node, "describe");
+    let Some(element) = found.element() else {
+        return match found.parent {
+            Some(parent) => format!("text node {node:?} under {}", describe(arena, parent)),
+            None => format!("text node {node:?}"),
+        };
     };
     let mut out = format!("<{}", element.tag);
     for name in ["id", "class"] {

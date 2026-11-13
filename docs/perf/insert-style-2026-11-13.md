@@ -56,13 +56,35 @@ checked in constant time. For that:
   again; `crates/elements/tests/insert_checks_rows.rs` pins it at 8
   for a middle insert (the body, the row's four elements and three
   text nodes) and 1 for the remove, the same at 100 and 400 rows.
+- The count says which nodes were checked, not what each check read
+  (review of #279, M2). So the checks are given the node's own data
+  and a name for messages, never the arena (`check_element`,
+  `right_to_left_text`, `attribute_refusals` in `check.rs`): a check
+  that read children again would not compile. And `--scaling Insert`
+  now judges `style` flat beside the accessibility ceiling
+  (`Judged::AccessibilityPerRow { flat: &["style"] }`,
+  `scaling_judged.rs`; `scaling_flat_tests.rs` shows the numbers above
+  named as a violation), so a run fails if it grows per row again.
+- A node moved into a parent outside the root's tree, not removed,
+  kept its checks before (review M1: a refused text node or element
+  moved out this way refused the next update as unmarked, in release
+  too). `Document::mark_moved_out` (`restyle.rs`) forgets the subtree
+  when the new parent is not attached; `kept_checks_moved.rs` pins it
+  for a text node, for a refused-tag element, and for a subtree moved
+  out and back.
+- One refusal per text node now, where it was one per element: an
+  element with two right-to-left text children is named twice
+  (`check.rs`, `right_to_left_text`).
 
 Each check was proven by breaking what it guards: the pin by
 checking each mark's subtree (708 and 2,808 at 100 and 400 rows); the
 inserted text node's check by walking elements only in the added
-subtrees; the removed text node's by forgetting elements only; the
-`set_text` mark by dropping it. Each failed on its test; each is
-restored.
+subtrees (the nested case too); the removed text node's by forgetting
+elements only; the `set_text` mark by dropping it; the move out of the
+tree by dropping the forget in `mark_moved_out`; the flat judge by
+dropping the `flat` loop in `Scaling::violations`; and a children read
+in `check_element` by writing one, which does not compile. Each failed
+on its test; each is restored.
 
 ## After
 
@@ -90,5 +112,5 @@ accessibility are unchanged and still grow per row; the layout lane
 the accessibility ceiling as it does on main (`docs/perf/
 splice-layout-2026-11-13.md`, "The accessibility ceilings fail on
 main"); `Insert` is judged on accessibility alone
-(`scaling_judged.rs`), so `style` is reported, not judged, until the
-lane's PR 5 moves it to `EveryPhase`.
+(`scaling_judged.rs`) and, since the review of this change, on `style`
+held flat; the lane's PR 5 moves it to `EveryPhase`.

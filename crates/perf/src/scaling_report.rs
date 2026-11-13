@@ -60,14 +60,23 @@ pub fn verdict(change: RowChange, scaling: &Scaling) -> Result<String, String> {
         ));
     }
     Ok(match judged {
-        Judged::AccessibilityPerRow { ceiling } => format!(
-            "scaling: pass, {change:?} accessibility within {ceiling} instructions per extra row; \
-             the other phases are reported, not judged: property 3 (the splice step) is not built"
+        Judged::AccessibilityPerRow { ceiling, flat } => format!(
+            "scaling: pass, {change:?} accessibility within {ceiling} instructions per extra row{}; \
+             the other phases are reported, not judged: property 3 (the splice step) is not built",
+            held_flat(flat)
         ),
         Judged::EveryPhase => format!(
             "scaling: pass, every {change:?} phase within {TOLERANCE_PERCENT}% or {MIN_GROWTH_INSTRUCTIONS} instructions of its 1000-row count"
         ),
     })
+}
+
+/// The phases a moving change holds flat, for its pass line.
+fn held_flat(flat: &[&str]) -> String {
+    if flat.is_empty() {
+        return String::new();
+    }
+    format!(" and {} flat", flat.join(", "))
 }
 
 #[cfg(test)]

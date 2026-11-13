@@ -15,9 +15,10 @@ pub struct UpdateCounts {
     /// Nodes whose tags, attributes, text and listeners the style phase
     /// checked again before restyling: those marked or added since the
     /// last update, each once; every node on the first update. A parent
-    /// whose children changed is one of them, and is checked without
-    /// reading its children, so an insert checks the same nodes at any
-    /// size (`insert_checks_rows.rs`).
+    /// whose children changed is one of them; each check reads its node
+    /// alone (`check_node` gives it no arena), so an insert checks the
+    /// same nodes at any size (`insert_checks_rows.rs`) and each for
+    /// the same work.
     pub nodes_checked: usize,
     /// Elements the style phase checked again after restyling: those
     /// restyled, marked or added since the last update; every element

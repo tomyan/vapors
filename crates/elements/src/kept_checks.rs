@@ -18,7 +18,7 @@ pub(crate) struct KeptChecks {
     /// (its parent's box is marked, not its own). Box marks cover the
     /// rest.
     pub(crate) marked: HashSet<NodeId>,
-    /// Elements added to the tree, each with its subtree.
+    /// Nodes added to the tree, each with its subtree.
     pub(crate) added: Vec<NodeId>,
     /// Elements whose tags, attributes, text or listeners refuse.
     pub(crate) tree: HashSet<NodeId>,

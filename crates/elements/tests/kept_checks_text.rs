@@ -47,6 +47,24 @@ fn right_to_left_text_inserted_after_an_update_is_refused_until_it_is_removed() 
 }
 
 #[test]
+fn an_element_inserted_with_right_to_left_text_below_it_is_refused() {
+    // Given
+    let mut doc = document();
+    let body = doc.body();
+    let section = element(&mut doc, body, "section", "");
+    assert_accepted(&mut doc);
+
+    // When: <div><p>HEBREW</p></div> goes under the section
+    let div = doc.create_element("div");
+    let p = element(&mut doc, div, "p", "greeting");
+    text(&mut doc, p, HEBREW);
+    doc.insert_before(section, div, None);
+
+    // Then
+    assert_refused(&mut doc, "<p class=\"greeting\">: its text holds");
+}
+
+#[test]
 fn right_to_left_text_moved_to_another_element_names_that_element() {
     // Given: refused under one element
     let mut doc = document();
