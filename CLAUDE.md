@@ -72,9 +72,14 @@ the directory:
 - Tests first. A check is proven by breaking what it guards, watching
   it fail, restoring. Say so in the commit.
 - A tier that cannot run fails and names what is missing. Never skip.
-- Files about 200 lines (checked: the `files` step of `cargo xtask lint`,
-  `[files] max_lines` in `.config/factory.toml`, allow with a reason);
-  functions 10 to 15 lines; no `unsafe`.
+- Files about 200 lines, functions 10 to 15 lines, no `unsafe`. The
+  checks sit at the tail (`cargo xtask lint`: `[files] max_lines` in
+  `.config/factory.toml`, clippy's `too_many_lines` and
+  `cognitive_complexity` at clippy.toml's thresholds; over one, fix it
+  or allow it at the site with a comment naming the one concept it
+  holds). The band below is judged in review (`docs/review.md`); the
+  "quality signals" section `cargo xtask lint` prints lists its worst.
+  A split made only to pass a number is a review finding.
 - Warnings are errors in CI (`-D warnings`, clippy pedantic).
 - Every failure message names the fix and the reproducing command.
 - Where a service asks for a contact address (a crates.io User-Agent,
@@ -87,8 +92,9 @@ the directory:
 2. Red, green, refactor. Commit.
 3. `cargo xtask ci` green locally.
 4. Pull request. An independent review agent reads the diff with the
-   "Failure must be loud" rules and no author context; findings are
-   verified before action.
+   "Failure must be loud" rules and `docs/review.md` (single
+   responsibility, reaching through other objects, splits made to pass
+   a number) and no author context; findings are verified before action.
 5. Merge on the local gate, not GitHub CI (Tom, 2026-11-11, as touche
    since 2026-10-23): once the review's findings are in, update the
    branch onto current `main`, run `cargo xtask gate --pr <n>` at the

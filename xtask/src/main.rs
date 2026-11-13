@@ -52,6 +52,15 @@ mod lock_owner;
 mod pixels;
 mod precompress;
 mod priority;
+mod quality;
+mod quality_chains;
+mod quality_collect;
+mod quality_complexity;
+mod quality_lines;
+mod quality_macros;
+mod quality_measure;
+mod quality_stats;
+mod quality_thresholds;
 mod queue;
 mod queue_act;
 mod queue_checks;
@@ -140,6 +149,7 @@ use clap::Parser;
 
 use cli::{Cli, Command, Tier};
 
+#[allow(clippy::too_many_lines)] // the command dispatch, one arm per command
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let reporter = report::Reporter::new(cli.verbose);
@@ -147,6 +157,10 @@ fn main() -> ExitCode {
         Command::Setup { ci } => return setup::run(ci),
         Command::CheckTools => return setup::check(),
         Command::CheckFiles => return files::run(),
+        Command::Quality {
+            distributions,
+            list,
+        } => return quality::run(distributions, list),
         Command::CheckLayers => return layers::run(),
         Command::CheckBuilds => return builds::run(),
         Command::CheckImports => return imports::run(),

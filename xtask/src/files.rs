@@ -14,10 +14,12 @@ use std::process::ExitCode;
 use crate::config::Config;
 use crate::files_walk::{count_lines, workspace_files};
 
-/// The rule says about 200. 220 leaves room for a module doc comment
-/// and a test-module mount without forcing a split that would only
-/// move lines; a file past it has a second responsibility to give away.
-pub const DEFAULT_MAX_LINES: usize = 220;
+/// The hard limit; the guideline of about 200 is `[quality] file_lines`
+/// and the band between them is for review. 320 is the p99 a lognormal
+/// fit gives the file sizes of main on 2026-11-13 from their median and
+/// p90, the part the old cap of 220 did not squash
+/// (docs/decisions/2026-11-13-quality-thresholds.md).
+pub const DEFAULT_MAX_LINES: usize = 320;
 
 /// The rule as configured.
 #[derive(Debug, PartialEq, Eq)]

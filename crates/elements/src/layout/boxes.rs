@@ -56,6 +56,7 @@ pub(crate) fn build_shallow(
     (boxes, placeholders)
 }
 
+#[allow(clippy::too_many_lines)] // the one box built from every style field layout reads
 fn add_element(
     source: &Source<'_>,
     node: NodeId,

@@ -4,7 +4,7 @@
 //! show within the first minute.
 
 pub use crate::step::Step;
-use crate::steps_checks::{builds, files, imports, layers};
+use crate::steps_checks::{builds, files, imports, layers, quality};
 
 #[path = "steps_tiers.rs"]
 mod tiers;
@@ -143,9 +143,17 @@ pub fn deny_check() -> Vec<Step> {
     vec![deny()]
 }
 
-/// Formatting and lints only.
+/// Formatting and lints, then the quality signals.
 pub fn lint() -> Vec<Step> {
-    vec![fmt(), files(), layers(), builds(), imports(), clippy()]
+    vec![
+        fmt(),
+        files(),
+        layers(),
+        builds(),
+        imports(),
+        clippy(),
+        quality(),
+    ]
 }
 
 /// The unit tier.

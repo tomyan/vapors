@@ -26,6 +26,7 @@ fn main() {
     }
 }
 
+#[allow(clippy::too_many_lines)] // the command dispatch, one branch per mode
 fn run() -> Result<(), String> {
     if cfg!(debug_assertions) {
         return Err("a debug build; the baseline is timed in release: \

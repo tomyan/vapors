@@ -37,6 +37,18 @@ pub enum Command {
     /// Check every source file is within `[files] max_lines` (the `files` step).
     #[command(hide = true)]
     CheckFiles,
+    /// Print the quality signals: functions, complexity, files and field
+    /// chains in the band from the guideline to the hard limit (the
+    /// `quality` step of lint; advisory, never failing on a finding).
+    Quality {
+        /// Print the distributions the thresholds were set from instead.
+        #[arg(long)]
+        distributions: bool,
+        /// Print every sample, one per line as `<metric>\t<value>\t<where>`,
+        /// for checking the counts against clippy's.
+        #[arg(long, conflicts_with = "distributions")]
+        list: bool,
+    },
     /// Write docs/gpu-limits.md from the adapters and limits wgpu reports here.
     GpuInfo,
     /// Run a windowed example under Xvfb and save its frame as a PNG.

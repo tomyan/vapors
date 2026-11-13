@@ -1,4 +1,5 @@
-//! The lint tier's checks of the tree: files, layers, builds and imports.
+//! The lint tier's checks of the tree: files, layers, builds and
+//! imports, and the advisory quality signals.
 
 use crate::step::Step;
 
@@ -33,6 +34,19 @@ pub fn imports() -> Step {
         &["xtask", "check-imports"],
         "move the call into an allowed module, or list the path under [imports.<crate>] in .config/factory.toml with a reason",
     )
+}
+
+/// The quality signals, printed whether or not the step passes; it
+/// fails only when it cannot measure. `cargo xtask quality`.
+pub fn quality() -> Step {
+    let mut step = Step::new(
+        "quality",
+        "cargo",
+        &["xtask", "quality"],
+        "make the file it names parse, or list it under [files.generated]; a missing threshold is set in clippy.toml or [quality]",
+    );
+    step.advisory = true;
+    step
 }
 
 /// Every source file within `[files] max_lines`; `cargo xtask check-files`.
