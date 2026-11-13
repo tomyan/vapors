@@ -41,7 +41,7 @@ fn a_child_of_a_removed_row_moved_into_the_owner_is_declined_and_walked() {
     let counts = updated(&page);
 
     // Then
-    assert_declined(counts, SpliceDecline::InsertedHasPlace);
+    assert_declined(&counts, SpliceDecline::InsertedHasPlace);
     matches_full(&page, "unwrap");
 }
 
@@ -61,6 +61,6 @@ fn a_child_of_a_removed_row_moved_into_a_new_row_is_declined_and_walked() {
     let counts = updated(&page);
 
     // Then
-    assert_declined(counts, SpliceDecline::InsertedHasPlace);
+    assert_declined(&counts, SpliceDecline::InsertedHasPlace);
     matches_full(&page, "into new row");
 }

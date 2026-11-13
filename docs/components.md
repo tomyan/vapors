@@ -405,8 +405,14 @@ For example, in a component whose scope is `app/src/panel.wisp`:
   which has no scope, `:global` is refused anywhere.
 - A scope added again with a different style (two components with the
   same scope) is refused, naming the scope.
-- A style that does not parse is refused by the next update, naming the
-  scope, line and column.
+- A style that does not parse, or holds a `:global()` the scoping
+  cannot honour, fails the build (`compile_dir` and `wisp-check`),
+  naming `file:line:col`; the compiler reads it with `vapors-css`, the
+  runtime's own parser and scoping (`vapors_css::scope`), so the two
+  give the same parse and `:global()` refusals (the runtime's
+  per-element value refusals still happen at run time). A style the runtime is given by hand
+  (`add_style`) is refused by the next update, naming the scope, line
+  and column.
 - A crate whose components' styles the app adds as global sheets uses
   `compile_dir_global` instead. Nothing is then scoped, and the
   generated code has no `SCOPE`, `add_style` or tags. The layout corpus
@@ -416,8 +422,9 @@ For example, in a component whose scope is `app/src/panel.wisp`:
 
 ## Deferred
 
-- **CSS.** The compiler does not parse `STYLE`, so a CSS error appears
-  at run time, when the update refuses it, not at build time.
+- **CSS values.** The compiler parses `STYLE` and refuses what does not
+  parse; it does not yet classify which rules match which elements
+  (`docs/plans/build-time-styles.md`, B1 onward).
 - **Elements (F2c).** The only `Dom` implementation is the recording
   fake in `vapors_dom::recording`, used by tests. The elements crate
   implements `Dom` over the real element tree, with layout and paint.

@@ -75,6 +75,8 @@ pub struct Painted {
     /// Elements whose `rects` and `paddings` entries this update put or
     /// removed (`kept_maps.rs`), for `UpdateCounts`.
     pub(crate) maps_patched: usize,
+    /// What this update's patches did to `drawn` and `extents` (`blocks.rs`).
+    pub(crate) index_counts: crate::blocks::IndexCounts,
     /// Each slot's stacking, for the next update's shape comparison
     /// (`changed_slots.rs`).
     pub(crate) stackings: crate::paint_order::Stackings,
@@ -109,6 +111,7 @@ impl Painted {
             parts_visited_kept: 0,
             items_built: 0,
             maps_patched: 0,
+            index_counts: crate::blocks::IndexCounts::default(),
             stackings: crate::paint_order::Stackings::default(),
         }
     }
