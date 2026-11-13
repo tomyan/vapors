@@ -3148,6 +3148,7 @@ version = "0.0.0"
 dependencies = [
  "vapors-app",
  "vapors-gpu-harness",
+ "vapors-renderer",
  "vapors-scene3d",
  "wgpu",
 ]

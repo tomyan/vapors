@@ -17,43 +17,46 @@ pub(super) fn create(
         step_mode: wgpu::VertexStepMode::Vertex,
         attributes: &attributes,
     })];
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some(if solid {
-            "racer solids"
-        } else {
-            "racer ground"
-        }),
-        layout: Some(&layout),
-        vertex: wgpu::VertexState {
-            module: shader,
-            entry_point: Some(if solid { "vs_solid" } else { "vs_main" }),
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: if solid { &buffers } else { &[] },
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: shader,
-            entry_point: Some(if solid { "fs_solid" } else { "fs_main" }),
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-            targets: &[Some(wgpu::ColorTargetState {
-                format,
-                blend: None,
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-        }),
-        primitive: wgpu::PrimitiveState::default(),
-        depth_stencil: Some(wgpu::DepthStencilState {
-            format: wgpu::TextureFormat::Depth32Float,
-            depth_write_enabled: Some(solid),
-            depth_compare: if solid {
-                Some(wgpu::CompareFunction::LessEqual)
+    vapors_renderer::pipelines::render_pipeline(
+        device,
+        &wgpu::RenderPipelineDescriptor {
+            label: Some(if solid {
+                "racer solids"
             } else {
-                Some(wgpu::CompareFunction::Always)
+                "racer ground"
+            }),
+            layout: Some(&layout),
+            vertex: wgpu::VertexState {
+                module: shader,
+                entry_point: Some(if solid { "vs_solid" } else { "vs_main" }),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                buffers: if solid { &buffers } else { &[] },
             },
-            stencil: wgpu::StencilState::default(),
-            bias: wgpu::DepthBiasState::default(),
-        }),
-        multisample: wgpu::MultisampleState::default(),
-        multiview_mask: None,
-        cache: None,
-    })
+            fragment: Some(wgpu::FragmentState {
+                module: shader,
+                entry_point: Some(if solid { "fs_solid" } else { "fs_main" }),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format,
+                    blend: None,
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: wgpu::TextureFormat::Depth32Float,
+                depth_write_enabled: Some(solid),
+                depth_compare: if solid {
+                    Some(wgpu::CompareFunction::LessEqual)
+                } else {
+                    Some(wgpu::CompareFunction::Always)
+                },
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
+        },
+    )
 }
