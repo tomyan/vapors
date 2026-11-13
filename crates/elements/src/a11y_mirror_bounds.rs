@@ -8,7 +8,9 @@
 //! node whose box is placed outside its parent node's box (hoisted: a
 //! popover whose containing block is above the parent) does not move
 //! with the parent, so its bounds are from the viewport, which keeps
-//! them right when the parent moves or scrolls without it.
+//! them right when the parent moves or scrolls without it; a scroll of
+//! a container whose frame its box is in reads it again
+//! (`a11y_mirror_reach.rs`).
 
 use vapors_a11y::{AxRect, AxScroll};
 use vapors_dom::NodeId;
@@ -56,15 +58,22 @@ impl Document {
     /// it is placed in (its containing block, for an out-of-flow box)
     /// passes `parent`'s, so it moves and scrolls with it.
     fn ax_placed_in(&self, node: NodeId, parent: NodeId) -> bool {
+        self.boxes
+            .slot_of(parent)
+            .is_some_and(|target| self.ax_placed_under(node, &|slot| slot == target))
+    }
+
+    /// Whether the chain of boxes `node`'s box is placed in passes a
+    /// slot `under` holds for; false for a node with no box.
+    pub(crate) fn ax_placed_under(&self, node: NodeId, under: &dyn Fn(usize) -> bool) -> bool {
         let painted = self.painted.as_ref().expect("read from the last update");
         let up = &painted.from.placement.up;
-        let (Some(slot), Some(target)) = (self.boxes.slot_of(node), self.boxes.slot_of(parent))
-        else {
+        let Some(slot) = self.boxes.slot_of(node) else {
             return false;
         };
         let mut cursor = up[slot];
         while cursor != NO_SLOT {
-            if cursor == target {
+            if under(cursor) {
                 return true;
             }
             cursor = up[cursor];

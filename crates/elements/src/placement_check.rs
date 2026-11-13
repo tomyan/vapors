@@ -7,15 +7,16 @@
 //! so a broken chain fails on the update that broke it. Rects are kept
 //! in scroll-frame coordinates (IU4), so they are compared with a fresh
 //! placement at no scroll offset, and each slot's rect on the page,
-//! snapped as paint snaps it and shifted by its frames' rounded offsets
-//! (`frames.rs`), with the snapped rect of today's placement with the
-//! offsets applied: what the page shows.
+//! snapped as paint snaps it and shifted by its frames' whole shifts
+//! (`frames.rs`), with what today's placement with the offsets applied
+//! puts on the page (`placement_check_page.rs`).
 
 use rustc_hash::FxHashSet;
 
 use crate::changed_slots::ChangedSlots;
 use crate::layout::{BoxRect, Content, LayoutBox, containing_blocks, placed};
 use crate::placement::{LaidOut, NO_SLOT, Placed, Placement};
+use crate::placement_check_page::FreshRects;
 use crate::scroll::Offsets;
 
 /// What placement started from: the offsets, rects, paddings and each
@@ -64,6 +65,14 @@ impl Fresh {
         };
         (fresh, scroll)
     }
+
+    /// Its rects in their frames and on the page.
+    fn page(&self) -> FreshRects<'_> {
+        FreshRects {
+            in_frame: &self.rects,
+            on_page: &self.on_page,
+        }
+    }
 }
 
 /// The slots of `boxes` that hold a box.
@@ -87,7 +96,7 @@ pub(crate) fn assert_same(
     let held = held(boxes.boxes);
     assert_slots_same(kept, &fresh, &held);
     assert_chain_same(kept, boxes.boxes, &held);
-    crate::placement_check_page::assert_on_page_same((kept, boxes), &fresh.on_page, &held);
+    crate::placement_check_page::assert_on_page_same((kept, boxes), &fresh.page(), &held);
     if !scroll.same_offsets(&fresh_scroll) {
         fail("the offsets by element differ from a fresh settle");
     }

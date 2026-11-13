@@ -135,6 +135,32 @@ fn a_row_on_a_half_device_pixel_scrolled_across_the_top_snaps_as_the_page_does()
 }
 
 #[test]
+fn a_scroll_not_whole_in_css_pixels_puts_a_half_device_pixel_edge_where_paint_does() {
+    // Given: 25 px rows at 1.5x, the third's bottom at 112.5 device px
+    let mut list = list("overflow: auto;");
+    let rows_css = ".row { height: 25px; background-color: blue; }";
+    list.doc
+        .add_stylesheet("rows.css", rows_css)
+        .expect("parses");
+    let at_1_5 = vapors_elements::Viewport {
+        scale: 1.5,
+        ..at(1.0)
+    };
+    list.doc.update(at_1_5).expect("updates");
+
+    // When: scrolled 0.5 px, applied as 1 device px, which is no f32
+    // number of CSS px (0.6666667)
+    list.doc.scroll_node_by(list.container, [0.0, 0.5]);
+    list.doc.update(at_1_5).expect("updates");
+
+    // Then: the placement check (debug builds) holds, and the third
+    // row's bottom snaps to 113 device px less the 1 scrolled
+    let quads = row_quads(list.doc.painted().expect("painted"));
+    let third = quads[2].0;
+    assert_eq!((third.top, third.bottom), (74.0, 112.0));
+}
+
+#[test]
 fn a_draw_after_a_scroll_batches_the_rows_where_they_show() {
     // Given: a draw, which keeps its batches
     let mut list = scrolled("overflow: auto;", 0.0);

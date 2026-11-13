@@ -4,7 +4,8 @@
 //! to an ancestor; an element inserted that is not a node reaches the
 //! nearest nodes under it, moved with it while their boxes may have
 //! stayed (absolutely positioned); a node named by an id whose element
-//! changed, and the nodes focus left and came to, are read as well.
+//! changed, the nodes focus left and came to, and the hoisted nodes in
+//! the frame of a scroll container scrolled, are read as well.
 
 use vapors_dom::NodeId;
 
@@ -12,6 +13,7 @@ use crate::a11y_mirror_index::AxIndex;
 use crate::a11y_mirror_state::Touched;
 use crate::document::Document;
 use crate::node_map::NodeSet;
+use rustc_hash::FxHashSet;
 
 impl Document {
     /// Every node this take reads, each once, the touched first so that
@@ -41,6 +43,9 @@ impl Document {
         for &node in renamed.iter().chain(&touched.renamed) {
             add(node);
         }
+        for node in self.ax_scrolled_hoisted(&touched.scrolled) {
+            add(node);
+        }
         for node in focus.into_iter().flatten() {
             add(node);
         }
@@ -67,6 +72,21 @@ impl Document {
         for &referrer in index.referrers.get(id).into_iter().flatten() {
             add(referrer);
         }
+    }
+
+    /// The hoisted nodes whose boxes are in the frame of one of the
+    /// scroll containers `scrolled`: a scroll moves them on the page,
+    /// and their bounds are from the viewport.
+    fn ax_scrolled_hoisted(&self, scrolled: &NodeSet) -> Vec<NodeId> {
+        if scrolled.is_empty() || self.ax.hoisted.is_empty() {
+            return Vec::new();
+        }
+        let frames: FxHashSet<usize> = scrolled
+            .iter()
+            .filter_map(|&container| self.boxes.slot_of(container))
+            .collect();
+        let in_frame = |&node: &NodeId| self.ax_placed_under(node, &|slot| frames.contains(&slot));
+        self.ax.hoisted.iter().copied().filter(in_frame).collect()
     }
 
     /// The nearest nodes under `wrapper` when it is not a node itself:

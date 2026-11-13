@@ -70,16 +70,13 @@ fn frames_moved(painted: &mut Painted) {
 }
 
 /// The scroll frames of `order`'s scroll containers, each shifted by
-/// its offset in `input`, rounded to whole device pixels as placement
-/// applies it (`scroll.rs`).
+/// its offset in `input` as `scroll::frame_shift` gives it.
 fn frames(order: &KeptOrder, boxes: &[LayoutBox], input: &PaintInput<'_>) -> Frames {
     let scrolls = |slot| input.stackings.scrolls(slot);
     crate::frames_check::assert_scrollers_agree(&order.thumbs, &order.clips, &scrolls);
     let depth = |slot| order.tree.depth(slot);
-    let shift = |slot| {
-        let offset = scroll_offset(boxes, slot, input.scroll);
-        offset.map(|at| -(at * input.scale).round())
-    };
+    let shift =
+        |slot| crate::scroll::frame_shift(scroll_offset(boxes, slot, input.scroll), input.scale);
     Frames::of(&order.thumbs, (&order.clips, &depth), &shift, input.scale)
 }
 
