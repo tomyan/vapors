@@ -9,6 +9,7 @@ mod buckets;
 mod collect;
 mod compute;
 mod compute_resolve;
+mod compute_source;
 mod computed;
 mod conditions;
 mod environment;

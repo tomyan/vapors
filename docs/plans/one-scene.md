@@ -154,7 +154,13 @@ and the fix, as the compiler refuses other attributes today
 - Two shapes are the same entry when their canonical form is equal:
   absolute commands in viewBox units after parsing, plus the fill rule
   and stroke parameters that change the mesh (width, join, cap,
-  miter limit). Paint is not part of the key; it is per item.
+  miter limit). Paint is not part of the key; it is per item. Equality
+  is per build target: an arc whose radii the parser scaled up for its
+  chord passes through `sin_cos`, whose last bit differs between the
+  host's libm and wasm32's, so S4a's run-time parse must not rely on
+  cross-target bit equality: on a hash hit it compares bytes, and a
+  miss is a cache miss (one more tessellation, counted), never a
+  defect (S2, `crates/shapes/src/canonical.rs`).
 - Each crate's build emits one `static SHAPES: ShapeTable` beside its
   `wisp.rs`: triangle buffers for every mesh entry, parameters
   for every closed-form entry, and each entry's canonical bytes and

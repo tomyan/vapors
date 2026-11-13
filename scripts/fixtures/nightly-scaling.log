@@ -1,0 +1,44 @@
+scaling: revision 68371b9382ec643d57643d4b4ff31a2c2cd9cf38
+ok   build    117.3s
+Adapter: Intel(R) UHD Graphics 630 (CFL GT2) (Vulkan, Intel open-source Mesa driver Mesa 25.0.7-2)
+Profile: release; scale 1; warmup 10; runs 60
+scaling-changes: Idle Text FlexText Class HoveredClass Insert Resize Scroll ScrollSize
+### Scaling, Idle (median instructions per frame)
+
+| phase | 1000 rows | 3000 rows | 10000 rows | per extra row, 1000 to 3000 | per extra row, 3000 to 10000 |
+|---|---|---|---|---|---|
+| update | 52115 | 52115 | 52115 | 0.0 | 0.0 |
+
+scaling: pass, every Idle phase within 2% or 5000 instructions of its 1000-row count
+scaling-result: Idle pass
+scaling-error-begin: Text
+no instruction counter: perf_event_open failed (perf_event_paranoid is 4); fix: sysctl kernel.perf_event_paranoid=2
+scaling-error-end: Text
+scaling-result: Text fail
+scaling: pass, every FlexText phase within 2% (frame (CPU) 3%, relaxed: crates/perf/src/scaling_judged.rs) or 5000 instructions of its 1000-row count
+scaling-result: FlexText pass
+scaling-error-begin: Class
+scaling: Class, add frames does work that depends on the page's size:
+- frame (CPU) grows with the page: 1733654 instructions at 1000 rows, 1859360 at 10000 rows, 14.0 instructions per extra row (over 2% and 5000 instructions above the first size)
+- paint grows with the page: 67941 instructions at 1000 rows, 95345 at 3000 rows, 13.7 instructions per extra row (over 2% and 5000 instructions above the first size)
+- update grows with the page: 757723 instructions at 1000 rows, 787418 at 3000 rows, 14.8 instructions per extra row (over 2% and 5000 instructions above the first size)
+reproduce: vapors-perf 60 10 --scaling Class; the fix is to make the phase's work depend on what changed (docs/plans/perf-finish-line.md, properties 1 and 6)
+scaling: Class, remove frames does work that depends on the page's size:
+- paint grows with the page: 67001 instructions at 1000 rows, 94100 at 3000 rows, 13.5 instructions per extra row (over 2% and 5000 instructions above the first size)
+reproduce: vapors-perf 60 10 --scaling Class; the fix is to make the phase's work depend on what changed (docs/plans/perf-finish-line.md, properties 1 and 6)
+scaling-error-end: Class
+scaling-result: Class fail
+scaling-error-begin: HoveredClass
+scaling: HoveredClass, add frames does work that depends on the page's size:
+- paint grows with the page: 74854 instructions at 1000 rows, 102595 at 3000 rows, 13.9 instructions per extra row (over 2% and 5000 instructions above the first size)
+reproduce: vapors-perf 60 10 --scaling HoveredClass; the fix is to make the phase's work depend on what changed (docs/plans/perf-finish-line.md, properties 1 and 6)
+scaling-error-end: HoveredClass
+scaling-result: HoveredClass fail
+scaling: pass, Insert, insert frames accessibility within 9600 instructions per extra row; the other phases are reported, not judged: property 3 (the splice step) is not built
+scaling-result: Insert pass
+scaling-result: Resize pass
+scaling-result: Scroll pass
+scaling-result: ScrollSize pass
+FAIL perf: scaling: 3 of 9 changes failed:
+FAIL judge    380.2s
+scaling: fail 68371b9382ec643d57643d4b4ff31a2c2cd9cf38

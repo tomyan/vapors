@@ -41,6 +41,7 @@ fn a_screenshot_of_the_wrong_size_is_refused_naming_both_sizes() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)] // one scenario: the hung browser, its child and its stderr
 fn a_browser_past_its_deadline_is_killed_with_its_children_and_its_stderr_reported() {
     // Given: a "browser" that writes to stderr, leaves a child holding
     // the pipe, then hangs
