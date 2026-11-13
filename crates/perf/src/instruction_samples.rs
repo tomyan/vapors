@@ -26,6 +26,21 @@ impl InstructionSamples {
             counts.resize(self.frame.len(), 0);
         }
     }
+
+    /// The frames at `first`, `first + step`, `first + 2 step` and on,
+    /// with their phases.
+    #[must_use]
+    pub(crate) fn every_nth(&self, first: usize, step: usize) -> Self {
+        let pick = |counts: &[u64]| counts.iter().copied().skip(first).step_by(step).collect();
+        Self {
+            frame: pick(&self.frame),
+            phases: self
+                .phases
+                .iter()
+                .map(|(phase, counts)| (phase.clone(), pick(counts)))
+                .collect(),
+        }
+    }
 }
 
 #[cfg(test)]

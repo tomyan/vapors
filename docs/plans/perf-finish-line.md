@@ -50,6 +50,11 @@ on `style`, 2 instructions per extra row; they pass since the style
 phase's kept sets stopped keeping the mount's capacity (2026-11-12;
 HoveredClass `style` 843k / 847k / 870k instructions at 1,000 / 3,000 /
 10,000 rows before, 840k / 848k / 850k after, docs/plans/iu1.md, PR 2).
+Since #270 (2026-11-13) `--scaling` judges the frames that add the class
+apart from those that remove it, and Class and HoveredClass fail on the
+add frames: `paint` 13.6 instructions per extra row
+(docs/perf/splice-layout-2026-11-13.md); the one median had been the
+remove frames'.
 The 5k to 9k instructions HoveredClass `style` still rises from 1,000
 rows (once 1 under the judge's 5000 floor, passing on 2%) are glibc's
 malloc costing more per call on a larger heap: with jemalloc preloaded
