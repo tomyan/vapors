@@ -56,10 +56,17 @@ fn lines_of_another_shape_are_refused_naming_the_line() {
     }
 }
 
+fn phases(pairs: &[(&str, i64)]) -> BTreeMap<String, i64> {
+    pairs
+        .iter()
+        .map(|(name, bytes)| ((*name).to_owned(), *bytes))
+        .collect()
+}
+
 #[test]
-fn the_split_charges_the_update_rest_and_the_frames_rest() {
+fn the_split_charges_the_update_rest_and_puts_the_other_frame_phases_in_the_rest() {
     // Given: the update's 70 holds style 10, layout 20, paint 30
-    let phases: BTreeMap<String, i64> = [
+    let phases = phases(&[
         ("update", 70),
         ("style", 10),
         ("layout", 20),
@@ -67,14 +74,69 @@ fn the_split_charges_the_update_rest_and_the_frames_rest() {
         ("accessibility", 5),
         ("draw", 100),
         ("input", 1),
-    ]
-    .into_iter()
-    .map(|(name, bytes)| (name.to_owned(), bytes))
-    .collect();
+        ("tasks", 40),
+    ]);
 
     // When
     let owners = ElementMemory::split(1000, &phases, 1200);
 
-    // Then: rest is 1200 - 1000 - (70 + 5 + 100 + 1)
-    assert_eq!(owners, [1000, 10, 20, 30, 10, 5, 100, 24]);
+    // Then: the rest is 1200 - 1000 - (70 + 5 + 100), input and tasks in it
+    assert_eq!(owners, [1000, 10, 20, 30, 10, 5, 100, 25]);
+}
+
+#[test]
+fn the_owners_sum_to_the_total_whatever_the_phases() {
+    let cases = [
+        phases(&[]),
+        phases(&[("tasks", 5_000), ("record", -7)]),
+        phases(&[("update", -40), ("style", 9), ("layout", -60), ("paint", 3)]),
+        phases(&[("draw", 1 << 40), ("tick", 2), ("input", 3), ("other", 99)]),
+    ];
+    for (at, phases) in cases.iter().enumerate() {
+        let owners = ElementMemory::split(17, phases, 123_456);
+        assert_eq!(owners.iter().sum::<i64>(), 123_456, "case {at}: {owners:?}");
+    }
+}
+
+#[test]
+fn a_measurement_whose_owners_miss_the_total_is_refused() {
+    // Given
+    let mut memory = measured();
+    memory.owners[7] -= 1;
+
+    // When
+    let refused = memory.checked();
+
+    // Then
+    let error = refused.expect_err("one byte short");
+    assert!(error.contains("not the total 900000"), "{error}");
+}
+
+#[test]
+fn an_owner_freeing_more_than_a_percent_of_the_total_is_refused_naming_it() {
+    // Given: the update's rest at -2% of the total, the rest making up for it
+    let mut memory = measured();
+    memory.owners[4] = -18_000;
+    memory.owners[7] += 19_000;
+
+    // When
+    let refused = memory.checked();
+
+    // Then
+    let error = refused.expect_err("below -1%");
+    assert!(error.starts_with("update_rest is -18000 bytes"), "{error}");
+}
+
+#[test]
+fn a_measurement_within_the_limits_is_kept() {
+    // Given: a small negative, its owners summing to the total
+    let mut memory = measured();
+    memory.owners[4] = -1_000;
+    memory.owners[7] += 2_000;
+
+    // When
+    let kept = memory.clone().checked();
+
+    // Then
+    assert_eq!(kept, Ok(memory));
 }
