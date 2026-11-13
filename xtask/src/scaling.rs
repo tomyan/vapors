@@ -15,10 +15,9 @@ use crate::{ci, fail, gate, sccache};
 /// (2026-11-13); 30 minutes leaves room for a build that misses it.
 const BUILD_DEADLINE: Duration = Duration::from_mins(30);
 
-/// Every change took 71 s together at load average 20 (2026-11-13,
-/// 17 s and 19 s for Insert and Resize, the slowest); ten minutes is
-/// over eight times that.
-const JUDGE_DEADLINE: Duration = Duration::from_mins(10);
+/// Every change took 71 s together at load average 20 and 380 s at load
+/// average 50 (2026-11-13); twenty minutes is three times the slower.
+const JUDGE_DEADLINE: Duration = Duration::from_mins(20);
 
 /// Builds and runs the judge; ends `scaling: pass <sha>` or
 /// `scaling: fail <sha>`.

@@ -122,7 +122,7 @@ install_units() {
   fi
   local dir="$HOME/.config/systemd/user"
   mkdir -p "$dir"
-  # xtask's deadlines are 30 min for the build and 10 for the judge; the
+  # xtask's deadlines are 30 min for the build and 20 for the judge; the
   # rest covers the fetch, compiling xtask and the issue calls.
   printf '[Unit]\nDescription=%s\n\n[Service]\nType=oneshot\nExecStart=%s\nTimeoutStartSec=90min\n' \
     "vapors nightly scaling judge (scripts/nightly-scaling.sh)" \
