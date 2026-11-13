@@ -53,7 +53,7 @@ fn run(loads: &[f64], github: bool) -> (Result<Outcome, String>, Vec<String>, Du
 
 #[test]
 fn runnable_tasks_over_the_threshold_are_waited_out_saying_so_every_30_s() {
-    // Given: over at 0, 5, ... 30 s, under at 35 s
+    // Given: over at 0, 5, ... 30 s, under from 35 s
     let loads = [20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 15.0, 11.0];
 
     // When
@@ -61,7 +61,7 @@ fn runnable_tasks_over_the_threshold_are_waited_out_saying_so_every_30_s() {
 
     // Then
     assert_eq!(outcome, Ok(Outcome::Clear));
-    assert_eq!(slept, Duration::from_secs(35));
+    assert_eq!(slept, Duration::from_secs(45));
     assert_eq!(said.len(), 2, "{said:?}");
     assert!(
         said[1].starts_with(
@@ -72,25 +72,28 @@ fn runnable_tasks_over_the_threshold_are_waited_out_saying_so_every_30_s() {
 }
 
 #[test]
-fn the_wait_reads_again_every_5_s_and_starts_at_the_first_reading_under() {
-    // When
-    let (outcome, said, slept) = run(&[13.0, 12.0], false);
+fn the_wait_reads_every_5_s_and_starts_after_three_readings_in_a_row_under() {
+    // Given: a gap between compile bursts reads under once, at 5 s
+    let loads = [20.0, 2.0, 20.0, 20.0, 2.0, 2.0, 2.0];
 
-    // Then
+    // When
+    let (outcome, said, slept) = run(&loads, false);
+
+    // Then: under at 20, 25 and 30 s
     assert_eq!(outcome, Ok(Outcome::Clear));
-    assert_eq!(slept, READ_EVERY);
+    assert_eq!(slept, 6 * READ_EVERY);
     assert_eq!(said.len(), 1, "{said:?}");
 }
 
 #[test]
-fn a_load_at_the_threshold_starts_at_once_saying_nothing() {
+fn a_load_at_the_threshold_starts_after_three_readings_saying_nothing() {
     // When
     let (outcome, said, slept) = run(&[12.0], false);
 
     // Then
     assert_eq!(
         (outcome, said.len(), slept),
-        (Ok(Outcome::Clear), 0, Duration::ZERO)
+        (Ok(Outcome::Clear), 0, 2 * READ_EVERY)
     );
 }
 

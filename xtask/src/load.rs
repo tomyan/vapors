@@ -23,8 +23,12 @@ pub fn parse(text: &str) -> Result<String, String> {
 /// The count of runnable tasks now, this reader included, from
 /// `/proc/loadavg`: what the load wait reads.
 pub fn runnable_now() -> Result<u32, String> {
-    let text =
-        std::fs::read_to_string("/proc/loadavg").map_err(|e| format!("/proc/loadavg: {e}"))?;
+    runnable_in(std::path::Path::new("/proc/loadavg"))
+}
+
+/// The runnable count in the file at `path`, read as `/proc/loadavg`.
+pub fn runnable_in(path: &std::path::Path) -> Result<u32, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
     runnable(&text)
 }
 

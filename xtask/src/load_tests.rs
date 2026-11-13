@@ -42,3 +42,15 @@ fn a_fourth_field_of_another_shape_is_refused_quoting_the_text() {
         );
     }
 }
+
+#[test]
+fn an_unreadable_load_file_is_refused_naming_it() {
+    // Given
+    let missing = std::path::Path::new("/proc/no-such-loadavg");
+
+    // When
+    let refusal = runnable_in(missing).expect_err("unreadable");
+
+    // Then
+    assert!(refusal.starts_with("/proc/no-such-loadavg: "), "{refusal}");
+}

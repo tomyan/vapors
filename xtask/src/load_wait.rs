@@ -4,8 +4,8 @@
 //! `[load] deadline_minutes` saying that it did. The count of tasks
 //! runnable now, not the one-minute load average: the average decays
 //! for a minute or two after the work has gone (60 to 12 took 90 to
-//! 120 s in gate 271, docs/plans/factory-throughput.md C3). Several worktrees share the dev machine; a run started into a
-//! saturated one has timed out on its deadlines rather than failed on
+//! 120 s in gate 271, docs/plans/factory-throughput.md C3). Several
+//! worktrees share the dev machine; a run started into a saturated one has timed out on its deadlines rather than failed on
 //! its code. An unreadable load is refused, never taken as low, naming
 //! `[load] wait = false` as the fix. A `ci` run inside a gate does not
 //! wait: the gate already did (`main.rs`, the in-gate branch of
@@ -26,6 +26,11 @@ pub const SAY_EVERY: Duration = Duration::from_secs(30);
 /// the CPUs free starts within this. Not a measurement; the read is one
 /// small file, so the period costs nothing either way.
 pub const READ_EVERY: Duration = Duration::from_secs(5);
+/// How many readings in a row must be at or under the threshold: one
+/// reading is an instant, and a build between compile bursts (a link, a
+/// build script) reads low for a moment while its next jobs are about
+/// to start. Three is 10 s of it, read 5 s apart. Not a measurement.
+pub const CLEAR_READS: u32 = 3;
 /// Set by GitHub Actions on its runners.
 pub const GITHUB_ENV: &str = "GITHUB_ACTIONS";
 
@@ -72,27 +77,20 @@ pub fn wait(
     clock: &dyn Clock,
     say: &mut dyn FnMut(&str),
 ) -> Result<Outcome, String> {
-    // Relaxed: GitHub's runners are single-tenant, so nothing else loads
-    // them; the wait guards the shared dev machine only.
-    if github {
-        return Ok(Outcome::Skipped(
-            "on GitHub Actions, whose runners are single-tenant",
-        ));
-    }
-    // Relaxed guard, declared: `[load] wait = false` runs without the
-    // wait, for a machine with no /proc/loadavg (the planned Mac Studio),
-    // said on every run. Retired when the load is read portably.
-    if !settings.enabled {
-        return Ok(Outcome::Skipped(
-            "[load] wait = false in .config/factory.toml",
-        ));
+    if let Some(why) = skipped(settings, github) {
+        return Ok(Outcome::Skipped(why));
     }
     let started = clock.now();
-    let mut say_at = Duration::ZERO;
+    let (mut say_at, mut under) = (Duration::ZERO, 0);
     loop {
         let now = load()?;
         let waited = clock.now().saturating_duration_since(started);
-        if now <= settings.threshold {
+        under = if now <= settings.threshold {
+            under + 1
+        } else {
+            0
+        };
+        if under >= CLEAR_READS {
             return Ok(Outcome::Clear);
         }
         // Relaxed guard: at the deadline the run goes on, loudly, rather
@@ -101,16 +99,29 @@ pub fn wait(
         // retry in a loop that adds load. Retired when runs queue for
         // CPUs through a scheduler instead of this wait. Tom's choice:
         // docs/decisions/2026-11-01-load-wait-deadline.md.
-        if waited >= settings.deadline {
+        if under == 0 && waited >= settings.deadline {
             say(&past_deadline(now, settings, waited));
             return Ok(Outcome::PastDeadline);
         }
-        if waited >= say_at {
+        if under == 0 && waited >= say_at {
             say(&waiting(now, settings, waited));
             say_at = waited + SAY_EVERY;
         }
         clock.sleep(READ_EVERY.min(settings.deadline.saturating_sub(waited)));
     }
+}
+
+/// Why the wait is not made, if it is not.
+fn skipped(settings: Settings, github: bool) -> Option<&'static str> {
+    // Relaxed: GitHub's runners are single-tenant, so nothing else loads
+    // them; the wait guards the shared dev machine only.
+    if github {
+        return Some("on GitHub Actions, whose runners are single-tenant");
+    }
+    // Relaxed guard, declared: `[load] wait = false` runs without the
+    // wait, for a machine with no /proc/loadavg (the planned Mac Studio),
+    // said on every run. Retired when the load is read portably.
+    (!settings.enabled).then_some("[load] wait = false in .config/factory.toml")
 }
 
 fn waiting(load: f64, settings: Settings, waited: Duration) -> String {
