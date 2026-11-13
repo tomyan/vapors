@@ -76,9 +76,23 @@ impl GlyphAtlas {
         }
     }
 
-    /// Pins the entry under `key` into `pins`, when given.
+    /// Pins the entry under `key` into `pins`, when given. Pins made
+    /// before a clear and still empty take the current epoch: a build's
+    /// first pass may clear every pin before its second pass pins.
+    ///
+    /// # Panics
+    ///
+    /// When `pins` holds pins taken before the last clear.
     pub(crate) fn pin(&mut self, key: &AtlasKey, pins: Option<&mut AtlasPins>) {
         let Some(pins) = pins else { return };
+        if pins.epoch != self.pin_epoch {
+            assert!(
+                pins.keys.is_empty(),
+                "pins taken before every pin was cleared were added to (atlas_pins.rs): take a \
+                 batch's pins in one pass; reproduce with `cargo xtask test`"
+            );
+            pins.epoch = self.pin_epoch;
+        }
         let entry = self.entries.get_mut(key).expect("pinned right after a get");
         entry.pins += 1;
         pins.keys.push(key.clone());

@@ -149,3 +149,20 @@ fn each_glyph_of_a_text_is_pinned_once_on_the_second_pass_and_lookups_are_counte
     assert_eq!(atlas.lookups(), 4);
     assert!(atlas.entries.values().all(|entry| entry.pins == 1));
 }
+
+#[test]
+fn pins_made_before_a_clear_and_taken_after_it_are_given_back() {
+    // Given: pins made, then every pin cleared before any is taken, as
+    // when a build's first pass clears them
+    let (mut atlas, held) = page_of_two(true, false);
+    let mut pins = atlas.new_pins();
+    assert!(atlas.unpin_all());
+
+    // When
+    atlas.pin(&key(2), Some(&mut pins));
+    atlas.unpin(pins);
+
+    // Then
+    assert_eq!(pins_on(&atlas, 2), Some(0));
+    atlas.unpin(held); // void: taken before the clear
+}
