@@ -23,6 +23,7 @@ vapors-dom.workspace = true
 vapors-a11y.workspace = true
 vapors-css.workspace = true
 vapors-scene.workspace = true
+vapors-shapes.workspace = true
 vapors-text.workspace = true
 taffy.workspace = true
 rustc-hash.workspace = true

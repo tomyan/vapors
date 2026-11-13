@@ -13,9 +13,15 @@
 //! </Scene>
 //! ```
 //!
-//! Each component keeps one anchor element, a `div` with
-//! `display: none`: no box, no paint, and no place in the accessibility
-//! tree. The anchor is the component's identity in the document: its
+//! Each component keeps one anchor element, tagged `scene`, `group`,
+//! `mesh` or `camera` and made from a `StyleKey`: the one the compiler
+//! passes as the `anchor` prop for a tag carrying `class`, `class:` or
+//! `style` (`docs/plans/css-for-3d.md`, C1), or else the component's
+//! own (`own_keys.rs`). The user-agent sheet gives those tags
+//! `display: none`, so an anchor has no box, no paint and no place in
+//! the accessibility tree. No computed value reaches the node yet (C2,
+//! C3): a mesh's colour is its `colour` prop, whatever colour its
+//! anchor inherits. The anchor is the component's identity in the document: its
 //! children, and the `{if}` and `{for}` blocks among them, are placed in
 //! it, and a node component finds its parent scene node from the
 //! anchor it is placed in, at mount and at any later rebuild of a block.
@@ -42,6 +48,7 @@ mod component;
 mod group;
 mod mesh;
 mod node;
+mod own_keys;
 mod placement;
 mod scene;
 

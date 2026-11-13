@@ -6,48 +6,48 @@ use crate::placement::{Placement, place, placement_of};
 use std::cell::RefCell;
 use std::fmt::Display;
 use std::rc::Rc;
-use vapors_dom::{Dom, NodeId as ElementId, Root, Snippet};
+use vapors_dom::{Dom, NodeId as ElementId, Root, Snippet, StyleKey};
 use vapors_scene3d::{NodeId, NodeKind, StoreError, Transform};
 use vapors_signals::{Effect, Owner, Signal, on_cleanup};
-
-/// The anchor's inline style: no box, so no layout, no paint and no
-/// place in the accessibility tree.
-pub(crate) const ANCHOR_STYLE: &str = "display: none";
 
 /// A mounted node component: its owner, its one root (the anchor) and
 /// the scene node it holds.
 pub(crate) struct Mounted {
     pub(crate) owner: Owner,
     pub(crate) roots: Vec<Root>,
+    pub(crate) anchor: ElementId,
     pub(crate) placement: Placement,
 }
 
-/// The anchor element, in `parent` before `before`.
+/// The anchor element made from `key`, in `parent` before `before`.
+/// Its tag is a scene tag, which the user-agent sheet gives `display:
+/// none`: no box, so no layout, no paint and no place in the
+/// accessibility tree.
 pub(crate) fn anchor(
     dom: &Rc<RefCell<dyn Dom>>,
-    parent: ElementId,
-    before: Option<ElementId>,
+    key: &'static StyleKey,
+    (parent, before): (ElementId, Option<ElementId>),
 ) -> ElementId {
     let mut dom = dom.borrow_mut();
-    let anchor = dom.create_element("div");
-    dom.set_attribute(anchor, "style", ANCHOR_STYLE);
+    let anchor = dom.create_keyed_element(key);
     dom.insert_before(parent, anchor, before);
     anchor
 }
 
 /// Mounts a node of `kind` under the node whose anchor is `parent`,
-/// moved by `transform` from now on, with `children` in its anchor.
+/// its anchor made from `key`, moved by `transform` from now on, with
+/// `children` in its anchor.
 pub(crate) fn mount_node(
     dom: &Rc<RefCell<dyn Dom>>,
     (parent, before): (ElementId, Option<ElementId>),
-    (component, kind): (&'static str, NodeKind),
+    (component, key, kind): (&'static str, &'static StyleKey, NodeKind),
     transform: Signal<Transform>,
     children: &Snippet,
 ) -> Mounted {
     let above = placement_of(&*dom.borrow(), parent, component);
     let owner = Owner::new();
     owner.with(|| {
-        let anchor = anchor(dom, parent, before);
+        let anchor = anchor(dom, key, (parent, before));
         let node = above.add(component, kind, transform.get_untracked());
         let placement = Placement { node, ..above };
         place(&mut *dom.borrow_mut(), anchor, placement.clone());
@@ -57,6 +57,7 @@ pub(crate) fn mount_node(
         Mounted {
             owner,
             roots: vec![Root::Node(anchor)],
+            anchor,
             placement,
         }
     })

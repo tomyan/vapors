@@ -1,7 +1,7 @@
 use super::*;
 use crate::atlas::{AtlasConfig, PageKind};
 use crate::icon::IconStroke;
-use crate::icon_path::IconPath;
+use vapors_shapes::IconPath;
 
 fn line_icon(y: &str) -> Icon {
     let path = IconPath::parse(&format!("M0 {y}H16")).expect("parses");

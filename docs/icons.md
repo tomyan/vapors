@@ -105,7 +105,7 @@ numbers. Its `path` children are not boxes.
 
 ## Paint
 
-- `vapors-text` parses path data strictly (`IconPath`) into zeno
+- `vapors-shapes` parses path data strictly (`IconPath`) into zeno
   commands; the same parser answers the elements' refusal check, so a
   path that passed the check rasterises.
 - The element's content box is snapped to whole device pixels, as an

@@ -124,6 +124,18 @@ the one difference from the brief in this slice.
   same name with `Props` appended must name its props struct, so a
   plain tag needs a `use` in the script. Attributes become props, and unset props take their
   defaults. `bind:value={s}` on a component passes the signal itself.
+  `class`, `class:name={bool}` and `style` on a component tag are not
+  props: the tag gets a style key as an element does, passed as the
+  generated prop `anchor: Some(&KEY)`, with the tag its props type
+  declares (`CardProps::ANCHOR_TAG`), and the component creates its
+  one anchor element from it (`Dom::create_keyed_element`); the
+  directives toggle the element its `anchor_element()` returns
+  (`docs/plans/css-for-3d.md`, C1). The 3D scene components take
+  them. Only a Rust component can have an
+  anchor: on a `.wisp` component in the same directory they are
+  refused at each attribute, and another crate's component without the
+  field fails in rustc at its props struct, naming `anchor`. Writing
+  `anchor={..}` on a tag is refused.
 - **Children:** markup inside a component tag is the child's
   `children` prop, a `Snippet`. The child declares it, `#[prop] let
   children: Snippet = Snippet::empty();`, and places it with
@@ -238,7 +250,7 @@ The compiler refuses:
   an expression, which would be on whatever its value, since generated
   code cannot remove an attribute: use `bind:checked`, or the attribute
   on an element inside `{if}`;
-- `class={..}` and `style={..}` on an element: the compiler must see
+- `class={..}` and `style={..}` on an element or a component tag: the compiler must see
   every class and declaration an element can have, so a class is
   literal (`class="name"`) or toggled (`class:name={condition}`), and
   declarations go in the `<style>` section
