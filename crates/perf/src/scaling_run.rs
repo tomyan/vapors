@@ -1,5 +1,7 @@
 //! `--scaling <change>`: the change at each size of [`SIZES`], counted
-//! in instructions, tabled and judged.
+//! in instructions, tabled and judged; for `Idle`, then the page left
+//! alone at each size (`idle_run.rs`, property 6), after the
+//! instruction verdict passes: one failure is reported at a time.
 
 use vapors_gpu_harness::Gpu;
 
@@ -33,6 +35,9 @@ pub fn run(gpu: &Gpu, change: RowChange, settings: Settings) -> Result<(), Strin
         println!("{}", scaling_section(title, scaling));
     }
     println!("{}", verdicts(change, &kinds)?);
+    if matches!(change, RowChange::Idle) {
+        crate::idle_run::run(&mut timer, settings)?;
+    }
     Ok(())
 }
 

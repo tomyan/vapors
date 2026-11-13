@@ -206,3 +206,6 @@ impl<'g> Sampler<'g> {
 #[path = "sampler_judged.rs"]
 mod judged;
 pub use judged::JudgedFrame;
+
+#[path = "sampler_idle.rs"]
+mod idle;
