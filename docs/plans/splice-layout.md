@@ -411,7 +411,9 @@ answer by section 2.1; the 5b oracle compares `DOM.getBoxModel` per
 node, so a drift shows there. The touched set after an insert is the
 new row and its ancestors; `--scaling Insert` judges the
 `accessibility` phase as every other (`Judged::EveryPhase`) once this
-lands, in place of the per-row ceiling (`INSERT_A11Y_PER_ROW`).
+lands, in place of the per-row ceiling (`INSERT_A11Y_PER_ROW`), and
+`RESIZE_A11Y_PER_ROW` goes back to 13,000 from the 13,500 #289 relaxed
+it to (`crates/perf/src/scaling_judged.rs`).
 
 This is a change to `vapors-a11y`'s types and the mirror in
 `vapors-platform`, the R6 owner's area; PR 5 in section 7 is theirs
@@ -493,7 +495,7 @@ rows in `docs/perf/`, three runs, medians.
 | 3f | The flex column lane (section 10): `lane_flex.rs`, the per-item layout mirroring taffy `flexbox.rs` (10.5); a decline test per row of 10.3; `FlexInsert` on `rows_list.rs` | FlexInsert at 3000 rows: `layout_calls` the new row's plus a constant; `--scaling FlexInsert` `layout` within 2% across sizes; the Chromium layout fixtures unchanged | layout lane; after 3, before 4 |
 | 3b | The collapse-through join in the fold, with its test; absolute children of a lane container from the tree | the two declines of section 4 become lanes, each with a Chromium fixture | layout lane; any time after 3 |
 | 4 | Derived positions: `Placement` leaves a lane child's axis coordinate unstored and `rect(slot)` adds the chain's starts; the walk does not enter a lane child whose summary is unchanged; `moved` empty for them; a `restacked` set reported to the a11y take until PR 5 (5.3); parts, entries and hits of a lane child in its frame (its slot), on #248's naming; `Frames::at` lazy and memoised (5.4); `between(view)` for culling and for hit tests inside a lane (5.2) | Insert at 3000 rows: `boxes_placed` the new row's boxes plus the chain to the root, `boxes_moved` 0, `boxes_shifted` 0; `--scaling Insert` every phase but `accessibility` within 2% across sizes; pixels unchanged (the Chromium paint comparisons, the kept-paint debug check with translations); hit tests on the rows page unchanged (`sparse_updates` hover) | layout lane with the paint lane for `paint*.rs`, `kept_*.rs`; after 3 and IU4 4-ii |
-| 5 | The mirror in flow for lane children (5.3): `AxBounds::Stacked`, the mirror's `position: static` elements, the touched set after an insert; `--scaling Insert` judged `EveryPhase` | `accessibility` within 2% across sizes for Insert; the 5b oracle's bounds unchanged; `a11y_mirror_scroll.rs`-style tests for an insert | R6 owner; after 4, or in parallel on `vapors-a11y` and `vapors-platform` with the elements side stubbed |
+| 5 | The mirror in flow for lane children (5.3): `AxBounds::Stacked`, the mirror's `position: static` elements, the touched set after an insert; `--scaling Insert` judged `EveryPhase` | `accessibility` within 2% across sizes for Insert; `RESIZE_A11Y_PER_ROW` back to 13,000 (#289); the 5b oracle's bounds unchanged; `a11y_mirror_scroll.rs`-style tests for an insert | R6 owner; after 4, or in parallel on `vapors-a11y` and `vapors-platform` with the elements side stubbed |
 | 6 | Flex rows (a horizontal list): 3f's summary and per-item code on the other axis; the stretched-height refusal or `lane_relaid` count of 10.6 | a horizontal-list insert's `layout` within 2% across sizes; `sparse_updates_flex` counts | layout lane; after 4 |
 | 7 | Acceptance: Insert, Remove and Resize at 1000, 3000 and 10,000 rows, instruction counts, wall clock, in `docs/perf/`; property 3 marked held or not in `perf-finish-line.md`; `splice.md` (e) and `iu4.md` 8.5 closed | `--scaling Insert` and `Resize` pass `EveryPhase`; update under 1 ms at every size | last |
 

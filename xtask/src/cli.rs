@@ -111,6 +111,8 @@ pub enum Command {
         #[arg(long)]
         replace: bool,
     },
+    /// Run vapors-perf's scaling judge over every change, in release, on a clean tree.
+    Scaling,
     /// Run every step of .github/workflows/ci.yml here, in order, ending `gate: pass <sha>`.
     Gate {
         /// Post the gate's last lines to this pull request (`--pr` alone:
