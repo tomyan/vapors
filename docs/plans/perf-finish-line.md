@@ -18,7 +18,7 @@ the harness shows it, not when the code is believed to do it.
 | 3 | Inserting or removing a row | about the cost of an edit | redoes paint order, chains and clips over the whole tree | splice step (below) |
 | 4 | Scrolling a long list | no repaint; kept paint shifted | every moved box painted again | IU3 3c-3e |
 | 5 | Pointer over the window | no per-update walk of the tree | after 3c-3g, HoveredClass update 0.115 M instructions above Class at 3000 rows (0.043 M at 1000): `hit()`'s scan of the kept hits, about 13 µs | IU3 3c-3g (kept hit list) |
-| 6 | Idle | no update work and no frames drawn | no frames drawn; an update with no change 2.57 ms | IU3 3b, the idle fix |
+| 6 | Idle | no update work and no frames drawn | measured 2026-11-13 (`--scaling Idle`, idle row): the rows page left alone 10 s asks for 0 frames and does 0 updates at 1,000, 3,000 and 10,000 rows, settled after 2 frames; the update with no change 2.57 ms before the idle fix | IU3 3b, the idle fix |
 | 7 | First frame of a large page | the winning declarations for each template element worked out at build time (computed values still depend on viewport, scale and font size), and constant shapes once the shape table (item 8) lands; time measured and published | not measured | the build-time analysis; shapes by the shape table (Tom, 2026-11-12) |
 | 8 | Memory per element | one style record per distinct style, not per element; per-element memory bounded by the per-box layout records | not measured | the build-time analysis |
 | 9 | HTML, SVG and 3D in one scene | the racer (3D craft, SVG markings on it, HTML on top) drawn as one scene with CSS reaching scene nodes, and no frame over 16.7 ms across a 60 s run | not built | the shape table, 3D slice 2 (PRs 4, 4b, 5) |
@@ -43,6 +43,15 @@ It counts instructions at 1000, 3000 and 10,000 rows and exits non-zero,
 naming the phase and its growth per extra row, when an edit's phase
 (Text, FlexText, Class, HoveredClass; every phase) or an idle update's total
 (Idle; `update`) is both over 2% and over 5000 instructions above its 1000-row count at a larger size.
+`--scaling Idle` then measures property 6 itself (`crates/perf/src/idle.rs`):
+the rows page at each size is left alone for 10 s of the app's clock after
+it settles, driven as the platform would drive it (a frame per 16 ms after
+`Next::Continue`, one at a `WaitUntil` deadline, none after `Next::Wait`;
+nothing can wake a headless app, so a GPU scope's wake is not seen), and
+the run fails naming the size, the frames it asked for and the updates
+that did work, unless both are zero. On 2026-11-13: 0 and 0 at every size,
+settled after 2 frames (the mount's frame changes the document, the second
+draws it).
 At 1657b27 every one of the four failed
 (docs/perf/baseline-2026-11-10.md, "Scaling, 1657b27"); after M10b
 (2026-11-12) Text and Idle pass, and Class and HoveredClass failed only

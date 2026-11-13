@@ -13,6 +13,8 @@ pub mod driver;
 pub mod frame_kinds;
 pub mod gpu_reading;
 pub mod gpu_time;
+pub mod idle;
+pub mod idle_run;
 pub mod instruction_samples;
 pub mod instructions;
 pub mod instructions_check;
