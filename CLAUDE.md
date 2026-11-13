@@ -34,6 +34,9 @@ scripts/nightly-scaling.sh [--install]
                           in one GitHub issue, closed on a pass; --install writes the
                           systemd --user timer (03:00) and does not enable it:
                           systemctl --user enable --now vapors-nightly-scaling.timer
+scripts/nightly-scaling-check.sh
+                          its guards with a fake git and gh: network deadlines, the lock,
+                          the runner's error quoted in its issue
 cargo run -p vapors-app --example demo -- hello
                           an F2c demo in a window (crates/demos)
 cargo xtask screenshot demo target/hello.png -- hello
