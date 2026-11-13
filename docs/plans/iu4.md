@@ -405,6 +405,30 @@ PR 2 as built (2026-11-12), split along the file seam into 2a
 - Text batches keep keys by `TextId` (risk 8). Their bytes are not
   kept until PR 3, which must compare the resolved layouts.
 
+PR 3 as built (2026-11-13), split along the crate seam into 3a
+(`crates/text`: device-pixel vertices, kept text bytes, atlas pins) and
+3b (the painter):
+
+- The viewport goes in the text params uniform beside gamma and
+  contrast, so a resize writes the text uniform once, as it does the
+  quad and shadow uniforms.
+- Pins are a count per atlas entry. `AtlasPins` lists the entries one
+  batch pinned, once per use. A pin clear voids every `AtlasPins` taken
+  before it, by an epoch, so a batch released afterwards unpins
+  nothing. Empty pins made before a clear take the new epoch, because
+  a build's first pass can clear the pins before its second pass pins.
+- The order when room is needed: evict unpinned entries the frame has
+  not used; then grow the page; then clear every pin and evict again.
+  A page whose shown text does not fit even after the clear still
+  fails the frame with `AtlasError::Full`, as it did before.
+- Risk 8: a text or icon batch is current only while each item
+  resolves to the same `Rc` it was built from. `Painted::text` and
+  `Painted::icon` hand back the `Rc`, and the kept batch holds clones,
+  so no other layout can take the old one's address.
+- The debug compare rebuilds a kept text batch's bytes from where the
+  atlas holds its glyphs now (`placed_text_bytes`). It does no lookup,
+  so the lookup count is the release path's.
+
 ### 4a to 4c land together
 
 4a cannot land alone: once placement moves no slot on a scroll, paint
