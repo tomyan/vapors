@@ -174,3 +174,7 @@ fn walk_back(came_from: &BTreeMap<&str, &str>, from: &str, to: &str) -> Vec<Stri
 #[cfg(test)]
 #[path = "layers_graph_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "layers_graph_kinds_tests.rs"]
+mod kinds_tests;
