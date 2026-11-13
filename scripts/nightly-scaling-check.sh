@@ -24,7 +24,14 @@ printf '%s\n' "gh $*" >>"$FAKE_GH_LOG"
 [ -n "${FAKE_GH_SLEEP:-}" ] && exec sleep "$FAKE_GH_SLEEP"
 exit 0
 FAKE
-chmod +x "$work/bin/git" "$work/bin/gh"
+# A tee that holds each line 0.5 s when FAKE_SLOW_TEE is set: the window
+# in which the runner could read its log before the error reaches it.
+cat >"$work/bin/tee" <<'FAKE'
+#!/usr/bin/env bash
+[ -z "${FAKE_SLOW_TEE:-}" ] && exec /usr/bin/tee "$@"
+while IFS= read -r line; do sleep 0.5; printf '%s\n' "$line" | /usr/bin/tee "$@"; done
+FAKE
+chmod +x "$work/bin/git" "$work/bin/gh" "$work/bin/tee"
 failed=0
 
 reset() { rm -rf "$work/state"; mkdir -p "$work/state"; : >"$work/gh.log"; }
@@ -62,12 +69,9 @@ check "lock" "$(held grep -q "another nightly run holds" "$work/out")$(held [ ! 
   "a second run went on: $(head -c 300 "$work/out")"
 
 # The fetch's error is the runner's last stderr line, written just
-# before the trap reads the log; the race is run several times.
-missed=0
-for _ in 1 2 3 4 5 6 7 8 9 10; do
-  reset; run
-  grep -q "fatal: unable to access origin (fake fetch" "$work/gh.log" || missed=$((missed + 1))
-done
-check "quoted error" "$( [ "$missed" = 0 ] && echo 0 || echo 1)" "$missed of 10 issues lacked the fetch's error"
+# before the trap reads the log; a slow tee holds it back.
+reset; run FAKE_SLOW_TEE=1
+check "quoted error" "$(held grep -q "fatal: unable to access origin (fake fetch" "$work/gh.log")" \
+  "the issue lacked the fetch's error: $(head -c 300 "$work/gh.log")"
 
 exit "$failed"
