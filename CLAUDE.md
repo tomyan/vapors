@@ -40,6 +40,12 @@ scripts/nightly-scaling-check.sh
 scripts/nightly-scaling-issues-check.sh
                           its issues and run markers against scripts/fixtures/
                           nightly-scaling.log, with a fake gh
+cargo xtask quiet 10 -- <command>
+                          keep xtask's ci, test and gate runs from starting (each waits,
+                          saying who holds it and when it expires) once running ones
+                          finish, run the command, release; `quiet hold [minutes]` (15
+                          by default, 60 at most) keeps it after returning, `quiet
+                          release` ends it. The gate holds it for its run
 cargo run -p vapors-app --example demo -- hello
                           an F2c demo in a window (crates/demos)
 cargo xtask screenshot demo target/hello.png -- hello

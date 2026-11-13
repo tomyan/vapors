@@ -139,6 +139,14 @@ pub enum Command {
         /// The sibling checkout, such as ../vapors.
         sibling: PathBuf,
     },
+    /// Keep xtask's ci, test and gate runs from starting, for a timed run:
+    /// `quiet <minutes> -- <command>`, `quiet hold [<minutes>]` (15 by
+    /// default), or `quiet release`. A hold ends at its deadline.
+    Quiet {
+        /// The form and its arguments.
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
     /// Run one test tier (default: unit).
     Test {
         /// Which tier to run.

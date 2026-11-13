@@ -1,5 +1,5 @@
-//! `cargo xtask ci` as the command runs it: sharing the gate lock, the
-//! load wait, and sccache's hit rate over the run.
+//! `cargo xtask ci` as the command runs it: the quiet lock's wait,
+//! sharing the gate lock, the load wait, and sccache's hit rate over the run.
 
 use std::process::ExitCode;
 
@@ -15,6 +15,9 @@ pub fn run(steps: &[steps::Step], reporter: &Reporter) -> ExitCode {
     let gate_env = std::env::var(priority::GATE_ENV).ok();
     if priority::in_gate(false, gate_env.as_deref()) {
         return with_hit_rate(steps, reporter);
+    }
+    if let Err(why) = crate::quiet_command::before("ci") {
+        return fail("ci", &why);
     }
     if let Err(why) = load_wait::before("ci") {
         return fail("ci", &why);
