@@ -7,6 +7,9 @@
 
 use rustc_hash::FxHashSet;
 
+use vapors_scene::Rect;
+
+use super::NestedIndex;
 use super::{FrameAt, Frames, meet};
 use crate::kept_clips::Clips;
 use crate::layout::BoxRect;
@@ -33,6 +36,13 @@ impl Frames {
             let outer = inputs.clips.frame(slot);
             frames.nested.entry(outer).or_default().push(slot);
             frames.work_out(slot, inputs);
+            frames
+                .entered
+                .insert(slot, frames.clip_entered(slot, inputs));
+        }
+        for (&outer, slots) in &frames.nested {
+            let clips = slots.iter().map(|&slot| (slot, frames.entered[&slot]));
+            frames.index.insert(outer, NestedIndex::of(clips));
         }
         frames
     }
@@ -48,6 +58,7 @@ impl Frames {
         let mut done = FxHashSet::default();
         let mut moved = false;
         for start in starts {
+            self.enter_again(start, inputs);
             let mut open = vec![start];
             while let Some(slot) = open.pop() {
                 if !done.insert(slot) || !self.work_out(slot, inputs) {
@@ -58,6 +69,33 @@ impl Frames {
             }
         }
         (moved, done.len())
+    }
+
+    /// Container `slot` entered again in its frame's index, when its
+    /// clip there changed.
+    fn enter_again(&mut self, slot: usize, inputs: &FrameInputs<'_>) {
+        let clip = self.clip_entered(slot, inputs);
+        let was = self.entered.insert(slot, clip).unwrap_or_else(|| {
+            panic!(
+                "scroll container {slot} is updated but was never entered in its frame's index: \
+                 the frames update only the containers they were made for (paint_frames.rs); \
+                 reproduce with `cargo xtask test`"
+            )
+        });
+        if was != clip {
+            let index = self.index.entry(inputs.clips.frame(slot)).or_default();
+            index.remove(slot, was);
+            index.insert(slot, clip);
+        }
+    }
+
+    /// Container `slot`'s inner clip, device pixels in the frame it is
+    /// in: what it is indexed by there.
+    fn clip_entered(&self, slot: usize, inputs: &FrameInputs<'_>) -> Option<Rect> {
+        inputs
+            .clips
+            .inner(slot)
+            .map(|clip| snapped(clip, self.scale))
     }
 
     /// Works out frame `slot` from the frame it is in; whether it came
@@ -85,7 +123,13 @@ impl Frames {
             let (kept, fresh) = (self.by_frame.get(&slot), other.by_frame.get(&slot));
             return Some(format!("frame {slot}: kept {kept:?}, fresh {fresh:?}"));
         }
-        (self.nested != other.nested).then(|| "the scroll containers in each frame".to_owned())
+        let lists = (&self.nested, &self.index, &self.entered);
+        (lists != (&other.nested, &other.index, &other.entered)).then(|| {
+            format!(
+                "the scroll containers in each frame or their index: kept {:?} {:?}, fresh {:?} {:?}",
+                self.index, self.entered, other.index, other.entered
+            )
+        })
     }
 
     /// Notes frame `slot` at `shift` under the page clip `clip`; whether

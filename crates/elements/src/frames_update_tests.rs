@@ -106,3 +106,30 @@ fn a_frame_named_twice_or_also_reached_from_its_outer_frame_is_worked_out_once()
     assert_eq!(worked, 2);
     assert_eq!(frames, made(&clips, [0.0, -30.0]));
 }
+
+#[test]
+fn a_view_visits_the_page_and_only_the_frames_whose_clip_meets_it() {
+    // Given: slots 10 and 11's clips are at 600 and 660, 50 px tall
+    let frames = made(&page_clips(), [0.0; 2]);
+
+    // When
+    let mut found = frames.meeting(vapors_scene::Rect::new(0.0, 620.0, 100.0, 680.0));
+
+    // Then
+    found.sort_unstable();
+    assert_eq!(found, [10, 11, PAGE]);
+}
+
+#[test]
+fn a_frame_nested_in_a_scrolled_frame_is_found_where_the_scroll_put_it() {
+    // Given: slot 2's clip is at 120 in slot 1's frame, below slot 1's
+    // clip (60 to 110 on the page) until slot 1 scrolls 80 px
+    let frames = made(&page_clips(), [0.0, -80.0]);
+
+    // When
+    let mut found = frames.meeting(vapors_scene::Rect::new(0.0, 70.0, 100.0, 80.0));
+
+    // Then
+    found.sort_unstable();
+    assert_eq!(found, [1, 2, PAGE]);
+}

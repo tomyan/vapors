@@ -519,6 +519,10 @@ PR 5 as built (2026-11-13):
     O(frames · log steps) per scroll. The fix is to enter each frame's
     clip in its parent frame's index and descend only into frames that
     are candidates, as splice-layout's lanes enter one entry per lane.
+    Done (2026-11-13, perf/frames-nested): each frame keeps an index of
+    the scroll containers in it by their inner clips
+    (`frames_nested.rs`), and a sort visits only the frames whose
+    container's clip meets the view.
   - L1 to L3: the patch refuses paint order of another length; a view
     whose edges are not numbers is refused; a shown step's item count
     comes from its entry.

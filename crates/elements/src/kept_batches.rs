@@ -68,19 +68,17 @@ pub(crate) struct KeptBatches {
 }
 
 impl KeptBatches {
-    /// The steps of `sources` that show in `view`: in each frame, the
-    /// extents index's candidates for the view as it falls in the
-    /// frame, tested item by item.
+    /// The steps of `sources` that show in `view`: in each frame that
+    /// can show in it, the extents index's candidates for the view as it
+    /// falls in the frame, tested item by item.
     pub(crate) fn of(view: Rect, sources: Sources<'_>) -> Self {
         #[cfg(test)]
         BUILDS.with(|builds| builds.set(builds.get() + 1));
         let mut shown = Vec::new();
         let boxes = (sources.boxes, sources.frames);
-        // Relaxed: every frame is searched on every sort, O(frames ·
-        // log steps); a page of thousands of small scrollers pays it per
-        // scroll. Retired by entering each frame's clip in its parent's
-        // index (iu4.md, PR 5 as built, M2).
-        for frame in sources.extents.frames() {
+        // Only the frames whose container's clip meets the view are
+        // searched (`frames_nested.rs`): O(shown frames · log steps).
+        for frame in sources.frames.meeting(view) {
             let in_frame = sources.frames.view_in(frame, view);
             let candidates = sources.extents.candidates(frame, in_frame);
             let showing = candidates.filter(|e| hidden_items(e.step, boxes, view).is_none());

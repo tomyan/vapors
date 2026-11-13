@@ -127,6 +127,7 @@ impl Extents {
     }
 
     /// The frames with a drawing step.
+    #[cfg(test)]
     pub(crate) fn frames(&self) -> impl Iterator<Item = usize> + '_ {
         self.frames.keys().copied()
     }
