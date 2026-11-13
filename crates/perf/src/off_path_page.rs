@@ -109,6 +109,9 @@ impl UnitPage {
 
     /// Scrolls the body down by `step` pixels, or back to the top when
     /// it cannot move further.
+    ///
+    /// # Panics
+    /// The body can move neither way: its units fit in the viewport.
     pub fn scroll_body(&self, step: f32) {
         let body = self.doc.borrow().body();
         self.scroll_or_rewind(body, [0.0, step]);
@@ -128,13 +131,16 @@ impl UnitPage {
 
     fn scroll_or_rewind(&self, node: NodeId, delta: [f32; 2]) {
         let mut doc = self.doc.borrow_mut();
-        if doc.scroll_node_by(node, delta) {
+        if doc.scroll_node_by(node, delta) || doc.scroll_to(node, [0.0, 0.0]) {
             return;
         }
-        assert!(
-            doc.scroll_to(node, [0.0, 0.0]),
-            "the scroller {node:?} neither moves by {delta:?} nor back to its start: \
-             it is not a scroll container (cargo test -p vapors-perf --lib off_path)"
+        let why = match doc.scroll_offset(node) {
+            None => "is not a scroll container",
+            Some(_) => "has nothing to scroll: its content fits; give the page more units",
+        };
+        panic!(
+            "the scroller {node:?} neither moves by {delta:?} nor back to its start: it {why} \
+             (cargo test -p vapors-perf --lib off_path)"
         );
     }
 

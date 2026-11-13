@@ -86,3 +86,13 @@ fn insert_adds_a_unit_before_the_middle_unit_then_removes_it() {
     page.toggle_inserted();
     assert_eq!(count(&page), 10);
 }
+
+#[test]
+#[should_panic(expected = "has nothing to scroll: its content fits")]
+fn a_scroll_of_a_body_whose_units_fit_fails_saying_so() {
+    // Given: one message fits in the viewport
+    let page = page(1);
+
+    // When
+    page.scroll_body(24.0);
+}

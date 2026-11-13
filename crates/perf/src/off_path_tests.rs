@@ -8,7 +8,7 @@ use crate::run::Workload;
 fn every_kind_and_change_makes_three_changes() {
     for kind in Kind::ALL {
         for &change in kind.changes() {
-            let mut workload = OffPath::new(kind, 20, change);
+            let mut workload = OffPath::new(kind, 60, change);
             for sample in 0..3 {
                 workload.change(sample);
             }
@@ -19,8 +19,8 @@ fn every_kind_and_change_makes_three_changes() {
 #[test]
 fn an_edit_reaches_the_documents_middle_unit() {
     // Given
-    let mut workload = OffPath::new(Kind::NestedScrollers, 20, OffPathChange::Edit);
-    let value = workload.page.units[10].value;
+    let mut workload = OffPath::new(Kind::NestedScrollers, 60, OffPathChange::Edit);
+    let value = workload.page.units[30].value;
 
     // When
     workload.change(7);
