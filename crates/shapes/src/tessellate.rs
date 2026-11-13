@@ -39,7 +39,8 @@ type Buffers = VertexBuffers<[f32; 2], u32>;
 ///
 /// # Errors
 /// A tolerance or stroke width that is not a finite number above
-/// zero; a tessellation lyon refuses (naming its error); a result
+/// zero; a tessellation lyon refuses (naming its error); outline
+/// edges meeting head-on at a vertex (naming it); a result
 /// with no triangle of any area, which SVG draws as nothing and
 /// vapors refuses rather than keeping an empty entry.
 pub fn tessellate(
@@ -59,7 +60,8 @@ pub fn tessellate(
         Paint::Stroke { width } => stroke(&lyon_path, width, tolerance, &mut buffers),
     }
     .map_err(|error| format!("the shape at {site} cannot be tessellated: {error}"))?;
-    let triangles = triangles_with_edges(&buffers.vertices, &buffers.indices);
+    let triangles = triangles_with_edges(&buffers.vertices, &buffers.indices)
+        .map_err(|error| format!("the shape at {site} cannot be tessellated: {error}"))?;
     if triangles.is_empty() {
         return Err(no_area(site, paint));
     }

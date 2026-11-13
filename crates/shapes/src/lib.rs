@@ -11,6 +11,7 @@ mod classify_near;
 mod geometry;
 mod mesh;
 mod mesh_edges;
+mod mesh_normals;
 mod path;
 mod path_lex;
 mod path_verb;
