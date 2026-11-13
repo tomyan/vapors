@@ -6,21 +6,17 @@
 //!   returning, until its deadline or `quiet release`.
 //! - `quiet release`: release a hold taken from this worktree.
 //!
-//! Also the wait every `ci`, `test` and `gate` run makes before it
-//! starts, and the gate's own hold.
+//! The waits on it and the gate's hold are in `quiet_wait.rs`.
 
 use std::process::{Command, ExitCode};
 use std::time::Duration;
 
-use crate::quiet_lock::{self, Holder, LONGEST, Quiet, WAIT};
+use crate::quiet_lock::{self, Form, Holder, LONGEST, Quiet, WAIT};
+use crate::quiet_wait::{HOLDER_ENV, worktree};
 
 /// A hold by hand's deadline when none is given: the lead's choice
 /// (2026-11-13), not a measurement; a timed run takes minutes.
 pub const DEFAULT: Duration = Duration::from_mins(15);
-
-/// Set on the command `quiet` runs to the holder's pid, so the xtask
-/// runs it starts do not wait on their own holder.
-pub const HOLDER_ENV: &str = "XTASK_QUIET_HOLDER";
 
 /// What `cargo xtask quiet` was asked to do.
 #[derive(Debug, PartialEq, Eq)]
@@ -59,8 +55,10 @@ impl Action {
     }
 }
 
+/// Whole minutes from 1 to [`LONGEST`]'s; none for anything else.
 fn minutes_of(text: &str) -> Option<Duration> {
-    let minutes: u64 = text.parse().ok().filter(|&m| m > 0)?;
+    let longest = LONGEST.as_secs() / 60;
+    let minutes: u64 = text.parse().ok().filter(|&m| m > 0 && m <= longest)?;
     Some(Duration::from_mins(minutes))
 }
 
@@ -77,53 +75,66 @@ pub fn run(args: &[String]) -> ExitCode {
     }
 }
 
+/// Run `command` in quiet; its exit code, or failure when the hold
+/// ended before the command did, since its timings then ran beside
+/// other work.
 fn run_quiet(held: Duration, command: &[String]) -> Result<ExitCode, String> {
-    let _quiet = take_and_drain(held, &command.join(" "))?;
+    let shown = command.join(" ");
+    let quiet = take_and_drain(held, Form::Run, &shown)?;
     let status = child(command)
         .status()
-        .map_err(|e| format!("`{}` could not start: {e}", command.join(" ")))?;
-    println!("quiet: `{}` ended ({status}); released", command.join(" "));
-    Ok(if status.success() {
-        ExitCode::SUCCESS
-    } else {
-        ExitCode::FAILURE
-    })
+        .map_err(|e| format!("`{shown}` could not start: {e}"))?;
+    if !quiet.still_held() {
+        return Err(format!(
+            "the quiet hold of {} s ended before `{shown}` did ({status}), so the rest of it ran \
+             beside other work; fix: rerun with more minutes (at most {})",
+            held.as_secs(),
+            LONGEST.as_secs() / 60
+        ));
+    }
+    println!("quiet: `{shown}` ended ({status}); released");
+    Ok(status
+        .code()
+        .and_then(|code| u8::try_from(code).ok())
+        .map_or(ExitCode::FAILURE, ExitCode::from))
 }
 
 fn hold(held: Duration) -> Result<ExitCode, String> {
-    take_and_drain(held, "hold")?.keep();
+    take_and_drain(held, Form::Hold, "hold")?.keep();
     println!(
-        "quiet: held for {} s from now; `cargo xtask quiet release` here ends it sooner",
+        "quiet: held for {} s from now; xtask runs from this worktree go on, others wait; \
+         `cargo xtask quiet release` here ends it sooner",
         held.as_secs()
     );
     Ok(ExitCode::SUCCESS)
 }
 
+/// End a hold taken from this worktree; a gate's or a command's hold is
+/// its process's to end.
 fn release() -> Result<ExitCode, String> {
     let dir = crate::gate_lock::dir()?;
     let here = worktree();
-    match quiet_lock::read(&dir)? {
-        None => println!("quiet: not held"),
-        Some(holder) if holder.worktree == here => {
-            std::fs::remove_file(dir.join(quiet_lock::FILE)).map_err(|e| e.to_string())?;
-            println!("quiet: released");
-        }
-        Some(holder) => {
-            return Err(format!(
-                "held by {}, not from {here}; fix: release it from {}, or wait for it to expire",
-                holder.describe(quiet_lock::now_ms()),
-                holder.worktree
-            ));
-        }
+    let Some(holder) = quiet_lock::current(&dir)? else {
+        println!("quiet: not held");
+        return Ok(ExitCode::SUCCESS);
+    };
+    if holder.form != Form::Hold || holder.owner.worktree != here {
+        return Err(format!(
+            "held by {}, not a hold from {here}; fix: release a hold from the worktree that took it, \
+             or wait for it to end",
+            holder.describe(quiet_lock::now_ms())
+        ));
     }
+    std::fs::remove_file(dir.join(quiet_lock::FILE)).map_err(|e| e.to_string())?;
+    println!("quiet: released");
     Ok(ExitCode::SUCCESS)
 }
 
 /// Take the lock for `held`, then wait for running ci runs and gates to
 /// finish, by taking the gate lock once and letting it go.
-fn take_and_drain(held: Duration, what: &str) -> Result<Quiet, String> {
+fn take_and_drain(held: Duration, form: Form, what: &str) -> Result<Quiet, String> {
     let dir = crate::gate_lock::dir()?;
-    let quiet = quiet_lock::take(&dir, Holder::me(&worktree(), held, what), WAIT)?;
+    let quiet = quiet_lock::take(&dir, Holder::me(&worktree(), held, form, what), WAIT)?;
     println!("quiet: taken; waiting for running ci runs and gates to finish");
     drop(crate::gate_lock::acquire(
         &dir,
@@ -140,42 +151,6 @@ fn child(command: &[String]) -> Command {
         .args(&command[1..])
         .env(HOLDER_ENV, std::process::id().to_string());
     child
-}
-
-/// Before `who` (`ci`, `test`) starts: wait while someone else holds the
-/// lock. Not in a gate's step, whose gate holds it.
-///
-/// # Errors
-///
-/// As [`quiet_lock::wait_clear`].
-pub fn before(who: &str) -> Result<(), String> {
-    let gate_env = std::env::var(crate::priority::GATE_ENV).ok();
-    if crate::priority::in_gate(false, gate_env.as_deref()) {
-        return Ok(());
-    }
-    let me = std::env::var(HOLDER_ENV)
-        .ok()
-        .and_then(|pid| pid.parse().ok());
-    let dir = crate::gate_lock::dir()?;
-    quiet_lock::wait_clear(&dir, (who, me), WAIT, &mut |line| println!("{line}"))
-}
-
-/// The gate's hold, for [`LONGEST`]; none when `quiet` started the gate
-/// and holds it already.
-///
-/// # Errors
-///
-/// As [`quiet_lock::take`].
-pub fn for_gate(worktree: &str) -> Result<Option<Quiet>, String> {
-    if std::env::var(HOLDER_ENV).is_ok() {
-        return Ok(None);
-    }
-    let dir = crate::gate_lock::dir()?;
-    quiet_lock::take(&dir, Holder::me(worktree, LONGEST, "gate"), WAIT).map(Some)
-}
-
-fn worktree() -> String {
-    std::env::current_dir().map_or_else(|_| "?".to_owned(), |d| d.display().to_string())
 }
 
 #[cfg(test)]

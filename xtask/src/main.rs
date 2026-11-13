@@ -94,6 +94,7 @@ mod queue_serve;
 mod queue_state;
 mod quiet_command;
 mod quiet_lock;
+mod quiet_wait;
 mod report;
 #[cfg(test)]
 #[path = "report_timeout_tests.rs"]
@@ -212,7 +213,7 @@ fn main() -> ExitCode {
         Command::Lint => steps::lint(),
         Command::Deny => steps::deny_check(),
         Command::Test { tier } => {
-            if let Err(why) = quiet_command::before("test") {
+            if let Err(why) = quiet_wait::before("test") {
                 return fail("test", &why);
             }
             match tier {

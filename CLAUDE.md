@@ -44,8 +44,10 @@ cargo xtask quiet 10 -- <command>
                           keep xtask's ci, test and gate runs from starting (each waits,
                           saying who holds it and when it expires) once running ones
                           finish, run the command, release; `quiet hold [minutes]` (15
-                          by default, 60 at most) keeps it after returning, `quiet
-                          release` ends it. The gate holds it for its run
+                          by default, 60 at most) keeps it after returning (xtask runs
+                          from the same worktree go on), `quiet release` there ends it.
+                          The gate holds it for its run; a gate's or a command's hold
+                          also ends when its process does
 cargo run -p vapors-app --example demo -- hello
                           an F2c demo in a window (crates/demos)
 cargo xtask screenshot demo target/hello.png -- hello

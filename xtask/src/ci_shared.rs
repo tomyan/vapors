@@ -16,20 +16,36 @@ pub fn run(steps: &[steps::Step], reporter: &Reporter) -> ExitCode {
     if priority::in_gate(false, gate_env.as_deref()) {
         return with_hit_rate(steps, reporter);
     }
-    if let Err(why) = crate::quiet_command::before("ci") {
-        return fail("ci", &why);
-    }
-    if let Err(why) = load_wait::before("ci") {
-        return fail("ci", &why);
-    }
-    let worktree =
-        std::env::current_dir().map_or_else(|_| "?".to_owned(), |d| d.display().to_string());
-    let shared = gate_lock::dir()
-        .and_then(|dir| gate_lock_shared::acquire_shared(&dir, &worktree, gate_lock::WAIT));
-    match shared {
+    match quiet_then_share() {
         Ok(_shared) => with_hit_rate(steps, reporter),
         Err(why) => fail("ci", &why),
     }
+}
+
+/// How many times a ci run waits for the quiet lock again when it was
+/// taken between its wait and its share. Each round is a whole quiet
+/// window, so three is already rare; not a measurement.
+const QUIET_ROUNDS: u32 = 3;
+
+/// Wait for the quiet lock and the load, then take a share of the gate
+/// lock; if the quiet lock was taken meanwhile, let the share go so the
+/// holder's drain can finish, and wait again.
+fn quiet_then_share() -> Result<gate_lock_shared::Shared, String> {
+    let dir = gate_lock::dir()?;
+    let worktree = crate::quiet_wait::worktree();
+    for _ in 0..QUIET_ROUNDS {
+        crate::quiet_wait::before("ci")?;
+        load_wait::before("ci")?;
+        let shared = gate_lock_shared::acquire_shared(&dir, &worktree, gate_lock::WAIT)?;
+        if !crate::quiet_wait::taken_since(&dir)? {
+            return Ok(shared);
+        }
+        println!("ci: the quiet lock was taken while this run waited; letting its share go");
+    }
+    Err(format!(
+        "the quiet lock was taken {QUIET_ROUNDS} times between this run's wait and its share; \
+         fix: rerun `cargo xtask ci` once the quiet holders are done"
+    ))
 }
 
 /// `cargo xtask ci`, then sccache's hit rate over the run; sccache must

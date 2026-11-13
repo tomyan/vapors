@@ -7,17 +7,23 @@ use crate::scratch::lock_dir;
 
 use super::*;
 
-const BRIEF: Duration = Duration::from_millis(400);
+pub(super) const BRIEF: Duration = Duration::from_millis(400);
 
-fn other(worktree: &str, held_for: Duration) -> Holder {
-    Holder {
-        pid: GONE,
-        ..Holder::me(worktree, held_for, "a timed run")
-    }
+/// A hold by a process that has exited, as `quiet hold` leaves it.
+pub(super) fn other(worktree: &str, held_for: Duration) -> Holder {
+    gone(worktree, held_for, Form::Hold)
 }
 
+pub(super) fn gone(worktree: &str, held_for: Duration, form: Form) -> Holder {
+    let mut holder = Holder::me(worktree, held_for, form, "a timed run");
+    holder.owner.pid = GONE;
+    holder
+}
+
+pub(super) const NOBODY: &dyn Fn(&Holder) -> bool = &|_| false;
+
 /// A pid above Linux's largest `pid_max` (2^22), so never this process.
-const GONE: u32 = 4_194_305;
+pub(super) const GONE: u32 = 4_194_305;
 
 #[test]
 fn a_free_quiet_lock_is_taken_and_names_its_holder_until_its_deadline() {
@@ -25,12 +31,12 @@ fn a_free_quiet_lock_is_taken_and_names_its_holder_until_its_deadline() {
     let dir = lock_dir("quiet-free");
 
     // When
-    let held = take(&dir, Holder::me("/w/perf", BRIEF, "perf"), BRIEF).expect("taken");
+    let held = take(&dir, Holder::me("/w/perf", BRIEF, Form::Run, "perf"), BRIEF).expect("taken");
 
     // Then
     let holder = read(&dir).expect("readable").expect("held");
     assert_eq!(
-        (holder.worktree.as_str(), holder.what.as_str()),
+        (holder.owner.worktree.as_str(), holder.what.as_str()),
         ("/w/perf", "perf")
     );
     drop(held);
@@ -41,28 +47,24 @@ fn a_free_quiet_lock_is_taken_and_names_its_holder_until_its_deadline() {
 fn a_waiter_says_who_holds_it_and_when_it_expires_then_goes_on_at_the_deadline() {
     // Given
     let dir = lock_dir("quiet-expire");
-    write(&dir, &other("/w/holder", BRIEF)).expect("held");
+    let holder = other("/w/holder", BRIEF);
+    write(&dir, &holder).expect("held");
 
     // When
-    let started = Instant::now();
     let mut said = Vec::new();
-    let waited = wait_clear(&dir, ("ci", None), 10 * BRIEF, &mut |line| {
+    let waited = wait_clear(&dir, ("ci", NOBODY), 10 * BRIEF, &mut |line| {
         said.push(line.to_owned());
     });
 
-    // Then
-    let elapsed = started.elapsed();
+    // Then: it went on at the holder's deadline, not before
     assert_eq!(waited, Ok(()));
-    assert!(
-        elapsed >= Duration::from_millis(350) && elapsed < 10 * BRIEF,
-        "{elapsed:?}"
-    );
+    assert!(now_ms() >= holder.until_ms, "went on before the deadline");
     assert!(
         said[0].starts_with("ci: waiting for the quiet lock, held by pid "),
         "{said:?}"
     );
     assert!(
-        said[0].contains("in /w/holder running `a timed run`, expires in "),
+        said[0].contains("in /w/holder running `a timed run` (hold), expires in "),
         "{said:?}"
     );
 }
@@ -73,7 +75,7 @@ fn a_waiter_goes_on_as_soon_as_the_holder_releases_it() {
     let dir = lock_dir("quiet-release");
     let held = take(
         &dir,
-        Holder::me("/w/holder", Duration::from_secs(60), "perf"),
+        Holder::me("/w/holder", Duration::from_secs(60), Form::Run, "perf"),
         BRIEF,
     )
     .expect("taken");
@@ -82,7 +84,7 @@ fn a_waiter_goes_on_as_soon_as_the_holder_releases_it() {
         let started = Instant::now();
         wait_clear(
             &waiting_dir,
-            ("ci", None),
+            ("ci", NOBODY),
             Duration::from_secs(5),
             &mut |_| {},
         )
@@ -107,7 +109,13 @@ fn the_holders_own_commands_do_not_wait_on_it() {
 
     // When
     let started = Instant::now();
-    let waited = wait_clear(&dir, ("ci", Some(holder.pid)), BRIEF, &mut |_| {});
+    let pid = holder.owner.pid;
+    let waited = wait_clear(
+        &dir,
+        ("ci", &|h: &Holder| h.owner.pid == pid),
+        BRIEF,
+        &mut |_| {},
+    );
 
     // Then
     assert_eq!(waited, Ok(()));
@@ -121,12 +129,16 @@ fn a_second_holder_waits_for_the_first_to_expire_then_takes_it() {
     write(&dir, &other("/w/first", BRIEF)).expect("held");
 
     // When
-    let held = take(&dir, Holder::me("/w/second", BRIEF, "perf"), 10 * BRIEF);
+    let held = take(
+        &dir,
+        Holder::me("/w/second", BRIEF, Form::Run, "perf"),
+        10 * BRIEF,
+    );
 
     // Then
     assert!(held.is_ok(), "{held:?}");
     let holder = read(&dir).expect("readable").expect("held");
-    assert_eq!(holder.worktree, "/w/second");
+    assert_eq!(holder.owner.worktree, "/w/second");
 }
 
 #[test]
@@ -137,7 +149,7 @@ fn a_holder_file_of_another_shape_is_refused_naming_it_and_the_fix() {
     std::fs::write(dir.join(FILE), "somebody\n").expect("written");
 
     // When
-    let refusal = wait_clear(&dir, ("ci", None), 10 * BRIEF, &mut |_| {}).expect_err("refused");
+    let refusal = wait_clear(&dir, ("ci", NOBODY), 10 * BRIEF, &mut |_| {}).expect_err("refused");
 
     // Then
     assert!(
@@ -154,7 +166,7 @@ fn a_deadline_past_the_longest_hold_is_refused_not_waited_on() {
     write(&dir, &other("/w/far", LONGEST + Duration::from_secs(3_600))).expect("held");
 
     // When
-    let refusal = wait_clear(&dir, ("ci", None), 10 * BRIEF, &mut |_| {}).expect_err("refused");
+    let refusal = wait_clear(&dir, ("ci", NOBODY), 10 * BRIEF, &mut |_| {}).expect_err("refused");
 
     // Then
     assert!(refusal.contains("past the longest hold"), "{refusal}");
@@ -165,7 +177,7 @@ fn a_hold_longer_than_the_longest_is_refused() {
     let dir = lock_dir("quiet-long");
     let refusal = take(
         &dir,
-        Holder::me("/w/x", LONGEST + Duration::from_secs(60), "x"),
+        Holder::me("/w/x", LONGEST + Duration::from_secs(60), Form::Run, "x"),
         BRIEF,
     )
     .expect_err("too long");
@@ -179,7 +191,7 @@ fn a_waiter_fails_at_its_own_deadline_naming_the_holder() {
     write(&dir, &other("/w/holder", Duration::from_secs(60))).expect("held");
 
     // When
-    let refusal = wait_clear(&dir, ("ci", None), BRIEF, &mut |_| {}).expect_err("still held");
+    let refusal = wait_clear(&dir, ("ci", NOBODY), BRIEF, &mut |_| {}).expect_err("still held");
 
     // Then
     assert!(
@@ -188,3 +200,6 @@ fn a_waiter_fails_at_its_own_deadline_naming_the_holder() {
     );
     assert!(refusal.contains("fix: rm "), "{refusal}");
 }
+
+#[path = "quiet_lock_ended_tests.rs"]
+mod ended;

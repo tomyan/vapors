@@ -1,24 +1,32 @@
 //! The quiet lock: one holder at a time keeps xtask's builds and test
 //! runs from starting, so a timed run gets the machine to itself. It is
 //! a file, `~/.cache/factory/quiet.holder`, naming who holds it and until
-//! when; `cargo xtask ci`, `test` and `gate` wait while it is held, saying
-//! who holds it and when it expires. The deadline is hard: a holder that
-//! crashed or forgot to release blocks nobody past it, and a waiter goes
-//! on at it. The gate takes it for its run (`gate_floor.rs`);
+//! when, and in which form; `cargo xtask ci`, `test` and `gate` wait while
+//! it is held (`quiet_wait.rs`), saying who holds it and when it expires.
+//! A hold ends at its deadline, which is hard: a forgotten hold blocks
+//! nobody past it. A gate's hold and a `quiet <minutes> -- <command>`
+//! hold also end when their process does, however it ends (its pid gone
+//! or reused, as `lock_owner` reads it); a `quiet hold` outlives its
+//! process by design. The gate takes it for its run (`gate_floor.rs`);
 //! `cargo xtask quiet` takes it by hand (`quiet_command.rs`).
 //!
-//! Declared limits: plain `cargo` outside xtask does not wait; a waiter
-//! polls, so two holders waiting on the same expiry are not served in
-//! turn.
+//! Declared limits: plain `cargo` outside xtask does not wait, and nor
+//! does an xtask built before this file, in another worktree or in
+//! touche, until that worktree has rebased; a waiter polls, so two
+//! holders waiting on the same expiry are not served in turn.
 
-use std::io::Write;
 use std::path::Path;
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[path = "quiet_holder.rs"]
 mod holder;
-pub use holder::Holder;
+pub use holder::{Form, Holder};
+#[path = "quiet_file.rs"]
+mod file;
+pub use file::read;
+#[cfg(test)]
+use file::write;
 
 /// The holder file's name, beside the gate lock.
 pub const FILE: &str = "quiet.holder";
@@ -51,13 +59,17 @@ impl Quiet {
     pub fn keep(self) {
         std::mem::forget(self);
     }
+
+    /// Whether the holder file still names this hold, before its deadline.
+    pub fn still_held(&self) -> bool {
+        read(&self.dir).is_ok_and(|now| now.as_ref() == Some(&self.holder))
+            && self.holder.left(now_ms()).is_some()
+    }
 }
 
 impl Drop for Quiet {
     fn drop(&mut self) {
-        if read(&self.dir).is_ok_and(|now| now.as_ref() == Some(&self.holder)) {
-            let _ = std::fs::remove_file(self.dir.join(FILE));
-        }
+        file::remove_if(&self.dir, &self.holder);
     }
 }
 
@@ -79,10 +91,10 @@ pub fn take(dir: &Path, holder: Holder, wait: Duration) -> Result<Quiet, String>
     let started = std::time::Instant::now();
     loop {
         let left = wait.saturating_sub(started.elapsed());
-        wait_clear(dir, (&holder.what, None), left, &mut |line| {
+        wait_clear(dir, (&holder.what, &|_| false), left, &mut |line| {
             println!("{line}");
         })?;
-        if create(dir, &holder)? {
+        if file::claim(dir, &holder)? {
             return Ok(Quiet {
                 dir: dir.to_path_buf(),
                 holder,
@@ -91,7 +103,7 @@ pub fn take(dir: &Path, holder: Holder, wait: Duration) -> Result<Quiet, String>
     }
 }
 
-/// Wait while someone other than `me` holds the lock in `dir`, calling
+/// Wait while a holder that is not `mine` holds the lock in `dir`, calling
 /// `say` each minute, `who` naming the waiter: until the holder's
 /// deadline, and never past `wait`.
 ///
@@ -101,14 +113,14 @@ pub fn take(dir: &Path, holder: Holder, wait: Duration) -> Result<Quiet, String>
 /// [`LONGEST`] from now, or is still held when `wait` ends.
 pub fn wait_clear(
     dir: &Path,
-    (who, me): (&str, Option<u32>),
+    (who, mine): (&str, &dyn Fn(&Holder) -> bool),
     wait: Duration,
     say: &mut dyn FnMut(&str),
 ) -> Result<(), String> {
     let started = std::time::Instant::now();
     let mut said: Option<std::time::Instant> = None;
     while let Some(holder) = current(dir)? {
-        if Some(holder.pid) == me {
+        if mine(&holder) {
             return Ok(());
         }
         if started.elapsed() >= wait {
@@ -130,11 +142,18 @@ pub fn wait_clear(
     Ok(())
 }
 
-/// The holder before its deadline, or none.
-fn current(dir: &Path) -> Result<Option<Holder>, String> {
+/// The holder that has not ended, or none.
+///
+/// # Errors
+///
+/// As [`read`], or its deadline is past [`LONGEST`] from now.
+pub fn current(dir: &Path) -> Result<Option<Holder>, String> {
     let Some(holder) = read(dir)? else {
         return Ok(None);
     };
+    if holder.ended(now_ms()) {
+        return Ok(None);
+    }
     match holder.left(now_ms()) {
         None => Ok(None),
         Some(left) if left > LONGEST + Duration::from_secs(60) => Err(format!(
@@ -145,59 +164,6 @@ fn current(dir: &Path) -> Result<Option<Holder>, String> {
             dir.join(FILE).display()
         )),
         Some(_) => Ok(Some(holder)),
-    }
-}
-
-/// The holder file in `dir`, expired or not; none when absent.
-///
-/// # Errors
-///
-/// It is unreadable or of another shape, naming it and the fix.
-pub fn read(dir: &Path) -> Result<Option<Holder>, String> {
-    let path = dir.join(FILE);
-    let text = match std::fs::read_to_string(&path) {
-        Ok(text) => text,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(format!("{}: {e}", path.display())),
-    };
-    Holder::parse(&text).map(Some).ok_or_else(|| {
-        format!(
-            "{} reads `{}`, not `pid <P> in <worktree> until <unix ms> running <what>`; fix: rm {}",
-            path.display(),
-            text.trim(),
-            path.display()
-        )
-    })
-}
-
-/// Write `holder` whether or not the lock is held, as another process
-/// would: for tests.
-#[cfg(test)]
-fn write(dir: &Path, holder: &Holder) -> Result<(), String> {
-    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    let path = dir.join(FILE);
-    std::fs::write(&path, holder.line()).map_err(|e| format!("{}: {e}", path.display()))
-}
-
-/// Write `holder` if no file is there, or the one there is past its
-/// deadline; whether it was written.
-fn create(dir: &Path, holder: &Holder) -> Result<bool, String> {
-    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    let path = dir.join(FILE);
-    if read(dir)?.is_some_and(|there| there.left(now_ms()).is_none()) {
-        let _ = std::fs::remove_file(&path);
-    }
-    let opened = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&path);
-    match opened {
-        Ok(mut file) => file
-            .write_all(holder.line().as_bytes())
-            .map(|()| true)
-            .map_err(|e| format!("{}: {e}", path.display())),
-        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Ok(false),
-        Err(e) => Err(format!("{}: {e}", path.display())),
     }
 }
 

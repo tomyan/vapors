@@ -5,13 +5,14 @@
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const CONFIG: &str = "[web]\npackage = \"none\"\n\n[load]\nwait = \"false\"\n";
 /// A pid above Linux's largest `pid_max` (2^22), so never a live process.
 const GONE: u32 = 4_194_305;
-/// How long the scratch holder holds the lock.
-const HELD: Duration = Duration::from_secs(2);
+/// How long the scratch holder holds the lock: long enough that a child
+/// xtask started on a loaded machine still finds it held.
+const HELD: Duration = Duration::from_secs(5);
 
 fn scratch(name: &str) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("quiet-{name}"));
@@ -26,12 +27,14 @@ fn holder_file(home: &Path) -> PathBuf {
 }
 
 /// Another process's hold on the lock in `home`, for [`HELD`] from now.
-fn held_by_another(home: &Path) {
+fn held_by_another(home: &Path) -> u128 {
     let now = SystemTime::now().duration_since(UNIX_EPOCH).expect("clock");
-    let until = (now + HELD).as_millis();
+    let (since, until) = (now.as_secs(), (now + HELD).as_millis());
     std::fs::create_dir_all(home.join(".cache/factory")).expect("lock dir");
-    let line = format!("pid {GONE} in /w/timed until {until} running a timed run\n");
+    let line =
+        format!("pid {GONE} in /w/timed since {since} until {until} as hold running a timed run\n");
     std::fs::write(holder_file(home), line).expect("holder");
+    until
 }
 
 fn xtask(dir: &Path, args: &[&str], env: &[(&str, &str)]) -> Output {
@@ -64,20 +67,20 @@ fn ci_test_and_gate_wait_for_another_holder_saying_who_and_until_when() {
     ] {
         // Given
         let dir = scratch(who);
-        held_by_another(&dir);
+        let until = held_by_another(&dir);
 
         // When
-        let started = Instant::now();
         let text = stdout(&xtask(&dir, command, &[]));
 
         // Then
         let line = format!(
-            "{who}: waiting for the quiet lock, held by pid {GONE} in /w/timed running `a timed run`, expires in "
+            "{who}: waiting for the quiet lock, held by pid {GONE} in /w/timed running `a timed run` (hold), expires in "
         );
         assert!(text.contains(&line), "{who}: {text}");
+        let ended = SystemTime::now().duration_since(UNIX_EPOCH).expect("clock");
         assert!(
-            started.elapsed() >= Duration::from_millis(1_500),
-            "{who} went on early"
+            ended.as_millis() >= until,
+            "{who} went on before the deadline"
         );
     }
 }
@@ -132,4 +135,32 @@ fn a_hold_outlives_its_command_until_released_from_its_worktree() {
     assert!(held.status.success() && kept, "{}", stdout(&held));
     assert!(released.status.success(), "{}", stdout(&released));
     assert!(!holder_file(&dir).exists());
+}
+
+#[test]
+fn release_refuses_a_gate_s_hold_even_from_its_worktree() {
+    // Given: a live gate (this test's process) holds it from the scratch dir
+    let dir = scratch("release-gate");
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).expect("clock");
+    let until = (now + Duration::from_secs(60)).as_millis();
+    let line = format!(
+        "pid {} in {} since {} until {until} as gate running gate\n",
+        std::process::id(),
+        dir.canonicalize().expect("the scratch dir").display(),
+        now.as_secs()
+    );
+    std::fs::create_dir_all(dir.join(".cache/factory")).expect("lock dir");
+    std::fs::write(holder_file(&dir), line).expect("holder");
+
+    // When
+    let output = xtask(&dir, &["quiet", "release"], &[]);
+
+    // Then
+    assert!(!output.status.success(), "{}", stdout(&output));
+    assert!(
+        stdout(&output).contains("not a hold from"),
+        "{}",
+        stdout(&output)
+    );
+    assert!(holder_file(&dir).exists());
 }

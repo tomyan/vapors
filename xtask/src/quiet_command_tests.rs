@@ -3,6 +3,7 @@
 use std::time::Duration;
 
 use super::*;
+use crate::quiet_wait::HOLDER_ENV;
 
 fn parsed(args: &[&str]) -> Result<Action, String> {
     let args: Vec<String> = args.iter().map(|&a| a.to_owned()).collect();
@@ -41,6 +42,8 @@ fn any_other_form_is_refused_naming_the_three_forms() {
         &["soon", "--", "true"][..],
         &["hold", "x"][..],
         &["hold", "5", "6"][..],
+        &["hold", "61"][..],
+        &["400000000000000000", "--", "true"][..],
         &["release", "now"][..],
     ] {
         let refusal = parsed(args).expect_err(&format!("{args:?}"));

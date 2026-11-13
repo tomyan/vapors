@@ -41,7 +41,7 @@ pub type Locks = (Option<crate::quiet_lock::Quiet>, crate::gate_lock::Held);
 /// lock for `worktree`, then check the floors and the load wait; both
 /// are held until the returned guards are dropped.
 pub fn begin(worktree: &str) -> Result<Locks, String> {
-    let quiet = crate::quiet_command::for_gate(worktree)?;
+    let quiet = crate::quiet_wait::for_gate(worktree)?;
     let held = crate::gate_lock::dir()
         .and_then(|dir| crate::gate_lock::acquire(&dir, worktree, crate::gate_lock::WAIT))?;
     before()?;
