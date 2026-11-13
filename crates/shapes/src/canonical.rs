@@ -131,10 +131,9 @@ fn write_points(verb: u8, points: &[Point], out: &mut Vec<u8>) {
     }
 }
 
-/// A finite number's bits, little-endian, with negative zero written
-/// as zero so `M-0 0` and `M0 0` are one shape.
+/// A finite number's bits, little-endian. The lexer reads `-0` as `0`,
+/// so `M-0 0` and `M0 0` arrive as one shape.
 fn write_number(value: f32, out: &mut Vec<u8>) {
-    let value = if value == 0.0 { 0.0 } else { value };
     out.extend_from_slice(&value.to_le_bytes());
 }
 
