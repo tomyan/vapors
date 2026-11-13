@@ -95,6 +95,28 @@ fn every_build_xtask_starts_goes_through_sccache_without_incremental() {
 }
 
 #[test]
+fn plain_cargo_builds_are_not_incremental_either() {
+    // Given: the workspace's cargo config, read by every cargo command
+    let config = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../.cargo/config.toml"
+    ))
+    .expect(".cargo/config.toml is read by every build in the workspace");
+
+    // When
+    let build = config.split("[build]").nth(1).unwrap_or_default();
+
+    // Then: an incremental target reached 104 GB on 2026-11-13
+    assert!(
+        build
+            .lines()
+            .any(|line| line.trim() == "incremental = false"),
+        ".cargo/config.toml lost `[build] incremental = false`; restore it (CLAUDE.md), \
+         reproduce with `cargo test -p xtask --all-targets plain_cargo_builds`"
+    );
+}
+
+#[test]
 fn cache_errors_during_the_run_fail_it() {
     // Given: sccache compiled one crate without the cache after an error
     let before = Stats {

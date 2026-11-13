@@ -78,19 +78,21 @@ impl Scaling {
     }
 
     /// The phases of `judged` that grew beyond [`TOLERANCE_PERCENT`],
-    /// or the accessibility phase beyond its ceiling per extra row, one
-    /// message each naming the phase, the size and the growth per
-    /// extra row.
+    /// or the accessibility phase beyond its ceiling per extra row and
+    /// the phases held flat beside it, one message each naming the
+    /// phase, the size and the growth per extra row.
     ///
     /// # Errors
     /// `judged` names a phase the series lack (never a pass).
     pub fn violations(&self, judged: Judged) -> Result<Vec<String>, String> {
         match judged {
-            Judged::AccessibilityPerRow { ceiling } => Ok(beyond_ceiling(
-                self.series("accessibility")?,
-                &self.rows,
-                ceiling,
-            )),
+            Judged::AccessibilityPerRow { ceiling, flat } => {
+                let mut found = beyond_ceiling(self.series("accessibility")?, &self.rows, ceiling);
+                for phase in flat {
+                    found.extend(self.beyond_tolerance(self.series(phase)?));
+                }
+                Ok(found)
+            }
             Judged::EveryPhase => Ok(self
                 .phases
                 .iter()
@@ -175,3 +177,7 @@ fn extra_phase(first: &AtSize, size: &AtSize) -> Option<String> {
 #[cfg(test)]
 #[path = "scaling_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "scaling_flat_tests.rs"]
+mod flat_tests;
