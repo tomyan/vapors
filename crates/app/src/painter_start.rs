@@ -1,6 +1,9 @@
 //! What a painter does once, before the first frame (`App::start`,
-//! one-scene F0): each surface renderer's `mount`, and the glyph
-//! atlas's new page uploaded, so the first frame pays for neither.
+//! one-scene F0): each surface renderer's `mount`, the glyph atlas's
+//! new page uploaded, and each surface's backing made at its laid-out
+//! size, so the first frame pays for none of them.
+
+use vapors_elements::Painted;
 
 use super::ScenePainter;
 use super::errors::PaintError;
@@ -19,6 +22,28 @@ impl ScenePainter {
         self.text.upload_atlas(queue, &mut self.atlas);
         let _start_up = self.take_work();
         Ok(())
+    }
+
+    /// At `App::start`, after the document's first update: each surface
+    /// of `painted` gets its backing at its laid-out size, its renderer
+    /// resized, and the backing cleared, so the first frame neither
+    /// allocates it nor is the first submit to use its memory.
+    ///
+    /// # Errors
+    ///
+    /// [`PaintError`] naming a surface with no renderer, one too large
+    /// for the device, or one whose `mount` or `resize` failed.
+    pub fn start_surfaces(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        painted: &Painted,
+    ) -> Result<(), PaintError> {
+        let started = self
+            .surfaces
+            .start_at((device, queue), &self.images, painted);
+        let _start_up = self.take_work();
+        started
     }
 
     /// The format of the targets it draws into.

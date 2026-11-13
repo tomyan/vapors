@@ -1,7 +1,8 @@
 //! GPU tier: `App::start` on an `ElementsApp` does, before the first
 //! frame, the work that frame would otherwise do once (one-scene F0):
-//! it builds every pipeline, mounts the surface renderers, and uploads
-//! the glyph atlas's new page.
+//! it builds every pipeline, mounts the surface renderers, uploads the
+//! glyph atlas's new page, lays the document out at the surface's size
+//! and sizes each surface's backing.
 
 #[path = "support/surface.rs"]
 mod support;
@@ -10,7 +11,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use support::{RED, SIZE, Solid, app_frame, document, pixel};
-use vapors_app::{ElementsApp, StartState};
+use vapors_app::{ElementsApp, StartState, SurfaceSize};
 use vapors_dom::Dom;
 use vapors_gpu_harness::{Gpu, gpu};
 use vapors_platform::{App, Start};
@@ -39,14 +40,22 @@ fn start(app: &mut ElementsApp, gpu: &Gpu) -> Result<(), String> {
 /// `app`'s start on `gpu` for textures of `format`.
 fn start_for(app: &mut ElementsApp, gpu: &Gpu, format: wgpu::TextureFormat) -> Result<(), String> {
     app.start(&Start {
+        format,
+        ..start_at(gpu)
+    })
+}
+
+/// A start on `gpu` for the test target: its size and format.
+fn start_at(gpu: &Gpu) -> Start<'_> {
+    Start {
         adapter: &gpu.adapter,
         device: &gpu.device,
         queue: &gpu.queue,
-        format,
+        format: wgpu::TextureFormat::Rgba8Unorm,
         width: SIZE,
         height: SIZE,
         scale_factor: 1.0,
-    })
+    }
 }
 
 #[test]
@@ -158,4 +167,41 @@ fn gpu_a_started_app_says_it_was_started() {
 
     // Then
     assert_eq!(app.start_state(), StartState::Started);
+}
+
+#[test]
+fn gpu_start_lays_the_document_out_and_sizes_each_surface_before_the_first_frame() {
+    // Given
+    let (mut app, log, gpu) = rig();
+    start(&mut app, &gpu).expect("starts");
+    let at_start = log.borrow().resizes.clone();
+
+    // When
+    app_frame(&mut app, &gpu);
+
+    // Then: the first frame reuses the backing sized at start
+    let side = SurfaceSize {
+        width: 16,
+        height: 16,
+        scale: 1.0,
+    };
+    assert_eq!(at_start, vec![side]);
+    assert_eq!(log.borrow().resizes, vec![side]);
+    assert_eq!(log.borrow().frames, vec![side]);
+}
+
+#[test]
+fn gpu_a_start_with_no_surface_size_is_refused_naming_the_fix() {
+    // Given
+    let (mut app, _, gpu) = rig();
+
+    // When
+    let refused = app.start(&Start {
+        width: 0,
+        ..start_at(&gpu)
+    });
+
+    // Then
+    let error = refused.expect_err("a 0-pixel surface has no layout");
+    assert!(error.contains("0x32") && error.contains("fix:"), "{error}");
 }

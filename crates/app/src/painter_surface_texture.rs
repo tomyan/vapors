@@ -2,10 +2,10 @@
 //! painter composites, bound for the image pipeline when it is made.
 //! Another size is another backing, binding and all.
 
-use vapors_renderer::{ImagePipeline, Sampling, TextureBinding};
+use vapors_renderer::{ImagePipeline, Sampling, Target, TextureBinding, WorkCounter};
 
 use super::super::errors::Refusal;
-use crate::surface::{SURFACE_FORMAT, SurfaceSize};
+use crate::surface::{SURFACE_FORMAT, SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
 
 /// The texture of one active surface, bound for compositing, and the
 /// size it was made at.
@@ -25,6 +25,58 @@ impl Backing {
             size,
         }
     }
+
+    /// Clears the backing in a submit of its own: the first submit that
+    /// uses it, before the first frame (`Mounted::start_at`).
+    pub(super) fn clear(&self, device: &wgpu::Device, queue: &wgpu::Queue) {
+        let mut encoder = device.create_command_encoder(&ENCODER);
+        let clear = wgpu::RenderPassColorAttachment {
+            view: &self.view,
+            depth_slice: None,
+            resolve_target: None,
+            ops: wgpu::Operations {
+                load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                store: wgpu::StoreOp::Store,
+            },
+        };
+        drop(encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("gpu-surface backing cleared at start"),
+            color_attachments: &[Some(clear)],
+            ..Default::default()
+        }));
+        queue.submit([encoder.finish()]);
+    }
+}
+
+const ENCODER: wgpu::CommandEncoderDescriptor<'static> = wgpu::CommandEncoderDescriptor {
+    label: Some("gpu-surface"),
+};
+
+/// `renderer`'s render into `backing`, submitted on `target`'s queue.
+pub(super) fn render_into(
+    renderer: &mut Box<dyn SurfaceRenderer>,
+    target: &Target<'_>,
+    backing: &Backing,
+    work: &WorkCounter,
+) -> Result<(), SurfaceError> {
+    let mut encoder = target.device.create_command_encoder(&ENCODER);
+    // a timed frame's pair around the renderer's passes (GpuTimer)
+    target
+        .encoder
+        .time_section(&mut encoder, &backing.view, |encoder| {
+            renderer.render(SurfaceFrame {
+                device: target.device,
+                queue: target.queue,
+                encoder,
+                view: &backing.view,
+                size: backing.size,
+                work,
+            })
+        })?;
+    let commands = encoder.finish();
+    let _submit = tracing::trace_span!("draw step", phase = "submit").entered();
+    target.encoder.submit_section(target.queue, commands);
+    Ok(())
 }
 
 /// A backing is rendered into, sampled, and copyable both ways.

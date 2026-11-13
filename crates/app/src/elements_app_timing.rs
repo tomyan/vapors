@@ -48,6 +48,17 @@ impl AppTimer {
         }
     }
 
+    /// Makes the timer at `App::start` when timing is on, so the first
+    /// frame does not. Measured on the racer's 60 s run (one-scene F0):
+    /// with the timer made in frame 0, that frame's surface submit took
+    /// 13 to 20 ms; made at start, before the backings' clear, 0.2 to
+    /// 0.4 ms.
+    pub(super) fn start(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+        if matches!(self, Self::Unmade) {
+            *self = GpuTimer::new(device, queue).map_or(Self::Unsupported, Self::Timing);
+        }
+    }
+
     fn gpu(&self) -> GpuTime {
         match self {
             Self::Off => GpuTime::NotRequested,
