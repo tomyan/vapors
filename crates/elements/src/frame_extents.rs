@@ -74,6 +74,10 @@ pub(crate) struct Extents {
     /// over the frames (`IndexCounts`).
     moved: usize,
     blocks: usize,
+    /// Over every frame, the items and the short entries: running
+    /// totals too, so a patch and the culled count sum over no frames.
+    items: u64,
+    short: usize,
 }
 
 impl Extents {
@@ -94,10 +98,13 @@ impl Extents {
             rebuilds: 0,
             moved: 0,
             blocks: 0,
+            items: 0,
+            short: 0,
         };
         let mut short: FxHashMap<usize, Vec<Entry>> = FxHashMap::default();
         for (frame, entry) in entries {
             extents.at[entry.place] = Some((frame, entry.top, entry.tall()));
+            extents.count_in(&entry);
             let index = extents.frames.entry(frame).or_default();
             index.items += entry.items;
             if entry.tall() {
@@ -123,8 +130,7 @@ impl Extents {
         (drawn, places): (&DrawnSteps, usize),
         boxes: &[Option<KeptBox>],
     ) {
-        let entries: usize = self.frames.values().map(|index| index.entries.len()).sum();
-        if steps.len() > REBUILD.max(entries / 16) {
+        if steps.len() > REBUILD.max(self.short / 16) {
             let rebuilds = self.rebuilds + 1;
             *self = Self::of(drawn, places, boxes);
             self.rebuilds = rebuilds;
@@ -141,16 +147,6 @@ impl Extents {
         for &(place, step) in steps {
             self.repatch(place, step, boxes);
         }
-    }
-
-    /// The frames with a drawing step.
-    pub(crate) fn frames(&self) -> impl Iterator<Item = usize> + '_ {
-        self.frames.keys().copied()
-    }
-
-    /// How many items every drawing step paints.
-    pub(crate) fn items(&self) -> u64 {
-        self.frames.values().map(|index| index.items).sum()
     }
 }
 

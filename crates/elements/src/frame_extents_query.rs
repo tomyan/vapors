@@ -1,11 +1,21 @@
-//! Reading the extents index (`frame_extents.rs`): the steps of a
-//! frame that can show in a view, and a step's item count.
+//! Reading the extents index (`frame_extents.rs`): its frames, the
+//! steps of a frame that can show in a view, and the item counts.
 
 use vapors_scene::Rect;
 
 use super::{Entry, Extents, FrameIndex, missing};
 
 impl Extents {
+    /// The frames with a drawing step.
+    pub(crate) fn frames(&self) -> impl Iterator<Item = usize> + '_ {
+        self.frames.keys().copied()
+    }
+
+    /// How many items every drawing step paints.
+    pub(crate) fn items(&self) -> u64 {
+        self.items
+    }
+
     /// How many items the step at `place` paints; 0 when it draws
     /// nothing.
     pub(crate) fn items_at(&self, place: usize) -> u64 {

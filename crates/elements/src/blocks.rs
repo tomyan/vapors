@@ -77,6 +77,9 @@ impl<T> Blocks<T> {
         }
     }
 
+    /// How many items the blocks hold, for tests: the extents index
+    /// keeps its own total (`frame_extents.rs`).
+    #[cfg(test)]
     pub(crate) fn len(&self) -> usize {
         self.len
     }
