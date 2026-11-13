@@ -4,12 +4,57 @@
 //! literal classes, `class:` directive names and literal `style`), and
 //! the `create_keyed_element(&KEY_DIV0)` that builds the element from
 //! it. The tree sets those attributes from the key, so nothing else
-//! is emitted for them.
+//! is emitted for them. A component tag carrying `class`, `class:` or
+//! `style` gets a key the same way, which it passes to the component
+//! (`component_anchor`).
+
+use super::attribute_refusals::refuse_string_styling;
+use std::fmt::Write;
 
 use super::element::attribute_named;
 use super::emit::Emitter;
 use crate::CompileError;
-use crate::ast::{AttrValue, Element};
+use crate::ast::{AttrValue, Attribute, Attributes, ComponentTag, Element};
+
+/// What a key is made from: an element, whose key's tag is its own, or
+/// a component tag, whose key's tag is the `ANCHOR_TAG` its props type
+/// declares, so an alias (`Group as Section`) still keys a `group`.
+pub(super) struct Keyed<'e> {
+    /// The key's `tag` field, as Rust.
+    pub(super) tag: String,
+    /// `div` or `Mesh`, for messages.
+    pub(super) name: &'e str,
+    /// Where `class:` directives past the limit can go instead.
+    pub(super) elsewhere: String,
+    /// The tag names a type the script's `use` items bring in.
+    pub(super) reads_uses: bool,
+    pub(super) attributes: &'e Attributes,
+    pub(super) offset: usize,
+}
+
+impl<'e> Keyed<'e> {
+    pub(super) fn element(element: &'e Element) -> Self {
+        Self {
+            tag: format!("{:?}", element.tag),
+            name: &element.tag,
+            elsewhere: "a child element".to_owned(),
+            reads_uses: false,
+            attributes: &element.attributes,
+            offset: element.offset,
+        }
+    }
+
+    pub(super) fn component(tag: &'e ComponentTag) -> Self {
+        Self {
+            tag: format!("{}Props::ANCHOR_TAG", tag.name),
+            name: &tag.name,
+            elsewhere: format!("an element inside <{}>", tag.name),
+            reads_uses: true,
+            attributes: &tag.attributes,
+            offset: tag.offset,
+        }
+    }
+}
 
 /// Whether `name` is an attribute the key carries, so the element
 /// emits no `set_attribute` for it.
@@ -25,49 +70,88 @@ impl Emitter<'_> {
         element: &Element,
         var: &str,
     ) -> Result<(), CompileError> {
-        let name = format!("KEY_{}", var.to_ascii_uppercase());
-        let key = self.style_key(element)?;
-        self.keys
-            .push(format!("static {name}: vapors_dom::StyleKey = {key};"));
+        let name = self.key_static(&Keyed::element(element), var)?;
         self.line(format!(
             "let {var} = dom.borrow_mut().create_keyed_element(&{name});"
         ));
         Ok(())
     }
 
-    fn style_key(&self, element: &Element) -> Result<String, CompileError> {
-        let (line, column) = self.source.position(element.offset);
+    /// Adds `keyed`'s key to the file-level statics as `KEY_{VAR}`, and
+    /// returns that name.
+    pub(super) fn key_static(&mut self, keyed: &Keyed, var: &str) -> Result<String, CompileError> {
+        let name = format!("KEY_{}", var.to_ascii_uppercase());
+        let mut key = self.style_key(keyed)?;
+        if keyed.reads_uses {
+            key = format!("{{ {} {key} }}", self.script_uses());
+        }
+        self.keys
+            .push(format!("static {name}: vapors_dom::StyleKey = {key};"));
+        Ok(name)
+    }
+
+    /// The script's `use` items, for a file-level static that names a
+    /// type they bring in (`MeshProps::ANCHOR_TAG`).
+    fn script_uses(&self) -> String {
+        let uses = self.script.statements.iter();
+        let uses = uses.filter(|statement| statement.starts_with("use "));
+        uses.fold(String::new(), |mut out, item| {
+            let _ = write!(out, "#[allow(unused_imports)] {item}");
+            out
+        })
+    }
+
+    fn style_key(&self, keyed: &Keyed) -> Result<String, CompileError> {
+        let (line, column) = self.source.position(keyed.offset);
         // the package, as `SCOPE` names it, so two crates' `src/card.wisp` differ
         let place = format!("{}:{line}:{column}", self.source.path);
         let site = format!("concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {place:?})");
         let scope = if self.scoped { "Some(SCOPE)" } else { "None" };
-        let classes = quoted(&self.literal_classes(element)?);
-        let toggles = quoted(&self.key_directives(element)?);
-        let style = match attribute_named(element, "style").map(|a| &a.value) {
-            Some(AttrValue::Literal(text)) => format!("Some({text:?})"),
-            // `style={..}` is refused before this (attribute_refusals)
-            Some(AttrValue::Expr(_)) | None => "None".to_owned(),
-        };
+        let classes = quoted(&self.literal_classes(keyed.attributes)?);
+        let toggles = quoted(&self.key_directives(keyed)?);
+        let style = self.key_style(keyed)?;
         Ok(format!(
-            "vapors_dom::StyleKey {{ site: {site}, scope: {scope}, tag: {:?}, classes: &[{classes}], toggles: &[{toggles}], style: {style} }}",
-            element.tag
+            "vapors_dom::StyleKey {{ site: {site}, scope: {scope}, tag: {}, classes: &[{classes}], toggles: &[{toggles}], style: {style} }}",
+            keyed.tag
         ))
+    }
+
+    /// The literal `style` as Rust; `style={..}` is refused here, where
+    /// it would otherwise be dropped.
+    fn key_style(&self, keyed: &Keyed) -> Result<String, CompileError> {
+        match attribute_named(keyed.attributes, "style") {
+            Some(
+                attribute @ Attribute {
+                    value: AttrValue::Expr(_),
+                    ..
+                },
+            ) => {
+                refuse_string_styling(self.source, attribute)?;
+                unreachable!("refuse_string_styling refuses every `style={{..}}`")
+            }
+            Some(Attribute {
+                value: AttrValue::Literal(text),
+                ..
+            }) => Ok(format!("Some({text:?})")),
+            None => Ok("None".to_owned()),
+        }
     }
 }
 
 impl Emitter<'_> {
-    /// `element`'s directive names, refusing more than
+    /// `keyed`'s directive names, refusing more than
     /// [`crate::MAX_CLASS_DIRECTIVES`], naming the element.
-    fn key_directives<'e>(&self, element: &'e Element) -> Result<Vec<&'e str>, CompileError> {
-        let names = self.directive_names(element)?;
+    fn key_directives<'e>(&self, keyed: &Keyed<'e>) -> Result<Vec<&'e str>, CompileError> {
+        let names = self.directive_names(keyed.attributes)?;
         if names.len() > crate::MAX_CLASS_DIRECTIVES {
             return Err(self.source.error(
-                element.offset,
+                keyed.offset,
                 format!(
-                    "<{}> has {} `class:` directives; at most {} fit one element, so move some to a child element",
-                    element.tag,
+                    "<{}> has {} `class:` directives; at most {} fit one element, so move some to {}",
+                    keyed.name,
                     names.len(),
-                    crate::MAX_CLASS_DIRECTIVES
+                    crate::MAX_CLASS_DIRECTIVES,
+                    keyed.elsewhere
                 ),
             ));
         }

@@ -51,7 +51,10 @@ count (`docs/plans/iu1.md`, PR 2). An insert's update is 97 edits at
 half of it. `--scaling Insert` alternates an insert and a remove per
 frame, and the median over both kinds is the cheaper kind's slowest
 frame (`docs/perf/baseline-2026-11-10.md`, "Insert"), so these are one
-kind's numbers; section 7's PR 0 reports the two apart. Section 1.4
+kind's numbers (the remove frames'); section 7's PR 0 reports the two
+apart, and `docs/perf/splice-layout-2026-11-13.md` has the split: an insert
+costs about 630,000 instructions more than a remove at every size, in
+`style`, and the same per extra row. Section 1.4
 splits the phases.
 
 ### 1.2 Read from the code: where every row is touched
@@ -568,10 +571,9 @@ handles not indices (section 2 (b)).
 5. The a11y oracle (5b) is not built; PR 5's bounds are checked by
    `DOM.getBoxModel` once it is. Until then PR 5 is checked by the
    fake DOM's counts and by vapors' own bounds.
-6. `--scaling Insert`'s median over alternating kinds hides the
-   costlier kind (section 1.1); PR 0 fixes the reporting before any
-   acceptance number is read from it.
-
+6. `--scaling Insert`'s median over alternating kinds hid the
+   costlier kind (section 1.1); PR 0 (#270) reports each kind apart,
+   with the split in `docs/perf/splice-layout-2026-11-13.md`.
 ## 10. Block and flex in one lane
 
 Tom's decision 4 (2026-11-13): block and flex lanes designed together,
@@ -588,7 +590,7 @@ Everything outside the per-child layout and the fold:
 - **The tree.** One `LaneTree<S: Summary>` (`lane_tree.rs`, section 2
   (b)): handles, parent links, fanout 16, `start`, `between`, `total`,
   in-order iteration. `Summary` has `combine(left, right, gap) -> Self`
-  and `empty()`; the tree holds the container's main-axis gap as one
+  with `Default` as its identity; the tree holds the container's main-axis gap as one
   `f64` and passes it to every `combine`, 0 for a block container
   (`row-gap` does not apply to block layout). A change of gap is a
   change to the container's style, which rebuilds the container's box
@@ -752,7 +754,8 @@ name the functions and lines they mirror, as `lane_block.rs` does for
   the tallest item's (the max fold), so an insert of a taller item lays
   out every item; accepted with `lane_relaid` counted, or declined if
   the measurement shows the relayout common.
-- **Follow-up, after PR 4 measures**: the scrolling flex list with
+- **PR 3s** (next after 3f, before 4; lead, 2026-11-13: scrolling
+  lists are a real-app case): the scrolling flex list with
   shrinking items (10.3). An item shrinks only when the total exceeds
   the container's height and the item's minimum main size is below
   its hypothetical size, which is per item. The leaf would carry

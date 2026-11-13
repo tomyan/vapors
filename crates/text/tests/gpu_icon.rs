@@ -5,8 +5,9 @@
 use vapors_gpu_harness::{gpu, read_rgba8};
 use vapors_renderer::{FrameEncoder, clear};
 use vapors_scene::{Color, Size};
+use vapors_shapes::IconPath;
 use vapors_text::{
-    AtlasConfig, GlyphAtlas, Icon, IconDraw, IconPath, IconStroke, RenderTarget, TextPipeline,
+    AtlasConfig, GlyphAtlas, Icon, IconDraw, IconStroke, RenderTarget, TextPipeline,
 };
 
 const SIDE: u32 = 24;
