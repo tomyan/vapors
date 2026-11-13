@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use vapors_elements::Painted;
 use vapors_renderer::{
-    GpuWork, ImagePipeline, KeptRange, Sampling, Target, TextureBinding, WorkCounter,
+    GpuWork, ImagePipeline, KeptRange, Sampling, Shift, Target, TextureBinding, WorkCounter,
     upload_rgba8_mipmapped_counted,
 };
 use vapors_scene::{Item, RgbaImage};
@@ -53,7 +53,7 @@ impl Textures {
         pipeline: &mut ImagePipeline,
         target: &Target<'_>,
         painted: &Painted,
-        (items, kept, shift): (&[Item], &KeptRange, [f32; 2]),
+        (items, kept, shift): (&[Item], &KeptRange, Shift),
     ) {
         for (place, item) in (0..).zip(items) {
             if let Item::Image { image, .. } = item {

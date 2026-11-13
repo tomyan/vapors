@@ -7,7 +7,7 @@
 //! drawn, though its surfaces are refused as they would be in view.
 
 use vapors_elements::{BatchKey, Painted};
-use vapors_renderer::{ImagePipeline, QuadPipeline, ShadowPipeline, Target, clear_target};
+use vapors_renderer::{ImagePipeline, QuadPipeline, ShadowPipeline, Shift, Target, clear_target};
 use vapors_scene::Run;
 use vapors_text::{AtlasConfig, GlyphAtlas, TextPipeline};
 
@@ -141,7 +141,12 @@ impl ScenePainter {
             let clip = on_page(batch.clip, frame);
             match clipped(target, clip).filter(|_| !batch.culled) {
                 Some(clipped) => {
-                    self.draw_run(&clipped, painted, (&batch.run, key, at), frame.shift)?;
+                    self.draw_run(
+                        &clipped,
+                        painted,
+                        (&batch.run, key, at),
+                        Shift::whole(frame.shift),
+                    )?;
                 }
                 None => self
                     .surfaces
@@ -159,7 +164,7 @@ impl ScenePainter {
         target: &Target<'_>,
         painted: &Painted,
         (run, key, at): (&Run, BatchKey, usize),
-        shift: [f32; 2],
+        shift: Shift,
     ) -> Result<(), PaintError> {
         let result = match KeptKind::of_run(run) {
             Some(_) => self.draw_retained(target, painted, (run, key, at), shift),

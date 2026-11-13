@@ -1,9 +1,8 @@
 //! A pipeline's uniform values kept on the GPU between frames: each
 //! distinct value (16 bytes, or `SIZE`) in its own slot of one buffer,
 //! written when it first appears and bound after by its dynamic offset.
-//! A frame
-//! whose values the buffer already holds writes nothing; a bind group
-//! made for the buffer serves every slot.
+//! A frame whose values the buffer already holds writes nothing; a bind
+//! group made for the buffer serves every slot.
 
 use crate::encoder_turn::EncoderTurn;
 use crate::{ArenaFull, FrameEncoder, Holding, WorkCounter};
@@ -34,9 +33,27 @@ struct Slot<const SIZE: usize> {
 
 impl<const SIZE: usize> UniformSlots<SIZE> {
     /// An empty buffer of `FIRST_SLOTS` slots for the pipeline `label`.
+    ///
+    /// # Panics
+    ///
+    /// When `SIZE` is not a whole number of 16-byte rows (WGSL's uniform
+    /// struct alignment), or is larger than the device's uniform offset
+    /// alignment, so slots would overlap.
     #[must_use]
     pub fn new(device: &wgpu::Device, label: &'static str) -> Self {
+        const {
+            assert!(
+                SIZE.is_multiple_of(16),
+                "a uniform value is whole 16-byte rows"
+            );
+        }
         let align = u64::from(device.limits().min_uniform_buffer_offset_alignment);
+        assert!(
+            SIZE as u64 <= align,
+            "{label}: {SIZE}-byte uniform values in slots {align} bytes apart would overlap; \
+             keep values within the device's min_uniform_buffer_offset_alignment \
+             (uniform_slots.rs)"
+        );
         Self {
             label,
             align,

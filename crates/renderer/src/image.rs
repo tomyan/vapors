@@ -11,7 +11,7 @@ use crate::image_binding::{Sampling, TextureBinding};
 use crate::image_setup::{bind_group_layout, render_pipeline, samplers, view_layout};
 use crate::kept_bind_group::KeptBindGroup;
 use crate::uniform_slots::UniformSlots;
-use crate::{ArenaFull, FrameEncoder, GpuWork, Retained, Target, WorkCounter};
+use crate::{ArenaFull, FrameEncoder, GpuWork, Retained, Shift, Target, WorkCounter};
 
 use crate::quad::{VERTEX_COUNT, VERTEX_SIZE, quad_corners, vertex_bytes};
 
@@ -139,7 +139,7 @@ impl ImagePipeline {
         else {
             return;
         };
-        let Some(view) = self.view_slot(target, [0.0; 2]) else {
+        let Some(view) = self.view_slot(target, Shift::NONE) else {
             return;
         };
         let from = (Quads::Placed(&vertices), 0..VERTEX_COUNT);

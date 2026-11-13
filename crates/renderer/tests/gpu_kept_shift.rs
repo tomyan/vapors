@@ -9,26 +9,37 @@ mod frame;
 #[path = "support/retained.rs"]
 mod retained;
 
-use frame::{BACKGROUND, rgba, square, target};
+use frame::{BACKGROUND, quad, rgba, square, target};
 use retained::{Frame, RED, kept};
 use vapors_gpu_harness::{gpu, read_rgba8};
-use vapors_renderer::{FrameEncoder, ShadowPipeline};
+use vapors_renderer::{FrameEncoder, QuadPipeline, ShadowPipeline, Shift, Target};
 use vapors_scene::{Rect, Shadow};
 
-#[test]
-fn gpu_kept_quads_drawn_with_a_shift_land_moved_by_it() {
-    // Given: a red quad over pixel 0, kept
-    let mut frame = Frame::new(gpu());
-    let encoder = frame.encoder();
-    let red = kept(frame.keep(&encoder, (1, 0.0, RED)), "red");
+const SIDE: u32 = 24;
 
-    // When
-    frame.draw_shifted(&encoder, &red, [1.0, 0.0]);
-    encoder.submit(&frame.gpu.queue).expect("no refusal");
+#[test]
+fn gpu_kept_quads_drawn_with_a_shift_match_the_quad_drawn_at_the_moved_place() {
+    // Given
+    let at = |x: f32, y: f32| [quad([x, y, x + 5.0, y + 3.0], RED)];
+    let moved = drawn_on_square(|pipeline: &mut QuadPipeline, target| {
+        pipeline.draw(target, &at(7.0, 9.0));
+    });
+
+    // When: kept at 4, 4 and drawn shifted by 3, 5
+    let shifted = drawn_on_square(|pipeline: &mut QuadPipeline, target| {
+        let range = pipeline
+            .keep(target, &QuadPipeline::bytes(&at(4.0, 4.0)))
+            .expect("room");
+        pipeline.draw_kept(target, &range, Shift::whole([3.0, 5.0]));
+        pipeline.release(range);
+    });
 
     // Then
-    assert_eq!(frame.row(), [BACKGROUND, RED, BACKGROUND]);
-    frame.pipeline.release(red);
+    assert!(moved.contains(&255), "the quad drew nothing");
+    assert!(
+        shifted == moved,
+        "the shifted quad differs from the moved one"
+    );
 }
 
 #[test]
@@ -47,7 +58,7 @@ fn gpu_kept_quads_drawn_at_a_new_shift_write_one_uniform_and_no_instances() {
 
     // When: drawn two pixels right in the next
     let second = frame.encoder();
-    frame.draw_shifted(&second, &red, [2.0, 0.0]);
+    frame.draw_shifted(&second, &red, Shift::whole([2.0, 0.0]));
     second.submit(&frame.gpu.queue).expect("no refusal");
 
     // Then
@@ -56,8 +67,6 @@ fn gpu_kept_quads_drawn_at_a_new_shift_write_one_uniform_and_no_instances() {
     assert_eq!((work.uniform_writes, work.buffer_bytes), (1, 16));
     frame.pipeline.release(red);
 }
-
-const SIDE: u32 = 24;
 
 /// A blurred shadow of a box at `x`, `y`, cast by the box.
 fn shadow(x: f32, y: f32) -> Shadow {
@@ -72,11 +81,28 @@ fn shadow(x: f32, y: f32) -> Shadow {
     }
 }
 
-/// The pixels of `draw` on a square `SIDE` across with a shadow pipeline.
-fn shadows_drawn(draw: impl FnOnce(&mut ShadowPipeline, &vapors_renderer::Target<'_>)) -> Vec<u8> {
+/// A pipeline made for targets of `format`.
+trait Made {
+    fn made(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self;
+}
+
+impl Made for ShadowPipeline {
+    fn made(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+        Self::new(device, format)
+    }
+}
+
+impl Made for QuadPipeline {
+    fn made(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+        Self::new(device, format)
+    }
+}
+
+/// The pixels of `draw` on a square `SIDE` across with a pipeline `P`.
+fn drawn_on_square<P: Made>(draw: impl FnOnce(&mut P, &Target<'_>)) -> Vec<u8> {
     let gpu = gpu();
     let (texture, view) = square(&gpu, SIDE);
-    let mut pipeline = ShadowPipeline::new(&gpu.device, texture.format());
+    let mut pipeline = P::made(&gpu.device, texture.format());
     let encoder = FrameEncoder::new(&gpu.device);
     draw(&mut pipeline, &target(&gpu, &encoder, &view, SIDE));
     encoder.submit(&gpu.queue).expect("no refusal");
@@ -86,13 +112,14 @@ fn shadows_drawn(draw: impl FnOnce(&mut ShadowPipeline, &vapors_renderer::Target
 #[test]
 fn gpu_kept_shadows_drawn_with_a_shift_match_the_shadow_drawn_at_the_moved_place() {
     // Given
-    let moved = shadows_drawn(|pipeline, at| pipeline.draw(at, &[shadow(7.0, 9.0)]));
+    let moved =
+        drawn_on_square(|pipeline: &mut ShadowPipeline, at| pipeline.draw(at, &[shadow(7.0, 9.0)]));
 
     // When: kept at 4, 4 and drawn shifted by 3, 5
-    let shifted = shadows_drawn(|pipeline, at| {
+    let shifted = drawn_on_square(|pipeline: &mut ShadowPipeline, at| {
         let bytes = ShadowPipeline::bytes(&[shadow(4.0, 4.0)]);
         let range = pipeline.keep(at, &bytes).expect("room");
-        pipeline.draw_kept(at, &range, [3.0, 5.0]);
+        pipeline.draw_kept(at, &range, Shift::whole([3.0, 5.0]));
         pipeline.release(range);
     });
 

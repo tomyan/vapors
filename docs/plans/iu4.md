@@ -472,6 +472,10 @@ keys):
 - Measured (`docs/perf/iu4-4c-2026-11-13.md`): Scroll writes 5 of 53
   batches. Its draw is still O(rows) through the `batches` step until
   PR 5.
+4c-i (review at 015ead5, L5): the painter passes `Shift::NONE` at
+4c-i's head, so its forwarding of each frame's shift is pinned only in
+4c-ii. 4c-ii must include a pixel test that only the correct shift
+passes, at a scale other than 1.
 
 ### 4a to 4c land together
 

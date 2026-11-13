@@ -6,7 +6,7 @@
 //! built at an atlas generation behind the atlas's name moved glyphs:
 //! drawing them panics; build them again.
 
-use vapors_renderer::KeptRange;
+use vapors_renderer::{KeptRange, Shift};
 
 use crate::atlas::{AtlasError, GlyphAtlas};
 use crate::atlas_pins::AtlasPins;
@@ -95,7 +95,7 @@ impl TextPipeline {
         atlas: &mut GlyphAtlas,
         (kept, pins): (&KeptRange, &AtlasPins),
         params: BlendParams,
-        shift: [f32; 2],
+        shift: Shift,
     ) {
         let (built, now) = (pins.generation(), atlas.generation());
         assert_eq!(

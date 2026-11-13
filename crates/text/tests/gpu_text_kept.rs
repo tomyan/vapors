@@ -10,7 +10,7 @@ mod painter;
 use std::cell::RefCell;
 
 use painter::Painter;
-use vapors_renderer::KeptRange;
+use vapors_renderer::{KeptRange, Shift};
 use vapors_text::{
     AtlasConfig, AtlasPins, BlendParams, Family, Layout, LayoutOptions, Style, TextDraw,
     TextPipeline,
@@ -18,7 +18,7 @@ use vapors_text::{
 
 const PAGE: u32 = 128;
 /// No scroll frame's shift.
-const NONE: [f32; 2] = [0.0; 2];
+const NONE: Shift = Shift::NONE;
 
 /// The first frame: `text`'s bytes built, pinned, kept and drawn.
 fn keep_and_draw(painter: &mut Painter, text: &str) -> (Vec<u8>, KeptRange, AtlasPins) {
@@ -112,7 +112,13 @@ fn gpu_kept_text_drawn_with_a_shift_matches_the_text_drawn_at_the_moved_origin()
     // When: its bytes kept at 2, 4 drawn shifted by 3, 5
     let shifted = painter.frame(|pipeline, atlas, target| {
         let params = BlendParams::default();
-        pipeline.draw_kept(target, atlas, (&range, &pins), params, [3.0, 5.0]);
+        pipeline.draw_kept(
+            target,
+            atlas,
+            (&range, &pins),
+            params,
+            Shift::whole([3.0, 5.0]),
+        );
         Ok(())
     });
 
