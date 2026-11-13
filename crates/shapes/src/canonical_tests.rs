@@ -67,9 +67,10 @@ fn the_bytes_are_the_paint_then_each_command_with_its_numbers() {
     }
     expected.push(b'Z');
     assert_eq!(stroke.bytes(), expected);
-    let arc = canonical("M0 0A1 2 30 1 0 4 4", Paint::Fill(FillRule::NonZero));
+    // radii large enough for the chord, so the pen leaves them as written
+    let arc = canonical("M0 0A8 9 30 1 0 4 4", Paint::Fill(FillRule::NonZero));
     let mut expected = vec![b'F', b'M', 0, 0, 0, 0, 0, 0, 0, 0, b'A'];
-    for n in [1.0f32, 2.0, 30.0] {
+    for n in [8.0f32, 9.0, 30.0] {
         expected.extend_from_slice(&n.to_le_bytes());
     }
     expected.push(0b01);
