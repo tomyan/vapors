@@ -4,13 +4,19 @@
 //! the offsets by element, and the moved slots with a comparison of
 //! every held slot's rect and padding with the last paint's. The chain
 //! the next update's walk follows (`up`, `containing`) is compared too,
-//! so a broken chain fails on the update that broke it.
+//! so a broken chain fails on the update that broke it. Rects are kept
+//! in scroll-frame coordinates (IU4), so they are compared with a fresh
+//! placement at no scroll offset, and each slot's rect on the page,
+//! snapped as paint snaps it and shifted by its frames' whole shifts
+//! (`frames.rs`), with what today's placement with the offsets applied
+//! puts on the page (`placement_check_page.rs`).
 
 use rustc_hash::FxHashSet;
 
 use crate::changed_slots::ChangedSlots;
 use crate::layout::{BoxRect, Content, LayoutBox, containing_blocks, placed};
 use crate::placement::{LaidOut, NO_SLOT, Placed, Placement};
+use crate::placement_check_page::FreshRects;
 use crate::scroll::Offsets;
 
 /// What placement started from: the offsets, rects, paddings and each
@@ -22,11 +28,13 @@ pub(crate) struct Before {
     offsets: Vec<[f32; 2]>,
 }
 
-/// A fresh placement: each slot's rect, padding and offset.
+/// A fresh placement: each slot's rect in its frame, padding, offset,
+/// and rect on the page.
 struct Fresh {
     rects: Vec<BoxRect>,
     paddings: Vec<taffy::Rect<f32>>,
     offsets: Vec<[f32; 2]>,
+    on_page: Vec<BoxRect>,
 }
 
 impl Before {
@@ -47,13 +55,23 @@ impl Fresh {
     fn of(before: &Before, boxes: &LaidOut<'_>) -> (Self, Offsets) {
         let mut scroll = before.scroll.clone();
         let offsets = scroll.settle(boxes.boxes, boxes.scrolls, boxes.scale);
-        let (rects, paddings) = placed(boxes.boxes, &offsets);
+        let (rects, paddings) = placed(boxes.boxes, &vec![[0.0; 2]; offsets.len()]);
+        let (on_page, _) = placed(boxes.boxes, &offsets);
         let fresh = Self {
             rects,
             paddings,
             offsets,
+            on_page,
         };
         (fresh, scroll)
+    }
+
+    /// Its rects in their frames and on the page.
+    fn page(&self) -> FreshRects<'_> {
+        FreshRects {
+            in_frame: &self.rects,
+            on_page: &self.on_page,
+        }
     }
 }
 
@@ -78,18 +96,13 @@ pub(crate) fn assert_same(
     let held = held(boxes.boxes);
     assert_slots_same(kept, &fresh, &held);
     assert_chain_same(kept, boxes.boxes, &held);
+    crate::placement_check_page::assert_on_page_same((kept, boxes), &fresh.page(), &held);
     if !scroll.same_offsets(&fresh_scroll) {
         fail("the offsets by element differ from a fresh settle");
     }
     if !changed.every {
-        let moved: Vec<usize> = placed
-            .moved
-            .iter()
-            .chain(&placed.scrolled)
-            .copied()
-            .collect();
-        assert_moved_same(before, &fresh, &held, (&moved, changed));
-        assert_scrolled_by_scrolls(before, &fresh, kept, &placed.scrolled);
+        assert_moved_same(before, &fresh, &held, (&placed.moved, changed));
+        assert_offsets_moved_same(before, &fresh, &held, (&placed.offsets_moved, changed));
     }
 }
 
@@ -128,8 +141,7 @@ fn assert_moved_same(
     held: &[usize],
     (moved, changed): (&[usize], &ChangedSlots),
 ) {
-    let freed = changed.freed.iter().map(|(slot, _)| *slot);
-    let changed: FxHashSet<usize> = changed.rebuilt.iter().copied().chain(freed).collect();
+    let changed = built_or_freed(changed);
     let differs = |slot: &&usize| {
         let slot = **slot;
         let was = (before.rects.get(slot), before.paddings.get(slot));
@@ -153,7 +165,7 @@ fn first_differing(a: &[usize], b: &[usize]) -> Option<usize> {
         .or_else(|| a.get(b.len()).or_else(|| b.get(a.len())).copied())
 }
 
-fn fail(what: &str) -> ! {
+pub(crate) fn fail(what: &str) -> ! {
     panic!(
         "the kept placement differs from a fresh one: {what}; a box whose layout, scroll \
          offset or containing block changed is not marked (crates/elements/src/placement.rs, \
@@ -162,45 +174,37 @@ fn fail(what: &str) -> ! {
     )
 }
 
-/// Fails on the first `scrolled` slot whose rect moved by other than
-/// the offset deltas of the scroll containers it is placed in (the
-/// chain `up`), so a slot moved by layout and reported as scrolled is
-/// caught.
-fn assert_scrolled_by_scrolls(
+/// Fails on the first `held` slot, neither built again nor freed, in
+/// one of `offsets_moved` and the slots whose offset as applied
+/// differs from `before`'s, but not the other: a scroll is reported to
+/// paint by this alone, as it moves no slot (IU4).
+// Exact: an offset kept is the same bits.
+#[allow(clippy::float_cmp)]
+fn assert_offsets_moved_same(
     before: &Before,
     fresh: &Fresh,
-    kept: &Placement,
-    scrolled: &[usize],
+    held: &[usize],
+    (offsets_moved, changed): (&[usize], &ChangedSlots),
 ) {
-    for &slot in scrolled {
-        let moved = [
-            fresh.rects[slot].x - before.rects[slot].x,
-            fresh.rects[slot].y - before.rects[slot].y,
-        ];
-        let by_scrolls = scrolls_above(before, fresh, kept, slot);
-        // sums of applied offsets against a rect the walk summed
-        let same =
-            (moved[0] - by_scrolls[0]).abs() < 1e-3 && (moved[1] - by_scrolls[1]).abs() < 1e-3;
-        if !same {
-            fail(&format!(
-                "slot {slot} reported scrolled moved by {moved:?}, its containers' scrolls by {by_scrolls:?}"
-            ));
-        }
+    let changed = built_or_freed(changed);
+    let was = |slot: usize| before.offsets.get(slot).copied().unwrap_or_default();
+    let differs = |slot: &&usize| !changed.contains(*slot) && was(**slot) != fresh.offsets[**slot];
+    let expected: Vec<usize> = held.iter().filter(differs).copied().collect();
+    let mut reported: Vec<usize> = offsets_moved
+        .iter()
+        .filter(|slot| !changed.contains(*slot))
+        .copied()
+        .collect();
+    reported.sort_unstable();
+    if let Some(slot) = first_differing(&expected, &reported) {
+        fail(&format!(
+            "slot {slot}: offsets moved {expected:?}, reported {reported:?}"
+        ));
     }
 }
 
-/// How far the scrolls of the containers `slot` is placed in moved its
-/// content between `before` and `fresh`.
-fn scrolls_above(before: &Before, fresh: &Fresh, kept: &Placement, slot: usize) -> [f32; 2] {
-    let mut by_scrolls = [0.0_f32, 0.0];
-    let mut up = kept.up[slot];
-    while up != NO_SLOT {
-        let (was, now) = (before.offsets[up], fresh.offsets[up]);
-        by_scrolls = [
-            by_scrolls[0] + was[0] - now[0],
-            by_scrolls[1] + was[1] - now[1],
-        ];
-        up = kept.up[up];
-    }
-    by_scrolls
+/// The slots `changed` built again or freed.
+fn built_or_freed(changed: &ChangedSlots) -> FxHashSet<usize> {
+    let freed = changed.freed.iter().map(|(slot, _)| *slot);
+    changed.rebuilt.iter().copied().chain(freed).collect()
 }

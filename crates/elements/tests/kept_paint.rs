@@ -88,7 +88,7 @@ fn a_built_box_paints_again() {
 }
 
 #[test]
-fn a_scroll_alone_shifts_the_scrolled_rows_and_paints_none() {
+fn a_scroll_alone_paints_and_shifts_no_row() {
     // Given: html, body, the list and its 4 rows
     let mut list = list("overflow: auto;");
 
@@ -96,10 +96,10 @@ fn a_scroll_alone_shifts_the_scrolled_rows_and_paints_none() {
     assert!(scroll(&mut list.doc, [0.0, 30.0]));
     list.doc.update(at(1.0)).expect("updates");
 
-    // Then: the rows moved whole pixels, so their kept paint is
-    // shifted (IU3 3c-3e, `kept_shift.rs`)
+    // Then: the rows are kept in the list's scroll frame, which the
+    // scroll shifted (IU4, `frames.rs`)
     assert_eq!(work(list.doc.update_counts()), (0, 0, 0));
-    assert_eq!(list.doc.update_counts().boxes_shifted, 4);
+    assert_eq!(list.doc.update_counts().boxes_shifted, 0);
 }
 
 #[test]

@@ -152,7 +152,11 @@ impl Clips {
     /// by `Clips::of`, never redone here.
     fn redo(&mut self, slot: usize, tree: &ClipTree, inner: Inner<'_>) -> bool {
         let parent = tree.parent(slot);
-        let own = parent.and_then(|parent| self.inner[parent]);
+        // A scroll container's content starts a frame with no clip of
+        // its own: the frame's clip is applied on read (`frames.rs`).
+        let own = parent
+            .filter(|&parent| !inner.scrolls(parent))
+            .and_then(|parent| self.inner[parent]);
         let frame = parent.map_or(PAGE, |parent| self.frame_inside(parent, inner));
         let new = inner.inner(slot, own);
         self.own[slot] = own;

@@ -21,8 +21,11 @@ const NO_RECT: BoxRect = BoxRect {
     height: 0.0,
 };
 
-/// Each slot's border box, scroll offsets applied, its padding and
-/// scroll offset, and what placing it again needs.
+/// Each slot's border box in its scroll frame (IU4: as if no box above
+/// it were scrolled, `docs/plans/iu4.md` section 3), its padding and
+/// scroll offset, and what placing it again needs. A scroll moves no
+/// content: paint adds each frame's rounded offsets on read
+/// (`frames.rs`).
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Placement {
     pub(crate) rects: Vec<BoxRect>,

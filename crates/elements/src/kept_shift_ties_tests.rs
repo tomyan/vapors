@@ -1,6 +1,6 @@
-//! Moves `kept_shift.rs` refuses because a snapped edge would not move
-//! with the box, and the part entries paint derives from more than the
-//! rect.
+//! Moves across zero at half device pixels, which `kept_shift.rs`
+//! shifts since edges snap half up, and the part entries paint derives
+//! from more than the rect, which it refuses.
 
 use vapors_dom::NodeId;
 
@@ -29,30 +29,31 @@ fn shift_at_scale(part: &KeptBox, to: BoxRect, scale: f32) -> Option<Shift> {
 }
 
 #[test]
-fn a_half_pixel_edge_crossing_zero_at_1_5x_is_painted_again() {
+fn a_half_pixel_edge_crossing_zero_at_1_5x_is_shifted() {
     // Given: a 25 px box at y -26 (-39 device pixels), its bottom at
-    // -1.5, which rounds to -2
+    // -1.5, which rounds half up to -1
     let part = kept(painting(tall(-26.0, 25.0)), tall(-26.0, 25.0));
 
     // When: it moves 28 px (42 device pixels) to y 2, bottom 40.5,
-    // which rounds to 41, not -2 + 42
+    // which rounds to 41, -1 + 42
     let shift = shift_at_scale(&part, tall(2.0, 25.0), 1.5);
 
-    // Then
-    assert!(shift.is_none());
+    // Then: half-up rounding moves with the box (iu4.md section 3)
+    assert!(shift.is_some());
 }
 
 #[test]
-fn a_half_pixel_edge_crossing_zero_at_1_25x_is_painted_again() {
-    // Given: a 10 px box at y -12 (-15 device pixels), bottom -2.5
+fn a_half_pixel_edge_crossing_zero_at_1_25x_is_shifted() {
+    // Given: a 10 px box at y -12 (-15 device pixels), bottom -2.5,
+    // which rounds half up to -2
     let part = kept(painting(tall(-12.0, 10.0)), tall(-12.0, 10.0));
 
-    // When: it moves 16 px (20 device pixels), bottom 17.5 -> 18, not
-    // -3 + 20
+    // When: it moves 16 px (20 device pixels), bottom 17.5 -> 18,
+    // -2 + 20
     let shift = shift_at_scale(&part, tall(4.0, 10.0), 1.25);
 
     // Then
-    assert!(shift.is_none());
+    assert!(shift.is_some());
 }
 
 #[test]
@@ -68,10 +69,10 @@ fn a_half_pixel_edge_staying_above_zero_at_1_5x_is_shifted() {
 }
 
 #[test]
-fn a_content_box_edge_crossing_zero_at_1_5x_is_painted_again() {
+fn a_content_box_edge_crossing_zero_at_1_5x_is_shifted() {
     // Given: a content box inset 1 px; its top at y -2 + 1 is -1.5
-    // device pixels, which rounds to -2, while the border box's edges
-    // are whole
+    // device pixels, which rounds half up to -1, while the border box's
+    // edges are whole
     let part = kept(painting(tall(-2.0, 10.0)), tall(-2.0, 10.0));
     let inset = |at: BoxRect| {
         let content = BoxRect {
@@ -84,7 +85,7 @@ fn a_content_box_edge_crossing_zero_at_1_5x_is_painted_again() {
     let node = super::tests::NODE;
 
     // When: 28 px (42 device pixels) down, the top is 40.5, rounding
-    // to 41, not -2 + 42
+    // to 41, -1 + 42
     let shift = Shift::of(
         0,
         (&part, &Content::Element(node)),
@@ -93,7 +94,7 @@ fn a_content_box_edge_crossing_zero_at_1_5x_is_painted_again() {
     );
 
     // Then
-    assert!(shift.is_none());
+    assert!(shift.is_some());
 }
 
 #[test]

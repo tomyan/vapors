@@ -34,6 +34,9 @@ pub(crate) struct Touched {
     /// Nodes a refused take found named by an id whose element changed,
     /// to read again.
     pub(crate) renamed: NodeSet,
+    /// The scroll containers whose offset as applied changed: each moves
+    /// the hoisted nodes in its frame on the page (`a11y_mirror_reach`).
+    pub(crate) scrolled: NodeSet,
 }
 
 pub(crate) struct AxMirror {
@@ -42,6 +45,9 @@ pub(crate) struct AxMirror {
     touched: Touched,
     /// The records last emitted, by node.
     pub(crate) records: NodeMap<AxMirrorNode>,
+    /// The nodes whose record last emitted is hoisted: bounds from the
+    /// viewport (`a11y_mirror_bounds.rs`).
+    pub(crate) hoisted: NodeSet,
     /// The focused node as last emitted.
     pub(crate) focus: Option<NodeId>,
     index: Option<AxIndex>,
@@ -57,6 +63,7 @@ impl Default for AxMirror {
             all: true,
             touched: Touched::default(),
             records: NodeMap::default(),
+            hoisted: NodeSet::default(),
             focus: None,
             index: None,
             counts: AxTakeCounts::default(),
@@ -86,10 +93,15 @@ impl AxMirror {
         for (_, key) in &changed.freed {
             self.touched.nodes.insert(node_of(*key));
         }
+        let scrolled = changed
+            .offsets_moved
+            .iter()
+            .filter_map(|&slot| slots.key(slot));
+        self.touched.scrolled.extend(scrolled.map(node_of));
     }
 
-    /// Notes `node` scrolled: its offset changed, which moves no box of
-    /// its own, and the boxes it moved are left out (`Placed::scrolled`).
+    /// Notes `node` scrolled: its offset changed, which moves no box
+    /// (its content is in its own scroll frame, IU4).
     /// An offset clamped by an update is read without this: the boxes
     /// built, moved or freed inside it reach it as their ancestor.
     pub(crate) fn touch_node(&mut self, node: NodeId) {
@@ -109,7 +121,8 @@ impl AxMirror {
 
     /// Whether nothing was touched since the last take.
     pub(crate) fn touched_nothing(&self) -> bool {
-        self.touched.nodes.is_empty() && self.touched.renamed.is_empty()
+        let touched = &self.touched;
+        touched.nodes.is_empty() && touched.renamed.is_empty() && touched.scrolled.is_empty()
     }
 
     /// What was touched since the last take; cleared.
@@ -129,6 +142,7 @@ impl AxMirror {
         touched.nodes.extend(self.touched.nodes.drain());
         touched.replaced.extend(self.touched.replaced.drain());
         touched.renamed.extend(self.touched.renamed.drain());
+        touched.scrolled.extend(self.touched.scrolled.drain());
         self.touched = touched;
         self.index = Some(index);
     }
@@ -136,6 +150,8 @@ impl AxMirror {
     /// Keeps `nodes` as the records of every node, after a take of all.
     pub(crate) fn reset(&mut self, nodes: &[AxMirrorNode], index: AxIndex, focus: Option<NodeId>) {
         self.records = nodes.iter().map(|n| (n.node, n.clone())).collect();
+        let hoisted = nodes.iter().filter(|n| n.hoisted);
+        self.hoisted = hoisted.map(|n| n.node).collect();
         self.touched = Touched::default();
         self.all = false;
         self.index = Some(index);
@@ -152,9 +168,11 @@ impl AxMirror {
     ) -> AxUpdate {
         for node in &diff.removed {
             self.records.remove(node);
+            self.hoisted.remove(node);
         }
         for record in &diff.nodes {
             self.records.insert(record.node, record.clone());
+            self.note_hoisted(record);
         }
         let moved = (focus != self.focus).then_some(focus);
         self.focus = focus;
@@ -165,6 +183,17 @@ impl AxMirror {
             nodes: diff.nodes,
             placed,
             focus: moved,
+        }
+    }
+}
+
+impl AxMirror {
+    /// Keeps [`AxMirror::hoisted`] in step with `record`, just emitted.
+    fn note_hoisted(&mut self, record: &AxMirrorNode) {
+        if record.hoisted {
+            self.hoisted.insert(record.node);
+        } else {
+            self.hoisted.remove(&record.node);
         }
     }
 }

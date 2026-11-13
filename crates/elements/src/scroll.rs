@@ -137,11 +137,19 @@ impl Offset {
     }
 }
 
-/// An offset `at` as paint applies it: rounded to whole device pixels
-/// at `scale`, in CSS pixels. The a11y mirror reads the same
-/// (`a11y_mirror_bounds.rs`).
+/// The shift a scroll container's offset `at` gives the content of its
+/// frame at `scale`: device pixels, whole. The one answer to how far a
+/// scroll moves its frame: paint's frames (`paint_partial.rs`), the
+/// placement check (`placement_check_page.rs`) and, through
+/// [`applied`], placement and the a11y mirror read it.
+pub(crate) fn frame_shift(at: [f32; 2], scale: f32) -> [f32; 2] {
+    at.map(|v| -(v * scale).round())
+}
+
+/// An offset `at` as paint applies it, in CSS pixels: its frame shift
+/// ([`frame_shift`]) at `scale`, negated.
 pub(crate) fn applied(at: [f32; 2], scale: f32) -> [f32; 2] {
-    at.map(|v| (v * scale).round() / scale)
+    frame_shift(at, scale).map(|shift| -shift / scale)
 }
 
 /// How far box `index` scrolls on each axis: its content's extent past
