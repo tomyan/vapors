@@ -103,13 +103,21 @@ markings seen up close in 3D, is to be measured in S3b.
 Antialiasing differs by kind. A closed-form shape has a distance to its
 edge in the fragment shader, so analytic coverage from `fwidth` works
 as it does for boxes. A tessellated mesh has interior triangle edges
-with no edge distance; analytic coverage for it needs each vertex to
-carry its distance to the outline (edge flags or distances per
-triangle, evaluated with `fwidth`), built at tessellation time but
-evaluated after the transform. A CPU fringe of fixed width is early
-antialiasing and is not a candidate (the brief, "Antialiasing after
-every transform"). S3b compares, for each kind, MSAA against that
-kind's analytic method.
+with no edge distance; analytic coverage for it needs distances per
+triangle, evaluated with `fwidth`, built at tessellation time but
+evaluated after the transform. S2 builds them as three distances per
+vertex, one to each edge of its own triangle (zero on the two edges
+the vertex is on, its altitude to the third, and a far value for an
+edge two triangles share, found by counting each edge's uses in
+lyon's output), so a fragment's coverage is taken from the nearest
+outline edge. One distance per shared vertex was not possible: every
+vertex of a convex fill, and every vertex lyon's stroker emits, lies
+on the outline at distance zero, and a corner triangle has two
+outline edges. The cost is 20 bytes per vertex, three vertices per
+triangle and no index buffer (`crates/shapes/src/mesh_edges.rs`). A
+CPU fringe of fixed width is early antialiasing and is not a
+candidate (the brief, "Antialiasing after every transform"). S3b
+compares, for each kind, MSAA against that kind's analytic method.
 
 A literal outside the subset is refused at build time naming file, line
 and the fix, as the compiler refuses other attributes today

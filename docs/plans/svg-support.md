@@ -232,8 +232,9 @@ below.
   anti-aliasing is off exact coverage, the pixel is compared with
   exact coverage and declared, as `paint_support/exact.rs` does for
   Mute.
-- **Cost:** per entry, 12 bytes per vertex (position and outline
-  distance) and 2 to 4 bytes per index, to be measured in S5a; no new
+- **Cost:** per entry, 20 bytes per vertex (position and three edge
+  distances) and three vertices per triangle with no index buffer
+  (one-scene 1.2, as S2 built it), to be measured in S5a; no new
   dependency beyond S2's lyon.
 - **Verdict:** support (V1, V2).
 
@@ -248,12 +249,10 @@ below.
   the canonical form. `miter-clip` and `arcs` are refused: Chromium
   draws them as `miter`, and vapors does not draw one thing as
   another; the refusal names `miter`. Outline distance for stroke
-  meshes: lyon's stroke vertices carry `side` (-1 to 1 across the
-  stroke) and `advancement` (arc length along it); the distance to
-  the outline is the smaller of `(1 - |side|) * width / 2` and the
-  distance to the nearer end along the path, both interpolated by the
-  rasteriser, which is exact on straight segments and first-order on
-  round joins and caps. S3b's measurement decides whether that is
+  meshes: as for fills, three per-edge distances per vertex of each
+  triangle, the outline edges found by their use count in lyon's
+  output (one-scene 1.2, as S2 built it); exact on straight segments
+  and first-order on round joins and caps. S3b's measurement decides whether that is
   within the rules; if not, round joins and caps are tessellated with
   an explicit centre vertex. Dashes: the flattened path is split by
   the dash pattern into subpaths at build time, each then stroked with

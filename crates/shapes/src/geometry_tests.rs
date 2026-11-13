@@ -2,20 +2,14 @@
 
 use super::*;
 
-const V: MeshVertex = MeshVertex {
-    position: [0.0, 0.0],
-    outline_distance: 0.0,
-};
+const fn vertex(position: [f32; 2], edges: [f32; 3]) -> MeshVertex {
+    MeshVertex { position, edges }
+}
+
 const TRIANGLE: [MeshVertex; 3] = [
-    V,
-    MeshVertex {
-        position: [4.0, 0.0],
-        outline_distance: 0.0,
-    },
-    MeshVertex {
-        position: [0.0, 4.0],
-        outline_distance: 0.0,
-    },
+    vertex([0.0, 0.0], [2.8, 0.0, 0.0]),
+    vertex([4.0, 0.0], [0.0, 4.0, 0.0]),
+    vertex([0.0, 4.0], [0.0, 0.0, 4.0]),
 ];
 
 fn rect(size: [f32; 2], radius: [f32; 2]) -> Geometry {
@@ -46,8 +40,7 @@ fn drawable_geometries_pass() {
         rect([2.0, 3.0], [1.0, 1.0]),
         ellipse([8.0, 8.0], [3.0, 3.0]),
         Geometry::Mesh {
-            vertices: &TRIANGLE,
-            indices: &[0, 1, 2],
+            triangles: &[TRIANGLE],
         },
     ];
 
@@ -114,6 +107,14 @@ fn a_corner_radius_the_box_shader_cannot_draw_is_refused() {
             "a corner radius of [1.0, 2.5] is over half the size [10.0, 4.0]; the emitter clamps rx to width / 2 and ry to height / 2, as SVG does",
         ),
         (
+            rect([4.0, 10.0], [3.0, 3.0]),
+            "a corner radius of [3.0, 3.0] is over half the size [4.0, 10.0]; the emitter clamps rx to width / 2 and ry to height / 2, as SVG does",
+        ),
+        (
+            rect([10.0, 4.0], [3.0, 3.0]),
+            "a corner radius of [3.0, 3.0] is over half the size [10.0, 4.0]; the emitter clamps rx to width / 2 and ry to height / 2, as SVG does",
+        ),
+        (
             rect([2.0, 3.0], [0.5, 1.0]),
             "corner radii [0.5, 1.0] differ, and the box shader draws circular corners; elliptical corners come with S3a",
         ),
@@ -126,70 +127,49 @@ fn a_corner_radius_the_box_shader_cannot_draw_is_refused() {
 }
 
 #[test]
-fn a_mesh_whose_indices_do_not_name_triangles_of_its_vertices_is_refused() {
-    // Given
-    let cases: [(&'static [MeshVertex], &'static [u32], &str); 4] = [
-        (
-            &[],
-            &[0, 1, 2],
-            "0 vertices and 3 indices; a mesh names at least one triangle",
-        ),
-        (
-            &TRIANGLE,
-            &[],
-            "3 vertices and 0 indices; a mesh names at least one triangle",
-        ),
-        (
-            &TRIANGLE,
-            &[0, 1],
-            "2 indices is not a whole number of triangles",
-        ),
-        (
-            &TRIANGLE,
-            &[0, 1, 3],
-            "index 3 at position 2 names no vertex; the mesh has 3",
-        ),
-    ];
-
+fn a_mesh_with_no_triangles_is_refused() {
     // When, Then
-    for (vertices, indices, reason) in cases {
-        refused(&Geometry::Mesh { vertices, indices }, reason);
-    }
+    refused(
+        &Geometry::Mesh { triangles: &[] },
+        "a mesh with no triangles draws nothing",
+    );
 }
 
 #[test]
-fn a_mesh_with_a_non_finite_vertex_is_refused_naming_its_position() {
+fn a_vertex_that_is_not_finite_or_has_a_negative_edge_distance_is_refused_naming_its_place() {
     // Given
-    static DISTANCE: [MeshVertex; 3] = [
-        V,
-        V,
-        MeshVertex {
-            position: [1.0, 1.0],
-            outline_distance: f32::NAN,
-        },
+    static NAN_POSITION: [[MeshVertex; 3]; 2] = [
+        TRIANGLE,
+        [TRIANGLE[0], vertex([f32::NAN, 1.0], [0.0; 3]), TRIANGLE[2]],
     ];
-    static POSITION: [MeshVertex; 3] = [
-        V,
-        MeshVertex {
-            position: [f32::INFINITY, 1.0],
-            outline_distance: 0.0,
-        },
-        V,
-    ];
+    static INFINITE_EDGE: [[MeshVertex; 3]; 1] = [[
+        TRIANGLE[0],
+        TRIANGLE[1],
+        vertex([0.0, 4.0], [0.0, 0.0, f32::INFINITY]),
+    ]];
+    static NEGATIVE_EDGE: [[MeshVertex; 3]; 1] = [[
+        vertex([0.0, 0.0], [-1.0, 0.0, 0.0]),
+        TRIANGLE[1],
+        TRIANGLE[2],
+    ]];
 
     // When, Then
     refused(
         &Geometry::Mesh {
-            vertices: &DISTANCE,
-            indices: &[0, 1, 2],
+            triangles: &NAN_POSITION,
         },
-        "vertex 2 MeshVertex { position: [1.0, 1.0], outline_distance: NaN } is not finite",
+        "triangle 1 corner 1 MeshVertex { position: [NaN, 1.0], edges: [0.0, 0.0, 0.0] } is not finite or has a negative edge distance",
     );
     refused(
         &Geometry::Mesh {
-            vertices: &POSITION,
-            indices: &[0, 1, 2],
+            triangles: &INFINITE_EDGE,
         },
-        "vertex 1 MeshVertex { position: [inf, 1.0], outline_distance: 0.0 } is not finite",
+        "triangle 0 corner 2 MeshVertex { position: [0.0, 4.0], edges: [0.0, 0.0, inf] } is not finite or has a negative edge distance",
+    );
+    refused(
+        &Geometry::Mesh {
+            triangles: &NEGATIVE_EDGE,
+        },
+        "triangle 0 corner 0 MeshVertex { position: [0.0, 0.0], edges: [-1.0, 0.0, 0.0] } is not finite or has a negative edge distance",
     );
 }

@@ -28,36 +28,39 @@ pub enum Geometry {
         /// Its radii, both above zero.
         radii: [f32; 2],
     },
-    /// Triangles from the tessellator, for every other shape. Winding
-    /// is not checked, so the mesh pipeline must not cull faces.
+    /// Triangles from the tessellator, for every other shape, each
+    /// with its own three vertices (no index buffer: a vertex's edge
+    /// distances belong to one triangle). Winding is not checked, so
+    /// the mesh pipeline must not cull faces.
     Mesh {
-        /// The vertices the indices name.
-        vertices: &'static [MeshVertex],
-        /// Three indices per triangle, each below the vertex count.
-        indices: &'static [u32],
+        /// The triangles.
+        triangles: &'static [[MeshVertex; 3]],
     },
 }
 
-/// A vertex of a tessellated shape: 12 bytes, as docs/plans/svg-support.md
-/// 3.1 costs it, in field order, so the table's vertex slices upload
-/// as they are.
+/// A vertex of one triangle of a tessellated shape: 20 bytes, in field
+/// order, so the table's triangles upload as they are.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MeshVertex {
     /// Its position in viewBox units.
     pub position: [f32; 2],
-    /// Its distance to the shape's outline, from which the fragment
-    /// shader takes coverage after the transform (one-scene.md 1.2).
-    pub outline_distance: f32,
+    /// Its distance to each of the triangle's three edges, edge `i`
+    /// opposite corner `i`: zero on the two edges it lies on, its
+    /// altitude to the third, and far past the shape for an edge
+    /// inside it. Interpolated, each is a fragment's distance to that
+    /// edge's line, so the fragment shader takes coverage from the
+    /// nearest outline edge after the transform (one-scene.md 1.2).
+    pub edges: [f32; 3],
 }
 
-const _: () = assert!(size_of::<MeshVertex>() == 12);
+const _: () = assert!(size_of::<MeshVertex>() == 20);
 
 /// Why `geometry` cannot be drawn, if it cannot: a value that is not a
 /// finite number, a size or radius that is not above zero, a corner
 /// radius that is negative, over half the rect's side, or not equal to
-/// the other, or a mesh whose indices do not name its vertices as
-/// triangles.
+/// the other, or a mesh with no triangle or a vertex that is not
+/// finite or has a negative edge distance.
 ///
 /// # Errors
 /// The reason, without the crate and site [`ShapeTable::check`] adds.
@@ -76,7 +79,7 @@ pub fn check_geometry(geometry: &Geometry) -> Result<(), String> {
             finite("centre", *centre)?;
             positive("radii", *radii)
         }
-        Geometry::Mesh { vertices, indices } => check_mesh(vertices, indices),
+        Geometry::Mesh { triangles } => check_mesh(triangles),
     }
 }
 
@@ -118,41 +121,29 @@ fn positive(name: &str, values: [f32; 2]) -> Result<(), String> {
     Err(format!("{name} {values:?} is not above zero"))
 }
 
-/// Triangles over finite vertices. A degenerate triangle (repeated or
-/// collinear vertices) passes: it covers nothing and draws nothing, as
-/// a tessellator may emit at a cusp.
-fn check_mesh(vertices: &[MeshVertex], indices: &[u32]) -> Result<(), String> {
-    if vertices.is_empty() || indices.is_empty() {
-        return Err(format!(
-            "{} vertices and {} indices; a mesh names at least one triangle",
-            vertices.len(),
-            indices.len()
-        ));
+/// Triangles over finite vertices with edge distances of zero or
+/// more. A degenerate triangle (repeated or collinear vertices) passes:
+/// it covers nothing and draws nothing.
+fn check_mesh(triangles: &[[MeshVertex; 3]]) -> Result<(), String> {
+    if triangles.is_empty() {
+        return Err("a mesh with no triangles draws nothing".to_owned());
     }
-    if !indices.len().is_multiple_of(3) {
-        return Err(format!(
-            "{} indices is not a whole number of triangles",
-            indices.len()
-        ));
-    }
-    if let Some((at, index)) = indices
+    let bad = triangles
         .iter()
         .enumerate()
-        .find(|(_, i)| **i as usize >= vertices.len())
-    {
-        return Err(format!(
-            "index {index} at position {at} names no vertex; the mesh has {}",
-            vertices.len()
-        ));
-    }
-    match vertices.iter().position(|v| !is_finite(v)) {
-        Some(at) => Err(format!("vertex {at} {:?} is not finite", vertices[at])),
+        .flat_map(|(t, triangle)| triangle.iter().enumerate().map(move |(c, v)| (t, c, v)))
+        .find(|(_, _, v)| !is_drawable(v));
+    match bad {
+        Some((t, c, vertex)) => Err(format!(
+            "triangle {t} corner {c} {vertex:?} is not finite or has a negative edge distance"
+        )),
         None => Ok(()),
     }
 }
 
-fn is_finite(vertex: &MeshVertex) -> bool {
-    vertex.position.iter().all(|p| p.is_finite()) && vertex.outline_distance.is_finite()
+fn is_drawable(vertex: &MeshVertex) -> bool {
+    vertex.position.iter().all(|p| p.is_finite())
+        && vertex.edges.iter().all(|d| d.is_finite() && *d >= 0.0)
 }
 
 #[cfg(test)]
