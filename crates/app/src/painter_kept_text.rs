@@ -91,25 +91,37 @@ impl KeptGpu {
             atlas.unpin(pins);
             return Ok(());
         };
-        let gpu = TextGpu::new((range, pins), (run, painted), (bytes, self.frame));
+        let gpu = TextGpu::new((range.range(), pins), (run, painted), (bytes, self.frame));
         self.texts.insert(key, gpu);
         self.written += 1;
         Ok(())
     }
 }
 
-/// `bytes` written into `text`'s kept buffer: `Some(None)` for a batch
-/// with no ink, which keeps nothing; `None` when the write is refused
-/// (the refusal is on the target's encoder).
-fn kept_range(
-    text: &mut TextPipeline,
-    target: &Target<'_>,
-    bytes: &[u8],
-) -> Option<Option<KeptRange>> {
-    if bytes.is_empty() {
-        return Some(None);
+/// Where a batch's bytes went.
+enum Kept {
+    /// Into this range.
+    At(KeptRange),
+    /// Nowhere: the batch has no ink.
+    NoInk,
+}
+
+impl Kept {
+    fn range(self) -> Option<KeptRange> {
+        match self {
+            Self::At(range) => Some(range),
+            Self::NoInk => None,
+        }
     }
-    text.keep(target, bytes).map(Some)
+}
+
+/// `bytes` written into `text`'s kept buffer; `None` when the write is
+/// refused (the refusal is on the target's encoder).
+fn kept_range(text: &mut TextPipeline, target: &Target<'_>, bytes: &[u8]) -> Option<Kept> {
+    if bytes.is_empty() {
+        return Some(Kept::NoInk);
+    }
+    text.keep(target, bytes).map(Kept::At)
 }
 
 impl TextGpu {

@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use vapors_elements::BatchKey;
 use vapors_renderer::{KeptRange, Target};
 use vapors_scene::{Run, Size};
+use vapors_text::{GlyphAtlas, TextPipeline};
 
 use super::{Kind, Pipelines, run_bytes};
 
@@ -106,6 +107,14 @@ impl KeptGpu {
         let undrawn = self.texts.extract_if(|_, gpu| gpu.drawn != frame);
         let text = (&mut *pipelines.text, &mut *pipelines.atlas);
         undrawn.for_each(|(_, gpu)| gpu.release((&mut *text.0, &mut *text.1)));
+    }
+
+    /// Gives back every text and icon batch's range and pins: the
+    /// painter is going, and its atlas with it.
+    pub(super) fn release_texts(&mut self, text: &mut TextPipeline, atlas: &mut GlyphAtlas) {
+        for (_, gpu) in self.texts.drain() {
+            gpu.release((&mut *text, &mut *atlas));
+        }
     }
 
     /// The bytes the kept batches hold.

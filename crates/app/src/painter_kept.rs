@@ -139,6 +139,14 @@ impl ScenePainter {
     }
 }
 
+/// Gives the kept text pins back, which debug builds require of every
+/// `AtlasPins` (`vapors_text::AtlasPins`).
+impl Drop for ScenePainter {
+    fn drop(&mut self) {
+        self.kept.release_texts(&mut self.text, &mut self.atlas);
+    }
+}
+
 impl Pipelines<'_> {
     fn keep(&mut self, kind: Kind, target: &Target<'_>, bytes: &[u8]) -> Option<KeptRange> {
         match kind {

@@ -64,6 +64,10 @@ fn gpu_new_text_in_an_atlas_of_pinned_glyphs_clears_the_pins_and_every_text_batc
     assert_eq!(rebuilt.batches_written, 2, "both text batches: {rebuilt:?}");
     let fresh = Rig::new().draw(&doc).expect("paints");
     assert!(
+        in_clear == fresh,
+        "text drawn before the clear in its frame sampled the repacked page"
+    );
+    assert!(
         pixels == fresh,
         "text drawn from bytes kept before the clear"
     );
