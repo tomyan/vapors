@@ -36,6 +36,9 @@ check "changes listed" "$(expected_changes "$fixture" | xargs)" \
   "Class FlexText HoveredClass Idle Insert Resize Scroll ScrollSize Text"
 check "changes failed" "$(changes_that "$fixture" fail | xargs)" "Class HoveredClass Text"
 check "a block is its change's alone" "$(change_block "$fixture" Class | grep -c '74854')" 0
+printf '%s\n' "scaling-error-begin: Text" mine "scaling-error-end: Text" \
+  "scaling-error-begin: TextLong" theirs "scaling-error-end: TextLong" >"$work/prefix.log"
+check "a change named by another's prefix has its own block" "$(change_block "$work/prefix.log" Text | xargs)" mine
 check "parts of a growth failure" "$(change_block "$fixture" Class | failing_parts)" \
   "add frames frame (CPU), add frames paint, add frames update, remove frames paint"
 
