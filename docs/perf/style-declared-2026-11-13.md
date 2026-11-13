@@ -33,9 +33,9 @@ keywords to match them.
 `vapors-perf 60 10`, release, Intel UHD 630, load 30 to 70
 (instruction counts do not move with load). Before is main at
 00dbc38b with #279 (`docs/perf/style-s1-2026-11-13.md`'s baseline);
-after is this branch on main at 7c4fc70d, without #279 or #299, so
-its Insert frames carry the body check's 45 instructions per row and
-none of S1's saving.
+after is this branch on main at 7c4fc70d, which has #279 and not
+#299, so the Insert frames compare like for like and carry none of
+S1's saving.
 
 | workload | phase | before | after |
 |---|---|---|---|
