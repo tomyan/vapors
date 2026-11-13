@@ -25,23 +25,24 @@ pub(super) enum Source<'a> {
     /// The initial value, resolved.
     Initial,
     /// The parent's computed value, copied as it is: computed values
-    /// are absolute (lengths px, colours rgba, calcs with absolute
-    /// lengths), which `copied` checks in debug builds.
-    Parent,
+    /// are absolute (lengths px, calcs with absolute lengths, colours
+    /// rgba; `currentcolor` among them, where CSS Color 4 keeps the
+    /// keyword: issue #301), which `copied` checks in debug builds.
+    Parent(&'a ComputedStyle),
 }
 
 /// The source of one longhand's computed value: its winner, substituted
 /// when it holds `var()`, or what inheritance and the initial value give.
-pub(super) fn source<'w, 'c>(
+pub(super) fn source<'a, 'c>(
     id: PropertyId,
-    winners: &Winners<'w>,
-    parent: Option<&ComputedStyle>,
+    winners: &Winners<'a>,
+    parent: Option<&'a ComputedStyle>,
     lookup: &dyn Fn(&str) -> Option<&'c [ComponentValue]>,
-) -> Result<Source<'w>> {
+) -> Result<Source<'a>> {
     let Some(candidate) = &winners.longhands[id.index()] else {
         return Ok(unset(id, parent));
     };
-    let specified = match candidate.value {
+    let specified: Cow<'a, Specified> = match candidate.value {
         Specified::Pending { property, tokens } => Cow::Owned(resolve_pending(
             property,
             tokens,
@@ -51,30 +52,39 @@ pub(super) fn source<'w, 'c>(
         )?),
         other => Cow::Borrowed(other),
     };
-    Ok(match specified {
-        Cow::Borrowed(Specified::Value(v)) => Source::Declared(v),
-        Cow::Owned(Specified::Value(v)) => Source::Substituted(v),
-        Cow::Borrowed(Specified::Inherit) | Cow::Owned(Specified::Inherit) => inherited(parent),
-        Cow::Borrowed(Specified::Initial) | Cow::Owned(Specified::Initial) => Source::Initial,
-        Cow::Borrowed(Specified::Unset) | Cow::Owned(Specified::Unset) => unset(id, parent),
-        Cow::Borrowed(Specified::Pending { .. }) | Cow::Owned(Specified::Pending { .. }) => {
-            unreachable!("substitution removes every var()")
-        }
+    Ok(match keyword(&specified, id, parent) {
+        Some(source) => source,
+        None => match specified {
+            Cow::Borrowed(Specified::Value(v)) => Source::Declared(v),
+            Cow::Owned(Specified::Value(v)) => Source::Substituted(v),
+            _ => unreachable!("substitution removes every var(); keywords are handled above"),
+        },
     })
+}
+
+/// What a CSS-wide keyword gives; `None` for a value.
+fn keyword<'a>(
+    specified: &Specified,
+    id: PropertyId,
+    parent: Option<&'a ComputedStyle>,
+) -> Option<Source<'a>> {
+    match specified {
+        Specified::Inherit => Some(inherited(parent)),
+        Specified::Initial => Some(Source::Initial),
+        Specified::Unset => Some(unset(id, parent)),
+        Specified::Value(_) | Specified::Pending { .. } => None,
+    }
 }
 
 /// What `inherit` gives: the parent's computed value, or the initial
 /// value on the root.
-fn inherited(parent: Option<&ComputedStyle>) -> Source<'static> {
-    match parent {
-        Some(_) => Source::Parent,
-        None => Source::Initial,
-    }
+fn inherited(parent: Option<&ComputedStyle>) -> Source<'_> {
+    parent.map_or(Source::Initial, Source::Parent)
 }
 
 /// What no declaration, or `unset`, gives: `inherit` for an inherited
 /// property, `initial` for the rest.
-fn unset(id: PropertyId, parent: Option<&ComputedStyle>) -> Source<'static> {
+fn unset(id: PropertyId, parent: Option<&ComputedStyle>) -> Source<'_> {
     if id.inherited() {
         inherited(parent)
     } else {
@@ -86,7 +96,6 @@ fn unset(id: PropertyId, parent: Option<&ComputedStyle>) -> Source<'static> {
 pub(super) fn value_of(
     source: Source<'_>,
     id: PropertyId,
-    parent: Option<&ComputedStyle>,
     ctx: &Context,
     env: &Environment,
     current: Rgba,
@@ -95,10 +104,7 @@ pub(super) fn value_of(
         Source::Declared(v) => resolve(v, ctx, env.color_scheme, current),
         Source::Substituted(v) => resolve(&v, ctx, env.color_scheme, current),
         Source::Initial => resolve(initial(id), ctx, env.color_scheme, current),
-        Source::Parent => {
-            let parent = parent.expect("Source::Parent is only given with a parent");
-            Ok(copied(id, parent, ctx, env, current))
-        }
+        Source::Parent(parent) => Ok(copied(id, parent, ctx, env, current)),
     }
 }
 

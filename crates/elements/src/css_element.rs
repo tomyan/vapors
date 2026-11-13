@@ -55,6 +55,13 @@ impl<'a> ElementRef<'a> {
     fn previous_of(&self, id: NodeId) -> Option<NodeId> {
         self.arena.get(id, "css").previous
     }
+
+    /// The names in the `class` attribute, in order, without collecting.
+    fn classes(&self) -> impl Iterator<Item = &str> {
+        self.attribute("class")
+            .into_iter()
+            .flat_map(str::split_ascii_whitespace)
+    }
 }
 
 impl CssElement for ElementRef<'_> {
@@ -67,14 +74,11 @@ impl CssElement for ElementRef<'_> {
     }
 
     fn has_class(&self, class: &str) -> bool {
-        self.attribute("class")
-            .is_some_and(|names| names.split_ascii_whitespace().any(|name| name == class))
+        self.classes().any(|name| name == class)
     }
 
     fn class_names(&self) -> Vec<&str> {
-        self.attribute("class")
-            .map(|classes| classes.split_ascii_whitespace().collect())
-            .unwrap_or_default()
+        self.classes().collect()
     }
 
     fn attribute(&self, name: &str) -> Option<&str> {

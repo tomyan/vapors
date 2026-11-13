@@ -1,5 +1,5 @@
-//! Where each longhand's computed value comes from (`src/cascade/compute.rs`,
-//! `Source`): a declared value resolved, the parent's computed value
+//! Where each longhand's computed value comes from
+//! (`src/cascade/compute_source.rs`, `Source`): a declared value resolved, the parent's computed value
 //! copied as it is, the initial value resolved, or a `var()` winner
 //! substituted and resolved. The copies are what tell the paths apart:
 //! a parent's computed value is already absolute, so a child takes it
@@ -61,10 +61,31 @@ fn a_var_winner_is_substituted_then_resolved() {
 }
 
 #[test]
-fn a_var_winner_that_substitutes_to_inherit_copies_the_parent() {
-    let src = ".p { font-size: 10px; border-top-width: 2em; --k: inherit; } .c { font-size: 20px; border-top-width: var(--k); }";
+fn a_var_fallback_of_inherit_copies_the_parent() {
+    // Given: CSS Variables 1 section 2.3, a fallback used when the
+    // custom property is not set; a CSS-wide keyword in a custom
+    // property's own value is issue #300
+    let src = ".p { font-size: 10px; border-top-width: 2em; } .c { font-size: 20px; border-top-width: var(--missing, inherit); }";
     assert_eq!(
         css_at(src, &["div.p", "span.c"], "border-top-width"),
         "20px"
+    );
+}
+
+#[test]
+fn a_calc_that_is_not_finite_is_refused_naming_it() {
+    // Given: infinity minus infinity
+    let src = ".c { line-height: calc(1e308 * 10 - 1e308 * 10); }";
+    let (tree, leaf) = support::chain(&["div.c"]);
+
+    // When
+    let error = support::cascade(src)
+        .compute(&tree.node(leaf), None, &support::env())
+        .expect_err("refused");
+
+    // Then
+    assert!(
+        error.to_string().contains("line-height") && error.to_string().contains("finite"),
+        "{error}"
     );
 }

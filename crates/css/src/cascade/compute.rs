@@ -45,24 +45,31 @@ pub(crate) fn style(
 ) -> Result<ComputedStyle> {
     let custom = custom_properties(winners, parent)?;
     let lookup = |name: &str| custom.get(name).map(Vec::as_slice);
-    let font_size = font_size(winners, parent, env, &lookup)?;
+    let (font_size_id, color_id) = (named("font-size"), named("color"));
+    let font_size = font_size(font_size_id, winners, parent, env, &lookup)?;
     let root_font_size = parent.map_or(font_size, |p| p.root_font_size);
     let ctx = context(font_size, root_font_size, None, env);
-    let color = color(winners, parent, &ctx, env, &lookup)?;
+    let color = color(color_id, winners, parent, &ctx, env, &lookup)?;
     let mut values = Vec::with_capacity(PROPERTIES.len());
     for id in PropertyId::all() {
+        // the two read above: their sources are read once
+        if id == font_size_id {
+            values.push(Value::Length(Length::px(font_size)));
+            continue;
+        }
+        if id == color_id {
+            values.push(Value::Color(Color::Rgba(color)));
+            continue;
+        }
         let percent_base = (id.name() == "line-height").then_some(font_size);
         let ctx = Context {
             percent_base,
             ..ctx
         };
         let source = source(id, winners, parent, &lookup)?;
-        let value =
-            value_of(source, id, parent, &ctx, env, color).map_err(|e| at(&e, winners, id))?;
+        let value = value_of(source, id, &ctx, env, color).map_err(|e| at(&e, winners, id))?;
         values.push(value);
     }
-    let font_size_id = PropertyId::from_name("font-size").expect("table");
-    values[font_size_id.index()] = Value::Length(Length::px(font_size));
     super::font_weight::resolve_relative(&mut values, parent);
     let positions = winners
         .longhands
@@ -79,9 +86,15 @@ pub(crate) fn style(
     })
 }
 
+/// A longhand the table is known to hold.
+fn named(name: &str) -> PropertyId {
+    PropertyId::from_name(name).expect("table")
+}
+
 /// The computed font size: em and % against the parent's; rem on the
 /// root refers to the initial font size (Values Level 4 section 6.1.2).
 fn font_size<'a>(
+    id: PropertyId,
     winners: &Winners<'_>,
     parent: Option<&ComputedStyle>,
     env: &Environment,
@@ -90,16 +103,8 @@ fn font_size<'a>(
     let parent_font_size = parent.map_or(env.root_font_size, |p| p.font_size);
     let rem = parent.map_or(env.root_font_size, |p| p.root_font_size);
     let ctx = context(parent_font_size, rem, Some(parent_font_size), env);
-    let id = PropertyId::from_name("font-size").expect("table");
     let source = source(id, winners, parent, lookup)?;
-    match value_of(
-        source,
-        id,
-        parent,
-        &ctx,
-        env,
-        Rgba::from_rgba8(0, 0, 0, 255),
-    )? {
+    match value_of(source, id, &ctx, env, Rgba::from_rgba8(0, 0, 0, 255))? {
         Value::Length(l) => Ok(l.value),
         other => Err(Error::new(
             Position::default(),
@@ -110,6 +115,7 @@ fn font_size<'a>(
 
 /// The computed colour; `currentcolor` here means the parent's.
 fn color<'a>(
+    id: PropertyId,
     winners: &Winners<'_>,
     parent: Option<&ComputedStyle>,
     ctx: &Context,
@@ -117,9 +123,8 @@ fn color<'a>(
     lookup: &dyn Fn(&str) -> Option<&'a [ComponentValue]>,
 ) -> Result<Rgba> {
     let parent_color = parent.map_or(Rgba::from_rgba8(0, 0, 0, 255), |p| p.color);
-    let id = PropertyId::from_name("color").expect("table");
     let source = source(id, winners, parent, lookup)?;
-    match value_of(source, id, parent, ctx, env, parent_color)? {
+    match value_of(source, id, ctx, env, parent_color)? {
         Value::Color(Color::Rgba(c)) => Ok(c),
         other => Err(Error::new(
             Position::default(),
