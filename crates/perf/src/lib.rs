@@ -36,6 +36,7 @@ pub mod scene_judge;
 pub mod scene_report;
 pub mod scene_run;
 pub mod select;
+pub mod shader_cache;
 mod span_instructions;
 pub mod spans;
 pub mod stats;

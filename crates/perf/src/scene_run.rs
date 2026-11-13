@@ -9,21 +9,30 @@ use crate::racer_driven::DrivenRacer;
 use crate::sampler::{JudgedFrame, Sampler};
 use crate::scene_judge::{BUDGET, REPRODUCE, load_average, over_budget, quiet, require_timestamps};
 use crate::scene_report::{over_budget_lines, report};
+use crate::shader_cache::shader_cache;
 
-/// Runs the driven racer for [`RUN_FRAMES`] frames on `gpu` and prints
-/// the report.
+/// The revision the harness was built from (`build.rs`).
+pub const REVISION: &str = env!("VAPORS_PERF_REVISION");
+
+/// Runs the driven racer for [`RUN_FRAMES`] frames on the GPU `open`
+/// makes, after the shader cache is read, and prints the report.
 ///
 /// # Errors
-/// A device without timestamps or a busy machine, before the first
-/// frame; a frame refused or without a GPU reading, naming it; then
-/// every frame over budget and a busy machine at the end.
-pub fn run(gpu: &Gpu) -> Result<(), String> {
+/// Mesa's shader cache not chosen, a device without timestamps or a
+/// busy machine, before the first frame; a frame refused or without a
+/// GPU reading, naming it; then every frame over budget and a busy
+/// machine at the end.
+pub fn run(open: impl FnOnce() -> Gpu) -> Result<(), String> {
+    let cache = shader_cache(|name| std::env::var(name).ok())?;
+    let gpu = open();
     require_timestamps(gpu.device.features(), &gpu.adapter.get_info().name)?;
     let start = quiet("start", load_average())?;
+    println!("Revision: {REVISION}");
+    println!("Shader cache: {}", cache.describe());
     println!(
         "Frames: {RUN_FRAMES}, every one judged, no warmup; load average at the start {start:.2}\n"
     );
-    let frames = Sampler::new(gpu).judged(&mut DrivenRacer::new(), RUN_FRAMES)?;
+    let frames = Sampler::new(&gpu).judged(&mut DrivenRacer::new(), RUN_FRAMES)?;
     let end = load_average();
     println!("{}", report(&frames, start, end.clone().ok()));
     verdict(&frames, end)

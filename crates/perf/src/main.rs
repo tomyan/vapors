@@ -42,9 +42,11 @@ fn run() -> Result<(), String> {
         scene_run,
     } = options(std::env::args().skip(1))?;
     if scene_run {
-        let gpu = gpu_with(FEATURES);
-        print_adapter(&gpu);
-        return scene_run::run(&gpu);
+        return scene_run::run(|| {
+            let gpu = gpu_with(FEATURES);
+            print_adapter(&gpu);
+            gpu
+        });
     }
     if let Some(rows) = mount_memory {
         let gpu = gpu_with(FEATURES);

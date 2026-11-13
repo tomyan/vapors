@@ -23,6 +23,9 @@ vapors-scene.workspace = true
 vapors-signals.workspace = true
 vapors-text = { workspace = true, features = ["complex-script-breaks"] }
 
+[dev-dependencies]
+tempfile.workspace = true
+
 [build-dependencies]
 vapors-compiler.workspace = true
 

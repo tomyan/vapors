@@ -63,8 +63,10 @@ fn work_table(out: &mut String, frames: &[JudgedFrame]) {
     out.push_str("| per frame | median | max |\n|---|---|---|\n");
     for (name, pick) in WORK {
         let counts: Vec<u64> = frames.iter().map(pick).collect();
-        let median = median_count(&counts).unwrap_or_default();
-        let max = counts.iter().max().copied().unwrap_or_default();
+        let shown =
+            |value: Option<u64>| value.map_or_else(|| "no samples".into(), |v| v.to_string());
+        let median = shown(median_count(&counts));
+        let max = shown(counts.iter().max().copied());
         let _ = writeln!(out, "| {name} | {median} | {max} |");
     }
     out.push('\n');

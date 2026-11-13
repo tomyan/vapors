@@ -71,3 +71,16 @@ fn a_frame_over_budget_is_printed_with_its_time_on_the_clock_and_its_phases() {
     );
     assert!(lines.contains("phases (µs) update 1500.0"), "{lines}");
 }
+
+#[test]
+fn a_run_of_no_frames_reports_no_samples_in_both_tables() {
+    let report = report(&[], 0.0, None);
+    assert!(
+        report.contains("| frame to idle | no samples | no samples | no samples |"),
+        "{report}"
+    );
+    assert!(
+        report.contains("| draw calls | no samples | no samples |"),
+        "{report}"
+    );
+}
