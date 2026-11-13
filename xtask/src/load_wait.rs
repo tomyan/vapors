@@ -1,7 +1,10 @@
 //! Before `cargo xtask ci` and `cargo xtask gate` start: wait while the
-//! machine's one-minute load is over `[load] threshold`, saying so every
-//! [`SAY_EVERY`], and go on at `[load] deadline_minutes` saying that it
-//! did. Several worktrees share the dev machine; a run started into a
+//! machine's runnable tasks are over `[load] threshold`, reading them
+//! every [`READ_EVERY`] and saying so every [`SAY_EVERY`], and go on at
+//! `[load] deadline_minutes` saying that it did. The count of tasks
+//! runnable now, not the one-minute load average: the average decays
+//! for a minute or two after the work has gone (60 to 12 took 90 to
+//! 120 s in gate 271, docs/plans/factory-throughput.md C3). Several worktrees share the dev machine; a run started into a
 //! saturated one has timed out on its deadlines rather than failed on
 //! its code. An unreadable load is refused, never taken as low, naming
 //! `[load] wait = false` as the fix. A `ci` run inside a gate does not
@@ -19,6 +22,10 @@ pub use load_settings::{Settings, settings};
 
 /// How often the wait says the load it is waiting on.
 pub const SAY_EVERY: Duration = Duration::from_secs(30);
+/// How often the wait reads the runnable tasks: a step that starts once
+/// the CPUs free starts within this. Not a measurement; the read is one
+/// small file, so the period costs nothing either way.
+pub const READ_EVERY: Duration = Duration::from_secs(5);
 /// Set by GitHub Actions on its runners.
 pub const GITHUB_ENV: &str = "GITHUB_ACTIONS";
 
@@ -81,6 +88,7 @@ pub fn wait(
         ));
     }
     let started = clock.now();
+    let mut say_at = Duration::ZERO;
     loop {
         let now = load()?;
         let waited = clock.now().saturating_duration_since(started);
@@ -97,14 +105,17 @@ pub fn wait(
             say(&past_deadline(now, settings, waited));
             return Ok(Outcome::PastDeadline);
         }
-        say(&waiting(now, settings, waited));
-        clock.sleep(SAY_EVERY.min(settings.deadline.saturating_sub(waited)));
+        if waited >= say_at {
+            say(&waiting(now, settings, waited));
+            say_at = waited + SAY_EVERY;
+        }
+        clock.sleep(READ_EVERY.min(settings.deadline.saturating_sub(waited)));
     }
 }
 
 fn waiting(load: f64, settings: Settings, waited: Duration) -> String {
     format!(
-        "load: {load:.2} is over {} ([load] threshold); waiting, {} s so far, until {} s",
+        "load: {load} runnable tasks, over {} ([load] threshold); waiting, {} s so far, until {} s",
         settings.threshold,
         waited.as_secs(),
         settings.deadline.as_secs()
@@ -113,7 +124,7 @@ fn waiting(load: f64, settings: Settings, waited: Duration) -> String {
 
 fn past_deadline(load: f64, settings: Settings, waited: Duration) -> String {
     format!(
-        "load: STILL {load:.2}, over {} ([load] threshold), after waiting {} s; going on \
+        "load: STILL {load} runnable tasks, over {} ([load] threshold), after waiting {} s; going on \
          anyway at the deadline ([load] deadline_minutes), so timings in this run may fail \
          from the load, not the code",
         settings.threshold,
@@ -157,9 +168,7 @@ pub const NO_LOAD_FIX: &str =
     "fix: on a machine without /proc/loadavg, set [load] wait = \"false\" in .config/factory.toml";
 
 fn machine_load() -> Result<f64, String> {
-    crate::load::now()?
-        .parse::<f64>()
-        .map_err(|e| format!("/proc/loadavg: {e}"))
+    crate::load::runnable_now().map(f64::from)
 }
 
 static PAST: OnceLock<String> = OnceLock::new();

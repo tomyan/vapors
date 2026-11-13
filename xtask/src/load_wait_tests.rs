@@ -52,18 +52,34 @@ fn run(loads: &[f64], github: bool) -> (Result<Outcome, String>, Vec<String>, Du
 }
 
 #[test]
-fn a_load_over_the_threshold_is_waited_out_saying_so_every_30_s() {
+fn runnable_tasks_over_the_threshold_are_waited_out_saying_so_every_30_s() {
+    // Given: over at 0, 5, ... 30 s, under at 35 s
+    let loads = [20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 15.0, 11.0];
+
     // When
-    let (outcome, said, slept) = run(&[20.0, 15.5, 11.0], false);
+    let (outcome, said, slept) = run(&loads, false);
 
     // Then
     assert_eq!(outcome, Ok(Outcome::Clear));
-    assert_eq!(slept, Duration::from_secs(60));
+    assert_eq!(slept, Duration::from_secs(35));
     assert_eq!(said.len(), 2, "{said:?}");
     assert!(
-        said[1].starts_with("load: 15.50 is over 12 ([load] threshold); waiting, 30 s so far"),
+        said[1].starts_with(
+            "load: 15 runnable tasks, over 12 ([load] threshold); waiting, 30 s so far"
+        ),
         "{said:?}"
     );
+}
+
+#[test]
+fn the_wait_reads_again_every_5_s_and_starts_at_the_first_reading_under() {
+    // When
+    let (outcome, said, slept) = run(&[13.0, 12.0], false);
+
+    // Then
+    assert_eq!(outcome, Ok(Outcome::Clear));
+    assert_eq!(slept, READ_EVERY);
+    assert_eq!(said.len(), 1, "{said:?}");
 }
 
 #[test]
@@ -87,7 +103,7 @@ fn at_the_deadline_it_goes_on_saying_the_load_and_the_wait() {
     assert_eq!(outcome, Ok(Outcome::PastDeadline));
     assert_eq!(slept, SETTINGS.deadline);
     let last = said.last().expect("a line at the deadline");
-    assert!(last.contains("STILL 30.00"), "{last}");
+    assert!(last.contains("STILL 30 runnable tasks"), "{last}");
     assert!(
         last.contains("after waiting 600 s; going on anyway"),
         "{last}"
