@@ -24,7 +24,7 @@ chmod +x "$work/gh"
 repo=tomyan/vapors gh="$work/gh" network_deadline=10 worktree="$here/.."
 export FAKE_GH_LOG="$work/gh.log" FAKE_OPEN="$work/open"
 # shellcheck source=scripts/nightly-scaling-issues.sh
-source "$here/nightly-scaling-issues.sh"
+source "$here/nightly-scaling-issues.sh" || { echo "FAIL sourcing nightly-scaling-issues.sh"; exit 1; }
 failed=0
 
 reset() { state="$work/state"; rm -rf "$state"; mkdir -p "$state/pass"; : >"$FAKE_GH_LOG"; : >"$FAKE_OPEN"; }
@@ -74,7 +74,8 @@ check "an unreported run gets its own issue" "$(calls "title $unreported_title")
 check "and a pass closes the runner issue only" "$(calls 'issue close')$(calls 'issue close 14')" 11
 
 # The marker functions, from the runner.
-source <(sed -n '/^record_stale_marker() {/,/^}/p; /^unit_failed() {/,/^}/p' "$here/nightly-scaling.sh")
+source <(sed -n '/^record_stale_marker() {/,/^}/p; /^unit_failed() {/,/^}/p' "$here/nightly-scaling.sh") ||
+  { echo "FAIL sourcing the marker functions"; exit 1; }
 unit=vapors-nightly-scaling
 reset; echo "inv-a" >"$state/running"
 MONITOR_INVOCATION_ID=inv-b unit_failed
