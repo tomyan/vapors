@@ -23,7 +23,7 @@ fn a_component_tag_with_classes_passes_its_key_as_the_anchor_prop() {
     // the component's props type declares
     assert_has(
         &code,
-        "static KEY_MESH0: vapors_dom::StyleKey = vapors_dom::StyleKey { site: concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:4:1\"), scope: None, tag: MeshProps::ANCHOR_TAG, classes: &[\"body\"], toggles: &[\"braking\"], style: Some(\"color: red\") };",
+        "static KEY_MESH0: vapors_dom::StyleKey = { vapors_dom::StyleKey { site: concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:4:1\"), scope: None, tag: MeshProps::ANCHOR_TAG, classes: &[\"body\"], toggles: &[\"braking\"], style: Some(\"color: red\") } };",
     );
     assert_has(&code, "anchor: Some(&KEY_MESH0),");
     assert_lacks(&code, "braking:");
@@ -76,6 +76,22 @@ fn the_keys_tag_comes_from_the_props_type_the_tag_names() {
     assert_has(
         &alias,
         "tag: SectionProps::ANCHOR_TAG, classes: &[\"craft\"]",
+    );
+}
+
+#[test]
+fn a_components_key_brings_in_the_scripts_use_items_to_name_its_props_type() {
+    // When: the key is a file-level static, outside mount where the
+    // script's `use` items are
+    let code = generated_with(
+        "use vapors_scene3d_components::{Mesh, MeshProps};",
+        "<Mesh class=\"body\" />",
+    );
+
+    // Then
+    assert_has(
+        &code,
+        "static KEY_MESH0: vapors_dom::StyleKey = { #[allow(unused_imports)] use vapors_scene3d_components::{Mesh, MeshProps}; vapors_dom::StyleKey {",
     );
 }
 
