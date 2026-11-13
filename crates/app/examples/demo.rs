@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::rc::Rc;
 
-use vapors_app::{ElementsApp, StartState};
+use vapors_app::ElementsApp;
 use vapors_elements::Document;
 use vapors_pixels::{DEFAULT_VIEWPORT, Image, Spec, failures, parse, section};
 use vapors_platform::{App, Event, Frame, Next, Platform, Start, WindowOptions, run};
@@ -141,7 +141,7 @@ impl App for Shot {
     /// are none).
     fn frame(&mut self, frame: &Frame<'_>) -> Next {
         let next = self.app.frame(frame);
-        if self.app.start_state() != StartState::Started {
+        if !self.app.start_state().started() {
             *self.result.borrow_mut() = Some(Err(UNSTARTED.to_owned()));
             return Next::Exit;
         }

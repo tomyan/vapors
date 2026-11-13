@@ -159,6 +159,13 @@ impl Mounted {
         self.start(device, turn)?;
         self.allocate(device, pipeline, size, turn)?;
         let backing = self.backing.as_ref().expect("allocated above");
+        // RELAXED: no test pins this clear. Its pixels are the zeros wgpu
+        // fills a new texture with, and wgpu offers no count of submits,
+        // so only frame 0's time shows it. Measured in diagnostic builds
+        // on a loaded box (1-minute load 20 to 60), not acceptance runs:
+        // without it frame 0's surface submit took 13 to 20 ms, with it
+        // and the timer made before it 0.2 to 0.4 ms (one-scene.md, F0).
+        // Retired by the acceptance runs, or a GPU-time test of frame 0.
         backing.clear(device, queue);
         Ok(())
     }

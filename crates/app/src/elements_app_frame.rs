@@ -76,6 +76,7 @@ impl ElementsApp {
         #[allow(clippy::cast_possible_truncation)] // a display scale
         let scale = frame.scale_factor as f32;
         let max_side = frame.device.limits().max_texture_dimension_2d;
+        self.check_start_target(size_of(frame), scale);
         self.update_document_at(max_side, size_of(frame), scale)
     }
 
@@ -132,7 +133,7 @@ impl ElementsApp {
         self.check_format(frame.texture.format())?;
         if self.painter.is_none() {
             self.painter = Some(self.unstarted_painter(frame)?);
-            self.start_state = super::StartState::MadeInFirstFrame;
+            self.start.state = super::StartState::MadeInFirstFrame;
         }
         let scene_painter = self.painter.as_mut().expect("made above");
         self.surfaces

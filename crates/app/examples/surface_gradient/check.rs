@@ -7,7 +7,7 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use vapors_app::{ElementsApp, Invalidated, StartState, SurfaceHandle};
+use vapors_app::{ElementsApp, Invalidated, SurfaceHandle};
 use vapors_platform::{App, Event, Frame, Next, Platform, Start, Waker};
 
 use super::script::script;
@@ -199,7 +199,7 @@ impl App for Checked {
         let (decision, states) = (self.app.last_decision(), self.app.surface_states());
         trace.frame(number, next, decision, &states, rendered);
         drop(trace);
-        if self.app.start_state() != StartState::Started {
+        if !self.app.start_state().started() {
             self.counts.refuse(UNSTARTED);
             return Next::Exit;
         }

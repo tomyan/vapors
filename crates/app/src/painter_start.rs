@@ -26,8 +26,9 @@ impl ScenePainter {
 
     /// At `App::start`, after the document's first update: each surface
     /// of `painted` gets its backing at its laid-out size, its renderer
-    /// resized, and the backing cleared, so the first frame neither
-    /// allocates it nor is the first submit to use its memory.
+    /// resized, and the backing cleared, so a first frame at the start's
+    /// size neither allocates it nor is the first submit to use its
+    /// memory; a first frame at another size remakes it.
     ///
     /// # Errors
     ///

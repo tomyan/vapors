@@ -375,7 +375,9 @@ is the counted door, and clippy bans wgpu's constructors elsewhere.
 the first frame. In it, `ElementsApp` builds the painter's pipelines,
 mounts and sizes the surfaces, uploads the atlas page, makes the frame
 timer, runs the document's first update, and clears each surface's
-backing. The judged run refuses any frame that builds a pipeline.
+backing at the start's size (a frame 0 at another size or scale remakes
+the backings in frame 0, says so on the status line, and records
+`StartState::StartedAtOtherSize`). The judged run refuses any frame that builds a pipeline.
 Measured on a loaded box: frame 0's first surface submit cost 13 to 20 ms.
 `perf` showed i915 allocating and zeroing the pages of a new memory block
 (`clear_page_erms` under execbuffer); wgpu's default block is 128 MiB.
@@ -384,8 +386,9 @@ and the backings cleared at start, in that order. `MemoryHints` is
 unchanged (lead, 2026-11-13).
 Open: the acceptance runs (P0's three cold and warm pairs, load under
 1.5) have not been made. Every window so far stayed loaded. They come in
-the first real quiet window, which xtask's quiet lock (throughput slice
-3, pending Tom) is to make possible.
+the first real quiet window, which xtask's quiet lock is to make
+possible: slice 3 of `docs/plans/factory-throughput.md` (branch
+`factory/throughput-0`, not yet on main; pending Tom).
 
 Each row is under about 400 lines (estimate), built by a fresh agent,
 each check proven by breaking what it guards. After each row the next

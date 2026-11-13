@@ -54,8 +54,8 @@ pub struct ElementsApp {
     hosting: Option<Hosting>,
     /// Render passes the last painted frame's encoder began.
     render_passes: u64,
-    /// How the painter came to be made: at `App::start` or not.
-    start_state: StartState,
+    /// How the painter came to be made, and the start's target size.
+    start: start::StartRecord,
     /// Times frames on the GPU (`elements_app_timing.rs`).
     timer: AppTimer,
     /// The a11y mirror, when attached (`elements_app_a11y.rs`).
@@ -95,7 +95,7 @@ impl ElementsApp {
             decision: FrameDecision::default(),
             hosting: None,
             render_passes: 0,
-            start_state: StartState::NotStarted,
+            start: start::StartRecord::default(),
             timer: AppTimer::default(),
             a11y: a11y::A11yMirror::default(),
         }

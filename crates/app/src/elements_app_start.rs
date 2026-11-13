@@ -20,7 +20,7 @@ use super::ElementsApp;
 use crate::painter::ScenePainter;
 
 /// How an app's painter, and every pipeline with it, came to be made.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum StartState {
     /// Neither `App::start` nor a frame has run.
     NotStarted,
@@ -29,14 +29,70 @@ pub enum StartState {
     /// In the first frame, as no `App::start` came first: the status
     /// line said so, naming the fix.
     MadeInFirstFrame,
+    /// At `App::start`, but frame 0 came at another size or scale: its
+    /// surfaces' backings were remade in frame 0, and the status line
+    /// said so.
+    StartedAtOtherSize {
+        /// The start's size in device pixels, and its scale.
+        start: (Size, f32),
+        /// Frame 0's size in device pixels, and its scale.
+        frame: (Size, f32),
+    },
+}
+
+impl StartState {
+    /// Whether `App::start` ran before the first frame.
+    #[must_use]
+    pub fn started(self) -> bool {
+        matches!(self, Self::Started | Self::StartedAtOtherSize { .. })
+    }
+}
+
+/// How the app started, and the start's target until frame 0 is checked
+/// against it.
+pub(super) struct StartRecord {
+    pub(super) state: StartState,
+    target: Option<(Size, f32)>,
+}
+
+impl Default for StartRecord {
+    fn default() -> Self {
+        Self {
+            state: StartState::NotStarted,
+            target: None,
+        }
+    }
 }
 
 impl ElementsApp {
     /// How its painter came to be made: an `App` that wraps this one
-    /// checks it is [`StartState::Started`] after its first frame.
+    /// checks [`StartState::started`] after its first frame.
     #[must_use]
     pub fn start_state(&self) -> StartState {
-        self.start_state
+        self.start.state
+    }
+
+    /// At the first frame after a start: a frame at another size or
+    /// scale than the start's remakes the surfaces' backings, which the
+    /// start was to spare it, so it is said on the status line and kept
+    /// in the state (review of #303, M1).
+    pub(super) fn check_start_target(&mut self, size: Size, scale: f32) {
+        let Some((start, start_scale)) = self.start.target.take() else {
+            return;
+        };
+        #[allow(clippy::float_cmp)] // the same window's scale, compared exactly
+        if start == size && start_scale == scale {
+            return;
+        }
+        report_status(&format!(
+            "frame 0 is {}x{} at scale {scale} but App::start was {}x{} at scale \
+             {start_scale}: the surfaces' backings were remade in frame 0",
+            size.width, size.height, start.width, start.height
+        ));
+        self.start.state = StartState::StartedAtOtherSize {
+            start: (start, start_scale),
+            frame: (size, scale),
+        };
     }
 
     /// [`App::start`](vapors_platform::App::start) for this app.
@@ -55,9 +111,13 @@ impl ElementsApp {
         painter
             .start(start.device, start.queue)
             .map_err(|error| format!("a surface could not be mounted: {error}"))?;
-        // made before the backings' clear: measured, frame 0 kept a 13
-        // to 20 ms submit unless both came at start, in this order
-        // (AppTimer::start)
+        // RELAXED: the timer made here is pinned (gpu_start_tests.rs); its
+        // order before the backings' clear (Mounted::start_at) is not. Measured in diagnostic
+        // builds on a loaded box (1-minute load 20 to 60), not acceptance
+        // runs: frame 0's surface submit took 13 to 20 ms unless both the
+        // timer and the clear came at start, in this order, and 0.2 to 0.4
+        // ms when they did (one-scene.md, F0). Retired by the acceptance
+        // runs, or a GPU-time test of frame 0's submit.
         self.timer.start(start.device, start.queue);
         self.first_update(start, size)?;
         // RELAXED: no test pins this submit. It runs the staged atlas and
@@ -66,7 +126,10 @@ impl ElementsApp {
         // fails nothing but frame 0's measured time. Retired when wgpu can
         // report pending writes, or a GPU-time test resolves one copy.
         start.queue.submit([]);
-        self.start_state = StartState::Started;
+        self.start.state = StartState::Started;
+        #[allow(clippy::cast_possible_truncation)] // a display scale
+        let scale = start.scale_factor as f32;
+        self.start.target = Some((size, scale));
         Ok(())
     }
 

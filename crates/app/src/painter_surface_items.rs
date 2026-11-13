@@ -1,6 +1,8 @@
 //! The surface items of a run: each one's name, backing size and rect;
 //! and each surface's backing made at its laid-out size at start.
 
+use std::collections::BTreeSet;
+
 use vapors_elements::Painted;
 use vapors_renderer::ImagePipeline;
 use vapors_scene::{Item, Rect};
@@ -12,13 +14,19 @@ use crate::surface::SurfaceSize;
 impl Surfaces {
     /// At `App::start`, after the document's first update: each surface
     /// item of `painted` mounted, its backing made at its laid-out size
-    /// and cleared, so the first frame allocates nothing for it.
+    /// and cleared, so a first frame at the start's size allocates
+    /// nothing for it (at another size it remakes the backing). Every
+    /// surface item is sized, clipped out of view or not: a clipped one's
+    /// backing is dropped again by frame 0, a cost paid at start, not in
+    /// a frame. Two items of one name are refused, as a frame refuses
+    /// them.
     pub(in super::super) fn start_at(
         &mut self,
         gpu: (&wgpu::Device, &wgpu::Queue),
         pipeline: &ImagePipeline,
         painted: &Painted,
     ) -> Result<(), PaintError> {
+        let mut seen = BTreeSet::new();
         for (item, _) in painted.scene().items() {
             let Item::Surface { surface, rect } = item else {
                 continue;
@@ -27,6 +35,9 @@ impl Surfaces {
                 painted.surface(surface),
                 backing_size(rect, painted.scale()),
             );
+            if !seen.insert(name) {
+                return Err(PaintError::DuplicateName(name.to_owned()));
+            }
             let mounted = unmounted_refused(&mut self.mounted, name)?;
             let started = mounted.start_at(gpu, pipeline, size, turn(&self.waker));
             started.map_err(|refusal| refusal.named(name))?;
