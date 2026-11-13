@@ -21,9 +21,9 @@
 # the network, and the next run files it on its own issue. A marker no
 # unit recorded (a hand run) is recorded by the next run.
 # Not covered here: no run at all (the timer disabled, a unit removed,
-# the worktree removed). The lead's heartbeat covers it: it fails when
-# $state/UNREPORTED exists or the newest file in $state/logs is over
-# 26 hours old.
+# the worktree removed). The lead's batch gate script covers it
+# (~/.cache/handoffs/gate-batch.sh): each batch prints a WARNING when
+# $state/UNREPORTED exists or no file in $state/logs is newer than 26 h.
 set -eEuo pipefail
 # Hook variables and the session bus are never passed on (CLAUDE.md).
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE DBUS_SESSION_BUS_ADDRESS
