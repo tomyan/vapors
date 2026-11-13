@@ -26,6 +26,7 @@ mod gate_action;
 mod gate_expression;
 mod gate_lock;
 mod gate_lock_shared;
+mod gate_lock_slots;
 mod gate_plan;
 mod gate_pr;
 mod gate_pr_gh;

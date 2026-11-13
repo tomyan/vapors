@@ -72,7 +72,10 @@ target, #35). xtask refuses to build without it (`cargo xtask setup` installs it
 Incremental compilation is off for every build (`.cargo/config.toml`;
 `CARGO_INCREMENTAL` set in the environment overrides it): xtask's builds
 go through sccache, which needs it off, and an incremental target of a
-plain build reached 104 GB. A worktree's `target` lives under
+plain build reached 104 GB. Plain `cargo` builds 4 jobs at once (`[build] jobs` in
+`.cargo/config.toml`), as xtask's steps do; at most three `cargo xtask
+ci` runs go at once on the machine, and the next waits for a slot,
+naming who holds them. A worktree's `target` lives under
 `~/.cache`, never the `/tmp` tmpfs. When its PR merges, empty it and keep
 the directory:
 `find <target dir> -mindepth 1 -maxdepth 1 -exec rm -rf {} +`.

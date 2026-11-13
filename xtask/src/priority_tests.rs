@@ -74,12 +74,35 @@ fn a_niced_step_says_so_to_the_xtask_it_runs() {
 }
 
 #[test]
-fn the_gate_clears_a_job_cap_inherited_from_the_shell() {
+fn the_gate_builds_on_every_thread_over_any_inherited_or_configured_cap() {
+    // Given
+    let threads = std::thread::available_parallelism()
+        .expect("threads")
+        .to_string();
+
+    // When
     let command = command_for("cargo", true, false);
-    let cleared = command
+
+    // Then
+    let jobs = command
         .get_envs()
-        .any(|(name, value)| name == "CARGO_BUILD_JOBS" && value.is_none());
-    assert!(cleared);
+        .find(|(name, _)| *name == "CARGO_BUILD_JOBS")
+        .and_then(|(_, value)| value);
+    assert_eq!(jobs, Some(threads.as_ref()));
+}
+
+#[test]
+fn plain_cargo_is_capped_at_the_same_jobs_as_xtask_s_steps() {
+    // Given
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../.cargo/config.toml");
+    let text = std::fs::read_to_string(path).expect(".cargo/config.toml");
+
+    // Then
+    let line = format!("jobs = {DEFAULT_JOBS}");
+    assert!(
+        text.lines().any(|l| l.trim() == line),
+        "{path} has no `{line}` under [build]; fix: set it to priority.rs's DEFAULT_JOBS"
+    );
 }
 
 #[test]
