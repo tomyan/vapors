@@ -23,6 +23,7 @@ mod kept_bind_group;
 mod kept_range;
 mod mips;
 mod open_pass;
+pub mod pipelines;
 mod quad;
 mod quads;
 mod quads_setup;
