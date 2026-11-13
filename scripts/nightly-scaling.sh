@@ -11,7 +11,9 @@
 #                                              --user timer (03:00), not enabled
 #        scripts/nightly-scaling.sh --unit-failed  the OnFailure= unit: no network
 # Overrides, for trying it: NIGHTLY_REF (origin/main), NIGHTLY_GH (gh),
-# NIGHTLY_STATE (~/.cache/nightly-scaling).
+# NIGHTLY_STATE (~/.cache/nightly-scaling), NIGHTLY_NETWORK_DEADLINE (60 s).
+# scripts/nightly-scaling-check.sh proves the deadlines, the lock and the
+# quoted error with fakes.
 #
 # A run that ends without reporting (killed at the unit's timeout, gh
 # unreachable) leaves $state/running, holding its invocation id; the
@@ -38,7 +40,7 @@ unit=vapors-nightly-scaling
 judge_status=0
 # A fetch and a gh call each took 0.5 s here (2026-11-13); a minute is
 # far past a slow network, and well inside the unit's timeout.
-network_deadline=60
+network_deadline=${NIGHTLY_NETWORK_DEADLINE:-60}
 # shellcheck source=scripts/nightly-scaling-issues.sh
 source "$(dirname "$0")/nightly-scaling-issues.sh"
 
@@ -60,6 +62,10 @@ ensure_worktree() {
 runner_failed() {
   trap - ERR
   [ "$BASH_SUBSHELL" -gt 0 ] && exit 1
+  # tee copies stderr to the log asynchronously: close its pipe and wait
+  # for it, or the log can lack its last line, the error itself.
+  exec 2>&8
+  wait "$runner_tee"
   file_issue "$runner_title" "$runner_title" "The nightly runner failed before the judge could pass or fail ($(date -u +%FT%TZ)): \`$2\` at line $1 of scripts/nightly-scaling.sh.
 
 \`\`\`
@@ -76,7 +82,8 @@ run_once() {
   exec 9>"$state/lock"
   flock -n 9 || { echo "another nightly run holds $state/lock; fix: wait for it to end" >&2; exit 1; }
   runner_log="$state/logs/$(date +%F-%H%M%S)-runner.log"
-  exec 2> >(tee -a "$runner_log" >&2)
+  exec 8>&2 2> >(tee -a "$runner_log" >&2)
+  runner_tee=$!
   record_stale_marker
   echo "${INVOCATION_ID:-pid $$}" >"$state/running"
   trap 'runner_failed $LINENO "$BASH_COMMAND"' ERR
