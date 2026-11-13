@@ -52,6 +52,7 @@ fn tap(doc: &Rc<RefCell<Document>>, point: [f32; 2], taps: &mut Option<([f32; 2]
     });
 }
 
+#[allow(clippy::too_many_lines)] // one arm per script action
 pub(super) fn act(
     doc: &Rc<RefCell<Document>>,
     action: &Action,

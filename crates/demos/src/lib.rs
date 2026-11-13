@@ -79,6 +79,7 @@ pub fn find(name: &str) -> Result<Demo, String> {
 
 /// Every elements demo, by name.
 #[must_use]
+#[allow(clippy::too_many_lines)] // the demo list, one literal per demo
 pub fn all() -> Vec<Demo> {
     vec![
         Demo {

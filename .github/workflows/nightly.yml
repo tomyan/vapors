@@ -1,0 +1,36 @@
+# The nightly run: what is read by people rather than checked. Today
+# the quality signals (`cargo xtask quality`, advisory: the band between
+# each guideline and its hard limit, docs/decisions/2026-11-13-quality-
+# thresholds.md). The hard checks are in ci.yml. `cargo xtask gate` runs
+# ci.yml's steps, not these.
+name: nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *" # 03:17 UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  quality:
+    name: quality signals
+    runs-on: ubuntu-24.04
+    # The command took 54 s on the loaded dev machine (2026-11-13) after
+    # xtask was built; a cold xtask build on the runner is a few minutes.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: install pinned toolchain
+        run: rustup toolchain install && rustup show active-toolchain
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: quality signals
+        run: cargo xtask quality
