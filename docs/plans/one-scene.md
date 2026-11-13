@@ -116,7 +116,7 @@ carry a far value, so it never wins the `min`. Fragments exist only
 inside the mesh, which would leave the outer half of the coverage
 ramp missing (every edge a hard edge on its outer side), so the
 outline is extruded by half a device pixel in the vertex shader (Tom,
-2026-11-14, option 2): each vertex carries the miter offset of its
+2026-11-13, option 2): each vertex carries the miter offset of its
 outline edges as a normal and, per edge, the shift that move takes
 off its distance; distances go negative outside the true outline and
 the ramp straddles it, where Chromium's edge sits. Rejected: one

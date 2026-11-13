@@ -12,7 +12,7 @@
 //! is constant and never the nearest. The vertex shader moves each
 //! vertex by `h * normal`, `h` half a device pixel in viewBox units,
 //! and takes `h * shift[i]` off `edges[i]`, so the ramp from 0 to 1
-//! coverage straddles the true outline (Tom, 2026-11-14, "option 2").
+//! coverage straddles the true outline (Tom, 2026-11-13, "option 2").
 //! `shift[i]` is `normal` projected on edge `i`'s outward normal: 1 on
 //! a corner's own outline edges (the miter offset makes it so), the
 //! projection on the opposite edge, 0 for a far edge, which stays far.
@@ -55,7 +55,9 @@ const SLACK: f32 = 1e-4;
 /// value that is not finite; a triangle without area; an edge far on
 /// some corners and not others; a distance that is neither zero on its
 /// corners, the altitude opposite, nor far; a shift that is not the
-/// normal's projection on the edge, or not zero on a far edge.
+/// normal's projection on the edge, or not zero on a far edge; a
+/// corner on an outline edge whose normal does not move it out across
+/// that edge.
 ///
 /// # Errors
 /// The reason, naming the triangle, the corner and the field.
@@ -132,8 +134,23 @@ fn check_edge(
         )?;
         let shift = vertex.normal[0] * outward[0] + vertex.normal[1] * outward[1];
         check_near("shift", corner, edge, vertex.shift[edge], shift, 1.0)?;
+        if corner != edge {
+            check_moves_out(corner, edge, vertex.normal, shift)?;
+        }
     }
     Ok(())
+}
+
+/// A corner on an outline edge moves out across it (its miter offset
+/// projects to 1 on the edge, or less where clamped): a zero or inward
+/// normal leaves the outer half of the coverage ramp undrawn.
+fn check_moves_out(corner: usize, edge: usize, normal: [f32; 2], shift: f32) -> Result<(), String> {
+    if shift > 0.0 {
+        return Ok(());
+    }
+    Err(format!(
+        "corner {corner} on outline edge {edge} has normal {normal:?}, which does not move it out across that edge; write its miter offset"
+    ))
 }
 
 fn check_far_shifts(triangle: &[MeshVertex; 3], edge: usize) -> Result<(), String> {
