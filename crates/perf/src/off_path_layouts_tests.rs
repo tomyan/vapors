@@ -1,5 +1,6 @@
 //! The layout pages are what they say: cards wrap four to a line, the
-//! grid has seven columns, and longer paragraphs wrap into more lines.
+//! grid has seven columns, paragraphs wrap into two to nine lines, and
+//! the edited and inserted paragraph is the same at every size.
 
 use vapors_elements::BoxRect;
 
@@ -46,10 +47,21 @@ fn the_grid_has_seven_columns() {
 }
 
 #[test]
-fn a_seven_sentence_paragraph_wraps_into_more_lines_than_a_one_sentence_one() {
-    let paragraphs = boxes(&MIXED_TEXT, 7);
-    assert!(
-        paragraphs[6].height > paragraphs[0].height * 3.0,
-        "{paragraphs:?}"
-    );
+fn paragraphs_wrap_into_two_to_nine_lines() {
+    // Given: paragraphs 2 and 1 have one and five sentences a side
+    let paragraphs = boxes(&MIXED_TEXT, 5);
+    let (shortest, longest) = (paragraphs[2].height, paragraphs[1].height);
+
+    // Then: two lines and nine lines of one line height
+    let line = shortest / 2.0;
+    assert!((longest / line - 9.0).abs() < 0.01, "{paragraphs:?}");
+    assert!((15.0..30.0).contains(&line), "{paragraphs:?}");
+}
+
+#[test]
+fn the_edited_and_the_inserted_paragraph_have_four_sentences_at_every_size() {
+    for count in crate::off_path_kinds::SIZES {
+        assert_eq!(super::sentences(count / 2), 4, "edited at {count}");
+        assert_eq!(super::sentences(count), 4, "inserted at {count}");
+    }
 }

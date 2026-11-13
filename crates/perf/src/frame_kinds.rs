@@ -19,16 +19,20 @@ impl Samples {
     /// kind `i % step`, and the first kept frame is frame `warmup`), with
     /// their GPU times, which the sampler keeps in frame order though it
     /// reads each back a frame late; the counts are the last frame's.
-    #[must_use]
-    pub fn of_kind(&self, kind: usize, step: usize) -> Self {
-        let first = (kind + step - self.warmup % step) % step;
+    ///
+    /// # Errors
+    /// A column without one entry per kept frame, naming it: its entries
+    /// would be read as the other kind's.
+    pub fn of_kind(&self, kind: usize, step: usize) -> Result<Self, String> {
+        self.columns_kept_whole()?;
+        let first = self.first_of_kind(kind, step);
         let pick = |times: &[_]| times.iter().copied().skip(first).step_by(step).collect();
         let phases: BTreeMap<_, _> = self
             .phases
             .iter()
             .map(|(phase, times)| (phase.clone(), pick(times)))
             .collect();
-        Self {
+        Ok(Self {
             frame: pick(&self.frame),
             phases,
             gpu: self.gpu.as_deref().map(pick),
@@ -37,6 +41,41 @@ impl Samples {
             instructions: self.instructions.as_ref().map(|i| i.every_nth(first, step)),
             counts: self.counts,
             warmup: self.warmup,
+        })
+    }
+
+    /// The first kept frame of kind `kind` of `step` kinds: frame `i` is
+    /// of kind `i % step`, and kept frame `j` is frame `warmup + j`. The
+    /// one answer `--scaling` and the full run's sections both read.
+    #[must_use]
+    pub fn first_of_kind(&self, kind: usize, step: usize) -> usize {
+        (kind + step - self.warmup % step) % step
+    }
+
+    fn columns_kept_whole(&self) -> Result<(), String> {
+        let kept = self.frame.len();
+        let phases = self
+            .phases
+            .iter()
+            .map(|(phase, times)| (phase.as_str(), times.len()));
+        let gpu = [("GPU span", &self.gpu), ("GPU time", &self.gpu_time)]
+            .into_iter()
+            .filter_map(|(name, times)| times.as_ref().map(|times| (name, times.len())));
+        let instructions = self
+            .instructions
+            .as_ref()
+            .map(|i| ("instructions", i.frame.len()));
+        match phases
+            .chain(gpu)
+            .chain(instructions)
+            .find(|(_, len)| *len != kept)
+        {
+            None => Ok(()),
+            Some((column, len)) => Err(format!(
+                "{column} has {len} entries for {kept} kept frames; the sampler keeps one per \
+                 frame (crates/perf/src/sampler.rs), and a column out of step would be read as \
+                 the other kind's"
+            )),
         }
     }
 }
@@ -62,7 +101,7 @@ pub fn sections(
         .enumerate()
         .map(|(at, kind)| {
             let title = format!("{name}, {kind} frames");
-            one_section(&title, &samples.of_kind(at, kinds.len()), instructions)
+            one_section(&title, &samples.of_kind(at, kinds.len())?, instructions)
         })
         .collect()
 }

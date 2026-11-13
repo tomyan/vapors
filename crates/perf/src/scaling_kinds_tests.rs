@@ -16,8 +16,9 @@ fn samples(phases: &[&str]) -> Samples {
     }
 }
 
-/// Frames alternating `first` and `second` instructions in `update`.
-fn alternating(first: u64, second: u64, frames: usize) -> Samples {
+/// Frames alternating `first` and `second` instructions in `update`,
+/// after `warmup` frames.
+fn alternating(first: u64, second: u64, frames: usize, warmup: usize) -> Samples {
     let mut kept = InstructionSamples::default();
     for frame in 0..frames {
         let count = if frame % 2 == 0 { first } else { second };
@@ -25,6 +26,7 @@ fn alternating(first: u64, second: u64, frames: usize) -> Samples {
     }
     Samples {
         instructions: Some(kept),
+        warmup,
         ..Samples::default()
     }
 }
@@ -36,10 +38,10 @@ fn update_medians(sizes: &[crate::scaling::AtSize]) -> Vec<u64> {
 #[test]
 fn alternating_kinds_get_a_median_each_in_the_order_the_change_makes_them() {
     // Given: an even warmup, so the first kept frame is the first kind
-    let samples = alternating(100, 900, 6);
+    let samples = alternating(100, 900, 6, 10);
 
     // When
-    let sizes = by_kind(1000, &samples, &["insert", "remove"], 10).expect("counted");
+    let sizes = by_kind(1000, &samples, &["insert", "remove"]).expect("counted");
 
     // Then: one kind's median no longer stands for both
     assert_eq!(update_medians(&sizes), [100, 900]);
@@ -48,10 +50,10 @@ fn alternating_kinds_get_a_median_each_in_the_order_the_change_makes_them() {
 #[test]
 fn an_odd_warmup_makes_the_first_kept_frame_the_second_kind() {
     // Given: frame 11 is the first kept, a frame of the second kind
-    let samples = alternating(900, 100, 6);
+    let samples = alternating(900, 100, 6, 11);
 
     // When
-    let sizes = by_kind(1000, &samples, &["insert", "remove"], 11).expect("counted");
+    let sizes = by_kind(1000, &samples, &["insert", "remove"]).expect("counted");
 
     // Then
     assert_eq!(update_medians(&sizes), [100, 900]);
@@ -60,10 +62,10 @@ fn an_odd_warmup_makes_the_first_kept_frame_the_second_kind() {
 #[test]
 fn a_change_of_one_kind_takes_the_median_of_every_frame() {
     // Given
-    let samples = alternating(100, 900, 5);
+    let samples = alternating(100, 900, 5, 10);
 
     // When
-    let sizes = by_kind(1000, &samples, &["every"], 10).expect("counted");
+    let sizes = by_kind(1000, &samples, &["every"]).expect("counted");
 
     // Then
     assert_eq!(update_medians(&sizes), [100]);
@@ -78,10 +80,10 @@ fn a_kinds_title_names_the_kind_only_when_the_change_makes_more_than_one() {
 #[test]
 fn a_kind_with_no_kept_frame_is_refused_naming_the_kind() {
     // Given: one kept frame, an insert
-    let samples = alternating(100, 900, 1);
+    let samples = alternating(100, 900, 1, 10);
 
     // When
-    let error = by_kind(1000, &samples, &["insert", "remove"], 10).expect_err("no remove frame");
+    let error = by_kind(1000, &samples, &["insert", "remove"]).expect_err("no remove frame");
 
     // Then
     assert!(error.starts_with("remove frames: "), "{error}");
