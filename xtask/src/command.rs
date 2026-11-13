@@ -116,17 +116,34 @@ fn wait(child: &mut Child, deadline: Option<Duration>) -> Result<bool, String> {
     }
 }
 
-/// SIGKILL to the step's process group, then reap the leader, with
-/// `kill -s KILL -- -<pid>`, procps's documented form for a group. With
-/// `kill -KILL -<pid>` the group survived on the runner: vapors run
-/// 40006425576, where the gate's deadline test took 21 s, and likewise vapors
-/// #30. The kill's own failure is returned to be reported.
+/// SIGTERM to the step's process group, then, once the leader has
+/// ended or [`TERM_GRACE`] has passed, SIGKILL to what is left, then
+/// reap the leader. The TERM lets a script's traps run: the page
+/// contract removes its work directory on exit, and killed outright it
+/// left about 80 files in the gate's TMPDIR. Signals go by `kill -s SIG
+/// -- -<pid>`, procps's documented form for a group. With `kill -KILL
+/// -<pid>` the group survived on the runner: vapors run 40006425576,
+/// where the gate's deadline test took 21 s, and likewise vapors #30.
+/// The KILL's own failure is returned to be reported.
 pub(crate) fn kill_group(child: &mut Child) -> Result<(), String> {
+    let _ = signal_group(child.id(), "TERM");
+    let asked = Instant::now();
+    while child.try_wait().ok().flatten().is_none() && asked.elapsed() < TERM_GRACE {
+        std::thread::sleep(Duration::from_millis(20));
+    }
     let killed = kill_group_id(child.id());
     let _ = child.kill();
     let _ = child.wait();
     killed
 }
+
+/// How long a step's group has to end after SIGTERM before SIGKILL.
+/// Measured 2026-11-13 at load 37 to 55 with this file's test step (a
+/// bash with an exit trap that removes its work directory, and a child
+/// in the background): it ended 27 to 56 ms after the TERM in six runs.
+/// The page contract's trap does the same kind of work (stop its
+/// server, remove about 80 files). 5 s is about 90 times the worst.
+pub const TERM_GRACE: Duration = Duration::from_secs(5);
 
 /// Kill process group `group`; a group already gone counts as killed.
 ///
@@ -134,16 +151,22 @@ pub(crate) fn kill_group(child: &mut Child) -> Result<(), String> {
 ///
 /// `kill` could not run, or refused for another reason.
 pub(crate) fn kill_group_id(group: u32) -> Result<(), String> {
+    signal_group(group, "KILL")
+}
+
+/// Send `signal` to process group `group`; a group already gone counts
+/// as signalled.
+fn signal_group(group: u32, signal: &str) -> Result<(), String> {
     let group = format!("-{group}");
-    let killed = Command::new("kill")
-        .args(["-s", "KILL", "--", &group])
+    let sent = Command::new("kill")
+        .args(["-s", signal, "--", &group])
         .output();
-    match killed {
+    match sent {
         Ok(out) if out.status.success() => Ok(()),
-        // ESRCH: every process of the group had exited by the kill.
+        // ESRCH: every process of the group had exited by the signal.
         Ok(out) if String::from_utf8_lossy(&out.stderr).contains("No such process") => Ok(()),
         Ok(out) => Err(format!(
-            "kill -s KILL -- {group}: {}",
+            "kill -s {signal} -- {group}: {}",
             String::from_utf8_lossy(&out.stderr).trim()
         )),
         Err(e) => Err(format!("kill: {e}")),
