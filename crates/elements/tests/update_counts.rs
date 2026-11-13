@@ -57,8 +57,12 @@ fn a_style_attribute_that_does_not_parse_refuses_before_any_element_is_visited()
     // When
     refusals(&mut doc);
 
-    // Then
-    assert_eq!(doc.update_counts(), UpdateCounts::default());
+    // Then: the tree check of the body, whose attribute changed, ran
+    // before the refusal; nothing after it is counted
+    let mut counts = doc.update_counts();
+    assert_eq!(counts.nodes_checked, 1);
+    counts.nodes_checked = 0;
+    assert_eq!(counts, UpdateCounts::default());
 }
 
 #[test]

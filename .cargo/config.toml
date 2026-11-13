@@ -1,3 +1,9 @@
 # `cargo xtask <command>` runs the factory. `cargo xtask --help` lists every command.
 [alias]
 xtask = "run --quiet --package xtask --"
+
+# Incremental compilation is off for every build, not only xtask's: an
+# incremental target reached 104 GB on 2026-11-13 and, with ten worktrees
+# building, filled the disk in 30 minutes. sccache needs it off too.
+[build]
+incremental = false

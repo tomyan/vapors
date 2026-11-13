@@ -137,3 +137,69 @@ fn a_thumb_stays_under_what_paints_after_its_container_and_is_not_inside_it() {
         ]
     );
 }
+
+#[test]
+fn nested_thumbs_moved_after_one_box_keep_the_inner_thumb_first() {
+    // Given: root > 1 (scrolls) > 2 (scrolls) > 3 (relative), root > 4:
+    // both thumbs move to just after 3, the last box inside each
+    let found = steps(
+        &[None, Some(0), Some(1), Some(2), Some(0)],
+        &[(1, scrolling()), (2, scrolling()), (3, positioned(None))],
+    );
+
+    // Then
+    assert_eq!(
+        found,
+        [
+            Step::Box(0),
+            Step::Box(1),
+            Step::Box(2),
+            Step::Box(4),
+            Step::Box(3),
+            Step::Thumb(2),
+            Step::Thumb(1)
+        ]
+    );
+}
+
+#[test]
+fn sibling_scroll_containers_each_paint_their_thumb_after_their_own_content() {
+    // Given: root > 1 (scrolls) > 2, root > 3 (scrolls) > 4, root > 5
+    let found = steps(
+        &[None, Some(0), Some(1), Some(0), Some(3), Some(0)],
+        &[(1, scrolling()), (3, scrolling())],
+    );
+
+    // Then
+    assert_eq!(
+        found,
+        [
+            Step::Box(0),
+            Step::Box(1),
+            Step::Box(2),
+            Step::Thumb(1),
+            Step::Box(3),
+            Step::Box(4),
+            Step::Thumb(3),
+            Step::Box(5)
+        ]
+    );
+}
+
+#[test]
+fn an_empty_scroll_containers_thumb_stays_where_the_walk_put_it() {
+    // Given: root > 1 (scrolls, no children), root > 2 (relative)
+    let found = steps(
+        &[None, Some(0), Some(0)],
+        &[(1, scrolling()), (2, positioned(None))],
+    );
+
+    // Then
+    assert_eq!(
+        found,
+        [Step::Box(0), Step::Box(1), Step::Thumb(1), Step::Box(2)]
+    );
+}
+
+#[path = "thumb_order_many_tests.rs"]
+mod many;

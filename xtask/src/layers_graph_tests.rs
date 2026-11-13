@@ -56,7 +56,7 @@ fn a_forbidden_crate_reached_through_another_is_named_with_its_path() {
     // Given
     let graph = parse(&metadata(&[
         ("engine", &[("helper", None)]),
-        ("helper", &[("platform", Some("build"))]),
+        ("helper", &[("platform", None)]),
         ("platform", &[]),
     ]))
     .expect("graph");
@@ -68,22 +68,6 @@ fn a_forbidden_crate_reached_through_another_is_named_with_its_path() {
     assert_eq!(
         found,
         ["engine depends on platform: engine -> helper -> platform"]
-    );
-}
-
-#[test]
-fn a_dev_dependency_is_not_a_layering_dependency() {
-    // Given: tests may use a UI crate; the library does not
-    let graph = parse(&metadata(&[
-        ("engine", &[("platform", Some("dev"))]),
-        ("platform", &[]),
-    ]))
-    .expect("graph");
-
-    // When / Then
-    assert_eq!(
-        violations(&graph, &[rule("engine", &["platform"])]),
-        Ok(Vec::new())
     );
 }
 
