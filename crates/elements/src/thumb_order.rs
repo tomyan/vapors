@@ -9,6 +9,13 @@
 use crate::layout::LayoutBox;
 use crate::paint_order::Step;
 
+#[cfg(test)]
+thread_local! {
+    /// How many ancestors [`last_inside`] marked on this thread, for the
+    /// test that each box is marked at most once.
+    pub(crate) static MARKS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 /// `steps` with each thumb moved to just after the last box inside its
 /// container, when that box paints later than the thumb. Linear in
 /// `steps` and `boxes`: a page of scroll containers has as many thumbs
@@ -42,6 +49,12 @@ fn placed(steps: &[Step], targets: &[(usize, Step)]) -> Vec<Step> {
             out.push(*thumb);
         }
     }
+    debug_assert_eq!(
+        out.len(),
+        steps.len(),
+        "a thumb's target is past the steps or out of order, so it was dropped: `targets` \
+         must be sorted step positions (thumb_order.rs); reproduce with `cargo xtask test`"
+    );
     out
 }
 
@@ -56,6 +69,8 @@ fn last_inside(steps: &[Step], parents: &[Option<usize>]) -> Vec<Option<usize>> 
         let mut above = parents[index];
         while let Some(parent) = above.filter(|&parent| last[parent].is_none()) {
             last[parent] = Some(at);
+            #[cfg(test)]
+            MARKS.with(|marks| marks.set(marks.get() + 1));
             above = parents[parent];
         }
     }

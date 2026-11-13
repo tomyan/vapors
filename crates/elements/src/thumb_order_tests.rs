@@ -200,3 +200,6 @@ fn an_empty_scroll_containers_thumb_stays_where_the_walk_put_it() {
         [Step::Box(0), Step::Box(1), Step::Thumb(1), Step::Box(2)]
     );
 }
+
+#[path = "thumb_order_many_tests.rs"]
+mod many;
