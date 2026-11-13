@@ -6,6 +6,7 @@
 //! check rasterises. No GPU and no text dependency.
 
 mod canonical;
+mod classify;
 mod geometry;
 mod path;
 mod path_lex;
@@ -15,6 +16,7 @@ mod table;
 mod table_error;
 
 pub use canonical::{Canonical, FillRule, Paint, hash_bytes};
+pub use classify::{Classified, classify};
 pub use geometry::{Geometry, MeshVertex, check_geometry};
 pub use path::{IconPath, PathError};
 pub use segment::{Pen, Segment, to_zeno};
