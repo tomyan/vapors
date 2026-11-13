@@ -14,10 +14,14 @@
 # NIGHTLY_STATE (~/.cache/nightly-scaling).
 #
 # A run that ends without reporting (killed at the unit's timeout, gh
-# unreachable) leaves $state/running; the unit's OnFailure= unit then
-# appends a line to $state/UNREPORTED, without the network, and the next
-# run files it. Not covered: the worktree removed, so neither unit's
-# script exists; that is only in `journalctl --user -u vapors-nightly-scaling`.
+# unreachable) leaves $state/running, holding its invocation id; the
+# unit's OnFailure= unit then appends a line to $state/UNREPORTED, without
+# the network, and the next run files it on its own issue. A marker no
+# unit recorded (a hand run) is recorded by the next run.
+# Not covered here: no run at all (the timer disabled, a unit removed,
+# the worktree removed). The lead's heartbeat covers it: it fails when
+# $state/UNREPORTED exists or the newest file in $state/logs is over
+# 26 hours old.
 set -eEuo pipefail
 # Hook variables and the session bus are never passed on (CLAUDE.md).
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE DBUS_SESSION_BUS_ADDRESS
@@ -73,29 +77,33 @@ run_once() {
   flock -n 9 || { echo "another nightly run holds $state/lock; fix: wait for it to end" >&2; exit 1; }
   runner_log="$state/logs/$(date +%F-%H%M%S)-runner.log"
   exec 2> >(tee -a "$runner_log" >&2)
-  touch "$state/running"
+  record_stale_marker
+  echo "${INVOCATION_ID:-pid $$}" >"$state/running"
   trap 'runner_failed $LINENO "$BASH_COMMAND"' ERR
   ensure_worktree
-  local revision log change failing
+  local revision log
   revision=$(git -C "$worktree" rev-parse HEAD)
   log="$state/logs/$(date +%F)-$revision.log"
-  (cd "$worktree" && nice -n 10 cargo xtask scaling) 2>&1 | tee "$log" || judge_status=$?
-  report_unreported
-  for change in $(changes_that "$log" pass); do report_change_pass "$change" "$revision"; done
-  failing=$(changes_that "$log" fail)
-  for change in $failing; do report_change_failure "$change" "$log" "$revision"; done
-  if [ "$judge_status" -eq 0 ]; then
-    close_issue "$runner_title" "\`cargo xtask scaling\` passed at $revision; closing."
-  elif [ -z "$failing" ]; then
-    report_run_failure "$log" "$revision"
-  fi
+  # --verbose: the judge's lines are in the log on a pass too.
+  (cd "$worktree" && nice -n 10 cargo xtask --verbose scaling) 2>&1 | tee "$log" || judge_status=$?
+  report_results "$log" "$revision" "$judge_status"
   trap - ERR
   rm -f "$state/running"
 }
 
-# The OnFailure= unit: a run that left $state/running did not report.
-unit_failed() {
+# A marker left by a run that ended without reporting, which no
+# OnFailure= unit recorded (a hand run, or the unit itself failing): this
+# run holds the lock, so its owner is gone.
+record_stale_marker() {
   [ -e "$state/running" ] || return 0
+  printf -- '- a run (%s) started %s ended without reporting or being recorded\n' \
+    "$(cat "$state/running")" "$(date -u -r "$state/running" +%FT%TZ)" >>"$state/UNREPORTED"
+}
+
+# The OnFailure= unit: the failed run's marker, left, means it did not
+# report. A marker of another run (a hand run holding the lock) is left.
+unit_failed() {
+  [ "$(cat "$state/running" 2>/dev/null)" = "${MONITOR_INVOCATION_ID:-none}" ] || return 0
   printf -- '- %s: result %s, exit %s %s (invocation %s); journalctl --user -u %s\n' \
     "$(date -u +%FT%TZ)" "${MONITOR_SERVICE_RESULT:-?}" "${MONITOR_EXIT_CODE:-?}" \
     "${MONITOR_EXIT_STATUS:-?}" "${MONITOR_INVOCATION_ID:-?}" "$unit" >>"$state/UNREPORTED"

@@ -1,6 +1,6 @@
 //! The verdict over several changes.
 
-use super::{result_line, verdict};
+use super::{changes_line, error_block, result_line, verdict};
 use crate::rows::RowChange;
 
 #[test]
@@ -45,4 +45,26 @@ fn each_change_ends_with_a_line_naming_it_and_its_result() {
         result_line(RowChange::Insert, false),
         "scaling-result: Insert fail"
     );
+}
+
+/// The log `scripts/nightly-scaling-check.sh` parses: its lines must be
+/// the ones this harness prints, so a change of wording fails here.
+const FIXTURE: &str = include_str!("../../../scripts/fixtures/nightly-scaling.log");
+
+#[test]
+fn the_nightly_fixture_holds_the_lines_the_harness_prints() {
+    // Given
+    let printed = [
+        changes_line(&RowChange::ALL),
+        result_line(RowChange::Idle, true),
+        result_line(RowChange::Class, false),
+        error_block(RowChange::Class, "scaling: Class, add frames does work"),
+        error_block(RowChange::Text, "no instruction counter"),
+    ];
+
+    // Then
+    for line in printed.iter().flat_map(|block| block.lines()) {
+        let line = line.split(" does work").next().unwrap_or(line);
+        assert!(FIXTURE.contains(line), "fixture lacks `{line}`");
+    }
 }
