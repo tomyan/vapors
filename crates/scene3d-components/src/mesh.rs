@@ -23,6 +23,11 @@ pub struct MeshProps {
     pub anchor: Option<&'static StyleKey>,
 }
 
+impl MeshProps {
+    /// Its anchor's tag, which the compiler puts in the key it passes.
+    pub const ANCHOR_TAG: &'static str = "mesh";
+}
+
 impl Default for MeshProps {
     fn default() -> Self {
         Self {
@@ -62,7 +67,7 @@ impl Mesh {
             panic!("<Mesh> has no geometry: pass geometry={{Some(id)}} with an id from the renderer's Meshes")
         });
         let colour = props.colour.get_untracked();
-        let key = props.anchor.unwrap_or(&own_keys::MESH);
+        let key = own_keys::anchor_key("Mesh", props.anchor, &own_keys::MESH);
         let kind = ("Mesh", key, NodeKind::Mesh { geometry, colour });
         let mounted = mount_node(
             dom,

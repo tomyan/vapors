@@ -50,7 +50,8 @@ const SUPPORTED: &[&str] = &[
 /// docs/plans/css-for-3d.md C1): styled by the cascade, `display: none`
 /// from the user-agent sheet, and drawn by their surface, never laid
 /// out. Not offered in the refusal's list: only the components make
-/// them.
+/// them. `decal` has no component yet: `<Decal>` arrives in
+/// docs/plans/one-scene.md S8.
 const SCENE_ANCHORS: &[&str] = &["scene", "group", "mesh", "camera", "decal"];
 
 /// Whether `tag` is a scene component's anchor.

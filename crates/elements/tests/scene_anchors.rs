@@ -55,3 +55,25 @@ fn a_display_other_than_none_on_a_scene_anchor_is_refused_naming_the_declaration
         );
     }
 }
+
+#[test]
+fn a_display_on_an_anchor_inside_a_hidden_anchor_is_refused_too() {
+    // Given: a `group.craft` inside a `scene`, which is `display: none`
+    let mut doc = document();
+    let body = doc.body();
+    let scene = element(&mut doc, body, "scene", "stage");
+    element(&mut doc, scene, "group", "craft");
+    doc.add_stylesheet("app.css", "body { margin: 0; }\n.craft { display: block; }")
+        .expect("parses");
+
+    // When
+    let refused = refusals(&mut doc).join("\n");
+
+    // Then
+    assert!(
+        refused.contains("app.css:2:")
+            && refused.contains("<group class=\"craft\">")
+            && refused.contains("`display: block`"),
+        "{refused}"
+    );
+}

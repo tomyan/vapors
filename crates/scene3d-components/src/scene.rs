@@ -31,6 +31,11 @@ pub struct SceneProps {
     pub anchor: Option<&'static StyleKey>,
 }
 
+impl SceneProps {
+    /// Its anchor's tag, which the compiler puts in the key it passes.
+    pub const ANCHOR_TAG: &'static str = "scene";
+}
+
 /// A scene's root group, with its children mounted under it.
 pub struct Scene {
     mounted: Mounted,
@@ -67,7 +72,7 @@ impl Scene {
             surface,
         };
         let owner = Owner::new();
-        let key = props.anchor.unwrap_or(&own_keys::SCENE);
+        let key = own_keys::anchor_key("Scene", props.anchor, &own_keys::SCENE);
         let anchor = owner.with(|| {
             let anchor = anchor(dom, key, (parent, before));
             place(&mut *dom.borrow_mut(), anchor, placement.clone());

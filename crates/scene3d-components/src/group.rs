@@ -19,6 +19,11 @@ pub struct GroupProps {
     pub anchor: Option<&'static StyleKey>,
 }
 
+impl GroupProps {
+    /// Its anchor's tag, which the compiler puts in the key it passes.
+    pub const ANCHOR_TAG: &'static str = "group";
+}
+
 impl Default for GroupProps {
     fn default() -> Self {
         Self {
@@ -52,7 +57,7 @@ impl Group {
         props: GroupProps,
     ) -> Self {
         let dom = &dom.dyn_dom();
-        let key = props.anchor.unwrap_or(&own_keys::GROUP);
+        let key = own_keys::anchor_key("Group", props.anchor, &own_keys::GROUP);
         let kind = ("Group", key, NodeKind::Group);
         let mounted = mount_node(
             dom,

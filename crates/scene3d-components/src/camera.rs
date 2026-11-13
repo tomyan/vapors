@@ -22,6 +22,11 @@ pub struct CameraProps {
     pub anchor: Option<&'static StyleKey>,
 }
 
+impl CameraProps {
+    /// Its anchor's tag, which the compiler puts in the key it passes.
+    pub const ANCHOR_TAG: &'static str = "camera";
+}
+
 impl Default for CameraProps {
     fn default() -> Self {
         Self {
@@ -60,7 +65,7 @@ impl Camera {
         let (Some(handle), Some(projection)) = (props.handle, props.projection) else {
             panic!("<Camera> needs handle={{Some(..)}} and projection={{Some(..)}}: pass both")
         };
-        let key = props.anchor.unwrap_or(&own_keys::CAMERA);
+        let key = own_keys::anchor_key("Camera", props.anchor, &own_keys::CAMERA);
         let kind = ("Camera", key, NodeKind::Camera { handle, projection });
         let mounted = mount_node(
             dom,
