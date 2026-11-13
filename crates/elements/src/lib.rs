@@ -124,6 +124,7 @@ mod restyle_check;
 mod restyle_children;
 mod restyle_pass;
 mod restyle_share;
+mod restyle_used;
 mod run_bits;
 mod scene_view;
 mod scroll;
