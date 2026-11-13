@@ -158,6 +158,11 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
 /// them together), so each entry's id is its position: nothing is
 /// looked up by name, and nothing is allocated when nothing is refused.
 pub(crate) fn check_honoured(styles: Styles<'_>, initial: &ComputedStyle) -> Vec<Refusal> {
+    debug_assert_eq!(
+        TABLE.len(),
+        PropertyId::all().count(),
+        "crates/elements/src/style/honoured.rs TABLE and vapors-css's property table differ in length; add or remove entries to match (cargo test -p vapors-elements --lib every_css_longhand_has_exactly_one_treatment)"
+    );
     TABLE
         .iter()
         .zip(PropertyId::all())
