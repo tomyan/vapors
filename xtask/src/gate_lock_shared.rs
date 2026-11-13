@@ -40,7 +40,7 @@ pub fn acquire_shared(dir: &Path, worktree: &str, wait: Duration) -> Result<Shar
     let started = Instant::now();
     let turn = open(dir, TURN)?;
     wait_for(dir, (&turn, TURN, Mode::Exclusive), (started, wait), "ci")?;
-    let slot = crate::gate_lock_slots::take(dir, (started, wait))?;
+    let slot = crate::gate_lock_slots::take(dir, worktree, (started, wait))?;
     let file = open(dir, LOCK)?;
     wait_for(dir, (&file, LOCK, Mode::Shared), (started, wait), "ci")?;
     drop(turn);
@@ -74,7 +74,8 @@ pub fn ci_holders(dir: &Path) -> Vec<String> {
 }
 
 fn live_marker(path: &Path) -> Option<String> {
-    path.file_name()?.to_str()?.strip_prefix(MARKER)?;
+    let pid = path.file_name()?.to_str()?.strip_prefix(MARKER)?;
+    pid.parse::<u32>().ok()?;
     let owner = Owner::parse(&std::fs::read_to_string(path).ok()?)?;
     owner.live().then(|| {
         format!(

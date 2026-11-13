@@ -44,8 +44,12 @@ fn a_fourth_ci_run_waits_then_fails_naming_the_three_that_hold_the_slots() {
         refusal.contains(&format!("all {SLOTS} ci slots")),
         "{refusal}"
     );
-    // One process here, so one `ci.<pid>` marker: the last run's.
-    assert!(refusal.contains("by ci in /w/c"), "{refusal}");
+    for worktree in ["/w/a", "/w/b", "/w/c"] {
+        assert!(
+            refusal.contains(&format!("ci in {worktree} (pid ")),
+            "{refusal}"
+        );
+    }
     assert!(refusal.contains("fix:"), "{refusal}");
 }
 
@@ -68,4 +72,21 @@ fn a_waiting_ci_run_takes_the_slot_a_finished_one_frees() {
 
     // Then
     assert_eq!(waiting.join().expect("joined"), Ok(()));
+}
+
+#[test]
+fn a_slot_names_its_holder_from_the_moment_it_is_taken() {
+    // Given: slots taken, no ci marker written yet
+    let dir = lock_dir("slots-named");
+    let started = (Instant::now(), BRIEF);
+    let _slots: Vec<_> = (0..SLOTS)
+        .map(|_| take(&dir, "/w/early", started).expect("a slot"))
+        .collect();
+
+    // When
+    let refusal = take(&dir, "/w/late", started).expect_err("no slot");
+
+    // Then
+    assert!(refusal.contains("ci in /w/early (pid "), "{refusal}");
+    assert!(!refusal.contains("nobody"), "{refusal}");
 }

@@ -94,14 +94,19 @@ fn the_gate_builds_on_every_thread_over_any_inherited_or_configured_cap() {
 #[test]
 fn plain_cargo_is_capped_at_the_same_jobs_as_xtask_s_steps() {
     // Given
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../.cargo/config.toml");
-    let text = std::fs::read_to_string(path).expect(".cargo/config.toml");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let text = std::fs::read_to_string(root.join(".cargo/config.toml")).expect("config.toml");
+    let config = Config::load_from(&root).expect(".config/factory.toml");
+
+    // When
+    let configured = jobs(&config).expect("[build] jobs");
 
     // Then
-    let line = format!("jobs = {DEFAULT_JOBS}");
+    let line = format!("jobs = {configured}");
     assert!(
         text.lines().any(|l| l.trim() == line),
-        "{path} has no `{line}` under [build]; fix: set it to priority.rs's DEFAULT_JOBS"
+        ".cargo/config.toml has no `{line}` under [build], the [build] jobs xtask's steps use; \
+         fix: make the two the same"
     );
 }
 
