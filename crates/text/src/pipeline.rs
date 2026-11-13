@@ -34,13 +34,18 @@ impl Default for BlendParams {
 pub(crate) const FLOATS_PER_VERTEX: usize = 8;
 pub(crate) const VERTEX_SIZE: u64 = (FLOATS_PER_VERTEX * std::mem::size_of::<f32>()) as u64;
 
+/// Bytes of the params uniform: gamma, contrast, the viewport and a
+/// scroll frame's shift, padded to 32.
+pub(crate) const PARAMS_SIZE: usize = 32;
+
 /// Draws laid-out text into a render target.
 pub struct TextPipeline {
     pub(crate) pipeline: wgpu::RenderPipeline,
     pub(crate) layout: wgpu::BindGroupLayout,
     pub(crate) sampler: wgpu::Sampler,
-    /// The blend parameters, one slot per distinct pair drawn with.
-    pub(crate) params: UniformSlots,
+    /// The blend parameters with the viewport and a scroll frame's
+    /// shift, one slot per distinct value drawn with.
+    pub(crate) params: UniformSlots<PARAMS_SIZE>,
     /// The atlas texture, its view and the bind group over them.
     pub(crate) atlas_texture: AtlasTexture,
     pub(crate) vertices: FrameArena,
@@ -108,7 +113,7 @@ pub(crate) fn bind_group(
     layout: &wgpu::BindGroupLayout,
     view: &wgpu::TextureView,
     sampler: &wgpu::Sampler,
-    params: &UniformSlots,
+    params: &UniformSlots<PARAMS_SIZE>,
 ) -> wgpu::BindGroup {
     work.create_bind_group(
         device,

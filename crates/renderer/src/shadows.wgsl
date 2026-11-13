@@ -26,7 +26,14 @@ struct Out {
     @location(6) @interpolate(flat) sigma: f32,
 }
 
-@group(0) @binding(0) var<uniform> viewport: vec2<f32>;
+// The target's size, and the shift of the scroll frame the instances
+// are in, added to their positions (device pixels, whole).
+struct View {
+    size: vec2<f32>,
+    shift: vec2<f32>,
+}
+
+@group(0) @binding(0) var<uniform> view: View;
 
 @vertex
 fn vs_main(@builtin(vertex_index) vertex: u32, instance: Instance) -> Out {
@@ -36,7 +43,8 @@ fn vs_main(@builtin(vertex_index) vertex: u32, instance: Instance) -> Out {
     );
     let pixel = mix(instance.quad.xy, instance.quad.zw, corners[vertex]);
     var out: Out;
-    out.position = vec4(pixel.x / viewport.x * 2.0 - 1.0, 1.0 - pixel.y / viewport.y * 2.0, 0.0, 1.0);
+    let on_target = pixel + view.shift;
+    out.position = vec4(on_target.x / view.size.x * 2.0 - 1.0, 1.0 - on_target.y / view.size.y * 2.0, 0.0, 1.0);
     out.pixel = pixel;
     out.shape = instance.shape;
     out.radii = instance.radii;

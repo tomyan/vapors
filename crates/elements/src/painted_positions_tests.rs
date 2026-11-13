@@ -71,11 +71,13 @@ fn page() -> Page {
 }
 
 /// `doc`'s paint with the list's frame shifted by `SHIFT`, its kept
-/// batches dropped as a shift change drops them.
+/// batches to be sorted again as after a shift change.
 fn shifted(doc: &mut Document) -> &Painted {
     let painted = doc.painted.as_mut().expect("painted");
     painted.frames.shift_every_frame(SHIFT);
-    painted.kept_batches = std::cell::RefCell::default();
+    if let Some(kept) = painted.kept_batches.get_mut() {
+        kept.unsort();
+    }
     painted
 }
 
@@ -84,13 +86,30 @@ fn moved([x, y]: [f32; 2]) -> [f32; 2] {
 }
 
 /// The blue row's quad among `items`.
-fn row_quad(mut items: impl Iterator<Item = Item>) -> Rect {
+fn row_quad(items: impl Iterator<Item = Item>) -> Rect {
+    row_quad_in(items).expect("the row's quad")
+}
+
+/// The blue row's quad among `items`, if there.
+fn row_quad_in(mut items: impl Iterator<Item = Item>) -> Option<Rect> {
     let blue = Color::from_rgba8(0, 0, 255, 255);
-    let found = items.find_map(|item| match item {
+    items.find_map(|item| match item {
         Item::Quad(quad) if quad.background == blue => Some(quad.rect),
         _ => None,
+    })
+}
+
+/// The blue row's quad among `kept`'s batches, in its frame, and the
+/// frame.
+fn row_batch(kept: &crate::KeptBatched) -> (Rect, crate::BatchFrame) {
+    let mut batches = kept.batched.batches.iter().zip(&kept.frames);
+    let found = batches.find_map(|(batch, &frame)| match &batch.run {
+        vapors_scene::Run::Quads(quads) => {
+            row_quad_in(quads.iter().map(|quad| Item::Quad(*quad))).map(|quad| (quad, frame))
+        }
+        _ => None,
     });
-    found.expect("the row's quad")
+    found.expect("a batch with the row's quad")
 }
 
 #[test]
@@ -141,12 +160,9 @@ fn items_batches_and_hits_move_with_the_frame() {
         row_quad(after.scene().items().map(|(item, _)| item)),
         moved_quad
     );
-    let kept = after.batches(view).clone();
-    let batched = kept.batches.iter().flat_map(|batch| match &batch.run {
-        vapors_scene::Run::Quads(quads) => quads.iter().map(|quad| Item::Quad(*quad)).collect(),
-        _ => Vec::new(),
-    });
-    assert_eq!(row_quad(batched), moved_quad);
+    let kept = after.kept_batches(view).clone();
+    let (in_frame, frame) = row_batch(&kept);
+    assert_eq!((in_frame, after.frame_draw(frame).shift), (quad, SHIFT));
     assert_eq!(after.hit([50.0, 45.0]), Some(page.row));
 }
 

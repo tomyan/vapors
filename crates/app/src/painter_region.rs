@@ -1,6 +1,8 @@
 //! Where the painter may draw on a target: the area batching culls
-//! against, and each batch's scissor inside it.
+//! against, and each batch's scissor inside it, from the batch's clip
+//! in its scroll frame and the frame's shift and clip.
 
+use vapors_elements::FrameDraw;
 use vapors_renderer::Target;
 use vapors_scene::{Rect, Scissor, Size};
 
@@ -44,6 +46,16 @@ pub(super) fn view(target: &Target<'_>) -> Rect {
             )
         },
     )
+}
+
+/// A batch's clip on the page: `clip`, its clip inside `frame`, moved by
+/// the frame's shift and cut to the frame's clip; `None` for none.
+pub(super) fn on_page(clip: Option<Rect>, frame: FrameDraw) -> Option<Rect> {
+    let clip = clip.map(|clip| clip.offset(frame.shift));
+    match (clip, frame.clip) {
+        (Some(clip), Some(outer)) => Some(clip.intersection(outer)),
+        (clip, outer) => clip.or(outer),
+    }
 }
 
 /// `target` cut to `clip`; `None` when nothing of it is left.

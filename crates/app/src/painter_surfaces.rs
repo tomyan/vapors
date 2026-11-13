@@ -13,7 +13,7 @@ use std::rc::Rc;
 
 use vapors_elements::Painted;
 use vapors_platform::Instant;
-use vapors_renderer::{GpuWork, ImagePipeline, KeptRange, Target, WorkCounter};
+use vapors_renderer::{GpuWork, ImagePipeline, KeptRange, Shift, Target, WorkCounter};
 use vapors_scene::{Item, Rect, Run};
 
 use super::errors::{MountError, PaintError};
@@ -124,20 +124,20 @@ impl Surfaces {
     }
 
     /// Renders, as needed, and composites each surface item of `items`
-    /// over the quad at its place in `kept`.
+    /// over the quad at its place in `kept`, moved by `shift`.
     pub(super) fn draw_kept(
         &mut self,
         pipeline: &mut ImagePipeline,
         target: &Target<'_>,
         painted: &Painted,
-        (items, kept): (&[Item], &KeptRange),
+        (items, kept, shift): (&[Item], &KeptRange, Shift),
     ) -> Result<(), PaintError> {
         for (place, (name, size, _)) in (0..).zip(surfaces(painted, items)) {
             let mounted = unmounted_refused(&mut self.mounted, name)?;
             let turn = turn(&self.waker);
             let bound = mounted.prepare(target, pipeline, size, turn, &self.work);
             let bound = bound.map_err(|r| r.named(name))?;
-            pipeline.draw_kept(target, bound, (kept, place));
+            pipeline.draw_kept(target, bound, (kept, place), shift);
         }
         Ok(())
     }

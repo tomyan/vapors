@@ -181,7 +181,6 @@ impl Retained {
         KeptRange {
             owner: self.owner,
             slot,
-            viewport: None,
         }
     }
 

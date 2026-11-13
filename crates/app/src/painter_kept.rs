@@ -3,9 +3,8 @@
 //! batch's instance or vertex bytes (text and icon batches':
 //! `painter_kept_text.rs`), written into its pipeline's kept buffer on the first
 //! draw of its key (`vapors_elements::BatchKey`) and drawn from there
-//! while the key lasts. Image and surface quads are in clip space, so
-//! their bytes are written again on a target of another viewport (one
-//! scissored to the same view). A key a frame does not draw has its
+//! while the key lasts, on targets of any viewport, moved by the shift
+//! of the scroll frame they are in. A key a frame does not draw has its
 //! bytes released after the frame. Each `draw` or `draw_over` call is a
 //! frame, so a painter keeps the bytes of one document: a second drawn
 //! by the same painter releases the first's, and both write every batch
@@ -17,8 +16,8 @@
 //! and compares them with the bytes kept (`painter_kept_check.rs`).
 
 use vapors_elements::{BatchKey, Painted};
-use vapors_renderer::{ImagePipeline, KeptRange, QuadPipeline, ShadowPipeline, Target};
-use vapors_scene::{Item, Rect, Run, Size};
+use vapors_renderer::{ImagePipeline, KeptRange, QuadPipeline, ShadowPipeline, Shift, Target};
+use vapors_scene::{Item, Rect, Run};
 use vapors_text::{BlendParams, GlyphAtlas, ICON_BLEND, TextPipeline};
 
 use super::ScenePainter;
@@ -49,14 +48,15 @@ pub(super) struct Pipelines<'a> {
 
 impl ScenePainter {
     /// Draws `run`, a shadow, quad, image or surface batch keyed `key`,
-    /// from its kept bytes, writing them first when none are kept for
-    /// the target's viewport. Nothing is drawn when the write is refused
-    /// (the refusal is on the target's encoder).
+    /// from its kept bytes moved by `shift`, writing them first when none
+    /// are kept. Nothing is drawn when the write is refused (the refusal
+    /// is on the target's encoder).
     pub(super) fn draw_retained(
         &mut self,
         target: &Target<'_>,
         painted: &Painted,
         (run, key, at): (&Run, BatchKey, usize),
+        shift: Shift,
     ) -> Result<(), PaintError> {
         let pipelines = Pipelines {
             shadows: &mut self.shadows,
@@ -69,17 +69,17 @@ impl ScenePainter {
             return Ok(());
         };
         match run {
-            Run::Shadows(_) => self.shadows.draw_kept(target, range),
-            Run::Quads(_) => self.quads.draw_kept(target, range),
+            Run::Shadows(_) => self.shadows.draw_kept(target, range, shift),
+            Run::Quads(_) => self.quads.draw_kept(target, range, shift),
             Run::Images(items) => {
                 let images = &mut self.images;
                 self.textures
-                    .draw_kept(images, target, painted, (items, range));
+                    .draw_kept(images, target, painted, (items, range, shift));
             }
             Run::Surfaces(items) => {
                 let images = &mut self.images;
                 self.surfaces
-                    .draw_kept(images, target, painted, (items, range))?;
+                    .draw_kept(images, target, painted, (items, range, shift))?;
             }
             Run::Texts(_) | Run::Icons(_) => unreachable!("Kind::of refused it in range"),
         }
@@ -87,8 +87,8 @@ impl ScenePainter {
     }
 
     /// Draws `run`, a text or icon batch keyed `key`, from its kept
-    /// bytes, building and writing them first when none are current
-    /// (`painter_kept_text.rs`). Nothing is drawn for a batch with no
+    /// bytes moved by `shift`, building and writing them first when none
+    /// are current (`painter_kept_text.rs`). Nothing is drawn for a batch with no
     /// ink, or when the write is refused (the refusal is on the
     /// target's encoder).
     pub(super) fn draw_kept_text(
@@ -96,6 +96,7 @@ impl ScenePainter {
         target: &Target<'_>,
         painted: &Painted,
         (run, key, at): (&Run, BatchKey, usize),
+        shift: Shift,
     ) -> Result<(), PaintError> {
         let parts = (&mut self.text, &mut self.atlas);
         let kept = self
@@ -103,7 +104,7 @@ impl ScenePainter {
             .text_range(parts, (target, painted), (run, key, at))?;
         if let Some(kept) = kept {
             self.text
-                .draw_kept(target, &mut self.atlas, kept, blend(run));
+                .draw_kept(target, &mut self.atlas, kept, blend(run), shift);
         }
         Ok(())
     }
@@ -182,14 +183,13 @@ impl Kind {
     }
 }
 
-/// `run`'s instance or vertex bytes on a target of `viewport`, as its
-/// pipeline draws them.
-pub(super) fn run_bytes(run: &Run, viewport: Size) -> Vec<u8> {
+/// `run`'s instance or vertex bytes, as its pipeline draws them.
+pub(super) fn run_bytes(run: &Run) -> Vec<u8> {
     match run {
         Run::Shadows(shadows) => ShadowPipeline::bytes(shadows),
         Run::Quads(quads) => QuadPipeline::bytes(quads),
         Run::Images(items) | Run::Surfaces(items) => {
-            ImagePipeline::rect_bytes(viewport, items.iter().map(item_rect))
+            ImagePipeline::rect_bytes(items.iter().map(item_rect))
         }
         Run::Texts(_) | Run::Icons(_) => unreachable!("text and icon runs are not kept"),
     }

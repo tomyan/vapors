@@ -57,6 +57,9 @@ pub struct Painted {
     pub(crate) kept_boxes: Vec<Option<crate::kept_box::KeptBox>>,
     /// The steps of `order` that draw, which the scene's items walk.
     pub(crate) drawn: crate::drawn_steps::DrawnSteps,
+    /// Each scroll frame's drawing steps by their extents, which the
+    /// kept batches find the steps in a view through.
+    pub(crate) extents: crate::frame_extents::Extents,
     /// The last draw's batches and what they were made from.
     pub(crate) kept_batches: std::cell::RefCell<Option<crate::kept_batches::KeptBatches>>,
     /// Boxes painted by this update, for `UpdateCounts`.
@@ -99,6 +102,7 @@ impl Painted {
             from: crate::kept_paint::PaintedFrom::default(),
             kept_boxes: Vec::new(),
             drawn: crate::drawn_steps::DrawnSteps::default(),
+            extents: crate::frame_extents::Extents::default(),
             kept_batches: std::cell::RefCell::new(None),
             boxes_drawn: 0,
             boxes_shifted: 0,

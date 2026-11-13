@@ -9,6 +9,7 @@ use vapors_scene::{Batched, Item, Rect, Scene};
 
 use crate::drawn_steps::DrawnSteps;
 use crate::frames::Frames;
+use crate::frames_draw::BatchFrame;
 use crate::kept_box::KeptBox;
 use crate::kept_hits::FramedHit;
 use crate::paint_order::Step;
@@ -48,10 +49,20 @@ impl<'a> SceneView<'a> {
     }
 
     /// The batches for a target whose drawable area is `view` (device
-    /// pixels): [`vapors_scene::batched`] over [`SceneView::items`].
+    /// pixels): [`vapors_scene::batched`] over [`SceneView::items`], on
+    /// the page.
     #[must_use]
     pub fn batches(&self, view: Rect) -> Batched {
         vapors_scene::batched(self.items(), view)
+    }
+
+    /// The batches for a target whose drawable area is `view` (device
+    /// pixels) in their scroll frames, with each one's frame, made
+    /// afresh as the kept batches are (`framed_batches.rs`).
+    #[must_use]
+    pub fn framed_batches(&self, view: Rect) -> (Batched, Vec<BatchFrame>) {
+        let steps: Vec<Step> = self.drawn.steps().collect();
+        crate::framed_batches::framed_batches(&steps, |&step| step, (self.boxes, self.frames), view)
     }
 
     /// The items as a flat scene, each under its clip.
@@ -103,6 +114,18 @@ pub(crate) fn step_items<'a>(
     let clips = scene.clips().iter().copied();
     let on_page = move |(item, clip)| frames.item(kept.from.frame, item, clip);
     scene.items().iter().zip(clips).map(on_page)
+}
+
+/// The items `step` paints, each with its clip inside its part's frame
+/// (device pixels, frame coordinates), and the frame.
+pub(crate) fn frame_items(
+    boxes: &[Option<KeptBox>],
+    step: Step,
+) -> (usize, impl Iterator<Item = (Item, Option<Rect>)> + '_) {
+    let kept = kept(boxes, step.index(), step);
+    let scene = kept.scene_of(step);
+    let items = scene.items().iter().copied();
+    (kept.from.frame, items.zip(scene.clips().iter().copied()))
 }
 
 /// The items `step` paints: its slot's own part, outline or thumbs.

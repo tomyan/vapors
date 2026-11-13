@@ -165,16 +165,20 @@ fn a_draw_after_a_scroll_batches_the_rows_where_they_show() {
     // Given: a draw, which keeps its batches
     let mut list = scrolled("overflow: auto;", 0.0);
     let view = Rect::new(0.0, 0.0, 200.0, 200.0);
-    drop(list.doc.painted().expect("painted").batches(view));
+    drop(list.doc.painted().expect("painted").kept_batches(view));
 
     // When: the list scrolls, which paints no part
     list.doc.scroll_node_by(list.container, [0.0, 30.0]);
     let painted = list.doc.update(at(1.0)).expect("updates");
 
     // Then: the batches are made again, with the rows where they show
-    // (a debug build compares them with the whole scene's)
-    let batched = painted.batches(view).clone();
-    assert_eq!(batched, painted.scene().batches(view));
+    // in the list's frame (a debug build compares them with the whole
+    // scene's)
+    let kept = painted.kept_batches(view).clone();
+    assert_eq!(
+        (kept.batched, kept.frames),
+        painted.scene().framed_batches(view)
+    );
     let quads = row_quads(painted);
     assert_eq!(quads[1].0, Rect::new(0.0, 10.0, 100.0, 50.0));
 }

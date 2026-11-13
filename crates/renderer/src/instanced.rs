@@ -1,7 +1,8 @@
 //! A pipeline that draws one quad per instance: the shared machinery of
 //! the box and shadow pipelines. Each instance is `vec4s` four-float
 //! attributes, in device pixels where they are positions; the viewport
-//! size is a uniform, kept per size seen and bound by its offset. Alpha
+//! size and a scroll frame's shift (device pixels, added to every
+//! position) are a uniform, kept per value seen and bound by its offset. Alpha
 //! blends over what the target holds, in instance order, in one draw
 //! recorded into the target's encoder.
 
@@ -11,7 +12,7 @@ use crate::frame_arena::{FrameArena, Placed};
 use crate::kept_bind_group::KeptBindGroup;
 use crate::quads_setup::{bind_group_layout, render_pipeline};
 use crate::uniform_slots::UniformSlots;
-use crate::{KeptRange, Retained, Target, WorkCounter};
+use crate::{KeptRange, Retained, Shift, Target, WorkCounter};
 
 const VERTICES_PER_QUAD: u32 = 6;
 
@@ -77,7 +78,7 @@ impl Instanced {
         let Some(instances) = self.instances.push(frame, queue, &self.work, bytes) else {
             return;
         };
-        let Some(viewport) = self.viewport_slot(target) else {
+        let Some(viewport) = self.viewport_slot(target, Shift::NONE) else {
             return;
         };
         self.record(target, count, Instances::Placed(&instances), viewport);
@@ -103,11 +104,12 @@ impl Instanced {
         self.kept.keep(frame, queue, &self.work, bytes)
     }
 
-    /// Draws the instances `kept` holds; not when the viewport slot is
-    /// refused (the refusal is on the encoder).
-    pub(crate) fn draw_kept(&mut self, target: &Target<'_>, kept: &KeptRange) {
+    /// Draws the instances `kept` holds, moved by `shift` (device
+    /// pixels); not when the viewport slot is refused (the refusal is on
+    /// the encoder).
+    pub(crate) fn draw_kept(&mut self, target: &Target<'_>, kept: &KeptRange, shift: Shift) {
         let count = self.count(self.kept.len(kept));
-        let Some(viewport) = self.viewport_slot(target) else {
+        let Some(viewport) = self.viewport_slot(target, shift) else {
             return;
         };
         self.record(target, count, Instances::Kept(kept), viewport);
@@ -138,9 +140,10 @@ impl Instanced {
         })
     }
 
-    /// The dynamic offset of the target's viewport in the slots.
-    fn viewport_slot(&mut self, target: &Target<'_>) -> Option<u32> {
-        let viewport = viewport_bytes(target.viewport);
+    /// The dynamic offset of the target's viewport and `shift` in the
+    /// slots.
+    fn viewport_slot(&mut self, target: &Target<'_>, shift: Shift) -> Option<u32> {
+        let viewport = viewport_bytes(target.viewport, shift);
         let (frame, queue) = (target.encoder, target.queue);
         self.viewports.slot(frame, queue, &self.work, viewport)
     }
@@ -185,12 +188,15 @@ enum Instances<'a> {
     Kept(&'a KeptRange),
 }
 
-/// The viewport uniform's bytes: its size as two floats, padded to 16.
+/// The viewport uniform's bytes: its size and `shift`, two floats each.
 #[allow(clippy::cast_precision_loss)] // viewports are far below 2^24 pixels
-fn viewport_bytes(viewport: Size) -> [u8; 16] {
+pub(crate) fn viewport_bytes(viewport: Size, shift: Shift) -> [u8; 16] {
+    let [dx, dy] = shift.pixels();
+    let floats = [viewport.width as f32, viewport.height as f32, dx, dy];
     let mut bytes = [0; 16];
-    bytes[..4].copy_from_slice(&(viewport.width as f32).to_le_bytes());
-    bytes[4..8].copy_from_slice(&(viewport.height as f32).to_le_bytes());
+    for (at, float) in floats.into_iter().enumerate() {
+        bytes[at * 4..at * 4 + 4].copy_from_slice(&float.to_le_bytes());
+    }
     bytes
 }
 

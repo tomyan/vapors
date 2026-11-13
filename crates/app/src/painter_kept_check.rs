@@ -18,9 +18,8 @@ pub(super) fn assert_kept(kept: &[u8], fresh: &[u8], (run, at): (&Run, usize)) {
     panic!(
         "batch {at} ({kind}) drew kept bytes that differ from its bytes built afresh at \
          instance {}, {part} {} (byte {byte}; {} bytes kept, {} afresh): a key was kept for \
-         a batch whose run changed (kept_batches_keys.rs), bytes were kept for another \
-         viewport (painter_kept.rs), or text bytes for moved glyphs or another layout \
-         (painter_kept_text.rs); reproduce with `cargo xtask test`",
+         a batch whose run changed (kept_batches_keys.rs), or text bytes were kept for \
+         moved glyphs or another layout (painter_kept_text.rs); reproduce with `cargo xtask test`",
         byte / stride,
         byte % stride / part_size,
         kept.len(),

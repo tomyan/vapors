@@ -4,10 +4,10 @@
 
 use crate::atlas::{AtlasError, GlyphAtlas};
 use crate::layout::Layout;
-use vapors_renderer::{KeptRange, Placed};
+use vapors_renderer::{KeptRange, Placed, Shift};
 use vapors_scene::Size;
 
-use crate::pipeline::{self, BlendParams, TextPipeline, VERTEX_SIZE};
+use crate::pipeline::{self, BlendParams, PARAMS_SIZE, TextPipeline, VERTEX_SIZE};
 use crate::quads::{TextDraw, quads};
 
 /// Where a draw goes: [`vapors_renderer::Target`], under the name the
@@ -74,15 +74,15 @@ impl TextPipeline {
         quads: &[f32],
         params: BlendParams,
     ) {
-        let Some(params) = self.prepare(target, atlas, params) else {
+        let Some(params) = self.prepare(target, atlas, (params, Shift::NONE)) else {
             return;
         };
         self.draw_quads(target, quads, params);
     }
 
     /// Uploads what changed in the atlas page; the dynamic offset of the
-    /// slot holding `params` and the target's viewport, `None` when
-    /// refused (the refusal is on the encoder).
+    /// slot holding `params`, the target's viewport and `shift`, `None`
+    /// when refused (the refusal is on the encoder).
     ///
     /// # Panics
     ///
@@ -91,11 +91,11 @@ impl TextPipeline {
         &mut self,
         target: &RenderTarget<'_>,
         atlas: &mut GlyphAtlas,
-        params: BlendParams,
+        (params, shift): (BlendParams, Shift),
     ) -> Option<u32> {
         self.match_page_size(target.device, atlas);
         self.upload_page(target, atlas);
-        let params = params_bytes(params, target.viewport);
+        let params = params_bytes(params, target.viewport, shift);
         self.params
             .slot(target.encoder, target.queue, &self.work, params)
     }
@@ -160,17 +160,20 @@ pub(crate) enum Vertices<'a> {
     Kept(&'a KeptRange),
 }
 
-/// The params uniform's bytes: gamma, contrast and the viewport's width
-/// and height in device pixels.
+/// The params uniform's bytes: gamma, contrast, the viewport's width
+/// and height and `shift`, in device pixels.
 #[allow(clippy::cast_precision_loss)] // viewports are far below 2^24 pixels
-fn params_bytes(params: BlendParams, viewport: Size) -> [u8; 16] {
+fn params_bytes(params: BlendParams, viewport: Size, shift: Shift) -> [u8; PARAMS_SIZE] {
+    let [dx, dy] = shift.pixels();
     let floats = [
         params.gamma,
         params.contrast,
         viewport.width as f32,
         viewport.height as f32,
+        dx,
+        dy,
     ];
-    let mut bytes = [0; 16];
+    let mut bytes = [0; PARAMS_SIZE];
     for (at, float) in floats.into_iter().enumerate() {
         bytes[at * 4..][..4].copy_from_slice(&float.to_le_bytes());
     }

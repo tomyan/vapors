@@ -1,7 +1,8 @@
 use vapors_scene::{Batched, Color, Item, Quad, Rect, Scene, SurfaceId};
 
-use super::KeptBatches;
+use super::{KeptBatches, Sources};
 use crate::drawn_steps::DrawnSteps;
+use crate::frame_extents::Extents;
 use crate::frames::{PAGE, on_page};
 use crate::kept_box::{BoxFrom, KeptBox, Part};
 use crate::layout::BoxRect;
@@ -61,17 +62,46 @@ fn steps(boxes: &[Option<KeptBox>]) -> Vec<Step> {
     (0..boxes.len()).map(Step::Box).collect()
 }
 
-/// `boxes` kept for `VIEW`, and the steps that draw.
-fn kept_batches(boxes: &[Option<KeptBox>]) -> (KeptBatches, DrawnSteps) {
-    let steps = steps(boxes);
-    let drawn = DrawnSteps::of(&steps, boxes);
-    let kept = KeptBatches::of(VIEW, (&drawn, steps.len()), on_page(boxes));
-    (kept, drawn)
+/// `boxes`' drawing steps and extents index, as a paint keeps them.
+struct Steps {
+    drawn: DrawnSteps,
+    extents: Extents,
+    places: usize,
+}
+
+impl Steps {
+    fn of(boxes: &[Option<KeptBox>]) -> Self {
+        let places = boxes.len();
+        let drawn = DrawnSteps::of(&steps(boxes), boxes);
+        let extents = Extents::of(&drawn, places, boxes);
+        Self {
+            drawn,
+            extents,
+            places,
+        }
+    }
+
+    /// The batches' sources for `boxes`, every part on the page.
+    fn sources<'a>(&'a self, boxes: &'a [Option<KeptBox>]) -> Sources<'a> {
+        let (boxes, frames) = on_page(boxes);
+        Sources {
+            drawn: &self.drawn,
+            extents: &self.extents,
+            boxes,
+            frames,
+        }
+    }
+}
+
+/// `boxes` kept for `VIEW`, and their steps.
+fn kept_batches(boxes: &[Option<KeptBox>]) -> (KeptBatches, Steps) {
+    let steps = Steps::of(boxes);
+    (KeptBatches::of(VIEW, steps.sources(boxes)), steps)
 }
 
 /// `kept`'s batches of `boxes`, made when none are current.
-fn made(kept: &mut KeptBatches, boxes: &[Option<KeptBox>]) -> Batched {
-    kept.batches(on_page(boxes)).batched.clone()
+fn made(kept: &mut KeptBatches, steps: &Steps, boxes: &[Option<KeptBox>]) -> Batched {
+    kept.batches(steps.sources(boxes)).batched.clone()
 }
 
 /// Batching every item of `boxes` afresh.
@@ -81,15 +111,20 @@ fn afresh(boxes: &[Option<KeptBox>]) -> Batched {
     crate::SceneView::new(&steps, &drawn, on_page(boxes)).batches(VIEW)
 }
 
-/// Slot `slot` painted again as `items`, and both kept for the patch.
+/// Slot `slot` painted again as `part`, and its steps and the kept
+/// batches patched.
 fn painted_again(
-    (kept, drawn): (&mut KeptBatches, &mut DrawnSteps),
+    (kept, steps): (&mut KeptBatches, &mut Steps),
     boxes: &mut [Option<KeptBox>],
     (slot, part): (usize, Option<KeptBox>),
 ) {
     boxes[slot] = part;
-    drawn.patch([slot].into_iter(), boxes);
-    kept.patch(drawn.places_of(slot), on_page(boxes));
+    steps.drawn.patch([slot].into_iter(), boxes);
+    let placed: Vec<(usize, Step)> = steps.drawn.places_of(slot).collect();
+    steps
+        .extents
+        .patch(&placed, (&steps.drawn, steps.places), boxes);
+    kept.patch(placed.into_iter(), steps.sources(boxes));
 }
 
 #[test]
@@ -102,28 +137,28 @@ fn the_kept_batches_hold_the_shown_steps_and_count_the_hidden_ones_culled() {
     ];
 
     // When
-    let (mut kept, _) = kept_batches(&boxes);
+    let (mut kept, steps) = kept_batches(&boxes);
 
     // Then
-    assert_eq!(kept.shown, [(0, Step::Box(0)), (2, Step::Box(2))]);
-    assert_eq!(made(&mut kept, &boxes), afresh(&boxes));
-    assert_eq!(made(&mut kept, &boxes).culled, 3);
+    assert_eq!(kept.shown(), [(0, Step::Box(0)), (2, Step::Box(2))]);
+    assert_eq!(made(&mut kept, &steps, &boxes), afresh(&boxes));
+    assert_eq!(made(&mut kept, &steps, &boxes).culled, 3);
 }
 
 #[test]
 fn a_hidden_step_painted_again_out_of_view_keeps_the_batches() {
     // Given
     let mut boxes = [part_of(&[quad_at(0.0)]), part_of(&[quad_at(200.0)])];
-    let (mut kept, mut drawn) = kept_batches(&boxes);
-    _ = kept.batches(on_page(&boxes));
+    let (mut kept, mut steps) = kept_batches(&boxes);
+    _ = kept.batches(steps.sources(&boxes));
 
     // When
     let again = part_of(&[quad_at(300.0), quad_at(400.0)]);
-    painted_again((&mut kept, &mut drawn), &mut boxes, (1, again));
+    painted_again((&mut kept, &mut steps), &mut boxes, (1, again));
 
     // Then
     assert!(kept.holds_batches());
-    assert_eq!(made(&mut kept, &boxes), afresh(&boxes));
+    assert_eq!(made(&mut kept, &steps, &boxes), afresh(&boxes));
 }
 
 #[test]
@@ -131,17 +166,17 @@ fn a_step_painted_again_into_or_out_of_view_makes_the_batches_again() {
     for (before, after) in [(200.0, 50.0), (50.0, 200.0), (50.0, 60.0)] {
         // Given
         let mut boxes = [part_of(&[quad_at(0.0)]), part_of(&[quad_at(before)])];
-        let (mut kept, mut drawn) = kept_batches(&boxes);
-        _ = kept.batches(on_page(&boxes));
+        let (mut kept, mut steps) = kept_batches(&boxes);
+        _ = kept.batches(steps.sources(&boxes));
 
         // When
         let again = part_of(&[quad_at(after)]);
-        painted_again((&mut kept, &mut drawn), &mut boxes, (1, again));
+        painted_again((&mut kept, &mut steps), &mut boxes, (1, again));
 
         // Then
         assert!(!kept.holds_batches(), "{before} to {after}");
         assert_eq!(
-            made(&mut kept, &boxes),
+            made(&mut kept, &steps, &boxes),
             afresh(&boxes),
             "{before} to {after}"
         );
@@ -153,14 +188,14 @@ fn a_freed_slot_leaves_the_kept_steps_and_its_culled_count() {
     for top in [50.0, 200.0] {
         // Given
         let mut boxes = [part_of(&[quad_at(0.0)]), part_of(&[quad_at(top)])];
-        let (mut kept, mut drawn) = kept_batches(&boxes);
-        _ = kept.batches(on_page(&boxes));
+        let (mut kept, mut steps) = kept_batches(&boxes);
+        _ = kept.batches(steps.sources(&boxes));
 
         // When
-        painted_again((&mut kept, &mut drawn), &mut boxes, (1, None));
+        painted_again((&mut kept, &mut steps), &mut boxes, (1, None));
 
         // Then
-        assert_eq!(made(&mut kept, &boxes), afresh(&boxes), "at {top}");
+        assert_eq!(made(&mut kept, &steps, &boxes), afresh(&boxes), "at {top}");
     }
 }
 
@@ -170,9 +205,9 @@ fn a_surface_out_of_view_is_kept_shown_for_its_culled_batch() {
     let boxes = [part_of(&[quad_at(0.0)]), part_of(&[surface_at(200.0)])];
 
     // When
-    let (mut kept, _) = kept_batches(&boxes);
+    let (mut kept, steps) = kept_batches(&boxes);
 
     // Then
-    assert_eq!(kept.shown.len(), 2);
-    assert_eq!(made(&mut kept, &boxes), afresh(&boxes));
+    assert_eq!(kept.shown().len(), 2);
+    assert_eq!(made(&mut kept, &steps, &boxes), afresh(&boxes));
 }

@@ -1,42 +1,59 @@
 //! A pipeline's uniform values kept on the GPU between frames: each
-//! distinct 16-byte value in its own slot of one buffer, written when
-//! it first appears and bound after by its dynamic offset. A frame
-//! whose values the buffer already holds writes nothing; a bind group
-//! made for the buffer serves every slot.
+//! distinct value (16 bytes, or `SIZE`) in its own slot of one buffer,
+//! written when it first appears and bound after by its dynamic offset.
+//! A frame whose values the buffer already holds writes nothing; a bind
+//! group made for the buffer serves every slot.
 
 use crate::encoder_turn::EncoderTurn;
 use crate::{ArenaFull, FrameEncoder, Holding, WorkCounter};
 
-/// Bytes of one value: the viewport, or the text blend parameters.
-const VALUE_SIZE: u64 = 16;
 /// Slots in a new buffer: 4 KiB at the 256-byte alignment WebGPU, ANV
 /// and lavapipe give. A frame needing more moves to a buffer twice as
 /// large.
 const FIRST_SLOTS: u64 = 16;
 
 /// One uniform buffer of slots, each the device's uniform offset
-/// alignment apart.
-pub struct UniformSlots {
+/// alignment apart, each holding a value of `SIZE` bytes: the viewport
+/// and a scroll frame's shift, or the text blend parameters with them.
+pub struct UniformSlots<const SIZE: usize = 16> {
     label: &'static str,
     align: u64,
     buffer: wgpu::Buffer,
-    slots: Vec<Slot>,
+    slots: Vec<Slot<SIZE>>,
     turn: EncoderTurn,
     /// Counts the buffers made; a bind group is for one buffer.
     generation: u64,
 }
 
 /// A slot's value and the last encoder whose draw read it.
-struct Slot {
-    value: [u8; 16],
+struct Slot<const SIZE: usize> {
+    value: [u8; SIZE],
     encoder: u64,
 }
 
-impl UniformSlots {
+impl<const SIZE: usize> UniformSlots<SIZE> {
     /// An empty buffer of `FIRST_SLOTS` slots for the pipeline `label`.
+    ///
+    /// # Panics
+    ///
+    /// When `SIZE` is not a whole number of 16-byte rows (WGSL's uniform
+    /// struct alignment), or is larger than the device's uniform offset
+    /// alignment, so slots would overlap.
     #[must_use]
     pub fn new(device: &wgpu::Device, label: &'static str) -> Self {
+        const {
+            assert!(
+                SIZE.is_multiple_of(16),
+                "a uniform value is whole 16-byte rows"
+            );
+        }
         let align = u64::from(device.limits().min_uniform_buffer_offset_alignment);
+        assert!(
+            SIZE as u64 <= align,
+            "{label}: {SIZE}-byte uniform values in slots {align} bytes apart would overlap; \
+             keep values within the device's min_uniform_buffer_offset_alignment \
+             (uniform_slots.rs)"
+        );
         Self {
             label,
             align,
@@ -54,7 +71,7 @@ impl UniformSlots {
         wgpu::BindingResource::Buffer(wgpu::BufferBinding {
             buffer: &self.buffer,
             offset: 0,
-            size: wgpu::BufferSize::new(VALUE_SIZE),
+            size: wgpu::BufferSize::new(SIZE as u64),
         })
     }
 
@@ -80,7 +97,7 @@ impl UniformSlots {
         frame: &FrameEncoder,
         queue: &wgpu::Queue,
         work: &WorkCounter,
-        value: [u8; 16],
+        value: [u8; SIZE],
     ) -> Option<u32> {
         self.turn.begin(frame);
         let at = match self.slots.iter().position(|slot| slot.value == value) {
@@ -96,7 +113,7 @@ impl UniformSlots {
         frame: &FrameEncoder,
         queue: &wgpu::Queue,
         work: &WorkCounter,
-        value: [u8; 16],
+        value: [u8; SIZE],
     ) -> Option<usize> {
         let at = self.free_slot(frame)?;
         work.write_uniform(queue, &self.buffer, u64::from(self.offset(at)), &value);
@@ -123,7 +140,7 @@ impl UniformSlots {
 
     fn push(&mut self, frame: &FrameEncoder) -> usize {
         self.slots.push(Slot {
-            value: [0; 16],
+            value: [0; SIZE],
             encoder: frame.id(),
         });
         self.slots.len() - 1

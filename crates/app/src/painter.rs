@@ -1,13 +1,13 @@
 //! Drawing an update: clear to the canvas colour (or, drawing over what
 //! the target holds, not), then each run of the scene's items with the
-//! pipeline for its kind, in painting order, under the run's clip as a
-//! scissor. Items that paint nothing inside the target under their clip
+//! pipeline for its kind, in painting order, moved by its scroll frame's
+//! shift, under the run's clip moved the same way and cut to the frame's
+//! clip as a scissor. Items that paint nothing inside the target under their clip
 //! are culled when the scene is batched; a run clipped to nothing is not
 //! drawn, though its surfaces are refused as they would be in view.
 
-use vapors_elements::{BatchKey, Painted};
+use vapors_elements::Painted;
 use vapors_renderer::{ImagePipeline, QuadPipeline, ShadowPipeline, Target, clear_target};
-use vapors_scene::Run;
 use vapors_text::{AtlasConfig, GlyphAtlas, TextPipeline};
 
 /// The pipelines and glyph atlas for one target format.
@@ -128,51 +128,17 @@ impl ScenePainter {
         self.end_counts();
         runs
     }
-
-    fn paint_runs(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
-        let kept = painted.kept_batches(view(target));
-        self.counts.culled = kept.batched.culled;
-        for (at, (batch, &key)) in kept.batched.batches.iter().zip(&kept.keys).enumerate() {
-            match clipped(target, batch.clip).filter(|_| !batch.culled) {
-                Some(clipped) => self.draw_run(&clipped, painted, (&batch.run, key, at))?,
-                None => self
-                    .surfaces
-                    .check_clipped(target.device, painted, &batch.run)?,
-            }
-        }
-        Ok(())
-    }
-
-    /// Draws `run` with the pipeline for its kind under `target`'s
-    /// scissor, and counts the work it issued. A draw the pipeline's
-    /// buffers refused ends the frame here.
-    fn draw_run(
-        &mut self,
-        target: &Target<'_>,
-        painted: &Painted,
-        (run, key, at): (&Run, BatchKey, usize),
-    ) -> Result<(), PaintError> {
-        let result = match KeptKind::of_run(run) {
-            Some(_) => self.draw_retained(target, painted, (run, key, at)),
-            None => self.draw_kept_text(target, painted, (run, key, at)),
-        };
-        self.count_run(run);
-        result?;
-        target
-            .encoder
-            .take_refusal()
-            .map_or(Ok(()), |refused| Err(refused.into()))
-    }
 }
 
-#[path = "painter_region.rs"]
-mod region;
-use region::{clipped, view};
 #[path = "painter_counts.rs"]
 mod counts;
 #[path = "painter_kept.rs"]
 mod kept;
-use kept::{KeptGpu, Kind as KeptKind};
+#[path = "painter_region.rs"]
+mod region;
+#[path = "painter_runs.rs"]
+mod runs;
+use kept::KeptGpu;
 #[cfg(debug_assertions)]
 #[path = "painter_kept_check.rs"]
 mod kept_check;

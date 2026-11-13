@@ -8,7 +8,7 @@ fn names() -> Vec<String> {
 }
 
 #[test]
-fn the_full_run_has_the_10000_row_edits_and_insert_at_three_sizes() {
+fn the_full_run_has_the_10000_row_edits_and_insert_resize_and_scroll_at_three_sizes() {
     let names = names();
     for name in [
         "10000 rows, Idle",
@@ -20,6 +20,8 @@ fn the_full_run_has_the_10000_row_edits_and_insert_at_three_sizes() {
         "1000 rows, Insert",
         "3000 rows, Insert",
         "10000 rows, Insert",
+        "10000 rows, Resize",
+        "10000 rows, Scroll",
     ] {
         assert!(names.iter().any(|n| n == name), "{name} in {names:?}");
     }

@@ -441,6 +441,107 @@ PR 3 as built (2026-11-13), split along the crate seam into 3a
   atlas holds its glyphs now (`placed_text_bytes`). It does no lookup,
   so the lookup count is the release path's.
 
+4c as built (2026-11-13), split along the crate seam into 4c-i
+(`crates/renderer`, `crates/text`: the shift in the uniforms, the
+painter passing none) and 4c-ii (the painter, the kept batches and the
+keys):
+
+- Image and surface quads moved from clip space to device pixels, with
+  a view uniform (viewport and shift) in a second bind group. Their
+  kept bytes draw on targets of any viewport and under any shift, so
+  `KeptRange` no longer records a viewport.
+- Batches are made per run of consecutive steps in one frame, each run
+  batched in that frame's view (`framed_batches.rs`), so
+  `vapors_scene::batched` is unchanged. `KeptBatched::frames` names each
+  batch's frame. The painter reads its shift and clip from
+  `Painted::frame_draw`.
+- A frame's shift or clip changing, or a walk of paint order, marks the
+  kept batches unsorted instead of dropping them. The next draw sorts
+  the steps again and keeps the old batches for their keys.
+- Keys are matched after the common prefix by one offset: the distance
+  from the first new batch to an old batch with the same run. Where the
+  offset finds no match, keys are matched from the end, unless the
+  offset already gave that old batch's key to another batch. The offset
+  keeps a scroll's batches. Matching from the end keeps Resize's
+  batches in place. The search looks for the first 8 new batches after
+  the prefix only, so it compares O(shown batches) runs when nothing
+  matches (a reflow, review of #267 L4).
+- The debug build checks the kept batches against a fresh batching in
+  frames. It also checks that their items, put on the page by their
+  frames, are the items batching the page draws, in the same order
+  (`kept_batches_check.rs`).
+- `Painted::batches` is gone: batches in frame coordinates mean
+  nothing without their frames, so callers read `Painted::kept_batches`.
+- Measured (`docs/perf/iu4-4c-2026-11-13.md`): Scroll writes 5 of 53
+  batches. An insert outside the view writes none; one inside it moves
+  the rows below it in their frame, and their batches are written. Its draw is still O(rows) through the `batches` step until
+  PR 5.
+4c-i (review at 015ead5, L5): the painter passes `Shift::NONE` at
+4c-i's head, so its forwarding of each frame's shift is pinned only in
+4c-ii. 4c-ii must include a pixel test that only the correct shift
+passes, at a scale other than 1.
+
+PR 5 as built (2026-11-13):
+
+- The index lives in `Painted` beside the drawing steps
+  (`frame_extents.rs`), keyed by frame. It is made afresh when paint
+  order is walked, and patched with the drawing steps otherwise. A step
+  whose new entry sorts to the same position is overwritten in place,
+  and the reaches after it are made again until one is unchanged. So
+  an edit costs O(1) on a page of disjoint rows. Patching more steps
+  than 64 or a sixteenth of the entries makes the index afresh.
+- A step with a surface, or a bound that is not a number, spans every
+  view. Candidates are the entries with `bottom > view.top` and
+  `top < view.bottom`, which is `Rect::is_disjoint`'s rule, so a step
+  the index leaves out has every item culled.
+- `hidden` and `hidden_culled` are gone. The culled count is every
+  drawing step's items, less the shown steps' items, plus those culled
+  inside the shown steps.
+- Debug checks: the index equals one made afresh after every paint
+  (`kept_paint_check.rs`). The steps found for a view equal testing
+  every step (`kept_batches_check.rs` `assert_candidates`).
+- Measured (`docs/perf/iu4-pr5-2026-11-13.md`): `batches` is flat in
+  the rows for Scroll and Resize. Remaking the index adds 2,100 to
+  2,700 instructions per row to Insert's and Resize's updates, which
+  were already O(rows).
+- Review at 649d4c4:
+  - M1: steps taller than 1024 device pixels, and those that span every
+    view, are kept in a list apart and tested on every view. A tall
+    wrapper therefore no longer raises every later step's reach, and the
+    scan visits only short steps whose top is within 1024 px above the
+    view (a unit test counts the entries visited). Still open: a page
+    of many tall steps tests them all on every view. A max-bottom tree
+    over top order (O(log n + shown) for any heights) replaces both the
+    list and the reach if that shows.
+  - M2: the index is built straight into its map.
+  - M2, still open: every frame is searched on every sort, so a page of
+    thousands of small scrollers (code blocks in a transcript) pays
+    O(frames · log steps) per scroll. The fix is to enter each frame's
+    clip in its parent frame's index and descend only into frames that
+    are candidates, as splice-layout's lanes enter one entry per lane.
+  - L1 to L3: the patch refuses paint order of another length; a view
+    whose edges are not numbers is refused; a shown step's item count
+    comes from its entry.
+- Requirement for the layout lane (lead, 2026-11-13): an insert makes
+  the index afresh (O(rows)), which is accepted for now. Once layout
+  and placement make an insert O(log n), this rebuild, with
+  `DrawnSteps::of` and the hits rebuild, becomes the floor of Insert's
+  update: about 21 to 27 million instructions at 10,000 rows. The index
+  must then be updated incrementally. That needs entries keyed by step
+  rather than by paint place, with paint order compared through an
+  order-maintenance structure or the lane's in-order position; a lane
+  entered as one entry, widened by its largest overflow, whose visible
+  children come from the lane's `between(view)`; and parts kept in
+  row-relative coordinates, so a moved row needs no entry patch
+  (`docs/plans/splice-layout.md` 5.x and row 4).
+- Risk 7, measured 2026-11-13: the 1000-row oracle test
+  (`sparse_updates.rs` `a_thousand_rows_update_sparsely_...`), three
+  runs each at load 10 to 12: 1.28 s on main 4d1451c, 1.30 s with 4c,
+  1.31 s with PR 5, which is +2%. That test paints and does not draw.
+  The draw-time checks (`assert_on_page`, `assert_candidates`) are
+  O(items) per debug draw, the same order as the existing
+  `assert_same`.
+
 ### 4a to 4c land together
 
 4a cannot land alone: once placement moves no slot on a scroll, paint

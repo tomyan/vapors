@@ -5,7 +5,7 @@
 #![allow(dead_code)]
 
 use vapors_gpu_harness::{Gpu, read_rgba8};
-use vapors_renderer::{FrameEncoder, KeptRange, QuadPipeline};
+use vapors_renderer::{FrameEncoder, KeptRange, QuadPipeline, Shift};
 
 use super::frame::{pixel, quad, square, target};
 
@@ -50,8 +50,13 @@ impl Frame {
     }
 
     pub fn draw(&mut self, encoder: &FrameEncoder, kept: &KeptRange) {
+        self.draw_shifted(encoder, kept, Shift::NONE);
+    }
+
+    /// Draws `kept` moved by `shift`, device pixels.
+    pub fn draw_shifted(&mut self, encoder: &FrameEncoder, kept: &KeptRange, shift: Shift) {
         let at = target(&self.gpu, encoder, &self.view, SIDE);
-        self.pipeline.draw_kept(&at, kept);
+        self.pipeline.draw_kept(&at, kept, shift);
     }
 
     /// The colours of the top row's first three pixels.

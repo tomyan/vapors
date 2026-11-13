@@ -79,7 +79,7 @@ impl DrawnSteps {
 
 /// True when `step`'s slot holds a kept paint whose items for `step`
 /// are not empty.
-fn draws(boxes: &[Option<KeptBox>], step: Step) -> bool {
+pub(crate) fn draws(boxes: &[Option<KeptBox>], step: Step) -> bool {
     let kept = boxes.get(step.index()).and_then(Option::as_ref);
     kept.is_some_and(|kept| !kept.scene_of(step).items().is_empty())
 }

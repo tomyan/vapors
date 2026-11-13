@@ -6,7 +6,7 @@ use vapors_scene::Shadow;
 
 use crate::instanced::{Instanced, float_bytes};
 use crate::quads::rgba;
-use crate::{GpuWork, KeptRange, Target};
+use crate::{GpuWork, KeptRange, Shift, Target};
 
 /// A pipeline that draws shadows. Create once per target format.
 pub struct ShadowPipeline(Instanced);
@@ -43,13 +43,14 @@ impl ShadowPipeline {
         self.0.keep(target, bytes)
     }
 
-    /// Draws the shadows `kept` holds into `target`, in one draw call.
+    /// Draws the shadows `kept` holds into `target`, moved by `shift`
+    /// (device pixels: a scroll frame's), in one draw call.
     ///
     /// # Panics
     ///
     /// If `kept` was kept by another pipeline.
-    pub fn draw_kept(&mut self, target: &Target<'_>, kept: &KeptRange) {
-        self.0.draw_kept(target, kept);
+    pub fn draw_kept(&mut self, target: &Target<'_>, kept: &KeptRange, shift: Shift) {
+        self.0.draw_kept(target, kept, shift);
     }
 
     /// Gives `kept`'s bytes back. Draws of it already recorded still

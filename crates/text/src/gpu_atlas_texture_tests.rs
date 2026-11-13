@@ -5,11 +5,15 @@ use vapors_gpu_harness::gpu;
 use vapors_renderer::{UniformSlots, WorkCounter};
 
 use crate::atlas_texture::AtlasTexture;
-use crate::pipeline::bind_group;
+use crate::pipeline::{PARAMS_SIZE, bind_group};
 use crate::pipeline_gpu::bind_group_layout;
 
 /// Bind groups `atlas` made for one draw against `params`.
-fn made_for_a_draw(device: &wgpu::Device, atlas: &mut AtlasTexture, params: &UniformSlots) -> u64 {
+fn made_for_a_draw(
+    device: &wgpu::Device,
+    atlas: &mut AtlasTexture,
+    params: &UniformSlots<PARAMS_SIZE>,
+) -> u64 {
     let work = WorkCounter::default();
     let layout = bind_group_layout(device);
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());

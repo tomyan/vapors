@@ -11,6 +11,8 @@ use vapors_elements::Document;
 
 /// An image quad: 6 vertices of 4 floats.
 const IMAGE_QUAD_BYTES: u64 = 6 * 16;
+/// The image pipeline's viewport and shift uniform, written on its first draw.
+const VIEW_UNIFORM_BYTES: u64 = 16;
 /// What [`Writer`] writes each render.
 const WRITTEN: u64 = 64;
 
@@ -64,7 +66,8 @@ fn gpu_a_surface_render_adds_its_counted_work_to_the_surface_counts() {
     let counts = drawn(&mut rig, &doc);
 
     // Then
-    assert_eq!(counts.surfaces.buffer_bytes, IMAGE_QUAD_BYTES + WRITTEN);
+    let composition = IMAGE_QUAD_BYTES + VIEW_UNIFORM_BYTES;
+    assert_eq!(counts.surfaces.buffer_bytes, composition + WRITTEN);
     assert_eq!(counts.surfaces.draw_calls, 1);
 }
 
