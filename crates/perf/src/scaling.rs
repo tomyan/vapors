@@ -190,8 +190,10 @@ fn extra_phase(first: &AtSize, size: &AtSize) -> Option<String> {
 #[path = "scaling_tests.rs"]
 mod tests;
 
+#[cfg(test)]
 #[path = "scaling_flat_tests.rs"]
 mod flat_tests;
+
 #[cfg(test)]
 #[path = "scaling_relaxed_tests.rs"]
 mod relaxed_tests;
