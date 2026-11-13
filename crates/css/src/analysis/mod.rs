@@ -30,6 +30,8 @@ use crate::tree::States;
 
 /// The run-time inputs a conditional match depends on.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+// each flag is one named input a reader prints; a set type would hide the names
+#[allow(clippy::struct_excessive_bools)]
 pub struct Depends {
     /// `class:` directives whose state the match reads.
     pub toggles: BTreeSet<String>,

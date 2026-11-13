@@ -67,7 +67,7 @@ fn specificity_decides_before_order() {
     );
     assert_eq!(
         longhand(&lower, "color"),
-        constant(1, 1, 0, Constancy::Constant)
+        constant(1, 0, 0, Constancy::Constant)
     );
 }
 

@@ -112,9 +112,8 @@ fn specified_constancy(value: &Specified, id: PropertyId) -> Constancy {
     match value {
         Specified::Value(value) if is_constant(value) => Constancy::Constant,
         Specified::Value(_) | Specified::Pending { .. } => Constancy::Variable,
-        Specified::Initial => Constancy::Constant,
         Specified::Inherit => Constancy::FromParent,
         Specified::Unset if id.inherited() => Constancy::FromParent,
-        Specified::Unset => Constancy::Constant,
+        Specified::Initial | Specified::Unset => Constancy::Constant,
     }
 }
