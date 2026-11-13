@@ -11,7 +11,7 @@ use vapors_dom::NodeId;
 
 use crate::document::Document;
 use crate::error::ElementError;
-use crate::style::{Styles, Used};
+use crate::style::{Styles, UsedMap};
 use crate::update::Viewport;
 
 /// What changed since the last update.
@@ -51,7 +51,7 @@ pub(crate) struct Kept {
     pub(crate) viewport: Viewport,
     pub(crate) initial: ComputedStyle,
     pub(crate) styles: Styles,
-    pub(crate) used: NodeMap<Used>,
+    pub(crate) used: UsedMap,
     /// Each element's refusals, kept until it is restyled again.
     pub(crate) refused: NodeMap<Vec<ElementError>>,
     /// Which elements the last update restyled: their computed styles,

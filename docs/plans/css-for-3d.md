@@ -441,7 +441,7 @@ element"). The scene components create their anchor with
 the tag and literal attributes, and toggle through
 `Dom::toggle_classes`. #251's inline `display: none` moves to the
 user-agent sheet (`scene, group, mesh, camera, decal { display: none
-}`, `style/ua.css`), since a literal `style` on the key would be the
+}`, `crates/css/src/ua.css`), since a literal `style` on the key would be the
 author's, and the anchor's attribute `data-scene3d-node` stays an
 ordinary attribute set after creation.
 

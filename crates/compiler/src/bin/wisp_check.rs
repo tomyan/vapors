@@ -1,18 +1,32 @@
-//! `wisp-check <file>`: parses a `.wisp` file and generates its Rust,
-//! reporting a refusal in `file:line:col: message` form. Native only;
-//! the web has no files.
+//! `wisp-check [--global] <file>`: parses a `.wisp` file as its build
+//! does (`compile_dir`, or `compile_dir_global` with `--global`) and
+//! generates its Rust, reporting a refusal in `file:line:col: message`
+//! form. Native only; the web has no files.
 
 #[cfg(not(target_family = "wasm"))]
 fn main() {
-    let Some(path) = std::env::args().nth(1) else {
-        eprintln!("usage: wisp-check <file.wisp>");
-        std::process::exit(2);
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let (global, path) = match args.as_slice() {
+        [flag, path] if flag == "--global" => (true, path),
+        [path] if path != "--global" => (false, path),
+        _ => {
+            eprintln!("usage: wisp-check [--global] <file.wisp>");
+            std::process::exit(2);
+        }
     };
-    let path = std::path::Path::new(&path);
-    let checked = vapors_compiler::parse_file(path)
-        .and_then(|component| vapors_compiler::generate(&component).map(|_| component.name));
+    let path = std::path::Path::new(path);
+    let (reading, parsed) = if global {
+        ("global style", vapors_compiler::parse_file_global(path))
+    } else {
+        ("scoped style", vapors_compiler::parse_file(path))
+    };
+    let checked =
+        parsed.and_then(|component| vapors_compiler::generate(&component).map(|_| component.name));
     match checked {
-        Ok(name) => println!("ok: {} compiles to component `{name}`", path.display()),
+        Ok(name) => println!(
+            "ok: {} compiles to component `{name}` ({reading})",
+            path.display()
+        ),
         Err(err) => {
             eprintln!("{err}");
             std::process::exit(1);
@@ -28,6 +42,6 @@ fn main() {
 #[cfg(target_family = "wasm")]
 fn main() {
     panic!(
-        "wisp-check reads files and runs on native targets only: run it with `cargo run -p vapors-compiler --bin wisp-check -- <file>`"
+        "wisp-check reads files and runs on native targets only: run it with `cargo run -p vapors-compiler --bin wisp-check -- [--global] <file>`"
     );
 }

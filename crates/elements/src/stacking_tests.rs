@@ -15,7 +15,7 @@ const VIEWPORT: Viewport = Viewport {
 #[should_panic(expected = "slot 0 is vacant, and no box's child")]
 fn a_vacant_slots_stacking_is_refused() {
     // Given: one vacant slot
-    let stackings = Stackings::of(&[LayoutBox::vacant()], &NodeMap::default());
+    let stackings = Stackings::of(&[LayoutBox::vacant()], &crate::style::UsedMap::default());
 
     // When: its stacking is asked for
     let _ = stackings.get(0);

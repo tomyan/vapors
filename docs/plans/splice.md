@@ -289,7 +289,7 @@ both branches of each `{if}`, and the bodies of nested `{for}`s):
   States: every element can take every state pseudo-class (`:hover`,
   `:focus`, `:focus-visible`, `:focus-within`, `:active`, `:checked`,
   `:disabled`, `:enabled`, `:invalid`).
-- Sheets: the user-agent sheet (`elements/src/style/ua.css`) and the
+- Sheets: the user-agent sheet (`crates/css/src/ua.css`) and the
   component's own `<style>`, as the runtime parses them
   (`vapors_css::parse`). A component compiled with `Styles::Global`,
   or holding a `:global(...)` compound, has its rows unmarked: its
