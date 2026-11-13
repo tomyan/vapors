@@ -134,12 +134,12 @@ fn an_attribute_given_twice_in_other_case_is_refused() {
 #[test]
 fn a_colon_name_on_a_component_is_refused_naming_the_fix() {
     // When
-    let err = refusal_with_flag("<Card class:lit={flag.get()} />");
+    let err = refusal_with_flag("<Card on:click={flag.get()} />");
 
     // Then
     assert_eq!(
         err,
-        "counter.wisp:4:7: `class:lit` is not a prop: a component tag takes plain props and `bind:name`; `class:` directives and `on:` listeners are for elements"
+        "counter.wisp:4:7: `on:click` is not a prop: a component tag takes plain props, `bind:name` and `class:name={bool}`; a listener is for an element: `onclick={handler}`, with no colon"
     );
 }
 

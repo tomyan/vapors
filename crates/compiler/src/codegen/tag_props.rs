@@ -6,6 +6,7 @@
 //! and a declaration that compiles. A tag the index cannot resolve is
 //! recorded as unchecked, for the build to list.
 
+use super::component_anchor::styles_anchor;
 use super::emit::Emitter;
 use super::props_index::{Declared, PropsIndex};
 use crate::CompileError;
@@ -49,6 +50,9 @@ impl Emitter<'_> {
             self.note_unchecked(tag);
             return;
         };
+        for (offset, refusal) in super::component_anchor::anchor_refusals(tag, declared) {
+            self.tags.errors.push(self.source.error(offset, refusal));
+        }
         for passed in passed(tag) {
             if !declared.props.contains(&passed.name) {
                 let refusal = refusal(&tag.name, &passed, declared);
@@ -79,7 +83,8 @@ impl Emitter<'_> {
 /// The props a tag passes: its attributes, `children` for any content,
 /// and each snippet declared in it.
 fn passed(tag: &ComponentTag) -> Vec<Passed> {
-    let mut passed: Vec<Passed> = tag.attributes.0.iter().map(attribute_passed).collect();
+    let props = tag.attributes.iter().filter(|a| !styles_anchor(a));
+    let mut passed: Vec<Passed> = props.map(attribute_passed).collect();
     for child in &tag.children {
         match child {
             Node::Snippet(snippet) => passed.push(Passed {
