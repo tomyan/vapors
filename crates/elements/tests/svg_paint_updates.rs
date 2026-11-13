@@ -9,7 +9,8 @@ use support::viewport;
 use vapors_dom::Dom;
 use vapors_elements::Painted;
 use vapors_scene::{Color, Item};
-use vapors_text::{Icon, IconPath, IconStroke};
+use vapors_shapes::IconPath;
+use vapors_text::{Icon, IconStroke};
 
 fn only_icon(painted: &Painted) -> (&Icon, Color) {
     let scene = painted.scene().to_scene();

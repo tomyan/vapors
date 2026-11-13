@@ -61,22 +61,25 @@ pub(crate) fn render_pipeline(
     format: wgpu::TextureFormat,
 ) -> wgpu::RenderPipeline {
     let targets = [Some(color_target(format))];
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("text"),
-        layout: Some(layout),
-        vertex: vertex_state(shader),
-        fragment: Some(wgpu::FragmentState {
-            module: shader,
-            entry_point: Some("fs_main"),
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-            targets: &targets,
-        }),
-        primitive: wgpu::PrimitiveState::default(),
-        depth_stencil: None,
-        multisample: wgpu::MultisampleState::default(),
-        multiview_mask: None,
-        cache: None,
-    })
+    vapors_renderer::pipelines::render_pipeline(
+        device,
+        &wgpu::RenderPipelineDescriptor {
+            label: Some("text"),
+            layout: Some(layout),
+            vertex: vertex_state(shader),
+            fragment: Some(wgpu::FragmentState {
+                module: shader,
+                entry_point: Some("fs_main"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                targets: &targets,
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
+        },
+    )
 }
 
 const ATTRIBUTES: [wgpu::VertexAttribute; 3] =

@@ -16,7 +16,7 @@ decision says which.
 
 - **Icons** (`docs/icons.md`): `<svg>` with stroked `<path>`s (M L H V A
   Z, `currentColor`, stroke only) is parsed at run time by
-  `vapors_text::IconPath`, stroked on the CPU by zeno into an 8-bit mask
+  `vapors_shapes::IconPath`, stroked on the CPU by zeno into an 8-bit mask
   per path, cached in the glyph atlas at device size, and drawn as one
   tinted quad per path (`Item::Icon { icon, rect, colour }`,
   `crates/scene/src/display.rs:137`; built in

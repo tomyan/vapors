@@ -5,8 +5,8 @@
 
 use zeno::{Angle, ArcSize, ArcSweep, Command, PathBuilder, Point};
 
-use crate::icon_path_lex::Cursor;
-pub use crate::icon_path_lex::PathError;
+use crate::path_lex::Cursor;
+pub use crate::path_lex::PathError;
 
 /// Path data that parsed, as zeno commands in viewBox units.
 #[derive(Clone, Debug, PartialEq)]
@@ -181,13 +181,13 @@ fn arc_sweep(cursor: &mut Cursor<'_>) -> Result<ArcSweep, PathError> {
 }
 
 #[cfg(test)]
-#[path = "icon_path_tests.rs"]
+#[path = "path_tests.rs"]
 mod tests;
 
 #[cfg(test)]
-#[path = "icon_path_arc_tests.rs"]
+#[path = "path_arc_tests.rs"]
 mod arc_tests;
 
 #[cfg(test)]
-#[path = "icon_path_refusals_tests.rs"]
+#[path = "path_refusals_tests.rs"]
 mod refusals_tests;
