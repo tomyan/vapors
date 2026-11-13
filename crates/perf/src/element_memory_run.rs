@@ -5,10 +5,12 @@
 //! the allocator for the next one, but its counts do not, and fonts and
 //! pipelines made once would be charged to the first size alone.
 
+use std::alloc::System;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
+use stats_alloc::StatsAlloc;
 use vapors_app::ElementsApp;
 use vapors_elements::Document;
 use vapors_gpu_harness::Gpu;
@@ -39,8 +41,14 @@ const FRAME_DEADLINE: Duration = Duration::from_secs(10);
 /// heap read from `live`.
 ///
 /// # Errors
-/// A frame the app failed, a GPU wait that failed, or a page that still
-/// asks for frames after [`SETTLE_FRAMES`].
+/// A frame the app failed, a GPU wait that failed, a page that still
+/// asks for frames after [`SETTLE_FRAMES`], a span the meter could not
+/// place, or owners `ElementMemory::checked` refuses.
+///
+/// The total holds what does not grow with the rows too (the fonts in
+/// the mount, `ElementsApp::new` in the rest, the painter's pipelines
+/// and atlas in the draw): per element is the slope between sizes, or
+/// the total less a 0-row page's, never the total over the elements.
 pub fn run_child(gpu: &Gpu, rows: usize, live: fn() -> i64) -> Result<ElementMemory, String> {
     let phases = HeapPhases::new(live);
     let texture = clear(&gpu.device, &gpu.queue, SIZE.0, SIZE.1, Color::default());
@@ -60,13 +68,27 @@ pub fn run_child(gpu: &Gpu, rows: usize, live: fn() -> i64) -> Result<ElementMem
     let counts =
         tracing::dispatcher::with_default(&dispatch, || settle(gpu, (&mut app, &doc), &texture))?;
     let total = live() - before;
-    Ok(ElementMemory {
+    let measured = ElementMemory {
         rows,
         elements: counts.0,
         styles_computed: counts.1,
         total,
-        owners: ElementMemory::split(mount, &phases.take(), total),
-    })
+        owners: ElementMemory::split(mount, &phases.take()?, total),
+    };
+    measured.checked()
+}
+
+/// The live heap bytes `allocator` has counted: allocated less freed.
+/// The one reading the memory binary and its test share.
+///
+/// # Panics
+/// A count past `i64`, which no process reaches.
+#[must_use]
+pub fn live_bytes(allocator: &StatsAlloc<System>) -> i64 {
+    let stats = allocator.stats();
+    let allocated = i64::try_from(stats.bytes_allocated).expect("allocated bytes fit i64");
+    let freed = i64::try_from(stats.bytes_deallocated).expect("freed bytes fit i64");
+    allocated - freed
 }
 
 /// The app's frames until it asks for none, returning the first

@@ -9,17 +9,13 @@ use std::alloc::System;
 
 use stats_alloc::{INSTRUMENTED_SYSTEM, StatsAlloc};
 use vapors_gpu_harness::gpu;
-use vapors_perf::element_memory_run::run_child;
+use vapors_perf::element_memory_run::{live_bytes, run_child};
 
 #[global_allocator]
 static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 
-/// Bytes allocated less bytes freed since the process started.
 fn live() -> i64 {
-    let stats = GLOBAL.stats();
-    let live = i128::try_from(stats.bytes_allocated).unwrap_or(i128::MAX)
-        - i128::try_from(stats.bytes_deallocated).unwrap_or(i128::MAX);
-    i64::try_from(live).expect("the live heap fits i64")
+    live_bytes(GLOBAL)
 }
 
 fn main() {
