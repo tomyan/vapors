@@ -80,8 +80,11 @@ impl Slots {
         }
     }
 
-    pub(super) fn longhands(self) -> Vec<Winner> {
-        (self.longhands.into_iter().zip(PropertyId::all()))
+    /// Every slot decided: the longhands by table index, the custom
+    /// properties by name.
+    pub(super) fn decide(self) -> (Vec<Winner>, BTreeMap<String, Winner>) {
+        let Self { longhands, custom } = self;
+        let longhands = (longhands.into_iter().zip(PropertyId::all()))
             .map(|(slot, id)| {
                 let undeclared = if id.inherited() {
                     Constancy::FromParent
@@ -90,20 +93,18 @@ impl Slots {
                 };
                 slot.decide(|value| specified_constancy(value, id), undeclared)
             })
-            .collect()
-    }
-
-    pub(super) fn custom(self) -> BTreeMap<String, Winner> {
-        let constancy = |has_var: &bool| {
+            .collect();
+        let custom_constancy = |has_var: &bool| {
             if *has_var {
                 Constancy::Variable
             } else {
                 Constancy::Constant
             }
         };
-        (self.custom.into_iter())
-            .map(|(name, slot)| (name, slot.decide(constancy, Constancy::FromParent)))
-            .collect()
+        let custom = (custom.into_iter())
+            .map(|(name, slot)| (name, slot.decide(custom_constancy, Constancy::FromParent)))
+            .collect();
+        (longhands, custom)
     }
 }
 

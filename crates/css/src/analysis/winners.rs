@@ -111,10 +111,11 @@ pub fn analyse(sheets: &[Sheet<'_>], facts: &KeyFacts<'_>, inline: &[Declaration
         }
     }
     slots.consider_inline(inline);
+    let (longhands, custom) = slots.decide();
     KeyWinners {
         rules,
-        longhands: slots.longhands(),
-        custom: slots.custom(),
+        longhands,
+        custom,
         shareable,
     }
 }
