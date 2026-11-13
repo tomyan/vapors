@@ -5,7 +5,9 @@ mod support;
 use std::rc::Rc;
 use support::Rig;
 use vapors_scene3d::CameraHandle;
-use vapors_scene3d_components::{Camera, CameraProps, Mesh, MeshProps, Scene, SceneProps};
+use vapors_scene3d_components::{
+    Camera, CameraProps, Group, GroupProps, Mesh, MeshProps, Scene, SceneProps,
+};
 
 #[test]
 #[should_panic(expected = "<Mesh> is placed in an element that is not a scene node")]
@@ -99,4 +101,31 @@ fn markup_inside_a_group_is_refused_naming_its_template_site() {
     let message = refusal.downcast_ref::<String>().expect("a formatted panic");
     assert!(message.contains("<Group> holds <p> at "), "{message}");
     assert!(message.contains("markup_in_group.wisp:10:"), "{message}");
+}
+
+/// A key a template `<div>` would have, not a group's.
+static DIV_KEY: vapors_dom::StyleKey = vapors_dom::StyleKey {
+    site: "refusals.rs:1:1",
+    scope: None,
+    tag: "div",
+    classes: &[],
+    toggles: &[],
+    style: None,
+};
+
+#[test]
+#[should_panic(
+    expected = "<Group> was passed the key of a <div> (refusals.rs:1:1): its anchor's tag is `group`"
+)]
+fn a_group_given_a_key_with_another_tag_is_refused_naming_the_keys_site() {
+    // Given: the scene's anchor, after the surface
+    let rig = Rig::new();
+    let anchor = rig.page.roots()[1];
+    let props = GroupProps {
+        anchor: Some(&DIV_KEY),
+        ..GroupProps::default()
+    };
+
+    // When
+    Group::mount(&rig.doc, anchor, props);
 }

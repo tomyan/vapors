@@ -7,7 +7,8 @@ use std::rc::Rc;
 
 use vapors_dom::NodeId;
 use vapors_scene::{Color, IconId, Item};
-use vapors_text::{Icon, IconPath, IconStroke};
+use vapors_shapes::IconPath;
+use vapors_text::{Icon, IconStroke};
 
 use crate::arena::Arena;
 use crate::layout::{BoxRect, Content, LayoutBox};

@@ -1,6 +1,6 @@
 //! What a `path` of an inline `<svg>` icon refuses (docs/icons.md, The
 //! subset): a place outside an `svg`, attributes outside the subset,
-//! path data `vapors_text::IconPath` does not read (the parser paint
+//! path data `vapors_shapes::IconPath` does not read (the parser paint
 //! uses, so a path that passes rasterises), a fill, a stroke other than
 //! `currentColor`, a `stroke-width` that is not a positive number, and
 //! content.
@@ -8,7 +8,7 @@
 use std::collections::BTreeMap;
 
 use vapors_dom::NodeId;
-use vapors_text::IconPath;
+use vapors_shapes::IconPath;
 
 use crate::arena::Arena;
 use crate::svg::positive;

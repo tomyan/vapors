@@ -52,3 +52,21 @@ impl RowChange {
             .find(|change| format!("{change:?}") == name)
     }
 }
+
+impl RowChange {
+    /// The kinds of frame the change alternates between, in the order it
+    /// makes them from frame 0 (warmup counted): frame `i` is of kind
+    /// `i % len`. A change whose every frame does the same work has one.
+    /// `--scaling` takes a median per kind, as one median over
+    /// alternating kinds is the cheaper kind's slowest frame.
+    #[must_use]
+    pub fn frame_kinds(self) -> &'static [&'static str] {
+        match self {
+            Self::Insert => &["insert", "remove"],
+            Self::Resize => &["taller", "shorter"],
+            Self::ScrollSize => &["longer label", "shorter label"],
+            Self::Class | Self::HoveredClass => &["add", "remove"],
+            Self::Idle | Self::Text | Self::FlexText | Self::Scroll => &["every"],
+        }
+    }
+}
