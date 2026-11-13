@@ -14,6 +14,7 @@ fn key(classes: &'static [&'static str], toggles: &'static [&'static str]) -> St
         tag: "li",
         classes,
         toggles,
+        attributes: &[],
         style: None,
     }
 }
