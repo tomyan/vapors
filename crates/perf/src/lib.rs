@@ -33,6 +33,8 @@ pub mod scaling_judged;
 pub mod scaling_report;
 pub mod scaling_run;
 pub mod scene_judge;
+pub mod scene_report;
+pub mod scene_run;
 pub mod select;
 mod span_instructions;
 pub mod spans;

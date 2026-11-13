@@ -49,7 +49,7 @@ pub fn scripted(frame: usize) -> Vec<Scripted> {
     let Some(before) = frame.checked_sub(1) else {
         return Vec::new();
     };
-    let (from, to) = (at(before), at(frame));
+    let (from, to) = (frame_time(before), frame_time(frame));
     let mut due = Vec::new();
     if from.as_millis() / CAMERA_EVERY.as_millis() != to.as_millis() / CAMERA_EVERY.as_millis() {
         due.push(Scripted::CameraSwitch);
@@ -61,7 +61,8 @@ pub fn scripted(frame: usize) -> Vec<Scripted> {
 }
 
 /// Frame `frame`'s time on the frame clock, from the first frame.
-fn at(frame: usize) -> Duration {
+#[must_use]
+pub fn frame_time(frame: usize) -> Duration {
     INTERVAL * u32::try_from(frame).unwrap_or(u32::MAX)
 }
 
