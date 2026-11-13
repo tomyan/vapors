@@ -15,7 +15,7 @@ use tracing::span::{Attributes, Id, Record};
 use tracing::{Event, Metadata, Subscriber};
 
 use crate::instructions::InstructionCounter;
-use crate::span_instructions::InstructionMeter;
+use crate::span_meter::Meter;
 
 /// The spans it times, by name.
 const TIMED: [&str; 3] = ["frame phase", "update phase", "draw step"];
@@ -30,7 +30,7 @@ struct Spans {
     phases: HashMap<u64, String>,
     entered: HashMap<u64, Instant>,
     totals: BTreeMap<String, Duration>,
-    meter: Option<InstructionMeter>,
+    meter: Option<Meter<InstructionCounter, 1>>,
 }
 
 impl PhaseClock {
@@ -38,7 +38,7 @@ impl PhaseClock {
     #[must_use]
     pub fn with_instructions(counter: InstructionCounter) -> Self {
         let spans = Spans {
-            meter: Some(InstructionMeter::new(counter)),
+            meter: Some(Meter::new(counter)),
             ..Spans::default()
         };
         Self(Arc::new(Mutex::new(spans)))
@@ -50,11 +50,8 @@ impl PhaseClock {
     /// # Errors
     /// A counter read that failed since the last take.
     pub fn take_instructions(&self) -> Result<Option<BTreeMap<String, u64>>, String> {
-        self.spans()
-            .meter
-            .as_mut()
-            .map(InstructionMeter::take)
-            .transpose()
+        let taken = self.spans().meter.as_mut().map(Meter::take).transpose()?;
+        Ok(taken.map(|phases| phases.into_iter().map(|(p, [count])| (p, count)).collect()))
     }
 
     /// The counter now; `None` when the clock has no counter.
@@ -62,11 +59,13 @@ impl PhaseClock {
     /// # Errors
     /// The read's failure.
     pub fn instructions_now(&self) -> Result<Option<u64>, String> {
-        self.spans()
+        let now = self
+            .spans()
             .meter
             .as_mut()
-            .map(InstructionMeter::reading)
-            .transpose()
+            .map(Meter::reading)
+            .transpose()?;
+        Ok(now.map(|[count]| count))
     }
 
     /// Each phase's time since the last take, by phase name; the times
