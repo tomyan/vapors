@@ -23,7 +23,7 @@ fn inserting_a_row_in_the_middle_of_many_splices_the_order() {
     let counts = updated(&page);
 
     // Then: no walk, one splice, and the row is hit where it lies
-    assert_eq!(order(counts), SPLICED);
+    assert_eq!(order(&counts), SPLICED);
     let doc = page.doc.borrow();
     let painted = doc.painted().expect("painted");
     let y = painted.border_box(row).expect("the row has a box").y;
@@ -41,7 +41,7 @@ fn removing_a_row_from_many_splices_the_order() {
     let counts = updated(&page);
 
     // Then
-    assert_eq!(order(counts), SPLICED);
+    assert_eq!(order(&counts), SPLICED);
 }
 
 #[test]
@@ -54,7 +54,7 @@ fn inserting_a_row_at_the_top_splices_before_the_first() {
     let counts = updated(&page);
 
     // Then: the new row paints first and is hit at the top
-    assert_eq!(order(counts), SPLICED);
+    assert_eq!(order(&counts), SPLICED);
     let hit = page
         .doc
         .borrow()
@@ -75,7 +75,7 @@ fn appending_a_row_splices_after_the_last() {
     let counts = updated(&page);
 
     // Then
-    assert_eq!(order(counts), SPLICED);
+    assert_eq!(order(&counts), SPLICED);
     matches_full(&page, "append");
 }
 
@@ -90,7 +90,7 @@ fn replacing_a_row_in_one_update_splices_both_runs() {
     let counts = updated(&page);
 
     // Then
-    assert_eq!(order(counts), SPLICED);
+    assert_eq!(order(&counts), SPLICED);
     matches_full(&page, "replace");
 }
 
@@ -108,7 +108,7 @@ fn emptying_and_refilling_a_list_splices() {
     let counts = updated(&page);
 
     // Then
-    assert_eq!(order(counts), SPLICED);
+    assert_eq!(order(&counts), SPLICED);
     matches_full(&page, "refill");
 }
 
@@ -122,6 +122,6 @@ fn removing_the_last_row_splices() {
     let counts = updated(&page);
 
     // Then
-    assert_eq!(order(counts), SPLICED);
+    assert_eq!(order(&counts), SPLICED);
     matches_full(&page, "remove last");
 }
