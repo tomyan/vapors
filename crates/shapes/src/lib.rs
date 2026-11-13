@@ -8,12 +8,14 @@
 mod canonical;
 mod classify;
 mod geometry;
+mod mesh_edges;
 mod path;
 mod path_lex;
 mod segment;
 mod shape_id;
 mod table;
 mod table_error;
+mod tessellate;
 
 pub use canonical::{Canonical, FillRule, Paint, hash_bytes};
 pub use classify::{Classified, classify};
@@ -21,3 +23,4 @@ pub use geometry::{Geometry, MeshVertex, check_geometry};
 pub use path::{IconPath, PathError};
 pub use segment::{Pen, Segment, to_zeno};
 pub use table::{ShapeEntry, ShapeId, ShapeIndex, ShapeTable, TABLE_FORMAT, TableError};
+pub use tessellate::{Mesh, tessellate};

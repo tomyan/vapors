@@ -12,6 +12,10 @@ publish = false
 # The parser's output is zeno's commands, which the icon route strokes;
 # the pin is the workspace's, so the two crates share one zeno.
 zeno.workspace = true
+# Pinned exactly: the tessellator's triangles are the table's geometry
+# (docs/plans/one-scene.md 1.2), compared with Chromium in S3b; a bump
+# is a deliberate change checked against that comparison.
+lyon_tessellation = { version = "=1.0.23", default-features = false, features = ["std"] }
 
 [lints]
 workspace = true
