@@ -165,7 +165,7 @@ fn a_draw_after_a_scroll_batches_the_rows_where_they_show() {
     // Given: a draw, which keeps its batches
     let mut list = scrolled("overflow: auto;", 0.0);
     let view = Rect::new(0.0, 0.0, 200.0, 200.0);
-    drop(list.doc.painted().expect("painted").batches(view));
+    drop(list.doc.painted().expect("painted").kept_batches(view));
 
     // When: the list scrolls, which paints no part
     list.doc.scroll_node_by(list.container, [0.0, 30.0]);

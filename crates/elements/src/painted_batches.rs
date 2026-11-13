@@ -1,26 +1,15 @@
-//! `Painted::batches`: the kept batches of the last draw, read when the
+//! `Painted::kept_batches`: the kept batches of the last draw, read when the
 //! view is the same and made again otherwise (`kept_batches.rs`).
 
 use std::cell::Ref;
 
-use vapors_scene::{Batched, Rect};
+use vapors_scene::Rect;
 
 use crate::kept_batches::KeptBatches;
 use crate::kept_batches_keys::KeptBatched;
 use crate::painted::Painted;
 
 impl Painted {
-    /// The scene's batches for a target whose drawable area is `view`
-    /// (device pixels), each in its scroll frame's coordinates:
-    /// [`Painted::kept_batches`] without their frames and keys.
-    ///
-    /// # Panics
-    /// As [`Painted::kept_batches`].
-    #[must_use]
-    pub fn batches(&self, view: Rect) -> Ref<'_, Batched> {
-        Ref::map(self.kept_batches(view), |kept| &kept.batched)
-    }
-
     /// The scene's batches for a target whose drawable area is `view`
     /// (device pixels), each in its scroll frame's coordinates under its
     /// clip inside the frame, with its frame ([`Painted::frame_draw`]
@@ -65,7 +54,7 @@ impl Painted {
     fn make_batches(&self, view: Rect) -> Ref<'_, KeptBatched> {
         let mut slot = self.kept_batches.try_borrow_mut().unwrap_or_else(|_| {
             panic!(
-                "Painted::batches needs to make the batches while a Ref from an earlier call is \
+                "Painted::kept_batches needs to make the batches while a Ref from an earlier call is \
                  held (painted_batches.rs); drop the Ref before drawing at another view or after an \
                  update; reproduce with `cargo xtask test`"
             )

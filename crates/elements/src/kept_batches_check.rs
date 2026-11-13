@@ -35,16 +35,7 @@ pub(crate) fn assert_same(kept: &KeptBatched, fresh: &(Batched, Vec<BatchFrame>)
 /// not the one its items were painted for, or culling in the frame
 /// differs from culling on the page.
 pub(crate) fn assert_on_page(kept: &KeptBatched, frames: &Frames, page: &Batched) {
-    let batches = kept.batched.batches.iter().zip(&kept.frames);
-    let on_page = batches.flat_map(|(batch, frame)| {
-        let put = move |item| (frames.item(frame.0, &item, batch.clip), batch.culled);
-        run_items(&batch.run).into_iter().map(put)
-    });
-    let page_items = page.batches.iter().flat_map(|batch| {
-        let item = move |item| ((item, batch.clip), batch.culled);
-        run_items(&batch.run).into_iter().map(item)
-    });
-    let (on_page, page_items): (Vec<_>, Vec<_>) = (on_page.collect(), page_items.collect());
+    let (on_page, page_items) = (items_on_page(kept, frames), page_items(page));
     let longest = on_page.len().max(page_items.len());
     let differing = (0..longest).find(|&at| on_page.get(at) != page_items.get(at));
     let culled = (kept.batched.culled, page.culled);
@@ -52,16 +43,45 @@ pub(crate) fn assert_on_page(kept: &KeptBatched, frames: &Frames, page: &Batched
         return;
     }
     let at = differing.unwrap_or(longest);
+    on_page_differs(at, (on_page.get(at), page_items.get(at)), culled);
+}
+
+/// An item, its clip and whether its batch is culled.
+type Placed = ((Item, Option<vapors_scene::Rect>), bool);
+
+/// `kept`'s items put on the page by their frames in `frames`.
+fn items_on_page(kept: &KeptBatched, frames: &Frames) -> Vec<Placed> {
+    let batches = kept.batched.batches.iter().zip(&kept.frames);
+    let on_page = batches.flat_map(|(batch, frame)| {
+        let put = move |item| (frames.item(frame.0, &item, batch.clip), batch.culled);
+        run_items(&batch.run).into_iter().map(put)
+    });
+    on_page.collect()
+}
+
+/// `page`'s items, each with its batch's clip.
+fn page_items(page: &Batched) -> Vec<Placed> {
+    let items = page.batches.iter().flat_map(|batch| {
+        let item = move |item| ((item, batch.clip), batch.culled);
+        run_items(&batch.run).into_iter().map(item)
+    });
+    items.collect()
+}
+
+/// Panics naming item `at`, as put on the page and as batched there,
+/// and the culled counts.
+fn on_page_differs(
+    at: usize,
+    (kept, page): (Option<&Placed>, Option<&Placed>),
+    culled: (u64, u64),
+) {
     panic!(
         "the kept batches put on the page by their frames differ from batching the scene on \
-         the page at item {at}: {:?}, on the page {:?} (culled {} and {}); a frame's shift or \
-         clip is not the one its items were painted for (frames.rs, frames_draw.rs), or \
-         culling in a frame's view differs from culling on the page (framed_batches.rs); \
+         the page at item {at}: {kept:?}, on the page {page:?} (culled {} and {}); a frame's \
+         shift or clip is not the one its items were painted for (frames.rs, frames_draw.rs), \
+         or culling in a frame's view differs from culling on the page (framed_batches.rs); \
          reproduce with `cargo xtask test`",
-        on_page.get(at),
-        page_items.get(at),
-        culled.0,
-        culled.1
+        culled.0, culled.1
     );
 }
 
