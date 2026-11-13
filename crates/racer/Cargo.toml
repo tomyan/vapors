@@ -14,13 +14,13 @@ vapors-components.workspace = true
 vapors-dom.workspace = true
 vapors-elements = { workspace = true, features = ["complex-script-breaks"] }
 vapors-platform.workspace = true
+vapors-renderer.workspace = true
 vapors-signals.workspace = true
 vapors-text = { workspace = true, features = ["complex-script-breaks"] }
 wgpu.workspace = true
 
 [dev-dependencies]
 vapors-gpu-harness.workspace = true
-vapors-renderer.workspace = true
 vapors-scene.workspace = true
 
 [build-dependencies]
