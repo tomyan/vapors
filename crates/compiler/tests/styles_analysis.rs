@@ -46,7 +46,8 @@ fn an_elements_facts_come_from_its_attributes_as_its_key_does() {
 
 #[test]
 fn the_own_sheet_is_scoped_and_judged_with_the_user_agent_sheet() {
-    // Given: `.card` scoped is always for the keyed <div>; UA `div` too
+    // Given: `.card` scoped is always for the keyed <div>; `.open` is no
+    // candidate: the key has no such class or directive
     let analysis = analysed(
         "<style>\n.card { color: red }\n.open { color: blue }\n</style>\n<div class=\"card\"></div>",
     );
@@ -57,7 +58,7 @@ fn the_own_sheet_is_scoped_and_judged_with_the_user_agent_sheet() {
         .filter(|rule| rule.sheet == 1)
         .map(|rule| &rule.verdict)
         .collect();
-    assert_eq!(own, [&Match::Always, &Match::Never]);
+    assert_eq!(own, [&Match::Always]);
     assert!(matches!(
         element.winners.longhands[id("color")],
         Winner::Constant {
