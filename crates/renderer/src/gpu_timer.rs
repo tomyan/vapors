@@ -46,6 +46,10 @@ pub struct GpuTimer {
     resolution: GpuResolution,
 }
 
+/// What a device needs for a [`GpuTimer`]: timestamps written at the
+/// start and end of passes.
+pub const TIMER_FEATURES: wgpu::Features = wgpu::Features::TIMESTAMP_QUERY;
+
 impl GpuTimer {
     /// A timer of [`DEFAULT_PAIRS`] pairs per frame; `None` when
     /// `device` lacks `TIMESTAMP_QUERY`.
@@ -58,7 +62,7 @@ impl GpuTimer {
     /// `device` lacks `TIMESTAMP_QUERY`.
     #[must_use]
     pub fn with_capacity(device: &wgpu::Device, queue: &wgpu::Queue, pairs: u32) -> Option<Self> {
-        if !device.features().contains(wgpu::Features::TIMESTAMP_QUERY) {
+        if !device.features().contains(TIMER_FEATURES) {
             return None;
         }
         Some(Self {

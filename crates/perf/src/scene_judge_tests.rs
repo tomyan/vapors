@@ -34,6 +34,14 @@ fn a_device_without_timestamp_queries_is_refused_naming_it() {
 }
 
 #[test]
+fn a_device_with_timestamps_but_not_inside_encoders_is_accepted_as_the_timer_is() {
+    assert_eq!(
+        require_timestamps(wgpu::Features::TIMESTAMP_QUERY, "a WebGPU adapter"),
+        Ok(())
+    );
+}
+
+#[test]
 fn a_device_with_timestamp_queries_is_accepted() {
     assert_eq!(
         require_timestamps(crate::gpu_time::FEATURES, "Intel UHD 630"),

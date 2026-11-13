@@ -5,14 +5,20 @@
 
 use std::time::Duration;
 
-use crate::gpu_time::FEATURES;
 use crate::sampler::JudgedFrame;
+use vapors_renderer::TIMER_FEATURES;
 
-/// A 60 Hz display's frame (docs/plans/perf-finish-line.md, property 9).
+/// The longest a frame may take to idle: one refresh of a 60 Hz display,
+/// rounded as property 9 states it (docs/plans/perf-finish-line.md).
+/// Not the frame clock's step (`sampler::INTERVAL`, 16 ms), which is
+/// how far simulated time moves per frame.
 pub const BUDGET: Duration = Duration::from_micros(16_700);
 
 /// The most 1-minute load the run accepts: on a busy machine the times
-/// measure the other work.
+/// measure the other work. The limit is the finish line's method
+/// (docs/perf/timed-2026-11-12.md). Measured on the dev machine in the
+/// window of docs/perf/scene-run-2026-11-13.md: 0.73 to 0.82 at the
+/// starts and ends of three runs, so the run's own load stays below it.
 const MAX_LOAD: f64 = 1.5;
 
 /// How to run it again.
@@ -25,18 +31,18 @@ pub fn over_budget(frames: &[JudgedFrame]) -> Vec<&JudgedFrame> {
 }
 
 /// Whether a device with `features`, the adapter `adapter`, times its
-/// frames' GPU work.
+/// frames' GPU work: whether the app's `GpuTimer` can be made on it.
 ///
 /// # Errors
-/// It lacks the timestamp features, naming the adapter.
+/// It lacks [`TIMER_FEATURES`], naming the adapter.
 pub fn require_timestamps(features: wgpu::Features, adapter: &str) -> Result<(), String> {
-    if features.contains(FEATURES) {
+    if features.contains(TIMER_FEATURES) {
         return Ok(());
     }
     Err(format!(
-        "{adapter} lacks TIMESTAMP_QUERY and TIMESTAMP_QUERY_INSIDE_ENCODERS, so no frame's \
-         GPU time can be read; run on a device with both (the dev machine's Intel UHD 630 \
-         on Vulkan): {REPRODUCE}"
+        "{adapter} lacks TIMESTAMP_QUERY, so the app's GpuTimer cannot read any frame's \
+         GPU time; run on a device with it (the dev machine's Intel UHD 630 on Vulkan): \
+         {REPRODUCE}"
     ))
 }
 
