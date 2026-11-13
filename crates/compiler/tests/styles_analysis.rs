@@ -110,6 +110,69 @@ fn rows_of_a_for_keep_the_enclosing_parent_and_snippets_do_not() {
 }
 
 #[test]
+fn both_branches_of_an_if_keep_the_enclosing_parent_and_a_component_tags_children_do_not() {
+    // Given
+    let analysis = analysed(
+        "<script>\nlet c: Signal<bool> = Signal::new(false);\n</script>\n<style>\n.card { color: red }\n</style>\n<div class=\"card\">{if c}<span></span>{else}<em></em>{/if}<Child><b></b></Child></div>",
+    );
+
+    // Then
+    let by_tag = |tag: &str| {
+        (analysis.elements.iter())
+            .find(|element| element.facts.tag == tag)
+            .unwrap_or_else(|| panic!("<{tag}>"))
+    };
+    assert_eq!(by_tag("span").resolved[id("color")], Resolved::Constant);
+    assert_eq!(by_tag("em").resolved[id("color")], Resolved::Constant);
+    assert_eq!(
+        by_tag("b").resolved[id("color")],
+        Resolved::Variable("placed by a snippet or a component")
+    );
+}
+
+#[test]
+fn a_child_of_a_variable_parent_names_the_parent_and_custom_properties_resolve_through_parents() {
+    // Given: `.card`'s colour is variable; `--x` is constant on it
+    let analysis = analysed(
+        "<script>\nlet o: Signal<bool> = Signal::new(false);\n</script>\n<style>\n.card { --x: red; color: blue }\n.open { color: red }\n</style>\n<div class=\"card\" class:open={o}><span></span></div>",
+    );
+
+    // Then
+    let [div, span] = analysis.elements.as_slice() else {
+        panic!("two elements");
+    };
+    assert_eq!(
+        div.resolved[id("color")],
+        Resolved::Variable("conditional rules")
+    );
+    assert_eq!(
+        span.resolved[id("color")],
+        Resolved::Variable("the parent's value is variable")
+    );
+    assert_eq!(div.resolved_custom["--x"], Resolved::Constant);
+    assert!(span.resolved_custom.is_empty());
+}
+
+#[test]
+fn a_key_refusal_is_the_analysis_refusal_too() {
+    // Given: a directive that is also a literal class
+    let component = vapors_compiler::parse_str(
+        "card.wisp",
+        "<script>\nlet o: Signal<bool> = Signal::new(false);\n</script>\n<div class=\"open\" class:open={o}></div>",
+    )
+    .expect("parses");
+
+    // When
+    let error = analyse(&component, &[]).expect_err("refused");
+
+    // Then
+    assert!(
+        error.message.contains("`class:open` toggles a class"),
+        "{error}"
+    );
+}
+
+#[test]
 fn a_literal_style_that_does_not_parse_is_refused_at_its_attribute() {
     // Given
     let component =
@@ -127,7 +190,7 @@ fn a_literal_style_that_does_not_parse_is_refused_at_its_attribute() {
 fn the_report_names_each_element_its_rules_and_its_declared_properties() {
     // Given
     let analysis = analysed(
-        "<script>\nlet o: Signal<bool> = Signal::new(false);\n</script>\n<style>\n.card { color: red; width: 2em }\n.open { color: blue }\n</style>\n<div class=\"card\" class:open={o}></div>",
+        "<script>\nlet o: Signal<bool> = Signal::new(false);\n</script>\n<style>\n.card { color: red; width: 2em }\n.open { color: blue }\n</style>\n<div class=\"card\" class:open={o} id={o}></div>",
     );
 
     // When
@@ -135,7 +198,9 @@ fn the_report_names_each_element_its_rules_and_its_declared_properties() {
 
     // Then
     for line in [
+        "sheets: ua, card.wisp; other sheets of the crate: not read",
         "card.wisp:8:1 <div>",
+        "  inputs: id",
         "    always      card.wisp:0 .card",
         "    conditional card.wisp:1 .open (class:open)",
         "  color: variable winner: card.wisp:0:0 unless card.wisp:1 matches; computed variable (conditional rules)",

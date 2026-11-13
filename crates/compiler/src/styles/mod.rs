@@ -10,17 +10,21 @@
 
 mod facts;
 mod report;
+mod walk;
+
+use std::collections::BTreeMap;
 
 pub use facts::ElementFacts;
 pub use report::report;
 
-use vapors_css::analysis::{Constancy, KeyWinners, Sheet, SheetId, Winner, analyse as analyse_key};
+use vapors_css::analysis::{KeyWinners, SheetId};
 use vapors_css::ast::Stylesheet;
 
 use crate::CompileError;
-use crate::ast::{Component, Node};
+use crate::ast::Component;
 use crate::build::Styles;
 use crate::source::Source;
+use walk::Walker;
 
 /// One element's analysis.
 #[derive(Debug)]
@@ -36,6 +40,9 @@ pub struct ElementStyles {
     /// Per longhand, by `PropertyId::index`: whether the computed value
     /// is the same for every element of this key in every situation.
     pub resolved: Vec<Resolved>,
+    /// The same per custom property the key's rules declare, or a
+    /// template parent's do.
+    pub resolved_custom: BTreeMap<String, Resolved>,
 }
 
 /// A winner's value once parents are followed.
@@ -52,13 +59,17 @@ pub enum Resolved {
 pub struct Analysis {
     /// The sheets the elements' places index: UA, the own sheet, others.
     pub sheets: Vec<(SheetId, Stylesheet)>,
+    /// Whether the crate's other sheets were given (`wisp-check` gives
+    /// none; the build does): without them a rule of another file can
+    /// still override a winner reported constant here.
+    pub others_given: bool,
     /// Every template element in source order.
     pub elements: Vec<ElementStyles>,
 }
 
 /// Where an element sits, for values taken from the parent.
 #[derive(Clone, Copy)]
-enum Parent {
+pub(super) enum Parent {
     /// A root of the component: the mount site's ancestors decide.
     Root,
     /// Under the element at this index of the analysis.
@@ -72,8 +83,10 @@ enum Parent {
 /// as the runtime registers it (scoped sheets already scoped).
 ///
 /// # Errors
-/// A literal `style` that does not parse, or a `<style>` the build
-/// refuses (`style_check`), naming the position.
+/// A literal `style` that does not parse, a `<style>` the build
+/// refuses (`style_check`), an attribute the key refuses
+/// (`codegen::key_parts`), or sheets the analysis refuses, naming the
+/// position.
 pub fn analyse(
     component: &Component,
     others: &[(SheetId, Stylesheet)],
@@ -95,6 +108,7 @@ pub fn analyse(
     walker.walk(&component.template.children, Parent::Root)?;
     Ok(Analysis {
         elements: walker.elements,
+        others_given: !others.is_empty(),
         sheets,
     })
 }
@@ -117,81 +131,4 @@ fn own_sheet(
             crate::style_check::checked(source, section, Styles::Global)?,
         ),
     })
-}
-
-struct Walker<'a> {
-    source: &'a Source,
-    scope: Option<&'a str>,
-    sheets: &'a [(SheetId, Stylesheet)],
-    /// How many leading sheets are the key's own (UA, and the scoped
-    /// own sheet when there is one): judged `Always` where they fit.
-    own: usize,
-    elements: Vec<ElementStyles>,
-}
-
-impl Walker<'_> {
-    fn walk(&mut self, nodes: &[Node], parent: Parent) -> Result<(), CompileError> {
-        for node in nodes {
-            match node {
-                Node::Element(element) => {
-                    let facts = ElementFacts::of(element, self.scope, self.source)?;
-                    let index = self.push(facts, element.offset, parent);
-                    self.walk(&element.children, Parent::Element(index))?;
-                }
-                Node::If(block) => {
-                    self.walk(&block.then, parent)?;
-                    if let Some(otherwise) = &block.otherwise {
-                        self.walk(otherwise, parent)?;
-                    }
-                }
-                Node::For(block) => self.walk(&block.children, parent)?,
-                Node::Snippet(snippet) => self.walk(&snippet.children, Parent::Unknown)?,
-                Node::Component(tag) => self.walk(&tag.children, Parent::Unknown)?,
-                Node::Text(_) | Node::Render(_) => {}
-            }
-        }
-        Ok(())
-    }
-
-    /// Analyses one element and records it; its index.
-    fn push(&mut self, facts: ElementFacts, offset: usize, parent: Parent) -> usize {
-        let sheets: Vec<Sheet<'_>> = (self.sheets.iter().enumerate())
-            .map(|(index, (id, rules))| Sheet {
-                id,
-                rules,
-                own: index < self.own,
-            })
-            .collect();
-        let winners = facts.with_key(|key| analyse_key(&sheets, key, &facts.inline));
-        let resolved = (winners.longhands.iter().enumerate())
-            .map(|(index, winner)| self.resolve(winner, index, parent))
-            .collect();
-        let (line, col) = self.source.position(offset);
-        self.elements.push(ElementStyles {
-            line,
-            col,
-            facts,
-            winners,
-            resolved,
-        });
-        self.elements.len() - 1
-    }
-
-    fn resolve(&self, winner: &Winner, longhand: usize, parent: Parent) -> Resolved {
-        let value = match winner {
-            Winner::Constant { value, .. } | Winner::Undeclared { value } => *value,
-            Winner::Variable { .. } => return Resolved::Variable("conditional rules"),
-        };
-        match (value, parent) {
-            (Constancy::Constant, _) => Resolved::Constant,
-            (Constancy::Variable, _) => Resolved::Variable("the value reads its context"),
-            (Constancy::FromParent, Parent::Element(index)) => {
-                self.elements[index].resolved[longhand]
-            }
-            (Constancy::FromParent, Parent::Root) => Resolved::Variable("the mount site's parent"),
-            (Constancy::FromParent, Parent::Unknown) => {
-                Resolved::Variable("placed by a snippet or a component")
-            }
-        }
-    }
 }

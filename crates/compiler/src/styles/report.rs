@@ -10,17 +10,36 @@ use vapors_css::property::PropertyId;
 
 use super::{Analysis, ElementStyles, Resolved};
 
-/// The report, one block per element.
+/// The report: the sheets read, then one block per element.
 #[must_use]
 pub fn report(analysis: &Analysis, path: &str) -> String {
     let mut out = String::new();
+    let sheets: Vec<String> = analysis.sheets.iter().map(|(id, _)| name(id)).collect();
+    let _ = writeln!(
+        out,
+        "sheets: {}; other sheets of the crate: {}",
+        sheets.join(", "),
+        if analysis.others_given {
+            "given"
+        } else {
+            "not read, so a rule of another file may override a winner reported constant"
+        }
+    );
     for element in &analysis.elements {
         let _ = writeln!(
             out,
             "{path}:{}:{} <{}>",
             element.line, element.col, element.facts.tag
         );
-        rules(&mut out, analysis, element);
+        if !element.facts.expression_attributes.is_empty() {
+            let _ = writeln!(
+                out,
+                "  inputs: {}",
+                element.facts.expression_attributes.join(", ")
+            );
+        }
+        let _ = writeln!(out, "  rules: {}", verdict_counts(element));
+        rule_lines(&mut out, analysis, element);
         winners(&mut out, analysis, element);
         let _ = writeln!(
             out,
@@ -35,7 +54,8 @@ pub fn report(analysis: &Analysis, path: &str) -> String {
     out
 }
 
-fn rules(out: &mut String, analysis: &Analysis, element: &ElementStyles) {
+/// `N always, N conditional, N never`.
+fn verdict_counts(element: &ElementStyles) -> String {
     let counts = element
         .winners
         .rules
@@ -48,11 +68,13 @@ fn rules(out: &mut String, analysis: &Analysis, element: &ElementStyles) {
             }] += 1;
             counts
         });
-    let _ = writeln!(
-        out,
-        "  rules: {} always, {} conditional, {} never",
+    format!(
+        "{} always, {} conditional, {} never",
         counts[0], counts[1], counts[2]
-    );
+    )
+}
+
+fn rule_lines(out: &mut String, analysis: &Analysis, element: &ElementStyles) {
     for rule in &element.winners.rules {
         let (id, sheet) = &analysis.sheets[rule.sheet];
         let selector = sheet.rules[rule.rule].selector_text();
@@ -80,14 +102,24 @@ fn winners(out: &mut String, analysis: &Analysis, element: &ElementStyles) {
             "  {}: {}; computed {}",
             id.name(),
             describe(winner, analysis),
-            match resolved {
-                Resolved::Constant => "constant".to_owned(),
-                Resolved::Variable(why) => format!("variable ({why})"),
-            }
+            computed(Some(resolved))
         );
     }
     for (property, winner) in &element.winners.custom {
-        let _ = writeln!(out, "  {property}: {}", describe(winner, analysis));
+        let _ = writeln!(
+            out,
+            "  {property}: {}; computed {}",
+            describe(winner, analysis),
+            computed(element.resolved_custom.get(property))
+        );
+    }
+}
+
+fn computed(resolved: Option<&Resolved>) -> String {
+    match resolved {
+        Some(Resolved::Constant) => "constant".to_owned(),
+        Some(Resolved::Variable(why)) => format!("variable ({why})"),
+        None => "unresolved".to_owned(),
     }
 }
 

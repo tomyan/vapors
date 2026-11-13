@@ -11,17 +11,15 @@
 
 use std::fmt::Write;
 
-use super::attribute_kind::fixed_attributes;
-use super::attribute_refusals::refuse_string_styling;
-use super::element::attribute_named;
 use super::emit::Emitter;
+use super::key_parts::key_parts;
 use crate::CompileError;
-use crate::ast::{AttrValue, Attribute, Attributes, ComponentTag, Element};
+use crate::ast::{Attributes, ComponentTag, Element};
 
 /// What a key is made from: an element, whose key's tag is its own, or
 /// a component tag, whose key's tag is the `ANCHOR_TAG` its props type
 /// declares, so an alias (`Group as Section`) still keys a `group`.
-pub(super) struct Keyed<'e> {
+pub(crate) struct Keyed<'e> {
     /// The key's `tag` field, as Rust.
     pub(super) tag: String,
     /// `div` or `Mesh`, for messages.
@@ -38,7 +36,7 @@ pub(super) struct Keyed<'e> {
 }
 
 impl<'e> Keyed<'e> {
-    pub(super) fn element(element: &'e Element) -> Self {
+    pub(crate) fn element(element: &'e Element) -> Self {
         Self {
             tag: format!("{:?}", element.tag),
             name: &element.tag,
@@ -108,56 +106,20 @@ impl Emitter<'_> {
         let place = format!("{}:{line}:{column}", self.source.path);
         let site = format!("concat!(env!(\"CARGO_PKG_NAME\"), \"/\", {place:?})");
         let scope = if self.scoped { "Some(SCOPE)" } else { "None" };
-        let classes = quoted(&self.literal_classes(keyed.attributes)?);
-        let toggles = quoted(&self.key_directives(keyed)?);
-        let style = self.key_style(keyed)?;
-        let attributes = key_attributes(keyed);
+        let parts = key_parts(self.source, keyed)?;
+        let attributes: Vec<String> = (parts.attributes.iter())
+            .map(|(name, value)| format!("({name:?}, {value:?})"))
+            .collect();
         Ok(format!(
-            "vapors_dom::StyleKey {{ site: {site}, scope: {scope}, tag: {}, classes: &[{classes}], toggles: &[{toggles}], style: {style}, attributes: &[{attributes}] }}",
-            keyed.tag
+            "vapors_dom::StyleKey {{ site: {site}, scope: {scope}, tag: {}, classes: &[{}], toggles: &[{}], style: {}, attributes: &[{}] }}",
+            keyed.tag,
+            quoted(&parts.classes),
+            quoted(&parts.toggles),
+            parts
+                .style
+                .map_or("None".to_owned(), |text| format!("Some({text:?})")),
+            attributes.join(", ")
         ))
-    }
-
-    /// The literal `style` as Rust; `style={..}` is refused here, where
-    /// it would otherwise be dropped.
-    fn key_style(&self, keyed: &Keyed) -> Result<String, CompileError> {
-        match attribute_named(keyed.attributes, "style") {
-            Some(
-                attribute @ Attribute {
-                    value: AttrValue::Expr(_),
-                    ..
-                },
-            ) => {
-                refuse_string_styling(self.source, attribute)?;
-                unreachable!("refuse_string_styling refuses every `style={{..}}`")
-            }
-            Some(Attribute {
-                value: AttrValue::Literal(text),
-                ..
-            }) => Ok(format!("Some({text:?})")),
-            None => Ok("None".to_owned()),
-        }
-    }
-}
-
-impl Emitter<'_> {
-    /// `keyed`'s directive names, refusing more than
-    /// [`crate::MAX_CLASS_DIRECTIVES`], naming the element.
-    fn key_directives<'e>(&self, keyed: &Keyed<'e>) -> Result<Vec<&'e str>, CompileError> {
-        let names = self.directive_names(keyed.attributes)?;
-        if names.len() > crate::MAX_CLASS_DIRECTIVES {
-            return Err(self.source.error(
-                keyed.offset,
-                format!(
-                    "<{}> has {} `class:` directives; at most {} fit one element, so move some to {}",
-                    keyed.name,
-                    names.len(),
-                    crate::MAX_CLASS_DIRECTIVES,
-                    keyed.elsewhere
-                ),
-            ));
-        }
-        Ok(names)
     }
 }
 
@@ -171,19 +133,6 @@ pub(super) fn key_statics(keys: &[String]) -> String {
     let mut out = keys.join("\n");
     out.push_str("\n\n");
     out
-}
-
-/// `("title", "t"), ..` for the key's `attributes`: the element's fixed
-/// literal attributes (`attribute_kind::fixed_attributes`, the one
-/// list) in template order; none for a component tag.
-fn key_attributes(keyed: &Keyed) -> String {
-    if !keyed.carries_attributes {
-        return String::new();
-    }
-    let each: Vec<String> = (fixed_attributes(keyed.attributes).into_iter())
-        .map(|(name, value)| format!("({name:?}, {value:?})"))
-        .collect();
-    each.join(", ")
 }
 
 /// `"a", "b"` for a slice literal.

@@ -1,15 +1,21 @@
-//! What one template element fixes, read from the AST as
-//! `codegen/style_key.rs` reads its key, and its literal `style`
-//! parsed: the `KeyFacts` the analysis judges rules against.
+//! What one template element fixes, read through the one function
+//! that builds its emitted key (`codegen::key_parts`), with its
+//! refusals; plus its literal `style` parsed and the names of its
+//! expression attributes: the `KeyFacts` the analysis judges rules
+//! against.
 
 use vapors_css::analysis::KeyFacts;
 use vapors_css::ast::Declaration;
 
 use crate::CompileError;
-use crate::ast::{AttrValue, Attribute, Element};
+use crate::ast::{Attribute, Element};
+use crate::codegen::attribute_kind::{AttributeKind, kind};
+use crate::codegen::key_parts::key_parts;
+use crate::codegen::style_key::Keyed;
 use crate::source::Source;
 
-/// The owned form of a `KeyFacts`, plus the literal `style` parsed.
+/// The owned form of a `KeyFacts`, plus the literal `style` parsed
+/// and the expression attributes, which the key does not fix.
 #[derive(Debug)]
 pub struct ElementFacts {
     /// The tag.
@@ -23,63 +29,39 @@ pub struct ElementFacts {
     pub toggles: Vec<String>,
     /// The literal `style` text.
     pub style: Option<String>,
-    /// Every other literal attribute.
+    /// Every other literal attribute, as the key fixes them.
     pub literal_attributes: Vec<(String, String)>,
-    /// Every `name={expr}` attribute's name, a run-time input the key
-    /// does not fix. Listeners (`on*`) and bindings (`bind:*`) set no
-    /// attribute, as `codegen/element.rs` treats them.
+    /// Every `name={expr}` attribute's name, a run-time input.
     pub expression_attributes: Vec<String>,
     /// The literal `style`'s declarations.
     pub inline: Vec<Declaration>,
 }
 
 impl ElementFacts {
+    /// The facts of `element`, refusing what its key would refuse
+    /// (`key_parts`) and a literal `style` that does not parse.
     pub(super) fn of(
         element: &Element,
         scope: Option<&str>,
         source: &Source,
     ) -> Result<Self, CompileError> {
-        let mut facts = Self {
+        let parts = key_parts(source, &Keyed::element(element))?;
+        let inline = match attribute_named_style(element) {
+            Some(attribute) => inline_declarations(attribute, source)?,
+            None => Vec::new(),
+        };
+        Ok(Self {
             tag: element.tag.clone(),
             scope: scope.map(str::to_owned),
-            classes: Vec::new(),
-            toggles: Vec::new(),
-            style: None,
-            literal_attributes: Vec::new(),
-            expression_attributes: Vec::new(),
-            inline: Vec::new(),
-        };
-        for attribute in element.attributes.iter() {
-            facts.take(attribute, source)?;
-        }
-        Ok(facts)
-    }
-
-    fn take(&mut self, attribute: &Attribute, source: &Source) -> Result<(), CompileError> {
-        let name = attribute.name.as_str();
-        if let Some(toggle) = name.strip_prefix("class:") {
-            self.toggles.push(toggle.to_owned());
-            return Ok(());
-        }
-        let listener = name.strip_prefix("on").is_some_and(|rest| !rest.is_empty());
-        if listener || name.starts_with("bind:") {
-            return Ok(());
-        }
-        let AttrValue::Literal(value) = &attribute.value else {
-            // `class={..}` and `style={..}` are refused by codegen
-            self.expression_attributes.push(name.to_owned());
-            return Ok(());
-        };
-        if name.eq_ignore_ascii_case("class") {
-            self.classes = value.split_ascii_whitespace().map(str::to_owned).collect();
-        } else if name.eq_ignore_ascii_case("style") {
-            self.inline = inline_declarations(value, attribute, source)?;
-            self.style = Some(value.clone());
-        } else {
-            self.literal_attributes
-                .push((name.to_owned(), value.clone()));
-        }
-        Ok(())
+            classes: parts.classes.iter().map(|c| (*c).to_owned()).collect(),
+            toggles: parts.toggles.iter().map(|t| (*t).to_owned()).collect(),
+            style: parts.style.map(str::to_owned),
+            literal_attributes: (parts.attributes.iter())
+                .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
+                .collect(),
+            expression_attributes: expression_names(element),
+            inline,
+        })
     }
 
     /// Runs `with` on the facts as the analysis borrows them.
@@ -101,14 +83,26 @@ impl ElementFacts {
     }
 }
 
+/// The names set by an expression, in template order.
+fn expression_names(element: &Element) -> Vec<String> {
+    (element.attributes.iter())
+        .filter(|attribute| matches!(kind(attribute), AttributeKind::Expression(_)))
+        .map(|attribute| attribute.name.clone())
+        .collect()
+}
+
+fn attribute_named_style(element: &Element) -> Option<&Attribute> {
+    (element.attributes.iter()).find(|attribute| kind(attribute) == AttributeKind::Style)
+}
+
 /// The literal `style` parsed as the runtime parses it at the first
 /// update, refused at build instead, positioned at the attribute.
 fn inline_declarations(
-    value: &str,
     attribute: &Attribute,
     source: &Source,
 ) -> Result<Vec<Declaration>, CompileError> {
-    vapors_css::parse_inline(value).map_err(|error| {
+    let text = attribute.value.literal().unwrap_or_default();
+    vapors_css::parse_inline(text).map_err(|error| {
         source.error(
             attribute.offset,
             format!(
