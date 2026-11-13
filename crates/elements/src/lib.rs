@@ -162,6 +162,7 @@ mod text_undo;
 mod text_word;
 mod thumb;
 mod thumb_order;
+mod thumbs_again;
 mod tooltip_text;
 mod tree;
 mod typing;

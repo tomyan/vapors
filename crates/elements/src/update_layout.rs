@@ -118,6 +118,7 @@ impl Document {
         let boxes = LaidOut::new(&placed.boxes, &scrolls, viewport.scale);
         let done = self.placed(&mut placement, (&boxes, &placed.slots), (written, changed));
         (changed.moved, changed.offsets_moved) = (done.moved, done.offsets_moved);
+        changed.scroll_states = done.states_changed;
         self.made_from(placement, viewport.scale)
     }
 

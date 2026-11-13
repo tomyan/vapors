@@ -59,6 +59,7 @@ impl<'a, 'b> Walk<'a, 'b> {
             placed: Placed {
                 moved: Vec::new(),
                 offsets_moved: Vec::new(),
+                states_changed: Vec::new(),
                 count: 0,
                 chained: 0,
             },
@@ -185,8 +186,14 @@ impl<'a, 'b> Walk<'a, 'b> {
             return [0.0; 2];
         }
         self.settled.insert(node);
-        self.scroll
-            .settle_box(node, (self.boxes.boxes, slot), self.boxes.scale)
+        let scale = self.boxes.scale;
+        let (applied, changed) = self
+            .scroll
+            .settle_box(node, (self.boxes.boxes, slot), scale);
+        if changed {
+            self.placed.states_changed.push(slot);
+        }
+        applied
     }
 }
 
