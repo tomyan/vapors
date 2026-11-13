@@ -65,10 +65,12 @@ pub struct UpdateCounts {
     /// no other child built or walked in the DOM. The edit still copies
     /// and searches the box's child list, O(children).
     pub children_edited: usize,
-    /// Elements whose inserts and removes were not made as an edit and
-    /// were built shallow instead.
+    /// Elements whose inserts and removes were not made as an edit:
+    /// built shallow instead, or, making no box of their own, built by
+    /// an ancestor (`EditDecline::OwnerHasNoBox`).
     pub children_edits_declined: usize,
-    /// The condition that declined the first of those, by slot, when
+    /// The condition that declined the first of those (the owners by
+    /// slot, then the elements with no box), when
     /// `children_edits_declined` is above 0, else `None`.
     pub children_edit_decline: Option<EditDecline>,
     /// Times Taffy asked a box for its layout, a cache hit included. A

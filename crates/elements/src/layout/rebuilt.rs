@@ -33,8 +33,9 @@ pub(crate) struct Rebuilt {
     pub(crate) edits: EditCounts,
 }
 
-/// How many owners were edited, how many declined, and the first
-/// decline by slot.
+/// How many elements with recorded edits were edited, how many
+/// declined, and the first decline: the owners' by slot, then the
+/// elements that are no owner.
 #[derive(Debug, Default)]
 pub(crate) struct EditCounts {
     pub(crate) edited: usize,
@@ -49,14 +50,24 @@ impl EditCounts {
         for build in builds {
             match build {
                 Build::Edited(_) => counts.edited += 1,
-                Build::Shallow(_, Some(decline)) => {
-                    counts.declined += 1;
-                    counts.decline = counts.decline.or(Some(*decline));
-                }
+                Build::Shallow(_, Some(decline)) => counts.count_decline(*decline),
                 Build::Shallow(_, None) | Build::Full => {}
             }
         }
         counts
+    }
+
+    /// Counts the declines of the elements that are no owner, after
+    /// the owners'.
+    pub(crate) fn count_unowned(&mut self, declines: &[EditDecline]) {
+        for &decline in declines {
+            self.count_decline(decline);
+        }
+    }
+
+    fn count_decline(&mut self, decline: EditDecline) {
+        self.declined += 1;
+        self.decline = self.decline.or(Some(decline));
     }
 }
 

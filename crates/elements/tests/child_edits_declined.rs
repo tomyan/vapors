@@ -158,3 +158,41 @@ fn an_element_put_under_a_text_field_is_not_an_edit() {
     // Then
     assert_declined(&counts, EditDecline::OwnerNotABlock);
 }
+
+const HIDDEN: &str = ".hidden { display: none; }";
+
+#[test]
+fn an_insert_into_a_list_hidden_in_the_same_update_is_declined_and_counted() {
+    // Given
+    let list = list(6, &format!("{ROWS} {HIDDEN}"));
+
+    // When: the list hidden and a row inserted into it, body untouched
+    list.doc
+        .borrow_mut()
+        .set_attribute(list.parent, "class", "list hidden");
+    list.insert_at(2);
+    let counts = list.update();
+
+    // Then: the list makes no box, so body builds it; the decline counts
+    assert_declined(&counts, EditDecline::OwnerHasNoBox);
+    assert_matches_full(&list.doc, VIEW(), "list hidden with an insert");
+}
+
+#[test]
+fn an_insert_into_a_list_hidden_since_the_last_update_has_nothing_to_edit() {
+    // Given: the list hidden an update ago, so it holds no box slot
+    let list = list(6, &format!("{ROWS} {HIDDEN}"));
+    list.doc
+        .borrow_mut()
+        .set_attribute(list.parent, "class", "list hidden");
+    list.update();
+
+    // When
+    list.insert_at(2);
+    let counts = list.update();
+
+    // Then: no box to edit, so neither an edit nor a decline
+    assert_eq!(counts.children_edited, 0);
+    assert_eq!(counts.children_edits_declined, 0);
+    assert_matches_full(&list.doc, VIEW(), "insert into a hidden list");
+}

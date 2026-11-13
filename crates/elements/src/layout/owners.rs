@@ -26,8 +26,10 @@ pub(crate) type KeptChildren = FxHashMap<NodeId, usize>;
 pub(crate) enum Rebuild {
     /// Every box.
     Every,
-    /// These owners' boxes, in the slots they hold.
-    Owners(Vec<Owner>),
+    /// These owners' boxes, in the slots they hold; and the declines
+    /// of the children-marked elements that are no owner, having no
+    /// box of their own (`EditDecline::OwnerHasNoBox`).
+    Owners(Vec<Owner>, Vec<EditDecline>),
 }
 
 /// An element whose boxes an update builds again.
@@ -119,6 +121,12 @@ impl Resolver<'_> {
         self.arena.contains(element)
             && self.arena.get(element, "kept_child").parent == Some(owner)
             && boxed(self.used, element)
+    }
+
+    /// Whether `node` is in the tree and held a box slot last update,
+    /// whether or not it makes a box now.
+    pub(super) fn held_slot(&self, node: NodeId) -> bool {
+        self.arena.contains(node) && self.placed.slots.of(Key::Element(node)).is_some()
     }
 
     /// `node`'s slot, when it makes a box of its own.

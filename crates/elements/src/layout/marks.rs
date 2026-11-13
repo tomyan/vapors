@@ -71,13 +71,13 @@ impl Marks {
             placed,
             root,
         };
-        let mut shallow = self.shallow(&resolver);
+        let (mut shallow, unowned) = self.shallow(&resolver);
         self.unedit_marked(&resolver, &mut shallow);
         let Some(full) = self.full(&resolver, &shallow) else {
             return Rebuild::Every;
         };
         shallow.retain(|node, _| !full.contains(node));
-        Rebuild::Owners(resolver.outermost(&full, shallow))
+        Rebuild::Owners(resolver.outermost(&full, shallow), unowned)
     }
 
     /// The owners of the box marks, and of the children marks that are
@@ -104,28 +104,6 @@ impl Marks {
         Some(full)
     }
 
-    /// The children-marked elements that hold a slot and make a box,
-    /// each edited in place where its recorded edits allow, else with
-    /// its kept children.
-    fn shallow(&self, resolver: &Resolver<'_>) -> FxHashMap<NodeId, Build> {
-        let shallow = |&node: &NodeId| Some((node, self.build_of(resolver, node)?));
-        self.children.iter().filter_map(shallow).collect()
-    }
-
-    fn build_of(&self, resolver: &Resolver<'_>, node: NodeId) -> Option<Build> {
-        let edited = self
-            .edits
-            .get(&node)
-            .map(|edits| resolver.edits(node, edits));
-        let decline = match edited {
-            Some(Ok(edits)) => return Some(Build::Edited(edits)),
-            Some(Err(decline)) => Some(decline),
-            None => None,
-        };
-        let kept = resolver.kept_children(node)?;
-        Some(Build::Shallow(kept, decline))
-    }
-
     /// Each edited owner a mark reaches outside the children its edit
     /// builds, built shallow instead: the edit keeps every other box,
     /// so it would keep the marked one as it was (review of #285, H1).
@@ -147,6 +125,9 @@ impl Marks {
         }
     }
 }
+
+#[path = "marks_build.rs"]
+mod build;
 
 #[cfg(test)]
 #[path = "marks_tests.rs"]

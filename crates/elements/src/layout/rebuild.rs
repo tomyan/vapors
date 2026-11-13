@@ -41,11 +41,12 @@ impl KeptBoxes {
         } else {
             marks.rebuild(source.arena, source.used, &self.placed, root)
         };
-        let Rebuild::Owners(owners) = rebuild else {
+        let Rebuild::Owners(owners, unowned) = rebuild else {
             return self.build_every(source, root, scale, may_keep);
         };
         let mut kept = std::mem::take(&mut self.placed);
-        let built = rebuild_owners(&mut kept, &owners, source, may_keep);
+        let mut built = rebuild_owners(&mut kept, &owners, source, may_keep);
+        built.edits.count_unowned(&unowned);
         // Debug timings include this full box build on every narrowed
         // update; the test that would retire it is the one
         // `layout_check.rs` names.

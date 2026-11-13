@@ -7,7 +7,9 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum EditDecline {
-    /// The element no longer makes a box of its own.
+    /// The element makes no box of its own: `display: none`, hidden
+    /// before or in this update, or removed from the document. An
+    /// ancestor builds it; nothing is edited.
     OwnerHasNoBox,
     /// The element is an `svg`, a text field or a number field, whose
     /// children are not boxes.
