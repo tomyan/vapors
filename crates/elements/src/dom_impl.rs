@@ -78,9 +78,7 @@ impl Dom for Document {
             Kind::Text(current) if current == text => {}
             Kind::Text(current) => {
                 text.clone_into(current);
-                if let Some(parent) = self.arena.get(node, "set_text").parent {
-                    self.boxes.marks.mark(parent);
-                }
+                self.mark_text_changed(node);
             }
             Kind::Element(element) => panic!(
                 "set_text: {node:?} is a <{}> element, not a text node",
@@ -116,8 +114,8 @@ impl Dom for Document {
     fn insert_before(&mut self, parent: NodeId, child: NodeId, before: Option<NodeId>) {
         self.note_replaced(child);
         if let Some(old) = self.parent(child) {
-            self.mark_children_changed(old, child, false);
             self.boxes.note_removed(&self.arena, old, child);
+            self.mark_moved_out(old, child, parent);
         }
         self.arena.place("insert_before", parent, child, before);
         self.checks.added.push(child);
