@@ -26,6 +26,7 @@ impl Default for Margins {
 
 impl Margins {
     /// One margin's set.
+    #[cfg(test)]
     #[allow(clippy::cast_possible_truncation)] // a margin in CSS px, well within f32
     pub(crate) fn of(margin: f64) -> Self {
         Self(CollapsibleMarginSet::from_margin(margin as f32))
@@ -97,6 +98,7 @@ impl BlockSummary {
     }
 
     /// The run's height with its first top and last bottom margins.
+    #[cfg(test)]
     pub(crate) fn outer(&self) -> f64 {
         self.0.map_or(0.0, |run| {
             run.top.resolve() + run.inner + run.bottom.resolve()

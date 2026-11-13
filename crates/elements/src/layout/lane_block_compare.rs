@@ -47,7 +47,7 @@ enum Answered {
 /// Compares every block container with children in `doc` as laid out.
 pub(super) fn compare(doc: &mut Document) -> Compared {
     let kept = doc.kept.as_ref().expect("updated");
-    let placed = std::mem::take(&mut doc.boxes.placed);
+    let mut placed = std::mem::take(&mut doc.boxes.placed);
     let mut tree = BoxTree {
         boxes: placed.boxes,
         fonts: &mut doc.fonts,
@@ -57,6 +57,10 @@ pub(super) fn compare(doc: &mut Document) -> Compared {
         written: Written::default(),
         calls: 0,
         disowned: 0,
+        lanes: &mut placed.lanes,
+        lanes_enabled: false,
+        stale: Vec::new(),
+        lane_counts: crate::layout::lane_layout::LaneCounts::default(),
     };
     let mut compared = Compared::default();
     for slot in 0..tree.boxes.len() {

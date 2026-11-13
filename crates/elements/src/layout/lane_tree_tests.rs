@@ -114,6 +114,23 @@ fn between_gives_the_children_an_interval_meets_in_order() {
 }
 
 #[test]
+fn starts_from_gives_each_later_child_with_its_start() {
+    // Given: more children than one leaf holds
+    let (tree, handles) = appended(60);
+
+    // When
+    let from = tree.starts_from(handles[37]);
+
+    // Then: handle 37 on, each at the start `start` gives
+    let expected: Vec<(Handle, f64)> = handles[37..]
+        .iter()
+        .map(|&handle| (handle, tree.start(handle)))
+        .collect();
+    assert_eq!(from, expected);
+    assert_eq!(tree.starts_from(handles[59]).len(), 1);
+}
+
+#[test]
 #[should_panic(expected = "is not in the tree")]
 fn a_removed_handle_is_refused() {
     let (mut tree, handles) = appended(3);

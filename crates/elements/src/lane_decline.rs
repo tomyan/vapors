@@ -9,6 +9,14 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum LaneDecline {
+    /// `align-content` other than `normal` or `start`: every child is
+    /// shifted by the free space.
+    AlignContent,
+    /// A flex container: the flex lane is PR 3f.
+    FlexLaneNotBuilt,
+    /// A grid container: tracks are shared by several items, so an
+    /// insert moves items by cell; not planned.
+    Grid,
     /// A child's margins collapse through it (empty, no padding or
     /// border): the join in the fold is PR 3b's.
     CollapsesThrough,
