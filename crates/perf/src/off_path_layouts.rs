@@ -25,8 +25,9 @@ pub const GRID_CELLS: Shape = Shape {
     unit: cell,
 };
 
-/// Paragraphs of one to seven sentences, each with a bold span and the
-/// value in a coloured span, wrapping into one to five lines.
+/// Paragraphs of one to five sentences on each side of a bold span and
+/// the value in a coloured span, wrapping into two to nine 21 px lines
+/// at 640 px.
 pub const MIXED_TEXT: Shape = Shape {
     css: ".para { margin: 0 0 8px 0; } .em { font-weight: 700; } .value { color: #36c; }",
     container: body,
@@ -70,11 +71,20 @@ fn cell(doc: &mut Document, parent: NodeId, index: usize, before: Option<NodeId>
 
 const SENTENCE: &str = "The retoucher lifts the shadows by the window and keeps the sky. ";
 
-/// Paragraph `index`: `1 + index % 7` sentences around a bold span and
-/// the value's span.
+/// The sentences paragraph `index` has on each side of its spans: one to
+/// five, by `index % 5`. Every size is a multiple of ten, so the edited
+/// paragraph (`count / 2`) and the inserted one (`count`) have four at
+/// every size.
+#[must_use]
+pub fn sentences(index: usize) -> usize {
+    1 + (index + 3) % 5
+}
+
+/// Paragraph `index`: its [`sentences`] before and after a bold span
+/// and the value's span.
 fn paragraph(doc: &mut Document, parent: NodeId, index: usize, before: Option<NodeId>) -> Unit {
     let para = child_before(doc, parent, "p", "para", before);
-    let sentences = SENTENCE.repeat(1 + index % 7);
+    let sentences = SENTENCE.repeat(sentences(index));
     text(doc, para, &format!("{index}. {sentences}"));
     let em = element(doc, para, "span", "em");
     text(doc, em, "Curves");

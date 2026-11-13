@@ -66,8 +66,8 @@ fn every_kind_has_a_gpu_test_here() {
 }
 
 #[test]
-fn gpu_the_samples_record_the_warmup_the_kinds_are_named_from() {
-    // Given: an odd warmup, so a wrong one swaps Insert's kinds
+fn gpu_the_samples_record_the_warmup_the_sampler_ran() {
+    // Given: an odd warmup; `of_kind`'s tests pin how it names the kinds
     let gpu = gpu_with(FEATURES);
     let mut workload = OffPath::new(
         Kind::CodeBlocks,
