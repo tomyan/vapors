@@ -8,16 +8,16 @@ use crate::scaling::{Judged, MIN_GROWTH_INSTRUCTIONS, PhaseSeries, Scaling, TOLE
 /// The counts of every phase at each size, with the growth per extra
 /// row between neighbouring sizes.
 #[must_use]
-pub fn scaling_section(change: RowChange, scaling: &Scaling) -> String {
-    let mut out = header(change, scaling);
+pub fn scaling_section(title: &str, scaling: &Scaling) -> String {
+    let mut out = header(title, scaling);
     for series in &scaling.phases {
         out.push_str(&phase_row(series, &scaling.rows));
     }
     out
 }
 
-fn header(change: RowChange, scaling: &Scaling) -> String {
-    let mut out = format!("### Scaling, {change:?} (median instructions per frame)\n\n| phase |");
+fn header(title: &str, scaling: &Scaling) -> String {
+    let mut out = format!("### Scaling, {title} (median instructions per frame)\n\n| phase |");
     for rows in &scaling.rows {
         let _ = write!(out, " {rows} rows |");
     }
@@ -42,18 +42,40 @@ fn phase_row(series: &PhaseSeries, rows: &[usize]) -> String {
     out
 }
 
-/// The line a passing run ends with.
+/// A pass line per kind of frame, each kind judged as [`verdict`]
+/// judges one, so the run passes only when its costlier kind does.
+///
+/// # Errors
+/// Every kind's failure, each naming its kind.
+pub fn verdicts(change: RowChange, kinds: &[(String, Scaling)]) -> Result<String, String> {
+    let judged: Vec<_> = kinds
+        .iter()
+        .map(|(title, scaling)| verdict(change, title, scaling))
+        .collect();
+    let failures: Vec<_> = judged
+        .iter()
+        .filter_map(|v| v.as_ref().err())
+        .cloned()
+        .collect();
+    if !failures.is_empty() {
+        return Err(failures.join("\n"));
+    }
+    Ok(judged.into_iter().flatten().collect::<Vec<_>>().join("\n"))
+}
+
+/// The line a passing run of `change` ends with, its frames named by
+/// `title`.
 ///
 /// # Errors
 /// A phase grew beyond the tolerance (each named, with its growth per
 /// extra row and the command that reproduces it), or the judged phase
 /// has no count.
-pub fn verdict(change: RowChange, scaling: &Scaling) -> Result<String, String> {
+pub fn verdict(change: RowChange, title: &str, scaling: &Scaling) -> Result<String, String> {
     let judged = Judged::of(change);
     let violations = scaling.violations(judged)?;
     if !violations.is_empty() {
         return Err(format!(
-            "scaling: {change:?} does work that depends on the page's size:\n- {}\nreproduce: \
+            "scaling: {title} does work that depends on the page's size:\n- {}\nreproduce: \
              vapors-perf 60 10 --scaling {change:?}; the fix is to make the phase's work depend \
              on what changed (docs/plans/perf-finish-line.md, properties 1 and 6)",
             violations.join("\n- ")
@@ -61,11 +83,11 @@ pub fn verdict(change: RowChange, scaling: &Scaling) -> Result<String, String> {
     }
     Ok(match judged {
         Judged::AccessibilityPerRow { ceiling } => format!(
-            "scaling: pass, {change:?} accessibility within {ceiling} instructions per extra row; \
+            "scaling: pass, {title} accessibility within {ceiling} instructions per extra row; \
              the other phases are reported, not judged: property 3 (the splice step) is not built"
         ),
         Judged::EveryPhase => format!(
-            "scaling: pass, every {change:?} phase within {TOLERANCE_PERCENT}% or {MIN_GROWTH_INSTRUCTIONS} instructions of its 1000-row count"
+            "scaling: pass, every {title} phase within {TOLERANCE_PERCENT}% or {MIN_GROWTH_INSTRUCTIONS} instructions of its 1000-row count"
         ),
     })
 }
