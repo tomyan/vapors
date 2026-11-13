@@ -1,6 +1,7 @@
 //! Before `cargo xtask ci` and `cargo xtask gate` start: wait while the
-//! machine's runnable tasks are over `[load] threshold`, reading them
-//! every [`READ_EVERY`] and saying so every [`SAY_EVERY`], and go on at
+//! machine's runnable tasks, averaged over the last [`WINDOW`] readings,
+//! are over `[load] threshold`, reading them every [`READ_EVERY`] and
+//! saying so every [`SAY_EVERY`], and go on at
 //! `[load] deadline_minutes` saying that it did. The count of tasks
 //! runnable now, not the one-minute load average: the average decays
 //! for a minute or two after the work has gone (60 to 12 took 90 to
@@ -12,6 +13,7 @@
 //! `ci_shared::run`). The gate waits once it holds its lock,
 //! so the load it measures is what it will run beside.
 
+use std::collections::VecDeque;
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
@@ -26,11 +28,16 @@ pub const SAY_EVERY: Duration = Duration::from_secs(30);
 /// the CPUs free starts within this. Not a measurement; the read is one
 /// small file, so the period costs nothing either way.
 pub const READ_EVERY: Duration = Duration::from_secs(5);
-/// How many readings in a row must be at or under the threshold: one
-/// reading is an instant, and a build between compile bursts (a link, a
-/// build script) reads low for a moment while its next jobs are about
-/// to start. Three is 10 s of it, read 5 s apart. Not a measurement.
-pub const CLEAR_READS: u32 = 3;
+/// How many readings the wait averages: the last six, 30 s of them. A
+/// reading is an instant, and builds read low between compile bursts.
+/// Sampled every 1 s on 2026-11-13 with ten builders running (one-minute
+/// load 16 to 50): one reading was at or under 12 in 45 % of samples,
+/// three in a row 5 s apart in 10.6 % of windows; at load 35 to 52 the
+/// mean of six readings 5 s apart was never under 12 (median 27). So
+/// the mean of six waits out a busy machine where three in a row would
+/// start into it about once a minute, and clears within 30 s of the
+/// builds ending, where the one-minute average took 90 to 120 s.
+pub const WINDOW: u32 = 6;
 /// Set by GitHub Actions on its runners.
 pub const GITHUB_ENV: &str = "GITHUB_ACTIONS";
 
@@ -81,16 +88,12 @@ pub fn wait(
         return Ok(Outcome::Skipped(why));
     }
     let started = clock.now();
-    let (mut say_at, mut under) = (Duration::ZERO, 0);
+    let (mut say_at, mut readings) = (Duration::ZERO, VecDeque::new());
     loop {
-        let now = load()?;
+        let mean = push_reading(&mut readings, load()?);
         let waited = clock.now().saturating_duration_since(started);
-        under = if now <= settings.threshold {
-            under + 1
-        } else {
-            0
-        };
-        if under >= CLEAR_READS {
+        let over = mean > settings.threshold;
+        if !over && readings.len() == WINDOW as usize {
             return Ok(Outcome::Clear);
         }
         // Relaxed guard: at the deadline the run goes on, loudly, rather
@@ -99,16 +102,26 @@ pub fn wait(
         // retry in a loop that adds load. Retired when runs queue for
         // CPUs through a scheduler instead of this wait. Tom's choice:
         // docs/decisions/2026-11-01-load-wait-deadline.md.
-        if under == 0 && waited >= settings.deadline {
-            say(&past_deadline(now, settings, waited));
+        if over && waited >= settings.deadline {
+            say(&past_deadline(mean, settings, waited));
             return Ok(Outcome::PastDeadline);
         }
-        if under == 0 && waited >= say_at {
-            say(&waiting(now, settings, waited));
+        if over && waited >= say_at {
+            say(&waiting(mean, settings, waited));
             say_at = waited + SAY_EVERY;
         }
         clock.sleep(READ_EVERY.min(settings.deadline.saturating_sub(waited)));
     }
+}
+
+/// Keep `reading` among the last [`WINDOW`]; their mean.
+fn push_reading(readings: &mut VecDeque<f64>, reading: f64) -> f64 {
+    if readings.len() == WINDOW as usize {
+        readings.pop_front();
+    }
+    readings.push_back(reading);
+    let count = u32::try_from(readings.len()).unwrap_or(WINDOW);
+    readings.iter().sum::<f64>() / f64::from(count)
 }
 
 /// Why the wait is not made, if it is not.
@@ -126,7 +139,7 @@ fn skipped(settings: Settings, github: bool) -> Option<&'static str> {
 
 fn waiting(load: f64, settings: Settings, waited: Duration) -> String {
     format!(
-        "load: {load} runnable tasks, over {} ([load] threshold); waiting, {} s so far, until {} s",
+        "load: {load:.1} runnable tasks on average over the last {WINDOW} readings, over {} ([load] threshold); waiting, {} s so far, until {} s",
         settings.threshold,
         waited.as_secs(),
         settings.deadline.as_secs()
@@ -135,7 +148,7 @@ fn waiting(load: f64, settings: Settings, waited: Duration) -> String {
 
 fn past_deadline(load: f64, settings: Settings, waited: Duration) -> String {
     format!(
-        "load: STILL {load} runnable tasks, over {} ([load] threshold), after waiting {} s; going on \
+        "load: STILL {load:.1} runnable tasks on average, over {} ([load] threshold), after waiting {} s; going on \
          anyway at the deadline ([load] deadline_minutes), so timings in this run may fail \
          from the load, not the code",
         settings.threshold,
