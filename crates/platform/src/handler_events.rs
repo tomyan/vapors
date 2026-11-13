@@ -33,6 +33,8 @@ impl ApplicationHandler<Message> for Handler {
             // at once. Unproven: no test can make the acquire fail, and
             // `Handler` needs a real `ActiveEventLoop`.
             event_loop.set_control_flow(ControlFlow::Wait);
+            // the start gate's deadline, while the window has no size
+            self.start_when_sized(event_loop);
             self.platform.request_redraw();
             self.redraw_if_asked();
         }

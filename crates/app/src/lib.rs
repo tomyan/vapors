@@ -30,7 +30,7 @@ mod wheel_scroll;
 pub use document_input::{DocumentInput, Given, Route, Unplaced};
 pub use elements_app::{
     ElementsApp, Failure, FrameDecision, FrameTimesHook, FrameTiming, GiveError, InvalidateError,
-    Invalidated, PerFrame, SurfaceHandle,
+    Invalidated, PerFrame, StartState, SurfaceHandle,
 };
 pub use painter::{
     DrawOverError, FrameCounts, MountError, NewPainterError, PaintError, SUPPORTED, ScenePainter,

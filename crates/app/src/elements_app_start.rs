@@ -16,7 +16,26 @@ use vapors_platform::{Frame, Start, report_status};
 use super::ElementsApp;
 use crate::painter::ScenePainter;
 
+/// How an app's painter, and every pipeline with it, came to be made.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StartState {
+    /// Neither `App::start` nor a frame has run.
+    NotStarted,
+    /// At `App::start`, before the first frame.
+    Started,
+    /// In the first frame, as no `App::start` came first: the status
+    /// line said so, naming the fix.
+    MadeInFirstFrame,
+}
+
 impl ElementsApp {
+    /// How its painter came to be made: an `App` that wraps this one
+    /// checks it is [`StartState::Started`] after its first frame.
+    #[must_use]
+    pub fn start_state(&self) -> StartState {
+        self.start_state
+    }
+
     /// [`App::start`](vapors_platform::App::start) for this app.
     pub(super) fn start_on(&mut self, start: &Start<'_>) -> Result<(), String> {
         if self.painter.is_some() {
@@ -32,9 +51,13 @@ impl ElementsApp {
         painter
             .start(start.device, start.queue)
             .map_err(|error| format!("a surface could not be mounted: {error}"))?;
-        // the staged atlas and mount writes run now, not at the head of
-        // frame 0's submit (review of #281, M2)
+        // RELAXED: no test pins this submit. It runs the staged atlas and
+        // mount writes now, not at the head of frame 0's submit (review of
+        // #281, M2); wgpu exposes no pending-write count, so removing it
+        // fails nothing but frame 0's measured time. Retired when wgpu can
+        // report pending writes, or a GPU-time test resolves one copy.
         start.queue.submit([]);
+        self.start_state = StartState::Started;
         Ok(())
     }
 

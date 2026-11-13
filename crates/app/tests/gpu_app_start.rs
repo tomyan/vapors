@@ -10,7 +10,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use support::{RED, SIZE, Solid, app_frame, document, pixel};
-use vapors_app::ElementsApp;
+use vapors_app::{ElementsApp, StartState};
 use vapors_dom::Dom;
 use vapors_gpu_harness::{Gpu, gpu};
 use vapors_platform::{App, Start};
@@ -133,4 +133,29 @@ fn gpu_a_second_start_is_refused_naming_the_fix() {
         error.contains("after the app's painter was made") && error.contains("fix:"),
         "{error}"
     );
+}
+
+#[test]
+fn gpu_an_app_framed_without_a_start_says_its_painter_was_made_in_the_frame() {
+    // Given
+    let (mut app, _, gpu) = rig();
+
+    // When
+    app_frame(&mut app, &gpu);
+
+    // Then
+    assert_eq!(app.start_state(), StartState::MadeInFirstFrame);
+}
+
+#[test]
+fn gpu_a_started_app_says_it_was_started() {
+    // Given
+    let (mut app, _, gpu) = rig();
+
+    // When
+    start(&mut app, &gpu).expect("starts");
+    app_frame(&mut app, &gpu);
+
+    // Then
+    assert_eq!(app.start_state(), StartState::Started);
 }

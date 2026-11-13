@@ -74,6 +74,7 @@ mod redraw;
 mod report;
 mod shortcut_modifier;
 mod start;
+mod start_gate;
 mod surface;
 mod surface_texture;
 mod tasks;

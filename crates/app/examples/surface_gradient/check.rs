@@ -7,7 +7,7 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use vapors_app::{ElementsApp, Invalidated, SurfaceHandle};
+use vapors_app::{ElementsApp, Invalidated, StartState, SurfaceHandle};
 use vapors_platform::{App, Event, Frame, Next, Platform, Start, Waker};
 
 use super::script::script;
@@ -166,6 +166,10 @@ impl Checked {
     }
 }
 
+/// The first frame came before the painter was made at start.
+const UNSTARTED: &str = "the ElementsApp was not started before its first frame; fix: forward \
+    App::start from Checked to the ElementsApp";
+
 impl App for Checked {
     fn start(&mut self, start: &Start<'_>) -> Result<(), String> {
         self.app.start(start)
@@ -194,6 +198,11 @@ impl App for Checked {
         let number = self.counts.frames.fetch_add(1, Ordering::SeqCst) + 1;
         let (decision, states) = (self.app.last_decision(), self.app.surface_states());
         trace.frame(number, next, decision, &states, rendered);
+        drop(trace);
+        if self.app.start_state() != StartState::Started {
+            self.counts.refuse(UNSTARTED);
+            return Next::Exit;
+        }
         next
     }
 

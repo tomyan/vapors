@@ -18,6 +18,7 @@ pub use decision::FrameDecision;
 pub use failure::Failure;
 pub use give::GiveError;
 use give::Hosting;
+pub use start::StartState;
 pub use surface_handle::{InvalidateError, Invalidated, SurfaceHandle};
 use surfaces::AppSurfaces;
 
@@ -53,6 +54,8 @@ pub struct ElementsApp {
     hosting: Option<Hosting>,
     /// Render passes the last painted frame's encoder began.
     render_passes: u64,
+    /// How the painter came to be made: at `App::start` or not.
+    start_state: StartState,
     /// Times frames on the GPU (`elements_app_timing.rs`).
     timer: AppTimer,
     /// The a11y mirror, when attached (`elements_app_a11y.rs`).
@@ -92,6 +95,7 @@ impl ElementsApp {
             decision: FrameDecision::default(),
             hosting: None,
             render_passes: 0,
+            start_state: StartState::NotStarted,
             timer: AppTimer::default(),
             a11y: a11y::A11yMirror::default(),
         }

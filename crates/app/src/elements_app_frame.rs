@@ -120,6 +120,7 @@ impl ElementsApp {
         self.check_format(frame.texture.format())?;
         if self.painter.is_none() {
             self.painter = Some(self.unstarted_painter(frame)?);
+            self.start_state = super::StartState::MadeInFirstFrame;
         }
         let scene_painter = self.painter.as_mut().expect("made above");
         self.surfaces
