@@ -7,19 +7,19 @@ use crate::kept_box::{BoxFrom, KeptBox, Part};
 use crate::layout::BoxRect;
 use crate::paint_order::Step;
 
-fn quad(top: f32, bottom: f32) -> Item {
+pub(super) fn quad(top: f32, bottom: f32) -> Item {
     let rect = Rect::new(0.0, top, 10.0, bottom);
     Item::Quad(Quad::fill(rect, Color::from_rgba8(1, 2, 3, 255)))
 }
 
 /// A row of 10 px at `top`.
-fn row(top: f32) -> Item {
+pub(super) fn row(top: f32) -> Item {
     quad(top, top + 10.0)
 }
 
 /// A kept paint in `frame` whose own step paints `items`.
 #[allow(clippy::unnecessary_wraps)] // a slot's type, so a slot can be set to `None` beside it
-fn part(frame: usize, items: &[Item]) -> Option<KeptBox> {
+pub(super) fn part(frame: usize, items: &[Item]) -> Option<KeptBox> {
     let rect = BoxRect {
         x: 0.0,
         y: 0.0,
@@ -46,20 +46,20 @@ fn part(frame: usize, items: &[Item]) -> Option<KeptBox> {
 }
 
 /// Each slot's own step, in slot order, and those that draw.
-fn drawn(boxes: &[Option<KeptBox>]) -> (Vec<Step>, DrawnSteps) {
+pub(super) fn drawn(boxes: &[Option<KeptBox>]) -> (Vec<Step>, DrawnSteps) {
     let steps: Vec<Step> = (0..boxes.len()).map(Step::Box).collect();
     let drawn = DrawnSteps::of(&steps, boxes);
     (steps, drawn)
 }
 
-fn extents(boxes: &[Option<KeptBox>]) -> Extents {
+pub(super) fn extents(boxes: &[Option<KeptBox>]) -> Extents {
     let (steps, drawn) = drawn(boxes);
     Extents::of(&drawn, steps.len(), boxes)
 }
 
 /// The places of `extents`' candidates in `frame` for the band from
 /// `top` to `bottom`, in place order.
-fn candidates(extents: &Extents, frame: usize, (top, bottom): (f32, f32)) -> Vec<usize> {
+pub(super) fn candidates(extents: &Extents, frame: usize, (top, bottom): (f32, f32)) -> Vec<usize> {
     let view = Rect::new(0.0, top, 100.0, bottom);
     let mut places: Vec<usize> = extents.candidates(frame, view).map(|e| e.place).collect();
     places.sort_unstable();
@@ -67,7 +67,7 @@ fn candidates(extents: &Extents, frame: usize, (top, bottom): (f32, f32)) -> Vec
 }
 
 /// `boxes` with slot `slot` painted again as `now`, `extents` patched.
-fn painted_again(
+pub(super) fn painted_again(
     extents: &mut Extents,
     boxes: &mut [Option<KeptBox>],
     (slot, now): (usize, Option<KeptBox>),
@@ -79,7 +79,7 @@ fn painted_again(
 }
 
 /// Ten rows of 10 px on the page, the first at 0.
-fn rows() -> Vec<Option<KeptBox>> {
+pub(super) fn rows() -> Vec<Option<KeptBox>> {
     (0..10u8)
         .map(|at| part(PAGE, &[row(f32::from(at) * 10.0)]))
         .collect()

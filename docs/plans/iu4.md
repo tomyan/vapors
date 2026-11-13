@@ -504,6 +504,43 @@ PR 5 as built (2026-11-13):
   the rows for Scroll and Resize. Remaking the index adds 2,100 to
   2,700 instructions per row to Insert's and Resize's updates, which
   were already O(rows).
+- Review at 649d4c4:
+  - M1: steps taller than 1024 device pixels, and those that span every
+    view, are kept in a list apart and tested on every view. A tall
+    wrapper therefore no longer raises every later step's reach, and the
+    scan visits only short steps whose top is within 1024 px above the
+    view (a unit test counts the entries visited). Still open: a page
+    of many tall steps tests them all on every view. A max-bottom tree
+    over top order (O(log n + shown) for any heights) replaces both the
+    list and the reach if that shows.
+  - M2: the index is built straight into its map.
+  - M2, still open: every frame is searched on every sort, so a page of
+    thousands of small scrollers (code blocks in a transcript) pays
+    O(frames · log steps) per scroll. The fix is to enter each frame's
+    clip in its parent frame's index and descend only into frames that
+    are candidates, as splice-layout's lanes enter one entry per lane.
+  - L1 to L3: the patch refuses paint order of another length; a view
+    whose edges are not numbers is refused; a shown step's item count
+    comes from its entry.
+- Requirement for the layout lane (lead, 2026-11-13): an insert makes
+  the index afresh (O(rows)), which is accepted for now. Once layout
+  and placement make an insert O(log n), this rebuild, with
+  `DrawnSteps::of` and the hits rebuild, becomes the floor of Insert's
+  update: about 21 to 27 million instructions at 10,000 rows. The index
+  must then be updated incrementally. That needs entries keyed by step
+  rather than by paint place, with paint order compared through an
+  order-maintenance structure or the lane's in-order position; a lane
+  entered as one entry, widened by its largest overflow, whose visible
+  children come from the lane's `between(view)`; and parts kept in
+  row-relative coordinates, so a moved row needs no entry patch
+  (`docs/plans/splice-layout.md` 5.x and row 4).
+- Risk 7, measured 2026-11-13: the 1000-row oracle test
+  (`sparse_updates.rs` `a_thousand_rows_update_sparsely_...`), three
+  runs each at load 10 to 12: 1.28 s on main 4d1451c, 1.30 s with 4c,
+  1.31 s with PR 5, which is +2%. That test paints and does not draw.
+  The draw-time checks (`assert_on_page`, `assert_candidates`) are
+  O(items) per debug draw, the same order as the existing
+  `assert_same`.
 
 ### 4a to 4c land together
 

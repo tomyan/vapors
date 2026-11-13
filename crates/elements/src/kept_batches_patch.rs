@@ -4,8 +4,6 @@
 
 use super::{KeptBatches, Sources};
 use crate::framed_batches::hidden_items;
-use crate::frames::Frames;
-use crate::kept_box::KeptBox;
 use crate::paint_order::Step;
 
 impl KeptBatches {
@@ -23,7 +21,7 @@ impl KeptBatches {
         for (place, step) in steps {
             self.remove(place);
             if sources.boxes.get(step.index()).is_some_and(Option::is_some) {
-                self.add(place, step, (sources.boxes, sources.frames));
+                self.add(place, step, sources);
             }
         }
         let culled = self.culled(sources.extents);
@@ -32,12 +30,13 @@ impl KeptBatches {
         }
     }
 
-    /// Puts `step`, at `place`, in `shown` when one of its items shows.
-    fn add(&mut self, place: usize, step: Step, boxes: (&[Option<KeptBox>], &Frames)) {
-        if hidden_items(step, boxes, self.view).is_some() {
+    /// Puts `step`, at `place`, in `shown` when one of its items shows,
+    /// with the item count its entry in the extents index has.
+    fn add(&mut self, place: usize, step: Step, sources: Sources<'_>) {
+        if hidden_items(step, (sources.boxes, sources.frames), self.view).is_some() {
             return;
         }
-        let items = crate::scene_view::frame_items(boxes.0, step).1.count() as u64;
+        let items = sources.extents.items_at(place);
         let at = self.shown.partition_point(|&(shown, ..)| shown < place);
         self.shown.insert(at, (place, step, items));
         self.shown_items += items;
