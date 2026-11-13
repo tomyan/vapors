@@ -1,0 +1,223 @@
+use super::{Blocks, CAP, Pos};
+
+/// `0..len`, in order.
+fn counted(len: usize) -> Blocks<usize> {
+    Blocks::from_sorted((0..len).collect())
+}
+
+fn items(blocks: &Blocks<usize>) -> Vec<usize> {
+    blocks.iter().copied().collect()
+}
+
+#[test]
+fn from_sorted_keeps_the_order_across_blocks() {
+    // Given
+    let len = 3 * CAP + 5;
+
+    // When
+    let blocks = counted(len);
+
+    // Then
+    assert_eq!(blocks.len(), len);
+    assert_eq!(items(&blocks), (0..len).collect::<Vec<_>>());
+    assert!(blocks.block_count() >= 3, "{} blocks", blocks.block_count());
+}
+
+#[test]
+fn partition_point_finds_the_first_item_failing_the_predicate_in_any_block() {
+    // Given
+    let blocks = counted(3 * CAP);
+
+    // When
+    let in_second_block = blocks.partition_point(|&item| item < CAP + 7);
+    let at_a_boundary = blocks.partition_point(|&item| item < CAP);
+    let past_every = blocks.partition_point(|_| true);
+    let before_every = blocks.partition_point(|_| false);
+
+    // Then
+    assert_eq!(blocks.get(in_second_block), Some(&(CAP + 7)));
+    assert_eq!(blocks.get(at_a_boundary), Some(&CAP));
+    assert_eq!(blocks.get(past_every), None);
+    assert_eq!(past_every, blocks.end());
+    assert_eq!(blocks.get(before_every), Some(&0));
+}
+
+#[test]
+fn binary_search_names_the_position_found_or_the_insertion_point() {
+    // Given
+    let blocks = Blocks::from_sorted((0..2 * CAP).map(|item| item * 2).collect());
+
+    // When
+    let found = blocks.binary_search_by(|item| item.cmp(&(2 * CAP + 4)));
+    let missing = blocks.binary_search_by(|item| item.cmp(&(2 * CAP + 5)));
+
+    // Then
+    assert_eq!(blocks.get(found.expect("present")), Some(&(2 * CAP + 4)));
+    let at = missing.expect_err("absent");
+    assert_eq!(blocks.get(at), Some(&(2 * CAP + 6)));
+}
+
+#[test]
+fn insert_puts_the_item_at_the_position_and_returns_where_it_is() {
+    // Given
+    let mut blocks = Blocks::from_sorted(vec![0, 2, 4]);
+
+    // When
+    let placed = blocks.insert(blocks.partition_point(|&item| item < 3), 3);
+    let placed_at = blocks.get(placed).copied();
+    let first = blocks.insert(blocks.partition_point(|&item| item < 0), -1);
+    let first_at = blocks.get(first).copied();
+    let last = blocks.insert(blocks.end(), 9);
+
+    // Then
+    assert_eq!(items_i64(&blocks), vec![-1, 0, 2, 3, 4, 9]);
+    assert_eq!((placed_at, first_at), (Some(3), Some(-1)));
+    assert_eq!(blocks.get(last), Some(&9));
+    assert_eq!(blocks.block_count(), 1, "appends fill the last block");
+}
+
+fn items_i64(blocks: &Blocks<i64>) -> Vec<i64> {
+    blocks.iter().copied().collect()
+}
+
+#[test]
+fn insert_into_a_full_block_splits_it_and_keeps_the_order() {
+    // Given
+    let mut blocks = counted(CAP);
+    assert_eq!(blocks.block_count(), 1);
+
+    // When
+    let at = blocks.partition_point(|&item| item < CAP / 2);
+    let placed = blocks.insert(at, usize::MAX);
+
+    // Then
+    assert_eq!(blocks.block_count(), 2);
+    assert_eq!(blocks.get(placed), Some(&usize::MAX));
+    let mut expected: Vec<usize> = (0..CAP).collect();
+    expected.insert(CAP / 2, usize::MAX);
+    assert_eq!(items(&blocks), expected);
+}
+
+#[test]
+fn remove_returns_the_item_and_the_position_of_the_next() {
+    // Given
+    let mut blocks = counted(2 * CAP);
+
+    // When
+    let (last_of_first, next) = blocks.remove(blocks.partition_point(|&item| item < CAP - 1));
+
+    // Then
+    assert_eq!(last_of_first, CAP - 1);
+    assert_eq!(blocks.get(next), Some(&CAP));
+    assert_eq!(blocks.len(), 2 * CAP - 1);
+}
+
+#[test]
+fn removing_the_only_item_of_a_block_drops_the_block() {
+    // Given
+    let mut blocks = counted(CAP + 1);
+    assert_eq!(blocks.block_count(), 2);
+
+    // When
+    let (alone, next) = blocks.remove(blocks.partition_point(|&item| item < CAP));
+    let (first, after_first) = blocks.remove(Pos::default());
+
+    // Then
+    assert_eq!((alone, first), (CAP, 0));
+    assert_eq!(next, blocks.end());
+    assert_eq!(blocks.get(after_first), Some(&1));
+    assert_eq!(blocks.block_count(), 1);
+    assert_eq!(blocks.len(), CAP - 1);
+}
+
+#[test]
+fn removing_every_item_leaves_no_block() {
+    // Given
+    let mut blocks = Blocks::from_sorted(vec![1, 2]);
+
+    // When
+    let (_, next) = blocks.remove(Pos::default());
+    let (_, at_end) = blocks.remove(next);
+
+    // Then
+    assert_eq!(at_end, blocks.end());
+    assert!(blocks.is_empty());
+    assert_eq!(blocks.block_count(), 0);
+}
+
+#[test]
+fn an_insert_or_remove_moves_at_most_a_block_of_items() {
+    // Given
+    let mut blocks = counted(40 * CAP);
+
+    // When
+    let at = blocks.partition_point(|&item| item < 20 * CAP + 3);
+    let placed = blocks.insert(at, 0);
+    let after_insert = blocks.moved();
+    blocks.remove(placed);
+    let after_remove = blocks.moved() - after_insert;
+
+    // Then
+    assert!(after_insert <= CAP, "insert moved {after_insert} items");
+    assert!(after_remove <= CAP, "remove moved {after_remove} items");
+    assert!(
+        after_insert > 0 && after_remove > 0,
+        "a middle insert moves the block's tail"
+    );
+}
+
+#[test]
+fn prev_crosses_a_block_boundary_and_is_none_before_the_first() {
+    // Given
+    let blocks = counted(2 * CAP);
+
+    // When
+    let first_of_second = blocks.partition_point(|&item| item < CAP);
+    let before = blocks.prev(first_of_second).expect("a block before");
+    let before_first = blocks.prev(Pos::default());
+    let last = blocks.prev(blocks.end()).expect("not empty");
+
+    // Then
+    assert_eq!(blocks.get(before), Some(&(CAP - 1)));
+    assert_eq!(before_first, None);
+    assert_eq!(blocks.get(last), Some(&(2 * CAP - 1)));
+}
+
+#[test]
+fn iter_from_and_iter_mut_from_run_on_across_blocks() {
+    // Given
+    let mut blocks = counted(2 * CAP + 2);
+    let from = blocks.partition_point(|&item| item < CAP - 1);
+
+    // When
+    for item in blocks.iter_mut_from(from) {
+        *item += 1000;
+    }
+    let read: Vec<usize> = blocks.iter_from(from).copied().collect();
+
+    // Then
+    let expected: Vec<usize> = (CAP - 1..2 * CAP + 2).map(|item| item + 1000).collect();
+    assert_eq!(read, expected);
+    assert_eq!(blocks.get(Pos::default()), Some(&0));
+}
+
+#[test]
+fn equality_reads_the_items_not_the_block_boundaries() {
+    // Given
+    let sorted = counted(2 * CAP);
+    let mut grown = counted(2 * CAP);
+
+    // When
+    let third = CAP / 3;
+    grown.insert(grown.partition_point(|&item| item < third), third);
+    grown.remove(grown.partition_point(|&item| item < third));
+
+    // Then
+    assert_ne!(
+        sorted.block_count(),
+        grown.block_count(),
+        "the point of the test"
+    );
+    assert_eq!(sorted, grown);
+    assert_ne!(sorted, counted(2 * CAP - 1));
+}
