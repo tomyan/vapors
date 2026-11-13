@@ -160,4 +160,3 @@ fn global_and_nested_lists_combine_their_arguments() {
         Match::Never
     );
 }
-

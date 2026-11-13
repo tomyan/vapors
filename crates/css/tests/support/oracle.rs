@@ -170,4 +170,3 @@ pub fn judged(css: &str) -> (Match, Vec<(Situation, bool)>) {
         .collect();
     (classify(rule, &KEY), outcomes)
 }
-

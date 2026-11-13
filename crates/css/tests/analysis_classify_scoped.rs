@@ -22,8 +22,14 @@ fn an_unscoped_key_never_matches_a_scoped_rule() {
 #[test]
 fn scoped_rules_are_judged_in_the_form_the_runtime_scopes_them() {
     // Given: the subject gains the attribute bare, the rest inside :where()
-    assert_eq!(classified(&scoped(".card { color: red }"), &CARD), Match::Always);
-    assert_eq!(classified(&scoped(".other { color: red }"), &CARD), Match::Never);
+    assert_eq!(
+        classified(&scoped(".card { color: red }"), &CARD),
+        Match::Always
+    );
+    assert_eq!(
+        classified(&scoped(".other { color: red }"), &CARD),
+        Match::Never
+    );
     assert_eq!(
         classified(&scoped(":global(.dark) .card { color: red }"), &CARD),
         depends(|d| d.ancestors = true)

@@ -75,7 +75,6 @@ fn forms() -> Vec<String> {
         .collect()
 }
 
-
 #[test]
 fn always_matches_every_situation_never_matches_none_and_conditional_follows_its_inputs() {
     for css in forms() {
@@ -114,7 +113,11 @@ fn the_table_has_each_verdict_and_each_situation_bit_changes_some_outcome() {
     // some outcome, so no bit is vacuous
     assert!(judged.iter().any(|(v, _)| *v == Match::Always));
     assert!(judged.iter().any(|(v, _)| *v == Match::Never));
-    assert!(judged.iter().any(|(v, _)| matches!(v, Match::Conditional(_))));
+    assert!(
+        judged
+            .iter()
+            .any(|(v, _)| matches!(v, Match::Conditional(_)))
+    );
     for bit in 0..7u8 {
         let flips = judged.iter().any(|(_, outcomes)| {
             let by_bits: BTreeMap<(u8, u8), bool> = outcomes
@@ -125,6 +128,9 @@ fn the_table_has_each_verdict_and_each_situation_bit_changes_some_outcome() {
                 .iter()
                 .any(|((toggles, bits), m)| by_bits.get(&(*toggles, bits ^ (1 << bit))) != Some(m))
         });
-        assert!(flips, "situation bit {bit} changes no outcome: a vacuous input");
+        assert!(
+            flips,
+            "situation bit {bit} changes no outcome: a vacuous input"
+        );
     }
 }

@@ -4,7 +4,9 @@
 //! where the key leaves it to run time.
 
 use super::{Depends, KeyFacts, Match};
-use crate::selector::{AttributeSelector, Compound, PseudoClass, Reads, Selector, matching::attribute_matches, reads};
+use crate::selector::{
+    AttributeSelector, Compound, PseudoClass, Reads, Selector, matching::attribute_matches, reads,
+};
 
 /// Whether a key's elements satisfy `compound`, without its context.
 pub(super) fn judge(compound: &Compound, facts: &KeyFacts<'_>) -> Match {

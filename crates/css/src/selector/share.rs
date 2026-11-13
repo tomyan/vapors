@@ -65,9 +65,11 @@ pub(crate) fn reads(pseudo: &PseudoClass) -> Reads<'_> {
 pub(crate) fn state_flag(pseudo: &PseudoClass) -> Option<States> {
     match reads(pseudo) {
         Reads::State(flag) => Some(flag),
-        Reads::Nested(_) | Reads::Negated(_) | Reads::Relative(_) | Reads::Structure | Reads::Root => {
-            None
-        }
+        Reads::Nested(_)
+        | Reads::Negated(_)
+        | Reads::Relative(_)
+        | Reads::Structure
+        | Reads::Root => None,
     }
 }
 

@@ -33,4 +33,3 @@ pub fn depends(set: impl FnOnce(&mut Depends)) -> Match {
     set(&mut depends);
     Match::Conditional(depends)
 }
-
