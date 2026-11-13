@@ -69,8 +69,9 @@ pub struct Depends {
     pub toggles: BTreeSet<String>,
     /// State flags the match reads (`:hover`, `:focus`, ...).
     pub states: States,
-    /// Attributes whose run-time value the match reads: expression
-    /// attributes, `id`, and attributes the template does not set.
+    /// Attributes whose run-time value the match reads: every
+    /// attribute the key does not fix (`literal_attributes`), set by
+    /// an expression or at run time; `class` as text (`[class~=x]`).
     pub attributes: BTreeSet<String>,
     /// Compounds left of the subject, or `:root`: the mount site decides.
     pub ancestors: bool,

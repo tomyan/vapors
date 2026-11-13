@@ -78,3 +78,24 @@ fn dependencies_display_as_a_list() {
         "class:open, :hover, [hidden], ancestors, @media/@supports/@container"
     );
 }
+
+#[test]
+#[should_panic(expected = "a directive is also a literal class")]
+fn a_directive_that_is_also_a_literal_class_fails_the_shape_check() {
+    let facts = KeyFacts {
+        classes: &["card"],
+        toggles: &["card"],
+        ..CARD
+    };
+    classified("div { color: red }", &facts);
+}
+
+#[test]
+#[should_panic(expected = "the key's own fields")]
+fn class_style_or_the_scope_attribute_under_literal_attributes_fails_the_shape_check() {
+    let facts = KeyFacts {
+        literal_attributes: &[("Style", "color: red")],
+        ..CARD
+    };
+    classified("div { color: red }", &facts);
+}

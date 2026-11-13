@@ -66,6 +66,8 @@ fn attribute_fact<'a>(name: &str, facts: &KeyFacts<'a>) -> Fact<'a> {
     if name == "style" {
         return Fact::Fixed(facts.style);
     }
+    // fixed at run time by `StyleKey::attributes` (#312): the tree sets
+    // them at creation and refuses `set_attribute` of them after
     if let Some((_, value)) = facts.literal_attributes.iter().find(|(n, _)| *n == name) {
         return Fact::Fixed(Some(value));
     }
