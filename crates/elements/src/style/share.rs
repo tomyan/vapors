@@ -43,6 +43,8 @@ pub(crate) struct Shared {
     /// By key address: whether no candidate rule of the key reads
     /// siblings or descendants (`restyle_share`).
     pub(crate) shareable: HashMap<usize, bool>,
+    /// The used styles of shared computed styles, cleared with them.
+    pub(crate) used: super::SharedUsed,
 }
 
 impl Shared {
@@ -67,8 +69,10 @@ impl Shared {
         );
     }
 
-    /// Drops every entry no element holds any more.
+    /// Drops every entry no element holds any more, used styles first:
+    /// a used style's entry pins its computed style.
     pub(crate) fn sweep(&mut self) {
+        self.used.sweep();
         self.entries
             .retain(|_, entry| Rc::strong_count(&entry.style) > 1);
     }

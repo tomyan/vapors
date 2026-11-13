@@ -11,8 +11,9 @@ use crate::report::Reporter;
 use crate::steps::Step;
 use crate::{ci, fail, gate, sccache};
 
-/// The release build of vapors-perf took 104 s with the cache warm
-/// (2026-11-13); 30 minutes leaves room for a build that misses it.
+/// The release build of vapors-perf took 104 s with the cache warm and
+/// 525 s with no cache and an empty target, 4 jobs at load average 33
+/// (2026-11-13); 30 minutes is over three times the cold build.
 const BUILD_DEADLINE: Duration = Duration::from_mins(30);
 
 /// Every change took 71 s together at load average 20 and 380 s at load

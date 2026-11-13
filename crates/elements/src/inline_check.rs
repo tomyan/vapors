@@ -7,15 +7,13 @@
 //! on the wrong baseline. Weight and face alone change neither: the
 //! bundled faces share their vertical metrics.
 
-use crate::node_map::NodeMap;
-
 use vapors_dom::NodeId;
 use vapors_text::{LineHeight, content_area};
 
 use crate::check::describe;
 use crate::document::Document;
 use crate::error::ElementError;
-use crate::style::{TextStyle, Used};
+use crate::style::{TextStyle, UsedMap};
 
 const REASON: &str = "differs from its block's, and a line mixing font sizes or line heights is not laid out as Chromium lays it out yet (a slice after F2c, docs/F2c.md); give the element its block's font-size and line-height";
 
@@ -25,7 +23,7 @@ impl Document {
     pub(crate) fn mixed_metrics(
         &self,
         node: NodeId,
-        used: &NodeMap<Used>,
+        used: &UsedMap,
         scale: f32,
     ) -> Option<ElementError> {
         let own = &used.get(&node)?.text;
