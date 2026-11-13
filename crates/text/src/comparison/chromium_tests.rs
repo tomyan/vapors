@@ -112,15 +112,36 @@ fn a_browser_past_its_deadline_is_killed_with_its_children_and_its_stderr_report
             stage("no child pid: the fake browser was killed before it started its child")
         )
     });
-    let alive = std::process::Command::new("kill")
-        .args(["-0", child.trim()])
-        .status()
-        .expect("kill -0");
+    let left = state_once_killed(child.trim());
     assert!(
-        !alive.success(),
-        "the browser's child {} outlived the deadline",
+        left.is_none(),
+        "the browser's child {} outlived the deadline, in state {left:?}",
         child.trim()
     );
+}
+
+/// How long a killed process may take to end. SIGKILL is delivered at
+/// once, but the process ends only when it is next scheduled, and at
+/// load 40 to 55 here a few hundred milliseconds is possible; 5 s is
+/// far past that (not measured more closely).
+const KILLED_ENDS_WITHIN: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// The state of process `pid` once it has had [`KILLED_ENDS_WITHIN`] to
+/// end, from /proc: none when it is gone or a zombie. A killed orphan
+/// stays a zombie until init reaps it, and `kill -0` counts a zombie as
+/// alive, which failed this test under load.
+fn state_once_killed(pid: &str) -> Option<char> {
+    let started = std::time::Instant::now();
+    loop {
+        let state = std::fs::read_to_string(format!("/proc/{pid}/stat"))
+            .ok()
+            .and_then(|stat| stat[stat.rfind(')')? + 1..].trim_start().chars().next())
+            .filter(|&state| state != 'Z');
+        if state.is_none() || started.elapsed() >= KILLED_ENDS_WITHIN {
+            return state;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
 }
 
 #[test]

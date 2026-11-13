@@ -11,7 +11,16 @@ use std::path::Path;
 /// The held lock; dropping it frees the lock.
 #[derive(Debug)]
 pub struct Held {
-    _file: File,
+    file: File,
+}
+
+impl Drop for Held {
+    /// Unlock before the file closes: a process spawned while the lock was
+    /// held has a copy of the descriptor until it execs, and the lock,
+    /// which belongs to the open file, would outlive this close until then.
+    fn drop(&mut self) {
+        let _ = self.file.unlock();
+    }
 }
 
 /// Take the pass lock at `path`.
@@ -31,7 +40,7 @@ pub fn take(path: &Path) -> Result<Held, String> {
     file.set_len(0)
         .map_err(|e| format!("{}: {e}", path.display()))?;
     writeln!(file, "pid {}", std::process::id()).map_err(|e| format!("{}: {e}", path.display()))?;
-    Ok(Held { _file: file })
+    Ok(Held { file })
 }
 
 /// Lock `file` without waiting; refused naming the holder's pid when
