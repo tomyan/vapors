@@ -39,6 +39,9 @@ for change in Idle Text FlexText Class HoveredClass; do
 done
 ```
 
+`cargo xtask scaling` runs every change (`--scaling all`) on a clean
+tree; it runs nightly on origin/main on the dev machine
+(`scripts/nightly-scaling.sh`), not in the gate (Tom, 2026-11-13).
 It counts instructions at 1000, 3000 and 10,000 rows and exits non-zero,
 naming the phase and its growth per extra row, when an edit's phase
 (Text, FlexText, Class, HoveredClass; every phase) or an idle update's total
