@@ -420,6 +420,11 @@ For example, in a component whose scope is `app/src/panel.wisp`:
   per-element value refusals still happen at run time). A style the runtime is given by hand
   (`add_style`) is refused by the next update, naming the scope, line
   and column.
+- `wisp-check --styles <file>` prints the build-time styles analysis
+  (`docs/plans/build-time-styles.md`, section 1): per element, each
+  candidate rule as never, always or conditional with what it depends
+  on, and per declared property its winner and whether the computed
+  value is constant.
 - A crate whose components' styles the app adds as global sheets uses
   `compile_dir_global` instead. Nothing is then scoped, and the
   generated code has no `SCOPE`, `add_style` or tags. The layout corpus
