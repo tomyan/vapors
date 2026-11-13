@@ -1,5 +1,6 @@
 //! A rect path classified as a rect, two arcs as a circle, other paths
-//! as meshes; a degenerate closed form refused naming the shape.
+//! as meshes; the forms the closed form would draw differently stay
+//! paths, including a rectangle without width or height.
 
 use super::*;
 use crate::canonical::FillRule;
@@ -9,12 +10,7 @@ const STROKE: Paint = Paint::Stroke { width: 1.5 };
 
 fn classified(data: &str, paint: Paint) -> Classified {
     let path = IconPath::parse(data).unwrap_or_else(|e| panic!("{data:?}: {e}"));
-    classify("a.wisp:3", &path, paint).unwrap_or_else(|e| panic!("{data:?}: {e}"))
-}
-
-fn refused(data: &str, paint: Paint) -> String {
-    let path = IconPath::parse(data).unwrap_or_else(|e| panic!("{data:?}: {e}"));
-    classify("b.wisp:7", &path, paint).expect_err("refused")
+    classify(&path, paint)
 }
 
 const RECT: Classified = Classified::Rect {
@@ -24,7 +20,8 @@ const RECT: Classified = Classified::Rect {
 
 #[test]
 fn a_closed_axis_aligned_rectangle_is_a_rect() {
-    // Given: written four ways, from any corner, either way round
+    // Given: written four ways, from any corner, either way round, and
+    // a side off by less than the tolerance
     let cases = [
         ("M1 1h4v3h-4z", STROKE),
         ("M1 1h4v3h-4z", FILL),
@@ -33,25 +30,40 @@ fn a_closed_axis_aligned_rectangle_is_a_rect() {
         ("M1 1L5 1L5 4L1 4L1 1Z", FILL),
         ("M5 4V1H1V4Z", STROKE),
         ("M1 4v-3h4v3z", STROKE),
+        ("M1 1L5 1.00003L5 4L1 4z", FILL),
     ];
 
     // When, Then
     for (data, paint) in cases {
-        assert_eq!(classified(data, paint), RECT, "{data}");
+        let found = classified(data, paint);
+        assert!(
+            matches!(found, Classified::Rect { .. }),
+            "{data}: {found:?}"
+        );
     }
+    assert_eq!(classified("M1 1h4v3h-4z", STROKE), RECT);
 }
 
 #[test]
 fn a_rectangle_a_closed_form_would_draw_differently_is_a_path() {
     // Given: a stroke whose line back to the start adds a join; an open
-    // stroke; a rectangle not axis-aligned; five sides; a triangle
+    // stroke; a rectangle not axis-aligned; a side off by more than the
+    // tolerance; five sides; a triangle; a second subpath after it; a
+    // rectangle without height, written either side first (SVG strokes
+    // a line, which the tessellator draws)
     let cases = [
         ("M1 1L5 1L5 4L1 4L1 1Z", STROKE),
         ("M1 1L5 1L5 4L1 4L1 1", STROKE),
         ("M1 1h4v3h-4", STROKE),
         ("M1 1L5 2L5 4L1 4Z", FILL),
+        ("M1 1L5 1.001L5 4L1 4z", FILL),
         ("M1 1h4v3h-2h-2z", FILL),
         ("M1 1L5 1L3 4Z", FILL),
+        ("M1 1h4v3h-4zM6 6h1v1z", FILL),
+        ("M1 1h4v3h-4zM6 6h1v1z", STROKE),
+        ("M1 1h4v0h-4z", FILL),
+        ("M1 1v0h4v0z", FILL),
+        ("M1 1h0v4h0z", STROKE),
     ];
 
     // When, Then
@@ -61,21 +73,10 @@ fn a_rectangle_a_closed_form_would_draw_differently_is_a_path() {
 }
 
 #[test]
-fn a_rectangle_without_width_or_height_is_refused_naming_the_shape() {
-    // When
-    let error = refused("M1 1h4v0h-4z", FILL);
-
-    // Then
-    assert_eq!(
-        error,
-        "the shape at b.wisp:7 is a rectangle of size [4.0, 0.0]; a rectangle needs width and height above zero"
-    );
-}
-
-#[test]
 fn two_half_arcs_are_a_circle_or_an_ellipse() {
     // Given: a circle on a horizontal diameter, closed and not, either
-    // sweep; an ellipse on a vertical diameter
+    // sweep; an ellipse on a vertical diameter; a circle far from the
+    // origin written with relative arcs
     let circle = Classified::Ellipse {
         centre: [8.0, 8.0],
         radii: [6.0, 6.0],
@@ -98,33 +99,47 @@ fn two_half_arcs_are_a_circle_or_an_ellipse() {
     for (data, paint, expected) in cases {
         assert_eq!(classified(data, paint), expected, "{data}");
     }
+    // and a circle far from the origin whose relative arcs miss the
+    // start by an f32 ulp (6e-5 across 1024): within the tolerance,
+    // which scales by the coordinates' magnitude, not the radius
+    let far = classified(
+        "M1023.9999 8a0.1 0.1 0 1 0 0.2 0a0.1 0.1 0 1 0-0.2 0z",
+        FILL,
+    );
+    assert!(
+        matches!(
+            far,
+            Classified::Ellipse {
+                radii: [0.1, 0.1],
+                ..
+            }
+        ),
+        "{far:?}"
+    );
 }
 
 #[test]
 fn arcs_that_do_not_form_one_ellipse_are_a_path() {
     // Given: radii that differ between the arcs (both fitting the chord,
-    // so the pen leaves them); a rotation; sweeps that differ; a chord
-    // that is not a diameter; three arcs; not back to the start
+    // so the pen leaves them); a rotation (a circle is rotation
+    // invariant, but the form is not exact, so this is the conservative
+    // answer, pinned); sweeps that differ; a chord that is not a
+    // diameter; a chord 6e-5 short of the diameter, whose two centres
+    // are 0.019 apart; three arcs; not back to the start; zero-radius
+    // arcs, which the pen made lines
     let cases = [
         "M2 8a6 6 0 1 0 12 0a7 7 0 1 0-12 0z",
-        "M2 8a6 4 30 1 0 12 0a6 4 30 1 0-12 0z",
+        "M2 8a6 6 30 1 0 12 0a6 6 30 1 0-12 0z",
         "M2 8a6 6 0 1 0 12 0a6 6 0 1 1-12 0z",
         "M2 8a6 6 0 1 0 10 0a6 6 0 1 0-10 0z",
+        "M2 8A6 6 0 1 0 13.99994 8A6 6 0 1 0 2 8z",
         "M2 8a6 6 0 0 0 6-6a6 6 0 0 0 6 6a6 6 0 0 0-12 0z",
         "M2 8a6 6 0 1 0 12 0a6 6 0 1 0-12 1z",
+        "M2 8a0 0 0 1 0 12 0a0 0 0 1 0-12 0z",
     ];
 
     // When, Then
     for data in cases {
         assert_eq!(classified(data, FILL), Classified::Path, "{data}");
     }
-}
-
-#[test]
-fn arcs_without_radius_are_lines_and_so_a_path() {
-    // When: the pen made each zero-radius arc a line (SVG 2, 9.5.1)
-    let classified = classified("M2 8a0 0 0 1 0 12 0a0 0 0 1 0-12 0z", STROKE);
-
-    // Then
-    assert_eq!(classified, Classified::Path);
 }
