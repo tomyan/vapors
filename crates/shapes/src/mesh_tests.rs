@@ -152,3 +152,26 @@ fn a_triangle_without_area_is_refused() {
         "triangle 0 has no area: corners [[0.0, 0.0], [1.0, 0.0], [2.0, 0.0]]",
     );
 }
+
+#[test]
+fn a_corner_on_the_outline_that_does_not_move_out_is_refused() {
+    // Given: corner 1 with no normal and so no shift, which would leave
+    // the hard outer edge the extrusion is for
+    let mut zero = square();
+    zero[0][1].normal = [0.0, 0.0];
+    zero[0][1].shift = [0.0, 0.0, 0.0];
+    // and corner 1 moving inwards, its shifts its projection
+    let mut inward = square();
+    inward[0][1].normal = [-1.0, 1.0];
+    inward[0][1].shift = [-1.0, 0.0, -1.0];
+
+    // When, Then
+    refused(
+        &zero,
+        "triangle 0 corner 1 on outline edge 0 has normal [0.0, 0.0], which does not move it out across that edge; write its miter offset",
+    );
+    refused(
+        &inward,
+        "triangle 0 corner 1 on outline edge 0 has normal [-1.0, 1.0], which does not move it out across that edge; write its miter offset",
+    );
+}
