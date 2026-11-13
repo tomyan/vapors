@@ -61,8 +61,14 @@ fn gpu_the_translated_items_page_runs_its_frames() {
 }
 
 #[test]
+fn gpu_the_wrapped_and_whole_offset_controls_run_their_frames() {
+    runs_each_change(Kind::Wrapped);
+    runs_each_change(Kind::WholeOffset);
+}
+
+#[test]
 fn every_kind_has_a_gpu_test_here() {
-    assert_eq!(Kind::ALL.len(), 6, "add a gpu_ test above for the new kind");
+    assert_eq!(Kind::ALL.len(), 8, "add a gpu_ test above for the new kind");
 }
 
 #[test]

@@ -4,12 +4,12 @@
 
 use crate::off_path::{OffPath, OffPathChange};
 use crate::off_path_layouts::{GRID_CELLS, MIXED_TEXT, WRAPPED_CARDS};
-use crate::off_path_moved::TRANSLATED;
+use crate::off_path_moved::{TRANSLATED, WHOLE_OFFSET, WRAPPED};
 use crate::off_path_page::Shape;
 use crate::off_path_scrollers::{CODE_BLOCKS, NESTED_SCROLLERS};
 use crate::workloads::Make;
 
-use OffPathChange::{Animate, Edit, Insert, Scroll, ScrollInner};
+use OffPathChange::{Animate, Edit, Insert, Reclass, Scroll, ScrollInner};
 
 /// The unit counts every kind runs at.
 pub const SIZES: [usize; 3] = [1000, 3000, 10_000];
@@ -29,17 +29,25 @@ pub enum Kind {
     MixedText,
     /// Rows inside a container at a fractional offset, which moves.
     Translated,
+    /// `Translated`'s rows in the same container with no offset: a
+    /// control for its Edit.
+    Wrapped,
+    /// `Translated`'s rows with the container offset by whole pixels: a
+    /// second control for its Edit.
+    WholeOffset,
 }
 
 impl Kind {
     /// Every kind, in the order the run lists them.
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 8] = [
         Self::NestedScrollers,
         Self::CodeBlocks,
         Self::WrappedCards,
         Self::GridCells,
         Self::MixedText,
         Self::Translated,
+        Self::Wrapped,
+        Self::WholeOffset,
     ];
 
     /// What the page's units are called in a workload's name. None has
@@ -53,6 +61,8 @@ impl Kind {
             Self::GridCells => "grid cells",
             Self::MixedText => "paragraphs",
             Self::Translated => "translated items",
+            Self::Wrapped => "wrapped items",
+            Self::WholeOffset => "whole-offset items",
         }
     }
 
@@ -62,7 +72,8 @@ impl Kind {
         match self {
             Self::NestedScrollers | Self::CodeBlocks => &[Edit, Scroll, ScrollInner, Insert],
             Self::WrappedCards | Self::GridCells | Self::MixedText => &[Edit, Scroll, Insert],
-            Self::Translated => &[Edit, Scroll, Insert, Animate],
+            Self::Translated => &[Edit, Scroll, Insert, Animate, Reclass],
+            Self::Wrapped | Self::WholeOffset => &[Edit],
         }
     }
 
@@ -76,6 +87,8 @@ impl Kind {
             Self::GridCells => GRID_CELLS,
             Self::MixedText => MIXED_TEXT,
             Self::Translated => TRANSLATED,
+            Self::Wrapped => WRAPPED,
+            Self::WholeOffset => WHOLE_OFFSET,
         }
     }
 }

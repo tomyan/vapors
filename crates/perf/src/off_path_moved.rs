@@ -5,6 +5,11 @@
 //! fractional `left` and `top`, and the animation is the container's
 //! class moved to the next of eight offsets each frame. Scale and
 //! rotate have no equivalent and are not run.
+//!
+//! Controls separate the costs: Reclass changes the container's class
+//! without moving it (an attribute change restyles the whole subtree,
+//! `restyle.rs`'s `mark_changed`), and the wrapped and whole-offset
+//! shapes run Edit without the fractional offset.
 
 use vapors_dom::{Dom, NodeId};
 use vapors_elements::Document;
@@ -12,7 +17,8 @@ use vapors_elements::Document;
 use crate::off_path_page::{Shape, Unit, UnitPage, child_before, value_text};
 use crate::rows::basics::{element, text};
 
-/// Rows of a label and a value inside the moved container.
+/// Rows of a label and a value inside the moved container, at the
+/// first of [`OFFSETS`]; `.moved.at1` to `.at7` are the others.
 pub const TRANSLATED: Shape = Shape {
     css: ".moved { position: relative; left: 0.5px; top: 0.25px; } \
           .moved.at1 { left: 0.375px; top: 0.125px; } \
@@ -28,19 +34,61 @@ pub const TRANSLATED: Shape = Shape {
     unit: item,
 };
 
-/// The offsets the animation steps through: `.moved.at1` to `.at7`,
-/// then plain `.moved` again.
-pub const STEPS: usize = 8;
+/// The control for [`TRANSLATED`]'s Edit: the same rows in the same
+/// block container, with no position and no offset.
+pub const WRAPPED: Shape = Shape {
+    css: ".item { display: flex; height: 24px; gap: 8px; } .label { width: 120px; }",
+    container: moved,
+    unit: item,
+};
+
+/// The second control: the container offset by whole pixels.
+pub const WHOLE_OFFSET: Shape = Shape {
+    css: ".moved { position: relative; left: 1px; top: 1px; } \
+          .item { display: flex; height: 24px; gap: 8px; } .label { width: 120px; }",
+    container: moved,
+    unit: item,
+};
+
+/// The offsets the animation steps through, in CSS pixels: plain
+/// `.moved`, then `.moved.at1` to `.at7`, then plain `.moved` again.
+/// [`TRANSLATED`]'s rules must give these; a test walks every step.
+pub const OFFSETS: [(f32, f32); 8] = [
+    (0.5, 0.25),
+    (0.375, 0.125),
+    (0.75, 0.25),
+    (1.125, 0.375),
+    (1.5, 0.5),
+    (1.875, 0.625),
+    (2.25, 0.75),
+    (2.625, 0.875),
+];
 
 /// Moves the container to the offset of frame `sample`.
 pub fn animate(page: &UnitPage, sample: usize) {
-    let class = match sample % STEPS {
+    let class = match sample % OFFSETS.len() {
         0 => "moved".to_owned(),
         step => format!("moved at{step}"),
     };
+    set_class(page, &class);
+}
+
+/// The control for Animate: the container's class changed to one no
+/// rule matches, and back, on alternate frames. Nothing moves, and no
+/// computed style changes.
+pub fn reclass(page: &UnitPage, sample: usize) {
+    let class = if sample.is_multiple_of(2) {
+        "moved unmatched"
+    } else {
+        "moved"
+    };
+    set_class(page, class);
+}
+
+fn set_class(page: &UnitPage, class: &str) {
     page.doc
         .borrow_mut()
-        .set_attribute(page.container, "class", &class);
+        .set_attribute(page.container, "class", class);
 }
 
 fn moved(doc: &mut Document) -> NodeId {
