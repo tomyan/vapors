@@ -74,6 +74,13 @@ impl Rows {
 }
 
 impl Rows {
+    /// The consumer's part of a frame with no change: the a11y update
+    /// taken, as `change` takes it. For a workload around this one that
+    /// makes its change only on some frames (`gpu_idle_frames.rs`).
+    pub fn take_ax_update(&mut self) {
+        let _taken = self.app.ax_update();
+    }
+
     /// Removes the inserted row, or inserts one before the middle row.
     fn toggle_inserted_row(&mut self) {
         let page = self.page.rows();
