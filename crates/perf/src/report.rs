@@ -4,6 +4,8 @@
 use std::fmt::Write;
 use std::time::Duration;
 
+use vapors_renderer::WRITE_PHASE;
+
 use crate::instruction_samples::InstructionSamples;
 use crate::run::{Counts, Samples};
 use crate::stats::{Distribution, median_count};
@@ -16,7 +18,7 @@ use crate::stats::{Distribution, median_count};
 /// repack and per `gpu-surface` that renders); the rest of draw is the
 /// painter's own work. The app's other phases are [`APP_PHASES`].
 pub const PHASES: [&str; 8] = [
-    "update", "style", "layout", "paint", "draw", "encode", "write", "submit",
+    "update", "style", "layout", "paint", "draw", "encode", WRITE_PHASE, "submit",
 ];
 
 /// The app's other frame phases: `run_frame` spans each one, so each is
@@ -40,7 +42,7 @@ pub const EVERY_PHASE: [&str; 13] = [
     "accessibility",
     "draw",
     "encode",
-    "write",
+    WRITE_PHASE,
     "submit",
     "record",
 ];

@@ -11,6 +11,7 @@ use support::{Rig, bare_document, update};
 use vapors_app::FrameCounts;
 use vapors_dom::Dom;
 use vapors_elements::Document;
+use vapors_scene::{Item, TextId};
 
 /// Text in two absolutely placed boxes with backgrounds, so each is its
 /// own text batch; `.red` turns a box's text red.
@@ -27,6 +28,16 @@ fn page() -> Document {
     }
     update(&mut doc, 1.0);
     doc
+}
+
+/// The text id of `doc`'s first text item.
+fn first_text(doc: &Document) -> TextId {
+    let scene = doc.painted().expect("updated").scene().to_scene();
+    let text = scene.items().iter().find_map(|item| match *item {
+        Item::Text { text, .. } => Some(text),
+        _ => None,
+    });
+    text.expect("a text item")
 }
 
 /// `doc` drawn by `rig`: the pixels and the frame's counts.
@@ -61,6 +72,7 @@ fn gpu_text_repainted_in_another_colour_is_built_again_from_its_new_layout() {
     let mut doc = page();
     let mut rig = Rig::new();
     drawn(&mut rig, &doc);
+    let black = first_text(&doc);
 
     // When
     let div = doc.children(doc.body())[0];
@@ -68,7 +80,10 @@ fn gpu_text_repainted_in_another_colour_is_built_again_from_its_new_layout() {
     update(&mut doc, 1.0);
     let (pixels, counts) = drawn(&mut rig, &doc);
 
-    // Then: the frame matches a painter that never saw the black text
+    // Then: the red layout took the black one's freed id, so the batch
+    // kept its key and only the layouts tell them apart; the frame
+    // matches a painter that never saw the black text
+    assert_eq!(first_text(&doc), black, "the test needs the id issued again");
     let fresh = Rig::new().draw(&doc).expect("paints");
     assert!(
         pixels == fresh,

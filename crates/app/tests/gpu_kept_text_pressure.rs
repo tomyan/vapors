@@ -54,7 +54,7 @@ fn gpu_new_text_in_an_atlas_of_pinned_glyphs_clears_the_pins_and_every_text_batc
     // When: the second text's glyphs change to ones with no room
     doc.set_text(second, THIRD);
     update(&mut doc, 1.0);
-    let (_, cleared) = drawn(&mut rig, &doc);
+    let (in_clear, cleared) = drawn(&mut rig, &doc);
     let (pixels, rebuilt) = drawn(&mut rig, &doc);
     let (_, idle) = drawn(&mut rig, &doc);
 

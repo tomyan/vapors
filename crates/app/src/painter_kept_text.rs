@@ -87,11 +87,7 @@ impl KeptGpu {
             stale.release((text, atlas));
         }
         let (bytes, pins) = run_bytes(atlas, painted, run)?;
-        let range = if bytes.is_empty() {
-            None
-        } else if let Some(range) = text.keep(target, &bytes) {
-            Some(range)
-        } else {
+        let Some(range) = kept_range(text, target, &bytes) else {
             atlas.unpin(pins);
             return Ok(());
         };
@@ -100,6 +96,20 @@ impl KeptGpu {
         self.written += 1;
         Ok(())
     }
+}
+
+/// `bytes` written into `text`'s kept buffer: `Some(None)` for a batch
+/// with no ink, which keeps nothing; `None` when the write is refused
+/// (the refusal is on the target's encoder).
+fn kept_range(
+    text: &mut TextPipeline,
+    target: &Target<'_>,
+    bytes: &[u8],
+) -> Option<Option<KeptRange>> {
+    if bytes.is_empty() {
+        return Some(None);
+    }
+    text.keep(target, bytes).map(Some)
 }
 
 impl TextGpu {

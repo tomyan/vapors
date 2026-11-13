@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use vapors_gpu_harness::Gpu;
 use vapors_platform::{Frame, Next};
-use vapors_renderer::clear;
+use vapors_renderer::{WRITE_PHASE, clear};
 use vapors_scene::Color;
 
 use crate::gpu_reading::frame_gpu_time;
@@ -20,9 +20,6 @@ const INTERVAL: Duration = Duration::from_millis(16);
 /// How long the GPU may take to finish a frame. The slowest frame here
 /// (the racer on lavapipe) is under a second; ten is far beyond it.
 const FRAME_DEADLINE: Duration = Duration::from_secs(10);
-
-/// The `draw step` phase of buffer writes (`WorkCounter::write_buffer`).
-const WRITE: &str = "write";
 
 /// One frame's measurements: wall time and per-phase times, and, with a
 /// counter, the frame's instructions and each phase's.
@@ -143,9 +140,9 @@ impl<'g> Sampler<'g> {
         let (next, took, frame_instructions) = self.timed(workload, texture, index, gpu_clock)?;
         let mut phases = self.clock.take();
         let mut instructions = self.clock.take_instructions()?;
-        phases.entry(WRITE.into()).or_default();
+        phases.entry(WRITE_PHASE.into()).or_default();
         if let Some(counts) = &mut instructions {
-            counts.entry(WRITE.into()).or_default();
+            counts.entry(WRITE_PHASE.into()).or_default();
         }
         workload
             .check(next)
