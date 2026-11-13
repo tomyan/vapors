@@ -12,10 +12,7 @@ fn item(size: f64) -> FlexSummary {
         size,
         basis: size,
         content: size,
-        bounds: Bounds {
-            reach: size,
-            ..Bounds::EMPTY
-        },
+        bounds: Bounds::span(0.0, size),
     })
 }
 

@@ -12,6 +12,18 @@ mod keep;
 // reads them from PR 3, so until then only the tests do; PR 3 removes these
 // allows.
 #[allow(dead_code)]
+mod lane_block;
+#[allow(dead_code)]
+mod lane_block_answer;
+#[allow(dead_code)]
+mod lane_block_child;
+#[allow(dead_code)]
+mod lane_block_child_place;
+#[allow(dead_code)]
+mod lane_block_item;
+#[allow(dead_code)]
+mod lane_block_sizes;
+#[allow(dead_code)]
 mod lane_block_summary;
 #[allow(dead_code)]
 mod lane_bounds;

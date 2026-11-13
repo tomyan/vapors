@@ -7,9 +7,33 @@ fn bounds(low: f64, reach: f64, baseline: Option<f64>, cross: [f64; 2]) -> Bound
     Bounds {
         low,
         reach,
+        across: [0.0, 0.0],
         baseline,
         cross,
     }
+}
+
+#[test]
+fn empty_is_the_identity_on_either_side() {
+    let run = bounds(-2.0, 5.0, Some(3.0), [1.0, 2.0]);
+    assert_eq!(
+        Bounds::EMPTY.then(7.0, &run),
+        bounds(5.0, 12.0, Some(10.0), [1.0, 2.0])
+    );
+    assert_eq!(run.then(7.0, &Bounds::EMPTY), run);
+}
+
+#[test]
+fn the_reach_across_the_axis_is_not_moved_by_the_offset() {
+    let left = Bounds {
+        across: [-1.0, 10.0],
+        ..bounds(0.0, 5.0, None, [0.0; 2])
+    };
+    let right = Bounds {
+        across: [2.0, 12.0],
+        ..bounds(0.0, 5.0, None, [0.0; 2])
+    };
+    assert_eq!(left.then(100.0, &right).across, [-1.0, 12.0]);
 }
 
 #[test]
