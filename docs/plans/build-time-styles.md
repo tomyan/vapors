@@ -72,9 +72,9 @@ dom_keyed.rs`). So for each element the compiler knows:
 - **Ancestors inside the template:** known elements with the same
   facts. Ancestors above the component's root are whatever the mount
   site gives, which the compiler does not see from one file.
-- **Sheets:** the user-agent sheet (`crates/elements/src/style/ua.css`),
+- **Sheets:** the user-agent sheet (`crates/css/src/ua.css`),
   the component's own `<style>` scoped as the runtime scopes it
-  (`crates/elements/src/style/scope.rs`), and the sheets of the other
+  (`crates/css/src/scope.rs`), and the sheets of the other
   files `compile_dir` compiles in the same crate (`build/files.rs`),
   which carry the crate's `:global(...)` compounds and its
   `Styles::Global` sheets. It does not see sheets added from Rust with
@@ -156,10 +156,10 @@ matcher pieces, `unshareable`, `Candidate` ranking). This plan adopts
 the rule from the lead's analysis handoff of 2026-11-11 (not in the
 repository): "the compiler must use `vapors-css` for any selector or
 value reasoning, never a second matcher", so the compiler and the
-runtime cannot disagree about what a selector means. Two pieces live
-outside `vapors-css` today and move into it: the scoping in
-`crates/elements/src/style/scope.rs`, with its refusals
-(`first_global`, `first_nested_global`), and the UA sheet text.
+runtime cannot disagree about what a selector means. Two pieces lived
+outside `vapors-css` and moved into it in B0: the scoping, with its
+refusals (`vapors_css::scope`), and the UA sheet text
+(`vapors_css::user_agent`).
 
 ### What stays at run time, and why
 
@@ -534,7 +534,7 @@ fail, and restored, stated in the commit.
 | T1 | Text shaping kept by content | The text cache keyed by text, style, width and scale with span positions relative to the run, not `NodeId` (first read why `SpanKey` holds the node, and keep what needs it per node); a `texts_shaped` count beside `text layouts` | Mount: `texts_shaped` per row and layout instructions per row before and after, in the PR; a page of 1,000 equal labels shapes once, pinned; text oracle comparisons with Chromium unchanged; the count proven by breaking (node back in the key) | none |
 | R1a | Compiled global sheets | Generated code for a `Styles::Global` file registers its sheet itself under `SheetId::Global(file)`; the elements corpus (`events_vapors.rs`) moves from `add_stylesheet` to it | Corpus results unchanged; a test that a global fixture's sheet is registered once per document | none |
 | R1b | Rust sheets refused beside analysed elements | `add_stylesheet` on a document that has created a keyed element is refused naming the fix (compile the sheet into a component); `create_keyed_element` on a document holding a Rust-added author sheet is refused under the update-error convention, naming the sheet | Both refusals pinned and proven by breaking; the 5 non-test `add_stylesheet` sites (no keyed elements) unchanged | R1a; decision 2 |
-| B0 | Compiler reads sheets | `vapors-compiler` depends on `vapors-css`; `scope.rs` scoping, its `first_global` and `first_nested_global` refusals, and the UA sheet text move into `vapors-css` (the runtime calls the moved code); the compiler parses and scopes each `<style>` and refuses what the runtime refuses, naming `file:line:column` | A malformed `<style>` and a nested `:global()` each fail `compile_dir` with the position; runtime behaviour unchanged (all tiers green); refusals proven by breaking | none |
+| B0 (done) | Compiler reads sheets | `vapors-compiler` depends on `vapors-css`; `scope.rs` scoping, its `first_global` and `first_nested_global` refusals, and the UA sheet text move into `vapors-css` (the runtime calls the moved code); the compiler parses and scopes each `<style>` and refuses what the runtime refuses, naming `file:line:column` | A malformed `<style>` and a nested `:global()` each fail `compile_dir` with the position; runtime behaviour unchanged (all tiers green); refusals proven by breaking | none |
 | B1 | Classification | Per template element: candidate rules from `rules_for_key` over the UA sheet and the crate's sheets, each classified never / always / conditional with what it depends on (other sheets' rules always conditional); per longhand and custom property: constant or known-variable winner, constant or variable value; `wisp-check --styles <file>` prints both | Table-driven tests per selector shape: tag, class, directive, `:not()` over a directive class, state, structural pseudo-classes in the subject (`:first-child`, `:root`, `:empty`: conditional), attribute literal, expression, absent from the template, and case-insensitive values (`type`), descendant, `:global`, `@media`, inline `style`, `!important` across origins, `all` and a shorthand in a conditional rule over an always longhand, `var()` fed from an always rule and from a conditional one, an equal-specificity rule from another sheet; each class of result proven by breaking | B0 |
 | B2 | Emitted winners | `StyleKey::winners` (`KeyWinners`: per-sheet identity and hash, base winners for longhands and custom properties, conditional rules); the sheet hash in one function in `vapors-css`, used by both; snapshot tests of the generated keys updated | Generated code compiles for every demo and the racer; compiler and runtime hashes equal for each demo's sheets, pinned; hash proven by breaking (a changed sheet text changes it) | B1 |
 | B3a | Runtime takes compiled winners | Checks 1 and 2 per key per `Kept`, check 1 refusing; on a miss, winners from `base` at their runtime standing plus matching conditional and other-sheet rules; the debug winners oracle and the every-build first-miss verification over longhands and custom properties; `winners_compiled`, `winners_runtime`, `winners_foreign` | Racer and one demo page mounted in two orders give equal styles; in a release-profile test, a forged `base` entry and a sheet registered with other text under the key's scope each refuse the element naming the site (not a wrong render); the debug oracle proven by breaking; Chromium comparisons and `incremental_*` unchanged | B2, R1b |

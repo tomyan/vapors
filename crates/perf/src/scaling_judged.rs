@@ -39,11 +39,14 @@ pub enum Judged {
     /// The accessibility phase alone, held to `ceiling` instructions
     /// per extra row: the change moves every row below it, and the
     /// mirror's take reads each moved row (`docs/plans/r6.md`, "Known
-    /// non-constant costs"). The other phases are reported, not judged:
-    /// property 3 of `docs/plans/perf-finish-line.md` is not built.
+    /// non-constant costs"), and `flat` held as `EveryPhase` holds every
+    /// phase. The other phases are reported, not judged: property 3 of
+    /// `docs/plans/perf-finish-line.md` is not built.
     AccessibilityPerRow {
         /// The most instructions per extra row the phase may cost.
         ceiling: u64,
+        /// Phases whose cost may not grow with the rows.
+        flat: &'static [&'static str],
     },
 }
 
@@ -57,17 +60,22 @@ impl Judged {
             | RowChange::FlexText
             | RowChange::Class
             | RowChange::HoveredClass => Self::EveryPhase,
+            // style flat since docs/perf/insert-style-2026-11-13.md
             RowChange::Insert => Self::AccessibilityPerRow {
                 ceiling: INSERT_A11Y_PER_ROW,
+                flat: &["style"],
             },
             RowChange::Resize => Self::AccessibilityPerRow {
                 ceiling: RESIZE_A11Y_PER_ROW,
+                flat: &[],
             },
             RowChange::Scroll => Self::AccessibilityPerRow {
                 ceiling: SCROLL_A11Y_PER_ROW,
+                flat: &[],
             },
             RowChange::ScrollSize => Self::AccessibilityPerRow {
                 ceiling: SCROLL_SIZE_A11Y_PER_ROW,
+                flat: &[],
             },
         }
     }

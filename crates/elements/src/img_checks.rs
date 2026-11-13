@@ -5,26 +5,24 @@
 //! padding, which its measure does not resolve; and the `width`,
 //! `height` and `srcset` attributes, which are not read.
 
-use crate::node_map::NodeMap;
-
 use vapors_dom::NodeId;
 
 use crate::arena::Arena;
 use crate::check::describe;
 use crate::error::ElementError;
 use crate::images::{Images, src};
-use crate::style::Used;
+use crate::style::{Used, UsedMap};
 
 /// The refusals of every `img` among `nodes`.
 pub(crate) fn refusals(
     images: &Images,
     arena: &Arena,
     nodes: &[NodeId],
-    used: &NodeMap<Used>,
+    used: &UsedMap,
 ) -> Vec<ElementError> {
     let imgs = nodes.iter().copied().filter(|&node| is_img(arena, node));
     imgs.flat_map(|node| {
-        let reasons = reasons(images, arena, node, used.get(&node));
+        let reasons = reasons(images, arena, node, used.get(&node).map(AsRef::as_ref));
         let element = describe(arena, node);
         reasons
             .into_iter()
