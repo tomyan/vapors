@@ -100,10 +100,7 @@ fn rebuild_owners(
         .collect();
     placed.free_taken(&taken);
     let mut rebuilt = Rebuilt::subtrees(&placed.boxes, put, &taken);
-    rebuilt.edited = owners
-        .iter()
-        .filter(|owner| matches!(owner.build, Build::Edited(_)))
-        .count();
+    rebuilt.edits = super::rebuilt::EditCounts::of(owners.iter().map(|owner| &owner.build));
     let nodes: Vec<NodeId> = owners.iter().map(|owner| owner.node).collect();
     let changed = lend_owners(placed, (&nodes, &slots), &taken, may_keep);
     rebuilt.changed = changed_owners(placed, source.arena, &changed, (taken, may_keep));
@@ -132,7 +129,7 @@ fn take_owners(placed: &mut Placed, owners: &[Owner], slots: &[usize]) -> Taken 
     let mut taken = Taken::default();
     for (owner, &slot) in owners.iter().zip(slots) {
         match &owner.build {
-            Build::Shallow(kept) => placed.take_shallow(slot, kept, &mut taken),
+            Build::Shallow(kept, _) => placed.take_shallow(slot, kept, &mut taken),
             Build::Edited(edits) => placed.take_edited(slot, edits, &mut taken),
             Build::Full => placed.take_subtree(slot, &mut taken),
         }
@@ -148,7 +145,7 @@ fn put_owner(
     taken: &mut Taken,
 ) -> Vec<usize> {
     match &owner.build {
-        Build::Shallow(kept) => {
+        Build::Shallow(kept, _) => {
             let (built, placeholders) = build_shallow(source, owner.node, kept);
             placed.put_subtree(built, &placeholders, taken)
         }

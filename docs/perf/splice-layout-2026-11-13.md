@@ -106,3 +106,11 @@ same method, layout phase:
 section 1.4 (`l.rebuild`, 1,465). What is left in layout is Taffy's
 block layout of the body and placement (sections 1.4 and 2), the
 lane's.
+
+The rows workload inserts with a plain `insert_before`. A list a
+template compiles (`{for}`: an empty marker text before each row, an
+empty anchor after the last, new rows built last first) takes the same
+edit since the review of #285 (empty text passed over, inserted rows
+put in in DOM order; `tests/child_edits_for.rs`); before that it was
+built shallow. `vapors-perf` has no `{for}` workload yet, so these
+numbers are the plain list's.

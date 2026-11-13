@@ -41,7 +41,8 @@ impl Placed {
             children.remove(position(&children, removed));
         }
         let mut put = vec![slot];
-        for &child in &edits.inserted {
+        let mut pending = edits.inserted.clone();
+        while let Some(child) = next_in_order(source, &mut pending) {
             let at = self.after_previous(source, (child, &children), taken);
             let built = self.put_subtree(build(source, child), &FxHashMap::default(), taken);
             children.insert(at, built[0]);
@@ -74,16 +75,45 @@ impl Placed {
         (child, children): (NodeId, &[usize]),
         taken: &Taken,
     ) -> usize {
-        let previous = |node: NodeId| source.arena.get(node, "put_edited").previous;
-        let mut at = previous(child);
-        while let Some(node) = at {
-            if source.used[&node].layout.display != Display::None {
-                return position(children, self.slot_held(node, taken)) + 1;
-            }
-            at = previous(node);
+        match previous_box(source, child) {
+            Some(node) => position(children, self.slot_held(node, taken)) + 1,
+            None => 0,
         }
-        0
     }
+}
+
+/// Takes out of `pending` an inserted child whose previous sibling with
+/// a box is not pending too, so each is put in after a box already put:
+/// in DOM order, whatever order they were inserted in (review of #285,
+/// H2). None when nothing is pending.
+fn next_in_order(source: &Source<'_>, pending: &mut Vec<NodeId>) -> Option<NodeId> {
+    let waits = |child: &NodeId| previous_box(source, *child).is_some_and(|p| pending.contains(&p));
+    let ready = pending.iter().position(|child| !waits(child));
+    if pending.is_empty() {
+        return None;
+    }
+    let ready =
+        ready.expect("inserted children form a chain of previous siblings, so one is first");
+    Some(pending.remove(ready))
+}
+
+/// `child`'s nearest previous sibling that makes a box, past empty text
+/// and `display: none`: `Resolver::edits` let no other text or inline
+/// element through.
+fn previous_box(source: &Source<'_>, child: NodeId) -> Option<NodeId> {
+    let previous = |node: NodeId| source.arena.get(node, "put_edited").previous;
+    let mut at = previous(child);
+    while let Some(node) = at {
+        let shown = source
+            .used
+            .get(&node)
+            .is_some_and(|used| used.layout.display != Display::None);
+        if shown {
+            return Some(node);
+        }
+        at = previous(node);
+    }
+    None
 }
 
 fn old_children(taken: &Taken, slot: usize) -> Vec<usize> {

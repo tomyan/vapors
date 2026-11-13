@@ -9,6 +9,14 @@ use support::narrow_list::{ROWS, VIEW, list};
 use support::oracle::assert_matches_full;
 use support::text;
 use vapors_dom::Dom;
+use vapors_elements::{EditDecline, UpdateCounts};
+
+/// The update built the list shallow, for `reason`, and edited nothing.
+fn assert_declined(counts: &UpdateCounts, reason: EditDecline) {
+    assert_eq!(counts.children_edited, 0);
+    assert_eq!(counts.children_edits_declined, 1);
+    assert_eq!(counts.children_edit_decline, Some(reason));
+}
 
 #[test]
 fn an_insert_beside_text_builds_the_list_shallow() {
@@ -26,7 +34,7 @@ fn an_insert_beside_text_builds_the_list_shallow() {
     let counts = list.update();
 
     // Then: the run beside it may change, so no edit
-    assert_eq!(counts.children_edited, 0);
+    assert_declined(&counts, EditDecline::TextBeside);
     assert_matches_full(&list.doc, VIEW(), "insert beside text");
 }
 
@@ -49,7 +57,7 @@ fn removing_a_row_beside_text_builds_the_list_shallow() {
     let counts = list.update();
 
     // Then
-    assert_eq!(counts.children_edited, 0);
+    assert_declined(&counts, EditDecline::TextBeside);
     assert_matches_full(&list.doc, VIEW(), "remove between texts");
 }
 
@@ -63,7 +71,7 @@ fn inserting_text_builds_the_list_shallow() {
     let counts = list.update();
 
     // Then
-    assert_eq!(counts.children_edited, 0);
+    assert_declined(&counts, EditDecline::InsertedInline);
     assert_matches_full(&list.doc, VIEW(), "text appended");
 }
 
@@ -79,7 +87,7 @@ fn a_row_moved_within_the_list_builds_the_list_shallow() {
     let counts = list.update();
 
     // Then
-    assert_eq!(counts.children_edited, 0);
+    assert_declined(&counts, EditDecline::Moved);
     assert_matches_full(&list.doc, VIEW(), "move within the list");
 }
 
@@ -100,7 +108,7 @@ fn removing_a_child_that_has_no_box_builds_the_list_shallow() {
     let counts = list.update();
 
     // Then
-    assert_eq!(counts.children_edited, 0);
+    assert_declined(&counts, EditDecline::RemovedWithoutBox);
     assert_matches_full(&list.doc, VIEW(), "text removed");
 }
 
@@ -121,6 +129,32 @@ fn an_insert_beside_an_inline_element_builds_the_list_shallow() {
     let counts = list.update();
 
     // Then
-    assert_eq!(counts.children_edited, 0);
+    assert_declined(&counts, EditDecline::TextBeside);
     assert_matches_full(&list.doc, VIEW(), "insert beside inline");
+}
+
+#[test]
+fn an_element_put_under_a_text_field_is_not_an_edit() {
+    // Given: a text field in the list, a flex column so it is laid out
+    let css = ".list { display: flex; flex-direction: column; } input { width: 6em; }";
+    let list = list(3, &format!("{ROWS} {css}"));
+    let field = {
+        let mut doc = list.doc.borrow_mut();
+        let field = doc.create_element("input");
+        doc.set_attribute(field, "type", "text");
+        doc.append(list.parent, field);
+        field
+    };
+    list.update();
+
+    // When
+    {
+        let mut doc = list.doc.borrow_mut();
+        let inner = doc.create_element("div");
+        doc.append(field, inner);
+    }
+    let counts = list.update();
+
+    // Then
+    assert_declined(&counts, EditDecline::OwnerNotABlock);
 }

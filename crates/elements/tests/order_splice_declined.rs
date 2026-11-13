@@ -22,7 +22,7 @@ fn a_positioned_row_is_declined_and_walked() {
     let counts = updated(&page);
 
     // Then
-    assert_declined(counts, SpliceDecline::InsertedStacked);
+    assert_declined(&counts, SpliceDecline::InsertedStacked);
     matches_full(&page, "positioned row");
 }
 
@@ -36,7 +36,7 @@ fn a_scrolling_row_is_declined_and_walked() {
     let counts = updated(&page);
 
     // Then
-    assert_declined(counts, SpliceDecline::InsertedStacked);
+    assert_declined(&counts, SpliceDecline::InsertedStacked);
     matches_full(&page, "scrolling row");
 }
 
@@ -50,7 +50,7 @@ fn a_z_index_in_a_row_is_declined_and_walked() {
     let counts = updated(&page);
 
     // Then
-    assert_declined(counts, SpliceDecline::InsertedStacked);
+    assert_declined(&counts, SpliceDecline::InsertedStacked);
     matches_full(&page, "z-index in a row");
 }
 
@@ -68,7 +68,7 @@ fn reordered_kept_children_are_declined_and_walked() {
     let counts = updated(&page);
 
     // Then
-    assert_declined(counts, SpliceDecline::Reordered);
+    assert_declined(&counts, SpliceDecline::Reordered);
     matches_full(&page, "reorder");
 }
 
@@ -84,7 +84,7 @@ fn removing_a_positioned_row_is_declined_and_walked() {
     let counts = updated(&page);
 
     // Then: its steps are not in the flow run
-    assert_declined(counts, SpliceDecline::FreedStacked);
+    assert_declined(&counts, SpliceDecline::FreedStacked);
     matches_full(&page, "remove positioned");
 }
 
@@ -103,7 +103,7 @@ fn a_kept_row_restacked_by_the_insert_is_declined_and_walked() {
     let counts = updated(&page);
 
     // Then
-    assert_declined(counts, SpliceDecline::Restacked);
+    assert_declined(&counts, SpliceDecline::Restacked);
     matches_full(&page, "restack");
 }
 
@@ -120,6 +120,6 @@ fn a_kept_row_moved_into_a_new_row_is_declined_and_walked() {
     let counts = updated(&page);
 
     // Then
-    assert_declined(counts, SpliceDecline::Moved);
+    assert_declined(&counts, SpliceDecline::Moved);
     matches_full(&page, "wrap");
 }

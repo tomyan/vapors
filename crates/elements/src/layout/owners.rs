@@ -13,6 +13,7 @@ use vapors_dom::NodeId;
 use super::child_edits::Edits;
 use super::slots::{Key, Placed};
 use crate::arena::Arena;
+use crate::edit_decline::EditDecline;
 use crate::node_map::NodeMap;
 use crate::style::Used;
 
@@ -42,8 +43,9 @@ pub(crate) struct Owner {
 pub(crate) enum Build {
     /// The whole subtree.
     Full,
-    /// Its own box and runs, and the children not kept in their slots.
-    Shallow(KeptChildren),
+    /// Its own box and runs, and the children not kept in their slots;
+    /// with why its recorded edits were not made as an edit, if any.
+    Shallow(KeptChildren, Option<EditDecline>),
     /// Its kept box's children edited in place (`child_edits.rs`): the
     /// removed taken out, the inserted built.
     Edited(Edits),
@@ -54,7 +56,7 @@ impl Build {
     fn builds(&self, child: NodeId) -> bool {
         match self {
             Self::Full => true,
-            Self::Shallow(kept) => !kept.contains_key(&child),
+            Self::Shallow(kept, _) => !kept.contains_key(&child),
             Self::Edited(edits) => edits.inserted.contains(&child),
         }
     }
@@ -121,7 +123,7 @@ impl Resolver<'_> {
     }
 
     /// `node`'s slot, when it makes a box of its own.
-    fn slot(&self, node: NodeId) -> Option<usize> {
+    pub(super) fn slot(&self, node: NodeId) -> Option<usize> {
         let slot = self.placed.slots.of(Key::Element(node));
         slot.filter(|_| boxed(self.used, node))
     }

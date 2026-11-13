@@ -5,7 +5,9 @@
 
 use super::boxes::{Content, LayoutBox};
 use super::isolated::Changed;
+use super::owners::Build;
 use super::slots::{Key, Taken};
+use crate::edit_decline::EditDecline;
 
 /// The slots `KeptBoxes::rebuild` placed and freed.
 #[derive(Debug)]
@@ -27,8 +29,35 @@ pub(crate) struct Rebuilt {
     /// (`isolated.rs`); none when every box was built.
     pub(crate) changed: Vec<Changed>,
     /// Owners whose box children were edited in place
-    /// (`child_edits.rs`) rather than built from every child.
+    /// (`child_edits.rs`), and those whose edits were declined.
+    pub(crate) edits: EditCounts,
+}
+
+/// How many owners were edited, how many declined, and the first
+/// decline by slot.
+#[derive(Debug, Default)]
+pub(crate) struct EditCounts {
     pub(crate) edited: usize,
+    pub(crate) declined: usize,
+    pub(crate) decline: Option<EditDecline>,
+}
+
+impl EditCounts {
+    /// The counts of `builds`, in slot order.
+    pub(crate) fn of<'a>(builds: impl Iterator<Item = &'a Build>) -> Self {
+        let mut counts = Self::default();
+        for build in builds {
+            match build {
+                Build::Edited(_) => counts.edited += 1,
+                Build::Shallow(_, Some(decline)) => {
+                    counts.declined += 1;
+                    counts.decline = counts.decline.or(Some(*decline));
+                }
+                Build::Shallow(_, None) | Build::Full => {}
+            }
+        }
+        counts
+    }
 }
 
 impl Rebuilt {
@@ -44,7 +73,7 @@ impl Rebuilt {
             shape_changed: true,
             reshaped: Vec::new(),
             changed: Vec::new(),
-            edited: 0,
+            edits: EditCounts::default(),
         }
     }
 
@@ -64,7 +93,7 @@ impl Rebuilt {
             freed,
             reshaped,
             changed: Vec::new(),
-            edited: 0,
+            edits: EditCounts::default(),
         }
     }
 

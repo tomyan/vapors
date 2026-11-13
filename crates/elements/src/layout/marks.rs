@@ -19,6 +19,7 @@ pub(crate) use super::owners::{Build, Owner, Rebuild};
 use super::owners::{Resolved, Resolver};
 use super::slots::Placed;
 use crate::arena::Arena;
+use crate::edit_decline::EditDecline::MarkedInside;
 use crate::style::Used;
 
 /// What changed since the last update: every box, the boxes of these
@@ -73,6 +74,7 @@ impl Marks {
             root,
         };
         let mut shallow = self.shallow(&resolver);
+        self.unedit_marked(&resolver, &mut shallow);
         let Some(full) = self.full(&resolver, &shallow) else {
             return Rebuild::Every;
         };
@@ -116,10 +118,34 @@ impl Marks {
         let edited = self
             .edits
             .get(&node)
-            .and_then(|edits| resolver.edits(node, edits));
-        match edited {
-            Some(edits) => Some(Build::Edited(edits)),
-            None => resolver.kept_children(node).map(Build::Shallow),
+            .map(|edits| resolver.edits(node, edits));
+        let decline = match edited {
+            Some(Ok(edits)) => return Some(Build::Edited(edits)),
+            Some(Err(decline)) => Some(decline),
+            None => None,
+        };
+        let kept = resolver.kept_children(node)?;
+        Some(Build::Shallow(kept, decline))
+    }
+
+    /// Each edited owner a mark reaches outside the children its edit
+    /// builds, built shallow instead: the edit keeps every other box,
+    /// so it would keep the marked one as it was (review of #285, H1).
+    fn unedit_marked(&self, resolver: &Resolver<'_>, shallow: &mut FxHashMap<NodeId, Build>) {
+        for &node in self.nodes.iter().chain(&self.children) {
+            let Resolved::Element(owner) = resolver.owner(node) else {
+                continue;
+            };
+            let Some(Build::Edited(edits)) = shallow.get(&owner) else {
+                continue;
+            };
+            if owner == node || edits.covers(resolver.arena, node, owner) {
+                continue;
+            }
+            match resolver.kept_children(owner) {
+                Some(kept) => _ = shallow.insert(owner, Build::Shallow(kept, Some(MarkedInside))),
+                None => _ = shallow.remove(&owner),
+            }
         }
     }
 }

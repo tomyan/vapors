@@ -104,9 +104,11 @@ fn a_row_inserted_then_removed_before_the_update_changes_nothing_visible() {
     // When
     let added = list.insert_at(4);
     list.doc.borrow_mut().remove(added);
-    list.update();
+    let counts = list.update();
 
-    // Then
+    // Then: an edit with nothing in it builds the list's box alone
+    assert_eq!(counts.children_edited, 1);
+    assert_eq!(counts.boxes_built, 1);
     assert_matches_full(&list.doc, VIEW(), "inserted then removed");
 }
 
