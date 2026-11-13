@@ -82,7 +82,14 @@ impl Context<'_> {
             scene_anchor,
             to_viewport,
         } = self;
-        let facts = [flex_item, in_inline, text_like_field, surface, scene_anchor, to_viewport];
+        let facts = [
+            flex_item,
+            in_inline,
+            text_like_field,
+            surface,
+            scene_anchor,
+            to_viewport,
+        ];
         facts
             .iter()
             .enumerate()
