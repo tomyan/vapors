@@ -186,3 +186,11 @@ pub(crate) fn implemented(arena: &Arena, node: NodeId) -> bool {
         .element()
         .is_some_and(|element| tags::unsupported(&element.tag).is_none())
 }
+
+/// Whether `node` is a scene component's anchor (`tags::is_scene_anchor`).
+pub(crate) fn is_scene_anchor(arena: &Arena, node: NodeId) -> bool {
+    arena
+        .get(node, "is_scene_anchor")
+        .element()
+        .is_some_and(|element| tags::is_scene_anchor(&element.tag))
+}

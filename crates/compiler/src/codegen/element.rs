@@ -8,7 +8,7 @@ use super::element_class::is_class_directive;
 use super::emit::{Emitter, Place};
 use super::style_key::carried_by_key;
 use crate::CompileError;
-use crate::ast::{AttrValue, Attribute, Element, Expr};
+use crate::ast::{AttrValue, Attribute, Attributes, Element, Expr};
 
 impl Emitter<'_> {
     pub fn emit_element(&mut self, element: &Element, place: &Place) -> Result<(), CompileError> {
@@ -28,7 +28,7 @@ impl Emitter<'_> {
             }
             self.emit_attribute(element, &var, attribute)?;
         }
-        self.emit_class_directives(element, &var)?;
+        self.emit_class_directives(&element.attributes, &var)?;
         self.emit_nodes(&element.children, &Place::child_of(&var))?;
         // once the element is whole, so what reads the signal sees it built
         this.into_iter()
@@ -136,8 +136,10 @@ impl Emitter<'_> {
     }
 }
 
-/// The element's attribute called `name`, in any case, as HTML
-/// compares attribute names.
-pub(super) fn attribute_named<'e>(element: &'e Element, name: &str) -> Option<&'e Attribute> {
-    (element.attributes.iter()).find(|attribute| attribute.name.eq_ignore_ascii_case(name))
+/// The attribute called `name`, in any case, as HTML compares
+/// attribute names.
+pub(super) fn attribute_named<'e>(attributes: &'e Attributes, name: &str) -> Option<&'e Attribute> {
+    attributes
+        .iter()
+        .find(|attribute| attribute.name.eq_ignore_ascii_case(name))
 }

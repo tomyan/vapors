@@ -36,10 +36,13 @@ impl Instanced {
         source: &str,
         vec4s: u32,
     ) -> Self {
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some(label),
-            source: wgpu::ShaderSource::Wgsl(source.into()),
-        });
+        let shader = crate::pipelines::shader_module(
+            device,
+            wgpu::ShaderModuleDescriptor {
+                label: Some(label),
+                source: wgpu::ShaderSource::Wgsl(source.into()),
+            },
+        );
         let layout = bind_group_layout(device);
         let stride = u64::from(vec4s) * 16;
         let attributes: Vec<wgpu::VertexAttribute> = (0..vec4s)

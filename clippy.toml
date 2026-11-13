@@ -1,0 +1,8 @@
+# Every render pipeline and shader module is built through
+# vapors_renderer::pipelines, which counts them, so a frame that builds
+# one is found and refused (one-scene F0; docs/plans/one-scene.md).
+disallowed-methods = [
+  { path = "wgpu::Device::create_render_pipeline", reason = "build it with vapors_renderer::pipelines::render_pipeline, which counts it, before the first frame" },
+  { path = "wgpu::Device::create_shader_module", reason = "build it with vapors_renderer::pipelines::shader_module, which counts it, before the first frame" },
+  { path = "wgpu::Device::create_compute_pipeline", reason = "vapors builds no compute pipeline yet; add a counted door to vapors_renderer::pipelines first" },
+]
