@@ -15,7 +15,7 @@ use vapors_platform::{App, Next};
 use crate::run::{Counts, Workload};
 
 #[path = "../../elements/tests/support/basics.rs"]
-mod basics;
+pub(crate) mod basics;
 #[allow(dead_code, clippy::pedantic)] // the tests' file: `edit` and its other edits are theirs
 #[path = "../../elements/tests/support/rows_page.rs"]
 pub(crate) mod rows_page;

@@ -3,7 +3,10 @@
 //! nothing nor their slots' kept paint. Made afresh when paint order is
 //! walked again; else patched for the slots painted again or freed. A
 //! debug build compares it with one made afresh (`kept_paint_check.rs`).
+//! The drawing steps are kept in blocks (`blocks.rs`), so a step put
+//! in or taken out moves at most a block's tail, not the page's.
 
+use crate::blocks::{Blocks, IndexCounts};
 use crate::kept_box::KeptBox;
 use crate::paint_order::Step;
 
@@ -14,7 +17,7 @@ pub(crate) struct DrawnSteps {
     /// By slot: the places of its box, thumb and outline steps.
     places: Vec<[Option<usize>; 3]>,
     /// The steps that draw, ordered by place.
-    drawn: Vec<(usize, Step)>,
+    drawn: Blocks<(usize, Step)>,
 }
 
 impl DrawnSteps {
@@ -30,7 +33,10 @@ impl DrawnSteps {
         let drawn = places_drawn
             .filter(|&(_, step)| draws(boxes, step))
             .collect();
-        Self { places, drawn }
+        Self {
+            places,
+            drawn: Blocks::from_sorted(drawn),
+        }
     }
 
     /// `self` with the steps of each of `slots` put in or taken out as
@@ -46,11 +52,21 @@ impl DrawnSteps {
 
     /// Puts in or takes out `step`, at `place`, as it draws or not.
     fn patch_step(&mut self, place: usize, step: Step, boxes: &[Option<KeptBox>]) {
-        let found = self.drawn.binary_search_by_key(&place, |&(place, _)| place);
+        let found = self.drawn.binary_search_by(|&(at, _)| at.cmp(&place));
         match (found, draws(boxes, step)) {
-            (Err(at), true) => self.drawn.insert(at, (place, step)),
+            (Err(at), true) => _ = self.drawn.insert(at, (place, step)),
             (Ok(at), false) => _ = self.drawn.remove(at),
             _ => {}
+        }
+    }
+
+    /// The entries the patches since the last take moved and the blocks
+    /// held (`blocks.rs` `IndexCounts`), for `UpdateCounts`.
+    pub(crate) fn take_counts(&mut self) -> IndexCounts {
+        IndexCounts {
+            moved: self.drawn.take_moved(),
+            rebuilds: 0,
+            blocks: self.drawn.block_count(),
         }
     }
 
