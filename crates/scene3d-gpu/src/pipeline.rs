@@ -29,7 +29,8 @@ impl Pipeline {
             bind_group_layouts: &[Some(&camera_layout), Some(&mesh_layout)],
             immediate_size: 0,
         });
-        let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
+        let shader =
+            vapors_renderer::pipelines::shader_module(device, wgpu::include_wgsl!("shader.wgsl"));
         Self {
             render: render_pipeline(device, &layout, &shader),
             camera_layout,
@@ -70,22 +71,25 @@ fn render_pipeline(
         step_mode: wgpu::VertexStepMode::Vertex,
         attributes: &attributes,
     })];
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("scene3d"),
-        layout: Some(layout),
-        vertex: wgpu::VertexState {
-            module: shader,
-            entry_point: Some("vs_main"),
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &buffers,
+    vapors_renderer::pipelines::render_pipeline(
+        device,
+        &wgpu::RenderPipelineDescriptor {
+            label: Some("scene3d"),
+            layout: Some(layout),
+            vertex: wgpu::VertexState {
+                module: shader,
+                entry_point: Some("vs_main"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                buffers: &buffers,
+            },
+            fragment: Some(fragment(shader)),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: Some(depth_test()),
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
         },
-        fragment: Some(fragment(shader)),
-        primitive: wgpu::PrimitiveState::default(),
-        depth_stencil: Some(depth_test()),
-        multisample: wgpu::MultisampleState::default(),
-        multiview_mask: None,
-        cache: None,
-    })
+    )
 }
 
 const TARGETS: [Option<wgpu::ColorTargetState>; 1] = [Some(wgpu::ColorTargetState {

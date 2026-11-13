@@ -52,7 +52,7 @@ The icon subset, `docs/icons.md`, and nothing else of SVG.
   viewport scale may not pass 256 device px (`svg_limit.rs`).
 - **`<path>`:** `d` in `M L H V A Z`, absolute and relative, implicit
   repeats, SVG number syntax, arc flags packed or spaced
-  (`crates/text/src/icon_path.rs`, `icon_path_lex.rs`); `fill="none"`
+  (`crates/shapes/src/path.rs`, `path_lex.rs`); `fill="none"`
   and `stroke="currentColor"` required; `stroke-width` a positive
   number, 1 when absent; no other attribute
   (`crates/elements/src/svg_path_checks.rs`). Joins miter at limit 4,
