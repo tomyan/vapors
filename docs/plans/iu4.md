@@ -441,6 +441,11 @@ PR 3 as built (2026-11-13), split along the crate seam into 3a
   atlas holds its glyphs now (`placed_text_bytes`). It does no lookup,
   so the lookup count is the release path's.
 
+4c-i (review at 015ead5, L5): the painter passes `Shift::NONE` at
+4c-i's head, so its forwarding of each frame's shift is pinned only in
+4c-ii. 4c-ii must include a pixel test that only the correct shift
+passes, at a scale other than 1.
+
 ### 4a to 4c land together
 
 4a cannot land alone: once placement moves no slot on a scroll, paint

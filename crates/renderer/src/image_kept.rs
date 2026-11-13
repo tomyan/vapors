@@ -9,7 +9,7 @@ use vapors_scene::Rect;
 use super::{ImagePipeline, Quads};
 use crate::image_binding::TextureBinding;
 use crate::quad::{VERTEX_COUNT, VERTEX_SIZE, quad_corners, vertex_bytes};
-use crate::{KeptRange, Target};
+use crate::{KeptRange, Shift, Target};
 
 impl ImagePipeline {
     /// The vertex bytes of a quad over each of `rects` (device pixels),
@@ -46,7 +46,7 @@ impl ImagePipeline {
         target: &Target<'_>,
         bound: &TextureBinding,
         (kept, index): (&KeptRange, u32),
-        shift: [f32; 2],
+        shift: Shift,
     ) {
         let vertices = self.vertices(kept, index);
         let Some(view) = self.view_slot(target, shift) else {

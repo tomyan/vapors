@@ -6,14 +6,15 @@
 
 use vapors_gpu_harness::{Gpu, gpu, read_rgba8};
 use vapors_renderer::{
-    FrameEncoder, ImagePipeline, KeptRange, Sampling, Target, TextureBinding, clear, upload_rgba8,
+    FrameEncoder, ImagePipeline, KeptRange, Sampling, Shift, Target, TextureBinding, clear,
+    upload_rgba8,
 };
 use vapors_scene::{Color, Rect, Size};
 
 const RED: [u8; 4] = [211, 47, 47, 255];
 const BLUE: [u8; 4] = [25, 118, 210, 255];
 /// No scroll frame's shift.
-const NONE: [f32; 2] = [0.0; 2];
+const NONE: Shift = Shift::NONE;
 const VIEWPORT: Size = Size {
     width: 16,
     height: 8,
@@ -150,19 +151,20 @@ fn gpu_kept_image_quads_draw_on_a_target_of_another_viewport() {
     scene.frame(|scene, at| kept = Some(scene.keep_halves(at)));
     let kept = kept.expect("kept");
 
-    // When: the right half drawn on the left 8 by 8 of it
+    // When: both halves drawn on the left 8 by 8 of it, blue left
     let resized = Size {
         width: 8,
         height: 8,
     };
     scene.frame_on(resized, |scene, at| {
+        scene.pipeline.draw_kept(at, &scene.blue, (&kept, 0), NONE);
         scene.pipeline.draw_kept(at, &scene.red, (&kept, 1), NONE);
     });
 
-    // Then: device pixels, the same place on any viewport
+    // Then: device pixels, the same place on any viewport: the left half
+    // covers the 8 by 8 target, the right half lands past it
     let pixels = read_rgba8(&scene.gpu.device, &scene.gpu.queue, &scene.target);
-    let grey = [40, 40, 40, 255];
-    assert_eq!([pixel(&pixels, 3, 3), pixel(&pixels, 7, 7)], [grey, grey]);
+    assert_eq!([pixel(&pixels, 3, 3), pixel(&pixels, 7, 7)], [BLUE, BLUE]);
     scene.pipeline.release(kept);
 }
 
@@ -178,7 +180,7 @@ fn gpu_kept_image_quads_drawn_with_a_shift_land_moved_by_it() {
     scene.frame(|scene, at| {
         scene
             .pipeline
-            .draw_kept(at, &scene.blue, (&kept, 0), [4.0, 2.0]);
+            .draw_kept(at, &scene.blue, (&kept, 0), Shift::whole([4.0, 2.0]));
     });
 
     // Then

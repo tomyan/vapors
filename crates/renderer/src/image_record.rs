@@ -8,7 +8,9 @@ use super::ImagePipeline;
 use crate::frame_arena::Placed;
 use crate::image_binding::TextureBinding;
 use crate::instanced::viewport_bytes;
-use crate::{KeptRange, Target};
+use crate::kept_bind_group::KeptBindGroup;
+use crate::uniform_slots::UniformSlots;
+use crate::{KeptRange, Shift, Target, WorkCounter};
 
 /// Where a draw's vertices are: this frame's arena, or kept.
 #[derive(Clone, Copy)]
@@ -20,7 +22,7 @@ pub(super) enum Quads<'a> {
 impl ImagePipeline {
     /// The dynamic offset of the target's viewport and `shift` in the
     /// view slots; `None` when refused (the refusal is on the encoder).
-    pub(super) fn view_slot(&mut self, target: &Target<'_>, shift: [f32; 2]) -> Option<u32> {
+    pub(super) fn view_slot(&mut self, target: &Target<'_>, shift: Shift) -> Option<u32> {
         let value = viewport_bytes(target.viewport, shift);
         let (frame, queue) = (target.encoder, target.queue);
         self.views.slot(frame, queue, &self.work, value)
@@ -36,20 +38,11 @@ impl ImagePipeline {
         view: u32,
     ) {
         let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
-        let (layout, work, views) = (&self.view_layout, &self.work, &self.views);
-        let view_group = self.view_group.of(views.generation(), || {
-            let entries = [wgpu::BindGroupEntry {
-                binding: 0,
-                resource: views.binding(),
-            }];
-            let label = Some("image view");
-            let descriptor = wgpu::BindGroupDescriptor {
-                label,
-                layout,
-                entries: &entries,
-            };
-            work.create_bind_group(target.device, &descriptor)
-        });
+        let view_group = view_group(
+            &mut self.view_group,
+            (&self.view_layout, &self.views),
+            (target, &self.work),
+        );
         let slice = match from {
             Quads::Placed(placed) => placed.slice(),
             Quads::Kept(kept) => self.kept.slice(target.encoder, kept),
@@ -62,4 +55,26 @@ impl ImagePipeline {
             self.work.draw(pass, vertices, 0..1);
         });
     }
+}
+
+/// The kept view bind group over `views`' buffer, made (and counted in
+/// `work`) for its generation when none is kept for it.
+fn view_group<'a>(
+    kept: &'a mut KeptBindGroup,
+    (layout, views): (&wgpu::BindGroupLayout, &UniformSlots),
+    (target, work): (&Target<'_>, &WorkCounter),
+) -> &'a wgpu::BindGroup {
+    kept.of(views.generation(), || {
+        let entries = [wgpu::BindGroupEntry {
+            binding: 0,
+            resource: views.binding(),
+        }];
+        let label = Some("image view");
+        let descriptor = wgpu::BindGroupDescriptor {
+            label,
+            layout,
+            entries: &entries,
+        };
+        work.create_bind_group(target.device, &descriptor)
+    })
 }

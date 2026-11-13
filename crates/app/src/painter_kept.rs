@@ -16,7 +16,7 @@
 //! and compares them with the bytes kept (`painter_kept_check.rs`).
 
 use vapors_elements::{BatchKey, Painted};
-use vapors_renderer::{ImagePipeline, KeptRange, QuadPipeline, ShadowPipeline, Target};
+use vapors_renderer::{ImagePipeline, KeptRange, QuadPipeline, ShadowPipeline, Shift, Target};
 use vapors_scene::{Item, Rect, Run};
 use vapors_text::{BlendParams, GlyphAtlas, ICON_BLEND, TextPipeline};
 
@@ -56,7 +56,7 @@ impl ScenePainter {
         target: &Target<'_>,
         painted: &Painted,
         (run, key, at): (&Run, BatchKey, usize),
-        shift: [f32; 2],
+        shift: Shift,
     ) -> Result<(), PaintError> {
         let pipelines = Pipelines {
             shadows: &mut self.shadows,
@@ -87,8 +87,8 @@ impl ScenePainter {
     }
 
     /// Draws `run`, a text or icon batch keyed `key`, from its kept
-    /// bytes moved by `shift`, building and writing them first when none are current
-    /// (`painter_kept_text.rs`). Nothing is drawn for a batch with no
+    /// bytes moved by `shift`, building and writing them first when none
+    /// are current (`painter_kept_text.rs`). Nothing is drawn for a batch with no
     /// ink, or when the write is refused (the refusal is on the
     /// target's encoder).
     pub(super) fn draw_kept_text(
@@ -96,7 +96,7 @@ impl ScenePainter {
         target: &Target<'_>,
         painted: &Painted,
         (run, key, at): (&Run, BatchKey, usize),
-        shift: [f32; 2],
+        shift: Shift,
     ) -> Result<(), PaintError> {
         let parts = (&mut self.text, &mut self.atlas);
         let kept = self
