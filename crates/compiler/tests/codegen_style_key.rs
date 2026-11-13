@@ -28,7 +28,12 @@ fn an_element_is_created_from_its_key_with_site_scope_tag_classes_and_style() {
         "let div0 = dom.borrow_mut().create_keyed_element(&KEY_DIV0);",
     );
     assert_lacks(&code, "create_element(");
-    for fixed in ["\"class\"", "\"style\"", "\"title\"", "SCOPE_ATTRIBUTE, SCOPE"] {
+    for fixed in [
+        "\"class\"",
+        "\"style\"",
+        "\"title\"",
+        "SCOPE_ATTRIBUTE, SCOPE",
+    ] {
         assert_lacks(&code, &format!("set_attribute(div0, {fixed}"));
     }
 }
