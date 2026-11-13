@@ -8,15 +8,22 @@
 //! `style` gets a key the same way, which it passes to the component
 //! (`component_anchor`).
 
+use super::attribute_refusals::refuse_string_styling;
 use super::element::attribute_named;
 use super::emit::Emitter;
 use crate::CompileError;
-use crate::ast::{AttrValue, Attributes, ComponentTag, Element};
+use crate::ast::{AttrValue, Attribute, Attributes, ComponentTag, Element};
 
-/// What a key is made from: an element, or a component tag, whose key's
-/// tag is the component's name in lower case (`mesh` for `<Mesh>`).
+/// What a key is made from: an element, whose key's tag is its own, or
+/// a component tag, whose key's tag is the `ANCHOR_TAG` its props type
+/// declares, so an alias (`Group as Section`) still keys a `group`.
 pub(super) struct Keyed<'e> {
+    /// The key's `tag` field, as Rust.
     pub(super) tag: String,
+    /// `div` or `Mesh`, for messages.
+    pub(super) name: &'e str,
+    /// Where `class:` directives past the limit can go instead.
+    pub(super) elsewhere: String,
     pub(super) attributes: &'e Attributes,
     pub(super) offset: usize,
 }
@@ -24,16 +31,19 @@ pub(super) struct Keyed<'e> {
 impl<'e> Keyed<'e> {
     pub(super) fn element(element: &'e Element) -> Self {
         Self {
-            tag: element.tag.clone(),
+            tag: format!("{:?}", element.tag),
+            name: &element.tag,
+            elsewhere: "a child element".to_owned(),
             attributes: &element.attributes,
             offset: element.offset,
         }
     }
 
     pub(super) fn component(tag: &'e ComponentTag) -> Self {
-        let last = tag.name.rsplit("::").next().unwrap_or(&tag.name);
         Self {
-            tag: last.to_lowercase(),
+            tag: format!("{}Props::ANCHOR_TAG", tag.name),
+            name: &tag.name,
+            elsewhere: format!("an element inside <{}>", tag.name),
             attributes: &tag.attributes,
             offset: tag.offset,
         }
@@ -79,15 +89,32 @@ impl Emitter<'_> {
         let scope = if self.scoped { "Some(SCOPE)" } else { "None" };
         let classes = quoted(&self.literal_classes(keyed.attributes)?);
         let toggles = quoted(&self.key_directives(keyed)?);
-        let style = match attribute_named(keyed.attributes, "style").map(|a| &a.value) {
-            Some(AttrValue::Literal(text)) => format!("Some({text:?})"),
-            // `style={..}` is refused before this (attribute_refusals)
-            Some(AttrValue::Expr(_)) | None => "None".to_owned(),
-        };
+        let style = self.key_style(keyed)?;
         Ok(format!(
-            "vapors_dom::StyleKey {{ site: {site}, scope: {scope}, tag: {:?}, classes: &[{classes}], toggles: &[{toggles}], style: {style} }}",
+            "vapors_dom::StyleKey {{ site: {site}, scope: {scope}, tag: {}, classes: &[{classes}], toggles: &[{toggles}], style: {style} }}",
             keyed.tag
         ))
+    }
+
+    /// The literal `style` as Rust; `style={..}` is refused here, where
+    /// it would otherwise be dropped.
+    fn key_style(&self, keyed: &Keyed) -> Result<String, CompileError> {
+        match attribute_named(keyed.attributes, "style") {
+            Some(
+                attribute @ Attribute {
+                    value: AttrValue::Expr(_),
+                    ..
+                },
+            ) => {
+                refuse_string_styling(self.source, attribute)?;
+                unreachable!("refuse_string_styling refuses every `style={{..}}`")
+            }
+            Some(Attribute {
+                value: AttrValue::Literal(text),
+                ..
+            }) => Ok(format!("Some({text:?})")),
+            None => Ok("None".to_owned()),
+        }
     }
 }
 
@@ -100,10 +127,11 @@ impl Emitter<'_> {
             return Err(self.source.error(
                 keyed.offset,
                 format!(
-                    "<{}> has {} `class:` directives; at most {} fit one element, so move some to a child element",
-                    keyed.tag,
+                    "<{}> has {} `class:` directives; at most {} fit one element, so move some to {}",
+                    keyed.name,
                     names.len(),
-                    crate::MAX_CLASS_DIRECTIVES
+                    crate::MAX_CLASS_DIRECTIVES,
+                    keyed.elsewhere
                 ),
             ));
         }
