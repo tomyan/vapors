@@ -1,39 +1,16 @@
 //! `analysis::classify` (`src/analysis/`): one rule against a template
 //! key's fixed parts, per selector shape, as `build-time-styles.md`
 //! section 1 classifies them. The soundness of `Always` and `Never` is
-//! checked against the matcher in `analysis_oracle.rs`.
+//! checked against the matcher in `analysis_oracle.rs`; the scoped
+//! forms, state names and `Depends` text are in
+//! `analysis_classify_scoped.rs`.
 
-use vapors_css::analysis::{Depends, KeyFacts, Match, classify};
+#[path = "support/classify.rs"]
+mod support;
+
+use support::{CARD, classified, depends};
+use vapors_css::analysis::{KeyFacts, Match};
 use vapors_css::tree::States;
-
-/// `<button class="card" class:open={..} type="text" id={..} data-wisp="s">`
-const CARD: KeyFacts<'static> = KeyFacts {
-    tag: "button",
-    scope_attribute: "data-wisp",
-    scope: Some("s"),
-    classes: &["card"],
-    toggles: &["open"],
-    style: Some("color: red"),
-    literal_attributes: &[("type", "Text")],
-};
-
-/// `css` with its subject scoped as `scope::scoped` scopes a component's
-/// sheet for scope `s`.
-fn scoped(css: &str) -> String {
-    let sheet = vapors_css::parse(css).unwrap_or_else(|e| panic!("{css}: {e}"));
-    vapors_css::scope::scoped(sheet, "data-wisp", "s").to_css()
-}
-
-fn classified(css: &str, facts: &KeyFacts<'_>) -> Match {
-    let sheet = vapors_css::parse(css).unwrap_or_else(|e| panic!("{css}: {e}"));
-    classify(&sheet.rules[0], facts)
-}
-
-fn depends(set: impl FnOnce(&mut Depends)) -> Match {
-    let mut depends = Depends::default();
-    set(&mut depends);
-    Match::Conditional(depends)
-}
 
 #[test]
 fn always_from_the_fixed_parts_alone() {
@@ -184,68 +161,3 @@ fn global_and_nested_lists_combine_their_arguments() {
     );
 }
 
-#[test]
-fn an_unscoped_key_never_matches_a_scoped_rule() {
-    let unscoped = KeyFacts {
-        scope: None,
-        ..CARD
-    };
-    assert_eq!(
-        classified(&scoped("button { color: red }"), &unscoped),
-        Match::Never
-    );
-}
-
-#[test]
-fn scoped_rules_are_judged_in_the_form_the_runtime_scopes_them() {
-    // Given: the subject gains the attribute bare, the rest inside :where()
-    assert_eq!(classified(&scoped(".card { color: red }"), &CARD), Match::Always);
-    assert_eq!(classified(&scoped(".other { color: red }"), &CARD), Match::Never);
-    assert_eq!(
-        classified(&scoped(":global(.dark) .card { color: red }"), &CARD),
-        depends(|d| d.ancestors = true)
-    );
-    assert_eq!(
-        classified(&scoped(".panel :global(button) { color: red }"), &CARD),
-        depends(|d| d.ancestors = true)
-    );
-    assert_eq!(
-        classified(&scoped(":is(.open, .card) { color: red }"), &CARD),
-        Match::Always
-    );
-}
-
-#[test]
-fn state_names_round_trip_through_every_state_pseudo_class() {
-    for name in [
-        ":hover",
-        ":focus",
-        ":focus-visible",
-        ":focus-within",
-        ":active",
-        ":checked",
-        ":disabled",
-        ":enabled",
-        ":invalid",
-    ] {
-        let Match::Conditional(depends) = classified(&format!("{name} {{ color: red }}"), &CARD)
-        else {
-            panic!("{name}: conditional");
-        };
-        assert_eq!(depends.to_string(), name);
-    }
-}
-
-#[test]
-fn dependencies_display_as_a_list() {
-    let Match::Conditional(depends) = classified(
-        "@media print { .panel .open:hover[hidden] { color: red } }",
-        &CARD,
-    ) else {
-        panic!("conditional");
-    };
-    assert_eq!(
-        depends.to_string(),
-        "class:open, :hover, [hidden], ancestors, @media/@supports/@container"
-    );
-}
