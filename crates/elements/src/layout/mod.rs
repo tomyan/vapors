@@ -4,6 +4,7 @@
 mod asked;
 mod boxes;
 mod calcs;
+mod child_edits;
 mod field_box;
 mod inline;
 mod isolated;

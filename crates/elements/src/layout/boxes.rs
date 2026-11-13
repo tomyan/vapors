@@ -67,30 +67,8 @@ fn add_element(
         return None;
     }
     let index = boxes.len();
-    let range = crate::range::of_element(source.arena, node);
-    let checked = source
-        .arena
-        .get(node, "build")
-        .element()
-        .and_then(crate::checkbox::checked_of);
-    let natural = source
-        .images
-        .natural(source.arena, node)
-        .or_else(|| crate::svg::natural(source.arena, node))
-        .or(range.map(|_| crate::range::NATURAL_SIZE))
-        .or(checked.map(|_| crate::checkbox::NATURAL_SIZE));
-    let mut replaced = LayoutBox::replaced(
-        Content::Element(node),
-        crate::svg::layout_style(source.arena, node, &style.layout),
-        (natural, source.images.of(source.arena, node).cloned()),
-        checked.is_some(),
-    );
-    replaced.icon = crate::svg_paint::icon(source.arena, node);
-    replaced.surface = crate::surfaces::name(source.arena, node).map(Into::into);
-    replaced.range = range;
-    replaced.checked = checked;
-    let field_text = super::field_box::fill(source, node, &mut replaced);
-    boxes.push(replaced);
+    let (own, field_text) = element_box(source, node);
+    boxes.push(own);
     let mut run = Collector::new(style.text, style.visible);
     // a number or text field's text is its run; a blank one keeps its
     // line with a no-break space, which paints nothing (3-E3c, E6a)
@@ -119,6 +97,36 @@ fn add_element(
     }
     add_run(run, index, boxes);
     Some(index)
+}
+
+/// `node`'s own box, with no children, and the text of a text or
+/// number field, which is its run.
+pub(super) fn element_box(source: &Source<'_>, node: NodeId) -> (LayoutBox, Option<String>) {
+    let style = &source.used[&node];
+    let range = crate::range::of_element(source.arena, node);
+    let checked = source
+        .arena
+        .get(node, "build")
+        .element()
+        .and_then(crate::checkbox::checked_of);
+    let natural = source
+        .images
+        .natural(source.arena, node)
+        .or_else(|| crate::svg::natural(source.arena, node))
+        .or(range.map(|_| crate::range::NATURAL_SIZE))
+        .or(checked.map(|_| crate::checkbox::NATURAL_SIZE));
+    let mut own = LayoutBox::replaced(
+        Content::Element(node),
+        crate::svg::layout_style(source.arena, node, &style.layout),
+        (natural, source.images.of(source.arena, node).cloned()),
+        checked.is_some(),
+    );
+    own.icon = crate::svg_paint::icon(source.arena, node);
+    own.surface = crate::surfaces::name(source.arena, node).map(Into::into);
+    own.range = range;
+    own.checked = checked;
+    let field_text = super::field_box::fill(source, node, &mut own);
+    (own, field_text)
 }
 
 /// A placeholder for kept `child`'s box; its index.

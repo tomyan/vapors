@@ -45,6 +45,11 @@ pub struct UpdateCounts {
     /// subtree and inline elements, whose text is part of a run, have
     /// none.
     pub boxes_built: usize,
+    /// Elements whose box children an insert or remove edited in place
+    /// (`layout/child_edits.rs`): the inserted children built and put
+    /// in after their previous sibling's box, the removed taken out,
+    /// the other children not walked.
+    pub children_edited: usize,
     /// Times Taffy asked a box for its layout, a cache hit included. A
     /// box can be asked more than once in an update (measured, then
     /// laid out), and a box under a cache hit is not asked at all.

@@ -26,6 +26,9 @@ pub(crate) struct Rebuilt {
     /// The owners whose rebuilt subtree changed, for layout to settle
     /// (`isolated.rs`); none when every box was built.
     pub(crate) changed: Vec<Changed>,
+    /// Owners whose box children were edited in place
+    /// (`child_edits.rs`) rather than built from every child.
+    pub(crate) edited: usize,
 }
 
 impl Rebuilt {
@@ -41,6 +44,7 @@ impl Rebuilt {
             shape_changed: true,
             reshaped: Vec::new(),
             changed: Vec::new(),
+            edited: 0,
         }
     }
 
@@ -60,6 +64,7 @@ impl Rebuilt {
             freed,
             reshaped,
             changed: Vec::new(),
+            edited: 0,
         }
     }
 

@@ -14,8 +14,9 @@ use crate::node_map::NodeMap;
 
 use vapors_dom::NodeId;
 
-use super::owners::{KeptChildren, Resolved, Resolver};
-pub(crate) use super::owners::{Owner, Rebuild};
+use super::child_edits::ChildEdits;
+pub(crate) use super::owners::{Build, Owner, Rebuild};
+use super::owners::{Resolved, Resolver};
 use super::slots::Placed;
 use crate::arena::Arena;
 use crate::style::Used;
@@ -27,6 +28,9 @@ pub(crate) struct Marks {
     pub(crate) all: bool,
     nodes: HashSet<NodeId>,
     children: HashSet<NodeId>,
+    /// The inserts and removes behind the children marks, where the
+    /// document recorded them (`child_edits.rs`).
+    pub(super) edits: FxHashMap<NodeId, ChildEdits>,
 }
 
 impl Marks {
@@ -82,7 +86,7 @@ impl Marks {
     fn full(
         &self,
         resolver: &Resolver<'_>,
-        shallow: &FxHashMap<NodeId, KeptChildren>,
+        shallow: &FxHashMap<NodeId, Build>,
     ) -> Option<HashSet<NodeId>> {
         let deep = self
             .children
@@ -101,10 +105,22 @@ impl Marks {
     }
 
     /// The children-marked elements that hold a slot and make a box,
-    /// with their kept children.
-    fn shallow(&self, resolver: &Resolver<'_>) -> FxHashMap<NodeId, KeptChildren> {
-        let shallow = |&node: &NodeId| Some((node, resolver.kept_children(node)?));
+    /// each edited in place where its recorded edits allow, else with
+    /// its kept children.
+    fn shallow(&self, resolver: &Resolver<'_>) -> FxHashMap<NodeId, Build> {
+        let shallow = |&node: &NodeId| Some((node, self.build_of(resolver, node)?));
         self.children.iter().filter_map(shallow).collect()
+    }
+
+    fn build_of(&self, resolver: &Resolver<'_>, node: NodeId) -> Option<Build> {
+        let edited = self
+            .edits
+            .get(&node)
+            .and_then(|edits| resolver.edits(node, edits));
+        match edited {
+            Some(edits) => Some(Build::Edited(edits)),
+            None => resolver.kept_children(node).map(Build::Shallow),
+        }
     }
 }
 

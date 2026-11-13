@@ -10,6 +10,7 @@ use rustc_hash::FxHashMap;
 use taffy::Display;
 use vapors_dom::NodeId;
 
+use super::child_edits::Edits;
 use super::slots::{Key, Placed};
 use crate::arena::Arena;
 use crate::node_map::NodeMap;
@@ -33,9 +34,30 @@ pub(crate) enum Rebuild {
 #[derive(Debug, PartialEq)]
 pub(crate) struct Owner {
     pub(crate) node: NodeId,
-    /// Shallow: the children kept in their slots, not built. None: the
-    /// whole subtree is built.
-    pub(crate) kept: Option<KeptChildren>,
+    pub(crate) build: Build,
+}
+
+/// How an owner's boxes are built.
+#[derive(Debug, PartialEq)]
+pub(crate) enum Build {
+    /// The whole subtree.
+    Full,
+    /// Its own box and runs, and the children not kept in their slots.
+    Shallow(KeptChildren),
+    /// Its kept box's children edited in place (`child_edits.rs`): the
+    /// removed taken out, the inserted built.
+    Edited(Edits),
+}
+
+impl Build {
+    /// Whether this owner builds its child `child`'s boxes.
+    fn builds(&self, child: NodeId) -> bool {
+        match self {
+            Self::Full => true,
+            Self::Shallow(kept) => !kept.contains_key(&child),
+            Self::Edited(edits) => edits.inserted.contains(&child),
+        }
+    }
 }
 
 /// Where a box mark resolves.
@@ -108,17 +130,18 @@ impl Resolver<'_> {
     pub(super) fn outermost(
         &self,
         full: &HashSet<NodeId>,
-        mut shallow: FxHashMap<NodeId, KeptChildren>,
+        mut shallow: FxHashMap<NodeId, Build>,
     ) -> Vec<Owner> {
         let outer = |&node: &NodeId| self.placement(node, full, &shallow) == Placement::Outermost;
         let full_outer: Vec<NodeId> = full.iter().copied().filter(outer).collect();
         let shallow_outer: Vec<NodeId> = shallow.keys().copied().filter(outer).collect();
-        let fulls = full_outer
-            .into_iter()
-            .map(|node| Owner { node, kept: None });
-        let shallows = shallow_outer.into_iter().map(|node| Owner {
+        let fulls = full_outer.into_iter().map(|node| Owner {
             node,
-            kept: shallow.remove(&node),
+            build: Build::Full,
+        });
+        let shallows = shallow_outer.into_iter().filter_map(|node| {
+            let build = shallow.remove(&node)?;
+            Some(Owner { node, build })
         });
         let mut owners: Vec<Owner> = fulls.chain(shallows).collect();
         owners.sort_by_key(|owner| self.placed.slots.of(Key::Element(owner.node)));
@@ -131,11 +154,11 @@ impl Resolver<'_> {
         &self,
         node: NodeId,
         full: &HashSet<NodeId>,
-        shallow: &FxHashMap<NodeId, KeptChildren>,
+        shallow: &FxHashMap<NodeId, Build>,
     ) -> Placement {
         let mut at = node;
         while let Some(ancestor) = self.arena.get(at, "owner").parent {
-            let builds = |kept: &KeptChildren| !kept.contains_key(&at);
+            let builds = |build: &Build| build.builds(at);
             if full.contains(&ancestor) || shallow.get(&ancestor).is_some_and(builds) {
                 return Placement::Inside;
             }

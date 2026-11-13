@@ -94,6 +94,7 @@ impl Document {
         let may_keep = |node| kept.may_keep_layout(node);
         let (boxes, built) = self.boxes.rebuild(&source, root, scale, &may_keep);
         self.counts.boxes_built = built.count();
+        self.counts.children_edited = built.edited;
         debug_assert!(
             !boxes.boxes.is_empty() || kept.used[&root].layout.display == taffy::Display::None,
             "no boxes built while html is shown: a box build dropped the root"
