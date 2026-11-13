@@ -9,9 +9,10 @@
 //! `style` gets a key the same way, which it passes to the component
 //! (`component_anchor`); its other attributes are props, not carried.
 
-use super::attribute_refusals::refuse_string_styling;
 use std::fmt::Write;
 
+use super::attribute_kind::fixed_attributes;
+use super::attribute_refusals::refuse_string_styling;
 use super::element::attribute_named;
 use super::emit::Emitter;
 use crate::CompileError;
@@ -60,26 +61,6 @@ impl<'e> Keyed<'e> {
             offset: tag.offset,
         }
     }
-}
-
-/// Whether `name` is `class` or `style`, which a key carries as its
-/// own fields, so no `set_attribute` is emitted for it.
-pub(super) fn carried_by_key(name: &str) -> bool {
-    name.eq_ignore_ascii_case("class") || name.eq_ignore_ascii_case("style")
-}
-
-/// Whether an element's key fixes `attribute` under `attributes`: a
-/// literal that is not a listener, a binding, a `class:` directive,
-/// `class`, `style` or the scope attribute (refused at its own site).
-pub(super) fn fixed_by_key(attribute: &Attribute) -> bool {
-    let name = attribute.name.as_str();
-    let listener = name.strip_prefix("on").is_some_and(|rest| !rest.is_empty());
-    matches!(attribute.value, AttrValue::Literal(_))
-        && !listener
-        && !name.starts_with("bind:")
-        && !name.starts_with("class:")
-        && !carried_by_key(name)
-        && !name.eq_ignore_ascii_case(crate::SCOPE_ATTRIBUTE)
 }
 
 impl Emitter<'_> {
@@ -193,17 +174,14 @@ pub(super) fn key_statics(keys: &[String]) -> String {
 }
 
 /// `("title", "t"), ..` for the key's `attributes`: the element's fixed
-/// literal attributes in template order; none for a component tag.
+/// literal attributes (`attribute_kind::fixed_attributes`, the one
+/// list) in template order; none for a component tag.
 fn key_attributes(keyed: &Keyed) -> String {
     if !keyed.carries_attributes {
         return String::new();
     }
-    let each: Vec<String> = (keyed.attributes.iter())
-        .filter(|attribute| fixed_by_key(attribute))
-        .filter_map(|attribute| {
-            let value = attribute.value.literal()?;
-            Some(format!("({:?}, {value:?})", attribute.name))
-        })
+    let each: Vec<String> = (fixed_attributes(keyed.attributes).into_iter())
+        .map(|(name, value)| format!("({name:?}, {value:?})"))
         .collect();
     each.join(", ")
 }

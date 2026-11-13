@@ -8,6 +8,7 @@
 //! `{for}` an anchor and a call into `vapors_dom::blocks`.
 
 mod allowances;
+pub(crate) mod attribute_kind;
 mod attribute_refusals;
 mod bind_this_shape;
 mod blocks;

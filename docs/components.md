@@ -92,7 +92,9 @@ the one difference from the brief in this slice.
   afterwards, naming `name={expr}`, as it refuses `class` and `style`,
   so the build-time analysis can read it (the analysable-sources
   decision, `docs/decisions/2026-11-11-analysable-sources.md`); an
-  expression attribute is a run-time input.
+  expression attribute is a run-time input. Attribute names are
+  matched as written (`Title="a"` is not `[title]`); the refusal
+  compares them without case.
 - **Events:** `onclick={handler}` listens for `click`. The event name
   is the attribute name after `on`. The handler is a script closure or
   an inline closure that takes `&mut Event`. It returns `()` or
