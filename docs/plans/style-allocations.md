@@ -248,6 +248,21 @@ workload (1.4: the finish line judges the unkeyed page, and the keyed
 path after warm-up is four table hits, which the Mount workload's
 `styles_shared` already shows).
 
+### S1 as built (2026-11-13)
+
+`Winners<'a>` holds `Candidate<&'a Specified>` and
+`Candidate<&'a [ComponentValue]>`; `compute::style` builds `values`
+from a per-longhand `Source` (`Declared`, `Substituted`, `Initial`,
+`Parent`), the parent's computed value copied without `resolve` and
+checked to resolve to itself in debug builds (`copied`); `has_class`
+scans the attribute and `candidates` allocates its list once. Measured
+in `docs/perf/style-s1-2026-11-13.md`: a Class edit's `style` from
+600k to 403k instructions, the cascade from about 100k to about 61k
+per restyled element on the rows Insert frame.
+The two `Used` adds (a `declared` bitset so `check_honoured` compares
+only declared longhands; empty grid tracks unless the display is grid)
+are slice B.
+
 ## 6. Decisions for Tom
 
 1. **S3, the `Value` representation.** The time target holds; S1

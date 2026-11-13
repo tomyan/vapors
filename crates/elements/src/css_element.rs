@@ -67,7 +67,8 @@ impl CssElement for ElementRef<'_> {
     }
 
     fn has_class(&self, class: &str) -> bool {
-        self.class_names().contains(&class)
+        self.attribute("class")
+            .is_some_and(|names| names.split_ascii_whitespace().any(|name| name == class))
     }
 
     fn class_names(&self) -> Vec<&str> {
