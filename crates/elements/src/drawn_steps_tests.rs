@@ -95,3 +95,35 @@ fn a_step_that_no_longer_draws_and_a_freed_slots_steps_are_taken_out() {
     let listed: Vec<Step> = drawn.steps().collect();
     assert_eq!(listed, [Step::Box(0), Step::Thumb(0)]);
 }
+
+#[test]
+fn a_step_put_in_among_many_moves_at_most_a_block_of_entries() {
+    // Given: 3 blocks' worth of drawing boxes, the middle one not drawing
+    let count = 3 * crate::blocks::CAP;
+    // Not at a half block, so the move is not an append after a split.
+    let middle = count / 2 + 5;
+    let mut boxes: Vec<Option<KeptBox>> =
+        (0..count).map(|_| Some(kept(true, false, false))).collect();
+    boxes[middle] = Some(kept(false, false, false));
+    let steps: Vec<Step> = (0..count).map(Step::Box).collect();
+    let mut drawn = DrawnSteps::of(&steps, &boxes);
+
+    // When
+    boxes[middle] = Some(kept(true, false, false));
+    drawn.patch([middle].into_iter(), &boxes);
+    let put_in = drawn.take_counts().moved;
+    boxes[middle] = Some(kept(false, false, false));
+    drawn.patch([middle].into_iter(), &boxes);
+    let taken_out = drawn.take_counts().moved;
+
+    // Then
+    assert!(put_in <= crate::blocks::CAP, "put in moved {put_in}");
+    assert!(
+        taken_out <= crate::blocks::CAP,
+        "taken out moved {taken_out}"
+    );
+    assert!(
+        put_in > 0 && taken_out > 0,
+        "a middle entry moves a block's tail"
+    );
+}

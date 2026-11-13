@@ -143,6 +143,25 @@ pub struct UpdateCounts {
     /// last paint (IU3 3c-3b); every element when paint built the maps
     /// afresh, and none when the update showed the last update's paint.
     pub map_entries_patched: usize,
+    /// Entries of paint's two ordered indexes, the drawing steps and
+    /// the scroll frames' extents, that this update's patches moved,
+    /// a block pointer moved when a block splits or empties counting
+    /// as one: each index is kept in blocks of [`Self::INDEX_BLOCK`]
+    /// entries (`blocks.rs`), so a step that starts or stops drawing
+    /// moves at most a block's entries in each, plus the block
+    /// pointers after a split or an emptied block, whatever the page's
+    /// size. 0 when paint order was walked and both were made afresh
+    /// (`order_walks` is 1), when a patch made the extents index afresh
+    /// (`index_rebuilds` counts it), and when nothing was painted.
+    pub index_entries_moved: usize,
+    /// Times a patch made the extents index afresh instead, because
+    /// more steps were patched at once than it patches one by one
+    /// (`frame_extents.rs` `REBUILD`): 1 or 0. The work is O(drawing
+    /// steps) then, and `index_entries_moved` does not count it.
+    pub index_rebuilds: usize,
+    /// Blocks the two indexes hold after the update, which bound the
+    /// block pointers one patch can move.
+    pub index_blocks: usize,
     /// Times paint order (the paint steps, with each thumb's place)
     /// was walked over the whole tree: 1 when the tree's shape changed
     /// since the last paint (a box added, removed or moved among its

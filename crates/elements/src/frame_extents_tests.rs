@@ -1,6 +1,7 @@
 use vapors_scene::{Color, Item, Quad, Rect, Scene, SurfaceId};
 
 use super::Extents;
+use super::moves_tests::assert_blocks_total;
 use crate::drawn_steps::DrawnSteps;
 use crate::frames::PAGE;
 use crate::kept_box::{BoxFrom, KeptBox, Part};
@@ -182,6 +183,7 @@ fn a_freed_step_leaves_the_index_and_its_frame_with_its_last_step() {
     // Then
     assert_eq!(patched, extents(&boxes));
     assert_eq!(patched.frames().collect::<Vec<_>>(), [PAGE]);
+    assert_blocks_total(&mut patched);
 }
 
 #[test]
