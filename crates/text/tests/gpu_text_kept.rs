@@ -9,7 +9,10 @@ use std::cell::RefCell;
 
 use painter::Painter;
 use vapors_renderer::KeptRange;
-use vapors_text::{AtlasPins, BlendParams, TextDraw, TextPipeline};
+use vapors_text::{
+    AtlasConfig, AtlasPins, BlendParams, Family, Layout, LayoutOptions, Style, TextDraw,
+    TextPipeline,
+};
 
 const PAGE: u32 = 128;
 
@@ -24,7 +27,7 @@ fn keep_and_draw(painter: &mut Painter, text: &str) -> (Vec<u8>, KeptRange, Atla
         };
         let (bytes, pins) = TextPipeline::text_bytes(atlas, &[draw])?;
         let range = pipeline.keep(target, &bytes).expect("kept");
-        pipeline.draw_kept(target, atlas, &range, BlendParams::default());
+        pipeline.draw_kept(target, atlas, (&range, &pins), BlendParams::default());
         *kept.borrow_mut() = Some((range, pins));
         Ok(())
     });
@@ -32,12 +35,12 @@ fn keep_and_draw(painter: &mut Painter, text: &str) -> (Vec<u8>, KeptRange, Atla
     (drawn.pixels, range, pins)
 }
 
-/// A later frame drawing `range` again: its pixels and the vertex
+/// A later frame drawing kept bytes again: its pixels and the vertex
 /// bytes it wrote.
-fn draw_again(painter: &mut Painter, range: &KeptRange) -> (Vec<u8>, u64) {
+fn draw_again(painter: &mut Painter, kept: (&KeptRange, &AtlasPins)) -> (Vec<u8>, u64) {
     let written = RefCell::new(0);
     let drawn = painter.frame(|pipeline, atlas, target| {
-        pipeline.draw_kept(target, atlas, range, BlendParams::default());
+        pipeline.draw_kept(target, atlas, kept, BlendParams::default());
         *written.borrow_mut() = pipeline.take_work().buffer_bytes;
         Ok(())
     });
@@ -53,7 +56,7 @@ fn gpu_kept_text_draws_as_the_immediate_draw_and_again_with_no_writes_or_lookups
     let lookups = painter.atlas.lookups();
 
     // When
-    let (again, written) = draw_again(&mut painter, &range);
+    let (again, written) = draw_again(&mut painter, (&range, &pins));
 
     // Then
     assert!(
@@ -67,4 +70,26 @@ fn gpu_kept_text_draws_as_the_immediate_draw_and_again_with_no_writes_or_lookups
     painter.atlas.unpin(pins);
     painter.pipeline.release(range);
     assert_eq!(painter.pipeline.retained_bytes(), 0);
+}
+
+#[test]
+#[should_panic(expected = "kept bytes built at atlas generation")]
+fn gpu_kept_text_drawn_after_the_atlas_grew_and_repacked_panics() {
+    // Given: "Hello" kept in a 64 px page that can grow
+    let config = AtlasConfig {
+        page_size: 64,
+        max_page_size: 256,
+    };
+    let mut painter = Painter::with_atlas(config);
+    let (_, range, pins) = keep_and_draw(&mut painter, "Hello");
+    let style = Style::new(Family::Geist, 48.0);
+    let large = Layout::new(&mut painter.system, "WM", &style, &LayoutOptions::default());
+
+    // When: large glyphs grow the page, which repacks it, then "Hello"
+    // is drawn from its bytes
+    painter.frame(|pipeline, atlas, target| {
+        pipeline.draw(target, atlas, &large, [0.0, 60.0], BlendParams::default())?;
+        pipeline.draw_kept(target, atlas, (&range, &pins), BlendParams::default());
+        Ok(())
+    });
 }
