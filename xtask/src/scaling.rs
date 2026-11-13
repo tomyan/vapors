@@ -13,12 +13,12 @@ use crate::{ci, fail, gate, sccache};
 
 /// The release build of vapors-perf took 104 s with the cache warm
 /// (2026-11-13); 30 minutes leaves room for a build that misses it.
-const BUILD_DEADLINE: Duration = Duration::from_secs(30 * 60);
+const BUILD_DEADLINE: Duration = Duration::from_mins(30);
 
 /// Every change took 71 s together at load average 20 (2026-11-13,
 /// 17 s and 19 s for Insert and Resize, the slowest); ten minutes is
 /// over eight times that.
-const JUDGE_DEADLINE: Duration = Duration::from_secs(10 * 60);
+const JUDGE_DEADLINE: Duration = Duration::from_mins(10);
 
 /// Builds and runs the judge; ends `scaling: pass <sha>` or
 /// `scaling: fail <sha>`.
