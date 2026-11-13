@@ -19,11 +19,19 @@ fn at(x: f32, y: f32) -> Point {
 #[test]
 fn cubic_and_quadratic_curves_parse_with_their_control_points() {
     // When
-    let commands = parsed("M1 1C2 0 3 0 4 1Q5 2 6 1");
+    let path = IconPath::parse("M1 1C2 0 3 0 4 1Q5 2 6 1").expect("parses");
 
-    // Then
+    // Then: the segments, and zeno's commands from them
     assert_eq!(
-        commands,
+        path.segments(),
+        [
+            Segment::Move(at(1.0, 1.0)),
+            Segment::Cubic(at(2.0, 0.0), at(3.0, 0.0), at(4.0, 1.0)),
+            Segment::Quad(at(5.0, 2.0), at(6.0, 1.0)),
+        ]
+    );
+    assert_eq!(
+        path.commands(),
         [
             Command::MoveTo(at(1.0, 1.0)),
             Command::CurveTo(at(2.0, 0.0), at(3.0, 0.0), at(4.0, 1.0)),

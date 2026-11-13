@@ -5,11 +5,11 @@
 //! understood, never drawn approximately. The smooth curves `S` and `T`
 //! come with docs/plans/svg-support.md V1.
 
-use zeno::{Command, Point};
+use zeno::{Command, PathBuilder, Point};
 
 use crate::path_lex::Cursor;
 pub use crate::path_lex::PathError;
-use crate::segment::{Segment, to_zeno};
+use crate::segment::{Pen, Segment, to_zeno};
 
 /// Path data that parsed: its segments, absolute, in viewBox units,
 /// and zeno's commands for them.
@@ -26,6 +26,11 @@ impl IconPath {
     /// [`PathError`] at the first character not understood: empty data,
     /// data not starting with a move, a command outside `M L H V C Q A Z`,
     /// or a missing or malformed number or arc flag.
+    ///
+    /// # Panics
+    /// When the segments and zeno's commands end at different points:
+    /// a bug in the arc corrections, which `Pen::push` applies once for
+    /// both.
     pub fn parse(data: &str) -> Result<Self, PathError> {
         let mut cursor = Cursor::new(data);
         cursor.skip_space();
@@ -43,9 +48,15 @@ impl IconPath {
             command(&mut cursor, &mut pen)?;
             cursor.skip_space();
         }
-        let commands = to_zeno(&pen.segments);
+        let commands = to_zeno(pen.segments());
+        assert!(
+            agree(commands.current_point(), pen.current()),
+            "{data:?}: the segments end at {:?} and zeno's commands at {:?}; the arc corrections in Pen::push and to_zeno disagree",
+            pen.current(),
+            commands.current_point()
+        );
         Ok(Self {
-            segments: pen.segments,
+            segments: pen.into_segments(),
             commands,
         })
     }
@@ -64,29 +75,11 @@ impl IconPath {
     }
 }
 
-/// The segments so far and where the pen is: the current point, which
-/// relative commands add to, and the subpath's start, where a close
-/// returns it.
-#[derive(Default)]
-struct Pen {
-    segments: Vec<Segment>,
-    current: Point,
-    start: Point,
-}
-
-impl Pen {
-    fn push(&mut self, segment: Segment) {
-        self.current = match segment {
-            Segment::Move(p) => {
-                self.start = p;
-                p
-            }
-            Segment::Line(p) | Segment::Quad(_, p) | Segment::Cubic(_, _, p) => p,
-            Segment::Arc { to, .. } => to,
-            Segment::Close => self.start,
-        };
-        self.segments.push(segment);
-    }
+/// Whether the pen's end and zeno's agree: zeno computes an arc's end
+/// from its curves, within rounding of the end point written.
+fn agree(a: Point, b: Point) -> bool {
+    let scale = a.x.abs().max(a.y.abs()).max(1.0);
+    (a.x - b.x).abs() <= 1e-3 * scale && (a.y - b.y).abs() <= 1e-3 * scale
 }
 
 /// A command letter of the subset.
@@ -132,8 +125,8 @@ fn command(cursor: &mut Cursor<'_>, pen: &mut Pen) -> Result<(), PathError> {
     }
     cursor.refuse_comma_after_command()?;
     loop {
-        let from = if relative { pen.current } else { Point::ZERO };
-        pen.push(group(cursor, verb, from, pen.current)?);
+        let from = if relative { pen.current() } else { Point::ZERO };
+        pen.push(group(cursor, verb, from, pen.current())?);
         if verb == Verb::Move {
             verb = Verb::Line;
         }
@@ -211,6 +204,10 @@ mod arc_tests;
 #[cfg(test)]
 #[path = "path_curve_tests.rs"]
 mod curve_tests;
+
+#[cfg(test)]
+#[path = "path_pen_tests.rs"]
+mod pen_tests;
 
 #[cfg(test)]
 #[path = "path_refusals_tests.rs"]

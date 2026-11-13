@@ -1,6 +1,7 @@
 //! The subset of SVG path data: what parses to which commands.
 //! Arcs are in `path_arc_tests.rs`, curves in `path_curve_tests.rs`,
-//! refusals in `path_refusals_tests.rs`.
+//! the pen's segments in `path_pen_tests.rs`, refusals in
+//! `path_refusals_tests.rs`.
 
 use zeno::{Command, Point};
 
@@ -178,34 +179,4 @@ fn packed_arc_flags_parse() {
 
     // Then
     assert_eq!(spaced, packed);
-}
-
-#[test]
-fn segments_keep_arcs_and_track_the_pen_through_a_close() {
-    // When
-    let path = IconPath::parse("M1 1h2a3 4 30 1 0 2 2zl1 1").expect("parses");
-
-    // Then: the arc stays an arc; after Z the pen is back at the start
-    assert_eq!(
-        path.segments(),
-        [
-            Segment::Move(at(1.0, 1.0)),
-            Segment::Line(at(3.0, 1.0)),
-            Segment::Arc {
-                radii: [3.0, 4.0],
-                rotation: 30.0,
-                large: true,
-                sweep: false,
-                to: at(5.0, 3.0),
-            },
-            Segment::Close,
-            Segment::Line(at(2.0, 2.0)),
-        ]
-    );
-    // and zeno draws the arc as curves, one or more
-    assert!(
-        path.commands().len() > path.segments().len(),
-        "{:?}",
-        path.commands()
-    );
 }
