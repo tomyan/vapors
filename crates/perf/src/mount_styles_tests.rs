@@ -28,17 +28,20 @@ fn first_update(count: usize) -> UpdateCounts {
 }
 
 #[test]
-fn rows_compute_one_style_per_share_key_and_keep_as_many_alive_at_any_count() {
+fn rows_compute_one_style_and_one_used_style_per_share_key_at_any_count() {
     // When
     let (small, large) = (first_update(300), first_update(3000));
 
     // Then: html and body are unkeyed; the row, its label, value and
-    // button compute one style each, which every other row shares
+    // button compute one style and derive one used style each, which
+    // every other row shares
     for (rows, counts) in [(300, small), (3000, large)] {
         assert_eq!(counts.elements_restyled, rows * 4 + 2, "{rows} rows");
         assert_eq!(counts.styles_unkeyed, 2, "{rows} rows");
         assert_eq!(counts.styles_computed, 4, "{rows} rows: {counts:?}");
         assert_eq!(counts.styles_shared, rows * 4 - 4, "{rows} rows");
         assert_eq!(counts.styles_live, 6, "{rows} rows: {counts:?}");
+        assert_eq!(counts.used_derived, 6, "{rows} rows: {counts:?}");
+        assert_eq!(counts.used_shared, rows * 4 - 4, "{rows} rows");
     }
 }

@@ -10,7 +10,6 @@ use vapors_dom::NodeId;
 
 use crate::layout::{BoxRect, LayoutBox};
 use crate::paint::PaintInput;
-use crate::style::Used;
 
 /// The clip box `index` gives its content, from `own`, the clip it
 /// paints under, CSS pixels, `None` for none: its padding box within
@@ -74,7 +73,7 @@ pub(crate) fn clipping(boxes: &[LayoutBox], index: usize, input: &PaintInput<'_>
     let Some(node) = boxes[index].element_in(index) else {
         return false;
     };
-    let clips = |node: NodeId| input.used.get(&node).is_some_and(Used::clips);
+    let clips = |node: NodeId| input.used.get(&node).is_some_and(|used| used.clips());
     let to_viewport =
         crate::style::to_viewport(node == input.root, node == input.body, !clips(input.root));
     clips(node) && !to_viewport
