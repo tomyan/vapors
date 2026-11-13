@@ -9,6 +9,8 @@
 //! (`component_anchor`).
 
 use super::attribute_refusals::refuse_string_styling;
+use std::fmt::Write;
+
 use super::element::attribute_named;
 use super::emit::Emitter;
 use crate::CompileError;
@@ -24,6 +26,8 @@ pub(super) struct Keyed<'e> {
     pub(super) name: &'e str,
     /// Where `class:` directives past the limit can go instead.
     pub(super) elsewhere: String,
+    /// The tag names a type the script's `use` items bring in.
+    pub(super) reads_uses: bool,
     pub(super) attributes: &'e Attributes,
     pub(super) offset: usize,
 }
@@ -34,6 +38,7 @@ impl<'e> Keyed<'e> {
             tag: format!("{:?}", element.tag),
             name: &element.tag,
             elsewhere: "a child element".to_owned(),
+            reads_uses: false,
             attributes: &element.attributes,
             offset: element.offset,
         }
@@ -44,6 +49,7 @@ impl<'e> Keyed<'e> {
             tag: format!("{}Props::ANCHOR_TAG", tag.name),
             name: &tag.name,
             elsewhere: format!("an element inside <{}>", tag.name),
+            reads_uses: true,
             attributes: &tag.attributes,
             offset: tag.offset,
         }
@@ -75,10 +81,24 @@ impl Emitter<'_> {
     /// returns that name.
     pub(super) fn key_static(&mut self, keyed: &Keyed, var: &str) -> Result<String, CompileError> {
         let name = format!("KEY_{}", var.to_ascii_uppercase());
-        let key = self.style_key(keyed)?;
+        let mut key = self.style_key(keyed)?;
+        if keyed.reads_uses {
+            key = format!("{{ {} {key} }}", self.script_uses());
+        }
         self.keys
             .push(format!("static {name}: vapors_dom::StyleKey = {key};"));
         Ok(name)
+    }
+
+    /// The script's `use` items, for a file-level static that names a
+    /// type they bring in (`MeshProps::ANCHOR_TAG`).
+    fn script_uses(&self) -> String {
+        let uses = self.script.statements.iter();
+        let uses = uses.filter(|statement| statement.starts_with("use "));
+        uses.fold(String::new(), |mut out, item| {
+            let _ = write!(out, "#[allow(unused_imports)] {item}");
+            out
+        })
     }
 
     fn style_key(&self, keyed: &Keyed) -> Result<String, CompileError> {
