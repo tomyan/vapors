@@ -28,7 +28,10 @@ pub use computed::ComputedStyle;
 pub use environment::Environment;
 pub use inline::INLINE_SHEET;
 pub use restyle::RestyleScope;
-pub use share::{Unshareable, unshareable};
+pub use share::{Unshareable, rule_indices_for_key, unshareable};
+
+pub(crate) use collect::rank;
+pub(crate) use inline::INLINE_SPECIFICITY;
 
 pub(crate) use compute::resolve_for;
 

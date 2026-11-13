@@ -11,8 +11,15 @@
 
 mod compound;
 mod facts;
+mod sheets;
+mod slots;
+mod standing;
+mod value;
+mod winners;
 
 pub use facts::KeyFacts;
+pub use sheets::{Sheet, SheetId};
+pub use winners::{ClassifiedRule, Constancy, KeyWinners, Place, Winner, analyse};
 
 use std::collections::BTreeSet;
 use std::fmt;
@@ -39,6 +46,9 @@ pub struct Depends {
     pub structure: bool,
     /// `@media`, `@supports` or `@container` conditions.
     pub conditions: bool,
+    /// The rule is in a sheet other than the key's own: its order
+    /// against the key's rules is the order sheets were added.
+    pub other_sheet: bool,
 }
 
 /// What the analysis decided about a rule and a key.
@@ -60,6 +70,7 @@ impl Depends {
         self.ancestors |= other.ancestors;
         self.structure |= other.structure;
         self.conditions |= other.conditions;
+        self.other_sheet |= other.other_sheet;
         self
     }
 }
@@ -155,6 +166,7 @@ impl fmt::Display for Depends {
             (self.ancestors, "ancestors"),
             (self.structure, "siblings or descendants"),
             (self.conditions, "@media/@supports/@container"),
+            (self.other_sheet, "another sheet"),
         ] {
             if flag {
                 parts.push(name.to_owned());
