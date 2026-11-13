@@ -65,10 +65,10 @@ reset; run FAKE_GH_SLEEP=30
 check "gh deadline" "$(held [ "$elapsed" -ge 2 ])$(held [ "$elapsed" -lt 15 ])$(held [ "$status" = 124 ])" \
   "a hung gh ran ${elapsed} s and the run exited $status"
 
-reset; flock "$work/state/lock" sleep 30 & holder=$!
-sleep 1
+# This shell holds the lock, as a live run would.
+reset; exec 7>"$work/state/lock"; flock 7
 run
-kill "$holder" 2>/dev/null || true
+exec 7>&-
 check "lock" "$(held grep -q "another nightly run holds" "$work/out")$(held [ ! -s "$work/gh.log" ])" \
   "a second run went on: $(head -c 300 "$work/out")"
 
