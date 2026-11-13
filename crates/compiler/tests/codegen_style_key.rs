@@ -110,10 +110,20 @@ fn every_element_gets_its_own_key_named_after_its_node() {
 }
 
 #[test]
-fn a_literal_id_stays_an_ordinary_attribute() {
+fn a_literal_id_is_fixed_by_the_key_and_an_expression_id_is_not() {
     // When
-    let code = generated("<div id=\"main\"></div>");
+    let literal = generated("<div id=\"main\"></div>");
+    let expression = generated_with(
+        "let x: Signal<String> = Signal::new(String::new());",
+        "<div id={x}></div>",
+    );
 
     // Then
-    assert_has(&code, "set_attribute(div0, \"id\", \"main\");");
+    assert_has(&literal, "attributes: &[(\"id\", \"main\")]");
+    assert_lacks(&literal, "set_attribute(");
+    assert_has(&expression, "attributes: &[]");
+    assert_has(
+        &expression,
+        "set_attribute_if_changed(div0, \"id\", &value);",
+    );
 }
