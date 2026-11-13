@@ -94,7 +94,10 @@ impl<'g> Sampler<'g> {
         mut gpu_clock: Option<&mut GpuClock>,
     ) -> Result<Samples, String> {
         let texture = self.texture(workload.size());
-        let mut samples = Samples::default();
+        let mut samples = Samples {
+            warmup: settings.warmup,
+            ..Samples::default()
+        };
         let timed = settings.warmup..settings.warmup + settings.runs;
         for index in 0..=timed.end {
             let clock = gpu_clock.as_deref_mut().filter(|_| timed.contains(&index));

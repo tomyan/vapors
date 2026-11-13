@@ -59,3 +59,23 @@ fn gpu_the_paragraphs_page_runs_its_frames() {
 fn every_kind_has_a_gpu_test_here() {
     assert_eq!(Kind::ALL.len(), 5, "add a gpu_ test above for the new kind");
 }
+
+#[test]
+fn gpu_the_samples_record_the_warmup_the_kinds_are_named_from() {
+    // Given: an odd warmup, so a wrong one swaps Insert's kinds
+    let gpu = gpu_with(FEATURES);
+    let mut workload = OffPath::new(
+        Kind::CodeBlocks,
+        UNITS,
+        vapors_perf::off_path::OffPathChange::Insert,
+    );
+    let settings = Settings { warmup: 3, runs: 6 };
+
+    // When
+    let samples = Sampler::new(&gpu)
+        .sample(&mut workload, settings)
+        .expect("the frames ran");
+
+    // Then
+    assert_eq!(samples.warmup, 3);
+}

@@ -88,7 +88,7 @@ fn run() -> Result<(), String> {
             .sample(workload.as_mut(), at)
             .map_err(|e| format!("{name}: {e}"))?;
         let kinds = workload.frame_kinds();
-        for report in sections(&name, &samples, kinds, at.warmup, instructions)? {
+        for report in sections(&name, &samples, kinds, instructions)? {
             println!("{report}");
         }
     }
