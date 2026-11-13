@@ -12,13 +12,32 @@ use crate::atlas::GlyphAtlas;
 use crate::atlas_types::AtlasKey;
 
 /// The atlas entries one kept batch's bytes name, each once per use:
-/// kept in the atlas until given back with [`GlyphAtlas::unpin`].
+/// kept in the atlas until given back with [`GlyphAtlas::unpin`], and
+/// the atlas generation those bytes were built at.
+///
+/// A debug build panics when pins are dropped without being given back:
+/// their entries would stay pinned until the next clear of every pin.
 #[derive(Debug)]
 #[must_use = "pinned glyphs stay in the atlas until unpinned"]
 pub struct AtlasPins {
     keys: Vec<AtlasKey>,
     /// The pin epoch they were taken in: void once it moves on.
     epoch: u64,
+    /// The atlas generation when the build that took them ended.
+    pub(crate) generation: u64,
+}
+
+impl Drop for AtlasPins {
+    fn drop(&mut self) {
+        if cfg!(debug_assertions) && !self.keys.is_empty() && !std::thread::panicking() {
+            panic!(
+                "{} atlas pins dropped without GlyphAtlas::unpin: their glyphs stay pinned until \
+                 the next clear of every pin; give every AtlasPins back (atlas_pins.rs); \
+                 reproduce with `cargo xtask test`",
+                self.keys.len()
+            );
+        }
+    }
 }
 
 impl AtlasPins {
@@ -33,6 +52,13 @@ impl AtlasPins {
     pub fn is_empty(&self) -> bool {
         self.keys.is_empty()
     }
+
+    /// The atlas generation the bytes built with these pins were built
+    /// at: they are current while [`GlyphAtlas::generation`] equals it.
+    #[must_use]
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
 }
 
 impl GlyphAtlas {
@@ -41,6 +67,7 @@ impl GlyphAtlas {
         AtlasPins {
             keys: Vec::new(),
             epoch: self.pin_epoch,
+            generation: self.generation,
         }
     }
 
@@ -70,11 +97,12 @@ impl GlyphAtlas {
     ///
     /// When a pinned entry is gone or holds fewer pins than given back:
     /// pinned entries are never evicted, so the pins were given twice.
-    pub fn unpin(&mut self, pins: AtlasPins) {
+    pub fn unpin(&mut self, mut pins: AtlasPins) {
+        let keys = std::mem::take(&mut pins.keys);
         if pins.epoch != self.pin_epoch {
             return;
         }
-        for key in pins.keys {
+        for key in keys {
             let entry = self.entries.get_mut(&key);
             let pins = entry.and_then(|entry| entry.pins.checked_sub(1).map(|n| (entry, n)));
             let (entry, left) = pins.unwrap_or_else(|| panic!("{}", unpinned_twice(&key)));
@@ -99,7 +127,12 @@ impl GlyphAtlas {
             );
             pins.epoch = self.pin_epoch;
         }
-        let entry = self.entries.get_mut(key).expect("pinned right after a get");
+        let entry = self.entries.get_mut(key).unwrap_or_else(|| {
+            panic!(
+                "atlas entry {key:?} pinned but not in the atlas: pin only right after a get or \
+                 an insert of it (atlas_pins.rs); reproduce with `cargo xtask test`"
+            )
+        });
         entry.pins += 1;
         pins.keys.push(key.clone());
     }
