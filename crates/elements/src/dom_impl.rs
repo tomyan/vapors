@@ -78,9 +78,7 @@ impl Dom for Document {
             Kind::Text(current) if current == text => {}
             Kind::Text(current) => {
                 text.clone_into(current);
-                if let Some(parent) = self.arena.get(node, "set_text").parent {
-                    self.boxes.marks.mark(parent);
-                }
+                self.mark_text_changed(node);
             }
             Kind::Element(element) => panic!(
                 "set_text: {node:?} is a <{}> element, not a text node",

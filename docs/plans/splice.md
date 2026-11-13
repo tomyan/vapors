@@ -171,6 +171,15 @@ structural rule: 4 (none), 5 (`.row + .row`), 6004
 2026-11-11; the test itself runs 1000 rows only, as 3000 takes 22 s in
 debug.
 
+The style phase around the restyle was still O(rows) on 2026-11-13:
+the body's tree check read every child for right-to-left text, 45
+instructions per row on each insert and remove
+(`docs/perf/insert-style-2026-11-13.md`). The check is now the text
+node's own (`check_node`, `check.rs`), the nodes checked are pinned
+(`insert_checks_rows.rs`: 8 for a middle insert, 1 for its removal, at
+any size), and `style` is 557k / 8.1k instructions on insert / remove
+frames at every size.
+
 ## (c) PR B: the order splice, decided at runtime
 
 On an update whose shape changed and that is not `every`, paint

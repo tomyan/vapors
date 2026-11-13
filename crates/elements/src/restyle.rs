@@ -100,6 +100,15 @@ impl Document {
         }
     }
 
+    /// Marks what a change to the text node `node` redoes: its own
+    /// check (right-to-left text, `check.rs`) and its parent's box.
+    pub(crate) fn mark_text_changed(&mut self, node: NodeId) {
+        self.checks.marked.insert(node);
+        if let Some(parent) = self.arena.get(node, "set_text").parent {
+            self.boxes.marks.mark(parent);
+        }
+    }
+
     /// Marks what `flag` flipping on `node` restyles, as the sheets'
     /// selectors use it (`Cascade::restyle_scope_of_selectors`): a flag
     /// only on a subject compound restyles the element alone, and its
