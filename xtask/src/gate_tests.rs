@@ -155,3 +155,21 @@ fn the_lint_wasm_and_unit_steps_have_no_if_so_a_failure_stops_the_rest_as_and_di
     // Then
     assert!(conditional.is_empty(), "{WORKFLOW}: {conditional:?}");
 }
+
+#[test]
+fn the_build_timings_step_builds_bins_and_examples_not_the_test_targets_again() {
+    // When
+    let planned = this_repositorys_plan().expect("plannable");
+
+    // Then
+    let timings: Vec<&str> = planned
+        .iter()
+        .filter(|step| step.run.contains("--timings"))
+        .map(|step| step.run.trim())
+        .collect();
+    assert_eq!(
+        timings,
+        ["cargo build --workspace --bins --examples --timings"],
+        "{WORKFLOW}: nextest built the test targets in the step before; fix: build only what the cargo run steps need"
+    );
+}
