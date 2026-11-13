@@ -53,6 +53,7 @@ fn gpu_a_scripted_camera_switch_clicks_the_button_and_space_still_reaches_the_ra
 
     // Then: Space paused the race and left the camera alone
     assert!(follows, "the camera follows after the switch");
+    assert!(driven.racer().paused(), "Space reached the race");
     assert!(
         driven.racer().camera().follow,
         "Space did not press the camera button"
