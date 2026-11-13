@@ -1,6 +1,6 @@
 use super::*;
 use crate::icon::{Icon, IconStroke};
-use crate::icon_path::IconPath;
+use vapors_shapes::IconPath;
 
 const WIDTH: f32 = 10.0;
 
