@@ -1,0 +1,91 @@
+//! Putting an item into a blocked list and taking one out
+//! (`blocks.rs`): a full block splits first, an emptied block is
+//! dropped, and each operation moves at most `CAP` items.
+
+use super::{Blocks, CAP, Pos};
+
+impl<T> Blocks<T> {
+    /// Puts `item` at `pos`, splitting the block first when it is
+    /// full; where it is now. Moves at most `CAP` items: a split's
+    /// upper half and the tail of the half the item goes in. The block
+    /// list's own tail moves too when a block splits: one pointer per
+    /// block after it, not counted in `moved`.
+    pub(crate) fn insert(&mut self, pos: Pos, item: T) -> Pos {
+        self.len += 1;
+        if pos.block >= self.chunks.len() {
+            return self.push_last(item);
+        }
+        let pos = if self.chunks[pos.block].len() == CAP {
+            self.split(pos)
+        } else {
+            pos
+        };
+        let block = &mut self.chunks[pos.block];
+        let tail = block.len() - pos.at;
+        block.insert(pos.at, item);
+        self.moved += tail;
+        pos
+    }
+
+    /// Splits the full block at `pos` in two halves; `pos` in the half
+    /// it falls in.
+    fn split(&mut self, pos: Pos) -> Pos {
+        let upper = self.chunks[pos.block].split_off(CAP / 2);
+        self.moved += upper.len();
+        self.chunks.insert(pos.block + 1, upper);
+        if pos.at <= CAP / 2 {
+            return pos;
+        }
+        Pos {
+            block: pos.block + 1,
+            at: pos.at - CAP / 2,
+        }
+    }
+
+    /// Puts `item` after the last, in the last block when it has room;
+    /// where it is.
+    fn push_last(&mut self, item: T) -> Pos {
+        let last = self.chunks.len().saturating_sub(1);
+        match self.chunks.last_mut() {
+            Some(block) if block.len() < CAP => {
+                block.push(item);
+                Pos {
+                    block: last,
+                    at: block.len() - 1,
+                }
+            }
+            _ => {
+                self.chunks.push(vec![item]);
+                Pos {
+                    block: self.chunks.len() - 1,
+                    at: 0,
+                }
+            }
+        }
+    }
+
+    /// Takes the item at `pos` out, dropping a block it empties; the
+    /// item and the position of the one after it.
+    ///
+    /// # Panics
+    /// When `pos` holds no item.
+    pub(crate) fn remove(&mut self, pos: Pos) -> (T, Pos) {
+        let block = &mut self.chunks[pos.block];
+        let item = block.remove(pos.at);
+        let (tail, emptied) = (block.len() - pos.at, block.is_empty());
+        self.len -= 1;
+        self.moved += tail;
+        if emptied {
+            self.chunks.remove(pos.block);
+        }
+        let next = match self.chunks.get(pos.block) {
+            Some(block) if pos.at < block.len() => pos,
+            Some(_) => Pos {
+                block: pos.block + 1,
+                at: 0,
+            },
+            None => self.end(),
+        };
+        (item, next)
+    }
+}

@@ -122,6 +122,13 @@ pub struct UpdateCounts {
     /// last paint (IU3 3c-3b); every element when paint built the maps
     /// afresh, and none when the update showed the last update's paint.
     pub map_entries_patched: usize,
+    /// Entries of paint's two ordered indexes, the drawing steps and
+    /// the scroll frames' extents, that this update's patches moved:
+    /// each is kept in blocks (`blocks.rs`), so a step that starts or
+    /// stops drawing moves at most a block's entries in each, whatever
+    /// the page's size. 0 when paint order was walked and both were
+    /// made afresh, and when nothing was painted.
+    pub index_entries_moved: usize,
     /// Times paint order (the paint steps, with each thumb's place)
     /// was walked over the whole tree: 1 when the tree's shape changed
     /// since the last paint (a box added, removed or moved among its

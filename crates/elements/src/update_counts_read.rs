@@ -26,6 +26,7 @@ impl UpdateCounts {
         self.parts_visited_kept = painted.parts_visited_kept;
         self.scene_items_built = painted.items_built;
         self.map_entries_patched = painted.maps_patched;
+        self.index_entries_moved = painted.index_entries_moved;
         let walks = painted.order.walks;
         (self.order_walks, self.chain_walks, self.clips_redone) =
             (walks.order, walks.chains, walks.clips);

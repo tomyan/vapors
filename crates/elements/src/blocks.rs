@@ -28,7 +28,7 @@ pub(crate) struct Pos {
 /// The list; see the module.
 #[derive(Debug)]
 pub(crate) struct Blocks<T> {
-    blocks: Vec<Vec<T>>,
+    chunks: Vec<Vec<T>>,
     len: usize,
     /// Items moved by every insert and remove so far, for the tests
     /// that pin the per-row work.
@@ -39,16 +39,16 @@ impl<T> Blocks<T> {
     /// The list of `items`, already in order.
     pub(crate) fn from_sorted(mut items: Vec<T>) -> Self {
         let len = items.len();
-        let mut blocks = Vec::with_capacity(len.div_ceil(CAP));
+        let mut chunks = Vec::with_capacity(len.div_ceil(CAP));
         while items.len() > CAP {
             let rest = items.split_off(CAP);
-            blocks.push(std::mem::replace(&mut items, rest));
+            chunks.push(std::mem::replace(&mut items, rest));
         }
         if !items.is_empty() {
-            blocks.push(items);
+            chunks.push(items);
         }
         Self {
-            blocks,
+            chunks,
             len,
             moved: 0,
         }
@@ -65,28 +65,34 @@ impl<T> Blocks<T> {
     /// How many blocks hold the items.
     #[cfg(test)]
     pub(crate) fn block_count(&self) -> usize {
-        self.blocks.len()
+        self.chunks.len()
     }
 
     /// Items moved by every insert and remove so far.
+    #[cfg(test)]
     pub(crate) fn moved(&self) -> usize {
         self.moved
+    }
+
+    /// Items moved by every insert and remove since the last take.
+    pub(crate) fn take_moved(&mut self) -> usize {
+        std::mem::take(&mut self.moved)
     }
 
     /// The position after the last item.
     pub(crate) fn end(&self) -> Pos {
         Pos {
-            block: self.blocks.len(),
+            block: self.chunks.len(),
             at: 0,
         }
     }
 
     pub(crate) fn get(&self, pos: Pos) -> Option<&T> {
-        self.blocks.get(pos.block)?.get(pos.at)
+        self.chunks.get(pos.block)?.get(pos.at)
     }
 
     pub(crate) fn get_mut(&mut self, pos: Pos) -> Option<&mut T> {
-        self.blocks.get_mut(pos.block)?.get_mut(pos.at)
+        self.chunks.get_mut(pos.block)?.get_mut(pos.at)
     }
 
     /// The position before `pos`; `None` at the first item.
@@ -100,25 +106,25 @@ impl<T> Blocks<T> {
         let block = pos.block.checked_sub(1)?;
         Some(Pos {
             block,
-            at: self.blocks[block].len() - 1,
+            at: self.chunks[block].len() - 1,
         })
     }
 
     /// Every item, in order.
     pub(crate) fn iter(&self) -> impl DoubleEndedIterator<Item = &T> {
-        self.blocks.iter().flatten()
+        self.chunks.iter().flatten()
     }
 
     /// The items from `pos` on, in order.
     pub(crate) fn iter_from(&self, pos: Pos) -> impl Iterator<Item = &T> {
-        let first = self.blocks.get(pos.block).map(|block| &block[pos.at..]);
-        let rest = self.blocks.iter().skip(pos.block + 1);
+        let first = self.chunks.get(pos.block).map(|block| &block[pos.at..]);
+        let rest = self.chunks.iter().skip(pos.block + 1);
         first.into_iter().chain(rest.map(Vec::as_slice)).flatten()
     }
 
     /// The items from `pos` on, in order, to change.
     pub(crate) fn iter_mut_from(&mut self, pos: Pos) -> impl Iterator<Item = &mut T> {
-        let mut blocks = self.blocks.iter_mut().skip(pos.block);
+        let mut blocks = self.chunks.iter_mut().skip(pos.block);
         let first = blocks.next().map(|block| &mut block[pos.at..]);
         first
             .into_iter()
@@ -130,8 +136,8 @@ impl<T> Blocks<T> {
     /// before it passes; the end when all pass.
     pub(crate) fn partition_point(&self, mut pred: impl FnMut(&T) -> bool) -> Pos {
         let last_passes = |block: &Vec<T>| pred(block.last().expect("blocks are never empty"));
-        let block = self.blocks.partition_point(last_passes);
-        let Some(items) = self.blocks.get(block) else {
+        let block = self.chunks.partition_point(last_passes);
+        let Some(items) = self.chunks.get(block) else {
             return self.end();
         };
         Pos {
@@ -152,90 +158,6 @@ impl<T> Blocks<T> {
             _ => Err(pos),
         }
     }
-
-    /// Puts `item` at `pos`, splitting the block first when it is
-    /// full; where it is now. Moves at most `CAP` items: a split's
-    /// upper half and the tail of the half the item goes in. The block
-    /// list's own tail moves too when a block splits: one pointer per
-    /// block after it, not counted in `moved`.
-    pub(crate) fn insert(&mut self, pos: Pos, item: T) -> Pos {
-        self.len += 1;
-        if pos.block >= self.blocks.len() {
-            return self.push_last(item);
-        }
-        let pos = if self.blocks[pos.block].len() == CAP {
-            self.split(pos)
-        } else {
-            pos
-        };
-        let block = &mut self.blocks[pos.block];
-        let tail = block.len() - pos.at;
-        block.insert(pos.at, item);
-        self.moved += tail;
-        pos
-    }
-
-    /// Splits the full block at `pos` in two halves; `pos` in the half
-    /// it falls in.
-    fn split(&mut self, pos: Pos) -> Pos {
-        let upper = self.blocks[pos.block].split_off(CAP / 2);
-        self.moved += upper.len();
-        self.blocks.insert(pos.block + 1, upper);
-        if pos.at <= CAP / 2 {
-            return pos;
-        }
-        Pos {
-            block: pos.block + 1,
-            at: pos.at - CAP / 2,
-        }
-    }
-
-    /// Puts `item` after the last, in the last block when it has room;
-    /// where it is.
-    fn push_last(&mut self, item: T) -> Pos {
-        let last = self.blocks.len().saturating_sub(1);
-        match self.blocks.last_mut() {
-            Some(block) if block.len() < CAP => {
-                block.push(item);
-                Pos {
-                    block: last,
-                    at: block.len() - 1,
-                }
-            }
-            _ => {
-                self.blocks.push(vec![item]);
-                Pos {
-                    block: self.blocks.len() - 1,
-                    at: 0,
-                }
-            }
-        }
-    }
-
-    /// Takes the item at `pos` out, dropping a block it empties; the
-    /// item and the position of the one after it.
-    ///
-    /// # Panics
-    /// When `pos` holds no item.
-    pub(crate) fn remove(&mut self, pos: Pos) -> (T, Pos) {
-        let block = &mut self.blocks[pos.block];
-        let item = block.remove(pos.at);
-        let (tail, emptied) = (block.len() - pos.at, block.is_empty());
-        self.len -= 1;
-        self.moved += tail;
-        if emptied {
-            self.blocks.remove(pos.block);
-        }
-        let next = match self.blocks.get(pos.block) {
-            Some(block) if pos.at < block.len() => pos,
-            Some(_) => Pos {
-                block: pos.block + 1,
-                at: 0,
-            },
-            None => self.end(),
-        };
-        (item, next)
-    }
 }
 
 impl<T> Default for Blocks<T> {
@@ -250,6 +172,9 @@ impl<T: PartialEq> PartialEq for Blocks<T> {
         self.len == other.len && self.iter().eq(other.iter())
     }
 }
+
+#[path = "blocks_edit.rs"]
+mod edit;
 
 #[cfg(test)]
 #[path = "blocks_tests.rs"]

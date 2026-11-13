@@ -157,6 +157,7 @@ fn drawn_updated(
         None => HitsChanged::Unknown,
     };
     batches_patched(painted, patched);
+    painted.index_entries_moved = painted.drawn.take_moved() + painted.extents.take_moved();
 }
 
 /// `painted`'s extents index patched for the `patched` slots' steps.
@@ -187,7 +188,7 @@ fn restarted(mut last: Painted, started: &Painted) -> (Painted, Option<KeptOrder
     (last.canvas, last.canvas_from) = (started.canvas, started.canvas_from);
     last.scale = started.scale;
     (last.boxes_drawn, last.items_built, last.parts_visited_kept) = (0, 0, 0);
-    last.boxes_shifted = 0;
+    (last.boxes_shifted, last.index_entries_moved) = (0, 0);
     (last, Some(order))
 }
 
