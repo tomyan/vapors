@@ -3,7 +3,8 @@
 //! and padding boxes, its clip, its offset and range, its scrollbar
 //! style and whether thumbs are shown (`thumb.rs`). A container painted
 //! again or shifted has a new box or clip, and a fresh part holds no
-//! thumb; one placement settled can have a new offset or range; the
+//! thumb; one whose offset or range changed at all (placement compares
+//! them exactly, `ChangedSlots::scroll_states`) has moved thumbs; the
 //! rest keep theirs. A page of thousands of small scrollers therefore
 //! paints O(changed) thumbs per update, not every one.
 
@@ -29,7 +30,10 @@ pub(crate) fn of_update(
 /// The scroll containers whose thumbs this update paints, each once:
 /// every one of `thumbs` when nothing was kept or thumbs were shown or
 /// hidden (`every`); else those painted `again` or `shifted`, and those
-/// `changed` names as settled, that `scrolls`.
+/// whose scroll state `changed`, that `scrolls`. An empty answer
+/// allocates nothing. A debug build panics, naming the slot, when one
+/// chosen is not among `thumbs`: `scrolls` and paint order's thumb
+/// steps must name the same containers (`frames_check.rs`).
 pub(crate) fn thumbs_again(
     thumbs: &[usize],
     (again, shifted): (&[(usize, BoxFrom)], &[usize]),
@@ -42,10 +46,20 @@ pub(crate) fn thumbs_again(
     }
     let again = again.iter().map(|(slot, _)| *slot);
     let named = again.chain(shifted.iter().copied());
-    let mut slots: Vec<usize> = named.chain(changed.settled.iter().copied()).collect();
-    slots.retain(|&slot| scrolls(slot));
+    let named = named.chain(changed.scroll_states.iter().copied());
+    let mut slots: Vec<usize> = named.filter(|&slot| scrolls(slot)).collect();
     slots.sort_unstable();
     slots.dedup();
+    if let Some(slot) = slots
+        .iter()
+        .find(|slot| cfg!(debug_assertions) && !thumbs.contains(slot))
+    {
+        panic!(
+            "slot {slot} scrolls but has no thumb step in paint order: the stackings and paint \
+             order disagree on the scroll containers (paint_order.rs, frames_check.rs); \
+             reproduce with `cargo xtask test`"
+        );
+    }
     slots
 }
 

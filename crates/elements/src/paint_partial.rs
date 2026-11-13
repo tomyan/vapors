@@ -4,12 +4,13 @@
 //! again, and it is returned. Which slots: those built again, and those
 //! moved or whose clip was redone whose part was made from other values
 //! (`BoxFrom`) and cannot be shifted to them (`kept_shift.rs`); no
-//! other kept part is read. A dropped part frees its
-//! slab ids and removes its map entries before any part is painted, so
-//! a part painted after takes them. The thumbs painted are those of the
-//! scroll containers that can have changed (`thumbs_again.rs`). The scene is the parts of the steps that draw
-//! walked in paint order (`scene_view.rs`, `drawn_steps.rs`); it
-//! equals a full paint's, which a debug build checks (`kept_paint.rs`).
+//! other kept part is read. A dropped part frees its slab ids and
+//! removes its map entries before any part is painted, so a part
+//! painted after takes them. The thumbs painted are those of the scroll
+//! containers that can have changed (`thumbs_again.rs`). The scene is
+//! the parts of the steps that draw walked in paint order
+//! (`scene_view.rs`, `drawn_steps.rs`); it equals a full paint's, which
+//! a debug build checks (`kept_paint.rs`).
 
 use crate::blocks::IndexCounts;
 use crate::changed_slots::ChangedSlots;
