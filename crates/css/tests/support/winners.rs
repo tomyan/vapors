@@ -17,7 +17,6 @@ pub fn facts(style: Option<&'static str>) -> KeyFacts<'static> {
         toggles: &["open"],
         style,
         literal_attributes: &[],
-        expression_attributes: &[],
     }
 }
 
