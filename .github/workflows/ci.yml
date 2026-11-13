@@ -65,8 +65,14 @@ jobs:
       # advisory database every run and fails if it cannot.
       - name: dependencies (cargo-deny)
         run: cargo xtask deny
-      - name: lint, wasm lint and unit
-        run: cargo xtask lint && cargo xtask wasm && cargo xtask test --tier unit
+      # Three steps rather than one `&&` line so the gate log and CI time
+      # each; a failure skips the rest, as `&&` did.
+      - name: lint
+        run: cargo xtask lint
+      - name: wasm lint
+        run: cargo xtask wasm
+      - name: unit
+        run: cargo xtask test --tier unit
       - name: build timings
         if: always()
         run: cargo build --workspace --all-targets --timings
