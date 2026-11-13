@@ -356,6 +356,19 @@ hides-gpu-device.md`). Two tests cover the workload without timing:
 
 ## 4. PR stack
 
+Added by Tom's decision, 2026-11-13 (from P0's runs,
+docs/perf/scene-run-2026-11-13.md: frame 0 about 98 ms with a cold Mesa
+shader cache and about 22 ms warm, every later frame under 16.7 ms):
+row F0, the first frame. Every pipeline is built before frame 0, from
+one registry of vapors' pipelines; the glyph atlas's first upload and
+the surface's first setup move before frame 0. Accepted when: P0's run
+shows frame 0 under 16.7 ms cold and warm on the dev machine, and a test
+fails when a pipeline is created during a judged frame, so later rows'
+pipelines must join the registry. Start-up time is moved out of the
+judged frames, not reduced. A vapors-owned on-disk pipeline cache
+(faster later launches; wgpu supports it on Vulkan only) is deferred to
+after the finish line (Tom, 2026-11-13).
+
 Each row is under about 400 lines (estimate), built by a fresh agent,
 each check proven by breaking what it guards. After each row the next
 is checked against what it found.

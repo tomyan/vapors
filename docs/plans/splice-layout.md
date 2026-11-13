@@ -504,6 +504,18 @@ section 6 assume PR 1 lands before PR 4's acceptance run.
 
 ## 8. Decisions for Tom
 
+Decided by Tom, 2026-11-13: 1 build the lane (Taffy stays for every other
+layout; the per-child lines mirrored from Taffy carry its MIT copyright
+and licence notice); 2 start now in plan order, PR 0 first, with
+build-time styles (U2 onward) alongside (4-ii has merged, so PR 4 waits
+on nothing); 3 the a11y mirror in flow as its own PR; 4 block and flex
+lanes designed together, not block first (a design note for flex columns
+precedes PRs 1 to 3, so the sum tree serves both; flex cases that grow or
+shrink are refused loudly and laid out by Taffy); 5 one Taffy issue after
+PR 4 is measured, no PR. Also (lead, 2026-11-13): the extents index
+(IU4 PR 5) must update incrementally in the lane, not be rebuilt
+(docs/plans/iu4.md). The options below are kept as the record.
+
 1. **Build the layout lane, or hold property 3 at "O(rows after) in
    layout, bounded on the GPU side".** The measured floor is 12,044
    instructions per row in the update and 21,307 per row in the frame:
