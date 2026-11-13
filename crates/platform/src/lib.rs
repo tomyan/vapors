@@ -73,6 +73,7 @@ mod platform;
 mod redraw;
 mod report;
 mod shortcut_modifier;
+mod start;
 mod surface;
 mod surface_texture;
 mod tasks;
@@ -108,6 +109,7 @@ pub use paste_key::paste_shortcut;
 pub use platform::Platform;
 pub use report::{report_error, report_startup, report_status};
 pub use shortcut_modifier::shortcut_is_command;
+pub use start::Start;
 pub use surface::pick_format;
 pub use text_field::TextField;
 #[cfg(target_family = "wasm")]

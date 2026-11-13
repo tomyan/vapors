@@ -117,9 +117,10 @@ impl ElementsApp {
             viewport: size_of(frame),
             scissor: None,
         };
+        self.check_format(frame.texture.format())?;
         if self.painter.is_none() {
             let made = self
-                .make_painter(frame)
+                .make_painter(frame.device, frame.texture.format())
                 .map_err(|refused| refused.to_string())?;
             self.painter = Some(made);
         }

@@ -9,7 +9,7 @@ use std::{cell::RefCell, rc::Rc};
 use surface::TrackSurface;
 use vapors_app::{ElementsApp, Failure, FrameCounts, FrameTiming};
 use vapors_elements::Document;
-use vapors_platform::{App, Event, Frame, Next, Platform, report_error};
+use vapors_platform::{App, Event, Frame, Next, Platform, Start, report_error};
 use vapors_text::FontSystem;
 
 /// The racer as a platform app: the HUD's document and the track's
@@ -184,6 +184,9 @@ impl App for Racer {
             return Next::Wait;
         }
         next
+    }
+    fn start(&mut self, start: &Start<'_>) -> Result<(), String> {
+        self.app.start(start)
     }
     fn drawn(&mut self, platform: &Platform) {
         self.app.drawn(platform);

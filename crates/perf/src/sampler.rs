@@ -19,7 +19,7 @@ pub const INTERVAL: Duration = Duration::from_millis(16);
 
 /// How long the GPU may take to finish a frame. The slowest frame here
 /// (the racer on lavapipe) is under a second; ten is far beyond it.
-const FRAME_DEADLINE: Duration = Duration::from_secs(10);
+pub(crate) const FRAME_DEADLINE: Duration = Duration::from_secs(10);
 
 /// One frame's measurements: wall time, the time from the start of the
 /// app's frame to the return of the GPU wait after it (frame-to-idle),
@@ -205,4 +205,4 @@ impl<'g> Sampler<'g> {
 
 #[path = "sampler_judged.rs"]
 mod judged;
-pub use judged::JudgedFrame;
+pub use judged::{JudgedFrame, JudgedRun};

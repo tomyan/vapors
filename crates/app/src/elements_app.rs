@@ -9,32 +9,17 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use vapors_elements::{Document, ShortcutModifier};
-use vapors_platform::{App, Event, Frame, Next, Platform, report_error};
+use vapors_platform::{App, Event, Frame, Next, Platform, Start, report_error};
 
 use crate::document_input::{DocumentInput, Unplaced};
 use crate::frame::FrameTimes;
 use crate::painter::ScenePainter;
 pub use decision::FrameDecision;
+pub use failure::Failure;
 pub use give::GiveError;
 use give::Hosting;
 pub use surface_handle::{InvalidateError, Invalidated, SurfaceHandle};
 use surfaces::AppSurfaces;
-
-/// Why the app stopped, once it has: shared with whoever ran it.
-#[derive(Clone, Default)]
-pub struct Failure(Rc<RefCell<Option<String>>>);
-
-impl Failure {
-    /// The report, if the app stopped on a failure.
-    #[must_use]
-    pub fn get(&self) -> Option<String> {
-        self.0.borrow().clone()
-    }
-
-    fn set(&self, message: &str) {
-        *self.0.borrow_mut() = Some(message.to_owned());
-    }
-}
 
 /// Shows a document in the window. Events come through `App::event`,
 /// or through [`ElementsApp::give`] for an app that wraps this one; one
@@ -168,6 +153,13 @@ impl App for ElementsApp {
         }
     }
 
+    fn start(&mut self, start: &Start<'_>) -> Result<(), String> {
+        self.start_on(start).inspect_err(|message| {
+            report_error(message);
+            self.failure.set(message);
+        })
+    }
+
     fn drawn(&mut self, platform: &Platform) {
         self.surfaces.keep_waker(platform);
         self.surfaces.give_waker(self.painter.as_mut());
@@ -193,6 +185,8 @@ mod atlas;
 mod counts;
 #[path = "elements_app_decision.rs"]
 mod decision;
+#[path = "elements_app_failure.rs"]
+mod failure;
 #[path = "elements_app_frame.rs"]
 mod frame_phases;
 #[path = "elements_app_give.rs"]
@@ -202,6 +196,8 @@ mod give;
 mod paste;
 #[path = "elements_app_shown.rs"]
 mod shown;
+#[path = "elements_app_start.rs"]
+mod start;
 #[path = "elements_app_surface_handle.rs"]
 mod surface_handle;
 #[path = "elements_app_surfaces.rs"]

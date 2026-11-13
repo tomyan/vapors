@@ -133,7 +133,8 @@ impl Mounted {
         fits(device, size)
     }
 
-    fn start(&mut self, device: &wgpu::Device, turn: Turn<'_>) -> Result<(), Refusal> {
+    /// Calls the renderer's `mount` unless it was called already.
+    pub(super) fn start(&mut self, device: &wgpu::Device, turn: Turn<'_>) -> Result<(), Refusal> {
         if !self.started {
             let renderer = &mut self.renderer;
             self.scopes.run(device, turn, || renderer.mount(device))?;

@@ -45,7 +45,7 @@ impl ApplicationHandler<Message> for Handler {
         #[cfg(not(target_family = "wasm"))]
         self.ime_message();
         match message {
-            Message::GpuReady(Ok(gpu)) => self.gpu_ready(gpu),
+            Message::GpuReady(Ok(gpu)) => self.gpu_ready(event_loop, gpu),
             Message::GpuReady(Err(error)) => self.fail(event_loop, error),
             Message::FileChosen { name, bytes } => self
                 .app
