@@ -11,18 +11,20 @@
 //! keeps its position; made afresh when paint order is walked or more
 //! steps are patched at once than `REBUILD` allows. A debug build
 //! compares it with one made afresh after every paint
-//! (`kept_paint_check.rs`).
+//! (`kept_paint_check.rs`). The short entries are kept in blocks
+//! (`blocks.rs`): one put in or taken out moves at most a block's tail.
 
 use rustc_hash::FxHashMap;
 use vapors_scene::Item;
 
+use crate::blocks::Blocks;
 use crate::drawn_steps::DrawnSteps;
 use crate::kept_box::KeptBox;
 use crate::paint_order::Step;
 use crate::scene_view::frame_items;
 
 /// Patching more steps than this, or than a sixteenth of the entries,
-/// makes the index afresh: each patch can move a `Vec`'s tail.
+/// makes the index afresh: each patch is a search and a block's move.
 const REBUILD: usize = 64;
 
 /// One drawing step in its frame's index.
@@ -50,7 +52,7 @@ const TALL: f32 = 1024.0;
 /// and the items they paint.
 #[derive(Debug, Default, PartialEq)]
 struct FrameIndex {
-    entries: Vec<Entry>,
+    entries: Blocks<Entry>,
     tall: Vec<Entry>,
     items: u64,
 }
@@ -59,11 +61,19 @@ struct FrameIndex {
 type At = (usize, f32, bool);
 
 /// Every frame's index, and where each place's entry is.
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default)]
 pub(crate) struct Extents {
     frames: FxHashMap<usize, FrameIndex>,
     /// By place: where the step's entry is, if it draws.
     at: Vec<Option<At>>,
+    /// Times a patch made the index afresh since the last take, for
+    /// `UpdateCounts`.
+    rebuilds: usize,
+    /// Entries the patches moved since the last take, and the blocks
+    /// every frame's entries hold: running totals, so no update sums
+    /// over the frames (`IndexCounts`).
+    moved: usize,
+    blocks: usize,
 }
 
 impl Extents {
@@ -81,7 +91,11 @@ impl Extents {
         let mut extents = Self {
             frames: FxHashMap::default(),
             at: vec![None; places],
+            rebuilds: 0,
+            moved: 0,
+            blocks: 0,
         };
+        let mut short: FxHashMap<usize, Vec<Entry>> = FxHashMap::default();
         for (frame, entry) in entries {
             extents.at[entry.place] = Some((frame, entry.top, entry.tall()));
             let index = extents.frames.entry(frame).or_default();
@@ -89,12 +103,13 @@ impl Extents {
             if entry.tall() {
                 index.tall.push(entry);
             } else {
-                index.entries.push(entry);
+                short.entry(frame).or_default().push(entry);
             }
         }
-        for index in extents.frames.values_mut() {
-            index.entries.sort_unstable_by(order);
-            index.reach_from(0, usize::MAX);
+        for (frame, entries) in short {
+            let index = extents.frames.entry(frame).or_default();
+            index.sorted(entries);
+            extents.blocks += index.entries.block_count();
         }
         extents
     }
@@ -110,7 +125,9 @@ impl Extents {
     ) {
         let entries: usize = self.frames.values().map(|index| index.entries.len()).sum();
         if steps.len() > REBUILD.max(entries / 16) {
+            let rebuilds = self.rebuilds + 1;
             *self = Self::of(drawn, places, boxes);
+            self.rebuilds = rebuilds;
             return;
         }
         assert_eq!(
@@ -196,3 +213,7 @@ mod tests;
 #[cfg(test)]
 #[path = "frame_extents_tall_tests.rs"]
 mod tall_tests;
+
+#[cfg(test)]
+#[path = "frame_extents_moves_tests.rs"]
+mod moves_tests;

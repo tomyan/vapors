@@ -51,7 +51,7 @@ fn update(doc: &mut Document) -> UpdateCounts {
 }
 
 /// (shared, computed, unkeyed, unshareable, live) of the last update.
-fn styles(counts: UpdateCounts) -> (usize, usize, usize, usize, usize) {
+fn styles(counts: &UpdateCounts) -> (usize, usize, usize, usize, usize) {
     (
         counts.styles_shared,
         counts.styles_computed,
@@ -79,7 +79,7 @@ fn rows_with_one_key_compute_one_style_and_share_it() {
 
     // Then: html and body are unkeyed; one row computes, two share
     assert_eq!(counts.elements_restyled, 5);
-    assert_eq!(styles(counts), (2, 1, 2, 0, 3));
+    assert_eq!(styles(&counts), (2, 1, 2, 0, 3));
 }
 
 #[test]
@@ -98,7 +98,7 @@ fn a_toggled_class_is_a_new_share_key_and_the_old_style_stays_for_the_others() {
 
     // Then
     assert_eq!(counts.elements_restyled, 1);
-    assert_eq!(styles(counts), (0, 1, 0, 0, 4));
+    assert_eq!(styles(&counts), (0, 1, 0, 0, 4));
     assert_eq!(color(&doc, rows[1]), "rgb(4 5 6)");
     assert_eq!(color(&doc, rows[0]), "rgb(1 2 3)");
 }
@@ -116,7 +116,7 @@ fn a_style_no_element_holds_is_dropped() {
     let counts = update(&mut doc);
 
     // Then: it shares the unmarked style again and the marked one goes
-    assert_eq!(styles(counts), (1, 0, 0, 0, 3));
+    assert_eq!(styles(&counts), (1, 0, 0, 0, 3));
 }
 
 #[test]
@@ -128,7 +128,7 @@ fn a_key_whose_rules_read_siblings_does_not_share() {
     let counts = update(&mut doc);
 
     // Then
-    assert_eq!(styles(counts), (0, 0, 2, 3, 5));
+    assert_eq!(styles(&counts), (0, 0, 2, 3, 5));
 }
 
 #[test]
@@ -142,7 +142,7 @@ fn an_attribute_a_sheet_selects_is_part_of_the_share_key() {
     let counts = update(&mut doc);
 
     // Then
-    assert_eq!(styles(counts), (0, 1, 0, 0, 4));
+    assert_eq!(styles(&counts), (0, 1, 0, 0, 4));
     let display = |node| {
         doc.computed_style(node)
             .expect("styled")
@@ -165,7 +165,7 @@ fn an_attribute_no_sheet_selects_keeps_the_share() {
     let counts = update(&mut doc);
 
     // Then
-    assert_eq!(styles(counts), (1, 0, 0, 0, 3));
+    assert_eq!(styles(&counts), (1, 0, 0, 0, 3));
 }
 
 #[test]
@@ -182,7 +182,7 @@ fn a_state_is_part_of_the_share_key() {
     let counts = update(&mut doc);
 
     // Then
-    assert_eq!(styles(counts), (0, 2, 2, 0, 4));
+    assert_eq!(styles(&counts), (0, 2, 2, 0, 4));
     assert_eq!(color(&doc, buttons[0]), "rgb(1 2 3)");
     assert_eq!(color(&doc, buttons[1]), "rgb(4 5 6)");
 }
@@ -213,5 +213,5 @@ fn a_failed_restyle_keeps_no_style_counts() {
 
     // Then
     assert!(refused);
-    assert_eq!(styles(doc.update_counts()), (0, 0, 0, 0, 0));
+    assert_eq!(styles(&doc.update_counts()), (0, 0, 0, 0, 0));
 }

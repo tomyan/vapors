@@ -281,7 +281,12 @@ extents index over the drawing steps in that frame:
 - Patching: a step painted again has its entry removed and inserted
   again (binary search and a `Vec` shift, O(n) memmove of 24-byte
   entries, measured against a B-tree in PR 5 if it shows); an order
-  walk makes the index afresh, O(n log n). `hidden` and
+  walk makes the index afresh, O(n log n). As built, the entries are
+  48 bytes and the shift showed: 9 instructions per row on `--scaling
+  Class`'s add frames, the drawing steps' own `Vec` another 4.5
+  (`docs/perf/class-add-paint-2026-11-13.md`). Both lists are kept in
+  blocks of 128 entries (`blocks.rs`) since 2026-11-13: a patch moves
+  at most a block, searches stay binary. `hidden` and
   `hidden_culled` go: `Batched::culled` is the frame's item count less
   its shown items' count, with a per-frame item count kept and patched
   per step.

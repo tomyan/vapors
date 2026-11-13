@@ -88,7 +88,7 @@ fn style_may_come_before_script() {
 #[test]
 fn style_text_passes_through_untouched() {
     // Given: braces, a Rust-looking hole and odd spacing in CSS
-    let css = "\n  .x { content: \"{not a hole}\"; }\n\n";
+    let css = "\n  .x { font-family: \"{not a hole}\"; }\n\n";
 
     // When
     let component = parse_file(&format!("<style>{css}</style>\n<div></div>")).unwrap();

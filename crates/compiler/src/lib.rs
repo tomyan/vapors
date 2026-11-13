@@ -12,10 +12,12 @@ mod error;
 mod naming;
 mod sections;
 mod source;
+mod style_check;
 mod template;
 
 use std::path::Path;
 
+use build::Styles;
 pub use codegen::{Generated, PropsIndex, generate, generate_checked, generate_with};
 pub use error::CompileError;
 pub use naming::component_name;
@@ -34,15 +36,23 @@ pub const SCOPE_ATTRIBUTE: &str = "data-wisp";
 pub const MAX_CLASS_DIRECTIVES: usize = 64;
 
 /// Parses the text of a `.wisp` file. `path` names the file in
-/// refusals and gives the component its name.
+/// refusals and gives the component its name. Its `<style>` is read as
+/// a scoped style (see [`parse_file_global`] for the other kind).
 ///
 /// # Errors
 /// A [`CompileError`] naming the first thing the parser did not
-/// recognise.
+/// recognise, in the template or the style.
 pub fn parse_str(path: &str, text: &str) -> Result<ast::Component, CompileError> {
+    parse_text(path, text, Styles::Scoped)
+}
+
+fn parse_text(path: &str, text: &str, styles: Styles) -> Result<ast::Component, CompileError> {
     let source = Source::new(path, text);
     let name = component_name(Path::new(path))?;
     let sections = sections::split(&source)?;
+    if let Some(style) = &sections.style {
+        style_check::check(&source, style, styles)?;
+    }
     let template = template::parse(&source, sections.template_start, sections.template_end)?;
     Ok(ast::Component {
         name,
@@ -126,12 +136,14 @@ pub fn compile_file_global(path: &Path) -> Result<String, CompileError> {
     generate(&parse_file_global(path)?)
 }
 
-/// [`parse_file`] for a component whose `<style>` is a global sheet.
+/// [`parse_file`] for a component whose `<style>` is a global sheet,
+/// which may hold no `:global()`.
 ///
 /// # Errors
 /// As [`parse_file`].
 pub fn parse_file_global(path: &Path) -> Result<ast::Component, CompileError> {
-    let mut component = parse_file(path)?;
+    let text = read_source(path)?;
+    let mut component = parse_text(&path.display().to_string(), &text, Styles::Global)?;
     component.scope = None;
     Ok(component)
 }
