@@ -29,9 +29,9 @@ use crate::painter::text::run_placed_bytes;
 pub(super) struct TextGpu {
     /// `None` for a batch with no ink.
     range: Option<KeptRange>,
+    /// The pins on the glyphs the bytes name, and the atlas generation
+    /// they were built at.
     pins: AtlasPins,
-    /// The atlas generation the bytes were built at.
-    generation: u64,
     /// What each item resolved to when the bytes were built.
     resolved: Resolved,
     len: u64,
@@ -46,9 +46,10 @@ pub(crate) type TextParts<'a> = (&'a mut TextPipeline, &'a mut GlyphAtlas);
 
 impl KeptGpu {
     /// The kept range of text or icon `run`, batch `at` of the frame,
-    /// keyed `key` on `target`: built and written first when none is
-    /// current. `Ok(None)` when it has no ink or the write was refused
-    /// (the refusal is on the target's encoder).
+    /// keyed `key` on `target`, and the pins it was built with: built
+    /// and written first when none is current. `Ok(None)` when it has no
+    /// ink or the write was refused (the refusal is on the target's
+    /// encoder).
     ///
     /// # Errors
     ///
@@ -58,7 +59,7 @@ impl KeptGpu {
         (text, atlas): TextParts<'_>,
         (target, painted): (&Target<'_>, &Painted),
         (run, key, at): (&Run, BatchKey, usize),
-    ) -> Result<Option<&KeptRange>, AtlasError> {
+    ) -> Result<Option<(&KeptRange, &AtlasPins)>, AtlasError> {
         let generation = atlas.generation();
         match self.texts.get(&key) {
             Some(gpu) if gpu.current(run, painted, generation) => {
@@ -71,7 +72,7 @@ impl KeptGpu {
             return Ok(None);
         };
         gpu.drawn = self.frame;
-        Ok(gpu.range.as_ref())
+        Ok(gpu.range.as_ref().map(|range| (range, &gpu.pins)))
     }
 
     /// Builds and writes `run`'s bytes under `key`, releasing those kept
@@ -94,8 +95,7 @@ impl KeptGpu {
             atlas.unpin(pins);
             return Ok(());
         };
-        let built = (range, pins, atlas.generation());
-        let gpu = TextGpu::new(built, (run, painted), (bytes, self.frame));
+        let gpu = TextGpu::new((range, pins), (run, painted), (bytes, self.frame));
         self.texts.insert(key, gpu);
         self.written += 1;
         Ok(())
@@ -103,17 +103,16 @@ impl KeptGpu {
 }
 
 impl TextGpu {
-    /// The bytes built at `generation` for `run` as `painted` resolves
-    /// it, kept at `range` with `pins`, drawn in `frame`.
+    /// The bytes built for `run` as `painted` resolves it, kept at
+    /// `range` with `pins`, drawn in `frame`.
     fn new(
-        (range, pins, generation): (Option<KeptRange>, AtlasPins, u64),
+        (range, pins): (Option<KeptRange>, AtlasPins),
         (run, painted): (&Run, &Painted),
         (bytes, frame): (Vec<u8>, u64),
     ) -> Self {
         Self {
             range,
             pins,
-            generation,
             resolved: Resolved::of(run, painted),
             len: bytes.len() as u64,
             drawn: frame,
@@ -125,7 +124,7 @@ impl TextGpu {
     /// True when these bytes are `run`'s as `painted` resolves it, with
     /// the atlas at `generation`.
     fn current(&self, run: &Run, painted: &Painted, generation: u64) -> bool {
-        self.generation == generation && self.resolved.matches(run, painted)
+        self.pins.generation() == generation && self.resolved.matches(run, painted)
     }
 
     /// The bytes held in the kept buffer.

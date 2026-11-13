@@ -98,12 +98,11 @@ impl ScenePainter {
         (run, key, at): (&Run, BatchKey, usize),
     ) -> Result<(), PaintError> {
         let parts = (&mut self.text, &mut self.atlas);
-        let range = self
+        let kept = self
             .kept
             .text_range(parts, (target, painted), (run, key, at))?;
-        if let Some(range) = range {
-            self.text
-                .draw_kept(target, &mut self.atlas, range, blend(run));
+        if let Some(kept) = kept {
+            self.text.draw_kept(target, &mut self.atlas, kept, blend(run));
         }
         Ok(())
     }
