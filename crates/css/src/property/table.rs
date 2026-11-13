@@ -54,7 +54,7 @@ pub(super) const GRID_LINE: &str = "auto | <integer> | span <integer [1,inf]>";
 pub(super) const CURSOR: &str = "auto | default | none | pointer | text | move | grab | grabbing | not-allowed | crosshair | col-resize | row-resize | ew-resize | ns-resize | nesw-resize | nwse-resize | wait | progress | help | zoom-in | zoom-out";
 
 /// Longhands a to g, sorted by name; `table_rest` has the rest.
-pub(super) static FIRST_HALF: &[PropertyDef] = &[
+pub(super) const FIRST_HALF: &[PropertyDef] = &[
     def("align-content", false, "normal", ALIGN_CONTENT),
     def("align-items", false, "normal", ALIGN),
     def("align-self", false, "auto", SELF),

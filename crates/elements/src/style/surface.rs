@@ -4,22 +4,11 @@
 //! (inline-block content is not laid out).
 
 use taffy::{LengthPercentage, Style};
+use vapors_css::property::longhands::DISPLAY;
 
 use super::decoration::Decoration;
+use super::sides::{BORDER_RADII, PADDINGS};
 use super::values::Reader;
-
-const PADDINGS: [&str; 4] = [
-    "padding-top",
-    "padding-right",
-    "padding-bottom",
-    "padding-left",
-];
-const RADII: [&str; 4] = [
-    "border-top-left-radius",
-    "border-top-right-radius",
-    "border-bottom-right-radius",
-    "border-bottom-left-radius",
-];
 
 /// Refuses, by property, what a `gpu-surface` styled `layout`,
 /// `decoration` and (when `inline`) `display: inline` cannot draw.
@@ -30,9 +19,9 @@ pub(crate) fn refuse(
     inline: bool,
 ) {
     if inline {
-        reader.refuse("display", "is inline on a gpu-surface, and inline-block content is not laid out yet; give it display: block, or put it in a flex or grid container".to_owned());
+        reader.refuse(DISPLAY, "is inline on a gpu-surface, and inline-block content is not laid out yet; give it display: block, or put it in a flex or grid container".to_owned());
     }
-    for (property, radius) in RADII.into_iter().zip(decoration.radii) {
+    for (property, radius) in BORDER_RADII.into_iter().zip(decoration.radii) {
         if radius > 0.0 {
             reader.refuse(property, "rounds a gpu-surface, and a surface is not clipped to rounded corners (docs/gpu-surface.md); drop the radius".to_owned());
         }
