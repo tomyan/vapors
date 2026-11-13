@@ -25,8 +25,9 @@ impl Margins {
         }
     }
 
-    /// The two sets collapsed into one.
-    fn collapse(self, other: Self) -> Self {
+    /// The two sets collapsed into one (Taffy's
+    /// `CollapsibleMarginSet::collapse_with_set`).
+    pub(crate) fn collapse(self, other: Self) -> Self {
         Self {
             positive: self.positive.max(other.positive),
             negative: self.negative.min(other.negative),
@@ -47,10 +48,15 @@ pub(crate) enum LaneDecline {
     CollapsesThrough,
 }
 
-/// One child as block layout laid it out.
+/// One child as block layout laid it out: its collapsible margin sets
+/// are its own margin joined with the sets its descendants collapsed
+/// through to its edges (taffy `block.rs`, `perform_final_layout_on_
+/// in_flow_children`: `item_layout.top_margin.collapse_with_margin(
+/// item_margin.top)`), as `SizeAnswer` records them (`asked.rs`).
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct BlockChild {
-    pub(crate) margins: [f64; 2],
+    pub(crate) top: Margins,
+    pub(crate) bottom: Margins,
     pub(crate) height: f64,
     pub(crate) collapses_through: bool,
     pub(crate) bounds: Bounds,
@@ -78,9 +84,9 @@ impl BlockSummary {
             return Err(LaneDecline::CollapsesThrough);
         }
         Ok(Self(Some(BlockRun {
-            top: Margins::of(child.margins[0]),
+            top: child.top,
             inner: child.height,
-            bottom: Margins::of(child.margins[1]),
+            bottom: child.bottom,
             bounds: child.bounds,
         })))
     }
@@ -90,6 +96,19 @@ impl BlockSummary {
         self.0.map_or(0.0, |run| {
             run.top.resolve() + run.inner + run.bottom.resolve()
         })
+    }
+
+    /// The first child's top set: the container's own collapsible top
+    /// margin when it collapses with its children (PR 3, plan 10.4),
+    /// and then every `start` is less this set's `resolve()`.
+    pub(crate) fn top(&self) -> Margins {
+        self.0.map_or(Margins::default(), |run| run.top)
+    }
+
+    /// The last child's bottom set, the container's collapsible bottom
+    /// margin when it collapses with its children (PR 3).
+    pub(crate) fn bottom(&self) -> Margins {
+        self.0.map_or(Margins::default(), |run| run.bottom)
     }
 }
 

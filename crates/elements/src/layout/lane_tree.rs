@@ -6,6 +6,15 @@
 //! its left, O(log n). A B-tree of fanout 16 with parent links, nodes
 //! in a slab; a node left empty by a remove is freed, and an underfull
 //! one is kept as it is.
+//!
+//! Keeping underfull nodes is a relaxed guard: a lane that peaked at N
+//! children and holds n keeps up to about N/8 leaves (a leaf splits at
+//! 17 into 8 and 9, and removes thin it to 1), so `handles`, a wide
+//! `between` and the memory are proportional to the peak, not to n, and
+//! the depth is the peak's. What would retire it: merging a node with a
+//! neighbour when it falls below `FANOUT / 4`, or rebuilding the tree
+//! when its nodes exceed `4 * n / FANOUT`; neither is built until a
+//! workload shows a lane shrinking far below its peak.
 
 use std::fmt::Debug;
 
@@ -21,9 +30,14 @@ pub(crate) trait Summary: Copy + Debug + Default + PartialEq {
     fn bounds(&self) -> super::lane_bounds::Bounds;
 }
 
-/// A child of a lane, stable while it is in the tree.
+/// A child of a lane, stable while it is in the tree, and refused once
+/// its child is removed even if the index names a child put in since
+/// (`lane_tree_handles.rs`).
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub(crate) struct Handle(u32);
+pub(crate) struct Handle {
+    index: u32,
+    generation: u32,
+}
 
 /// The most children a node holds.
 const FANOUT: usize = 16;
@@ -43,8 +57,9 @@ pub(crate) struct LaneTree<S> {
     pub(super) nodes: Vec<Node<S>>,
     free_nodes: Vec<usize>,
     pub(super) root: usize,
-    /// By handle: the leaf node holding it; none once removed.
-    leaf_of: Vec<Option<usize>>,
+    /// By handle index: the leaf holding its child and the generation
+    /// the index is on.
+    leaf_of: Vec<Slot>,
     free_handles: Vec<u32>,
     pub(super) gap: f64,
 }
@@ -80,7 +95,7 @@ impl<S: Summary> LaneTree<S> {
         };
         let handle = self.new_handle(leaf);
         let node = &mut self.nodes[leaf];
-        node.children.insert(at, handle.0);
+        node.children.insert(at, handle.index);
         node.sums.insert(at, summary);
         self.settle(leaf);
         handle
@@ -94,8 +109,7 @@ impl<S: Summary> LaneTree<S> {
         let (leaf, at) = self.locate(handle);
         self.nodes[leaf].children.remove(at);
         self.nodes[leaf].sums.remove(at);
-        self.leaf_of[handle.0 as usize] = None;
-        self.free_handles.push(handle.0);
+        self.forget(handle);
         self.prune(leaf);
     }
 
@@ -144,17 +158,6 @@ impl<S: Summary> LaneTree<S> {
             .fold(S::default(), |run, sum| run.combine(sum, self.gap))
     }
 
-    /// The leaf holding `handle` and its index there.
-    fn locate(&self, handle: Handle) -> (usize, usize) {
-        let leaf = self.leaf_of.get(handle.0 as usize).copied().flatten();
-        let leaf = leaf.unwrap_or_else(|| panic!("lane handle {handle:?} is not in the tree"));
-        let at = self.nodes[leaf]
-            .children
-            .iter()
-            .position(|&h| h == handle.0);
-        (leaf, at.expect("a leaf holds the handles that name it"))
-    }
-
     /// The index of `child` among `parent`'s children.
     fn child_at(&self, parent: usize, child: usize) -> usize {
         let children = &self.nodes[parent].children;
@@ -168,16 +171,6 @@ impl<S: Summary> LaneTree<S> {
             node = self.nodes[node].children[0] as usize;
         }
         node
-    }
-
-    fn new_handle(&mut self, leaf: usize) -> Handle {
-        let index = self.free_handles.pop().unwrap_or_else(|| {
-            let next = u32::try_from(self.leaf_of.len()).expect("a lane under 2^32 children");
-            self.leaf_of.push(None);
-            next
-        });
-        self.leaf_of[index as usize] = Some(leaf);
-        Handle(index)
     }
 
     /// Splits `node` while it is over [`FANOUT`], then refolds above.
@@ -198,8 +191,11 @@ impl<S: Summary> LaneTree<S> {
     }
 }
 
+#[path = "lane_tree_handles.rs"]
+mod handles;
 #[path = "lane_tree_shape.rs"]
 mod shape;
+use handles::Slot;
 
 #[cfg(test)]
 #[path = "lane_tree_random_tests.rs"]

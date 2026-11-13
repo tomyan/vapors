@@ -19,7 +19,9 @@ pub(crate) struct Bounds {
 }
 
 impl Bounds {
-    /// No children.
+    /// No children: the fold's empty value, never a leaf's. As the
+    /// left side of `then` it clamps `low` and `reach` to 0, so it is
+    /// not an identity: a leaf names its own `low` and `reach`.
     pub(crate) const EMPTY: Self = Self {
         low: 0.0,
         reach: 0.0,

@@ -2,7 +2,9 @@
 //! layout.md`, section 10.2): margins never collapse, so a run is the
 //! sum of its items' margin-box sizes plus one gap between neighbours,
 //! and the two sums Taffy 0.15.1 sizes a flex container's auto main
-//! size from (`determine_container_main_size`).
+//! size from (`determine_container_main_size`, `compute/flexbox.rs`:
+//! the definite-space branch at 1420-1560, the min- and max-content
+//! branch at 1700-1715).
 
 use super::lane_bounds::Bounds;
 use super::lane_tree::Summary;
@@ -15,7 +17,14 @@ pub(crate) struct FlexItem {
     /// `max(flex_basis, min_size)` plus margins, floored at padding
     /// and border: its share of a container sized under definite space.
     pub(crate) basis: f64,
-    /// Its min- or max-content contribution plus margins.
+    /// Its share of a container sized under min- or max-content space:
+    /// `flex_basis + flex_contribution + margin` (`flexbox.rs:1700-1715`),
+    /// where for `flex-grow: 0` the contribution is the item's content
+    /// contribution above its basis (`content_flex_fraction`,
+    /// 1660-1670), and 0 when its scaled shrink factor is 0 (an inner
+    /// flex basis of 0 under a clamped contribution): then this is the
+    /// basis plus margins, not the content contribution. PR 3f computes
+    /// it as Taffy does, per item.
     pub(crate) content: f64,
     pub(crate) bounds: Bounds,
 }

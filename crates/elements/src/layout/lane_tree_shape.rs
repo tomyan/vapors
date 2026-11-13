@@ -11,7 +11,7 @@ impl<S: Summary> LaneTree<S> {
         while let Some(node) = stack.pop() {
             let node = &self.nodes[node];
             if node.leaf {
-                out.extend(node.children.iter().map(|&h| Handle(h)));
+                out.extend(node.children.iter().map(|&h| self.handle(h)));
             } else {
                 stack.extend(node.children.iter().rev().map(|&c| c as usize));
             }
@@ -35,7 +35,7 @@ impl<S: Summary> LaneTree<S> {
             let bounds = sum.bounds();
             if start + bounds.low <= to && start + bounds.reach >= from {
                 if node.leaf {
-                    out.push(Handle(child));
+                    out.push(self.handle(child));
                 } else {
                     self.collect(child as usize, left, (from, to), out);
                 }
@@ -60,6 +60,15 @@ impl<S: Summary> LaneTree<S> {
             Some(parent) => parent,
             None => self.new_root(node),
         };
+        self.attach_after(parent, node, right);
+        if self.nodes[parent].children.len() > FANOUT {
+            self.split(parent);
+        }
+    }
+
+    /// Puts `right` into `parent` just after `node`, both freshly
+    /// folded.
+    fn attach_after(&mut self, parent: usize, node: usize, right: usize) {
         self.nodes[right].parent = Some(parent);
         let at = self.child_at(parent, node);
         let (left_sum, right_sum) = (self.fold_of(node), self.fold_of(right));
@@ -67,9 +76,6 @@ impl<S: Summary> LaneTree<S> {
         above.sums[at] = left_sum;
         above.children.insert(at + 1, to_u32(right));
         above.sums.insert(at + 1, right_sum);
-        if above.children.len() > FANOUT {
-            self.split(parent);
-        }
     }
 
     /// Frees `node` and each ancestor a remove left without children,
@@ -86,6 +92,12 @@ impl<S: Summary> LaneTree<S> {
             node = parent;
         }
         self.refold(node);
+        self.drop_single_roots();
+    }
+
+    /// While the root is an inner node with one child, that child is
+    /// the root.
+    fn drop_single_roots(&mut self) {
         while !self.nodes[self.root].leaf && self.nodes[self.root].children.len() == 1 {
             let child = self.nodes[self.root].children[0] as usize;
             self.release(self.root);
@@ -117,7 +129,7 @@ impl<S: Summary> LaneTree<S> {
         for at in 0..self.nodes[node].children.len() {
             let child = self.nodes[node].children[at];
             if self.nodes[node].leaf {
-                self.leaf_of[child as usize] = Some(node);
+                self.leaf_of[child as usize].leaf = Some(node);
             } else {
                 self.nodes[child as usize].parent = Some(node);
             }

@@ -123,3 +123,32 @@ fn a_removed_handle_is_refused() {
     tree.remove(handles[1]);
     tree.start(handles[1]);
 }
+
+#[test]
+#[should_panic(expected = "is not in the tree")]
+fn a_removed_handle_is_refused_once_its_index_names_a_new_child() {
+    // Given: a remove, then an insert that takes the freed index
+    let (mut tree, handles) = appended(3);
+    tree.remove(handles[1]);
+    let added = tree.insert_after(Some(handles[0]), item(10.0));
+    assert_ne!(added, handles[1], "the new child's handle differs");
+
+    // When / Then: the old handle does not name the new child
+    tree.start(handles[1]);
+}
+
+#[test]
+fn a_freed_index_is_reused_on_a_new_generation() {
+    // Given
+    let (mut tree, handles) = appended(3);
+    tree.remove(handles[1]);
+
+    // When
+    let added = tree.insert_after(Some(handles[0]), item(30.0));
+
+    // Then: the index is reused, the handle is new, and it works
+    assert_eq!(tree.leaf_of.len(), 3);
+    assert_ne!(added, handles[1]);
+    assert_eq!(tree.start(added), 12.0);
+    assert_eq!(tree.handles(), vec![handles[0], added, handles[2]]);
+}
