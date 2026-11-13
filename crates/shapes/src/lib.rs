@@ -11,6 +11,7 @@ mod geometry;
 mod mesh_edges;
 mod path;
 mod path_lex;
+mod path_verb;
 mod segment;
 mod shape_id;
 mod table;
