@@ -41,8 +41,8 @@ pub(crate) struct KeptBox {
     pub(crate) own: Part,
     /// Its outline's items.
     pub(crate) outline: Scene,
-    /// Its scroll thumbs' items, painted again on every update that
-    /// paints.
+    /// Its scroll thumbs' items, painted again when they can have
+    /// changed (`thumbs_again.rs`).
     pub(crate) thumb: Scene,
 }
 

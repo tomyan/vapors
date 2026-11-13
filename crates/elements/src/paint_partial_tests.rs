@@ -93,3 +93,49 @@ fn a_hidden_inline_element_loses_its_border_box() {
     // Then
     assert!(!painted.rects.contains_key(&span));
 }
+
+/// A document of `count` scroll containers, each holding a taller
+/// block of text, updated once; the first container's text node.
+fn scrollers(count: usize) -> (Document, NodeId) {
+    let mut doc = Document::new(FontSystem::bundle_only());
+    doc.add_stylesheet(
+        "app.css",
+        ".scroller { overflow: auto; height: 10px; } .tall { height: 40px; }",
+    )
+    .expect("parses");
+    let body = doc.body();
+    let texts: Vec<NodeId> = (0..count)
+        .map(|_| {
+            let (scroller, tall) = (doc.create_element("div"), doc.create_element("div"));
+            doc.set_attribute(scroller, "class", "scroller");
+            doc.set_attribute(tall, "class", "tall");
+            let text = doc.create_text("12345");
+            doc.append(body, scroller);
+            doc.append(scroller, tall);
+            doc.append(tall, text);
+            text
+        })
+        .collect();
+    doc.update(VIEWPORT).expect("updates");
+    (doc, texts[0])
+}
+
+/// The scene items an edit of `text` to a text of the same length built.
+fn items_built_by_edit(doc: &mut Document, text: NodeId) -> usize {
+    doc.set_text(text, "54321");
+    doc.update(VIEWPORT).expect("updates").items_built
+}
+
+#[test]
+fn an_edit_inside_a_scroll_container_paints_no_other_containers_thumbs() {
+    // Given
+    let (mut one, one_text) = scrollers(1);
+    let (mut many, many_text) = scrollers(5);
+
+    // When
+    let built_with_one = items_built_by_edit(&mut one, one_text);
+    let built_with_many = items_built_by_edit(&mut many, many_text);
+
+    // Then
+    assert_eq!(built_with_many, built_with_one);
+}
