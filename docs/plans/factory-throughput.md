@@ -3,6 +3,9 @@
 Status: slice 0 is built (#308): the step this document calls "lint,
 wasm lint and unit" is now three steps, `lint`, `wasm lint` and
 `unit`, and the ci.yml line numbers below are as they were before it.
+Slice 1 is built (#309): the build-timings step builds `--bins
+--examples`; where this document quotes `--all-targets` it describes
+the step before the change.
 
 Written as a design, before anything was built, on 2026-11-13 from
 `origin/main` at 00dbc38b, the 65 gate logs in `~/.cache/handoffs`
@@ -297,6 +300,12 @@ profile.
   `ci` job gets the same cut, which also keeps it clear of its 9-minute
   timeout (ci.yml:34; its lint-and-unit step took 273 s on the last
   successful main run, 43204069045, before #233).
+- Accepted with it: the timings artefact no longer shows the test
+  harnesses' compile cost; nextest's build of them is in no artefact.
+  A slice that needs that number adds `--timings` to its own build.
+  CI's `ci` job keeps the step although nothing else in that job uses
+  the dev bins and examples (about 56 CPU-s): the artefact is the one
+  record of the dev build's units, and the gate runs the step as CI does.
 - Effort: one PR, two lines and a comment.
 - Proof: the next gate's `cargo-timing.html` lists no `(test)` units
   and the step is under 10 s; the gpu job's first `cargo run` step does
@@ -515,7 +524,7 @@ Smallest first; each under 400 lines; each proved as its cut says.
 | slice | cut | lines | what it proves before the next |
 |---|---|---|---|
 | 0 (done, #308) | split ci.yml's "lint, wasm lint and unit" into three steps, `cargo xtask lint`, `cargo xtask wasm`, `cargo xtask test --tier unit`, same order, same env (the gate stops at the first failure as `&&` did) | about 15 | the gate log measures lint, wasm and unit apart; the baselines for 2 and 4 |
-| 1 | C1, the timings step without test targets | 3 | 60 s a gate; the next gate's timings file has no `(test)` units |
+| 1 (done, #309) | C1, the timings step without test targets | 3 | 60 s a gate; the next gate's timings file has no `(test)` units |
 | 2 | C3, the load wait reads runnable tasks | about 100 | wait lines in the next gates |
 | 3 | C4, three ci slots, `[build] jobs = 4` for plain cargo | about 150 + 10 | ci hold times and gate lock waits in the next day's logs |
 | 4 | C2 for elements: the xtask script, build.rs, the move | about 200 non-rename | `nextest list` counts; the unit step's time from slice 0 |
