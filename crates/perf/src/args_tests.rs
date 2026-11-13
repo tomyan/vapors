@@ -52,13 +52,13 @@ fn only_and_instructions_are_read_among_the_counts() {
     let o = full(&["--instructions", "50", "--only", "3000 rows, Class", "5"]).expect("parsed");
     assert_eq!((o.settings.runs, o.settings.warmup), (50, 5));
     assert_eq!(o.only.as_deref(), Some("3000 rows, Class"));
-    assert!(o.instructions);
+    assert_eq!(o.measure, super::Measure::Instructions);
 }
 
 #[test]
 fn without_flags_there_is_no_filter_and_times_are_reported() {
     let o = full(&[]).expect("parsed");
-    assert_eq!((o.only, o.instructions), (None, false));
+    assert_eq!((o.only, o.measure), (None, super::Measure::Times));
 }
 
 #[test]

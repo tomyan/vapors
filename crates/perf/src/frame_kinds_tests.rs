@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 use std::time::Duration;
 
 use super::sections;
+use crate::args::Measure;
 use crate::run::Samples;
 
 /// Six kept frames of 0 to 5 µs, the update phase the same.
@@ -37,7 +38,8 @@ fn an_odd_warmup_makes_the_second_kept_frame_the_first_kinds() {
 
 #[test]
 fn one_kind_gives_one_section_with_its_gpu_rows() {
-    let reports = sections("10 units, Edit", &six_frames(), &["every"], false).expect("one");
+    let reports =
+        sections("10 units, Edit", &six_frames(), &["every"], Measure::Times).expect("one");
     assert_eq!(reports.len(), 1);
     assert!(
         reports[0].starts_with("### 10 units, Edit\n"),
@@ -54,7 +56,7 @@ fn two_kinds_give_a_section_each_titled_by_kind_with_gpu_rows() {
         "10 units, Insert",
         &six_frames(),
         &["insert", "remove"],
-        false,
+        Measure::Times,
     )
     .expect("two");
 
@@ -85,8 +87,13 @@ fn two_kinds_give_a_section_each_titled_by_kind_with_gpu_rows() {
 fn too_few_frames_of_a_kind_are_refused_naming_the_runs_to_give() {
     let mut samples = six_frames();
     samples.frame.truncate(5);
-    let error = sections("10 units, Insert", &samples, &["insert", "remove"], false)
-        .expect_err("five frames");
+    let error = sections(
+        "10 units, Insert",
+        &samples,
+        &["insert", "remove"],
+        Measure::Times,
+    )
+    .expect_err("five frames");
     assert!(
         error.contains("give at least 6 runs: vapors-perf 6 10 --off-path"),
         "{error}"
