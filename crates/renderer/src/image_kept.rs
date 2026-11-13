@@ -4,81 +4,68 @@
 
 use std::ops::Range;
 
-use vapors_scene::{Rect, Size};
+use vapors_scene::Rect;
 
-use super::ImagePipeline;
+use super::{ImagePipeline, Quads};
 use crate::image_binding::TextureBinding;
-use crate::quad::{VERTEX_COUNT, VERTEX_SIZE, quad_vertices, vertex_bytes};
+use crate::quad::{VERTEX_COUNT, VERTEX_SIZE, quad_corners, vertex_bytes};
 use crate::{KeptRange, Target};
 
 impl ImagePipeline {
-    /// The vertex bytes of a quad over each of `rects` (device pixels)
-    /// on a target of `viewport`, in order, as [`ImagePipeline::draw_rect`]
-    /// writes one.
+    /// The vertex bytes of a quad over each of `rects` (device pixels),
+    /// in order, as [`ImagePipeline::draw_rect`] writes one.
     #[must_use]
-    pub fn rect_bytes(viewport: Size, rects: impl IntoIterator<Item = Rect>) -> Vec<u8> {
+    pub fn rect_bytes(rects: impl IntoIterator<Item = Rect>) -> Vec<u8> {
         let quad = |rect: Rect| [[rect.left, rect.top], [rect.right, rect.bottom]];
         rects
             .into_iter()
-            .flat_map(|rect| vertex_bytes(&quad_vertices(quad(rect), viewport)))
+            .flat_map(|rect| vertex_bytes(&quad_corners(quad(rect))))
             .collect()
     }
 
     /// Writes `bytes` ([`ImagePipeline::rect_bytes`]) into the kept
     /// buffer, for [`ImagePipeline::draw_kept`] in this and later
-    /// frames on targets of the viewport they were made for. `None` when
-    /// the buffer they need is over the device's `max_buffer_size`: the
-    /// refusal is on the target's encoder.
+    /// frames, on targets of any viewport. `None` when the buffer they
+    /// need is over the device's `max_buffer_size`: the refusal is on
+    /// the target's encoder.
     pub fn keep(&mut self, target: &Target<'_>, bytes: &[u8]) -> Option<KeptRange> {
         let (frame, queue) = (target.encoder, target.queue);
-        let kept = self.kept.keep(frame, queue, &self.work, bytes)?;
-        Some(kept.on(target.viewport))
+        self.kept.keep(frame, queue, &self.work, bytes)
     }
 
-    /// Draws `bound`'s texture over the `index`th quad `kept` holds, in
-    /// `target`, inside the target's scissor.
+    /// Draws `bound`'s texture over the `index`th quad `kept` holds,
+    /// moved by `shift` (device pixels: a scroll frame's), in `target`,
+    /// inside the target's scissor; not when the view slot is refused
+    /// (the refusal is on the encoder).
     ///
     /// # Panics
     ///
-    /// If `kept` was kept by another pipeline, holds no `index`th quad,
-    /// or was kept on a target of another viewport.
+    /// If `kept` was kept by another pipeline or holds no `index`th quad.
     pub fn draw_kept(
         &mut self,
         target: &Target<'_>,
         bound: &TextureBinding,
         (kept, index): (&KeptRange, u32),
+        shift: [f32; 2],
     ) {
-        let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
-        let vertices = self.vertices(kept, index, target.viewport);
-        let slice = self.kept.slice(target.encoder, kept);
-        target.draw_pass(|pass| {
-            pass.set_pipeline(&self.pipeline);
-            pass.set_bind_group(0, bound.bind_group(), &[]);
-            pass.set_vertex_buffer(0, slice);
-            self.work.draw(pass, vertices, 0..1);
-        });
+        let vertices = self.vertices(kept, index);
+        let Some(view) = self.view_slot(target, shift) else {
+            return;
+        };
+        self.record(target, bound, (Quads::Kept(kept), vertices), view);
     }
 
-    /// The vertices of the `index`th quad `kept` holds, to draw on a
-    /// target of `viewport`.
+    /// The vertices of the `index`th quad `kept` holds.
     ///
     /// # Panics
     ///
     /// As [`ImagePipeline::draw_kept`].
-    fn vertices(&self, kept: &KeptRange, index: u32, viewport: Size) -> Range<u32> {
+    fn vertices(&self, kept: &KeptRange, index: u32) -> Range<u32> {
         let quads = self.kept.len(kept) / VERTEX_SIZE / u64::from(VERTEX_COUNT);
         assert!(
             u64::from(index) < quads,
             "image quads: quad {index} drawn from a kept range of {quads} quads; draw each \
              kept range's quads by their place in it (image_kept.rs)"
-        );
-        let on = kept.viewport();
-        assert_eq!(
-            on,
-            Some(viewport),
-            "image quads: quads kept on a target of {on:?} drawn on one of {viewport:?}; their \
-             vertices are in clip space, so keep the rects again on a target of the new viewport \
-             (image_kept.rs)"
         );
         let first = index * VERTEX_COUNT;
         first..first + VERTEX_COUNT

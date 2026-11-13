@@ -1,9 +1,10 @@
-//! One textured quad in clip space: the vertex type and the geometry the
-//! image and solid pipelines share.
+//! One textured quad, in pixels or clip space: the vertex type and the
+//! geometry the image and solid pipelines share.
 
 use vapors_scene::Size;
 
-/// One vertex: viewport position in clip space, texture coordinate.
+/// One vertex: position (clip space for the solid pipeline, device
+/// pixels for the image pipeline), texture coordinate.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Vertex {
@@ -33,9 +34,18 @@ pub(crate) fn quad_vertices(
     bounds: [[f32; 2]; 2],
     viewport: Size,
 ) -> [Vertex; VERTEX_COUNT as usize] {
+    quad_corners(bounds).map(|corner| Vertex {
+        position: to_clip(corner.position, viewport),
+        ..corner
+    })
+}
+
+/// Two triangles covering `bounds` (top-left, bottom-right), positions
+/// as `bounds` gives them, with texture coordinates 0..1 across them.
+pub(crate) fn quad_corners(bounds: [[f32; 2]; 2]) -> [Vertex; VERTEX_COUNT as usize] {
     let [[left, top], [right, bottom]] = bounds;
     let corner = |x: f32, y: f32, u: f32, v: f32| Vertex {
-        position: to_clip([x, y], viewport),
+        position: [x, y],
         uv: [u, v],
     };
     [

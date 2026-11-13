@@ -8,10 +8,12 @@ use vapors_scene::{Rect, Size, Transform};
 
 use crate::frame_arena::FrameArena;
 use crate::image_binding::{Sampling, TextureBinding};
-use crate::image_setup::{bind_group_layout, render_pipeline};
+use crate::image_setup::{bind_group_layout, render_pipeline, samplers, view_layout};
+use crate::kept_bind_group::KeptBindGroup;
+use crate::uniform_slots::UniformSlots;
 use crate::{ArenaFull, FrameEncoder, GpuWork, Retained, Target, WorkCounter};
 
-use crate::quad::{VERTEX_COUNT, VERTEX_SIZE, quad_vertices, vertex_bytes};
+use crate::quad::{VERTEX_COUNT, VERTEX_SIZE, quad_corners, vertex_bytes};
 
 /// A pipeline that draws one 2D texture as a quad. Create once per
 /// target format; draw many times.
@@ -24,6 +26,10 @@ pub struct ImagePipeline {
     smooth: wgpu::Sampler,
     vertices: FrameArena,
     kept: Retained,
+    /// The viewport and scroll frame shift each quad is drawn at.
+    views: UniformSlots,
+    view_layout: wgpu::BindGroupLayout,
+    view_group: KeptBindGroup,
     work: WorkCounter,
 }
 
@@ -35,34 +41,9 @@ impl ImagePipeline {
             label: Some("image"),
             source: wgpu::ShaderSource::Wgsl(include_str!("image.wgsl").into()),
         });
-        let layout = bind_group_layout(device);
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("image"),
-            bind_group_layouts: &[Some(&layout)],
-            immediate_size: 0,
-        });
-        let pipeline = render_pipeline(device, &pipeline_layout, &shader, format);
-        let sampler = |label, filter, mipmap_filter| {
-            device.create_sampler(&wgpu::SamplerDescriptor {
-                label: Some(label),
-                mag_filter: filter,
-                min_filter: filter,
-                mipmap_filter,
-                ..Default::default()
-            })
-        };
-        let (nearest, smooth) = (
-            sampler(
-                "image nearest",
-                wgpu::FilterMode::Nearest,
-                wgpu::MipmapFilterMode::Nearest,
-            ),
-            sampler(
-                "image smooth",
-                wgpu::FilterMode::Linear,
-                wgpu::MipmapFilterMode::Linear,
-            ),
-        );
+        let (layout, view_layout) = (bind_group_layout(device), view_layout(device));
+        let pipeline = render_pipeline(device, (&layout, &view_layout), &shader, format);
+        let (nearest, smooth) = samplers(device);
         let vertices = FrameArena::new(
             device,
             "image quad",
@@ -76,6 +57,9 @@ impl ImagePipeline {
             smooth,
             vertices,
             kept: Retained::new(device, "image quads", wgpu::BufferUsages::VERTEX),
+            views: UniformSlots::new(device, "image views"),
+            view_layout,
+            view_group: KeptBindGroup::NONE,
             work: WorkCounter::default(),
         }
     }
@@ -148,20 +132,18 @@ impl ImagePipeline {
     }
 
     fn quad(&mut self, target: &Target<'_>, bound: &TextureBinding, bounds: [[f32; 2]; 2]) {
-        let quad = vertex_bytes(&quad_vertices(bounds, target.viewport));
+        let quad = vertex_bytes(&quad_corners(bounds));
         let Some(vertices) = self
             .vertices
             .push(target.encoder, target.queue, &self.work, &quad)
         else {
             return;
         };
-        let _encoding = tracing::trace_span!("draw step", phase = "encode").entered();
-        target.draw_pass(|pass| {
-            pass.set_pipeline(&self.pipeline);
-            pass.set_bind_group(0, bound.bind_group(), &[]);
-            pass.set_vertex_buffer(0, vertices.slice());
-            self.work.draw(pass, 0..VERTEX_COUNT, 0..1);
-        });
+        let Some(view) = self.view_slot(target, [0.0; 2]) else {
+            return;
+        };
+        let from = (Quads::Placed(&vertices), 0..VERTEX_COUNT);
+        self.record(target, bound, from, view);
     }
 
     fn bind_group(
@@ -192,3 +174,6 @@ impl ImagePipeline {
 
 #[path = "image_kept.rs"]
 mod kept;
+#[path = "image_record.rs"]
+mod record;
+use record::Quads;

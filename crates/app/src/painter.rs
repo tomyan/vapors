@@ -10,6 +10,9 @@ use vapors_renderer::{ImagePipeline, QuadPipeline, ShadowPipeline, Target, clear
 use vapors_scene::Run;
 use vapors_text::{AtlasConfig, GlyphAtlas, TextPipeline};
 
+/// The shift of a batch whose items are on the page: none.
+const ON_PAGE: [f32; 2] = [0.0; 2];
+
 /// The pipelines and glyph atlas for one target format.
 pub struct ScenePainter {
     shadows: ShadowPipeline,
@@ -153,8 +156,8 @@ impl ScenePainter {
         (run, key, at): (&Run, BatchKey, usize),
     ) -> Result<(), PaintError> {
         let result = match KeptKind::of_run(run) {
-            Some(_) => self.draw_retained(target, painted, (run, key, at)),
-            None => self.draw_kept_text(target, painted, (run, key, at)),
+            Some(_) => self.draw_retained(target, painted, (run, key, at), ON_PAGE),
+            None => self.draw_kept_text(target, painted, (run, key, at), ON_PAGE),
         };
         self.count_run(run);
         result?;

@@ -43,13 +43,14 @@ impl QuadPipeline {
         self.0.keep(target, bytes)
     }
 
-    /// Draws the quads `kept` holds into `target`, in one draw call.
+    /// Draws the quads `kept` holds into `target`, moved by `shift`
+    /// (device pixels: a scroll frame's), in one draw call.
     ///
     /// # Panics
     ///
     /// If `kept` was kept by another pipeline.
-    pub fn draw_kept(&mut self, target: &Target<'_>, kept: &KeptRange) {
-        self.0.draw_kept(target, kept);
+    pub fn draw_kept(&mut self, target: &Target<'_>, kept: &KeptRange, shift: [f32; 2]) {
+        self.0.draw_kept(target, kept, shift);
     }
 
     /// Gives `kept`'s bytes back. Draws of it already recorded still

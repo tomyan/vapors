@@ -1,8 +1,8 @@
 //! GPU tier: an image pipeline's quads kept (`image_kept.rs`): a run's
 //! rects written once, each drawn by its place in the kept range with
-//! its own texture, in a later frame with nothing written; a place past
-//! the range, however far, and a draw on a target of another viewport
-//! panic.
+//! its own texture, in a later frame with nothing written, on a target
+//! of any viewport, moved by a scroll frame's shift (IU4 4c); a place
+//! past the range, however far, panics.
 
 use vapors_gpu_harness::{Gpu, gpu, read_rgba8};
 use vapors_renderer::{
@@ -12,6 +12,8 @@ use vapors_scene::{Color, Rect, Size};
 
 const RED: [u8; 4] = [211, 47, 47, 255];
 const BLUE: [u8; 4] = [25, 118, 210, 255];
+/// No scroll frame's shift.
+const NONE: [f32; 2] = [0.0; 2];
 const VIEWPORT: Size = Size {
     width: 16,
     height: 8,
@@ -82,7 +84,7 @@ impl Scene {
             Rect::new(0.0, 0.0, 8.0, 8.0),
             Rect::new(8.0, 0.0, 16.0, 8.0),
         ];
-        let bytes = ImagePipeline::rect_bytes(VIEWPORT, halves);
+        let bytes = ImagePipeline::rect_bytes(halves);
         self.pipeline.keep(at, &bytes).expect("room")
     }
 }
@@ -97,8 +99,8 @@ fn gpu_kept_image_quads_draw_by_their_place_in_a_later_frame_with_nothing_writte
 
     // When: blue drawn over the right half, red over the left
     scene.frame(|scene, at| {
-        scene.pipeline.draw_kept(at, &scene.blue, (&kept, 1));
-        scene.pipeline.draw_kept(at, &scene.red, (&kept, 0));
+        scene.pipeline.draw_kept(at, &scene.blue, (&kept, 1), NONE);
+        scene.pipeline.draw_kept(at, &scene.red, (&kept, 0), NONE);
     });
 
     // Then
@@ -106,7 +108,9 @@ fn gpu_kept_image_quads_draw_by_their_place_in_a_later_frame_with_nothing_writte
     let pixels = read_rgba8(&scene.gpu.device, &scene.gpu.queue, &scene.target);
     assert_eq!([pixel(&pixels, 2, 2), pixel(&pixels, 12, 5)], [RED, BLUE]);
     assert_eq!(written.buffer_bytes, 2 * 6 * 16);
-    assert_eq!((work.buffer_bytes, work.draw_calls), (0, 2));
+    // No vertex bytes: the 16 are the view uniform's first value.
+    let uniform = (work.buffer_bytes, work.uniform_writes);
+    assert_eq!((uniform, work.draw_calls), ((16, 1), 2));
     assert_eq!(scene.pipeline.retained_bytes(), 2 * 6 * 16);
 }
 
@@ -119,7 +123,7 @@ fn gpu_a_kept_image_quad_past_the_range_panics() {
     // When
     scene.frame(|scene, at| {
         let kept = scene.keep_halves(at);
-        scene.pipeline.draw_kept(at, &scene.red, (&kept, 2));
+        scene.pipeline.draw_kept(at, &scene.red, (&kept, 2), NONE);
     });
 }
 
@@ -134,25 +138,53 @@ fn gpu_a_kept_image_quad_far_past_the_range_panics() {
         let kept = scene.keep_halves(at);
         scene
             .pipeline
-            .draw_kept(at, &scene.red, (&kept, u32::MAX / 6 + 1));
+            .draw_kept(at, &scene.red, (&kept, u32::MAX / 6 + 1), NONE);
     });
 }
 
 #[test]
-#[should_panic(expected = "keep the rects again on a target of the new viewport")]
-fn gpu_kept_image_quads_drawn_on_a_target_of_another_viewport_panic() {
+fn gpu_kept_image_quads_draw_on_a_target_of_another_viewport() {
     // Given: the halves kept on a 16 by 8 target
     let mut scene = Scene::new();
     let mut kept = None;
     scene.frame(|scene, at| kept = Some(scene.keep_halves(at)));
     let kept = kept.expect("kept");
 
-    // When: drawn on an 8 by 8 one
+    // When: the right half drawn on the left 8 by 8 of it
     let resized = Size {
         width: 8,
         height: 8,
     };
     scene.frame_on(resized, |scene, at| {
-        scene.pipeline.draw_kept(at, &scene.red, (&kept, 0));
+        scene.pipeline.draw_kept(at, &scene.red, (&kept, 1), NONE);
     });
+
+    // Then: device pixels, the same place on any viewport
+    let pixels = read_rgba8(&scene.gpu.device, &scene.gpu.queue, &scene.target);
+    let grey = [40, 40, 40, 255];
+    assert_eq!([pixel(&pixels, 3, 3), pixel(&pixels, 7, 7)], [grey, grey]);
+    scene.pipeline.release(kept);
+}
+
+#[test]
+fn gpu_kept_image_quads_drawn_with_a_shift_land_moved_by_it() {
+    // Given: the halves kept
+    let mut scene = Scene::new();
+    let mut kept = None;
+    scene.frame(|scene, at| kept = Some(scene.keep_halves(at)));
+    let kept = kept.expect("kept");
+
+    // When: the left half drawn 4 pixels right and 2 down
+    scene.frame(|scene, at| {
+        scene
+            .pipeline
+            .draw_kept(at, &scene.blue, (&kept, 0), [4.0, 2.0]);
+    });
+
+    // Then
+    let pixels = read_rgba8(&scene.gpu.device, &scene.gpu.queue, &scene.target);
+    let grey = [40, 40, 40, 255];
+    let corners = [(3, 2), (4, 1), (4, 2), (11, 7)].map(|(x, y)| pixel(&pixels, x, y));
+    assert_eq!(corners, [grey, grey, BLUE, BLUE]);
+    scene.pipeline.release(kept);
 }

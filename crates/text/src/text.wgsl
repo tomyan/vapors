@@ -1,5 +1,6 @@
 // Glyph quads from the coverage atlas. Positions arrive in device
-// pixels (origin top-left, y down) and go to clip space by the viewport.
+// pixels (origin top-left, y down), are moved by the scroll frame's
+// shift and go to clip space by the viewport.
 // The fragment turns coverage into an alpha the way Skia's mask gamma
 // does: blend text and an assumed background in linear light, with a
 // contrast boost that fades as the text gets lighter, then find the
@@ -10,6 +11,7 @@ struct Params {
     gamma: f32,
     contrast: f32,
     viewport: vec2<f32>,
+    shift: vec2<f32>,
 }
 
 struct VertexIn {
@@ -31,9 +33,10 @@ struct VertexOut {
 @vertex
 fn vs_main(in: VertexIn) -> VertexOut {
     var out: VertexOut;
+    let pixel = in.position + params.shift;
     let clip = vec2<f32>(
-        in.position.x / params.viewport.x * 2.0 - 1.0,
-        1.0 - in.position.y / params.viewport.y * 2.0,
+        pixel.x / params.viewport.x * 2.0 - 1.0,
+        1.0 - pixel.y / params.viewport.y * 2.0,
     );
     out.position = vec4<f32>(clip, 0.0, 1.0);
     out.uv = in.uv;

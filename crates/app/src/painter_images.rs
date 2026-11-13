@@ -47,18 +47,18 @@ impl Textures {
     }
 
     /// Draws each image item of `items` with `pipeline`, over the quad
-    /// at its place in `kept`.
+    /// at its place in `kept`, moved by `shift`.
     pub(super) fn draw_kept(
         &mut self,
         pipeline: &mut ImagePipeline,
         target: &Target<'_>,
         painted: &Painted,
-        (items, kept): (&[Item], &KeptRange),
+        (items, kept, shift): (&[Item], &KeptRange, [f32; 2]),
     ) {
         for (place, item) in (0..).zip(items) {
             if let Item::Image { image, .. } = item {
                 let bound = self.bound(pipeline, target, painted.image(*image));
-                pipeline.draw_kept(target, bound, (kept, place));
+                pipeline.draw_kept(target, bound, (kept, place), shift);
             }
         }
     }

@@ -78,9 +78,10 @@ impl TextPipeline {
     }
 
     /// Uploads what changed in `atlas`'s page and draws the vertices
-    /// `kept` holds, built with `pins`, into `target` with `params`, in
-    /// one draw call; not when the params slot is refused (the refusal
-    /// is on the encoder).
+    /// `kept` holds, built with `pins`, into `target` with `params`,
+    /// moved by `shift` (device pixels: a scroll frame's), in one draw
+    /// call; not when the params slot is refused (the refusal is on the
+    /// encoder).
     ///
     /// # Panics
     ///
@@ -94,6 +95,7 @@ impl TextPipeline {
         atlas: &mut GlyphAtlas,
         (kept, pins): (&KeptRange, &AtlasPins),
         params: BlendParams,
+        shift: [f32; 2],
     ) {
         let (built, now) = (pins.generation(), atlas.generation());
         assert_eq!(
@@ -101,7 +103,7 @@ impl TextPipeline {
             "text: kept bytes built at atlas generation {built} drawn at {now}; build them again \
              when the generation moves on (draw_kept.rs); reproduce with `cargo xtask test`"
         );
-        let Some(params) = self.prepare(target, atlas, params) else {
+        let Some(params) = self.prepare(target, atlas, (params, shift)) else {
             return;
         };
         self.record_draw(target, Vertices::Kept(kept), params);

@@ -119,7 +119,7 @@ fn gpu_a_batch_no_longer_drawn_has_its_bytes_released() {
 }
 
 #[test]
-fn gpu_image_quads_kept_for_one_viewport_are_written_again_for_another_with_the_same_view() {
+fn gpu_image_quads_kept_for_one_viewport_draw_on_another_with_the_same_view_unwritten() {
     // Given: drawn on a 64 px target scissored to its top-left 32 px
     let doc = page();
     let mut rig = Rig::new();
@@ -134,10 +134,12 @@ fn gpu_image_quads_kept_for_one_viewport_are_written_again_for_another_with_the_
     // When: drawn on a 32 px target, the same view
     let pixels = draw_on(&mut rig, &doc, (32, None));
 
-    // Then: the image's quad, in clip space, is written again
+    // Then: the image's quad, in device pixels, is drawn as kept; the
+    // 16 bytes are the new viewport's uniform value
     let counts = rig.painter.frame_counts();
-    assert_eq!(counts.batches_written, 1, "{counts:?}");
-    assert_eq!(counts.images.buffer_bytes, 6 * 16);
+    assert_eq!(counts.batches_written, 0, "{counts:?}");
+    let images = counts.images;
+    assert_eq!((images.buffer_bytes, images.uniform_writes), (16, 1));
     let at = |x: u32, y: u32| pixels[((y * 32 + x) * 4) as usize..][..4].to_vec();
     assert_eq!([at(14, 4), at(20, 4)], [RED.to_vec(), WHITE.to_vec()]);
 }

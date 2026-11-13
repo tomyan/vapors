@@ -50,8 +50,13 @@ impl Frame {
     }
 
     pub fn draw(&mut self, encoder: &FrameEncoder, kept: &KeptRange) {
+        self.draw_shifted(encoder, kept, [0.0; 2]);
+    }
+
+    /// Draws `kept` moved by `shift`, device pixels.
+    pub fn draw_shifted(&mut self, encoder: &FrameEncoder, kept: &KeptRange, shift: [f32; 2]) {
         let at = target(&self.gpu, encoder, &self.view, SIDE);
-        self.pipeline.draw_kept(&at, kept);
+        self.pipeline.draw_kept(&at, kept, shift);
     }
 
     /// The colours of the top row's first three pixels.

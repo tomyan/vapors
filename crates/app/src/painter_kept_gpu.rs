@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use vapors_elements::BatchKey;
 use vapors_renderer::{KeptRange, Target};
-use vapors_scene::{Run, Size};
+use vapors_scene::Run;
 use vapors_text::{GlyphAtlas, TextPipeline};
 
 use super::{Kind, Pipelines, run_bytes};
@@ -53,18 +53,16 @@ impl KeptGpu {
     }
 
     /// The kept bytes of `run`, batch `at` of the frame, keyed `key` on
-    /// `target`, written first when none are kept for its viewport;
-    /// `None` when refused.
+    /// `target`, written first when none are kept; `None` when refused.
     pub(super) fn range(
         &mut self,
         mut pipelines: Pipelines<'_>,
         target: &Target<'_>,
         (run, key, at): (&Run, BatchKey, usize),
     ) -> Option<&KeptRange> {
-        let viewport = target.viewport;
         match self.entries.get(&key) {
-            Some(gpu) if gpu.range.viewport().is_none_or(|kept| kept == viewport) => {
-                gpu.check(run, viewport, at);
+            Some(gpu) => {
+                gpu.check(run, at);
                 self.kept += 1;
             }
             _ => self.write(&mut pipelines, target, (run, key))?,
@@ -74,18 +72,14 @@ impl KeptGpu {
         Some(&gpu.range)
     }
 
-    /// Builds and writes `run`'s bytes under `key`, releasing those kept
-    /// for another viewport; `None` when refused.
+    /// Builds and writes `run`'s bytes under `key`; `None` when refused.
     fn write(
         &mut self,
         pipelines: &mut Pipelines<'_>,
         target: &Target<'_>,
         (run, key): (&Run, BatchKey),
     ) -> Option<()> {
-        if let Some(stale) = self.entries.remove(&key) {
-            pipelines.release(stale.kind, stale.range);
-        }
-        let (kind, bytes) = (Kind::of(run), run_bytes(run, target.viewport));
+        let (kind, bytes) = (Kind::of(run), run_bytes(run));
         let range = pipelines.keep(kind, target, &bytes)?;
         self.written += 1;
         let gpu = Gpu {
@@ -125,13 +119,13 @@ impl KeptGpu {
 }
 
 impl Gpu {
-    /// In a debug build, panics when `run`'s bytes built afresh for
-    /// `viewport` differ from those kept, naming batch `at`.
+    /// In a debug build, panics when `run`'s bytes built afresh differ
+    /// from those kept, naming batch `at`.
     #[cfg_attr(not(debug_assertions), allow(clippy::unused_self))]
-    fn check(&self, run: &Run, viewport: Size, at: usize) {
+    fn check(&self, run: &Run, at: usize) {
         #[cfg(debug_assertions)]
-        super::super::kept_check::assert_kept(&self.bytes, &run_bytes(run, viewport), (run, at));
+        super::super::kept_check::assert_kept(&self.bytes, &run_bytes(run), (run, at));
         #[cfg(not(debug_assertions))]
-        let _ = (run, viewport, at); // only the debug build's compare uses them
+        let _ = (run, at); // only the debug build's compare uses them
     }
 }

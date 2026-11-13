@@ -1,6 +1,8 @@
 //! GPU tier: text vertices kept between frames (IU4 PR 3) draw the
 //! pixels the immediate draw does, and a frame drawing them again
-//! writes no vertex bytes and looks nothing up in the atlas.
+//! writes no vertex bytes and looks nothing up in the atlas; drawn
+//! under a scroll frame's shift (IU4 4c), they land where the text
+//! drawn at the moved origin does.
 
 #[path = "support/painter.rs"]
 mod painter;
@@ -15,6 +17,8 @@ use vapors_text::{
 };
 
 const PAGE: u32 = 128;
+/// No scroll frame's shift.
+const NONE: [f32; 2] = [0.0; 2];
 
 /// The first frame: `text`'s bytes built, pinned, kept and drawn.
 fn keep_and_draw(painter: &mut Painter, text: &str) -> (Vec<u8>, KeptRange, AtlasPins) {
@@ -27,7 +31,7 @@ fn keep_and_draw(painter: &mut Painter, text: &str) -> (Vec<u8>, KeptRange, Atla
         };
         let (bytes, pins) = TextPipeline::text_bytes(atlas, &[draw])?;
         let range = pipeline.keep(target, &bytes).expect("kept");
-        pipeline.draw_kept(target, atlas, (&range, &pins), BlendParams::default());
+        pipeline.draw_kept(target, atlas, (&range, &pins), BlendParams::default(), NONE);
         *kept.borrow_mut() = Some((range, pins));
         Ok(())
     });
@@ -40,7 +44,7 @@ fn keep_and_draw(painter: &mut Painter, text: &str) -> (Vec<u8>, KeptRange, Atla
 fn draw_again(painter: &mut Painter, kept: (&KeptRange, &AtlasPins)) -> (Vec<u8>, u64) {
     let written = RefCell::new(0);
     let drawn = painter.frame(|pipeline, atlas, target| {
-        pipeline.draw_kept(target, atlas, kept, BlendParams::default());
+        pipeline.draw_kept(target, atlas, kept, BlendParams::default(), NONE);
         *written.borrow_mut() = pipeline.take_work().buffer_bytes;
         Ok(())
     });
@@ -89,7 +93,31 @@ fn gpu_kept_text_drawn_after_the_atlas_grew_and_repacked_panics() {
     // is drawn from its bytes
     painter.frame(|pipeline, atlas, target| {
         pipeline.draw(target, atlas, &large, [0.0, 60.0], BlendParams::default())?;
-        pipeline.draw_kept(target, atlas, (&range, &pins), BlendParams::default());
+        pipeline.draw_kept(target, atlas, (&range, &pins), BlendParams::default(), NONE);
         Ok(())
     });
+}
+
+#[test]
+fn gpu_kept_text_drawn_with_a_shift_matches_the_text_drawn_at_the_moved_origin() {
+    // Given: "Hello" drawn at 5, 9
+    let mut immediate = Painter::new(PAGE);
+    let layout = immediate.layout("Hello");
+    let moved = immediate.frame(|pipeline, atlas, target| {
+        pipeline.draw(target, atlas, &layout, [5.0, 9.0], BlendParams::default())
+    });
+    let mut painter = Painter::new(PAGE);
+    let (_, range, pins) = keep_and_draw(&mut painter, "Hello");
+
+    // When: its bytes kept at 2, 4 drawn shifted by 3, 5
+    let shifted = painter.frame(|pipeline, atlas, target| {
+        let params = BlendParams::default();
+        pipeline.draw_kept(target, atlas, (&range, &pins), params, [3.0, 5.0]);
+        Ok(())
+    });
+
+    // Then
+    assert!(shifted.pixels == moved.pixels, "shifted kept text differs");
+    painter.atlas.unpin(pins);
+    painter.pipeline.release(range);
 }

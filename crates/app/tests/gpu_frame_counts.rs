@@ -26,6 +26,8 @@ const PAGE_BYTES: u64 = 1024 * 1024;
 const C_GLYPH_BYTES: u64 = 72;
 /// An image quad: 6 vertices of 4 floats.
 const IMAGE_QUAD_BYTES: u64 = 6 * 16;
+/// The image pipeline's viewport and shift uniform, written on its first draw.
+const VIEW_UNIFORM_BYTES: u64 = 16;
 
 const SWATCH: &str = ".swatch { width: 8px; height: 8px; background-color: #0000ff; \
     box-shadow: 2px 2px 2px #000000; }";
@@ -147,7 +149,10 @@ fn gpu_a_surface_frame_counts_its_composition() {
 
     // Then
     assert_eq!(counts.surfaces.draw_calls, 1);
-    assert_eq!(counts.surfaces.buffer_bytes, IMAGE_QUAD_BYTES);
+    assert_eq!(
+        counts.surfaces.buffer_bytes,
+        IMAGE_QUAD_BYTES + VIEW_UNIFORM_BYTES
+    );
     assert_eq!(counts.total().draw_calls, 1);
 }
 
