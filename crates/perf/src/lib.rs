@@ -10,6 +10,7 @@ pub mod args;
 pub mod args_off_path;
 pub mod circuit;
 pub mod driver;
+pub mod frame_kinds;
 pub mod gpu_reading;
 pub mod gpu_time;
 pub mod instruction_samples;

@@ -21,12 +21,12 @@ fn every_kind_mounts_without_a_refusal() {
 }
 
 #[test]
-fn every_inner_scroller_is_a_scroll_container() {
+fn every_inner_scroller_moves_sideways_by_a_scroll_step() {
     for kind in Kind::ALL {
         let page = UnitPage::new(&kind.shape(), 20).expect("mounts");
         for unit in page.units.iter().filter_map(|unit| unit.inner) {
-            let offset = page.doc.borrow().scroll_offset(unit);
-            assert_eq!(offset, Some([0.0, 0.0]), "{kind:?}");
+            let moved = page.doc.borrow_mut().scroll_node_by(unit, [24.0, 0.0]);
+            assert!(moved, "{kind:?}: {unit:?} has no sideways scroll range");
         }
     }
 }
