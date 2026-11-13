@@ -2,9 +2,12 @@
 //! from the attributes; a literal converts with `into`, an expression
 //! is passed raw, and `bind:name={signal}` passes the signal itself.
 //! Expressions are evaluated into their own `let`s first, so the
-//! allowance on the props literal covers only generated code.
+//! allowance on the props literal covers only generated code. `class`,
+//! `class:` and `style` style the component's anchor element instead
+//! (`component_anchor`).
 
 use super::allowances::Allowance;
+use super::component_anchor::styles_anchor;
 use super::emit::{Emitter, Place};
 use crate::CompileError;
 use crate::ast::{AttrValue, ComponentTag, Node};
@@ -30,6 +33,7 @@ impl Emitter<'_> {
         let var = self.fresh(&last.to_lowercase());
         self.reserve(&format!("{var}_props"));
         let mut fields = self.emit_prop_values(tag, &var)?;
+        fields.extend(self.anchor_field(tag, &var)?);
         let outer = self.snippets.len();
         self.emit_list_snippets(&tag.children)?;
         for child in &tag.children {
@@ -58,8 +62,8 @@ impl Emitter<'_> {
         self.line("..Default::default()");
         self.dedent(1);
         self.line("};");
-        self.emit_mount(tag, &var, place);
-        Ok(())
+        let binding = self.emit_mount(tag, &var, place);
+        self.emit_anchor_toggles(tag, &binding, &var)
     }
 
     /// `let {var}_{prop} = expr;` for each expression attribute; returns
@@ -70,7 +74,8 @@ impl Emitter<'_> {
         var: &str,
     ) -> Result<Vec<String>, CompileError> {
         let mut fields = Vec::new();
-        for attribute in tag.attributes.iter() {
+        let props = tag.attributes.iter().filter(|a| !styles_anchor(a));
+        for attribute in props {
             let name = super::tag_props::prop_name(attribute);
             let value = match &attribute.value {
                 AttrValue::Literal(value) => format!("{value:?}.into()"),
@@ -86,7 +91,8 @@ impl Emitter<'_> {
         Ok(fields)
     }
 
-    fn emit_mount(&mut self, tag: &ComponentTag, var: &str, place: &Place) {
+    /// Mounts the component; returns the binding that holds it.
+    fn emit_mount(&mut self, tag: &ComponentTag, var: &str, place: &Place) -> String {
         let binding = if place.roots {
             var.to_string()
         } else {
@@ -103,6 +109,7 @@ impl Emitter<'_> {
                 "roots.extend({var}.root_entries().iter().cloned());"
             ));
         }
+        binding
     }
 }
 
