@@ -46,6 +46,18 @@ const SUPPORTED: &[&str] = &[
     "var",
 ];
 
+/// The anchors of the 3D scene components (vapors-scene3d-components,
+/// docs/plans/css-for-3d.md C1): styled by the cascade, `display: none`
+/// from the user-agent sheet, and drawn by their surface, never laid
+/// out. Not offered in the refusal's list: only the components make
+/// them.
+const SCENE_ANCHORS: &[&str] = &["scene", "group", "mesh", "camera", "decal"];
+
+/// Whether `tag` is a scene component's anchor.
+pub(crate) fn is_scene_anchor(tag: &str) -> bool {
+    SCENE_ANCHORS.contains(&tag)
+}
+
 /// Where each unimplemented tag arrives.
 const LATER: &[(&str, &[&str])] = &[
     ("F2d, the first item after F2c", &["br", "a"]),
@@ -64,7 +76,7 @@ const LATER: &[(&str, &[&str])] = &[
 /// `None` when the tree implements `tag`; otherwise why not, with the
 /// slice that brings it.
 pub(crate) fn unsupported(tag: &str) -> Option<String> {
-    if SUPPORTED.contains(&tag) {
+    if SUPPORTED.contains(&tag) || is_scene_anchor(tag) {
         return None;
     }
     let reason = match LATER.iter().find(|(_, tags)| tags.contains(&tag)) {

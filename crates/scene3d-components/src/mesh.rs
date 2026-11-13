@@ -3,8 +3,9 @@
 
 use crate::component::node_component;
 use crate::node::{Mounted, mount_node, refuse};
+use crate::own_keys;
 use crate::placement::Placement;
-use vapors_dom::{DynDom, NodeId as ElementId, Snippet};
+use vapors_dom::{DynDom, NodeId as ElementId, Snippet, StyleKey};
 use vapors_scene3d::{Colour, GeometryId, NodeKind, Transform};
 use vapors_signals::{Effect, Signal};
 
@@ -17,6 +18,9 @@ pub struct MeshProps {
     /// Where the mesh sits in its parent; a change writes its uniform
     /// alone.
     pub transform: Signal<Transform>,
+    /// The anchor's key, which the compiler passes for a tag carrying
+    /// `class`, `class:` or `style`; `None` takes the component's own.
+    pub anchor: Option<&'static StyleKey>,
 }
 
 impl Default for MeshProps {
@@ -25,6 +29,7 @@ impl Default for MeshProps {
             geometry: None,
             colour: Signal::new(Colour::BLACK),
             transform: Signal::new(Transform::IDENTITY),
+            anchor: None,
         }
     }
 }
@@ -57,7 +62,8 @@ impl Mesh {
             panic!("<Mesh> has no geometry: pass geometry={{Some(id)}} with an id from the renderer's Meshes")
         });
         let colour = props.colour.get_untracked();
-        let kind = ("Mesh", NodeKind::Mesh { geometry, colour });
+        let key = props.anchor.unwrap_or(&own_keys::MESH);
+        let kind = ("Mesh", key, NodeKind::Mesh { geometry, colour });
         let mounted = mount_node(
             dom,
             (parent, before),

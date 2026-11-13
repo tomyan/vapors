@@ -2,7 +2,8 @@
 
 use crate::component::node_component;
 use crate::node::{Mounted, mount_node};
-use vapors_dom::{DynDom, NodeId as ElementId, Snippet};
+use crate::own_keys;
+use vapors_dom::{DynDom, NodeId as ElementId, Snippet, StyleKey};
 use vapors_scene3d::{NodeKind, Transform};
 use vapors_signals::Signal;
 
@@ -13,6 +14,9 @@ pub struct GroupProps {
     pub transform: Signal<Transform>,
     /// Its nodes.
     pub children: Snippet,
+    /// The anchor's key, which the compiler passes for a tag carrying
+    /// `class`, `class:` or `style`; `None` takes the component's own.
+    pub anchor: Option<&'static StyleKey>,
 }
 
 impl Default for GroupProps {
@@ -20,6 +24,7 @@ impl Default for GroupProps {
         Self {
             transform: Signal::new(Transform::IDENTITY),
             children: Snippet::empty(),
+            anchor: None,
         }
     }
 }
@@ -47,7 +52,8 @@ impl Group {
         props: GroupProps,
     ) -> Self {
         let dom = &dom.dyn_dom();
-        let kind = ("Group", NodeKind::Group);
+        let key = props.anchor.unwrap_or(&own_keys::GROUP);
+        let kind = ("Group", key, NodeKind::Group);
         let mounted = mount_node(
             dom,
             (parent, before),

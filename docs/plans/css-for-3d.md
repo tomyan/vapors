@@ -561,6 +561,18 @@ Dependencies name the plan they come from.
 | C7 | Transitions on scene nodes | `transition-*` on `color` and `opacity` for scene anchors through A1's machinery; the surface requests animation while any node transition runs and stops after; reduced motion | Stepped clock: a 200 ms colour transition writes one uniform per frame for that node and none for others; frames stop at the end (`idle_fps` 0 after); `Environment { reduced_motion: true }` makes it instant | C3; design 06 slice A1 |
 | C8 | Docs | `docs/scene3d.md` (3D PR 5's lane doc) gains the property set, the refusals, inheritance from HTML, hit testing, transparency; `docs/css.md` points to it | The docs name every row of section 3 | C1 to C7 |
 
+C1 as built (branch `gpu/c1-scene-style-key`): as the row says, with
+three choices the row left open. A tag with no `class`, `class:` or
+`style` gets no key from the compiler, and its anchor is made from the
+component's own key (`own_keys.rs`: the scene tag and nothing else),
+so every anchor is keyed and unclassed meshes share. The directives
+are toggled by the parent's generated effect on the element the
+component returns from `anchor_element()`, the same emission as an
+element's. `display` other than `none` on a scene tag is refused at
+the update naming the declaration (`style/used.rs`), pulled forward
+from section 3: the user-agent rule, unlike #251's inline style, loses
+to an author's rule.
+
 Later, not in the stack: C9 `backface-visibility` as a per-mesh cull
 mode (two pipelines; the winding convention documented first); C10 a
 per-style appearance slot with `Instances` (D7); keyframe animations on

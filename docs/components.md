@@ -128,8 +128,8 @@ the one difference from the brief in this slice.
   props: the tag gets a style key as an element does, passed as the
   generated prop `anchor: Some(&KEY)`, and the component creates its
   one anchor element from it (`Dom::create_keyed_element`); the
-  directives toggle the element its `anchor_element()` returns
-  (`docs/plans/css-for-3d.md`, C1). A
+  directives toggle the element its `anchor_element()` returns. The
+  3D scene components take them (`docs/plans/css-for-3d.md`, C1). A
   component in the same directory that declares no `anchor` prop is
   refused at each such attribute; another crate's component without
   the field fails in rustc at its props struct, naming `anchor`.

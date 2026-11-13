@@ -4,11 +4,12 @@
 use crate::children::render_children;
 use crate::component::node_component;
 use crate::node::{Mounted, anchor};
+use crate::own_keys;
 use crate::placement::{Placement, place};
 use std::cell::RefCell;
 use std::rc::Rc;
 use vapors_app::SurfaceHandle;
-use vapors_dom::{DynDom, NodeId as ElementId, Root, Snippet};
+use vapors_dom::{DynDom, NodeId as ElementId, Root, Snippet, StyleKey};
 use vapors_scene3d::{CameraHandle, Scene as Store};
 use vapors_signals::Owner;
 
@@ -25,6 +26,9 @@ pub struct SceneProps {
     pub camera: Option<CameraHandle>,
     /// Its nodes.
     pub children: Snippet,
+    /// The anchor's key, which the compiler passes for a tag carrying
+    /// `class`, `class:` or `style`; `None` takes the component's own.
+    pub anchor: Option<&'static StyleKey>,
 }
 
 /// A scene's root group, with its children mounted under it.
@@ -63,16 +67,18 @@ impl Scene {
             surface,
         };
         let owner = Owner::new();
-        let roots = owner.with(|| {
-            let anchor = anchor(dom, parent, before);
+        let key = props.anchor.unwrap_or(&own_keys::SCENE);
+        let anchor = owner.with(|| {
+            let anchor = anchor(dom, key, (parent, before));
             place(&mut *dom.borrow_mut(), anchor, placement.clone());
             placement.invalidate("Scene");
             render_children(dom, anchor, &props.children, "Scene");
-            vec![Root::Node(anchor)]
+            anchor
         });
         let mounted = Mounted {
             owner,
-            roots,
+            roots: vec![Root::Node(anchor)],
+            anchor,
             placement,
         };
         Self { mounted }
