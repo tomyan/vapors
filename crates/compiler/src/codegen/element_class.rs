@@ -6,7 +6,7 @@ use super::attribute_refusals::refuse_string_styling;
 use super::element::attribute_named;
 use super::emit::Emitter;
 use crate::CompileError;
-use crate::ast::{AttrValue, Attribute, Element, Expr};
+use crate::ast::{AttrValue, Attribute, Attributes, Expr};
 
 const PREFIX: &str = "class:";
 
@@ -20,10 +20,9 @@ impl Emitter<'_> {
     /// toggles; a name that is not a class is refused.
     pub(super) fn directive_names<'e>(
         &self,
-        element: &'e Element,
+        attributes: &'e Attributes,
     ) -> Result<Vec<&'e str>, CompileError> {
-        element
-            .attributes
+        attributes
             .iter()
             .filter(|attribute| is_class_directive(attribute))
             .map(|attribute| {
@@ -33,13 +32,14 @@ impl Emitter<'_> {
             .collect()
     }
 
-    /// The effect that toggles `var`'s directives, when `element` has any.
+    /// The effect that toggles `var`'s directives, when `attributes`
+    /// has any.
     pub(super) fn emit_class_directives(
         &mut self,
-        element: &Element,
+        attributes: &Attributes,
         var: &str,
     ) -> Result<(), CompileError> {
-        let directives = self.class_directives(element)?;
+        let directives = self.class_directives(attributes)?;
         if directives.is_empty() {
             return Ok(());
         }
@@ -62,9 +62,9 @@ impl Emitter<'_> {
     /// this (`attribute_refusals`, c1b).
     pub(super) fn literal_classes<'e>(
         &self,
-        element: &'e Element,
+        attributes: &'e Attributes,
     ) -> Result<Vec<&'e str>, CompileError> {
-        let Some(class) = attribute_named(element, "class") else {
+        let Some(class) = attribute_named(attributes, "class") else {
             return Ok(Vec::new());
         };
         let AttrValue::Literal(value) = &class.value else {
@@ -73,7 +73,7 @@ impl Emitter<'_> {
             refuse_string_styling(self.source, class)?;
             return Err(self.source.error(class.offset, "`class={..}` cannot be part of the element's style key: write class=\"name\" and class:name={condition}"));
         };
-        for attribute in element.attributes.iter().filter(|a| is_class_directive(a)) {
+        for attribute in attributes.iter().filter(|a| is_class_directive(a)) {
             let name = &attribute.name[PREFIX.len()..];
             if value.split_ascii_whitespace().any(|set| set == name) {
                 return Err(self.source.error(
@@ -87,10 +87,9 @@ impl Emitter<'_> {
 
     fn class_directives<'e>(
         &self,
-        element: &'e Element,
+        attributes: &'e Attributes,
     ) -> Result<Vec<(&'e str, &'e Expr)>, CompileError> {
-        element
-            .attributes
+        attributes
             .iter()
             .filter(|attribute| is_class_directive(attribute))
             .map(|attribute| self.class_directive(attribute))

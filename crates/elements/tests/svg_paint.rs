@@ -9,7 +9,8 @@ use support::{document, element, viewport};
 use vapors_dom::Dom;
 use vapors_elements::{Document, Painted, Viewport};
 use vapors_scene::{Color, IconId, Item, Rect};
-use vapors_text::{Icon, IconPath, IconStroke};
+use vapors_shapes::IconPath;
+use vapors_text::{Icon, IconStroke};
 
 const UNDO_ARROW: &str = "M5 3L2 6l3 3";
 const UNDO_TAIL: &str = "M2 6h7a4 4 0 0 1 0 8H6";

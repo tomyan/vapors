@@ -97,26 +97,30 @@ impl Drawing {
 }
 
 fn pipeline(device: &wgpu::Device) -> wgpu::RenderPipeline {
-    let module = device.create_shader_module(wgpu::include_wgsl!("gradient.wgsl"));
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("gradient"),
-        layout: None,
-        vertex: wgpu::VertexState {
-            module: &module,
-            entry_point: Some("vertex"),
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[],
+    let module =
+        vapors_renderer::pipelines::shader_module(device, wgpu::include_wgsl!("gradient.wgsl"));
+    vapors_renderer::pipelines::render_pipeline(
+        device,
+        &wgpu::RenderPipelineDescriptor {
+            label: Some("gradient"),
+            layout: None,
+            vertex: wgpu::VertexState {
+                module: &module,
+                entry_point: Some("vertex"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &module,
+                entry_point: Some("fragment"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                targets: &[Some(SURFACE_FORMAT.into())],
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
         },
-        fragment: Some(wgpu::FragmentState {
-            module: &module,
-            entry_point: Some("fragment"),
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-            targets: &[Some(SURFACE_FORMAT.into())],
-        }),
-        primitive: wgpu::PrimitiveState::default(),
-        depth_stencil: None,
-        multisample: wgpu::MultisampleState::default(),
-        multiview_mask: None,
-        cache: None,
-    })
+    )
 }

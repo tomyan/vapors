@@ -11,6 +11,7 @@ mod allowances;
 mod attribute_refusals;
 mod bind_this_shape;
 mod blocks;
+mod component_anchor;
 mod component_tag;
 mod element;
 mod element_bind;

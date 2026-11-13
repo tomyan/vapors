@@ -15,6 +15,9 @@ use super::inline;
 use super::text_style::{TextStyle, color, text_style};
 use super::values::{Reader, Refusal, Styles, keyword};
 
+/// Why a scene anchor's `display` other than `none` is refused.
+const SCENE_ANCHOR_DISPLAY: &str = "is not `none` on a scene node's anchor: a scene node is drawn by its gpu-surface, never laid out (docs/plans/css-for-3d.md, section 3); remove the `display` declaration; to hide the node, put its component in an `{if}`";
+
 /// What the element's computed style means to layout, text and paint.
 #[derive(Clone, Debug)]
 pub(crate) struct Used {
@@ -59,6 +62,8 @@ pub(crate) struct Context<'a> {
     pub(crate) text_like_field: bool,
     /// The element is a `gpu-surface` (docs/gpu-surface.md).
     pub(crate) surface: bool,
+    /// The element is a scene component's anchor (`tags.rs`).
+    pub(crate) scene_anchor: bool,
 }
 
 /// The used style of an element whose computed styles (its own and its
@@ -86,6 +91,9 @@ pub(crate) fn used(styles: Styles<'_>, context: &Context<'_>) -> Result<Used, Ve
     }
     if context.surface {
         super::surface::refuse(&mut reader, &layout, &decoration, inline);
+    }
+    if context.scene_anchor && layout.display != taffy::Display::None {
+        reader.refuse(DISPLAY, SCENE_ANCHOR_DISPLAY.to_owned());
     }
     super::overflow::refuse_rounded_clip(&mut reader, &layout, &decoration);
     super::overflow::refuse_viewport_scroll(&mut reader, &layout, context.to_viewport);

@@ -35,19 +35,22 @@ impl Parser<'_> {
         }
     }
 
-    /// A component tag's attribute with a `:` other than `bind:` would
+    /// A component tag's attribute with a `:` other than `bind:` or
+    /// `class:` (which toggles the component's anchor element) would
     /// become a prop with a colon in its name.
     pub fn refuse_component_directives(&self, attributes: &Attributes) -> Result<(), CompileError> {
-        let Some(attribute) = attributes
-            .iter()
-            .find(|attribute| attribute.name.contains(':') && !attribute.name.starts_with("bind:"))
-        else {
+        let Some(attribute) = attributes.iter().find(|attribute| {
+            attribute.name.contains(':')
+                && !["bind:", "class:"]
+                    .iter()
+                    .any(|prefix| attribute.name.starts_with(prefix))
+        }) else {
             return Ok(());
         };
         Err(self.error(
             attribute.offset,
             format!(
-                "`{}` is not a prop: a component tag takes plain props and `bind:name`; `class:` directives and `on:` listeners are for elements",
+                "`{}` is not a prop: a component tag takes plain props, `bind:name` and `class:name={{bool}}`; a listener is for an element: `onclick={{handler}}`, with no colon",
                 attribute.name
             ),
         ))
