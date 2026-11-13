@@ -8,7 +8,8 @@ use crate::rows::RowChange;
 use crate::run::Settings;
 use crate::scaling_run;
 
-/// Runs every change of `changes`, prints each table and verdict.
+/// Runs every change of `changes`, prints each table and verdict, and
+/// after each its [`result_line`].
 ///
 /// # Errors
 /// One or more changes failed: each failure's message, which names the
@@ -17,9 +18,21 @@ use crate::scaling_run;
 pub fn run(gpu: &Gpu, changes: &[RowChange], settings: Settings) -> Result<(), String> {
     let failures: Vec<String> = changes
         .iter()
-        .filter_map(|&change| scaling_run::run(gpu, change, settings).err())
+        .filter_map(|&change| {
+            let result = scaling_run::run(gpu, change, settings);
+            println!("{}", result_line(change, result.is_ok()));
+            result.err()
+        })
         .collect();
     verdict(changes.len(), &failures)
+}
+
+/// `scaling-result: <change> pass|fail`, the line
+/// `scripts/nightly-scaling.sh` reads to tell which changes failed.
+#[must_use]
+pub fn result_line(change: RowChange, passed: bool) -> String {
+    let result = if passed { "pass" } else { "fail" };
+    format!("scaling-result: {change:?} {result}")
 }
 
 /// Passes when nothing failed; one failure of one change is returned as

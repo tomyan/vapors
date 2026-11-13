@@ -1,6 +1,7 @@
 //! The verdict over several changes.
 
-use super::verdict;
+use super::{result_line, verdict};
+use crate::rows::RowChange;
 
 #[test]
 fn no_failures_pass() {
@@ -31,5 +32,17 @@ fn several_changes_judged_fail_naming_the_count_and_every_failure() {
     assert_eq!(
         error,
         "scaling: 2 of 9 changes failed:\n\nInsert grows\n\nResize grows"
+    );
+}
+
+#[test]
+fn each_change_ends_with_a_line_naming_it_and_its_result() {
+    assert_eq!(
+        result_line(RowChange::FlexText, true),
+        "scaling-result: FlexText pass"
+    );
+    assert_eq!(
+        result_line(RowChange::Insert, false),
+        "scaling-result: Insert fail"
     );
 }
