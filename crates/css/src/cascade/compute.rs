@@ -14,6 +14,7 @@ use crate::syntax::match_value;
 use crate::value::{Color, Context, Length, Value, substitute_vars};
 
 use super::compute_resolve::resolve;
+use super::declared::Declared;
 use crate::{Error, Position, Result};
 
 /// The initial value of every longhand, parsed once.
@@ -74,6 +75,7 @@ pub(crate) fn style(
         root_font_size,
         color,
         positions,
+        declared: Declared::of(winners, parent),
     })
 }
 

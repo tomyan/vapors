@@ -5,11 +5,6 @@
 //! is refused: it would otherwise be parsed, cascaded and silently
 //! ignored.
 
-use vapors_css::cascade::ComputedStyle;
-use vapors_css::property::PropertyId;
-
-use super::values::{Refusal, Styles, later};
-
 /// What the tree does with a property.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Treatment {
@@ -21,7 +16,7 @@ pub(crate) enum Treatment {
     Off(&'static str),
 }
 
-use Treatment::{Deferred, Off, Read};
+pub(crate) use Treatment::{Deferred, Off, Read};
 
 /// The grid properties: read with the `grid` feature, refused without it.
 const GRID: Treatment = if cfg!(feature = "grid") {
@@ -151,46 +146,6 @@ pub(crate) const TABLE: &[(&str, Treatment)] = &[
     ("width", Read),
     ("z-index", Read),
 ];
-
-/// The deferred properties of `styles.own` that are not at their
-/// initial value in `initial`, each reported at the element that
-/// declared it. `TABLE` is in vapors-css's table order (its test holds
-/// them together), so each entry's id is its position: nothing is
-/// looked up by name, and nothing is allocated when nothing is refused.
-pub(crate) fn check_honoured(styles: Styles<'_>, initial: &ComputedStyle) -> Vec<Refusal> {
-    debug_assert_eq!(
-        TABLE.len(),
-        PropertyId::all().count(),
-        "crates/elements/src/style/honoured.rs TABLE and vapors-css's property table differ in length; add or remove entries to match (cargo test -p vapors-elements --lib every_css_longhand_has_exactly_one_treatment)"
-    );
-    TABLE
-        .iter()
-        .zip(PropertyId::all())
-        .filter_map(|((_, treatment), id)| match treatment {
-            Deferred(slice) => in_use(styles, initial, id, || {
-                format!(
-                    "is not implemented by vapors-elements yet: it {}",
-                    later(slice)
-                )
-            }),
-            Off(why) => in_use(styles, initial, id, || (*why).to_owned()),
-            Read => None,
-        })
-        .collect()
-}
-
-/// A refusal for `id` when it is set other than its initial value.
-fn in_use(
-    styles: Styles<'_>,
-    initial: &ComputedStyle,
-    id: PropertyId,
-    reason: impl FnOnce() -> String,
-) -> Option<Refusal> {
-    if styles.own.get(id) == initial.get(id) {
-        return None;
-    }
-    styles.refusal(id, reason())
-}
 
 #[cfg(test)]
 #[path = "honoured_tests.rs"]

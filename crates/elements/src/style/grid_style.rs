@@ -64,8 +64,12 @@ fn component(value: &Value) -> Result<GridTemplateComponent<String>, String> {
     }
 }
 
+/// The implicit tracks; none for `auto`, which is what Taffy repeats
+/// when the list is empty (its default), so the initial value costs
+/// no allocation.
 fn auto_tracks(value: &Value) -> Result<Vec<TrackSizingFunction>, String> {
     match value {
+        Value::Keyword(k) if k == "auto" => Ok(Vec::new()),
         Value::List(items) => items.iter().map(track).collect(),
         single => Ok(vec![track(single)?]),
     }
@@ -131,23 +135,25 @@ fn track_max(value: &Value) -> Result<MaxTrackSizingFunction, String> {
     }
 }
 
+/// `row`, `column`, `dense`, `row dense` or `column dense`, read from
+/// the keywords without serialising them.
 fn auto_flow(value: &Value) -> Result<GridAutoFlow, String> {
-    let words: Vec<String> = match value {
-        Value::List(items) => items.iter().map(Value::to_css).collect(),
-        single => vec![single.to_css()],
+    let flow = match value {
+        Value::Keyword(k) if k == "row" => GridAutoFlow::Row,
+        Value::Keyword(k) if k == "column" => GridAutoFlow::Column,
+        Value::Keyword(k) if k == "dense" => GridAutoFlow::RowDense,
+        Value::List(items) => match items.as_slice() {
+            [Value::Keyword(a), Value::Keyword(b)] if a == "row" && b == "dense" => {
+                GridAutoFlow::RowDense
+            }
+            [Value::Keyword(a), Value::Keyword(b)] if a == "column" && b == "dense" => {
+                GridAutoFlow::ColumnDense
+            }
+            _ => return Err(unknown(&value.to_css())),
+        },
+        _ => return Err(unknown(&value.to_css())),
     };
-    match words
-        .iter()
-        .map(String::as_str)
-        .collect::<Vec<_>>()
-        .as_slice()
-    {
-        ["row"] => Ok(GridAutoFlow::Row),
-        ["column"] => Ok(GridAutoFlow::Column),
-        ["row", "dense"] | ["dense"] => Ok(GridAutoFlow::RowDense),
-        ["column", "dense"] => Ok(GridAutoFlow::ColumnDense),
-        _ => Err(unknown(&value.to_css())),
-    }
+    Ok(flow)
 }
 
 fn placement(value: &Value) -> Result<GridPlacement<String>, String> {
@@ -191,3 +197,7 @@ fn justify_self(value: &Value) -> Result<Option<taffy::AlignItems>, String> {
         _ => align_self(value),
     }
 }
+
+#[cfg(test)]
+#[path = "grid_style_tests.rs"]
+mod tests;
