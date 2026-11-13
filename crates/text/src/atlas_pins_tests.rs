@@ -160,7 +160,11 @@ fn pins_made_before_a_clear_and_taken_after_it_are_given_back() {
     let mut pins = atlas.new_pins();
     let generation = atlas.generation();
     assert!(atlas.unpin_all());
-    assert_eq!(atlas.generation(), generation + 1, "the clear moves it on itself");
+    assert_eq!(
+        atlas.generation(),
+        generation + 1,
+        "the clear moves it on itself"
+    );
 
     // When
     atlas.pin(&key(2), Some(&mut pins));

@@ -83,7 +83,11 @@ fn gpu_text_repainted_in_another_colour_is_built_again_from_its_new_layout() {
     // Then: the red layout took the black one's freed id, so the batch
     // kept its key and only the layouts tell them apart; the frame
     // matches a painter that never saw the black text
-    assert_eq!(first_text(&doc), black, "the test needs the id issued again");
+    assert_eq!(
+        first_text(&doc),
+        black,
+        "the test needs the id issued again"
+    );
     let fresh = Rig::new().draw(&doc).expect("paints");
     assert!(
         pixels == fresh,

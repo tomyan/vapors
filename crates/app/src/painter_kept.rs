@@ -102,7 +102,8 @@ impl ScenePainter {
             .kept
             .text_range(parts, (target, painted), (run, key, at))?;
         if let Some(kept) = kept {
-            self.text.draw_kept(target, &mut self.atlas, kept, blend(run));
+            self.text
+                .draw_kept(target, &mut self.atlas, kept, blend(run));
         }
         Ok(())
     }

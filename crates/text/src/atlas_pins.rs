@@ -29,14 +29,14 @@ pub struct AtlasPins {
 
 impl Drop for AtlasPins {
     fn drop(&mut self) {
-        if cfg!(debug_assertions) && !self.keys.is_empty() && !std::thread::panicking() {
-            panic!(
-                "{} atlas pins dropped without GlyphAtlas::unpin: their glyphs stay pinned until \
-                 the next clear of every pin; give every AtlasPins back (atlas_pins.rs); \
-                 reproduce with `cargo xtask test`",
-                self.keys.len()
-            );
-        }
+        let given_back = self.keys.is_empty() || std::thread::panicking();
+        assert!(
+            !cfg!(debug_assertions) || given_back,
+            "{} atlas pins dropped without GlyphAtlas::unpin: their glyphs stay pinned until the \
+             next clear of every pin; give every AtlasPins back (atlas_pins.rs); reproduce with \
+             `cargo xtask test`",
+            self.keys.len()
+        );
     }
 }
 
