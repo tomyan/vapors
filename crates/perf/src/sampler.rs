@@ -8,9 +8,9 @@ use vapors_platform::{Frame, Next};
 use vapors_renderer::{WRITE_PHASE, clear};
 use vapors_scene::Color;
 
+use crate::frame_counts::{self, Counted, Start};
 use crate::gpu_reading::frame_gpu_time;
 use crate::gpu_time::{GpuClock, wait};
-use crate::instruction_samples::InstructionSamples;
 use crate::run::{Samples, Settings, Workload};
 use crate::spans::PhaseClock;
 
@@ -23,13 +23,13 @@ const FRAME_DEADLINE: Duration = Duration::from_secs(10);
 
 /// One frame's measurements: wall time, the time from the start of the
 /// app's frame to the return of the GPU wait after it (frame-to-idle),
-/// per-phase times, and, with a counter, the frame's instructions and
-/// each phase's.
+/// per-phase times, and, with counters, the frame's counts and each
+/// phase's.
 struct Measured {
     took: Duration,
     idle: Duration,
     phases: BTreeMap<String, Duration>,
-    instructions: Option<(u64, BTreeMap<String, u64>)>,
+    counted: Counted,
 }
 
 /// A GPU and the phase clock frames are timed by.
@@ -106,12 +106,7 @@ impl<'g> Sampler<'g> {
                 samples.push_gpu_time(frame_gpu_time(workload.timing().gpu, index - 1)?);
             }
             if timed.contains(&index) {
-                if let Some((count, phases)) = measured.instructions {
-                    let kept = samples
-                        .instructions
-                        .get_or_insert_with(InstructionSamples::default);
-                    kept.push(count, phases);
-                }
+                samples.push_counts(measured.counted);
                 samples.push(measured.took, measured.phases);
                 samples.counts = workload.counts();
             }
@@ -142,28 +137,22 @@ impl<'g> Sampler<'g> {
             .map_err(|error| format!("frame {index}: {error}"))?;
         self.now += INTERVAL;
         let _ = self.clock.take();
-        let _ = self.clock.take_instructions()?;
-        let (next, started, took, frame_instructions) =
-            self.timed(workload, texture, index, gpu_clock)?;
+        let _ = frame_counts::take(&self.clock)?;
+        let (next, started, took, counted) = self.timed(workload, texture, index, gpu_clock)?;
         // frame-to-idle ends here, before the harness's own bookkeeping;
         // gpu_judged_frames.rs holds it at or above the frame's GPU time
         wait(&self.gpu.device, FRAME_DEADLINE)?;
         let idle = started.elapsed();
         let mut phases = self.clock.take();
-        let mut instructions = self.clock.take_instructions()?;
         phases.entry(WRITE_PHASE.into()).or_default();
-        if let Some(counts) = &mut instructions {
-            counts.entry(WRITE_PHASE.into()).or_default();
-        }
         workload
             .check(next)
             .map_err(|error| format!("frame {index}: {error}"))?;
-        let instructions = frame_instructions.zip(instructions);
         Ok(Measured {
             took,
             idle,
             phases,
-            instructions,
+            counted,
         })
     }
 
@@ -175,18 +164,16 @@ impl<'g> Sampler<'g> {
         texture: &wgpu::Texture,
         index: usize,
         mut gpu_clock: Option<&mut GpuClock>,
-    ) -> Result<(Next, Instant, Duration, Option<u64>), String> {
+    ) -> Result<(Next, Instant, Duration, Counted), String> {
         let (device, queue) = (&self.gpu.device, &self.gpu.queue);
         if let Some(clock) = gpu_clock.as_deref_mut() {
             clock.mark(device, queue);
         }
-        let before = self.clock.instructions_now()?;
+        let start = Start::now(&self.clock)?;
         let started = Instant::now();
         let next = workload.app().frame(&self.frame_of(texture, index));
         let took = started.elapsed();
-        let counted = before
-            .zip(self.clock.instructions_now()?)
-            .map(|(a, b)| b - a);
+        let counted = start.since(&self.clock)?;
         if let Some(clock) = gpu_clock {
             clock.mark(device, queue);
         }
