@@ -9,7 +9,8 @@ use zeno::{Command, PathBuilder, Point};
 
 use crate::path_lex::Cursor;
 pub use crate::path_lex::PathError;
-use crate::segment::{Pen, Segment, to_zeno};
+use crate::path_verb::Verb;
+use crate::segment::{Pen, Segment, non_finite, to_zeno};
 
 /// Path data that parsed: its segments, absolute, in viewBox units,
 /// and zeno's commands for them.
@@ -25,12 +26,13 @@ impl IconPath {
     /// # Errors
     /// [`PathError`] at the first character not understood: empty data,
     /// data not starting with a move, a command outside `M L H V C Q A Z`,
-    /// or a missing or malformed number or arc flag.
+    /// a missing or malformed number or arc flag, or a relative command
+    /// whose coordinate overflows to infinity.
     ///
     /// # Panics
     /// When the segments and zeno's commands end at different points:
     /// a bug in the arc corrections, which `Pen::push` applies once for
-    /// both.
+    /// both (every coordinate is finite by then, so the comparison is).
     pub fn parse(data: &str) -> Result<Self, PathError> {
         let mut cursor = Cursor::new(data);
         cursor.skip_space();
@@ -82,37 +84,6 @@ fn agree(a: Point, b: Point) -> bool {
     (a.x - b.x).abs() <= 1e-3 * scale && (a.y - b.y).abs() <= 1e-3 * scale
 }
 
-/// A command letter of the subset.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Verb {
-    Move,
-    Line,
-    Horizontal,
-    Vertical,
-    Cubic,
-    Quadratic,
-    Arc,
-    Close,
-}
-
-impl Verb {
-    /// The verb `letter` names and whether it is relative.
-    fn of(letter: u8) -> Option<(Self, bool)> {
-        let verb = match letter.to_ascii_uppercase() {
-            b'M' => Self::Move,
-            b'L' => Self::Line,
-            b'H' => Self::Horizontal,
-            b'V' => Self::Vertical,
-            b'C' => Self::Cubic,
-            b'Q' => Self::Quadratic,
-            b'A' => Self::Arc,
-            b'Z' => Self::Close,
-            _ => return None,
-        };
-        Some((verb, letter.is_ascii_lowercase()))
-    }
-}
-
 /// One command letter and its argument groups, repeated while numbers
 /// follow (a move's repeats are lines).
 fn command(cursor: &mut Cursor<'_>, pen: &mut Pen) -> Result<(), PathError> {
@@ -126,7 +97,15 @@ fn command(cursor: &mut Cursor<'_>, pen: &mut Pen) -> Result<(), PathError> {
     cursor.refuse_comma_after_command()?;
     loop {
         let from = if relative { pen.current() } else { Point::ZERO };
-        pen.push(group(cursor, verb, from, pen.current())?);
+        let segment = group(cursor, verb, from, pen.current())?;
+        if let Some(value) = non_finite(&segment) {
+            return Err(cursor.error(format!(
+                "a coordinate of this {} is {value} after adding the current point {:?}; a shape's numbers must stay under 3.4e38, so write it in absolute coordinates or nearer the origin",
+                letter as char,
+                pen.current()
+            )));
+        }
+        pen.push(segment);
         if verb == Verb::Move {
             verb = Verb::Line;
         }
