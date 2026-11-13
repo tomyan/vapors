@@ -29,6 +29,7 @@ mod styles;
 mod surface;
 mod text_style;
 mod used;
+mod used_share;
 mod values;
 
 use vapors_css::cascade::{Cascade, ComputedStyle, Environment};
@@ -50,8 +51,9 @@ pub(crate) use styles::{Counted, Styles};
 pub(crate) use text_style::Face;
 pub(crate) use text_style::TextStyle;
 pub(crate) use used::{Context, Used, used};
+pub(crate) use used_share::{SharedUsed, UsedKey};
 
-/// Each element's used style.
+/// Each element's used style, shared between elements by `SharedUsed`.
 pub(crate) type UsedMap = crate::node_map::NodeMap<std::rc::Rc<Used>>;
 pub(crate) use values::{Refusal, Styles as ElementStyles, keyword};
 

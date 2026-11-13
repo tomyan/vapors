@@ -160,7 +160,7 @@ impl Document {
         if changed || !kept.may_keep_layout(node) {
             self.boxes.marks.mark(node);
         }
-        self.keep_used(node, viewport);
+        self.keep_used(node, viewport, path);
         Ok(changed)
     }
 }
