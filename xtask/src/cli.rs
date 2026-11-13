@@ -37,6 +37,20 @@ pub enum Command {
     /// Check every source file is within `[files] max_lines` (the `files` step).
     #[command(hide = true)]
     CheckFiles,
+    /// Print the quality signals: functions, complexity, files and field
+    /// chains in the band from the guideline to the hard limit (nightly
+    /// and on demand; advisory, never failing on a finding).
+    Quality {
+        /// Print the measurement the thresholds were set from instead:
+        /// clippy's counts (a clippy run at threshold 1), the file-cap
+        /// fit, and the agreement of this command's counts with clippy's.
+        #[arg(long)]
+        distributions: bool,
+        /// Print every sample, one per line as `<metric>\t<value>\t<where>`,
+        /// for checking the counts against clippy's.
+        #[arg(long, conflicts_with = "distributions")]
+        list: bool,
+    },
     /// Write docs/gpu-limits.md from the adapters and limits wgpu reports here.
     GpuInfo,
     /// Run a windowed example under Xvfb and save its frame as a PNG.
