@@ -4011,7 +4011,10 @@ dependencies = [
  "clap",
  "flate2",
  "png",
+ "proc-macro2",
+ "quote",
  "serde_json",
+ "syn 3.0.9",
  "tempfile",
  "yaml-rust2",
 ]
