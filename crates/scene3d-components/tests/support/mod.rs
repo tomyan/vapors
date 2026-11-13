@@ -5,6 +5,8 @@
 
 include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
+pub mod keyed;
+
 use scene_page::{ScenePage, ScenePageProps};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -41,9 +43,17 @@ pub fn at(x: f32) -> Transform {
     Transform::from_translation(Vec3::new(x, 0.0, 0.0)).unwrap()
 }
 
-impl Rig {
-    /// The page mounted: a camera 5 units back looking at a red square
-    /// 1 unit wide at the origin, through an orthographic view 4 high.
+/// A document with a `SceneRenderer` mounted on the surface named
+/// `view`, before any page is.
+pub struct Stage {
+    pub doc: Rc<RefCell<Document>>,
+    pub app: ElementsApp,
+    pub scene: Rc<RefCell<Scene>>,
+    pub meshes: Rc<RefCell<Meshes>>,
+    pub surface: SurfaceHandle,
+}
+
+impl Stage {
     pub fn new() -> Self {
         let doc = Rc::new(RefCell::new(Document::new(FontSystem::bundle_only())));
         let sheet = "html, body { margin: 0; background-color: #ffffff; }";
@@ -53,6 +63,27 @@ impl Rig {
         let meshes = Rc::new(RefCell::new(Meshes::new()));
         let renderer = SceneRenderer::new(Rc::clone(&scene), Rc::clone(&meshes));
         let surface = app.mount("view", Box::new(renderer)).unwrap();
+        Self {
+            doc,
+            app,
+            scene,
+            meshes,
+            surface,
+        }
+    }
+}
+
+impl Rig {
+    /// The page mounted: a camera 5 units back looking at a red square
+    /// 1 unit wide at the origin, through an orthographic view 4 high.
+    pub fn new() -> Self {
+        let Stage {
+            doc,
+            app,
+            scene,
+            meshes,
+            surface,
+        } = Stage::new();
         let square = square(&meshes);
         let signals = Signals {
             back: Signal::new(Transform::from_translation(Vec3::new(0.0, 0.0, 5.0)).unwrap()),

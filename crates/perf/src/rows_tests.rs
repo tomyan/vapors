@@ -56,3 +56,111 @@ fn changes_are_named_as_debug_prints_them() {
     }
     assert!(RowChange::named("insert").is_none());
 }
+
+#[test]
+fn insert_names_its_frames_in_the_order_it_makes_them() {
+    // Given
+    let mut rows = Rows::new(10, RowChange::Insert);
+    let kinds = RowChange::Insert.frame_kinds();
+
+    // When / Then: frame 0 inserts, frame 1 removes
+    rows.change(0);
+    assert_eq!((kinds[0], body_rows(&rows)), ("insert", 11));
+    rows.change(1);
+    assert_eq!((kinds[1], body_rows(&rows)), ("remove", 10));
+    assert_eq!(kinds.len(), 2);
+}
+
+#[test]
+fn a_change_whose_frames_are_alike_has_one_kind() {
+    for change in [
+        RowChange::Idle,
+        RowChange::Text,
+        RowChange::FlexText,
+        RowChange::Scroll,
+    ] {
+        assert_eq!(change.frame_kinds().len(), 1, "{change:?}");
+    }
+}
+
+#[test]
+fn resize_names_its_frames_in_the_order_it_makes_them() {
+    // Given
+    let mut rows = Rows::new(10, RowChange::Resize);
+    let second = rows.page.rows().rows[1].element;
+    let kinds = RowChange::Resize.frame_kinds();
+    let class = |rows: &Rows| {
+        rows.page
+            .doc()
+            .borrow()
+            .attribute(second, "class")
+            .map(str::to_owned)
+    };
+
+    // When / Then: frame 0 makes the second row tall, frame 1 short again
+    rows.change(0);
+    assert_eq!(
+        (kinds[0], class(&rows).as_deref()),
+        ("taller", Some("row tall"))
+    );
+    rows.change(1);
+    assert_eq!(
+        (kinds[1], class(&rows).as_deref()),
+        ("shorter", Some("row"))
+    );
+    assert_eq!(kinds.len(), 2);
+}
+
+#[test]
+fn scroll_size_names_its_frames_in_the_order_it_makes_them() {
+    // Given
+    let mut rows = Rows::new(100, RowChange::ScrollSize);
+    let label = rows.page.rows().rows[50].label;
+    let kinds = RowChange::ScrollSize.frame_kinds();
+    let text = |rows: &Rows| rows.page.doc().borrow().text(label).map(str::to_owned);
+
+    // When / Then
+    rows.change(0);
+    assert_eq!(
+        (kinds[0], text(&rows).as_deref()),
+        ("longer label", Some("A much longer label"))
+    );
+    rows.change(1);
+    assert_eq!(
+        (kinds[1], text(&rows).as_deref()),
+        ("shorter label", Some("Label"))
+    );
+    assert_eq!(kinds.len(), 2);
+}
+
+#[test]
+fn class_and_hovered_class_name_their_frames_in_the_order_they_make_them() {
+    for change in [RowChange::Class, RowChange::HoveredClass] {
+        // Given
+        let mut rows = Rows::new(10, change);
+        let middle = rows.page.rows().rows[5].element;
+        let kinds = change.frame_kinds();
+        let class = |rows: &Rows| {
+            rows.page
+                .doc()
+                .borrow()
+                .attribute(middle, "class")
+                .map(str::to_owned)
+        };
+
+        // When / Then: frame 0 adds `marked`, frame 1 removes it
+        rows.change(0);
+        assert_eq!(
+            (kinds[0], class(&rows).as_deref()),
+            ("add", Some("row marked")),
+            "{change:?}"
+        );
+        rows.change(1);
+        assert_eq!(
+            (kinds[1], class(&rows).as_deref()),
+            ("remove", Some("row")),
+            "{change:?}"
+        );
+        assert_eq!(kinds.len(), 2, "{change:?}");
+    }
+}

@@ -95,10 +95,13 @@ pub(super) fn pipelines(
     format: wgpu::TextureFormat,
     layout: &wgpu::BindGroupLayout,
 ) -> (wgpu::RenderPipeline, wgpu::RenderPipeline) {
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("racer track"),
-        source: wgpu::ShaderSource::Wgsl(include_str!("../track.wgsl").into()),
-    });
+    let shader = vapors_renderer::pipelines::shader_module(
+        device,
+        wgpu::ShaderModuleDescriptor {
+            label: Some("racer track"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../track.wgsl").into()),
+        },
+    );
     let ground = pipeline::create(device, format, layout, &shader, false);
     (
         ground,
