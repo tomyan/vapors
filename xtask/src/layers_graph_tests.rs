@@ -56,7 +56,7 @@ fn a_forbidden_crate_reached_through_another_is_named_with_its_path() {
     // Given
     let graph = parse(&metadata(&[
         ("engine", &[("helper", None)]),
-        ("helper", &[("platform", Some("build"))]),
+        ("helper", &[("platform", None)]),
         ("platform", &[]),
     ]))
     .expect("graph");
@@ -83,6 +83,23 @@ fn a_dev_dependency_is_not_a_layering_dependency() {
     // When / Then
     assert_eq!(
         violations(&graph, &[rule("engine", &["platform"])]),
+        Ok(Vec::new())
+    );
+}
+
+#[test]
+fn a_build_dependency_is_not_a_layering_dependency() {
+    // Given: a build script is not linked into the crate
+    let graph = parse(&metadata(&[
+        ("components", &[("compiler", Some("build"))]),
+        ("compiler", &[("css", None)]),
+        ("css", &[]),
+    ]))
+    .expect("graph");
+
+    // When / Then
+    assert_eq!(
+        violations(&graph, &[rule("components", &["css"])]),
         Ok(Vec::new())
     );
 }

@@ -1,7 +1,10 @@
 //! The workspace's dependency graph from `cargo metadata`, and the
-//! dependencies a layering rule forbids. Normal and build dependencies
-//! count, followed transitively; dev dependencies do not, since they
-//! build only tests.
+//! dependencies a layering rule forbids. Normal dependencies count,
+//! followed transitively. Dev dependencies do not, since they build only
+//! tests; build dependencies do not, since a build script is not linked
+//! into the crate, so it cannot reach what a rule guards (a build.rs
+//! that runs the compiler links vapors-css into the script, not into
+//! vapors-components; lead decision 2026-11-13).
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
@@ -82,15 +85,14 @@ fn name_of(names: &BTreeMap<String, String>, id: &str) -> Result<String, String>
         .ok_or_else(|| format!("cargo metadata: node {id} is not among the packages"))
 }
 
-/// A dependency that ships with the crate: normal or build, not dev.
+/// A dependency linked into the crate: normal (`kind` null in the
+/// metadata), not dev or build.
 fn layering(dep: &Value, owner: &str) -> Result<bool, String> {
     let kinds = dep["dep_kinds"]
         .as_array()
         .filter(|kinds| !kinds.is_empty())
         .ok_or_else(|| format!("cargo metadata: a dependency of {owner} has no `dep_kinds`"))?;
-    Ok(kinds
-        .iter()
-        .any(|kind| kind["kind"].as_str() != Some("dev")))
+    Ok(kinds.iter().any(|kind| kind["kind"].is_null()))
 }
 
 /// One line per forbidden crate reached, with the path to it.

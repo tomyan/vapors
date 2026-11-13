@@ -18,7 +18,6 @@ pub(crate) mod outline;
 mod overflow;
 mod parts;
 mod position;
-mod scope;
 mod scrollbar;
 mod share;
 mod sibling_deps;
@@ -33,7 +32,7 @@ mod values;
 
 use vapors_css::cascade::{Cascade, ComputedStyle, Environment};
 
-use vapors_dom::NodeId;
+use vapors_dom::{NodeId, SCOPE_ATTRIBUTE};
 
 use crate::arena::Arena;
 use crate::css_element::ElementRef;
@@ -52,11 +51,6 @@ pub(crate) use text_style::TextStyle;
 pub(crate) use used::{Context, Used, used};
 pub(crate) use values::{Refusal, Styles as ElementStyles, keyword};
 
-const UA_SHEET: &str = include_str!("ua.css");
-
-/// Why a `:global()` below a selector's top level is refused.
-const NESTED_GLOBAL: &str = ":global() leaves a top-level compound unscoped; inside :is(), :not(), :where() or :has() it would be ignored, so write that selector without it";
-
 /// The stylesheets, in cascade order, and their names for errors; the
 /// component scopes added, and the scoped styles that did not parse.
 pub(crate) struct Sheets {
@@ -71,12 +65,7 @@ pub(crate) struct Sheets {
 
 impl Sheets {
     pub(crate) fn new() -> Self {
-        let ua = vapors_css::parse(UA_SHEET).unwrap_or_else(|error| {
-            panic!(
-                "vapors-elements' ua.css does not parse at {}: {}",
-                error.position, error.message
-            )
-        });
+        let ua = vapors_css::user_agent::sheet();
         Self {
             features: features::Features::default().with(&ua),
             cascade: Cascade::new().user_agent(ua),
@@ -92,12 +81,7 @@ impl Sheets {
             error,
         };
         let sheet = vapors_css::parse(text).map_err(refuse)?;
-        if let Some(position) = scope::first_global(&sheet) {
-            return Err(refuse(vapors_css::Error::new(
-                position,
-                ":global() only means something in a component's <style>, where the rest is scoped; in this sheet every rule is already global, so write the selector without it",
-            )));
-        }
+        vapors_css::scope::refuse_global(&sheet).map_err(refuse)?;
         self.features = self.features.with(&sheet);
         self.cascade = std::mem::take(&mut self.cascade).author(sheet);
         self.names.push(name.to_owned());
@@ -135,12 +119,10 @@ impl Sheets {
             Ok(sheet) => sheet,
             Err(error) => return self.refused.push(refuse(error)),
         };
-        if let Some(position) = scope::first_nested_global(&sheet) {
-            return self
-                .refused
-                .push(refuse(vapors_css::Error::new(position, NESTED_GLOBAL)));
+        if let Err(error) = vapors_css::scope::refuse_nested_global(&sheet) {
+            return self.refused.push(refuse(error));
         }
-        let sheet = scope::scoped(sheet, scope);
+        let sheet = vapors_css::scope::scoped(sheet, SCOPE_ATTRIBUTE, scope);
         self.features = self.features.with(&sheet);
         self.cascade = std::mem::take(&mut self.cascade).author(sheet);
         self.names.push(scope.to_owned());

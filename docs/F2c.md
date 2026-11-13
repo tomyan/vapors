@@ -92,7 +92,7 @@ knows is wrong.
   component's subtree. The generated code does not currently tell the
   `Dom` which component created an element, so scoping needs a
   compiler change. **Decision needed (D1)**, listed at the end.
-- **User-agent sheet.** `crates/elements/src/ua.css` holds the subset
+- **User-agent sheet.** `crates/css/src/ua.css` holds the subset
   of the HTML specification's rendering section for the F2c elements:
   `display` for the block elements, margins for `p`, `h1` to `h6` and
   `body` (8 px, as in browsers), heading sizes and weights, `b` and
