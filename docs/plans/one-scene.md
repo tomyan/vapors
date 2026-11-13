@@ -369,6 +369,24 @@ judged frames, not reduced. A vapors-owned on-disk pipeline cache
 (faster later launches; wgpu supports it on Vulkan only) is deferred to
 after the finish line (Tom, 2026-11-13).
 
+F0 as built (2026-11-13, #272, #281 and PR 3): `vapors_renderer::pipelines`
+is the counted door, and clippy bans wgpu's constructors elsewhere.
+`App::start` runs once the GPU is ready and the window has a size, before
+the first frame. In it, `ElementsApp` builds the painter's pipelines,
+mounts and sizes the surfaces, uploads the atlas page, makes the frame
+timer, runs the document's first update, and clears each surface's
+backing. The judged run refuses any frame that builds a pipeline.
+Measured on a loaded box: frame 0's first surface submit cost 13 to 20 ms.
+`perf` showed i915 allocating and zeroing the pages of a new memory block
+(`clear_page_erms` under execbuffer); wgpu's default block is 128 MiB.
+The submit fell to 0.2 to 0.4 ms only with both the timer made at start
+and the backings cleared at start, in that order. `MemoryHints` is
+unchanged (lead, 2026-11-13).
+Open: the acceptance runs (P0's three cold and warm pairs, load under
+1.5) have not been made. Every window so far stayed loaded. They come in
+the first real quiet window, which xtask's quiet lock (throughput slice
+3, pending Tom) is to make possible.
+
 Each row is under about 400 lines (estimate), built by a fresh agent,
 each check proven by breaking what it guards. After each row the next
 is checked against what it found.
