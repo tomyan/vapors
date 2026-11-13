@@ -441,6 +441,38 @@ PR 3 as built (2026-11-13), split along the crate seam into 3a
   atlas holds its glyphs now (`placed_text_bytes`). It does no lookup,
   so the lookup count is the release path's.
 
+4c as built (2026-11-13), split along the crate seam into 4c-i
+(`crates/renderer`, `crates/text`: the shift in the uniforms, the
+painter passing none) and 4c-ii (the painter, the kept batches and the
+keys):
+
+- Image and surface quads moved from clip space to device pixels, with
+  a view uniform (viewport and shift) in a second bind group. Their
+  kept bytes draw on targets of any viewport and under any shift, so
+  `KeptRange` no longer records a viewport.
+- Batches are made per run of consecutive steps in one frame, each run
+  batched in that frame's view (`framed_batches.rs`), so
+  `vapors_scene::batched` is unchanged. `KeptBatched::frames` names each
+  batch's frame. The painter reads its shift and clip from
+  `Painted::frame_draw`.
+- A frame's shift or clip changing, or a walk of paint order, marks the
+  kept batches unsorted instead of dropping them. The next draw sorts
+  the steps again and keeps the old batches for their keys.
+- Keys are matched after the common prefix by one offset: the distance
+  from the first new batch to an old batch with the same run. Where the
+  offset finds no match, keys are matched from the end, unless the
+  offset already gave that old batch's key to another batch. The offset
+  keeps a scroll's batches. Matching from the end keeps Resize's
+  batches in place. The search compares O(shown batches²) runs at worst,
+  each comparison stopping at the first difference.
+- The debug build checks the kept batches against a fresh batching in
+  frames. It also checks that their items, put on the page by their
+  frames, are the items batching the page draws, in the same order
+  (`kept_batches_check.rs`).
+- Measured (`docs/perf/iu4-4c-2026-11-13.md`): Scroll writes 5 of 53
+  batches. Its draw is still O(rows) through the `batches` step until
+  PR 5.
+
 ### 4a to 4c land together
 
 4a cannot land alone: once placement moves no slot on a scroll, paint

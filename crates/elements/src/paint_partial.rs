@@ -62,11 +62,19 @@ pub(crate) fn paint_partial(
 }
 
 /// After a frame's shift or clip changed: every item and hit in it is
-/// elsewhere on the page, so the kept batches are made again at the
-/// next draw and the hover is tested again.
+/// elsewhere on the page, so the kept batches' steps are sorted again
+/// at the next draw and the hover is tested again.
 fn frames_moved(painted: &mut Painted) {
-    painted.kept_batches = std::cell::RefCell::default();
+    batches_unsorted(painted);
     painted.hits_changed = HitsChanged::Unknown;
+}
+
+/// `painted`'s kept batches, if any, to be sorted again at the next
+/// draw, keeping their keys for the runs made again.
+fn batches_unsorted(painted: &mut Painted) {
+    if let Some(kept) = painted.kept_batches.get_mut() {
+        kept.unsort();
+    }
 }
 
 /// The scroll frames of `order`'s scroll containers, each shifted by
@@ -111,8 +119,8 @@ fn patched_slots(
     (slots, with_hits)
 }
 
-/// `painted`'s drawing steps made afresh, and its kept batches and hits
-/// dropped, when `order` was walked again; else all three patched for
+/// `painted`'s drawing steps made afresh, its kept batches unsorted and
+/// its hits dropped, when `order` was walked again; else all three patched for
 /// the `patched` slots, the hits for the first `with_hits` only, noting
 /// the hits that changed.
 fn drawn_updated(
@@ -124,7 +132,7 @@ fn drawn_updated(
     // as after a walk, until a follow-up shifts them by the splice's edits.
     if order.walks.order > 0 || order.walks.splices > 0 {
         painted.drawn = DrawnSteps::of(&order.steps, &painted.kept_boxes);
-        painted.kept_batches = std::cell::RefCell::default();
+        batches_unsorted(painted);
         painted.hits = std::cell::OnceCell::new();
         painted.hits_changed = HitsChanged::Unknown;
         return;

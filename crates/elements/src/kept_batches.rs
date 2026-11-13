@@ -5,17 +5,20 @@
 //! the kept batches; an update patches the steps of the slots it paints
 //! again (`paint_partial.rs`), and the batches made again after it keep
 //! the keys of those whose runs did not change (`kept_batches_keys.rs`).
-//! A debug build compares every draw's batches with
-//! [`vapors_scene::batched`] over the whole scene.
+//! Items stay in their scroll frames' coordinates (`framed_batches.rs`).
+//! When a frame's shift or clip changes, or paint order is walked again,
+//! the steps are sorted again at the next draw and the batches made
+//! again, keeping the keys of equal runs. A debug build compares every
+//! draw's batches with batching the whole scene afresh.
 
-use vapors_scene::{Item, Rect};
+use vapors_scene::Rect;
 
 use crate::drawn_steps::DrawnSteps;
+use crate::framed_batches::{framed_batches, hidden_items};
 use crate::frames::Frames;
 use crate::kept_batches_keys::KeptBatched;
 use crate::kept_box::KeptBox;
 use crate::paint_order::Step;
-use crate::scene_view::step_items;
 
 #[cfg(test)]
 thread_local! {
@@ -41,6 +44,10 @@ pub(crate) struct KeptBatches {
     /// True when a shown step changed since `batched` was made: the
     /// next draw makes them again, keeping the keys of equal runs.
     stale: bool,
+    /// True when `shown` and `hidden` no longer hold: a frame's shift or
+    /// clip changed, or paint order was walked. The next draw sorts the
+    /// steps again, keeping `batched` for its keys.
+    unsorted: bool,
 }
 
 impl KeptBatches {
@@ -60,6 +67,7 @@ impl KeptBatches {
             hidden_culled: 0,
             batched: None,
             stale: false,
+            unsorted: false,
         };
         for (place, step) in drawn.placed() {
             kept.add(place, step, boxes);
@@ -67,28 +75,48 @@ impl KeptBatches {
         kept
     }
 
-    /// `slot`'s kept batches for `view`, made from `drawn` when it holds
-    /// none or holds them for another view; with their batches made.
+    /// `slot`'s kept batches for `view`, sorted from `drawn` when it
+    /// holds none, holds them for another view or unsorted; with their
+    /// batches made, keeping the keys of equal runs of the last ones.
     pub(crate) fn for_view(
         slot: &mut Option<Self>,
         view: Rect,
         drawn: (&DrawnSteps, usize),
         boxes: (&[Option<KeptBox>], &Frames),
     ) {
-        if slot.as_ref().is_some_and(|kept| kept.view != view) {
-            *slot = None;
+        if slot
+            .as_ref()
+            .is_some_and(|kept| kept.view != view || kept.unsorted)
+        {
+            let was = slot.take().and_then(|kept| kept.batched);
+            let sorted = Self::of(view, drawn, boxes);
+            *slot = Some(Self {
+                batched: was,
+                stale: true,
+                ..sorted
+            });
         }
         slot.get_or_insert_with(|| Self::of(view, drawn, boxes))
             .batches(boxes);
     }
 
+    /// Notes that the steps must be sorted again before the next draw: a
+    /// frame's shift or clip changed, or paint order was walked again.
+    pub(crate) fn unsort(&mut self) {
+        (self.unsorted, self.stale) = (true, true);
+    }
+
     /// `self` with `steps`, each with its place, sorted again from their
-    /// parts in `boxes`.
+    /// parts in `boxes`; nothing when every step is sorted again at the
+    /// next draw.
     pub(crate) fn patch(
         &mut self,
         steps: impl Iterator<Item = (usize, Step)>,
         boxes: (&[Option<KeptBox>], &Frames),
     ) {
+        if self.unsorted {
+            return;
+        }
         for (place, step) in steps {
             self.remove(place);
             if boxes.0.get(step.index()).is_some_and(Option::is_some) {
@@ -113,13 +141,11 @@ impl KeptBatches {
     /// or a shown step changed.
     pub(crate) fn batches(&mut self, boxes: (&[Option<KeptBox>], &Frames)) -> &KeptBatched {
         if self.current().is_none() {
-            let items = self
-                .shown
-                .iter()
-                .flat_map(|&(_, step)| step_items(boxes, step));
-            let mut batched = vapors_scene::batched(items, self.view);
+            let shown = &self.shown;
+            let (mut batched, frames) = framed_batches(shown, |&(_, step)| step, boxes, self.view);
             batched.culled += self.hidden_culled;
-            self.batched = Some(KeptBatched::keyed(batched, self.batched.as_ref()));
+            let was = self.batched.as_ref();
+            self.batched = Some(KeptBatched::keyed((batched, frames), was));
             self.stale = false;
         }
         self.batched.as_ref().expect("made above")
@@ -127,7 +153,7 @@ impl KeptBatches {
 
     /// Puts `step`, at `place`, in `shown` or `hidden` by its items.
     fn add(&mut self, place: usize, step: Step, boxes: (&[Option<KeptBox>], &Frames)) {
-        match hidden_items(step_items(boxes, step), self.view) {
+        match hidden_items(step, boxes, self.view) {
             None => {
                 let at = self.shown.partition_point(|&(shown, _)| shown < place);
                 self.shown.insert(at, (place, step));
@@ -169,21 +195,6 @@ fn added(count: u64, change: i64) -> u64 {
              taken out of them twice (kept_batches.rs); reproduce with `cargo xtask test`"
         )
     })
-}
-
-/// How many `items` there are when every one is culled in `view` and
-/// none is a surface (a culled surface keeps its place in a batch);
-/// `None` when one shows.
-fn hidden_items(items: impl Iterator<Item = (Item, Option<Rect>)>, view: Rect) -> Option<u64> {
-    let mut count = 0;
-    for (item, clip) in items {
-        let surface = matches!(item, Item::Surface { .. });
-        if surface || !vapors_scene::culled(&item, clip, view) {
-            return None;
-        }
-        count += 1;
-    }
-    Some(count)
 }
 
 #[cfg(test)]

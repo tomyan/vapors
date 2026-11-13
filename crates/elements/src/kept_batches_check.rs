@@ -1,18 +1,78 @@
-//! The debug build's check on kept batches (`kept_batches.rs`): every
-//! draw's batches equal batching the whole scene afresh.
+//! The debug build's checks on kept batches (`kept_batches.rs`): every
+//! draw's batches and their frames equal batching the whole scene
+//! afresh in its frames (`framed_batches.rs`); and their items, put on
+//! the page by their frames' shifts and clips, are the items batching
+//! the scene on the page draws, in the same order, so the frames put
+//! every item where the page has it.
 
-use vapors_scene::Batched;
+use vapors_scene::{Batched, Item, Run};
 
-/// Panics, naming the first differing batch or the culled counts, when
-/// `kept` is not `fresh`.
-pub(crate) fn assert_same(kept: &Batched, fresh: &Batched) {
-    if let Some(difference) = first_difference(kept, fresh) {
+use crate::frames::Frames;
+use crate::frames_draw::BatchFrame;
+use crate::kept_batches_keys::KeptBatched;
+
+/// Panics, naming the first differing batch, frame or the culled
+/// counts, when `kept` is not `fresh`.
+pub(crate) fn assert_same(kept: &KeptBatched, fresh: &(Batched, Vec<BatchFrame>)) {
+    let difference = first_difference(&kept.batched, &fresh.0).or_else(|| {
+        let at = (0..kept.frames.len().max(fresh.1.len()))
+            .find(|&at| kept.frames.get(at) != fresh.1.get(at))?;
+        let (kept, fresh) = (kept.frames.get(at), fresh.1.get(at));
+        Some(format!("batch {at} is in frame {kept:?}, afresh {fresh:?}"))
+    });
+    if let Some(difference) = difference {
         panic!(
             "the kept batches differ from batching the scene afresh: {difference}; a slot \
              painted again was not patched into the kept batches or a change that \
              batching reads was not dropped from them (kept_batches.rs, \
              paint_partial.rs); reproduce with `cargo xtask test`"
         );
+    }
+}
+
+/// Panics, naming the first differing item, when `kept`'s items put on
+/// the page by `frames` are not `page`'s: a frame's shift or clip is
+/// not the one its items were painted for, or culling in the frame
+/// differs from culling on the page.
+pub(crate) fn assert_on_page(kept: &KeptBatched, frames: &Frames, page: &Batched) {
+    let batches = kept.batched.batches.iter().zip(&kept.frames);
+    let on_page = batches.flat_map(|(batch, frame)| {
+        let put = move |item| (frames.item(frame.0, &item, batch.clip), batch.culled);
+        run_items(&batch.run).into_iter().map(put)
+    });
+    let page_items = page.batches.iter().flat_map(|batch| {
+        let item = move |item| ((item, batch.clip), batch.culled);
+        run_items(&batch.run).into_iter().map(item)
+    });
+    let (on_page, page_items): (Vec<_>, Vec<_>) = (on_page.collect(), page_items.collect());
+    let longest = on_page.len().max(page_items.len());
+    let differing = (0..longest).find(|&at| on_page.get(at) != page_items.get(at));
+    let culled = (kept.batched.culled, page.culled);
+    if differing.is_none() && culled.0 == culled.1 {
+        return;
+    }
+    let at = differing.unwrap_or(longest);
+    panic!(
+        "the kept batches put on the page by their frames differ from batching the scene on \
+         the page at item {at}: {:?}, on the page {:?} (culled {} and {}); a frame's shift or \
+         clip is not the one its items were painted for (frames.rs, frames_draw.rs), or \
+         culling in a frame's view differs from culling on the page (framed_batches.rs); \
+         reproduce with `cargo xtask test`",
+        on_page.get(at),
+        page_items.get(at),
+        culled.0,
+        culled.1
+    );
+}
+
+/// The items of `run`.
+fn run_items(run: &Run) -> Vec<Item> {
+    match run {
+        Run::Shadows(shadows) => shadows.iter().map(|&shadow| Item::Shadow(shadow)).collect(),
+        Run::Quads(quads) => quads.iter().map(|&quad| Item::Quad(quad)).collect(),
+        Run::Texts(items) | Run::Images(items) | Run::Icons(items) | Run::Surfaces(items) => {
+            items.clone()
+        }
     }
 }
 

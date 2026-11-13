@@ -1,6 +1,7 @@
 //! Batches kept across draws (IU3 3c-3f, `docs/plans/iu3.md` "3c-3f:
 //! kept batches"): after every kind of update and view change, a draw's
-//! batches equal batching the whole scene afresh. A debug build also
+//! batches and their scroll frames equal batching the whole scene afresh
+//! in its frames. A debug build also
 //! makes that comparison inside every draw (`kept_batches_check.rs`).
 
 mod support;
@@ -25,8 +26,7 @@ const VIEW: Rect = Rect {
 fn assert_drawn_afresh(page: &RowsPage, viewport: Viewport, view: Rect, case: &str) {
     let mut doc = page.doc.borrow_mut();
     let painted = doc.update(viewport).expect("updates");
-    let kept = painted.batches(view).clone();
-    assert_eq!(kept, painted.scene().batches(view), "{case}");
+    assert_framed_afresh(painted, view, case);
 }
 
 #[test]
@@ -83,8 +83,15 @@ fn a_row_put_in_after_a_draw_is_in_the_next_draws_batches() {
 /// the batches of the whole scene, naming `case`.
 fn assert_list_drawn_afresh(doc: &mut vapors_elements::Document, view: Rect, case: &str) {
     let painted = doc.update(scroll_list::at(1.0)).expect("updates");
-    let kept = painted.batches(view).clone();
-    assert_eq!(kept, painted.scene().batches(view), "{case}");
+    assert_framed_afresh(painted, view, case);
+}
+
+/// Asserts that `painted`'s kept batches at `view` and their frames are
+/// batching the whole scene afresh in its frames, naming `case`.
+fn assert_framed_afresh(painted: &vapors_elements::Painted, view: Rect, case: &str) {
+    let kept = painted.kept_batches(view).clone();
+    let fresh = painted.scene().framed_batches(view);
+    assert_eq!((kept.batched, kept.frames), fresh, "{case}");
 }
 
 #[test]

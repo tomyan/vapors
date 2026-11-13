@@ -1,7 +1,8 @@
 //! Drawing an update: clear to the canvas colour (or, drawing over what
 //! the target holds, not), then each run of the scene's items with the
-//! pipeline for its kind, in painting order, under the run's clip as a
-//! scissor. Items that paint nothing inside the target under their clip
+//! pipeline for its kind, in painting order, moved by its scroll frame's
+//! shift, under the run's clip moved the same way and cut to the frame's
+//! clip as a scissor. Items that paint nothing inside the target under their clip
 //! are culled when the scene is batched; a run clipped to nothing is not
 //! drawn, though its surfaces are refused as they would be in view.
 
@@ -9,9 +10,6 @@ use vapors_elements::{BatchKey, Painted};
 use vapors_renderer::{ImagePipeline, QuadPipeline, ShadowPipeline, Target, clear_target};
 use vapors_scene::Run;
 use vapors_text::{AtlasConfig, GlyphAtlas, TextPipeline};
-
-/// The shift of a batch whose items are on the page: none.
-const ON_PAGE: [f32; 2] = [0.0; 2];
 
 /// The pipelines and glyph atlas for one target format.
 pub struct ScenePainter {
@@ -137,9 +135,14 @@ impl ScenePainter {
         let kept = painted.kept_batches(view(target));
         drop(batching);
         self.counts.culled = kept.batched.culled;
-        for (at, (batch, &key)) in kept.batched.batches.iter().zip(&kept.keys).enumerate() {
-            match clipped(target, batch.clip).filter(|_| !batch.culled) {
-                Some(clipped) => self.draw_run(&clipped, painted, (&batch.run, key, at))?,
+        let batches = kept.batched.batches.iter().zip(&kept.frames);
+        for (at, ((batch, &frame), &key)) in batches.zip(&kept.keys).enumerate() {
+            let frame = painted.frame_draw(frame);
+            let clip = on_page(batch.clip, frame);
+            match clipped(target, clip).filter(|_| !batch.culled) {
+                Some(clipped) => {
+                    self.draw_run(&clipped, painted, (&batch.run, key, at), frame.shift)?;
+                }
                 None => self
                     .surfaces
                     .check_clipped(target.device, painted, &batch.run)?,
@@ -149,17 +152,18 @@ impl ScenePainter {
     }
 
     /// Draws `run` with the pipeline for its kind under `target`'s
-    /// scissor, and counts the work it issued. A draw the pipeline's
-    /// buffers refused ends the frame here.
+    /// scissor, moved by its frame's `shift`, and counts the work it
+    /// issued. A draw the pipeline's buffers refused ends the frame here.
     fn draw_run(
         &mut self,
         target: &Target<'_>,
         painted: &Painted,
         (run, key, at): (&Run, BatchKey, usize),
+        shift: [f32; 2],
     ) -> Result<(), PaintError> {
         let result = match KeptKind::of_run(run) {
-            Some(_) => self.draw_retained(target, painted, (run, key, at), ON_PAGE),
-            None => self.draw_kept_text(target, painted, (run, key, at), ON_PAGE),
+            Some(_) => self.draw_retained(target, painted, (run, key, at), shift),
+            None => self.draw_kept_text(target, painted, (run, key, at), shift),
         };
         self.count_run(run);
         result?;
@@ -172,7 +176,7 @@ impl ScenePainter {
 
 #[path = "painter_region.rs"]
 mod region;
-use region::{clipped, view};
+use region::{clipped, on_page, view};
 #[path = "painter_counts.rs"]
 mod counts;
 #[path = "painter_kept.rs"]

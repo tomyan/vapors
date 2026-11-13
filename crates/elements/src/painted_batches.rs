@@ -11,7 +11,8 @@ use crate::painted::Painted;
 
 impl Painted {
     /// The scene's batches for a target whose drawable area is `view`
-    /// (device pixels): [`Painted::kept_batches`] without their keys.
+    /// (device pixels), each in its scroll frame's coordinates:
+    /// [`Painted::kept_batches`] without their frames and keys.
     ///
     /// # Panics
     /// As [`Painted::kept_batches`].
@@ -21,14 +22,17 @@ impl Painted {
     }
 
     /// The scene's batches for a target whose drawable area is `view`
-    /// (device pixels), each with its key: kept from the last draw when
-    /// its view was `view` and no step it showed was painted again
-    /// since; made again otherwise, a batch keeping its key when the
-    /// batch at its place had an equal run (`kept_batches_keys.rs`).
+    /// (device pixels), each in its scroll frame's coordinates under its
+    /// clip inside the frame, with its frame ([`Painted::frame_draw`]
+    /// gives the shift and clip to draw it with) and its key: kept from
+    /// the last draw when its view was `view` and no step it showed was
+    /// painted again since; made again otherwise, a batch keeping its
+    /// key when an earlier batch had an equal run (`kept_batches_keys.rs`).
     ///
     /// # Panics
-    /// In a debug build, when they differ from batching the whole scene,
-    /// naming the first differing batch. Always, when called while a
+    /// In a debug build, when they differ from batching the whole scene
+    /// in its frames, or their items put on the page from batching it on
+    /// the page, naming the first difference. Always, when called while a
     /// `Ref` from an earlier call is held and the batches must be made.
     #[must_use]
     pub fn kept_batches(&self, view: Rect) -> Ref<'_, KeptBatched> {
@@ -42,8 +46,19 @@ impl Painted {
             self.make_batches(view)
         });
         #[cfg(debug_assertions)]
-        crate::kept_batches_check::assert_same(&kept.batched, &self.scene().batches(view));
+        self.assert_batches_hold(&kept, view);
         kept
+    }
+
+    /// Panics when `kept` differs from batching the scene afresh in its
+    /// frames, or its items put on the page from batching it on the page
+    /// (`kept_batches_check.rs`).
+    #[cfg(debug_assertions)]
+    fn assert_batches_hold(&self, kept: &KeptBatched, view: Rect) {
+        let scene = self.scene();
+        crate::kept_batches_check::assert_same(kept, &scene.framed_batches(view));
+        let page = scene.batches(view);
+        crate::kept_batches_check::assert_on_page(kept, &self.frames, &page);
     }
 
     /// The kept batches made for `view`, then read.

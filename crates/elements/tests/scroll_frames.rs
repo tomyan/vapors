@@ -172,9 +172,13 @@ fn a_draw_after_a_scroll_batches_the_rows_where_they_show() {
     let painted = list.doc.update(at(1.0)).expect("updates");
 
     // Then: the batches are made again, with the rows where they show
-    // (a debug build compares them with the whole scene's)
-    let batched = painted.batches(view).clone();
-    assert_eq!(batched, painted.scene().batches(view));
+    // in the list's frame (a debug build compares them with the whole
+    // scene's)
+    let kept = painted.kept_batches(view).clone();
+    assert_eq!(
+        (kept.batched, kept.frames),
+        painted.scene().framed_batches(view)
+    );
     let quads = row_quads(painted);
     assert_eq!(quads[1].0, Rect::new(0.0, 10.0, 100.0, 50.0));
 }
