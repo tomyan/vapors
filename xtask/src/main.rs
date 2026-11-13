@@ -189,6 +189,7 @@ fn main() -> ExitCode {
         Command::Deny => steps::deny_check(),
         Command::Test { tier: Tier::Unit } => steps::unit_tests(),
         Command::Test { tier: Tier::Gpu } => steps::gpu_tests(),
+        Command::Test { tier: Tier::Pmu } => steps::pmu_tests(),
     };
     ci::run(&steps, &reporter)
 }

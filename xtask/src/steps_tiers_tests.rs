@@ -58,3 +58,22 @@ fn harness_source() -> String {
         .find_map(|place| std::fs::read_to_string(place).ok())
         .unwrap_or_else(|| panic!("gpu-harness's lib.rs is at none of {places:?}"))
 }
+
+#[test]
+fn the_unit_tier_leaves_out_the_gpu_and_pmu_tests() {
+    let step = unit();
+    assert_eq!(
+        step.args.last().map(String::as_str),
+        Some("not test(/^gpu_/) and not test(/^pmu_/)")
+    );
+}
+
+#[test]
+fn the_pmu_tier_runs_only_the_pmu_tests_and_is_not_in_ci() {
+    // When
+    let step = pmu();
+
+    // Then
+    assert_eq!(step.args.last().map(String::as_str), Some("test(/^pmu_/)"));
+    assert!(!super::super::ci("web").iter().any(|s| s.name == "pmu"));
+}

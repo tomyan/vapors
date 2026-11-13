@@ -9,11 +9,13 @@
 pub mod args;
 pub mod args_off_path;
 pub mod circuit;
+pub mod counter_samples;
 pub mod driver;
 pub mod frame_counts;
 pub mod frame_kinds;
 pub mod gpu_reading;
 pub mod gpu_time;
+pub mod hardware_counters;
 pub mod instruction_samples;
 pub mod instructions;
 pub mod instructions_check;

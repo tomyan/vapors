@@ -39,6 +39,7 @@ impl Samples {
             gpu_time: self.gpu_time.as_deref().map(pick),
             gpu_resolution: self.gpu_resolution,
             instructions: self.instructions.as_ref().map(|i| i.every_nth(first, step)),
+            counters: self.counters.as_ref().map(|c| c.every_nth(first, step)),
             counts: self.counts,
             warmup: self.warmup,
         })
@@ -54,20 +55,9 @@ impl Samples {
 
     fn columns_kept_whole(&self) -> Result<(), String> {
         let kept = self.frame.len();
-        let phases = self
-            .phases
-            .iter()
-            .map(|(phase, times)| (phase.as_str(), times.len()));
-        let gpu = [("GPU span", &self.gpu), ("GPU time", &self.gpu_time)]
+        match self
+            .column_lengths()
             .into_iter()
-            .filter_map(|(name, times)| times.as_ref().map(|times| (name, times.len())));
-        let instructions = self
-            .instructions
-            .as_ref()
-            .map(|i| ("instructions", i.frame.len()));
-        match phases
-            .chain(gpu)
-            .chain(instructions)
             .find(|(_, len)| *len != kept)
         {
             None => Ok(()),
@@ -77,6 +67,33 @@ impl Samples {
                  the other kind's"
             )),
         }
+    }
+
+    /// Each column a kept frame has an entry in, with its length.
+    fn column_lengths(&self) -> Vec<(&str, usize)> {
+        let mut lengths: Vec<_> = self
+            .phases
+            .iter()
+            .map(|(phase, times)| (phase.as_str(), times.len()))
+            .collect();
+        let optional = [
+            ("GPU span", self.gpu.as_ref().map(Vec::len)),
+            ("GPU time", self.gpu_time.as_ref().map(Vec::len)),
+            (
+                "instructions",
+                self.instructions.as_ref().map(|i| i.frame.len()),
+            ),
+            (
+                "hardware counts",
+                self.counters.as_ref().map(|c| c.frame.len()),
+            ),
+        ];
+        lengths.extend(
+            optional
+                .into_iter()
+                .filter_map(|(name, len)| Some((name, len?))),
+        );
+        lengths
     }
 }
 
