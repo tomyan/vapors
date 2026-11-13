@@ -1,5 +1,5 @@
-//! The style phase's checks, redone only for the elements changed since
-//! the last update (`kept_checks`). When the kept checks say an element
+//! The style phase's checks, redone only for the nodes changed since
+//! the last update (`kept_checks`). When the kept checks say a node
 //! refuses, a walk over the whole tree collects the refusals in
 //! document order, and it must find one. Debug builds walk on every
 //! update and assert the kept checks agree, so a missed mark fails the
@@ -9,25 +9,27 @@ use std::collections::HashSet;
 
 use vapors_dom::NodeId;
 
-use crate::check::{check_element, check_tree, describe, elements, style_attribute_refusal};
+use crate::check::{check_node, check_tree, describe, elements, nodes, style_attribute_refusal};
 use crate::document::Document;
 use crate::error::ElementError;
 use crate::kept_checks::KeptChecks;
 
 impl Document {
-    /// The elements under the root to check again: every one when
-    /// nothing was checked yet or every box is marked; else the marked
-    /// elements and each added subtree.
+    /// The nodes under the root to check again, each once: every one
+    /// when nothing was checked yet or every box is marked; else the
+    /// marked nodes and each added subtree, text nodes included.
     pub(crate) fn touched(&self) -> Vec<NodeId> {
         if self.checks.all || self.boxes.marks.all {
-            return elements(&self.arena, self.root());
+            return nodes(&self.arena, self.root());
         }
-        let mut nodes = self.marked();
-        nodes.extend(self.added_subtrees());
-        nodes
+        let mut touched = self.marked();
+        touched.extend(self.added_subtrees());
+        touched.sort_by_key(|node| node.0);
+        touched.dedup();
+        touched
     }
 
-    /// The box-marked and listener-marked elements still in the tree.
+    /// The box-marked and check-marked nodes still in the tree.
     fn marked(&self) -> Vec<NodeId> {
         let marked = self.boxes.marks.nodes();
         marked
@@ -36,17 +38,18 @@ impl Document {
             .collect()
     }
 
-    /// The elements of each subtree added since the last update and
-    /// still in the tree.
+    /// The nodes of each subtree added since the last update and still
+    /// in the tree.
     fn added_subtrees(&self) -> Vec<NodeId> {
         let added = self.checks.added.iter().copied();
         added
             .filter(|&node| self.attached(node))
-            .flat_map(|node| elements(&self.arena, node))
+            .flat_map(|node| nodes(&self.arena, node))
             .collect()
     }
 
-    /// `touched` and the elements restyled, each once.
+    /// The elements among `touched`, and the elements restyled, each
+    /// once.
     pub(crate) fn rechecked(&self, touched: Vec<NodeId>) -> Vec<NodeId> {
         let restyled = &self
             .kept
@@ -59,10 +62,14 @@ impl Document {
             .collect();
         let mut nodes: Vec<NodeId> = all
             .into_iter()
-            .filter(|&node| self.attached(node))
+            .filter(|&node| self.is_element(node) && self.attached(node))
             .collect();
         nodes.sort_by_key(|node| node.0);
         nodes
+    }
+
+    fn is_element(&self, node: NodeId) -> bool {
+        self.arena.contains(node) && self.arena.get(node, "rechecked").element().is_some()
     }
 
     /// Whether `node` is in the tree under the root.
@@ -73,8 +80,9 @@ impl Document {
     /// Checks `nodes`' tags, attributes, text, listeners and `style`
     /// attributes again.
     pub(crate) fn recheck_tree(&mut self, nodes: &[NodeId]) {
+        self.counts.nodes_checked = nodes.len();
         for &node in nodes {
-            let refuses = !check_element(&self.arena, node, &self.declared_events).is_empty();
+            let refuses = !check_node(&self.arena, node, &self.declared_events).is_empty();
             KeptChecks::note(&mut self.checks.tree, node, refuses);
             let refuses = style_attribute_refusal(&self.arena, node).is_some();
             KeptChecks::note(&mut self.checks.style_attribute, node, refuses);
@@ -141,7 +149,7 @@ impl Document {
     /// Drops what is kept for `node` and its subtree, which leave the
     /// tree.
     pub(crate) fn forget_subtree(&mut self, node: NodeId) {
-        for node in elements(&self.arena, node) {
+        for node in nodes(&self.arena, node) {
             self.checks.forget(node);
             if let Some(kept) = self.kept.as_mut() {
                 kept.styles.remove(node);
@@ -168,7 +176,7 @@ impl Document {
 }
 
 /// The refusals a walk over the tree finds, when the kept checks say
-/// some element refuses, or always in a debug build, which panics when
+/// some node refuses, or always in a debug build, which panics when
 /// the two disagree. A missed mark causes that; a release build, which
 /// walks only when the kept checks say some element refuses, refuses
 /// the update naming the element when the walk finds nothing.
@@ -193,11 +201,11 @@ fn walked(
     }
 }
 
-/// The refusal when the kept checks say `element` refuses and a walk
-/// over the tree finds no refusal.
-fn unmarked(element: &str, checks: &str) -> ElementError {
+/// The refusal when the kept checks say `node` refuses and a walk over
+/// the tree finds no refusal.
+fn unmarked(node: &str, checks: &str) -> ElementError {
     ElementError::Unmarked(format!(
-        "{element}: the kept {checks} checks say it refuses and a check of the whole tree finds nothing: a change was not marked (docs/plans/iu3.md, PR 3a); reproduce in a debug build, which checks every update and panics at the change"
+        "{node}: the kept {checks} checks say it refuses and a check of the whole tree finds nothing: a change was not marked (docs/plans/iu3.md, PR 3a); reproduce in a debug build, which checks every update and panics at the change"
     ))
 }
 

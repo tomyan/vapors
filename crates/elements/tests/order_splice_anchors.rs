@@ -70,7 +70,7 @@ fn an_insert_after_a_sibling_holding_a_scroll_container_is_declined_and_walked()
     let counts = updated_counts(&doc);
 
     // Then
-    assert_declined(counts, SpliceDecline::ScrollInPreviousSibling);
+    assert_declined(&counts, SpliceDecline::ScrollInPreviousSibling);
     assert_matches_full(&doc, viewport(640.0, 400.0), "after scroller");
 }
 
@@ -87,7 +87,7 @@ fn an_insert_into_an_owner_whose_only_kept_child_is_out_of_flow_is_declined_and_
     let counts = updated_counts(&doc);
 
     // Then: spliced, the row would land before the negative layer
-    assert_declined(counts, SpliceDecline::OnlyOutOfFlowKept);
+    assert_declined(&counts, SpliceDecline::OnlyOutOfFlowKept);
     assert_matches_full(&doc, viewport(640.0, 400.0), "only out of flow");
 }
 
@@ -107,7 +107,7 @@ fn an_append_after_a_row_whose_last_cell_is_positioned_goes_after_its_last_in_fl
     let counts = updated(&page);
 
     // Then
-    assert_eq!(order(counts), SPLICED);
+    assert_eq!(order(&counts), SPLICED);
     matches_full(&page, "positioned last cell");
 }
 
@@ -128,6 +128,6 @@ fn an_insert_before_a_positioned_row_goes_before_the_next_in_flow_row() {
     let counts = updated(&page);
 
     // Then
-    assert_eq!(order(counts), SPLICED);
+    assert_eq!(order(&counts), SPLICED);
     matches_full(&page, "before positioned");
 }

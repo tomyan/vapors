@@ -19,7 +19,7 @@ use super::values::{Reader, Refusal, Styles, keyword};
 const SCENE_ANCHOR_DISPLAY: &str = "is not `none` on a scene node's anchor: a scene node is drawn by its gpu-surface, never laid out (docs/plans/css-for-3d.md, section 3); remove the `display` declaration; to hide the node, put its component in an `{if}`";
 
 /// What the element's computed style means to layout, text and paint.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Used {
     pub(crate) layout: taffy::Style,
     pub(crate) text: TextStyle,
@@ -64,6 +64,37 @@ pub(crate) struct Context<'a> {
     pub(crate) surface: bool,
     /// The element is a scene component's anchor (`tags.rs`).
     pub(crate) scene_anchor: bool,
+}
+
+impl Context<'_> {
+    /// The facts about the element's place as bits, for the used-style
+    /// table's key (`used_share`).
+    pub(crate) fn bits(&self) -> u8 {
+        // every field named, so a fact added to `Context` fails to
+        // compile here until it is in the key; one `Kept` fixes these two
+        let Context {
+            initial: _,
+            scale: _,
+            flex_item,
+            in_inline,
+            text_like_field,
+            surface,
+            scene_anchor,
+            to_viewport,
+        } = self;
+        let facts = [
+            flex_item,
+            in_inline,
+            text_like_field,
+            surface,
+            scene_anchor,
+            to_viewport,
+        ];
+        facts
+            .iter()
+            .enumerate()
+            .fold(0, |bits, (at, &&fact)| bits | (u8::from(fact) << at))
+    }
 }
 
 /// The used style of an element whose computed styles (its own and its
@@ -127,6 +158,42 @@ impl Used {
     /// padding box.
     pub(crate) fn clips(&self) -> bool {
         self.layout.overflow.x != taffy::Overflow::Visible
+    }
+
+    /// The first field in which `self` and `other` differ, for the
+    /// used-style oracle (`restyle_used`).
+    pub(crate) fn differing_field(&self, other: &Self) -> Option<&'static str> {
+        // every field named, so a field added to `Used` fails to compile
+        // here until the oracle compares it
+        let Used {
+            layout,
+            text,
+            background,
+            decoration,
+            cursor,
+            visible,
+            takes_pointer,
+            inline,
+            z_index,
+            scrollbar,
+            parts,
+        } = self;
+        [
+            ("layout", *layout == other.layout),
+            ("text", *text == other.text),
+            ("background", *background == other.background),
+            ("decoration", *decoration == other.decoration),
+            ("cursor", *cursor == other.cursor),
+            ("visible", *visible == other.visible),
+            ("takes_pointer", *takes_pointer == other.takes_pointer),
+            ("inline", *inline == other.inline),
+            ("z_index", *z_index == other.z_index),
+            ("scrollbar", *scrollbar == other.scrollbar),
+            ("parts", *parts == other.parts),
+        ]
+        .into_iter()
+        .find(|(_, same)| !same)
+        .map(|(field, _)| field)
     }
 
     /// `overflow` is `scroll` or `auto`: a scroll container.
