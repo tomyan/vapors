@@ -1,6 +1,6 @@
 //! From lyon's shared-vertex output to the triangles `mesh.rs` checks:
 //! each with its own three vertices, the edge distances by the rule
-//! there, and the normal (`mesh_normals.rs`) and shifts the half-pixel
+//! there, and the normal (`mesh_normals.rs`) and edge normals the half-pixel
 //! extrusion needs. Vertices at one position are welded first. An edge
 //! used by one surviving triangle is on the outline; an edge two share
 //! is interior and far. Triangles without area are dropped first, so a
@@ -104,14 +104,15 @@ pub(crate) fn edge_key(a: u32, b: u32) -> (u32, u32) {
 }
 
 /// The triangle over `points` with its corners' `normals`: edge `i`
-/// opposite corner `i`, distances and shifts by the rule in `mesh.rs`.
+/// opposite corner `i`, distances and edge normals by the rule in
+/// `mesh.rs`.
 fn triangle(points: [[f32; 2]; 3], normals: [[f32; 2]; 3], outline: [bool; 3]) -> [MeshVertex; 3] {
     let area2 = twice_area(points).abs();
     let mut out = [MeshVertex {
         position: [0.0; 2],
         normal: [0.0; 2],
         edges: [FAR_EDGE; 3],
-        shift: [0.0; 3],
+        edge_normals: [[0.0; 2]; 3],
     }; 3];
     for (corner, vertex) in out.iter_mut().enumerate() {
         vertex.position = points[corner];
@@ -126,8 +127,7 @@ fn triangle(points: [[f32; 2]; 3], normals: [[f32; 2]; 3], outline: [bool; 3]) -
             } else {
                 0.0
             };
-            let n = outward_normal(points, edge);
-            vertex.shift[edge] = normals[corner][0] * n[0] + normals[corner][1] * n[1];
+            vertex.edge_normals[edge] = outward_normal(points, edge);
         }
     }
     out
