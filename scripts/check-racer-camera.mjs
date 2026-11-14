@@ -9,7 +9,10 @@ const env={...process.env,VK_DRIVER_FILES:'/usr/lib/chromium/vk_swiftshader_icd.
 const browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,env,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-webgpu','--enable-features=Vulkan,WebGPU']});
 const errors=[];
 async function state(page){return page.locator('#status').evaluate(e=>JSON.parse(e.textContent));}
-async function click(page,name){const s=await state(page);const [x,y,w,h]=s.targets[name];await page.mouse.click(x+w/2,y+h/2);}
+// Targets are the canvas's coordinates (the racer's document); the demo bar
+// (crates/web-demo/src/bar.rs) puts the canvas below the top of the page.
+const canvasAt=page=>page.evaluate(()=>{const r=document.querySelector('canvas').getBoundingClientRect();return [r.left,r.top];});
+async function click(page,name){const s=await state(page);const [x,y,w,h]=s.targets[name];const [cx,cy]=await canvasAt(page);await page.mouse.click(cx+x+w/2,cy+y+h/2);}
 try {
  for(const [width,height] of [[1100,720],[320,568],[740,250]]) {
   const page=await browser.newPage({viewport:{width,height},hasTouch:true});

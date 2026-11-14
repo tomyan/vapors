@@ -9,13 +9,64 @@
     <style>
       html, body { margin: 0; height: 100%; background: #282828; }
       canvas { width: 100vw; height: 100vh; display: block; touch-action: none; }
+      /* The bar that steps through the demos (crates/web-demo/src/bar.rs):
+         above the canvas, never over it. */
+      #demo-bar { height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: 16px; padding: 0 12px; background: #171b1f; color: #e4e8ec; font: 14px system-ui, sans-serif; white-space: nowrap; overflow: hidden; }
+      #demo-bar[hidden] { display: none; }
+      #demo-bar:not([hidden]) + canvas { height: calc(100vh - 40px); }
+      #demo-bar:not([hidden]) ~ #open { top: 48px; }
+      #demo-bar a { color: #8ab4f8; text-decoration: none; }
+      #demo-bar span { flex: 1; overflow: hidden; text-overflow: ellipsis; color: #b7bec5; }
       #status { position: fixed; left: 8px; bottom: 8px; margin: 0; color: #ddd; font: 14px system-ui, sans-serif; }
       #error { position: fixed; left: 8px; bottom: 32px; margin: 0; color: #fb4934; font: 14px system-ui, sans-serif; }
       #open { position: fixed; right: 8px; top: 8px; height: 44px; padding: 0 16px; font: 16px system-ui, sans-serif; }
     </style>
   </head>
   <body>
+    <nav id="demo-bar" hidden></nav>
     <canvas id="vapors"></canvas>
+    <script>
+      // The demo bar (crates/web-demo/src/bar.rs decides what it shows):
+      // a link to the demo before, the demo's title and line, a link to
+      // the demo after; [ and ] click the links, with no modifier and
+      // not into a text input (the page's text bridge is a textarea).
+      // Idempotent: a second call leaves the bar and its one key listener.
+      window.vaporsShowBar = (before, title, line, after) => {
+        const bar = document.getElementById('demo-bar');
+        if (!bar) throw new Error('index.html has no #demo-bar');
+        if (!bar.hidden) return;
+        const part = (tag, text) => {
+          const element = document.createElement(tag);
+          element.textContent = text;
+          return element;
+        };
+        const link = (id, [href, name], label) => {
+          const a = part('a', label(name));
+          a.id = id;
+          a.setAttribute('href', href);
+          return a;
+        };
+        bar.append(
+          link('demo-before', before, (name) => `← ${name} [`),
+          part('strong', title),
+          part('span', line),
+          link('demo-after', after, (name) => `${name} → ]`),
+        );
+        bar.hidden = false;
+        const intoText = (target) =>
+          target instanceof HTMLElement &&
+          (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable);
+        window.addEventListener('keydown', (event) => {
+          const id = { '[': 'demo-before', ']': 'demo-after' }[event.key];
+          if (!id || event.repeat || event.isComposing || event.defaultPrevented) return;
+          if (event.ctrlKey || event.altKey || event.metaKey || intoText(event.target)) return;
+          event.preventDefault();
+          document.getElementById(id).click();
+        });
+        // the racer sizes its canvas from the window, less the bar
+        window.dispatchEvent(new Event('resize'));
+      };
+    </script>
     <script>
       if (new URLSearchParams(location.search).get('demo') === 'racer') {
         const canvas = document.getElementById('vapors');
@@ -30,6 +81,11 @@
           }
           return [innerWidth, innerHeight];
         };
+        // the demo bar, once shown, takes the top 40 px (bar.rs)
+        const barHeight = () => {
+          const bar = document.getElementById('demo-bar');
+          return bar && !bar.hidden ? bar.offsetHeight : 0;
+        };
         const report = (message) => {
           const error = document.getElementById('error');
           if (!error) throw new Error(message);
@@ -43,7 +99,7 @@
             return;
           }
           canvas.style.width = `${width}px`;
-          canvas.style.height = `${height}px`;
+          canvas.style.height = `${height - barHeight()}px`;
         };
         window.visualViewport?.addEventListener('resize', resize);
         window.addEventListener('resize', resize);

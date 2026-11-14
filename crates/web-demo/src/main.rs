@@ -7,22 +7,14 @@
 //! same binary runs natively, which is how `cargo clippy --workspace`
 //! checks it; natively there is no query, so it shows the index.
 
+mod apps;
+#[cfg(target_family = "wasm")]
+mod bar;
 mod wake;
 
 use vapors_app::ElementsApp;
-use vapors_canvas::{ImageApp, decode_png};
 use vapors_platform::{
     WindowOptions, app_draws_open, hide_status_line, query_parameter, report_error, run,
-};
-use vapors_scene::Color;
-
-const GRADIENT: &[u8] = include_bytes!("../../platform/examples/fixtures/gradient.png");
-
-const BACKGROUND: Color = Color {
-    r: 40.0 / 255.0,
-    g: 40.0 / 255.0,
-    b: 40.0 / 255.0,
-    a: 1.0,
 };
 
 fn main() {
@@ -41,27 +33,29 @@ fn start() -> Result<(), String> {
         width: 640,
         height: 400,
     };
-    if name == "racer" {
-        return vapors_racer::run();
-    }
-    if name == "one-scene" {
-        let ticks = vapors_demos::frame_limit(query_parameter("ticks").as_deref())?;
-        return vapors_one_scene::run(ticks.map(|frames| frames as u64));
-    }
-    if name == "image" {
-        let image = decode_png(GRADIENT).map_err(|message| format!("gradient.png: {message}"))?;
-        let app = ImageApp::showing("gradient.png", image, BACKGROUND);
-        return run(options, app).map_err(|e| e.to_string());
+    // the bar stepping through the listed demos; none for the index
+    #[cfg(target_family = "wasm")]
+    bar::show(&name)?;
+    if let Some(app) = apps::named(&name) {
+        return apps::run_app(app, options);
     }
     if name == "wake" {
         return run(options, wake::WakeApp).map_err(|e| e.to_string());
     }
+    run_elements(&name, options)
+}
+
+/// The elements demo `name`, or the index, in a window from `options`.
+///
+/// # Errors
+/// An unknown name, a bad `ticks=`, or the window failing.
+fn run_elements(name: &str, options: WindowOptions) -> Result<(), String> {
     // `own-open` is `hello` with the page's status line left as it is: the
     // page check's case for an app that draws its own Open and keeps `#status`.
     // A test hook for scripts/check-page-contract.sh only; like `wake`, it is
     // not in `vapors_demos`, so no demo list or error message names it.
     let keeps_status = name == "own-open";
-    let demo = vapors_demos::find(if keeps_status { "hello" } else { &name })?;
+    let demo = vapors_demos::find(if keeps_status { "hello" } else { name })?;
     // An elements demo draws its own controls; the page's would cover them.
     app_draws_open();
     if !keeps_status {

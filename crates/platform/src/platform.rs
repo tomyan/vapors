@@ -33,6 +33,8 @@ pub struct Platform {
     text_field: RefCell<Option<Option<TextField>>>,
     /// The a11y updates the app set, in order, until the loop takes them.
     ax_updates: RefCell<Vec<AxUpdate>>,
+    /// The links a detached platform was asked to follow (`navigate.rs`).
+    pub(crate) followed: RefCell<Vec<crate::navigate::Followed>>,
 }
 
 impl Platform {
@@ -55,6 +57,7 @@ impl Platform {
             cursor: Cell::new(None),
             text_field: RefCell::new(None),
             ax_updates: RefCell::new(Vec::new()),
+            followed: RefCell::new(Vec::new()),
         }
     }
 
@@ -144,6 +147,11 @@ impl Platform {
     #[must_use]
     pub fn device_lost(&self) -> Option<Lost> {
         self.gpu_watch.lost.get()
+    }
+
+    /// Whether this platform has no event loop (`detached`).
+    pub(crate) fn is_detached(&self) -> bool {
+        self.proxy.is_none()
     }
 
     /// The loop's proxy.

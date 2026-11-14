@@ -34,6 +34,7 @@ const SUPPORTED: &[&str] = &[
     "svg",
     "path",
     "span",
+    "a",
     "b",
     "strong",
     "code",
@@ -59,7 +60,7 @@ pub(crate) fn is_scene_anchor(tag: &str) -> bool {
 
 /// Where each unimplemented tag arrives.
 const LATER: &[(&str, &[&str])] = &[
-    ("F2d, the first item after F2c", &["br", "a"]),
+    ("F2d, the first item after F2c", &["br"]),
     ("F3", &["canvas"]),
     (
         "F4",
@@ -168,13 +169,11 @@ mod tests {
     }
 
     #[test]
-    fn line_breaks_and_links_are_refused_naming_f2d() {
-        for tag in ["br", "a"] {
-            // When
-            let refusal = unsupported(tag).expect("refused until F2d");
+    fn line_breaks_are_refused_naming_f2d() {
+        // When
+        let refusal = unsupported("br").expect("refused until F2d");
 
-            // Then
-            assert!(refusal.contains("F2d"), "{refusal}");
-        }
+        // Then
+        assert!(refusal.contains("F2d"), "{refusal}");
     }
 }

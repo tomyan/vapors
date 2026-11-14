@@ -145,7 +145,7 @@ impl Document {
                 );
                 true
             }
-            "Enter" => Self::activate(document, target, &["button"]),
+            "Enter" => Self::activate(document, target, (&["button", "link"], modifiers)),
             " " => {
                 document.borrow_mut().space_on = Some(target);
                 document
@@ -187,34 +187,12 @@ impl Document {
         // `space_on` is `None` with no press recorded: those must not match
         let still = document.borrow().still_in(target);
         if let Some(target) = still.filter(|t| press.key == " " && space_on == Some(*t)) {
-            Self::activate(document, target, &["button", "checkbox"]);
+            Self::activate(document, target, (&["button", "checkbox"], press.modifiers));
         }
     }
 
     /// The focused element, else the body.
     fn key_target(&self) -> NodeId {
         self.active_element().unwrap_or_else(|| self.body())
-    }
-
-    /// A focused control's click, when it is one of `kinds` (`button`,
-    /// or `checkbox` for Space, which Enter does not click, as in
-    /// Chromium) and not disabled; a checkbox then toggles.
-    fn activate(document: &Rc<RefCell<Document>>, target: NodeId, kinds: &[&str]) -> bool {
-        if !document.borrow().activatable(target, kinds) {
-            return false;
-        }
-        crate::events::tree::dispatch_click(document, target, Event::new("click"));
-        true
-    }
-
-    /// Whether `target` is one of `kinds` (`button`, `checkbox`) and not
-    /// disabled: a key would click it.
-    fn activatable(&self, target: NodeId, kinds: &[&str]) -> bool {
-        let kind = match self.tag(target) {
-            Some("button") => "button",
-            Some("input") if self.checked(target).is_some() => "checkbox",
-            _ => return false,
-        };
-        kinds.contains(&kind) && !self.in_disabled_button(target)
     }
 }

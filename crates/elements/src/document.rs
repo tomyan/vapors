@@ -31,6 +31,8 @@ pub struct Document {
     pub(crate) window: crate::focus_window::Window,
     /// Where Space went down, for its click on keyup.
     pub(crate) space_on: Option<NodeId>,
+    /// The link a followed click asks to open (`link.rs`).
+    pub(crate) navigation: Option<crate::link::Navigation>,
     /// The modifier shortcuts take (`shortcuts`).
     pub(crate) shortcut_modifier: crate::ShortcutModifier,
     /// Each number field's last committed number and value (`number_committed`).
@@ -94,6 +96,7 @@ impl Document {
             settle: crate::focus_fixup::Settle::default(),
             window: crate::focus_window::Window::Focused,
             space_on: None,
+            navigation: None,
             shortcut_modifier: crate::ShortcutModifier::default(),
             committed: std::collections::HashMap::new(),
             editors: crate::text_field::Editors::new(),
