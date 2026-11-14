@@ -26,6 +26,7 @@ mod gate_action;
 mod gate_expression;
 mod gate_lock;
 mod gate_lock_shared;
+mod gate_lock_slots;
 mod gate_plan;
 mod gate_pr;
 mod gate_pr_gh;
@@ -91,6 +92,9 @@ mod queue_regate;
 mod queue_remote;
 mod queue_serve;
 mod queue_state;
+mod quiet_command;
+mod quiet_lock;
+mod quiet_wait;
 mod report;
 #[cfg(test)]
 #[path = "report_timeout_tests.rs"]
@@ -205,10 +209,18 @@ fn main() -> ExitCode {
         Command::Gate { pr: Some(number) } => return gate_pr_real::run(number),
         Command::Queue { dry_run } => return queue::run(dry_run),
         Command::Scaling => return scaling::run(&reporter),
+        Command::Quiet { args } => return quiet_command::run(&args),
         Command::Lint => steps::lint(),
         Command::Deny => steps::deny_check(),
-        Command::Test { tier: Tier::Unit } => steps::unit_tests(),
-        Command::Test { tier: Tier::Gpu } => steps::gpu_tests(),
+        Command::Test { tier } => {
+            if let Err(why) = quiet_wait::before("test") {
+                return fail("test", &why);
+            }
+            match tier {
+                Tier::Unit => steps::unit_tests(),
+                Tier::Gpu => steps::gpu_tests(),
+            }
+        }
     };
     ci::run(&steps, &reporter)
 }
