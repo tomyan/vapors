@@ -19,7 +19,7 @@ pub use vapors_pixels as pixels;
 
 mod frames;
 mod listed;
-pub use listed::{DEMOS, Kind, Listed, listed};
+pub use listed::{DEMOS, Kind, Listed, listed, neighbours, stepped};
 mod later;
 mod mounts;
 pub use mounts::register_thumbnails;

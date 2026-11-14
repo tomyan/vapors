@@ -8,6 +8,8 @@
 //! checks it; natively there is no query, so it shows the index.
 
 mod apps;
+#[cfg(target_family = "wasm")]
+mod bar;
 mod wake;
 
 use vapors_app::ElementsApp;
@@ -31,6 +33,9 @@ fn start() -> Result<(), String> {
         width: 640,
         height: 400,
     };
+    // the bar stepping through the listed demos; none for the index
+    #[cfg(target_family = "wasm")]
+    bar::show(&name)?;
     if let Some(app) = apps::named(&name) {
         return apps::run_app(app, options);
     }

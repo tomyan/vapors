@@ -104,7 +104,9 @@ prepare() {
   # a resize is redrawn is the `resize` case's to check.
   counter='<script>var current = GPUCanvasContext.prototype.getCurrentTexture; GPUCanvasContext.prototype.getCurrentTexture = function () { if (document.body) { document.body.dataset.frames = String((Number(document.body.dataset.frames) || 0) + 1); document.body.dataset.frameHeight = String(this.canvas.height); } return current.apply(this, arguments); };</script>'
   frames=$(frames_at 640 400)
-  page as-built-shot "$frames" "$full_size"
+  # the demo bar hidden, as in the demo screenshots (frames_at): the
+  # canvas fills the 400 px the hold waits for
+  page as-built-shot "$frames<style>#demo-bar { display: none !important; }</style>" "$full_size"
   # Only the image demo opens files through the page's Open button; an
   # elements demo hides it and the status line, and needs neither.
   page no-open-button "" "!error.hidden && $adapter" 's#<button id="open">Open</button>##'
@@ -126,10 +128,15 @@ prepare() {
   # is written, every element on the canvas that may paint or take a
   # pointer event, but #error (failures stay visible), is listed on
   # <body> as data-overlaps.
-  measure="(function () { if (status.textContent.indexOf('adapter: ') !== 0) return false; document.body.dataset.overlaps = vaporsOverlaps(); return true; })()"
+  measure="(function () { if (status.textContent.indexOf('adapter: ') !== 0) return false; document.body.dataset.overlaps = vaporsOverlaps(); document.body.dataset.outside = vaporsOutside(); return true; })()"
   for demo in $demos one-scene index; do
     page "$demo-overlap" "$overlaps" "$measure"
   done
+  # The demo bar on hello: its links are the demos before and after in
+  # vapors_demos::DEMOS (wrapping to racer), and ] then [ click them; a
+  # ] typed into a textarea does not. A capturing listener records each
+  # click on a bar link and prevents it, so the page stays.
+  page demo-bar "$stepper" "$adapter && (function () { var bar = document.getElementById('demo-bar'); if (bar.hidden) return false; if (!window.vaporsKeyed) { window.vaporsKeyed = true; var t = document.createElement('textarea'); document.body.appendChild(t); t.dispatchEvent(new KeyboardEvent('keydown', { key: ']', bubbles: true })); t.remove(); [']', '['].forEach(function (k) { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true })); }); } document.body.dataset.bar = Array.prototype.map.call(bar.querySelectorAll('a'), function (a) { return a.getAttribute('href'); }).join(' '); document.body.dataset.stepped = window.vaporsStepped.join(' '); return true; })()"
   # The rule's own case: the hello demo with elements over its canvas
   # that the rule must list (refused, below) beside one it must accept.
   page overlap-refused "$overlaps<style>#quiet-after::after { content: \"\"; position: absolute; inset: 0; pointer-events: auto; }</style>" "$measure" \
@@ -199,7 +206,21 @@ overlaps='<script>function vaporsOverlaps() {
     ["::before", "::after"].forEach(function (p) { if (touchable(e, p)) found.push(name(e) + p); });
   });
   return found.join(" ") || "none";
+}
+function vaporsOutside() {
+  var c = document.getElementById("vapors").getBoundingClientRect(), bar = document.getElementById("demo-bar"), found = [];
+  function meets(r) { return r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top; }
+  function unpainted(e) { for (; e && e !== document.body; e = e.parentElement) if (getComputedStyle(e).opacity === "0") return true; return false; }
+  document.querySelectorAll("body *").forEach(function (e) {
+    var r = e.getBoundingClientRect();
+    if (e.id === "vapors" || e.tagName === "SCRIPT" || e.tagName === "STYLE" || (bar && bar.contains(e))) return;
+    if (r.width === 0 || r.height === 0 || meets(r) || getComputedStyle(e).visibility === "hidden") return;
+    if (!unpainted(e) || getComputedStyle(e).pointerEvents !== "none") found.push(e.tagName.toLowerCase() + (e.id ? "#" + e.id : ""));
+  });
+  return found.join(" ") || "none";
 }</script>'
+# Records each click on a demo bar link, and prevents it (demo-bar).
+stepper='<script>window.vaporsStepped = []; document.addEventListener("click", function (e) { var a = e.target.closest && e.target.closest("#demo-bar a"); if (a) { e.preventDefault(); window.vaporsStepped.push(a.getAttribute("href")); } }, true);</script>'
 # What overlap-refused must list: an element with pointer-events none but
 # painted, one unpainted that takes pointer events, a pointer-taking child
 # of an unpainted, untouchable parent (#quiet, accepted), and the
@@ -216,8 +237,12 @@ viewports() {
 
 # frames_at <w> <h>: the screenshot copy's canvas at w x h CSS px (see
 # frames in prepare), with the frame counter its hold reads.
+# The demo bar (crates/web-demo/src/bar.rs) is hidden in these copies:
+# the .pixels coordinates are the canvas's, shared with the native
+# screenshot, which has no bar; the bar has its own cases (demo-bar, and
+# the outside check of the overlap pages).
 frames_at() {
-  printf '%s' "<style>canvas { width: $1px !important; height: $2px !important; }</style>$counter"
+  printf '%s' "<style>canvas { width: $1px !important; height: $2px !important; } #demo-bar { display: none !important; }</style>$counter"
 }
 
 # clicker <demo> <WxH>: a script that makes the WxH section's inputs on
@@ -480,18 +505,29 @@ budget=--virtual-time-budget=8000
 drawn=$(printf '%s' "$dom" | sed -n 's#.*data-frames="\([0-9]*\)".*#\1#p')
 [ "${drawn:-0}" -ge 30 ] || fail "one-scene-draws: drew ${drawn:-no} frames, wanted 30 or more while it animates"
 # overlap <page> <query> <wanted> <fix>: the page lists [<wanted>] over
-# its canvas (see vaporsOverlaps), or fails with <fix>.
+# its canvas (see vaporsOverlaps), or fails with <fix>; and nothing but
+# the demo bar outside it (vaporsOutside).
 overlap() {
   dom=$(dump "$1" "$2") || { fail "$1: $chrome exited non-zero or passed 60 s"; console "$1"; return; }
   held "$1" || return
   found=$(printf '%s' "$dom" | grep -o 'data-overlaps="[^"]*"' | sed 's#data-overlaps="\(.*\)"#\1#')
   echo "$1: HTML over the canvas: [${found:-not measured}]"
   [ "$found" = "$3" ] || fail "$1: over the canvas [${found:-not measured}], wanted [$3]; $4"
+  outside=$(printf '%s' "$dom" | grep -o 'data-outside="[^"]*"' | sed 's#data-outside="\(.*\)"#\1#')
+  echo "$1: HTML outside the canvas but the demo bar: [${outside:-not measured}]"
+  [ "$outside" = none ] || fail "$1: outside the canvas [${outside:-not measured}], wanted [none]: only the demo bar (#demo-bar, crates/web-demo/src/bar.rs) may sit outside it"
 }
 for demo in $demos one-scene index; do
   overlap "$demo-overlap" "$(query "$demo")" none "an element that may paint or take pointer events lies over the canvas of an elements demo; hide it (vapors_platform::hide_status_line, app_draws_open), move it off the canvas, or give it opacity 0 and pointer-events none"
 done
 overlap overlap-refused '?demo=hello' "$refused" "vaporsOverlaps accepts or refuses the wrong elements; fix the rule in $0"
+dom=$(dump demo-bar '?demo=hello') || fail "demo-bar: $chrome exited non-zero or passed 60 s"
+held demo-bar || true
+bar_links=$(printf '%s' "$dom" | grep -o 'data-bar="[^"]*"' | sed 's#data-bar="\(.*\)"#\1#')
+stepped=$(printf '%s' "$dom" | grep -o 'data-stepped="[^"]*"' | sed 's#data-stepped="\(.*\)"#\1#')
+echo "demo-bar: links [$bar_links], stepped by ] then [ [$stepped]"
+[ "$bar_links" = "?demo=racer ?demo=counter" ] || fail "demo-bar: hello's bar links [$bar_links], wanted [?demo=racer ?demo=counter] (the demos around it in vapors_demos::DEMOS); see crates/web-demo/src/bar.rs and vaporsShowBar in crates/web-demo/index.html"
+[ "$stepped" = "?demo=counter ?demo=racer" ] || fail "demo-bar: ] then [ clicked [$stepped], wanted [?demo=counter ?demo=racer], and nothing for the ] typed into a textarea; see the keydown listener in vaporsShowBar, crates/web-demo/index.html"
 # Each demo as Chromium shows the canvas after its clicks, held to the
 # same crates/demos/demos/<name>.pixels as the native screenshot, by the
 # same code, one screenshot per section at that section's window size;
@@ -509,4 +545,4 @@ for demo in $demos; do
   done
 done
 [ "$failed" = 0 ] || { echo "the page contract does not hold; reproduce: cargo xtask web && PAGE_CONTRACT_KEEP=1 $0 target/web \$(mktemp -d), which keeps the pages and logs" >&2; exit 1; }
-echo "ok   the page contract holds in all twelve cases (one-scene drew $drawn frames in real time), no HTML over the canvas of: $demos one-scene index (overlap-refused lists its four); the gradient screenshot and the screenshots:$shots"
+echo "ok   the page contract holds in all thirteen cases (one-scene drew $drawn frames in real time), no HTML over the canvas of: $demos one-scene index (overlap-refused lists its four) and nothing outside it but the demo bar, whose links and [ ] keys step through vapors_demos::DEMOS; the gradient screenshot and the screenshots:$shots"

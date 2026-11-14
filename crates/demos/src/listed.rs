@@ -142,3 +142,24 @@ pub const DEMOS: &[Listed] = &[
 pub fn listed(name: &str) -> Option<&'static Listed> {
     DEMOS.iter().find(|demo| demo.name == name)
 }
+
+/// The demos before and after `name` in [`DEMOS`], wrapping at the
+/// ends: what the page's bar links; `None` for a name not listed.
+#[must_use]
+pub fn neighbours(name: &str) -> Option<(&'static Listed, &'static Listed)> {
+    let at = DEMOS.iter().position(|demo| demo.name == name)?;
+    let before = &DEMOS[(at + DEMOS.len() - 1) % DEMOS.len()];
+    Some((before, &DEMOS[(at + 1) % DEMOS.len()]))
+}
+
+/// Where `key` steps from `name`: `[` to the demo before it, `]` to the
+/// one after; `None` for any other key or a name not listed.
+#[must_use]
+pub fn stepped(name: &str, key: &str) -> Option<&'static Listed> {
+    let (before, after) = neighbours(name)?;
+    match key {
+        "[" => Some(before),
+        "]" => Some(after),
+        _ => None,
+    }
+}
