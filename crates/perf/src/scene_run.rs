@@ -32,10 +32,23 @@ pub fn run(open: impl FnOnce() -> Gpu) -> Result<(), String> {
     println!(
         "Frames: {RUN_FRAMES}, every one judged, no warmup; load average at the start {start:.2}\n"
     );
-    let frames = Sampler::new(&gpu).judged(&mut DrivenRacer::new(), RUN_FRAMES)?;
+    let run = Sampler::new(&gpu)
+        .judged(&mut DrivenRacer::new(), RUN_FRAMES)
+        .map_err(|error| format!("{error}\nreproduce: {REPRODUCE}"))?;
+    println!("{}", start_up_line(run.start_up));
+    let frames = run.frames;
     let end = load_average();
     println!("{}", report(&frames, start, end.clone().ok()));
     verdict(&frames, end)
+}
+
+/// The start-up's line: `App::start`'s time, before frame 0 and not
+/// judged, printed so the time moved out of frame 0 is never hidden.
+fn start_up_line(start_up: std::time::Duration) -> String {
+    format!(
+        "Start-up (App::start, before frame 0, not judged): {:.1} µs\n",
+        start_up.as_secs_f64() * 1e6
+    )
 }
 
 /// The run's failures together: the frames over budget, then the load

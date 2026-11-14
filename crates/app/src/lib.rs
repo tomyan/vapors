@@ -12,6 +12,8 @@ mod document_input;
 mod elements_app;
 pub mod frame;
 #[cfg(test)]
+mod gpu_start_tests;
+#[cfg(test)]
 mod gpu_surface_backing_tests;
 mod painter;
 mod pointer;
@@ -30,7 +32,7 @@ mod wheel_scroll;
 pub use document_input::{DocumentInput, Given, Route, Unplaced};
 pub use elements_app::{
     ElementsApp, Failure, FrameDecision, FrameTimesHook, FrameTiming, GiveError, InvalidateError,
-    Invalidated, PerFrame, SurfaceHandle,
+    Invalidated, PerFrame, StartState, SurfaceHandle,
 };
 pub use painter::{
     DrawOverError, FrameCounts, MountError, NewPainterError, PaintError, SUPPORTED, ScenePainter,

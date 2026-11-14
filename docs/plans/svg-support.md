@@ -232,9 +232,11 @@ below.
   anti-aliasing is off exact coverage, the pixel is compared with
   exact coverage and declared, as `paint_support/exact.rs` does for
   Mute.
-- **Cost:** per entry, 12 bytes per vertex (position and outline
-  distance) and 2 to 4 bytes per index, to be measured in S5a; no new
-  dependency beyond S2's lyon.
+- **Cost:** per entry, 40 bytes per vertex (position, normal, three
+  edge distances and their shifts) and three vertices per triangle
+  with no index buffer, 5 times the indexed layout (one-scene 1.2, as
+  S2 built it), to be measured in S5a; no new dependency beyond S2's
+  lyon.
 - **Verdict:** support (V1, V2).
 
 ### 3.2 Strokes: joins, caps, miter limit, dashes, non-scaling
@@ -248,13 +250,11 @@ below.
   the canonical form. `miter-clip` and `arcs` are refused: Chromium
   draws them as `miter`, and vapors does not draw one thing as
   another; the refusal names `miter`. Outline distance for stroke
-  meshes: lyon's stroke vertices carry `side` (-1 to 1 across the
-  stroke) and `advancement` (arc length along it); the distance to
-  the outline is the smaller of `(1 - |side|) * width / 2` and the
-  distance to the nearer end along the path, both interpolated by the
-  rasteriser, which is exact on straight segments and first-order on
-  round joins and caps. S3b's measurement decides whether that is
-  within the rules; if not, round joins and caps are tessellated with
+  meshes: as for fills, three per-edge distances per vertex of each
+  triangle, the outline edges found by their use count in lyon's
+  output (one-scene 1.2, as S2 built it); exact on straight segments
+  and first-order on round joins and caps. S3b's measurement decides
+  whether that is within the rules; if not, round joins and caps are tessellated with
   an explicit centre vertex. Dashes: the flattened path is split by
   the dash pattern into subpaths at build time, each then stroked with
   its caps and joins, which is what Skia does (`SkDashPathEffect`
@@ -722,6 +722,8 @@ V19 close the "element in the tree" promise. V8 to V12 are the paint
 and compositing batch; V13 to V17 and V20 to V23 follow by demand.
 
 ## 6. Decisions for Tom
+
+**Decided 2026-11-13 (Tom): D1 to D10 all as recommended.** D1 (a) flatten at build time, tolerance per entry; D2 (a) closed forms analytic, paths and masks through a coverage texture (S2's shapes antialias by a half-pixel outline extrusion, #306); D3 layers built in V11; D4 (a) `<use>` by compile-time expansion with the ancestor-rule refusal; D5 the two filter sets; D6 (a) atlas upright, outlines under a transform; D7 SMIL out; D8 (a) hit testing by the painted shape; D9 (a) bound presentation attributes refused; D10 (a) after property 9, V1 to V7 first.
 
 **D1. Curves: flattened at build time, or evaluated in the shader.**
 (a) Flatten at build time at a tolerance for the entry's largest

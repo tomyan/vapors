@@ -137,6 +137,30 @@ Rules are bucketed by their subject compound (id, else first class,
 else tag, else universal); `Cascade::candidates(&e)` is the rules the
 matcher runs on for an element, in source order.
 
+## Build-time analysis
+
+`analysis::classify(rule, &KeyFacts)` judges one rule against a
+template key (`docs/plans/build-time-styles.md`, section 1): what the
+key fixes about every element it makes (tag, scope attribute, literal
+classes, literal attributes, literal `style`; the tree sets each from
+the `StyleKey` and refuses a change to it, the literal attributes
+since #312), with the names of its `class:` directives. The answer is
+`Match::Never` (no such element can match), `Match::Always` (every one
+matches in every state) or `Match::Conditional(Depends)`, naming the
+run-time inputs: directives, state flags, attributes (every attribute
+the key does not fix, which an expression or `set_attribute` sets),
+ancestors (compounds left of the
+subject, `:root`), siblings or descendants (`+`, `~`, positional
+pseudo-classes, `:empty`, `:has()`) and at-rule conditions.
+
+`Never` and `Always` are decided from the fixed parts with the
+matcher's own tests (an attribute operator through the function the
+matcher uses), and `tests/analysis_oracle.rs` checks both against
+`selector::matches` over every concrete element a key can make.
+Anything else is `Conditional`, which the runtime tests as it does
+today, so a judgement the analysis cannot make is never wrong, only
+deferred.
+
 ## Adding a property
 
 1. Add a `def(name, inherited, initial, syntax)` line to

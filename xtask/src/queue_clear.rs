@@ -109,7 +109,7 @@ fn clean_merge(dir: &Path, merge: &str) -> Result<bool, String> {
 /// Whether `main` already holds `commit`'s change: its diff applies in
 /// reverse to main's tree (in a scratch index, touching no worktree).
 fn in_main(dir: &Path, main: &str, commit: &str) -> Result<bool, String> {
-    let index = std::env::temp_dir().join(format!("xtask-queue-index-{}", std::process::id()));
+    let index = std::env::temp_dir().join(scratch_index_name());
     let index_text = index.display().to_string();
     let applied = read_tree(dir, main, &index_text).and_then(|()| {
         let diff = git(dir, &["show", "--format=", "--binary", commit])?;
@@ -118,6 +118,15 @@ fn in_main(dir: &Path, main: &str, commit: &str) -> Result<bool, String> {
     });
     let _ = std::fs::remove_file(&index);
     applied.map(|output| output.status.success())
+}
+
+/// A scratch index's file name, unique to this call: by pid alone, two
+/// checks in one process (tests on parallel threads) shared one index
+/// and read each other's trees.
+fn scratch_index_name() -> String {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let call = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    format!("xtask-queue-index-{}-{call}", std::process::id())
 }
 
 /// Read `main`'s tree into the scratch index `index`, judged by git's

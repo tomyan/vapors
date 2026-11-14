@@ -1,22 +1,7 @@
-//! Each geometry the check refuses, and the ones it passes.
+//! Each closed form the check refuses, and the ones it passes; meshes
+//! are checked in `mesh_tests.rs`.
 
 use super::*;
-
-const V: MeshVertex = MeshVertex {
-    position: [0.0, 0.0],
-    outline_distance: 0.0,
-};
-const TRIANGLE: [MeshVertex; 3] = [
-    V,
-    MeshVertex {
-        position: [4.0, 0.0],
-        outline_distance: 0.0,
-    },
-    MeshVertex {
-        position: [0.0, 4.0],
-        outline_distance: 0.0,
-    },
-];
 
 fn rect(size: [f32; 2], radius: [f32; 2]) -> Geometry {
     Geometry::Rect {
@@ -45,10 +30,6 @@ fn drawable_geometries_pass() {
         rect([2.0, 3.0], [0.0, 0.0]),
         rect([2.0, 3.0], [1.0, 1.0]),
         ellipse([8.0, 8.0], [3.0, 3.0]),
-        Geometry::Mesh {
-            vertices: &TRIANGLE,
-            indices: &[0, 1, 2],
-        },
     ];
 
     // When, Then
@@ -114,6 +95,14 @@ fn a_corner_radius_the_box_shader_cannot_draw_is_refused() {
             "a corner radius of [1.0, 2.5] is over half the size [10.0, 4.0]; the emitter clamps rx to width / 2 and ry to height / 2, as SVG does",
         ),
         (
+            rect([4.0, 10.0], [3.0, 3.0]),
+            "a corner radius of [3.0, 3.0] is over half the size [4.0, 10.0]; the emitter clamps rx to width / 2 and ry to height / 2, as SVG does",
+        ),
+        (
+            rect([10.0, 4.0], [3.0, 3.0]),
+            "a corner radius of [3.0, 3.0] is over half the size [10.0, 4.0]; the emitter clamps rx to width / 2 and ry to height / 2, as SVG does",
+        ),
+        (
             rect([2.0, 3.0], [0.5, 1.0]),
             "corner radii [0.5, 1.0] differ, and the box shader draws circular corners; elliptical corners come with S3a",
         ),
@@ -123,73 +112,4 @@ fn a_corner_radius_the_box_shader_cannot_draw_is_refused() {
     for (geometry, reason) in &cases {
         refused(geometry, reason);
     }
-}
-
-#[test]
-fn a_mesh_whose_indices_do_not_name_triangles_of_its_vertices_is_refused() {
-    // Given
-    let cases: [(&'static [MeshVertex], &'static [u32], &str); 4] = [
-        (
-            &[],
-            &[0, 1, 2],
-            "0 vertices and 3 indices; a mesh names at least one triangle",
-        ),
-        (
-            &TRIANGLE,
-            &[],
-            "3 vertices and 0 indices; a mesh names at least one triangle",
-        ),
-        (
-            &TRIANGLE,
-            &[0, 1],
-            "2 indices is not a whole number of triangles",
-        ),
-        (
-            &TRIANGLE,
-            &[0, 1, 3],
-            "index 3 at position 2 names no vertex; the mesh has 3",
-        ),
-    ];
-
-    // When, Then
-    for (vertices, indices, reason) in cases {
-        refused(&Geometry::Mesh { vertices, indices }, reason);
-    }
-}
-
-#[test]
-fn a_mesh_with_a_non_finite_vertex_is_refused_naming_its_position() {
-    // Given
-    static DISTANCE: [MeshVertex; 3] = [
-        V,
-        V,
-        MeshVertex {
-            position: [1.0, 1.0],
-            outline_distance: f32::NAN,
-        },
-    ];
-    static POSITION: [MeshVertex; 3] = [
-        V,
-        MeshVertex {
-            position: [f32::INFINITY, 1.0],
-            outline_distance: 0.0,
-        },
-        V,
-    ];
-
-    // When, Then
-    refused(
-        &Geometry::Mesh {
-            vertices: &DISTANCE,
-            indices: &[0, 1, 2],
-        },
-        "vertex 2 MeshVertex { position: [1.0, 1.0], outline_distance: NaN } is not finite",
-    );
-    refused(
-        &Geometry::Mesh {
-            vertices: &POSITION,
-            indices: &[0, 1, 2],
-        },
-        "vertex 1 MeshVertex { position: [inf, 1.0], outline_distance: 0.0 } is not finite",
-    );
 }

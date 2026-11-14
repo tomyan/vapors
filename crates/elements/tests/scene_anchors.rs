@@ -7,9 +7,13 @@
 mod support;
 
 use support::{document, element, refusals, viewport};
+use vapors_css::property::scene::SceneTag;
 use vapors_elements::Document;
 
-const SCENE_TAGS: [&str; 5] = ["scene", "group", "mesh", "camera", "decal"];
+/// Every scene tag, from the one list vapors-css keeps.
+fn scene_tags() -> impl Iterator<Item = &'static str> {
+    SceneTag::ALL.into_iter().map(SceneTag::name)
+}
 
 /// A body holding a `tag.node` element, with `css` added as `app.css`.
 fn page(tag: &str, css: &str) -> Document {
@@ -23,9 +27,9 @@ fn page(tag: &str, css: &str) -> Document {
 
 #[test]
 fn a_scene_anchor_is_implemented_and_builds_no_box() {
-    for tag in SCENE_TAGS {
+    for tag in scene_tags() {
         // Given
-        let mut doc = page(tag, ".node { color: #ff0000; }");
+        let mut doc = page(tag, ".node { --tint: #ff0000; }");
 
         // When
         let updated = doc.update(viewport(400.0, 300.0)).map(|_| ());
@@ -38,7 +42,7 @@ fn a_scene_anchor_is_implemented_and_builds_no_box() {
 
 #[test]
 fn a_display_other_than_none_on_a_scene_anchor_is_refused_naming_the_declaration() {
-    for tag in SCENE_TAGS {
+    for tag in scene_tags() {
         // Given
         let mut doc = page(tag, ".node { display: block; }");
 
@@ -76,4 +80,21 @@ fn a_display_on_an_anchor_inside_a_hidden_anchor_is_refused_too() {
             && refused.contains("`display: block`"),
         "{refused}"
     );
+}
+
+#[test]
+fn the_user_agent_sheet_gives_every_scene_tag_display_none() {
+    for tag in scene_tags() {
+        // Given
+        let mut doc = page(tag, "");
+        let node = doc.children(doc.body())[0];
+
+        // When
+        doc.update(viewport(400.0, 300.0)).expect("no refusal");
+
+        // Then
+        let style = doc.computed_style(node).expect("styled");
+        let display = style.get(vapors_css::property::longhands::DISPLAY);
+        assert_eq!(display.as_keyword(), Some("none"), "<{tag}>");
+    }
 }

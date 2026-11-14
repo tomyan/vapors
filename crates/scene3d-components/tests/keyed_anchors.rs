@@ -1,12 +1,11 @@
 //! Each scene component's anchor is a keyed element with the scene tag
 //! (`docs/plans/css-for-3d.md`, C1): the key the compiler emitted for a
 //! tag carrying `class` or `class:`, or the component's own, so anchors
-//! share computed styles as template elements do. No computed value
-//! reaches a node yet: that is C2 and C3.
+//! share computed styles as template elements do; each mesh takes its
+//! anchor's computed colour (C3).
 
 mod support;
 
-use support::Rig;
 use support::keyed::KeyedRig;
 use vapors_dom::Dom;
 use vapors_scene3d::{Colour, NodeKind};
@@ -45,7 +44,8 @@ fn a_class_directive_on_a_mesh_toggles_its_anchors_class() {
 
 #[test]
 fn two_meshes_of_one_key_share_one_computed_style_and_no_anchor_is_unkeyed() {
-    // Given: the two wheels, one template site in a {for}
+    // Given: the two wheels, one template site in a {for}, with no
+    // class: both take the component's own key
     let rig = KeyedRig::new();
 
     // When
@@ -57,42 +57,26 @@ fn two_meshes_of_one_key_share_one_computed_style_and_no_anchor_is_unkeyed() {
 }
 
 #[test]
-fn meshes_without_classes_share_their_components_own_key() {
-    // Given: the scene page's two meshes in one group, neither with a class
-    let rig = Rig::new();
-    rig.signals.shown.set(true);
-    let viewport = vapors_elements::Viewport {
-        width: 64.0,
-        height: 64.0,
-        scale: 1.0,
-    };
-
-    // When
-    rig.doc.borrow_mut().update(viewport).unwrap();
-
-    // Then
-    let counts = rig.doc.borrow().update_counts();
-    assert_eq!(counts.styles_shared, 1, "{counts:?}");
-}
-
-#[test]
-fn a_mesh_keeps_its_colour_prop_whatever_its_anchors_computed_colour() {
-    // Given: the body's colour inherits to every anchor and `.body`
-    // sets its own; C1 reads neither, so no page colour tints a mesh
+fn an_unclassed_mesh_takes_the_body_colour_only_by_inheritance() {
+    // Given: as the racer HUD's `:global(body) { color }`, the page's
+    // body is blue; `.body` declares red and `.braking` green, and the
+    // wheels carry no class and declare nothing
     let rig = KeyedRig::new();
     rig.braking.set(true);
 
     // When
     rig.update();
 
-    // Then
+    // Then: the braking body green, the wheels the body's blue
     let scene = rig.scene.borrow();
     let group = scene.children(scene.root()).unwrap()[0];
-    for mesh in scene.children(group).unwrap() {
-        let kind = scene.kind(*mesh).unwrap();
-        assert!(
-            matches!(kind, NodeKind::Mesh { colour, .. } if *colour == Colour::BLACK),
-            "{kind:?}"
-        );
-    }
+    let colours: Vec<Colour> = (scene.children(group).unwrap().iter())
+        .map(|mesh| match scene.kind(*mesh).unwrap() {
+            NodeKind::Mesh { colour, .. } => *colour,
+            other => panic!("a mesh, found {other:?}"),
+        })
+        .collect();
+    let [green, blue] =
+        [[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]].map(|[r, g, b]| Colour::srgb(r, g, b).unwrap());
+    assert_eq!(colours, [green, blue, blue]);
 }

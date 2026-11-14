@@ -1,4 +1,5 @@
-//! The lint tier's checks of the tree: files, layers, builds and imports.
+//! The lint tier's checks of the tree: files, layers, builds and imports,
+//! and the nightly scaling runner's scripts.
 
 use crate::step::Step;
 
@@ -43,4 +44,28 @@ pub fn files() -> Step {
         &["xtask", "check-files"],
         "split the file, or allow it in .config/factory.toml under [files.allow] with a reason",
     )
+}
+
+/// The nightly scaling runner's guards: deadlines, lock, quoted error.
+pub fn nightly() -> Step {
+    nightly_script("nightly", "scripts/nightly-scaling-check.sh")
+}
+
+/// The nightly scaling runner's issue logic and run markers against
+/// scripts/fixtures/nightly-scaling.log.
+pub fn nightly_issues() -> Step {
+    nightly_script("nightly issues", "scripts/nightly-scaling-issues-check.sh")
+}
+
+/// A check script with a fake git and gh: no network, no build. They
+/// took 5 s and 2 s here (2026-11-13); a minute is over ten times that.
+fn nightly_script(name: &str, script: &str) -> Step {
+    let mut step = Step::new(
+        name,
+        script,
+        &[],
+        "each FAIL line names the guard and what happened; fix scripts/nightly-scaling.sh or scripts/nightly-scaling-issues.sh",
+    );
+    step.deadline = Some(std::time::Duration::from_mins(1));
+    step
 }

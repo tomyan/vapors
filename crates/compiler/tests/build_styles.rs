@@ -110,6 +110,19 @@ fn a_form_feed_or_lone_carriage_return_in_a_style_is_refused_at_its_place() {
 }
 
 #[test]
+fn a_lone_carriage_return_in_a_style_is_refused_at_its_place() {
+    // Given: old-Mac line endings; CSS would count the CR as a line break
+    let text = "<style>\np { color: red; }\rp { colr: red; }\n</style>\n<p>Card</p>";
+
+    // When
+    let (file, refusal) = one_refusal("style_lone_cr", text, Styles::Scoped);
+
+    // Then
+    assert!(refusal.starts_with(&format!("{file}:2:18: ")), "{refusal}");
+    assert!(refusal.contains("lone carriage return"), "{refusal}");
+}
+
+#[test]
 fn wisp_check_refuses_a_style_that_does_not_parse() {
     // Given
     let (src, _) = dirs("style_wisp_check");

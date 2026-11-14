@@ -67,15 +67,17 @@ code sets it.
 
 `<path>`:
 
-- `d`: required. Commands `M L H V A Z`, absolute and relative, with
+- `d`: required. Commands `M L H V C Q A Z`, absolute and relative, with
   implicit repeats (`l4 4-4 4`), SVG number syntax (signs, decimals,
   exponents, `1.5.5` as two numbers), and arc flags written `0` or `1`,
   packed or spaced. Malformed data is refused with the offset of the
   first character not understood, naming the fix. Only whitespace may
   follow a command letter, so `M,1 1` is refused as in Chromium. A
   number that does not fit a 32-bit float is refused. An arc with a
-  zero radius is drawn as a line to its end point, as SVG says.
-  Curves (`C S Q T`) are not in the subset.
+  zero radius is drawn as a line to its end point, as SVG says. Cubic
+  (`C`) and quadratic (`Q`) curves are stroked as arcs are (zeno
+  flattens both); the smooth forms `S` and `T` are refused naming the
+  fix until docs/plans/svg-support.md V1.
 - `fill="none"`: required (SVG's default fill is black).
 - `stroke="currentColor"`: required.
 - `stroke-width`: a positive number in viewBox units; 1 when absent, as
