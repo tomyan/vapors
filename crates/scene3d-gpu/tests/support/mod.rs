@@ -10,7 +10,8 @@ use vapors_app::{
 };
 use vapors_gpu_harness::{Gpu, read_rgba8};
 use vapors_scene3d::{
-    CameraHandle, Colour, GeometryId, Meshes, NodeId, NodeKind, Projection, Scene, Transform, Vec3,
+    CameraHandle, Colour, GeometryHandle, Meshes, NodeId, NodeKind, Projection, Scene, Transform,
+    Vec3,
 };
 use vapors_scene3d_gpu::SceneRenderer;
 
@@ -51,7 +52,7 @@ impl Fixture {
     }
 
     /// A square `2 * half` wide in the XY plane, centred on the origin.
-    pub fn square(&self, half: f32) -> GeometryId {
+    pub fn square(&self, half: f32) -> GeometryHandle {
         let corners = [(-half, -half), (half, -half), (half, half), (-half, half)];
         let positions = corners.map(|(x, y)| Vec3::new(x, y, 0.0)).to_vec();
         self.meshes
@@ -64,12 +65,13 @@ impl Fixture {
     pub fn mesh(
         &self,
         parent: NodeId,
-        geometry: GeometryId,
+        geometry: &GeometryHandle,
         rgba: [u8; 4],
         local: Transform,
     ) -> NodeId {
         let [r, g, b, _] = rgba.map(|c| f32::from(c) / 255.0);
         let colour = Colour::srgb(r, g, b).unwrap();
+        let geometry = geometry.clone();
         let kind = NodeKind::Mesh { geometry, colour };
         self.scene.borrow_mut().add(parent, kind, local).unwrap()
     }

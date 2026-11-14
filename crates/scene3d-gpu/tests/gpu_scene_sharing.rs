@@ -13,7 +13,7 @@ fn one_square() -> Fixture {
     let projection = Projection::orthographic(6.0, 0.1, 100.0).unwrap();
     fixture.camera(projection, Vec3::new(0.0, 0.0, 5.0));
     let square = fixture.square(0.5);
-    fixture.mesh(fixture.root(), square, RED, Transform::IDENTITY);
+    fixture.mesh(fixture.root(), &square, RED, Transform::IDENTITY);
     fixture
 }
 

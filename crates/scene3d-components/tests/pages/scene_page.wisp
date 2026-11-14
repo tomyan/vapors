@@ -3,7 +3,7 @@ use vapors_scene3d_components::{Camera, CameraProps, Group, GroupProps, Mesh, Me
 
 #[prop] let scene: Option<std::rc::Rc<std::cell::RefCell<vapors_scene3d::Scene>>> = None;
 #[prop] let surface: Option<vapors_app::SurfaceHandle> = None;
-#[prop] let square: Option<vapors_scene3d::GeometryId> = None;
+#[prop] let square: Option<vapors_scene3d::GeometryHandle> = None;
 #[prop] let eye: Option<vapors_scene3d::CameraHandle> = None;
 #[prop] let lens: Option<vapors_scene3d::Projection> = None;
 #[prop] let back: Signal<vapors_scene3d::Transform> = Signal::new(vapors_scene3d::Transform::IDENTITY);
@@ -28,9 +28,9 @@ use vapors_scene3d_components::{Camera, CameraProps, Group, GroupProps, Mesh, Me
 <Scene scene={scene} surface={surface} camera={eye}>
   <Camera handle={eye} projection={lens} transform={back} />
   <Group>
-    <Mesh geometry={square} class="left" class:blue={blue.get()} class:gone={gone.get()} transform={left} />
+    <Mesh geometry={square.clone()} class="left" class:blue={blue.get()} class:gone={gone.get()} transform={left} />
     {if shown.get()}
-      <Mesh geometry={square} transform={right} />
+      <Mesh geometry={square.clone()} transform={right} />
     {/if}
   </Group>
 </Scene>
