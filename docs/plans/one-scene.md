@@ -459,7 +459,8 @@ Accepted (docs/perf/scene-run-f0-2026-11-14.md): P0's run at 06b0c94,
 three cold and warm pairs at a 1-minute load under 1.5, no frame over
 16.7 ms in any run; frame 0 6.2 to 6.5 ms to idle cold and 6.6 to 6.7 ms
 warm (from about 98 and 22 ms); `App::start`, before frame 0, 104.5 to
-106.9 ms cold and 17.3 to 17.9 ms warm.
+106.9 ms cold and 17.3 to 17.9 ms warm. The pipeline test: crates/perf/tests/gpu_judged_frames.rs:91 and
+crates/app/tests/gpu_app_start.rs:15.
 
 Each row is under about 400 lines (estimate), built by a fresh agent,
 each check proven by breaking what it guards. After each row the next
