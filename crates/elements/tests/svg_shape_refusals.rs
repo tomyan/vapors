@@ -46,8 +46,10 @@ fn a_path_changed_after_the_first_update_to_reach_outside_is_refused() {
     // When: only the path changes
     doc.set_attribute(path, "d", "M2 2h16v4z");
 
-    // Then
+    // Then: refused; and put back inside, it paints again
     assert_refused(&mut doc, &["outside its viewBox", "not clipped yet"]);
+    doc.set_attribute(path, "d", "M3 3h8v8h-8z");
+    assert_eq!(drawn(updated(&mut doc)).1.len(), 2);
 }
 
 #[test]
@@ -128,4 +130,29 @@ fn a_circle_path_is_a_closed_form() {
         drawn(updated(&mut doc)),
         (0, vec![(ShapeKind::ClosedForm, red())])
     );
+}
+
+#[test]
+fn a_grown_svg_whose_width_changes_without_a_change_to_it_is_checked_again() {
+    // Given: a filled svg growing in a 300 px flex row beside a 100 px
+    // div, so 200 px wide
+    let (mut doc, _) = icon(
+        "flex-grow: 1; } body { display: flex; width: 300px; } .side { width: 100px; } .side.wide { width: 290px; } .x {",
+        &[],
+        &[("fill", "red")],
+    );
+    let side = doc.create_element("div");
+    doc.set_attribute(side, "class", "side");
+    let body = doc.body();
+    doc.append(body, side);
+    updated(&mut doc);
+
+    // When: only the sibling changes, which shrinks the svg to 10 px,
+    // narrower than its 16 px height, so its scale falls
+    doc.set_attribute(side, "class", "side wide");
+    let painted = updated(&mut doc);
+
+    // Then: drawn at its new size, its shapes checked at it first (paint
+    // asserts so)
+    assert_eq!(drawn(painted).1.len(), 2);
 }

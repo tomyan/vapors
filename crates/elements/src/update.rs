@@ -76,6 +76,7 @@ impl Document {
         let mut changed = ChangedSlots::of(rebuilt, last.as_ref(), patched);
         let laid = (&slotted, &stackings);
         let from = self.painted_from(laid, viewport, (last.as_mut(), &written), &mut changed);
+        self.svg_shape_refusals(&slotted, &from.placement.rects, viewport.scale)?;
         drop(layout);
         let paint_span = tracing::trace_span!("update phase", phase = "paint").entered();
         let mut painted = self.paint_or_keep(last, (&slotted.boxes, &stackings), &from, &changed);

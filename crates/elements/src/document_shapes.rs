@@ -19,6 +19,10 @@ pub(crate) type ShapeSpec<'a> = (&'a str, &'a IconPath, Paint, f32);
 pub(crate) struct DocumentShapes {
     pub(crate) cache: ShapeCache,
     uses: NodeMap<Vec<CacheRef>>,
+    /// Each svg on the shapes route, with the device pixels per unit its
+    /// shapes were last checked at after layout; `None` until they are,
+    /// or after a change to it or a path (`svg_shape_checks`).
+    pub(crate) svgs: NodeMap<Option<f32>>,
 }
 
 impl DocumentShapes {
@@ -27,6 +31,7 @@ impl DocumentShapes {
         Self {
             cache: ShapeCache::new(next_document()),
             uses: NodeMap::default(),
+            svgs: NodeMap::default(),
         }
     }
 
@@ -62,8 +67,10 @@ impl DocumentShapes {
         Ok(refs)
     }
 
-    /// `node` left the tree: its shapes are released.
+    /// `node` paints no shapes (it left the tree, or is an svg that
+    /// left the shapes route or is hidden): its shapes are released.
     pub(crate) fn release(&mut self, node: NodeId) {
+        self.svgs.remove(&node);
         for at in self.uses.remove(&node).unwrap_or_default() {
             self.cache.release(at);
         }

@@ -92,9 +92,12 @@ code sets it.
   that is its svg's, and a width above zero. Otherwise the whole svg
   is drawn as shapes (one-scene S4a): each path's fill, then its
   stroke, a shape item each from the document's run-time shape cache,
-  coverage on the GPU after the transform, the fill rule nonzero. A
-  shape reaching outside the viewBox is refused naming its path, since
-  an svg's content is not clipped yet; a path with no fill and no
+  coverage on the GPU after the transform, the fill rule nonzero, the
+  viewBox fitted and centred in the laid-out content box (SVG's
+  default `xMidYMid meet`). After layout and before paint, a shape
+  reaching outside the viewBox is refused naming its path by index and
+  why the svg is on the shapes route, since an svg's content is not
+  clipped yet; a path with no fill and no
   stroke (or one of no width) paints nothing and is refused. Moving
   icons onto shapes is the brief's open question (one-scene 1.1).
 - Nothing else: no `class`, `style`, `transform`, caps or joins. Joins

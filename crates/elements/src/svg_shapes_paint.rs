@@ -31,6 +31,12 @@ pub(crate) fn paint(
     // Lifting that deferral, or anchoring an svg in 3D (one-scene S7),
     // must pass the larger scale here, or curves flatten coarser than
     // 0.1 px by the extra factor.
+    let checked = input.shapes.borrow().svgs.get(&svg).copied().flatten();
+    assert_eq!(
+        checked,
+        Some(transform[0]),
+        "the svg's shapes were checked at another scale than paint draws them at; svg_shape_refusals must run after layout on every svg on the shapes route"
+    );
     let made = acquired(input.shapes, svg, &paths, transform[0])
         .unwrap_or_else(|e| panic!("the svg checks passed these paths: {e}"));
     for shape in &made {
@@ -39,17 +45,24 @@ pub(crate) fn paint(
 }
 
 /// `matrix(a, b, c, d, e, f)` from view box units to device pixels: the
-/// content box's origin snapped to a device pixel, as Chromium places a
-/// replaced element's content (and the icon route snaps its rect).
-fn transform([vx, vy, vw, _]: [f32; 4], content: BoxRect, scale: f32) -> [f32; 6] {
-    let per_unit = content.width / vw * scale;
+/// view box fitted inside the content box and centred in it (SVG's
+/// default `xMidYMid meet`), from the content box's origin snapped to a
+/// device pixel, as Chromium places a replaced element's content (and
+/// the icon route snaps its rect).
+fn transform(view_box: [f32; 4], content: BoxRect, scale: f32) -> [f32; 6] {
+    let [vx, vy, vw, vh] = view_box;
+    let per_unit = crate::svg_shapes::per_unit(view_box, content, scale);
     let origin = crate::paint::snapped(content, scale);
+    let spare = [
+        content.width * scale - vw * per_unit,
+        content.height * scale - vh * per_unit,
+    ];
     [
         per_unit,
         0.0,
         0.0,
         per_unit,
-        origin.left - vx * per_unit,
-        origin.top - vy * per_unit,
+        origin.left + spare[0] / 2.0 - vx * per_unit,
+        origin.top + spare[1] / 2.0 - vy * per_unit,
     ]
 }

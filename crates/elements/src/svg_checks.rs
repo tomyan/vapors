@@ -37,40 +37,42 @@ const ATTRIBUTES: [&str; 12] = [
     "stroke-width",
 ];
 
-/// The refusals of every `svg` and `path` among `nodes`, then of each
-/// svg on the shapes route that is among them or holds one of them: a
-/// change to a path alone (its `d`, its paint) rechecks its svg's
-/// shapes (#381 review, H1).
-///
-/// Side effect: the shape checks acquire each such svg's shapes for it
-/// as paint will (`svg_shape_checks`), so a recheck of an unchanged svg
-/// acquires and releases the same entries, net nothing.
+/// The refusals of every `svg` and `path` among `nodes`. An svg's
+/// shapes are checked after layout (`svg_shape_checks`), for the svgs
+/// [`mark_shapes`] marks.
 pub(crate) fn refusals(
     arena: &Arena,
     nodes: &[NodeId],
-    (used, shapes): (&UsedMap, &RefCell<DocumentShapes>),
+    used: &UsedMap,
     scale: f32,
 ) -> Vec<ElementError> {
-    let mut found: Vec<(NodeId, String)> = nodes
+    nodes
         .iter()
         .flat_map(|&node| {
+            let element = describe(arena, node);
             reasons(arena, node, used, scale)
                 .into_iter()
-                .map(move |r| (node, r))
-        })
-        .collect();
-    for svg in svgs_of(arena, nodes) {
-        if found.iter().all(|(node, _)| *node != svg) {
-            let shape_reasons = crate::svg_shape_checks::reasons((arena, used), svg, shapes, scale);
-            found.extend(shape_reasons.into_iter().map(|r| (svg, r)));
-        }
-    }
-    found
-        .into_iter()
-        .map(|(node, reason)| {
-            ElementError::UnsupportedAttribute(format!("{}: {reason}", describe(arena, node)))
+                .map(move |reason| {
+                    ElementError::UnsupportedAttribute(format!("{element}: {reason}"))
+                })
         })
         .collect()
+}
+
+/// Marks each svg among the rechecked `nodes`, or holding a path among
+/// them, to have its shapes checked after layout, so a change to a path
+/// alone (its `d`, its paint) rechecks its svg's shapes (#381 review,
+/// H1). Called on the update's rechecked nodes only, never by the debug
+/// walk over the tree, so debug and release mark alike.
+pub(crate) fn mark_shapes(
+    arena: &Arena,
+    nodes: &[NodeId],
+    used: &UsedMap,
+    shapes: &RefCell<DocumentShapes>,
+) {
+    for svg in svgs_of(arena, nodes) {
+        crate::svg_shape_checks::mark((arena, used), svg, shapes);
+    }
 }
 
 /// Each svg among `nodes` or holding a path among them, once, in order.

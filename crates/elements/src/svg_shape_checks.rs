@@ -1,59 +1,49 @@
-//! What an svg on the shapes route refuses (`svg_route`): a path the
-//! run-time cache cannot make (it fills the cache as it checks, so
-//! paint finds every shape there), and a shape that reaches outside the
-//! view box, since an svg's content is not clipped yet and Chromium
-//! clips it (`overflow: hidden` on an inner svg).
+//! What an svg on the shapes route refuses (`svg_route`), in two steps.
+//! Before layout, each svg the update rechecks (it changed, or a path
+//! of it did) is marked to be checked, or released when it left the
+//! route or paints nothing (`display: none`, hidden). After layout, and
+//! before paint, each marked svg, or one whose laid-out width changed,
+//! has its shapes acquired at the device pixels per unit of its laid-out
+//! content box, as paint will acquire them. Refused, naming the path: a
+//! path the cache cannot make, and a shape reaching outside the view
+//! box, since an svg drawn as shapes is not clipped yet (Chromium clips
+//! it). So checks and paint read one width, and paint never refuses.
 
 use std::cell::RefCell;
 
 use vapors_dom::NodeId;
-use vapors_shapes::IconPath;
-
-use crate::document_shapes::DocumentShapes;
 
 use crate::arena::Arena;
+use crate::document::Document;
+use crate::document_shapes::DocumentShapes;
+use crate::error::ElementError;
+use crate::layout::{BoxRect, Key, Placed};
+use crate::slot_list::SlotList;
 use crate::style::UsedMap;
-use crate::svg_route::{Route, path_site, paths, route, why_shapes};
-use crate::svg_shapes::{acquired, local_box};
+use crate::svg_route::{Route, paints_nothing, path_site, paths, route, why_shapes};
+use crate::svg_shapes::{PathShape, SvgShapes, acquired, local_box, per_unit};
 
 /// Slack for f32 rounding of a shape's box against the view box, as a
 /// share of the view box's size.
 const SLACK: f32 = 1e-4;
 
-/// Why `svg`, an svg whose attributes the checks passed, is refused on
-/// the shapes route, at `scale` device pixels per CSS px, naming the
-/// path. Its shapes are acquired for it as they will be painted; an svg
-/// that paints nothing (`display: none` or hidden) releases them.
-pub(crate) fn reasons(
+/// Marks `svg` to have its shapes checked after layout, or releases
+/// them when it is off the shapes route or paints nothing: hidden, or
+/// no path of it painting a fill or a stroke (`use_for(svg, &[])`, the
+/// verify note on #379).
+pub(crate) fn mark(
     (arena, used): (&Arena, &UsedMap),
     svg: NodeId,
     shapes: &RefCell<DocumentShapes>,
-    scale: f32,
-) -> Vec<String> {
-    if route(arena, used, svg) != Some(Route::Shapes) {
-        return Vec::new();
+) {
+    let mut shapes = shapes.borrow_mut();
+    let paints = (paths(arena, svg).iter())
+        .any(|path| used.get(path).is_some_and(|own| !paints_nothing(own)));
+    if route(arena, used, svg) == Some(Route::Shapes) && shown(arena, used, svg) && paints {
+        shapes.svgs.insert(svg, None);
+    } else if shapes.svgs.contains_key(&svg) {
+        shapes.release(svg);
     }
-    let (Some((view_box, per_unit)), Some(paths)) =
-        (placed(arena, svg, scale), parsed(arena, used, svg))
-    else {
-        return Vec::new();
-    };
-    if !shown(arena, used, svg) {
-        shapes.borrow_mut().release(svg);
-        return Vec::new();
-    }
-    let to_paint: Vec<_> = (paths.iter())
-        .map(|(site, data, own)| (site.as_str(), data, *own))
-        .collect();
-    let made = match acquired(shapes, svg, &to_paint, per_unit) {
-        Ok(made) => made,
-        Err(reason) => return vec![format!("a path cannot be drawn: {reason}")],
-    };
-    let reach = outside(shapes, &made, view_box);
-    reach
-        .map(|(path, reach)| overflow(arena, used, svg, (path, reach, view_box)))
-        .into_iter()
-        .collect()
 }
 
 /// Whether `svg` paints: it is visible, and neither it nor an ancestor
@@ -73,11 +63,88 @@ fn shown(arena: &Arena, used: &UsedMap, svg: NodeId) -> bool {
     visible
 }
 
+impl Document {
+    /// The refusals of each svg on the shapes route whose shapes need
+    /// checking at its laid-out size: `placed`'s boxes at `rects`, at
+    /// `scale` device pixels per CSS px. On a page with no svg on the
+    /// shapes route this is one check of an empty map.
+    pub(crate) fn svg_shape_refusals(
+        &self,
+        placed: &Placed,
+        rects: &SlotList<BoxRect>,
+        scale: f32,
+    ) -> Result<(), Vec<ElementError>> {
+        if self.shapes.borrow().svgs.is_empty() {
+            return Ok(());
+        }
+        let mut svgs: Vec<NodeId> = self.shapes.borrow().svgs.keys().copied().collect();
+        svgs.sort_unstable();
+        let errors: Vec<ElementError> = svgs
+            .into_iter()
+            .flat_map(|svg| self.laid_out_reasons(svg, placed, rects, scale))
+            .collect();
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    /// `svg`'s refusals at its laid-out content box; none when it was
+    /// checked at this size, or has no box (released then).
+    fn laid_out_reasons(
+        &self,
+        svg: NodeId,
+        placed: &Placed,
+        rects: &SlotList<BoxRect>,
+        scale: f32,
+    ) -> Vec<ElementError> {
+        let slot = placed.slots.of(Key::Element(svg));
+        let found = slot.and_then(|slot| Some((placed.boxes.get(slot)?, *rects.get(slot)?)));
+        let Some((layout_box, border_box)) = found.filter(|(b, _)| b.svg_shapes.is_some()) else {
+            self.shapes.borrow_mut().release(svg);
+            return Vec::new();
+        };
+        let shapes = layout_box.svg_shapes.as_ref().expect("filtered");
+        let content = crate::clip::content_box(layout_box, border_box);
+        let at = per_unit(shapes.view_box, content, scale);
+        if self.shapes.borrow().svgs.get(&svg) == Some(&Some(at)) {
+            return Vec::new();
+        }
+        let reasons = self.reasons_at(svg, shapes, at);
+        if reasons.is_empty() {
+            self.shapes.borrow_mut().svgs.insert(svg, Some(at));
+        }
+        let element = crate::check::describe(&self.arena, svg);
+        reasons
+            .into_iter()
+            .map(|reason| ElementError::UnsupportedAttribute(format!("{element}: {reason}")))
+            .collect()
+    }
+
+    /// Why `svg`'s `shapes`, acquired at `at` device pixels per unit,
+    /// cannot be drawn.
+    fn reasons_at(&self, svg: NodeId, shapes: &SvgShapes, at: f32) -> Vec<String> {
+        let used = &self.kept.as_ref().expect("styled keeps the styles").used;
+        let paths: Vec<_> = (shapes.paths.iter())
+            .map(|path| (path.site.as_str(), &path.data, &*used[&path.node]))
+            .collect();
+        let made = match acquired(&self.shapes, svg, &paths, at) {
+            Ok(made) => made,
+            Err(reason) => return vec![format!("a path cannot be drawn: {reason}")],
+        };
+        let reach = outside(&self.shapes, &made, shapes.view_box);
+        let overflow =
+            |(path, reach)| overflow(&self.arena, used, svg, (path, reach, shapes.view_box));
+        reach.map(overflow).into_iter().collect()
+    }
+}
+
 /// The first shape of `made` reaching outside `view_box`: its path's
 /// index and the box it draws.
 fn outside(
     shapes: &RefCell<DocumentShapes>,
-    made: &[crate::svg_shapes::PathShape],
+    made: &[PathShape],
     view_box: [f32; 4],
 ) -> Option<(usize, [[f32; 2]; 2])> {
     made.iter()
@@ -100,38 +167,6 @@ fn overflow(
         hi[0],
         hi[1]
     )
-}
-
-/// The view box and the device pixels per unit the svg draws at.
-fn placed(arena: &Arena, svg: NodeId, scale: f32) -> Option<([f32; 4], f32)> {
-    let element = arena.get(svg, "svg_shape_checks").element()?;
-    let view_box = crate::svg::view_box(element.attributes.get("viewBox")?)?;
-    let [width, _] = crate::svg::natural(arena, svg)?;
-    Some((view_box, width / view_box[2] * scale))
-}
-
-/// Each path of `svg`: its description, its data and its used style.
-fn parsed<'a>(
-    arena: &Arena,
-    used: &'a UsedMap,
-    svg: NodeId,
-) -> Option<Vec<(String, IconPath, &'a crate::style::Used)>> {
-    paths(arena, svg)
-        .into_iter()
-        .enumerate()
-        .map(|(index, path)| {
-            let d = arena
-                .get(path, "svg_shape_checks")
-                .element()?
-                .attributes
-                .get("d")?;
-            Some((
-                path_site(index),
-                IconPath::parse(d).ok()?,
-                &**used.get(&path)?,
-            ))
-        })
-        .collect()
 }
 
 fn inside([lo, hi]: [[f32; 2]; 2], [x, y, w, h]: [f32; 4]) -> bool {

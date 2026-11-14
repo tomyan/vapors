@@ -19,6 +19,8 @@
 {"height":44,"tag":"button","width":44,"x":328,"y":16},
 {"height":16,"tag":"svg","width":16,"x":342,"y":30},
 {"height":44,"tag":"button","width":44,"x":380,"y":16},
-{"height":16,"tag":"svg","width":16,"x":394.5,"y":30.25}
+{"height":16,"tag":"svg","width":16,"x":394.5,"y":30.25},
+{"height":44,"tag":"button","width":44,"x":432,"y":16},
+{"height":16,"tag":"svg","width":36,"x":436,"y":30}
 ]}
 ]}

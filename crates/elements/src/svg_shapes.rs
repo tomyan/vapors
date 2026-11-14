@@ -73,6 +73,14 @@ fn parsed(arena: &Arena, path: NodeId) -> Option<IconPath> {
     IconPath::parse(element.attributes.get("d")?).ok()
 }
 
+/// The device pixels per view box unit an svg with `view_box` draws at
+/// over its laid-out `content` box (CSS px) at `scale`: the view box
+/// fitted inside the box (SVG's default `xMidYMid meet`), the one
+/// answer its checks and its paint read.
+pub(crate) fn per_unit(view_box: [f32; 4], content: crate::layout::BoxRect, scale: f32) -> f32 {
+    (content.width / view_box[2]).min(content.height / view_box[3]) * scale
+}
+
 /// One path to paint: where it was written, its data, its used style.
 pub(crate) type PathToPaint<'a> = (&'a str, &'a IconPath, &'a Used);
 

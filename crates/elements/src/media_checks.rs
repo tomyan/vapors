@@ -17,11 +17,6 @@ pub(crate) fn refusals(
 ) -> Vec<ElementError> {
     let mut errors = crate::img_checks::refusals(&doc.images, &doc.arena, live, used);
     errors.extend(crate::surfaces::refusals(&doc.arena, live));
-    errors.extend(crate::svg_checks::refusals(
-        &doc.arena,
-        live,
-        (used, &doc.shapes),
-        scale,
-    ));
+    errors.extend(crate::svg_checks::refusals(&doc.arena, live, used, scale));
     errors
 }
