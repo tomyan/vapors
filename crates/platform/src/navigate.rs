@@ -82,6 +82,14 @@ fn go(href: &str, context: Option<NewContext>) -> Result<(), String> {
                 NewContext::Tab => "noopener",
                 NewContext::Window => "noopener,popup",
             };
+            // Relaxed: with `noopener` window.open always returns null, so a
+            // popup the browser blocked looks the same as one it opened, and
+            // a blocked link goes unreported. Accepted because noopener
+            // keeps the new page from reaching this one (window.opener),
+            // and the link is followed from a user's click or Enter, which
+            // browsers let open. Retired by opening without noopener and
+            // clearing the new window's opener ourselves, so the return
+            // value tells a blocked popup apart.
             window
                 .open_with_url_and_target_and_features(href, "_blank", features)
                 .map(drop)
