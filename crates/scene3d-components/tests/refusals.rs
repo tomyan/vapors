@@ -110,6 +110,7 @@ static DIV_KEY: vapors_dom::StyleKey = vapors_dom::StyleKey {
     tag: "div",
     classes: &[],
     toggles: &[],
+    attributes: &[],
     style: None,
 };
 

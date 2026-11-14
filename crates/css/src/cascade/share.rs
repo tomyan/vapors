@@ -56,6 +56,23 @@ fn reads_layout(condition: &Condition) -> bool {
     }
 }
 
+/// The indices of `sheet`'s rules any element of a template key with
+/// `tag` and `classes` can match, in source order: the bucket filter of
+/// [`Cascade::rules_for_key`] over one sheet alone, for the build-time
+/// analysis, which refers to rules by sheet and position.
+#[must_use]
+pub fn rule_indices_for_key(
+    sheet: &crate::ast::Stylesheet,
+    tag: &str,
+    classes: &[&str],
+) -> Vec<usize> {
+    let mut buckets = super::buckets::Buckets::default();
+    for (index, rule) in sheet.rules.iter().enumerate() {
+        buckets.insert(&rule.selector, index);
+    }
+    buckets.candidates_for_key(tag, classes)
+}
+
 impl Cascade {
     /// Adds what `selector` reads to the selected attributes and states.
     pub(super) fn note_selected(&mut self, selector: &crate::selector::Selector) {

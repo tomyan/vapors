@@ -6,14 +6,34 @@ use super::ComputedStyle;
 use crate::property::PropertyId;
 use crate::value::Value;
 
+/// A keyword's step from the inherited weight.
+type Step = fn(f64) -> f64;
+
+/// The `font-weight` keywords computed from the parent's weight, each
+/// with its step: the one list the build-time analysis reads too.
+const PARENT_RELATIVE: [(&str, Step); 2] = [("bolder", bolder), ("lighter", lighter)];
+
+/// Whether a specified `font-weight` reads the parent's weight.
+pub(crate) fn is_parent_relative(value: &Value) -> bool {
+    relative_step(value).is_some()
+}
+
+fn relative_step(value: &Value) -> Option<Step> {
+    let Value::Keyword(keyword) = value else {
+        return None;
+    };
+    PARENT_RELATIVE
+        .iter()
+        .find(|(name, _)| name == keyword)
+        .map(|(_, step)| *step)
+}
+
 /// Replaces a computed `bolder` or `lighter` in `values` with the
 /// number its parent's weight gives (400 without a parent).
 pub(super) fn resolve_relative(values: &mut [Value], parent: Option<&ComputedStyle>) {
     let id = PropertyId::from_name("font-weight").expect("table");
-    let relative = match &values[id.index()] {
-        Value::Keyword(k) if k == "bolder" => bolder,
-        Value::Keyword(k) if k == "lighter" => lighter,
-        _ => return,
+    let Some(relative) = relative_step(&values[id.index()]) else {
+        return;
     };
     let inherited = parent.map_or(400.0, |p| weight(&p.values[id.index()]));
     values[id.index()] = Value::Number(relative(inherited));
