@@ -3121,6 +3121,7 @@ dependencies = [
  "vapors-platform",
  "vapors-renderer",
  "vapors-scene",
+ "vapors-shapes",
  "vapors-signals",
  "vapors-text",
  "wgpu",
