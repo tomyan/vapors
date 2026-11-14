@@ -6,7 +6,10 @@
 //! kept frames with frames made afresh after every update.
 
 use crate::changed_slots::ChangedSlots;
-use crate::frames::{FrameInputs, Frames};
+use rustc_hash::FxHashMap;
+
+use crate::frames::{FrameInputs, Frames, LaneBase};
+use crate::kept_clips::Clips;
 use crate::kept_order::KeptOrder;
 use crate::layout::LayoutBox;
 use crate::paint::PaintInput;
@@ -30,7 +33,12 @@ pub(crate) fn updated(
     // refuses a container the frames were not made for in its place.
     if reshaped || cfg!(debug_assertions) {
         let scrolls = |slot| input.stackings.scrolls(slot);
-        crate::frames_check::assert_scrollers_agree(&order.thumbs, &order.clips, &scrolls);
+        let lane_frame = |slot: usize| input.placement.framed.get(slot).copied().unwrap_or(false);
+        let named = (
+            &scrolls as &dyn Fn(usize) -> bool,
+            &lane_frame as &dyn Fn(usize) -> bool,
+        );
+        crate::frames_check::assert_scrollers_agree(&order.thumbs, &order.clips, named);
     }
     let depth = |slot| order.tree.depth(slot);
     let shift =
@@ -40,10 +48,48 @@ pub(crate) fn updated(
         depth: &depth,
         shift: &shift,
     };
-    if reshaped {
-        return made_afresh(painted, &order.thumbs, &inputs, input.scale);
-    }
-    kept_updated(painted, (order, changed), &inputs, input)
+    let moved = if reshaped {
+        made_afresh(painted, &order.thumbs, &inputs, input.scale)
+    } else {
+        kept_updated(painted, (order, changed), &inputs, input)
+    };
+    let bases = lane_bases(input, &order.clips);
+    painted
+        .frames
+        .set_lanes(std::rc::Rc::clone(input.lanes), bases);
+    moved
+}
+
+/// Each framed lane's base (`frames_lane.rs`): the frame its
+/// container's content is in, the container's top there and the clip it
+/// gives its content, from the placement and clips painted from.
+/// O(framed lanes): a framed lane is one of many children
+/// (`placement_frames.rs`).
+fn lane_bases(input: &PaintInput<'_>, clips: &Clips) -> FxHashMap<usize, LaneBase> {
+    let placement = input.placement;
+    let framed = placement
+        .framing
+        .iter()
+        .filter(|(_, framing)| framing.is_ok());
+    let base = |container: usize| {
+        let scrolls = input.stackings.scrolls(container);
+        LaneBase {
+            parent: if scrolls {
+                container
+            } else {
+                clips.frame(container)
+            },
+            origin: placement.rects[container].y,
+            inner: if scrolls {
+                None
+            } else {
+                clips.inner(container)
+            },
+        }
+    };
+    framed
+        .map(|(&container, _)| (container, base(container)))
+        .collect()
 }
 
 /// `painted`'s frames made afresh for the scroll containers `thumbs`;

@@ -166,6 +166,15 @@ impl ClipInputs for BoxClips<'_, '_> {
     fn scrolls(&self, slot: usize) -> bool {
         self.input.stackings.scrolls(slot)
     }
+
+    fn lane_frame(&self, slot: usize) -> bool {
+        self.input
+            .placement
+            .framed
+            .get(slot)
+            .copied()
+            .unwrap_or(false)
+    }
 }
 
 /// The slots of `steps`' thumb steps.

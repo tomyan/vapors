@@ -15,8 +15,8 @@ use vapors_text::FontSystem;
 use super::asked::Asked;
 use super::boxes::{Content, LayoutBox};
 use super::calcs::Calcs;
-use super::lane::Lanes;
 use super::lane_layout::LaneCounts;
+use super::lane_set::Lanes;
 use super::measure::measure_text;
 
 /// The boxes, what measuring text needs, and the calcs Taffy may ask for.

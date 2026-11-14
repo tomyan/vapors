@@ -12,6 +12,21 @@ impl Extents {
         self.frames.keys().copied()
     }
 
+    /// The least top and greatest bottom of frame `frame`'s drawing
+    /// steps' items, device pixels in the frame; `None` for none, or for
+    /// a frame holding a step that spans every view, which every view
+    /// searches anyway. O(the frame's steps): read for a lane frame,
+    /// a row's few.
+    pub(crate) fn frame_span(&self, frame: usize) -> Option<[f32; 2]> {
+        let index = self.frames.get(&frame)?;
+        let entries = index.entries.iter().chain(&index.tall);
+        let span = entries.fold(
+            [f32::INFINITY, f32::NEG_INFINITY],
+            |[top, bottom], entry| [top.min(entry.top), bottom.max(entry.bottom)],
+        );
+        (span[0] <= span[1]).then_some(span)
+    }
+
     /// The frames holding a step that spans every view.
     pub(crate) fn spanning_frames(&self) -> impl Iterator<Item = usize> + '_ {
         self.spanning.keys().copied()

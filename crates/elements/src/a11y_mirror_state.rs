@@ -86,7 +86,14 @@ impl AxMirror {
         if self.all {
             return;
         }
-        let built = changed.rebuilt.iter().chain(&changed.moved);
+        // a framed lane child that started elsewhere has not moved in
+        // its frame, but its record's bounds are from its parent node
+        // (`docs/plans/splice-layout.md`, 5.3; until PR 5's mirror in flow)
+        let built = changed
+            .rebuilt
+            .iter()
+            .chain(&changed.moved)
+            .chain(&changed.started);
         for key in built.filter_map(|&slot| slots.key(slot)) {
             self.touched.nodes.insert(node_of(key));
         }

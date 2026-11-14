@@ -41,6 +41,7 @@ impl Placed {
             let at = position(&children, removed);
             children.remove(at);
             self.lanes
+                .borrow_mut()
                 .child_removed(slot, removed, children.get(at).copied());
         }
         let mut put = vec![slot];
@@ -50,7 +51,9 @@ impl Placed {
             let built = self.put_subtree(build(source, child), &FxHashMap::default(), taken);
             let after = at.checked_sub(1).map(|before| children[before]);
             children.insert(at, built[0]);
-            self.lanes.child_inserted(slot, built[0], after);
+            self.lanes
+                .borrow_mut()
+                .child_inserted(slot, built[0], after);
             put.extend(built);
         }
         let (mut own, field_text) = element_box(source, owner);

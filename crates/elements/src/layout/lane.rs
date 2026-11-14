@@ -10,48 +10,15 @@ use rustc_hash::FxHashMap;
 use rustc_hash::FxHashSet;
 use taffy::Layout;
 
-use super::lane_flex_share::FlexLane;
+use super::lane_frame::FrameFacts;
 use super::lane_kind::LaneKind;
-use super::lane_share::BlockLane;
 use super::lane_tree::{Handle, LaneTree};
+use crate::lane_decline::LaneDecline;
 
-/// The lanes beside the boxes, by the container's slot, a map per
-/// kind.
-#[derive(Debug, Default)]
-pub(crate) struct Lanes {
-    pub(super) block: FxHashMap<usize, Lane<BlockLane>>,
-    pub(super) flex: FxHashMap<usize, Lane<FlexLane>>,
-}
-
-impl Lanes {
-    /// Drops the lane of the container in `slot`, of either kind.
-    pub(crate) fn remove(&mut self, slot: usize) {
-        self.block.remove(&slot);
-        self.flex.remove(&slot);
-    }
-
-    /// Tells the lane of the container in `owner`, if it has one, of
-    /// the child put in at `slot` after `after` (`Lane::child_inserted`).
-    pub(crate) fn child_inserted(&mut self, owner: usize, slot: usize, after: Option<usize>) {
-        if let Some(lane) = self.block.get_mut(&owner) {
-            lane.child_inserted(slot, after);
-        }
-        if let Some(lane) = self.flex.get_mut(&owner) {
-            lane.child_inserted(slot, after);
-        }
-    }
-
-    /// Tells the lane of the container in `owner`, if it has one, of
-    /// the child taken out of `slot` (`Lane::child_removed`).
-    pub(crate) fn child_removed(&mut self, owner: usize, slot: usize, next: Option<usize>) {
-        if let Some(lane) = self.block.get_mut(&owner) {
-            lane.child_removed(slot, next);
-        }
-        if let Some(lane) = self.flex.get_mut(&owner) {
-            lane.child_removed(slot, next);
-        }
-    }
-}
+/// The fewest children a lane frames (`Lane::framing`): enough that
+/// framing pays for its frames, set from no measurement yet; the rows
+/// page's list has thousands, a row's cells a handful.
+pub(super) const FRAMED_CHILDREN: usize = 32;
 
 /// One container's lane.
 #[derive(Debug)]
@@ -84,6 +51,11 @@ pub(crate) struct Lane<K: LaneKind> {
     /// Whether every child must be laid out again and every start
     /// written: a fresh lane, or one whose share changed.
     pub(super) all: bool,
+    /// What framing the children reads (`lane_frame.rs`).
+    pub(crate) facts: FrameFacts,
+    /// Children put since the lane was last put back among the lanes,
+    /// whose container `Lanes` then notes.
+    pub(super) born: Vec<usize>,
 }
 
 impl<K: LaneKind> Lane<K> {
@@ -102,6 +74,8 @@ impl<K: LaneKind> Lane<K> {
             pending: FxHashMap::default(),
             relative: FxHashMap::default(),
             all: true,
+            facts: FrameFacts::default(),
+            born: Vec::new(),
         }
     }
 
@@ -124,6 +98,7 @@ impl<K: LaneKind> Lane<K> {
         self.pending.remove(&slot);
         self.relative.remove(&slot);
         self.height_readers.remove(&slot);
+        self.facts.forget(slot);
     }
 
     /// The child in `slot`'s layout to write, and its relative offset:
@@ -155,7 +130,36 @@ impl<K: LaneKind> Lane<K> {
         self.handles.insert(slot, handle);
         self.slots.insert(handle, slot);
         self.moved.push(slot);
+        self.born.push(slot);
         handle
+    }
+
+    /// Whether the children can be frames of their own; `None` for a
+    /// lane of fewer than `FRAMED_CHILDREN` children, which keeps its
+    /// children placed as before: placing a few costs little, and every
+    /// framed lane is worked out once per update (`paint_frames.rs`), so
+    /// framing the small lanes too (a cell holding its text is one)
+    /// would cost O(rows) per update again.
+    pub(super) fn framing(&self, origin: f64, scale: f32) -> Option<Result<(), LaneDecline>> {
+        (self.handles.len() >= FRAMED_CHILDREN)
+            .then(|| self.facts.framable(self.tree.gap, origin, scale))
+    }
+
+    /// The children whose box or overflow meets `from..=to`, CSS pixels
+    /// from the container's border box top, by slot.
+    pub(super) fn children_between(&self, from: f64, to: f64) -> Vec<usize> {
+        let top = self.facts.top;
+        let handles = self.tree.between(from - top, to - top);
+        handles
+            .into_iter()
+            .map(|handle| self.slots[&handle])
+            .collect()
+    }
+
+    /// The child in `slot`'s start from the lane's top, plus that top.
+    pub(super) fn frame_offset(&self, slot: usize) -> Option<f64> {
+        let handle = *self.handles.get(&slot)?;
+        Some(self.facts.top + self.tree.start(handle))
     }
 
     /// The moved child nearest the start, whose start and every later

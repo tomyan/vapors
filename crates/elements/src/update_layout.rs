@@ -141,9 +141,11 @@ impl Document {
         let take = |last: &mut Painted| std::mem::take(&mut last.from.placement);
         let mut placement = last.map(take).unwrap_or_default();
         let scrolls = |slot| stackings.scrolls(slot);
-        let boxes = LaidOut::new(&placed.boxes, &scrolls, viewport.scale);
+        let lanes = placed.lanes.borrow();
+        let boxes = LaidOut::new(&placed.boxes, &scrolls, &lanes, viewport.scale);
         let done = self.placed(&mut placement, (&boxes, &placed.slots), (written, changed));
         (changed.moved, changed.offsets_moved) = (done.moved, done.offsets_moved);
+        changed.started.clone_from(&written.started);
         changed.scroll_states = done.states_changed;
         self.made_from(placement, viewport.scale)
     }
@@ -173,6 +175,8 @@ impl Document {
         self.forget_freed(&changed.freed, slots);
         self.counts.boxes_placed = done.count;
         self.counts.boxes_moved = done.moved.len();
+        self.counts.lanes_unframed = done.unframed.len();
+        self.counts.lane_unframed = done.unframed.first().map(|&(_, decline)| decline);
         self.counts.slots_chained = done.chained;
         self.check_placed(before, (boxes, placement), (&done, changed));
         done

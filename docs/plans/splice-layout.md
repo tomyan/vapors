@@ -917,6 +917,6 @@ Lane frames are lighter than scroll frames:
 | Slice | Content | Accepted when |
 |---|---|---|
 | 4a | This note (approved by the lead, 2026-11-14; ships with 4b) | reviewed |
-| 4b | Lane frames: clips, placement, `Frames::at`, draw, the a11y `started` list, the two declines | Insert at 3000 rows: `boxes_moved` 0, `boxes_shifted` 0, `boxes_placed` the new row's boxes and their ancestors plus the later rows visited (until 4c); the Chromium paint comparisons and the kept-paint check unchanged; `--scaling Insert` `paint` within 2% across sizes |
+| 4b | Lane frames: clips, placement, `Frames::at`, draw, the a11y `started` list, the two declines | Insert at 3000 rows: `boxes_moved` the containers that grow (the list and body) and no row, the same at every size, `boxes_shifted` 0, `boxes_placed` the new row's boxes and their ancestors plus the later rows visited (until 4c); the Chromium paint comparisons and the kept-paint check unchanged; `--scaling Insert` `paint` within 2% across sizes |
 | 4c | Layout leaves starts out of later children's layouts; the layout check derives them | `layout` within 2% across sizes for Insert and FlexInsert |
 | 4d | Culling and hits through `between`; the lane's extents entry | every phase but `accessibility` within 2% across sizes |

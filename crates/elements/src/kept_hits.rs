@@ -105,13 +105,16 @@ pub(crate) enum HitsChanged {
 }
 
 impl HitsChanged {
-    /// The `changed` hits, put on the page by `frames`.
+    /// The `changed` hits, put on the page by `frames`; unknown when a
+    /// changed hit's frame is gone (a lane child taken out with its
+    /// hits), which is the safe answer.
     pub(crate) fn on_page(changed: Vec<FramedHit>, frames: &Frames) -> Self {
         let hits = changed.into_iter();
-        Self::Known(
-            hits.map(|(frame, (node, rect))| (node, frames.hit(frame, rect)))
-                .collect(),
-        )
+        let on_page =
+            hits.map(|(frame, (node, rect))| Some((node, frames.hit_if_held(frame, rect)?)));
+        on_page
+            .collect::<Option<_>>()
+            .map_or(Self::Unknown, Self::Known)
     }
 
     /// Whether a hit test at `point` may name another element than

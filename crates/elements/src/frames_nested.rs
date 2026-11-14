@@ -151,9 +151,11 @@ fn order(a: &Nested, b: &Nested) -> std::cmp::Ordering {
 
 impl Frames {
     /// The frames whose items can show in `view`, device pixels on the
-    /// page: the page's, and each frame whose container's clip meets the
+    /// page: the page's, each frame whose container's clip meets the
     /// view in the frame that container is in, found through each
-    /// frame's index of its containers (`frames_nested.rs`).
+    /// frame's index of its containers (`frames_nested.rs`), and each
+    /// lane frame whose child meets the view in its lane's frame
+    /// (`frames_lane.rs`).
     pub(crate) fn meeting(&self, view: Rect) -> Vec<usize> {
         let mut found = Vec::new();
         let mut open = vec![PAGE];
@@ -162,6 +164,7 @@ impl Frames {
             if let Some(index) = self.index.get(&frame) {
                 open.extend(index.meeting(self.view_in(frame, view)));
             }
+            open.extend(self.lane_frames_meeting(frame, view));
         }
         found
     }

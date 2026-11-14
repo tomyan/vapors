@@ -33,7 +33,7 @@ pub(crate) struct Slots {
 pub(crate) struct Placed {
     pub(crate) boxes: Vec<LayoutBox>,
     pub(crate) slots: Slots,
-    pub(crate) lanes: super::lane::Lanes,
+    pub(crate) lanes: super::lane_set::SharedLanes,
 }
 
 impl Slots {
@@ -74,7 +74,7 @@ impl Slots {
         Placed {
             boxes,
             slots,
-            lanes: super::lane::Lanes::default(),
+            lanes: super::lane_set::SharedLanes::default(),
         }
     }
 

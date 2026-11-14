@@ -36,6 +36,13 @@ pub(crate) struct Frames {
     nested: FxHashMap<usize, Vec<usize>>,
     index: FxHashMap<usize, NestedIndex>,
     entered: FxHashMap<usize, Option<Rect>>,
+    /// The lane frames, resolved on read (`frames_lane.rs`).
+    lanes: LaneFrames,
+    /// By framed lane container, how far its children's ink reaches
+    /// past their border boxes above and below, CSS pixels: the most
+    /// seen since the frames were made, which culling widens by
+    /// (`frames_lane.rs`).
+    lane_ink: LaneInk,
 }
 
 impl Default for Frames {
@@ -58,16 +65,28 @@ impl Frames {
             nested: FxHashMap::default(),
             index: FxHashMap::default(),
             entered: FxHashMap::default(),
+            lanes: LaneFrames::default(),
+            lane_ink: LaneInk::default(),
         }
     }
 
-    /// Frame `frame`, or a panic naming it.
-    pub(crate) fn at(&self, frame: usize) -> &FrameAt {
-        self.by_frame.get(&frame).unwrap_or_else(|| {
+    /// Frame `frame`, a scroll frame or a lane frame, if it is one.
+    pub(crate) fn get(&self, frame: usize) -> Option<FrameAt> {
+        self.by_frame
+            .get(&frame)
+            .copied()
+            .or_else(|| self.lane_at(frame))
+    }
+
+    /// Frame `frame`, a scroll frame or a lane frame, or a panic naming
+    /// it.
+    pub(crate) fn at(&self, frame: usize) -> FrameAt {
+        self.get(frame).unwrap_or_else(|| {
             panic!(
-                "a part names scroll frame {frame}, which this paint does not hold: the \
+                "a part names frame {frame}, which this paint does not hold: the scroll \
                  frames are made from the scroll containers in paint order (frames.rs, \
-                 paint_partial.rs) and a part's frame from its clip chain (kept_clips.rs); \
+                 paint_partial.rs), the lane frames from the framed lanes (frames_lane.rs, \
+                 paint_frames.rs), and a part's frame from its clip chain (kept_clips.rs); \
                  reproduce with `cargo xtask test`"
             )
         })
@@ -93,19 +112,29 @@ impl Frames {
 
     /// `rect`, CSS pixels in frame `frame`, on the page.
     pub(crate) fn rect(&self, frame: usize, rect: BoxRect) -> BoxRect {
-        self.css_rect(*self.at(frame), rect)
+        self.css_rect(self.at(frame), rect)
     }
 
     /// `point`, CSS pixels in frame `frame`, on the page.
     pub(crate) fn point(&self, frame: usize, [x, y]: [f32; 2]) -> [f32; 2] {
-        let [dx, dy] = self.css_shift(*self.at(frame));
+        let [dx, dy] = self.css_shift(self.at(frame));
         [x + dx, y + dy]
     }
 
     /// A hit `rect` in frame `frame` on the page, cut to the frame's
     /// clip.
     pub(crate) fn hit(&self, frame: usize, rect: BoxRect) -> BoxRect {
-        let at = *self.at(frame);
+        self.hit_at(self.at(frame), rect)
+    }
+
+    /// A hit `rect` in frame `frame` on the page, when the frame is
+    /// still one: a hit taken out with a lane child names the child's
+    /// frame, gone with it.
+    pub(crate) fn hit_if_held(&self, frame: usize, rect: BoxRect) -> Option<BoxRect> {
+        self.get(frame).map(|at| self.hit_at(at, rect))
+    }
+
+    fn hit_at(&self, at: FrameAt, rect: BoxRect) -> BoxRect {
         crate::clip::within(at.clip, self.css_rect(at, rect))
     }
 
@@ -180,8 +209,12 @@ fn shifted(item: Item, delta: [f32; 2]) -> Item {
 pub(crate) fn on_page(
     boxes: &[Option<crate::kept_box::KeptBox>],
 ) -> (&[Option<crate::kept_box::KeptBox>], &'static Frames) {
-    static ON_PAGE: std::sync::LazyLock<Frames> = std::sync::LazyLock::new(|| Frames::page(1.0));
-    (boxes, &ON_PAGE)
+    thread_local! {
+        // Leaked once per test thread: `Frames` holds the lanes, which
+        // are not shared between threads.
+        static ON_PAGE: &'static Frames = Box::leak(Box::new(Frames::page(1.0)));
+    }
+    (boxes, ON_PAGE.with(|frames| *frames))
 }
 
 #[path = "frames_nested.rs"]
@@ -193,6 +226,11 @@ mod update;
 
 #[path = "frames_compare.rs"]
 mod compare;
+
+#[path = "frames_lane.rs"]
+mod lane;
+pub(crate) use lane::LaneBase;
+use lane::{LaneFrames, LaneInk};
 pub(crate) use update::FrameInputs;
 
 #[cfg(test)]

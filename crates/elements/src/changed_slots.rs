@@ -23,6 +23,9 @@ pub(crate) struct ChangedSlots {
     /// The scroll containers whose offset as applied changed: their
     /// frames' shifts change, and no slot moves (`frames.rs`).
     pub(crate) offsets_moved: Vec<usize>,
+    /// The lane children whose start changed (`layout/written.rs`): a
+    /// framed one's frame shifts, and no slot moves (`frames_lane.rs`).
+    pub(crate) started: Vec<usize>,
     /// The scroll containers whose offset or range, unrounded, differs
     /// from when it was last settled (exact): their thumbs move, even
     /// when no slot is built or moved and no offset as applied moved.
@@ -54,6 +57,7 @@ impl ChangedSlots {
             every: false,
             moved: Vec::new(),
             offsets_moved: Vec::new(),
+            started: Vec::new(),
             scroll_states: Vec::new(),
             shape_changed: rebuilt.shape_changed || stackings.restacked,
             rebuilt: rebuilt.slots,
@@ -71,6 +75,7 @@ impl ChangedSlots {
             freed: rebuilt.freed,
             moved: Vec::new(),
             offsets_moved: Vec::new(),
+            started: Vec::new(),
             scroll_states: Vec::new(),
             shape_changed: true,
             reshaped: Vec::new(),

@@ -70,7 +70,7 @@ fn a_nested_frame_adds_its_shift_to_the_outer_one_and_is_cut_to_its_clip() {
     let frames = nested([0.0, -30.0], [0.0, -5.0], 1.0);
 
     // When
-    let inner = *frames.at(2);
+    let inner = frames.at(2);
 
     // Then: slot 2's clip, (20, 200) in slot 1's frame, is at
     // (20, 170) on the page, below slot 1's clip, which ends at 110
@@ -135,7 +135,7 @@ fn a_hit_is_moved_by_its_frame_and_cut_to_its_frame_clip() {
 }
 
 #[test]
-#[should_panic(expected = "names scroll frame 7, which this paint does not hold")]
+#[should_panic(expected = "names frame 7, which this paint does not hold")]
 fn a_frame_the_paint_does_not_hold_is_refused_by_name() {
     // Given
     let frames = nested([0.0; 2], [0.0; 2], 1.0);

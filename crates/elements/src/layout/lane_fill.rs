@@ -88,6 +88,8 @@ impl BoxTree<'_> {
         lane: &mut Lane<K>,
     ) -> Result<K::Summary, LaneDecline> {
         let (leaf, layout) = K::lay_out_child(self, slot, c)?;
+        let scrolls = self.scroller_at_or_below(slot);
+        lane.facts.note(slot, &layout, self.scale, scrolls);
         lane.pending.insert(slot, layout);
         if K::reads_heights(&self.boxes[slot].style) {
             lane.height_readers.insert(slot);
@@ -95,6 +97,22 @@ impl BoxTree<'_> {
             lane.height_readers.remove(&slot);
         }
         Ok(leaf)
+    }
+}
+
+impl BoxTree<'_> {
+    /// Whether the box in `slot` or one below it scrolls (its content a
+    /// scroll frame): O(the subtree), which laying the child out is too.
+    fn scroller_at_or_below(&self, slot: usize) -> bool {
+        let mut open = vec![slot];
+        while let Some(at) = open.pop() {
+            let overflow = self.boxes[at].style.overflow;
+            if overflow.x.is_scroll_container() || overflow.y.is_scroll_container() {
+                return true;
+            }
+            open.extend_from_slice(&self.boxes[at].children);
+        }
+        false
     }
 }
 

@@ -35,10 +35,12 @@ mod lane_flex_place;
 mod lane_flex_share;
 mod lane_flex_sizes;
 mod lane_flex_summary;
+mod lane_frame;
 mod lane_kind;
 mod lane_layout;
 #[cfg(test)]
 mod lane_page;
+mod lane_set;
 mod lane_share;
 mod lane_tree;
 mod layout_box;
@@ -69,6 +71,7 @@ pub(crate) use calcs::Calcs;
 pub(crate) use inline::{InlineRun, InlineSpan};
 pub(crate) use keep::KeptBoxes;
 pub(crate) use lane_layout::LaneCounts;
+pub(crate) use lane_set::{Lanes, SharedLanes};
 pub(crate) use rebuilt::Rebuilt;
 pub(crate) use slots::{Key, Placed, Slots};
 pub(crate) use text_cache::TextCache;
@@ -106,7 +109,7 @@ pub struct BoxRect {
 /// A `calc()` that did not resolve (see `Calcs`), with what Taffy did
 /// (boxed: the pair is wider than clippy's `Err` limit).
 pub(crate) fn lay_out(
-    mut placed: Placed,
+    placed: Placed,
     texts: (&mut FontSystem, &mut TextCache),
     scale: f32,
     size: (f32, f32),
@@ -114,6 +117,8 @@ pub(crate) fn lay_out(
     settling: Settling,
 ) -> Result<(Placed, LayoutWork), Box<(String, LayoutWork)>> {
     let (fonts, cache) = texts;
+    let shared = std::rc::Rc::clone(&placed.lanes);
+    let mut lanes = shared.borrow_mut();
     let mut tree = BoxTree {
         boxes: placed.boxes,
         fonts,
@@ -123,7 +128,7 @@ pub(crate) fn lay_out(
         written: Written::default(),
         calls: 0,
         disowned: 0,
-        lanes: &mut placed.lanes,
+        lanes: &mut lanes,
         lanes_enabled: settling.lanes,
         stale: settling.built.into_iter().collect(),
         lane_counts: LaneCounts::default(),
@@ -147,6 +152,7 @@ pub(crate) fn lay_out(
         written: std::mem::take(&mut tree.written),
     };
     let boxes = tree.boxes;
+    drop(lanes);
     match calcs.failure() {
         Some(failure) => Err(Box::new((failure, work))),
         None => Ok((

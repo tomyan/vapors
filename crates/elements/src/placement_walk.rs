@@ -62,6 +62,7 @@ impl<'a, 'b> Walk<'a, 'b> {
                 states_changed: Vec::new(),
                 count: 0,
                 chained: 0,
+                unframed: Vec::new(),
             },
         }
     }
@@ -108,7 +109,9 @@ impl<'a, 'b> Walk<'a, 'b> {
         }
         self.put(slot, origin, mark);
         let inner = content_origin(self.kept.rects[slot]);
-        self.visit_placed_in(slot, inner, mark == Mark::Rebuilt || inner != before);
+        let reframed = self.frame_lane(slot, inner);
+        let moved = mark == Mark::Rebuilt || reframed || self.children_moved(slot, inner, before);
+        self.visit_placed_in(slot, inner, moved);
     }
 
     /// Settles the scroll offset of `slot` again, noting it when the
@@ -159,16 +162,26 @@ impl<'a, 'b> Walk<'a, 'b> {
     }
 
     /// Writes the rect and padding of `slot`, noting it as moved when
-    /// either changed and it was not built again.
+    /// either changed, or it went in or out of a lane frame, and it was
+    /// not built again. A lane child in a frame of its own has its rect
+    /// in that frame: along the axis, its relative offset alone.
     fn put(&mut self, slot: usize, origin: (f32, f32), mark: Mark) {
         let layout = &self.boxes.boxes[slot].layout;
+        let framed = self.lane_framed(slot);
+        let y = if framed {
+            self.boxes.lanes.relative(self.kept.up[slot], slot)
+        } else {
+            origin.1 + layout.location.y
+        };
         let rect = BoxRect {
             x: origin.0 + layout.location.x,
-            y: origin.1 + layout.location.y,
+            y,
             width: layout.size.width,
             height: layout.size.height,
         };
-        let changed = rect != self.kept.rects[slot] || layout.padding != self.kept.paddings[slot];
+        let reframed = std::mem::replace(&mut self.kept.framed[slot], framed) != framed;
+        let changed =
+            reframed || rect != self.kept.rects[slot] || layout.padding != self.kept.paddings[slot];
         if changed && mark != Mark::Rebuilt {
             self.placed.moved.push(slot);
         }
@@ -202,3 +215,6 @@ impl<'a, 'b> Walk<'a, 'b> {
 fn content_origin(rect: BoxRect) -> (f32, f32) {
     (rect.x, rect.y)
 }
+
+#[path = "placement_frames.rs"]
+mod frames;
