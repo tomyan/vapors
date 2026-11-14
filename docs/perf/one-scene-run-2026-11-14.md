@@ -21,7 +21,7 @@ draw every mesh as the schedule says.
 ## Setup
 
 - Release build at 7bcb59a, which holds #351 with its review round
-  (977f37f) and this record's script. Every run prints
+  and this record's script. Every run prints
   `7bcb59a2a384`, with no `-dirty` suffix. After the runs, #351 and this record were
   replayed onto main (after #344's squash-merge) with no change of
   their own; main's commits since 7bcb59a's base (the elements layout
