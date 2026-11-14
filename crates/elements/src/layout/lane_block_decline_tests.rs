@@ -67,3 +67,28 @@ fn a_child_wholly_before_a_scroll_containers_origin_declines_it() {
     );
     assert_eq!(compared.containers, 4, "{compared:?}");
 }
+
+#[test]
+fn a_child_wholly_left_of_a_scroll_containers_origin_declines_it() {
+    // Given: a scrolling list whose second row ends left of the content
+    // box's corner, which Taffy leaves out of the overflow
+    let css = "body { margin: 0; } .list { height: 40px; overflow: auto; padding: 2px; } \
+               .row { height: 20px; } .gone { width: 20px; margin-left: -40px; }";
+    let mut doc = page(css, |doc, body| {
+        let list = element(doc, body, "list", None);
+        element(doc, list, "row", Some("row"));
+        element(doc, list, "row gone", Some("gone"));
+    });
+
+    // When
+    let compared = compare(&mut doc);
+
+    // Then: the list declines on its layout ask; html, body and the
+    // rows compare
+    assert_eq!(
+        compared.declined,
+        [LaneDecline::BeforeScrollOrigin],
+        "{compared:?}"
+    );
+    assert_eq!(compared.containers, 4, "{compared:?}");
+}
