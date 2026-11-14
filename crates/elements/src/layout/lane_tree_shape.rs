@@ -35,6 +35,36 @@ impl<S: Summary> LaneTree<S> {
         out
     }
 
+    /// `handle`'s child and every child after it, in order, each with
+    /// where it starts: O(log n) to reach it, then one step per child.
+    pub(crate) fn starts_from(&self, handle: Handle) -> Vec<(Handle, f64)> {
+        let (leaf, at) = self.locate(handle);
+        let mut left = self.before(handle);
+        let mut out = Vec::new();
+        self.starts_run_from(leaf, at, &mut left, &mut out);
+        let mut node = leaf;
+        while let Some(parent) = self.nodes[node].parent {
+            let at = self.child_at(parent, node);
+            self.starts_run_from(parent, at + 1, &mut left, &mut out);
+            node = parent;
+        }
+        out
+    }
+
+    /// Every child under `node` from its `at`th entry on, in order,
+    /// folded into `left` as it goes.
+    fn starts_run_from(&self, node: usize, at: usize, left: &mut S, out: &mut Vec<(Handle, f64)>) {
+        let node = &self.nodes[node];
+        for (&child, sum) in node.children[at..].iter().zip(&node.sums[at..]) {
+            if node.leaf {
+                out.push((self.handle(child), S::start_of(left, sum, self.gap)));
+                *left = left.combine(sum, self.gap);
+            } else {
+                self.starts_run_from(child as usize, 0, left, out);
+            }
+        }
+    }
+
     /// Every child under `node` from its `at`th entry on, in order.
     fn run_from(&self, node: usize, at: usize, out: &mut Vec<Handle>) {
         let node = &self.nodes[node];

@@ -37,6 +37,9 @@ pub(crate) struct LaneFrames {
     /// The framed containers whose content is in each frame.
     by_parent: FxHashMap<usize, Vec<usize>>,
     memo: RefCell<FxHashMap<usize, FrameAt>>,
+    /// The lanes whose children from the one named on started elsewhere
+    /// this update (`ChangedSlots::started`), for `prime_started`.
+    started: Vec<(usize, usize)>,
 }
 
 /// How far each framed lane's children's ink reaches past their boxes,
@@ -69,7 +72,7 @@ impl Frames {
     pub(crate) fn set_lanes(
         &mut self,
         shared: SharedLanes,
-        bases: FxHashMap<usize, LaneBase>,
+        (bases, started): (FxHashMap<usize, LaneBase>, &[(usize, usize)]),
     ) -> bool {
         let changed = self.lanes.bases != bases;
         let mut by_parent: FxHashMap<usize, Vec<usize>> = FxHashMap::default();
@@ -81,6 +84,7 @@ impl Frames {
             bases,
             by_parent,
             memo: RefCell::default(),
+            started: started.to_vec(),
         };
         changed
     }
@@ -142,20 +146,25 @@ impl Frames {
 
     /// Lane frame `frame` worked out, the frame its container's content
     /// is in read through `outer`.
-    #[allow(clippy::cast_possible_truncation)] // device px, whole, within f32
     fn lane_resolved(&self, frame: usize, outer: &dyn Fn(usize) -> FrameAt) -> Option<FrameAt> {
         let (base, offset) = self.lane_place(frame)?;
-        let outer = outer(base.parent);
+        Some(self.lane_frame_at(base, offset, outer(base.parent)))
+    }
+
+    /// The frame of a child `offset` down a lane at `base`, its
+    /// container's content in the frame at `outer`.
+    #[allow(clippy::cast_possible_truncation)] // device px, whole, within f32
+    pub(super) fn lane_frame_at(&self, base: LaneBase, offset: f64, outer: FrameAt) -> FrameAt {
         let down = (f64::from(base.origin) + offset) * f64::from(self.scale);
         let clip = match base.inner {
             Some(inner) => meet(Some(self.css_rect(outer, inner)), outer.clip),
             None => outer.clip,
         };
-        Some(FrameAt {
+        FrameAt {
             shift: [outer.shift[0], outer.shift[1] + down as f32],
             clip,
             device_clip: clip.map(|clip| snapped(clip, self.scale)),
-        })
+        }
     }
 
     /// The base of the framed lane `frame` is a child of and the
@@ -167,3 +176,6 @@ impl Frames {
         Some((base, lanes.frame_offset(container, frame)?))
     }
 }
+
+#[path = "frames_lane_prime.rs"]
+mod prime;

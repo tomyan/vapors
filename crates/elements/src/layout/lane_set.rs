@@ -131,6 +131,14 @@ impl Lanes {
         Some(lane.children_from(first))
     }
 
+    /// The children of the lane container in `container` from the one
+    /// in `first` on, each with its `frame_offset`, in one pass along the
+    /// lane; none when it has no lane.
+    pub(crate) fn offsets_from(&self, container: usize, first: usize) -> Vec<(usize, f64)> {
+        let lane = self.lane(container);
+        lane.map_or_else(Vec::new, |lane| lane.offsets_from(first))
+    }
+
     /// Whether the children of the lane container in `container` can be
     /// frames of their own, its content origin along the axis `origin`
     /// at `scale` (`lane_frame.rs`); `None` when it has no lane, or too

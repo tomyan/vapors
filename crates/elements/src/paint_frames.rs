@@ -54,9 +54,10 @@ pub(crate) fn updated(
         kept_updated(painted, (order, changed), &inputs, input)
     };
     let bases = lane_bases(input, &order.clips);
+    let lanes = (bases, &changed.started[..]);
     let rebased = painted
         .frames
-        .set_lanes(std::rc::Rc::clone(input.lanes), bases);
+        .set_lanes(std::rc::Rc::clone(input.lanes), lanes);
     moved || rebased
 }
 

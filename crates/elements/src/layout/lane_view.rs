@@ -22,6 +22,9 @@ pub(super) trait LaneView {
     fn children_between(&self, from: f64, to: f64) -> Vec<usize>;
     /// The children from the one in `slot` on, in order.
     fn children_from(&self, slot: usize) -> Vec<usize>;
+    /// The children from the one in `slot` on, in order, each with its
+    /// `frame_offset`: one fold to reach it, then one step a child.
+    fn offsets_from(&self, slot: usize) -> Vec<(usize, f64)>;
     /// Whether its children can be frames (`Lane::framing`).
     fn framing(&self, origin: f64, scale: f32) -> Option<Result<(), LaneDecline>>;
     /// The child in `slot`'s `position: relative` offset along the axis.
@@ -59,6 +62,17 @@ impl<K: LaneKind> LaneView for Lane<K> {
 
     fn children_from(&self, slot: usize) -> Vec<usize> {
         Lane::children_from(self, slot)
+    }
+
+    fn offsets_from(&self, slot: usize) -> Vec<(usize, f64)> {
+        let Some(&handle) = self.handles.get(&slot) else {
+            return Vec::new();
+        };
+        let top = self.facts.top;
+        let starts = self.tree.starts_from(handle).into_iter();
+        starts
+            .map(|(handle, start)| (self.slots[&handle], top + start))
+            .collect()
     }
 
     fn framing(&self, origin: f64, scale: f32) -> Option<Result<(), LaneDecline>> {
