@@ -156,7 +156,8 @@ store does today.
   `propagate_parent_transforms` (dirty subtrees only) with a different
   dirty mechanism (a list, not ticks).
 - **Change detection.** `world_version` per node, incremented by
-  `recompute` and by `set_colour` (`appearance.rs:15`); a reader keeps
+  `recompute` and by `set_appearance` when the colour changes
+  (`appearance.rs`; `set_colour` was removed in CSS for 3D C3c); a reader keeps
   the version it last read (`slot_table.rs`, `Slot::written`). This is
   (C) with the tick on the node rather than the component, and with
   the reader holding its own last-seen version per node rather than
@@ -464,7 +465,7 @@ replaces its wording.
 
 | PR | Content | Accepted when | Depends on |
 |---|---|---|---|
-| E1 | A kept draw list in `SceneRenderer`: `Scene` gains a structural version (moved by `add`, `remove`, `reparent` and a kind change) and `update` returns the changed nodes as today; the renderer rebuilds its mesh list only when the structural version moved, and writes slots from `update`'s returned list and `set_colour`'s (a colour change joins the dirty list rather than only moving the version). `SlotTable::assign` runs only on a structural change | The `vapors-perf` scene workload (section 6, row 1) added, with N = 1,000, 3,000, 10,000; one moving node: instructions flat within the judge's rule; `FrameCounts` unchanged (#252's pins hold); a node added from Rust after mount is drawn on the next render (the structural version proven by removing the bump and watching the test fail) | 3D PR 5 |
+| E1 | A kept draw list in `SceneRenderer`: `Scene` gains a structural version (moved by `add`, `remove`, `reparent` and a kind change) and `update` returns the changed nodes as today; the renderer rebuilds its mesh list only when the structural version moved, and writes slots from `update`'s returned list and `set_appearance`'s (a colour change joins the dirty list rather than only moving the version). `SlotTable::assign` runs only on a structural change | The `vapors-perf` scene workload (section 6, row 1) added, with N = 1,000, 3,000, 10,000; one moving node: instructions flat within the judge's rule; `FrameCounts` unchanged (#252's pins hold); a node added from Rust after mount is drawn on the next render (the structural version proven by removing the bump and watching the test fail) | 3D PR 5 |
 | E2 | `Scene::world` and `world_version` without the ancestor walk: a scene-level `pending` count (the dirty list's length) answers `WorldPending` in O(1) after an update; the ancestor walk stays only for the error's message | `world_version_tests.rs` and `world_tests.rs` unchanged and green; the workload's `update`-plus-render instructions per node drop by the walk (recorded in `docs/perf/`); `WorldPending` still refused for a node changed since the last update (proven by breaking) | E1 |
 | E3 | Columns: `Scene`'s per-node fields split into `Vec`s (`local`, `world`, `version`, `parent`, `first_child`, `next_sibling`, `kind`, `dirty`); children as a sibling chain, not a `Vec` per node; `NodeId` and every public method unchanged; a `size_of` pin per node | Every `vapors-scene3d` and `vapors-scene3d-gpu` test unchanged and green; the per-node bytes pinned in a unit test at the number section 6 estimates or the measured one; the 10,000-node mount's RSS recorded before and after | E1 |
 | E4 | `Scene::set_transforms(&[(NodeId, Transform)])` (parity T2's batch) with the one-writer rule: a `<Mesh>` or `<Group>` whose `transform` prop is bound marks its node `bound` in the scene, and the batch refuses a bound node naming the node and the component; a node mounted without a binding is task-owned. Since a props struct fills every unset prop from `Default` (#251), `transform` becomes `Option<Signal<Transform>>`, `None` meaning task-owned; and a `node` out-prop (`bind:node={handle}`, the shape of `bind:this`) hands the `NodeId` to app code, since nothing does today (`mesh.rs`, `Mounted.placement` is private) | 1,000 nodes moved in one call recompute each world once (counted by `update`'s return); a bound node in the batch refused naming both; a template `<Mesh bind:node={..}>` gives the app the id that the batch then moves; proven by breaking the `bound` mark | E1, 3D PR 5 |
@@ -558,9 +559,10 @@ E7 gives the number before any app needs it.
   codegen has rough edges. If the out-prop is not available in time,
   the example adds its nodes under a `<Group bind:node>` with
   `Scene::add`, which is the M3 visibility question again.
-- **The structural version and `set_colour`.** E1 moves colour changes
-  onto the dirty list so the renderer stops scanning for them; `#250`
-  made `set_colour` move `world_version` precisely to avoid a scan.
+- **The structural version and `set_appearance`.** E1 moves colour
+  changes onto the dirty list so the renderer stops scanning for them;
+  `#250` made `set_colour` (now `set_appearance`, C3c) move
+  `world_version` precisely to avoid a scan.
   Both must agree, and the test that one colour change writes 80 bytes
   (#252) is the pin.
 - **Columns and the sibling chain.** Child order matters

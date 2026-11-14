@@ -29,7 +29,7 @@ impl Document {
     /// style and its parent's; `path` says where the computed style came
     /// from.
     pub(crate) fn keep_used(&mut self, node: NodeId, viewport: Viewport, path: Path) {
-        if !crate::check::implemented(&self.arena, node) {
+        if !crate::check::implemented(&self.arena, node) || self.keep_scene_used(node) {
             return;
         }
         let found = self.find_used(node, viewport, path);
@@ -103,7 +103,6 @@ impl Document {
                     && (crate::check::is_type(e, "number") || crate::text_field::is_text_input(e))
             }),
             surface: crate::surfaces::is_surface(&self.arena, node),
-            scene_anchor: crate::check::is_scene_anchor(&self.arena, node),
             to_viewport: crate::style::to_viewport(
                 node == self.root(),
                 node == self.body(),
@@ -113,7 +112,7 @@ impl Document {
         }
     }
 
-    fn element_styles(&self, node: NodeId) -> ElementStyles<'_> {
+    pub(crate) fn element_styles(&self, node: NodeId) -> ElementStyles<'_> {
         let kept = self.kept.as_ref().expect("restyle sets it");
         ElementStyles {
             own: kept.styles.of(node),
