@@ -99,3 +99,23 @@ fn class_style_or_the_scope_attribute_under_literal_attributes_fails_the_shape_c
     };
     classified("div { color: red }", &facts);
 }
+
+#[test]
+#[should_panic(expected = "an attribute is listed twice")]
+fn an_attribute_listed_twice_in_any_case_fails_the_shape_check() {
+    let facts = KeyFacts {
+        literal_attributes: &[("title", "a"), ("Title", "b")],
+        ..CARD
+    };
+    classified("div { color: red }", &facts);
+}
+
+#[test]
+#[should_panic(expected = "the key's own fields")]
+fn the_scope_attribute_in_another_case_fails_the_shape_check() {
+    let facts = KeyFacts {
+        literal_attributes: &[("DATA-WISP", "s")],
+        ..CARD
+    };
+    classified("div { color: red }", &facts);
+}
