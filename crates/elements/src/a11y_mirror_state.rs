@@ -92,8 +92,9 @@ impl AxMirror {
         let started = changed
             .started
             .iter()
-            // a lane dropped later in the layout: Taffy laid its rows out
-            // again, and placement moved them (`moved` above)
+            // a lane dropped later in the layout: placement places its rows
+            // again (`started_unframed`), and a row whose rect changed is in
+            // `moved` above; one placed where it was keeps its record
             .flat_map(|&(container, first)| {
                 lanes.children_from(container, first).unwrap_or_default()
             });

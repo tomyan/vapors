@@ -38,7 +38,7 @@ impl<K: LaneKind> Lane<K> {
     }
 
     fn assert_written(&self, container: usize) {
-        if self.written.is_none() {
+        if !self.has_written() {
             return;
         }
         let terms = self.handles.len();

@@ -80,7 +80,8 @@ impl Placement {
         };
         let children = |&(container, first): &(usize, usize)| {
             let held = boxes.lanes.children_from(container, first);
-            held.unwrap_or_else(|| children_after(&boxes.boxes[container].children, first))
+            let children = &boxes.boxes[container].children;
+            held.unwrap_or_else(|| children_after(children, (container, first)))
         };
         written
             .started
@@ -108,11 +109,22 @@ impl Placement {
     }
 }
 
-/// `children` from `first` on; all of them when `first` is not one.
-fn children_after(children: &[usize], first: usize) -> Vec<usize> {
-    let at = children
-        .iter()
-        .position(|&child| child == first)
-        .unwrap_or(0);
+/// The children of `container`, `children`, from `first` on, or a panic
+/// naming both when `first` is not one: a `started` entry names a child
+/// of its container in the layout that wrote it, and boxes do not change
+/// within a layout.
+fn children_after(children: &[usize], (container, first): (usize, usize)) -> Vec<usize> {
+    let at = children.iter().position(|&child| child == first);
+    let at = at.unwrap_or_else(|| {
+        panic!(
+            "a started entry names slot {first} under slot {container}, which is not one of \
+             its children (layout/lane_write.rs `write_laid`); reproduce with \
+             `cargo test -p vapors-elements`"
+        )
+    });
     children[at..].to_vec()
 }
+
+#[cfg(test)]
+#[path = "placement_marks_tests.rs"]
+mod tests;

@@ -159,3 +159,17 @@ fn a_size_query_a_child_declines_puts_the_starts_back() {
         }
     });
 }
+
+#[test]
+#[should_panic(expected = "past the")]
+fn restoring_starts_into_too_few_boxes_is_refused() {
+    // Given: a list its lane wrote
+    let css = "body { margin: 0; } .row { height: 20px; }";
+    let mut doc = laid_out(css, 40);
+
+    asked(&mut doc, 40, |tree, list| {
+        // When: its starts put back into boxes that end before its rows
+        let lane = tree.lanes.lane(list).expect("a lane");
+        lane.restore_starts(list, &mut tree.boxes[..2]);
+    });
+}

@@ -112,6 +112,19 @@ impl<K: LaneKind> Lane<K> {
         self.facts.forget(slot);
     }
 
+    /// The share and height bases of the lane's last write; `None` before
+    /// its first. The one answer to whether this lane wrote its
+    /// children's layouts: framing, `written_start`, the aside answer
+    /// and the debug check read it.
+    pub(super) fn written_bases(&self) -> Option<&(K::Share, K::Heights)> {
+        self.written.as_ref()
+    }
+
+    /// Whether this lane wrote its children's layouts (`written_bases`).
+    pub(super) fn has_written(&self) -> bool {
+        self.written_bases().is_some()
+    }
+
     /// Notes the child in `slot`'s `position: relative` offset along
     /// the axis, `relative`, as its layout is written.
     pub(super) fn note_relative(&mut self, slot: usize, relative: f32) {
@@ -153,7 +166,7 @@ impl<K: LaneKind> Lane<K> {
     /// framing the small lanes too (a cell holding its text is one)
     /// would cost O(rows) per update again.
     pub(super) fn framing(&self, origin: f64, scale: f32) -> Option<Result<(), LaneDecline>> {
-        let framable = self.written.is_some() && self.handles.len() >= FRAMED_CHILDREN;
+        let framable = self.has_written() && self.handles.len() >= FRAMED_CHILDREN;
         framable.then(|| self.facts.framable(self.tree.gap, origin, scale))
     }
 

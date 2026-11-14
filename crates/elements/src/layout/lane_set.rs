@@ -74,6 +74,8 @@ impl Lanes {
     /// Where the child in `child` starts in the border box of the lane
     /// container in `container`: the lane's top and the child's start,
     /// CSS pixels; `None` when `container` has no lane holding `child`.
+    /// Answered for a lane that never wrote too, whose children hold
+    /// Taffy's values: callers outside framing read `written_start`.
     pub(crate) fn frame_offset(&self, container: usize, child: usize) -> Option<f64> {
         self.lane(container)?.frame_offset(child)
     }

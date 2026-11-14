@@ -47,7 +47,9 @@ impl<K: LaneKind> LaneView for Lane<K> {
     }
 
     fn written_start(&self, slot: usize) -> Option<f64> {
-        self.written.as_ref()?;
+        if !self.has_written() {
+            return None;
+        }
         Lane::frame_offset(self, slot)
     }
 
@@ -80,10 +82,18 @@ impl<K: LaneKind> LaneView for Lane<K> {
     }
 
     fn restore_starts(&self, container: usize, boxes: &mut [LayoutBox]) {
+        if !self.has_written() {
+            return;
+        }
         let boxes_len = boxes.len();
-        for &slot in self.handles.keys() {
-            let Some(start) = LaneView::written_start(self, slot) else {
-                return;
+        // a child laid out since the last write holds no written layout
+        let written = self
+            .handles
+            .keys()
+            .filter(|slot| !self.pending.contains_key(slot));
+        for &slot in written {
+            let Some(start) = Lane::frame_offset(self, slot) else {
+                continue;
             };
             let layout_box = boxes.get_mut(slot).unwrap_or_else(|| {
                 panic!(

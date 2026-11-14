@@ -20,7 +20,7 @@ impl BoxTree<'_> {
     /// to answer aside: the lane was written, with another share or
     /// other height bases, and nothing in it changed since.
     pub(super) fn answers_aside<K: LaneKind>(&self, c: &K::Container, lane: &Lane<K>) -> bool {
-        let Some((share, heights)) = lane.written.as_ref().filter(|_| !K::writes(c)) else {
+        let Some((share, heights)) = lane.written_bases().filter(|_| !K::writes(c)) else {
             return false;
         };
         let rebased = *heights != K::heights(c) || *share != K::share(c);
