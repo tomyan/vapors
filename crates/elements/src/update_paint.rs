@@ -5,11 +5,10 @@ use crate::changed_slots::ChangedSlots;
 use crate::document::Document;
 use crate::kept_paint::{PaintedFrom, keep, paint_all};
 use crate::layout::{LayoutBox, Rebuilt};
-use crate::node_map::NodeMap;
 use crate::paint::PaintInput;
 use crate::paint_order::{Patched, Stackings};
 use crate::painted::Painted;
-use crate::style::Used;
+use crate::style::UsedMap;
 
 impl Document {
     /// Each slot's stacking in `boxes`, for paint order and scroll
@@ -68,7 +67,7 @@ impl Document {
 fn patched_or_made(
     last: Option<&mut Painted>,
     boxes: &[LayoutBox],
-    used: &NodeMap<Used>,
+    used: &UsedMap,
     rebuilt: &Rebuilt,
 ) -> (Stackings, Patched, usize) {
     if let Some(painted) = last {

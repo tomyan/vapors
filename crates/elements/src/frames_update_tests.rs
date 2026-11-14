@@ -133,3 +133,16 @@ fn a_frame_nested_in_a_scrolled_frame_is_found_where_the_scroll_put_it() {
     found.sort_unstable();
     assert_eq!(found, [1, 2, PAGE]);
 }
+
+#[test]
+#[should_panic(
+    expected = "scroll container slot 500 is updated but the kept frames were not made for it"
+)]
+fn updating_a_container_the_frames_were_not_made_for_is_refused_naming_it() {
+    // Given
+    let clips = page_clips();
+    let mut frames = made(&clips, [0.0; 2]);
+
+    // When
+    updated(&mut frames, &clips, &[500], [0.0; 2]);
+}

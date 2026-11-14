@@ -3,7 +3,7 @@
 
 use vapors_scene::Rect;
 
-use super::{Entry, Extents};
+use super::{Entry, Extents, FrameIndex, missing};
 
 impl Extents {
     /// How many items the step at `place` paints; 0 when it draws
@@ -14,10 +14,10 @@ impl Extents {
         };
         let index = &self.frames[&frame];
         if tall {
-            index.tall[index.tall_position(place)].items
-        } else {
-            index.entries[index.position(top, place)].items
+            return index.tall[index.tall_position(place)].items;
         }
+        let entry = index.entries.get(index.position(top, place));
+        entry.map_or_else(|| missing(place), |entry| entry.items)
     }
 
     /// The entries of frame `frame` whose extent meets `view` (frame
@@ -34,26 +34,30 @@ impl Extents {
              numbers: a frame's shift or clip is not a number (frames.rs, scroll::frame_shift); \
              reproduce with `cargo xtask test`"
         );
-        let (entries, tall) = self.frames.get(&frame).map_or((&[][..], &[][..]), |index| {
-            (&index.entries[..], &index.tall[..])
-        });
-        let first = entries.partition_point(|entry| entry.reach <= view.top);
-        let last = entries.partition_point(|entry| entry.top < view.bottom);
-        let between = entries.get(first..last).unwrap_or_default();
+        let index = self.frames.get(&frame);
+        let tall = index.map_or(&[][..], |index| &index.tall[..]);
+        let short = index.map(|index| index.in_reach(view));
         let meets = move |entry: &&Entry| entry.bottom > view.top && entry.top < view.bottom;
-        tall.iter().chain(between).filter(meets)
+        tall.iter().chain(short.into_iter().flatten()).filter(meets)
     }
 
     /// How many entries [`Extents::candidates`] tests for `view`.
     #[cfg(test)]
     pub(crate) fn visited(&self, frame: usize, view: Rect) -> usize {
         let index = &self.frames[&frame];
-        let first = index
+        index.tall.len() + index.in_reach(view).count()
+    }
+}
+
+impl FrameIndex {
+    /// The short entries from the first whose reach passes `view`'s top
+    /// to the last whose top is before its bottom.
+    fn in_reach(&self, view: Rect) -> impl Iterator<Item = &Entry> {
+        let first = self
             .entries
             .partition_point(|entry| entry.reach <= view.top);
-        let last = index
-            .entries
-            .partition_point(|entry| entry.top < view.bottom);
-        index.tall.len() + last.saturating_sub(first)
+        self.entries
+            .iter_from(first)
+            .take_while(move |entry| entry.top < view.bottom)
     }
 }

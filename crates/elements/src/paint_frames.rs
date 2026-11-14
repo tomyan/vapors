@@ -22,9 +22,14 @@ pub(crate) fn updated(
     (boxes, input): (&[LayoutBox], &PaintInput<'_>),
     (changed, kept): (&ChangedSlots, bool),
 ) -> bool {
-    let scrolls = |slot| input.stackings.scrolls(slot);
-    let walked = !kept || order.walks.order > 0 || order.walks.splices > 0;
-    if walked || cfg!(debug_assertions) {
+    let reshaped = !kept || order.walks.reshaped();
+    // Relaxed in a release build: the scan runs only when the frames are
+    // made afresh. The scroll containers change only when paint order is
+    // walked or spliced (a box that starts or stops scrolling is
+    // restacked, kept_clips.rs `redo`); on a kept update `Frames::update`
+    // refuses a container the frames were not made for in its place.
+    if reshaped || cfg!(debug_assertions) {
+        let scrolls = |slot| input.stackings.scrolls(slot);
         crate::frames_check::assert_scrollers_agree(&order.thumbs, &order.clips, &scrolls);
     }
     let depth = |slot| order.tree.depth(slot);
@@ -35,16 +40,42 @@ pub(crate) fn updated(
         depth: &depth,
         shift: &shift,
     };
-    let fresh = || Frames::of(&order.thumbs, &inputs, input.scale);
-    if walked {
-        painted.frames_worked = order.thumbs.len();
-        let made = fresh();
-        return std::mem::replace(&mut painted.frames, made) != painted.frames;
+    if reshaped {
+        return made_afresh(painted, &order.thumbs, &inputs, input.scale);
     }
-    let starts = changed.offsets_moved.iter().chain(&order.redone);
-    let starts: Vec<usize> = starts.copied().filter(|&slot| scrolls(slot)).collect();
+    kept_updated(painted, (order, changed), &inputs, input)
+}
+
+/// `painted`'s frames made afresh for the scroll containers `thumbs`;
+/// whether they differ from the kept ones.
+fn made_afresh(
+    painted: &mut Painted,
+    thumbs: &[usize],
+    inputs: &FrameInputs<'_>,
+    scale: f32,
+) -> bool {
+    painted.frames_worked = thumbs.len();
+    let made = Frames::of(thumbs, inputs, scale);
+    std::mem::replace(&mut painted.frames, made) != painted.frames
+}
+
+/// `painted`'s kept frames worked out again for the scroll containers
+/// whose offset moved or whose clips were redone, and the frames nested
+/// in those that changed; whether any changed. A debug build compares
+/// them with frames made afresh.
+fn kept_updated(
+    painted: &mut Painted,
+    (order, changed): (&KeptOrder, &ChangedSlots),
+    inputs: &FrameInputs<'_>,
+    input: &PaintInput<'_>,
+) -> bool {
+    let starts = changed.offsets_moved.iter().chain(&order.redone).copied();
+    let starts: Vec<usize> = starts
+        .filter(|&slot| input.stackings.scrolls(slot))
+        .collect();
     let moved;
-    (moved, painted.frames_worked) = painted.frames.update(&starts, &inputs);
+    (moved, painted.frames_worked) = painted.frames.update(&starts, inputs);
+    let fresh = || Frames::of(&order.thumbs, inputs, input.scale);
     crate::frames_check::assert_kept_frames_fresh(&painted.frames, fresh);
     moved
 }

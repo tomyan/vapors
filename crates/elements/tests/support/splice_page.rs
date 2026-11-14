@@ -59,7 +59,7 @@ pub fn inserted(page: &RowsPage, before: Option<usize>, class: &str) -> NodeId {
 }
 
 /// (order walks, chain walks, splices, declined) of `counts`.
-pub fn order(counts: UpdateCounts) -> (usize, usize, usize, usize) {
+pub fn order(counts: &UpdateCounts) -> (usize, usize, usize, usize) {
     (
         counts.order_walks,
         counts.chain_walks,
@@ -76,7 +76,7 @@ pub fn matches_full(page: &RowsPage, context: &str) {
 }
 
 /// `counts` show a declined splice, walked, for `reason`.
-pub fn assert_declined(counts: UpdateCounts, reason: SpliceDecline) {
+pub fn assert_declined(counts: &UpdateCounts, reason: SpliceDecline) {
     assert_eq!(order(counts), DECLINED_WALK);
     assert_eq!(counts.splice_decline, Some(reason));
 }

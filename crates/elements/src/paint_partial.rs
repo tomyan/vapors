@@ -4,13 +4,15 @@
 //! again, and it is returned. Which slots: those built again, and those
 //! moved or whose clip was redone whose part was made from other values
 //! (`BoxFrom`) and cannot be shifted to them (`kept_shift.rs`); no
-//! other kept part is read. A dropped part frees its
-//! slab ids and removes its map entries before any part is painted, so
-//! a part painted after takes them. The thumbs painted are those of the
-//! scroll containers that can have changed (`thumbs_again.rs`). The scene is the parts of the steps that draw
-//! walked in paint order (`scene_view.rs`, `drawn_steps.rs`); it
-//! equals a full paint's, which a debug build checks (`kept_paint.rs`).
+//! other kept part is read. A dropped part frees its slab ids and
+//! removes its map entries before any part is painted, so a part
+//! painted after takes them. The thumbs painted are those of the scroll
+//! containers that can have changed (`thumbs_again.rs`). The scene is
+//! the parts of the steps that draw walked in paint order
+//! (`scene_view.rs`, `drawn_steps.rs`); it equals a full paint's, which
+//! a debug build checks (`kept_paint.rs`).
 
+use crate::blocks::IndexCounts;
 use crate::changed_slots::ChangedSlots;
 use crate::drawn_steps::DrawnSteps;
 use crate::frame_extents::Extents;
@@ -109,7 +111,7 @@ fn drawn_updated(
 ) {
     // After a splice the drawing steps, hits and batches are made afresh
     // as after a walk, until a follow-up shifts them by the splice's edits.
-    if order.walks.order > 0 || order.walks.splices > 0 {
+    if order.walks.reshaped() {
         painted.drawn = DrawnSteps::of(&order.steps, &painted.kept_boxes);
         let places = order.steps.len();
         painted.extents = Extents::of(&painted.drawn, places, &painted.kept_boxes);
@@ -134,6 +136,8 @@ fn drawn_updated(
         None => HitsChanged::Unknown,
     };
     batches_patched(painted, patched);
+    let drawn = painted.drawn.take_counts();
+    painted.index_counts = drawn.and(painted.extents.take_counts());
 }
 
 /// `painted`'s extents index patched for the `patched` slots' steps.
@@ -164,7 +168,7 @@ fn restarted(mut last: Painted, started: &Painted) -> (Painted, Option<KeptOrder
     (last.canvas, last.canvas_from) = (started.canvas, started.canvas_from);
     last.scale = started.scale;
     (last.boxes_drawn, last.items_built, last.parts_visited_kept) = (0, 0, 0);
-    last.boxes_shifted = 0;
+    (last.boxes_shifted, last.index_counts) = (0, IndexCounts::default());
     (last, Some(order))
 }
 
