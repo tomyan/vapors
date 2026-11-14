@@ -100,6 +100,7 @@ mod number_text;
 mod number_validity;
 mod order_splice;
 mod paint;
+mod paint_frames;
 mod paint_inline;
 mod paint_order;
 mod paint_outline;
