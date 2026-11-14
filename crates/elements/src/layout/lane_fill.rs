@@ -3,28 +3,30 @@
 //! whose leaves changed, each laid out by its kind (`lane_kind.rs`) with
 //! its layout held for the lane's write.
 
+use rustc_hash::{FxHashMap, FxHashSet};
+
 use super::lane::Lane;
 use super::lane_kind::LaneKind;
 use super::lane_share::reads_heights;
+use super::lane_tree::Handle;
 use super::tree::BoxTree;
 use crate::lane_decline::LaneDecline;
 
 impl BoxTree<'_> {
-    /// The children whose leaves changed laid out again: those reading
-    /// the height bases when they changed, those put in, and those
-    /// built or cleared.
+    /// The children whose leaves changed laid out again: those built or
+    /// cleared and those reading the height bases when they changed,
+    /// each once, then those put in, once (a child put in is stale too,
+    /// but not yet in the tree when the others are found).
     pub(super) fn fill_changed<K: LaneKind>(
         &mut self,
         c: &K::Container,
         lane: &mut Lane<K>,
         heights_changed: bool,
     ) -> Result<(), LaneDecline> {
-        if heights_changed {
-            let readers = lane.height_readers.iter().copied().collect();
-            self.lay_out_again(readers, c, lane)?;
-        }
-        self.fill_inserted(c, lane)?;
-        self.fill_stale(c, lane)
+        let readers = heights_changed.then_some(&lane.height_readers);
+        let again = again(&self.stale, &lane.handles, readers);
+        self.lay_out_again(again, c, lane)?;
+        self.fill_inserted(c, lane)
     }
 
     /// Every child laid out and put in a fresh tree, in order.
@@ -63,28 +65,6 @@ impl BoxTree<'_> {
         Ok(())
     }
 
-    /// The children built or cleared this update laid out again, their
-    /// leaves set: found from the lane's children or from the stale
-    /// slots, whichever are fewer, so a lane of a few children under
-    /// many restyled rows, or a long list with a few, costs the fewer.
-    fn fill_stale<K: LaneKind>(
-        &mut self,
-        c: &K::Container,
-        lane: &mut Lane<K>,
-    ) -> Result<(), LaneDecline> {
-        let mut stale: Vec<usize> = if lane.handles.len() < self.stale.len() {
-            (lane.handles.keys().copied())
-                .filter(|slot| self.stale.contains(slot))
-                .collect()
-        } else {
-            (self.stale.iter().copied())
-                .filter(|slot| lane.handles.contains_key(slot))
-                .collect()
-        };
-        stale.sort_unstable();
-        self.lay_out_again(stale, c, lane)
-    }
-
     /// The `children` of the lane laid out again, their leaves set.
     fn lay_out_again<K: LaneKind>(
         &mut self,
@@ -118,3 +98,36 @@ impl BoxTree<'_> {
         Ok(leaf)
     }
 }
+
+/// The lane's children to lay out again, each once and in slot order:
+/// those among the `stale` slots, found from the lane's children or
+/// from the stale slots, whichever are fewer, so a lane of a few
+/// children under many restyled rows, or a long list with a few, costs
+/// the fewer; and the height `readers` when the bases changed.
+fn again(
+    stale: &FxHashSet<usize>,
+    handles: &FxHashMap<usize, Handle>,
+    readers: Option<&FxHashSet<usize>>,
+) -> Vec<usize> {
+    let mut again: Vec<usize> = if handles.len() < stale.len() {
+        handles
+            .keys()
+            .copied()
+            .filter(|slot| stale.contains(slot))
+            .collect()
+    } else {
+        stale
+            .iter()
+            .copied()
+            .filter(|slot| handles.contains_key(slot))
+            .collect()
+    };
+    again.extend(readers.into_iter().flatten().copied());
+    again.sort_unstable();
+    again.dedup();
+    again
+}
+
+#[cfg(test)]
+#[path = "lane_fill_tests.rs"]
+mod tests;

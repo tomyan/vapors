@@ -147,3 +147,7 @@ pub(crate) fn reads_heights(style: &Style) -> bool {
     .any(percent)
         || relative && (percent(inset.top.into_raw()) || percent(inset.bottom.into_raw()))
 }
+
+#[cfg(test)]
+#[path = "lane_share_tests.rs"]
+mod tests;
