@@ -63,8 +63,13 @@ let surface = app.mount("view", Box::new(renderer))?;
   released piece's `GeometryId` (from `GeometryHandle::id`) is stale:
   `Meshes::get` and `Meshes::holds` find nothing. No node can name a
   released piece, since each holds a handle; the frame's refusal of a
-  piece its `Meshes` does not hold stays as the guard. A handle from another `Meshes` is refused at the frame,
-  naming the node.
+  piece its `Meshes` does not hold stays as the guard, naming a broken
+  invariant. A handle from another `Meshes` is refused at the frame,
+  naming the node. Release waits for the next render of a renderer
+  sharing the `Meshes`: a page idle and drawing on demand keeps a
+  released piece's data until it renders again. A render borrows the
+  `Meshes` mutably for its sweep, so an application must not hold a
+  borrow of it across a frame (the `RefCell` panics).
 
 ## What a frame does
 

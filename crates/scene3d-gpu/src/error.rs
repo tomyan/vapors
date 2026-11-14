@@ -75,7 +75,7 @@ impl fmt::Display for FrameError {
             ),
             Self::GeometryMissing { node, geometry } => write!(
                 f,
-                "mesh {node} names {geometry}, which its Meshes has released (a stale id): a mesh node holds a GeometryHandle, which keeps its piece held, so make the node from a handle, not from an id kept after the handles were dropped"
+                "mesh {node} names {geometry}, which its Meshes has released: a broken invariant, since the node's GeometryHandle should keep its piece held; a defect in vapors-scene3d's Meshes or vapors-scene3d-gpu's release. Reproduce with `cargo test -p vapors-scene3d-gpu` and report it with the scene that produced it"
             ),
             Self::ActiveCameraNotCamera(node) => write!(
                 f,

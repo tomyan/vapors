@@ -13,7 +13,8 @@ use vapors_app::{SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
 use vapors_scene3d::{Meshes, NodeId, Scene};
 
 /// Draws a [`Scene`] shared with the application, with the geometry
-/// given to its [`Meshes`]. See the crate docs for what a render does.
+/// given to its [`Meshes`]. Each render borrows the `Meshes` mutably to
+/// release unclaimed geometry, so a borrow held across a frame panics. See the crate docs for what a render does.
 pub struct SceneRenderer {
     scene: Rc<RefCell<Scene>>,
     meshes: Rc<RefCell<Meshes>>,

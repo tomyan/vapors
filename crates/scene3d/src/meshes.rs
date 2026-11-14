@@ -6,9 +6,9 @@ use glam::Vec3;
 use std::collections::HashMap;
 use std::fmt;
 use std::rc::Weak;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::GeometryHandle;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Geometry in one [`Meshes`]; a mesh node names it
 /// (`NodeKind::Mesh`). It carries its `Meshes`' id, so a renderer can
@@ -55,7 +55,10 @@ static NEXT_MESHES: AtomicU64 = AtomicU64::new(0);
 /// [`Meshes::get`] and uploads it once to its own device, so several
 /// renderers can share one `Meshes`. A piece whose every handle is
 /// dropped is released at the next [`Meshes::release_unclaimed`], which
-/// each render runs.
+/// each render of a `SceneRenderer` sharing this `Meshes` runs: until
+/// one renders (a page idle and drawing on demand renders nothing), the
+/// piece's data stays here. A render borrows the `Meshes` mutably for
+/// that sweep, so holding a borrow of it across a frame panics there.
 #[derive(Debug)]
 pub struct Meshes {
     id: u64,

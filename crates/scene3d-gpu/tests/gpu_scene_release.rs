@@ -70,3 +70,29 @@ fn gpu_a_piece_the_application_still_holds_stays_after_its_mesh_is_removed() {
     assert!(fixture.meshes.borrow().holds(square.id()));
     assert!(shown.is_ok(), "{shown:?}");
 }
+
+#[test]
+fn gpu_every_piece_uploaded_is_released_once_no_mesh_or_handle_is_left() {
+    // Given: two pieces drawn, the application keeping no handle
+    let gpu = vapors_gpu_harness::gpu();
+    let fixture = Fixture::new();
+    let projection = Projection::orthographic(6.0, 0.1, 100.0).unwrap();
+    fixture.camera(projection, Vec3::new(0.0, 0.0, 5.0));
+    let nodes = [0.5, 1.0].map(|half| {
+        let square = fixture.square(half);
+        fixture.mesh(fixture.root(), &square, RED, Transform::IDENTITY)
+    });
+    let mut renderer = fixture.renderer(&gpu);
+    let log = renderer.log();
+    render(&mut renderer, &gpu).expect("renders");
+
+    // When: the last meshes removed
+    for node in nodes {
+        fixture.scene.borrow_mut().remove(node).unwrap();
+    }
+    render(&mut renderer, &gpu).expect("renders");
+
+    // Then: as many released as uploaded
+    assert_eq!(log.made(Resource::Geometry), 2);
+    assert_eq!(log.freed(Resource::Geometry), 2);
+}
