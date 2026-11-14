@@ -2,8 +2,9 @@
 
 use std::time::Duration;
 
-use super::verdict;
+use super::{reproducing, verdict};
 use crate::sampler::JudgedFrame;
+use crate::scene_judge::require_hardware;
 use crate::scene_kind::SceneKind;
 
 fn frames(idle_millis: &[u64]) -> Vec<JudgedFrame> {
@@ -41,4 +42,20 @@ fn a_busy_machine_at_the_end_fails_the_run_beside_any_slow_frame() {
     let error = verdict(&frames(&[20]), Ok(2.25), SceneKind::Racer).expect_err("busy");
     assert!(error.contains("frame 0 at 0.000 s,"), "{error}");
     assert!(error.contains("load average is 2.25 at the end"), "{error}");
+}
+
+#[test]
+fn a_refusal_before_frame_zero_names_the_asked_scenes_command() {
+    // Given
+    let refused =
+        require_hardware(wgpu::DeviceType::Cpu, "llvmpipe", "llvmpipe").expect_err("software");
+
+    // When
+    let line = reproducing(SceneKind::OneScene)(refused);
+
+    // Then
+    assert!(
+        line.ends_with("reproduce: cargo run --release -p vapors-perf -- --scene-run one-scene"),
+        "{line}"
+    );
 }

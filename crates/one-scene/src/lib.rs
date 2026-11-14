@@ -32,6 +32,10 @@ use clock::Clock;
 
 use one_scene::{OneScene as Page, OneSceneProps};
 
+/// The example's size in device pixels at scale 1: its window's, and the
+/// judged run's target.
+pub const SIZE: (u32, u32) = (1100, 720);
+
 /// The example as an app: the page in an `ElementsApp`, its scene drawn
 /// by a `SceneRenderer` on the surface named `view`.
 pub struct OneScene {
@@ -171,8 +175,8 @@ pub fn run(limit: Option<u64>) -> Result<(), String> {
     let options = vapors_platform::WindowOptions {
         app_name: "vapors one scene".into(),
         title: "Vapors / One scene".into(),
-        width: 1100,
-        height: 720,
+        width: SIZE.0,
+        height: SIZE.1,
     };
     vapors_platform::run(options, OneScene::new(limit)?).map_err(|error| error.to_string())
 }

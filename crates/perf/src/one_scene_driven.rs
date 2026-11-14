@@ -15,8 +15,12 @@ use crate::run::{Counts, Workload};
 use crate::sampler::INTERVAL;
 
 const _: () = assert!(
-    FRAME.as_millis() == INTERVAL.as_millis(),
+    FRAME.as_nanos() == INTERVAL.as_nanos(),
     "the example's schedule and the sampler must step one frame clock"
+);
+const _: () = assert!(
+    vapors_one_scene::schedule::RUN_FRAMES == crate::driver::RUN_FRAMES,
+    "the example's script and the judged run must be one length"
 );
 
 /// The example, animating for ever, timing its frames on the GPU.
@@ -44,7 +48,7 @@ impl DrivenScene {
 
 impl Workload for DrivenScene {
     fn size(&self) -> (u32, u32) {
-        (1100, 720)
+        vapors_one_scene::SIZE
     }
 
     fn change(&mut self, sample: usize) {

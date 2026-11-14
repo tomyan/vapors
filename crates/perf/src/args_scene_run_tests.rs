@@ -51,3 +51,9 @@ fn scene_run_with_another_mode_or_selection_is_refused_naming_both() {
         );
     }
 }
+
+#[test]
+fn scene_run_given_twice_is_refused() {
+    let error = parsed(&["--scene-run", "one-scene", "--scene-run"]).expect_err("twice");
+    assert!(error.starts_with("--scene-run given twice"), "{error}");
+}

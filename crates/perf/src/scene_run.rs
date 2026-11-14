@@ -26,25 +26,36 @@ pub const REVISION: &str = env!("VAPORS_PERF_REVISION");
 /// or without a GPU reading, naming it; then every frame over budget and
 /// a busy machine at the end.
 pub fn run(open: impl FnOnce() -> Gpu, kind: SceneKind) -> Result<(), String> {
-    let cache = shader_cache(|name| std::env::var(name).ok())?;
+    let reproduce = reproducing(kind);
+    let cache = shader_cache(|name| std::env::var(name).ok()).map_err(&reproduce)?;
     let gpu = open();
-    let info = gpu.adapter.get_info();
-    require_hardware(info.device_type, &info.name, &info.driver)?;
-    require_timestamps(gpu.device.features(), &info.name)?;
-    let start = quiet("start", load_average())?;
+    let start =
+        before_frame_zero(&gpu.adapter.get_info(), gpu.device.features()).map_err(&reproduce)?;
     println!("Revision: {REVISION}\nShader cache: {}", cache.describe());
     println!(
         "Frames: {RUN_FRAMES}, every one judged, no warmup; load average at the start {start:.2}\n"
     );
-    let reproduce = |error| format!("{error}\nreproduce: {}", kind.reproduce());
-    let mut workload = kind.workload().map_err(reproduce)?;
+    let mut workload = kind.workload().map_err(&reproduce)?;
     let run = Sampler::new(&gpu)
         .judged(&mut *workload, RUN_FRAMES)
-        .map_err(reproduce)?;
+        .map_err(&reproduce)?;
     println!("{}", start_up_line(run.start_up));
     let end = load_average();
     println!("{}", report(&run.frames, start, end.clone().ok(), kind));
     verdict(&run.frames, end, kind)
+}
+
+/// A refusal of `kind`'s run, with the command that reproduces it.
+fn reproducing(kind: SceneKind) -> impl Fn(String) -> String {
+    move |error| format!("{error}\nreproduce: {}", kind.reproduce())
+}
+
+/// The refusals on the GPU `info` names, with `features`, and on the
+/// machine's load: the load at the start when the run may go on.
+fn before_frame_zero(info: &wgpu::AdapterInfo, features: wgpu::Features) -> Result<f64, String> {
+    require_hardware(info.device_type, &info.name, &info.driver)?;
+    require_timestamps(features, &info.name)?;
+    quiet("start", load_average())
 }
 
 /// The start-up's line: `App::start`'s time, before frame 0 and not

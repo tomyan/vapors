@@ -133,6 +133,9 @@ impl Flags {
     /// next argument is a flag or a count (read as given then), or there
     /// is none.
     fn scene_run(&mut self, rest: &mut impl Iterator<Item = String>) -> Result<(), String> {
+        if self.scene_run.is_some() {
+            return Err(format!("--scene-run given twice: {USAGE}"));
+        }
         self.scene_run = Some(SceneKind::Racer);
         let Some(next) = rest.next() else {
             return Ok(());

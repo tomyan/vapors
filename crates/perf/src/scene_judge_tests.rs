@@ -72,23 +72,29 @@ fn a_load_of_1_5_or_more_is_refused_printing_it_and_less_is_accepted() {
 }
 
 #[test]
-fn a_software_adapter_is_refused_naming_it_and_a_gpu_is_not() {
-    // When
-    let llvmpipe = "llvmpipe (LLVM 19.1.7, 256 bits)";
-    let refused =
-        require_hardware(wgpu::DeviceType::Cpu, llvmpipe, "llvmpipe").expect_err("software");
+fn only_an_integrated_or_discrete_gpu_is_accepted_and_every_other_type_is_refused_by_name() {
+    use wgpu::DeviceType::{Cpu, DiscreteGpu, IntegratedGpu, Other, VirtualGpu};
+    let cases = [
+        (IntegratedGpu, None),
+        (DiscreteGpu, None),
+        (Cpu, Some("is Cpu: a software adapter")),
+        (VirtualGpu, Some("is VirtualGpu: not known to be a GPU")),
+        (Other, Some("is Other: not known to be a GPU")),
+    ];
+    for (device_type, refused) in cases {
+        // When
+        let checked = require_hardware(device_type, "an adapter", "a driver");
 
-    // Then
-    assert!(
-        refused.starts_with("llvmpipe (LLVM 19.1.7, 256 bits) (llvmpipe) is a software adapter"),
-        "{refused}"
-    );
-    assert!(refused.contains("--scene-run"), "{refused}");
-    let uhd = "Intel(R) UHD Graphics 630 (CML GT2)";
-    let gpu = require_hardware(
-        wgpu::DeviceType::IntegratedGpu,
-        uhd,
-        "Intel open-source Mesa driver",
-    );
-    assert_eq!(gpu, Ok(()));
+        // Then
+        match refused {
+            None => assert_eq!(checked, Ok(()), "{device_type:?}"),
+            Some(why) => {
+                let error = checked.expect_err("refused");
+                assert!(
+                    error.starts_with(&format!("an adapter (a driver) {why}")),
+                    "{error}"
+                );
+            }
+        }
+    }
 }
