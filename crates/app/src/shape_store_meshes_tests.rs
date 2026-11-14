@@ -1,5 +1,5 @@
 //! The store's mesh side: an item whose kind is not its entry's, either
-//! way round, and a mesh drawn before its vertices are uploaded, each
+//! way round, and a mesh drawn before its triangles are uploaded, each
 //! refused naming the entry.
 
 use vapors_scene::ShapeKind;
@@ -52,7 +52,7 @@ fn a_mesh_item_drawn_before_its_upload_is_refused_naming_its_site() {
     // Then
     assert_eq!(
         refused.to_string(),
-        "shape 0, the mesh at a.wisp:9, has no vertices on the GPU: their upload this frame was refused, and the frame's encoder holds why; the store refuses a table its buffer cannot hold, so report this with the frame's error; reproduce with `cargo test -p vapors-app --lib shape_store_meshes`"
+        "shape 0, the mesh at a.wisp:9, has no triangles on the GPU: their upload this frame was refused, and the frame's encoder holds why; the store refuses a table its buffer cannot hold, so report this with the frame's error; reproduce with `cargo test -p vapors-app --lib shape_store_meshes`"
     );
 }
 
@@ -76,7 +76,7 @@ fn a_table_whose_meshes_pass_the_entry_buffers_limit_is_refused_naming_its_crate
     assert_eq!(
         refused.to_string(),
         format!(
-            "shape table of crate demo would put {bytes} bytes of mesh vertices in the painter's entry buffer, over the device's max_buffer_size of {}; register fewer or smaller mesh tables, or draw some with a second ScenePainter; reproduce with `cargo test -p vapors-app --lib shape_store_meshes`",
+            "shape table of crate demo would put {bytes} bytes of mesh triangles in the painter's entry buffer, over the device's max_buffer_size of {}; register fewer or smaller mesh tables, or draw some with a second ScenePainter; reproduce with `cargo test -p vapors-app --lib shape_store_meshes`",
             bytes - 1
         )
     );

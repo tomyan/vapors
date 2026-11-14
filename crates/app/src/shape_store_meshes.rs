@@ -1,5 +1,5 @@
 //! The store's mesh entries (one-scene S3a2): each registered mesh's
-//! vertices uploaded once, at the start of the first frame after it is
+//! triangles uploaded once, at the start of the first frame after it is
 //! registered, and each mesh item's instance and entry for the mesh
 //! pipeline.
 
@@ -35,7 +35,7 @@ impl ShapeStore {
         Ok(needed)
     }
 
-    /// Uploads the vertices of every mesh entry registered since the
+    /// Uploads the triangles of every mesh entry registered since the
     /// last upload into `entries`; the work it issued, no bytes when
     /// nothing was registered. Registration keeps the buffer within the
     /// device's limit, so a write it refuses is a fault outside the
@@ -87,7 +87,7 @@ impl ShapeStore {
     /// [`ShapeStore::mesh_instances`]), for a kept run's draw.
     ///
     /// # Errors
-    /// [`ShapeError::NotUploaded`] for an entry whose vertices are not
+    /// [`ShapeError::NotUploaded`] for an entry whose triangles are not
     /// on the GPU.
     pub(crate) fn uploaded(&self, indices: &[usize]) -> Result<Vec<&MeshEntry>, ShapeError> {
         indices

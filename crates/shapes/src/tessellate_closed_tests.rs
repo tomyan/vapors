@@ -4,17 +4,16 @@
 
 use super::tests::mesh;
 use super::*;
-use crate::mesh::FAR_EDGE;
 
 /// The midpoint of every outline edge in `mesh`.
 fn outline_midpoints(mesh: &Mesh) -> Vec<[f32; 2]> {
     let mut midpoints = Vec::new();
     for triangle in &mesh.triangles {
         for edge in 0..3 {
-            if triangle[0].edges[edge] == FAR_EDGE {
+            if !triangle.on_outline(edge) {
                 continue;
             }
-            let (b, c) = (triangle[(edge + 1) % 3], triangle[(edge + 2) % 3]);
+            let [b, c] = [1, 2].map(|k| triangle.corners[(edge + k) % 3]);
             midpoints.push([0, 1].map(|k| f32::midpoint(b.position[k], c.position[k])));
         }
     }

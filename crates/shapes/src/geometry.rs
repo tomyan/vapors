@@ -3,7 +3,8 @@
 //! primitive (docs/plans/one-scene.md 1.2); the table check refuses a
 //! geometry no shader could draw rather than letting it reach one.
 
-use crate::mesh::{MeshVertex, check_mesh};
+use crate::mesh::MeshTriangle;
+use crate::mesh_check::check_mesh;
 
 /// A shape's geometry, in viewBox units: the cheapest exact primitive
 /// the compiler classified it to (one-scene.md 1.2).
@@ -31,13 +32,13 @@ pub enum Geometry {
         radii: [f32; 2],
     },
     /// Triangles from the tessellator, for every other shape, each
-    /// with its own three vertices (no index buffer: a vertex's edge
-    /// distances belong to one triangle; `mesh.rs` says the rule).
+    /// with its own three corners (no index buffer: a corner's wedge
+    /// belongs to one triangle; `mesh.rs` says the rule).
     /// Winding is not checked, so the mesh pipeline must not cull
     /// faces.
     Mesh {
         /// The triangles.
-        triangles: &'static [[MeshVertex; 3]],
+        triangles: &'static [MeshTriangle],
     },
 }
 

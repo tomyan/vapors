@@ -2,17 +2,18 @@
 //! outside its true outline (#360 review, H1): at the corners of a
 //! convex and a concave polygon, round a circle flattened under
 //! scale(10, 1), and round a skewed rect, where triangles moved out by
-//! the extrusion carry only some of a corner's outline edges.
+//! the extrusion carry only some of a corner's outline edges; and an
+//! inner corner covered by the farther of its two lines (S3a3).
 
 #[path = "support/meshes.rs"]
 mod support;
 
-use support::{assert_nothing_past_half_a_pixel, coverage, mesh, scaled, white};
+use support::{assert_at, assert_ramp_within_half_a_pixel, coverage, mesh, scaled, white};
 
 fn check(data: &str, transform: [f32; 6], what: &str) {
     let triangles = mesh(data, None);
     let coverage = coverage(&[white(triangles.clone(), transform)]);
-    assert_nothing_past_half_a_pixel(&coverage, &triangles, transform, what);
+    assert_ramp_within_half_a_pixel(&coverage, &triangles, transform, what);
 }
 
 #[test]
@@ -71,4 +72,25 @@ fn gpu_a_skewed_meshs_slanted_edge_ramps_its_full_half_pixel_outside() {
         "0.447 outside the slanted edge",
     );
     support::assert_at(&coverage, (9, 2), 0.75, "0.25 inside the top edge");
+}
+
+#[test]
+fn gpu_an_inner_corner_is_covered_by_the_farther_of_its_lines() {
+    // Given: an L whose inner corner is at (16.25, 16.25): a foot from
+    // y = 8 to 16.25 and an upright from x = 8 to 16.25
+    let l = mesh("M8 8H24.25V16.25H16.25V24H8Z", None);
+
+    // When
+    let coverage = coverage(&[white(l, scaled(1.0))]);
+
+    // Then: pixel (16, 15) is 0.75 inside the foot and 0.25 outside the
+    // upright, so covered; (16, 16) is 0.25 outside both
+    assert_at(&coverage, (16, 15), 1.0, "inside the foot, past the corner");
+    assert_at(
+        &coverage,
+        (15, 16),
+        1.0,
+        "inside the upright, past the corner",
+    );
+    assert_at(&coverage, (16, 16), 0.25, "outside both lines");
 }

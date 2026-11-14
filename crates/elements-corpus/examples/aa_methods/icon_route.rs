@@ -6,8 +6,8 @@
 use vapors_shapes::IconPath;
 use vapors_text::{Icon as IconMask, IconStroke};
 
-use crate::analytic::size;
 use crate::cases::{AT, CELL, Icon, PAGE, Placement};
+use crate::pipeline::size;
 
 /// `icons` drawn by the icon route in `ink`; `None` for a placement it
 /// cannot draw (rotated, or at a scale that is not whole).

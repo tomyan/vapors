@@ -12,12 +12,12 @@ use vapors_elements::test_items::paint_after_background;
 use vapors_renderer::mesh_entry_bytes;
 use vapors_scene::{Color, Item, Rect, ShapeRef};
 use vapors_shapes::{
-    FillRule, Geometry, IconPath, MeshVertex, Paint, ShapeEntry, ShapeTable, TABLE_FORMAT,
+    FillRule, Geometry, IconPath, MeshTriangle, Paint, ShapeEntry, ShapeTable, TABLE_FORMAT,
     hash_bytes, tessellate,
 };
 
 /// `data` painted by `paint`, tessellated, for the test binary's life.
-fn mesh(data: &str, paint: Paint) -> &'static [[MeshVertex; 3]] {
+fn mesh(data: &str, paint: Paint) -> &'static [MeshTriangle] {
     let path = IconPath::parse(data).expect("parses");
     let mesh = tessellate("gpu_shape_meshes.rs", &path, paint, 0.05).expect("tessellated");
     Box::leak(mesh.triangles.into_boxed_slice())

@@ -1,52 +1,76 @@
-//! The mesh pipeline's wgpu objects: two vertex buffers, an entry's
-//! vertices and the items' instances, and no face culling (the
+//! The mesh pipeline's wgpu objects: two vertex buffers, both stepped
+//! per instance, an entry's triangles (one instance each, the shader
+//! choosing the corner by vertex index) and the item's instance (stride
+//! 0, so every triangle of a draw reads it); no face culling (the
 //! tessellator's winding is not checked).
 
 use std::mem::offset_of;
 
-use vapors_shapes::MeshVertex;
+use vapors_shapes::{MeshCorner, MeshTriangle};
 
-/// Per vertex, at `MeshVertex`'s own field offsets: position, normal
-/// (two floats each), three edge distances, and the triangle's three
-/// edge normals (two floats each).
-const VERTEX: [wgpu::VertexAttribute; 6] = [
-    attribute(
-        0,
-        offset_of!(MeshVertex, position),
-        wgpu::VertexFormat::Float32x2,
-    ),
-    attribute(
-        1,
-        offset_of!(MeshVertex, normal),
-        wgpu::VertexFormat::Float32x2,
-    ),
-    attribute(
-        2,
-        offset_of!(MeshVertex, edges),
-        wgpu::VertexFormat::Float32x3,
-    ),
-    attribute(
-        3,
-        offset_of!(MeshVertex, edge_normals),
-        wgpu::VertexFormat::Float32x2,
-    ),
-    attribute(
-        4,
-        offset_of!(MeshVertex, edge_normals) + 8,
-        wgpu::VertexFormat::Float32x2,
-    ),
-    attribute(
-        5,
-        offset_of!(MeshVertex, edge_normals) + 16,
-        wgpu::VertexFormat::Float32x2,
-    ),
+/// Per triangle, at `MeshTriangle`'s own field offsets, for each corner
+/// `k` at locations `4k` to `4k + 3`: its position (two floats), its two
+/// normals (four), its kind (one) and its two reaches (two).
+const TRIANGLE: [wgpu::VertexAttribute; 12] = [
+    position(0),
+    normals(0),
+    kind(0),
+    reaches(0),
+    position(1),
+    normals(1),
+    kind(1),
+    reaches(1),
+    position(2),
+    normals(2),
+    kind(2),
+    reaches(2),
 ];
 
-/// Per instance: the linear part; translation and the inverse of the
+/// Per item: the linear part; translation and the inverse of the
 /// determinant; colour.
-const INSTANCE: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
-    6 => Float32x4, 7 => Float32x4, 8 => Float32x4
+const ITEM: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
+    12 => Float32x4, 13 => Float32x4, 14 => Float32x4
 ];
+
+const fn corner(k: usize) -> usize {
+    offset_of!(MeshTriangle, corners) + k * size_of::<MeshCorner>()
+}
+
+#[allow(clippy::cast_possible_truncation)] // k < 3
+const fn position(k: usize) -> wgpu::VertexAttribute {
+    attribute(
+        4 * k as u32,
+        corner(k) + offset_of!(MeshCorner, position),
+        wgpu::VertexFormat::Float32x2,
+    )
+}
+
+#[allow(clippy::cast_possible_truncation)] // k < 3
+const fn normals(k: usize) -> wgpu::VertexAttribute {
+    attribute(
+        4 * k as u32 + 1,
+        corner(k) + offset_of!(MeshCorner, normals),
+        wgpu::VertexFormat::Float32x4,
+    )
+}
+
+#[allow(clippy::cast_possible_truncation)] // k < 3
+const fn reaches(k: usize) -> wgpu::VertexAttribute {
+    attribute(
+        4 * k as u32 + 3,
+        corner(k) + offset_of!(MeshCorner, reaches),
+        wgpu::VertexFormat::Float32x2,
+    )
+}
+
+#[allow(clippy::cast_possible_truncation)] // k < 3
+const fn kind(k: usize) -> wgpu::VertexAttribute {
+    attribute(
+        4 * k as u32 + 2,
+        corner(k) + offset_of!(MeshCorner, kind),
+        wgpu::VertexFormat::Float32,
+    )
+}
 
 const fn attribute(
     location: u32,
@@ -108,18 +132,18 @@ pub(crate) fn render_pipeline(
     )
 }
 
-/// An entry's vertices, then the items' instances.
+/// An entry's triangles, then the item, at stride 0.
 fn buffers() -> [Option<wgpu::VertexBufferLayout<'static>>; 2] {
     [
         Some(wgpu::VertexBufferLayout {
-            array_stride: crate::mesh_entries::VERTEX_BYTES,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &VERTEX,
+            array_stride: crate::mesh_entries::TRIANGLE_BYTES,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &TRIANGLE,
         }),
         Some(wgpu::VertexBufferLayout {
-            array_stride: crate::meshes::INSTANCE_BYTES,
+            array_stride: 0,
             step_mode: wgpu::VertexStepMode::Instance,
-            attributes: &INSTANCE,
+            attributes: &ITEM,
         }),
     ]
 }

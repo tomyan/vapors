@@ -3,12 +3,12 @@
 //! is resolved, coverage from `SAMPLES` samples a pixel.
 
 use vapors_gpu_harness::{Gpu, read_rgba8};
-use vapors_shapes::MeshVertex;
+use vapors_shapes::MeshCorner;
 use wgpu::util::DeviceExt as _;
 
-use crate::analytic::{mesh, scale, size};
 use crate::cases::{Icon, PAGE, Placement, transform};
 use crate::offscreen::{cleared_pass, pipeline_of, texture_for};
+use crate::pipeline::{mesh, scale, size};
 
 /// WebGPU guarantees 4 samples for an 8-bit RGBA target.
 pub const SAMPLES: u32 = 4;
@@ -63,16 +63,19 @@ fn vertices(
     let mut floats = Vec::new();
     for (at, icon) in (0u32..).zip(icons) {
         let m = transform(placement, at);
-        for vertex in mesh(icon, tolerance_px, scale(placement)).iter().flatten() {
-            floats.extend(clip(vertex, m, size));
+        for corner in mesh(icon, tolerance_px, scale(placement))
+            .iter()
+            .flat_map(|t| &t.corners)
+        {
+            floats.extend(clip(corner, m, size));
             floats.extend(colour);
         }
     }
     floats
 }
 
-fn clip(vertex: &MeshVertex, m: [f32; 6], [width, height]: [u32; 2]) -> [f32; 2] {
-    let [x, y] = vertex.position;
+fn clip(corner: &MeshCorner, m: [f32; 6], [width, height]: [u32; 2]) -> [f32; 2] {
+    let [x, y] = corner.position;
     let pixel = [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
     [
         pixel[0] / width as f32 * 2.0 - 1.0,

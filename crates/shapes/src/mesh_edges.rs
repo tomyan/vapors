@@ -1,16 +1,14 @@
 //! From lyon's shared-vertex output to the triangles `mesh.rs` checks:
-//! each with its own three vertices, the edge distances by the rule
-//! there, and the normal (`mesh_normals.rs`) and edge normals the half-pixel
-//! extrusion needs. Vertices at one position are welded first. An edge
-//! used by one surviving triangle is on the outline; an edge two share
-//! is interior and far. Triangles without area are dropped first, so a
-//! sliver along the outline cannot make its neighbour's edge count as
-//! shared.
+//! each with its three corners' wedges (`mesh_normals.rs`). Vertices at
+//! one position are welded first. An edge used by one surviving
+//! triangle is on the outline; an edge two share is interior.
+//! Triangles without area are dropped first, so a sliver along the
+//! outline cannot make its neighbour's edge count as shared.
 
 use std::collections::HashMap;
 
-use crate::mesh::{FAR_EDGE, MeshVertex, length, outward_normal, twice_area};
-use crate::mesh_normals::corner_normals;
+use crate::mesh::{MeshTriangle, twice_area};
+use crate::mesh_normals::corner_wedges;
 use crate::mesh_slivers::check_slivers;
 
 /// The triangles using each undirected edge, by index; two at most,
@@ -27,10 +25,7 @@ pub(crate) type EdgeTriangles = HashMap<(u32, u32), Vec<usize>>;
 /// # Panics
 /// When `indices` is not a whole number of triangles: lyon emits
 /// triples, so a remainder is a producer bug.
-pub fn triangles_with_edges(
-    vertices: &[[f32; 2]],
-    indices: &[u32],
-) -> Result<Vec<[MeshVertex; 3]>, String> {
+pub fn mesh_triangles(vertices: &[[f32; 2]], indices: &[u32]) -> Result<Vec<MeshTriangle>, String> {
     assert!(
         indices.len().is_multiple_of(3),
         "{} indices is not a whole number of triangles; the producer must emit triples",
@@ -45,15 +40,10 @@ pub fn triangles_with_edges(
         .partition(|corner| twice_area(positions(vertices, *corner)) != 0.0);
     let edges = edge_triangles(vertices, &corners)?;
     check_slivers(vertices, &slivers, &edges)?;
-    let normals = corner_normals(vertices, &corners, &edges)?;
-    Ok(corners
-        .iter()
-        .zip(normals)
-        .map(|(corner, normals)| {
-            let outline =
-                [1, 2, 0].map(|k| edges[&edge_key(corner[k], corner[(k + 1) % 3])].len() == 1);
-            triangle(positions(vertices, *corner), normals, outline)
-        })
+    let wedges = corner_wedges(vertices, &corners, &edges)?;
+    Ok(wedges
+        .into_iter()
+        .map(|corners| MeshTriangle { corners })
         .collect())
 }
 
@@ -101,36 +91,6 @@ fn edge_triangles(vertices: &[[f32; 2]], corners: &[[u32; 3]]) -> Result<EdgeTri
 
 pub(crate) fn edge_key(a: u32, b: u32) -> (u32, u32) {
     (a.min(b), a.max(b))
-}
-
-/// The triangle over `points` with its corners' `normals`: edge `i`
-/// opposite corner `i`, distances and edge normals by the rule in
-/// `mesh.rs`.
-fn triangle(points: [[f32; 2]; 3], normals: [[f32; 2]; 3], outline: [bool; 3]) -> [MeshVertex; 3] {
-    let area2 = twice_area(points).abs();
-    let mut out = [MeshVertex {
-        position: [0.0; 2],
-        normal: [0.0; 2],
-        edges: [FAR_EDGE; 3],
-        edge_normals: [[0.0; 2]; 3],
-    }; 3];
-    for (corner, vertex) in out.iter_mut().enumerate() {
-        vertex.position = points[corner];
-        vertex.normal = normals[corner];
-        for (edge, on_outline) in outline.iter().enumerate() {
-            if !on_outline {
-                continue;
-            }
-            let (b, c) = (points[(edge + 1) % 3], points[(edge + 2) % 3]);
-            vertex.edges[edge] = if edge == corner {
-                area2 / length(b, c)
-            } else {
-                0.0
-            };
-            vertex.edge_normals[edge] = outward_normal(points, edge);
-        }
-    }
-    out
 }
 
 #[cfg(test)]

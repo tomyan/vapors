@@ -7,15 +7,15 @@
 use vapors_gpu_harness::{gpu, read_rgba8};
 use vapors_renderer::{FrameEncoder, MeshEntries, MeshPipeline, MeshShape, Target, clear};
 use vapors_scene::{Color, Size};
-use vapors_shapes::{FillRule, IconPath, MeshVertex, Paint, tessellate};
+use vapors_shapes::{FillRule, IconPath, MeshTriangle, Paint, tessellate};
 
 pub const SIDE: u32 = 32;
 
 /// A mesh's triangles, its transform and its colour.
-pub type Drawn = (Vec<[MeshVertex; 3]>, [f32; 6], Color);
+pub type Drawn = (Vec<MeshTriangle>, [f32; 6], Color);
 
 /// `data` filled (nonzero) or stroked `stroke` wide, tessellated.
-pub fn mesh(data: &str, stroke: Option<f32>) -> Vec<[MeshVertex; 3]> {
+pub fn mesh(data: &str, stroke: Option<f32>) -> Vec<MeshTriangle> {
     let path = IconPath::parse(data).unwrap_or_else(|e| panic!("{data:?}: {e}"));
     let paint = stroke.map_or(Paint::Fill(FillRule::NonZero), |width| Paint::Stroke {
         width,
@@ -73,10 +73,7 @@ pub fn coverage(meshes: &[Drawn]) -> Vec<f32> {
 }
 
 /// `mesh` in white under `transform`.
-pub fn white(
-    mesh: Vec<[MeshVertex; 3]>,
-    transform: [f32; 6],
-) -> (Vec<[MeshVertex; 3]>, [f32; 6], Color) {
+pub fn white(mesh: Vec<MeshTriangle>, transform: [f32; 6]) -> (Vec<MeshTriangle>, [f32; 6], Color) {
     (mesh, transform, Color::from_rgba8(255, 255, 255, 255))
 }
 
@@ -96,22 +93,16 @@ pub fn assert_at(coverage: &[f32], (x, y): (u32, u32), expected: f32, what: &str
 
 /// How far device point `p` lies outside `mesh` drawn under
 /// `transform`, device pixels; 0 inside. The outline is the mesh's own
-/// outline edges (those not FAR), so the oracle needs no curve maths.
-pub fn outside_by(mesh: &[[MeshVertex; 3]], m: [f32; 6], p: [f32; 2]) -> f32 {
-    let to_device = |q: [f32; 2]| {
-        [
-            m[0] * q[0] + m[2] * q[1] + m[4],
-            m[1] * q[0] + m[3] * q[1] + m[5],
-        ]
-    };
+/// outline edges, so the oracle needs no curve maths.
+pub fn outside_by(mesh: &[MeshTriangle], m: [f32; 6], p: [f32; 2]) -> f32 {
     let inside = mesh
         .iter()
-        .any(|t| contains(t.map(|v| to_device(v.position)), p));
+        .any(|t| contains(t.corners.map(|c| to_device(m, c.position)), p));
     if inside {
         return 0.0;
     }
     outline_segments(mesh)
-        .map(|[q, r]| segment_distance(p, to_device(q), to_device(r)))
+        .map(|[q, r]| segment_distance(p, to_device(m, q), to_device(m, r)))
         .fold(f32::INFINITY, f32::min)
 }
 
@@ -120,32 +111,86 @@ pub fn outside_by(mesh: &[[MeshVertex; 3]], m: [f32; 6], p: [f32; 2]) -> f32 {
 /// coverage.
 pub fn assert_nothing_past_half_a_pixel(
     coverage: &[f32],
-    mesh: &[[MeshVertex; 3]],
+    mesh: &[MeshTriangle],
     transform: [f32; 6],
     what: &str,
 ) {
-    for y in 0..SIDE {
-        for x in 0..SIDE {
-            let centre = [
-                f32::from(u16::try_from(x).expect("small")) + 0.5,
-                f32::from(u16::try_from(y).expect("small")) + 0.5,
-            ];
-            let out = outside_by(mesh, transform, centre);
-            let found = coverage[(y * SIDE + x) as usize];
-            assert!(
-                out <= 0.52 || found <= 1.5 / 255.0,
-                "{what}: pixel ({x}, {y}) is {out} px outside the outline but covered {found}"
-            );
-        }
+    for (x, y, centre) in pixel_centres() {
+        let out = outside_by(mesh, transform, centre);
+        let found = coverage[(y * SIDE + x) as usize];
+        assert!(
+            out <= 0.52 || found <= 1.5 / 255.0,
+            "{what}: pixel ({x}, {y}) is {out} px outside the outline but covered {found}"
+        );
     }
 }
 
-fn outline_segments(mesh: &[[MeshVertex; 3]]) -> impl Iterator<Item = [[f32; 2]; 2]> + '_ {
-    mesh.iter().flat_map(|t| {
-        (0..3).filter_map(move |edge| {
-            let outline = t[0].edges[edge] < vapors_shapes::FAR_EDGE;
-            outline.then(|| [t[(edge + 1) % 3].position, t[(edge + 2) % 3].position])
+/// How far device point `p` lies inside `mesh` under `m`, device
+/// pixels; 0 outside.
+pub fn inside_by(mesh: &[MeshTriangle], m: [f32; 6], p: [f32; 2]) -> f32 {
+    let inside = mesh
+        .iter()
+        .any(|t| contains(t.corners.map(|c| to_device(m, c.position)), p));
+    if !inside {
+        return 0.0;
+    }
+    outline_segments(mesh)
+        .map(|[q, r]| segment_distance(p, to_device(m, q), to_device(m, r)))
+        .fold(f32::INFINITY, f32::min)
+}
+
+/// Asserts every pixel whose centre lies more than half a device pixel
+/// (and a rasteriser's margin) inside `mesh` under `transform` is fully
+/// covered.
+pub fn assert_full_past_half_a_pixel_inside(
+    coverage: &[f32],
+    mesh: &[MeshTriangle],
+    transform: [f32; 6],
+    what: &str,
+) {
+    for (x, y, centre) in pixel_centres() {
+        let depth = inside_by(mesh, transform, centre);
+        let found = coverage[(y * SIDE + x) as usize];
+        assert!(
+            depth < 0.52 || found >= 254.0 / 255.0,
+            "{what}: pixel ({x}, {y}) is {depth} px inside the outline but covered only {found}"
+        );
+    }
+}
+
+/// Both halves of the rule: nothing covered past half a device pixel
+/// outside the outline, everything past half a pixel inside it.
+pub fn assert_ramp_within_half_a_pixel(
+    coverage: &[f32],
+    mesh: &[MeshTriangle],
+    transform: [f32; 6],
+    what: &str,
+) {
+    assert_nothing_past_half_a_pixel(coverage, mesh, transform, what);
+    assert_full_past_half_a_pixel_inside(coverage, mesh, transform, what);
+}
+
+fn pixel_centres() -> impl Iterator<Item = (u32, u32, [f32; 2])> {
+    (0..SIDE).flat_map(|y| {
+        (0..SIDE).map(move |x| {
+            let at = |v: u32| f32::from(u16::try_from(v).expect("small")) + 0.5;
+            (x, y, [at(x), at(y)])
         })
+    })
+}
+
+fn to_device(m: [f32; 6], q: [f32; 2]) -> [f32; 2] {
+    [
+        m[0] * q[0] + m[2] * q[1] + m[4],
+        m[1] * q[0] + m[3] * q[1] + m[5],
+    ]
+}
+
+fn outline_segments(mesh: &[MeshTriangle]) -> impl Iterator<Item = [[f32; 2]; 2]> + '_ {
+    mesh.iter().flat_map(|t| {
+        (0..3)
+            .filter(|&edge| t.on_outline(edge))
+            .map(|edge| [1, 2].map(|k| t.corners[(edge + k) % 3].position))
     })
 }
 
