@@ -25,6 +25,7 @@ use crate::paint_order::Step;
 use crate::paint_partial_read::to_paint;
 use crate::painted::Painted;
 use crate::repaint::Repaint;
+use crate::slot_list;
 use crate::thumbs_again;
 
 /// Paints `boxes` at `rects`, keeping `last`'s parts in place where
@@ -187,7 +188,7 @@ fn dropped(again: &[(usize, BoxFrom)], changed: &ChangedSlots, len: usize, paint
     for gone in past {
         gone.drop_from(painted);
     }
-    painted.kept_boxes.resize_with(len, || None);
+    slot_list::resize_with(&mut painted.kept_boxes, len, || None);
 }
 
 #[cfg(test)]

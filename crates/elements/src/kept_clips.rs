@@ -9,6 +9,7 @@
 //! beside its clips: its clip parent's when that does not scroll, else
 //! the clip parent itself.
 
+use crate::slot_list;
 use rustc_hash::FxHashSet;
 
 use crate::clip_tree::ClipTree;
@@ -36,6 +37,15 @@ pub(crate) struct Clips {
 }
 
 impl Clips {
+    /// Each per-slot list's length and capacity, for the growth test.
+    #[cfg(test)]
+    pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
+        vec![
+            ("clips.own", self.own.len(), self.own.capacity()),
+            ("clips.inner", self.inner.len(), self.inner.capacity()),
+            ("clips.frame", self.frame.len(), self.frame.capacity()),
+        ]
+    }
     /// Every box's clips; the slots that redid.
     pub(crate) fn of(tree: &ClipTree, inner: Inner<'_>) -> (Self, Vec<usize>) {
         let mut clips = Self {
@@ -53,9 +63,9 @@ impl Clips {
     /// `self` for `len` slots, the `freed` ones' clips cleared: an order
     /// splice (`order_splice.rs`); the added slots are redone after.
     pub(crate) fn spliced(&mut self, len: usize, freed: impl Iterator<Item = usize>) {
-        self.own.resize(len, None);
-        self.inner.resize(len, None);
-        self.frame.resize(len, PAGE);
+        slot_list::resize(&mut self.own, len, None);
+        slot_list::resize(&mut self.inner, len, None);
+        slot_list::resize(&mut self.frame, len, PAGE);
         for slot in freed {
             (self.own[slot], self.inner[slot], self.frame[slot]) = (None, None, PAGE);
         }

@@ -99,6 +99,29 @@ own time at this size. If it shows in insert's instructions once the
 splice step makes inserts cheap, chunked storage for the box list (as
 `blocks.rs`, #288) is the follow-up.
 
+## Every per-slot list grown by a quarter (slot_list.rs)
+
+The 56.4 MB paint left on the first insert was the kept boxes' list
+(`painted.kept_boxes`, one `Option<KeptBox>` a slot, about 740 bytes:
+48.6 MB for 65,538 slots), sized exactly by the first paint and doubled
+by an insert that adds four boxes. The placement's six lists, the clip
+lists, the clip tree's two, the stackings and the style slots did the
+same. Each now grows by a quarter, as the box list does:
+
+| one row added at 16,384 rows | bytes the insert leaves | the insert's frames |
+|---|---|---|
+| main at 06b0c94 | 110,180,323 | 156 ms (one run) |
+| every per-slot list by a quarter | 58,483,505 | 67 to 77 ms (three runs) |
+
+Wall times at a 1-minute load near 1 to 8, with the counting allocator.
+The page itself is unchanged: 12,887 bytes per element on main and
+12,863 with this change (the slope from 4,096 to 16,384 rows; main's
+layout per element rose to 8,193 bytes since #333's 6,859, from the
+work merged in between).
+
+At about 740 bytes a slot, the kept boxes' list is the next per-element
+target after layout's boxes (a later slice).
+
 ## A dropped page (#353)
 
 Live bytes after a settled 10,000-row page is dropped, three times in

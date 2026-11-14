@@ -72,6 +72,8 @@ fn a_box_added_after_a_full_build_grows_the_list_by_a_quarter() {
     doc.insert_before(body, div, Some(made[20]));
     doc.update(viewport(1.0)).expect("updates");
 
-    // Then: 42 + 42 / 4 slots, not 84
+    // Then: 42 + 42 / 4 slots, not 84, for the boxes and their keys
     assert_eq!(slots(&doc), (43, 52));
+    let keys = &doc.boxes.placed.slots.keys;
+    assert_eq!((keys.len(), keys.capacity()), (43, 52));
 }

@@ -9,6 +9,7 @@ pub(crate) use crate::placement_changes::{Changes, Placed};
 use crate::placement_marks::Marked;
 use crate::placement_walk::{Mark, Walk};
 use crate::scroll::Offsets;
+use crate::slot_list;
 
 /// No slot: the root's `up`, and a new or freed slot's before it is placed.
 pub(crate) const NO_SLOT: usize = usize::MAX;
@@ -158,12 +159,12 @@ impl Placement {
 
     /// Sizes the vectors to `len` slots.
     fn resize(&mut self, len: usize) {
-        self.rects.resize(len, NO_RECT);
-        self.paddings.resize(len, taffy::Rect::zero());
-        self.offsets.resize(len, [0.0; 2]);
-        self.up.resize(len, NO_SLOT);
-        self.containing.resize(len, None);
-        self.marks.resize(len, Mark::None);
+        slot_list::resize(&mut self.rects, len, NO_RECT);
+        slot_list::resize(&mut self.paddings, len, taffy::Rect::zero());
+        slot_list::resize(&mut self.offsets, len, [0.0; 2]);
+        slot_list::resize(&mut self.up, len, NO_SLOT);
+        slot_list::resize(&mut self.containing, len, None);
+        slot_list::resize(&mut self.marks, len, Mark::None);
     }
 
     /// Clears the containing block of each slot built again or freed,

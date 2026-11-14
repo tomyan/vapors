@@ -6,6 +6,7 @@
 //! comes from it without a walk over the tree.
 
 use crate::layout::{LayoutBox, containing_blocks};
+use crate::slot_list;
 
 /// Each slot's clip parent and depth, and the slots each passes its
 /// clip to.
@@ -23,6 +24,14 @@ pub(crate) struct ClipTree {
 }
 
 impl ClipTree {
+    /// Each per-slot list's length and capacity, for the growth test.
+    #[cfg(test)]
+    pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
+        vec![
+            ("tree.parent", self.parent.len(), self.parent.capacity()),
+            ("tree.depth", self.depth.len(), self.depth.capacity()),
+        ]
+    }
     /// The clip tree of `boxes`, box 0 the root.
     pub(crate) fn of(boxes: &[LayoutBox]) -> Self {
         let (parent, depth) = parents_and_depths(boxes);
@@ -45,8 +54,8 @@ impl ClipTree {
         added: &[(usize, usize)],
         freed: impl Iterator<Item = usize>,
     ) {
-        self.parent.resize(len, None);
-        self.depth.resize(len, 0);
+        slot_list::resize(&mut self.parent, len, None);
+        slot_list::resize(&mut self.depth, len, 0);
         for &(slot, parent) in added {
             self.parent[slot] = Some(parent);
             self.depth[slot] = self.depth[parent] + 1;
