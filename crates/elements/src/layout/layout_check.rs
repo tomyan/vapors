@@ -38,6 +38,7 @@ pub(crate) fn check_layout_against_fresh(
     layout: Inputs<'_>,
 ) {
     walk(&fresh_layout(source, root, layout), placed);
+    placed.lanes.borrow().assert_starts_written(&placed.boxes);
 }
 
 /// `root`'s boxes built and laid out with no cache and no lane, so a
@@ -84,7 +85,7 @@ const TOLERANCE: f32 = 1.0 / 1024.0;
 /// How far `a` and `b` may differ when one was summed in f32 over
 /// `terms` terms (above).
 #[allow(clippy::cast_precision_loss)] // child counts, far below 2^24
-fn tolerance(a: f32, b: f32, terms: usize) -> f32 {
+pub(super) fn tolerance(a: f32, b: f32, terms: usize) -> f32 {
     TOLERANCE + terms as f32 * f32::EPSILON / 2.0 * a.abs().max(b.abs())
 }
 

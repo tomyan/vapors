@@ -121,7 +121,7 @@ impl BoxTree<'_> {
 /// from the stale slots, whichever are fewer, so a lane of a few
 /// children under many restyled rows, or a long list with a few, costs
 /// the fewer; and the height `readers` when the bases changed.
-fn again(
+pub(super) fn again(
     stale: &FxHashSet<usize>,
     handles: &FxHashMap<usize, Handle>,
     readers: Option<&FxHashSet<usize>>,

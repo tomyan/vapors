@@ -11,6 +11,7 @@ mod inline;
 mod isolated;
 mod keep;
 mod lane;
+mod lane_aside;
 mod lane_block;
 mod lane_block_answer;
 mod lane_block_child;
@@ -43,6 +44,8 @@ mod lane_page;
 mod lane_set;
 mod lane_share;
 mod lane_tree;
+#[cfg(debug_assertions)]
+mod lane_written_check;
 mod layout_box;
 #[cfg(debug_assertions)]
 pub(crate) mod layout_check;

@@ -51,6 +51,10 @@ pub(crate) struct Lane<K: LaneKind> {
     /// Whether every child must be laid out again and every start
     /// written: a fresh lane, or one whose share changed.
     pub(super) all: bool,
+    /// The share and height bases the children's layouts were last
+    /// written with; `None` before the first write. The tree holds the
+    /// leaves of that write (`lane_aside.rs`).
+    pub(super) written: Option<(K::Share, K::Heights)>,
     /// What framing the children reads (`lane_frame.rs`).
     pub(crate) facts: FrameFacts,
     /// Children put since the lane was last put back among the lanes,
@@ -74,6 +78,7 @@ impl<K: LaneKind> Lane<K> {
             pending: FxHashMap::default(),
             relative: FxHashMap::default(),
             all: true,
+            written: None,
             facts: FrameFacts::default(),
             born: Vec::new(),
         }
@@ -141,8 +146,8 @@ impl<K: LaneKind> Lane<K> {
     /// framing the small lanes too (a cell holding its text is one)
     /// would cost O(rows) per update again.
     pub(super) fn framing(&self, origin: f64, scale: f32) -> Option<Result<(), LaneDecline>> {
-        (self.handles.len() >= FRAMED_CHILDREN)
-            .then(|| self.facts.framable(self.tree.gap, origin, scale))
+        let framable = self.written.is_some() && self.handles.len() >= FRAMED_CHILDREN;
+        framable.then(|| self.facts.framable(self.tree.gap, origin, scale))
     }
 
     /// The children whose box or overflow meets `from..=to`, CSS pixels

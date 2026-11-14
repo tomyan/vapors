@@ -72,6 +72,23 @@ impl Lanes {
         block.or_else(flex).unwrap_or(false)
     }
 
+    /// The slot of a lane container holding `children` children, for
+    /// the tests that ask one.
+    #[cfg(test)]
+    pub(crate) fn container_of_children(&self, children: usize) -> usize {
+        let block = self
+            .block
+            .iter()
+            .map(|(&slot, lane)| (slot, lane.handles.len()));
+        let flex = self
+            .flex
+            .iter()
+            .map(|(&slot, lane)| (slot, lane.handles.len()));
+        let mut lanes = block.chain(flex);
+        let found = lanes.find(|&(_, held)| held == children);
+        found.expect("a lane holds that many children").0
+    }
+
     /// The lane container holding the child in `child`, if any.
     pub(crate) fn container_of(&self, child: usize) -> Option<usize> {
         let container = *self.parents.get(&child)?;

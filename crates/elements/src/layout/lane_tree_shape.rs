@@ -5,7 +5,7 @@ use super::{FANOUT, Handle, LaneTree, Node, Summary};
 
 impl<S: Summary> LaneTree<S> {
     /// Every child, in tree order.
-    #[cfg(test)]
+    #[cfg(any(test, debug_assertions))]
     pub(crate) fn handles(&self) -> Vec<Handle> {
         let mut out = Vec::new();
         let mut stack = vec![self.root];

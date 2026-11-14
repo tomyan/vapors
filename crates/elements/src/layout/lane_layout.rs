@@ -9,8 +9,8 @@
 //! algorithm, counted with the reason (`LaneCounts`).
 
 use taffy::{
-    BlockContext, LayoutInput, LayoutOutput, LayoutPartialTree, NodeId, compute_block_layout,
-    compute_flexbox_layout,
+    BlockContext, LayoutInput, LayoutOutput, LayoutPartialTree, NodeId, RunMode,
+    compute_block_layout, compute_flexbox_layout,
 };
 
 use super::lane::Lane;
@@ -61,7 +61,7 @@ impl BoxTree<'_> {
             Settled::Declined(decline) => Err(decline),
             Settled::Laid(container) => self.lane_answer::<BlockLane>(id, &container),
         };
-        self.counted(id, laid)
+        self.counted((id, inputs), laid)
             .unwrap_or_else(|| compute_block_layout(self, id, inputs, block))
     }
 
@@ -77,16 +77,17 @@ impl BoxTree<'_> {
             FlexSettled::Declined(decline) => Err(decline),
             FlexSettled::Laid(column) => self.lane_answer::<FlexLane>(id, &column),
         };
-        self.counted(id, laid)
+        self.counted((id, inputs), laid)
             .unwrap_or_else(|| compute_flexbox_layout(self, id, inputs))
     }
 
     /// The container's answer counted as a lane's, or its decline
-    /// counted and its lane dropped: then `None`, for Taffy to lay it
-    /// out.
+    /// counted: then `None`, for Taffy to lay it out. A declined layout
+    /// drops the lane, since Taffy writes every child; a declined size
+    /// query writes none, so the lane is kept as written.
     fn counted(
         &mut self,
-        id: NodeId,
+        (id, inputs): (NodeId, LayoutInput),
         laid: Result<LayoutOutput, LaneDecline>,
     ) -> Option<LayoutOutput> {
         match laid {
@@ -96,7 +97,9 @@ impl BoxTree<'_> {
             }
             Err(decline) => {
                 self.lane_counts.decline(decline);
-                self.lanes.remove(usize::from(id));
+                if inputs.run_mode == RunMode::PerformLayout {
+                    self.lanes.remove(usize::from(id));
+                }
                 None
             }
         }
@@ -132,13 +135,27 @@ impl BoxTree<'_> {
         let mut lane = K::lanes(self.lanes)
             .remove(&slot)
             .unwrap_or_else(|| Lane::new(K::gap(c)));
-        let run = self.fill(slot, c, &mut lane)?;
+        let aside = self.answers_aside(c, &lane);
+        let run = if aside {
+            self.fill_aside::<K>(slot, c)
+        } else {
+            self.fill(slot, c, &mut lane)
+        };
+        // a lane answered aside is as written, even when the ask declines
+        if run.is_ok() || aside {
+            self.lane_kept(slot, lane);
+        }
+        K::answer(c, &run?)
+    }
+
+    /// Puts `lane` back among the lanes as the lane of the container in
+    /// `slot`, noting its children put since.
+    fn lane_kept<K: LaneKind>(&mut self, slot: usize, mut lane: Lane<K>) {
         let born = std::mem::take(&mut lane.born);
         K::lanes(self.lanes).insert(slot, lane);
         self.lanes
             .parents
             .extend(born.into_iter().map(|child| (child, slot)));
-        K::answer(c, &run)
     }
 
     fn fill<K: LaneKind>(
@@ -159,8 +176,9 @@ impl BoxTree<'_> {
             self.fill_changed(c, lane, heights_changed)?;
         }
         let run = lane.tree.total();
-        lane.facts.top = K::top(c, &run);
         if K::writes(c) {
+            lane.facts.top = K::top(c, &run);
+            lane.written = lane.share.clone().zip(lane.heights);
             self.write_starts(c, lane, &run);
         }
         Ok(run)
