@@ -6,6 +6,7 @@ mod declaration;
 mod declaration_check;
 pub mod longhands;
 mod names;
+pub mod scene;
 mod shorthand;
 mod shorthand_border;
 mod shorthand_layout;
