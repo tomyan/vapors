@@ -210,8 +210,27 @@ every registered entry it has not uploaded (counted as
 painter draws from it, and `SurfaceFrame` gains `shapes: &ShapeStore`
 so a `SurfaceRenderer` such as `SceneRenderer` draws the same entries
 (S7). A draw naming an entry the store has not uploaded is refused with
-an error naming the entry and its site, never skipped. Added in S3a1
-(the store and the 2D path) and S7 (the `SurfaceFrame` field).
+an error naming the entry and its site, never skipped (a ref the store
+never issued has no site, so its error names the ref and how many the
+store holds; the refusal comes when a run's bytes are built, so a shape
+run culled or clipped out of every view is not resolved; and an item
+whose bounds, which culling reads, do not hold what its entry draws
+under its transform is refused naming both, S3a1). Added in S3a1
+(the store and the 2D path) and S7 (the `SurfaceFrame` field). A
+closed-form entry's parameters go in each instance's bytes (80 bytes:
+transform, colour, the rect or ellipse, the stroke width), kept between
+frames like a quad's, so the store uploads GPU bytes for mesh entries
+only (S3a2) and needs no storage buffer in the vertex stage (S3a1,
+2026-11-14, lead): `shape_bytes_uploaded` counts those uploads and is
+0 for closed forms. It arrives with the first upload; until then an
+idle frame's shape bytes are its shape runs' instance bytes
+(`FrameCounts::shapes`), 0 when every shape batch is kept. Until
+S4a's `<path>` paints shapes, the painter's tests have elements paint
+shape items through `vapors_elements::test_items` (the `test-support`
+feature, enabled by dev-dependencies only). The closed-form shader takes coverage as 0.5 minus
+the signed distance to the outline in device pixels, the ramp
+straddling the outline, and grows each quad by a device pixel past the
+shape for the ramp's outer half (Tom, 2026-11-13).
 
 ### 1.5 Constant and known-variable properties
 
@@ -453,9 +472,9 @@ is checked against what it found.
 | S2 | Classifier and tessellator (lyon, pinned; `cargo xtask deny` passing) in `vapors-shapes`, canonical form and hash, per-triangle edge distances for meshes (1.2); C and Q curves in the parser. Five PRs: curves, segments and a curve-icon paint fixture; canonical form and hash; the classifier; the mesh format; the tessellator | Unit tests: a rect path classified as a rect, two arcs as a circle, other paths as meshes; equal shapes one hash, a changed stroke width another; a non-finite or degenerate input refused naming the shape | S1 | everything |
 | S3a1 | `Item::Shape`, the `ShapeStore` (1.4), the closed-form pipeline and the painter's dispatch, on IU4's retained path | Rects and circles batched in paint order; idle frame writes 0 shape bytes; a draw of an entry not uploaded refused naming it | S2, IU4 PR 2 | 3D 4, 4b, 5 |
 | S3a2 | The mesh pipeline | Fill and stroke meshes batched in paint order with closed-form shapes | S3a1 | 3D 4, 4b, 5 |
-| S3b | The antialiasing test (the brief's slice 1): touche's ten icons as shapes at 1x, 2x, rotated 30 degrees and scaled 1.37; per kind, MSAA against its analytic method (1.2), against Chromium with the paint_check rules, beside the icon route; the curve tolerance | The numbers recorded; a method chosen per kind, or the question returned to Tom if none is within the rules at 1x (the brief, decision 3) | S3a2 | everything |
+| S3b | The antialiasing test (the brief's slice 1): touche's ten icons as shapes at 1x, 2x, rotated 30 degrees and scaled 1.37; per kind, MSAA against its analytic method (1.2), against Chromium with the paint_check rules, beside the icon route; the curve tolerance; sub-pixel features against Chromium (the closed-form ramp gives a 0.25 px stroke on a pixel centre 0.625, #345 review M4) | The numbers recorded; a method chosen per kind, or the question returned to Tom if none is within the rules at 1x (the brief, decision 3) | S3a2 | everything |
 | S4a | `<path>` fill and stroke in templates; `fill`, `stroke`, `stroke-width` in `vapors-css` with the presentation attributes mapped; run-time parse and tessellation cached by hash | Chromium paint comparisons for fill and stroke; a class toggle recolours and tessellates nothing (counted) | S3b | 3D 4, 4b, 5 |
-| S4b | `<rect>` and `<circle>` | Chromium paint comparisons, including a rounded rect | S4a | 3D 4, 4b, 5 |
+| S4b | `<rect>` and `<circle>`; elliptical corners (`rx` and `ry` differ) in the closed-form shader, which `check_geometry` refuses until then | Chromium paint comparisons, including a rounded rect and one with elliptical corners | S4a | 3D 4, 4b, 5 |
 | S5a | Compile time: the compiler parses, refuses, classifies, deduplicates and emits each crate's `SHAPES` and each element's index | A bad `d` fails the build naming file and line; the same path in two components of one crate is one entry (snapshot test) | S4b | 3D 4, 4b, 5 |
 | S5b | The process registry (1.3): merge on first mount, the byte comparison and its refusal, `ShapeId`s to the elements | A page of literal shapes: `shapes_tessellated` 0 on every frame; the same path in two crates is one entry; a forged hash collision refused naming both crates | S5a | 3D 4, 4b, 5 |
 | S6 | Known-variable geometry: `d={expr}` tessellated on change, counted | Changing the signal tessellates that element once; others 0 | S5b | everything after S5b; not on property 9's path |

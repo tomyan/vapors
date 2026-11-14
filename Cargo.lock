@@ -3187,6 +3187,7 @@ dependencies = [
  "tracing",
  "vapors-gpu-harness",
  "vapors-scene",
+ "vapors-shapes",
  "wgpu",
 ]
 

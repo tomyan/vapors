@@ -23,7 +23,7 @@ mod table_error;
 mod tessellate;
 mod tessellate_path;
 
-pub use canonical::{Canonical, FillRule, Paint, hash_bytes};
+pub use canonical::{Canonical, FillRule, Paint, hash_bytes, paint_of};
 pub use classify::{Classified, classify};
 pub use geometry::{Geometry, check_geometry};
 pub use mesh::{FAR_EDGE, MeshVertex, check_mesh};
