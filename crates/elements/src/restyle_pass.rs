@@ -82,6 +82,7 @@ impl Document {
             initial: crate::style::initial_style(&self.arena, self.root(), &environment(viewport)),
             styles: Styles::default(),
             used: UsedMap::default(),
+            scene: NodeMap::default(),
             refused: NodeMap::default(),
             restyled_nodes: NodeSet::default(),
             calcs: crate::layout::Calcs::default(),

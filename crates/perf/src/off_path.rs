@@ -14,6 +14,7 @@ use vapors_app::{ElementsApp, FrameTiming};
 use vapors_platform::{App, Next};
 
 pub use crate::off_path_kinds::{Kind, off_path_workloads};
+use crate::off_path_moved::{animate, reclass};
 use crate::off_path_page::{UnitPage, page_viewport};
 use crate::run::{Counts, Workload};
 
@@ -42,6 +43,13 @@ pub enum OffPathChange {
     /// that unit removed. The report has a section for each kind of frame
     /// (`frame_kinds.rs`).
     Insert,
+    /// The container's offset moved to the next of eight fractional
+    /// offsets (`off_path_moved.rs`): the whole subtree moves every frame.
+    Animate,
+    /// Alternating frames: the container's class changed to one no rule
+    /// matches, then back. Nothing moves: Animate's control
+    /// (`off_path_moved.rs`).
+    Reclass,
 }
 
 /// An off-path page in an app, and its change.
@@ -93,6 +101,8 @@ impl Workload for OffPath {
             OffPathChange::Scroll => self.page.scroll_body(SCROLL_STEP),
             OffPathChange::ScrollInner => self.page.scroll_inner(SCROLL_STEP),
             OffPathChange::Insert => self.page.toggle_inserted(),
+            OffPathChange::Animate => animate(&self.page, sample),
+            OffPathChange::Reclass => reclass(&self.page, sample),
         }
     }
 
@@ -120,7 +130,12 @@ impl Workload for OffPath {
     fn frame_kinds(&self) -> &'static [&'static str] {
         match self.change {
             OffPathChange::Insert => &["insert", "remove"],
-            OffPathChange::Edit | OffPathChange::Scroll | OffPathChange::ScrollInner => &["every"],
+            OffPathChange::Reclass => &["add", "remove"],
+            // Animate too: each step moves the subtree by a fraction of a pixel, the same work
+            OffPathChange::Edit
+            | OffPathChange::Scroll
+            | OffPathChange::ScrollInner
+            | OffPathChange::Animate => &["every"],
         }
     }
 }

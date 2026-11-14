@@ -24,7 +24,7 @@ fn wheel_at(x: f32) -> Signal<vapors_scene3d::Transform> {
   <Group class="craft">
     <Mesh geometry={square.clone()} class="body" class:braking={braking.get()} />
     {for x in [-0.5f32, 0.5] key=x.to_bits()}
-      <Mesh geometry={square.clone()} class="wheel" transform={wheel_at(x.get())} />
+      <Mesh geometry={square.clone()} transform={wheel_at(x.get())} />
     {/for}
   </Group>
 </Scene>

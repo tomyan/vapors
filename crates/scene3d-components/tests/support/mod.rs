@@ -22,7 +22,8 @@ use vapors_text::FontSystem;
 pub struct Signals {
     pub back: Signal<Transform>,
     pub left: Signal<Transform>,
-    pub left_colour: Signal<Colour>,
+    pub blue: Signal<bool>,
+    pub gone: Signal<bool>,
     pub shown: Signal<bool>,
 }
 
@@ -95,7 +96,8 @@ impl Rig {
         let signals = Signals {
             back: Signal::new(Transform::from_translation(Vec3::new(0.0, 0.0, 5.0)).unwrap()),
             left: Signal::new(Transform::IDENTITY),
-            left_colour: Signal::new(red()),
+            blue: Signal::new(false),
+            gone: Signal::new(false),
             shown: Signal::new(false),
         };
         let eye = CameraHandle::new();
@@ -107,10 +109,10 @@ impl Rig {
             lens: Some(Projection::orthographic(4.0, 0.1, 100.0).unwrap()),
             back: signals.back,
             left: signals.left,
-            left_colour: signals.left_colour,
+            blue: signals.blue,
+            gone: signals.gone,
             right: Signal::new(at(1.0)),
             shown: signals.shown,
-            ..ScenePageProps::default()
         };
         let body = doc.borrow().body();
         let page = ScenePage::mount(&doc, body, props);

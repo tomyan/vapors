@@ -3,7 +3,9 @@
 //! `--global`) and generates its Rust, reporting a refusal in
 //! `file:line:col: message` form; with `--styles`, prints the
 //! build-time styles analysis of each element first
-//! (`vapors_compiler::styles`). Native only; the web has no files.
+//! (`vapors_compiler::styles`). After its `ok` line it prints a note for
+//! each `<Mesh>` nothing in the file colours (`scene_notes`). Native
+//! only; the web has no files.
 
 #[cfg(not(target_family = "wasm"))]
 fn main() {
@@ -26,27 +28,44 @@ fn main() {
     } else {
         ("scoped style", vapors_compiler::parse_file(path))
     };
-    let checked = parsed.and_then(|component| {
-        vapors_compiler::generate(&component)?;
-        if flags.contains(&&"--styles".to_owned()) {
-            let analysis = vapors_compiler::styles::analyse(&component, &[])?;
-            print!(
-                "{}",
-                vapors_compiler::styles::report(&analysis, &component.path)
-            );
-        }
-        Ok(component.name)
-    });
+    let styles = flags.contains(&&"--styles".to_owned());
+    let checked = parsed.and_then(|component| check(&component, styles));
     match checked {
-        Ok(name) => println!(
-            "ok: {} compiles to component `{name}` ({reading})",
-            path.display()
-        ),
+        Ok((notes, name)) => {
+            println!(
+                "ok: {} compiles to component `{name}` ({reading})",
+                path.display()
+            );
+            for note in notes {
+                println!("{note}");
+            }
+        }
         Err(err) => {
             eprintln!("{err}");
             std::process::exit(1);
         }
     }
+}
+
+/// Generates `component`'s Rust, printing its styles analysis when
+/// `styles`; its scene notes and name.
+#[cfg(not(target_family = "wasm"))]
+fn check(
+    component: &vapors_compiler::ast::Component,
+    styles: bool,
+) -> Result<(Vec<String>, String), vapors_compiler::CompileError> {
+    vapors_compiler::generate(component)?;
+    if styles {
+        let analysis = vapors_compiler::styles::analyse(component, &[])?;
+        print!(
+            "{}",
+            vapors_compiler::styles::report(&analysis, &component.path)
+        );
+    }
+    Ok((
+        vapors_compiler::scene_notes(component)?,
+        component.name.clone(),
+    ))
 }
 
 #[cfg(not(target_family = "wasm"))]

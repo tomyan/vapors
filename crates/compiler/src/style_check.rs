@@ -63,7 +63,11 @@ fn refuse_other_line_breaks(source: &Source, section: &Section) -> Result<(), Co
 /// A refusal positioned in the section's text, moved to the file: the
 /// section's first line starts after its open tag, every later line is
 /// a file line of its own.
-fn positioned(source: &Source, section: &Section, error: vapors_css::Error) -> CompileError {
+pub(crate) fn positioned(
+    source: &Source,
+    section: &Section,
+    error: vapors_css::Error,
+) -> CompileError {
     let (line, col) = source.position(section.offset);
     let (css_line, css_col) = (error.position.line as usize, error.position.column as usize);
     let (line, col) = if css_line == 1 {
