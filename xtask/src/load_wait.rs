@@ -6,12 +6,13 @@
 //! runnable now, not the one-minute load average: the average decays
 //! for a minute or two after the work has gone (60 to 12 took 90 to
 //! 120 s in gate 271, docs/plans/factory-throughput.md C3). Several
-//! worktrees share the dev machine; a run started into a saturated one has timed out on its deadlines rather than failed on
-//! its code. An unreadable load is refused, never taken as low, naming
-//! `[load] wait = false` as the fix. A `ci` run inside a gate does not
-//! wait: the gate already did (`main.rs`, the in-gate branch of
-//! `ci_shared::run`). The gate waits once it holds its lock,
-//! so the load it measures is what it will run beside.
+//! worktrees share the dev machine; a run started into a saturated one
+//! has timed out on its deadlines rather than failed on its code. An
+//! unreadable load is refused, never taken as low, naming `[load] wait =
+//! false` as the fix. A `ci` run inside a gate does not wait: the gate
+//! already did (`main.rs`, the in-gate branch of `ci_shared::run`). The
+//! gate waits once it holds its lock, so the load it measures is what it
+//! will run beside.
 
 use std::collections::VecDeque;
 use std::sync::OnceLock;
@@ -37,6 +38,11 @@ pub const READ_EVERY: Duration = Duration::from_secs(5);
 /// the mean of six waits out a busy machine where three in a row would
 /// start into it about once a minute, and clears within 30 s of the
 /// builds ending, where the one-minute average took 90 to 120 s.
+/// Not taken: the runnable count on an idle machine, during one ci run
+/// alone, or during one gate alone, which would show where the default
+/// threshold of 12 sits for a single builder's mean. The box has had ten
+/// builders since this was written; take them in a quiet window
+/// (`cargo xtask quiet`) before changing the threshold.
 pub const WINDOW: u32 = 6;
 /// Set by GitHub Actions on its runners.
 pub const GITHUB_ENV: &str = "GITHUB_ACTIONS";
@@ -107,7 +113,7 @@ pub fn wait(
             return Ok(Outcome::PastDeadline);
         }
         if over && waited >= say_at {
-            say(&waiting(mean, settings, waited));
+            say(&waiting((mean, readings.len()), settings, waited));
             say_at = waited + SAY_EVERY;
         }
         clock.sleep(READ_EVERY.min(settings.deadline.saturating_sub(waited)));
@@ -137,9 +143,11 @@ fn skipped(settings: Settings, github: bool) -> Option<&'static str> {
     (!settings.enabled).then_some("[load] wait = false in .config/factory.toml")
 }
 
-fn waiting(load: f64, settings: Settings, waited: Duration) -> String {
+fn waiting((load, readings): (f64, usize), settings: Settings, waited: Duration) -> String {
     format!(
-        "load: {load:.1} runnable tasks on average over the last {WINDOW} readings, over {} ([load] threshold); waiting, {} s so far, until {} s",
+        "load: {load:.1} runnable tasks on average over the last {readings} reading{}, over {} \
+         ([load] threshold); waiting, {} s so far, until {} s",
+        if readings == 1 { "" } else { "s" },
         settings.threshold,
         waited.as_secs(),
         settings.deadline.as_secs()
@@ -148,8 +156,8 @@ fn waiting(load: f64, settings: Settings, waited: Duration) -> String {
 
 fn past_deadline(load: f64, settings: Settings, waited: Duration) -> String {
     format!(
-        "load: STILL {load:.1} runnable tasks on average, over {} ([load] threshold), after waiting {} s; going on \
-         anyway at the deadline ([load] deadline_minutes), so timings in this run may fail \
+        "load: STILL {load:.1} runnable tasks on average, over {} ([load] threshold), \
+         after waiting {} s; going on anyway at the deadline ([load] deadline_minutes), so timings in this run may fail \
          from the load, not the code",
         settings.threshold,
         waited.as_secs()

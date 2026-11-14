@@ -64,6 +64,10 @@ fn runnable_tasks_over_the_threshold_are_waited_out_saying_the_mean_every_30_s()
     assert_eq!(slept, Duration::from_secs(60));
     assert_eq!(said.len(), 2, "{said:?}");
     assert!(
+        said[0].starts_with("load: 20.0 runnable tasks on average over the last 1 reading, "),
+        "{said:?}"
+    );
+    assert!(
         said[1].starts_with(
             "load: 20.0 runnable tasks on average over the last 6 readings, over 12 ([load] threshold); waiting, 30 s so far"
         ),

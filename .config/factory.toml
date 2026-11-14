@@ -35,11 +35,12 @@ https = "8446"
 
 # `cargo xtask ci` and `cargo xtask gate` wait first while the tasks
 # runnable (/proc/loadavg's fourth field, read every 5 s), averaged over
-# the last six readings, are over `threshold`, and go on at `deadline_minutes` saying so
-# (xtask/src/load_wait.rs; why it goes on rather than fails:
-# docs/decisions/2026-11-01-load-wait-deadline.md). Unset, the threshold
-# is the machine's core count as std::thread::available_parallelism reads
-# it (12 on the dev machine, 2026-11-01): over that, runs queue for CPUs.
+# the last six readings, are over `threshold`, and go on at
+# `deadline_minutes` saying so (xtask/src/load_wait.rs; why it goes on
+# rather than fails: docs/decisions/2026-11-01-load-wait-deadline.md).
+# Unset, the threshold is the machine's core count as
+# std::thread::available_parallelism reads it (12 on the dev machine,
+# 2026-11-01): over that, runs queue for CPUs.
 # The deadline defaults to 10 minutes, the wait agents did by hand before.
 # `wait = "false"` turns the wait off, said on every run, for a machine
 # without /proc/loadavg. None is set here; to change them:
