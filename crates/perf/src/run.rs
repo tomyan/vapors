@@ -113,6 +113,9 @@ pub struct Samples {
     pub instructions: Option<InstructionSamples>,
     /// The last frame's counts.
     pub counts: Counts,
+    /// Frames run before the first kept one: kept frame `j` is frame
+    /// `warmup + j`, which names its kind (`frame_kinds.rs`).
+    pub warmup: usize,
 }
 
 impl Samples {

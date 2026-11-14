@@ -36,10 +36,13 @@ fn bind_this_evaluates_its_expression_once() {
 #[test]
 fn bind_this_is_set_after_the_elements_children_and_later_attributes() {
     // When
-    let code = generated_with(SCRIPT, "<p bind:this={field} title=\"x\">text</p>");
+    let code = generated_with(SCRIPT, "<p bind:this={field} title={field}>text</p>");
 
     // Then
     let set = at(&code, "this.set(Some(p0));");
     assert!(at(&code, "create_text(") < set, "{code}");
-    assert!(at(&code, "set_attribute(p0, \"title\"") < set, "{code}");
+    assert!(
+        at(&code, "set_attribute_if_changed(p0, \"title\"") < set,
+        "{code}"
+    );
 }

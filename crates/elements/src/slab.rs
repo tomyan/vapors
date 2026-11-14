@@ -101,7 +101,8 @@ impl Named {
                 surface: SurfaceId(id),
                 ..
             } => Some(Self::Surface(id)),
-            Item::Shadow(_) | Item::Quad(_) => None,
+            // A shape's entry is the painter's shape store's, not a slab's.
+            Item::Shadow(_) | Item::Quad(_) | Item::Shape(_) => None,
         }
     }
 }

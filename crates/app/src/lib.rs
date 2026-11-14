@@ -12,11 +12,17 @@ mod document_input;
 mod elements_app;
 pub mod frame;
 #[cfg(test)]
+mod gpu_start_tests;
+#[cfg(test)]
 mod gpu_surface_backing_tests;
 mod painter;
 mod pointer;
 #[cfg(test)]
 mod scroll_fixture;
+mod shape_bounds;
+mod shape_error;
+mod shape_store;
+mod shape_store_meshes;
 mod surface;
 mod tooltip;
 mod tooltip_box;
@@ -30,12 +36,13 @@ mod wheel_scroll;
 pub use document_input::{DocumentInput, Given, Route, Unplaced};
 pub use elements_app::{
     ElementsApp, Failure, FrameDecision, FrameTimesHook, FrameTiming, GiveError, InvalidateError,
-    Invalidated, PerFrame, SurfaceHandle,
+    Invalidated, PerFrame, StartState, SurfaceHandle,
 };
 pub use painter::{
     DrawOverError, FrameCounts, MountError, NewPainterError, PaintError, SUPPORTED, ScenePainter,
     SurfaceState, UnsupportedFormat,
 };
+pub use shape_store::{ShapeError, ShapeStore, kind_of, shape_item};
 pub use surface::{SURFACE_FORMAT, SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
 pub use tooltip::{TOOLTIP_DELAY, Tooltip, TooltipTrigger};
 pub use tooltip_error::TooltipError;

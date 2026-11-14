@@ -6,7 +6,9 @@
 use std::time::Duration;
 
 use vapors_platform::Next;
+use vapors_renderer::pipelines::built;
 
+use super::judged::nothing_built;
 use super::{FRAME_DEADLINE, INTERVAL, Sampler};
 use crate::gpu_time::wait;
 use crate::idle::{IdleCounts, SETTLE_FRAMES, Step, did_update, is_settled, max_frames, step};
@@ -18,9 +20,10 @@ impl Sampler<'_> {
     /// command a refusal names.
     ///
     /// # Errors
-    /// The app not settled within [`SETTLE_FRAMES`], more frames asked
-    /// for than [`max_frames`] (a deadline in the past, asked again), a
-    /// frame the workload refused, a failed GPU wait, or the app
+    /// `App::start` failing, the app not settled within
+    /// [`SETTLE_FRAMES`], more frames asked for than [`max_frames`] (a
+    /// deadline in the past, asked again), a frame that built a pipeline
+    /// or that the workload refused, a failed GPU wait, or the app
     /// exiting; each names the fix and `reproduce`.
     pub fn idle(
         &mut self,
@@ -29,28 +32,30 @@ impl Sampler<'_> {
         reproduce: &str,
     ) -> Result<IdleCounts, String> {
         let texture = self.texture(workload.size());
+        let named = |error: String| format!("{error}; reproduce: {reproduce}");
+        self.start(workload, texture.format()).map_err(named)?;
         let mut index = 0;
-        let mut next = self.idle_frame(workload, &texture, index)?;
+        let mut next = self.idle_frame(workload, &texture, index).map_err(named)?;
         while !is_settled(next) {
             index += 1;
             if index >= SETTLE_FRAMES {
                 return Err(not_settled(index, next, reproduce));
             }
             self.now += INTERVAL;
-            next = self.idle_frame(workload, &texture, index)?;
+            next = self.idle_frame(workload, &texture, index).map_err(named)?;
         }
         let mut counts = IdleCounts {
             settled_after: index + 1,
             ..IdleCounts::default()
         };
         let (end, cap) = (self.now + interval, max_frames(interval));
-        while let Step::Frame(at) = step(next, self.now, end)? {
+        while let Step::Frame(at) = step(next, self.now, end).map_err(named)? {
             if counts.frames >= cap {
                 return Err(over_cap(cap, interval, next, reproduce));
             }
             self.now = at;
             index += 1;
-            next = self.idle_frame(workload, &texture, index)?;
+            next = self.idle_frame(workload, &texture, index).map_err(named)?;
             counts.frames += 1;
             counts.updates += usize::from(did_update(workload.counts().update));
         }
@@ -58,7 +63,8 @@ impl Sampler<'_> {
     }
 
     /// One frame with no change made before it, then the wait for the
-    /// GPU, then the workload's check.
+    /// GPU, then the workload's check; refused when it built a pipeline,
+    /// which `App::start` builds before frame 0 (one-scene F0).
     fn idle_frame(
         &mut self,
         workload: &mut dyn Workload,
@@ -69,7 +75,9 @@ impl Sampler<'_> {
         workload
             .ready()
             .map_err(|error| format!("idle frame {index}: {error}"))?;
+        let before = built();
         let next = workload.app().frame(&self.frame_of(texture, index));
+        nothing_built(index, built().since(before)).map_err(|error| format!("idle {error}"))?;
         wait(&self.gpu.device, FRAME_DEADLINE)?;
         workload
             .check(next)

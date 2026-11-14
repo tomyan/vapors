@@ -10,9 +10,11 @@ pub mod build;
 mod codegen;
 mod error;
 mod naming;
+mod scene_notes;
 mod sections;
 mod source;
 mod style_check;
+pub mod styles;
 mod template;
 
 use std::path::Path;
@@ -21,6 +23,7 @@ use build::Styles;
 pub use codegen::{Generated, PropsIndex, generate, generate_checked, generate_with};
 pub use error::CompileError;
 pub use naming::component_name;
+pub use scene_notes::scene_notes;
 use source::Source;
 
 /// The attribute generated code tags each element with, to its

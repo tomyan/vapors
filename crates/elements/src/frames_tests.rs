@@ -1,6 +1,6 @@
 use vapors_scene::{Color, Item, Quad, Rect, TextId};
 
-use super::{Frames, PAGE};
+use super::{FrameInputs, Frames, PAGE};
 use crate::kept_clips::Clips;
 use crate::layout::BoxRect;
 
@@ -27,7 +27,12 @@ fn nested(outer: [f32; 2], inner: [f32; 2], scale: f32) -> Frames {
         vec![PAGE, PAGE, 1],
     );
     let shift = |slot: usize| if slot == 1 { outer } else { inner };
-    Frames::of(&[2, 1], (&clips, &|slot| slot), &shift, scale)
+    let inputs = FrameInputs {
+        clips: &clips,
+        depth: &|slot| slot,
+        shift: &shift,
+    };
+    Frames::of(&[2, 1], &inputs, scale)
 }
 
 #[test]

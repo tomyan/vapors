@@ -57,6 +57,7 @@ pub fn page(random: &mut Random) -> Rc<RefCell<Document>> {
 
 /// One random change, described for a failure message; the viewport
 /// may change with it.
+#[allow(clippy::too_many_lines)] // one arm per kind of random change; the list is the test's vocabulary
 pub fn change(
     doc: &Rc<RefCell<Document>>,
     random: &mut Random,

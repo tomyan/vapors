@@ -7,3 +7,10 @@ xtask = "run --quiet --package xtask --"
 # building, filled the disk in 30 minutes. sccache needs it off too.
 [build]
 incremental = false
+# Plain `cargo` builds 4 jobs at once, as xtask's steps do
+# (`[build] jobs` in .config/factory.toml, 4 when unset; a test holds
+# the two together):
+# three builders of 4 fill the dev machine's 12 threads
+# (docs/plans/factory-throughput.md 2.2). The gate sets CARGO_BUILD_JOBS
+# to every thread; CI's 4-core runners build 4 at once either way.
+jobs = 4

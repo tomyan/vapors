@@ -18,6 +18,7 @@ static ROW: StyleKey = StyleKey {
     tag: "div",
     classes: &["row"],
     toggles: &["marked"],
+    attributes: &[("title", "a row")],
     style: Some("width: 50px"),
 };
 
@@ -27,6 +28,7 @@ static TWICE: StyleKey = StyleKey {
     tag: "div",
     classes: &[],
     toggles: &["on", "on"],
+    attributes: &[],
     style: None,
 };
 
@@ -56,6 +58,7 @@ fn setting_an_attribute_the_key_fixes_is_refused_in_any_case_and_changes_nothing
         ("style", "write it there"),
         ("Style", "write it there"),
         (SCOPE_ATTRIBUTE, "write it there"),
+        ("title", "write `title={expr}` there"),
     ] {
         // Given
         let (mut doc, row) = page(&ROW);

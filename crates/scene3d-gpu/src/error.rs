@@ -1,7 +1,7 @@
 //! What a scene render refuses, each naming the fix.
 
 use std::fmt;
-use vapors_scene3d::{GeometryId, NodeId, SceneError, StoreError};
+use vapors_scene3d::{CameraError, GeometryId, NodeId, SceneError, StoreError};
 
 /// A frame the scene renderer cannot draw.
 #[derive(Debug, Clone, PartialEq)]
@@ -50,6 +50,17 @@ impl From<StoreError> for FrameError {
     }
 }
 
+impl From<CameraError> for FrameError {
+    fn from(error: CameraError) -> Self {
+        match error {
+            CameraError::Store(error) => Self::Store(error),
+            CameraError::NotCamera(node) => Self::ActiveCameraNotCamera(node),
+            CameraError::Projection(error) => Self::Projection(error),
+            CameraError::NotFinite(node) => Self::CameraNotFinite(node),
+        }
+    }
+}
+
 impl From<SceneError> for FrameError {
     fn from(error: SceneError) -> Self {
         Self::Projection(error)
@@ -75,7 +86,7 @@ impl fmt::Display for FrameError {
             ),
             Self::GeometryMissing { node, geometry } => write!(
                 f,
-                "mesh {node} names {geometry}, which its Meshes no longer holds: release geometry only after removing every mesh node that names it"
+                "mesh {node} names {geometry}, which its Meshes has released: a broken invariant, since the node's GeometryHandle should keep its piece held; a defect in vapors-scene3d's Meshes or vapors-scene3d-gpu's release. Reproduce with `cargo test -p vapors-scene3d-gpu` and report it with the scene that produced it"
             ),
             Self::ActiveCameraNotCamera(node) => write!(
                 f,

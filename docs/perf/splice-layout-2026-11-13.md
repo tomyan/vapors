@@ -87,3 +87,30 @@ not hold for the add frames.
 | update, remove | 745,721 | 746,360 | 747,653 | 0.2 |
 | paint, add | 67,987 | 95,434 | 190,397 | 13.6 |
 | paint, remove | 53,954 | 54,452 | 54,895 | 0.1 |
+
+## PR 1a: the box children edited in place
+
+An insert or remove under the body edits the body box's children
+(`layout/child_edits.rs`): no walk over the DOM children, no
+placeholder per kept row, no kept-children map. `--scaling Insert`,
+same method, layout phase:
+
+| layout | 1000 rows | 3000 rows | 10,000 rows | per extra row, 3000 to 10,000 |
+|---|---|---|---|---|
+| insert frames, before | 3,566,972 | 10,230,953 | 33,914,917 | 3,383 |
+| insert frames, after | 2,080,098 | 5,949,717 | 19,510,423 | 1,937 |
+| remove frames, before | 3,507,225 | 10,178,879 | 33,873,899 | 3,385 |
+| remove frames, after | 2,015,349 | 5,891,249 | 19,455,817 | 1,938 |
+
+1,446 instructions per row gone from each kind, the build walk of
+section 1.4 (`l.rebuild`, 1,465). What is left in layout is Taffy's
+block layout of the body and placement (sections 1.4 and 2), the
+lane's.
+
+The rows workload inserts with a plain `insert_before`. A list a
+template compiles (`{for}`: an empty marker text before each row, an
+empty anchor after the last, new rows built last first) takes the same
+edit since the review of #285 (empty text passed over, inserted rows
+put in in DOM order; `tests/child_edits_for.rs`); before that it was
+built shallow. `vapors-perf` has no `{for}` workload yet, so these
+numbers are the plain list's.

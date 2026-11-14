@@ -22,16 +22,30 @@ pub(crate) enum Key {
 #[derive(Default)]
 pub(crate) struct Slots {
     of: FxHashMap<Key, usize>,
-    pub(super) keys: Vec<Option<Key>>,
+    pub(super) keys: crate::slot_list::SlotList<Option<Key>>,
     /// Vacant slots, highest first, so the lowest is taken first.
     free: Vec<usize>,
 }
 
-/// Boxes in their slots, with the slots they were placed by.
+/// Boxes in their slots, with the slots they were placed by, and the
+/// lanes of the block containers among them (`lane.rs`).
 #[derive(Default)]
 pub(crate) struct Placed {
-    pub(crate) boxes: Vec<LayoutBox>,
+    pub(crate) boxes: crate::slot_list::SlotList<LayoutBox>,
     pub(crate) slots: Slots,
+    pub(crate) lanes: super::lane::Lanes,
+}
+
+impl Placed {
+    /// Each per-slot list's name, length and capacity (the growth
+    /// tests read these alone).
+    #[cfg(test)]
+    pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
+        vec![
+            self.boxes.named("layout.boxes"),
+            self.slots.keys.named("layout.keys"),
+        ]
+    }
 }
 
 impl Slots {
@@ -69,7 +83,14 @@ impl Slots {
             None,
             "a walk from the root reaches a vacant slot or misses a box"
         );
-        Placed { boxes, slots }
+        // the kept list, cut to its length (vacant slots included) as a
+        // `SlotList`: grown by doubling, a box being about 2.8 KB, 40,002
+        // boxes held 65,536 slots (property 8, `vapors-perf-memory`)
+        Placed {
+            boxes: boxes.into(),
+            slots,
+            lanes: super::lane::Lanes::default(),
+        }
     }
 
     /// Each new key's slot, by its pre-order index, and the slots after.
@@ -92,7 +113,7 @@ impl Slots {
     fn holding(keys: &[Key], to: &[usize], len: usize, free: Vec<usize>) -> Self {
         let mut slots = Self {
             of: FxHashMap::with_capacity_and_hasher(keys.len(), rustc_hash::FxBuildHasher),
-            keys: vec![None; len],
+            keys: vec![None; len].into(),
             free,
         };
         for (key, &slot) in keys.iter().zip(to) {
@@ -139,7 +160,7 @@ fn arrange(mut built: Vec<LayoutBox>, to: &[usize], len: usize) -> Vec<LayoutBox
     }
     let mut destination = to.to_vec();
     destination.extend((0..len).filter(|&slot| !taken[slot]));
-    built.resize_with(len, LayoutBox::vacant);
+    crate::slot_list::resize_with(&mut built, len, LayoutBox::vacant);
     permute(&mut built, destination);
     built
 }
@@ -191,6 +212,8 @@ pub(super) fn keys(boxes: &[LayoutBox]) -> Vec<Key> {
     keys
 }
 
+#[path = "slots_edit.rs"]
+mod edit;
 #[path = "slots_subtree.rs"]
 mod subtree;
 pub(crate) use subtree::Taken;

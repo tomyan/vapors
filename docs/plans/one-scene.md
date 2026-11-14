@@ -103,13 +103,71 @@ markings seen up close in 3D, is to be measured in S3b.
 Antialiasing differs by kind. A closed-form shape has a distance to its
 edge in the fragment shader, so analytic coverage from `fwidth` works
 as it does for boxes. A tessellated mesh has interior triangle edges
-with no edge distance; analytic coverage for it needs each vertex to
-carry its distance to the outline (edge flags or distances per
-triangle, evaluated with `fwidth`), built at tessellation time but
-evaluated after the transform. A CPU fringe of fixed width is early
-antialiasing and is not a candidate (the brief, "Antialiasing after
-every transform"). S3b compares, for each kind, MSAA against that
-kind's analytic method.
+with no edge distance; analytic coverage for it needs distances per
+triangle, evaluated with `fwidth`, built at tessellation time but
+evaluated after the transform. S2 builds them by edge
+(`crates/shapes/src/mesh.rs`, the check; `mesh_edges.rs` in S2's last
+PR, the builder): each triangle has its own three vertices, and for
+an outline edge the two corners on it carry distance 0 and the third
+its altitude, so the interpolated value is a fragment's signed
+distance to that edge's line; for an edge two triangles share (found
+by counting each edge's uses in lyon's output) all three corners
+carry a far value, so it never wins the `min`. Fragments exist only
+inside the mesh, which would leave the outer half of the coverage
+ramp missing (every edge a hard edge on its outer side), so the
+outline is extruded by half a device pixel in the vertex shader (Tom,
+2026-11-13, option 2): each vertex carries the miter offset of its
+outline edges as a normal and its triangle's three edge normals; the
+vertex shader rebuilds the vertex's two outline edges' normals from
+its miter offset (the unit vectors with offset . m = 1), moves it half
+a device pixel out across both in device space (the device miter,
+clamped at SVG's limit of 4), and takes the move's projection on each
+edge normal off that edge's distance; distances go negative outside
+the true outline and the ramp straddles it, where Chromium's edge
+sits, under any affine transform (#360 review, lead 2026-11-14; a move
+of half a pixel over the transform's smaller singular value drew
+spikes 3.5 px out of a circle under scale(10, 1)). The miter is taken
+per triangle corner from the two outline edges bounding its wedge, so
+where an outline touches itself at a vertex (a bowtie, an even-odd
+star's points) each wedge moves out of its own side; two outline edges
+meeting head-on (the end of a cut of no width into the shape) have no
+miter and are refused, naming the vertex. Vertices lyon emits twice at
+one position (a closed stroke's start) are welded first, so the edge
+across the stroke there is shared, not a seam. Two shapes the builder
+cannot draw are refused naming the shape and a vertex, until a path
+that produces one is in hand as a fixture: an edge used by three or
+more triangles, and a dropped sliver with triangles on both sides (a
+T-junction inside the fill, whose edges would draw as outline).
+Rejected: one
+distance per shared vertex (every vertex of a convex fill, and every
+vertex lyon's stroker emits, lies on the outline at zero, and a
+corner triangle has two outline edges); an index buffer with
+per-vertex edge flags (edge membership is per triangle); per-triangle
+flags through `@interpolate(flat)` with an index buffer (WebGPU takes
+the first vertex, so every triangle needs its own first vertex, extra
+work for no bytes saved); barycentrics (not in WebGPU); curves
+evaluated in the fragment shader, Loop-Blinn style (svg-support D1);
+an inset-only ramp (the shape draws half a pixel small) and an AA
+ring of inset fill plus a one-pixel band (an inset of a stroke under a
+pixel wide folds its fill). Cost against the indexed layout it
+replaces: a fill of n outline vertices is about 24n bytes indexed
+(12-byte vertices, u32 indices) and 156n bytes here (52-byte vertices,
+three per triangle, no index buffer), 6.5 times; a 24 px icon of 200
+vertices about 31 KB against 5 KB; the vertex shader runs three times
+per triangle. Small in absolute terms for icons; S5a measures. Known
+limits for S3b, each pinned by a test in
+`crates/renderer/tests/gpu_mesh_divergences.rs`: (1) at a corner, a
+triangle that carries only one of the corner's outline edges takes
+coverage from that edge alone, inside (the wedge: a 12 x 8 rect
+rotated 30 degrees gets 1 where the closed form gives 0.82) and just
+outside (0.255 where it gives 0.196), at most a pixel or two per
+corner, within half a pixel times the miter of the outline; (2) one
+item's overlapping triangles (a self-crossing stroke, lyon's stroker
+at some joins) blend twice, so a translucent overlap draws darker
+(1 - (1 - a)^2 for a) where SVG paints the union once. A CPU fringe of fixed width is early antialiasing
+and is not a candidate (the brief, "Antialiasing after every
+transform"). S3b compares, for each kind, MSAA against that kind's
+analytic method.
 
 A literal outside the subset is refused at build time naming file, line
 and the fix, as the compiler refuses other attributes today
@@ -120,9 +178,15 @@ and the fix, as the compiler refuses other attributes today
 - Two shapes are the same entry when their canonical form is equal:
   absolute commands in viewBox units after parsing, plus the fill rule
   and stroke parameters that change the mesh (width, join, cap,
-  miter limit). Paint is not part of the key; it is per item.
+  miter limit). Paint is not part of the key; it is per item. Equality
+  is per build target: an arc whose radii the parser scaled up for its
+  chord passes through `sin_cos`, whose last bit differs between the
+  host's libm and wasm32's, so S4a's run-time parse must not rely on
+  cross-target bit equality: on a hash hit it compares bytes, and a
+  miss is a cache miss (one more tessellation, counted), never a
+  defect (S2, `crates/shapes/src/canonical.rs`).
 - Each crate's build emits one `static SHAPES: ShapeTable` beside its
-  `wisp.rs`: vertex and index buffers for every mesh entry, parameters
+  `wisp.rs`: triangle buffers for every mesh entry, parameters
   for every closed-form entry, and each entry's canonical bytes and
   their hash. Each shape element's emitted code names its index in that
   table.
@@ -142,6 +206,12 @@ and the fix, as the compiler refuses other attributes today
 
 - `shape`: a `ShapeRef`, either a registered `ShapeId` or a run-time
   entry (1.5);
+- `kind`: closed form or mesh, so batching splits the two into runs
+  for their pipelines (S3a2, lead's option (a)); it is set once, at
+  construction, and `vapors_app::shape_item` builds an item from its
+  entry with the kind its geometry gives (`kind_of`); the painter's
+  store refuses an item whose kind differs from its entry's, naming
+  the entry;
 - `transform`: viewBox to device pixels, 2 x 3 affine;
 - `paint`: the fill or stroke colour from the element's computed style;
 - the clip, from the `Scene`'s clip as for every item.
@@ -158,8 +228,32 @@ every registered entry it has not uploaded (counted as
 painter draws from it, and `SurfaceFrame` gains `shapes: &ShapeStore`
 so a `SurfaceRenderer` such as `SceneRenderer` draws the same entries
 (S7). A draw naming an entry the store has not uploaded is refused with
-an error naming the entry and its site, never skipped. Added in S3a1
-(the store and the 2D path) and S7 (the `SurfaceFrame` field).
+an error naming the entry and its site, never skipped (a ref the store
+never issued has no site, so its error names the ref and how many the
+store holds; the refusal comes when a run's bytes are built, so a shape
+run culled or clipped out of every view is not resolved; and an item
+whose bounds, which culling reads, do not hold what its entry draws
+under its transform is refused naming both, S3a1). Added in S3a1
+(the store and the 2D path) and S7 (the `SurfaceFrame` field). A
+closed-form entry's parameters go in each instance's bytes (80 bytes:
+transform, colour, the rect or ellipse, the stroke width), kept between
+frames like a quad's, so the store uploads GPU bytes for mesh entries
+only (S3a2) and needs no storage buffer in the vertex stage (S3a1,
+2026-11-14, lead): `shape_bytes_uploaded` counts those uploads and is
+0 for closed forms. It arrives with the first upload; until then an
+idle frame's shape bytes are its shape runs' instance bytes
+(`FrameCounts::shapes`), 0 when every shape batch is kept. Since S3a2
+the upload runs at each frame's start and is counted in
+`FrameCounts::meshes` (growth and compaction included) and in
+`retained_bytes`; a table whose meshes would take the entry buffer
+past the device's `max_buffer_size` is refused at registration, naming
+its crate, since the store only grows. Until
+S4a's `<path>` paints shapes, the painter's tests have elements paint
+shape items through `vapors_elements::test_items` (the `test-support`
+feature, enabled by dev-dependencies only). The closed-form shader takes coverage as 0.5 minus
+the signed distance to the outline in device pixels, the ramp
+straddling the outline, and grows each quad by a device pixel past the
+shape for the ramp's outer half (Tom, 2026-11-13).
 
 ### 1.5 Constant and known-variable properties
 
@@ -369,6 +463,28 @@ judged frames, not reduced. A vapors-owned on-disk pipeline cache
 (faster later launches; wgpu supports it on Vulkan only) is deferred to
 after the finish line (Tom, 2026-11-13).
 
+F0 as built (2026-11-13, #272, #281 and PR 3): `vapors_renderer::pipelines`
+is the counted door, and clippy bans wgpu's constructors elsewhere.
+`App::start` runs once the GPU is ready and the window has a size, before
+the first frame. In it, `ElementsApp` builds the painter's pipelines,
+mounts and sizes the surfaces, uploads the atlas page, makes the frame
+timer, runs the document's first update, and clears each surface's
+backing at the start's size (a frame 0 at another size or scale remakes
+the backings in frame 0, says so on the status line, and records
+`StartState::StartedAtOtherSize`). The judged run refuses any frame that builds a pipeline.
+Measured on a loaded box: frame 0's first surface submit cost 13 to 20 ms.
+`perf` showed i915 allocating and zeroing the pages of a new memory block
+(`clear_page_erms` under execbuffer); wgpu's default block is 128 MiB.
+The submit fell to 0.2 to 0.4 ms only with both the timer made at start
+and the backings cleared at start, in that order. `MemoryHints` is
+unchanged (lead, 2026-11-13).
+Accepted (docs/perf/scene-run-f0-2026-11-14.md): P0's run at 06b0c94,
+three cold and warm pairs at a 1-minute load under 1.5, no frame over
+16.7 ms in any run; frame 0 6.2 to 6.5 ms to idle cold and 6.6 to 6.7 ms
+warm (from about 98 and 22 ms); `App::start`, before frame 0, 104.5 to
+106.9 ms cold and 17.3 to 17.9 ms warm. The pipeline test: crates/perf/tests/gpu_judged_frames.rs:91 and
+crates/app/tests/gpu_app_start.rs:15.
+
 Each row is under about 400 lines (estimate), built by a fresh agent,
 each check proven by breaking what it guards. After each row the next
 is checked against what it found.
@@ -377,12 +493,12 @@ is checked against what it found.
 |---|---|---|---|---|
 | P0 | `vapors-perf`: the 60 s mode on today's racer (3.2), the scripted driver, frame-to-idle time, the four refusals, the schedule unit test | Three runs on the dev machine of today's racer recorded in `docs/perf/`; each refusal shown failing (a frame made slow, a GPU reading withheld, load faked high), then restored | #240 merged (same `report.rs`) | everything |
 | S1 | `vapors-shapes`: the path parser moved from `vapors-text`, `ShapeTable`/`ShapeId` types; the icon route on the moved parser. Two PRs: #278 the move; the types (`ShapeTable::check` refuses an undrawable geometry or a shared hash, naming crate and site) in the second | Every icon test and the icon Chromium comparison unchanged; one parser (the old file gone) | none | 3D 4, 4b, 5; IU4 except PR 3 (`crates/text`), so after or before IU4 PR 3, not during |
-| S2 | Classifier and tessellator (lyon, pinned; `cargo xtask deny` passing) in `vapors-shapes`, canonical form and hash, per-vertex outline distances for meshes; C and Q curves in the parser | Unit tests: a rect path classified as a rect, two arcs as a circle, other paths as meshes; equal shapes one hash, a changed stroke width another; a non-finite or degenerate input refused naming the shape | S1 | everything |
+| S2 | Classifier and tessellator (lyon, pinned; `cargo xtask deny` passing) in `vapors-shapes`, canonical form and hash, per-triangle edge distances for meshes (1.2); C and Q curves in the parser. Five PRs: curves, segments and a curve-icon paint fixture; canonical form and hash; the classifier; the mesh format; the tessellator | Unit tests: a rect path classified as a rect, two arcs as a circle, other paths as meshes; equal shapes one hash, a changed stroke width another; a non-finite or degenerate input refused naming the shape | S1 | everything |
 | S3a1 | `Item::Shape`, the `ShapeStore` (1.4), the closed-form pipeline and the painter's dispatch, on IU4's retained path | Rects and circles batched in paint order; idle frame writes 0 shape bytes; a draw of an entry not uploaded refused naming it | S2, IU4 PR 2 | 3D 4, 4b, 5 |
 | S3a2 | The mesh pipeline | Fill and stroke meshes batched in paint order with closed-form shapes | S3a1 | 3D 4, 4b, 5 |
-| S3b | The antialiasing test (the brief's slice 1): touche's ten icons as shapes at 1x, 2x, rotated 30 degrees and scaled 1.37; per kind, MSAA against its analytic method (1.2), against Chromium with the paint_check rules, beside the icon route; the curve tolerance | The numbers recorded; a method chosen per kind, or the question returned to Tom if none is within the rules at 1x (the brief, decision 3) | S3a2 | everything |
+| S3b | The antialiasing test (the brief's slice 1): touche's ten icons as shapes at 1x, 2x, rotated 30 degrees and scaled 1.37; per kind, MSAA against its analytic method (1.2), against Chromium with the paint_check rules, beside the icon route; the curve tolerance; sub-pixel features against Chromium (the closed-form ramp gives a 0.25 px stroke on a pixel centre 0.625, #345 review M4); the mesh known limits (1.2: corners, a translucent self-crossing stroke) against Chromium, with an exact candidate for the corners beside MSAA: each triangle carries, flat, the outline lines of its corners' wedges (up to six, with a convex or reflex flag per corner), and coverage is 0.5 plus the minimum over its corners of each wedge's distance (convex: the nearer line; reflex: the farther), each line's distance in device pixels from the local position (about 88 bytes a vertex) | The numbers recorded; a method chosen per kind, or the question returned to Tom if none is within the rules at 1x (the brief, decision 3) | S3a2 | everything |
 | S4a | `<path>` fill and stroke in templates; `fill`, `stroke`, `stroke-width` in `vapors-css` with the presentation attributes mapped; run-time parse and tessellation cached by hash | Chromium paint comparisons for fill and stroke; a class toggle recolours and tessellates nothing (counted) | S3b | 3D 4, 4b, 5 |
-| S4b | `<rect>` and `<circle>` | Chromium paint comparisons, including a rounded rect | S4a | 3D 4, 4b, 5 |
+| S4b | `<rect>` and `<circle>`; elliptical corners (`rx` and `ry` differ) in the closed-form shader, which `check_geometry` refuses until then | Chromium paint comparisons, including a rounded rect and one with elliptical corners | S4a | 3D 4, 4b, 5 |
 | S5a | Compile time: the compiler parses, refuses, classifies, deduplicates and emits each crate's `SHAPES` and each element's index | A bad `d` fails the build naming file and line; the same path in two components of one crate is one entry (snapshot test) | S4b | 3D 4, 4b, 5 |
 | S5b | The process registry (1.3): merge on first mount, the byte comparison and its refusal, `ShapeId`s to the elements | A page of literal shapes: `shapes_tessellated` 0 on every frame; the same path in two crates is one entry; a forged hash collision refused naming both crates | S5a | 3D 4, 4b, 5 |
 | S6 | Known-variable geometry: `d={expr}` tessellated on change, counted | Changing the signal tessellates that element once; others 0 | S5b | everything after S5b; not on property 9's path |

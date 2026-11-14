@@ -4,7 +4,7 @@
 use crate::FrameError;
 use crate::pipeline::{CAMERA_BYTES, Pipeline};
 use vapors_app::{SurfaceFrame, SurfaceSize};
-use vapors_scene3d::{Mat4, NodeKind, Scene};
+use vapors_scene3d::{Mat4, Scene};
 
 pub(crate) struct CameraUniform {
     buffer: wgpu::Buffer,
@@ -57,21 +57,11 @@ impl CameraUniform {
     }
 }
 
-/// World space to clip space through the active camera: its projection
-/// for the backing's aspect, times the inverse of its world matrix.
+/// World space to clip space through the active camera at the
+/// backing's aspect ([`Scene::view_projection`], which `pick` uses too).
 /// `scene` must be updated.
 pub(crate) fn view_projection(scene: &Scene, size: SurfaceSize) -> Result<Mat4, FrameError> {
-    let camera = scene.active_camera()?;
-    let NodeKind::Camera { projection, .. } = scene.kind(camera)? else {
-        return Err(FrameError::ActiveCameraNotCamera(camera));
-    };
     #[allow(clippy::cast_precision_loss)] // texture sizes are at most 2^14
     let aspect = size.width as f32 / size.height as f32;
-    let view = scene.world(camera)?.inverse();
-    let view_projection = projection.matrix(aspect)? * view;
-    if view_projection.is_finite() {
-        Ok(view_projection)
-    } else {
-        Err(FrameError::CameraNotFinite(camera))
-    }
+    Ok(scene.view_projection(aspect)?)
 }

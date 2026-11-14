@@ -22,6 +22,8 @@ pub enum PlatformError {
     /// A GPU call failed with no error scope to catch it; the sentence
     /// names wgpu's error and the fix.
     UncapturedGpuError(String),
+    /// The app's `App::start`, before the first frame, refused.
+    Start(String),
 }
 
 impl fmt::Display for PlatformError {
@@ -37,6 +39,7 @@ impl fmt::Display for PlatformError {
             Self::Device(message) => write!(f, "device: {message}"),
             Self::Surface(message) => write!(f, "surface: {message}"),
             Self::Picker(message) => write!(f, "picker: {message}"),
+            Self::Start(message) => write!(f, "the app could not start on this GPU: {message}"),
             Self::DeviceLost(sentence) | Self::UncapturedGpuError(sentence) => {
                 write!(f, "{sentence}")
             }

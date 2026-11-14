@@ -108,6 +108,14 @@ pub trait App {
     fn event(&mut self, event: Event, platform: &Platform);
     /// Draw this frame.
     fn frame(&mut self, frame: &Frame<'_>) -> Next;
+    /// The GPU is ready and no frame has been drawn: called once, before
+    /// the first frame, for work that frame would otherwise do once.
+    ///
+    /// # Errors
+    /// Why the app cannot draw on this GPU; the loop stops with it.
+    fn start(&mut self, _start: &crate::Start<'_>) -> Result<(), String> {
+        Ok(())
+    }
     /// The frame just drawn is presented: what the app asks for that
     /// depends on the frame's layout, such as the focused text field's
     /// caret area ([`Platform::set_text_field`]), goes here.

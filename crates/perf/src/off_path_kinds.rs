@@ -3,11 +3,13 @@
 //! its changes.
 
 use crate::off_path::{OffPath, OffPathChange};
+use crate::off_path_layouts::{GRID_CELLS, MIXED_TEXT, WRAPPED_CARDS};
+use crate::off_path_moved::{TRANSLATED, WHOLE_OFFSET, WRAPPED};
 use crate::off_path_page::Shape;
 use crate::off_path_scrollers::{CODE_BLOCKS, NESTED_SCROLLERS};
 use crate::workloads::Make;
 
-use OffPathChange::{Edit, Insert, Scroll, ScrollInner};
+use OffPathChange::{Animate, Edit, Insert, Reclass, Scroll, ScrollInner};
 
 /// The unit counts every kind runs at.
 pub const SIZES: [usize; 3] = [1000, 3000, 10_000];
@@ -19,11 +21,34 @@ pub enum Kind {
     NestedScrollers,
     /// A transcript of messages, each with a small scrolling code block.
     CodeBlocks,
+    /// A wrapping flex row of cards.
+    WrappedCards,
+    /// A grid of cells in seven columns.
+    GridCells,
+    /// Paragraphs of varied lengths with inline spans, wrapping.
+    MixedText,
+    /// Rows inside a container at a fractional offset, which moves.
+    Translated,
+    /// `Translated`'s rows in the same container with no offset: a
+    /// control for its Edit.
+    Wrapped,
+    /// `Translated`'s rows with the container offset by whole pixels: a
+    /// second control for its Edit.
+    WholeOffset,
 }
 
 impl Kind {
     /// Every kind, in the order the run lists them.
-    pub const ALL: [Self; 2] = [Self::NestedScrollers, Self::CodeBlocks];
+    pub const ALL: [Self; 8] = [
+        Self::NestedScrollers,
+        Self::CodeBlocks,
+        Self::WrappedCards,
+        Self::GridCells,
+        Self::MixedText,
+        Self::Translated,
+        Self::Wrapped,
+        Self::WholeOffset,
+    ];
 
     /// What the page's units are called in a workload's name. None has
     /// "rows" in it, so `--only "1000 rows"` keeps meaning the rows page.
@@ -32,6 +57,12 @@ impl Kind {
         match self {
             Self::NestedScrollers => "nested scrollers",
             Self::CodeBlocks => "code blocks",
+            Self::WrappedCards => "wrapped cards",
+            Self::GridCells => "grid cells",
+            Self::MixedText => "paragraphs",
+            Self::Translated => "translated items",
+            Self::Wrapped => "wrapped items",
+            Self::WholeOffset => "whole-offset items",
         }
     }
 
@@ -40,6 +71,9 @@ impl Kind {
     pub fn changes(self) -> &'static [OffPathChange] {
         match self {
             Self::NestedScrollers | Self::CodeBlocks => &[Edit, Scroll, ScrollInner, Insert],
+            Self::WrappedCards | Self::GridCells | Self::MixedText => &[Edit, Scroll, Insert],
+            Self::Translated => &[Edit, Scroll, Insert, Animate, Reclass],
+            Self::Wrapped | Self::WholeOffset => &[Edit],
         }
     }
 
@@ -49,6 +83,12 @@ impl Kind {
         match self {
             Self::NestedScrollers => NESTED_SCROLLERS,
             Self::CodeBlocks => CODE_BLOCKS,
+            Self::WrappedCards => WRAPPED_CARDS,
+            Self::GridCells => GRID_CELLS,
+            Self::MixedText => MIXED_TEXT,
+            Self::Translated => TRANSLATED,
+            Self::Wrapped => WRAPPED,
+            Self::WholeOffset => WHOLE_OFFSET,
         }
     }
 }

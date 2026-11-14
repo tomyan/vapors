@@ -9,6 +9,7 @@
 //! beside its clips: its clip parent's when that does not scroll, else
 //! the clip parent itself.
 
+use crate::slot_list::SlotList;
 use rustc_hash::FxHashSet;
 
 use crate::clip_tree::ClipTree;
@@ -30,18 +31,27 @@ pub(crate) type Inner<'a> = &'a dyn ClipInputs;
 /// scroll frame.
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Clips {
-    own: Vec<Option<BoxRect>>,
-    inner: Vec<Option<BoxRect>>,
-    frame: Vec<usize>,
+    own: SlotList<Option<BoxRect>>,
+    inner: SlotList<Option<BoxRect>>,
+    frame: SlotList<usize>,
 }
 
 impl Clips {
+    /// Each per-slot list's length and capacity, for the growth test.
+    #[cfg(test)]
+    pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
+        vec![
+            self.own.named("clips.own"),
+            self.inner.named("clips.inner"),
+            self.frame.named("clips.frame"),
+        ]
+    }
     /// Every box's clips; the slots that redid.
     pub(crate) fn of(tree: &ClipTree, inner: Inner<'_>) -> (Self, Vec<usize>) {
         let mut clips = Self {
-            own: vec![None; tree.len()],
-            inner: vec![None; tree.len()],
-            frame: vec![PAGE; tree.len()],
+            own: vec![None; tree.len()].into(),
+            inner: vec![None; tree.len()].into(),
+            frame: vec![PAGE; tree.len()].into(),
         };
         let mut redone = Vec::new();
         if tree.len() > 0 {
@@ -66,9 +76,9 @@ impl Clips {
     #[cfg(test)]
     pub(crate) fn with(inner: Vec<Option<BoxRect>>, frame: Vec<usize>) -> Self {
         Self {
-            own: vec![None; inner.len()],
-            inner,
-            frame,
+            own: vec![None; inner.len()].into(),
+            inner: inner.into(),
+            frame: frame.into(),
         }
     }
 

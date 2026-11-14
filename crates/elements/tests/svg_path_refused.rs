@@ -11,7 +11,7 @@ use support::{document, element};
 fn path_attributes_outside_the_subset_are_refused_naming_the_fix() {
     for (changes, says) in [
         (&[("d", "")][..], &["<path>", "d", "required"][..]),
-        (&[("d", "M2 8C1 1 2 2 3 3")][..], &["<path>", "byte 4"]),
+        (&[("d", "M2 8S1 1 2 2")][..], &["<path>", "byte 4"]),
         (&[("fill", "")][..], &["fill=\"none\""]),
         (&[("fill", "red")][..], &["fill=\"none\""]),
         (&[("stroke", "")][..], &["stroke=\"currentColor\""]),

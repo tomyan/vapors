@@ -16,41 +16,45 @@
 //! and compares them with the bytes kept (`painter_kept_check.rs`).
 
 use vapors_elements::{BatchKey, Painted};
-use vapors_renderer::{ImagePipeline, KeptRange, QuadPipeline, ShadowPipeline, Shift, Target};
-use vapors_scene::{Item, Rect, Run};
+use vapors_renderer::{
+    ClosedFormPipeline, ImagePipeline, KeptRange, MeshPipeline, QuadPipeline, ShadowPipeline,
+    Shift, Target,
+};
+use vapors_scene::Run;
 use vapors_text::{BlendParams, GlyphAtlas, ICON_BLEND, TextPipeline};
 
 use super::ScenePainter;
 use super::errors::PaintError;
+use crate::shape_store::ShapeStore;
 
 #[path = "painter_kept_gpu.rs"]
 mod gpu;
 pub(super) use gpu::KeptGpu;
+#[path = "painter_kept_bytes.rs"]
+mod bytes;
+pub(super) use bytes::{Kind, RunBytes, run_bytes};
 
-/// Which pipeline's buffer holds a batch's bytes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum Kind {
-    Shadows,
-    Quads,
-    /// Image and surface quads: the image pipeline's.
-    Images,
-}
-
-/// The pipelines whose buffers hold kept bytes, and the atlas the text
-/// pipeline's name.
+/// The pipelines whose buffers hold kept bytes, the atlas the text
+/// pipeline's name, and the store shape items name entries in.
 pub(super) struct Pipelines<'a> {
     pub(super) shadows: &'a mut ShadowPipeline,
     pub(super) quads: &'a mut QuadPipeline,
+    pub(super) closed_forms: &'a mut ClosedFormPipeline,
+    pub(super) meshes: &'a mut MeshPipeline,
+    pub(super) shapes: &'a ShapeStore,
     pub(super) images: &'a mut ImagePipeline,
     pub(super) text: &'a mut TextPipeline,
     pub(super) atlas: &'a mut GlyphAtlas,
 }
 
 impl ScenePainter {
-    /// Draws `run`, a shadow, quad, image or surface batch keyed `key`,
-    /// from its kept bytes moved by `shift`, writing them first when none
-    /// are kept. Nothing is drawn when the write is refused (the refusal
-    /// is on the target's encoder).
+    /// Draws `run`, a shadow, quad, shape, image or surface batch keyed
+    /// `key`, from its kept bytes moved by `shift`, writing them first
+    /// when none are kept. A shape run naming an entry the store cannot
+    /// draw is refused when its bytes are built, before any is written
+    /// (the store only grows, so kept bytes stay drawable). Nothing is
+    /// drawn when the write is refused (the refusal is on the target's
+    /// encoder).
     pub(super) fn draw_retained(
         &mut self,
         target: &Target<'_>,
@@ -61,16 +65,29 @@ impl ScenePainter {
         let pipelines = Pipelines {
             shadows: &mut self.shadows,
             quads: &mut self.quads,
+            closed_forms: &mut self.closed_forms,
+            meshes: &mut self.meshes,
+            shapes: &self.shapes,
             images: &mut self.images,
             text: &mut self.text,
             atlas: &mut self.atlas,
         };
-        let Some(range) = self.kept.range(pipelines, target, (run, key, at)) else {
+        let Some(kept) = self.kept.range(pipelines, target, (run, key, at))? else {
             return Ok(());
         };
+        let range = kept.range;
         match run {
             Run::Shadows(_) => self.shadows.draw_kept(target, range, shift),
             Run::Quads(_) => self.quads.draw_kept(target, range, shift),
+            Run::Shapes(_) => self.closed_forms.draw_kept(target, range, shift),
+            Run::Meshes(_) => {
+                let drawn = self
+                    .shapes
+                    .uploaded(kept.meshes)
+                    .map_err(PaintError::Shape)?;
+                let entries = (&mut self.mesh_entries, drawn.as_slice());
+                self.meshes.draw_kept(target, range, shift, entries);
+            }
             Run::Images(items) => {
                 let images = &mut self.images;
                 self.textures
@@ -119,6 +136,9 @@ impl ScenePainter {
         let mut pipelines = Pipelines {
             shadows: &mut self.shadows,
             quads: &mut self.quads,
+            closed_forms: &mut self.closed_forms,
+            meshes: &mut self.meshes,
+            shapes: &self.shapes,
             images: &mut self.images,
             text: &mut self.text,
             atlas: &mut self.atlas,
@@ -136,7 +156,9 @@ impl ScenePainter {
     /// Bytes held in the pipelines' kept buffers.
     pub(super) fn retained_bytes(&self) -> u64 {
         let (images, text) = (self.images.retained_bytes(), self.text.retained_bytes());
-        self.shadows.retained_bytes() + self.quads.retained_bytes() + images + text
+        let (shadows, quads) = (self.shadows.retained_bytes(), self.quads.retained_bytes());
+        let shapes = self.closed_forms.retained_bytes() + self.meshes.retained_bytes();
+        shadows + quads + shapes + images + text
     }
 }
 
@@ -153,6 +175,8 @@ impl Pipelines<'_> {
         match kind {
             Kind::Shadows => self.shadows.keep(target, bytes),
             Kind::Quads => self.quads.keep(target, bytes),
+            Kind::ClosedForms => self.closed_forms.keep(target, bytes),
+            Kind::Meshes => self.meshes.keep(target, bytes),
             Kind::Images => self.images.keep(target, bytes),
         }
     }
@@ -161,37 +185,10 @@ impl Pipelines<'_> {
         match kind {
             Kind::Shadows => self.shadows.release(range),
             Kind::Quads => self.quads.release(range),
+            Kind::ClosedForms => self.closed_forms.release(range),
+            Kind::Meshes => self.meshes.release(range),
             Kind::Images => self.images.release(range),
         }
-    }
-}
-
-impl Kind {
-    /// The pipeline that keeps `run`'s bytes; `None` for text and icon
-    /// runs, kept by the text pipeline (`painter_kept_text.rs`).
-    pub(super) fn of_run(run: &Run) -> Option<Self> {
-        match run {
-            Run::Shadows(_) => Some(Self::Shadows),
-            Run::Quads(_) => Some(Self::Quads),
-            Run::Images(_) | Run::Surfaces(_) => Some(Self::Images),
-            Run::Texts(_) | Run::Icons(_) => None,
-        }
-    }
-
-    fn of(run: &Run) -> Self {
-        Self::of_run(run).expect("only shadow, quad, image and surface runs are kept")
-    }
-}
-
-/// `run`'s instance or vertex bytes, as its pipeline draws them.
-pub(super) fn run_bytes(run: &Run) -> Vec<u8> {
-    match run {
-        Run::Shadows(shadows) => ShadowPipeline::bytes(shadows),
-        Run::Quads(quads) => QuadPipeline::bytes(quads),
-        Run::Images(items) | Run::Surfaces(items) => {
-            ImagePipeline::rect_bytes(items.iter().map(item_rect))
-        }
-        Run::Texts(_) | Run::Icons(_) => unreachable!("text and icon runs are not kept"),
     }
 }
 
@@ -200,13 +197,5 @@ fn blend(run: &Run) -> BlendParams {
     match run {
         Run::Icons(_) => ICON_BLEND,
         _ => BlendParams::default(),
-    }
-}
-
-/// An image or surface item's rect.
-fn item_rect(item: &Item) -> Rect {
-    match item {
-        Item::Image { rect, .. } | Item::Surface { rect, .. } => *rect,
-        other => unreachable!("an image or surface run holds {other:?}"),
     }
 }

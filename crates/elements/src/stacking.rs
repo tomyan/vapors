@@ -4,6 +4,7 @@
 //! compares to know when to walk them again (`changed_slots.rs`).
 
 use super::layout::{Content, Key, LayoutBox, Rebuilt};
+use crate::slot_list::SlotList;
 use crate::style::{Used, UsedMap};
 
 /// What paint order needs to know of a box.
@@ -71,9 +72,15 @@ impl Stacking {
 /// again (`layout/marks.rs`). A used value that depends on something
 /// outside the subtree (a sibling, the viewport) needs its own check.
 #[derive(Default)]
-pub(crate) struct Stackings(Vec<Option<Stacking>>);
+pub(crate) struct Stackings(SlotList<Option<Stacking>>);
 
 impl Stackings {
+    /// Its per-slot list's length and capacity, for the growth test.
+    #[cfg(test)]
+    pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
+        vec![self.0.named("stackings")]
+    }
+
     /// The stackings of `boxes`, from their elements' used styles.
     pub(crate) fn of(boxes: &[LayoutBox], used: &UsedMap) -> Self {
         Self(

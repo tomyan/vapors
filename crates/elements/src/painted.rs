@@ -54,7 +54,7 @@ pub struct Painted {
     pub(crate) from: crate::kept_paint::PaintedFrom,
     /// Each slot's kept paint (`kept_box.rs`), walked in `order` for the
     /// scene and hits (`scene_view.rs`), kept in place for the next update.
-    pub(crate) kept_boxes: Vec<Option<crate::kept_box::KeptBox>>,
+    pub(crate) kept_boxes: crate::slot_list::SlotList<Option<crate::kept_box::KeptBox>>,
     /// The steps of `order` that draw, which the scene's items walk.
     pub(crate) drawn: crate::drawn_steps::DrawnSteps,
     /// Each scroll frame's drawing steps by their extents, which the
@@ -64,12 +64,12 @@ pub struct Painted {
     pub(crate) kept_batches: std::cell::RefCell<Option<crate::kept_batches::KeptBatches>>,
     /// Boxes painted by this update, for `UpdateCounts`.
     pub(crate) boxes_drawn: usize,
-    /// Boxes whose kept paint this update shifted in place
-    /// (`kept_shift.rs`), for `UpdateCounts`.
+    /// Boxes this update shifted in place (`kept_shift.rs`), for `UpdateCounts`.
     pub(crate) boxes_shifted: usize,
-    /// Kept parts this update visited without painting again (`paint_partial.rs`), for
-    /// `UpdateCounts`.
+    /// Kept parts this update read without painting (`paint_partial.rs`), for `UpdateCounts`.
     pub(crate) parts_visited_kept: usize,
+    /// Scroll frames this update worked out (`paint_frames.rs`).
+    pub(crate) frames_worked: usize,
     /// Scene items this update built, for `UpdateCounts`.
     pub(crate) items_built: usize,
     /// Elements whose `rects` and `paddings` entries this update put or
@@ -77,12 +77,24 @@ pub struct Painted {
     pub(crate) maps_patched: usize,
     /// What this update's patches did to `drawn` and `extents` (`blocks.rs`).
     pub(crate) index_counts: crate::blocks::IndexCounts,
-    /// Each slot's stacking, for the next update's shape comparison
-    /// (`changed_slots.rs`).
+    /// Each slot's stacking, for the next update's shape comparison (`changed_slots.rs`).
     pub(crate) stackings: crate::paint_order::Stackings,
 }
 
 impl Painted {
+    /// Each per-slot list it keeps: name, length, capacity (the growth
+    /// test, `slot_list_document_tests.rs`, reads these alone).
+    #[cfg(test)]
+    pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
+        let mut lists = vec![self.kept_boxes.named("kept_boxes")];
+        lists.extend(self.from.placement.slot_lists());
+        lists.extend(self.order.clips.slot_lists());
+        lists.extend(self.order.tree.slot_lists());
+        lists.extend(self.stackings.slot_lists());
+        lists.extend(self.kept_hits().slot_lists());
+        lists
+    }
+
     /// A paint of nothing on `canvas` at `scale`.
     pub(crate) fn empty(canvas: Color, canvas_from: Option<CanvasFrom>, scale: f32) -> Self {
         Self {
@@ -102,7 +114,7 @@ impl Painted {
             ranges: NodeMap::default(),
             text_origins: NodeMap::default(),
             from: crate::kept_paint::PaintedFrom::default(),
-            kept_boxes: Vec::new(),
+            kept_boxes: crate::slot_list::SlotList::default(),
             drawn: crate::drawn_steps::DrawnSteps::default(),
             extents: crate::frame_extents::Extents::default(),
             kept_batches: std::cell::RefCell::new(None),
@@ -110,6 +122,7 @@ impl Painted {
             boxes_shifted: 0,
             parts_visited_kept: 0,
             items_built: 0,
+            frames_worked: 0,
             maps_patched: 0,
             index_counts: crate::blocks::IndexCounts::default(),
             stackings: crate::paint_order::Stackings::default(),

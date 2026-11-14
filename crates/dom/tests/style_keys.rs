@@ -15,6 +15,7 @@ static ROW: StyleKey = StyleKey {
     tag: "div",
     classes: &["row"],
     toggles: &["marked", "wide"],
+    attributes: &[],
     style: Some("height: 24px"),
 };
 
@@ -24,6 +25,7 @@ static PLAIN: StyleKey = StyleKey {
     tag: "span",
     classes: &[],
     toggles: &[],
+    attributes: &[],
     style: None,
 };
 
@@ -138,6 +140,7 @@ static ROW_AGAIN: StyleKey = StyleKey {
     tag: "div",
     classes: &["row"],
     toggles: &["marked", "wide"],
+    attributes: &[],
     style: Some("height: 24px"),
 };
 

@@ -2,6 +2,8 @@
 //! tests hold (restyled, laid out, text built) and the structural work
 //! of each phase.
 
+use crate::edit_decline::EditDecline;
+use crate::lane_decline::LaneDecline;
 use crate::splice_decline::SpliceDecline;
 
 /// Structural counts of the work the last [`Document::update`] did, for
@@ -66,12 +68,38 @@ pub struct UpdateCounts {
     /// subtree and inline elements, whose text is part of a run, have
     /// none.
     pub boxes_built: usize,
+    /// Elements whose box children an insert or remove edited in place
+    /// (`layout/child_edits.rs`): the inserted children built and put
+    /// in after their previous sibling's box, the removed taken out,
+    /// no other child built or walked in the DOM. The edit still copies
+    /// and searches the box's child list, O(children).
+    pub children_edited: usize,
+    /// Elements whose inserts and removes were not made as an edit:
+    /// built shallow instead, or, making no box of their own, built by
+    /// an ancestor (`EditDecline::OwnerHasNoBox`).
+    pub children_edits_declined: usize,
+    /// The condition that declined the first of those (the owners by
+    /// slot, then the elements with no box), when
+    /// `children_edits_declined` is above 0, else `None`.
+    pub children_edit_decline: Option<EditDecline>,
     /// Times Taffy asked a box for its layout, a cache hit included. A
     /// box can be asked more than once in an update (measured, then
     /// laid out), and a box under a cache hit is not asked at all.
     pub layout_calls: usize,
     /// Times Taffy laid a box out rather than reading its cache.
     pub boxes_laid_out: usize,
+    /// Times a block container was laid out by its lane
+    /// (`layout/lane_layout.rs`, `docs/plans/splice-layout.md`): its
+    /// children put in or changed since laid out and their starts
+    /// summed in the lane's tree, the rest neither asked nor placed by
+    /// the lane.
+    pub lanes: usize,
+    /// Times a block or flex container was laid out by Taffy because
+    /// its style, place or a child kept it out of a lane.
+    pub lanes_declined: usize,
+    /// The condition that declined the first of those, when
+    /// `lanes_declined` is above 0, else `None`.
+    pub lane_decline: Option<LaneDecline>,
     /// Rebuilt boxes whose subtree changed and that layout laid out in
     /// isolation (`layout/isolated.rs`): asked what their parent asked
     /// the box they replaced, they answered the same, so their

@@ -23,7 +23,7 @@ fn a_component_tag_with_classes_passes_its_key_as_the_anchor_prop() {
     // the component's props type declares
     assert_has(
         &code,
-        "static KEY_MESH0: vapors_dom::StyleKey = { vapors_dom::StyleKey { site: concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:4:1\"), scope: None, tag: MeshProps::ANCHOR_TAG, classes: &[\"body\"], toggles: &[\"braking\"], style: Some(\"color: red\") } };",
+        "static KEY_MESH0: vapors_dom::StyleKey = { vapors_dom::StyleKey { site: concat!(env!(\"CARGO_PKG_NAME\"), \"/\", \"counter.wisp:4:1\"), scope: None, tag: MeshProps::ANCHOR_TAG, classes: &[\"body\"], toggles: &[\"braking\"], style: Some(\"color: red\"), attributes: &[] } };",
     );
     assert_has(&code, "anchor: Some(&KEY_MESH0),");
     assert_lacks(&code, "braking:");

@@ -20,6 +20,8 @@ fn ci_runs_fastest_checks_first() {
             "layers",
             "builds",
             "imports",
+            "nightly",
+            "nightly issues",
             "deny",
             "clippy",
             "wasm",
@@ -99,6 +101,15 @@ fn lint_checks_layers_builds_and_imports_after_files_and_before_clippy() {
     // Then
     assert_eq!(
         names,
-        ["fmt", "files", "layers", "builds", "imports", "clippy"]
+        [
+            "fmt",
+            "files",
+            "layers",
+            "builds",
+            "imports",
+            "nightly",
+            "nightly issues",
+            "clippy"
+        ]
     );
 }

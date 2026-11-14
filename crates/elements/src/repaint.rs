@@ -1,9 +1,8 @@
 //! Painting the slots an update paints again into parts kept in place
-//! (`paint_partial.rs`), and every scroll container's thumbs.
+//! (`paint_partial.rs`), and the thumbs of the scroll containers it
+//! names (`thumbs_again.rs`).
 
 use std::mem::take;
-
-use vapors_scene::Scene;
 
 use crate::kept_box::{BoxFrom, KeptBox, Part};
 use crate::kept_order::KeptOrder;
@@ -66,24 +65,24 @@ impl<'a> Repaint<'a> {
         let (layout_box, rect) = (&self.boxes[slot], self.rects[slot]);
         crate::paint_outline::paint_outline(layout_box, rect, input, &mut self.scratch);
         painted.slabs = take(&mut self.scratch.slabs);
-        KeptBox {
-            from,
-            own,
-            outline: take(&mut self.scratch.scene),
-            thumb: Scene::new(),
-        }
+        KeptBox::new(from, own, take(&mut self.scratch.scene))
     }
 
-    /// Paints every scroll container's thumbs into its kept paint;
-    /// their items counted.
-    pub(crate) fn thumbs(&mut self, input: &mut PaintInput<'_>, painted: &mut Painted) {
-        for &slot in &self.order.thumbs {
+    /// Paints the thumbs of the scroll containers `slots` into their
+    /// kept paint; their items counted.
+    pub(crate) fn thumbs(
+        &mut self,
+        slots: &[usize],
+        input: &mut PaintInput<'_>,
+        painted: &mut Painted,
+    ) {
+        for &slot in slots {
             clip_to(self.order.clips.own(slot), input, &mut self.scratch.scene);
             let (layout_box, rect) = (&self.boxes[slot], self.rects[slot]);
             crate::thumb::paint(layout_box, rect, input, &mut self.scratch);
             let thumb = take(&mut self.scratch.scene);
             painted.items_built += thumb.items().len();
-            kept_mut(painted, slot).thumb = thumb;
+            kept_mut(painted, slot).set_thumb(thumb);
         }
     }
 }

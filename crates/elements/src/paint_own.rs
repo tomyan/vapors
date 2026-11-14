@@ -62,6 +62,8 @@ fn paint_element(node: NodeId, rect: BoxRect, input: &PaintInput<'_>, out: &mut 
         };
         out.scene.push(Item::Quad(quad));
     }
+    #[cfg(feature = "test-support")]
+    crate::test_items::paint(node, out);
 }
 
 /// A CSS outer shadow as the scene draws it: the border box moved by

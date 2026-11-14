@@ -10,6 +10,7 @@
 //! in its part's scroll frame and put on the page as it is tested
 //! (`frames.rs`).
 
+use crate::slot_list::SlotList;
 use vapors_dom::NodeId;
 
 use crate::drawn_steps::DrawnSteps;
@@ -25,10 +26,17 @@ pub(crate) type FramedHit = (usize, (NodeId, BoxRect));
 /// in the order it painted them.
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct KeptHits {
-    placed: Vec<(usize, FramedHit)>,
+    placed: SlotList<(usize, FramedHit)>,
 }
 
 impl KeptHits {
+    /// Each per-slot list it keeps: name, length, capacity (the growth
+    /// test, `slot_list_document_tests.rs`, reads these alone).
+    #[cfg(test)]
+    pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
+        vec![self.placed.named("hits.placed")]
+    }
+
     /// The hits of `scene`'s parts, in painting order.
     pub(crate) fn of(scene: &crate::SceneView<'_>) -> Self {
         let placed = scene
@@ -59,7 +67,12 @@ impl KeptHits {
             let hits: Vec<FramedHit> = kept.into_iter().flat_map(framed).collect();
             changed.extend_from_slice(&hits);
             let placed = hits.into_iter().map(|hit| (place, hit));
-            changed.extend(self.placed.splice(start..end, placed).map(|(_, hit)| hit));
+            changed.extend(
+                self.placed
+                    .splice(start..end, placed)
+                    .into_iter()
+                    .map(|(_, hit)| hit),
+            );
         }
         changed
     }

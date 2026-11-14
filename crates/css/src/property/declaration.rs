@@ -150,7 +150,8 @@ fn css_wide(values: &[ComponentValue]) -> Option<Specified> {
     }
 }
 
-fn contains_var(values: &[ComponentValue]) -> bool {
+/// Whether a `var()` appears anywhere in `values`.
+pub(crate) fn contains_var(values: &[ComponentValue]) -> bool {
     values.iter().any(|v| match v {
         ComponentValue::Function { name, args, .. } => {
             name.eq_ignore_ascii_case("var") || contains_var(args)

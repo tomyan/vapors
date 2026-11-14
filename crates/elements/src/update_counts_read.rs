@@ -15,6 +15,8 @@ impl UpdateCounts {
     pub(crate) fn count_layout(&mut self, work: &LayoutWork) {
         (self.boxes_laid_out, self.layout_calls) = (work.laid_out, work.calls);
         self.size_answers_disowned = work.disowned;
+        (self.lanes, self.lanes_declined) = (work.lanes.lanes, work.lanes.declined);
+        self.lane_decline = work.lanes.decline;
         let settled = work.settled;
         (
             self.owners_isolated,

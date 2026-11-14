@@ -2,7 +2,7 @@
 
 use std::io::Read;
 use std::os::unix::process::CommandExt;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -116,40 +116,6 @@ fn wait(child: &mut Child, deadline: Option<Duration>) -> Result<bool, String> {
     }
 }
 
-/// SIGKILL to the step's process group, then reap the leader, with
-/// `kill -s KILL -- -<pid>`, procps's documented form for a group. With
-/// `kill -KILL -<pid>` the group survived on the runner: vapors run
-/// 40006425576, where the gate's deadline test took 21 s, and likewise vapors
-/// #30. The kill's own failure is returned to be reported.
-pub(crate) fn kill_group(child: &mut Child) -> Result<(), String> {
-    let killed = kill_group_id(child.id());
-    let _ = child.kill();
-    let _ = child.wait();
-    killed
-}
-
-/// Kill process group `group`; a group already gone counts as killed.
-///
-/// # Errors
-///
-/// `kill` could not run, or refused for another reason.
-pub(crate) fn kill_group_id(group: u32) -> Result<(), String> {
-    let group = format!("-{group}");
-    let killed = Command::new("kill")
-        .args(["-s", "KILL", "--", &group])
-        .output();
-    match killed {
-        Ok(out) if out.status.success() => Ok(()),
-        // ESRCH: every process of the group had exited by the kill.
-        Ok(out) if String::from_utf8_lossy(&out.stderr).contains("No such process") => Ok(()),
-        Ok(out) => Err(format!(
-            "kill -s KILL -- {group}: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
-        )),
-        Err(e) => Err(format!("kill: {e}")),
-    }
-}
-
 fn drain(stream: Option<impl Read + Send + 'static>) -> Option<JoinHandle<String>> {
     stream.map(|mut stream| {
         std::thread::spawn(move || {
@@ -182,6 +148,6 @@ fn joined(handle: Option<JoinHandle<String>>) -> String {
     handle.join().unwrap_or_default()
 }
 
-#[cfg(test)]
-#[path = "command_tests.rs"]
-mod tests;
+#[path = "command_kill.rs"]
+mod kill;
+pub(crate) use kill::{ask_groups_to_end, kill_group, kill_group_id};

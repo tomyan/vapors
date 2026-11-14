@@ -3,6 +3,7 @@
 //! offset into one buffer).
 
 use vapors_app::SURFACE_FORMAT;
+use vapors_scene3d::VERTEX_BYTES;
 
 /// The depth buffer's format.
 pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
@@ -65,11 +66,10 @@ fn render_pipeline(
     layout: &wgpu::PipelineLayout,
     shader: &wgpu::ShaderModule,
 ) -> wgpu::RenderPipeline {
-    let attributes = wgpu::vertex_attr_array![0 => Float32x3];
     let buffers = [Some(wgpu::VertexBufferLayout {
-        array_stride: 12,
+        array_stride: VERTEX_BYTES as u64,
         step_mode: wgpu::VertexStepMode::Vertex,
-        attributes: &attributes,
+        attributes: &VERTEX_ATTRIBUTES,
     })];
     vapors_renderer::pipelines::render_pipeline(
         device,
@@ -91,6 +91,11 @@ fn render_pipeline(
         },
     )
 }
+
+/// A vertex: its position, then its shade (`geometry.rs`,
+/// `vertex_bytes`); `pipeline_tests.rs` holds them to [`VERTEX_BYTES`].
+const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 2] =
+    wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32];
 
 const TARGETS: [Option<wgpu::ColorTargetState>; 1] = [Some(wgpu::ColorTargetState {
     format: SURFACE_FORMAT,
@@ -117,3 +122,7 @@ fn depth_test() -> wgpu::DepthStencilState {
         bias: wgpu::DepthBiasState::default(),
     }
 }
+
+#[cfg(test)]
+#[path = "pipeline_tests.rs"]
+mod tests;

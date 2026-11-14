@@ -5,6 +5,8 @@
 
 mod arena_full;
 mod clear;
+mod closed_form_shape;
+mod closed_forms;
 mod command_encoder;
 mod encoder_budget;
 mod encoder_turn;
@@ -21,6 +23,10 @@ mod image_setup;
 mod instanced;
 mod kept_bind_group;
 mod kept_range;
+mod mesh_entries;
+mod mesh_shape;
+mod meshes;
+mod meshes_setup;
 mod mips;
 mod open_pass;
 pub mod pipelines;
@@ -39,6 +45,8 @@ mod work;
 
 pub use arena_full::{ArenaFull, Holding};
 pub use clear::{clear, clear_target, clear_view};
+pub use closed_form_shape::{ClosedFormError, ClosedFormShape};
+pub use closed_forms::ClosedFormPipeline;
 pub use encoder_budget::EncoderBudget;
 pub use frame_arena::{FrameArena, Placed};
 pub use frame_clock::FrameClock;
@@ -49,6 +57,9 @@ pub use image::ImagePipeline;
 pub use image_binding::{Sampling, TextureBinding};
 pub use kept_bind_group::KeptBindGroup;
 pub use kept_range::KeptRange;
+pub use mesh_entries::{MeshEntries, MeshEntry, mesh_entry_bytes};
+pub use mesh_shape::MeshShape;
+pub use meshes::MeshPipeline;
 pub use mips::{upload_rgba8_mipmapped, upload_rgba8_mipmapped_counted};
 pub use quads::QuadPipeline;
 pub use readback::read_rgba8;

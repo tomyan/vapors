@@ -105,9 +105,13 @@ fn first_differing_hit(
     })?
 }
 
-/// "extents index" when `kept`'s extents index is not the one made
+/// Which total of `kept`'s extents index is not the sum over its
+/// entries; else "extents index" when the index is not the one made
 /// afresh from its drawing steps.
 fn differing_extents(kept: &Painted) -> Option<&'static str> {
+    if let Some(total) = kept.extents.total_differing() {
+        return Some(total);
+    }
     let places = kept.order.steps.len();
     let afresh = crate::frame_extents::Extents::of(&kept.drawn, places, &kept.kept_boxes);
     (kept.extents != afresh).then_some("extents index")

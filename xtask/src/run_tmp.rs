@@ -18,10 +18,13 @@
 //! is the backstop for those.
 //!
 //! A run that panics or is killed leaves its directory; the next run's
-//! sweep removes it if its pid is not running. Declared limit: "running"
-//! is `/proc/<pid>` existing, so a run in another pid namespace sharing
-//! /tmp (a container) looks dead and its directory would be swept; and a
-//! dead run whose pid was reused stays until that process exits.
+//! sweep removes it if its pid is not running. A run started by a step
+//! (a test running `xtask`) and killed is swept at this run's end the
+//! same way, before the leftover check (#358); a live one is refused.
+//! Declared limit: "running" is `/proc/<pid>` existing, so a run in
+//! another pid namespace sharing /tmp (a container) looks dead and its
+//! directory would be swept; and a dead run whose pid was reused stays
+//! until that process exits.
 
 use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
@@ -64,6 +67,13 @@ impl RunTmp {
     /// The directory, set as each step's TMPDIR.
     pub fn path(&self) -> &Path {
         &self.dir
+    }
+
+    /// [`sweep::sweep`] of the runs started inside this one's steps.
+    /// # Errors
+    /// As [`sweep::sweep`].
+    pub fn sweep_inner(&self, who: &sweep::Who<'_>) -> Result<Vec<String>, String> {
+        sweep::sweep(&self.dir, who)
     }
 
     /// Remove the directory; when it held anything, or any of it could
@@ -130,15 +140,23 @@ fn refusal(run: &str, dir: &Path, left: &[String]) -> String {
 /// # Errors
 /// [`sweep`]'s or [`RunTmp::make`]'s.
 pub fn begin(base: &Path) -> Result<RunTmp, String> {
-    let who = sweep::Who {
+    let who = this_run()?;
+    say(&sweep::sweep(base, &who)?);
+    RunTmp::make(base, who.pid)
+}
+
+fn this_run() -> Result<sweep::Who<'static>, String> {
+    Ok(sweep::Who {
         pid: std::process::id(),
         uid: crate::xvfb_display::current_uid()?,
         is_running: &crate::xvfb_display::process_is_running,
-    };
-    for line in sweep::sweep(base, &who)? {
+    })
+}
+
+fn say(lines: &[String]) {
+    for line in lines {
         println!("tmp: {line}");
     }
-    RunTmp::make(base, who.pid)
 }
 
 /// `step` with `tmp` as its TMPDIR.
@@ -157,10 +175,22 @@ pub fn around(
     base: &Path,
     body: impl FnOnce(&Path) -> ExitCode,
 ) -> Result<ExitCode, String> {
+    let who = this_run()?;
     let tmp = begin(base)?;
     let code = body(tmp.path());
-    tmp.finish(run, std::env::var_os(KEEP_ENV).is_some())?;
+    end(tmp, run, std::env::var_os(KEEP_ENV).is_some(), &who)?;
     Ok(code)
+}
+
+/// The inner sweep, then the leftover check whatever the sweep's result,
+/// so a sweep error does not hide the leftovers or skip the keep switch.
+fn end(tmp: RunTmp, run: &str, keep: bool, who: &sweep::Who<'_>) -> Result<(), String> {
+    let swept = tmp.sweep_inner(who).map(|lines| say(&lines));
+    match (swept, tmp.finish(run, keep)) {
+        (Ok(()), finished) => finished,
+        (Err(why), Ok(())) => Err(why),
+        (Err(why), Err(more)) => Err(format!("{why}; and {more}")),
+    }
 }
 
 /// [`around`] under the temp dir, its refusal printed as a failed run.
@@ -180,3 +210,7 @@ pub mod sweep;
 #[cfg(test)]
 #[path = "run_tmp_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "run_tmp_inner_tests.rs"]
+mod inner_tests;

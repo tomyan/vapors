@@ -24,7 +24,8 @@ impl Shadow {
 
 impl Item {
     /// Every pixel the item can paint, with a [`FRINGE`]: a shadow's
-    /// blurred quad, a text run's ink, any other item's rect.
+    /// blurred quad, a text run's ink, a shape's bounds, any other
+    /// item's rect.
     #[must_use]
     pub fn bounds(&self) -> Rect {
         let painted = match *self {
@@ -32,6 +33,7 @@ impl Item {
             Item::Quad(quad) => quad.rect,
             Item::Image { rect, .. } | Item::Icon { rect, .. } | Item::Surface { rect, .. } => rect,
             Item::Text { ink, .. } => ink,
+            Item::Shape(shape) => shape.bounds,
         };
         painted.grown(FRINGE)
     }

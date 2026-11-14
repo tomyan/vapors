@@ -1,7 +1,7 @@
 //! Prints the timing baseline (docs/perf): every workload, in a release
 //! build. `cargo run --release -p vapors-perf -- [runs] [warmup]
-//! [--only <substring>] [--instructions] [--off-path] [--scaling <change>] [--mount]
-//! [--mount-memory <rows>] [--scene-run]`, 200 and 20 by default
+//! [--only <substring>] [--instructions] [--off-path] [--scaling all|<change>] [--mount]
+//! [--mount-memory <rows>] [--scene-run [racer|one-scene]]`, 200 and 20 by default
 //! (`args.rs`).
 
 use vapors_gpu_harness::gpu_with;
@@ -14,7 +14,7 @@ use vapors_perf::mount_run;
 use vapors_perf::off_path::{OFF_PATH_SETUP, off_path_workloads};
 use vapors_perf::run::Settings;
 use vapors_perf::sampler::Sampler;
-use vapors_perf::scaling_run;
+use vapors_perf::scaling_all;
 use vapors_perf::scene_run;
 use vapors_perf::select::matching;
 use vapors_perf::spans::PhaseClock;
@@ -27,6 +27,7 @@ fn main() {
     }
 }
 
+#[allow(clippy::too_many_lines)] // the command dispatch, one branch per mode
 fn run() -> Result<(), String> {
     if cfg!(debug_assertions) {
         return Err("a debug build; the baseline is timed in release: \
@@ -43,12 +44,13 @@ fn run() -> Result<(), String> {
         mount_memory,
         scene_run,
     } = options(std::env::args().skip(1))?;
-    if scene_run {
-        return scene_run::run(|| {
+    if let Some(kind) = scene_run {
+        let open = || {
             let gpu = gpu_with(FEATURES);
             print_adapter(&gpu);
             gpu
-        });
+        };
+        return scene_run::run(open, kind);
     }
     if let Some(rows) = mount_memory {
         let gpu = gpu_with(FEATURES);
@@ -60,10 +62,10 @@ fn run() -> Result<(), String> {
         print_setup(&gpu, settings);
         return mount_run::run(&gpu, settings);
     }
-    if let Some(change) = scaling {
+    if let Some(changes) = scaling {
         let gpu = gpu_with(FEATURES);
         print_setup(&gpu, settings);
-        return scaling_run::run(&gpu, change, settings);
+        return scaling_all::run(&gpu, &changes, settings);
     }
     let all = match set {
         WorkloadSet::Main => workloads(),
@@ -88,7 +90,7 @@ fn run() -> Result<(), String> {
             .sample(workload.as_mut(), at)
             .map_err(|e| format!("{name}: {e}"))?;
         let kinds = workload.frame_kinds();
-        for report in sections(&name, &samples, kinds, at.warmup, instructions)? {
+        for report in sections(&name, &samples, kinds, instructions)? {
             println!("{report}");
         }
     }

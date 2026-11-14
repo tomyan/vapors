@@ -17,11 +17,13 @@ pub(crate) struct Offsets {
     scrolled: Vec<NodeId>,
 }
 
-/// One container's offset and how far it can go.
+/// One container's offset and how far it can go, and both as last
+/// settled: a scroll moves `at` before the update settles it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Offset {
     at: [f32; 2],
     max: [f32; 2],
+    settled: [[f32; 2]; 2],
 }
 
 impl Offsets {
@@ -66,16 +68,19 @@ impl Offsets {
     }
 
     /// Clamps the offset of `node`, the scroll container in box `index`
-    /// of `boxes`, and returns it as `settle` does.
+    /// of `boxes`, and returns it as `settle` does; and whether the
+    /// offset or the range, unrounded, differs from when it was last
+    /// settled (exact), which moves its thumbs.
     pub(crate) fn settle_box(
         &mut self,
         node: NodeId,
         (boxes, index): (&[LayoutBox], usize),
         scale: f32,
-    ) -> [f32; 2] {
+    ) -> ([f32; 2], bool) {
+        let was = self.by_node.get(&node).map(|offset| bits(offset.settled));
         let offset = self.clamped(node, boxes, index);
         self.by_node.insert(node, offset);
-        applied(offset.at, scale)
+        (applied(offset.at, scale), was != Some(bits(offset.settled)))
     }
 
     /// Drops the offset of `node`, which no longer scrolls.
@@ -101,9 +106,11 @@ impl Offsets {
     fn clamped(&self, node: NodeId, boxes: &[LayoutBox], index: usize) -> Offset {
         let max = range(boxes, index);
         let at = self.get(node).unwrap_or_default();
+        let at = [at[0].clamp(0.0, max[0]), at[1].clamp(0.0, max[1])];
         Offset {
-            at: [at[0].clamp(0.0, max[0]), at[1].clamp(0.0, max[1])],
+            at,
             max,
+            settled: [at, max],
         }
     }
 
@@ -135,6 +142,11 @@ impl Offset {
         let moved = [0, 1].map(|axis| (self.at[axis] + delta[axis]).clamp(0.0, self.max[axis]));
         (moved, moved.map(f32::to_bits) != self.at.map(f32::to_bits))
     }
+}
+
+/// `pair`'s bits, for an exact comparison.
+fn bits(pair: [[f32; 2]; 2]) -> [[u32; 2]; 2] {
+    pair.map(|v| v.map(f32::to_bits))
 }
 
 /// The shift a scroll container's offset `at` gives the content of its

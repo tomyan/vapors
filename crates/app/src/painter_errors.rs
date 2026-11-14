@@ -8,6 +8,7 @@ use vapors_elements::CanvasFrom;
 use vapors_renderer::ArenaFull;
 use vapors_text::{AtlasError, AtlasSizeError};
 
+use crate::shape_store::ShapeError;
 use crate::surface::SurfaceError;
 
 /// The target formats [`ScenePainter`](super::ScenePainter) draws: 8-bit,
@@ -116,6 +117,8 @@ pub enum PaintError {
         /// The device's `max_texture_dimension_2d`.
         limit: u32,
     },
+    /// A shape item names an entry the painter's store cannot draw.
+    Shape(ShapeError),
     /// A surface's renderer failed in `mount`, `resize` or `render`, or
     /// made a GPU validation error there.
     Renderer {

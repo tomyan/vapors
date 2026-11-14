@@ -36,6 +36,7 @@ impl PaintedFrom {
     pub(crate) fn shows(&self, now: &Self, changed: &ChangedSlots) -> bool {
         let same = (self.thumbs_shown, self.scale) == (now.thumbs_shown, now.scale);
         let unmoved = changed.moved.is_empty() && changed.offsets_moved.is_empty();
+        let unmoved = unmoved && changed.scroll_states.is_empty();
         same && !changed.every && changed.built() == 0 && unmoved
     }
 }
@@ -56,6 +57,7 @@ pub(crate) fn keep(
         crate::kept_paint_check::assert_same(&kept, &fresh);
     }
     kept.hits_changed = crate::kept_hits::HitsChanged::Known(Vec::new());
+    kept.frames_worked = 0;
     kept
 }
 

@@ -7,16 +7,27 @@
 //! drawn, though its surfaces are refused as they would be in view.
 
 use vapors_elements::Painted;
-use vapors_renderer::{ImagePipeline, QuadPipeline, ShadowPipeline, Target, clear_target};
+use vapors_renderer::{
+    ClosedFormPipeline, ImagePipeline, MeshEntries, MeshPipeline, QuadPipeline, ShadowPipeline,
+    Target, clear_target,
+};
 use vapors_text::{AtlasConfig, GlyphAtlas, TextPipeline};
+
+use crate::shape_store::ShapeStore;
 
 /// The pipelines and glyph atlas for one target format.
 pub struct ScenePainter {
     shadows: ShadowPipeline,
     quads: QuadPipeline,
+    closed_forms: ClosedFormPipeline,
+    meshes: MeshPipeline,
+    mesh_entries: MeshEntries,
+    shapes: ShapeStore,
     text: TextPipeline,
     atlas: GlyphAtlas,
     images: ImagePipeline,
+    /// The format its pipelines draw into.
+    format: wgpu::TextureFormat,
     textures: Textures,
     surfaces: Surfaces,
     kept: KeptGpu,
@@ -64,9 +75,14 @@ impl ScenePainter {
         Ok(Self {
             shadows: ShadowPipeline::new(device, format),
             quads: QuadPipeline::new(device, format),
+            closed_forms: ClosedFormPipeline::new(device, format),
+            meshes: MeshPipeline::new(device, format),
+            mesh_entries: MeshEntries::new(device),
+            shapes: ShapeStore::with_buffer_limit(device.limits().max_buffer_size),
             text: TextPipeline::new(device, format, &atlas),
             atlas,
             images: ImagePipeline::new(device, format),
+            format,
             textures: Textures::default(),
             surfaces: Surfaces::default(),
             kept: KeptGpu::default(),
@@ -74,12 +90,17 @@ impl ScenePainter {
         })
     }
 
+    /// The shapes the scene's shape items name, to register tables in.
+    pub fn shapes_mut(&mut self) -> &mut ShapeStore {
+        &mut self.shapes
+    }
+
     /// Clears `target` to the canvas colour and draws the scene over it.
     ///
     /// # Errors
     ///
-    /// [`PaintError`] when a glyph or a `gpu-surface` cannot be drawn;
-    /// the frame is then incomplete.
+    /// [`PaintError`] when a glyph, a `gpu-surface` or a shape cannot be
+    /// drawn; the frame is then incomplete.
     pub fn draw(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
         clear_target(target, painted.canvas());
         self.paint(target, painted)
@@ -119,6 +140,9 @@ impl ScenePainter {
         self.textures.begin_frame();
         self.surfaces.begin_frame();
         self.kept.begin_frame();
+        let uploaded = self.shapes.upload(&mut self.mesh_entries, target);
+        self.counts.shape_bytes_uploaded = uploaded.buffer_bytes;
+        self.counts.meshes += uploaded;
         let runs = self.paint_runs(target, painted);
         self.surfaces.end_frame();
         if runs.is_ok() {
@@ -145,6 +169,8 @@ mod kept_check;
 pub use counts::FrameCounts;
 #[path = "painter_images.rs"]
 mod images;
+#[path = "painter_start.rs"]
+mod start;
 #[path = "painter_text.rs"]
 mod text;
 #[path = "painter_tooltip.rs"]

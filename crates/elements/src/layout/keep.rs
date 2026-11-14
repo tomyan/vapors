@@ -34,9 +34,20 @@ pub(crate) struct KeptBoxes {
     /// Debug builds skip `layout_check.rs` (`Document::skip_layout_check`).
     #[cfg(debug_assertions)]
     pub(crate) skip_layout_check: bool,
+    /// The in-crate lane tests lay their pages out by Taffy alone, so
+    /// that each lane mirror is compared with Taffy's answers rather
+    /// than a lane's (`layout/lane_page.rs`).
+    #[cfg(test)]
+    pub(crate) lanes_off: bool,
 }
 
 impl KeptBoxes {
+    /// The kept boxes' per-slot lists (`Placed::slot_lists`).
+    #[cfg(test)]
+    pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
+        self.placed.slot_lists()
+    }
+
     /// The slot `node`'s element box holds, if it has one.
     pub(crate) fn slot_of(&self, node: NodeId) -> Option<usize> {
         self.placed.slots.of(super::Key::Element(node))

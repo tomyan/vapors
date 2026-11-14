@@ -63,8 +63,8 @@ fn a_same_size_edit_lays_out_the_row_alone_at_any_row_count() {
 }
 
 #[test]
-fn an_edit_that_makes_the_row_taller_lays_the_column_out_again() {
-    for rows in [100, 1000] {
+fn an_edit_that_makes_the_row_taller_lays_out_that_row_whatever_the_rows() {
+    let calls = |rows: usize| {
         // Given
         let list = flex_list(rows, GROWS);
 
@@ -72,11 +72,15 @@ fn an_edit_that_makes_the_row_taller_lays_the_column_out_again() {
         let what = format!("{rows} rows, taller edit");
         let counts = edited(&list, |list| list.set_middle_text(LONGER), &what);
 
-        // Then: the column asks every row for its size and lays it out
+        // Then: the row's answer differs, so the column is laid out
+        // again, by its lane: the taller row and its ancestors only
         assert_eq!(owners(&counts), (0, 1, 0), "{what}: {counts:?}; {FIX}");
-        assert!(
-            counts.layout_calls > rows,
-            "{what}: {counts:?}; the column is laid out again; {FIX}"
-        );
-    }
+        assert!(counts.lanes >= 1, "{what}: {counts:?}; {FIX}");
+        counts.layout_calls
+    };
+    assert_eq!(
+        calls(100),
+        calls(1000),
+        "layout calls grow with the rows; {FIX}"
+    );
 }

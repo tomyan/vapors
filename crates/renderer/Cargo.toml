@@ -12,6 +12,9 @@ publish = false
 tracing.workspace = true
 wgpu.workspace = true
 vapors-scene.workspace = true
+# The closed-form pipeline draws the shapes crate's checked geometry
+# (closed_form_shape.rs), so what can be drawn has one answer.
+vapors-shapes.workspace = true
 
 [dev-dependencies]
 vapors-gpu-harness.workspace = true

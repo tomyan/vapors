@@ -84,9 +84,14 @@ fn compound<E: Element>(c: &Compound, e: &E) -> bool {
 }
 
 fn attribute<E: Element>(a: &AttributeSelector, e: &E) -> bool {
-    let Some(value) = e.attribute(&a.name) else {
-        return false;
-    };
+    e.attribute(&a.name)
+        .is_some_and(|value| attribute_matches(a, value))
+}
+
+/// Whether an attribute whose value is `value` satisfies `a`: the
+/// operator and the case flag. The build-time analysis asks this of a
+/// value a template fixes, so one function answers for both.
+pub(crate) fn attribute_matches(a: &AttributeSelector, value: &str) -> bool {
     let (value, want) = if a.case_insensitive {
         (value.to_ascii_lowercase(), a.value.to_ascii_lowercase())
     } else {

@@ -1,12 +1,13 @@
 //! Elements: created from their `StyleKey` (`style_key`), attached,
-//! then each attribute the key does not carry by kind: a literal set
-//! once, an expression patched in an effect, `on<event>` a listener,
-//! `bind:` a listener plus a property effect.
+//! then each attribute by its kind (`attribute_kind`): the key's own
+//! (classes, directives, style, literals) need nothing more, an
+//! expression is patched in an effect, `on<event>` is a listener,
+//! `bind:` a listener plus a property effect, `bind:this` is set once
+//! the element is whole, and the scope attribute is refused.
 
 use super::allowances::shown_text;
-use super::element_class::is_class_directive;
+use super::attribute_kind::{AttributeKind, kind};
 use super::emit::{Emitter, Place};
-use super::style_key::carried_by_key;
 use crate::CompileError;
 use crate::ast::{AttrValue, Attribute, Attributes, Element, Expr};
 
@@ -18,68 +19,61 @@ impl Emitter<'_> {
         }
         self.emit_keyed_create(element, &var)?;
         self.attach(&var, place);
-        let (this, rest): (Vec<&Attribute>, Vec<&Attribute>) = element
-            .attributes
-            .iter()
-            .partition(|attribute| attribute.name == "bind:this");
-        for attribute in rest {
-            if is_class_directive(attribute) || carried_by_key(&attribute.name) {
-                continue;
-            }
+        for attribute in element.attributes.iter() {
             self.emit_attribute(element, &var, attribute)?;
         }
         self.emit_class_directives(&element.attributes, &var)?;
         self.emit_nodes(&element.children, &Place::child_of(&var))?;
         // once the element is whole, so what reads the signal sees it built
-        this.into_iter()
+        (element.attributes.iter())
+            .filter(|attribute| kind(attribute) == AttributeKind::BindThis)
             .try_for_each(|attribute| self.emit_bind_this(&var, attribute))
     }
 
+    /// What `attribute` needs after the element is created from its key.
     fn emit_attribute(
         &mut self,
         element: &Element,
         var: &str,
         attribute: &Attribute,
     ) -> Result<(), CompileError> {
-        if attribute.name.eq_ignore_ascii_case(crate::SCOPE_ATTRIBUTE) {
-            return Err(self.source.error(
+        match kind(attribute) {
+            AttributeKind::BindThis
+            | AttributeKind::ClassDirective(_)
+            | AttributeKind::Class
+            | AttributeKind::Style
+            | AttributeKind::Literal(_) => Ok(()),
+            AttributeKind::Scope => Err(self.source.error(
                 attribute.offset,
                 format!(
                     "`{}` is reserved: it names the component's style scope, which mount sets on each element; use another attribute name",
                     crate::SCOPE_ATTRIBUTE
                 ),
-            ));
-        }
-        if let Some(event) = attribute
-            .name
-            .strip_prefix("on")
-            .filter(|rest| !rest.is_empty())
-        {
-            return self.emit_listener(var, event, attribute);
-        }
-        if let Some(property) = attribute.name.strip_prefix("bind:") {
-            return self.emit_binding(element, var, property, attribute);
-        }
-        match &attribute.value {
-            AttrValue::Literal(value) => {
-                self.line(format!(
-                    "dom.borrow_mut().set_attribute({var}, {:?}, {value:?});",
-                    attribute.name
-                ));
-                Ok(())
+            )),
+            AttributeKind::Listener(event) => self.emit_listener(var, event, attribute),
+            AttributeKind::Binding(property) => {
+                self.emit_binding(element, var, property, attribute)
             }
-            AttrValue::Expr(expr) => {
-                let value = self.raw(expr)?;
-                let clones = self.clones_for(&[expr])?;
-                let mut body = shown_text(&value).to_vec();
-                body.push(format!(
-                    "dom.borrow_mut().set_attribute_if_changed({var}, {:?}, &value);",
-                    attribute.name
-                ));
-                self.emit_effect(&clones, &body);
-                Ok(())
-            }
+            AttributeKind::Expression(expr) => self.emit_expression_attribute(var, attribute, expr),
         }
+    }
+
+    /// An effect that sets `attribute` from its expression when it changes.
+    fn emit_expression_attribute(
+        &mut self,
+        var: &str,
+        attribute: &Attribute,
+        expr: &Expr,
+    ) -> Result<(), CompileError> {
+        let value = self.raw(expr)?;
+        let clones = self.clones_for(&[expr])?;
+        let mut body = shown_text(&value).to_vec();
+        body.push(format!(
+            "dom.borrow_mut().set_attribute_if_changed({var}, {:?}, &value);",
+            attribute.name
+        ));
+        self.emit_effect(&clones, &body);
+        Ok(())
     }
 
     fn emit_listener(

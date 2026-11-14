@@ -15,6 +15,7 @@ pub mod focus_page;
 pub mod hidden_page;
 pub mod mirror;
 pub mod mirror_model;
+pub mod narrow_list;
 pub mod number_page;
 pub mod oracle;
 pub mod parent_pages;

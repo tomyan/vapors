@@ -6,6 +6,7 @@ pub use crate::args_off_path::WorkloadSet;
 use crate::args_off_path::refuse_off_path_with_modes;
 use crate::rows::RowChange;
 use crate::run::Settings;
+use crate::scene_kind::SceneKind;
 
 /// The most timed frames: the GPU clock writes two timestamps a frame
 /// into one query set, which holds at most `QUERY_SET_MAX_QUERIES`.
@@ -13,8 +14,8 @@ pub const MAX_RUNS: usize = (wgpu::QUERY_SET_MAX_QUERIES / 2) as usize;
 
 pub(crate) const USAGE: &str = "cargo run --release -p vapors-perf -- \
                      [runs] [warmup] [--only <substring> (once)] [--instructions] [--off-path] \
-                     [--scaling Idle|Text|FlexText|Class|HoveredClass|Insert] [--mount] [--mount-memory <rows>] \
-                     [--scene-run]";
+                     [--scaling all|Idle|Text|FlexText|Class|HoveredClass|Insert|FlexInsert|Resize|Scroll|ScrollSize] [--mount] [--mount-memory <rows>] \
+                     [--scene-run [racer|one-scene]]";
 
 /// What the command line asks for.
 #[derive(Debug)]
@@ -27,17 +28,18 @@ pub struct Options {
     pub instructions: bool,
     /// Which workloads the full run runs.
     pub set: WorkloadSet,
-    /// Run this change at each size of `scaling::SIZES`, count its
-    /// instructions and judge their growth.
-    pub scaling: Option<RowChange>,
+    /// Run these changes at each size of `scaling::SIZES` and judge their
+    /// growth: one named change, or [`RowChange::ALL`] for `--scaling all`.
+    pub scaling: Option<Vec<RowChange>>,
     /// Run the Mount workload at each size of `scaling::SIZES`.
     pub mount: bool,
     /// Run the Mount workload at one size, in this process, and print its
     /// resident set on one line (`mount_memory`'s child mode).
     pub mount_memory: Option<usize>,
-    /// Run the racer for 60 s of frames, every one judged
-    /// (`scene_run`): no counts, no other flag.
-    pub scene_run: bool,
+    /// Run a scene for 60 s of frames, every one judged (`scene_run`):
+    /// the racer, or the scene named after the flag; no counts, no other
+    /// flag.
+    pub scene_run: Option<SceneKind>,
 }
 
 /// The options `args` name, without the program's name.
@@ -68,7 +70,7 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
             ("--scaling", scaling.is_some()),
             ("--mount", mount),
             ("--mount-memory", mount_memory.is_some()),
-            ("--scene-run", scene_run),
+            ("--scene-run", scene_run.is_some()),
         ],
     )?;
     refuse_mount_with_others([
@@ -77,9 +79,9 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
         ("--scaling", scaling.is_some()),
         ("--mount", mount),
         ("--mount-memory", mount_memory.is_some()),
-        ("--scene-run", scene_run),
+        ("--scene-run", scene_run.is_some()),
     ])?;
-    refuse_counts_with_scene_run(scene_run, &counts)?;
+    refuse_counts_with_scene_run(scene_run.is_some(), &counts)?;
     Ok(Options {
         settings: settings(counts.into_iter())?,
         only,
@@ -98,10 +100,10 @@ struct Flags {
     only: Option<String>,
     instructions: bool,
     set: WorkloadSet,
-    scaling: Option<RowChange>,
+    scaling: Option<Vec<RowChange>>,
     mount: bool,
     mount_memory: Option<usize>,
-    scene_run: bool,
+    scene_run: Option<SceneKind>,
 }
 
 impl Flags {
@@ -113,7 +115,7 @@ impl Flags {
             "--instructions" => self.instructions = true,
             "--off-path" => self.set = WorkloadSet::OffPath,
             "--mount" => self.mount = true,
-            "--scene-run" => self.scene_run = true,
+            "--scene-run" => return self.scene_run(rest),
             "--mount-memory" => self.mount_memory = Some(mount_rows(rest.next())?),
             "--scaling" if self.scaling.is_some() => {
                 return Err(format!("--scaling given twice: {USAGE}"));
@@ -123,6 +125,31 @@ impl Flags {
             _ => self.counts.push(arg),
         }
         Ok(())
+    }
+}
+
+impl Flags {
+    /// `--scene-run`, and the scene named after it: the racer when the
+    /// next argument is a flag or a count (read as given then), or there
+    /// is none.
+    fn scene_run(&mut self, rest: &mut impl Iterator<Item = String>) -> Result<(), String> {
+        if self.scene_run.is_some() {
+            return Err(format!("--scene-run given twice: {USAGE}"));
+        }
+        self.scene_run = Some(SceneKind::Racer);
+        let Some(next) = rest.next() else {
+            return Ok(());
+        };
+        if let Some(kind) = SceneKind::named(&next) {
+            self.scene_run = Some(kind);
+            return Ok(());
+        }
+        if next.starts_with("--") || next.parse::<usize>().is_ok() {
+            return self.take(next, rest);
+        }
+        Err(format!(
+            "--scene-run {next}: no scene is called `{next}`; the scenes are racer and one-scene: {USAGE}"
+        ))
     }
 }
 
@@ -175,9 +202,13 @@ fn mount_rows(value: Option<String>) -> Result<usize, String> {
         .ok_or_else(|| format!("--mount-memory needs a row count: {USAGE}"))
 }
 
-fn scaling_change(value: Option<String>) -> Result<RowChange, String> {
+fn scaling_change(value: Option<String>) -> Result<Vec<RowChange>, String> {
     let name = value.ok_or_else(|| format!("--scaling needs a change: {USAGE}"))?;
-    RowChange::named(&name).ok_or_else(|| format!("--scaling {name} is not a change: {USAGE}"))
+    match RowChange::named(&name) {
+        _ if name == "all" => Ok(RowChange::ALL.to_vec()),
+        Some(change) => Ok(vec![change]),
+        None => Err(format!("--scaling {name} is not a change: {USAGE}")),
+    }
 }
 
 fn only_value(value: Option<String>) -> Result<String, String> {

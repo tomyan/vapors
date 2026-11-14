@@ -145,6 +145,7 @@ pub(super) fn expressions_in(nodes: &[Node]) -> Vec<Expr> {
     found
 }
 
+#[allow(clippy::too_many_lines)] // one arm per template node kind
 fn collect(node: &Node, found: &mut Vec<Expr>) {
     match node {
         Node::Element(element) => {

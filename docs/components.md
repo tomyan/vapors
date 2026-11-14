@@ -87,7 +87,14 @@ the one difference from the brief in this slice.
   `name={name}`. A bare `name` with no value is refused with the fix.
   Each name may appear once. A quoted value is text: a `{` in it is
   refused (build the value with `name={format!(..)}`, or write
-  `&#123;`).
+  `&#123;`). A literal attribute is part of the element's style key:
+  the tree sets it at creation and refuses `set_attribute` of it
+  afterwards, naming `name={expr}`, as it refuses `class` and `style`,
+  so the build-time analysis can read it (the analysable-sources
+  decision, `docs/decisions/2026-11-11-analysable-sources.md`); an
+  expression attribute is a run-time input. Attribute names are
+  matched as written (`Title="a"` is not `[title]`); the refusal
+  compares them without case.
 - **Events:** `onclick={handler}` listens for `click`. The event name
   is the attribute name after `on`. The handler is a script closure or
   an inline closure that takes `&mut Event`. It returns `()` or
@@ -119,6 +126,17 @@ the one difference from the brief in this slice.
 - **Loops:** `{for (i, x) in expr key=expr} .. {/for}` or
   `{for x in expr key=expr} .. {/for}`. Without `key=`, the index is
   the key.
+- **Lifetime:** a component mounted from Rust lives as long as its
+  struct. Dropping it disposes its signals and effects (its nodes stay
+  in the document until `unmount` removes them), so keep the struct
+  while the page shows; the struct is `#[must_use]`, and a mount whose
+  result is dropped at once does not compile under `-D warnings`.
+  `let _ = Page::mount(..)` compiles: it is an explicit discard, and
+  disposes the component at the end of the statement (its nodes drawn
+  once, then never updated); bind a name (`let _page = ..`) to keep it. A
+  child component's struct is dropped inside its parent's mount: the
+  parent's generated code calls `owned_by_parent()` on it, its owner is
+  a child of the parent's, and it is disposed with the parent (#353).
 - **Child components:** a capitalised tag, `<TodoItem label={x} />`, or
   a path, `<forms::TextInput />`. The tag must name the type, and the
   same name with `Props` appended must name its props struct, so a
@@ -413,6 +431,11 @@ For example, in a component whose scope is `app/src/panel.wisp`:
   per-element value refusals still happen at run time). A style the runtime is given by hand
   (`add_style`) is refused by the next update, naming the scope, line
   and column.
+- `wisp-check --styles <file>` prints the build-time styles analysis
+  (`docs/plans/build-time-styles.md`, section 1): per element, each
+  candidate rule as never, always or conditional with what it depends
+  on, and per declared property its winner and whether the computed
+  value is constant.
 - A crate whose components' styles the app adds as global sheets uses
   `compile_dir_global` instead. Nothing is then scoped, and the
   generated code has no `SCOPE`, `add_style` or tags. The layout corpus

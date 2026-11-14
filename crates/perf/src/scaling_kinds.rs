@@ -32,9 +32,9 @@ pub(crate) fn enough_frames(change: RowChange, runs: usize) -> Result<(), String
     ))
 }
 
-/// The medians of each kind of frame in `kinds`, from `samples`, whose
-/// first kept frame is frame `warmup`: frame `i` is of kind
-/// `i % kinds.len()`.
+/// The medians of each kind of frame in `kinds`, from `samples`: frame
+/// `i` is of kind `i % kinds.len()`, and the first kept frame is frame
+/// `samples.warmup`, as the sampler recorded it.
 ///
 /// # Errors
 /// As [`crate::scaling_run::at_size`], for any kind, naming it.
@@ -42,11 +42,10 @@ pub(crate) fn by_kind(
     rows: usize,
     samples: &Samples,
     kinds: &[&str],
-    warmup: usize,
 ) -> Result<Vec<AtSize>, String> {
     let kept = kept_counts(rows, samples)?;
     let step = kinds.len();
-    let first_of = |kind: usize| (kind + step - warmup % step) % step;
+    let first_of = |kind: usize| samples.first_of_kind(kind, step);
     kinds
         .iter()
         .enumerate()

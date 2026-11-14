@@ -38,12 +38,9 @@ pub(super) fn part(frame: usize, items: &[Item]) -> Option<KeptBox> {
         own.scene.push(*item);
     }
     let (outline, thumb) = (Scene::new(), Scene::new());
-    Some(KeptBox {
-        from,
-        own,
-        outline,
-        thumb,
-    })
+    let mut kept = KeptBox::new(from, own, outline);
+    kept.set_thumb(thumb);
+    Some(kept)
 }
 
 /// Each slot's own step, in slot order, and those that draw.
@@ -168,6 +165,8 @@ fn a_patched_step_moves_and_the_index_equals_one_made_afresh() {
 
         // Then
         assert_eq!(patched, extents(&boxes), "slot {slot} to {now:?}");
+        assert_eq!(patched.items(), 10, "slot {slot} to {now:?}");
+        assert_eq!(patched.total_differing(), None, "slot {slot} to {now:?}");
     }
 }
 

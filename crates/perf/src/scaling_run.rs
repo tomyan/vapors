@@ -56,7 +56,7 @@ fn measure(
         .sample(workload, settings)
         .map_err(|e| format!("{name}: {e}"))?;
     samples_counted(&name, &samples)?;
-    by_kind(rows, &samples, change.frame_kinds(), settings.warmup)
+    by_kind(rows, &samples, change.frame_kinds())
 }
 
 /// The median count of the frame and of each phase `samples` recorded.

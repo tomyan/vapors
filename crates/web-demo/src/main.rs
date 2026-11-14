@@ -1,5 +1,6 @@
 //! The demos page. `?demo=<name>` picks what it shows: an elements demo
-//! from `vapors-demos` (F2c), or `image`, the image app (F0: the
+//! from `vapors-demos` (F2c), `racer`, `one-scene` (HTML over a 3D scene
+//! styled by CSS, `vapors-one-scene`), or `image`, the image app (F0: the
 //! gradient fixture fitted to the canvas; a tap, click or `o` opens a
 //! file), or `wake`, the waker's check (`wake.rs`). With no `?demo=` it
 //! shows the index, which lists them. The
@@ -42,6 +43,10 @@ fn start() -> Result<(), String> {
     };
     if name == "racer" {
         return vapors_racer::run();
+    }
+    if name == "one-scene" {
+        let ticks = vapors_demos::frame_limit(query_parameter("ticks").as_deref())?;
+        return vapors_one_scene::run(ticks.map(|frames| frames as u64));
     }
     if name == "image" {
         let image = decode_png(GRADIENT).map_err(|message| format!("gradient.png: {message}"))?;

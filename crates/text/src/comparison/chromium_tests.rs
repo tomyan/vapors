@@ -41,6 +41,7 @@ fn a_screenshot_of_the_wrong_size_is_refused_naming_both_sizes() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)] // one scenario: the hung browser, its child and its stderr
 fn a_browser_past_its_deadline_is_killed_with_its_children_and_its_stderr_reported() {
     // Given: a "browser" that writes to stderr, leaves a child holding
     // the pipe, then hangs
@@ -111,15 +112,55 @@ fn a_browser_past_its_deadline_is_killed_with_its_children_and_its_stderr_report
             stage("no child pid: the fake browser was killed before it started its child")
         )
     });
-    let alive = std::process::Command::new("kill")
-        .args(["-0", child.trim()])
-        .status()
-        .expect("kill -0");
+    let left = state_once_killed(child.trim());
     assert!(
-        !alive.success(),
-        "the browser's child {} outlived the deadline",
+        left.is_none(),
+        "the browser's child {} outlived the deadline, in state {left:?}",
         child.trim()
     );
+}
+
+/// How long a killed process may take to end. Measured 2026-11-14, 60
+/// runs 12 at a time at load 76 to 114: 59 had ended at the first read
+/// (under 0.1 ms), the slowest after 20 ms. 5 s is about 250 times that.
+const KILLED_ENDS_WITHIN: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// The state of process `pid` once it has had [`KILLED_ENDS_WITHIN`] to
+/// end, from /proc: none when it is gone or a zombie. A killed orphan
+/// stays a zombie until init reaps it, and `kill -0` counts a zombie as
+/// alive, which failed this test under load.
+fn state_once_killed(pid: &str) -> Option<char> {
+    let started = std::time::Instant::now();
+    loop {
+        let state = running_state(pid);
+        if state.is_none() || started.elapsed() >= KILLED_ENDS_WITHIN {
+            println!("pid {pid}: {state:?} after {:?}", started.elapsed());
+            return state;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+}
+
+/// `pid`'s state from /proc/<pid>/stat: none when the process is gone or
+/// a zombie. Any other read error or a line of another shape panics,
+/// naming the pid and what was read, rather than counting as ended.
+fn running_state(pid: &str) -> Option<char> {
+    let path = format!("/proc/{pid}/stat");
+    let stat = match std::fs::read_to_string(&path) {
+        Ok(stat) => stat,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(e) => panic!("{path}: {e}"),
+    };
+    let state = stat
+        .rfind(')')
+        .and_then(|end| stat[end + 1..].trim_start().chars().next())
+        .unwrap_or_else(|| {
+            panic!(
+                "{path} reads `{}`, with no state after the name",
+                stat.trim()
+            )
+        });
+    (state != 'Z').then_some(state)
 }
 
 #[test]

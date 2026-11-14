@@ -48,7 +48,17 @@ fn resolve_all(
         .collect()
 }
 
+/// The calc's value; refused when it is not finite, which no computed
+/// value may be (a copy of one could not be checked against itself).
 fn evaluate(c: &Calc, ctx: &Context) -> Result<f64> {
-    c.evaluate(ctx)
-        .map_err(|e| Error::new(Position::default(), e.to_string()))
+    let value = c
+        .evaluate(ctx)
+        .map_err(|e| Error::new(Position::default(), e.to_string()))?;
+    if !value.is_finite() {
+        return Err(Error::new(
+            Position::default(),
+            format!("calc() evaluates to {value}, not a finite number"),
+        ));
+    }
+    Ok(value)
 }

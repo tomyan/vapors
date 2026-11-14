@@ -7,7 +7,7 @@ use std::time::Duration;
 use vapors_app::FrameTiming;
 use vapors_perf::rows::Rows;
 use vapors_perf::run::{Counts, Workload};
-use vapors_platform::{App, Event, Frame, Next, Platform};
+use vapors_platform::{App, Event, Frame, Next, Platform, Start};
 
 /// What a fake app answers after each frame, drawing nothing.
 pub enum Answers {
@@ -79,6 +79,10 @@ impl Deadlines {
 const EDIT_FROM: usize = 2;
 
 impl App for Deadlines {
+    fn start(&mut self, start: &Start<'_>) -> Result<(), String> {
+        self.0.app().start(start)
+    }
+
     fn event(&mut self, event: Event, platform: &Platform) {
         self.0.app().event(event, platform);
     }

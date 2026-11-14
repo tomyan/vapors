@@ -13,6 +13,8 @@ mod app_frame;
 mod misfit;
 #[path = "renderers.rs"]
 mod renderers;
+#[path = "start_rig.rs"]
+pub mod start_rig;
 pub use app_frame::{app_frame, app_frame_at};
 pub use misfit::Misfit;
 pub use renderers::{Log, Solid};

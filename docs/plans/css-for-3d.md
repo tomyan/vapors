@@ -554,7 +554,7 @@ Dependencies name the plan they come from.
 |---|---|---|---|---|
 | C1 | Keyed anchors | The compiler emits a `StyleKey` and the `anchor` prop for a component tag carrying `class`, `class:` or `style` (D1); a component without the field fails to compile with the message; `Scene`, `Group`, `Mesh`, `Camera` create keyed anchors with their tag; `display: none` for the scene tags in the UA sheet, #251's inline style removed; `data-scene3d-node` unchanged | `<Mesh class:braking={b}>` compiles and toggles the anchor; `styles_shared` counts two `<Mesh>` of one key as one computed style; `<Card class="x">` on a component without an anchor fails the build naming the tag; snapshot of the generated key; every #251/#252 test unchanged | #252 merged; analysis PR 2d (merged) |
 | C2 | The scene property set | The per-tag table in `vapors-css` (4.2); `SceneUsed` derived for scene anchors in the restyle, no box or paint; run-time refusal of a declared longhand outside the set naming rule, property, site and the alternative; `opacity` read on scene anchors, still deferred on boxes; an unclassed anchor's key is the component's own (`own_keys.rs`), which the compiler never emits, so the run-time check is its only check: test `mesh { width: 10px }` reaching an unclassed `<Mesh>` | `mesh { width: 10px }` refused at the first update naming the rule; `body { font-size: 14px }` above a scene refuses nothing; `opacity: .5` on a `div` still refused; `elements_restyled` on a class toggle equals the anchors it reaches | C1 |
-| C3 | Appearance to the node | `Scene::set_appearance`; the restyle writes a changed `SceneUsed` to the node and invalidates; `visibility: hidden` skips the draw; `color` alpha times `opacity` into the uniform's alpha (opaque pass only until C5: alpha under 1 refused naming C5 until it lands); C1's pin `a_mesh_keeps_its_colour_prop_whatever_its_anchors_computed_colour` is replaced by a test that the racer HUD's `:global(body) { color }` reaches an unclassed scenery mesh only as the docs state (inherited), and the `wisp-check` note of risk 2 listing scene keys whose `color` is inherited and never declared | Pixel tests: a class toggle recolours one mesh with 80 bytes written and 0 geometry; a `--token` on `:root` recolours every reader, 80 bytes each; `visibility: hidden` drops one draw; an idle frame writes 0; `#252`'s `colour` prop removed | C2, #250 |
+| C3 | Appearance to the node | `Scene::set_appearance`; the restyle writes a changed `SceneUsed` to the node and invalidates; `visibility: hidden` skips the draw; `color` alpha times `opacity` into the uniform's alpha (opaque pass only until C5: alpha under 1 refused naming C5 until it lands); C1's pin `a_mesh_keeps_its_colour_prop_whatever_its_anchors_computed_colour` is replaced by a test that the racer HUD's `:global(body) { color }` reaches an unclassed scenery mesh only as the docs state (inherited), and the `wisp-check` note of risk 2 listing scene keys whose `color` is inherited and never declared. A watched mesh under an anchor (or element) whose style is refused writes nothing to its node: it may inherit the refused value, so it keeps what it drew until the restyle that fixes the ancestor reaches it (C3b, tested) | Pixel tests: a class toggle recolours one mesh with 80 bytes written and 0 geometry; a `--token` on `:root` recolours every reader, 80 bytes each; `visibility: hidden` drops one draw; an idle frame writes 0; `#252`'s `colour` prop removed | C2, #250 |
 | C4 | 3D hit test and states | Ray from the active camera through the surface-local point; bounding box then triangles over `Meshes`; `Painted::hit` through a scene surface to the hit anchor; `HOVER` and `ACTIVE` on the anchor chain; `pointer-events: none` and hidden nodes skipped; `cursor` from the hit mesh; `hovers_tested` covers it; a scene change marks the surface's hit as possibly moved | Hovering the craft applies `.craft:hover` to its group (pixel test); a mesh behind another is not hit; `pointer-events: none` passes to the mesh behind; a still pointer over a still scene tests 0 hovers per frame and draws 0 frames; a click on a mesh reaches its anchor's listener | C3; 3D PR 5 (geometry lifetime) |
 | C5 | Transparent meshes | The blended pass, depth write off, nodes sorted by origin depth far to near (D4); `nodes_sorted` count; opacity on `group` refused (D3) | Two overlapping translucent meshes render the same from both draw orders (pixel test against a reference render); an all-opaque scene sorts 0; a node crossing opacity 1 changes pass with one uniform write | C3 |
 | C6 | Build-time refusal and winners for scene keys | B1's classification applies 4.2's table to scene keys; `wisp-check --styles` lists each scene key's winners; the runtime takes compiled winners for scene anchors as for elements; constant-value appearance nodes skip restyle marking | `mesh { padding: 1px }` fails `compile_dir` naming rule and element; `winners_runtime` 0 on the racer's scene page; a toggle on the HUD visits 0 scene anchors whose appearance is constant (`elements_visited` pinned) | C2; `build-time-styles.md` B3b |
@@ -572,6 +572,38 @@ element's. `display` other than `none` on a scene tag is refused at
 the update naming the declaration (`style/used.rs`), pulled forward
 from section 3: the user-agent rule, unlike #251's inline style, loses
 to an author's rule.
+
+C2 as built (C2a, C2b): the set is
+`vapors_css::property::scene` (`SceneTag::reads`, `instead`), every
+longhand in one group of section 3's rows, a test holding the groups
+and the property table together. A scene anchor keeps a `SceneUsed`
+(`Document::scene_used`) and no `Used`, so the layout and paint
+readers never see it; C1's computed `display` refusal is now the
+set's: an author's `display` of any value is refused, the user-agent
+sheet's is not. A declared `transition-*` or `animation-*` on a mesh,
+in the set, is refused naming C7 until it lands. `SceneUsed` is derived per
+anchor at each restyle, not yet shared per computed style as 4.3 says;
+C6, which gives scene anchors compiled winners, shares it. `opacity`
+computed outside 0 to 1 (a `calc()`) is refused, as a literal is.
+
+C3 as built (C3a to C3d): `Scene::set_appearance(node, colour,
+visible)` returns whether either changed; a colour change advances the
+world version (80 bytes), a visibility change alone writes nothing and
+the renderer skips the hidden mesh's draw and slot write. vapors-elements
+does not know the scene, so the route of 4.4 is a sink: `<Mesh>` calls
+`Dom::watch_appearance(anchor, sink)`, and the restyle calls the sink
+when the anchor's colour channels or visibility change (its first
+restyle included, and again at the next update after a refused
+report); the sink asks the surface for a frame, then calls
+`set_appearance`, so a refused request leaves the mesh as drawn and the
+retry writes it. `Scene::set_colour` is removed: one writer of a mesh's
+colour. A watched mesh under an ancestor whose style is refused
+writes nothing until the restyle fixing the ancestor reaches it; a
+mesh's own refusal (a translucent colour) writes nothing either. There is no opacity parameter until C5:
+a watched mesh whose `color` alpha times `opacity` is under 1 is refused
+at the mesh, naming the declaration where it has one. Risk 2's note is
+built: `wisp-check` prints a note for each `<Mesh>` that no rule of its
+file, nor its literal `style`, can colour (`scene_notes.rs`).
 
 Later, not in the stack: C9 `backface-visibility` as a per-mesh cull
 mode (two pipelines; the winding convention documented first); C10 a
@@ -684,8 +716,8 @@ the count of nodes per style is measured.
   rule wins on the body meshes, but scenery with no rule of its own
   would take that off-white. The docs state it; a `wisp-check` note
   listing scene keys whose `color` is inherited and never declared
-  would catch it at build time (not in the stack; add if C3 shows it
-  surprising).
+  catches it at build time (built in C3d; it sees only the file's own
+  `<style>`).
 - **The hit test's cost with many nodes** (1.5) is one box test per
   mesh node per pointer move; fine at the racer's 11, unmeasured at
   hundreds. The `Instances` slice measures before adding a hierarchy.

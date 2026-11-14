@@ -35,14 +35,27 @@ impl TextPipeline {
     /// are submitted first: a frame that repacks submits once more.
     pub(crate) fn upload_page(&self, target: &RenderTarget<'_>, atlas: &mut GlyphAtlas) {
         let page = atlas.coverage_page_mut();
+        if page.dirty_rect().is_some() && page.cleared() {
+            target.encoder.flush(target.queue);
+        }
+        self.upload_dirty(target.queue, atlas);
+    }
+
+    /// Uploads the atlas page's new or changed part on `queue`, with no
+    /// draw recorded before it: before the first frame (`App::start`,
+    /// one-scene F0), so that frame uploads only the glyphs it adds,
+    /// not the whole new page.
+    pub fn upload_atlas(&self, queue: &wgpu::Queue, atlas: &mut GlyphAtlas) {
+        self.upload_dirty(queue, atlas);
+    }
+
+    fn upload_dirty(&self, queue: &wgpu::Queue, atlas: &mut GlyphAtlas) {
+        let page = atlas.coverage_page_mut();
         let Some(rect @ [x, y, width, height]) = page.dirty_rect() else {
             return;
         };
-        if page.cleared() {
-            target.encoder.flush(target.queue);
-        }
         self.work.write_texture(
-            target.queue,
+            queue,
             wgpu::TexelCopyTextureInfo {
                 origin: wgpu::Origin3d { x, y, z: 0 },
                 ..self.atlas_texture.texture().as_image_copy()

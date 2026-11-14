@@ -52,6 +52,7 @@ type Shared = Rc<RefCell<Vec<(String, String)>>>;
 /// # Errors
 /// A refused update, a `capture` target that names no element, or an
 /// action not played here, each naming the script's line.
+#[allow(clippy::too_many_lines)] // the script played: listeners, captures, cancels, then its steps
 pub fn play(fixture: &Fixture, script: &Script, viewport: Viewport) -> Result<Log, String> {
     let doc = mounted(fixture, viewport)?;
     let heard = Shared::default();

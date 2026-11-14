@@ -106,7 +106,7 @@ impl Mount {
 }
 
 /// The rows' data: an id, a label and a value each.
-fn row_data(count: usize) -> Vec<(u32, String, String)> {
+pub(crate) fn row_data(count: usize) -> Vec<(u32, String, String)> {
     (0..count)
         .map(|i| {
             (
