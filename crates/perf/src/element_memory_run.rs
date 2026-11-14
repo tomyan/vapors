@@ -27,7 +27,7 @@ use crate::mount::row_data;
 use crate::mount_rows::{MountRows, MountRowsProps};
 
 /// The frame's device size, as the Mount workload's.
-const SIZE: (u32, u32) = (640, 400);
+pub(crate) const SIZE: (u32, u32) = (640, 400);
 
 /// Frames a page may take to settle. A mounted page asks for no frame
 /// after its first unless an effect or a surface does; ten is room for
@@ -93,7 +93,7 @@ pub fn live_bytes(allocator: &StatsAlloc<System>) -> i64 {
 
 /// The app's frames until it asks for none, returning the first
 /// update's element and computed-style counts.
-fn settle(
+pub(crate) fn settle(
     gpu: &Gpu,
     (app, doc): (&mut ElementsApp, &RefCell<Document>),
     texture: &wgpu::Texture,

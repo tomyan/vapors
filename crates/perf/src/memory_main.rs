@@ -6,11 +6,14 @@
 //! rows, each in a child (`--rows <rows>`, which prints one
 //! `element-memory` line), prints their table, and fails when the bytes
 //! per element grow with the page (`element_memory_flat.rs`).
+//! `--add-row --rows <rows>` adds one row to a settled page and prints
+//! the bytes it left and the time of its frames.
 
 use std::alloc::System;
 
 use stats_alloc::{INSTRUMENTED_SYSTEM, StatsAlloc};
 use vapors_gpu_harness::gpu;
+use vapors_perf::element_memory_add::add_row;
 use vapors_perf::element_memory_run::{live_bytes, run_child};
 use vapors_perf::element_memory_sizes;
 
@@ -34,6 +37,11 @@ fn run() -> Result<(), String> {
         let exe = std::env::current_exe().map_err(|error| format!("this binary: {error}"))?;
         return element_memory_sizes::run(&exe);
     }
+    if args.first().map(String::as_str) == Some("--add-row") {
+        let rows = rows(args.into_iter().skip(1))?;
+        println!("{}", add_row(&gpu(), rows, live)?.line());
+        return Ok(());
+    }
     let rows = rows(args.into_iter())?;
     println!("{}", run_child(&gpu(), rows, live)?.line());
     Ok(())
@@ -41,7 +49,7 @@ fn run() -> Result<(), String> {
 
 /// The row count from `--rows <rows>`, alone.
 fn rows(mut args: impl Iterator<Item = String>) -> Result<usize, String> {
-    const USAGE: &str = "usage: vapors-perf-memory [--rows <rows>]";
+    const USAGE: &str = "usage: vapors-perf-memory [[--add-row] --rows <rows>]";
     let (Some(flag), Some(value), None) = (args.next(), args.next(), args.next()) else {
         return Err(USAGE.into());
     };

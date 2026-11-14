@@ -77,10 +77,29 @@ growth, paint's and the total over twice layout's. The unit tests in
 `element_memory_flat_tests.rs` name a style computed per element and a
 total over twice layout's, each failing with its check removed.
 
+## One row added at 16,384 rows
+
+`vapors-perf-memory --add-row --rows 16384` settles the page, inserts
+one row in the middle, and settles again. The kept box list grows by a
+quarter when it is full (`slots_subtree.rs`, lead's decision
+2026-11-14), not by doubling:
+
+| growth | bytes the insert leaves | the insert's frames |
+|---|---|---|
+| doubling (before) | 229,520,455 | 94 to 104 ms |
+| by a quarter | 109,783,399 | 97 to 121 ms |
+
+Three runs each, wall time under a 1-minute load of about 31, with the
+counting allocator. Of the 109.8 MB, the layout phase left 52.9 MB (the
+box list's quarter and the slots beside it) and paint 56.4 MB (another
+kept list grown by doubling; not located yet). The three inserts after
+it each left about 7 KB and took 99 to 147 ms, so the growing insert's
+copy of every box (about 160 MB) does not stand out from an insert's
+own time at this size. If it shows in insert's instructions once the
+splice step makes inserts cheap, chunked storage for the box list (as
+`blocks.rs`, #288) is the follow-up.
+
 ## Not measured here
 
-- A page after a structural edit: the box list is cut once placed,
-  and grows again by doubling when a box is added (one row added at
-  16,384 rows doubles the kept list). Open, for a decision.
 - A page's memory when it is dropped: dhat saw about all of it live at
   process end (the drop-leak slice).

@@ -59,3 +59,19 @@ fn a_full_build_with_a_vacant_slot_keeps_no_spare_slots() {
     let (len, capacity) = slots(&doc);
     assert_eq!(capacity, len, "{len} slots in {capacity}");
 }
+
+#[test]
+fn a_box_added_after_a_full_build_grows_the_list_by_a_quarter() {
+    // Given: 40 divs, 42 boxes in 42 slots
+    let (mut doc, made) = divs(40);
+    assert_eq!(slots(&doc), (42, 42));
+
+    // When: one div more, built into a new slot
+    let body = doc.body();
+    let div = doc.create_element("div");
+    doc.insert_before(body, div, Some(made[20]));
+    doc.update(viewport(1.0)).expect("updates");
+
+    // Then: 42 + 42 / 4 slots, not 84
+    assert_eq!(slots(&doc), (43, 52));
+}

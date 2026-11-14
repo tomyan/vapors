@@ -11,6 +11,7 @@ pub mod args_off_path;
 pub mod circuit;
 pub mod driver;
 pub mod element_memory;
+pub mod element_memory_add;
 pub mod element_memory_flat;
 pub mod element_memory_run;
 pub mod element_memory_sizes;

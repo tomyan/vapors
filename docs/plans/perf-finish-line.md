@@ -23,6 +23,13 @@ the harness shows it, not when the code is believed to do it.
 | 8 | Memory per element | one style record per distinct style, not per element; per-element memory bounded by the per-box layout records | measured (`vapors-perf-memory`, docs/perf/memory-per-element-2026-11-14.md): 4 styles for 65,538 elements; 11.4 KB per element, flat, 1.66 times layout's, with #327 and #333 | the build-time analysis |
 | 9 | HTML, SVG and 3D in one scene | the racer (3D craft, SVG markings on it, HTML on top) drawn as one scene with CSS reaching scene nodes, and no frame over 16.7 ms across a 60 s run | not built | the shape table, 3D slice 2 (PRs 4, 4b, 5) |
 
+Property 8's follow-ups (docs/perf/memory-per-element-2026-11-14.md):
+the kept box list grows by a quarter after a structural insert; if the
+growth's copy of every box shows in insert's instructions once inserts
+are cheap (property 3), chunked storage as `blocks.rs` (#288) replaces
+it. A first insert at 16,384 rows also leaves 56 MB in paint, another
+list grown by doubling, not located yet.
+
 Property 1 at 10,000 rows has a 10,000-row workload in `vapors-perf`.
 
 Property 9's run judges every frame from the first, with no warmup
