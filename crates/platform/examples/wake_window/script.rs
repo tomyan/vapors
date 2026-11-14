@@ -1,6 +1,6 @@
 //! `wake_window`'s script, on its own thread: settle, count idle frames,
-//! wake singly, wake in a burst, wait until a time (`timed.rs`), then end
-//! the loop with a last wake.
+//! wake singly, wake in a burst (`burst.rs`), wait until a time
+//! (`timed.rs`), then end the loop with a last wake.
 
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -8,7 +8,8 @@ use std::time::{Duration, Instant};
 
 use vapors_platform::{Next, Waker};
 
-use crate::timed;
+use crate::burst::{self, Burst};
+use crate::timed::{self, Timed};
 
 /// After the first frame, before the idle count. The window's own
 /// start-up frames (mapped, sized, exposed) land in this; 2 s is far
@@ -21,7 +22,6 @@ const IDLE: Duration = Duration::from_secs(1);
 /// Between wakes: llvmpipe draws this window in well under 50 ms.
 const BETWEEN: Duration = Duration::from_millis(300);
 const SINGLE_WAKES: usize = 3;
-const BURST: usize = 5;
 
 /// What the app and the script share.
 #[derive(Default)]
@@ -31,6 +31,7 @@ pub struct Shared {
     outcome: Mutex<Option<Result<String, String>>>,
     first_at: Mutex<Option<Instant>>,
     last_at: Mutex<Option<Instant>>,
+    previous_at: Mutex<Option<Instant>>,
     until: Mutex<Option<Instant>>,
 }
 
@@ -42,7 +43,8 @@ impl Shared {
             .lock()
             .expect("not poisoned")
             .get_or_insert(now);
-        *self.last_at.lock().expect("not poisoned") = Some(now);
+        let previous = self.last_at.lock().expect("not poisoned").replace(now);
+        *self.previous_at.lock().expect("not poisoned") = previous;
     }
 
     /// What the app returns from this frame: `WaitUntil` the time the
@@ -60,6 +62,12 @@ impl Shared {
     /// When the last frame came.
     pub fn last_at(&self) -> Option<Instant> {
         *self.last_at.lock().expect("not poisoned")
+    }
+
+    /// When the frame before the last came, and the last.
+    pub fn last_two(&self) -> Option<(Instant, Instant)> {
+        let previous = *self.previous_at.lock().expect("not poisoned");
+        previous.zip(self.last_at())
     }
 
     pub fn exit_asked(&self) -> bool {
@@ -112,20 +120,36 @@ fn measure(waker: &Waker, shared: &Shared) -> Result<String, String> {
         Ok(())
     })?;
     let single = (0..SINGLE_WAKES)
-        .map(|_| frames_over(shared, || wake_then_wait(waker, 1)))
+        .map(|_| frames_over(shared, || wake_then_wait(waker)))
         .collect::<Result<Vec<_>, _>>()?;
-    let burst = frames_over(shared, || wake_then_wait(waker, BURST))?;
+    let burst = burst::measure(waker, shared)?;
     let timed = timed::measure(waker, shared)?;
     let line = format!(
-        "start-up {} frames over {:?}; idle frames in {IDLE:?}: {idle}; per wake: {single:?}; a burst of {BURST}: {burst}; {timed}",
+        "start-up {} frames over {:?}; idle frames in {IDLE:?}: {idle}; per wake: {single:?}; {burst}; {timed}",
         startup.0, startup.1
     );
-    let held = idle == 0 && single.iter().all(|n| *n == 1) && (1..=2).contains(&burst);
+    judge(line, idle, &single, &burst, &timed)
+}
+
+/// `line` when every count held; `Err` with what was expected, or the
+/// burst's refusal.
+fn judge(
+    line: String,
+    idle: u64,
+    single: &[u64],
+    burst: &Burst,
+    timed: &Timed,
+) -> Result<String, String> {
+    let burst_held = burst
+        .held()
+        .map_err(|refused| format!("{line}; {refused}"))?;
+    let held = idle == 0 && single.iter().all(|n| *n == 1) && burst_held;
     if held && timed.held() {
         Ok(line)
     } else {
         Err(format!(
-            "{line}; expected 0 idle, 1 per wake, 1 or 2 for the burst, {}",
+            "{line}; expected 0 idle, 1 per wake, 1 to {} for the burst, {}",
+            burst.most(),
             timed::EXPECTED
         ))
     }
@@ -141,10 +165,8 @@ pub fn frames_over(
     Ok(shared.count() - at)
 }
 
-fn wake_then_wait(waker: &Waker, times: usize) -> Result<(), String> {
-    for _ in 0..times {
-        waker.wake().map_err(|closed| closed.to_string())?;
-    }
+fn wake_then_wait(waker: &Waker) -> Result<(), String> {
+    waker.wake().map_err(|closed| closed.to_string())?;
     std::thread::sleep(BETWEEN);
     Ok(())
 }
