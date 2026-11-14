@@ -6,6 +6,7 @@ use crate::placement::{Placement, place, placement_of};
 use std::cell::RefCell;
 use std::fmt::Display;
 use std::rc::Rc;
+use vapors_app::InvalidateError;
 use vapors_dom::{Dom, NodeId as ElementId, Root, Snippet, StyleKey};
 use vapors_scene3d::{NodeId, NodeKind, StoreError, Transform};
 use vapors_signals::{Effect, Owner, Signal, on_cleanup};
@@ -89,7 +90,13 @@ fn remove_on_cleanup(component: &'static str, placement: Placement) {
             Ok(_) | Err(StoreError::Stale(_)) => {}
             Err(error) => panic!("<{component}>: {error}"),
         }
-        placement.invalidate(component);
+        // the node is gone either way: when the event loop has ended (a
+        // page dropped after its app) no frame is left to show it, so
+        // that is not a refusal; a renderer missing still is
+        match placement.surface.invalidate() {
+            Ok(_) | Err(InvalidateError::LoopClosed(_)) => {}
+            Err(error) => panic!("<{component}>: {error}"),
+        }
     });
 }
 
