@@ -16,7 +16,6 @@ use crate::blocks::IndexCounts;
 use crate::changed_slots::ChangedSlots;
 use crate::drawn_steps::DrawnSteps;
 use crate::frame_extents::Extents;
-use crate::frames::Frames;
 use crate::kept_box::{BoxFrom, KeptBox};
 use crate::kept_hits::HitsChanged;
 use crate::kept_order::KeptOrder;
@@ -48,7 +47,8 @@ pub(crate) fn paint_partial(
     let place = &|step| painted.drawn.place_of(step);
     let order = KeptOrder::updated(kept_order, (boxes, rects), input, changed, place);
     let scale = input.scale;
-    let frames_were = std::mem::replace(&mut painted.frames, frames(&order, boxes, input));
+    let frames_moved_now =
+        crate::paint_frames::updated(&mut painted, &order, (boxes, input), (changed, kept));
     let (again, shifts) = to_paint(&order, (boxes, rects), (changed, kept), &mut painted, scale);
     dropped(&again, changed, boxes.len(), &mut painted);
     let shifted: Vec<usize> = shifts.iter().map(|shift| shift.slot).collect();
@@ -61,7 +61,7 @@ pub(crate) fn paint_partial(
     repaint.boxes(again, input, &mut painted);
     repaint.thumbs(&thumbs, input, &mut painted);
     drawn_updated(&mut painted, &order, (&patched, with_hits));
-    if painted.frames != frames_were {
+    if frames_moved_now {
         frames_moved(&mut painted);
     }
     painted.order = order;
@@ -82,31 +82,6 @@ fn batches_unsorted(painted: &mut Painted) {
     if let Some(kept) = painted.kept_batches.get_mut() {
         kept.unsort();
     }
-}
-
-/// The scroll frames of `order`'s scroll containers, each shifted by
-/// its offset in `input` as `scroll::frame_shift` gives it.
-fn frames(order: &KeptOrder, boxes: &[LayoutBox], input: &PaintInput<'_>) -> Frames {
-    let scrolls = |slot| input.stackings.scrolls(slot);
-    crate::frames_check::assert_scrollers_agree(&order.thumbs, &order.clips, &scrolls);
-    let depth = |slot| order.tree.depth(slot);
-    let shift =
-        |slot| crate::scroll::frame_shift(scroll_offset(boxes, slot, input.scroll), input.scale);
-    Frames::of(&order.thumbs, (&order.clips, &depth), &shift, input.scale)
-}
-
-/// The scroll offset of the scroll container at `slot`, or a panic
-/// naming it: placement settles every scroll container's offset
-/// before paint.
-fn scroll_offset(boxes: &[LayoutBox], slot: usize, scroll: &crate::scroll::Offsets) -> [f32; 2] {
-    let node = boxes[slot].element_in(slot);
-    node.and_then(|node| scroll.get(node)).unwrap_or_else(|| {
-        panic!(
-            "scroll container slot {slot} ({node:?}) has no settled offset: placement \
-             settles every scroll container's (placement_walk.rs `settled_offset`); \
-             reproduce with `cargo xtask test`"
-        )
-    })
 }
 
 /// The slots whose parts this update paints again, shifts or drops:
@@ -136,7 +111,7 @@ fn drawn_updated(
 ) {
     // After a splice the drawing steps, hits and batches are made afresh
     // as after a walk, until a follow-up shifts them by the splice's edits.
-    if order.walks.order > 0 || order.walks.splices > 0 {
+    if order.walks.reshaped() {
         painted.drawn = DrawnSteps::of(&order.steps, &painted.kept_boxes);
         let places = order.steps.len();
         painted.extents = Extents::of(&painted.drawn, places, &painted.kept_boxes);

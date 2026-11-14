@@ -67,3 +67,20 @@ pub(crate) fn assert_frames_follow_placement(
         );
     }
 }
+
+/// In a debug build, panics, naming the first frame that differs, when
+/// the frames kept and updated (`paint_frames.rs`) are not those made
+/// afresh by `fresh`: an update changed a frame it did not work out
+/// again.
+pub(crate) fn assert_kept_frames_fresh(kept: &Frames, fresh: impl FnOnce() -> Frames) {
+    if !cfg!(debug_assertions) {
+        return;
+    }
+    if let Some(differs) = kept.first_differing(&fresh()) {
+        panic!(
+            "the kept scroll frames differ from frames made afresh: {differs}; the update did \
+             not work the frame out again (paint_frames.rs takes the scroll containers whose \
+             offset moved or whose clips were redone); reproduce with `cargo xtask test`"
+        );
+    }
+}

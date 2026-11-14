@@ -47,6 +47,15 @@ pub(crate) struct OrderWalks {
     pub(crate) declined: Option<SpliceDecline>,
 }
 
+impl OrderWalks {
+    /// Whether paint order was walked or spliced: the one answer to
+    /// whether the drawing steps and the scroll containers can differ
+    /// from the kept ones.
+    pub(crate) fn reshaped(&self) -> bool {
+        self.order > 0 || self.splices > 0
+    }
+}
+
 impl KeptOrder {
     /// The order of `boxes` at `rects`, every part made afresh.
     pub(crate) fn of(boxes: &[LayoutBox], rects: &[BoxRect], input: &PaintInput<'_>) -> Self {
