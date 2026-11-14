@@ -1,12 +1,12 @@
 //! The scene's two pieces of geometry, given to its `Meshes` once.
 
-use vapors_scene3d::{GeometryId, MeshError, Meshes, Vec3};
+use vapors_scene3d::{GeometryHandle, MeshError, Meshes, Vec3};
 
 /// A cube 1 unit wide, centred on the origin: 8 corners, 12 triangles.
 ///
 /// # Errors
 /// As [`Meshes::geometry`]; never for these fixed corners.
-pub fn cube(meshes: &mut Meshes) -> Result<GeometryId, MeshError> {
+pub fn cube(meshes: &mut Meshes) -> Result<GeometryHandle, MeshError> {
     let corners = (0..8)
         .map(|i| {
             let side = |bit: u32| if i & (1 << bit) == 0 { -0.5 } else { 0.5 };
@@ -33,7 +33,7 @@ pub fn cube(meshes: &mut Meshes) -> Result<GeometryId, MeshError> {
 ///
 /// # Errors
 /// As [`Meshes::geometry`]; never for these fixed corners.
-pub fn ground(meshes: &mut Meshes) -> Result<GeometryId, MeshError> {
+pub fn ground(meshes: &mut Meshes) -> Result<GeometryHandle, MeshError> {
     let corners = [(-6.0, -6.0), (6.0, -6.0), (6.0, 6.0), (-6.0, 6.0)];
     let positions = corners.map(|(x, z)| Vec3::new(x, 0.0, z)).to_vec();
     meshes.geometry(positions, vec![0, 2, 1, 0, 3, 2])

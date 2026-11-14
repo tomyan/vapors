@@ -5,8 +5,8 @@ use crate::schedule::{gone, night};
 
 #[prop] let scene: Option<std::rc::Rc<std::cell::RefCell<vapors_scene3d::Scene>>> = None;
 #[prop] let surface: Option<vapors_app::SurfaceHandle> = None;
-#[prop] let cube: Option<vapors_scene3d::GeometryId> = None;
-#[prop] let ground: Option<vapors_scene3d::GeometryId> = None;
+#[prop] let cube: Option<vapors_scene3d::GeometryHandle> = None;
+#[prop] let ground: Option<vapors_scene3d::GeometryHandle> = None;
 #[prop] let eye: Option<vapors_scene3d::CameraHandle> = None;
 #[prop] let lens: Option<vapors_scene3d::Projection> = None;
 #[prop] let time: Signal<std::time::Duration> = Signal::new(std::time::Duration::ZERO);
@@ -47,11 +47,11 @@ button { width: 76px; background-color: #20383d; color: #f3f1e8; border: 1px sol
   <gpu-surface name="view" class="view"></gpu-surface>
   <Scene scene={scene} surface={surface} camera={eye}>
     <Camera handle={eye} projection={lens} transform={looking()} />
-    <Mesh geometry={ground} class="ground" transform={at(0.0, -0.5, 0.0)} />
+    <Mesh geometry={ground.clone()} class="ground" transform={at(0.0, -0.5, 0.0)} />
     <Group transform={turning(time)}>
-      <Mesh geometry={cube} class="one" class:lit={lit1.get()} transform={at(-2.0, 0.0, 0.0)} />
-      <Mesh geometry={cube} class="two" class:lit={lit2.get()} transform={at(0.0, 0.0, 0.0)} />
-      <Mesh geometry={cube} class="three" class:lit={lit3.get()} class:gone={gone(time.get())} transform={at(2.0, 0.0, 0.0)} />
+      <Mesh geometry={cube.clone()} class="one" class:lit={lit1.get()} transform={at(-2.0, 0.0, 0.0)} />
+      <Mesh geometry={cube.clone()} class="two" class:lit={lit2.get()} transform={at(0.0, 0.0, 0.0)} />
+      <Mesh geometry={cube.clone()} class="three" class:lit={lit3.get()} class:gone={gone(time.get())} transform={at(2.0, 0.0, 0.0)} />
     </Group>
   </Scene>
   <div class="hud">
