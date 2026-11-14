@@ -129,6 +129,7 @@ mod restyle_scene;
 mod restyle_share;
 mod restyle_used;
 mod run_bits;
+mod scene_sinks;
 mod scene_view;
 mod scroll;
 mod scroll_chains;
