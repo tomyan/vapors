@@ -24,6 +24,8 @@ pub enum PlatformError {
     UncapturedGpuError(String),
     /// The app's `App::start`, before the first frame, refused.
     Start(String),
+    /// A followed link's address could not be opened; names the `href`.
+    Navigation(String),
 }
 
 impl fmt::Display for PlatformError {
@@ -40,6 +42,7 @@ impl fmt::Display for PlatformError {
             Self::Surface(message) => write!(f, "surface: {message}"),
             Self::Picker(message) => write!(f, "picker: {message}"),
             Self::Start(message) => write!(f, "the app could not start on this GPU: {message}"),
+            Self::Navigation(message) => write!(f, "link: {message}"),
             Self::DeviceLost(sentence) | Self::UncapturedGpuError(sentence) => {
                 write!(f, "{sentence}")
             }

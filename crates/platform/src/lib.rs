@@ -64,6 +64,7 @@ mod input_keys;
 mod key_event;
 #[cfg(not(target_family = "wasm"))]
 mod log_forward;
+mod navigate;
 pub mod page;
 mod paste_key;
 mod picker;

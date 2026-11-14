@@ -145,7 +145,7 @@ impl Document {
                 );
                 true
             }
-            "Enter" => Self::activate(document, target, &["button"]),
+            "Enter" => Self::activate(document, target, &["button", "link"]),
             " " => {
                 document.borrow_mut().space_on = Some(target);
                 document
@@ -212,6 +212,7 @@ impl Document {
     fn activatable(&self, target: NodeId, kinds: &[&str]) -> bool {
         let kind = match self.tag(target) {
             Some("button") => "button",
+            Some("a") if self.attribute(target, "href").is_some() => "link",
             Some("input") if self.checked(target).is_some() => "checkbox",
             _ => return false,
         };

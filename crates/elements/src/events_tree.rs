@@ -160,6 +160,9 @@ pub(crate) fn dispatch_click(document: &Rc<RefCell<Document>>, target: NodeId, e
     };
     let was = crate::checkbox::before_click(document, target);
     let prevented = dispatch_bubbling(document, target, event);
+    if !prevented {
+        crate::link::follow(document, target);
+    }
     if let Some(was) = was {
         crate::checkbox::after_click(document, target, was, prevented);
     }

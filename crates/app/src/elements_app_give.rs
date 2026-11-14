@@ -8,7 +8,7 @@
 
 use std::fmt;
 
-use vapors_platform::{Event, Instant, Platform};
+use vapors_platform::{Event, Instant, Platform, report_error};
 
 use super::ElementsApp;
 use super::text::Text;
@@ -98,6 +98,7 @@ impl ElementsApp {
         self.one_hosting(hosting);
         self.surfaces.keep_waker(platform);
         let route = self.place(event, platform, hosting);
+        self.follow_link(platform);
         let text = self.text_event(event);
         let tooltip_changed = self.input.take_tooltip_changed();
         if self.document.borrow_mut().take_changed() || tooltip_changed {
@@ -110,6 +111,17 @@ impl ElementsApp {
             Text::Taken => Route::Document,
             Text::NotText => route?,
         })
+    }
+
+    /// Hands the address of a link the event followed, if any, to the
+    /// platform; one it cannot go to is reported and the app goes on.
+    fn follow_link(&self, platform: &Platform) {
+        let Some(href) = self.document.borrow_mut().take_navigation() else {
+            return;
+        };
+        if let Err(refused) = platform.navigate(&href) {
+            report_error(&refused.to_string());
+        }
     }
 
     /// Refuses, in a debug build, events through both `App::event` and
