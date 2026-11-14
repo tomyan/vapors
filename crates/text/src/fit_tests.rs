@@ -62,7 +62,7 @@ fn a_line_one_ulp_past_the_limit_fits_in_neither() {
 
 #[test]
 fn text_offered_its_max_content_width_a_rounding_short_stays_on_one_line() {
-    for scale in [1.0, 2.0, 2.625, 2.75, 3.0] {
+    for scale in [1.0, 2.0, 2.625, 2.75, 2.8125, 3.0] {
         // Given: the CSS width back from device pixels, one ulp short
         let shaped = shaped(scale);
         let max_content = shaped.lay_out(None, Align::Start).width() / scale;

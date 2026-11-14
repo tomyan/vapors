@@ -10,11 +10,20 @@
 //! keeps every length in `LayoutUnit`, fixed point at 1/64 px, where
 //! that round trip is exact; a line here fits when it is at most the
 //! width plus 1/64 device px. That is hundreds of ulps at UI sizes
-//! (one ulp at 400 px is about 3e-5 px), so it absorbs the rounding;
-//! a line it lets through overflows its box by at most 1/64 of a
-//! device pixel, below what a pixel can show, and a glyph's advance is
-//! normally many times that, so it moves a break only when the line
-//! was already within the slack.
+//! (one ulp at 400 px is about 3e-5 px), so it absorbs the rounding.
+//!
+//! It is not an exact match for Chromium. The slack is the whole
+//! `LayoutUnit` step, chosen to absorb float error; Chromium snaps a
+//! text width to a `LayoutUnit` (rounding to nearest on some paths,
+//! up on others), so a line over its width by less than 1/64 px may
+//! wrap there and fit here. Such a line overflows its box by at most 1/64 device px, and
+//! a glyph's advance is normally many times that, so the slack moves a
+//! break only for a line already within it. The slack decides the
+//! break only: lines are aligned in the width itself (`shaped.rs`),
+//! and text measures no wider than a width it fits (elements'
+//! `measure.rs`). From 2^17 device px the ulp reaches 1/64 and the
+//! addition can round away, leaving the exact comparison; UI text
+//! does not reach that width.
 
 /// How far past a width, in device pixels, a line may reach and still
 /// fit it: Chromium's `LayoutUnit` step.

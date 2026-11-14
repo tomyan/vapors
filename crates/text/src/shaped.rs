@@ -3,7 +3,7 @@
 //! each width asked for. Breaking a clone of the shaped paragraph gives
 //! the layout shaping and breaking together would (`shaped_tests.rs`).
 
-use parley::{AlignmentOptions, BaseDirection, ContentWidths};
+use parley::{AlignmentOptions, BaseDirection, ContentWidths, YieldData};
 use vapors_scene::Color;
 
 use crate::fit::fit_limit;
@@ -67,11 +67,11 @@ impl Shaped {
     }
 
     /// Breaks this paragraph into lines at `width` and aligns them; a
-    /// line fits the width as [`fits`] says.
+    /// line fits the width as [`fits`] says, and is aligned in the width
+    /// itself.
     #[must_use]
     pub fn into_layout(mut self, width: Option<f32>, align: Align) -> Layout {
-        let limit = width.map(|w| fit_limit(w * self.scale));
-        self.inner.break_all_lines(limit);
+        break_lines(&mut self.inner, width.map(|w| w * self.scale));
         self.inner
             .align(alignment(align), AlignmentOptions::default());
         Layout::broken(self.inner, self.text, self.scale)
@@ -88,6 +88,32 @@ impl Shaped {
     pub fn scale(&self) -> f32 {
         self.scale
     }
+}
+
+/// Breaks `inner` where a line fits `width` device pixels as [`fits`]
+/// says, then sets each line's box back to `width`: the slack decides
+/// the break only, and centre, end and justify place the line in the
+/// box Chromium would. `set_prior_line_width` is parley 0.12's hidden
+/// hook for an alignment width other than the breaking one; a parley
+/// bump that drops it fails to build, and `shaped_tests` pins the
+/// positions.
+fn break_lines(inner: &mut parley::Layout<Color>, width: Option<f32>) {
+    let Some(width) = width else {
+        inner.break_all_lines(None);
+        return;
+    };
+    let mut lines = inner.break_lines();
+    lines.state_mut().set_layout_max_advance(fit_limit(width));
+    lines.state_mut().set_line_max_advance(fit_limit(width));
+    while let Some(yielded) = lines.break_next() {
+        let YieldData::LineBreak(_) = yielded else {
+            unreachable!(
+                "parley yielded {yielded:?}; Shaped pushes no inline boxes and sets no line max height"
+            );
+        };
+        lines.set_prior_line_width(width);
+    }
+    lines.finish();
 }
 
 #[cfg(test)]

@@ -3,9 +3,7 @@
 //! match what is drawn, and the size comes back in CSS pixels.
 
 use taffy::{AvailableSpace, Size};
-#[cfg(test)]
-use vapors_text::Layout;
-use vapors_text::{FontSystem, Shaped, Span, Style};
+use vapors_text::{FontSystem, Layout, Shaped, Span, Style, fits};
 
 use super::inline::InlineRun;
 
@@ -25,8 +23,22 @@ pub(crate) fn measure_text(
     });
     let layout = cache.layout(fonts, scale, run, width);
     Size {
-        width: known.width.unwrap_or(layout.width() / scale),
+        width: known
+            .width
+            .unwrap_or_else(|| measured_width(&layout, scale, width)),
         height: known.height.unwrap_or(layout.height() / scale),
+    }
+}
+
+/// `layout`'s width in CSS pixels, no wider than a definite `width`
+/// its lines fit (`vapors_text::fits`): a line within the fit slack of
+/// the width it was offered measures that width, not up to
+/// 1/(64 * scale) px more.
+fn measured_width(layout: &Layout, scale: f32, width: Option<f32>) -> f32 {
+    let measured = layout.width() / scale;
+    match width {
+        Some(width) if fits(layout.width(), width * scale) => measured.min(width),
+        _ => measured,
     }
 }
 
@@ -69,3 +81,7 @@ fn inked(style: Style<'static>, visible: bool) -> Style<'static> {
         ..style
     }
 }
+
+#[cfg(test)]
+#[path = "measure_tests.rs"]
+mod tests;
