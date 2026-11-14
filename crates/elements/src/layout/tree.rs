@@ -22,7 +22,7 @@ use crate::lane_decline::LaneDecline;
 
 /// The boxes, what measuring text needs, and the calcs Taffy may ask for.
 pub(crate) struct BoxTree<'f> {
-    pub(crate) boxes: Vec<LayoutBox>,
+    pub(crate) boxes: crate::slot_list::SlotList<LayoutBox>,
     pub(crate) fonts: &'f mut FontSystem,
     pub(crate) cache: &'f mut super::TextCache,
     pub(crate) scale: f32,

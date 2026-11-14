@@ -32,8 +32,8 @@ fn divs(count: usize) -> (Document, Vec<NodeId>) {
 }
 
 fn slots(doc: &Document) -> (usize, usize) {
-    let boxes = &doc.boxes.placed.boxes;
-    (boxes.len(), boxes.capacity())
+    let (_, len, capacity) = doc.boxes.slot_lists()[0];
+    (len, capacity)
 }
 
 #[test]
@@ -72,6 +72,7 @@ fn a_box_added_after_a_full_build_grows_the_list_by_a_quarter() {
     doc.insert_before(body, div, Some(made[20]));
     doc.update(viewport(1.0)).expect("updates");
 
-    // Then: 42 + 42 / 4 slots, not 84
+    // Then: 42 + 42 / 4 slots, not 84, for the boxes and their keys
     assert_eq!(slots(&doc), (43, 52));
+    assert_eq!(doc.boxes.slot_lists()[1], ("layout.keys", 43, 52));
 }

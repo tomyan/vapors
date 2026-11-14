@@ -138,6 +138,11 @@ mod scroll_chains;
 mod scrolling;
 mod shortcuts;
 mod slab;
+mod slot_list;
+#[cfg(test)]
+mod slot_list_document_tests;
+#[cfg(test)]
+mod slot_list_inventory_tests;
 mod splice_decline;
 mod stacking;
 mod style;

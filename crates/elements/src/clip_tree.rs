@@ -6,6 +6,7 @@
 //! comes from it without a walk over the tree.
 
 use crate::layout::{LayoutBox, containing_blocks};
+use crate::slot_list::SlotList;
 
 /// Each slot's clip parent and depth, and the slots each passes its
 /// clip to.
@@ -13,23 +14,31 @@ use crate::layout::{LayoutBox, containing_blocks};
 pub(crate) struct ClipTree {
     /// The box whose content clip a box takes; `None` for the root and
     /// vacant slots.
-    parent: Vec<Option<usize>>,
+    parent: SlotList<Option<usize>>,
     /// The number of boxes above a box in the tree: a clip parent is
     /// above, so it comes first in depth order.
-    depth: Vec<usize>,
+    depth: SlotList<usize>,
     /// Slot `s`'s dependents are `dependents[first[s]..first[s + 1]]`.
     first: Vec<usize>,
     dependents: Vec<usize>,
 }
 
 impl ClipTree {
+    /// Each per-slot list's length and capacity, for the growth test.
+    #[cfg(test)]
+    pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
+        vec![
+            self.parent.named("tree.parent"),
+            self.depth.named("tree.depth"),
+        ]
+    }
     /// The clip tree of `boxes`, box 0 the root.
     pub(crate) fn of(boxes: &[LayoutBox]) -> Self {
         let (parent, depth) = parents_and_depths(boxes);
         let (first, dependents) = grouped(&parent);
         Self {
-            parent,
-            depth,
+            parent: parent.into(),
+            depth: depth.into(),
             first,
             dependents,
         }

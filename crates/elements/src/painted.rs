@@ -54,7 +54,7 @@ pub struct Painted {
     pub(crate) from: crate::kept_paint::PaintedFrom,
     /// Each slot's kept paint (`kept_box.rs`), walked in `order` for the
     /// scene and hits (`scene_view.rs`), kept in place for the next update.
-    pub(crate) kept_boxes: Vec<Option<crate::kept_box::KeptBox>>,
+    pub(crate) kept_boxes: crate::slot_list::SlotList<Option<crate::kept_box::KeptBox>>,
     /// The steps of `order` that draw, which the scene's items walk.
     pub(crate) drawn: crate::drawn_steps::DrawnSteps,
     /// Each scroll frame's drawing steps by their extents, which the
@@ -82,6 +82,19 @@ pub struct Painted {
 }
 
 impl Painted {
+    /// Each per-slot list it keeps: name, length, capacity (the growth
+    /// test, `slot_list_document_tests.rs`, reads these alone).
+    #[cfg(test)]
+    pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
+        let mut lists = vec![self.kept_boxes.named("kept_boxes")];
+        lists.extend(self.from.placement.slot_lists());
+        lists.extend(self.order.clips.slot_lists());
+        lists.extend(self.order.tree.slot_lists());
+        lists.extend(self.stackings.slot_lists());
+        lists.extend(self.kept_hits().slot_lists());
+        lists
+    }
+
     /// A paint of nothing on `canvas` at `scale`.
     pub(crate) fn empty(canvas: Color, canvas_from: Option<CanvasFrom>, scale: f32) -> Self {
         Self {
@@ -101,7 +114,7 @@ impl Painted {
             ranges: NodeMap::default(),
             text_origins: NodeMap::default(),
             from: crate::kept_paint::PaintedFrom::default(),
-            kept_boxes: Vec::new(),
+            kept_boxes: crate::slot_list::SlotList::default(),
             drawn: crate::drawn_steps::DrawnSteps::default(),
             extents: crate::frame_extents::Extents::default(),
             kept_batches: std::cell::RefCell::new(None),

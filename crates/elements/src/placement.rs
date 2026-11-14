@@ -9,6 +9,7 @@ pub(crate) use crate::placement_changes::{Changes, Placed};
 use crate::placement_marks::Marked;
 use crate::placement_walk::{Mark, Walk};
 use crate::scroll::Offsets;
+use crate::slot_list::SlotList;
 
 /// No slot: the root's `up`, and a new or freed slot's before it is placed.
 pub(crate) const NO_SLOT: usize = usize::MAX;
@@ -28,18 +29,18 @@ const NO_RECT: BoxRect = BoxRect {
 /// (`frames.rs`).
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Placement {
-    pub(crate) rects: Vec<BoxRect>,
+    pub(crate) rects: SlotList<BoxRect>,
     /// Each slot's padding widths: a `%` padding follows its containing
     /// block's width, which can change with its border box unchanged.
-    pub(crate) paddings: Vec<taffy::Rect<f32>>,
+    pub(crate) paddings: SlotList<taffy::Rect<f32>>,
     /// Each slot's scroll offset as applied, in CSS pixels.
-    pub(crate) offsets: Vec<[f32; 2]>,
+    pub(crate) offsets: SlotList<[f32; 2]>,
     /// The slot whose content each slot is placed in.
-    pub(crate) up: Vec<usize>,
+    pub(crate) up: SlotList<usize>,
     /// Each out-of-flow slot's containing block (`containing_blocks`).
-    pub(crate) containing: Vec<Option<usize>>,
+    pub(crate) containing: SlotList<Option<usize>>,
     /// Marks for the walk, all `Mark::None` between updates.
-    pub(crate) marks: Vec<Mark>,
+    pub(crate) marks: SlotList<Mark>,
 }
 
 /// The laid-out boxes, which of them scroll, and the scale.
@@ -64,6 +65,20 @@ impl<'a> LaidOut<'a> {
 }
 
 impl Placement {
+    /// Each per-slot list it keeps: name, length, capacity (the growth
+    /// test, `slot_list_document_tests.rs`, reads these alone).
+    #[cfg(test)]
+    pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
+        vec![
+            self.rects.named("placement.rects"),
+            self.paddings.named("placement.paddings"),
+            self.offsets.named("placement.offsets"),
+            self.up.named("placement.up"),
+            self.containing.named("placement.containing"),
+            self.marks.named("placement.marks"),
+        ]
+    }
+
     /// Places the boxes `changes` names, and those placed in a box
     /// whose content moved, settling `scroll` for them.
     pub(crate) fn place(
@@ -108,12 +123,12 @@ impl Placement {
     fn every(boxes: &[LayoutBox]) -> Self {
         let len = boxes.len();
         Self {
-            rects: vec![NO_RECT; len],
-            paddings: vec![taffy::Rect::zero(); len],
-            offsets: vec![[0.0; 2]; len],
-            up: vec![NO_SLOT; len],
-            containing: containing_blocks(boxes),
-            marks: vec![Mark::None; len],
+            rects: vec![NO_RECT; len].into(),
+            paddings: vec![taffy::Rect::zero(); len].into(),
+            offsets: vec![[0.0; 2]; len].into(),
+            up: vec![NO_SLOT; len].into(),
+            containing: containing_blocks(boxes).into(),
+            marks: vec![Mark::None; len].into(),
         }
     }
 

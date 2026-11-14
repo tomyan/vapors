@@ -143,14 +143,10 @@ impl Placed {
             return slot;
         }
         let slot = self.boxes.len();
+        // grown by a quarter, not doubled (`slot_list.rs`); a box is about
+        // 2.8 KB. Each growth copies every box; chunked storage, as the
+        // blocks of #288, is the follow-up if that shows in inserts.
         self.slots.keys.push(None);
-        // grown by a quarter, not doubled: a box is about 2.8 KB and the
-        // list is kept, so its slack stays under 25% (property 8; lead,
-        // 2026-11-14). Each growth copies every box; chunked storage, as
-        // the blocks of #288, is the follow-up if that shows in inserts.
-        if self.boxes.len() == self.boxes.capacity() {
-            self.boxes.reserve_exact((self.boxes.len() / 4).max(1));
-        }
         self.boxes.push(LayoutBox::vacant());
         slot
     }

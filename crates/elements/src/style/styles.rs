@@ -4,6 +4,7 @@
 //! must not read the old node's style as its own. Every allocation
 //! counts itself in and out of `live`, for `styles_live`.
 
+use crate::slot_list::SlotList;
 use std::cell::Cell;
 use std::ops::Deref;
 use std::rc::Rc;
@@ -35,11 +36,16 @@ impl Drop for Counted {
 /// Computed styles by slot; empty for text nodes and removed nodes.
 #[derive(Default)]
 pub(crate) struct Styles {
-    slots: Vec<Option<(NodeId, Rc<Counted>)>>,
+    slots: SlotList<Option<(NodeId, Rc<Counted>)>>,
     live: Rc<Cell<usize>>,
 }
 
 impl Styles {
+    /// Each per-slot list's length and capacity, for the growth test.
+    #[cfg(test)]
+    pub(crate) fn slot_lists(&self) -> Vec<(&'static str, usize, usize)> {
+        vec![self.slots.named("styles.slots")]
+    }
     /// A new allocation of `style`, counted in `live`.
     pub(crate) fn alloc(&self, style: ComputedStyle) -> Rc<Counted> {
         self.live.set(self.live.get() + 1);

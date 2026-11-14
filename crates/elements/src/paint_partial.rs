@@ -183,7 +183,7 @@ fn dropped(again: &[(usize, BoxFrom)], changed: &ChangedSlots, len: usize, paint
         }
     }
     let past = len.min(painted.kept_boxes.len());
-    let past: Vec<KeptBox> = painted.kept_boxes.drain(past..).flatten().collect();
+    let past: Vec<KeptBox> = painted.kept_boxes.drain_from(past).flatten().collect();
     for gone in past {
         gone.drop_from(painted);
     }
