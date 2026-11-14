@@ -37,6 +37,10 @@ fn quiet_then_share() -> Result<gate_lock_shared::Shared, String> {
         crate::quiet_wait::before("ci")?;
         load_wait::before("ci")?;
         let shared = gate_lock_shared::acquire_shared(&dir, &worktree, gate_lock::WAIT)?;
+        // RELAXED: no test drives this re-check (it needs a quiet lock
+        // taken between two real waits); `taken_since` and the waits it
+        // repeats are tested. Retired by a test that takes the lock
+        // during a ci run's load wait.
         if !crate::quiet_wait::taken_since(&dir)? {
             return Ok(shared);
         }
