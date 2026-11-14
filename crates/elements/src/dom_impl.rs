@@ -137,6 +137,7 @@ impl Dom for Document {
             self.boxes.note_removed(&self.arena, parent, node);
         }
         self.drop_focus_within(node);
+        self.drop_sinks(node);
         self.forget_subtree(node);
         self.arena.detach(node);
         self.arena.free_subtree(node);
@@ -144,6 +145,10 @@ impl Dom for Document {
         self.committed
             .retain(|field, _| self.arena.contains(*field));
         self.editors.retain(|field, _| self.arena.contains(*field));
+    }
+
+    fn watch_appearance(&mut self, anchor: NodeId, sink: vapors_dom::AppearanceSink) {
+        self.watch(anchor, sink);
     }
 
     fn listen(&mut self, node: NodeId, event: &str, handler: Handler) {

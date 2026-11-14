@@ -6,7 +6,8 @@
 //! after it: both take `gate.turn` first. The gate keeps the turn for its
 //! whole run; a ci run holds it only while it takes its shared lock.
 //! Each ci run names itself in `ci.<pid>` beside the lock while it holds
-//! it, so a waiting gate can say whom it waits for.
+//! it, so a waiting gate can say whom it waits for. At most three ci runs
+//! hold it at once (`gate_lock_slots.rs`).
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -18,6 +19,7 @@ use crate::lock_owner::Owner;
 #[derive(Debug)]
 pub struct Shared {
     _file: std::fs::File,
+    _slot: std::fs::File,
     marker: PathBuf,
 }
 
@@ -32,12 +34,13 @@ impl Drop for Shared {
 ///
 /// # Errors
 ///
-/// The lock is still held exclusively (by a gate) when `wait` ends, or
-/// its files cannot be opened.
+/// The lock is still held exclusively (by a gate), or every ci slot is
+/// taken, when `wait` ends, or its files cannot be opened.
 pub fn acquire_shared(dir: &Path, worktree: &str, wait: Duration) -> Result<Shared, String> {
     let started = Instant::now();
     let turn = open(dir, TURN)?;
     wait_for(dir, (&turn, TURN, Mode::Exclusive), (started, wait), "ci")?;
+    let slot = crate::gate_lock_slots::take(dir, worktree, (started, wait))?;
     let file = open(dir, LOCK)?;
     wait_for(dir, (&file, LOCK, Mode::Shared), (started, wait), "ci")?;
     drop(turn);
@@ -46,6 +49,7 @@ pub fn acquire_shared(dir: &Path, worktree: &str, wait: Duration) -> Result<Shar
     std::fs::write(&marker, line).map_err(|e| format!("{}: {e}", marker.display()))?;
     Ok(Shared {
         _file: file,
+        _slot: slot,
         marker,
     })
 }
@@ -70,7 +74,8 @@ pub fn ci_holders(dir: &Path) -> Vec<String> {
 }
 
 fn live_marker(path: &Path) -> Option<String> {
-    path.file_name()?.to_str()?.strip_prefix(MARKER)?;
+    let pid = path.file_name()?.to_str()?.strip_prefix(MARKER)?;
+    pid.parse::<u32>().ok()?;
     let owner = Owner::parse(&std::fs::read_to_string(path).ok()?)?;
     owner.live().then(|| {
         format!(

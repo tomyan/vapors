@@ -28,6 +28,29 @@ impl Extents {
         self.blocks = self.blocks + index.entries.block_count() - blocks_were;
     }
 
+    /// The totals with `entry` counted in.
+    pub(super) fn count_in(&mut self, entry: &Entry) {
+        self.items += entry.items;
+        self.short += usize::from(!entry.tall());
+    }
+
+    /// The totals with `entry` counted out, or a panic naming its place
+    /// when either would go below zero: an entry counted out that was
+    /// never counted in.
+    fn count_out(&mut self, entry: &Entry) {
+        let items = self.items.checked_sub(entry.items);
+        let short = self.short.checked_sub(usize::from(!entry.tall()));
+        let (Some(items), Some(short)) = (items, short) else {
+            panic!(
+                "the extents index's totals ({} items, {} short entries) go below zero taking \
+                 out the entry of place {} ({} items): it was not counted in \
+                 (frame_extents_patch.rs `count_out`); reproduce with `cargo xtask test`",
+                self.items, self.short, entry.place, entry.items
+            );
+        };
+        (self.items, self.short) = (items, short);
+    }
+
     /// The entry at `place` made again from `step`'s part in `boxes`:
     /// overwritten where it sorts to the same position, else taken out
     /// and put back; taken out when the step no longer draws.
@@ -62,10 +85,11 @@ impl Extents {
             return false;
         }
         let was = index.entries.get_mut(at).unwrap_or_else(|| missing(place));
-        index.items = index.items - was.items + entry.items;
-        *was = entry;
+        let was = std::mem::replace(was, entry);
         index.reach_from(at, 1);
         self.at[place] = Some((frame, entry.top, false));
+        self.count_out(&was);
+        self.count_in(&entry);
         true
     }
 
@@ -79,14 +103,9 @@ impl Extents {
             .get_mut(&frame)
             .expect("a frame for every entry");
         let blocks_were = index.entries.block_count();
-        if tall {
-            index.items -= index.tall.remove(index.tall_position(place)).items;
-        } else {
-            let (gone, next) = index.entries.remove(index.position(top, place));
-            index.items -= gone.items;
-            index.reach_from(next, 0);
-        }
+        let gone = index.taken(place, (top, tall));
         let empty = index.entries.is_empty() && index.tall.is_empty();
+        self.count_out(&gone);
         self.noted(frame, blocks_were);
         if empty {
             self.frames.remove(&frame);
@@ -96,8 +115,8 @@ impl Extents {
     /// Puts `entry`, in frame `frame`, where it sorts.
     fn insert(&mut self, (frame, entry): (usize, Entry)) {
         self.at[entry.place] = Some((frame, entry.top, entry.tall()));
+        self.count_in(&entry);
         let index = self.frames.entry(frame).or_default();
-        index.items += entry.items;
         if entry.tall() {
             let at = index.tall.partition_point(|e| e.place < entry.place);
             index.tall.insert(at, entry);
@@ -112,6 +131,16 @@ impl Extents {
 }
 
 impl FrameIndex {
+    /// The entry of `place`, at `top`, tall or not, taken out.
+    fn taken(&mut self, place: usize, (top, tall): (f32, bool)) -> Entry {
+        if tall {
+            return self.tall.remove(self.tall_position(place));
+        }
+        let (gone, next) = self.entries.remove(self.position(top, place));
+        self.reach_from(next, 0);
+        gone
+    }
+
     /// Where the entry of `place`, at `top`, is, or a panic naming it.
     pub(super) fn position(&self, top: f32, place: usize) -> Pos {
         let found = self
@@ -152,9 +181,11 @@ impl FrameIndex {
 }
 
 impl PartialEq for Extents {
-    /// The same entries in the same frames, whatever the patches did.
+    /// The same entries in the same frames, and the same totals over
+    /// them, whatever the patches did.
     fn eq(&self, other: &Self) -> bool {
-        self.frames == other.frames && self.at == other.at
+        let totals = (self.items, self.short) == (other.items, other.short);
+        self.frames == other.frames && self.at == other.at && totals
     }
 }
 

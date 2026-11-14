@@ -78,7 +78,9 @@ fn add_element(
         match &source.arena.get(child, "build").kind {
             Kind::Text(text) => run.push_text(text),
             // No box, and no break in the run around it (CSS Display 3,
-            // 2.5: `display: none` generates nothing).
+            // 2.5: `display: none` generates nothing); a scene anchor
+            // keeps a `SceneUsed`, not a `Used` (`restyle_scene`).
+            Kind::Element(_) if crate::check::is_scene_anchor(source.arena, child) => {}
             Kind::Element(_) if source.used[&child].layout.display == Display::None => {}
             Kind::Element(_) if source.used[&child].inline => add_inline(source, child, &mut run),
             Kind::Element(_) => {
