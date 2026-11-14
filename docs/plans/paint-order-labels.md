@@ -45,13 +45,23 @@ after the insert moves.
   again (list labelling, as in Dietz and Sleator's order maintenance):
   the smallest window around the insert whose labels have room is
   relabelled evenly. Those steps' entries are patched in each structure,
-  as if painted again. Amortized O(log n) labels per insert. With `u64`
-  labels and an initial spacing of 2^32, a window relabel needs more than
-  32 inserts into one gap, which the rows pages do not reach. The debug
-  build counts relabels (`UpdateCounts`).
-- `Extents.at` becomes a map keyed by step (slot and kind), or a vector by
-  slot with three kinds, as `DrawnSteps.places` is. It is no longer by
-  place.
+  as if painted again. Amortized O(log n) labels per insert.
+- **Spacing.** A walk spaces its `n` labels evenly over `u64`: about
+  2^64 / n apart, about 2^47 at 16k rows of several steps. That spacing,
+  `spacing(n)`, is the one the splice steps by too.
+- **Appends and prepends** step from the end label by the spacing,
+  rather than taking the midpoint of the gap to `u64::MAX` (or 0), which
+  would halve the room on every append and force a relabel after about
+  47 rows put in at the end, the common splice. They fall back to a
+  relabel only when the step would overflow.
+- **Counts.** `UpdateCounts` counts the labels a relabel moved
+  (`paint_relabelled`) and, apart, a relabel of every label
+  (`paint_relabel_all`), so a rows page that hits either shows in the
+  counts. A relabel's patches are paint's instructions, inside its 2%
+  budget and not exempt from it.
+- `Extents.at` becomes a vector by slot with three kinds (box, thumb,
+  outline), as `DrawnSteps.places` is: a map would hash on every lookup.
+  It is no longer by place.
 - `KeptOrder.steps` becomes blocks (`blocks.rs`) of `(label, step)`: a
   splice inserts and removes in blocks, O(CAP + log n), instead of
   copying the vector (`kept_order_splice.rs` `spliced_steps`). A walk
@@ -73,8 +83,10 @@ how a place is made, not how it is read. B changes every reader. So A.
 ## 4. A in each structure
 
 - **Labels.** `PaintOrder` hands them out: `afresh(n)` spaces `n` labels
-  evenly over `u64`; `between(a, b)` is the midpoint, or `None` when
-  `b - a < 2`, which asks for a window relabel.
+  evenly over `u64` (`spacing(n)` apart); `between(a, b)` is the midpoint,
+  or `None` when `b - a < 2`, which asks for a window relabel; `after(a)`
+  and `before(b)`, for an append and a prepend, step by the spacing, or
+  `None` on overflow.
 - **The splice** (`kept_order_splice.rs`). Each `Edit` (at, removed,
   inserted) becomes: take the removed steps' entries out of every
   structure (`DrawnSteps`, `Extents`, hits) by step; label the inserted
@@ -103,10 +115,19 @@ how a place is made, not how it is read. B changes every reader. So A.
   order.
 - The kept-paint check (`kept_paint_check.rs`) compares `DrawnSteps`,
   `Extents` and the hits with ones made afresh. Made afresh, labels
-  differ, so those comparisons compare by order: each structure's steps,
-  in label order, against the fresh one's in place order.
+  differ, so those comparisons compare by order: each structure's steps
+  in label order against the fresh one's in place order, and each
+  entry's payload (its step, extent, reach, items or hit), so a wrong
+  entry under a right label still fails.
 - A relabel that cannot find room (the whole list's labels are packed)
-  relabels everything, counted as a walk: never a silent overlap.
+  relabels everything, counted as `paint_relabel_all`: never a silent
+  overlap.
+- **Policy test.** Inserts 10,000 times into one gap and 10,000 times at
+  the front, then 10,000 appends. It asserts labels strictly increase
+  after each insert, and that the labels relabelled per insert, amortized
+  over each run, stay within `4 * log2(n) + 8` (n the labels held). After
+  slice 2 a rows-page measurement records `paint_relabelled` and
+  `paint_relabel_all` beside the 11.3 numbers.
 
 ## 6. Slices
 
@@ -118,10 +139,9 @@ how a place is made, not how it is read. B changes every reader. So A.
    across sizes (with 4e for Insert), and the Chromium paint comparisons
    and the kept-paint check are unchanged.
 
-## 7. Open questions for review
+## 7. Review decisions (lead, 2026-11-14)
 
-- `u64` labels with an initial spacing of 2^32: enough, or a relabel
-  policy test at 64 inserts into one gap?
-- `Extents.at` keyed by step: a map, or a vector by slot (dense, as
-  `DrawnSteps.places`)? I lean to the vector, as slots are dense.
-- 4d-2 (items 2 to 4) stays separate and lands first, being independent.
+- One spacing: evenly over `u64` on a walk, and the same spacing for
+  appends and prepends; the worst case pinned by the policy test above.
+- `Extents.at` is a vector by slot with three kinds.
+- 4d-2 (items 2 to 4) stays separate and lands first.
