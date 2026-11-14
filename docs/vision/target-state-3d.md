@@ -476,6 +476,9 @@ flat-scene: they work on today's painter, and touché's pixel layers
 
 ## 7. Decisions for Tom
 
+Decided by Tom, 2026-11-14: D1 to D13 as recommended. The options
+below are kept as the record of what was weighed.
+
 Decided by Tom, 2026-11-14: content in a scene is drawn exactly by
 default, with the same primitives and pipelines as top-level content;
 rasterising (route T) is a future option ("rasterising could be a
