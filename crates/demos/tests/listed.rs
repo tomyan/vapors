@@ -78,3 +78,46 @@ fn the_index_links_every_listed_demo_in_order() {
     let listed: Vec<String> = DEMOS.iter().map(vapors_demos::Listed::href).collect();
     assert_eq!(linked, listed);
 }
+
+#[test]
+fn the_index_shows_each_listed_demos_title_and_line_in_its_link() {
+    // Given
+    let index = vapors_demos::find(INDEX).expect("the index");
+    let document = vapors_demos::document(&index).document;
+    if let Err(errors) = document.borrow_mut().update(VIEWPORT) {
+        panic!("the index was refused: {errors:#?}");
+    }
+
+    // When: each link's accessible name, from its text
+    let tree = document.borrow().ax_tree().expect("an updated document");
+    let names: Vec<String> = tree
+        .iter()
+        .filter(|node| node.role == "link")
+        .map(|node| node.name.clone())
+        .collect();
+
+    // Then
+    let listed: Vec<String> = DEMOS
+        .iter()
+        .map(|demo| format!("{} {}", demo.title, demo.line))
+        .collect();
+    assert_eq!(names, listed);
+}
+
+#[test]
+fn an_unknown_name_is_refused_listing_every_listed_demo() {
+    // When
+    let Err(refused) = vapors_demos::find("nope") else {
+        panic!("nope is no demo");
+    };
+
+    // Then
+    let names: Vec<&str> = DEMOS.iter().map(|demo| demo.name).collect();
+    assert_eq!(
+        refused,
+        format!(
+            "no demo is called `nope`; the demos are {}",
+            names.join(", ")
+        )
+    );
+}
