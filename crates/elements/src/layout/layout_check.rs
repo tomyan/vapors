@@ -18,7 +18,7 @@ use vapors_dom::NodeId;
 use vapors_text::FontSystem;
 
 use super::boxes::{Source, build};
-use super::{Calcs, Placed, Slots, TextCache, lay_out};
+use super::{Calcs, Placed, Settling, Slots, TextCache, lay_out};
 use crate::update::Viewport;
 
 /// What laying out reads besides the boxes.
@@ -40,25 +40,59 @@ pub(crate) fn check_layout_against_fresh(
     walk(&fresh_layout(source, root, layout), placed);
 }
 
-/// `root`'s boxes built and laid out with no cache.
+/// `root`'s boxes built and laid out with no cache and no lane, so a
+/// lane's layout is compared with Taffy's block layout.
 fn fresh_layout(source: &Source<'_>, root: NodeId, layout: Inputs<'_>) -> Placed {
     let fresh = Placed {
         boxes: build(source, root),
         slots: Slots::default(),
+        lanes: super::lane::Lanes::default(),
     };
     let viewport = layout.viewport;
     let texts = (layout.fonts, &mut TextCache::default());
     let size = (viewport.width, viewport.height);
-    let laid = lay_out(fresh, texts, viewport.scale, size, layout.calcs, Vec::new());
+    let settling = Settling {
+        changed: Vec::new(),
+        built: Vec::new(),
+        lanes: false,
+    };
+    let laid = lay_out(fresh, texts, viewport.scale, size, layout.calcs, settling);
     laid.unwrap_or_else(|failed| panic!("a fresh layout failed: {}", failed.0))
         .0
 }
 
+/// How far a kept box's location or size may sit from the fresh one's,
+/// in CSS px: a lane sums its children's starts and its container's
+/// content height in f64 and Taffy in f32, which is not associative,
+/// so the last bits can differ (`docs/plans/splice-layout.md`, section
+/// 2.1). Every box is compared within it, not only a lane's children:
+/// a lane container's height differs by as much, and Taffy carries
+/// that into its ancestors' sizes and their later children's
+/// locations. A relaxed guard; what would retire it: a Taffy that sums
+/// in f64.
+const TOLERANCE: f32 = 1.0 / 1024.0;
+
 fn walk(fresh: &Placed, placed: &Placed) {
+    match (fresh.boxes.is_empty(), placed.boxes.is_empty()) {
+        (true, true) => return,
+        (false, false) => {}
+        (fresh_empty, _) => panic!(
+            "a fresh layout has {} boxes where the kept one has {}: the root's box is \
+             out of date (`html {{ display: none }}` builds none); \
+             `cargo test -p vapors-elements` reproduces it",
+            if fresh_empty { "no" } else { "some" },
+            if fresh_empty { "some" } else { "none" },
+        ),
+    }
     let mut stack = vec![(0, 0)];
     while let Some((index, slot)) = stack.pop() {
         let (new, kept) = (&fresh.boxes[index].layout, &placed.boxes[slot].layout);
-        if new.size != kept.size || new.location != kept.location {
+        let apart = |a: f32, b: f32| (a - b).abs() > TOLERANCE;
+        if apart(new.size.width, kept.size.width)
+            || apart(new.size.height, kept.size.height)
+            || apart(new.location.x, kept.location.x)
+            || apart(new.location.y, kept.location.y)
+        {
             stale(placed, slot, (new, kept));
         }
         let new_children = fresh.boxes[index].children.iter().copied();

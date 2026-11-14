@@ -107,11 +107,7 @@ impl Random {
 }
 
 fn bounds(child: Child) -> Bounds {
-    Bounds {
-        low: child.low(),
-        reach: child.reach(),
-        ..Bounds::EMPTY
-    }
+    Bounds::span(child.low(), child.reach())
 }
 
 pub(super) fn block(child: Child) -> BlockSummary {
@@ -134,6 +130,7 @@ pub(super) fn flex(child: Child) -> FlexSummary {
         size,
         basis: size,
         content: size,
+        shrinkable: false,
         bounds,
     })
 }

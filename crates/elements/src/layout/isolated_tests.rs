@@ -3,7 +3,7 @@ use vapors_text::FontSystem;
 
 use super::*;
 use crate::layout::slots::tests::{TEXT, tree};
-use crate::layout::{Calcs, Content, LayoutWork, Placed, TextCache, lay_out};
+use crate::layout::{Calcs, Content, LayoutWork, Placed, Settling, TextCache, lay_out};
 
 /// Root 1 holding rows 2, 3 and 4, each with a text run: slots 0 to 6,
 /// row 3 at slot 3 with its text at slot 4.
@@ -30,19 +30,36 @@ impl Texts {
         Self(FontSystem::bundle_only(), TextCache::default())
     }
 
+    /// Lays `placed` out with `changed` settled. A box these tests put
+    /// in by hand was never asked, as a box `rebuild` builds; it is
+    /// passed as built, so a lane above it lays it out again.
     pub(super) fn lay_out(
         &mut self,
         placed: Placed,
         changed: Vec<Changed>,
     ) -> (Placed, LayoutWork) {
         let texts = (&mut self.0, &mut self.1);
+        let never_asked = |(slot, b): (usize, &crate::layout::LayoutBox)| {
+            (b.asked.is_empty() && !matches!(b.content, Content::Vacant)).then_some(slot)
+        };
+        let built = placed
+            .boxes
+            .iter()
+            .enumerate()
+            .filter_map(never_asked)
+            .collect();
+        let settling = Settling {
+            changed,
+            built,
+            lanes: true,
+        };
         lay_out(
             placed,
             texts,
             1.0,
             (200.0, 100.0),
             &Calcs::default(),
-            changed,
+            settling,
         )
         .unwrap_or_else(|failed| panic!("refused: {}", failed.0))
     }
