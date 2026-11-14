@@ -62,21 +62,12 @@ pub(super) fn answering(
     known_height: Option<f32>,
     calc: impl Fn(*const (), f32) -> f32 + Copy,
 ) -> Answering {
-    let (padding, border) = (edges.padding, edges.border);
-    let prevents_collapse_through = !style.is_block()
-        || !in_block
-        || establishes_new_bfc(style)
-        || style.position().is_out_of_flow()
-        || padding.top > 0.0
-        || padding.bottom > 0.0
-        || border.top > 0.0
-        || border.bottom > 0.0;
     let margin = style.margin();
     Answering {
         known_height,
         min_size: sizes.min,
         max_size: sizes.max,
-        padding_border_size: (padding + border).sum_axes(),
+        padding_border_size: (edges.padding + edges.border).sum_axes(),
         resolved_padding: edges.resolved_padding,
         scrollbar_gutter: edges.gutter,
         margins: [
@@ -85,9 +76,23 @@ pub(super) fn answering(
                 .bottom
                 .resolve_or_zero(inputs.parent_size.width, calc),
         ],
-        prevents_collapse_through,
+        prevents_collapse_through: prevents_collapse_through(style, edges, in_block),
         suppresses_baseline: style.contain().suppresses_baseline(),
     }
+}
+
+/// Whether the container's own margins cannot collapse through it
+/// (`compute_inner` 580-586).
+fn prevents_collapse_through(style: &taffy::Style, edges: &Edges, in_block: bool) -> bool {
+    let (padding, border) = (edges.padding, edges.border);
+    !style.is_block()
+        || !in_block
+        || establishes_new_bfc(style)
+        || style.position().is_out_of_flow()
+        || padding.top > 0.0
+        || padding.bottom > 0.0
+        || border.top > 0.0
+        || border.bottom > 0.0
 }
 
 /// What the children share (`compute_inner` 547-551, 563-578,
@@ -100,16 +105,7 @@ pub(super) fn container(
     (outer_width, known): (f32, Size<Option<f32>>),
     answer: Answering,
 ) -> Container {
-    let percentage_basis = Size {
-        width: known.width,
-        height: known
-            .height
-            .filter(|_| inputs.known_dimensions_are_definite.height),
-    };
-    let inherent = inputs.sizing_mode == SizingMode::InherentSize;
-    let percentage_resolution_height = percentage_basis.height.or(inherent
-        .then(|| sizes.size.height.maybe_max(sizes.min.height))
-        .flatten());
+    let (percentage_basis, percentage_resolution_height) = percentage_bases(inputs, sizes, known);
     let resolved_inset = edges.resolved_inset();
     let inner_width = (outer_width - resolved_inset.horizontal_axis_sum()).max(0.0);
     let (children_adjoin, own_margins_collapse) = collapsing(
@@ -138,4 +134,26 @@ pub(super) fn container(
         scrolls: is_scroll_container(style),
         answer,
     }
+}
+
+/// The children's percentage basis, its height only when definite, and
+/// the height percentages resolve against: that, else the container's
+/// own height when asked for its inherent size (`compute_inner`
+/// 547-551, 618-620).
+fn percentage_bases(
+    inputs: &LayoutInput,
+    sizes: &Sizes,
+    known: Size<Option<f32>>,
+) -> (Size<Option<f32>>, Option<f32>) {
+    let basis = Size {
+        width: known.width,
+        height: known
+            .height
+            .filter(|_| inputs.known_dimensions_are_definite.height),
+    };
+    let inherent = inputs.sizing_mode == SizingMode::InherentSize;
+    let resolution_height = basis.height.or(inherent
+        .then(|| sizes.size.height.maybe_max(sizes.min.height))
+        .flatten());
+    (basis, resolution_height)
 }
