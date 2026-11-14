@@ -34,6 +34,9 @@ pub(crate) struct KeptOrder {
     /// which a run of the next leans on when it touches one
     /// (`paint_labels::Lean`).
     pub(crate) recent: Vec<(Label, Label)>,
+    /// What the splice that made this did, for the drawing steps, the
+    /// extents index and the hits to follow; empty unless it was spliced.
+    pub(crate) splice_edits: crate::kept_order_splice::SpliceEdits,
     pub(crate) tree: ClipTree,
     pub(crate) clips: Clips,
     pub(crate) chains: Chains,
@@ -63,6 +66,7 @@ impl KeptOrder {
             labels: crate::paint_labels::afresh(steps.len()),
             spacing: crate::paint_labels::spacing(steps.len()),
             recent: Vec::new(),
+            splice_edits: crate::kept_order_splice::SpliceEdits::default(),
             steps,
             tree,
             clips,
@@ -139,6 +143,8 @@ impl KeptOrder {
             clips: self.redone.len(),
             ..OrderWalks::default()
         };
+        // what a splice did is the splice's to set, after this
+        self.splice_edits = crate::kept_order_splice::SpliceEdits::default();
         self
     }
 }

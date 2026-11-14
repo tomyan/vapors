@@ -17,20 +17,20 @@ pub(crate) struct ClipTree {
     /// The number of boxes above a box in the tree: a clip parent is
     /// above, so it comes first in depth order.
     depth: Vec<usize>,
-    /// Slot `s`'s dependents are `dependents[first[s]..first[s + 1]]`.
-    first: Vec<usize>,
-    dependents: Vec<usize>,
+    /// Each slot's dependents, in slot order: kept by a splice in place,
+    /// a slot put in or taken out of its parent's group, not made again
+    /// over every slot.
+    dependents: Vec<Vec<usize>>,
 }
 
 impl ClipTree {
     /// The clip tree of `boxes`, box 0 the root.
     pub(crate) fn of(boxes: &[LayoutBox]) -> Self {
         let (parent, depth) = parents_and_depths(boxes);
-        let (first, dependents) = grouped(&parent);
+        let dependents = grouped(&parent);
         Self {
             parent,
             depth,
-            first,
             dependents,
         }
     }
@@ -47,14 +47,31 @@ impl ClipTree {
     ) {
         self.parent.resize(len, None);
         self.depth.resize(len, 0);
+        self.dependents.resize_with(len, Vec::new);
         for &(slot, parent) in added {
+            self.leave(slot);
             self.parent[slot] = Some(parent);
             self.depth[slot] = self.depth[parent] + 1;
+            let group = &mut self.dependents[parent];
+            let at = group.partition_point(|&dependent| dependent < slot);
+            group.insert(at, slot);
         }
         for slot in freed {
-            (self.parent[slot], self.depth[slot]) = (None, 0);
+            self.leave(slot);
+            self.depth[slot] = 0;
+            self.dependents[slot].clear();
         }
-        (self.first, self.dependents) = grouped(&self.parent);
+    }
+
+    /// Takes `slot` out of its parent's group, if it has a parent.
+    fn leave(&mut self, slot: usize) {
+        let Some(parent) = self.parent[slot].take() else {
+            return;
+        };
+        let group = &mut self.dependents[parent];
+        if let Ok(at) = group.binary_search(&slot) {
+            group.remove(at);
+        }
     }
 
     /// The slots in the tree: one past the last.
@@ -73,7 +90,7 @@ impl ClipTree {
 
     /// The boxes whose clip comes from box `slot`'s content.
     pub(crate) fn dependents(&self, slot: usize) -> &[usize] {
-        &self.dependents[self.first[slot]..self.first[slot + 1]]
+        &self.dependents[slot]
     }
 
     /// The first slot whose parent, depth or dependents differ from
@@ -105,30 +122,13 @@ fn parents_and_depths(boxes: &[LayoutBox]) -> (Vec<Option<usize>>, Vec<usize>) {
     (parent, depth)
 }
 
-/// Each slot's dependents in one vector, grouped by parent, and where
-/// each group starts.
-fn grouped(parent: &[Option<usize>]) -> (Vec<usize>, Vec<usize>) {
-    let first = group_starts(parent);
-    let mut next = first.clone();
-    let mut dependents = vec![0; first[parent.len()]];
+/// Each slot's dependents, in slot order.
+fn grouped(parent: &[Option<usize>]) -> Vec<Vec<usize>> {
+    let mut dependents = vec![Vec::new(); parent.len()];
     for (slot, above) in parent.iter().enumerate() {
         if let Some(above) = *above {
-            dependents[next[above]] = slot;
-            next[above] += 1;
+            dependents[above].push(slot);
         }
     }
-    (first, dependents)
-}
-
-/// Where each slot's group of dependents starts, and one past the last
-/// group's end: the running count of dependents of the slots before.
-fn group_starts(parent: &[Option<usize>]) -> Vec<usize> {
-    let mut first = vec![0; parent.len() + 1];
-    for &above in parent.iter().flatten() {
-        first[above + 1] += 1;
-    }
-    for slot in 0..parent.len() {
-        first[slot + 1] += first[slot];
-    }
-    first
+    dependents
 }

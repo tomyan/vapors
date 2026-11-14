@@ -15,7 +15,7 @@ fn inserted(start: usize, times: usize, at: impl Fn(usize) -> usize) -> (Vec<Lab
         let position = at(labels.len());
         relabelled += match insert(&mut labels, position, 1, step) {
             Relabelled::None => 0,
-            Relabelled::Range(range) => range.len(),
+            Relabelled::Range(range, _) => range.len(),
             Relabelled::All => labels.len(),
         };
         assert!(
@@ -103,6 +103,9 @@ fn a_full_gap_relabels_a_range_around_it() {
     let relabelled = insert(&mut labels, 1, 1, 100);
 
     // Then: a range relabelled, the order kept
-    assert!(matches!(relabelled, Relabelled::Range(_)), "{relabelled:?}");
+    assert!(
+        matches!(relabelled, Relabelled::Range(..)),
+        "{relabelled:?}"
+    );
     assert!(increasing(&labels), "{labels:?}");
 }

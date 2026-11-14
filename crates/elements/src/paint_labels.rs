@@ -30,8 +30,9 @@ fn under_threshold(held: usize, level: u32) -> bool {
 pub(crate) enum Relabelled {
     #[default]
     None,
-    /// The labels at these positions, after the insert, changed.
-    Range(std::ops::Range<usize>),
+    /// The labels at these positions, after the insert, changed; the
+    /// labels they held before (0 for those put in).
+    Range(std::ops::Range<usize>, Vec<Label>),
     /// Every label changed.
     All,
 }
@@ -159,8 +160,9 @@ fn relabel_around(labels: &mut [Label], new: std::ops::Range<usize>) -> Relabell
         let high = low.saturating_add(size - 1);
         let range = positions_in(labels, (low, high), &new);
         if under_threshold(range.len(), level) {
+            let before = labels[range.clone()].to_vec();
             spread(&mut labels[range.clone()], low, size);
-            return Relabelled::Range(range);
+            return Relabelled::Range(range, before);
         }
     }
     let n = labels.len();
