@@ -11,8 +11,8 @@
 use std::time::{Duration, Instant};
 
 use vapors_scene3d::{
-    CameraHandle, Colour, GeometryHandle, Meshes, NodeKind, PickAt, Projection, Scene, Transform,
-    Vec3, pick,
+    CameraHandle, Colour, GeometryHandle, Meshes, NodeId, NodeKind, PickAt, Projection, Scene,
+    Transform, Vec3, pick,
 };
 
 const COUNTS: [usize; 4] = [10, 100, 1_000, 10_000];
@@ -21,9 +21,9 @@ const THROUGH: [f32; 2] = [50.0, 50.0];
 
 fn main() {
     for count in COUNTS {
-        let (mut scene, meshes) = column(count);
+        let (mut scene, meshes, nearest) = column(count);
         let beside = time(&mut scene, &meshes, BESIDE, None);
-        let through = time(&mut scene, &meshes, THROUGH, Some(count));
+        let through = time(&mut scene, &meshes, THROUGH, Some(nearest));
         println!(
             "pick_cost: {count} meshes: bounds only median {:?} p95 {:?}; every triangle median {:?} p95 {:?}",
             beside.0, beside.1, through.0, through.1
@@ -32,13 +32,12 @@ fn main() {
 }
 
 /// The median and 95th percentile of 200 picks at `point`, failing
-/// loudly when the pick refuses or picks other than `expect_hit` says:
-/// `None` expects nothing, `Some(_)` expects the nearest cube.
+/// loudly when the pick refuses or picks other than `expect`.
 fn time(
     scene: &mut Scene,
     meshes: &Meshes,
     point: [f32; 2],
-    expect_hit: Option<usize>,
+    expect: Option<NodeId>,
 ) -> (Duration, Duration) {
     let at = PickAt {
         point,
@@ -47,65 +46,70 @@ fn time(
     let mut times = Vec::new();
     for round in 0..220 {
         let started = Instant::now();
-        let picked =
-            pick(scene, meshes, at, |_| false).unwrap_or_else(|error| fail(&error.to_string()));
+        let picked = pick(scene, meshes, at, |_| false).unwrap_or_else(|error| fail(&error));
         if round >= 20 {
             times.push(started.elapsed());
         }
-        if picked.is_some() != expect_hit.is_some() {
-            fail(&format!("the pick at {point:?} returned {picked:?}"));
+        if picked != expect {
+            fail(&format!(
+                "the pick at {point:?} returned {picked:?}, not {expect:?}"
+            ));
         }
     }
     times.sort();
     (times[times.len() / 2], times[(times.len() - 1) * 95 / 100])
 }
 
-fn fail(why: &str) -> ! {
+fn fail(why: &dyn std::fmt::Display) -> ! {
     eprintln!(
         "FAIL pick_cost: {why}; reproduce: cargo run --release -p vapors-scene3d --example pick_cost"
     );
     std::process::exit(1);
 }
 
-/// `count` unit cubes centred on the Z axis at z = 0, -2, -4, ..., and a
-/// camera at z = 5 whose far plane lies past the last one.
-fn column(count: usize) -> (Scene, Meshes) {
+/// `count` unit cubes centred on the Z axis at z = 0, -2, -4, ..., a
+/// camera at z = 5 whose far plane lies past the last one, and the
+/// nearest cube.
+fn column(count: usize) -> (Scene, Meshes, NodeId) {
     let mut scene = Scene::new();
     let mut meshes = Meshes::new();
     let cube = cube(&mut meshes);
-    let root = scene.root();
     #[allow(
         clippy::cast_precision_loss,
         reason = "counts up to 10,000 are exact in f32"
     )]
-    let far = 2.0 * count as f32 + 10.0;
-    let projection =
-        Projection::orthographic(4.0, 0.1, far).unwrap_or_else(|error| fail(&error.to_string()));
-    let handle = CameraHandle::new();
+    let depths: Vec<f32> = (0..count).map(|index| -2.0 * index as f32).collect();
+    // the camera is 5 in front of z = 0; the far plane 5 past the last
+    camera(&mut scene, 10.0 - depths[depths.len() - 1]);
+    let root = scene.root();
+    let cubes: Vec<NodeId> = (depths.iter())
+        .map(|z| {
+            let kind = NodeKind::Mesh {
+                geometry: cube.clone(),
+                colour: Colour::BLACK,
+            };
+            scene
+                .add(root, kind, at(*z))
+                .unwrap_or_else(|error| fail(&error))
+        })
+        .collect();
+    (scene, meshes, cubes[0])
+}
+
+/// An orthographic camera 4 units high at z = 5, its far plane `far`
+/// away, as the active camera.
+fn camera(scene: &mut Scene, far: f32) {
+    let projection = Projection::orthographic(4.0, 0.1, far).unwrap_or_else(|error| fail(&error));
+    let (root, handle) = (scene.root(), CameraHandle::new());
+    let kind = NodeKind::Camera { handle, projection };
     scene
-        .add(root, NodeKind::Camera { handle, projection }, at(5.0))
-        .unwrap_or_else(|error| fail(&error.to_string()));
+        .add(root, kind, at(5.0))
+        .unwrap_or_else(|error| fail(&error));
     scene.set_camera(Some(handle));
-    for index in 0..count {
-        #[allow(
-            clippy::cast_precision_loss,
-            reason = "counts up to 10,000 are exact in f32"
-        )]
-        let z = -2.0 * index as f32;
-        let kind = NodeKind::Mesh {
-            geometry: cube.clone(),
-            colour: Colour::BLACK,
-        };
-        scene
-            .add(root, kind, at(z))
-            .unwrap_or_else(|error| fail(&error.to_string()));
-    }
-    (scene, meshes)
 }
 
 fn at(z: f32) -> Transform {
-    Transform::from_translation(Vec3::new(0.0, 0.0, z))
-        .unwrap_or_else(|error| fail(&error.to_string()))
+    Transform::from_translation(Vec3::new(0.0, 0.0, z)).unwrap_or_else(|error| fail(&error))
 }
 
 /// A unit cube centred on the origin: corner `i` has x, y, z from bits
@@ -129,5 +133,5 @@ fn cube(meshes: &mut Meshes) -> GeometryHandle {
         .collect();
     meshes
         .geometry(positions, indices, vec![1.0; 8])
-        .unwrap_or_else(|error| fail(&error.to_string()))
+        .unwrap_or_else(|error| fail(&error))
 }

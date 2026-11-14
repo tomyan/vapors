@@ -32,6 +32,7 @@
 
 mod appearance;
 mod camera;
+mod camera_error;
 mod colour;
 mod error;
 mod geometry_handle;
@@ -40,6 +41,8 @@ mod mesh_error;
 mod meshes;
 mod node;
 mod pick;
+mod pick_error;
+mod pick_ray;
 mod projection;
 mod store;
 mod store_error;
@@ -50,6 +53,7 @@ mod world;
 #[cfg(test)]
 mod test_support;
 
+pub use camera_error::CameraError;
 pub use colour::Colour;
 pub use error::SceneError;
 pub use geometry_handle::GeometryHandle;
@@ -58,7 +62,8 @@ pub use handle::{CameraHandle, NodeId};
 pub use mesh_error::{MeshError, VERTEX_BYTES};
 pub use meshes::{Geometry, GeometryId, Meshes};
 pub use node::NodeKind;
-pub use pick::{PickAt, PickError, pick};
+pub use pick::{PickAt, pick};
+pub use pick_error::PickError;
 pub use projection::{Projection, project, view_projection};
 pub use store::Scene;
 pub use store_error::StoreError;

@@ -1,70 +1,14 @@
-use super::*;
-use crate::{
-    CameraHandle, Colour, GeometryHandle, Meshes, NodeKind, Projection, Quat, Transform, Vec3,
-};
+//! Which mesh wins: depth, skipping, visibility, transforms, ties.
 
-/// A scene viewed by a camera 5 back on +Z looking down -Z through
-/// `projection`, on a 100 x 100 surface, with its geometry.
-struct Stage {
-    scene: Scene,
-    meshes: Meshes,
-    square: GeometryHandle,
-}
-
-impl Stage {
-    fn new(projection: Projection) -> Self {
-        let mut scene = Scene::new();
-        let (root, handle) = (scene.root(), CameraHandle::new());
-        let eye = Transform::from_translation(Vec3::new(0.0, 0.0, 5.0)).unwrap();
-        scene
-            .add(root, NodeKind::Camera { handle, projection }, eye)
-            .unwrap();
-        scene.set_camera(Some(handle));
-        let mut meshes = Meshes::new();
-        let corners = [(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)];
-        let positions = corners.map(|(x, y)| Vec3::new(x, y, 0.0)).to_vec();
-        let square = meshes
-            .geometry(positions, vec![0, 1, 2, 0, 2, 3], vec![1.0; 4])
-            .unwrap();
-        Self {
-            scene,
-            meshes,
-            square,
-        }
-    }
-
-    fn square_at(&mut self, local: Transform) -> NodeId {
-        let kind = NodeKind::Mesh {
-            geometry: self.square.clone(),
-            colour: Colour::BLACK,
-        };
-        let root = self.scene.root();
-        self.scene.add(root, kind, local).unwrap()
-    }
-
-    fn pick(&mut self, point: [f32; 2], skip: impl Fn(NodeId) -> bool) -> Option<NodeId> {
-        let at = PickAt {
-            point,
-            size: [100.0, 100.0],
-        };
-        pick(&mut self.scene, &self.meshes, at, skip).expect("picks")
-    }
-}
-
-fn at(z: f32) -> Transform {
-    Transform::from_translation(Vec3::new(0.0, 0.0, z)).unwrap()
-}
-
-fn ortho() -> Projection {
-    Projection::orthographic(4.0, 0.1, 100.0).unwrap()
-}
+use super::stage::{Stage, at_z, unit_square};
+use crate::{Colour, Projection, Quat, Transform, Vec3};
 
 #[test]
 fn the_nearest_mesh_under_the_point_is_picked_not_one_behind_it() {
     // Given: a square at z 0 behind one at z 1, both under the centre
-    let mut stage = Stage::new(ortho());
-    let _behind = stage.square_at(at(0.0));
-    let front = stage.square_at(at(1.0));
+    let mut stage = Stage::new();
+    let _behind = stage.square_at(at_z(0.0));
+    let front = stage.square_at(at_z(1.0));
 
     // Then
     assert_eq!(stage.pick([50.0, 50.0], |_| false), Some(front));
@@ -73,34 +17,20 @@ fn the_nearest_mesh_under_the_point_is_picked_not_one_behind_it() {
 #[test]
 fn a_skipped_mesh_lets_the_pick_through_to_the_one_behind() {
     // Given
-    let mut stage = Stage::new(ortho());
-    let behind = stage.square_at(at(0.0));
-    let front = stage.square_at(at(1.0));
+    let mut stage = Stage::new();
+    let behind = stage.square_at(at_z(0.0));
+    let front = stage.square_at(at_z(1.0));
 
     // Then
     assert_eq!(stage.pick([50.0, 50.0], |node| node == front), Some(behind));
 }
 
 #[test]
-fn a_point_outside_every_mesh_picks_nothing() {
-    // Given: 25 pixels a unit, so the square covers 37.5 to 62.5
-    let mut stage = Stage::new(ortho());
-    stage.square_at(at(0.0));
-
-    // Then
-    assert_eq!(stage.pick([30.0, 50.0], |_| false), None);
-    assert!(
-        stage.pick([40.0, 60.0], |_| false).is_some(),
-        "inside, off centre"
-    );
-}
-
-#[test]
 fn a_hidden_mesh_is_not_picked() {
     // Given
-    let mut stage = Stage::new(ortho());
-    let behind = stage.square_at(at(0.0));
-    let front = stage.square_at(at(1.0));
+    let mut stage = Stage::new();
+    let behind = stage.square_at(at_z(0.0));
+    let front = stage.square_at(at_z(1.0));
     stage
         .scene
         .set_appearance(front, Colour::BLACK, false)
@@ -113,10 +43,10 @@ fn a_hidden_mesh_is_not_picked() {
 #[test]
 fn a_mesh_seen_edge_on_is_missed_and_its_transform_is_followed() {
     // Given: the square turned a quarter about +Y, and one moved right
-    let mut stage = Stage::new(ortho());
+    let mut stage = Stage::new();
     let edge_on = Quat::from_rotation_y(std::f32::consts::FRAC_PI_2);
     stage.square_at(Transform::new(Vec3::ZERO, edge_on, Vec3::ONE).unwrap());
-    let right = stage.square_at(Transform::from_translation(Vec3::new(1.0, 0.0, 0.0)).unwrap());
+    let right = stage.square_at(Transform::from_translation(Vec3::X).unwrap());
 
     // Then: 1 unit right is pixel 75
     assert_eq!(stage.pick([45.0, 50.0], |_| false), None);
@@ -124,45 +54,44 @@ fn a_mesh_seen_edge_on_is_missed_and_its_transform_is_followed() {
 }
 
 #[test]
-fn a_perspective_camera_picks_along_its_rays() {
-    // Given: a square 2 back at x 1, off the centre ray
-    let mut stage = Stage::new(Projection::perspective(1.0, 0.1, 100.0).unwrap());
-    let off = stage.square_at(Transform::from_translation(Vec3::new(1.0, 0.0, -2.0)).unwrap());
-    let view_projection = stage.scene_view_projection();
-
-    // When: where its centre projects
-    let ndc = crate::project(view_projection, Vec3::new(1.0, 0.0, -2.0)).unwrap();
-    let point = [(ndc.x + 1.0) * 50.0, (1.0 - ndc.y) * 50.0];
+fn meshes_at_exactly_the_same_depth_pick_the_first_in_draw_order() {
+    // Given: two coplanar squares; the renderer draws the first first,
+    // and its Less depth test keeps it
+    let mut stage = Stage::new();
+    let first = stage.square_at(at_z(0.0));
+    let _second = stage.square_at(at_z(0.0));
 
     // Then
-    assert_eq!(stage.pick(point, |_| false), Some(off));
-    assert_eq!(stage.pick([50.0, 50.0], |_| false), None);
-}
-
-impl Stage {
-    fn scene_view_projection(&mut self) -> crate::Mat4 {
-        self.scene.update();
-        let camera = self.scene.active_camera().unwrap();
-        let NodeKind::Camera { projection, .. } = self.scene.kind(camera).unwrap().clone() else {
-            panic!("a camera")
-        };
-        projection.matrix(1.0).unwrap() * self.scene.world(camera).unwrap().inverse()
-    }
+    assert_eq!(stage.pick([50.0, 50.0], |_| false), Some(first));
 }
 
 #[test]
-fn a_scene_without_a_camera_is_refused() {
-    // Given
-    let mut scene = Scene::new();
-    let meshes = Meshes::new();
-
-    // When
-    let at = PickAt {
-        point: [1.0, 1.0],
-        size: [10.0, 10.0],
-    };
-    let refused = pick(&mut scene, &meshes, at, |_| false);
+fn nearness_compares_across_differently_scaled_and_turned_meshes() {
+    // Given: a square shrunk by half in front of one grown four times
+    // and turned: in their own spaces the ray is twice and a quarter as
+    // long, so comparing local distances would pick the one behind
+    let mut stage = Stage::new();
+    let turned = Quat::from_rotation_z(0.7);
+    let _behind = stage.square_at(Transform::new(Vec3::ZERO, turned, Vec3::splat(4.0)).unwrap());
+    let half = Vec3::splat(0.5);
+    let front = stage.square_at(Transform::new(Vec3::Z, Quat::IDENTITY, half).unwrap());
 
     // Then
-    assert_eq!(refused, Err(PickError::Store(StoreError::NoCamera)));
+    assert_eq!(stage.pick([50.0, 50.0], |_| false), Some(front));
+}
+
+#[test]
+fn a_tiny_mesh_under_a_matching_camera_is_picked() {
+    // Given: a square of side 2e-4 filling half of a view 4e-4 high
+    // whose near-to-far segment is 1 long (250,000 pixels a unit; the
+    // square covers pixels 25 to 75); an absolute parallel threshold
+    // (f32::EPSILON) misses it
+    let projection = Projection::orthographic(4e-4, 0.0, 1.0).unwrap();
+    let mut stage = Stage::viewed(projection, [100.0, 100.0]);
+    let tiny = unit_square(&mut stage.meshes, 2e-4);
+    let square = stage.mesh_at(tiny, at_z(4.5));
+
+    // Then
+    assert_eq!(stage.pick([70.0, 50.0], |_| false), Some(square));
+    assert_eq!(stage.pick([80.0, 50.0], |_| false), None);
 }
