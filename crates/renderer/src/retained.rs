@@ -113,6 +113,25 @@ impl Retained {
         self.buffer.slice(self.range(kept))
     }
 
+    /// The kept bytes of each of `kept`, for draws recorded into
+    /// `frame`, as [`Retained::slice`] gives one.
+    ///
+    /// # Panics
+    ///
+    /// As [`Retained::slice`].
+    pub fn slices<'a>(
+        &'a mut self,
+        frame: &FrameEncoder,
+        kept: &[&KeptRange],
+    ) -> Vec<wgpu::BufferSlice<'a>> {
+        self.begin(frame);
+        let ranges: Vec<Range<u64>> = kept.iter().map(|kept| self.range(kept)).collect();
+        ranges
+            .into_iter()
+            .map(|range| self.buffer.slice(range))
+            .collect()
+    }
+
     /// How many bytes `kept` holds.
     ///
     /// # Panics

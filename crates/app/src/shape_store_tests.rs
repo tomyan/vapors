@@ -170,7 +170,7 @@ fn a_transform_the_pipeline_refuses_is_refused_naming_the_shape() {
     // Then
     assert_eq!(
         refused.to_string(),
-        "shape 0, the entry at a.wisp:3, cannot be drawn: transform [1.0, 0.0, 0.0, NaN, 0.0, 0.0] is not finite"
+        "shape 0, the entry at a.wisp:3, cannot be drawn: transform [1.0, 0.0, 0.0, NaN, 0.0, 0.0] is not finite; give the element a transform whose values and scale are finite; reproduce with `cargo test -p vapors-renderer --lib closed_form_shape`"
     );
 }
 
@@ -222,4 +222,23 @@ fn bounds_that_hold_the_stroked_entry_under_its_transform_pass() {
 
     // When, Then
     assert_eq!(store.closed_forms(&[scaled]).map(|s| s.len()), Ok(1));
+}
+
+#[test]
+fn bounds_that_miss_only_the_stroke_are_refused() {
+    // Given: the circle (4 to 12) stroked 2 wide draws 3 to 13, and 2.5
+    // to 13.5 with the ramp; bounds of 3.6 to 12.4 hold the fill and
+    // ramp (2.6 to 13.4 with the fringe) but not the stroke
+    let store = store(vec![entry("a.wisp:5", STROKE_2, CIRCLE)]);
+    let mut stroked = item(0, IDENTITY);
+    stroked.bounds = Rect::new(3.6, 3.6, 12.4, 12.4);
+
+    // When
+    let refused = store.closed_forms(&[stroked]);
+
+    // Then
+    assert!(
+        matches!(refused, Err(ShapeError::OutsideBounds { .. })),
+        "{refused:?}"
+    );
 }

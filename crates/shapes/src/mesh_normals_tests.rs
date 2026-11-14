@@ -9,19 +9,18 @@ use crate::mesh_edges::triangles_with_edges;
 use super::*;
 
 #[test]
-fn a_corner_moves_along_the_miter_of_its_outline_edges_with_shift_one_on_each() {
+fn a_corner_moves_along_the_miter_of_its_outline_edges() {
     // When
     let triangles = built(&SQUARE, &SQUARE_INDICES);
 
     // Then: corner (0, 0) sits between the bottom edge (outward -y)
-    // and the left edge (outward -x), so it moves (-1, -1); on its own
-    // outline edge 2 (bottom) the shift is 1, on the far diagonal 0, and
-    // on edge 0 (the right side, outward +x) -1
+    // and the left edge (outward -x), so its miter is (-1, -1); the
+    // triangle's edge normals are +x for the right side, none for the
+    // far diagonal, -y for the bottom
     let [a, b, _] = triangles[0];
     assert_eq!(a.normal, [-1.0, -1.0]);
-    assert_eq!(a.shift, [-1.0, 0.0, 1.0]);
     assert_eq!(b.normal, [1.0, -1.0]);
-    assert_eq!(b.shift, [1.0, 0.0, 1.0]);
+    assert_eq!(a.edge_normals, [[1.0, -0.0], [0.0, 0.0], [0.0, -1.0]]);
 }
 
 #[test]

@@ -117,9 +117,16 @@ inside the mesh, which would leave the outer half of the coverage
 ramp missing (every edge a hard edge on its outer side), so the
 outline is extruded by half a device pixel in the vertex shader (Tom,
 2026-11-13, option 2): each vertex carries the miter offset of its
-outline edges as a normal and, per edge, the shift that move takes
-off its distance; distances go negative outside the true outline and
-the ramp straddles it, where Chromium's edge sits. The miter is taken
+outline edges as a normal and its triangle's three edge normals; the
+vertex shader rebuilds the vertex's two outline edges' normals from
+its miter offset (the unit vectors with offset . m = 1), moves it half
+a device pixel out across both in device space (the device miter,
+clamped at SVG's limit of 4), and takes the move's projection on each
+edge normal off that edge's distance; distances go negative outside
+the true outline and the ramp straddles it, where Chromium's edge
+sits, under any affine transform (#360 review, lead 2026-11-14; a move
+of half a pixel over the transform's smaller singular value drew
+spikes 3.5 px out of a circle under scale(10, 1)). The miter is taken
 per triangle corner from the two outline edges bounding its wedge, so
 where an outline touches itself at a vertex (a bowtie, an even-odd
 star's points) each wedge moves out of its own side; two outline edges
@@ -144,15 +151,20 @@ an inset-only ramp (the shape draws half a pixel small) and an AA
 ring of inset fill plus a one-pixel band (an inset of a stroke under a
 pixel wide folds its fill). Cost against the indexed layout it
 replaces: a fill of n outline vertices is about 24n bytes indexed
-(12-byte vertices, u32 indices) and 120n bytes here (40-byte vertices,
-three per triangle, no index buffer), 5 times; a 24 px icon of 200
-vertices about 24 KB against 5 KB; the vertex shader runs three times
-per triangle. Small in absolute terms for icons; S5a measures. A known
-limit for S3b: a pixel inside the shape within half a pixel of the
-outline but inside a triangle with no outline edge (the wedge at an
-outline vertex) gets coverage 1 where Chromium gives between 0.5 and
-1, at most one slightly dark pixel per outline vertex, expected along
-flattened curves. A CPU fringe of fixed width is early antialiasing
+(12-byte vertices, u32 indices) and 156n bytes here (52-byte vertices,
+three per triangle, no index buffer), 6.5 times; a 24 px icon of 200
+vertices about 31 KB against 5 KB; the vertex shader runs three times
+per triangle. Small in absolute terms for icons; S5a measures. Known
+limits for S3b, each pinned by a test in
+`crates/renderer/tests/gpu_mesh_divergences.rs`: (1) at a corner, a
+triangle that carries only one of the corner's outline edges takes
+coverage from that edge alone, inside (the wedge: a 12 x 8 rect
+rotated 30 degrees gets 1 where the closed form gives 0.82) and just
+outside (0.255 where it gives 0.196), at most a pixel or two per
+corner, within half a pixel times the miter of the outline; (2) one
+item's overlapping triangles (a self-crossing stroke, lyon's stroker
+at some joins) blend twice, so a translucent overlap draws darker
+(1 - (1 - a)^2 for a) where SVG paints the union once. A CPU fringe of fixed width is early antialiasing
 and is not a candidate (the brief, "Antialiasing after every
 transform"). S3b compares, for each kind, MSAA against that kind's
 analytic method.
@@ -472,7 +484,7 @@ is checked against what it found.
 | S2 | Classifier and tessellator (lyon, pinned; `cargo xtask deny` passing) in `vapors-shapes`, canonical form and hash, per-triangle edge distances for meshes (1.2); C and Q curves in the parser. Five PRs: curves, segments and a curve-icon paint fixture; canonical form and hash; the classifier; the mesh format; the tessellator | Unit tests: a rect path classified as a rect, two arcs as a circle, other paths as meshes; equal shapes one hash, a changed stroke width another; a non-finite or degenerate input refused naming the shape | S1 | everything |
 | S3a1 | `Item::Shape`, the `ShapeStore` (1.4), the closed-form pipeline and the painter's dispatch, on IU4's retained path | Rects and circles batched in paint order; idle frame writes 0 shape bytes; a draw of an entry not uploaded refused naming it | S2, IU4 PR 2 | 3D 4, 4b, 5 |
 | S3a2 | The mesh pipeline | Fill and stroke meshes batched in paint order with closed-form shapes | S3a1 | 3D 4, 4b, 5 |
-| S3b | The antialiasing test (the brief's slice 1): touche's ten icons as shapes at 1x, 2x, rotated 30 degrees and scaled 1.37; per kind, MSAA against its analytic method (1.2), against Chromium with the paint_check rules, beside the icon route; the curve tolerance; sub-pixel features against Chromium (the closed-form ramp gives a 0.25 px stroke on a pixel centre 0.625, #345 review M4) | The numbers recorded; a method chosen per kind, or the question returned to Tom if none is within the rules at 1x (the brief, decision 3) | S3a2 | everything |
+| S3b | The antialiasing test (the brief's slice 1): touche's ten icons as shapes at 1x, 2x, rotated 30 degrees and scaled 1.37; per kind, MSAA against its analytic method (1.2), against Chromium with the paint_check rules, beside the icon route; the curve tolerance; sub-pixel features against Chromium (the closed-form ramp gives a 0.25 px stroke on a pixel centre 0.625, #345 review M4); the mesh known limits (1.2: corners, a translucent self-crossing stroke) against Chromium, with an exact candidate for the corners beside MSAA: each triangle carries, flat, the outline lines of its corners' wedges (up to six, with a convex or reflex flag per corner), and coverage is 0.5 plus the minimum over its corners of each wedge's distance (convex: the nearer line; reflex: the farther), each line's distance in device pixels from the local position (about 88 bytes a vertex) | The numbers recorded; a method chosen per kind, or the question returned to Tom if none is within the rules at 1x (the brief, decision 3) | S3a2 | everything |
 | S4a | `<path>` fill and stroke in templates; `fill`, `stroke`, `stroke-width` in `vapors-css` with the presentation attributes mapped; run-time parse and tessellation cached by hash | Chromium paint comparisons for fill and stroke; a class toggle recolours and tessellates nothing (counted) | S3b | 3D 4, 4b, 5 |
 | S4b | `<rect>` and `<circle>`; elliptical corners (`rx` and `ry` differ) in the closed-form shader, which `check_geometry` refuses until then | Chromium paint comparisons, including a rounded rect and one with elliptical corners | S4a | 3D 4, 4b, 5 |
 | S5a | Compile time: the compiler parses, refuses, classifies, deduplicates and emits each crate's `SHAPES` and each element's index | A bad `d` fails the build naming file and line; the same path in two components of one crate is one entry (snapshot test) | S4b | 3D 4, 4b, 5 |
