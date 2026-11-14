@@ -12,13 +12,6 @@ use crate::node_map::NodeMap;
 
 /// One shape an element paints: where it was written, its path, its
 /// paint, and the device pixels per unit it is drawn at.
-#[cfg_attr(
-    not(feature = "test-support"),
-    expect(
-        dead_code,
-        reason = "S4a PR 3's <path> paints shapes; until then only test_items does"
-    )
-)]
 pub(crate) type ShapeSpec<'a> = (&'a str, &'a IconPath, Paint, f32);
 
 /// The cache and each element's uses of it.
@@ -28,13 +21,6 @@ pub(crate) struct DocumentShapes {
     uses: NodeMap<Vec<CacheRef>>,
 }
 
-#[cfg_attr(
-    not(feature = "test-support"),
-    expect(
-        dead_code,
-        reason = "S4a PR 3's <path> paints shapes; until then only test_items does"
-    )
-)]
 impl DocumentShapes {
     /// No shapes yet, for a new document.
     pub(crate) fn new() -> Self {
@@ -81,6 +67,19 @@ impl DocumentShapes {
         for at in self.uses.remove(&node).unwrap_or_default() {
             self.cache.release(at);
         }
+    }
+
+    /// The live entry `at` names, when it is this document's.
+    pub(crate) fn get(
+        &self,
+        at: RuntimeRef,
+    ) -> Option<&std::sync::Arc<vapors_shapes::RuntimeShape>> {
+        let mine = at.document == self.cache.document();
+        let at = CacheRef {
+            index: at.index,
+            generation: at.generation,
+        };
+        self.cache.get(at).filter(|_| mine)
     }
 
     fn runtime_ref(&self, at: CacheRef) -> RuntimeRef {

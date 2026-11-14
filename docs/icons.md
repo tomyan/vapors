@@ -83,19 +83,26 @@ code sets it.
 - `fill`, `stroke` and `stroke-width`: presentation attributes. They
   are the CSS properties of their names, ranked below every author rule
   as in Chromium, so a rule can give them instead (one-scene S4a; on the
-  `<svg>` they are inherited by its paths). Paint must come out as no
-  fill (SVG's default fill is black, so write `fill="none"`), a stroke
-  in the path's own colour (`stroke="currentColor"`), and a stroke
-  width above zero in viewBox units, written as a number or in px; 1
-  when nothing gives one, as in SVG. A bound one (`fill={..}`) is
-  refused at build time.
+  `<svg>` they are inherited by its paths). The stroke width is in
+  viewBox units, written as a number or in px; 1 when nothing gives
+  one, as in SVG. A bound one (`fill={..}`) is refused at build time.
+- Which route draws the paths (`svg_route.rs`): the icon route below,
+  while every path has no fill (SVG's default fill is black, so write
+  `fill="none"`), a stroke in its own colour (`stroke="currentColor"`)
+  that is its svg's, and a width above zero. Otherwise the whole svg
+  is drawn as shapes (one-scene S4a): each path's fill, then its
+  stroke, a shape item each from the document's run-time shape cache,
+  coverage on the GPU after the transform, the fill rule nonzero. A
+  shape reaching outside the viewBox is refused naming its path, since
+  an svg's content is not clipped yet; a path with no fill and no
+  stroke (or one of no width) paints nothing and is refused. Moving
+  icons onto shapes is the brief's open question (one-scene 1.1).
 - Nothing else: no `class`, `style`, `transform`, caps or joins. Joins
   are miter with limit 4 and caps butt, SVG's defaults.
-- CSS: a `color` different from its svg's, `display: none`, and a
-  `visibility` different from its svg's are refused, as is paint the
-  icon route does not draw (above). Paint strokes
-  every path of an icon in the svg's colour and shows them with the
-  svg's visibility, so a path styled otherwise would not be drawn as
+- CSS: `display: none` and a `visibility` different from its svg's are
+  refused. A `color` of its own takes the svg to shapes, where each
+  path is drawn in its own colours. Both routes show every path with
+  the svg's visibility, so a path shown otherwise would not be drawn as
   styled.
 
 touche's Dictate icon also uses `<rect rx>`; it is written as a path

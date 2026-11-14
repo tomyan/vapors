@@ -98,6 +98,7 @@ fixtures![
     shell::Shell,
     sizing::Sizing,
     stacking::Stacking,
+    svg_shapes_paint::SvgShapesPaint,
     text::Text,
     text_align::TextAlign,
     text_wrap::TextWrap,

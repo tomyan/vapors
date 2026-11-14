@@ -33,13 +33,6 @@ pub(crate) struct PaintInput<'a> {
     pub(crate) thumbs_shown: bool,
     /// The document's run-time shapes, which elements that paint shapes
     /// acquire from.
-    #[cfg_attr(
-        not(feature = "test-support"),
-        expect(
-            dead_code,
-            reason = "S4a PR 3's <path> paints shapes; until then only test_items does"
-        )
-    )]
     pub(crate) shapes: &'a std::cell::RefCell<crate::document_shapes::DocumentShapes>,
 }
 

@@ -13,6 +13,10 @@ use crate::arena::Arena;
 use crate::check::describe;
 use crate::error::ElementError;
 use crate::node::Kind;
+use std::cell::RefCell;
+
+use crate::document_shapes::DocumentShapes;
+
 use crate::style::UsedMap;
 use crate::svg::{NAMESPACE, positive, view_box};
 
@@ -33,22 +37,25 @@ const ATTRIBUTES: [&str; 12] = [
     "stroke-width",
 ];
 
-/// The refusals of every `svg` and `path` among `nodes`.
+/// The refusals of every `svg` and `path` among `nodes`; an svg on the
+/// shapes route fills `shapes` as it is checked.
 pub(crate) fn refusals(
     arena: &Arena,
     nodes: &[NodeId],
-    used: &UsedMap,
+    (used, shapes): (&UsedMap, &RefCell<DocumentShapes>),
     scale: f32,
 ) -> Vec<ElementError> {
     nodes
         .iter()
         .flat_map(|&node| {
             let element = describe(arena, node);
-            reasons(arena, node, used, scale)
-                .into_iter()
-                .map(move |reason| {
-                    ElementError::UnsupportedAttribute(format!("{element}: {reason}"))
-                })
+            let mut found = reasons(arena, node, used, scale);
+            if found.is_empty() {
+                found = crate::svg_shape_checks::reasons((arena, used), node, shapes, scale);
+            }
+            found.into_iter().map(move |reason| {
+                ElementError::UnsupportedAttribute(format!("{element}: {reason}"))
+            })
         })
         .collect()
 }
