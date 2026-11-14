@@ -109,7 +109,7 @@ fn gpu_a_rotated_mesh_covers_its_area_and_a_later_one_draws_over() {
     let covered = coverage(&[turned, black]);
 
     // Then: it covers its area within one pixel; pixel by pixel against
-    // the closed form, gpu_mesh_divergences.rs compares it
+    // the closed form, gpu_mesh_matches_closed.rs compares it
     let area: f32 = alone.iter().sum();
     assert!((area - 96.0).abs() < 1.0, "covered {area} of 96");
     assert_at(&covered, (15, 15), 0.0, "the later square over it");

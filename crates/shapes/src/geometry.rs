@@ -3,7 +3,8 @@
 //! primitive (docs/plans/one-scene.md 1.2); the table check refuses a
 //! geometry no shader could draw rather than letting it reach one.
 
-use crate::mesh::{MeshTriangle, check_mesh};
+use crate::mesh::MeshTriangle;
+use crate::mesh_check::check_mesh;
 
 /// A shape's geometry, in viewBox units: the cheapest exact primitive
 /// the compiler classified it to (one-scene.md 1.2).

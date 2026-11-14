@@ -9,24 +9,27 @@ use std::mem::offset_of;
 use vapors_shapes::{MeshCorner, MeshTriangle};
 
 /// Per triangle, at `MeshTriangle`'s own field offsets, for each corner
-/// `k` at locations `3k` to `3k + 2`: its position (two floats), its two
-/// normals (four) and its kind (one).
-const TRIANGLE: [wgpu::VertexAttribute; 9] = [
+/// `k` at locations `4k` to `4k + 3`: its position (two floats), its two
+/// normals (four), its kind (one) and its two reaches (two).
+const TRIANGLE: [wgpu::VertexAttribute; 12] = [
     position(0),
     normals(0),
     kind(0),
+    reaches(0),
     position(1),
     normals(1),
     kind(1),
+    reaches(1),
     position(2),
     normals(2),
     kind(2),
+    reaches(2),
 ];
 
 /// Per item: the linear part; translation and the inverse of the
 /// determinant; colour.
 const ITEM: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
-    9 => Float32x4, 10 => Float32x4, 11 => Float32x4
+    12 => Float32x4, 13 => Float32x4, 14 => Float32x4
 ];
 
 const fn corner(k: usize) -> usize {
@@ -36,7 +39,7 @@ const fn corner(k: usize) -> usize {
 #[allow(clippy::cast_possible_truncation)] // k < 3
 const fn position(k: usize) -> wgpu::VertexAttribute {
     attribute(
-        3 * k as u32,
+        4 * k as u32,
         corner(k) + offset_of!(MeshCorner, position),
         wgpu::VertexFormat::Float32x2,
     )
@@ -45,16 +48,25 @@ const fn position(k: usize) -> wgpu::VertexAttribute {
 #[allow(clippy::cast_possible_truncation)] // k < 3
 const fn normals(k: usize) -> wgpu::VertexAttribute {
     attribute(
-        3 * k as u32 + 1,
+        4 * k as u32 + 1,
         corner(k) + offset_of!(MeshCorner, normals),
         wgpu::VertexFormat::Float32x4,
     )
 }
 
 #[allow(clippy::cast_possible_truncation)] // k < 3
+const fn reaches(k: usize) -> wgpu::VertexAttribute {
+    attribute(
+        4 * k as u32 + 3,
+        corner(k) + offset_of!(MeshCorner, reaches),
+        wgpu::VertexFormat::Float32x2,
+    )
+}
+
+#[allow(clippy::cast_possible_truncation)] // k < 3
 const fn kind(k: usize) -> wgpu::VertexAttribute {
     attribute(
-        3 * k as u32 + 2,
+        4 * k as u32 + 2,
         corner(k) + offset_of!(MeshCorner, kind),
         wgpu::VertexFormat::Float32,
     )

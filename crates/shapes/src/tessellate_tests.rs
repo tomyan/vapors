@@ -3,7 +3,7 @@
 //! tolerance or width and a shape without area are refused naming it.
 
 use super::*;
-use crate::mesh::check_mesh;
+use crate::mesh_check::check_mesh;
 
 const FILL: Paint = Paint::Fill(FillRule::NonZero);
 const TOLERANCE: f32 = 0.05;

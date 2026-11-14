@@ -106,22 +106,37 @@ as it does for boxes. A tessellated mesh has interior triangle edges
 with no edge distance; analytic coverage for it needs distances per
 triangle, evaluated with `fwidth`, built at tessellation time but
 evaluated after the transform. S3a3 builds them per corner
-(`crates/shapes/src/mesh.rs`, the format and its check;
-`mesh_edges.rs` and `mesh_normals.rs`, the builder), replacing S2's
-per-edge distances after S3b (below). Each triangle is 84 bytes: three
-corners, each its position, the outward unit normals of the two
-outline edges bounding its wedge, and whether the wedge is convex,
-reflex or inside. An edge one triangle uses is on the outline (found
-by counting each edge's uses in lyon's output). A corner's wedge is
-found by walking round its vertex through the triangles that share
-its edges until an outline edge on each side; it is reflex when the
-triangles walked span more than half a turn, and a corner the
-triangles surround is inside, with no normals. Coverage is 0.5 plus
-the least, over the triangle's outline corners, of each wedge's
-distance in device pixels (convex: the nearer of its two lines;
-reflex: the farther), each line's distance taken from the
-interpolated position and divided by its screen gradient, so it is
-exact under any affine transform. Fragments exist only inside the
+(`crates/shapes/src/mesh.rs`, the format; `mesh_check.rs`, its check;
+`mesh_edges.rs`, `mesh_normals.rs` and `mesh_wedge.rs`, the builder),
+replacing S2's per-edge distances after S3b (below). Each triangle is
+108 bytes: three corners, each its position, and for each of the two
+outline edges bounding its wedge the edge's outward unit normal and
+its reach (how far the edge runs from the corner), and whether the
+wedge is convex, reflex or inside. An edge one triangle uses is on
+the outline (found by counting each edge's uses in lyon's output). A
+corner's wedge is found by walking round its vertex through the
+triangles that share its edges until an outline edge on each side; a
+corner the triangles surround is inside, with no normals. The kind
+has two answers: the angle the walked triangles span (reflex past
+half a turn) and the outline's own turn (whether the second edge's
+far end lies outside the first edge's line). Lyon's stroker leaves
+triangles overlapping round some inner joins (touche's Open icon at
+(2.25, 4.75)), where the angle says reflex and the turn convex; that
+case is drawn as reflex, which covers only more inside the fan's own
+triangles (a relaxed guard, lead 2026-11-14, declared in
+`mesh_wedge.rs`), and the other disagreement, which overlap cannot
+produce, is refused naming the vertex. Coverage is 0.5 plus the
+least, over the triangle's outline corners, of each wedge's distance
+in device pixels (convex: the nearer of its two lines, or beyond both
+the device distance to the corner; reflex: the farther). A line
+counts only alongside its edge: past the edge's far
+end it does not limit the shape, so a corner's line cannot reach
+through the fill where the outline turns in at the edge's other end
+(#371 review, H1). Each line's distance in device pixels is its
+distance in the mesh's units over the length of the transform's
+inverse transpose applied to its normal, the same for the whole
+item. Coverage is exact along an edge; near an outline corner that is
+not one of the triangle's own corners it is not. Fragments exist only inside the
 mesh, which would leave the outer half of the coverage ramp missing
 (every edge a hard edge on its outer side), so the outline is
 extruded by half a device pixel in the vertex shader (Tom, 2026-11-13,
@@ -132,9 +147,12 @@ sits (#360 review, lead 2026-11-14; a move of half a pixel over the
 transform's smaller singular value drew spikes 3.5 px out of a circle
 under scale(10, 1)). Taken per corner, where an outline touches
 itself at a vertex (a bowtie, an even-odd star's points) each wedge
-is its own; two outline edges meeting head-on (the end of a cut of no
-width into the shape) leave the wedge no inside and are refused,
-naming the vertex. Vertices lyon emits twice at
+is its own; two outline edges meeting head-on at a reflex corner (the
+end of a cut of no width into the shape) are refused, naming the
+vertex, while a convex needle that sharp draws, its miter clamped.
+GPU tests hold every mesh pixel more than half a device pixel inside
+its outline fully covered and none more than half a pixel outside
+covered at all (`gpu_mesh_insides.rs`, `gpu_mesh_corners.rs`). Vertices lyon emits twice at
 one position (a closed stroke's start) are welded first, so the edge
 across the stroke there is shared, not a seam. Two shapes the builder
 cannot draw are refused naming the shape and a vertex, until a path
@@ -154,21 +172,19 @@ an inset-only ramp (the shape draws half a pixel small) and an AA
 ring of inset fill plus a one-pixel band (an inset of a stroke under a
 pixel wide folds its fill). Cost against the indexed layout it
 replaces: a fill of n outline vertices is about 24n bytes indexed
-(12-byte vertices, u32 indices) and about 84n bytes here (n - 2
-triangles of 84 bytes, no index buffer), 3.5 times; a 24 px icon of
-200 vertices about 17 KB against 5 KB; each triangle is one instance,
-its three vertices reading the same 84 bytes. Small in absolute terms
-for icons; S5a measures. Known divergences, each pinned by a test in
-`crates/renderer/tests/gpu_mesh_divergences.rs`: (1) just beyond a
-convex corner a wedge's distance is the farther of its two lines, not
-the distance to the corner, so a 12 x 8 rect rotated 30 degrees gets
-0.255 where the closed form gives 0.196 at the pixel beyond each of
-two corners (S3a3 measured the distance to the corner instead: the
-same passes against Chromium, and a larger maximum difference on Undo
-and Redo, up to 90 against 57); (2) one item's overlapping triangles
-(a self-crossing stroke, lyon's stroker at some joins) blend twice, so
-a translucent overlap draws darker (1 - (1 - a)^2 for a) where SVG
-paints the union once. S3b decided (lead, 2026-11-14; numbers in
+(12-byte vertices, u32 indices) and about 108n bytes here (n - 2
+triangles of 108 bytes, no index buffer), 4.5 times; a 24 px icon of
+200 vertices about 21 KB against 5 KB; each triangle is one instance,
+its three vertices reading the same 108 bytes. Small in absolute terms
+for icons; S5a measures. Beyond both lines of a convex corner the
+distance is the device distance to the corner, as the closed forms
+take it, so a 12 x 8 rect rotated 30 degrees matches the closed form
+pixel for pixel (`gpu_mesh_matches_closed.rs`; lead, 2026-11-14,
+#371 review). Known divergence, pinned by a test in
+`crates/renderer/tests/gpu_mesh_divergences.rs`: one item's
+overlapping triangles (a self-crossing stroke, lyon's stroker at some
+joins) blend twice, so a translucent overlap draws darker
+(1 - (1 - a)^2 for a) where SVG paints the union once. S3b decided (lead, 2026-11-14; numbers in
 `docs/perf/s3b-antialiasing-2026-11-14.md`):
 - Closed forms keep their analytic method. The measurement does not
   rank it: it, MSAA and the exact-corner prototype each pass 16 of 16
@@ -189,7 +205,7 @@ paints the union once. S3b decided (lead, 2026-11-14; numbers in
   - A 0.25 px stroke fails for every mesh method. As closed forms at
     0.25 px, the closed-form pipeline passes a rect and fails a circle
     (8 strongly-off pixels).
-  - Divergence (2), the translucent overlap, stays within the rules, so its
+  - The translucent overlap divergence stays within the rules, so its
     pinned test is a record, not a failure.
 - The curve tolerance stays 0.1 device px at the largest scale drawn:
   no difference was measured between 0.25 and 0.05 px (on the
@@ -527,7 +543,7 @@ is checked against what it found.
 | S3a1 | `Item::Shape`, the `ShapeStore` (1.4), the closed-form pipeline and the painter's dispatch, on IU4's retained path | Rects and circles batched in paint order; idle frame writes 0 shape bytes; a draw of an entry not uploaded refused naming it | S2, IU4 PR 2 | 3D 4, 4b, 5 |
 | S3a2 | The mesh pipeline | Fill and stroke meshes batched in paint order with closed-form shapes | S3a1 | 3D 4, 4b, 5 |
 | S3b | The antialiasing test (the brief's slice 1): touche's ten icons as shapes at 1x, 2x, rotated 30 degrees and scaled 1.37; per kind, MSAA against its analytic method (1.2), against Chromium with the paint_check rules, beside the icon route; the curve tolerance; sub-pixel features against Chromium (the closed-form ramp gives a 0.25 px stroke on a pixel centre 0.625, #345 review M4); the mesh known limits (1.2: corners, a translucent self-crossing stroke) against Chromium, with an exact candidate for the corners beside MSAA: each triangle carries, flat, the outline lines of its corners' wedges (up to six, with a convex or reflex flag per corner), and coverage is 0.5 plus the minimum over its corners of each wedge's distance (convex: the nearer line; reflex: the farther), each line's distance in device pixels from the local position (about 88 bytes a vertex) | The numbers recorded; a method chosen per kind, or the question returned to Tom if none is within the rules at 1x (the brief, decision 3) | S3a2 | everything |
-| S3a3 | Meshes by the exact-corner method (S3b decided, 2026-11-14): each triangle carries, flat, its corners' wedge lines (position, the two outline normals, convex or reflex), and coverage is 0.5 plus the least, over its outline corners, of each wedge's distance in device pixels; `MeshTriangle`, `check_mesh` and `mesh_edges` write and check them (a `TABLE_FORMAT` bump); the pinned corner divergence replaced | The aa_methods measurement's exact-corner column from the pipeline itself, not the prototype: 39 of 40 icon cells (Mute at 1x the recorded divergence); the rotated-rect test matches the closed form but at the pixel just beyond two corners (recorded in 1.2) | S3b | 3D 4, 4b, 5 |
+| S3a3 | Meshes by the exact-corner method (S3b decided, 2026-11-14): each triangle carries, flat, its corners' wedge lines (position, the two outline normals, convex or reflex), and coverage is 0.5 plus the least, over its outline corners, of each wedge's distance in device pixels; `MeshTriangle`, `check_mesh` and `mesh_edges` write and check them (a `TABLE_FORMAT` bump); the pinned corner divergence retired | The aa_methods measurement's exact-corner column from the pipeline itself, not the prototype: 39 of 40 icon cells (Mute at 1x the recorded divergence); the rotated-rect test matches the closed form pixel for pixel; every mesh pixel more than half a device pixel inside its outline fully covered and none more than half a pixel outside covered (`gpu_mesh_insides.rs`) | S3b | 3D 4, 4b, 5 |
 | S4a | `<path>` fill and stroke in templates; `fill`, `stroke`, `stroke-width` in `vapors-css` with the presentation attributes mapped; run-time parse and tessellation cached by hash | Chromium paint comparisons for fill and stroke; a class toggle recolours and tessellates nothing (counted) | S3b, S3a3 | 3D 4, 4b, 5 |
 | S4b | `<rect>` and `<circle>`; elliptical corners (`rx` and `ry` differ) in the closed-form shader, which `check_geometry` refuses until then | Chromium paint comparisons, including a rounded rect and one with elliptical corners | S4a | 3D 4, 4b, 5 |
 | S5a | Compile time: the compiler parses, refuses, classifies, deduplicates and emits each crate's `SHAPES` and each element's index | A bad `d` fails the build naming file and line; the same path in two components of one crate is one entry (snapshot test) | S4b | 3D 4, 4b, 5 |

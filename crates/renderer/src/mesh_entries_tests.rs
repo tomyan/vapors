@@ -19,11 +19,13 @@ fn each_field_is_at_its_offset_in_a_triangle_of_its_size() {
         position: [0.0; 2],
         normals: [[0.0; 2]; 2],
         kind: INSIDE,
+        reaches: [0.0; 2],
     };
     let third = MeshCorner {
         position: [1.0, 2.0],
         normals: [[3.0, 4.0], [5.0, 6.0]],
         kind: 7.0,
+        reaches: [8.0, 9.0],
     };
     let triangles = [
         MeshTriangle {
@@ -53,4 +55,5 @@ fn each_field_is_at_its_offset_in_a_triangle_of_its_size() {
     assert_eq!(at(offset_of!(MeshCorner, normals), 0), 3.0);
     assert_eq!(at(offset_of!(MeshCorner, normals), 3), 6.0);
     assert_eq!(at(offset_of!(MeshCorner, kind), 0), 7.0);
+    assert_eq!(at(offset_of!(MeshCorner, reaches), 1), 9.0);
 }

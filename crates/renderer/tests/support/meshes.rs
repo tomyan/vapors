@@ -95,20 +95,14 @@ pub fn assert_at(coverage: &[f32], (x, y): (u32, u32), expected: f32, what: &str
 /// `transform`, device pixels; 0 inside. The outline is the mesh's own
 /// outline edges, so the oracle needs no curve maths.
 pub fn outside_by(mesh: &[MeshTriangle], m: [f32; 6], p: [f32; 2]) -> f32 {
-    let to_device = |q: [f32; 2]| {
-        [
-            m[0] * q[0] + m[2] * q[1] + m[4],
-            m[1] * q[0] + m[3] * q[1] + m[5],
-        ]
-    };
     let inside = mesh
         .iter()
-        .any(|t| contains(t.corners.map(|c| to_device(c.position)), p));
+        .any(|t| contains(t.corners.map(|c| to_device(m, c.position)), p));
     if inside {
         return 0.0;
     }
     outline_segments(mesh)
-        .map(|[q, r]| segment_distance(p, to_device(q), to_device(r)))
+        .map(|[q, r]| segment_distance(p, to_device(m, q), to_device(m, r)))
         .fold(f32::INFINITY, f32::min)
 }
 
@@ -121,20 +115,75 @@ pub fn assert_nothing_past_half_a_pixel(
     transform: [f32; 6],
     what: &str,
 ) {
-    for y in 0..SIDE {
-        for x in 0..SIDE {
-            let centre = [
-                f32::from(u16::try_from(x).expect("small")) + 0.5,
-                f32::from(u16::try_from(y).expect("small")) + 0.5,
-            ];
-            let out = outside_by(mesh, transform, centre);
-            let found = coverage[(y * SIDE + x) as usize];
-            assert!(
-                out <= 0.52 || found <= 1.5 / 255.0,
-                "{what}: pixel ({x}, {y}) is {out} px outside the outline but covered {found}"
-            );
-        }
+    for (x, y, centre) in pixel_centres() {
+        let out = outside_by(mesh, transform, centre);
+        let found = coverage[(y * SIDE + x) as usize];
+        assert!(
+            out <= 0.52 || found <= 1.5 / 255.0,
+            "{what}: pixel ({x}, {y}) is {out} px outside the outline but covered {found}"
+        );
     }
+}
+
+/// How far device point `p` lies inside `mesh` under `m`, device
+/// pixels; 0 outside.
+pub fn inside_by(mesh: &[MeshTriangle], m: [f32; 6], p: [f32; 2]) -> f32 {
+    let inside = mesh
+        .iter()
+        .any(|t| contains(t.corners.map(|c| to_device(m, c.position)), p));
+    if !inside {
+        return 0.0;
+    }
+    outline_segments(mesh)
+        .map(|[q, r]| segment_distance(p, to_device(m, q), to_device(m, r)))
+        .fold(f32::INFINITY, f32::min)
+}
+
+/// Asserts every pixel whose centre lies more than half a device pixel
+/// (and a rasteriser's margin) inside `mesh` under `transform` is fully
+/// covered.
+pub fn assert_full_past_half_a_pixel_inside(
+    coverage: &[f32],
+    mesh: &[MeshTriangle],
+    transform: [f32; 6],
+    what: &str,
+) {
+    for (x, y, centre) in pixel_centres() {
+        let depth = inside_by(mesh, transform, centre);
+        let found = coverage[(y * SIDE + x) as usize];
+        assert!(
+            depth < 0.52 || found >= 254.0 / 255.0,
+            "{what}: pixel ({x}, {y}) is {depth} px inside the outline but covered only {found}"
+        );
+    }
+}
+
+/// Both halves of the rule: nothing covered past half a device pixel
+/// outside the outline, everything past half a pixel inside it.
+pub fn assert_ramp_within_half_a_pixel(
+    coverage: &[f32],
+    mesh: &[MeshTriangle],
+    transform: [f32; 6],
+    what: &str,
+) {
+    assert_nothing_past_half_a_pixel(coverage, mesh, transform, what);
+    assert_full_past_half_a_pixel_inside(coverage, mesh, transform, what);
+}
+
+fn pixel_centres() -> impl Iterator<Item = (u32, u32, [f32; 2])> {
+    (0..SIDE).flat_map(|y| {
+        (0..SIDE).map(move |x| {
+            let at = |v: u32| f32::from(u16::try_from(v).expect("small")) + 0.5;
+            (x, y, [at(x), at(y)])
+        })
+    })
+}
+
+fn to_device(m: [f32; 6], q: [f32; 2]) -> [f32; 2] {
+    [
+        m[0] * q[0] + m[2] * q[1] + m[4],
+        m[1] * q[0] + m[3] * q[1] + m[5],
+    ]
 }
 
 fn outline_segments(mesh: &[MeshTriangle]) -> impl Iterator<Item = [[f32; 2]; 2]> + '_ {

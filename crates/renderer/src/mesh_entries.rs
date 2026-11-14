@@ -123,6 +123,11 @@ fn put_corner(bytes: &mut [u8], start: usize, corner: &MeshCorner) {
         corner.normals.as_flattened(),
     );
     put(bytes, start + offset_of!(MeshCorner, kind), &[corner.kind]);
+    put(
+        bytes,
+        start + offset_of!(MeshCorner, reaches),
+        &corner.reaches,
+    );
 }
 
 fn put(bytes: &mut [u8], at: usize, floats: &[f32]) {

@@ -3,11 +3,10 @@
 //! spans; inside where the triangles surround the vertex; per corner
 //! where the outline touches itself; refused head-on.
 
-use crate::mesh::check_mesh;
+use crate::mesh::{CONVEX, INSIDE, REFLEX};
+use crate::mesh_check::check_mesh;
 use crate::mesh_edges::mesh_triangles;
 use crate::mesh_edges::tests::built;
-
-use super::*;
 
 /// Whether `a` and `b` agree to f32 rounding.
 fn near(a: [f32; 2], b: [f32; 2]) -> bool {
@@ -35,6 +34,7 @@ fn the_inner_corner_of_an_l_is_reflex() {
     let corner = triangles[1].corners[2];
     assert_eq!(corner.position, [1.0, 1.0]);
     assert_eq!(corner.normals, [[1.0, 0.0], [0.0, 1.0]]);
+    assert_eq!(corner.reaches, [1.0, -1.0]);
     assert_eq!(corner.kind, REFLEX);
     assert_eq!(triangles[2].corners[1].kind, REFLEX);
     assert_eq!(triangles[0].corners[0].kind, CONVEX);
@@ -118,6 +118,35 @@ fn outline_edges_meeting_head_on_are_refused_naming_the_vertex() {
     // Then
     assert_eq!(
         refused,
-        Err("outline edges meet head-on at [0.0, 0.0], where a cut of no width into the shape ends, with no inside to its wedge; close the cut or give it width".to_owned())
+        Err("outline edges meet head-on at [0.0, 0.0], where a cut of no width into the shape ends, with no outside to its wedge; close the cut or give it width".to_owned())
     );
+}
+
+#[test]
+fn a_convex_needle_builds() {
+    // Given: a spike of 0.57 degrees at the origin, whose edges' normals
+    // are within 1e-4 of opposite
+    let points = [[0.0, 0.0], [100.0, 0.5], [100.0, -0.5]];
+
+    // When
+    let triangles = built(&points, &[0, 1, 2]);
+
+    // Then
+    assert_eq!(triangles[0].corners[0].kind, CONVEX);
+    assert_eq!(check_mesh(&triangles), Ok(()));
+}
+
+#[test]
+fn triangles_overlapping_round_a_vertex_keep_the_walks_reflex() {
+    // Given: a fan at the origin from (4, 0) up to (1, 1), back down to
+    // (4, -0.5) and round to (0, 4); its angles sum past half a turn,
+    // though the outline from (4, 0) to (0, 4) turns convex, as lyon's
+    // stroker leaves some inner joins
+    let points = [[0.0, 0.0], [4.0, 0.0], [1.0, 1.0], [4.0, -0.5], [0.0, 4.0]];
+
+    // When
+    let triangles = built(&points, &[0, 1, 2, 0, 2, 3, 0, 3, 4]);
+
+    // Then: the relaxed guard in mesh_wedge.rs keeps it reflex
+    assert!(triangles.iter().all(|t| t.corners[0].kind == REFLEX));
 }

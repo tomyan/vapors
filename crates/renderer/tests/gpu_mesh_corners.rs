@@ -8,12 +8,12 @@
 #[path = "support/meshes.rs"]
 mod support;
 
-use support::{assert_at, assert_nothing_past_half_a_pixel, coverage, mesh, scaled, white};
+use support::{assert_at, assert_ramp_within_half_a_pixel, coverage, mesh, scaled, white};
 
 fn check(data: &str, transform: [f32; 6], what: &str) {
     let triangles = mesh(data, None);
     let coverage = coverage(&[white(triangles.clone(), transform)]);
-    assert_nothing_past_half_a_pixel(&coverage, &triangles, transform, what);
+    assert_ramp_within_half_a_pixel(&coverage, &triangles, transform, what);
 }
 
 #[test]

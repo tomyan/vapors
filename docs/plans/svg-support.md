@@ -232,11 +232,11 @@ below.
   anti-aliasing is off exact coverage, the pixel is compared with
   exact coverage and declared, as `paint_support/exact.rs` does for
   Mute.
-- **Cost:** per entry, 84 bytes per triangle (three corners, each its
-  position, its wedge's two outline normals and its convexity) with no
-  index buffer, 3.5 times the indexed layout (one-scene 1.2, as S3a3
-  built it), to be measured in S5a; no new dependency beyond S2's
-  lyon.
+- **Cost:** per entry, 108 bytes per triangle (three corners, each its
+  position, its wedge's two outline normals and their edges' reaches,
+  and its convexity) with no index buffer, 4.5 times the indexed
+  layout (one-scene 1.2, as S3a3 built it), to be measured in S5a; no
+  new dependency beyond S2's lyon.
 - **Verdict:** support (V1, V2).
 
 ### 3.2 Strokes: joins, caps, miter limit, dashes, non-scaling

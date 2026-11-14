@@ -125,8 +125,8 @@ tolerance table at the end.
   Chromium joins them differently.
 - The closed-form pipeline passes all 16 closed-form cells, as MSAA and
   the exact-corner prototype do: four shapes do not rank the three.
-- At 0.25 px, no mesh method passes the two-line path (strongly-off
-  pixels: analytic 11, exact corners 9, MSAA 4); the icon route does.
+- At 0.25 px, only the icon route passes the two-line path; the others
+  fail it (strongly-off pixels: analytic 11, exact corners 9, MSAA 4).
   Of the closed forms at 0.25 px, the closed-form pipeline passes the
   rect and fails the circle (8 strongly off, largest difference 76);
   MSAA passes the rect and fails the circle (12); the exact-corner
@@ -142,20 +142,25 @@ tolerance table at the end.
 
 The exact-corner method is now the mesh pipeline. `aa_methods`
 measures the pipeline in place of the analytic method and the
-prototype, both of which are removed. Its tables match the
-prototype's:
-- 39 of 40 icon cells;
-- all 16 closed-form cells;
-- the 0.25 px path failing with 9 strongly-off pixels;
-- the 0.25 px circle and rect failing with 8 and 4;
-- the translucent overlap passing.
+prototype, both of which are removed. The #371 review changed two
+things in the method, beside the prototype:
+- A corner's line counts only alongside its edge.
+- Beyond both lines of a convex corner, the distance is the device
+  distance to the corner. The prototype took the farther line.
+
+On the run with both changes:
+- 39 of 40 icon cells pass, as with the prototype.
+- All 16 closed-form cells pass.
+- The 0.25 px path fails with 9 strongly-off pixels.
+- The 0.25 px rect now passes. The 0.25 px circle fails with 8
+  strongly-off pixels.
+- The translucent overlap passes.
 
 The tolerance table now runs on the pipeline. Undo and Redo pass at
-0.25, 0.1 and 0.05 px under every placement. The largest difference
-is between 36 and 57 with no order by tolerance, so these two icons
-still show no tolerance effect.
+0.25, 0.1 and 0.05 px under every placement, so these two icons still
+show no tolerance effect.
 
-Beyond a convex corner, the pipeline takes the farther of the
-corner's two lines. Taking the distance to the corner instead gave
-the same passes and larger maximum differences on Undo and Redo (up
-to 90, against 57), so the pipeline keeps the farther line.
+The distance to the corner raises the largest difference on Undo and
+Redo. With the farther line, the largest difference was between 36
+and 57. With the distance to the corner, it is between 42 and 90 (90
+at rotated 30, 0.05 px). Every cell still passes.

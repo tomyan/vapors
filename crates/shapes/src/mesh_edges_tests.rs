@@ -3,7 +3,8 @@
 //! dropped before counting.
 
 use super::*;
-use crate::mesh::{CONVEX, MeshCorner, check_mesh};
+use crate::mesh::{CONVEX, MeshCorner};
+use crate::mesh_check::check_mesh;
 
 /// A unit square as two triangles sharing the diagonal 0-2.
 pub(crate) const SQUARE: [[f32; 2]; 4] = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
@@ -17,12 +18,14 @@ pub(crate) fn built(vertices: &[[f32; 2]], indices: &[u32]) -> Vec<MeshTriangle>
     mesh_triangles(vertices, indices).unwrap_or_else(|e| panic!("{indices:?}: {e}"))
 }
 
-/// A convex corner at `position` bounded by `normals`.
-pub(crate) fn convex(position: [f32; 2], normals: [[f32; 2]; 2]) -> MeshCorner {
+/// A convex corner at `position` bounded by `normals`, whose edges run
+/// `reaches` from it.
+pub(crate) fn convex(position: [f32; 2], normals: [[f32; 2]; 2], reaches: [f32; 2]) -> MeshCorner {
     MeshCorner {
         position,
         normals,
         kind: CONVEX,
+        reaches,
     }
 }
 
@@ -35,7 +38,10 @@ fn a_corner_across_a_shared_diagonal_is_bounded_by_the_outline_beyond_it() {
     // (outward -y) on one side and, across the diagonal, the left edge
     // (outward -x) on the other
     assert_eq!(triangles.len(), 2);
-    assert_eq!(triangles[0].corners[0], convex([0.0, 0.0], [UP, LEFT]));
+    assert_eq!(
+        triangles[0].corners[0],
+        convex([0.0, 0.0], [UP, LEFT], [1.0, -1.0])
+    );
     assert_eq!(check_mesh(&triangles), Ok(()));
 }
 
@@ -50,9 +56,9 @@ fn a_lone_triangles_corners_are_bounded_by_its_own_edges() {
     // Then: the hypotenuse's outward normal is (3, 4) / 5
     let hypotenuse = [0.6, 0.8];
     let [a, b, c] = triangles[0].corners;
-    assert_eq!(a, convex([0.0, 0.0], [UP, LEFT]));
-    assert_eq!(b, convex([4.0, 0.0], [hypotenuse, UP]));
-    assert_eq!(c, convex([0.0, 3.0], [LEFT, hypotenuse]));
+    assert_eq!(a, convex([0.0, 0.0], [UP, LEFT], [4.0, -3.0]));
+    assert_eq!(b, convex([4.0, 0.0], [hypotenuse, UP], [5.0, -4.0]));
+    assert_eq!(c, convex([0.0, 3.0], [LEFT, hypotenuse], [3.0, -5.0]));
     assert_eq!(check_mesh(&triangles), Ok(()));
 }
 
@@ -79,7 +85,7 @@ fn a_dropped_sliver_does_not_make_its_neighbours_edge_interior() {
     assert_eq!(triangles.len(), 1);
     assert_eq!(
         triangles[0].corners[1],
-        convex([4.0, 0.0], [[1.0, 0.0], UP])
+        convex([4.0, 0.0], [[1.0, 0.0], UP], [4.0, -4.0])
     );
 }
 
@@ -101,7 +107,10 @@ fn copies_of_a_vertex_are_one_vertex_so_their_edge_is_shared() {
     let triangles = built(&points, &[0, 1, 2, 4, 2, 3]);
 
     // Then: the walk crosses the diagonal, as in the welded square
-    assert_eq!(triangles[0].corners[0], convex([0.0, 0.0], [UP, LEFT]));
+    assert_eq!(
+        triangles[0].corners[0],
+        convex([0.0, 0.0], [UP, LEFT], [1.0, -1.0])
+    );
     assert_eq!(check_mesh(&triangles), Ok(()));
 }
 

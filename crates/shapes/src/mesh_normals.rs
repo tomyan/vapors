@@ -7,18 +7,16 @@
 //! vertex (a bowtie, the points of an even-odd star) each wedge is its
 //! own.
 
-use std::f32::consts::PI;
-
-use crate::mesh::{CONVEX, INSIDE, MeshCorner, REFLEX, head_on, outward_normal};
+use crate::mesh::{MeshCorner, outward_normal};
 use crate::mesh_edges::{EdgeTriangles, edge_key};
+use crate::mesh_wedge::{Bound, outline_corner};
 
 /// The corners of every triangle in `corners`: an inside corner where
 /// the triangles surround its vertex.
 ///
 /// # Errors
-/// Two outline edges meeting head-on at a corner (the end of a cut of
-/// no width into the shape), where the wedge has no inside; names the
-/// vertex.
+/// A corner `mesh_wedge.rs` refuses: the end of a cut of no width, or
+/// triangles that overlap round it; names the vertex.
 pub(crate) fn corner_wedges(
     vertices: &[[f32; 2]],
     corners: &[[u32; 3]],
@@ -38,11 +36,11 @@ struct Fans<'a> {
     edges: &'a EdgeTriangles,
 }
 
-/// One side of a corner's walk: the bounding outline edge's outward
-/// normal, if the walk met one, and the angle at the vertex of the
-/// triangles passed on the way.
+/// One side of a corner's walk: the bounding outline edge, if the walk
+/// met one, and the angle at the vertex of the triangles passed on the
+/// way.
 struct Side {
-    normal: Option<[f32; 2]>,
+    bound: Option<Bound>,
     angle: f32,
 }
 
@@ -60,25 +58,14 @@ impl Fans<'_> {
     fn corner(&self, t: usize, v: u32, sides: [u32; 2]) -> Result<MeshCorner, String> {
         let position = self.vertices[v as usize];
         let [a, b] = sides.map(|other| self.wedge_bound(t, v, other));
-        match (a.normal, b.normal) {
-            (Some(n1), Some(n2)) => {
-                if head_on([n1, n2]) {
-                    return Err(format!(
-                        "outline edges meet head-on at {position:?}, where a cut of no width into the shape ends, with no inside to its wedge; close the cut or give it width"
-                    ));
-                }
+        match (a.bound, b.bound) {
+            (Some(one), Some(two)) => {
                 let angle = self.angle(t, v) + a.angle + b.angle;
-                let kind = if angle > PI + 1e-4 { REFLEX } else { CONVEX };
-                Ok(MeshCorner {
-                    position,
-                    normals: [n1, n2],
-                    kind,
-                })
+                outline_corner(position, [one, two], angle)
             }
             (None, None) => Ok(MeshCorner {
                 position,
-                normals: [[0.0; 2]; 2],
-                kind: INSIDE,
+                ..MeshCorner::INSIDE_AT_ORIGIN
             }),
             _ => panic!(
                 "the triangles round vertex {v} close on one side and not the other; the producer's mesh is not a surface"
@@ -87,7 +74,7 @@ impl Fans<'_> {
     }
 
     /// From triangle `start` across its edge `v`-`other` and on round
-    /// `v`: the outward normal of the first outline edge, `None` when
+    /// `v`: the first outline edge, `None` when
     /// the walk comes back to `start` (the vertex inside), and the
     /// angle at `v` of the triangles passed.
     fn wedge_bound(&self, start: usize, v: u32, other: u32) -> Side {
@@ -95,17 +82,18 @@ impl Fans<'_> {
         for _ in 0..=self.corners.len() {
             let users = &self.edges[&edge_key(v, other)];
             if users.len() == 1 {
+                let bound = Bound {
+                    normal: self.outward(t, v, other),
+                    far: self.vertices[other as usize],
+                };
                 return Side {
-                    normal: Some(self.outward(t, v, other)),
+                    bound: Some(bound),
                     angle,
                 };
             }
             t = if users[0] == t { users[1] } else { users[0] };
             if t == start {
-                return Side {
-                    normal: None,
-                    angle,
-                };
+                return Side { bound: None, angle };
             }
             angle += self.angle(t, v);
             other = self.third(t, v, other);
