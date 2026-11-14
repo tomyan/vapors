@@ -151,7 +151,7 @@ pub fn current(dir: &Path) -> Result<Option<Holder>, String> {
     let Some(holder) = read(dir)? else {
         return Ok(None);
     };
-    if holder.ended(now_ms()) {
+    if holder.ended(now_ms())? {
         return Ok(None);
     }
     match holder.left(now_ms()) {
@@ -165,6 +165,12 @@ pub fn current(dir: &Path) -> Result<Option<Holder>, String> {
         )),
         Some(_) => Ok(Some(holder)),
     }
+}
+
+/// End `holder`'s hold in `dir` if the file still names it (`quiet
+/// release`), under the takers' lock.
+pub fn release(dir: &Path, holder: &Holder) {
+    file::remove_if(dir, holder);
 }
 
 /// Now, in unix milliseconds.

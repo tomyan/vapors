@@ -125,7 +125,7 @@ fn release() -> Result<ExitCode, String> {
             holder.describe(quiet_lock::now_ms())
         ));
     }
-    std::fs::remove_file(dir.join(quiet_lock::FILE)).map_err(|e| e.to_string())?;
+    quiet_lock::release(&dir, &holder);
     println!("quiet: released");
     Ok(ExitCode::SUCCESS)
 }

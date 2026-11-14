@@ -35,3 +35,27 @@ fn a_run_waits_on_another_worktree_s_hold_and_on_a_gate_in_its_own() {
     assert!(!is_mine(&holder(42, "/w/a", Form::Gate), None, "/w/a"));
     assert!(!is_mine(&holder(42, "/w/a", Form::Run), Some(43), "/w/a"));
 }
+
+#[test]
+fn a_gate_goes_on_under_its_own_worktree_s_hold_or_its_parent_quiet() {
+    assert!(!gate_takes_a_hold(
+        Some(&holder(42, "/w/a", Form::Hold)),
+        None,
+        "/w/a"
+    ));
+    assert!(!gate_takes_a_hold(
+        Some(&holder(42, "/w/a", Form::Run)),
+        Some(42),
+        "/w/b"
+    ));
+}
+
+#[test]
+fn a_gate_takes_a_hold_when_none_is_held_or_another_s_is() {
+    assert!(gate_takes_a_hold(None, None, "/w/a"));
+    assert!(gate_takes_a_hold(
+        Some(&holder(42, "/w/b", Form::Hold)),
+        None,
+        "/w/a"
+    ));
+}

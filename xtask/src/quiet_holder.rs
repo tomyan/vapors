@@ -90,9 +90,23 @@ impl Holder {
 
     /// Whether it no longer holds the lock at `now_ms`: past its
     /// deadline, or, but for a hold, its process gone (or its pid reused).
-    #[must_use]
-    pub fn ended(&self, now_ms: u64) -> bool {
-        self.left(now_ms).is_none() || (self.form != Form::Hold && !self.owner.live())
+    ///
+    /// # Errors
+    ///
+    /// Whether its process lives cannot be read: never taken as ended.
+    pub fn ended(&self, now_ms: u64) -> Result<bool, String> {
+        if self.left(now_ms).is_none() {
+            return Ok(true);
+        }
+        if self.form == Form::Hold {
+            return Ok(false);
+        }
+        self.owner.liveness().map(|live| !live).map_err(|why| {
+            format!(
+                "whether the quiet lock's holder, pid {}, lives: {why}",
+                self.owner.pid
+            )
+        })
     }
 
     /// `pid P in W running `what` (form), expires in S s`.

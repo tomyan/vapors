@@ -62,8 +62,15 @@ pub fn taken_since(dir: &std::path::Path) -> Result<bool, String> {
     Ok(quiet_lock::current(dir)?.is_some_and(|holder| !is_mine(&holder, parent, &here)))
 }
 
-/// The gate's hold, for [`LONGEST`]; none when the `quiet` that started
-/// the gate holds it now.
+/// Whether a gate takes a hold of its own given the `current` holder:
+/// not when it is the gate's own (its parent `quiet`, or a `quiet hold`
+/// from its worktree), whose hold already keeps others out.
+pub fn gate_takes_a_hold(current: Option<&Holder>, parent: Option<u32>, here: &str) -> bool {
+    !current.is_some_and(|holder| is_mine(holder, parent, here))
+}
+
+/// The gate's hold, for [`LONGEST`]; none when the holder now is its own
+/// ([`gate_takes_a_hold`]).
 ///
 /// # Errors
 ///
@@ -71,9 +78,7 @@ pub fn taken_since(dir: &std::path::Path) -> Result<bool, String> {
 pub fn for_gate(worktree: &str) -> Result<Option<Quiet>, String> {
     let dir = crate::gate_lock::dir()?;
     let parent = holder_from_env(std::env::var(HOLDER_ENV).ok().as_deref())?;
-    let held_by_parent =
-        quiet_lock::current(&dir)?.is_some_and(|holder| parent == Some(holder.owner.pid));
-    if held_by_parent {
+    if !gate_takes_a_hold(quiet_lock::current(&dir)?.as_ref(), parent, worktree) {
         return Ok(None);
     }
     let holder = Holder::me(worktree, LONGEST, Form::Gate, "gate");

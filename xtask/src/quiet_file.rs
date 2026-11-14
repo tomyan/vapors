@@ -42,9 +42,12 @@ pub fn read(dir: &Path) -> Result<Option<Holder>, String> {
 /// A file cannot be written, linked or locked, naming it.
 pub fn claim(dir: &Path, holder: &Holder) -> Result<bool, String> {
     let _take = serialised(dir)?;
-    if read(dir)?.is_some_and(|there| there.ended(now_ms())) {
+    if let Some(there) = read(dir)?
+        && there.ended(now_ms())?
+    {
         let _ = std::fs::remove_file(dir.join(FILE));
     }
+    sweep_staged(dir);
     let temporary = staged(dir, holder)?;
     let linked = std::fs::hard_link(&temporary, dir.join(FILE));
     let _ = std::fs::remove_file(&temporary);
@@ -55,8 +58,10 @@ pub fn claim(dir: &Path, holder: &Holder) -> Result<bool, String> {
     }
 }
 
-/// How long a taker waits for another to finish claiming. A claim is a
-/// read, a write and a link, milliseconds; 10 s is far past that.
+/// How long a taker waits for another to finish claiming. Measured
+/// 2026-11-14: the race test's 400 claims, eight threads at a time, took
+/// 1.1 s in all at load about 40, under 3 ms a claim; 10 s is thousands
+/// of times that.
 const CLAIM_WAIT: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// `quiet.take`, locked, so one taker claims at a time.
@@ -91,10 +96,34 @@ fn staged(dir: &Path, holder: &Holder) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-/// Remove the holder file if it names `holder`.
+/// Remove the holder file if it names `holder`, under the takers' lock,
+/// so a taker's fresh file replacing an ended `holder` is never removed.
+/// Unlocked if the lock cannot be had: the file is checked just before.
 pub fn remove_if(dir: &Path, holder: &Holder) {
+    let _take = serialised(dir).ok();
     if read(dir).is_ok_and(|there| there.as_ref() == Some(holder)) {
         let _ = std::fs::remove_file(dir.join(FILE));
+    }
+}
+
+/// Remove staged files (`quiet.holder.<pid>.<n>`) whose process has gone:
+/// left by a taker that crashed between staging and linking.
+fn sweep_staged(dir: &Path) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for path in entries.flatten().map(|entry| entry.path()) {
+        let staged_by = path.file_name().and_then(|name| {
+            name.to_str()?
+                .strip_prefix(&format!("{FILE}."))?
+                .split('.')
+                .next()?
+                .parse::<u32>()
+                .ok()
+        });
+        if staged_by.is_some_and(|pid| !Path::new(&format!("/proc/{pid}")).exists()) {
+            let _ = std::fs::remove_file(&path);
+        }
     }
 }
 

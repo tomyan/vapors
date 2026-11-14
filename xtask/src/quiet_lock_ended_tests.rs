@@ -83,3 +83,19 @@ fn a_hold_past_its_deadline_or_taken_over_is_no_longer_held() {
     // Then
     assert!(!held.still_held(), "held past its deadline");
 }
+
+#[test]
+fn a_claim_sweeps_files_staged_by_takers_that_have_gone() {
+    // Given: a taker that crashed between staging and linking
+    let dir = lock_dir("quiet-staged");
+    std::fs::create_dir_all(&*dir).expect("dir");
+    let left = dir.join(format!("{FILE}.{GONE}.0"));
+    std::fs::write(&left, "pid 1 in /w since 1 until 1 as run running x\n").expect("staged");
+
+    // When
+    let claimed = file::claim(&dir, &Holder::me("/w/x", BRIEF, Form::Run, "x"));
+
+    // Then
+    assert_eq!(claimed, Ok(true));
+    assert!(!left.exists(), "{} was left", left.display());
+}

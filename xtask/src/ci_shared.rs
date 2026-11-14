@@ -23,8 +23,11 @@ pub fn run(steps: &[steps::Step], reporter: &Reporter) -> ExitCode {
 }
 
 /// How many times a ci run waits for the quiet lock again when it was
-/// taken between its wait and its share. Each round is a whole quiet
-/// window, so three is already rare; not a measurement.
+/// taken between its wait and its share. RELAXED: chosen, not measured;
+/// no log yet shows a hold landing in a ci run's load wait. Each round
+/// is a whole quiet window (up to 60 min), so three bounds a ci run's
+/// wait at about three hours, and a fourth fails naming the fix.
+/// Retired by a count taken from the logs of the re-check's line.
 const QUIET_ROUNDS: u32 = 3;
 
 /// Wait for the quiet lock and the load, then take a share of the gate
