@@ -189,6 +189,7 @@ fn check_entry(entry: &ShapeEntry) -> Result<(), String> {
             entry.hash
         ));
     }
+    crate::canonical::paint_of(entry.canonical)?;
     check_geometry(&entry.geometry)
 }
 

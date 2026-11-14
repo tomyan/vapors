@@ -57,3 +57,20 @@ fn a_nan_edge_makes_a_rectangle_neither_empty_nor_disjoint_on_its_side() {
     assert!(!unplaced.is_empty());
     assert!(!unplaced.is_disjoint(&far));
 }
+
+#[test]
+fn a_shapes_bounds_are_its_own_with_a_pixel_of_fringe() {
+    // Given: a shape whose transform alone says nothing of its extent
+    let shape = Item::Shape(crate::Shape {
+        shape: crate::ShapeRef(3),
+        transform: [2.0, 0.0, 0.0, 2.0, 0.0, 0.0],
+        colour: Color::default(),
+        bounds: Rect::new(10.0, 12.0, 30.0, 40.0),
+    });
+
+    // When
+    let bounds = shape.bounds();
+
+    // Then
+    assert_eq!(bounds, Rect::new(9.0, 11.0, 31.0, 41.0));
+}

@@ -14,7 +14,10 @@ pub(crate) fn whole_item(item: &Item) -> bool {
         Item::Image { rect, .. } | Item::Icon { rect, .. } | Item::Surface { rect, .. } => {
             whole_rect(rect)
         }
-        Item::Text { .. } => false,
+        // Never shifted in place, so painted again: a shape's transform
+        // and bounds are not checked whole (no element paints one before
+        // S4a, which decides).
+        Item::Text { .. } | Item::Shape(_) => false,
     }
 }
 
@@ -52,6 +55,7 @@ pub(crate) fn shifted_item(item: Item, delta: [f32; 2]) -> Item {
             rect: rect.offset(delta),
         },
         Item::Text { .. } => unreachable!("a text item is made from its rect (text_item)"),
+        Item::Shape(_) => unreachable!("a shape is never whole (whole_item), so never shifted"),
     }
 }
 

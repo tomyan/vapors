@@ -33,6 +33,8 @@ pub struct FrameCounts {
     /// Icon runs: one draw per run, its vertices and blend uniform; the
     /// part of the atlas page its new icon masks changed.
     pub icons: GpuWork,
+    /// Shape runs: one draw per run, its instances and the viewport.
+    pub shapes: GpuWork,
     /// Image runs: one draw per image item and its quad's vertices; an
     /// image's pixels, every mip level, the first frame that draws it.
     pub images: GpuWork,
@@ -46,7 +48,7 @@ pub struct FrameCounts {
     /// refused frame holds the whole scene's.
     pub culled: u64,
     /// Bind groups held after the frame: one per pipeline that has
-    /// drawn (shadows, quads, text), one per image texture kept and
+    /// drawn (shadows, quads, shapes, text), one per image texture kept and
     /// one per surface backing. A texture dropped takes its bind group
     /// with it, so this falls when a frame stops drawing an image. A
     /// refused frame drops no texture and counts those still kept.
@@ -77,7 +79,13 @@ impl FrameCounts {
     /// The frame's work over every kind of run.
     #[must_use]
     pub fn total(&self) -> GpuWork {
-        self.shadows + self.quads + self.texts + self.icons + self.images + self.surfaces
+        self.shadows
+            + self.quads
+            + self.shapes
+            + self.texts
+            + self.icons
+            + self.images
+            + self.surfaces
     }
 
     /// Bind groups the frame made, over every kind of run: 0 on a frame
@@ -118,6 +126,7 @@ impl FrameCounts {
         match run {
             Run::Shadows(_) => &mut self.shadows,
             Run::Quads(_) => &mut self.quads,
+            Run::Shapes(_) => &mut self.shapes,
             Run::Texts(_) => &mut self.texts,
             Run::Icons(_) => &mut self.icons,
             Run::Images(_) => &mut self.images,
@@ -152,6 +161,7 @@ impl ScenePainter {
     pub(super) fn end_counts(&mut self) {
         self.counts.bind_groups_kept = self.shadows.bind_groups_kept()
             + self.quads.bind_groups_kept()
+            + self.closed_forms.bind_groups_kept()
             + self.text.bind_groups_kept()
             + self.textures.bind_groups_kept()
             + self.surfaces.bind_groups_kept();
@@ -172,6 +182,7 @@ impl ScenePainter {
     fn take_work(&self) -> GpuWork {
         self.shadows.take_work()
             + self.quads.take_work()
+            + self.closed_forms.take_work()
             + self.text.take_work()
             + self.images.take_work()
             + self.textures.take_work()

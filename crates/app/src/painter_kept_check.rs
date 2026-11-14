@@ -34,6 +34,7 @@ fn described(run: &Run) -> (&'static str, usize, (&'static str, usize)) {
     match run {
         Run::Shadows(_) => ("shadows", 112, ("attribute", 16)),
         Run::Quads(_) => ("quads", 128, ("attribute", 16)),
+        Run::Shapes(_) => ("shapes", 80, ("attribute", 16)),
         Run::Images(_) => ("images", 96, ("vertex", 16)),
         Run::Surfaces(_) => ("surfaces", 96, ("vertex", 16)),
         Run::Texts(_) => ("texts", 192, ("vertex", 32)),

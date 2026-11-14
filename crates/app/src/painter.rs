@@ -7,13 +7,19 @@
 //! drawn, though its surfaces are refused as they would be in view.
 
 use vapors_elements::Painted;
-use vapors_renderer::{ImagePipeline, QuadPipeline, ShadowPipeline, Target, clear_target};
+use vapors_renderer::{
+    ClosedFormPipeline, ImagePipeline, QuadPipeline, ShadowPipeline, Target, clear_target,
+};
 use vapors_text::{AtlasConfig, GlyphAtlas, TextPipeline};
+
+use crate::shape_store::ShapeStore;
 
 /// The pipelines and glyph atlas for one target format.
 pub struct ScenePainter {
     shadows: ShadowPipeline,
     quads: QuadPipeline,
+    closed_forms: ClosedFormPipeline,
+    shapes: ShapeStore,
     text: TextPipeline,
     atlas: GlyphAtlas,
     images: ImagePipeline,
@@ -64,6 +70,8 @@ impl ScenePainter {
         Ok(Self {
             shadows: ShadowPipeline::new(device, format),
             quads: QuadPipeline::new(device, format),
+            closed_forms: ClosedFormPipeline::new(device, format),
+            shapes: ShapeStore::default(),
             text: TextPipeline::new(device, format, &atlas),
             atlas,
             images: ImagePipeline::new(device, format),
@@ -74,12 +82,17 @@ impl ScenePainter {
         })
     }
 
+    /// The shapes the scene's shape items name, to register tables in.
+    pub fn shapes_mut(&mut self) -> &mut ShapeStore {
+        &mut self.shapes
+    }
+
     /// Clears `target` to the canvas colour and draws the scene over it.
     ///
     /// # Errors
     ///
-    /// [`PaintError`] when a glyph or a `gpu-surface` cannot be drawn;
-    /// the frame is then incomplete.
+    /// [`PaintError`] when a glyph, a `gpu-surface` or a shape cannot be
+    /// drawn; the frame is then incomplete.
     pub fn draw(&mut self, target: &Target<'_>, painted: &Painted) -> Result<(), PaintError> {
         clear_target(target, painted.canvas());
         self.paint(target, painted)

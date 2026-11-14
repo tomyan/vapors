@@ -54,6 +54,7 @@ fn consecutive_items_of_one_kind_share_a_batch_in_painting_order() {
             Run::Images(images) => ('i', images.len()),
             Run::Surfaces(surfaces) => ('g', surfaces.len()),
             Run::Icons(icons) => ('v', icons.len()),
+            Run::Shapes(shapes) => ('h', shapes.len()),
         })
         .collect();
     assert_eq!(shape, [('q', 2), ('t', 1), ('q', 1), ('t', 2)]);
@@ -209,4 +210,39 @@ fn consecutive_icons_share_a_batch_apart_from_images_and_texts() {
         })
         .collect();
     assert_eq!(shape, [('v', 2), ('i', 1), ('v', 1), ('t', 1)]);
+}
+
+fn shape(left: f32) -> Item {
+    Item::Shape(crate::Shape {
+        shape: crate::ShapeRef(0),
+        transform: [1.0, 0.0, 0.0, 1.0, left, 0.0],
+        colour: Color::from_rgba8(1, 2, 3, 255),
+        bounds: Rect::new(left, 0.0, left + 1.0, 1.0),
+    })
+}
+
+#[test]
+fn consecutive_shapes_share_a_batch_and_a_quad_between_them_splits_it() {
+    // Given: two shapes, a quad, a shape
+    let mut scene = Scene::new();
+    for item in [shape(0.0), shape(1.0), quad(2.0), shape(3.0)] {
+        scene.push(item);
+    }
+
+    // When
+    let batches = batches(&scene);
+
+    // Then: in painting order, the shapes' own order kept
+    let lefts: Vec<(char, Vec<f32>)> = batches
+        .iter()
+        .map(|batch| match &batch.run {
+            Run::Shapes(shapes) => ('h', shapes.iter().map(|s| s.transform[4]).collect()),
+            Run::Quads(quads) => ('q', quads.iter().map(|q| q.rect.left).collect()),
+            other => panic!("{other:?}"),
+        })
+        .collect();
+    assert_eq!(
+        lefts,
+        [('h', vec![0.0, 1.0]), ('q', vec![2.0]), ('h', vec![3.0])]
+    );
 }

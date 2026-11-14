@@ -9,6 +9,7 @@ use vapors_scene::Run;
 use vapors_text::{GlyphAtlas, TextPipeline};
 
 use super::{Kind, Pipelines, run_bytes};
+use crate::shape_store::ShapeStore;
 
 #[path = "painter_kept_text.rs"]
 mod text;
@@ -62,7 +63,7 @@ impl KeptGpu {
     ) -> Option<&KeptRange> {
         match self.entries.get(&key) {
             Some(gpu) => {
-                gpu.check(run, at);
+                gpu.check(run, at, pipelines.shapes);
                 self.kept += 1;
             }
             _ => self.write(&mut pipelines, target, (run, key))?,
@@ -79,7 +80,7 @@ impl KeptGpu {
         target: &Target<'_>,
         (run, key): (&Run, BatchKey),
     ) -> Option<()> {
-        let (kind, bytes) = (Kind::of(run), run_bytes(run));
+        let (kind, bytes) = (Kind::of(run), run_bytes(run, pipelines.shapes));
         let range = pipelines.keep(kind, target, &bytes)?;
         self.written += 1;
         let gpu = Gpu {
@@ -122,10 +123,10 @@ impl Gpu {
     /// In a debug build, panics when `run`'s bytes built afresh differ
     /// from those kept, naming batch `at`.
     #[cfg_attr(not(debug_assertions), allow(clippy::unused_self))]
-    fn check(&self, run: &Run, at: usize) {
+    fn check(&self, run: &Run, at: usize, shapes: &ShapeStore) {
         #[cfg(debug_assertions)]
-        super::super::kept_check::assert_kept(&self.bytes, &run_bytes(run), (run, at));
+        super::super::kept_check::assert_kept(&self.bytes, &run_bytes(run, shapes), (run, at));
         #[cfg(not(debug_assertions))]
-        let _ = (run, at); // only the debug build's compare uses them
+        let _ = (run, at, shapes); // only the debug build's compare uses them
     }
 }
