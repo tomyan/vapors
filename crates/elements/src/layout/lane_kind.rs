@@ -51,6 +51,9 @@ pub(crate) trait LaneKind: Sized + Debug {
     /// # Errors
     /// The fold shows a case the lane does not lay out.
     fn answer(c: &Self::Container, run: &Self::Summary) -> Result<LayoutOutput, LaneDecline>;
+    /// Whether a child styled `style` reads the height bases, so its
+    /// leaf is made again when they change.
+    fn reads_heights(style: &taffy::Style) -> bool;
     /// This kind's lanes.
     fn lanes(lanes: &mut Lanes) -> &mut FxHashMap<usize, Lane<Self>>;
 }

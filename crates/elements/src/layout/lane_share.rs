@@ -69,6 +69,10 @@ impl LaneKind for BlockLane {
         lane_answer(c, run)
     }
 
+    fn reads_heights(style: &Style) -> bool {
+        reads_heights(style)
+    }
+
     fn lanes(lanes: &mut Lanes) -> &mut FxHashMap<usize, Lane<Self>> {
         &mut lanes.block
     }

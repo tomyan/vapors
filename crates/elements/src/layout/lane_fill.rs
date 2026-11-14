@@ -7,7 +7,6 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::lane::Lane;
 use super::lane_kind::LaneKind;
-use super::lane_share::reads_heights;
 use super::lane_tree::Handle;
 use super::tree::BoxTree;
 use crate::lane_decline::LaneDecline;
@@ -90,7 +89,7 @@ impl BoxTree<'_> {
     ) -> Result<K::Summary, LaneDecline> {
         let (leaf, layout) = K::lay_out_child(self, slot, c)?;
         lane.pending.insert(slot, layout);
-        if reads_heights(&self.boxes[slot].style) {
+        if K::reads_heights(&self.boxes[slot].style) {
             lane.height_readers.insert(slot);
         } else {
             lane.height_readers.remove(&slot);

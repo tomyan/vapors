@@ -163,6 +163,9 @@ impl Workload for Rows {
         match (next, self.app.failure().get()) {
             (_, Some(failure)) => Err(failure),
             (Next::Exit, None) => Err("the app exited without a failure".into()),
+            _ if matches!(self.change, RowChange::FlexInsert) => {
+                crate::rows_list::laned(&self.page.doc().borrow().update_counts())
+            }
             _ => Ok(()),
         }
     }

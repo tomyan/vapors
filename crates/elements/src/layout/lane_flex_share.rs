@@ -13,6 +13,7 @@ use super::lane_flex::Column;
 use super::lane_flex_answer::lane_flex_answer;
 use super::lane_flex_summary::FlexSummary;
 use super::lane_kind::LaneKind;
+use super::lane_share::reads_heights;
 use super::tree::BoxTree;
 use crate::lane_decline::LaneDecline;
 
@@ -109,6 +110,16 @@ impl LaneKind for FlexLane {
 
     fn answer(c: &Column, run: &FlexSummary) -> Result<LayoutOutput, LaneDecline> {
         lane_flex_answer(c, run)
+    }
+
+    /// The block lane's readers (`lane_share::reads_heights`), and an
+    /// item whose `flex-basis` is relative: it resolves against the
+    /// column's inner height when that is definite (`lane_flex_base.rs`,
+    /// `styled_basis`).
+    fn reads_heights(style: &taffy::Style) -> bool {
+        use taffy::{CompactLength, FlexboxItemStyle};
+        let basis = style.flex_basis().into_raw();
+        reads_heights(style) || basis.tag() == CompactLength::PERCENT_TAG || basis.has_calc()
     }
 
     fn lanes(lanes: &mut Lanes) -> &mut FxHashMap<usize, Lane<Self>> {

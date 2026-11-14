@@ -723,6 +723,17 @@ when they change. The in-crate comparisons (`lane_compare.rs`) lay
 their pages out with lanes off (`KeptBoxes::lanes_off`, test builds
 only), so a mirror is compared with Taffy's answers and not a lane's.
 
+Known O(rows) case (review of #343, M1; `tests/lane_flex_heights.rs`
+pins it at 366 calls for an insert at 50 rows and 3516 at 500):
+touche's shell one level deeper, a definite-height column that is an
+item of a flex column, its rows reading its height (`min-height: 10%`).
+The parent asks the column for its content size, an ask that drops its
+styled height, so its height inputs flip between that ask and the
+layout, and every reading row is laid out again on each. The fix is a
+leaf set per height inputs (two trees, edits applied to both, each
+filled from the stale slots it has not yet seen); after PR 4, as rows
+that read their column's height are the less common list.
+
 ### 10.4 Margins
 
 Block: margins collapse between siblings by the fold of section 2.1,

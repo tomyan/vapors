@@ -85,7 +85,8 @@ impl FlexList {
         let middle = self.rows[self.rows.len() / 2].element;
         let row = doc.create_element("div");
         doc.set_attribute(row, "class", "row");
-        let label = doc.create_text(&row_text(self.rows.len(), 0));
+        // the same label at every size: an index would grow a glyph at 10,000
+        let label = doc.create_text(&row_text(0, 0));
         doc.append(row, label);
         let body = doc.body();
         doc.insert_before(body, row, Some(middle));

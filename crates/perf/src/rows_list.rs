@@ -65,3 +65,25 @@ impl Page {
         }
     }
 }
+
+/// Whether an update of the flex-column list laid the column out by its
+/// lane with nothing declined, as `FlexInsert` measures the lane: a
+/// fallback to Taffy would leave the judged phases unchanged.
+///
+/// # Errors
+/// No lane laid anything out, or a container was declined.
+pub fn laned(counts: &vapors_elements::UpdateCounts) -> Result<(), String> {
+    if counts.lanes >= 1 && counts.lanes_declined == 0 {
+        return Ok(());
+    }
+    Err(format!(
+        "FlexInsert: the flex-column list was not laid out by its lane ({} lanes, {} declined, \
+         first {:?}); reproduce: vapors-perf 60 10 --scaling FlexInsert; the fix is in \
+         crates/elements/src/layout/lane_flex*.rs or the list's CSS (rows_list.rs)",
+        counts.lanes, counts.lanes_declined, counts.lane_decline
+    ))
+}
+
+#[cfg(test)]
+#[path = "rows_list_tests.rs"]
+mod tests;
