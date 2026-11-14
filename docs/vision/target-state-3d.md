@@ -14,7 +14,9 @@ scene (CSS has no third layout axis); yes to animated SVG on a sphere,
 crisp through a mapped mesh or softer through a texture; yes to a form
 around a cone, with a stated horizontal distortion that grows towards
 the apex; on a sphere, HTML is refused (section 3.2). Canvas: no Canvas
-2D context in vapors now; section 4 gives the options.
+2D context; instead a pixel buffer primitive whose writes name their
+regions, with sparse tiles and tile-level differencing for touché's
+layers (section 4).
 
 Standing rules every part keeps: analysable sources only
 (`docs/decisions/2026-11-11-analysable-sources.md`); a small shared
@@ -249,7 +251,7 @@ before a slice copies a behaviour.
   oracle; the reference is an 8x exact-coverage render
   (`flat-scene.md` 4.5).
 
-## 4. Canvas
+## 4. Canvas and pixel buffers
 
 ### 4.1 What is already covered
 
@@ -258,34 +260,129 @@ before a slice copies a behaviour.
   web `<canvas>` with `getContext("webgpu")`: no swap chain to
   configure, vapors composites the result, no WebGL context.
 - **Charts and diagrams**: SVG with bound geometry (`d={expr}`,
-  one-scene S6) and `{for}` over data, styled by the cascade, in 3D on
-  any route of section 2.
-- **Pixel buffers** (touché's image, a paint program, an emulator's
-  frame): an image whose pixels the app updates by region, as atlas
-  region uploads do (#160), drawn by the image pipeline.
+  one-scene S6) and `{for}` over data, in 3D on any route of section 2.
+- **Pixels the app computes** (touché's layers, a paint program, an
+  emulator's frame): not covered today; 4.3 is the primitive for them.
 
-### 4.2 The analysis question
+### 4.2 Why not a Canvas 2D context
 
-The rule closes ways to change styles, classes and custom properties
-that the compiler cannot see. A Canvas 2D context changes pixels inside
-its own box and nothing the cascade or layout reads, which is already
-true of a `gpu-surface` renderer: the compiler sees the element and its
-CSS, not what is drawn in it. What would breach the target design is a
-2D context drawing into the flat list itself: `PaintUses` could not
-say which pipelines it needs, so every page holding one would build
-them all, and its primitives would be invisible to the build-time
-proofs of `flat-scene.md` section 3.
+The analysable-sources rule closes ways to change styles, classes and
+custom properties that the compiler cannot see. A Canvas 2D context
+changes pixels inside its own box, as a `gpu-surface` renderer does,
+so drawn into a surface it breaches nothing. Drawn into the flat list
+it would: `PaintUses` could not name its pipelines, so every page
+holding one would build them all. Its drawing operations (paths, text,
+composite modes) duplicate SVG with bound geometry, and its
+immediate-mode redraw costs the canvas's content per change, not the
+change. Tom, 2026-11-14: a pixel buffer primitive is wanted, for a
+narrower use than canvas. Decision D8.
 
-### 4.3 Options
+### 4.3 The pixel buffer
 
-| | What | Costs | In 3D |
-|---|---|---|---|
-| (a) | No `<canvas>`; 4.1's three routes | none; porting existing Canvas 2D code means rewriting it as SVG or a surface renderer | SVG crisp (M, F) or texture; a surface's texture on route T |
-| (b) | A Canvas 2D API in its own crate, implemented as a `gpu-surface` renderer over a 2D rasteriser (vello or similar, chosen by measurement), with the web's bitmap semantics (`width` and `height` in pixels, `getImageData`, composite operations) | a crate and a rasteriser dependency, linked only by apps that use it (`3d-engine-parity.md` G1); an immediate-mode redraw per change, proportional to the canvas's content, not flat; the API surface to keep compatible | a texture (route T), soft up close by definition |
-| (c) | A retained vapors "picture": shapes recorded from Rust each time inputs change, drawn as flat-list primitives | crisp everywhere, but a second way to make shapes beside SVG with bound geometry, and run-time-only content in `PaintUses` (4.2) | crisp |
+A `Pixels` store beside `Meshes` issues `PixelBuffer` handles, counted
+and released as `GeometryHandle`s are (`docs/scene3d.md`). A buffer
+has a format from a closed enum (`Rgba8UnormSrgb`, `Rgba16Float`,
+`R8Unorm` for masks), a size in pixels and a tile size (256 by
+default, touché's, `~/projects/touche/DESIGN.md` section 3).
 
-Recommendation: (a) now; (b) as a separate crate when a port needs
-it; not (c). Decision D8.
+**Where writes come from.** Only through the store, each write naming
+its region, so the runtime knows every changed pixel's tile:
+
+- `write(region, bytes)`: CPU bytes, refused when the length is not
+  the region's area times the format's size;
+- `fill(region, colour)` and `copy(from, region, to)`, a copy between
+  buffers of one format being a GPU copy with no CPU bytes;
+- `render(region, pass)`: a GPU pass the app records (a brush dab, a
+  heal) that writes only inside the declared region, which the buffer
+  enforces with a scissor and viewport.
+
+There is no drawing API: paths and text are SVG and HTML. The compiler
+sees each place a buffer is shown (an element or prop of the closed
+handle type) and adds the formats to `PaintUses`; it does not see pixel
+values, as it does not see an image's.
+
+**Uploads.** Each write marks its tiles dirty with the written
+rectangle; the next frame uploads each dirty tile's rectangle once
+through `WorkCounter::write_texture` (`crates/renderer/src/work.rs`),
+counted, as the atlas uploads regions (#160). Idle uploads 0 bytes; a
+write covering k tiles uploads at most its own bytes. CPU memory holds
+the buffer's bytes only for CPU-written buffers; a buffer written only
+by GPU passes has no CPU copy. Mipmaps, when a consumer samples
+minified, are rebuilt for the dirty tiles' footprint only (region mips
+are not built; `crates/renderer/src/mips.rs` rebuilds whole images
+today; cost unmeasured).
+
+**Where it is shown.**
+
+| Consumer | How | A write costs besides the upload |
+|---|---|---|
+| A 2D box | `<pixels buffer={b}>`, a replaced element with the buffer's size as its natural size, drawn by the image pipeline with nearest or linear sampling | no restyle, no layout, no paint bytes: the frame redraws the batch that samples it |
+| A `gpu-surface` | the renderer binds the buffer's texture view (one device, `docs/design/09-3d.md`, "Textures are the engine's"); a write invalidates the surfaces that read it | the surface's own render |
+| A 3D material | `Unlit { texture }` takes a buffer as an app texture (`3d-engine-parity.md` E9); route T of section 2 | the meshes that sample it redraw; no node slot written |
+
+A buffer past the device's texture edge (16,384 on the dev machine's
+adapters, `docs/gpu-limits.md`; 8,192 by default on the web) is
+refused when dense; the sparse form (4.4) has no such edge.
+
+### 4.4 Sparse buffers and differencing, for touché's layers
+
+Touché's design already stores pixel layers as 256 px tiles, content
+addressed, so a heal touching four tiles stores four tiles and a
+duplicated layer costs nothing until painted (`DESIGN.md` section 3,
+"Design consequences"); undo appends compensating events that
+reference tiles by hash (section 2, "State"). Touché has no pixel
+layer yet (`crates/document/src/layer.rs` has `Adjustment` only). The
+two vapors features below would give that design a GPU side.
+
+**Sparse.** A sparse buffer allocates a tile only where written; an
+unwritten tile reads as the buffer's declared constant (transparent, or
+a base buffer's tile, below). WebGPU has no sparse textures, so the GPU
+form is an atlas texture of tile slots plus an index from tile
+coordinate to slot, read in the shader: one extra texture read per
+sample. Bilinear filtering across tile edges needs a one-pixel border
+per stored tile (258 x 258 for a 256 tile, 1.6% more memory), and mips
+need a border per level; both are unmeasured in cost.
+
+**Differencing.** A buffer may name a base: a tile it has not written
+reads the base's tile. That is copy-on-write at tile granularity, which
+is touché's content-addressed design expressed in the buffer. Tiles are
+shared by handle: two buffers holding the same tile handle hold one
+CPU copy and one GPU slot. Per-pixel differencing (storing new minus
+base inside a tile) is the alternative; it saves memory only when a
+change is sparse within a tile and costs a second sample per read
+(decision D11).
+
+Costs, for touché's worked size (60 MP, rgba16float, 8 bytes a pixel,
+`DESIGN.md` section 3):
+
+| Case | Dense | Sparse, shared tiles |
+|---|---|---|
+| One layer | 480 MB | 480 MB (950 tiles of 512 KB for 9,500 x 6,300) plus a 3.8 KB index |
+| A duplicate of it | 480 MB | 3.8 KB (the index) |
+| A heal touching 4 tiles | a whole layer, or a 480 MB snapshot for undo | 2 MB of new tiles; the old 4 stay referenced by the event stream |
+| Upload for that heal | the whole texture, or the dirty rectangle of one texture | at most 2 MB, the dirty rectangles of 4 tiles |
+| Undo of the heal | upload the old pixels | 4 index entries (16 bytes) when the old tiles are still resident; their bytes when evicted |
+| GPU memory | every layer at full size | the tiles resident, under a slot budget refused loudly when full |
+
+What touché's layers and undo would get: duplicate and derived layers
+at the cost of an index; history whose memory grows with the tiles
+changed, not with the steps times the image; undo and redo that move
+index entries rather than pixels while tiles stay resident; full
+resolution past the web's 8,192 texture edge without one texture of
+the image's size. What stays touché's: content hashing, the tile store
+on disk and in OPFS, and the proxy pyramid; vapors issues tile handles
+and holds residency, and touché maps its hashes onto handles (decision
+D12). Touché's engine composites layers in its own render graph
+(`DESIGN.md` section 3), so the buffer is the storage its passes
+sample, and the viewer shows the composite through a `<pixels>` box.
+
+### 4.5 Options for canvas
+
+| | What | Costs |
+|---|---|---|
+| (a) | No Canvas 2D context; the pixel buffer (4.3), SVG with bound geometry, `gpu-surface` | porting Canvas 2D code means rewriting it against these |
+| (b) | (a), plus a Canvas 2D crate later as a `gpu-surface` renderer over a 2D rasteriser, with the web's bitmap semantics | a crate and a dependency linked only by apps that use it (`3d-engine-parity.md` G1); redraw cost proportional to content; an API to keep compatible |
+| (c) | A retained "picture" of shapes recorded from Rust, drawn in the flat list | a second way to make shapes beside SVG; run-time-only content in `PaintUses` |
 
 ## 5. The architecture this implies
 
@@ -314,7 +411,8 @@ curvature (2.2, 3.2); route T's texture binding, its resolution from
 the screen footprint and re-rendered at camera settle (D4); the
 chained hit test (scene ray, surface inverse, kept hits); panel
 accessibility bounds (3.1); `PaintUses` fields for surface maps, texture
-routes and wrapped text.
+routes, wrapped text and pixel formats; the `Pixels` store with
+region writes, dirty-tile uploads, sparse tiles and bases (4.3, 4.4).
 
 ### 5.3 What it replaces
 
@@ -328,7 +426,7 @@ for application renderers.
 Each slice is one PR under about 400 lines (estimate), built by a
 fresh agent, each check proven by breaking what it guards; each starts
 only after the slices it names and after the next is re-checked
-against what it found. All come after flat-scene F12. "Rules" names
+against what it found. X rows come after flat-scene F12. "Rules" names
 the performance rules the slice's tests pin.
 
 | # | Slice | Shows a person | Accepted when | Rules pinned | Depends on |
@@ -341,9 +439,15 @@ the performance rules the slice's tests pin.
 | X6 | Wrapped HTML: boxes and glyph outlines mapped on a cylinder; hit testing through the inverse map | a form wrapped around a column, clickable and typable | clicks on each field reach it; text passes the 8x reference rule; `wisp-check` prints the panel's worst scale | as X1 | X5, F6 |
 | X7 | The cone: `Surface::Cone`, the stated horizontal scale, the sphere refusal for HTML | the form around a cone | the scale at three slant distances equals s / s_mid; HTML on a sphere refused naming the alternatives | as X1 | X6 |
 | X8 | Route F, only on a measurement: curve bands evaluated in the fragment shader | crisp vectors on a loaded glTF mesh | only if X4's softness or X5's limits are measured as a product problem | as X5 | X5; flat-scene D4 (b) |
+| P1 | Dense pixel buffer: the `Pixels` store, `write`, `fill`, `copy`, dirty tiles, `<pixels>` in a 2D box | a paint demo: a brush writes into a buffer shown on the page | a dab uploads its rectangle's bytes only (counted); a wrong byte length refused naming the region | idle 0 bytes; a write restyles 0, lays out 0, writes 0 paint bytes | none (2D, before F12) |
+| P2 | Buffer to `gpu-surface` and to a 3D material; `render(region, pass)` with the enforced scissor | the paint demo's canvas on a rotating cube | a write invalidates exactly the surfaces and meshes that read it (counted); a pass drawing outside its region leaves outside pixels unchanged (pixel test) | as P1; no node slot written | P1, M2 |
+| P3 | Sparse buffers: tile atlas, index, borders, slot budget refused when full | a 12,000 px image shown at full resolution on the web page | only written tiles allocated (counted `tiles_resident`); edge sampling against a dense reference within the paint rules; the web page past 8,192 px | as P1 | P1 |
+| P4 | Bases and shared tile handles: copy-on-write per tile, residency kept by handle | duplicate a layer, heal four tiles, undo, redo | duplicate allocates 0 tiles; the heal 4; undo with tiles resident uploads 0 texture bytes and writes 4 index entries | as P1 | P3 |
 
 X1 to X3 give the grid question its answer; X4 and X5 the sphere; X6
-and X7 the cone. Canvas is outside this order (section 4).
+and X7 the cone. P1 to P4 need none of the X rows and none of
+flat-scene: they work on today's painter, and touché's pixel layers
+(its milestone 2, `DESIGN.md` section 3) are their first user.
 
 ## 7. Decisions for Tom
 
@@ -396,17 +500,42 @@ script. (b) Keep `<Decal>` for SVG and add `<Panel>` for HTML: two
 components for one placement rule. Recommend (a), applied when F12
 lands.
 
-**D8. Canvas.** (a) No `<canvas>`; `gpu-surface`, SVG with bound
-geometry and region-updated images cover its uses. (b) A Canvas 2D
-crate on `gpu-surface` with the web's bitmap semantics, linked only by
+**D8. Canvas.** (a) No Canvas 2D context; the pixel buffer, SVG with
+bound geometry and `gpu-surface` cover its uses. (b) (a), plus a
+Canvas 2D crate on `gpu-surface` when a port needs it, linked only by
 apps that use it. (c) A retained picture API in the flat list.
-Recommend (a) now and (b) when a port needs it.
+Recommend (a), with (b) left open.
 
-**D9. Placement.** (a) After flat-scene F12, in section 6's order, X8
-only on a measurement. (b) X4 (route T) earlier, beside
-`3d-engine-parity.md` M2, since the after-launch texture material and
-feedback item need the same binding. Recommend (b) for X4 only if the
-after-launch item is scheduled before F12; otherwise (a).
+**D9. Where a pixel buffer's writes come from.** (a) CPU region
+writes, fills, buffer-to-buffer copies and app GPU passes confined to
+a declared region (4.3). (b) CPU writes only: simpler, but a brush or
+heal computed on the GPU reads back to the CPU to write again.
+Recommend (a).
+
+**D10. Sparse tiles in vapors.** (a) vapors' buffer has a sparse form
+(tile atlas and index, 4.4), used by touché and any app past the
+texture edge. (b) vapors keeps dense buffers; touché tiles in its own
+engine. (b) leaves the web's 8,192 edge to every app and gives the
+`<pixels>` box no way to show a tiled image. Recommend (a).
+
+**D11. Differencing granularity.** (a) Tile-level copy-on-write with a
+base buffer and shared tile handles. (b) Per-pixel deltas inside tiles,
+compressed: smaller for sparse changes within a tile, a second sample
+per read and a decode per write. Recommend (a); (b) only if touché
+measures edits whose tiles are mostly unchanged.
+
+**D12. Who owns tile identity.** (a) vapors issues counted tile handles
+and holds GPU residency; touché maps its content hashes onto handles
+and keeps the hashed store on disk. (b) vapors hashes tile content
+itself: dedup without touché's help, a hash per written tile in
+vapors, and a second answer to "which tiles are equal". Recommend (a).
+
+**D13. Placement.** (a) X rows after flat-scene F12 in section 6's
+order, X8 only on a measurement; P1 to P4 when touché's milestone 2
+needs pixel layers. (b) X4 (route T) earlier, beside
+`3d-engine-parity.md` M2, if the after-launch texture material and
+feedback item is scheduled before F12. Recommend (a), with (b) for X4
+in that case.
 
 ## 8. Risks
 
@@ -415,5 +544,7 @@ after-launch item is scheduled before F12; otherwise (a).
   Whether body sizes pass the paint rules is unmeasured (F6).
 - **Subdivision counts.** Mapped boxes and glyphs multiply vertex
   counts by the split factor; unmeasured until X6.
+- **Tile borders and mips in the sparse form** add per-sample index
+  reads and per-level borders; their GPU cost is unmeasured until P3.
 - **Native accessibility under perspective.** A bounding box per node
   does not match a tilted element's outline.
