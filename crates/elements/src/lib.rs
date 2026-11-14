@@ -71,6 +71,8 @@ mod kept_batches;
 mod kept_batches_check;
 mod kept_batches_keys;
 mod kept_box;
+#[cfg(test)]
+mod kept_box_size_tests;
 mod kept_checks;
 mod kept_clips;
 mod kept_hits;
@@ -80,6 +82,7 @@ mod kept_order_check;
 mod kept_order_splice;
 mod kept_paint;
 mod kept_paint_check;
+mod kept_part;
 mod kept_scene_check;
 mod kept_shift;
 mod kept_shift_items;

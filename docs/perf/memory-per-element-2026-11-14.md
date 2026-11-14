@@ -145,7 +145,50 @@ One-run wall times are left out of the table: they were taken at
 different loads and do not compare.
 
 At about 740 bytes a slot, the kept boxes' list is the next per-element
-target after layout's boxes (a later slice).
+target after layout's boxes (taken below).
+
+## A kept box's outline, thumbs and rarer entries boxed apart
+
+A kept box's slot (`Option<KeptBox>`) was 424 bytes: what it was made
+from (64), its own part (216: a scene and six lists) and two more
+scenes, outline and thumbs (72 each). Most boxes have no outline or
+thumbs, and no inline element's rect, range track or text origin. Those
+five now sit in two boxes made only when one of them has entries
+(`kept_box.rs` `Marks`, `kept_part.rs` `Rare`). Cursors stay in the
+slot: every element paints its cursor, `auto` included. A slot is now
+224 bytes (`kept_box_size_tests.rs`).
+
+`vapors-perf-memory --rows 16384`, main at 854ccb8 against this change:
+
+| | main | boxed apart |
+|---|---|---|
+| total bytes per element | 12,941 | 12,591 |
+| paint bytes per element | 2,158 | 1,808 |
+| one row added at 16,384 rows, bytes left | 58,483,505 | 52,749,105 |
+
+Paint fell by 22.9 MB at 16,384 rows, 350 bytes per element. The slots
+account for 200 bytes of that (65,538 slots of 424 and of 224 bytes);
+the other 150 bytes per element are not located.
+
+Paint's instructions on the rows page (`vapors-perf 60 10 --scaling
+<change>`, median per frame, the same to within 0.1% between runs):
+
+| change | paint at 10,000 rows: main | boxed apart | per extra row, 3000 to 10,000: main | boxed apart |
+|---|---|---|---|---|
+| Insert, insert frames | 123,437,530 | 120,828,212 | 12,512.7 | 12,251.8 |
+| Insert, remove frames | 123,428,526 | 120,821,550 | 12,510.5 | 12,249.9 |
+| Class, add frames | 58,013 | 55,279 | 0.1 | 0.1 |
+| Class, remove frames | 57,423 | 54,821 | 0.1 | 0.1 |
+| Scroll | 13,386 | 13,438 | 0.0 | 0.0 |
+
+The first version cost Insert about 150 instructions more per row: a
+shifted box's checks and move walked its own scene and outline as one
+chained iterator, and the outline now came through an `Option`. Two
+plain loops, the outline's skipped when there is none (`kept_shift.rs`),
+make Insert's paint about 260 instructions per row cheaper than main.
+A scroll container's thumbs are replaced in their box rather than the
+box made again each time they are painted; Scroll's paint is 52
+instructions a frame over main's, flat in rows.
 
 ## A dropped page (#353)
 
