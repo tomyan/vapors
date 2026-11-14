@@ -22,7 +22,11 @@ draw every mesh as the schedule says.
 
 - Release build at 7bcb59a, which holds #351 with its review round
   (977f37f) and this record's script. Every run prints
-  `7bcb59a2a384`, with no `-dirty` suffix. The binary's sha256 is in
+  `7bcb59a2a384`, with no `-dirty` suffix. After the runs, #351 and this record were
+  replayed onto main (after #344's squash-merge) with no change of
+  their own; main's commits since 7bcb59a's base (the elements layout
+  lane's flex work and vapors-shapes' tessellation) are in this
+  branch's head and not in the runs. The binary's sha256 is in
   `one-scene-run-2026-11-14/sha256.txt`.
 - The dev machine: Intel UHD 630 (CML GT2), Mesa 25.0.7 ANV, Vulkan,
   headless, rendering to an offscreen texture with no present. Scale
