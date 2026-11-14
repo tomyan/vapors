@@ -12,8 +12,11 @@ mod retained;
 use frame::{BACKGROUND, quad, rgba, square, target};
 use retained::{Frame, RED, kept};
 use vapors_gpu_harness::{gpu, read_rgba8};
-use vapors_renderer::{FrameEncoder, QuadPipeline, ShadowPipeline, Shift, Target};
-use vapors_scene::{Rect, Shadow};
+use vapors_renderer::{
+    ClosedForm, ClosedFormPipeline, ClosedFormShape, FrameEncoder, QuadPipeline, ShadowPipeline,
+    Shift, Target,
+};
+use vapors_scene::{Color, Rect, Shadow};
 
 const SIDE: u32 = 24;
 
@@ -92,6 +95,12 @@ impl Made for ShadowPipeline {
     }
 }
 
+impl Made for ClosedFormPipeline {
+    fn made(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+        Self::new(device, format)
+    }
+}
+
 impl Made for QuadPipeline {
     fn made(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
         Self::new(device, format)
@@ -128,5 +137,41 @@ fn gpu_kept_shadows_drawn_with_a_shift_match_the_shadow_drawn_at_the_moved_place
     assert!(
         shifted == moved,
         "the shifted shadow differs from the moved one"
+    );
+}
+
+/// A circle at `x`, `y` drawn under a transform of scale 1.5.
+fn circle(x: f32, y: f32) -> ClosedFormShape {
+    ClosedFormShape {
+        form: ClosedForm::Ellipse {
+            centre: [x / 1.5, y / 1.5],
+            radii: [2.0, 2.0],
+        },
+        stroke: None,
+        transform: [1.5, 0.0, 0.0, 1.5, 0.0, 0.0],
+        colour: Color::from_rgba8(200, 30, 20, 255),
+    }
+}
+
+#[test]
+fn gpu_kept_closed_forms_drawn_with_a_shift_match_the_shape_drawn_at_the_moved_place() {
+    // Given
+    let moved = drawn_on_square(|pipeline: &mut ClosedFormPipeline, at| {
+        pipeline.draw(at, &[circle(7.0, 9.0)]);
+    });
+
+    // When: kept at 4, 4 and drawn shifted by 3, 5
+    let shifted = drawn_on_square(|pipeline: &mut ClosedFormPipeline, at| {
+        let bytes = ClosedFormPipeline::bytes(&[circle(4.0, 4.0)]);
+        let range = pipeline.keep(at, &bytes).expect("room");
+        pipeline.draw_kept(at, &range, Shift::whole([3.0, 5.0]));
+        pipeline.release(range);
+    });
+
+    // Then
+    assert!(moved.iter().any(|&v| v != 40), "the circle drew nothing");
+    assert!(
+        shifted == moved,
+        "the shifted circle differs from the moved one"
     );
 }

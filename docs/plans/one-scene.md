@@ -211,7 +211,15 @@ painter draws from it, and `SurfaceFrame` gains `shapes: &ShapeStore`
 so a `SurfaceRenderer` such as `SceneRenderer` draws the same entries
 (S7). A draw naming an entry the store has not uploaded is refused with
 an error naming the entry and its site, never skipped. Added in S3a1
-(the store and the 2D path) and S7 (the `SurfaceFrame` field).
+(the store and the 2D path) and S7 (the `SurfaceFrame` field). A
+closed-form entry's parameters go in each instance's bytes (80 bytes:
+transform, colour, the rect or ellipse, the stroke width), kept between
+frames like a quad's, so the store uploads GPU bytes for mesh entries
+only (S3a2) and needs no storage buffer in the vertex stage (S3a1,
+2026-11-14). The closed-form shader takes coverage as 0.5 minus
+the signed distance to the outline in device pixels, the ramp
+straddling the outline, and grows each quad by a device pixel past the
+shape for the ramp's outer half (Tom, 2026-11-13).
 
 ### 1.5 Constant and known-variable properties
 
