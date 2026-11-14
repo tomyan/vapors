@@ -9,9 +9,7 @@
 use rustc_hash::FxHashMap;
 use vapors_scene::{Item, Rect};
 
-use crate::kept_clips::Clips;
 use crate::layout::BoxRect;
-use crate::paint::snapped;
 
 /// The page's frame: the parts under no scroll container.
 pub(crate) const PAGE: usize = usize::MAX;
@@ -28,11 +26,13 @@ pub(crate) struct FrameAt {
     pub(crate) device_clip: Option<Rect>,
 }
 
-/// Each frame of a paint, by its scroll container's slot.
+/// Each frame of a paint, by its scroll container's slot, and the
+/// scroll containers in each frame.
 #[derive(Debug, PartialEq)]
 pub(crate) struct Frames {
     scale: f32,
     by_frame: FxHashMap<usize, FrameAt>,
+    nested: FxHashMap<usize, Vec<usize>>,
 }
 
 impl Default for Frames {
@@ -52,41 +52,8 @@ impl Frames {
         Self {
             scale,
             by_frame: std::iter::once((PAGE, page)).collect(),
+            nested: FxHashMap::default(),
         }
-    }
-
-    /// The frames of the scroll containers `scrollers`, each shifted by
-    /// `shift(slot)` from the frame it is in and clipped by the clip it
-    /// gives its content in that frame (`clips`), at `scale`. Shallower
-    /// scroll containers are worked out first.
-    pub(crate) fn of(
-        scrollers: &[usize],
-        (clips, depth): (&Clips, &dyn Fn(usize) -> usize),
-        shift: &dyn Fn(usize) -> [f32; 2],
-        scale: f32,
-    ) -> Self {
-        let mut frames = Self::page(scale);
-        let mut ordered = scrollers.to_vec();
-        ordered.sort_by_key(|&slot| depth(slot));
-        for slot in ordered {
-            let outer = *frames.at(clips.frame(slot));
-            let own = shift(slot);
-            let shift = [outer.shift[0] + own[0], outer.shift[1] + own[1]];
-            let inner = clips.inner(slot).map(|clip| frames.css_rect(outer, clip));
-            frames.insert(slot, shift, meet(inner, outer.clip));
-        }
-        frames
-    }
-
-    /// Notes frame `slot` at `shift` under the page clip `clip`.
-    pub(crate) fn insert(&mut self, slot: usize, shift: [f32; 2], clip: Option<BoxRect>) {
-        let device_clip = clip.map(|clip| snapped(clip, self.scale));
-        let at = FrameAt {
-            shift,
-            clip,
-            device_clip,
-        };
-        self.by_frame.insert(slot, at);
     }
 
     /// Frame `frame`, or a panic naming it.
@@ -211,6 +178,10 @@ pub(crate) fn on_page(
     static ON_PAGE: std::sync::LazyLock<Frames> = std::sync::LazyLock::new(|| Frames::page(1.0));
     (boxes, &ON_PAGE)
 }
+
+#[path = "frames_update.rs"]
+mod update;
+pub(crate) use update::FrameInputs;
 
 #[cfg(test)]
 #[path = "frames_tests.rs"]

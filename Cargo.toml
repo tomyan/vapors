@@ -28,6 +28,7 @@ vapors-shapes = { path = "crates/shapes" }
 vapors-scene3d = { path = "crates/scene3d" }
 vapors-scene3d-gpu = { path = "crates/scene3d-gpu" }
 vapors-scene3d-components = { path = "crates/scene3d-components" }
+vapors-one-scene = { path = "crates/one-scene" }
 # Matrix maths for the 3D scene (docs/plans/3d-2.md, decision 3).
 glam = "=0.34.3"
 vapors-gpu = { path = "crates/gpu" }

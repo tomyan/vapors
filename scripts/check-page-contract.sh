@@ -118,12 +118,16 @@ prepare() {
   # and the page served one directory down, as the tailnet serves it
   # at /vapors/: its script and wasm load from beside it.
   page hello "" "$adapter"
+  # The launch example (crates/one-scene, ?demo=one-scene): HTML over a
+  # 3D scene CSS styles, through a gpu-surface. Held until it has drawn
+  # 30 frames, so it is animating, not only started.
+  page one-scene-draws "$counter" "$adapter && (Number(document.body.dataset.frames) || 0) >= 30"
   # No HTML control over an elements demo's canvas: once the adapter line
   # is written, every element on the canvas that may paint or take a
   # pointer event, but #error (failures stay visible), is listed on
   # <body> as data-overlaps.
   measure="(function () { if (status.textContent.indexOf('adapter: ') !== 0) return false; document.body.dataset.overlaps = vaporsOverlaps(); return true; })()"
-  for demo in $demos index; do
+  for demo in $demos one-scene index; do
     page "$demo-overlap" "$overlaps" "$measure"
   done
   # The rule's own case: the hello demo with elements over its canvas
@@ -312,8 +316,12 @@ dump() {
   env -u DBUS_SESSION_BUS_ADDRESS timeout 60 "$chrome" --headless=new --no-sandbox \
     --disable-gpu-sandbox --use-angle=swiftshader --enable-unsafe-webgpu \
     --enable-features=Vulkan,WebGPU --window-size=640,400 --enable-logging=stderr --v=0 \
-    --virtual-time-budget=8000 --dump-dom "$(url "$@")" 2>"$work/$1.log"
+    $budget --dump-dom "$(url "$@")" 2>"$work/$1.log"
 }
+
+# The virtual time a dump gives the page; empty for a page dumped in real
+# time (one-scene-draws, below).
+budget=--virtual-time-budget=8000
 
 # url <page> [query] [directory]: where a copy is served; a query such
 # as ?demo=hello picks the demo, and vapors/ loads it one directory
@@ -458,6 +466,19 @@ check adapter-element '^starting$' hidden '?demo=hello'
 adapter_line=$(printf '%s' "$dom" | grep -o '<p id="adapter">[^<]*</p>' | sed 's#<[^>]*>##g' || true)
 echo "adapter-element: #adapter [$adapter_line]"
 printf '%s' "$adapter_line" | grep -q '^adapter: ' || fail "adapter-element: #adapter is [$adapter_line], wanted the start-up line"
+# Real time: a gpu-surface's renderer reports its GPU errors within a
+# 1000 ms deadline, which virtual time runs past while the GPU process
+# works in real time ("the GPU did not report this surface's errors
+# within 1000 ms", seen on virtual-time runs of this page). Its pixels
+# are held by the gpu tier (crates/one-scene/tests/
+# gpu_one_scene_pixels.rs) to crates/one-scene/one_scene.pixels; a
+# real-time screenshot here was blank in 1 of 4 runs, and 3 of 4 with
+# ticks=5, so none is taken until that is understood (#349).
+budget=""
+check one-scene-draws '^adapter: ' hidden '?demo=one-scene'
+budget=--virtual-time-budget=8000
+drawn=$(printf '%s' "$dom" | sed -n 's#.*data-frames="\([0-9]*\)".*#\1#p')
+[ "${drawn:-0}" -ge 30 ] || fail "one-scene-draws: drew ${drawn:-no} frames, wanted 30 or more while it animates"
 # overlap <page> <query> <wanted> <fix>: the page lists [<wanted>] over
 # its canvas (see vaporsOverlaps), or fails with <fix>.
 overlap() {
@@ -467,7 +488,7 @@ overlap() {
   echo "$1: HTML over the canvas: [${found:-not measured}]"
   [ "$found" = "$3" ] || fail "$1: over the canvas [${found:-not measured}], wanted [$3]; $4"
 }
-for demo in $demos index; do
+for demo in $demos one-scene index; do
   overlap "$demo-overlap" "$(query "$demo")" none "an element that may paint or take pointer events lies over the canvas of an elements demo; hide it (vapors_platform::hide_status_line, app_draws_open), move it off the canvas, or give it opacity 0 and pointer-events none"
 done
 overlap overlap-refused '?demo=hello' "$refused" "vaporsOverlaps accepts or refuses the wrong elements; fix the rule in $0"
@@ -488,4 +509,4 @@ for demo in $demos; do
   done
 done
 [ "$failed" = 0 ] || { echo "the page contract does not hold; reproduce: cargo xtask web && PAGE_CONTRACT_KEEP=1 $0 target/web \$(mktemp -d), which keeps the pages and logs" >&2; exit 1; }
-echo "ok   the page contract holds in all eleven cases, no HTML over the canvas of: $demos index (overlap-refused lists its four); the gradient screenshot and the screenshots:$shots"
+echo "ok   the page contract holds in all twelve cases (one-scene drew $drawn frames in real time), no HTML over the canvas of: $demos one-scene index (overlap-refused lists its four); the gradient screenshot and the screenshots:$shots"

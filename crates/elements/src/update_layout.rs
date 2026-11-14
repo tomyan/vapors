@@ -7,7 +7,7 @@ use crate::error::ElementError;
 use crate::kept_paint::PaintedFrom;
 #[cfg(debug_assertions)]
 use crate::layout::layout_check::{Inputs, check_layout_against_fresh};
-use crate::layout::{Key, Placed, Rebuilt, Slots, Written, lay_out};
+use crate::layout::{Key, Placed, Rebuilt, Settling, Slots, Written, lay_out};
 use crate::paint_order::Stackings;
 use crate::painted::Painted;
 use crate::placement::{Changes, LaidOut, Placed as Placing, Placement};
@@ -26,8 +26,12 @@ impl Document {
         let kept = self.kept.as_ref().expect("styled keeps the styles");
         let size = (viewport.width, viewport.height);
         let texts = (&mut self.fonts, &mut self.texts);
-        let changed = std::mem::take(&mut built.changed);
-        let laid_out = lay_out(boxes, texts, viewport.scale, size, &kept.calcs, changed);
+        let settling = Settling {
+            changed: std::mem::take(&mut built.changed),
+            built: built.slots.clone(),
+            lanes: true,
+        };
+        let laid_out = lay_out(boxes, texts, viewport.scale, size, &kept.calcs, settling);
         let work = match &laid_out {
             Ok((_, work)) => work,
             Err(failed) => &failed.1,
@@ -35,11 +39,13 @@ impl Document {
         self.counts.count_layout(work);
         let (slotted, work) = laid_out.map_err(|failed| vec![ElementError::Layout(failed.0)])?;
         // Debug timings include this full build and layout on every
-        // narrowed update; `layout_check.rs` says what would retire it.
-        // A test whose own oracle compares the same layout each step
-        // skips it (`skip_layout_check`).
+        // update; `layout_check.rs` says what would retire it. A full
+        // build is checked too: it lays block containers out by lane,
+        // and the check's fresh layout by Taffy. A test whose own
+        // oracle compares the same layout each step skips it
+        // (`skip_layout_check`).
         #[cfg(debug_assertions)]
-        if !built.every && !self.boxes.skip_layout_check {
+        if !self.boxes.skip_layout_check {
             self.check_layout(&slotted, viewport);
         }
         Ok((slotted, built, work.written))

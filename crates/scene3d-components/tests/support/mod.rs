@@ -6,6 +6,7 @@
 include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
 pub mod keyed;
+pub mod rows;
 
 use scene_page::{ScenePage, ScenePageProps};
 use std::cell::RefCell;
@@ -13,7 +14,7 @@ use std::rc::Rc;
 use vapors_app::{ElementsApp, SurfaceHandle};
 use vapors_elements::Document;
 use vapors_scene3d::{CameraHandle, Colour, Meshes, Projection, Scene, Transform, Vec3};
-use vapors_scene3d_gpu::SceneRenderer;
+use vapors_scene3d_gpu::{RendererLog, SceneRenderer};
 use vapors_signals::Signal;
 use vapors_text::FontSystem;
 
@@ -35,6 +36,7 @@ pub struct Rig {
     pub scene: Rc<RefCell<Scene>>,
     pub meshes: Rc<RefCell<Meshes>>,
     pub surface: SurfaceHandle,
+    pub log: Rc<RendererLog>,
     pub signals: Signals,
 }
 
@@ -54,6 +56,8 @@ pub struct Stage {
     pub scene: Rc<RefCell<Scene>>,
     pub meshes: Rc<RefCell<Meshes>>,
     pub surface: SurfaceHandle,
+    /// The renderer's log: whether it was dropped.
+    pub log: Rc<RendererLog>,
 }
 
 impl Stage {
@@ -65,6 +69,7 @@ impl Stage {
         let scene = Rc::new(RefCell::new(Scene::new()));
         let meshes = Rc::new(RefCell::new(Meshes::new()));
         let renderer = SceneRenderer::new(Rc::clone(&scene), Rc::clone(&meshes));
+        let log = renderer.log();
         let surface = app.mount("view", Box::new(renderer)).unwrap();
         Self {
             doc,
@@ -72,6 +77,7 @@ impl Stage {
             scene,
             meshes,
             surface,
+            log,
         }
     }
 }
@@ -86,6 +92,7 @@ impl Rig {
             scene,
             meshes,
             surface,
+            log,
         } = Stage::new();
         let square = square(&meshes);
         let signals = Signals {
@@ -118,13 +125,14 @@ impl Rig {
             scene,
             meshes,
             surface,
+            log,
             signals,
         }
     }
 }
 
 /// A square 1 unit wide in the XY plane, centred on the origin.
-pub fn square(meshes: &Rc<RefCell<Meshes>>) -> vapors_scene3d::GeometryId {
+pub fn square(meshes: &Rc<RefCell<Meshes>>) -> vapors_scene3d::GeometryHandle {
     let corners = [(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)];
     let positions = corners.map(|(x, y)| Vec3::new(x, y, 0.0)).to_vec();
     meshes

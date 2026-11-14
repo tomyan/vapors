@@ -16,7 +16,7 @@ fn an_empty_box_tree_lays_out_nothing() {
         1.0,
         (200.0, 100.0),
         &calcs,
-        Vec::new(),
+        Settling::of(Vec::new()),
     );
 
     // Then

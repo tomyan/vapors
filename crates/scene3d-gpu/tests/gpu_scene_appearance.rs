@@ -21,8 +21,8 @@ fn drawn_once(gpu: &Gpu) -> (Fixture, SceneRenderer, NodeId) {
     fixture.camera(projection, Vec3::new(0.0, 0.0, 5.0));
     let square = fixture.square(0.5);
     let left = Transform::from_translation(Vec3::new(-2.0, 0.0, 0.0)).unwrap();
-    let node = fixture.mesh(fixture.root(), square, RED, left);
-    fixture.mesh(fixture.root(), square, GREEN, Transform::IDENTITY);
+    let node = fixture.mesh(fixture.root(), &square, RED, left);
+    fixture.mesh(fixture.root(), &square, GREEN, Transform::IDENTITY);
     let mut renderer = fixture.renderer(gpu);
     render_counted(&mut renderer, gpu).expect("renders");
     (fixture, renderer, node)

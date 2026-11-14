@@ -505,6 +505,17 @@ the splice lane's; 4 waits for IU4 4-ii's frame coordinates; 5 waits
 for 4 on the elements side; 3f after 3 and before 4 (section 10.6); 6 after 4; 7 last. The estimates in
 section 6 assume PR 1 lands before PR 4's acceptance run.
 
+As built, PR 3 (3a-1 #315, 3a-2 #323): the lane is not lent with its
+container's cache. `put_box` drops it with the container's box, so any
+rebuild of the container's own box (a class toggle or hover style on the
+list itself, or a declined child edit) makes the next layout lay every
+child out again: O(rows) `lane_child` calls, each a cache hit, no worse
+than Taffy. The leaves' inputs are split in two (`lane_share.rs`): the
+height bases change between a flex parent's size query and its layout,
+and only the children whose styles read them (a percentage height,
+min-height or max-height, or a relative `top` or `bottom` percentage)
+are laid out again when they do.
+
 ## 8. Decisions for Tom
 
 Decided by Tom, 2026-11-13: 1 build the lane (Taffy stays for every other
@@ -662,15 +673,17 @@ depend on the total. Taffy lays out every case the lane refuses.
 | `flex-direction: column`, `flex-wrap: nowrap` | lane | one line; positions are a sum |
 | Every item `flex-grow: 0` | lane | the default; with grow above 0, positive free space (a definite height, a `min-height`, an item's max below its basis) is shared by every item |
 | Any item `flex-grow` above 0 | declined | as above |
-| Container height auto with no `max-height` | lane, whatever `flex-shrink` is | Taffy sizes the column at the sum of its items' contributions, each at least the item's flex base size (`max(flex_basis, min_height)` with definite available height; `inner.max(flex_basis)` for a column under min- or max-content), so free space is not negative and shrink does nothing. The debug layout check compares with Taffy on every test update, and PR 3f has a test with a `flex-basis` above the content and the default shrink |
-| Container definite `height` or a `max-height`, every item `flex-shrink: 0` | lane | shrink is off, so overflow leaves sizes alone |
-| Container definite `height` or a `max-height`, any item `flex-shrink` above 0 | declined in the first slice | an item shrinks when the total exceeds the height: depends on the total. This includes the scrolling list `height: 400px; overflow: auto` with the default `flex-shrink: 1`; the follow-up is in 10.6 |
+| Any height, items no taller in total than the column's inner height | lane | no item shrinks, and with grow 0 nothing grows, so an item keeps its hypothetical height, except as the next row says |
+| An item that can shrink whose hypothetical height lies outside its own minimum and maximum (a floor from its aspect ratio or its padding and border above its `max-height`) | declined (`ClampedHeight`) | unless the column is exactly sized, Taffy leaves such an item unfrozen and clamps it to its resolved minimum and maximum (`resolve_flexible_lengths`, step d), so its height depends on the total (review of #342, H1) |
+| Items taller in total than the column's inner height, none that can shrink | lane | an item shrinks only when its `flex-shrink` is above 0, its basis is not below its hypothetical height and its minimum height is below it (`resolve_flexible_lengths`); auto-height rows of content have a minimum equal to their content. As built (3f-1): a leaf carries `shrinkable` (an OR fold), and the column's answer compares the sum with the inner height |
+| Items taller in total than the column's inner height, one that can shrink | declined at layout (`Shrinks`) | its height depends on the total. As first planned, an auto-height column could not reach this: it can, when an item's automatic minimum exceeds its basis share (`flex-basis` below its content), so the same check covers every height. This takes in PR 3s (10.6) |
 | `justify-content` `normal`, `flex-start`, `start`, `stretch` | lane | items packed from the start |
 | `justify-content` `flex-end`, `end`, `center`, `space-*` | declined | every item is moved by the free space |
-| `row-gap` (length or percentage) | lane | the gap is the container's; a percentage resolves against the container's inner height when definite, else to 0, as Taffy |
+| `row-gap`, a length, or a percentage with the column's height definite | lane | the gap is the container's |
+| `row-gap`, a percentage or a `calc()` with the column's height auto | declined (`RelativeGap`) | Taffy resolves it to 0 to size the column, then again against the height the items sum to (`compute_preliminary` 428-438), which depends on the total |
 | Main-axis `auto` margins on an item (`margin-top` or `margin-bottom: auto`) | declined | they take a share of the free space |
 | `align-items` or `align-self` `start`, `end`, `center`, `flex-start`, `flex-end`, `stretch`; cross-axis `auto` margins | lane | the cross position is per item, against the container's inner width |
-| `align-self: baseline` | declined | Taffy aligns participating items to the line's largest baseline (`calculate_children_base_lines`, 2046), which depends on every item |
+| `align-self: baseline` | lane | in a column an item aligned by baseline is placed by itself (Taffy reads line baselines only in rows, `calculate_children_base_lines` 2054-2056); in a row (PR 6) it depends on every item |
 | `flex-basis` (any), item `min-height`, `max-height`, `aspect-ratio`, `%` sizes | lane | per item; a `%` resolves against the container's inner size only when that size is definite and not derived from the container's content (taffy `generate_anonymous_flex_items`, 783-789), a property of the container |
 | `position: relative` on an item | lane | the inset moves that item only |
 | Container `padding`, `border`, `min-height`, `overflow: scroll` or `auto` (with height auto) | lane | the container's own answer |
@@ -678,9 +691,20 @@ depend on the total. Taffy lays out every case the lane refuses.
 | `flex-direction: column-reverse` | declined | positions run from the container's end, so every item moves when the total changes |
 | `flex-direction: row`, `row-reverse` | declined until PR 6 | 10.6 |
 | `flex-wrap: wrap`, `wrap-reverse` | declined | lines are formed from the running total |
-| Text or inline children, `display: contents` | declined | anonymous flex items, as for block (section 4) |
+| Text or inline children | lane | each is an item of its own in vapors' boxes, laid out as Taffy lays it out (a page with a loose text node and a `display: inline` div matched Taffy, review of #342) |
 | `position: absolute` children | declined, as block (section 4) | their static position is from the container's alignment |
 | `order` | n/a | not a property vapors reads (`crates/css/src/property/longhands.rs`); Taffy keeps tree order |
+
+As built, PR 3f is two PRs, as PR 3 was: 3f-1, the column mirror
+(`lane_flex*.rs`) compared with Taffy on pages of each case and its
+declines, with no change to layout; 3f-2, the flex lane live
+(`FlexLaneNotBuilt` retired) with `FlexInsert`. One input differs from
+Taffy's, declared where it is made (`lane_flex_child.rs`,
+`available_along`): for a column whose height is the items' total, an
+item is asked with its own hypothetical height as the space along the
+column, since one item does not read the total; its height is known in
+every ask that passes it, so neither Taffy's cache nor the item reads
+that space.
 
 ### 10.4 Margins
 
@@ -717,9 +741,12 @@ Mirrored from taffy `compute/flexbox.rs` for one item, in the order
    (`determine_flex_base_size`, 947-1231), with the container's
    available space from `determine_available_space` (896-946),
    computed once per container layout.
-3. Its target main size: the hypothetical main size, since grow is 0
-   and shrink does not apply in the lane's cases
-   (`resolve_flexible_lengths`, 1747, does nothing else for them).
+3. Its target main size: the hypothetical main size. Grow is 0, a
+   column whose items would shrink is declined (`Shrinks`), and an item
+   that can shrink and whose hypothetical size lies outside its own
+   minimum and maximum is declined (`ClampedHeight`): otherwise Taffy's
+   `resolve_flexible_lengths` (step d, 1898-1915) clamps an unfrozen
+   item whenever the column is not exactly sized.
 4. Its hypothetical cross size (`determine_hypothetical_cross_size`,
    1945) and its used cross size, stretched to the container's inner
    width when `is_stretched` (`determine_used_cross_size`, 2228-2281).

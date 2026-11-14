@@ -10,7 +10,8 @@ fn item(margins: [f64; 2], size: f64) -> FlexSummary {
         size,
         basis: size + 1.0,
         content: size + 2.0,
-        bounds: Bounds::EMPTY,
+        shrinkable: false,
+        bounds: Bounds::span(0.0, size),
     })
 }
 
@@ -42,4 +43,26 @@ fn the_contributions_sum_with_their_gaps() {
 fn the_first_item_starts_at_its_start_margin() {
     let start = FlexSummary::start_of(&FlexSummary::default(), &item([6.0, 0.0], 10.0), 4.0);
     assert_eq!(start, 6.0);
+}
+
+#[test]
+fn a_run_is_shrinkable_when_any_item_is_and_leads_with_its_first_margin() {
+    // Given
+    let shrinks = FlexSummary::leaf(FlexItem {
+        margins: [5.0, 0.0],
+        size: 10.0,
+        basis: 10.0,
+        content: 10.0,
+        shrinkable: true,
+        bounds: Bounds::span(0.0, 10.0),
+    });
+    let fixed = item([2.0, 0.0], 10.0);
+
+    // When
+    let runs = [fixed.combine(&shrinks, 0.0), shrinks.combine(&fixed, 0.0)];
+
+    // Then
+    assert_eq!(runs.map(|run| run.shrinkable()), [true, true]);
+    assert!(!fixed.combine(&fixed, 0.0).shrinkable());
+    assert_eq!(runs.map(|run| run.leading()), [2.0, 5.0]);
 }

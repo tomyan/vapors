@@ -28,9 +28,10 @@ pub(crate) fn mesh_nodes(scene: &Scene, meshes: &Meshes) -> Result<Vec<MeshNode>
 
 /// `node` to draw when it is a mesh naming geometry `meshes` issued.
 fn mesh_node(node: NodeId, scene: &Scene, meshes: &Meshes) -> Result<Option<MeshNode>, FrameError> {
-    let NodeKind::Mesh { geometry, colour } = *scene.kind(node)? else {
+    let NodeKind::Mesh { geometry, colour } = scene.kind(node)? else {
         return Ok(None);
     };
+    let (geometry, colour) = (geometry.id(), *colour);
     if !meshes.issued(geometry) {
         return Err(FrameError::ForeignGeometry { node, geometry });
     }
