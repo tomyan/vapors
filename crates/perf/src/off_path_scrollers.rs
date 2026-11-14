@@ -3,10 +3,10 @@
 //! on each sort (docs/plans/iu4.md, "PR 5 as built", M2, still open),
 //! and these pages show what that costs.
 
-use vapors_dom::{Dom, NodeId};
+use vapors_dom::NodeId;
 use vapors_elements::Document;
 
-use crate::off_path_page::{Shape, Unit, value_text};
+use crate::off_path_page::{Shape, Unit, body, child_before, value_text};
 use crate::rows::basics::{element, text};
 
 /// A scroller of rows (the body), each row a horizontal scroller of
@@ -34,25 +34,6 @@ pub const CODE_BLOCKS: Shape = Shape {
     container: body,
     unit: message,
 };
-
-/// The body: the pages' units are its children.
-fn body(doc: &mut Document) -> NodeId {
-    doc.body()
-}
-
-/// An element with `class` made under `parent`, before `before` or last.
-fn child_before(
-    doc: &mut Document,
-    parent: NodeId,
-    tag: &str,
-    class: &str,
-    before: Option<NodeId>,
-) -> NodeId {
-    let node = doc.create_element(tag);
-    doc.set_attribute(node, "class", class);
-    doc.insert_before(parent, node, before);
-    node
-}
 
 /// Row `index`: a label cell, the value's cell and two more.
 fn scroller_row(doc: &mut Document, parent: NodeId, index: usize, before: Option<NodeId>) -> Unit {

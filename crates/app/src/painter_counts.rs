@@ -179,7 +179,7 @@ impl ScenePainter {
 
     /// The work every pipeline issued since the last take. One run draws
     /// at a time, so it is that run's.
-    fn take_work(&self) -> GpuWork {
+    pub(super) fn take_work(&self) -> GpuWork {
         self.shadows.take_work()
             + self.quads.take_work()
             + self.closed_forms.take_work()

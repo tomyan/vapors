@@ -23,6 +23,8 @@ pub struct ScenePainter {
     text: TextPipeline,
     atlas: GlyphAtlas,
     images: ImagePipeline,
+    /// The format its pipelines draw into.
+    format: wgpu::TextureFormat,
     textures: Textures,
     surfaces: Surfaces,
     kept: KeptGpu,
@@ -75,6 +77,7 @@ impl ScenePainter {
             text: TextPipeline::new(device, format, &atlas),
             atlas,
             images: ImagePipeline::new(device, format),
+            format,
             textures: Textures::default(),
             surfaces: Surfaces::default(),
             kept: KeptGpu::default(),
@@ -158,6 +161,8 @@ mod kept_check;
 pub use counts::FrameCounts;
 #[path = "painter_images.rs"]
 mod images;
+#[path = "painter_start.rs"]
+mod start;
 #[path = "painter_text.rs"]
 mod text;
 #[path = "painter_tooltip.rs"]

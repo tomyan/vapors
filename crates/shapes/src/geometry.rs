@@ -10,8 +10,8 @@ use crate::mesh::{MeshVertex, check_mesh};
 #[derive(Debug, PartialEq)]
 pub enum Geometry {
     /// An axis-aligned rectangle, rounded when `radius` is not zero,
-    /// drawn by the box shader's closed-form distance
-    /// (`crates/renderer/src/quads.wgsl`).
+    /// drawn by the closed-form pipeline's distance
+    /// (`crates/renderer/src/closed_forms.wgsl`).
     Rect {
         /// Its top-left corner.
         origin: [f32; 2],
@@ -20,7 +20,7 @@ pub enum Geometry {
         /// Corner radii `rx`, `ry`: zero or more, at most half the
         /// width and the height (SVG clamps them there; the emitter
         /// clamps before the table), and equal until the shader draws
-        /// elliptical corners (S3a).
+        /// elliptical corners (S4b, with `<rect rx ry>`).
         radius: [f32; 2],
     },
     /// An ellipse; a circle when the radii are equal.
@@ -67,10 +67,10 @@ pub fn check_geometry(geometry: &Geometry) -> Result<(), String> {
     }
 }
 
-/// The corner radii the box shader draws: finite, not negative, within
-/// half the side (`rounded_distance` cuts each corner in its own r x r
-/// square and clamps nothing), and circular: the emitter writes equal
-/// radii, so the comparison is exact, not within a margin.
+/// The corner radii the closed-form shader draws: finite, not negative,
+/// within half the side (`rect_distance` clamps nothing), and circular:
+/// the emitter writes equal radii, so the comparison is exact, not
+/// within a margin.
 #[allow(clippy::float_cmp)]
 fn check_corners(size: [f32; 2], radius: [f32; 2]) -> Result<(), String> {
     finite("radius", radius)?;
@@ -84,7 +84,7 @@ fn check_corners(size: [f32; 2], radius: [f32; 2]) -> Result<(), String> {
     }
     if radius[0] != radius[1] {
         return Err(format!(
-            "corner radii {radius:?} differ, and the box shader draws circular corners; elliptical corners come with S3a"
+            "corner radii {radius:?} differ, and the closed-form shader draws circular corners; elliptical corners come with S4b's <rect rx ry>"
         ));
     }
     Ok(())

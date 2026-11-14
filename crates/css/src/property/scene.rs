@@ -96,7 +96,7 @@ const GROUPS: &[Group] = &[
     },
     Group {
         readers: MESH,
-        instead: "set `opacity` on each `mesh`: a group's opacity is not composited as one layer (docs/plans/css-for-3d.md, D3)",
+        instead: "set `opacity` on each `mesh`: a group's opacity is not composited as one layer (decision D3)",
         longhands: "opacity",
     },
     Group {

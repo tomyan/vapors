@@ -104,7 +104,7 @@ fn a_corner_radius_the_box_shader_cannot_draw_is_refused() {
         ),
         (
             rect([2.0, 3.0], [0.5, 1.0]),
-            "corner radii [0.5, 1.0] differ, and the box shader draws circular corners; elliptical corners come with S3a",
+            "corner radii [0.5, 1.0] differ, and the closed-form shader draws circular corners; elliptical corners come with S4b's <rect rx ry>",
         ),
     ];
 
