@@ -13,7 +13,7 @@ use crate::document_shapes::DocumentShapes;
 
 use crate::arena::Arena;
 use crate::style::UsedMap;
-use crate::svg_route::{Route, paths, route};
+use crate::svg_route::{Route, path_site, paths, route, why_shapes};
 use crate::svg_shapes::{acquired, local_box};
 
 /// Slack for f32 rounding of a shape's box against the view box, as a
@@ -22,7 +22,8 @@ const SLACK: f32 = 1e-4;
 
 /// Why `svg`, an svg whose attributes the checks passed, is refused on
 /// the shapes route, at `scale` device pixels per CSS px, naming the
-/// path. Its shapes are acquired for it as they will be painted.
+/// path. Its shapes are acquired for it as they will be painted; an svg
+/// that paints nothing (`display: none` or hidden) releases them.
 pub(crate) fn reasons(
     (arena, used): (&Arena, &UsedMap),
     svg: NodeId,
@@ -37,23 +38,68 @@ pub(crate) fn reasons(
     else {
         return Vec::new();
     };
-    let to_paint: Vec<_> = paths
-        .iter()
+    if !shown(arena, used, svg) {
+        shapes.borrow_mut().release(svg);
+        return Vec::new();
+    }
+    let to_paint: Vec<_> = (paths.iter())
         .map(|(site, data, own)| (site.as_str(), data, *own))
         .collect();
     let made = match acquired(shapes, svg, &to_paint, per_unit) {
         Ok(made) => made,
-        Err(reason) => return vec![format!("a <path> cannot be drawn: {reason}")],
+        Err(reason) => return vec![format!("a path cannot be drawn: {reason}")],
     };
-    made.iter()
-        .filter_map(|shape| {
-            let reach = local_box(shapes, shape);
-            (!inside(reach, view_box)).then(|| format!(
-                "its <path> {} draws over {reach:?} in viewBox units, outside the viewBox {view_box:?}; an svg's content is not clipped yet, so keep the path and its stroke inside the viewBox",
-                paths[shape.path].0
-            ))
-        })
+    let reach = outside(shapes, &made, view_box);
+    reach
+        .map(|(path, reach)| overflow(arena, used, svg, (path, reach, view_box)))
+        .into_iter()
         .collect()
+}
+
+/// Whether `svg` paints: it is visible, and neither it nor an ancestor
+/// has `display: none`.
+fn shown(arena: &Arena, used: &UsedMap, svg: NodeId) -> bool {
+    let visible = used.get(&svg).is_some_and(|own| own.visible);
+    let mut node = Some(svg);
+    while let Some(at) = node {
+        if used
+            .get(&at)
+            .is_some_and(|own| own.layout.display == taffy::Display::None)
+        {
+            return false;
+        }
+        node = arena.get(at, "svg_shape_checks").parent;
+    }
+    visible
+}
+
+/// The first shape of `made` reaching outside `view_box`: its path's
+/// index and the box it draws.
+fn outside(
+    shapes: &RefCell<DocumentShapes>,
+    made: &[crate::svg_shapes::PathShape],
+    view_box: [f32; 4],
+) -> Option<(usize, [[f32; 2]; 2])> {
+    made.iter()
+        .map(|shape| (shape.path, local_box(shapes, shape)))
+        .find(|(_, reach)| !inside(*reach, view_box))
+}
+
+fn overflow(
+    arena: &Arena,
+    used: &UsedMap,
+    svg: NodeId,
+    (path, [lo, hi], [x, y, w, h]): (usize, [[f32; 2]; 2], [f32; 4]),
+) -> String {
+    let why = why_shapes(arena, used, svg).unwrap_or_default();
+    format!(
+        "its {} draws from ({}, {}) to ({}, {}) in viewBox units, outside its viewBox \"{x} {y} {w} {h}\"; {why}, and an svg drawn as shapes is not clipped yet (the icon route clips to the box), so keep the path and its stroke inside the viewBox",
+        path_site(path),
+        lo[0],
+        lo[1],
+        hi[0],
+        hi[1]
+    )
 }
 
 /// The view box and the device pixels per unit the svg draws at.
@@ -72,14 +118,15 @@ fn parsed<'a>(
 ) -> Option<Vec<(String, IconPath, &'a crate::style::Used)>> {
     paths(arena, svg)
         .into_iter()
-        .map(|path| {
+        .enumerate()
+        .map(|(index, path)| {
             let d = arena
                 .get(path, "svg_shape_checks")
                 .element()?
                 .attributes
                 .get("d")?;
             Some((
-                crate::check::describe(arena, path),
+                path_site(index),
                 IconPath::parse(d).ok()?,
                 &**used.get(&path)?,
             ))

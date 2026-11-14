@@ -17,7 +17,7 @@ use crate::document_shapes::DocumentShapes;
 
 use crate::arena::Arena;
 use crate::style::{Used, UsedMap};
-use crate::svg_route::{Route, paths, route};
+use crate::svg_route::{Route, path_site, paths, route};
 
 /// An svg drawn as shapes: its view box and each path, its data parsed
 /// once with its box, and the description that names it in messages.
@@ -55,10 +55,14 @@ pub(crate) fn of(arena: &Arena, used: &UsedMap, svg: NodeId) -> Option<Rc<SvgSha
     let view_box = crate::svg::view_box(element.attributes.get("viewBox")?)?;
     let paths = paths(arena, svg)
         .into_iter()
-        .map(|node| {
+        .enumerate()
+        .map(|(index, node)| {
             let data = parsed(arena, node)?;
-            let site = crate::check::describe(arena, node);
-            Some(SvgPath { node, site, data })
+            Some(SvgPath {
+                node,
+                site: path_site(index),
+                data,
+            })
         })
         .collect::<Option<_>>()?;
     Some(Rc::new(SvgShapes { view_box, paths }))
@@ -85,11 +89,7 @@ pub(crate) fn acquired(
     paths: &[PathToPaint<'_>],
     px_per_unit: f32,
 ) -> Result<Vec<PathShape>, String> {
-    let painted: Vec<(usize, Paint, Color)> = (paths.iter().enumerate())
-        .flat_map(|(path, &(_, _, own))| {
-            paints(own).map(move |(paint, colour)| (path, paint, colour))
-        })
-        .collect();
+    let painted = painted(paths);
     let specs: Vec<_> = (painted.iter())
         .map(|&(path, paint, _)| (paths[path].0, paths[path].1, paint, px_per_unit))
         .collect();
@@ -104,6 +104,16 @@ pub(crate) fn acquired(
             colour,
         })
         .collect())
+}
+
+/// Each shape `paths` paint, in order: its path's index, paint and
+/// colour.
+fn painted(paths: &[PathToPaint<'_>]) -> Vec<(usize, Paint, Color)> {
+    (paths.iter().enumerate())
+        .flat_map(|(path, &(_, _, own))| {
+            paints(own).map(move |(paint, colour)| (path, paint, colour))
+        })
+        .collect()
 }
 
 /// What a path styled `own` paints, in SVG's order: its fill, then its

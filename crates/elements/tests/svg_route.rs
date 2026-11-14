@@ -132,7 +132,12 @@ fn a_path_reaching_outside_the_view_box_is_refused_naming_it() {
     // When, Then
     assert_refused(
         &mut doc,
-        &["<path>", "outside the viewBox", "not clipped yet"],
+        &[
+            "its path 1 draws from (2, 2) to (18, 6)",
+            "outside its viewBox \"0 0 16 16\"",
+            "drawn as shapes because path 1 has a fill",
+            "not clipped yet",
+        ],
     );
 }
 

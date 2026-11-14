@@ -50,29 +50,37 @@ fn stroke(arena: &Arena, used: &UsedMap, child: NodeId) -> Option<IconStroke> {
 }
 
 /// Paints what the svg `layout_box` is shows over its content box
-/// (border box `border_box`, CSS px), when it is visible: its icon, or
-/// its shapes.
+/// (border box `border_box`, CSS px): its icon or its shapes, when it is
+/// visible. An svg on the icon route releases the shapes it had; a
+/// hidden one's are released by its checks (`svg_shape_checks`).
+///
+/// # Panics
+/// When an svg's box has no used style: styling gives every element
+/// one before boxes are built.
 pub(crate) fn paint(
     layout_box: &LayoutBox,
     border_box: BoxRect,
     input: &PaintInput<'_>,
     out: &mut Painting,
 ) {
-    let &Content::Element(node) = &layout_box.content else {
+    let (true, &Content::Element(node)) = (
+        layout_box.icon.is_some() || layout_box.svg_shapes.is_some(),
+        &layout_box.content,
+    ) else {
         return;
     };
-    let Some(used) = input.used.get(&node).filter(|used| used.visible) else {
-        return;
-    };
+    let used = &input.used[&node];
     let content = crate::clip::content_box(layout_box, border_box);
-    if let Some(icon) = &layout_box.icon {
-        push_icon(icon, content, used.text.color, input.scale, out);
-    }
-    match (&layout_box.svg_shapes, &layout_box.icon) {
-        (Some(shapes), _) => crate::svg_shapes_paint::paint((node, shapes), content, input, out),
-        // an svg back on the icon route paints no shapes: free its uses
-        (None, Some(_)) => input.shapes.borrow_mut().release(node),
-        (None, None) => {}
+    match (&layout_box.icon, &layout_box.svg_shapes) {
+        (Some(icon), _) if used.visible => {
+            input.shapes.borrow_mut().release(node);
+            push_icon(icon, content, used.text.color, input.scale, out);
+        }
+        (_, Some(shapes)) if used.visible => {
+            crate::svg_shapes_paint::paint((node, shapes), content, input, out);
+        }
+        // a hidden svg's shapes are released by its checks
+        _ => {}
     }
 }
 

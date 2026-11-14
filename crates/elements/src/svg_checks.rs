@@ -37,27 +37,58 @@ const ATTRIBUTES: [&str; 12] = [
     "stroke-width",
 ];
 
-/// The refusals of every `svg` and `path` among `nodes`; an svg on the
-/// shapes route fills `shapes` as it is checked.
+/// The refusals of every `svg` and `path` among `nodes`, then of each
+/// svg on the shapes route that is among them or holds one of them: a
+/// change to a path alone (its `d`, its paint) rechecks its svg's
+/// shapes (#381 review, H1).
+///
+/// Side effect: the shape checks acquire each such svg's shapes for it
+/// as paint will (`svg_shape_checks`), so a recheck of an unchanged svg
+/// acquires and releases the same entries, net nothing.
 pub(crate) fn refusals(
     arena: &Arena,
     nodes: &[NodeId],
     (used, shapes): (&UsedMap, &RefCell<DocumentShapes>),
     scale: f32,
 ) -> Vec<ElementError> {
-    nodes
+    let mut found: Vec<(NodeId, String)> = nodes
         .iter()
         .flat_map(|&node| {
-            let element = describe(arena, node);
-            let mut found = reasons(arena, node, used, scale);
-            if found.is_empty() {
-                found = crate::svg_shape_checks::reasons((arena, used), node, shapes, scale);
-            }
-            found.into_iter().map(move |reason| {
-                ElementError::UnsupportedAttribute(format!("{element}: {reason}"))
-            })
+            reasons(arena, node, used, scale)
+                .into_iter()
+                .map(move |r| (node, r))
+        })
+        .collect();
+    for svg in svgs_of(arena, nodes) {
+        if found.iter().all(|(node, _)| *node != svg) {
+            let shape_reasons = crate::svg_shape_checks::reasons((arena, used), svg, shapes, scale);
+            found.extend(shape_reasons.into_iter().map(|r| (svg, r)));
+        }
+    }
+    found
+        .into_iter()
+        .map(|(node, reason)| {
+            ElementError::UnsupportedAttribute(format!("{}: {reason}", describe(arena, node)))
         })
         .collect()
+}
+
+/// Each svg among `nodes` or holding a path among them, once, in order.
+fn svgs_of(arena: &Arena, nodes: &[NodeId]) -> Vec<NodeId> {
+    let mut svgs: Vec<NodeId> = Vec::new();
+    for &node in nodes {
+        let svg = if crate::svg::is(arena, node, "path") {
+            arena.get(node, "svg_checks").parent
+        } else {
+            Some(node)
+        };
+        if let Some(svg) =
+            svg.filter(|&svg| crate::svg::is(arena, svg, "svg") && !svgs.contains(&svg))
+        {
+            svgs.push(svg);
+        }
+    }
+    svgs
 }
 
 fn reasons(arena: &Arena, node: NodeId, used: &UsedMap, scale: f32) -> Vec<String> {
@@ -65,7 +96,7 @@ fn reasons(arena: &Arena, node: NodeId, used: &UsedMap, scale: f32) -> Vec<Strin
         return Vec::new();
     };
     let mut found = match element.tag.as_str() {
-        "svg" => svg_reasons(arena, node, &element.attributes, scale),
+        "svg" => svg_reasons(arena, (node, used), &element.attributes, scale),
         "path" => crate::svg_path_checks::reasons(arena, node, &element.attributes),
         _ => return Vec::new(),
     };
@@ -75,13 +106,16 @@ fn reasons(arena: &Arena, node: NodeId, used: &UsedMap, scale: f32) -> Vec<Strin
 
 fn svg_reasons(
     arena: &Arena,
-    node: NodeId,
+    (node, used): (NodeId, &UsedMap),
     attributes: &BTreeMap<String, String>,
     scale: f32,
 ) -> Vec<String> {
     let mut found = outside(attributes, &ATTRIBUTES, "<svg>");
     found.extend(sizes(attributes));
-    found.extend(crate::svg_limit::reason(attributes, scale));
+    // the atlas's cap is the icon route's; shapes have none
+    if crate::svg_route::route(arena, used, node) != Some(crate::svg_route::Route::Shapes) {
+        found.extend(crate::svg_limit::reason(attributes, scale));
+    }
     found.extend(named(attributes));
     found.extend(namespace(attributes));
     found.extend(children(arena, node));

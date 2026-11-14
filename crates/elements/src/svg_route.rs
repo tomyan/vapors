@@ -43,6 +43,43 @@ pub(crate) fn paints_nothing(own: &Used) -> bool {
     own.svg.fill.is_none() && (own.svg.stroke.is_none() || own.svg.stroke_width <= 0.0)
 }
 
+/// Why `svg` is on the shapes route: the first path the icon route
+/// cannot draw, by its index, and what it has; `None` on the icon route.
+pub(crate) fn why_shapes(arena: &Arena, used: &UsedMap, svg: NodeId) -> Option<String> {
+    let own = used.get(&svg)?;
+    let (index, path) = paths(arena, svg)
+        .into_iter()
+        .enumerate()
+        .find(|(_, path)| !used.get(path).is_some_and(|path| icon_draws(path, own)))?;
+    let has = used
+        .get(&path)
+        .map_or("no used style", |path| what_it_has(path, own));
+    Some(format!(
+        "it is drawn as shapes because {} {has}",
+        path_site(index)
+    ))
+}
+
+/// What a path styled `own` in an svg styled `svg` has that keeps it
+/// off the icon route.
+fn what_it_has(own: &Used, svg: &Used) -> &'static str {
+    if own.svg.fill.is_some() {
+        "has a fill"
+    } else if own.text.color != svg.text.color {
+        "has a colour of its own"
+    } else if own.svg.stroke != Some(own.text.color) {
+        "has a stroke other than its colour"
+    } else {
+        "has a stroke of no width"
+    }
+}
+
+/// How messages name an svg's path: by its index among the svg's paths,
+/// counting from 1, which a bare path's description cannot tell apart.
+pub(crate) fn path_site(index: usize) -> String {
+    format!("path {}", index + 1)
+}
+
 /// The `path` children of `svg`, in order.
 pub(crate) fn paths(arena: &Arena, svg: NodeId) -> Vec<NodeId> {
     arena
