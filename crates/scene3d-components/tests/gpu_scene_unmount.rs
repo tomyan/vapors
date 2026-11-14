@@ -11,6 +11,7 @@ use vapors_gpu_harness::Gpu;
 use vapors_platform::{App, Frame, Instant, Next};
 use vapors_renderer::clear;
 use vapors_scene::Color;
+use vapors_scene3d_gpu::Resource;
 
 /// One app frame into a fresh 64-pixel target; what it asked for next.
 fn frame(app: &mut ElementsApp, gpu: &Gpu) -> Next {
@@ -46,4 +47,26 @@ fn gpu_unmounting_the_surface_drops_the_scene_renderer_and_the_app_waits() {
     assert!(rig.log.dropped(), "unmount kept the renderer alive");
     let after = [frame(&mut rig.app, &gpu), frame(&mut rig.app, &gpu)];
     assert_eq!(after, [Next::Continue, Next::Wait]);
+}
+
+#[test]
+fn gpu_unmounting_the_surface_frees_every_gpu_resource_the_renderer_made() {
+    // Given: the page drawn: one pipeline, camera uniform, slot buffer
+    // and depth view, and the square's one piece of geometry
+    let gpu = vapors_gpu_harness::gpu();
+    let mut rig = Rig::new();
+    frame(&mut rig.app, &gpu);
+    for kind in Resource::ALL {
+        assert_eq!(rig.log.made(kind), 1, "{kind:?}");
+        assert_eq!(rig.log.freed(kind), 0, "{kind:?}");
+    }
+
+    // When
+    rig.page.unmount(&rig.doc);
+    drop(rig.app.unmount("view").expect("mounted"));
+
+    // Then
+    for kind in Resource::ALL {
+        assert_eq!(rig.log.freed(kind), rig.log.made(kind), "{kind:?} leaked");
+    }
 }

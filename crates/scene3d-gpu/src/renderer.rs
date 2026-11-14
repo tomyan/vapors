@@ -3,9 +3,10 @@
 use crate::camera::{CameraUniform, view_projection};
 use crate::draw::{MeshNode, Pass, mesh_nodes, record};
 use crate::geometry::GpuGeometry;
+use crate::log::Tracked;
 use crate::pipeline::Pipeline;
 use crate::slots::Slots;
-use crate::{FrameError, RendererLog, depth};
+use crate::{FrameError, RendererLog, Resource, depth};
 use std::cell::RefCell;
 use std::rc::Rc;
 use vapors_app::{SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
@@ -17,15 +18,15 @@ pub struct SceneRenderer {
     scene: Rc<RefCell<Scene>>,
     meshes: Rc<RefCell<Meshes>>,
     mounted: Option<Mounted>,
-    depth: Option<wgpu::TextureView>,
+    depth: Option<Tracked<wgpu::TextureView>>,
     log: Rc<RendererLog>,
 }
 
 /// What `mount` builds.
 struct Mounted {
-    pipeline: Pipeline,
-    camera: CameraUniform,
-    slots: Slots,
+    pipeline: Tracked<Pipeline>,
+    camera: Tracked<CameraUniform>,
+    slots: Tracked<Slots>,
     geometry: GpuGeometry,
 }
 
@@ -57,18 +58,20 @@ impl Drop for SceneRenderer {
 
 impl SurfaceRenderer for SceneRenderer {
     fn mount(&mut self, device: &wgpu::Device) -> Result<(), SurfaceError> {
+        let log = &self.log;
         let pipeline = Pipeline::new(device);
         self.mounted = Some(Mounted {
-            camera: CameraUniform::new(device, &pipeline),
-            slots: Slots::new(device, &pipeline),
-            geometry: GpuGeometry::default(),
-            pipeline,
+            camera: Tracked::new(CameraUniform::new(device, &pipeline), log, Resource::Camera),
+            slots: Tracked::new(Slots::new(device, &pipeline), log, Resource::Slots),
+            geometry: GpuGeometry::new(log),
+            pipeline: Tracked::new(pipeline, log, Resource::Pipeline),
         });
         Ok(())
     }
 
     fn resize(&mut self, device: &wgpu::Device, size: SurfaceSize) -> Result<(), SurfaceError> {
-        self.depth = Some(depth::texture(device, size));
+        let view = depth::texture(device, size);
+        self.depth = Some(Tracked::new(view, &self.log, Resource::Depth));
         Ok(())
     }
 

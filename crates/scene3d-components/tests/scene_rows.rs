@@ -54,5 +54,12 @@ fn a_dropped_row_removes_its_node_alone_and_an_added_row_adds_one() {
     assert_eq!((after[&1], after[&3]), (before[&1], before[&3]));
     assert!(!after.contains_key(&2) && after.contains_key(&4));
     let scene = rig.scene.borrow();
+    let group = scene.children(scene.root()).unwrap()[0];
+    assert_eq!(
+        scene.children(group).unwrap().len(),
+        3,
+        "no duplicate at one x"
+    );
+    assert_eq!(scene.len(), 2 + 3, "root, group and three meshes");
     assert!(scene.kind(before[&2]).is_err(), "row 2's node is removed");
 }

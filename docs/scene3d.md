@@ -18,7 +18,7 @@ a `gpu-surface` (layer 1, [gpu-surface.md](gpu-surface.md)). Plan:
 | 2 | the scene store: generational ids, world matrices, the active camera | done |
 | 3 | `SceneRenderer`: geometry upload, uniform slots, counts in `FrameCounts::surfaces` | done |
 | 4 | the components, reactive transforms, one uniform per change | done |
-| 4b | CSS on scene nodes: `css-for-3d.md` C1 to C4 | C1 done; C2, C3 in review |
+| 4b | CSS on scene nodes: `css-for-3d.md` C1 to C4 | see that plan's table |
 | 5 | lifecycle: keyed rows, the renderer's drop, geometry release; this doc | this branch, release to follow |
 
 ## Conventions
@@ -51,7 +51,7 @@ let surface = app.mount("view", Box::new(renderer))?;
   the subtree; `set_transform` and `reparent` move a node. A removed
   node's id is refused (`StoreError::Stale`), never another node's.
 - The root names the active camera by `CameraHandle`; none, two, or an
-  unresolved handle is refused at the frame.
+  unresolved handle is refused (`vapors-scene3d`'s `camera_tests.rs`).
 - `Meshes::geometry` validates triangles and issues a `GeometryId`; an
   id from another `Meshes` is refused at the frame, naming the node.
   Geometry is held while the `Meshes` lives; release arrives with row
@@ -67,7 +67,7 @@ world version changed since this renderer wrote it, writes the camera
 upload, write and draw goes through `SurfaceFrame::work`, so
 `FrameCounts::surfaces` holds them. An idle frame writes nothing; a
 moved node writes its subtree's slots; a recoloured mesh writes its
-own.
+own (`scene3d-gpu/tests/gpu_scene_counts.rs` pins the bytes).
 
 ## In a template
 
@@ -103,14 +103,19 @@ own.
   row, `unmount`) removes its node and the node's subtree and
   invalidates the surface.
 - In a keyed `{for}`, a row keeps its node across a reorder: no node
-  is removed or added, so nothing is uploaded or written. A dropped row
-  removes its node alone; an added row adds one
-  (`scene3d-components/tests/scene_rows.rs`).
+  is removed or added. The scene's child order is not changed by a
+  reorder (children keep insertion order; an opaque, depth-tested draw
+  does not depend on it). A dropped row removes its node alone; an
+  added row adds one (`scene3d-components/tests/scene_rows.rs`).
 - Unmounting the surface (`ElementsApp::unmount`, then dropping what it
-  returns) drops the `SceneRenderer`, and with it every GPU resource it
-  holds: pipeline, depth texture, uniform slots, camera uniform and
-  uploaded geometry. `SceneRenderer::log` returns a `RendererLog`
-  shared with the application, whose `dropped()` says so. Remove the
+  returns) drops the `SceneRenderer` and frees every GPU resource it
+  made: pipeline, depth view, uniform slots, camera uniform and each
+  uploaded piece of geometry. `SceneRenderer::log` returns a
+  `RendererLog` shared with the application: `dropped()` says the drop
+  ran, and `made(kind)` and `freed(kind)` count each kind of resource
+  (`Resource`); each resource carries a record dropped after it, so a
+  leaked one stays made and never freed
+  (`scene3d-components/tests/gpu_scene_unmount.rs`). Remove the
   `gpu-surface` element first: a document holding a surface with no
   renderer is refused at the frame.
 

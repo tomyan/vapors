@@ -25,7 +25,8 @@ fn issued_geometry_whose_data_is_not_found_is_refused_naming_node_and_geometry()
     let mesh = mesh_in(&mut Meshes::new());
 
     // When
-    let refused = GpuGeometry::default().missing(std::slice::from_ref(&mesh), |_| None);
+    let refused =
+        GpuGeometry::new(&std::rc::Rc::default()).missing(std::slice::from_ref(&mesh), |_| None);
 
     // Then
     let error = refused.expect_err("refused");
@@ -52,7 +53,7 @@ fn geometry_not_yet_uploaded_is_found_once_however_many_nodes_name_it() {
     });
 
     // When
-    let missing = GpuGeometry::default().missing(&twice, |id| meshes.get(id));
+    let missing = GpuGeometry::new(&std::rc::Rc::default()).missing(&twice, |id| meshes.get(id));
 
     // Then
     let missing = missing.expect("found");
@@ -69,7 +70,9 @@ fn a_mesh_whose_geometry_is_not_uploaded_has_no_buffers() {
     let mesh = mesh_in(&mut Meshes::new());
 
     // When
-    let buffers = GpuGeometry::default().get(&mesh).map(|_| ());
+    let buffers = GpuGeometry::new(&std::rc::Rc::default())
+        .get(&mesh)
+        .map(|_| ());
 
     // Then
     assert_eq!(

@@ -29,5 +29,5 @@ mod slot_table;
 mod slots;
 
 pub use error::FrameError;
-pub use log::RendererLog;
+pub use log::{RendererLog, Resource};
 pub use renderer::SceneRenderer;

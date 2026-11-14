@@ -4,7 +4,10 @@
 
 use crate::FrameError;
 use crate::draw::MeshNode;
+use crate::log::Tracked;
+use crate::{RendererLog, Resource};
 use std::collections::HashMap;
+use std::rc::Rc;
 use vapors_app::SurfaceFrame;
 use vapors_scene3d::{Geometry, GeometryId, Vec3};
 
@@ -15,13 +18,20 @@ pub(crate) struct Uploaded {
     pub(crate) index_count: u32,
 }
 
-/// The pieces uploaded so far, by id.
-#[derive(Default)]
+/// The pieces uploaded so far, by id, each recorded in the log.
 pub(crate) struct GpuGeometry {
-    uploaded: HashMap<GeometryId, Uploaded>,
+    uploaded: HashMap<GeometryId, Tracked<Uploaded>>,
+    log: Rc<RendererLog>,
 }
 
 impl GpuGeometry {
+    pub(crate) fn new(log: &Rc<RendererLog>) -> Self {
+        Self {
+            uploaded: HashMap::new(),
+            log: Rc::clone(log),
+        }
+    }
+
     /// Uploads each piece `nodes` name that this renderer has not,
     /// reading it through `find`.
     ///
@@ -36,7 +46,8 @@ impl GpuGeometry {
         find: impl Fn(GeometryId) -> Option<&'a Geometry>,
     ) -> Result<(), FrameError> {
         for (id, geometry) in self.missing(nodes, find)? {
-            self.uploaded.insert(id, upload(frame, geometry));
+            let uploaded = Tracked::new(upload(frame, geometry), &self.log, Resource::Geometry);
+            self.uploaded.insert(id, uploaded);
         }
         Ok(())
     }
@@ -69,6 +80,7 @@ impl GpuGeometry {
     pub(crate) fn get(&self, mesh: &MeshNode) -> Result<&Uploaded, FrameError> {
         self.uploaded
             .get(&mesh.geometry)
+            .map(|uploaded| &**uploaded)
             .ok_or(FrameError::GeometryMissing {
                 node: mesh.node,
                 geometry: mesh.geometry,
