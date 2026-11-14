@@ -162,3 +162,25 @@ fn running_state(pid: &str) -> Option<char> {
         });
     (state != 'Z').then_some(state)
 }
+
+#[test]
+fn a_failed_screenshot_names_the_browser_it_launched() {
+    // Given: a "browser" that exits 1 at once
+    let scratch = tempfile::Builder::new()
+        .prefix("vapors-chromium-named-")
+        .tempdir();
+    let scratch = scratch.expect("a scratch directory under the temp dir");
+    let dir = scratch.path();
+    let chromium = Chromium {
+        binary: std::path::PathBuf::from("/bin/false"),
+        deadline: std::time::Duration::from_secs(5),
+    };
+
+    // When
+    let error = chromium
+        .screenshot(&dir.join("page.html"), &dir.join("page.png"), 10, 10, 1)
+        .expect_err("it exits 1");
+
+    // Then
+    assert!(error.to_string().contains("/bin/false"), "{error}");
+}
