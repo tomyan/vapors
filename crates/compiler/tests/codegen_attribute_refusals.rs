@@ -196,3 +196,31 @@ fn a_bound_svg_paint_attribute_is_refused() {
         );
     }
 }
+
+#[test]
+fn a_literal_svg_paint_attribute_the_runtime_refuses_fails_the_build_naming_the_line() {
+    // When
+    let err = refusal_with_flag(
+        "<svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" aria-hidden=\"true\"><path d=\"M2 8h12\" fill=\"bluish\"/></svg>",
+    );
+
+    // Then
+    assert!(
+        err.starts_with("counter.wisp:4:")
+            && err.contains("the fill attribute of <path> is \"bluish\"")
+            && err.ends_with("fix it in the template"),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_bound_fill_on_an_html_element_is_not_a_paint_attribute() {
+    // When: a div takes no presentation attributes
+    let code = vapors_compiler::compile_str(
+        "counter.wisp",
+        "<script>\nlet flag: Signal<bool> = Signal::new(false);\n</script>\n<div fill={flag.get().to_string()}></div>",
+    );
+
+    // Then
+    assert!(code.is_ok(), "{code:?}");
+}

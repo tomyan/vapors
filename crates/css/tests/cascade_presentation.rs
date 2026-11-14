@@ -50,7 +50,7 @@ fn an_attribute_with_no_rule_is_the_computed_value() {
     // Then
     assert_eq!(css(&style, "fill"), "none");
     assert_eq!(css(&style, "stroke"), "rgb(255 0 0)");
-    assert_eq!(css(&style, "stroke-width"), "1.5");
+    assert_eq!(css(&style, "stroke-width"), "1.5px");
     let stroke = PropertyId::from_name("stroke").expect("table");
     assert_eq!(style.declared_in(stroke), Some(PRESENTATION_SHEET));
 }
@@ -78,7 +78,7 @@ fn the_style_attribute_beats_an_attribute() {
     let style = computed("", &tree, leaf);
 
     // Then
-    assert_eq!(css(&style, "stroke-width"), "3");
+    assert_eq!(css(&style, "stroke-width"), "3px");
 }
 
 #[test]
@@ -91,7 +91,7 @@ fn an_attribute_on_the_svg_is_inherited_by_its_path() {
     let style = computed("", &tree, leaf);
 
     // Then
-    assert_eq!(css(&style, "stroke-width"), "2");
+    assert_eq!(css(&style, "stroke-width"), "2px");
 }
 
 #[test]
@@ -109,21 +109,48 @@ fn the_attributes_on_an_element_that_is_not_svg_are_not_styles() {
 
 #[test]
 fn an_attribute_that_is_not_one_value_of_its_property_is_refused_naming_it() {
-    // Given
-    let (bad, _) = path(&[("stroke-width", "thick")]);
-    let (smuggled, _) = path(&[("fill", "none; color: red")]);
+    for (name, value, says) in [
+        ("stroke-width", "thick", ""),
+        ("stroke-width", "-1", ""),
+        (
+            "stroke-width",
+            "50%",
+            "a percentage stroke-width is outside vapors' subset",
+        ),
+        ("fill", "bluish", ""),
+        (
+            "fill",
+            "red !important",
+            "an attribute holds one fill value",
+        ),
+        (
+            "fill",
+            "none; color: red",
+            "an attribute holds one fill value",
+        ),
+    ] {
+        // Given
+        let (tree, _) = path(&[(name, value)]);
 
-    // When, Then
-    assert!(
-        refused(&bad).starts_with("the stroke-width attribute of <path> is \"thick\": "),
-        "{}",
-        refused(&bad)
-    );
-    assert!(
-        refused(&smuggled).starts_with("the fill attribute of <path> is \"none; color: red\": an attribute holds one fill value"),
-        "{}",
-        refused(&smuggled)
-    );
+        // When
+        let message = refused(&tree);
+
+        // Then
+        let start = format!("the {name} attribute of <path> is {value:?}: {says}");
+        assert!(message.starts_with(&start), "{name}={value:?}: {message}");
+    }
+}
+
+#[test]
+fn a_var_in_an_attribute_is_substituted_as_chromium_substitutes_it() {
+    // Given: Chromium 155 paints fill="var(--c)" in --c
+    let (tree, leaf) = path(&[("fill", "var(--c)")]);
+
+    // When
+    let style = computed("svg { --c: blue }", &tree, leaf);
+
+    // Then
+    assert_eq!(css(&style, "fill"), "rgb(0 0 255)");
 }
 
 #[test]

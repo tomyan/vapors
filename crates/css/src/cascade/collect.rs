@@ -81,18 +81,46 @@ pub(crate) fn winners<'a, E: Element>(
         longhands: vec![None; PROPERTIES.len()],
         custom: BTreeMap::new(),
     };
-    for decl in attached.presentation {
-        let standing = Standing {
-            rank: rank(Origin::Author, false),
-            specificity: PRESENTATION_SPECIFICITY,
-            order: 0,
-            sheet: PRESENTATION_SHEET,
-        };
-        winners.consider(decl, standing);
-    }
+    winners.consider_attached(attached.presentation, PRESENTATION);
     for rule in rules {
+        winners.consider_rule(rule, element, env);
+    }
+    winners.consider_attached(attached.inline, INLINE);
+    winners
+}
+
+/// Where the presentation attributes stand: author normal,
+/// specificity 0, first, so an author rule of equal standing beats
+/// them by coming later.
+const PRESENTATION: Standing = Standing {
+    rank: 1,
+    specificity: PRESENTATION_SPECIFICITY,
+    order: 0,
+    sheet: PRESENTATION_SHEET,
+};
+
+/// Where the `style` attribute stands: above every selector, last.
+const INLINE: Standing = Standing {
+    rank: 1,
+    specificity: INLINE_SPECIFICITY,
+    order: usize::MAX,
+    sheet: INLINE_SHEET,
+};
+
+impl<'a> Winners<'a> {
+    /// Each of `declarations`, attached to the element, at `standing`,
+    /// ranked author normal or author important as each says.
+    fn consider_attached(&mut self, declarations: &'a [Declaration], standing: Standing) {
+        for decl in declarations {
+            let rank = rank(Origin::Author, decl.important);
+            self.consider(decl, Standing { rank, ..standing });
+        }
+    }
+
+    /// Each declaration of `rule`, when it matches `element`.
+    fn consider_rule<E: Element>(&mut self, rule: &'a CascadeRule, element: &E, env: &Environment) {
         if !rule.conditions.hold(element, env) || !matches(&rule.rule.selector, element) {
-            continue;
+            return;
         }
         let specificity = rule.rule.selector.specificity();
         for decl in &rule.rule.declarations {
@@ -102,22 +130,10 @@ pub(crate) fn winners<'a, E: Element>(
                 order: rule.order,
                 sheet: rule.sheet,
             };
-            winners.consider(decl, standing);
+            self.consider(decl, standing);
         }
     }
-    for decl in attached.inline {
-        let standing = Standing {
-            rank: rank(Origin::Author, decl.important),
-            specificity: INLINE_SPECIFICITY,
-            order: usize::MAX,
-            sheet: INLINE_SHEET,
-        };
-        winners.consider(decl, standing);
-    }
-    winners
-}
 
-impl<'a> Winners<'a> {
     /// Let one declaration compete for the properties it sets.
     fn consider(&mut self, decl: &'a Declaration, standing: Standing) {
         let Standing {

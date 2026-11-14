@@ -11,6 +11,8 @@
 {"height":44,"tag":"button","width":44,"x":120,"y":16},
 {"height":16,"tag":"svg","width":16,"x":134,"y":30},
 {"height":44,"tag":"button","width":44,"x":172,"y":16},
-{"height":16,"tag":"svg","width":16,"x":186,"y":30}
+{"height":16,"tag":"svg","width":16,"x":186,"y":30},
+{"height":44,"tag":"button","width":44,"x":224,"y":16},
+{"height":16,"tag":"svg","width":16,"x":238,"y":30}
 ]}
 ]}

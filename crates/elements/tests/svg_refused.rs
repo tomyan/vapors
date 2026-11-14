@@ -51,7 +51,7 @@ fn svg_attributes_outside_the_subset_are_refused_naming_the_fix() {
         ),
         (
             &[("stroke-width", "thick")][..],
-            &["the stroke-width attribute of <svg> is \"thick\""],
+            &["<svg class=\"icon\">: the stroke-width attribute of <svg> is \"thick\""],
         ),
         (
             &[("xmlns", "http://example.com")][..],

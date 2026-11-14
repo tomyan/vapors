@@ -7,15 +7,26 @@
 
 use crate::{MAX_TOGGLES, SCOPE_ATTRIBUTE, StyleKey};
 
+/// The SVG presentation attributes vapors maps to styles; the same
+/// three as `vapors_css::cascade::PRESENTATION_ATTRIBUTES` (this crate
+/// does not depend on it; a test in vapors-elements holds them equal).
+pub const PRESENTATION: [&str; 3] = ["fill", "stroke", "stroke-width"];
+
 impl StyleKey {
     /// Why `set_attribute` of `name` is refused on an element with this
-    /// key: `None` when it is not one the key fixes. Names compare
+    /// key: `None` when it is not one the key fixes. The key fixes
+    /// `class`, `style`, the scope attribute, its literal attributes and,
+    /// on an svg or path, the SVG presentation attributes. Names compare
     /// ASCII-case-insensitively, as HTML's do.
     #[must_use]
     pub fn refusal(&self, name: &str) -> Option<String> {
         let fix = match name.to_ascii_lowercase().as_str() {
             "class" => "toggle a class with `class:name={bool}` there".to_owned(),
             "style" | SCOPE_ATTRIBUTE => "write it there".to_owned(),
+            paint if self.paints(paint) => {
+                "write it there, or set the property under a class toggled with `class:name={bool}`"
+                    .to_owned()
+            }
             lower if self.carries(lower) => format!("write `{lower}={{expr}}` there"),
             _ => return None,
         };
@@ -23,6 +34,13 @@ impl StyleKey {
             "`{name}` on <{}> at {} is set from its template; {fix}",
             self.tag, self.site
         ))
+    }
+
+    /// Whether `lower` (lowercased) is an SVG presentation attribute on
+    /// an svg or path: a style the build-time analysis must see, so it
+    /// is set only in the template, as `style` is.
+    fn paints(&self, lower: &str) -> bool {
+        matches!(self.tag, "svg" | "path") && PRESENTATION.contains(&lower)
     }
 
     /// Whether `lower` (lowercased) names one of the key's attributes.

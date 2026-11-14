@@ -8,7 +8,7 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use vapors_css::cascade::{PRESENTATION_ATTRIBUTES, unshareable};
+use vapors_css::cascade::unshareable;
 use vapors_css::selector::Element as _;
 use vapors_dom::{NodeId, SCOPE_ATTRIBUTE, StyleKey};
 
@@ -129,9 +129,11 @@ impl Document {
         }
     }
 
-    /// The attributes of `attributes` a sheet selects, and the SVG
-    /// presentation attributes, which set styles; but `class` and the
-    /// scope attribute, which the template key fixes.
+    /// The attributes of `attributes` a sheet selects, but `class` and
+    /// the scope attribute, which the template key fixes. The SVG
+    /// presentation attributes, which set styles, are fixed by the key
+    /// too: `StyleKey::refusal` refuses setting them on a keyed svg or
+    /// path, so they are literals of the key.
     fn selected_attributes(
         &self,
         attributes: &BTreeMap<String, String>,
@@ -140,7 +142,7 @@ impl Document {
         attributes
             .iter()
             .filter(|(name, _)| {
-                (selected.contains(*name) || PRESENTATION_ATTRIBUTES.contains(&name.as_str()))
+                selected.contains(*name)
                     && name.as_str() != "class"
                     && name.as_str() != SCOPE_ATTRIBUTE
             })

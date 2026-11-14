@@ -42,6 +42,15 @@
         "invalid=false"
       ],
       "role": "button"
+    },
+    {
+      "depth": 1,
+      "name": "Var",
+      "properties": [
+        "focusable=true",
+        "invalid=false"
+      ],
+      "role": "button"
     }
   ],
   "viewport": [

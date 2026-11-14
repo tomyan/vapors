@@ -4,7 +4,8 @@
 //! below every author rule, specificity 0 and first in order, as
 //! Chromium ranks them. One answer for the runtime cascade and the
 //! build-time analysis, which reads a key's literal attributes through
-//! [`declarations_of`].
+//! [`declarations_of`]. A `var()` in one is substituted, as Chromium 155
+//! substitutes it (checked headless: `fill="var(--c)"` paints `--c`).
 
 use crate::ast::Declaration;
 use crate::selector::{Element, Specificity};
@@ -62,6 +63,9 @@ fn declaration(tag: &str, name: &str, value: &str) -> Result<Declaration> {
             format!("the {name} attribute of <{tag}> is {value:?}: {why}"),
         )
     };
+    if name == "stroke-width" && value.contains('%') {
+        return Err(refused("a percentage stroke-width is outside vapors' subset (Chromium resolves it against the viewport's diagonal); give a number in viewBox units, such as stroke-width=\"1.5\"".to_owned()));
+    }
     let parsed =
         crate::parse_inline(&format!("{name}: {value}")).map_err(|e| refused(e.message))?;
     match parsed.as_slice() {

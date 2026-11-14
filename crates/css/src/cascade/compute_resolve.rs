@@ -3,8 +3,9 @@
 use vapors_scene::Color as Rgba;
 
 use crate::property::PropertyId;
-use crate::property::longhands::{FILL, STROKE};
+use crate::property::longhands::{FILL, STROKE, STROKE_WIDTH};
 use crate::value::{Calc, CalcKind, Color, ColorScheme, Context, Length, LengthUnit, Value};
+use crate::{Error, Position, Result};
 
 /// Whether `id` keeps `currentcolor` as its computed value, as CSS
 /// Color 4 says every property does: SVG paint inherits the keyword,
@@ -13,7 +14,16 @@ use crate::value::{Calc, CalcKind, Color, ColorScheme, Context, Length, LengthUn
 pub(crate) fn keeps_current_color(id: PropertyId) -> bool {
     id == FILL || id == STROKE
 }
-use crate::{Error, Position, Result};
+
+/// `value` of `id` in its computed form where the property says more
+/// than [`resolve`]: a `stroke-width` number is user units, which are
+/// px, so `1.5` computes to `1.5px`, as Chromium's does.
+pub(crate) fn computed_form(id: PropertyId, value: Value) -> Value {
+    match value {
+        Value::Number(n) if id == STROKE_WIDTH => Value::Length(Length::px(n)),
+        other => other,
+    }
+}
 
 /// Lengths to px (percentages kept), `calc()` evaluated where it can be,
 /// colours to sRGB.
