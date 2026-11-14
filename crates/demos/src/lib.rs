@@ -18,6 +18,8 @@ include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 pub use vapors_pixels as pixels;
 
 mod frames;
+mod listed;
+pub use listed::{DEMOS, Kind, Listed, listed};
 mod later;
 mod mounts;
 pub use mounts::register_thumbnails;

@@ -56,6 +56,12 @@ fn start() -> Result<(), String> {
     if name == "wake" {
         return run(options, wake::WakeApp).map_err(|e| e.to_string());
     }
+    if vapors_demos::listed(&name).is_some_and(|demo| demo.kind == vapors_demos::Kind::App) {
+        return Err(format!(
+            "`{name}` is listed as an app the page runs (vapors_demos::DEMOS), but start() in \
+             crates/web-demo/src/main.rs does not run it; add it there"
+        ));
+    }
     // `own-open` is `hello` with the page's status line left as it is: the
     // page check's case for an app that draws its own Open and keeps `#status`.
     // A test hook for scripts/check-page-contract.sh only; like `wake`, it is
