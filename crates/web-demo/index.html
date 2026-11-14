@@ -14,6 +14,7 @@
       #demo-bar { height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: 16px; padding: 0 12px; background: #171b1f; color: #e4e8ec; font: 14px system-ui, sans-serif; white-space: nowrap; overflow: hidden; }
       #demo-bar[hidden] { display: none; }
       #demo-bar:not([hidden]) + canvas { height: calc(100vh - 40px); }
+      #demo-bar:not([hidden]) ~ #open { top: 48px; }
       #demo-bar a { color: #8ab4f8; text-decoration: none; }
       #demo-bar span { flex: 1; overflow: hidden; text-overflow: ellipsis; color: #b7bec5; }
       #status { position: fixed; left: 8px; bottom: 8px; margin: 0; color: #ddd; font: 14px system-ui, sans-serif; }
@@ -29,9 +30,11 @@
       // a link to the demo before, the demo's title and line, a link to
       // the demo after; [ and ] click the links, with no modifier and
       // not into a text input (the page's text bridge is a textarea).
+      // Idempotent: a second call leaves the bar and its one key listener.
       window.vaporsShowBar = (before, title, line, after) => {
         const bar = document.getElementById('demo-bar');
         if (!bar) throw new Error('index.html has no #demo-bar');
+        if (!bar.hidden) return;
         const part = (tag, text) => {
           const element = document.createElement(tag);
           element.textContent = text;
@@ -52,10 +55,11 @@
         bar.hidden = false;
         const intoText = (target) =>
           target instanceof HTMLElement &&
-          (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+          (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable);
         window.addEventListener('keydown', (event) => {
           const id = { '[': 'demo-before', ']': 'demo-after' }[event.key];
-          if (!id || event.ctrlKey || event.altKey || event.metaKey || intoText(event.target)) return;
+          if (!id || event.repeat || event.isComposing || event.defaultPrevented) return;
+          if (event.ctrlKey || event.altKey || event.metaKey || intoText(event.target)) return;
           event.preventDefault();
           document.getElementById(id).click();
         });

@@ -104,9 +104,9 @@ prepare() {
   # a resize is redrawn is the `resize` case's to check.
   counter='<script>var current = GPUCanvasContext.prototype.getCurrentTexture; GPUCanvasContext.prototype.getCurrentTexture = function () { if (document.body) { document.body.dataset.frames = String((Number(document.body.dataset.frames) || 0) + 1); document.body.dataset.frameHeight = String(this.canvas.height); } return current.apply(this, arguments); };</script>'
   frames=$(frames_at 640 400)
-  # the demo bar hidden, as in the demo screenshots (frames_at): the
-  # canvas fills the 400 px the hold waits for
-  page as-built-shot "$frames<style>#demo-bar { display: none !important; }</style>" "$full_size"
+  # $frames (frames_at) hides the demo bar, as in the demo screenshots:
+  # the canvas fills the 400 px the hold waits for
+  page as-built-shot "$frames" "$full_size"
   # Only the image demo opens files through the page's Open button; an
   # elements demo hides it and the status line, and needs neither.
   page no-open-button "" "!error.hidden && $adapter" 's#<button id="open">Open</button>##'
@@ -128,15 +128,21 @@ prepare() {
   # is written, every element on the canvas that may paint or take a
   # pointer event, but #error (failures stay visible), is listed on
   # <body> as data-overlaps.
-  measure="(function () { if (status.textContent.indexOf('adapter: ') !== 0) return false; document.body.dataset.overlaps = vaporsOverlaps(); document.body.dataset.outside = vaporsOutside(); return true; })()"
+  measure="(function () { if (status.textContent.indexOf('adapter: ') !== 0) return false; document.body.dataset.overlaps = vaporsOverlaps(); document.body.dataset.outside = vaporsOutside(); document.body.dataset.overbar = vaporsOverBar(); document.body.dataset.fits = vaporsFits(); return true; })()"
+  # The image app with its bar shown: its own Open and status line lie
+  # over its canvas by design, so only the bar's rules are held here:
+  # nothing over the bar, and the canvas below it, inside the window.
+  page image-bar "$overlaps" "$adapter && !document.getElementById('demo-bar').hidden && (function () { document.body.dataset.overbar = vaporsOverBar(); document.body.dataset.fits = vaporsFits(); return true; })()"
   for demo in $demos one-scene index; do
     page "$demo-overlap" "$overlaps" "$measure"
   done
   # The demo bar on hello: its links are the demos before and after in
   # vapors_demos::DEMOS (wrapping to racer), and ] then [ click them; a
-  # ] typed into a textarea does not. A capturing listener records each
-  # click on a bar link and prevents it, so the page stays.
-  page demo-bar "$stepper" "$adapter && (function () { var bar = document.getElementById('demo-bar'); if (bar.hidden) return false; if (!window.vaporsKeyed) { window.vaporsKeyed = true; var t = document.createElement('textarea'); document.body.appendChild(t); t.dispatchEvent(new KeyboardEvent('keydown', { key: ']', bubbles: true })); t.remove(); [']', '['].forEach(function (k) { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true })); }); } document.body.dataset.bar = Array.prototype.map.call(bar.querySelectorAll('a'), function (a) { return a.getAttribute('href'); }).join(' '); document.body.dataset.stepped = window.vaporsStepped.join(' '); return true; })()"
+  # ] typed into a textarea, an input, a select or an editable element,
+  # or a held ]'s repeat, does not; a second vaporsShowBar changes
+  # nothing. A capturing listener records each click on a bar link and
+  # prevents it, so the page stays.
+  page demo-bar "$stepper" "$adapter && (function () { var bar = document.getElementById('demo-bar'); if (bar.hidden) return false; if (!window.vaporsKeyed) { window.vaporsKeyed = true; window.vaporsShowBar(['?demo=x', 'X'], 'T', 'L', ['?demo=y', 'Y']); ['textarea', 'input', 'select'].forEach(function (tag) { var t = document.createElement(tag); document.body.appendChild(t); t.dispatchEvent(new KeyboardEvent('keydown', { key: ']', bubbles: true })); t.remove(); }); var editable = document.createElement('div'); editable.contentEditable = 'true'; document.body.appendChild(editable); editable.dispatchEvent(new KeyboardEvent('keydown', { key: ']', bubbles: true })); editable.remove(); document.body.dispatchEvent(new KeyboardEvent('keydown', { key: ']', bubbles: true, repeat: true })); [']', '['].forEach(function (k) { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true })); }); } document.body.dataset.bar = Array.prototype.map.call(bar.querySelectorAll('a'), function (a) { return a.getAttribute('href'); }).join(' '); document.body.dataset.stepped = window.vaporsStepped.join(' '); return true; })()"
   # The rule's own case: the hello demo with elements over its canvas
   # that the rule must list (refused, below) beside one it must accept.
   page overlap-refused "$overlaps<style>#quiet-after::after { content: \"\"; position: absolute; inset: 0; pointer-events: auto; }</style>" "$measure" \
@@ -206,6 +212,29 @@ overlaps='<script>function vaporsOverlaps() {
     ["::before", "::after"].forEach(function (p) { if (touchable(e, p)) found.push(name(e) + p); });
   });
   return found.join(" ") || "none";
+}
+function vaporsOverBar() {
+  var bar = document.getElementById("demo-bar"), found = [];
+  if (!bar || bar.hidden) return "none";
+  var b = bar.getBoundingClientRect();
+  function unpainted(e) { for (; e && e !== document.body; e = e.parentElement) if (getComputedStyle(e).opacity === "0") return true; return false; }
+  document.querySelectorAll("body *").forEach(function (e) {
+    var r = e.getBoundingClientRect();
+    if (bar.contains(e) || e.tagName === "SCRIPT" || e.tagName === "STYLE" || e.contains(bar)) return;
+    if (r.width === 0 || r.height === 0 || getComputedStyle(e).visibility === "hidden") return;
+    if (r.left >= b.right || r.right <= b.left || r.top >= b.bottom || r.bottom <= b.top) return;
+    if (!unpainted(e) || getComputedStyle(e).pointerEvents !== "none") found.push(e.tagName.toLowerCase() + (e.id ? "#" + e.id : ""));
+  });
+  return found.join(" ") || "none";
+}
+function vaporsFits() {
+  var c = document.getElementById("vapors").getBoundingClientRect(), bar = document.getElementById("demo-bar");
+  var tall = document.documentElement.scrollHeight;
+  if (tall > innerHeight + 0.5) return "the page is " + tall + " px tall in a " + innerHeight + " px window, so it scrolls";
+  var top = bar && !bar.hidden ? bar.getBoundingClientRect().bottom : 0;
+  if (c.top < top - 0.5) return "canvas top " + c.top + " above the bar bottom " + top;
+  if (c.bottom > innerHeight + 0.5) return "canvas bottom " + c.bottom + " below the window " + innerHeight;
+  return "yes";
 }
 function vaporsOutside() {
   var c = document.getElementById("vapors").getBoundingClientRect(), bar = document.getElementById("demo-bar"), found = [];
@@ -516,18 +545,31 @@ overlap() {
   outside=$(printf '%s' "$dom" | grep -o 'data-outside="[^"]*"' | sed 's#data-outside="\(.*\)"#\1#')
   echo "$1: HTML outside the canvas but the demo bar: [${outside:-not measured}]"
   [ "$outside" = none ] || fail "$1: outside the canvas [${outside:-not measured}], wanted [none]: only the demo bar (#demo-bar, crates/web-demo/src/bar.rs) may sit outside it"
+  # overlap-refused lays its own elements over the whole page, the bar too
+  [ "$1" = overlap-refused ] || bar_rules "$1" "$dom"
+}
+# bar_rules <page> <dom>: nothing lies over the demo bar, and the canvas
+# fits below it and inside the window (vaporsOverBar, vaporsFits).
+bar_rules() {
+  overbar=$(printf '%s' "$2" | grep -o 'data-overbar="[^"]*"' | sed 's#data-overbar="\(.*\)"#\1#')
+  fits=$(printf '%s' "$2" | grep -o 'data-fits="[^"]*"' | sed 's#data-fits="\(.*\)"#\1#')
+  echo "$1: over the demo bar [${overbar:-not measured}]; the canvas fits [${fits:-not measured}]"
+  [ "$overbar" = none ] || fail "$1: over the demo bar [${overbar:-not measured}], wanted [none]; move it below the bar (crates/web-demo/index.html, #demo-bar:not([hidden]) ~ ...)"
+  [ "$fits" = yes ] || fail "$1: the canvas does not fit below the demo bar: [${fits:-not measured}]; see #demo-bar:not([hidden]) + canvas in crates/web-demo/index.html"
 }
 for demo in $demos one-scene index; do
   overlap "$demo-overlap" "$(query "$demo")" none "an element that may paint or take pointer events lies over the canvas of an elements demo; hide it (vapors_platform::hide_status_line, app_draws_open), move it off the canvas, or give it opacity 0 and pointer-events none"
 done
 overlap overlap-refused '?demo=hello' "$refused" "vaporsOverlaps accepts or refuses the wrong elements; fix the rule in $0"
+dom=$(dump image-bar '?demo=image') || fail "image-bar: $chrome exited non-zero or passed 60 s"
+held image-bar && bar_rules image-bar "$dom"
 dom=$(dump demo-bar '?demo=hello') || fail "demo-bar: $chrome exited non-zero or passed 60 s"
 held demo-bar || true
 bar_links=$(printf '%s' "$dom" | grep -o 'data-bar="[^"]*"' | sed 's#data-bar="\(.*\)"#\1#')
 stepped=$(printf '%s' "$dom" | grep -o 'data-stepped="[^"]*"' | sed 's#data-stepped="\(.*\)"#\1#')
 echo "demo-bar: links [$bar_links], stepped by ] then [ [$stepped]"
 [ "$bar_links" = "?demo=racer ?demo=counter" ] || fail "demo-bar: hello's bar links [$bar_links], wanted [?demo=racer ?demo=counter] (the demos around it in vapors_demos::DEMOS); see crates/web-demo/src/bar.rs and vaporsShowBar in crates/web-demo/index.html"
-[ "$stepped" = "?demo=counter ?demo=racer" ] || fail "demo-bar: ] then [ clicked [$stepped], wanted [?demo=counter ?demo=racer], and nothing for the ] typed into a textarea; see the keydown listener in vaporsShowBar, crates/web-demo/index.html"
+[ "$stepped" = "?demo=counter ?demo=racer" ] || fail "demo-bar: ] then [ clicked [$stepped], wanted [?demo=counter ?demo=racer], and nothing for a ] typed into a text input or repeated, nor a second bar; see vaporsShowBar in crates/web-demo/index.html"
 # Each demo as Chromium shows the canvas after its clicks, held to the
 # same crates/demos/demos/<name>.pixels as the native screenshot, by the
 # same code, one screenshot per section at that section's window size;
