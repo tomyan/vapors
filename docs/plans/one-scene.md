@@ -455,11 +455,11 @@ Measured on a loaded box: frame 0's first surface submit cost 13 to 20 ms.
 The submit fell to 0.2 to 0.4 ms only with both the timer made at start
 and the backings cleared at start, in that order. `MemoryHints` is
 unchanged (lead, 2026-11-13).
-Open: the acceptance runs (P0's three cold and warm pairs, load under
-1.5) have not been made. Every window so far stayed loaded. They come in
-the first real quiet window, which xtask's quiet lock is to make
-possible: slice 3 of `docs/plans/factory-throughput.md` (branch
-`factory/throughput-0`, not yet on main; pending Tom).
+Accepted (docs/perf/scene-run-f0-2026-11-14.md): P0's run at 06b0c94,
+three cold and warm pairs at a 1-minute load under 1.5, no frame over
+16.7 ms in any run; frame 0 6.2 to 6.5 ms to idle cold and 6.6 to 6.7 ms
+warm (from about 98 and 22 ms); `App::start`, before frame 0, 104.5 to
+106.9 ms cold and 17.3 to 17.9 ms warm.
 
 Each row is under about 400 lines (estimate), built by a fresh agent,
 each check proven by breaking what it guards. After each row the next
