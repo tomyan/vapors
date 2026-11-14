@@ -48,13 +48,11 @@ pub(crate) struct Entry {
 /// is within this above the view. The rows page has 3 such steps.
 const TALL: f32 = 1024.0;
 
-/// One frame's entries: the short by top then place, the tall by place;
-/// and the items they paint.
+/// One frame's entries: the short by top then place, the tall by place.
 #[derive(Debug, Default, PartialEq)]
 struct FrameIndex {
     entries: Blocks<Entry>,
     tall: Vec<Entry>,
-    items: u64,
 }
 
 /// Where a place's entry is: its frame, its top, and whether it is tall.
@@ -106,7 +104,6 @@ impl Extents {
             extents.at[entry.place] = Some((frame, entry.top, entry.tall()));
             extents.count_in(&entry);
             let index = extents.frames.entry(frame).or_default();
-            index.items += entry.items;
             if entry.tall() {
                 index.tall.push(entry);
             } else {

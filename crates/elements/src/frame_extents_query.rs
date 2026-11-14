@@ -16,6 +16,20 @@ impl Extents {
         self.items
     }
 
+    /// Which running total, if any, is not the sum over the entries it
+    /// stands for: the check that `count_in` and `count_out` answer as
+    /// the entries do (`kept_paint_check.rs`).
+    pub(crate) fn total_differing(&self) -> Option<&'static str> {
+        let indexes = self.frames.values();
+        let short: usize = indexes.clone().map(|index| index.entries.len()).sum();
+        let entries = indexes.flat_map(|index| index.entries.iter().chain(&index.tall));
+        let items: u64 = entries.map(|entry| entry.items).sum();
+        if items != self.items {
+            return Some("extents index items total");
+        }
+        (short != self.short).then_some("extents index short entries total")
+    }
+
     /// How many items the step at `place` paints; 0 when it draws
     /// nothing.
     pub(crate) fn items_at(&self, place: usize) -> u64 {
