@@ -586,6 +586,25 @@ anchor at each restyle, not yet shared per computed style as 4.3 says;
 C6, which gives scene anchors compiled winners, shares it. `opacity`
 computed outside 0 to 1 (a `calc()`) is refused, as a literal is.
 
+C3 as built (C3a to C3d): `Scene::set_appearance(node, colour,
+visible)` returns whether either changed; a colour change advances the
+world version (80 bytes), a visibility change alone writes nothing and
+the renderer skips the hidden mesh's draw and slot write. vapors-elements
+does not know the scene, so the route of 4.4 is a sink: `<Mesh>` calls
+`Dom::watch_appearance(anchor, sink)`, and the restyle calls the sink
+when the anchor's colour channels or visibility change (its first
+restyle included, and again at the next update after a refused
+report); the sink asks the surface for a frame, then calls
+`set_appearance`, so a refused request leaves the mesh as drawn and the
+retry writes it. `Scene::set_colour` is removed: one writer of a mesh's
+colour. A watched mesh under an ancestor whose style is refused
+writes nothing until the restyle fixing the ancestor reaches it; a
+mesh's own refusal (a translucent colour) writes nothing either. There is no opacity parameter until C5:
+a watched mesh whose `color` alpha times `opacity` is under 1 is refused
+at the mesh, naming the declaration where it has one. Risk 2's note is
+built: `wisp-check` prints a note for each `<Mesh>` that no rule of its
+file, nor its literal `style`, can colour (`scene_notes.rs`).
+
 Later, not in the stack: C9 `backface-visibility` as a per-mesh cull
 mode (two pipelines; the winding convention documented first); C10 a
 per-style appearance slot with `Instances` (D7); keyframe animations on
@@ -697,8 +716,8 @@ the count of nodes per style is measured.
   rule wins on the body meshes, but scenery with no rule of its own
   would take that off-white. The docs state it; a `wisp-check` note
   listing scene keys whose `color` is inherited and never declared
-  would catch it at build time (not in the stack; add if C3 shows it
-  surprising).
+  catches it at build time (built in C3d; it sees only the file's own
+  `<style>`).
 - **The hit test's cost with many nodes** (1.5) is one box test per
   mesh node per pointer move; fine at the racer's 11, unmeasured at
   hundreds. The `Instances` slice measures before adding a hierarchy.
