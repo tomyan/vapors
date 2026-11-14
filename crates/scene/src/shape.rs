@@ -11,11 +11,25 @@ use crate::{Color, Rect};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ShapeRef(pub u32);
 
+/// Which pipeline draws an entry: its kind, as its table entry's
+/// geometry says (a rect or ellipse is a closed form, anything else a
+/// mesh). Batching splits on it; the painter's store refuses an item
+/// whose kind differs from its entry's.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ShapeKind {
+    /// A rect or ellipse, drawn by its closed-form distance.
+    ClosedForm,
+    /// Triangles from the tessellator.
+    Mesh,
+}
+
 /// One shape to draw.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Shape {
     /// Which entry.
     pub shape: ShapeRef,
+    /// Its entry's kind.
+    pub kind: ShapeKind,
     /// From the entry's viewBox units to device pixels, as CSS's
     /// `matrix(a, b, c, d, e, f)`: `x' = a x + c y + e`,
     /// `y' = b x + d y + f`.

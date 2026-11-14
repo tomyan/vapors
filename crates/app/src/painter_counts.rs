@@ -33,8 +33,16 @@ pub struct FrameCounts {
     /// Icon runs: one draw per run, its vertices and blend uniform; the
     /// part of the atlas page its new icon masks changed.
     pub icons: GpuWork,
-    /// Shape runs: one draw per run, its instances and the viewport.
+    /// Closed-form shape runs: one draw per run, its instances and the
+    /// viewport.
     pub shapes: GpuWork,
+    /// Mesh shape runs: one draw per item, the run's instances and the
+    /// viewport.
+    pub meshes: GpuWork,
+    /// Bytes of mesh entries' vertices uploaded at the frame's start:
+    /// those registered since the last frame; 0 on a frame that
+    /// registers nothing, and for closed forms, which upload nothing.
+    pub shape_bytes_uploaded: u64,
     /// Image runs: one draw per image item and its quad's vertices; an
     /// image's pixels, every mip level, the first frame that draws it.
     pub images: GpuWork,
@@ -82,6 +90,7 @@ impl FrameCounts {
         self.shadows
             + self.quads
             + self.shapes
+            + self.meshes
             + self.texts
             + self.icons
             + self.images
@@ -127,6 +136,7 @@ impl FrameCounts {
             Run::Shadows(_) => &mut self.shadows,
             Run::Quads(_) => &mut self.quads,
             Run::Shapes(_) => &mut self.shapes,
+            Run::Meshes(_) => &mut self.meshes,
             Run::Texts(_) => &mut self.texts,
             Run::Icons(_) => &mut self.icons,
             Run::Images(_) => &mut self.images,
@@ -162,6 +172,7 @@ impl ScenePainter {
         self.counts.bind_groups_kept = self.shadows.bind_groups_kept()
             + self.quads.bind_groups_kept()
             + self.closed_forms.bind_groups_kept()
+            + self.meshes.bind_groups_kept()
             + self.text.bind_groups_kept()
             + self.textures.bind_groups_kept()
             + self.surfaces.bind_groups_kept();
@@ -183,6 +194,7 @@ impl ScenePainter {
         self.shadows.take_work()
             + self.quads.take_work()
             + self.closed_forms.take_work()
+            + self.meshes.take_work()
             + self.text.take_work()
             + self.images.take_work()
             + self.textures.take_work()

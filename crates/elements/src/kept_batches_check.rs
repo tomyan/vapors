@@ -119,7 +119,9 @@ fn run_items(run: &Run) -> Vec<Item> {
     match run {
         Run::Shadows(shadows) => shadows.iter().map(|&shadow| Item::Shadow(shadow)).collect(),
         Run::Quads(quads) => quads.iter().map(|&quad| Item::Quad(quad)).collect(),
-        Run::Shapes(shapes) => shapes.iter().map(|&shape| Item::Shape(shape)).collect(),
+        Run::Shapes(shapes) | Run::Meshes(shapes) => {
+            shapes.iter().map(|&shape| Item::Shape(shape)).collect()
+        }
         Run::Texts(items) | Run::Images(items) | Run::Icons(items) | Run::Surfaces(items) => {
             items.clone()
         }

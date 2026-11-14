@@ -197,6 +197,11 @@ and the fix, as the compiler refuses other attributes today
 
 - `shape`: a `ShapeRef`, either a registered `ShapeId` or a run-time
   entry (1.5);
+- `kind`: closed form or mesh, so batching splits the two into runs
+  for their pipelines (S3a2, lead's option (a)); whoever builds the
+  item takes it from the entry's geometry (`vapors_app::kind_of`), and
+  the painter's store refuses an item whose kind differs from its
+  entry's, naming the entry;
 - `transform`: viewBox to device pixels, 2 x 3 affine;
 - `paint`: the fill or stroke colour from the element's computed style;
 - the clip, from the `Scene`'s clip as for every item.

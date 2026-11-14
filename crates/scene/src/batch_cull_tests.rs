@@ -45,6 +45,7 @@ fn kinds(batched: &Batched) -> Vec<(char, usize)> {
         Run::Surfaces(surfaces) => ('g', surfaces.len()),
         Run::Icons(icons) => ('v', icons.len()),
         Run::Shapes(shapes) => ('h', shapes.len()),
+        Run::Meshes(meshes) => ('m', meshes.len()),
     };
     batched.batches.iter().map(|b| shape(&b.run)).collect()
 }
@@ -194,6 +195,7 @@ fn a_shape_is_culled_by_its_bounds_not_its_transform() {
     let shape = |bounds_top: f32| {
         Item::Shape(crate::Shape {
             shape: crate::ShapeRef(0),
+            kind: crate::ShapeKind::ClosedForm,
             transform: [1.0, 0.0, 0.0, 1.0, 10.0, 10.0],
             colour: Color::from_rgba8(1, 2, 3, 255),
             bounds: Rect::new(10.0, bounds_top, 20.0, bounds_top + 10.0),

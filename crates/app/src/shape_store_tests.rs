@@ -4,7 +4,7 @@
 //! refused, named; a transform with no area draws nothing.
 
 use vapors_renderer::ClosedFormShape;
-use vapors_scene::{Color, Rect, Shape, ShapeRef};
+use vapors_scene::{Color, Rect, Shape, ShapeKind, ShapeRef};
 use vapors_shapes::{
     FillRule, Geometry, IconPath, MeshVertex, Paint, ShapeEntry, ShapeTable, TABLE_FORMAT,
     hash_bytes, tessellate,
@@ -12,7 +12,11 @@ use vapors_shapes::{
 
 use super::{ShapeError, ShapeStore};
 
-fn entry(site: &'static str, canonical: &'static [u8], geometry: Geometry) -> ShapeEntry {
+pub(crate) fn entry(
+    site: &'static str,
+    canonical: &'static [u8],
+    geometry: Geometry,
+) -> ShapeEntry {
     ShapeEntry {
         site,
         canonical,
@@ -21,7 +25,7 @@ fn entry(site: &'static str, canonical: &'static [u8], geometry: Geometry) -> Sh
     }
 }
 
-const CIRCLE: Geometry = Geometry::Ellipse {
+pub(crate) const CIRCLE: Geometry = Geometry::Ellipse {
     centre: [8.0, 8.0],
     radii: [4.0, 4.0],
 };
@@ -32,7 +36,7 @@ const RECT: Geometry = Geometry::Rect {
     radius: [1.0, 1.0],
 };
 
-const IDENTITY: [f32; 6] = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+pub(crate) const IDENTITY: [f32; 6] = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
 
 /// `entries` as a table that lives for the test binary's life.
 fn table(entries: Vec<ShapeEntry>) -> ShapeTable {
@@ -43,9 +47,10 @@ fn table(entries: Vec<ShapeEntry>) -> ShapeTable {
 const STROKE_2: &[u8] = &[b'S', 0, 0, 0, 64, b'M'];
 
 /// An item drawing `shape` under `transform` in blue.
-fn item(shape: u32, transform: [f32; 6]) -> Shape {
+pub(crate) fn item(shape: u32, transform: [f32; 6]) -> Shape {
     Shape {
         shape: ShapeRef(shape),
+        kind: ShapeKind::ClosedForm,
         transform,
         colour: Color::from_rgba8(0, 0, 255, 255),
         bounds: Rect::new(0.0, 0.0, 16.0, 16.0),
@@ -61,7 +66,7 @@ fn drawn(geometry: &Geometry, stroke: Option<f32>) -> ClosedFormShape {
 }
 
 /// A store with `entries` registered as one table.
-fn store(entries: Vec<ShapeEntry>) -> ShapeStore {
+pub(crate) fn store(entries: Vec<ShapeEntry>) -> ShapeStore {
     let mut store = ShapeStore::default();
     store.register(&table(entries)).expect("registered");
     store
@@ -141,24 +146,6 @@ fn a_ref_past_the_registered_entries_is_refused_naming_it() {
 }
 
 #[test]
-fn a_mesh_entry_is_registered_but_refused_at_draw_naming_its_site() {
-    // Given
-    let triangles = triangle_mesh();
-    let store = store(vec![entry("a.wisp:9", b"FM", Geometry::Mesh { triangles })]);
-
-    // When
-    let refused = store
-        .closed_forms(&[item(0, IDENTITY)])
-        .expect_err("refused");
-
-    // Then
-    assert_eq!(
-        refused.to_string(),
-        "shape 0, the mesh at a.wisp:9, is not drawn until the mesh pipeline (one-scene S3a2); draw it as a closed form or wait for S3a2"
-    );
-}
-
-#[test]
 fn a_transform_the_pipeline_refuses_is_refused_naming_the_shape() {
     // Given
     let store = store(vec![entry("a.wisp:3", b"FM", CIRCLE)]);
@@ -187,7 +174,7 @@ fn an_item_scaled_to_nothing_draws_nothing() {
 }
 
 /// A filled triangle's mesh, as the tessellator builds it.
-fn triangle_mesh() -> &'static [[MeshVertex; 3]] {
+pub(crate) fn triangle_mesh() -> &'static [[MeshVertex; 3]] {
     let path = IconPath::parse("M0 0L4 0L0 4z").expect("parses");
     let mesh =
         tessellate("a.wisp:9", &path, Paint::Fill(FillRule::NonZero), 0.05).expect("tessellated");

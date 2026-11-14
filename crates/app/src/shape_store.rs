@@ -4,12 +4,13 @@
 //! A closed form is drawn from its entry's geometry and the paint its
 //! canonical bytes begin with; its parameters go in each instance's
 //! bytes, so it uploads nothing (`shape_bytes_uploaded` is 0 for closed
-//! forms). A mesh entry is registered and refused at draw
-//! until the mesh pipeline (S3a2). The process registry (S5b) will
-//! register each crate's table once, on its first mount.
+//! forms). A mesh entry's vertices are uploaded once, at the start of
+//! the first frame after it is registered (`shape_store_meshes.rs`).
+//! The process registry (S5b) will register each crate's table once,
+//! on its first mount.
 
-use vapors_renderer::ClosedFormShape;
-use vapors_scene::{Shape, ShapeRef};
+use vapors_renderer::{ClosedFormShape, MeshEntry};
+use vapors_scene::{Shape, ShapeKind, ShapeRef};
 
 use crate::shape_bounds::outside_bounds;
 pub use crate::shape_error::ShapeError;
@@ -19,13 +20,17 @@ use vapors_shapes::{Geometry, Paint, ShapeEntry, ShapeTable, paint_of};
 #[derive(Debug, Default)]
 pub struct ShapeStore {
     entries: Vec<Registered>,
+    /// The first entry whose vertices, if a mesh, are not uploaded.
+    pub(crate) unuploaded: usize,
 }
 
 #[derive(Debug)]
-struct Registered {
-    entry: &'static ShapeEntry,
+pub(crate) struct Registered {
+    pub(crate) entry: &'static ShapeEntry,
     /// The stroke width its paint names; `None` fills it.
     stroke: Option<f32>,
+    /// A mesh's vertices on the GPU, once uploaded.
+    pub(crate) uploaded: Option<MeshEntry>,
 }
 
 impl ShapeStore {
@@ -49,10 +54,10 @@ impl ShapeStore {
     ///
     /// # Errors
     /// For the first that fails: [`ShapeError::Unregistered`] for a ref
-    /// the store did not issue, [`ShapeError::Mesh`] for a mesh entry,
-    /// [`ShapeError::Undrawable`] for a transform the pipeline refuses,
-    /// [`ShapeError::OutsideBounds`] for bounds that do not hold what
-    /// the item draws.
+    /// the store did not issue, [`ShapeError::Kind`] for an item whose
+    /// entry is a mesh, [`ShapeError::Undrawable`] for a transform the
+    /// pipeline refuses, [`ShapeError::OutsideBounds`] for bounds that
+    /// do not hold what the item draws.
     pub fn closed_forms(&self, shapes: &[Shape]) -> Result<Vec<ClosedFormShape>, ShapeError> {
         let mut drawn = Vec::with_capacity(shapes.len());
         for shape in shapes {
@@ -62,36 +67,72 @@ impl ShapeStore {
     }
 
     fn closed_form(&self, item: &Shape) -> Result<Option<ClosedFormShape>, ShapeError> {
-        let (shape, Registered { entry, stroke }) = (item.shape, self.registered(item.shape)?);
-        let site = entry.site;
-        if let Geometry::Mesh { .. } = entry.geometry {
-            return Err(ShapeError::Mesh { shape, site });
-        }
+        let Registered { entry, stroke, .. } = self.of_kind(item, ShapeKind::ClosedForm)?;
         let drawn = ClosedFormShape::new(&entry.geometry, *stroke, item.transform, item.colour)
-            .map_err(|reason| ShapeError::Undrawable {
-                shape,
-                site,
-                reason,
-            })?;
+            .map_err(|reason| undrawable(item, entry, reason))?;
         if drawn.is_some() {
             check_bounds(entry, *stroke, item)?;
         }
         Ok(drawn)
     }
 
-    fn registered(&self, shape: ShapeRef) -> Result<&Registered, ShapeError> {
-        self.entries
+    /// The entry `item` names, when it is registered and of the kind
+    /// both the item and the run it is drawn in say.
+    pub(crate) fn of_kind(&self, item: &Shape, run: ShapeKind) -> Result<&Registered, ShapeError> {
+        let shape = item.shape;
+        let registered = self
+            .entries
             .get(shape.0 as usize)
             .ok_or(ShapeError::Unregistered {
                 shape,
                 registered: self.entries.len(),
-            })
+            })?;
+        let entry = kind_of(&registered.entry.geometry);
+        if item.kind != entry || run != entry {
+            return Err(ShapeError::Kind {
+                shape,
+                site: registered.entry.site,
+                item: item.kind,
+                entry,
+            });
+        }
+        Ok(registered)
+    }
+
+    pub(crate) fn entries_mut(&mut self) -> &mut [Registered] {
+        &mut self.entries
+    }
+}
+
+/// The kind `geometry` is drawn as: the one answer an item's kind is
+/// held to.
+#[must_use]
+pub fn kind_of(geometry: &Geometry) -> ShapeKind {
+    match geometry {
+        Geometry::Rect { .. } | Geometry::Ellipse { .. } => ShapeKind::ClosedForm,
+        Geometry::Mesh { .. } => ShapeKind::Mesh,
+    }
+}
+
+pub(crate) fn undrawable(
+    item: &Shape,
+    entry: &ShapeEntry,
+    reason: vapors_renderer::ClosedFormError,
+) -> ShapeError {
+    ShapeError::Undrawable {
+        shape: item.shape,
+        site: entry.site,
+        reason,
     }
 }
 
 /// Refuses `item` when what `entry` draws under it lies outside its
 /// bounds, which culling reads.
-fn check_bounds(entry: &ShapeEntry, stroke: Option<f32>, item: &Shape) -> Result<(), ShapeError> {
+pub(crate) fn check_bounds(
+    entry: &ShapeEntry,
+    stroke: Option<f32>,
+    item: &Shape,
+) -> Result<(), ShapeError> {
     match outside_bounds(&entry.geometry, stroke, item) {
         None => Ok(()),
         Some(drawn) => Err(ShapeError::OutsideBounds {
@@ -114,9 +155,13 @@ fn registered(entry: &'static ShapeEntry) -> Registered {
         Paint::Fill(_) => None,
         Paint::Stroke { width } => Some(width),
     };
-    Registered { entry, stroke }
+    Registered {
+        entry,
+        stroke,
+        uploaded: None,
+    }
 }
 
 #[cfg(test)]
 #[path = "shape_store_tests.rs"]
-mod tests;
+pub(crate) mod tests;

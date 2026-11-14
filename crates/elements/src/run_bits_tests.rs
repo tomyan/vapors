@@ -30,6 +30,7 @@ fn surfaces(left: f32) -> Run {
 fn shapes(e: f32) -> Run {
     Run::Shapes(vec![Shape {
         shape: ShapeRef(2),
+        kind: vapors_scene::ShapeKind::ClosedForm,
         transform: [1.0, 0.0, 0.0, 1.0, e, 0.0],
         colour: Color::from_rgba8(0, 0, 255, 255),
         bounds: Rect::new(0.0, 0.0, 8.0, 8.0),

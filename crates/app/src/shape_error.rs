@@ -5,7 +5,7 @@
 use std::fmt;
 
 use vapors_renderer::ClosedFormError;
-use vapors_scene::{Rect, ShapeRef};
+use vapors_scene::{Rect, ShapeKind, ShapeRef};
 use vapors_shapes::TableError;
 
 /// Why a table was not registered or a shape not drawn.
@@ -20,8 +20,21 @@ pub enum ShapeError {
         /// How many entries the store holds.
         registered: usize,
     },
-    /// A mesh entry, which the mesh pipeline (S3a2) will draw.
-    Mesh {
+    /// An item whose kind is not its entry's: batched for one
+    /// pipeline, its entry needs the other.
+    Kind {
+        /// The ref.
+        shape: ShapeRef,
+        /// Where it was written.
+        site: &'static str,
+        /// The kind the item says.
+        item: ShapeKind,
+        /// The kind its entry's geometry is.
+        entry: ShapeKind,
+    },
+    /// A mesh entry whose vertices are not on the GPU: the painter
+    /// uploads every registered entry at the start of each frame.
+    NotUploaded {
         /// The ref.
         shape: ShapeRef,
         /// Where it was written.
@@ -78,9 +91,19 @@ impl fmt::Display for ShapeError {
                 "shape {}, the entry at {site}, draws over {drawn:?} but its item's bounds are {bounds:?}, so culling would drop pixels it draws; give the item bounds that hold its transformed entry",
                 shape.0
             ),
-            Self::Mesh { shape, site } => write!(
+            Self::Kind {
+                shape,
+                site,
+                item,
+                entry,
+            } => write!(
                 f,
-                "shape {}, the mesh at {site}, is not drawn until the mesh pipeline (one-scene S3a2); draw it as a closed form or wait for S3a2",
+                "shape {}, the entry at {site}, is a {entry:?} but its item says {item:?}; build the item's kind from its entry's geometry; reproduce with `cargo test -p vapors-app --lib shape_store`",
+                shape.0
+            ),
+            Self::NotUploaded { shape, site } => write!(
+                f,
+                "shape {}, the mesh at {site}, has no vertices on the GPU; draw through ScenePainter, which uploads every registered entry before a frame; reproduce with `cargo test -p vapors-app --test gpu_shapes`",
                 shape.0
             ),
         }

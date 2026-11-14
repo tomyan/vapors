@@ -16,5 +16,5 @@ pub use color::Color;
 pub use display::{IconId, ImageId, Item, Quad, Rect, Scene, Shadow, SurfaceId, TextId};
 pub use image::RgbaImage;
 pub use scissor::Scissor;
-pub use shape::{Shape, ShapeRef};
+pub use shape::{Shape, ShapeKind, ShapeRef};
 pub use transform::{Size, Transform};
