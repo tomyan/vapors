@@ -10,6 +10,7 @@ fn a_shifted_shape_moves_its_translation_and_bounds() {
     // Given
     let shape = Shape {
         shape: ShapeRef(4),
+        kind: vapors_scene::ShapeKind::ClosedForm,
         transform: [2.0, 0.5, -0.5, 2.0, 10.0, 20.0],
         colour: Color::from_rgba8(1, 2, 3, 255),
         bounds: Rect::new(8.0, 18.0, 30.0, 44.0),

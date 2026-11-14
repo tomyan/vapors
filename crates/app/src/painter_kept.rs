@@ -17,7 +17,8 @@
 
 use vapors_elements::{BatchKey, Painted};
 use vapors_renderer::{
-    ClosedFormPipeline, ImagePipeline, KeptRange, QuadPipeline, ShadowPipeline, Shift, Target,
+    ClosedFormPipeline, ImagePipeline, KeptRange, MeshPipeline, QuadPipeline, ShadowPipeline,
+    Shift, Target,
 };
 use vapors_scene::{Item, Rect, Run};
 use vapors_text::{BlendParams, GlyphAtlas, ICON_BLEND, TextPipeline};
@@ -35,8 +36,10 @@ pub(super) use gpu::KeptGpu;
 pub(super) enum Kind {
     Shadows,
     Quads,
-    /// Shapes: the closed-form pipeline's.
+    /// Closed-form shapes: the closed-form pipeline's.
     ClosedForms,
+    /// Mesh shapes' instances: the mesh pipeline's.
+    Meshes,
     /// Image and surface quads: the image pipeline's.
     Images,
 }
@@ -47,6 +50,7 @@ pub(super) struct Pipelines<'a> {
     pub(super) shadows: &'a mut ShadowPipeline,
     pub(super) quads: &'a mut QuadPipeline,
     pub(super) closed_forms: &'a mut ClosedFormPipeline,
+    pub(super) meshes: &'a mut MeshPipeline,
     pub(super) shapes: &'a ShapeStore,
     pub(super) images: &'a mut ImagePipeline,
     pub(super) text: &'a mut TextPipeline,
@@ -72,6 +76,7 @@ impl ScenePainter {
             shadows: &mut self.shadows,
             quads: &mut self.quads,
             closed_forms: &mut self.closed_forms,
+            meshes: &mut self.meshes,
             shapes: &self.shapes,
             images: &mut self.images,
             text: &mut self.text,
@@ -84,6 +89,11 @@ impl ScenePainter {
             Run::Shadows(_) => self.shadows.draw_kept(target, range, shift),
             Run::Quads(_) => self.quads.draw_kept(target, range, shift),
             Run::Shapes(_) => self.closed_forms.draw_kept(target, range, shift),
+            Run::Meshes(items) => {
+                let drawn = self.shapes.mesh_entries(items).map_err(PaintError::Shape)?;
+                let entries = (&mut self.mesh_entries, drawn.as_slice());
+                self.meshes.draw_kept(target, range, shift, entries);
+            }
             Run::Images(items) => {
                 let images = &mut self.images;
                 self.textures
@@ -133,6 +143,7 @@ impl ScenePainter {
             shadows: &mut self.shadows,
             quads: &mut self.quads,
             closed_forms: &mut self.closed_forms,
+            meshes: &mut self.meshes,
             shapes: &self.shapes,
             images: &mut self.images,
             text: &mut self.text,
@@ -152,7 +163,8 @@ impl ScenePainter {
     pub(super) fn retained_bytes(&self) -> u64 {
         let (images, text) = (self.images.retained_bytes(), self.text.retained_bytes());
         let (shadows, quads) = (self.shadows.retained_bytes(), self.quads.retained_bytes());
-        shadows + quads + self.closed_forms.retained_bytes() + images + text
+        let shapes = self.closed_forms.retained_bytes() + self.meshes.retained_bytes();
+        shadows + quads + shapes + images + text
     }
 }
 
@@ -170,6 +182,7 @@ impl Pipelines<'_> {
             Kind::Shadows => self.shadows.keep(target, bytes),
             Kind::Quads => self.quads.keep(target, bytes),
             Kind::ClosedForms => self.closed_forms.keep(target, bytes),
+            Kind::Meshes => self.meshes.keep(target, bytes),
             Kind::Images => self.images.keep(target, bytes),
         }
     }
@@ -179,6 +192,7 @@ impl Pipelines<'_> {
             Kind::Shadows => self.shadows.release(range),
             Kind::Quads => self.quads.release(range),
             Kind::ClosedForms => self.closed_forms.release(range),
+            Kind::Meshes => self.meshes.release(range),
             Kind::Images => self.images.release(range),
         }
     }
@@ -192,6 +206,7 @@ impl Kind {
             Run::Shadows(_) => Some(Self::Shadows),
             Run::Quads(_) => Some(Self::Quads),
             Run::Shapes(_) => Some(Self::ClosedForms),
+            Run::Meshes(_) => Some(Self::Meshes),
             Run::Images(_) | Run::Surfaces(_) => Some(Self::Images),
             Run::Texts(_) | Run::Icons(_) => None,
         }
@@ -213,6 +228,9 @@ pub(super) fn run_bytes(run: &Run, shapes: &ShapeStore) -> Result<Vec<u8>, Paint
         Run::Quads(quads) => QuadPipeline::bytes(quads),
         Run::Shapes(items) => {
             ClosedFormPipeline::bytes(&shapes.closed_forms(items).map_err(PaintError::Shape)?)
+        }
+        Run::Meshes(items) => {
+            MeshPipeline::bytes(&shapes.mesh_instances(items).map_err(PaintError::Shape)?)
         }
         Run::Images(items) | Run::Surfaces(items) => {
             ImagePipeline::rect_bytes(items.iter().map(item_rect))
