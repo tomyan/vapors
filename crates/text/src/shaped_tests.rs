@@ -23,7 +23,8 @@ fn shaped(system: &mut FontSystem, scale: f32) -> Shaped {
 }
 
 /// The reference: shaped and broken in one go, on a layout no other
-/// width has broken, as `Layout::styled` did before `Shaped`.
+/// width has broken, as `Layout::styled` did before `Shaped`, with
+/// lines broken and aligned in exactly the width (no fit slack).
 fn shaped_and_broken(system: &mut FontSystem, options: &LayoutOptions) -> Layout {
     let base = Style::new(Family::Geist, 16.0);
     let mut builder = system.ranged_builder(TEXT, options.scale);
@@ -95,5 +96,29 @@ fn content_widths_are_the_widths_at_min_and_max_content() {
         // Then
         assert_eq!(widths.min, once.lay_out(Some(0.0), Align::Start).width());
         assert_eq!(widths.max, once.lay_out(None, Align::Start).width());
+    }
+}
+
+#[test]
+fn centred_end_and_justified_lines_are_placed_in_the_width_not_the_slack() {
+    for align in [Align::Center, Align::End, Align::Justify] {
+        for scale in [1.0, 2.625] {
+            // Given: lines that wrap with room to spare, so each is moved
+            let mut system = FontSystem::bundle_only();
+            let width = Some(90.0);
+            let options = LayoutOptions {
+                width,
+                align,
+                scale,
+                direction: Direction::Ltr,
+            };
+
+            // When
+            let broken = shaped(&mut system, scale).lay_out(width, align);
+
+            // Then: placed as in a box exactly the width wide, with no slack
+            let in_the_width = shaped_and_broken(&mut system, &options);
+            assert_eq!(seen(&broken), seen(&in_the_width), "{align:?} at {scale}");
+        }
     }
 }
