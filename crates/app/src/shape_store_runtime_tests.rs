@@ -31,7 +31,7 @@ fn item(cache: &ShapeCache, at: CacheRef, kind: ShapeKind) -> Shape {
 /// The store with `cache`'s changes taken.
 fn take(store: &mut ShapeStore, cache: &mut ShapeCache) -> Result<(), ShapeError> {
     store
-        .take_runtime(cache.document(), cache.take_changes())
+        .take_runtime(cache.document(), take_changes(cache))
         .map(|_| ())
 }
 
@@ -121,4 +121,10 @@ fn run_time_meshes_past_the_buffers_limit_are_refused_naming_the_document() {
         "{refused}"
     );
     assert_eq!(store.document, None);
+}
+
+fn take_changes(cache: &mut ShapeCache) -> Vec<vapors_shapes::SlotChange> {
+    let changes = cache.changes();
+    cache.clear_changes();
+    changes
 }

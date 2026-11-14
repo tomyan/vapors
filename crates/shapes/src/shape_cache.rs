@@ -12,7 +12,7 @@
 //! at most the distinct (path, paint, stroke width, scale step) in
 //! use. The slots changed since the painter last took them are kept
 //! as a set, bounded by the slots, so a repaint takes only what
-//! changed. On a hash hit the canonical bytes are compared, and other
+//! changed. A slot whose generation would wrap is retired. On a hash hit the canonical bytes are compared, and other
 //! bytes are a new entry, never a defect (one-scene 1.3).
 
 use std::collections::{BTreeSet, HashMap};
@@ -142,13 +142,14 @@ impl ShapeCache {
             .filter(|_| slot.generation == at.generation)
     }
 
-    /// Each slot changed since the last take, with its entry now; the
-    /// set restarts.
-    pub fn take_changes(&mut self) -> Vec<SlotChange> {
-        let changed = std::mem::take(&mut self.changed);
-        changed
-            .into_iter()
-            .map(|index| {
+    /// Each slot changed since the changes were last cleared, with its
+    /// entry now. The set stays until [`ShapeCache::clear_changes`], so
+    /// a take the store refuses loses nothing.
+    #[must_use]
+    pub fn changes(&self) -> Vec<SlotChange> {
+        self.changed
+            .iter()
+            .map(|&index| {
                 let slot = &self.slots[index as usize];
                 let shape = slot
                     .shape
@@ -157,6 +158,11 @@ impl ShapeCache {
                 (index, shape)
             })
             .collect()
+    }
+
+    /// Forgets the changed slots: the store took them.
+    pub fn clear_changes(&mut self) {
+        self.changed.clear();
     }
 
     /// How many entries are live, and how many slots the cache holds.
@@ -221,14 +227,24 @@ impl ShapeCache {
     fn freed(&mut self, index: u32) {
         let slot = &mut self.slots[index as usize];
         let shape = slot.shape.take().expect("a live slot");
-        slot.generation += 1;
+        // a slot whose generation would wrap is retired, never reused:
+        // a stale ref could otherwise name the entry that took it
+        let reusable = match slot.generation.checked_add(1) {
+            Some(next) => {
+                slot.generation = next;
+                true
+            }
+            None => false,
+        };
         let hash = shape.canonical().hash();
         let filed = self.by_hash.get_mut(&hash).expect("a live slot is filed");
         filed.retain(|&filed| filed != index);
         if filed.is_empty() {
             self.by_hash.remove(&hash);
         }
-        self.free.push(index);
+        if reusable {
+            self.free.push(index);
+        }
         self.changed.insert(index);
     }
 

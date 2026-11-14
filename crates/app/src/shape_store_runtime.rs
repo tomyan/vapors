@@ -63,10 +63,12 @@ impl ShapeStore {
         painted: &vapors_elements::Painted,
         meshes: &mut vapors_renderer::MeshEntries,
     ) -> Result<(), ShapeError> {
-        let (document, changes) = painted.take_shape_changes();
+        let (document, changes) = painted.shape_changes();
         for freed in self.take_runtime(document, changes)? {
             meshes.release(freed);
         }
+        // only once taken: a refused take keeps them for the next frame
+        painted.shape_changes_taken();
         Ok(())
     }
 

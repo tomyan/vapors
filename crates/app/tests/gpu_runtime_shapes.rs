@@ -137,3 +137,21 @@ fn flat(doc: &Document, rig: &Rig) -> (usize, usize, u64) {
         rig.painter.frame_counts().retained_bytes,
     )
 }
+
+#[test]
+fn gpu_a_take_the_store_refuses_keeps_the_documents_changes() {
+    // Given: a painter that drew one document
+    let first = page();
+    let mut rig = Rig::new();
+    rig.draw(&first).expect("paints");
+
+    // When: it is given another document's shapes
+    let second = page();
+    let refused = rig.draw(&second);
+
+    // Then: refused, and the second document's changes are still there
+    // for a painter of its own
+    assert!(refused.is_err());
+    let (_, changes) = second.painted().expect("updated").shape_changes();
+    assert_eq!(changes.len(), 2);
+}

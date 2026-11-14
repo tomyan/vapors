@@ -98,3 +98,7 @@ fn next_document() -> u32 {
     static NEXT: AtomicU32 = AtomicU32::new(1);
     NEXT.fetch_add(1, Ordering::Relaxed)
 }
+
+#[cfg(test)]
+#[path = "document_shapes_tests.rs"]
+mod tests;

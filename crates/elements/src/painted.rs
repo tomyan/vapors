@@ -178,22 +178,36 @@ impl Painted {
         resolved(self.slabs.images.get(id.0), "image", id.0)
     }
 
-    /// The icon a scene item names.
-    ///
     /// The document's number and each run-time shape slot changed
-    /// since the last take, with its entry now (`None` when freed),
-    /// for the painter's store; the set restarts. A painter draws one
-    /// document, so one store takes each change once.
+    /// since the store last took them, with its entry now (`None` when
+    /// freed). They stay until [`Painted::shape_changes_taken`], so a
+    /// take the store refuses loses none. A painter draws one document,
+    /// so one store takes each change.
     ///
     /// # Panics
     /// On a `Painted` no update finished, which a document never hands
     /// out.
-    pub fn take_shape_changes(&self) -> (u32, Vec<vapors_shapes::SlotChange>) {
-        let shapes = self.shapes.as_ref().expect("an update shares its shapes");
-        let mut shapes = shapes.borrow_mut();
-        (shapes.cache.document(), shapes.cache.take_changes())
+    #[must_use]
+    pub fn shape_changes(&self) -> (u32, Vec<vapors_shapes::SlotChange>) {
+        let shapes = self
+            .shapes
+            .as_ref()
+            .expect("an update shares its shapes")
+            .borrow();
+        (shapes.cache.document(), shapes.cache.changes())
     }
 
+    /// The store took [`Painted::shape_changes`]: they are forgotten.
+    ///
+    /// # Panics
+    /// As [`Painted::shape_changes`].
+    pub fn shape_changes_taken(&self) {
+        let shapes = self.shapes.as_ref().expect("an update shares its shapes");
+        shapes.borrow_mut().cache.clear_changes();
+    }
+
+    /// The icon a scene item names.
+    ///
     /// # Panics
     /// When `id` is not one this update's scene names.
     #[must_use]

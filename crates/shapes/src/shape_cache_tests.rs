@@ -67,7 +67,7 @@ fn releasing_a_freed_entry_is_a_fault() {
 }
 
 #[test]
-fn the_changed_slots_are_taken_once_each_with_their_state() {
+fn the_changed_slots_stay_until_cleared_each_with_its_state() {
     // Given: an entry made, then another made and freed
     let mut cache = ShapeCache::new(1);
     let kept = acquire(&mut cache, ARROW, STROKE, 1.0);
@@ -75,7 +75,7 @@ fn the_changed_slots_are_taken_once_each_with_their_state() {
     cache.release(gone);
 
     // When
-    let changes = cache.take_changes();
+    let changes = cache.changes();
 
     // Then
     let states: Vec<_> = changes
@@ -83,7 +83,9 @@ fn the_changed_slots_are_taken_once_each_with_their_state() {
         .map(|(index, now)| (*index, now.as_ref().map(|(g, _)| *g)))
         .collect();
     assert_eq!(states, [(kept.index, Some(0)), (gone.index, None)]);
-    assert_eq!(cache.take_changes().len(), 0);
+    assert_eq!(cache.changes().len(), 2, "kept until cleared");
+    cache.clear_changes();
+    assert_eq!(cache.changes().len(), 0);
 }
 
 #[test]
@@ -181,4 +183,23 @@ fn a_failed_tessellation_counts_nothing() {
     // Then
     assert!(refused.is_err());
     assert_eq!(cache.take_tessellated(), 0);
+}
+
+#[test]
+fn a_slot_whose_generation_would_wrap_is_retired() {
+    // Given: an entry in a slot at the last generation
+    let mut cache = ShapeCache::new(1);
+    let at = acquire(&mut cache, ARROW, STROKE, 1.0);
+    cache.slots[at.index as usize].generation = u32::MAX;
+
+    // When: freed, then another path
+    cache.release(CacheRef {
+        generation: u32::MAX,
+        ..at
+    });
+    let next = acquire(&mut cache, "M2 2h12", STROKE, 1.0);
+
+    // Then: a new slot, the retired one left empty
+    assert_ne!(next.index, at.index);
+    assert_eq!(cache.counts(), (1, 2));
 }
