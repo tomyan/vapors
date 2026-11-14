@@ -8,7 +8,8 @@
 
 use vapors_elements::Painted;
 use vapors_renderer::{
-    ClosedFormPipeline, ImagePipeline, QuadPipeline, ShadowPipeline, Target, clear_target,
+    ClosedFormPipeline, ImagePipeline, MeshEntries, MeshPipeline, QuadPipeline, ShadowPipeline,
+    Target, clear_target,
 };
 use vapors_text::{AtlasConfig, GlyphAtlas, TextPipeline};
 
@@ -19,6 +20,8 @@ pub struct ScenePainter {
     shadows: ShadowPipeline,
     quads: QuadPipeline,
     closed_forms: ClosedFormPipeline,
+    meshes: MeshPipeline,
+    mesh_entries: MeshEntries,
     shapes: ShapeStore,
     text: TextPipeline,
     atlas: GlyphAtlas,
@@ -73,7 +76,9 @@ impl ScenePainter {
             shadows: ShadowPipeline::new(device, format),
             quads: QuadPipeline::new(device, format),
             closed_forms: ClosedFormPipeline::new(device, format),
-            shapes: ShapeStore::default(),
+            meshes: MeshPipeline::new(device, format),
+            mesh_entries: MeshEntries::new(device),
+            shapes: ShapeStore::with_buffer_limit(device.limits().max_buffer_size),
             text: TextPipeline::new(device, format, &atlas),
             atlas,
             images: ImagePipeline::new(device, format),
@@ -135,6 +140,9 @@ impl ScenePainter {
         self.textures.begin_frame();
         self.surfaces.begin_frame();
         self.kept.begin_frame();
+        let uploaded = self.shapes.upload(&mut self.mesh_entries, target);
+        self.counts.shape_bytes_uploaded = uploaded.buffer_bytes;
+        self.counts.meshes += uploaded;
         let runs = self.paint_runs(target, painted);
         self.surfaces.end_frame();
         if runs.is_ok() {

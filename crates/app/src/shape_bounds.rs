@@ -6,7 +6,7 @@
 //! item's culling bounds (`Item::bounds`, its own grown by the fringe).
 
 use vapors_scene::{Item, Rect, Shape};
-use vapors_shapes::Geometry;
+use vapors_shapes::{Geometry, MeshVertex};
 
 /// How far outside the outline the closed-form ramp covers, device
 /// pixels (`closed_forms.wgsl`: coverage 0.5 minus the distance).
@@ -22,7 +22,7 @@ pub(crate) fn outside_bounds(
     stroke: Option<f32>,
     item: &Shape,
 ) -> Option<Rect> {
-    let [lo, hi] = local_box(geometry, stroke.unwrap_or(0.0) / 2.0)?;
+    let [lo, hi] = local_box(geometry, stroke.unwrap_or(0.0) / 2.0);
     let drawn = transformed([lo, hi], item.transform).grown(RAMP);
     let bounds = Item::Shape(*item).bounds().grown(SLACK);
     let within = drawn.left >= bounds.left
@@ -33,16 +33,32 @@ pub(crate) fn outside_bounds(
 }
 
 /// The closed form's box in its own units, grown by `by`.
-fn local_box(geometry: &Geometry, by: f32) -> Option<[[f32; 2]; 2]> {
+fn local_box(geometry: &Geometry, by: f32) -> [[f32; 2]; 2] {
     let [lo, hi] = match *geometry {
         Geometry::Rect { origin, size, .. } => [origin, [origin[0] + size[0], origin[1] + size[1]]],
         Geometry::Ellipse { centre, radii } => [
             [centre[0] - radii[0], centre[1] - radii[1]],
             [centre[0] + radii[0], centre[1] + radii[1]],
         ],
-        Geometry::Mesh { .. } => return None,
+        Geometry::Mesh { triangles } => mesh_box(triangles),
     };
-    Some([[lo[0] - by, lo[1] - by], [hi[0] + by, hi[1] + by]])
+    [[lo[0] - by, lo[1] - by], [hi[0] + by, hi[1] + by]]
+}
+
+/// The box of a mesh's vertices: its outline (the extrusion past it
+/// draws only the ramp, which the half pixel added after the transform
+/// holds).
+fn mesh_box(triangles: &[[MeshVertex; 3]]) -> [[f32; 2]; 2] {
+    let points = triangles.iter().flatten().map(|v| v.position);
+    points.fold(
+        [[f32::INFINITY; 2], [f32::NEG_INFINITY; 2]],
+        |[lo, hi], p| {
+            [
+                [lo[0].min(p[0]), lo[1].min(p[1])],
+                [hi[0].max(p[0]), hi[1].max(p[1])],
+            ]
+        },
+    )
 }
 
 /// The device-pixel box of the four corners of `[lo, hi]` under

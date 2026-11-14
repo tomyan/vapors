@@ -11,11 +11,25 @@ use crate::{Color, Rect};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ShapeRef(pub u32);
 
+/// Which pipeline draws an entry: its kind, as `vapors_app::kind_of`
+/// gives it from the entry's geometry. Batching splits on it; the
+/// painter's store refuses an item whose kind differs from its entry's.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ShapeKind {
+    /// A rect or ellipse, drawn by its closed-form distance.
+    ClosedForm,
+    /// Triangles from the tessellator.
+    Mesh,
+}
+
 /// One shape to draw.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Shape {
     /// Which entry.
     pub shape: ShapeRef,
+    /// Its entry's kind, set once at construction ([`Shape::new`];
+    /// `vapors_app::shape_item` takes it from the entry).
+    pub(crate) kind: ShapeKind,
     /// From the entry's viewBox units to device pixels, as CSS's
     /// `matrix(a, b, c, d, e, f)`: `x' = a x + c y + e`,
     /// `y' = b x + d y + f`.
@@ -27,4 +41,33 @@ pub struct Shape {
     /// Every pixel the drawn entry covers, device pixels, before the
     /// fringe every item's bounds get: what it is culled by.
     pub bounds: Rect,
+}
+
+impl Shape {
+    /// An item drawing entry `shape`, of `kind`, under `transform` in
+    /// `colour`, culled by `bounds`. Build one from its entry with
+    /// `vapors_app::shape_item`, which takes the kind from the entry's
+    /// geometry, so the two cannot disagree.
+    #[must_use]
+    pub fn new(
+        shape: ShapeRef,
+        kind: ShapeKind,
+        transform: [f32; 6],
+        colour: Color,
+        bounds: Rect,
+    ) -> Self {
+        Self {
+            shape,
+            kind,
+            transform,
+            colour,
+            bounds,
+        }
+    }
+
+    /// Its entry's kind.
+    #[must_use]
+    pub fn kind(&self) -> ShapeKind {
+        self.kind
+    }
 }

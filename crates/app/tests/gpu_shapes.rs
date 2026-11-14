@@ -51,12 +51,13 @@ const CSS: &str = "div { position: absolute; top: 0; left: 0; width: 32px; heigh
 
 /// `shape` moved to `at` in red, its bounds `size` from there.
 fn red(shape: u32, at: [f32; 2], size: [f32; 2]) -> Item {
-    Item::Shape(Shape {
-        shape: ShapeRef(shape),
-        transform: [1.0, 0.0, 0.0, 1.0, at[0], at[1]],
-        colour: Color::from_rgba8(255, 0, 0, 255),
-        bounds: Rect::new(at[0], at[1], at[0] + size[0], at[1] + size[1]),
-    })
+    Item::Shape(Shape::new(
+        ShapeRef(shape),
+        vapors_scene::ShapeKind::ClosedForm,
+        [1.0, 0.0, 0.0, 1.0, at[0], at[1]],
+        Color::from_rgba8(255, 0, 0, 255),
+        Rect::new(at[0], at[1], at[0] + size[0], at[1] + size[1]),
+    ))
 }
 
 /// The page with `a` painting the circle at (0, 2) then the rect at

@@ -19,7 +19,9 @@ fn floats_same_bits(was: &Run, now: &Run) -> bool {
     match (was, now) {
         (Run::Shadows(was), Run::Shadows(now)) => pairs_same(was, now, shadow_floats),
         (Run::Quads(was), Run::Quads(now)) => pairs_same(was, now, quad_floats),
-        (Run::Shapes(was), Run::Shapes(now)) => pairs_same(was, now, shape_floats),
+        (Run::Shapes(was), Run::Shapes(now)) | (Run::Meshes(was), Run::Meshes(now)) => {
+            pairs_same(was, now, shape_floats)
+        }
         (Run::Images(was), Run::Images(now)) | (Run::Surfaces(was), Run::Surfaces(now)) => {
             pairs_same(was, now, item_floats)
         }
@@ -74,14 +76,16 @@ fn shadow_floats(shadow: &Shadow) -> [[f32; 4]; 6] {
     [rect, radii, color, caster, caster_radii, [blur; 4]]
 }
 
-/// Every float of `shape`: a field added to `Shape` stops this
-/// compiling.
+/// Every float of `shape`.
 fn shape_floats(shape: &Shape) -> [[f32; 4]; 4] {
+    // `..` is the private kind, which `==` compares; a public field
+    // added to `Shape` stops this compiling only once named here.
     let Shape {
         shape: _,
         transform,
         colour,
         bounds,
+        ..
     } = *shape;
     let [linear @ .., e, f] = transform;
     [

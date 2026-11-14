@@ -206,6 +206,12 @@ and the fix, as the compiler refuses other attributes today
 
 - `shape`: a `ShapeRef`, either a registered `ShapeId` or a run-time
   entry (1.5);
+- `kind`: closed form or mesh, so batching splits the two into runs
+  for their pipelines (S3a2, lead's option (a)); it is set once, at
+  construction, and `vapors_app::shape_item` builds an item from its
+  entry with the kind its geometry gives (`kind_of`); the painter's
+  store refuses an item whose kind differs from its entry's, naming
+  the entry;
 - `transform`: viewBox to device pixels, 2 x 3 affine;
 - `paint`: the fill or stroke colour from the element's computed style;
 - the clip, from the `Scene`'s clip as for every item.
@@ -236,7 +242,12 @@ only (S3a2) and needs no storage buffer in the vertex stage (S3a1,
 2026-11-14, lead): `shape_bytes_uploaded` counts those uploads and is
 0 for closed forms. It arrives with the first upload; until then an
 idle frame's shape bytes are its shape runs' instance bytes
-(`FrameCounts::shapes`), 0 when every shape batch is kept. Until
+(`FrameCounts::shapes`), 0 when every shape batch is kept. Since S3a2
+the upload runs at each frame's start and is counted in
+`FrameCounts::meshes` (growth and compaction included) and in
+`retained_bytes`; a table whose meshes would take the entry buffer
+past the device's `max_buffer_size` is refused at registration, naming
+its crate, since the store only grows. Until
 S4a's `<path>` paints shapes, the painter's tests have elements paint
 shape items through `vapors_elements::test_items` (the `test-support`
 feature, enabled by dev-dependencies only). The closed-form shader takes coverage as 0.5 minus

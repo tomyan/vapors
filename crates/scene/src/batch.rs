@@ -4,7 +4,7 @@
 use std::borrow::Borrow;
 
 use crate::display::{Item, Quad, Rect, Scene, Shadow};
-use crate::shape::Shape;
+use crate::shape::{Shape, ShapeKind};
 
 /// Consecutive items of one kind under one clip: what a painter draws
 /// with one pipeline before switching to the next.
@@ -34,8 +34,10 @@ pub enum Run {
     Icons(Vec<Item>),
     /// Consecutive GPU surfaces.
     Surfaces(Vec<Item>),
-    /// Consecutive shapes.
+    /// Consecutive closed-form shapes.
     Shapes(Vec<Shape>),
+    /// Consecutive mesh shapes.
+    Meshes(Vec<Shape>),
 }
 
 /// A scene's batches for one target, and how many items were culled.
@@ -118,7 +120,14 @@ impl Run {
             Item::Image { .. } => Run::Images(Vec::new()),
             Item::Icon { .. } => Run::Icons(Vec::new()),
             Item::Surface { .. } => Run::Surfaces(Vec::new()),
-            Item::Shape(_) => Run::Shapes(Vec::new()),
+            Item::Shape(Shape {
+                kind: ShapeKind::ClosedForm,
+                ..
+            }) => Run::Shapes(Vec::new()),
+            Item::Shape(Shape {
+                kind: ShapeKind::Mesh,
+                ..
+            }) => Run::Meshes(Vec::new()),
         }
     }
 
@@ -127,7 +136,12 @@ impl Run {
         match (self, item) {
             (Run::Shadows(shadows), Item::Shadow(shadow)) => shadows.push(*shadow),
             (Run::Quads(quads), Item::Quad(quad)) => quads.push(*quad),
-            (Run::Shapes(shapes), Item::Shape(shape)) => shapes.push(*shape),
+            (Run::Shapes(shapes), Item::Shape(shape)) if shape.kind == ShapeKind::ClosedForm => {
+                shapes.push(*shape);
+            }
+            (Run::Meshes(meshes), Item::Shape(shape)) if shape.kind == ShapeKind::Mesh => {
+                meshes.push(*shape);
+            }
             (Run::Texts(items), Item::Text { .. })
             | (Run::Images(items), Item::Image { .. })
             | (Run::Icons(items), Item::Icon { .. })
@@ -145,3 +159,7 @@ mod tests;
 #[cfg(test)]
 #[path = "batch_cull_tests.rs"]
 mod cull_tests;
+
+#[cfg(test)]
+#[path = "batch_shape_tests.rs"]
+mod shape_tests;
