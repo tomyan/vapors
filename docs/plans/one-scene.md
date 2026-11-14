@@ -216,9 +216,10 @@ closed-form entry's parameters go in each instance's bytes (80 bytes:
 transform, colour, the rect or ellipse, the stroke width), kept between
 frames like a quad's, so the store uploads GPU bytes for mesh entries
 only (S3a2) and needs no storage buffer in the vertex stage (S3a1,
-2026-11-14); `shape_bytes_uploaded` comes with that first upload, and
-until then an idle frame's shape bytes are its shape runs' instance
-bytes (`FrameCounts::shapes`), 0 when every shape batch is kept. Until
+2026-11-14, lead): `shape_bytes_uploaded` counts those uploads and is
+0 for closed forms. It arrives with the first upload; until then an
+idle frame's shape bytes are its shape runs' instance bytes
+(`FrameCounts::shapes`), 0 when every shape batch is kept. Until
 S4a's `<path>` paints shapes, the painter's tests have elements paint
 shape items through `vapors_elements::test_items` (the `test-support`
 feature, enabled by dev-dependencies only). The closed-form shader takes coverage as 0.5 minus
