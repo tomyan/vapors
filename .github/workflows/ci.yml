@@ -65,11 +65,20 @@ jobs:
       # advisory database every run and fails if it cannot.
       - name: dependencies (cargo-deny)
         run: cargo xtask deny
-      - name: lint, wasm lint and unit
-        run: cargo xtask lint && cargo xtask wasm && cargo xtask test --tier unit
+      # Three steps rather than one `&&` line so the gate log and CI time
+      # each; a failure skips the rest, as `&&` did.
+      - name: lint
+        run: cargo xtask lint
+      - name: wasm lint
+        run: cargo xtask wasm
+      - name: unit
+        run: cargo xtask test --tier unit
+      # Bins and examples only: the unit step's nextest built the test
+      # targets in the test profile, and --all-targets built them again in
+      # dev, 85 % of this step's CPU (docs/plans/factory-throughput.md C1).
       - name: build timings
         if: always()
-        run: cargo build --workspace --all-targets --timings
+        run: cargo build --workspace --bins --examples --timings
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

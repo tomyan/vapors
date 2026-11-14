@@ -51,6 +51,7 @@ fn the_styles_line_gives_where_the_last_frames_styles_came_from() {
         update.styles_unshareable,
         update.styles_live,
     ) = (2, 0, 6);
+    (update.used_shared, update.used_derived) = (12_000, 6);
     let samples = Samples {
         counts: Counts {
             update,
@@ -65,7 +66,7 @@ fn the_styles_line_gives_where_the_last_frames_styles_came_from() {
     // Then
     assert!(
         report.contains(
-            "Styles (last frame): shared 12000, computed 4, unkeyed 2, unshareable 0; live 6."
+            "Styles (last frame): shared 12000, computed 4, unkeyed 2, unshareable 0; live 6. Used styles: shared 12000, derived 6."
         ),
         "{report}"
     );

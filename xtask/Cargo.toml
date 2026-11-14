@@ -21,6 +21,12 @@ yaml-rust2 = { version = "=0.13.0", default-features = false }
 # brotli and gzip copies beside each file, served by static-web-server.
 brotli = { version = "9.1.0", default-features = false, features = ["std"] }
 flate2 = "1.1.10"
+# The quality measurement (quality_measure.rs) reads functions and field
+# chains from Rust source; the workspace's pins, which the compiler crate
+# already builds.
+syn.workspace = true
+proc-macro2.workspace = true
+quote.workspace = true
 
 [dev-dependencies]
 # Test scratch directories that delete themselves (scratch.rs).
