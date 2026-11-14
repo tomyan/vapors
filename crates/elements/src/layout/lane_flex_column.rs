@@ -42,7 +42,7 @@ pub(super) fn column_declines(style: &Style) -> Result<(), LaneDecline> {
 ///
 /// # Errors
 /// A percentage `row-gap` while the height is not known
-/// (`PercentGap`): Taffy resolves it again against the height the
+/// (`RelativeGap`): Taffy resolves it again against the height the
 /// items sum to (`compute_preliminary` 428-438).
 pub(super) fn constants(
     style: &Style,
@@ -102,7 +102,7 @@ fn row_gap(
     let raw = style.gap().height.into_raw();
     let relative = raw.tag() == CompactLength::PERCENT_TAG || raw.has_calc();
     if relative && inner_height.is_none() {
-        return Err(LaneDecline::PercentGap);
+        return Err(LaneDecline::RelativeGap);
     }
     Ok(style
         .gap()

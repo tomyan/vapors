@@ -78,6 +78,11 @@ impl FlexSummary {
         self.0.map_or(0.0, |run| run.leading)
     }
 
+    /// Whether the run has no items.
+    pub(crate) fn is_empty(&self) -> bool {
+        self.0.is_none()
+    }
+
     /// Whether some item would shrink.
     pub(crate) fn shrinkable(&self) -> bool {
         self.0.is_some_and(|run| run.shrinkable)

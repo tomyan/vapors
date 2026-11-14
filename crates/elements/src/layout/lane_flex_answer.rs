@@ -22,13 +22,16 @@ use crate::lane_decline::LaneDecline;
 /// The column's answer from `run`, its items' fold.
 ///
 /// # Errors
-/// The items overflow the column's height and one can shrink
-/// (`Shrinks`), or a scroll container has an item wholly before its
+/// The column has no items (`NoItems`); the items overflow the column's
+/// height and one can shrink (`Shrinks`); or a scroll container has an item wholly before its
 /// origin (`BeforeScrollOrigin`): Taffy lays the column out.
 pub(crate) fn lane_flex_answer(
     column: &Column,
     run: &FlexSummary,
 ) -> Result<LayoutOutput, LaneDecline> {
+    if run.is_empty() {
+        return Err(LaneDecline::NoItems);
+    }
     let gap = f64::from(column.gap);
     let (outer_height, inner_height) = main_size(column, run, gap);
     if column.run_mode == RunMode::ComputeSize && column.axis == RequestedAxis::Vertical {
