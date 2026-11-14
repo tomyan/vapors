@@ -126,9 +126,11 @@ pub trait Dom: Listeners {
     /// listeners for these.
     fn declare_events(&mut self, names: &[&str]);
     /// Calls `sink` with the appearance of `anchor`, a 3D scene
-    /// component's `mesh` anchor, at each update that changes it, until
-    /// `anchor` leaves the tree ([`AppearanceSink`]). Refused on any
-    /// other node.
+    /// component's `mesh` anchor: at the first update after the watch
+    /// and at each update that changes it, until `anchor` leaves the
+    /// tree ([`AppearanceSink`]). A sink's error refuses that update, and
+    /// the next update reports the appearance again. Refused on any node
+    /// but a `mesh`, and on a mesh already watched.
     fn watch_appearance(&mut self, anchor: NodeId, sink: AppearanceSink);
     /// A text node's text; `None` for an element. The `_if_changed`
     /// setters read this: `None` means absent or the wrong kind, and

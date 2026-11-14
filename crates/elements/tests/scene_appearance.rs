@@ -179,9 +179,8 @@ fn watching_an_element_that_is_no_mesh_anchor_is_refused() {
 }
 
 #[test]
-fn an_appearance_a_sink_refused_is_reported_again_at_the_next_restyle() {
-    // Given: a sink that fails once, then a restyle that changes no
-    // part of the appearance
+fn an_appearance_a_sink_refused_is_reported_again_at_the_next_update() {
+    // Given: a sink that fails once
     let calls = Rc::new(std::cell::Cell::new(0));
     let counted = Rc::clone(&calls);
     let sink = move |_| {
@@ -192,15 +191,71 @@ fn an_appearance_a_sink_refused_is_reported_again_at_the_next_restyle() {
             Ok(())
         }
     };
-    let (mut doc, mesh) = watched_by(".pointy { cursor: pointer; }", Box::new(sink));
+    let (mut doc, _) = watched_by("", Box::new(sink));
     refusals(&mut doc);
 
-    // When
-    doc.set_attribute(mesh, "class", "body pointy");
+    // When: nothing else changed
     updated(&mut doc);
 
     // Then
     assert_eq!(calls.get(), 2);
+}
+
+#[test]
+fn a_mesh_watched_after_its_first_update_reports_its_appearance() {
+    // Given: styled before anyone watches it
+    let mut doc = document();
+    let body = doc.body();
+    let mesh = element(&mut doc, body, "mesh", "body");
+    doc.add_stylesheet("app.css", ".body { color: #ff0000; }")
+        .expect("parses");
+    updated(&mut doc);
+    let seen = Seen::default();
+    let into = Rc::clone(&seen);
+    doc.watch_appearance(
+        mesh,
+        Box::new(move |appearance| {
+            into.borrow_mut().push(appearance);
+            Ok(())
+        }),
+    );
+
+    // When
+    updated(&mut doc);
+
+    // Then
+    assert_eq!(*seen.borrow(), [RED]);
+}
+
+#[test]
+fn a_translucent_colour_made_opaque_by_an_opacity_above_one_is_refused_naming_opacity() {
+    // Given: alpha 0.5 times opacity 2 would pass as opaque
+    let (mut doc, _, seen) = watched(".body { color: rgb(255 0 0 / 50%); opacity: calc(1 + 1); }");
+
+    // When
+    let refused = refusals(&mut doc).join("\n");
+
+    // Then
+    assert!(
+        refused.contains("`opacity: ") && refused.contains("0 to 1"),
+        "{refused}"
+    );
+    assert!(seen.borrow().is_empty());
+}
+
+#[test]
+fn a_translucent_colour_and_opacity_are_both_refused() {
+    // Given
+    let (mut doc, _, _) = watched(".body { color: rgb(255 0 0 / 50%); opacity: 0.5; }");
+
+    // When
+    let refused = refusals(&mut doc).join("\n");
+
+    // Then
+    assert!(
+        refused.contains("`opacity: 0.5`") && refused.contains("`color: "),
+        "{refused}"
+    );
 }
 
 #[test]

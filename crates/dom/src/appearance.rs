@@ -15,7 +15,8 @@ pub struct Appearance {
     pub visible: bool,
 }
 
-/// Called with an anchor's appearance whenever an update changes it,
-/// and at the first update that styles the anchor. An `Err` refuses
-/// that update, naming the anchor and the message.
+/// Called with an anchor's appearance at the first update after the
+/// watch and whenever an update changes it. An `Err` refuses that
+/// update, naming the anchor and the message; the next update calls it
+/// again.
 pub type AppearanceSink = Box<dyn FnMut(Appearance) -> Result<(), String>>;

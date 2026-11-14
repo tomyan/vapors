@@ -4,6 +4,7 @@
 //! colour whose alpha times `opacity` is under 1 is refused at the mesh,
 //! naming the declaration when the mesh has one; never drawn opaque.
 
+use vapors_css::property::PropertyId;
 use vapors_css::property::longhands::{COLOR, OPACITY};
 use vapors_dom::Appearance;
 
@@ -22,21 +23,28 @@ impl SceneUsed {
     }
 }
 
-/// A refusal of `opacity`, or else of `color`, when `used` would draw
-/// its mesh translucent.
-pub(crate) fn refuse_translucent(used: &SceneUsed, styles: Styles<'_>) -> Option<Refusal> {
+/// A refusal of each of `opacity` and `color` that is under 1 when
+/// `used` would draw its mesh translucent, so one update names both.
+pub(crate) fn refuse_translucent(used: &SceneUsed, styles: Styles<'_>) -> Vec<Refusal> {
     let alpha = used.colour.a * used.opacity;
     if alpha >= 1.0 {
-        return None;
+        return Vec::new();
     }
-    let property = if used.opacity < 1.0 { OPACITY } else { COLOR };
+    let under = [(OPACITY, used.opacity), (COLOR, used.colour.a)];
+    (under.into_iter())
+        .filter(|(_, value)| *value < 1.0)
+        .map(|(property, _)| translucent(property, alpha, styles))
+        .collect()
+}
+
+fn translucent(property: PropertyId, alpha: f32, styles: Styles<'_>) -> Refusal {
     let own = styles.own;
-    Some(Refusal {
+    Refusal {
         property: property.name(),
         value: own.get(property).to_css(),
         reason: format!(
             "draws a mesh translucent (alpha {alpha}); the scene draws meshes opaque until its blended pass arrives in C5 (docs/plans/css-for-3d.md)"
         ),
         declared: own.declared_in(property).zip(own.declared_at(property)),
-    })
+    }
 }

@@ -3,7 +3,7 @@
 //! appearance at the first restyle and whenever a restyle changes it,
 //! and dropped when the anchor is removed.
 
-use vapors_dom::{AppearanceSink, NodeId};
+use vapors_dom::{Appearance, AppearanceSink, NodeId};
 
 use crate::check::{describe, nodes};
 use crate::document::Document;
@@ -20,6 +20,11 @@ impl Document {
         }
         self.note_change();
         self.dirty.element(anchor);
+        // forget the kept appearance, so the next restyle reports it
+        // even when the anchor was styled before the watch
+        if let Some(kept) = self.kept.as_mut() {
+            kept.scene.remove(&anchor);
+        }
         self.sinks.insert(anchor, sink);
     }
 
@@ -57,23 +62,30 @@ impl Document {
         if !self.sinks.contains_key(&node) {
             return Vec::new();
         }
-        if let Some(refusal) = refuse_translucent(used, self.element_styles(node)) {
-            return self.unhonoured(node, vec![refusal]).collect();
+        let translucent = refuse_translucent(used, self.element_styles(node));
+        if !translucent.is_empty() {
+            return self.unhonoured(node, translucent).collect();
         }
         let appearance = used.appearance();
         if old.map(|old| old.appearance()) == Some(appearance) {
             return Vec::new();
         }
-        let sink = self.sinks.get_mut(&node).expect("checked above");
-        let refused = sink(appearance).err();
-        let describe = || describe(&self.arena, node);
-        (refused.into_iter())
-            .map(|error| {
-                ElementError::Refused(format!(
-                    "{}: its appearance {appearance:?} was not applied: {error}",
-                    describe()
-                ))
-            })
-            .collect()
+        self.call_sink(node, appearance).into_iter().collect()
+    }
+
+    /// Calls `node`'s sink with `appearance`; its error, as a refusal.
+    /// A refused appearance is reported again at the next update, which
+    /// restyles the anchor for it.
+    fn call_sink(&mut self, node: NodeId, appearance: Appearance) -> Option<ElementError> {
+        let sink = self
+            .sinks
+            .get_mut(&node)
+            .expect("report_appearance checked it");
+        let error = sink(appearance).err()?;
+        self.dirty.element(node);
+        let element = describe(&self.arena, node);
+        Some(ElementError::Refused(format!(
+            "{element}: its appearance {appearance:?} was not applied: {error}"
+        )))
     }
 }
