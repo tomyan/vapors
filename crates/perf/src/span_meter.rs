@@ -1,10 +1,11 @@
 //! What each phase retired on a counter, summed by phase name between
-//! the spans' enters and exits as `PhaseClock` sums their times. The
-//! counter reads `N` values at once: the instruction counter one
-//! (`--instructions`).
+//! the spans' enters and exits as `PhaseClock` sums their times: the
+//! instruction counter's one value (`--instructions`), or the hardware
+//! group's five (`--counters`).
 
 use std::collections::{BTreeMap, HashMap};
 
+use crate::hardware_counters::HardwareCounters;
 use crate::instructions::InstructionCounter;
 
 /// A counter of `N` values that only rise.
@@ -16,6 +17,12 @@ pub(crate) trait Counting<const N: usize> {
 impl Counting<1> for InstructionCounter {
     fn read_all(&mut self) -> Result<[u64; 1], String> {
         self.read().map(|count| [count])
+    }
+}
+
+impl Counting<5> for HardwareCounters {
+    fn read_all(&mut self) -> Result<[u64; 5], String> {
+        self.read()
     }
 }
 

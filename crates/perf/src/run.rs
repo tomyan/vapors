@@ -10,6 +10,7 @@ use vapors_app::{FrameCounts, FrameTiming, GpuResolution};
 use vapors_elements::{Document, UpdateCounts};
 use vapors_platform::{App, Next};
 
+use crate::counter_samples::CounterSamples;
 use crate::instruction_samples::InstructionSamples;
 
 /// A workload: an app and the change made before each of its frames.
@@ -111,6 +112,9 @@ pub struct Samples {
     pub gpu_resolution: Option<GpuResolution>,
     /// Instructions per frame; `None` unless the sampler counts them.
     pub instructions: Option<InstructionSamples>,
+    /// Hardware counts per frame; `None` unless the sampler reads them
+    /// (`--counters`).
+    pub counters: Option<CounterSamples>,
     /// The last frame's counts.
     pub counts: Counts,
     /// Frames run before the first kept one: kept frame `j` is frame

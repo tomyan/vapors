@@ -138,4 +138,6 @@ pub enum Tier {
     Unit,
     /// Needs a GPU adapter; `VAPORS_GPU_ADAPTER` names which. Fails, never skips, without one.
     Gpu,
+    /// Needs hardware performance counters and a GPU adapter; run in a quiet window, never by ci.
+    Pmu,
 }
