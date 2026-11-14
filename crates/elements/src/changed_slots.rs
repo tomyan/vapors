@@ -41,7 +41,7 @@ pub(crate) struct ChangedSlots {
     pub(crate) shape_changed: bool,
     /// The rebuilt slots whose children differ from the box each
     /// replaced, with the children it had: what the order splice reads.
-    pub(crate) reshaped: Vec<(usize, Vec<usize>)>,
+    pub(crate) reshaped: Vec<crate::layout::Reshaped>,
     /// What patching the stackings found: a rebuilt slot's stacking
     /// changed, or a freed slot held one other than the default.
     pub(crate) stackings: Patched,

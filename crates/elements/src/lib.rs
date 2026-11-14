@@ -109,6 +109,7 @@ mod paint_order;
 mod paint_outline;
 mod paint_own;
 mod paint_partial;
+mod paint_partial_drawn;
 mod paint_partial_read;
 mod painted;
 mod painted_batches;

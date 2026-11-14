@@ -9,6 +9,7 @@
 
 use crate::blocks::{Blocks, IndexCounts};
 use crate::kept_box::KeptBox;
+use crate::kept_order_splice::SpliceEdits;
 use crate::paint_labels::Label;
 use crate::paint_order::Step;
 
@@ -47,6 +48,57 @@ impl DrawnSteps {
             let labelled: Vec<(Label, Step)> = self.labels_of(slot).collect();
             for (label, step) in labelled {
                 self.patch_step(label, step, boxes);
+            }
+        }
+    }
+
+    /// `self` following a splice's `edits` (`kept_order_labelled.rs`), for
+    /// `slots` slots: the steps taken out gone, those relabelled under
+    /// their new labels (in place: a relabel keeps the order), those put
+    /// in labelled, to be put in as they draw by the patch for their
+    /// slots that follows. O(the edits' steps, log the drawn steps).
+    pub(crate) fn splice(&mut self, edits: &SpliceEdits, slots: usize) {
+        self.labels.resize(slots, [None; 3]);
+        for &(label, step) in &edits.removed {
+            self.forget(label, step);
+        }
+        self.relabel(&edits.relabelled);
+        for &(label, step) in &edits.inserted {
+            self.labels[step.index()][kind(step)] = Some(label);
+        }
+    }
+
+    /// Takes `step`, labelled `label`, out: its slot's label and, if it
+    /// draws, its entry.
+    fn forget(&mut self, label: Label, step: Step) {
+        let held = &mut self.labels[step.index()][kind(step)];
+        if *held == Some(label) {
+            *held = None;
+        }
+        if let Ok(at) = self.drawn.binary_search_by(|&(at, _)| at.cmp(&label)) {
+            self.drawn.remove(at);
+        }
+    }
+
+    /// Each `(step, old, new)` of `relabelled` relabelled, in its slot and
+    /// its entry: every entry found by its old label first, while they are
+    /// in order, then given its new one (a relabel keeps the order, but
+    /// one at a time would leave them out of order between).
+    fn relabel(&mut self, relabelled: &[(Step, Label, Label)]) {
+        let found: Vec<_> = relabelled
+            .iter()
+            .map(|&(_, old, _)| self.drawn.binary_search_by(|&(at, _)| at.cmp(&old)).ok())
+            .collect();
+        for (&(step, old, new), at) in relabelled.iter().zip(found) {
+            let held = &mut self.labels[step.index()][kind(step)];
+            assert_eq!(
+                *held,
+                Some(old),
+                "{step:?} relabelled from {old} holds {held:?} (kept_order_labelled.rs)"
+            );
+            *held = Some(new);
+            if let Some(at) = at {
+                self.drawn.get_mut(at).expect("found").0 = new;
             }
         }
     }

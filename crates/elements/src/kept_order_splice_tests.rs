@@ -94,15 +94,22 @@ fn a_splice_of_two_runs_counts_only_the_kept_labels_its_relabel_moved() {
     // Given: one row put in, its box step between 10 and 11 (no room)
     // and its outline step between 2000 and 5000
     let spliced = vec![10, 0, 11, 1000, 2000, 0, 5000];
+    let steps = boxes(&[0, 9, 1, 2, 3, 8, 4]);
     let runs = vec![1..2, 5..6];
-    let mut labels = Vec::new();
 
     // When
-    let ((relabelled, all), _) = super::labelled_runs(&mut labels, (spliced, runs), (&mut 1, &[]));
+    let done = super::Labelled::of((&steps, spliced), &runs, (&mut 1, &[]));
 
     // Then: 10 and 11 moved; 1000 and the outline run's placeholder,
     // past the range, were neither searched nor counted
-    assert_eq!((relabelled, all), (2, 0));
+    let moved: Vec<Step> = done
+        .edits
+        .relabelled
+        .iter()
+        .map(|&(step, ..)| step)
+        .collect();
+    assert_eq!((moved, done.edits.all), (boxes(&[0, 1]), false));
+    let labels = done.labels;
     assert_eq!(labels[3..], [1000, 2000, labels[5], 5000]);
     assert!(
         labels.windows(2).all(|pair| pair[0] < pair[1]),

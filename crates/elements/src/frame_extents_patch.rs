@@ -124,7 +124,7 @@ impl Extents {
     }
 
     /// Takes the entry at `label` out, if any.
-    fn remove(&mut self, label: Label, step: Step) {
+    pub(super) fn remove(&mut self, label: Label, step: Step) {
         let Some((frame, top, tall)) = self.at_mut(step).take() else {
             return;
         };

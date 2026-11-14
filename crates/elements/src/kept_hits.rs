@@ -56,7 +56,7 @@ impl KeptHits {
     }
 
     /// Takes out the hits of the box step at `label`; them.
-    fn take(&mut self, label: Label) -> Vec<FramedHit> {
+    pub(super) fn take(&mut self, label: Label) -> Vec<FramedHit> {
         let Some(frame) = self.frames.remove(&label) else {
             return Vec::new();
         };
@@ -175,6 +175,8 @@ fn box_label(drawn: &DrawnSteps, slot: usize) -> Option<Label> {
 
 #[path = "kept_hits_query.rs"]
 mod query;
+#[path = "kept_hits_splice.rs"]
+mod splice;
 
 #[cfg(test)]
 #[path = "kept_hits_tests.rs"]

@@ -183,6 +183,8 @@ mod patch;
 mod query;
 #[path = "frame_extents_spans.rs"]
 mod spans;
+#[path = "frame_extents_splice.rs"]
+mod splice;
 
 #[cfg(test)]
 #[path = "frame_extents_tests.rs"]
