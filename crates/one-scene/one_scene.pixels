@@ -1,0 +1,16 @@
+# The pixels a one-scene screenshot is checked against: 640x400 CSS px at
+# 1x, after the page's first five frames (`ticks=5` on the web; the
+# frame clock in the gpu tier), the group turned 0.04 rad at most. Read
+# by crates/one-scene/tests/gpu_one_scene_pixels.rs and by the page
+# contract (scripts/check-page-contract.sh), so the two cannot drift.
+# `pixel X Y #rrggbb` is exact within 1 per channel; `ink X0 Y0 X1 Y1
+# #rrggbb` needs at least one pixel in the box that is not that colour.
+pixel 4 4 #101418          the page behind the scene, top left
+pixel 30 140 #101418       below the HUD, above the ground
+pixel 20 20 #182a2f        the HUD panel, inside its top left
+ink 30 30 300 50 #182a2f   the HUD's title and frame counter are drawn
+pixel 320 380 #3b4a3f      the ground, by day (`--tint`)
+pixel 636 396 #3b4a3f      the ground, bottom right
+pixel 200 220 #c0392b      cube 1 (`.one`)
+pixel 320 220 #27ae60      cube 2 (`.two`)
+pixel 440 220 #2980b9      cube 3 (`.three`)
