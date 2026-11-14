@@ -1,22 +1,25 @@
-//! A block container laid out by its lane (`docs/plans/splice-layout.md`,
-//! section 2 (a) and (d)): the container's share settled
-//! (`lane_block.rs`), only the children put in, laid out again or
-//! sharing new inputs laid out and their leaves put in the tree
-//! (`lane_block_child.rs`), the starts of the children from the first
-//! that moved written into their layouts, and the container's answer
-//! folded (`lane_block_answer.rs`). A container, or one of its
-//! children, the lane does not lay out is handed to Taffy's block
+//! A block container or a flex column laid out by its lane
+//! (`docs/plans/splice-layout.md`, section 2 (a) and (d), section 10):
+//! the container's inputs settled (`lane_block.rs`, `lane_flex.rs`),
+//! only the children put in, laid out again or sharing new inputs laid
+//! out and their leaves put in the tree (`lane_fill.rs`), the starts of
+//! the children from the first that moved written into their layouts,
+//! and the container's answer folded (`lane_kind.rs`). A container, or
+//! one of its children, the lane does not lay out is handed to Taffy's
 //! algorithm, counted with the reason (`LaneCounts`).
 
 use taffy::{
-    BlockContext, LayoutInput, LayoutOutput, LayoutPartialTree, NodeId, RunMode,
-    compute_block_layout,
+    BlockContext, LayoutInput, LayoutOutput, LayoutPartialTree, NodeId, compute_block_layout,
+    compute_flexbox_layout,
 };
 
 use super::lane::Lane;
-use super::lane_block::{Container, Settled};
-use super::lane_block_answer::{lane_answer, narrow};
-use super::lane_block_summary::BlockSummary;
+use super::lane_block::Settled;
+use super::lane_block_answer::narrow;
+use super::lane_flex::FlexSettled;
+use super::lane_flex_share::FlexLane;
+use super::lane_kind::LaneKind;
+use super::lane_share::BlockLane;
 use super::tree::BoxTree;
 use crate::lane_decline::LaneDecline;
 
@@ -56,19 +59,45 @@ impl BoxTree<'_> {
             // Known without its children: no lane read, none counted
             Settled::Short(output) => return output,
             Settled::Declined(decline) => Err(decline),
-            Settled::Laid(container) => self
-                .lane_run(id, &container)
-                .and_then(|run| lane_answer(&container, &run)),
+            Settled::Laid(container) => self.lane_answer::<BlockLane>(id, &container),
         };
+        self.counted(id, laid)
+            .unwrap_or_else(|| compute_block_layout(self, id, inputs, block))
+    }
+
+    /// The flex container at `id` laid out by its lane where it is a
+    /// column a lane lays out (`lane_flex.rs`), else by Taffy.
+    pub(super) fn lane_or_flex(&mut self, id: NodeId, inputs: LayoutInput) -> LayoutOutput {
+        if !self.lanes_enabled {
+            return compute_flexbox_layout(self, id, inputs);
+        }
+        let laid = match self.lane_column(id, inputs) {
+            // Known without its items: no lane read, none counted
+            FlexSettled::Short(output) => return output,
+            FlexSettled::Declined(decline) => Err(decline),
+            FlexSettled::Laid(column) => self.lane_answer::<FlexLane>(id, &column),
+        };
+        self.counted(id, laid)
+            .unwrap_or_else(|| compute_flexbox_layout(self, id, inputs))
+    }
+
+    /// The container's answer counted as a lane's, or its decline
+    /// counted and its lane dropped: then `None`, for Taffy to lay it
+    /// out.
+    fn counted(
+        &mut self,
+        id: NodeId,
+        laid: Result<LayoutOutput, LaneDecline>,
+    ) -> Option<LayoutOutput> {
         match laid {
             Ok(output) => {
                 self.lane_counts.lanes += 1;
-                output
+                Some(output)
             }
             Err(decline) => {
                 self.lane_counts.decline(decline);
-                self.lanes.remove(&usize::from(id));
-                compute_block_layout(self, id, inputs, block)
+                self.lanes.remove(usize::from(id));
+                None
             }
         }
     }
@@ -92,56 +121,58 @@ impl BoxTree<'_> {
         Ok(())
     }
 
-    /// The container's run from its lane, filled for this ask; a
+    /// The container's answer from its lane, filled for this ask; a
     /// declined lane is dropped, to be made afresh next time.
-    fn lane_run(&mut self, id: NodeId, c: &Container) -> Result<BlockSummary, LaneDecline> {
+    fn lane_answer<K: LaneKind>(
+        &mut self,
+        id: NodeId,
+        c: &K::Container,
+    ) -> Result<LayoutOutput, LaneDecline> {
         let slot = usize::from(id);
-        let mut lane = self.lanes.remove(&slot).unwrap_or_default();
-        let filled = self.fill(slot, c, &mut lane);
-        if filled.is_ok() {
-            self.lanes.insert(slot, lane);
-        }
-        filled
+        let mut lane = K::lanes(self.lanes)
+            .remove(&slot)
+            .unwrap_or_else(|| Lane::new(K::gap(c)));
+        let run = self.fill(slot, c, &mut lane)?;
+        K::lanes(self.lanes).insert(slot, lane);
+        K::answer(c, &run)
     }
 
-    fn fill(
+    fn fill<K: LaneKind>(
         &mut self,
         slot: usize,
-        c: &Container,
-        lane: &mut Lane,
-    ) -> Result<BlockSummary, LaneDecline> {
-        let share = c.share();
+        c: &K::Container,
+        lane: &mut Lane<K>,
+    ) -> Result<K::Summary, LaneDecline> {
+        let share = K::share(c);
         if lane.share.as_ref() != Some(&share) {
             lane.share = Some(share);
             lane.all = true;
         }
-        let heights_changed = lane.heights.replace(c.heights()) != Some(c.heights());
+        let heights_changed = lane.heights.replace(K::heights(c)) != Some(K::heights(c));
         if lane.all {
             self.fill_all(slot, c, lane)?;
         } else {
             self.fill_changed(c, lane, heights_changed)?;
         }
         let run = lane.tree.total();
-        if c.run_mode == RunMode::PerformLayout {
+        if K::writes(c) {
             self.write_starts(c, lane, &run);
         }
         Ok(run)
     }
 
     /// Writes the layout of every child from the first that moved on:
-    /// its start from the tree, the container's inset and, when the
-    /// container's top margin collapses with its first child's, less
-    /// that margin, which Taffy applies outside the container.
-    fn write_starts(&mut self, c: &Container, lane: &mut Lane, run: &BlockSummary) {
+    /// its start from the tree, from where the kind measures starts.
+    fn write_starts<K: LaneKind>(
+        &mut self,
+        c: &K::Container,
+        lane: &mut Lane<K>,
+        run: &K::Summary,
+    ) {
         let Some(first) = lane.first_moved() else {
             return;
         };
-        let escape = if c.own_margins_collapse.start {
-            run.top().resolve()
-        } else {
-            0.0
-        };
-        let top = f64::from(c.resolved_inset.top) - escape;
+        let top = K::top(c, run);
         for (handle, start) in lane.tree.starts_from(first) {
             let slot = lane.slots[&handle];
             let (mut layout, relative) = lane.take_write(slot, self.boxes[slot].layout);

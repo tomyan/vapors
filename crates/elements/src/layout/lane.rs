@@ -1,4 +1,4 @@
-//! A block lane on a container's box slot (`docs/plans/splice-layout.md`,
+//! A block or flex lane on a container's box slot (`docs/plans/splice-layout.md`,
 //! section 2): the sum tree over its children's leaves, kept between
 //! updates beside the boxes (`Placed::lanes`, by the container's slot),
 //! edited where the container's box children were edited in place
@@ -10,28 +10,64 @@ use rustc_hash::FxHashMap;
 use rustc_hash::FxHashSet;
 use taffy::Layout;
 
-use super::lane_block_summary::BlockSummary;
-use super::lane_share::{Heights, Share};
+use super::lane_flex_share::FlexLane;
+use super::lane_kind::LaneKind;
+use super::lane_share::BlockLane;
 use super::lane_tree::{Handle, LaneTree};
 
-/// The lanes beside the boxes, by the container's slot.
-pub(crate) type Lanes = FxHashMap<usize, Lane>;
+/// The lanes beside the boxes, by the container's slot, a map per
+/// kind.
+#[derive(Debug, Default)]
+pub(crate) struct Lanes {
+    pub(super) block: FxHashMap<usize, Lane<BlockLane>>,
+    pub(super) flex: FxHashMap<usize, Lane<FlexLane>>,
+}
+
+impl Lanes {
+    /// Drops the lane of the container in `slot`, of either kind.
+    pub(crate) fn remove(&mut self, slot: usize) {
+        self.block.remove(&slot);
+        self.flex.remove(&slot);
+    }
+
+    /// Tells the lane of the container in `owner`, if it has one, of
+    /// the child put in at `slot` after `after` (`Lane::child_inserted`).
+    pub(crate) fn child_inserted(&mut self, owner: usize, slot: usize, after: Option<usize>) {
+        if let Some(lane) = self.block.get_mut(&owner) {
+            lane.child_inserted(slot, after);
+        }
+        if let Some(lane) = self.flex.get_mut(&owner) {
+            lane.child_inserted(slot, after);
+        }
+    }
+
+    /// Tells the lane of the container in `owner`, if it has one, of
+    /// the child taken out of `slot` (`Lane::child_removed`).
+    pub(crate) fn child_removed(&mut self, owner: usize, slot: usize, next: Option<usize>) {
+        if let Some(lane) = self.block.get_mut(&owner) {
+            lane.child_removed(slot, next);
+        }
+        if let Some(lane) = self.flex.get_mut(&owner) {
+            lane.child_removed(slot, next);
+        }
+    }
+}
 
 /// One container's lane.
 #[derive(Debug)]
-pub(crate) struct Lane {
-    pub(super) tree: LaneTree<BlockSummary>,
+pub(crate) struct Lane<K: LaneKind> {
+    pub(super) tree: LaneTree<K::Summary>,
     /// By child slot, its handle; and back.
     pub(super) handles: FxHashMap<usize, Handle>,
     pub(super) slots: FxHashMap<Handle, usize>,
     /// What the leaves were made with; every leaf is made again when
     /// it changes.
-    pub(super) share: Option<Share>,
+    pub(super) share: Option<K::Share>,
     /// The height bases the leaves were made with, and the children
     /// whose styles read them; only those are made again when the
     /// bases change, as they do between a flex parent's size query and
     /// its layout.
-    pub(super) heights: Option<Heights>,
+    pub(super) heights: Option<K::Heights>,
     pub(super) height_readers: FxHashSet<usize>,
     /// Children put in since the last layout, each after the child in
     /// the slot given, or first.
@@ -50,10 +86,12 @@ pub(crate) struct Lane {
     pub(super) all: bool,
 }
 
-impl Default for Lane {
-    fn default() -> Self {
+impl<K: LaneKind> Lane<K> {
+    /// An empty lane whose children sit `gap` apart, every child to be
+    /// laid out at its first layout.
+    pub(super) fn new(gap: f64) -> Self {
         Self {
-            tree: LaneTree::new(0.0),
+            tree: LaneTree::new(gap),
             handles: FxHashMap::default(),
             slots: FxHashMap::default(),
             share: None,
@@ -66,9 +104,7 @@ impl Default for Lane {
             all: true,
         }
     }
-}
 
-impl Lane {
     /// Notes the child in `slot` put in after the child in `after`'s
     /// slot, or first; its leaf is made at the next layout.
     pub(crate) fn child_inserted(&mut self, slot: usize, after: Option<usize>) {
@@ -113,7 +149,7 @@ impl Lane {
         &mut self,
         slot: usize,
         previous: Option<Handle>,
-        leaf: BlockSummary,
+        leaf: K::Summary,
     ) -> Handle {
         let handle = self.tree.insert_after(previous, leaf);
         self.handles.insert(slot, handle);

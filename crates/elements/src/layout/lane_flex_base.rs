@@ -12,6 +12,7 @@ use taffy::{
 use super::lane_flex::Column;
 use super::lane_flex_item::FlexChild;
 use super::tree::BoxTree;
+use crate::lane_decline::LaneDecline;
 
 /// The item's sizes along the column before the flexible lengths.
 #[derive(Clone, Copy, Debug)]
@@ -36,9 +37,18 @@ struct Measuring {
 impl BoxTree<'_> {
     /// The item at `id`'s base size, minimum and hypothetical height
     /// (955-1210).
-    pub(super) fn flex_base(&mut self, id: NodeId, column: &Column, child: &FlexChild) -> Base {
+    ///
+    /// # Errors
+    /// The item's content height differs under min- and max-content
+    /// space along (`SpaceDependentHeight`).
+    pub(super) fn flex_base(
+        &mut self,
+        id: NodeId,
+        column: &Column,
+        child: &FlexChild,
+    ) -> Result<Base, LaneDecline> {
         let measuring = measuring(column, child);
-        let (flex_basis, definite) = self.flex_basis(id, column, child, &measuring);
+        let (flex_basis, definite) = self.flex_basis(id, column, child, &measuring)?;
         let padding_border = child.padding.vertical_axis_sum() + child.border.vertical_axis_sum();
         let flex_basis = flex_basis.max(padding_border);
         let resolved_min = self.resolved_minimum(id, child, &measuring);
@@ -47,40 +57,45 @@ impl BoxTree<'_> {
             .maybe_max(transferred.0.height)
             .maybe_max(Some(padding_border));
         let hypothetical_inner = flex_basis.maybe_clamp(Some(floor), transferred.1.height);
-        Base {
+        Ok(Base {
             flex_basis,
             inner_flex_basis: flex_basis - padding_border,
             flex_basis_is_definite: definite,
             resolved_minimum_main_size: resolved_min,
             hypothetical_inner,
             hypothetical_outer: hypothetical_inner + child.margin.vertical_axis_sum(),
-        }
+        })
     }
 
     /// The flex base size and whether it is definite (1026-1146): the
     /// `flex-basis`, else a definite height under `flex-basis: auto`,
     /// else the height from the width by the aspect ratio, else the
-    /// item measured.
+    /// item measured. Taffy measures it under min-content space along
+    /// when the column is asked so, else under max-content (1124-1133);
+    /// the lane measures both and refuses an item whose two heights
+    /// differ, so that its leaf serves either ask.
     fn flex_basis(
         &mut self,
         id: NodeId,
         column: &Column,
         child: &FlexChild,
         measuring: &Measuring,
-    ) -> (f32, bool) {
+    ) -> Result<(f32, bool), LaneDecline> {
         if let Some(basis) = styled_basis(self, column, child) {
-            return (basis, true);
+            return Ok((basis, true));
         }
         if measuring.cross_size_is_definite
             && let (Some(ratio), Some(width)) = (child.aspect_ratio, measuring.known.width)
         {
-            return (width / ratio, true);
+            return Ok((width / ratio, true));
         }
-        let along = match column.available_space.height {
-            AvailableSpace::MinContent => AvailableSpace::MinContent,
-            _ => AvailableSpace::MaxContent,
-        };
-        (self.measure_height(id, measuring, along), false)
+        let most = self.measure_height(id, measuring, AvailableSpace::MaxContent);
+        let least = self.measure_height(id, measuring, AvailableSpace::MinContent);
+        // Exactly: the leaf is the same under both kinds, or it is not
+        if most.to_bits() != least.to_bits() {
+            return Err(LaneDecline::SpaceDependentHeight);
+        }
+        Ok((most, false))
     }
 
     /// The minimum height (1172-1197): the styled one, else 0 for an

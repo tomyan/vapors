@@ -164,3 +164,24 @@ fn class_and_hovered_class_name_their_frames_in_the_order_they_make_them() {
         assert_eq!(kinds.len(), 2, "{change:?}");
     }
 }
+
+#[test]
+fn flex_insert_adds_a_row_to_the_list_which_its_lane_lays_out() {
+    // Given
+    let mut rows = Rows::new(10, RowChange::FlexInsert);
+
+    // When
+    rows.change(0);
+    let counts = {
+        let mut doc = rows.page.doc().borrow_mut();
+        doc.update(crate::rows_list::list_viewport())
+            .expect("updates");
+        doc.update_counts()
+    };
+
+    // Then: eleven rows, the column laid out by its lane
+    assert_eq!(body_rows(&rows), 11);
+    assert_eq!(crate::rows_list::laned(&counts), Ok(()), "{counts:?}");
+    rows.change(1);
+    assert_eq!(body_rows(&rows), 10);
+}

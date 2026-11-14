@@ -106,10 +106,10 @@ fn the_first_update_lays_body_and_the_list_out_by_lane_and_declines_the_flex_row
     let counts = list.doc.borrow_mut().update_counts();
 
     // Then: body and the list are lanes (html, the root, is neither
-    // counted nor laned); each row is declined as a flex container
+    // counted nor laned); each row is declined as a flex row
     assert_eq!(
         counts.lane_decline,
-        Some(LaneDecline::FlexLaneNotBuilt),
+        Some(LaneDecline::FlexRow),
         "{counts:?}"
     );
     assert!(counts.lanes >= 2, "{counts:?}");
@@ -128,12 +128,17 @@ fn restyled_list(css: &str, class: &str) -> UpdateCounts {
 }
 
 #[test]
-fn a_flex_column_is_declined_as_the_flex_lane_not_built() {
+fn a_list_restyled_as_a_flex_column_is_laid_out_by_a_flex_lane() {
+    // When: the list becomes a flex column (its rows stay flex rows)
     let counts = restyled_list(
         ".col { display: flex; flex-direction: column; }",
         "list col",
     );
-    assert_eq!(counts.lane_decline, Some(LaneDecline::FlexLaneNotBuilt));
+
+    // Then: body and the list are lanes, as a full update lays them out
+    // (`restyled_list` checks); the rows are declined as flex rows
+    assert!(counts.lanes >= 2, "{counts:?}");
+    assert_eq!(counts.lane_decline, Some(LaneDecline::FlexRow));
 }
 
 #[test]
@@ -200,7 +205,7 @@ fn a_restyled_text_field_is_laned_with_its_run() {
     // Then: body, the list and the field are lanes (the field's one
     // child is its run); its row, a flex container, is the one decline
     assert_eq!((counts.lanes, counts.lanes_declined), (3, 1), "{counts:?}");
-    assert_eq!(counts.lane_decline, Some(LaneDecline::FlexLaneNotBuilt));
+    assert_eq!(counts.lane_decline, Some(LaneDecline::FlexRow));
     assert_matches_full(&list.doc, VIEW(), "field restyled");
 }
 

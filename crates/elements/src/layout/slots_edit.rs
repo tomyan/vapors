@@ -40,9 +40,8 @@ impl Placed {
         for &removed in &edits.removed {
             let at = position(&children, removed);
             children.remove(at);
-            if let Some(lane) = self.lanes.get_mut(&slot) {
-                lane.child_removed(removed, children.get(at).copied());
-            }
+            self.lanes
+                .child_removed(slot, removed, children.get(at).copied());
         }
         let mut put = vec![slot];
         let mut pending = edits.inserted.clone();
@@ -51,9 +50,7 @@ impl Placed {
             let built = self.put_subtree(build(source, child), &FxHashMap::default(), taken);
             let after = at.checked_sub(1).map(|before| children[before]);
             children.insert(at, built[0]);
-            if let Some(lane) = self.lanes.get_mut(&slot) {
-                lane.child_inserted(built[0], after);
-            }
+            self.lanes.child_inserted(slot, built[0], after);
             put.extend(built);
         }
         let (mut own, field_text) = element_box(source, owner);

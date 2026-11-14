@@ -19,7 +19,7 @@ use taffy::{
 use super::lane_flex::Column;
 use super::lane_flex_base::{Base, transferred};
 use super::lane_flex_item::FlexChild;
-use super::lane_flex_leaf::{item_layout, leaf};
+use super::lane_flex_leaf::{clamped_by_taffy, item_layout, leaf};
 use super::lane_flex_place::{column_width, cross_place, line_cross};
 use super::lane_flex_summary::FlexItem;
 use super::tree::BoxTree;
@@ -50,11 +50,11 @@ impl BoxTree<'_> {
         column: &Column,
     ) -> Result<LaidItem, LaneDecline> {
         let child = self.flex_child(id, column)?;
-        let base = self.flex_base(id, column, &child);
+        let base = self.flex_base(id, column, &child)?;
         if clamped_by_taffy(&child, &base) {
             return Err(LaneDecline::ClampedHeight);
         }
-        let [basis, content] = self.flex_contributions(id, column, &child, &base);
+        let [basis, content] = self.flex_contributions(id, column, &child, &base)?;
         let width = self.used_width(id, column, &child, &base);
         let (margin, offset_x) = cross_place(column, &child, width);
         let target = Target {
@@ -171,22 +171,6 @@ fn width_query(
         },
         vertical_margins_are_collapsible: Line::FALSE,
     }
-}
-
-/// Whether Taffy may move an item that can shrink off its hypothetical
-/// height in a column that is not exactly sized: step d of
-/// `resolve_flexible_lengths` (1898-1915) clamps an unfrozen item's
-/// target to its resolved minimum and its maximum, a narrower range than
-/// the hypothetical height's, whose floor also holds the transferred
-/// minimum and the padding and border, and wins over the maximum. Said
-/// whether or not the item would be frozen there: an over-refusal, which
-/// Taffy lays out exactly.
-fn clamped_by_taffy(child: &FlexChild, base: &Base) -> bool {
-    let clamped = base
-        .hypothetical_inner
-        .maybe_clamp(Some(base.resolved_minimum_main_size), child.max_size.height)
-        .max(0.0);
-    child.flex_shrink > 0.0 && clamped.to_bits() != base.hypothetical_inner.to_bits()
 }
 
 /// The space along the column an item is asked with: the column's

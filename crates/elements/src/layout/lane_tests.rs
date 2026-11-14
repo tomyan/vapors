@@ -3,11 +3,12 @@
 use super::Lane;
 use crate::layout::lane_block_summary::{BlockChild, BlockSummary, Margins};
 use crate::layout::lane_bounds::Bounds;
+use crate::layout::lane_share::BlockLane;
 
 /// A lane holding children in `slots`, in order, each 10 high, with
 /// nothing moved since.
-fn lane_of(slots: &[usize]) -> Lane {
-    let mut lane = Lane::default();
+fn lane_of(slots: &[usize]) -> Lane<BlockLane> {
+    let mut lane = Lane::new(0.0);
     let mut previous = None;
     for &slot in slots {
         previous = Some(lane.put(slot, previous, row()));

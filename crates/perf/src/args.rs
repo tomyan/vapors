@@ -13,7 +13,7 @@ pub const MAX_RUNS: usize = (wgpu::QUERY_SET_MAX_QUERIES / 2) as usize;
 
 pub(crate) const USAGE: &str = "cargo run --release -p vapors-perf -- \
                      [runs] [warmup] [--only <substring> (once)] [--instructions] [--off-path] \
-                     [--scaling all|Idle|Text|FlexText|Class|HoveredClass|Insert|Resize|Scroll|ScrollSize] [--mount] [--mount-memory <rows>] \
+                     [--scaling all|Idle|Text|FlexText|Class|HoveredClass|Insert|FlexInsert|Resize|Scroll|ScrollSize] [--mount] [--mount-memory <rows>] \
                      [--scene-run]";
 
 /// What the command line asks for.

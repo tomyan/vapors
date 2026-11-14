@@ -7,8 +7,8 @@ use rustc_hash::FxHashSet;
 use taffy::compute_grid_layout;
 use taffy::{
     BlockContext, Display, Layout, LayoutInput, LayoutOutput, LayoutPartialTree, NodeId, RunMode,
-    Style, TraversePartialTree, TraverseTree, compute_cached_layout, compute_flexbox_layout,
-    compute_hidden_layout, compute_leaf_layout, compute_oof_layout,
+    Style, TraversePartialTree, TraverseTree, compute_cached_layout, compute_hidden_layout,
+    compute_leaf_layout, compute_oof_layout,
 };
 use vapors_text::FontSystem;
 
@@ -90,10 +90,7 @@ impl BoxTree<'_> {
         match (self.node(id).style.display, has_children) {
             (Display::None, _) => compute_hidden_layout(self, id),
             (Display::Block, true) => self.lane_or_block(id, inputs, block),
-            (Display::Flex, true) => {
-                self.lane_counts.decline(LaneDecline::FlexLaneNotBuilt);
-                compute_flexbox_layout(self, id, inputs)
-            }
+            (Display::Flex, true) => self.lane_or_flex(id, inputs),
             #[cfg(feature = "grid")]
             (Display::Grid, true) => {
                 self.lane_counts.decline(LaneDecline::Grid);
