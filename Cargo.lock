@@ -3086,6 +3086,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "vapors-one-scene"
+version = "0.0.0"
+dependencies = [
+ "vapors-app",
+ "vapors-compiler",
+ "vapors-dom",
+ "vapors-elements",
+ "vapors-gpu-harness",
+ "vapors-pixels",
+ "vapors-platform",
+ "vapors-renderer",
+ "vapors-scene",
+ "vapors-scene3d",
+ "vapors-scene3d-components",
+ "vapors-scene3d-gpu",
+ "vapors-signals",
+ "vapors-text",
+]
+
+[[package]]
 name = "vapors-perf"
 version = "0.0.0"
 dependencies = [
@@ -3249,6 +3269,7 @@ dependencies = [
  "vapors-app",
  "vapors-canvas",
  "vapors-demos",
+ "vapors-one-scene",
  "vapors-platform",
  "vapors-racer",
  "vapors-renderer",
