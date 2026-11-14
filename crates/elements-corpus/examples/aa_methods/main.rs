@@ -10,7 +10,7 @@
 // A measurement program, not shipped code: its pixel coordinates and
 // counts are far below f32's 2^24, colour channels are rounded into
 // 0..=255 on purpose, and matrices are unpacked by CSS's single-letter
-// names. Retired with the program once S3b's choice is built and tested.
+// names.
 #![allow(
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
@@ -18,15 +18,14 @@
     clippy::many_single_char_names
 )]
 
-mod analytic;
 mod cases;
 mod chromium_page;
 mod closed;
 mod compare;
-mod corners;
 mod icon_route;
 mod msaa;
 mod offscreen;
+mod pipeline;
 mod report;
 
 use std::path::PathBuf;
@@ -78,23 +77,19 @@ fn methods(
 ) -> Vec<(&'static str, Option<Vec<u8>>)> {
     vec![
         (
-            "analytic",
-            Some(analytic::drawn(gpu, icons, placement, ink, TOLERANCE_PX)),
+            "mesh pipeline",
+            Some(pipeline::drawn(gpu, icons, placement, ink, TOLERANCE_PX)),
         ),
         (
             "MSAA 4x",
             Some(msaa::drawn(gpu, icons, placement, ink, TOLERANCE_PX)),
-        ),
-        (
-            "exact corners",
-            Some(corners::drawn(gpu, icons, placement, ink, TOLERANCE_PX)),
         ),
         ("icon route", icon_route::drawn(icons, placement, ink)),
     ]
 }
 
 /// The closed-form kind: two circles and two rects, by the closed-form
-/// pipeline and, from their paths, by the mesh methods.
+/// pipeline and, from their paths, by MSAA and the mesh pipeline.
 fn closed_forms(
     gpu: &vapors_gpu_harness::Gpu,
     work: &std::path::Path,
@@ -116,12 +111,12 @@ fn closed_forms(
         );
         let msaa = msaa::drawn(gpu, &shapes, &placement, INK, TOLERANCE_PX);
         report::row(&placement, "MSAA 4x", &shapes, Some(&msaa), &theirs, out);
-        let corners = corners::drawn(gpu, &shapes, &placement, INK, TOLERANCE_PX);
+        let meshed = pipeline::drawn(gpu, &shapes, &placement, INK, TOLERANCE_PX);
         report::row(
             &placement,
-            "exact corners",
+            "mesh pipeline",
             &shapes,
-            Some(&corners),
+            Some(&meshed),
             &theirs,
             out,
         );
@@ -164,7 +159,7 @@ fn sub_pixel_closed(
     }
 }
 
-/// The analytic method on Undo and Redo (the icons with arcs) at three
+/// The mesh pipeline on Undo and Redo (the icons with arcs) at three
 /// flattening tolerances, under each placement.
 fn tolerances(gpu: &vapors_gpu_harness::Gpu, work: &std::path::Path) {
     println!("{}", report::TOLERANCE_HEADER);
@@ -172,7 +167,7 @@ fn tolerances(gpu: &vapors_gpu_harness::Gpu, work: &std::path::Path) {
     for placement in placements() {
         let theirs = chromium_page::drawn(&icons, &placement, INK, work);
         for tolerance in [0.25, 0.1, 0.05] {
-            let ours = analytic::drawn(gpu, &icons, &placement, INK, tolerance);
+            let ours = pipeline::drawn(gpu, &icons, &placement, INK, tolerance);
             report::tolerance_row(&placement, tolerance, &icons, &ours, &theirs);
         }
     }

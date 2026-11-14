@@ -5,9 +5,9 @@ use vapors_gpu_harness::Gpu;
 use vapors_renderer::{ClosedFormPipeline, ClosedFormShape};
 use vapors_scene::Color;
 
-use crate::analytic::size;
 use crate::cases::{ClosedCase, Placement, transform};
 use crate::offscreen::drawn_on;
+use crate::pipeline::size;
 
 /// `cases` drawn by the closed-form pipeline in `ink` under `placement`.
 pub fn drawn(gpu: &Gpu, cases: &[ClosedCase], placement: &Placement, ink: [u8; 4]) -> Vec<u8> {

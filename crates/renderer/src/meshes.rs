@@ -1,11 +1,11 @@
 //! Drawing a run of mesh items (docs/plans/one-scene.md 1.2): each the
 //! triangles of an entry in [`MeshEntries`] under its own transform and
-//! colour, one draw per item, in order. The vertex shader moves each
-//! outline vertex out by the item's extrusion along its miter offset
-//! and takes the move off its edge distances, so the ramp straddles the
-//! outline; the fragment shader takes coverage from the nearest outline
-//! edge's distance in device pixels. Instance bytes are kept between
-//! frames as a quad run's are; the entries' vertices are the store's.
+//! colour, one draw per item, in order, one instance per triangle. The
+//! vertex shader moves each outline corner half a device pixel out
+//! across both lines of its wedge, so the ramp straddles the outline;
+//! the fragment shader takes coverage from the triangle's corners'
+//! wedges in device pixels. Instance bytes are kept between frames as a
+//! quad run's are; the entries' triangles are the store's.
 
 use crate::instanced::{float_bytes, viewport_bytes};
 use crate::kept_bind_group::KeptBindGroup;
@@ -13,8 +13,8 @@ use crate::mesh_entries::{MeshEntries, MeshEntry};
 use crate::uniform_slots::UniformSlots;
 use crate::{GpuWork, KeptRange, MeshShape, Retained, Shift, Target, WorkCounter};
 
-/// Bytes per instance: [`MeshShape::instance`]'s floats, the stride
-/// `meshes_setup.rs` declares.
+/// Bytes per item: [`MeshShape::instance`]'s floats, each draw's slice
+/// of the kept buffer, which `meshes_setup.rs` reads at stride 0.
 pub(crate) const INSTANCE_BYTES: u64 = (crate::mesh_shape::INSTANCE_FLOATS * 4) as u64;
 
 /// A pipeline that draws mesh items. Create once per target format.
@@ -113,8 +113,8 @@ impl MeshPipeline {
             pipeline,
             bind_group,
             viewport,
-            instances: instances_buffer.slice(target.encoder, kept),
-            vertices: entries.slices(target, drawn),
+            items: instances_buffer.slice(target.encoder, kept),
+            triangles: entries.slices(target, drawn),
         };
         run.record(target, work, drawn);
     }
@@ -168,26 +168,30 @@ fn made_bind_group(
 }
 
 /// One run's draws: the pipeline, its bind group at `viewport`, the
-/// run's instances and each item's entry's vertices.
+/// run's items and each item's entry's triangles.
 struct Draws<'a> {
     pipeline: &'a wgpu::RenderPipeline,
     bind_group: &'a wgpu::BindGroup,
     viewport: u32,
-    instances: wgpu::BufferSlice<'a>,
-    vertices: Vec<wgpu::BufferSlice<'a>>,
+    items: wgpu::BufferSlice<'a>,
+    triangles: Vec<wgpu::BufferSlice<'a>>,
 }
 
 impl Draws<'_> {
     /// Records one draw per item into `target`'s pass, the `i`th of
-    /// instance `i` over `drawn[i]`'s vertices.
+    /// item `i` over `drawn[i]`'s triangles, one instance each.
     fn record(self, target: &Target<'_>, work: &WorkCounter, drawn: &[&MeshEntry]) {
         target.draw_pass(|pass| {
             pass.set_pipeline(self.pipeline);
             pass.set_bind_group(0, self.bind_group, &[self.viewport]);
-            pass.set_vertex_buffer(1, self.instances);
-            for (at, (slice, entry)) in (0u32..).zip(self.vertices.into_iter().zip(drawn)) {
+            for (at, (slice, entry)) in (0u64..).zip(self.triangles.into_iter().zip(drawn)) {
                 pass.set_vertex_buffer(0, slice);
-                work.draw(pass, 0..entry.vertices, at..at + 1);
+                pass.set_vertex_buffer(
+                    1,
+                    self.items
+                        .slice(at * INSTANCE_BYTES..(at + 1) * INSTANCE_BYTES),
+                );
+                work.draw(pass, 0..3, 0..entry.triangles);
             }
         });
     }

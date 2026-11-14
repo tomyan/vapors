@@ -4,7 +4,7 @@
 //! A closed form is drawn from its entry's geometry and the paint its
 //! canonical bytes begin with; its parameters go in each instance's
 //! bytes, so it uploads nothing (`shape_bytes_uploaded` is 0 for closed
-//! forms). A mesh entry's vertices are uploaded once, at the start of
+//! forms). A mesh entry's triangles are uploaded once, at the start of
 //! the first frame after it is registered (`shape_store_meshes.rs`).
 //! The process registry (S5b) will register each crate's table once,
 //! on its first mount.
@@ -20,7 +20,7 @@ use vapors_shapes::{Geometry, Paint, ShapeEntry, ShapeTable, paint_of};
 #[derive(Debug)]
 pub struct ShapeStore {
     entries: Vec<Registered>,
-    /// The first entry whose vertices, if a mesh, are not uploaded.
+    /// The first entry whose triangles, if a mesh, are not uploaded.
     pub(crate) unuploaded: usize,
     /// The entry buffer's bytes for every mesh registered.
     pub(crate) mesh_bytes: u64,
@@ -56,7 +56,7 @@ pub(crate) struct Registered {
     pub(crate) entry: &'static ShapeEntry,
     /// The stroke width its paint names; `None` fills it.
     stroke: Option<f32>,
-    /// A mesh's vertices on the GPU, once uploaded.
+    /// A mesh's triangles on the GPU, once uploaded.
     pub(crate) uploaded: Option<MeshEntry>,
 }
 

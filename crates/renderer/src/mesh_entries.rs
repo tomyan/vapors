@@ -7,32 +7,32 @@
 
 use std::mem::offset_of;
 
-use vapors_shapes::MeshVertex;
+use vapors_shapes::{MeshCorner, MeshTriangle};
 
 use crate::{KeptRange, Retained, Target, WorkCounter};
 
-/// Bytes per vertex: `MeshVertex`'s own size, the one answer the
+/// Bytes per triangle: `MeshTriangle`'s own size, the one answer the
 /// buffer, the pipeline's stride and its attribute offsets read.
-pub(crate) const VERTEX_BYTES: u64 = size_of::<MeshVertex>() as u64;
+pub(crate) const TRIANGLE_BYTES: u64 = size_of::<MeshTriangle>() as u64;
 
-/// The bytes `triangles` take in the entry buffer: three vertices each,
-/// padded to 16, the one answer the store's registration limit, its
-/// upload count and the buffer agree on.
+/// The bytes `triangles` take in the entry buffer, padded to 16: the
+/// one answer the store's registration limit, its upload count and the
+/// buffer agree on.
 #[must_use]
 pub fn mesh_entry_bytes(triangles: usize) -> u64 {
-    (triangles as u64 * 3 * VERTEX_BYTES).next_multiple_of(16)
+    (triangles as u64 * TRIANGLE_BYTES).next_multiple_of(16)
 }
 
 /// One entry's triangles on the GPU.
 #[derive(Debug)]
 pub struct MeshEntry {
     pub(crate) range: KeptRange,
-    pub(crate) vertices: u32,
+    pub(crate) triangles: u32,
 }
 
 /// The kept buffer of every mesh entry written.
 pub struct MeshEntries {
-    vertices: Retained,
+    triangles: Retained,
     work: WorkCounter,
 }
 
@@ -41,7 +41,7 @@ impl MeshEntries {
     #[must_use]
     pub fn new(device: &wgpu::Device) -> Self {
         Self {
-            vertices: Retained::new(device, "mesh entries", wgpu::BufferUsages::VERTEX),
+            triangles: Retained::new(device, "mesh entries", wgpu::BufferUsages::VERTEX),
             work: WorkCounter::default(),
         }
     }
@@ -53,28 +53,26 @@ impl MeshEntries {
     /// # Panics
     /// When `triangles` is empty: the table's check refuses an empty
     /// mesh.
-    pub fn write(
-        &mut self,
-        target: &Target<'_>,
-        triangles: &[[MeshVertex; 3]],
-    ) -> Option<MeshEntry> {
+    pub fn write(&mut self, target: &Target<'_>, triangles: &[MeshTriangle]) -> Option<MeshEntry> {
         assert!(
             !triangles.is_empty(),
             "an empty mesh reached the GPU; check_mesh refuses one"
         );
-        let bytes = vertex_bytes(triangles);
+        let bytes = triangle_bytes(triangles);
         let range = self
-            .vertices
+            .triangles
             .keep(target.encoder, target.queue, &self.work, &bytes)?;
-        let vertices =
-            u32::try_from(triangles.len() * 3).expect("fewer than 2^32 vertices in one mesh");
-        Some(MeshEntry { range, vertices })
+        let count = u32::try_from(triangles.len()).expect("fewer than 2^32 triangles in one mesh");
+        Some(MeshEntry {
+            range,
+            triangles: count,
+        })
     }
 
     /// The bytes the buffer holds.
     #[must_use]
     pub fn bytes(&self) -> u64 {
-        self.vertices.live_bytes()
+        self.triangles.live_bytes()
     }
 
     /// What its writes issued since the last take; the count restarts.
@@ -88,43 +86,48 @@ impl MeshEntries {
         entries: &[&MeshEntry],
     ) -> Vec<wgpu::BufferSlice<'a>> {
         let ranges: Vec<&KeptRange> = entries.iter().map(|entry| &entry.range).collect();
-        self.vertices.slices(target.encoder, &ranges)
+        self.triangles.slices(target.encoder, &ranges)
     }
 }
 
-/// `triangles`' vertices as the mesh pipeline reads them: each field's
-/// floats at its `offset_of!` in a vertex of `size_of::<MeshVertex>()`,
+/// `triangles` as the mesh pipeline reads them: each corner's fields
+/// at their `offset_of!` in a triangle of `size_of::<MeshTriangle>()`,
 /// the layout `meshes_setup.rs` declares from the same offsets; padded
 /// with zeros to a multiple of 16 bytes for the kept buffer.
-pub(crate) fn vertex_bytes(triangles: &[[MeshVertex; 3]]) -> Vec<u8> {
-    let size = size_of::<MeshVertex>();
+pub(crate) fn triangle_bytes(triangles: &[MeshTriangle]) -> Vec<u8> {
     let len =
         usize::try_from(mesh_entry_bytes(triangles.len())).expect("a mesh entry fits in memory");
     let mut bytes = vec![0; len];
-    for (at, vertex) in triangles.iter().flatten().enumerate() {
-        let start = at * size;
-        put(
-            &mut bytes,
-            start + offset_of!(MeshVertex, position),
-            &vertex.position,
-        );
-        put(
-            &mut bytes,
-            start + offset_of!(MeshVertex, normal),
-            &vertex.normal,
-        );
-        put(
-            &mut bytes,
-            start + offset_of!(MeshVertex, edges),
-            &vertex.edges,
-        );
-        put(
-            &mut bytes,
-            start + offset_of!(MeshVertex, edge_normals),
-            vertex.edge_normals.as_flattened(),
-        );
+    for (at, triangle) in triangles.iter().enumerate() {
+        for (k, corner) in triangle.corners.iter().enumerate() {
+            put_corner(&mut bytes, corner_offset(at, k), corner);
+        }
     }
     bytes
+}
+
+/// Where corner `k` of triangle `at` starts.
+const fn corner_offset(at: usize, k: usize) -> usize {
+    at * size_of::<MeshTriangle>() + offset_of!(MeshTriangle, corners) + k * size_of::<MeshCorner>()
+}
+
+fn put_corner(bytes: &mut [u8], start: usize, corner: &MeshCorner) {
+    put(
+        bytes,
+        start + offset_of!(MeshCorner, position),
+        &corner.position,
+    );
+    put(
+        bytes,
+        start + offset_of!(MeshCorner, normals),
+        corner.normals.as_flattened(),
+    );
+    put(bytes, start + offset_of!(MeshCorner, kind), &[corner.kind]);
+    put(
+        bytes,
+        start + offset_of!(MeshCorner, reaches),
+        &corner.reaches,
+    );
 }
 
 fn put(bytes: &mut [u8], at: usize, floats: &[f32]) {

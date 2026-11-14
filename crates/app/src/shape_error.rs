@@ -42,7 +42,7 @@ pub enum ShapeError {
         /// The device's `max_buffer_size`.
         limit: u64,
     },
-    /// A mesh entry whose vertices are not on the GPU: its upload at
+    /// A mesh entry whose triangles are not on the GPU: its upload at
     /// the start of the frame was refused (on the frame's encoder).
     NotUploaded {
         /// The ref.
@@ -117,11 +117,11 @@ impl fmt::Display for ShapeError {
                 limit,
             } => write!(
                 f,
-                "shape table of crate {crate_name} would put {needed} bytes of mesh vertices in the painter's entry buffer, over the device's max_buffer_size of {limit}; register fewer or smaller mesh tables, or draw some with a second ScenePainter; reproduce with `cargo test -p vapors-app --lib shape_store_meshes`"
+                "shape table of crate {crate_name} would put {needed} bytes of mesh triangles in the painter's entry buffer, over the device's max_buffer_size of {limit}; register fewer or smaller mesh tables, or draw some with a second ScenePainter; reproduce with `cargo test -p vapors-app --lib shape_store_meshes`"
             ),
             Self::NotUploaded { shape, site } => write!(
                 f,
-                "shape {}, the mesh at {site}, has no vertices on the GPU: their upload this frame was refused, and the frame's encoder holds why; the store refuses a table its buffer cannot hold, so report this with the frame's error; reproduce with `cargo test -p vapors-app --lib shape_store_meshes`",
+                "shape {}, the mesh at {site}, has no triangles on the GPU: their upload this frame was refused, and the frame's encoder holds why; the store refuses a table its buffer cannot hold, so report this with the frame's error; reproduce with `cargo test -p vapors-app --lib shape_store_meshes`",
                 shape.0
             ),
         }
