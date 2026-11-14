@@ -863,10 +863,14 @@ Lane frames are lighter than scroll frames:
   keeps today's placement for its children (correct, O(rows after)),
   counted as a decline, `LaneFramePixel`; a lane whose framing flips
   has its children placed and their clips redone, O(children), rare.
-- The first slice refuses a scroll container inside a lane child
-  (`LaneFrameScroller`): a scroll frame's shift is worked out from the
-  frame it is in when frames are made, and a lane frame is resolved
-  later. Lifting it means scroll frames composing their shift on read.
+- A lane with a scroll container inside one of its children is not
+  framed: a scroll frame's shift is worked out from the frame it is in
+  when frames are made, and a lane frame is resolved later. This is a
+  counted decline (`LaneFrameScroller`) of that lane alone: its
+  children keep today's placement (correct, O(rows after)) and the
+  page is laid out and painted as before. Real pages put scrollers in
+  rows (the touche shell does), so lifting it, with scroll frames
+  composing their shift on read, is a follow-up to measure.
 
 ### 11.2 What each side does
 
@@ -912,7 +916,7 @@ Lane frames are lighter than scroll frames:
 
 | Slice | Content | Accepted when |
 |---|---|---|
-| 4a | This note | reviewed |
+| 4a | This note (approved by the lead, 2026-11-14; ships with 4b) | reviewed |
 | 4b | Lane frames: clips, placement, `Frames::at`, draw, the a11y `started` list, the two declines | Insert at 3000 rows: `boxes_moved` 0, `boxes_shifted` 0, `boxes_placed` the new row's boxes and their ancestors plus the later rows visited (until 4c); the Chromium paint comparisons and the kept-paint check unchanged; `--scaling Insert` `paint` within 2% across sizes |
 | 4c | Layout leaves starts out of later children's layouts; the layout check derives them | `layout` within 2% across sizes for Insert and FlexInsert |
 | 4d | Culling and hits through `between`; the lane's extents entry | every phase but `accessibility` within 2% across sizes |
