@@ -31,6 +31,16 @@ pub(crate) struct PaintInput<'a> {
     pub(crate) scroll: &'a crate::scroll::Offsets,
     /// Whether thumbs are drawn now (on touch, only while scrolling).
     pub(crate) thumbs_shown: bool,
+    /// The document's run-time shapes, which elements that paint shapes
+    /// acquire from.
+    #[cfg_attr(
+        not(feature = "test-support"),
+        expect(
+            dead_code,
+            reason = "S4a PR 3's <path> paints shapes; until then only test_items does"
+        )
+    )]
+    pub(crate) shapes: &'a std::cell::RefCell<crate::document_shapes::DocumentShapes>,
 }
 
 impl<'a> PaintInput<'a> {
@@ -40,7 +50,10 @@ impl<'a> PaintInput<'a> {
         (used, stackings): (&'a UsedMap, &'a Stackings),
         page: (NodeId, NodeId),
         (fonts, cache): (&'a mut FontSystem, &'a mut crate::layout::TextCache),
-        scroll: &'a crate::scroll::Offsets,
+        (scroll, shapes): (
+            &'a crate::scroll::Offsets,
+            &'a std::cell::RefCell<crate::document_shapes::DocumentShapes>,
+        ),
         from: &crate::kept_paint::PaintedFrom,
     ) -> Self {
         Self {
@@ -55,6 +68,7 @@ impl<'a> PaintInput<'a> {
             clip: None,
             scroll,
             thumbs_shown: from.thumbs_shown,
+            shapes,
         }
     }
 }

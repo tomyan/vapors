@@ -36,6 +36,6 @@ pub use mesh_edges::mesh_triangles;
 pub use path::{IconPath, PathError};
 pub use runtime_shape::{RuntimeShape, TOLERANCE_PX};
 pub use segment::{Pen, Segment, non_finite, to_zeno};
-pub use shape_cache::ShapeCache;
+pub use shape_cache::{CacheRef, MAX_PX_PER_UNIT, ShapeCache, SlotChange};
 pub use table::{ShapeEntry, ShapeId, ShapeIndex, ShapeTable, TABLE_FORMAT, TableError};
 pub use tessellate::{Mesh, tessellate};

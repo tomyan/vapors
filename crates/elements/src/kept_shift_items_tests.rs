@@ -9,7 +9,7 @@ use super::shifted_item;
 fn a_shifted_shape_moves_its_translation_and_bounds() {
     // Given
     let shape = Shape::new(
-        ShapeRef(4),
+        ShapeRef::Table(4),
         vapors_scene::ShapeKind::ClosedForm,
         [2.0, 0.5, -0.5, 2.0, 10.0, 20.0],
         Color::from_rgba8(1, 2, 3, 255),

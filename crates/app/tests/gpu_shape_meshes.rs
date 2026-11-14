@@ -65,7 +65,7 @@ fn item(shape: u32, at: [f32; 2], size: [f32; 2], colour: [u8; 4]) -> Item {
     let table = table();
     Item::Shape(shape_item(
         &table.entries()[shape as usize],
-        ShapeRef(shape),
+        ShapeRef::Table(shape),
         [1.0, 0.0, 0.0, 1.0, at[0], at[1]],
         Color::from_rgba8(colour[0], colour[1], colour[2], colour[3]),
         Rect::new(at[0], at[1], at[0] + size[0], at[1] + size[1]),

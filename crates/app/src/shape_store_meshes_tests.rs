@@ -81,7 +81,10 @@ fn a_table_whose_meshes_pass_the_entry_buffers_limit_is_refused_naming_its_crate
         )
     );
     let circle = crate::shape_store::tests::table(vec![entry("b.wisp:1", b"FC", CIRCLE)]);
-    assert_eq!(store.register(&circle), Ok(vec![vapors_scene::ShapeRef(0)]));
+    assert_eq!(
+        store.register(&circle),
+        Ok(vec![vapors_scene::ShapeRef::Table(0)])
+    );
 }
 
 #[test]
@@ -124,7 +127,14 @@ fn an_item_built_from_its_entry_takes_the_entrys_kind() {
     let at = |entry| {
         let bounds = vapors_scene::Rect::new(0.0, 0.0, 16.0, 16.0);
         let colour = vapors_scene::Color::from_rgba8(0, 0, 0, 255);
-        crate::shape_item(entry, vapors_scene::ShapeRef(0), IDENTITY, colour, bounds).kind()
+        crate::shape_item(
+            entry,
+            vapors_scene::ShapeRef::Table(0),
+            IDENTITY,
+            colour,
+            bounds,
+        )
+        .kind()
     };
 
     // When, Then

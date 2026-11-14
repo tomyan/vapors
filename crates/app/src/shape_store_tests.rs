@@ -56,7 +56,7 @@ pub(crate) fn item(shape: u32, transform: [f32; 6]) -> Shape {
 pub(crate) fn item_of(shape: u32, kind: ShapeKind, transform: [f32; 6]) -> Shape {
     let blue = Color::from_rgba8(0, 0, 255, 255);
     Shape::new(
-        ShapeRef(shape),
+        ShapeRef::Table(shape),
         kind,
         transform,
         blue,
@@ -93,7 +93,7 @@ fn a_tables_entries_are_registered_in_order_and_drawn_with_their_paint() {
     let shapes = store.closed_forms(&[item(0, IDENTITY), item(1, IDENTITY)]);
 
     // Then
-    assert_eq!(refs, [ShapeRef(0), ShapeRef(1)]);
+    assert_eq!(refs, [ShapeRef::Table(0), ShapeRef::Table(1)]);
     assert_eq!(
         shapes,
         Ok(vec![drawn(&RECT, None), drawn(&CIRCLE, Some(2.0))])
@@ -109,7 +109,7 @@ fn a_second_table_takes_the_refs_after_the_first() {
     let refs = store.register(&table(vec![entry("b.wisp:1", b"EM", CIRCLE)]));
 
     // Then
-    assert_eq!(refs, Ok(vec![ShapeRef(1)]));
+    assert_eq!(refs, Ok(vec![ShapeRef::Table(1)]));
 }
 
 #[test]
@@ -129,7 +129,7 @@ fn a_table_its_check_refuses_registers_nothing() {
     assert_eq!(
         store.closed_forms(&[item(0, IDENTITY)]),
         Err(ShapeError::Unregistered {
-            shape: ShapeRef(0),
+            shape: ShapeRef::Table(0),
             registered: 0
         })
     );

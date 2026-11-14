@@ -58,16 +58,29 @@ impl ShapeStore {
         let first = self.unuploaded;
         let mut done = 0;
         for registered in &mut self.entries_mut()[first..] {
-            if let Geometry::Mesh { triangles } = registered.source.geometry() {
-                let Some(written) = entries.write(target, triangles) else {
-                    break;
-                };
-                registered.uploaded = Some(written);
+            if !upload_one(registered, entries, target) {
+                break;
             }
             done += 1;
         }
         self.unuploaded += done;
+        self.upload_runtime(entries, target);
         entries.take_work()
+    }
+
+    /// Uploads each run-time slot taken since the last upload, stopping
+    /// at a refused write as [`ShapeStore::upload`] does.
+    fn upload_runtime(&mut self, entries: &mut MeshEntries, target: &Target<'_>) {
+        let pending = std::mem::take(&mut self.runtime_unuploaded);
+        for (at, &index) in pending.iter().enumerate() {
+            let Some(registered) = self.runtime[index as usize].as_mut() else {
+                continue;
+            };
+            if registered.uploaded.is_none() && !upload_one(registered, entries, target) {
+                self.runtime_unuploaded = pending[at..].to_vec();
+                return;
+            }
+        }
     }
 
     /// `shapes`' instances for the mesh pipeline, and beside each the
@@ -89,7 +102,7 @@ impl ShapeStore {
             if let Some(mesh) = mesh {
                 check_bounds(registered, None, item)?;
                 instances.push(mesh);
-                entries.push(self.index_of(item.shape));
+                entries.push(crate::shape_store::store_index(item.shape));
             }
         }
         Ok((instances, entries))
@@ -117,6 +130,19 @@ fn uploaded(registered: &Registered) -> Result<&MeshEntry, ShapeError> {
             shape: registered.shape,
             site: registered.source.site().to_owned(),
         })
+}
+
+/// Writes `registered`'s triangles, when it is a mesh; whether the
+/// buffer took them (a closed form needs none).
+fn upload_one(registered: &mut Registered, entries: &mut MeshEntries, target: &Target<'_>) -> bool {
+    let Geometry::Mesh { triangles } = registered.source.geometry() else {
+        return true;
+    };
+    let Some(written) = entries.write(target, triangles) else {
+        return false;
+    };
+    registered.uploaded = Some(written);
+    true
 }
 
 /// The entry buffer's bytes `geometry` takes: a mesh's, 0 for a

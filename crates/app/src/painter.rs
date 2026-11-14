@@ -141,7 +141,7 @@ impl ScenePainter {
         self.textures.begin_frame();
         self.surfaces.begin_frame();
         self.kept.begin_frame();
-        let taken = self.shapes.take_runtime(painted.runtime_shapes());
+        let taken = self.shapes.take_from(painted, &mut self.mesh_entries);
         let uploaded = self.shapes.upload(&mut self.mesh_entries, target);
         self.counts.shape_bytes_uploaded = uploaded.buffer_bytes;
         self.counts.meshes += uploaded;

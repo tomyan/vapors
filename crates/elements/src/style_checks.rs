@@ -151,6 +151,7 @@ impl Document {
     pub(crate) fn forget_subtree(&mut self, node: NodeId) {
         for node in nodes(&self.arena, node) {
             self.checks.forget(node);
+            self.shapes.borrow_mut().release(node);
             if let Some(kept) = self.kept.as_mut() {
                 kept.styles.remove(node);
                 kept.used.remove(&node);

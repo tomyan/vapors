@@ -11,23 +11,26 @@
 //! from its frame (`shape_store_runtime.rs`) into the same entries,
 //! named by refs of the run-time range.
 
-use std::sync::Arc;
-
-use vapors_renderer::{ClosedFormShape, MeshEntry};
+use vapors_renderer::ClosedFormShape;
 use vapors_scene::{Shape, ShapeKind, ShapeRef};
 
-use crate::shape_bounds::outside_bounds;
+pub(crate) use crate::shape_entry::{Registered, Source, check_bounds, stroke_of, undrawable};
+pub use crate::shape_entry::{kind_of, shape_item};
 pub use crate::shape_error::ShapeError;
-use vapors_shapes::{Geometry, Paint, RuntimeShape, ShapeEntry, ShapeTable, paint_of};
+use vapors_shapes::{ShapeEntry, ShapeTable, paint_of};
 
 /// The registered entries: a table entry at the index its
-/// [`ShapeRef`] holds, a run-time one where `runtime` says.
+/// [`ShapeRef::Table`] holds, a run-time one in the slot its
+/// [`ShapeRef::Runtime`] names, while the document's cache keeps it.
 #[derive(Debug)]
 pub struct ShapeStore {
     entries: Vec<Registered>,
-    /// Each run-time shape's entry index, by its index in its
-    /// document's cache.
-    pub(crate) runtime: Vec<usize>,
+    /// The run-time entries, by their slot in the document's cache.
+    pub(crate) runtime: Vec<Option<Registered>>,
+    /// The document whose run-time shapes the store holds.
+    pub(crate) document: Option<u32>,
+    /// Run-time slots whose meshes are not uploaded.
+    pub(crate) runtime_unuploaded: Vec<u32>,
     /// The first entry whose triangles, if a mesh, are not uploaded.
     pub(crate) unuploaded: usize,
     /// The entry buffer's bytes for every mesh registered.
@@ -45,6 +48,8 @@ impl ShapeStore {
         Self {
             entries: Vec::new(),
             runtime: Vec::new(),
+            document: None,
+            runtime_unuploaded: Vec::new(),
             unuploaded: 0,
             mesh_bytes: 0,
             buffer_limit: limit,
@@ -57,42 +62,6 @@ impl Default for ShapeStore {
     /// device; the painter's has the device's.
     fn default() -> Self {
         Self::with_buffer_limit(u64::MAX)
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Registered {
-    pub(crate) source: Source,
-    /// The ref items name it by.
-    pub(crate) shape: ShapeRef,
-    /// The stroke width its paint names; `None` fills it.
-    pub(crate) stroke: Option<f32>,
-    /// A mesh's triangles on the GPU, once uploaded.
-    pub(crate) uploaded: Option<MeshEntry>,
-}
-
-/// Where an entry came from: a crate's table, or a document's cache.
-#[derive(Debug)]
-pub(crate) enum Source {
-    Table(&'static ShapeEntry),
-    Runtime(Arc<RuntimeShape>),
-}
-
-impl Source {
-    /// Where it was written.
-    pub(crate) fn site(&self) -> &str {
-        match self {
-            Self::Table(entry) => entry.site,
-            Self::Runtime(shape) => shape.site(),
-        }
-    }
-
-    /// What it draws.
-    pub(crate) fn geometry(&self) -> Geometry<'_> {
-        match self {
-            Self::Table(entry) => entry.geometry,
-            Self::Runtime(shape) => shape.geometry(),
-        }
     }
 }
 
@@ -162,32 +131,28 @@ impl ShapeStore {
         Ok(registered)
     }
 
-    /// The entry `shape` names, when the store holds one by that ref.
+    /// The entry `shape` names, when the store holds one by that ref (a
+    /// run-time ref of its document, slot and generation).
     fn resolved(&self, shape: ShapeRef) -> Result<&Registered, ShapeError> {
-        let index = match shape.runtime_index() {
-            Some(index) => self.runtime.get(index as usize).copied(),
-            None => Some(shape.0 as usize),
-        };
-        index
-            .and_then(|index| self.entries.get(index))
+        self.get(store_index(shape))
             .filter(|registered| registered.shape == shape)
             .ok_or(ShapeError::Unregistered {
                 shape,
-                registered: self.entries.len(),
+                registered: self.entries.len() + self.runtime.iter().flatten().count(),
             })
     }
 
-    /// The entry index `shape` names; the store issued it.
-    pub(crate) fn index_of(&self, shape: ShapeRef) -> usize {
-        match shape.runtime_index() {
-            Some(index) => self.runtime[index as usize],
-            None => shape.0 as usize,
+    /// The entry at store index `index`, when one is there.
+    fn get(&self, index: usize) -> Option<&Registered> {
+        match index.checked_sub(RUNTIME_BASE) {
+            Some(slot) => self.runtime.get(slot)?.as_ref(),
+            None => self.entries.get(index),
         }
     }
 
     /// The entry at `index`, which the store issued.
     pub(crate) fn at(&self, index: usize) -> &Registered {
-        &self.entries[index]
+        self.get(index).expect("an index the store issued")
     }
 
     pub(crate) fn entries_mut(&mut self) -> &mut Vec<Registered> {
@@ -195,65 +160,26 @@ impl ShapeStore {
     }
 }
 
-/// An item drawing `entry`, registered as `shape`, with its kind from
-/// the entry's geometry ([`kind_of`]): the way to build a shape item,
-/// so its kind and its entry's cannot disagree.
-#[must_use]
-pub fn shape_item(
-    entry: &ShapeEntry,
-    shape: ShapeRef,
-    transform: [f32; 6],
-    colour: vapors_scene::Color,
-    bounds: vapors_scene::Rect,
-) -> Shape {
-    Shape::new(shape, kind_of(&entry.geometry), transform, colour, bounds)
-}
-
-/// The kind `geometry` is drawn as: the one answer an item's kind is
-/// held to.
-#[must_use]
-pub fn kind_of(geometry: &Geometry) -> ShapeKind {
-    if geometry.is_closed_form() {
-        ShapeKind::ClosedForm
-    } else {
-        ShapeKind::Mesh
+/// The store's index for `shape`: a table entry's index, or a run-time
+/// slot past [`RUNTIME_BASE`].
+pub(crate) fn store_index(shape: ShapeRef) -> usize {
+    match shape {
+        ShapeRef::Table(index) => index as usize,
+        ShapeRef::Runtime(at) => RUNTIME_BASE + at.index as usize,
     }
 }
 
-pub(crate) fn undrawable(
-    item: &Shape,
-    registered: &Registered,
-    reason: vapors_renderer::ClosedFormError,
-) -> ShapeError {
-    ShapeError::Undrawable {
-        shape: item.shape,
-        site: registered.source.site().to_owned(),
-        reason,
-    }
-}
-
-/// Refuses `item` when what `registered` draws under it, stroked
-/// `stroke` wide (a closed form's paint; a mesh holds its stroke),
-/// lies outside its bounds, which culling reads.
-pub(crate) fn check_bounds(
-    registered: &Registered,
-    stroke: Option<f32>,
-    item: &Shape,
-) -> Result<(), ShapeError> {
-    let geometry = registered.source.geometry();
-    match outside_bounds(&geometry, stroke, item) {
-        None => Ok(()),
-        Some(drawn) => Err(ShapeError::OutsideBounds {
-            shape: item.shape,
-            site: registered.source.site().to_owned(),
-            drawn,
-            bounds: item.bounds,
-        }),
-    }
-}
+/// Where run-time slots start in the store's index space: the top half
+/// of `usize` (2^31 on wasm32), which `shape_ref` keeps table indices
+/// below.
+pub(crate) const RUNTIME_BASE: usize = usize::MAX / 2 + 1;
 
 fn shape_ref(index: usize) -> ShapeRef {
-    ShapeRef(u32::try_from(index).expect("fewer than 2^32 shapes are registered"))
+    assert!(
+        index < RUNTIME_BASE,
+        "table entry {index} reaches the run-time slots' half of the store's index space"
+    );
+    ShapeRef::Table(u32::try_from(index).expect("fewer than 2^32 shapes are registered"))
 }
 
 /// `entry`, checked by its table, and the stroke width its paint names.
@@ -264,14 +190,6 @@ fn registered(entry: &'static ShapeEntry, shape: ShapeRef) -> Registered {
         shape,
         stroke: stroke_of(paint),
         uploaded: None,
-    }
-}
-
-/// The stroke width `paint` names; `None` fills.
-pub(crate) fn stroke_of(paint: Paint) -> Option<f32> {
-    match paint {
-        Paint::Fill(_) => None,
-        Paint::Stroke { width } => Some(width),
     }
 }
 

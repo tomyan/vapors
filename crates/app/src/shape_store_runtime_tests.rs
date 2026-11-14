@@ -1,84 +1,100 @@
-//! A document's run-time shapes in the store: taken past those held,
-//! named by run-time refs, drawn by the same paths as a table's; another
-//! document's cache, a ref the store did not issue and meshes past the
-//! buffer's limit are refused, named.
+//! A document's run-time shapes in the store: each changed slot taken
+//! as it is now, named by its document, slot and generation; a freed
+//! slot's ref refused, another document's changes refused, and meshes
+//! past the buffer's limit refused, each named.
 
-use vapors_scene::{Color, Rect, Shape, ShapeKind, ShapeRef};
-use vapors_shapes::{FillRule, IconPath, Paint, ShapeCache};
+use vapors_scene::{Color, Rect, RuntimeRef, Shape, ShapeKind, ShapeRef};
+use vapors_shapes::{CacheRef, FillRule, IconPath, Paint, ShapeCache};
 
 use super::{ShapeError, ShapeStore};
-use crate::shape_store::tests::{CIRCLE, IDENTITY, entry, store};
+use crate::shape_store::tests::IDENTITY;
 
 const FILL: Paint = Paint::Fill(FillRule::NonZero);
 
-/// A cache holding a triangle (a mesh) and a rect (a closed form).
-fn cache() -> ShapeCache {
-    let mut cache = ShapeCache::default();
-    for data in ["M0 0L4 0L0 4z", "M3 4h10v8h-10z"] {
-        let path = IconPath::parse(data).expect("parses");
-        cache
-            .entry("page.wisp:2", &path, FILL, 1.0)
-            .expect("cached");
-    }
+fn acquire(cache: &mut ShapeCache, data: &str) -> CacheRef {
+    let path = IconPath::parse(data).expect("parses");
     cache
+        .acquire("page.wisp:2", &path, FILL, 1.0)
+        .expect("cached")
 }
 
-fn item(shape: ShapeRef, kind: ShapeKind) -> Shape {
+fn item(cache: &ShapeCache, at: CacheRef, kind: ShapeKind) -> Shape {
     let blue = Color::from_rgba8(0, 0, 255, 255);
+    let shape = ShapeRef::Runtime(RuntimeRef {
+        document: cache.document(),
+        index: at.index,
+        generation: at.generation,
+    });
     Shape::new(shape, kind, IDENTITY, blue, Rect::new(0.0, 0.0, 16.0, 16.0))
+}
+
+/// The store with `cache`'s changes taken.
+fn take(store: &mut ShapeStore, cache: &mut ShapeCache) -> Result<(), ShapeError> {
+    store
+        .take_runtime(cache.document(), cache.take_changes())
+        .map(|_| ())
 }
 
 #[test]
 fn a_documents_shapes_are_drawn_by_their_runtime_refs() {
-    // Given
-    let (mut store, cache) = (ShapeStore::default(), cache());
+    // Given: a triangle (a mesh) and a rect (a closed form)
+    let (mut store, mut cache) = (ShapeStore::default(), ShapeCache::new(7));
+    let triangle = acquire(&mut cache, "M0 0L4 0L0 4z");
+    let rect = acquire(&mut cache, "M3 4h10v8h-10z");
 
     // When
-    store.take_runtime(cache.shapes()).expect("taken");
+    take(&mut store, &mut cache).expect("taken");
 
     // Then
-    let mesh = item(ShapeRef::runtime(0), ShapeKind::Mesh);
-    let rect = item(ShapeRef::runtime(1), ShapeKind::ClosedForm);
-    assert_eq!(store.mesh_instances(&[mesh]).map(|(_, at)| at), Ok(vec![0]));
-    assert_eq!(store.closed_forms(&[rect]).map(|drawn| drawn.len()), Ok(1));
-}
-
-#[test]
-fn shapes_are_taken_once_and_later_ones_after() {
-    // Given: a store that took the cache's two
-    let (mut store, mut cache) = (ShapeStore::default(), cache());
-    store.take_runtime(cache.shapes()).expect("taken");
-
-    // When: taken again, then with a third
-    store.take_runtime(cache.shapes()).expect("taken again");
-    let path = IconPath::parse("M0 0h4v2z").expect("parses");
-    cache
-        .entry("page.wisp:5", &path, FILL, 1.0)
-        .expect("cached");
-    store.take_runtime(cache.shapes()).expect("the third");
-
-    // Then
-    assert_eq!(store.runtime.len(), 3);
-    let third = item(ShapeRef::runtime(2), ShapeKind::Mesh);
+    let mesh = item(&cache, triangle, ShapeKind::Mesh);
+    let closed = item(&cache, rect, ShapeKind::ClosedForm);
+    assert!(store.mesh_instances(&[mesh]).is_ok());
     assert_eq!(
-        store.mesh_instances(&[third]).map(|(_, at)| at),
-        Ok(vec![2])
+        store.closed_forms(&[closed]).map(|drawn| drawn.len()),
+        Ok(1)
     );
 }
 
 #[test]
-fn another_documents_cache_is_refused() {
-    // Given
-    let mut store = ShapeStore::default();
-    store.take_runtime(cache().shapes()).expect("taken");
+fn a_freed_entrys_ref_is_refused_and_its_slots_new_entry_drawn() {
+    // Given: the triangle taken, then freed and its slot reused
+    let (mut store, mut cache) = (ShapeStore::default(), ShapeCache::new(7));
+    let old = acquire(&mut cache, "M0 0L4 0L0 4z");
+    take(&mut store, &mut cache).expect("taken");
+    cache.release(old);
+    let new = acquire(&mut cache, "M0 0L6 0L0 6z");
+    take(&mut store, &mut cache).expect("taken again");
 
     // When
-    let refused = store.take_runtime(cache().shapes());
+    let stale = item(&cache, old, ShapeKind::Mesh);
+    let fresh = item(&cache, new, ShapeKind::Mesh);
+
+    // Then
+    assert_eq!(new.index, old.index);
+    assert!(matches!(
+        store.mesh_instances(&[stale]),
+        Err(ShapeError::Unregistered { .. })
+    ));
+    assert!(store.mesh_instances(&[fresh]).is_ok());
+}
+
+#[test]
+fn another_documents_changes_are_refused() {
+    // Given
+    let mut store = ShapeStore::default();
+    let mut first = ShapeCache::new(7);
+    acquire(&mut first, "M0 0L4 0L0 4z");
+    take(&mut store, &mut first).expect("taken");
+
+    // When
+    let mut second = ShapeCache::new(8);
+    acquire(&mut second, "M0 0L4 0L0 4z");
+    let refused = take(&mut store, &mut second);
 
     // Then
     assert_eq!(
         refused,
-        Err(ShapeError::OtherDocument { held: 2, given: 2 })
+        Err(ShapeError::OtherDocument { held: 7, given: 8 })
     );
     assert!(
         refused
@@ -89,31 +105,13 @@ fn another_documents_cache_is_refused() {
 }
 
 #[test]
-fn a_table_ref_at_a_runtime_entrys_index_is_refused() {
-    // Given: the run-time triangle at entry 1, after a table's entry 0
-    let mut store = store(vec![entry("a.wisp:3", b"FN", CIRCLE)]);
-    store.take_runtime(cache().shapes()).expect("taken");
-
-    // When
-    let forged = item(ShapeRef(1), ShapeKind::Mesh);
-
-    // Then
-    assert_eq!(
-        store.mesh_instances(&[forged]).map(|_| ()),
-        Err(ShapeError::Unregistered {
-            shape: ShapeRef(1),
-            registered: 3
-        })
-    );
-}
-
-#[test]
 fn run_time_meshes_past_the_buffers_limit_are_refused_naming_the_document() {
     // Given: a buffer of 16 bytes, less than one triangle
-    let mut store = ShapeStore::with_buffer_limit(16);
+    let (mut store, mut cache) = (ShapeStore::with_buffer_limit(16), ShapeCache::new(7));
+    acquire(&mut cache, "M0 0L4 0L0 4z");
 
     // When
-    let refused = store.take_runtime(cache().shapes()).expect_err("refused");
+    let refused = take(&mut store, &mut cache).expect_err("refused");
 
     // Then
     assert!(
@@ -122,5 +120,5 @@ fn run_time_meshes_past_the_buffers_limit_are_refused_naming_the_document() {
             .starts_with("the document's run-time shapes would put"),
         "{refused}"
     );
-    assert_eq!(store.runtime, Vec::<usize>::new());
+    assert_eq!(store.document, None);
 }

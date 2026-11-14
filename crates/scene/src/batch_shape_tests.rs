@@ -18,7 +18,7 @@ fn batches(scene: &Scene) -> Vec<Batch> {
 
 fn shape(left: f32) -> Item {
     Item::Shape(crate::Shape {
-        shape: crate::ShapeRef(0),
+        shape: crate::ShapeRef::Table(0),
         kind: crate::ShapeKind::ClosedForm,
         transform: [1.0, 0.0, 0.0, 1.0, left, 0.0],
         colour: Color::from_rgba8(1, 2, 3, 255),

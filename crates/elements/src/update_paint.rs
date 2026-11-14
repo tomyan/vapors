@@ -44,7 +44,8 @@ impl Document {
         let page = (self.root(), self.body());
         let used = &self.kept.as_ref().expect("styled keeps the styles").used;
         let text = (&mut self.fonts, &mut self.texts);
-        let mut input = PaintInput::new((used, stackings), page, text, &self.scroll, from);
+        let places = (&self.scroll, &*self.shapes);
+        let mut input = PaintInput::new((used, stackings), page, text, places, from);
         let painted = match last {
             Some(kept) if kept.from.shows(from, changed) => {
                 keep(kept, boxes, &from.placement.rects, &mut input)

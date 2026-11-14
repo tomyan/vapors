@@ -59,6 +59,8 @@ impl Document {
     pub fn update(&mut self, viewport: Viewport) -> Result<&Painted, Vec<ElementError>> {
         let mut last = self.painted.take();
         self.counts = crate::UpdateCounts::default();
+        // a refused update's tessellations are not this one's
+        self.shapes.borrow_mut().cache.take_tessellated();
         self.texts.begin(
             last.as_ref()
                 .map_or(0, |painted| painted.slabs.texts.live()),
@@ -83,12 +85,14 @@ impl Document {
         Ok(self.shown(painted))
     }
 
-    /// Hands `painted` the run-time shapes the cache made since it last
-    /// had them, and counts the paths tessellated this update.
+    /// Shares the document's shapes with `painted`, and counts the
+    /// paths tessellated this update.
     fn keep_runtime_shapes(&mut self, painted: &mut Painted) {
-        self.counts.shapes_tessellated = self.shapes.take_tessellated();
-        let made = &self.shapes.shapes()[painted.runtime_shapes.len()..];
-        painted.runtime_shapes.extend(made.iter().cloned());
+        let mut shapes = self.shapes.borrow_mut();
+        self.counts.shapes_tessellated = shapes.cache.take_tessellated();
+        (self.counts.shapes_live, self.counts.shape_slots) = shapes.cache.counts();
+        drop(shapes);
+        painted.shapes = Some(std::rc::Rc::clone(&self.shapes));
     }
 
     /// Keeps `painted` as the last update's result, and moves the hover

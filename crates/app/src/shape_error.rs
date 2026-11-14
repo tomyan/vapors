@@ -63,13 +63,13 @@ pub enum ShapeError {
         /// The item's bounds.
         bounds: Rect,
     },
-    /// A document's cache given to a store that holds another
+    /// A document's shapes given to a store that holds another
     /// document's run-time shapes.
     OtherDocument {
-        /// How many run-time shapes the store holds.
-        held: usize,
-        /// How many the given cache holds.
-        given: usize,
+        /// The document whose shapes the store holds.
+        held: u32,
+        /// The document whose shapes it was given.
+        given: u32,
     },
     /// A run-time shape the store cannot draw: its geometry or paint.
     Runtime {
@@ -130,7 +130,7 @@ impl fmt::Display for ShapeError {
             ),
             Self::OtherDocument { held, given } => write!(
                 f,
-                "this painter holds {held} run-time shapes of another document, and was given a document's cache of {given}; draw each document with a ScenePainter of its own; reproduce with `cargo test -p vapors-app --lib shape_store_runtime`"
+                "this painter holds the run-time shapes of document {held} and was given document {given}'s; draw each document with a ScenePainter of its own; reproduce with `cargo test -p vapors-app --lib shape_store_runtime`"
             ),
             Self::Runtime { site, reason } => write!(
                 f,
