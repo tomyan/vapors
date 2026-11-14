@@ -7,10 +7,20 @@ fn bounds(low: f64, reach: f64, baseline: Option<f64>, cross: [f64; 2]) -> Bound
     Bounds {
         low,
         reach,
+        end: reach,
         across: [0.0, 0.0],
+        across_end: 0.0,
         baseline,
         cross,
     }
+}
+
+#[test]
+fn the_earliest_end_is_the_least_of_the_childrens_ends() {
+    let left = bounds(0.0, 10.0, None, [0.0; 2]);
+    let right = bounds(0.0, 4.0, None, [0.0; 2]);
+    assert_eq!(left.then(-20.0, &right).end, -16.0);
+    assert_eq!(left.then(20.0, &right).end, 10.0);
 }
 
 #[test]
@@ -45,8 +55,12 @@ fn the_right_runs_offsets_are_moved_by_where_it_starts() {
     // When: the right run starts 6 after the left
     let run = left.then(6.0, &right);
 
-    // Then
-    assert_eq!(run, bounds(0.0, 14.0, Some(10.0), [7.0, 30.0]));
+    // Then: the earliest end is the left run's, 10, before the right's 14
+    let expected = Bounds {
+        end: 10.0,
+        ..bounds(0.0, 14.0, Some(10.0), [7.0, 30.0])
+    };
+    assert_eq!(run, expected);
 }
 
 #[test]

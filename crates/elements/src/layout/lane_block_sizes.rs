@@ -11,7 +11,7 @@ use taffy::{
 
 /// A style's sizes resolved against the parent's size, aspect ratio
 /// and box sizing applied (`compute_block_layout` 394-420).
-pub(super) struct Sizes {
+pub(crate) struct Sizes {
     pub(super) size: Size<Option<f32>>,
     pub(super) min: Size<Option<f32>>,
     pub(super) max: Size<Option<f32>>,

@@ -4,7 +4,8 @@
 //! Taffy as before, the exact answer, slower, never a wrong one.
 
 /// The condition that kept a container, or one of its children, out of
-/// a lane (`UpdateCounts::lane_decline`).
+/// a lane, counted by 3a-2 as `UpdateCounts::lanes_declined` with the
+/// first as `lane_decline`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum LaneDecline {
@@ -29,4 +30,10 @@ pub enum LaneDecline {
     /// `max-content`, `fit-content`, `stretch`), which vapors' styles
     /// never produce: not mirrored.
     SizingKeyword,
+    /// A scroll container has a child wholly before its origin (its
+    /// border box and overflow end above or left of the content box's
+    /// corner, under negative margins), which Taffy leaves out of the
+    /// scrollable overflow; the fold cannot leave one child out, so the
+    /// container is handed to Taffy.
+    BeforeScrollOrigin,
 }

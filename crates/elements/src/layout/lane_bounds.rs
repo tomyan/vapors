@@ -13,9 +13,16 @@ pub(crate) struct Bounds {
     pub(crate) low: f64,
     /// The greatest offset a child's border box or overflow ends at.
     pub(crate) reach: f64,
+    /// The least offset a child's border box or overflow ends at: with
+    /// the run's start, whether some child ends before a scroll
+    /// container's origin (`lane_block_answer.rs`).
+    pub(crate) end: f64,
     /// The least start and the greatest end a child's border box or
     /// overflow reaches across the axis, in the container.
     pub(crate) across: [f64; 2],
+    /// The least end a child reaches across the axis: whether some
+    /// child ends before a scroll container's origin.
+    pub(crate) across_end: f64,
     /// The first child's first baseline that has one.
     pub(crate) baseline: Option<f64>,
     /// The largest min-content and max-content cross-axis contribution.
@@ -30,7 +37,9 @@ impl Bounds {
     pub(crate) const EMPTY: Self = Self {
         low: f64::INFINITY,
         reach: f64::NEG_INFINITY,
+        end: f64::INFINITY,
         across: [f64::INFINITY, f64::NEG_INFINITY],
+        across_end: f64::INFINITY,
         baseline: None,
         cross: [0.0; 2],
     };
@@ -42,7 +51,9 @@ impl Bounds {
         Self {
             low,
             reach,
+            end: reach,
             across: [0.0; 2],
+            across_end: 0.0,
             baseline: None,
             cross: [0.0; 2],
         }
@@ -54,10 +65,12 @@ impl Bounds {
         Self {
             low: self.low.min(offset + right.low),
             reach: self.reach.max(offset + right.reach),
+            end: self.end.min(offset + right.end),
             across: [
                 self.across[0].min(right.across[0]),
                 self.across[1].max(right.across[1]),
             ],
+            across_end: self.across_end.min(right.across_end),
             baseline: self.baseline.or(right.baseline.map(|b| offset + b)),
             cross: [
                 self.cross[0].max(right.cross[0]),

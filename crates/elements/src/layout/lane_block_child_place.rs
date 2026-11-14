@@ -2,7 +2,7 @@
 //! contributes to the container's overflow, mirrored from taffy 0.15.1
 //! `compute/block.rs` (`resolve_relative_offset` 1007-1023,
 //! `perform_final_layout_on_in_flow_children` 1588-1601, 1640-1692,
-//! 1734-1752) and `compute/common/scrollable_overflow.rs` (25-70);
+//! 1734-1752) and `compute/common/scrollable_overflow.rs` (25-63);
 //! `lane_block.rs` carries Taffy's MIT notice.
 
 use taffy::util::MaybeResolve;
@@ -51,9 +51,12 @@ pub(super) fn relative_offset(
 }
 
 /// Where the child's border box starts across the axis (1588-1601),
-/// then aligned by `justify-self` or `text-align` (1640-1692): the
-/// same in and out of the container's formatting context without
-/// floats.
+/// then aligned by `justify-self` or `text-align` (1640-1692). Without
+/// floats the start is the same in and out of the container's
+/// formatting context, but for RTL out of it (1623): Taffy goes
+/// through the inner width, clamped at 0, so the two differ when the
+/// inset exceeds the outer width; vapors has no `direction` property,
+/// so the same-context formula serves both.
 pub(super) fn placed_x(
     c: &Container,
     item: &Item,
@@ -66,37 +69,39 @@ pub(super) fn placed_x(
     };
     let outer_width = width + margin.left + margin.right;
     let has_auto_x_margin = item.margin.left.is_none() || item.margin.right.is_none();
-    let non_stretch = match item.justify_self.keyword {
-        AlignItemsKeyword::Normal | AlignItemsKeyword::Stretch => None,
-        _ => Some(item.justify_self),
-    };
-    match non_stretch {
-        Some(justify) if !has_auto_x_margin => {
-            let free = c.inner_width - outer_width;
-            let keyword = if matches!(justify.safety, AlignmentSafety::Safe) && free < 0.0 {
-                AlignItemsKeyword::Start
-            } else {
-                justify.keyword
-            };
-            let to_end = match keyword {
-                AlignItemsKeyword::Center => None,
-                AlignItemsKeyword::End
-                | AlignItemsKeyword::FlexEnd
-                | AlignItemsKeyword::SelfEnd => Some(true),
-                _ => Some(false),
-            };
-            let offset = match to_end {
-                None => free / 2.0,
-                Some(end) if end != c.direction.is_rtl() => free,
-                Some(_) => 0.0,
-            };
-            c.resolved_inset.left + margin.left + inset_x + offset
-        }
-        None if outer_width < c.inner_width => {
+    match item.justify_self.keyword {
+        AlignItemsKeyword::Normal | AlignItemsKeyword::Stretch if outer_width < c.inner_width => {
             start + text_align_shift(c, c.inner_width - outer_width)
         }
-        _ => start,
+        AlignItemsKeyword::Normal | AlignItemsKeyword::Stretch => start,
+        _ if has_auto_x_margin => start,
+        _ => justified_x(c, item, margin.left + inset_x, c.inner_width - outer_width),
     }
+}
+
+/// A non-stretch `justify-self` places the margin box in the free
+/// space (1645-1674), `safe` falling back to the start when it
+/// overflows.
+fn justified_x(c: &Container, item: &Item, lead: f32, free: f32) -> f32 {
+    let justify = item.justify_self;
+    let keyword = if matches!(justify.safety, AlignmentSafety::Safe) && free < 0.0 {
+        AlignItemsKeyword::Start
+    } else {
+        justify.keyword
+    };
+    let to_end = match keyword {
+        AlignItemsKeyword::Center => None,
+        AlignItemsKeyword::End | AlignItemsKeyword::FlexEnd | AlignItemsKeyword::SelfEnd => {
+            Some(true)
+        }
+        _ => Some(false),
+    };
+    let offset = match to_end {
+        None => free / 2.0,
+        Some(end) if end != c.direction.is_rtl() => free,
+        Some(_) => 0.0,
+    };
+    c.resolved_inset.left + lead + offset
 }
 
 /// Legacy `text-align` on a block container shifts a narrower child
@@ -116,10 +121,10 @@ fn text_align_shift(c: &Container, free: f32) -> f32 {
 /// What the child contributes to the container's scrollable overflow,
 /// from its border-box start along the axis (`[low, reach]`, the
 /// relative offset included) and across it (in the container, from the
-/// container's border): empty when its extent is empty. A child wholly
-/// before a scroll container's origin is not left out: that changes
-/// only the rect's top or left, which `Layout::scroll_width` and
-/// `scroll_height` do not read.
+/// container's border): empty when its extent is empty. Whether a
+/// scroll container leaves it out as wholly before the origin is
+/// decided in the answer, which knows the origin
+/// (`lane_block_answer.rs`).
 pub(super) fn contribution(
     c: &Container,
     item: &Item,
@@ -127,40 +132,16 @@ pub(super) fn contribution(
     placing: &Placing,
 ) -> ([f64; 2], [f64; 2]) {
     let rect = output.scrollable_overflow_rect;
-    let scrolls = item.overflow.x.is_scroll_container() || item.overflow.y.is_scroll_container();
-    let contained = item.contain.contains_scrollable_overflow();
-    let propagates = |overflow: Overflow| !scrolls && !contained && overflow == Overflow::Visible;
-    let (size, location) = (placing.size, placing.location);
-    let end = Size {
-        width: if propagates(item.overflow.x) {
-            size.width.max(rect.right)
-        } else {
-            size.width
-        },
-        height: if propagates(item.overflow.y) {
-            size.height.max(rect.bottom)
-        } else {
-            size.height
-        },
-    };
+    let propagates = propagates(item);
+    let end = end_extent(placing.size, rect, propagates);
     if end.width <= 0.0 || end.height <= 0.0 {
         return (
             [f64::INFINITY, f64::NEG_INFINITY],
             [f64::INFINITY, f64::NEG_INFINITY],
         );
     }
-    let start = Point {
-        x: if propagates(item.overflow.x) {
-            rect.left.min(0.0)
-        } else {
-            0.0
-        },
-        y: if propagates(item.overflow.y) {
-            rect.top.min(0.0)
-        } else {
-            0.0
-        },
-    };
+    let start = start_extent(rect, propagates);
+    let (size, location) = (placing.size, placing.location);
     let x = if c.direction.is_rtl() {
         c.outer_width - (location.x + size.width) - c.resolved_border.right
     } else {
@@ -172,4 +153,43 @@ pub(super) fn contribution(
     ];
     let across = [f64::from(x + start.x), f64::from(x + end.width)];
     (along, across)
+}
+
+/// On which axes the child's own overflow reaches its parent (34-41).
+fn propagates(item: &Item) -> Point<bool> {
+    let scrolls = item.overflow.x.is_scroll_container() || item.overflow.y.is_scroll_container();
+    let contained = item.contain.contains_scrollable_overflow();
+    let on = |overflow: Overflow| !scrolls && !contained && overflow == Overflow::Visible;
+    Point {
+        x: on(item.overflow.x),
+        y: on(item.overflow.y),
+    }
+}
+
+/// How far the child's box or overflow ends past its start (42-45).
+fn end_extent(size: Size<f32>, rect: Rect<f32>, propagates: Point<bool>) -> Size<f32> {
+    Size {
+        width: if propagates.x {
+            size.width.max(rect.right)
+        } else {
+            size.width
+        },
+        height: if propagates.y {
+            size.height.max(rect.bottom)
+        } else {
+            size.height
+        },
+    }
+}
+
+/// How far before its start the child's overflow begins (49-52).
+fn start_extent(rect: Rect<f32>, propagates: Point<bool>) -> Point<f32> {
+    Point {
+        x: if propagates.x {
+            rect.left.min(0.0)
+        } else {
+            0.0
+        },
+        y: if propagates.y { rect.top.min(0.0) } else { 0.0 },
+    }
 }

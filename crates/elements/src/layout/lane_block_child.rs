@@ -1,17 +1,17 @@
 //! One child of a block lane laid out as taffy 0.15.1's block algorithm
 //! lays an in-flow, non-floated item out (`compute/block.rs`,
-//! `generate_item_list` 885-958 and `perform_final_layout_on_in_flow_
-//! children` 1158-1167, 1293-1304, 1367-1448, 1462-1520, 1567-1601,
-//! 1694-1752), one item at a time: the leaf for the lane's tree and the
-//! child's layout, with its position along the axis left to the lane,
-//! which derives it from the tree. The cross-axis placement is
+//! `perform_final_layout_on_in_flow_children` 1158-1167, 1293-1304,
+//! 1383-1448, 1462-1520, 1567-1601, 1694-1752), one item at a time: the
+//! leaf for the lane's tree and the child's layout, with its position
+//! along the axis left to the lane, which derives it from the tree. The
+//! child's style is `lane_block_item.rs`, the cross-axis placement
 //! `lane_block_child_place.rs`; `lane_block.rs` carries Taffy's MIT
 //! notice.
 
 use taffy::util::MaybeMath;
 use taffy::{
     AlignItemsKeyword, AvailableSpace, BlockFormattingContext, Layout, LayoutInput, LayoutOutput,
-    Line, NodeId, Overflow, Point, Rect, RequestedAxis, Size, SizingMode,
+    Line, NodeId, Overflow, Point, Rect, RequestedAxis, RunMode, Size, SizingMode,
 };
 
 use super::lane_block::Container;
@@ -48,33 +48,19 @@ impl BoxTree<'_> {
         if !output.oof_candidates.is_empty() {
             return Err(LaneDecline::HoistedThrough);
         }
-        let free_x = (stretch_width - output.size.width).max(0.0);
-        let margin = auto_margins(item.margin, free_x);
         let calcs = self.calcs;
         let inset_offset = relative_offset(&item, c, |val, basis| calcs.resolve(val, basis));
-        let x = placed_x(c, &item, (output.size.width, margin), inset_offset.x);
+        let margin = auto_margins(item.margin, (stretch_width - output.size.width).max(0.0));
         let placing = Placing {
             size: output.size,
             location: Point {
-                x,
+                x: placed_x(c, &item, (output.size.width, margin), inset_offset.x),
                 y: inset_offset.y,
             },
         };
         Ok(LaidChild {
             leaf: leaf(c, &item, &output, &placing),
-            layout: Layout {
-                // Taffy numbers children by their place in the list;
-                // nothing in vapors reads it, and a lane child's place
-                // would cost a rank query, so every lane child is 0.
-                order: 0,
-                size: output.size,
-                scrollable_overflow_rect: output.scrollable_overflow_rect,
-                scrollbar_size: scrollbar_size(&item),
-                location: placing.location,
-                padding: item.padding,
-                border: item.border,
-                margin,
-            },
+            layout: layout(&item, &output, &placing, margin),
         })
     }
 
@@ -105,7 +91,7 @@ impl BoxTree<'_> {
     }
 }
 
-/// What the child is asked with (1383-1448): a stretched or compressed
+/// What the child is asked with (1383-1435): a stretched or compressed
 /// width, clamped; no sizing keyword, which `item` refused.
 fn known_dimensions(item: &Item, stretch_width: f32) -> Size<Option<f32>> {
     if item.compressible_replaced && item.justify_self.keyword != AlignItemsKeyword::Stretch {
@@ -122,19 +108,17 @@ fn known_dimensions(item: &Item, stretch_width: f32) -> Size<Option<f32>> {
         .maybe_clamp(item.min, item.max)
 }
 
+/// The child's inputs (1439-1448): a layout whatever the container was
+/// asked, as a size query would leave the child's overflow out of its
+/// leaf, and the leaf is kept for the container's layout too.
 fn child_inputs(
     c: &Container,
     item: &Item,
     known_dimensions: Size<Option<f32>>,
     stretch_width: f32,
 ) -> LayoutInput {
-    let collapsible = if item.same_bfc {
-        Line::TRUE
-    } else {
-        Line::FALSE
-    };
     LayoutInput {
-        run_mode: c.run_mode,
+        run_mode: RunMode::PerformLayout,
         sizing_mode: SizingMode::InherentSize,
         axis: RequestedAxis::Both,
         known_dimensions,
@@ -147,7 +131,11 @@ fn child_inputs(
             width: AvailableSpace::Definite(stretch_width),
             height: AvailableSpace::MaxContent,
         },
-        vertical_margins_are_collapsible: collapsible,
+        vertical_margins_are_collapsible: if item.same_bfc {
+            Line::TRUE
+        } else {
+            Line::FALSE
+        },
     }
 }
 
@@ -168,12 +156,23 @@ fn auto_margins(margin: Rect<Option<f32>>, free_x: f32) -> Rect<f32> {
     }
 }
 
-fn scrollbar_size(item: &Item) -> Size<f32> {
-    let width = (item.overflow.y == Overflow::Scroll).then_some(item.scrollbar_width);
-    let height = (item.overflow.x == Overflow::Scroll).then_some(item.scrollbar_width);
-    Size {
-        width: width.unwrap_or(0.0),
-        height: height.unwrap_or(0.0),
+/// The child's layout (1722-1732). Taffy numbers children by their
+/// place in the list; nothing in vapors reads it, and a lane child's
+/// place would cost a rank query, so every lane child is 0.
+fn layout(item: &Item, output: &LayoutOutput, placing: &Placing, margin: Rect<f32>) -> Layout {
+    let scrollbar = |axis: Overflow| (axis == Overflow::Scroll).then_some(item.scrollbar_width);
+    Layout {
+        order: 0,
+        size: output.size,
+        scrollable_overflow_rect: output.scrollable_overflow_rect,
+        scrollbar_size: Size {
+            width: scrollbar(item.overflow.y).unwrap_or(0.0),
+            height: scrollbar(item.overflow.x).unwrap_or(0.0),
+        },
+        location: placing.location,
+        padding: item.padding,
+        border: item.border,
+        margin,
     }
 }
 
@@ -199,7 +198,9 @@ fn leaf(c: &Container, item: &Item, output: &LayoutOutput, placing: &Placing) ->
         bounds: Bounds {
             low: along[0],
             reach: along[1],
+            end: along[1],
             across,
+            across_end: across[1],
             baseline: baseline.map(f64::from),
             cross: [0.0; 2],
         },

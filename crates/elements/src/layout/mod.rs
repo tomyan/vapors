@@ -20,6 +20,8 @@ mod lane_block_child;
 #[allow(dead_code)]
 mod lane_block_child_place;
 #[allow(dead_code)]
+mod lane_block_container;
+#[allow(dead_code)]
 mod lane_block_item;
 #[allow(dead_code)]
 mod lane_block_sizes;
