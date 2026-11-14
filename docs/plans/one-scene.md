@@ -164,7 +164,30 @@ outside (0.255 where it gives 0.196), at most a pixel or two per
 corner, within half a pixel times the miter of the outline; (2) one
 item's overlapping triangles (a self-crossing stroke, lyon's stroker
 at some joins) blend twice, so a translucent overlap draws darker
-(1 - (1 - a)^2 for a) where SVG paints the union once. A CPU fringe of fixed width is early antialiasing
+(1 - (1 - a)^2 for a) where SVG paints the union once. S3b decided (lead, 2026-11-14; numbers in
+`docs/perf/s3b-antialiasing-2026-11-14.md`):
+- Closed forms keep their analytic method. The measurement does not
+  rank it: it, MSAA and the exact-corner prototype each pass 16 of 16
+  closed-form cells. The reason is that a closed form needs no mesh,
+  not this data.
+- Meshes move to the exact-corner method (S3a3, before S4a): a
+  shader-only prototype passed 39 of 40 icon cells, against 9 for the
+  method above and 39 for MSAA 4x. MSAA did as well on the icons and
+  better on the 0.25 px path (4 strongly-off pixels against 9). The
+  choice over MSAA is a design preference, keeping one single-sample
+  pass; the cost of either, in bytes or frame time, is not measured.
+- Recorded divergences:
+  - Mute at 1x fails for every method, the icon route too. The cause
+    is not measured.
+  - A 0.25 px stroke fails for every mesh method. As closed forms at
+    0.25 px, the closed-form pipeline passes a rect and fails a circle
+    (8 strongly-off pixels).
+  - Limit (2), the translucent overlap, stays within the rules, so its
+    pinned test is a record, not a failure.
+- The curve tolerance stays 0.1 device px at the largest scale drawn:
+  no difference was measured between 0.25 and 0.05 px (on the
+  analytic method only), and the exact-corner method was not run at
+  other tolerances. A CPU fringe of fixed width is early antialiasing
 and is not a candidate (the brief, "Antialiasing after every
 transform"). S3b compares, for each kind, MSAA against that kind's
 analytic method.
@@ -497,7 +520,8 @@ is checked against what it found.
 | S3a1 | `Item::Shape`, the `ShapeStore` (1.4), the closed-form pipeline and the painter's dispatch, on IU4's retained path | Rects and circles batched in paint order; idle frame writes 0 shape bytes; a draw of an entry not uploaded refused naming it | S2, IU4 PR 2 | 3D 4, 4b, 5 |
 | S3a2 | The mesh pipeline | Fill and stroke meshes batched in paint order with closed-form shapes | S3a1 | 3D 4, 4b, 5 |
 | S3b | The antialiasing test (the brief's slice 1): touche's ten icons as shapes at 1x, 2x, rotated 30 degrees and scaled 1.37; per kind, MSAA against its analytic method (1.2), against Chromium with the paint_check rules, beside the icon route; the curve tolerance; sub-pixel features against Chromium (the closed-form ramp gives a 0.25 px stroke on a pixel centre 0.625, #345 review M4); the mesh known limits (1.2: corners, a translucent self-crossing stroke) against Chromium, with an exact candidate for the corners beside MSAA: each triangle carries, flat, the outline lines of its corners' wedges (up to six, with a convex or reflex flag per corner), and coverage is 0.5 plus the minimum over its corners of each wedge's distance (convex: the nearer line; reflex: the farther), each line's distance in device pixels from the local position (about 88 bytes a vertex) | The numbers recorded; a method chosen per kind, or the question returned to Tom if none is within the rules at 1x (the brief, decision 3) | S3a2 | everything |
-| S4a | `<path>` fill and stroke in templates; `fill`, `stroke`, `stroke-width` in `vapors-css` with the presentation attributes mapped; run-time parse and tessellation cached by hash | Chromium paint comparisons for fill and stroke; a class toggle recolours and tessellates nothing (counted) | S3b | 3D 4, 4b, 5 |
+| S3a3 | Meshes by the exact-corner method (S3b decided, 2026-11-14): each triangle carries, flat, its corners' wedge lines (position, the two outline normals, convex or reflex), and coverage is 0.5 plus the least, over its outline corners, of each wedge's distance in device pixels; `MeshVertex`, `check_mesh` and `mesh_edges` write and check them (a `TABLE_FORMAT` bump); the pinned corner divergence retired | The aa_methods measurement's exact-corner column from the pipeline itself, not the prototype: 39 of 40 icon cells (Mute at 1x the recorded divergence); the rotated-rect corner test matches the closed form | S3b | 3D 4, 4b, 5 |
+| S4a | `<path>` fill and stroke in templates; `fill`, `stroke`, `stroke-width` in `vapors-css` with the presentation attributes mapped; run-time parse and tessellation cached by hash | Chromium paint comparisons for fill and stroke; a class toggle recolours and tessellates nothing (counted) | S3b, S3a3 | 3D 4, 4b, 5 |
 | S4b | `<rect>` and `<circle>`; elliptical corners (`rx` and `ry` differ) in the closed-form shader, which `check_geometry` refuses until then | Chromium paint comparisons, including a rounded rect and one with elliptical corners | S4a | 3D 4, 4b, 5 |
 | S5a | Compile time: the compiler parses, refuses, classifies, deduplicates and emits each crate's `SHAPES` and each element's index | A bad `d` fails the build naming file and line; the same path in two components of one crate is one entry (snapshot test) | S4b | 3D 4, 4b, 5 |
 | S5b | The process registry (1.3): merge on first mount, the byte comparison and its refusal, `ShapeId`s to the elements | A page of literal shapes: `shapes_tessellated` 0 on every frame; the same path in two crates is one entry; a forged hash collision refused naming both crates | S5a | 3D 4, 4b, 5 |
