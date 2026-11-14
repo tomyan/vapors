@@ -40,6 +40,14 @@ scripts/nightly-scaling-check.sh
 scripts/nightly-scaling-issues-check.sh
                           its issues and run markers against scripts/fixtures/
                           nightly-scaling.log, with a fake gh
+cargo xtask quiet 10 -- <command>
+                          keep xtask's ci, test and gate runs from starting (each waits,
+                          saying who holds it and when it expires) once running ones
+                          finish, run the command, release; `quiet hold [minutes]` (15
+                          by default, 60 at most) keeps it after returning (xtask runs
+                          from the same worktree go on), `quiet release` there ends it.
+                          The gate holds it for its run; a gate's or a command's hold
+                          also ends when its process does
 cargo run -p vapors-app --example demo -- hello
                           an F2c demo in a window (crates/demos)
 cargo xtask screenshot demo target/hello.png -- hello
@@ -72,7 +80,10 @@ target, #35). xtask refuses to build without it (`cargo xtask setup` installs it
 Incremental compilation is off for every build (`.cargo/config.toml`;
 `CARGO_INCREMENTAL` set in the environment overrides it): xtask's builds
 go through sccache, which needs it off, and an incremental target of a
-plain build reached 104 GB. A worktree's `target` lives under
+plain build reached 104 GB. Plain `cargo` builds 4 jobs at once (`[build] jobs` in
+`.cargo/config.toml`), as xtask's steps do; at most three `cargo xtask
+ci` runs go at once on the machine, and the next waits for a slot,
+naming who holds them. A worktree's `target` lives under
 `~/.cache`, never the `/tmp` tmpfs. When its PR merges, empty it and keep
 the directory:
 `find <target dir> -mindepth 1 -maxdepth 1 -exec rm -rf {} +`.

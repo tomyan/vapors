@@ -65,7 +65,7 @@ impl fmt::Display for StoreError {
             ),
             Self::NotMesh(id) => write!(
                 f,
-                "{id} is not a mesh, so Scene::set_colour and Scene::set_appearance cannot colour it: pass a mesh node's id"
+                "{id} is not a mesh, so Scene::set_appearance cannot colour it: pass a mesh node's id"
             ),
         }
     }
