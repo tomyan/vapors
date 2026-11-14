@@ -142,3 +142,32 @@ fn gpu_a_shape_the_store_has_no_entry_for_is_refused_naming_it() {
         "shape 5 is not registered in this painter's store, which holds 2; register its crate's table (ShapeStore::register) before drawing it"
     );
 }
+
+/// A 32 x 16 scroll box at the top of the page holding a 64 px tall
+/// box that paints the rect at (0, 8) in the scroll frame.
+const SCROLLER: &str = "div { position: absolute; top: 0; left: 0; } \
+    .list { width: 32px; height: 16px; overflow: auto; } \
+    .tall { position: static; width: 32px; height: 64px; }";
+
+#[test]
+fn gpu_a_shape_in_a_scrolled_box_moves_with_the_scroll() {
+    // Given: the rect over rows 8 to 16, then scrolled 4 down
+    let mut doc = document(SCROLLER, &[(None, "div", "list"), (Some(0), "div", "tall")]);
+    let list = doc.children(doc.body())[0];
+    let tall = doc.children(list)[0];
+    paint_after_background(tall, vec![red(0, [0.0, 8.0], [12.0, 8.0])]);
+    update(&mut doc, 1.0);
+    let mut rig = rig();
+    let before = rig.draw(&doc).expect("paints");
+    assert!(doc.scroll_node_by(list, [0.0, 4.0]), "the list scrolls");
+    update(&mut doc, 1.0);
+
+    // When: drawn, the debug build's batch checks shifting every item
+    let after = rig.draw(&doc).expect("paints");
+
+    // Then: rows 4 to 12
+    assert_eq!(pixel(&before, 4, 6), WHITE, "above the rect before");
+    assert_eq!(pixel(&before, 4, 9), RED, "the rect before");
+    assert_eq!(pixel(&after, 4, 5), RED, "the rect, 4 rows up");
+    assert_eq!(pixel(&after, 4, 13), WHITE, "below it now");
+}

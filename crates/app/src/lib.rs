@@ -19,6 +19,8 @@ mod painter;
 mod pointer;
 #[cfg(test)]
 mod scroll_fixture;
+mod shape_bounds;
+mod shape_error;
 mod shape_store;
 mod surface;
 mod tooltip;

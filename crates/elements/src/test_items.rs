@@ -18,7 +18,9 @@ thread_local! {
 
 /// Has `node` paint `items` after its background from its next paint
 /// on, on this thread. A kept paint is not painted again for this, so
-/// set them before the update that first paints `node`.
+/// set them before the update that first paints `node`. The items are
+/// keyed by node id alone and kept for the thread's life, so a second
+/// document on the thread whose ids repeat paints them too.
 pub fn paint_after_background(node: NodeId, items: Vec<Item>) {
     ITEMS.with(|map| map.borrow_mut().insert(node, items));
 }

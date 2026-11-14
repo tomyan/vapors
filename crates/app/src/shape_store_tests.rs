@@ -193,3 +193,33 @@ fn triangle_mesh() -> &'static [[MeshVertex; 3]] {
         tessellate("a.wisp:9", &path, Paint::Fill(FillRule::NonZero), 0.05).expect("tessellated");
     Box::leak(mesh.triangles.into_boxed_slice())
 }
+
+#[test]
+fn an_item_whose_bounds_miss_what_it_draws_is_refused_naming_both() {
+    // Given: the circle (4 to 12 across) moved 10 right, its bounds left
+    // where the entry is unmoved
+    let store = store(vec![entry("a.wisp:3", b"FM", CIRCLE)]);
+    let mut moved = item(0, [1.0, 0.0, 0.0, 1.0, 10.0, 0.0]);
+    moved.bounds = Rect::new(4.0, 4.0, 12.0, 12.0);
+
+    // When
+    let refused = store.closed_forms(&[moved]).expect_err("refused");
+
+    // Then: drawn 14 to 22 with the ramp's half pixel either side
+    assert_eq!(
+        refused.to_string(),
+        "shape 0, the entry at a.wisp:3, draws over Rect { left: 13.5, top: 3.5, right: 22.5, bottom: 12.5 } but its item's bounds are Rect { left: 4.0, top: 4.0, right: 12.0, bottom: 12.0 }, so culling would drop pixels it draws; give the item bounds that hold its transformed entry"
+    );
+}
+
+#[test]
+fn bounds_that_hold_the_stroked_entry_under_its_transform_pass() {
+    // Given: the circle stroked 2 wide, scaled 2: 6 to 26 across, and
+    // bounds exactly that (the fringe holds the ramp)
+    let store = store(vec![entry("a.wisp:5", STROKE_2, CIRCLE)]);
+    let mut scaled = item(0, [2.0, 0.0, 0.0, 2.0, 0.0, 0.0]);
+    scaled.bounds = Rect::new(6.0, 6.0, 26.0, 26.0);
+
+    // When, Then
+    assert_eq!(store.closed_forms(&[scaled]).map(|s| s.len()), Ok(1));
+}

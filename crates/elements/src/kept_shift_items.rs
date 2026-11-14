@@ -1,5 +1,6 @@
-//! One kept item shifted (`kept_shift.rs`): a whole move of its
-//! rect, or a text item made from its rect as `paint_own.rs` makes it.
+//! One kept item shifted (`kept_shift.rs`, and a scroll frame's shift in
+//! `frames.rs`): a move of its rect, a shape's translation and bounds,
+//! or a text item made from its rect as `paint_own.rs` makes it.
 
 use vapors_scene::{Item, Rect, TextId};
 
@@ -14,9 +15,9 @@ pub(crate) fn whole_item(item: &Item) -> bool {
         Item::Image { rect, .. } | Item::Icon { rect, .. } | Item::Surface { rect, .. } => {
             whole_rect(rect)
         }
-        // Never shifted in place, so painted again: a shape's transform
+        // Painted again rather than shifted in place: a shape's transform
         // and bounds are not checked whole (no element paints one before
-        // S4a, which decides).
+        // S4a, which decides). A scroll frame's shift moves it exactly.
         Item::Text { .. } | Item::Shape(_) => false,
     }
 }
@@ -55,7 +56,12 @@ pub(crate) fn shifted_item(item: Item, delta: [f32; 2]) -> Item {
             rect: rect.offset(delta),
         },
         Item::Text { .. } => unreachable!("a text item is made from its rect (text_item)"),
-        Item::Shape(_) => unreachable!("a shape is never whole (whole_item), so never shifted"),
+        Item::Shape(mut shape) => {
+            shape.transform[4] += delta[0];
+            shape.transform[5] += delta[1];
+            shape.bounds = shape.bounds.offset(delta);
+            Item::Shape(shape)
+        }
     }
 }
 
@@ -78,3 +84,7 @@ pub(crate) fn text_item(text: TextId, rect: BoxRect, slabs: &Slabs, scale: f32) 
         ink: layout.ink().offset(origin),
     }
 }
+
+#[cfg(test)]
+#[path = "kept_shift_items_tests.rs"]
+mod tests;

@@ -210,7 +210,12 @@ every registered entry it has not uploaded (counted as
 painter draws from it, and `SurfaceFrame` gains `shapes: &ShapeStore`
 so a `SurfaceRenderer` such as `SceneRenderer` draws the same entries
 (S7). A draw naming an entry the store has not uploaded is refused with
-an error naming the entry and its site, never skipped. Added in S3a1
+an error naming the entry and its site, never skipped (a ref the store
+never issued has no site, so its error names the ref and how many the
+store holds; the refusal comes when a run's bytes are built, so a shape
+run culled or clipped out of every view is not resolved; and an item
+whose bounds, which culling reads, do not hold what its entry draws
+under its transform is refused naming both, S3a1). Added in S3a1
 (the store and the 2D path) and S7 (the `SurfaceFrame` field). A
 closed-form entry's parameters go in each instance's bytes (80 bytes:
 transform, colour, the rect or ellipse, the stroke width), kept between

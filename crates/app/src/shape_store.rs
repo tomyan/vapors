@@ -8,11 +8,12 @@
 //! until the mesh pipeline (S3a2). The process registry (S5b) will
 //! register each crate's table once, on its first mount.
 
-use std::fmt;
-
-use vapors_renderer::{ClosedFormError, ClosedFormShape};
+use vapors_renderer::ClosedFormShape;
 use vapors_scene::{Shape, ShapeRef};
-use vapors_shapes::{Geometry, Paint, ShapeEntry, ShapeTable, TableError, paint_of};
+
+use crate::shape_bounds::outside_bounds;
+pub use crate::shape_error::ShapeError;
+use vapors_shapes::{Geometry, Paint, ShapeEntry, ShapeTable, paint_of};
 
 /// The registered entries, by [`ShapeRef`].
 #[derive(Debug, Default)]
@@ -25,36 +26,6 @@ struct Registered {
     entry: &'static ShapeEntry,
     /// The stroke width its paint names; `None` fills it.
     stroke: Option<f32>,
-}
-
-/// Why a table was not registered or a shape not drawn.
-#[derive(Clone, Debug, PartialEq)]
-pub enum ShapeError {
-    /// The table's own check refused it.
-    Table(TableError),
-    /// A ref the store has issued no entry for.
-    Unregistered {
-        /// The ref.
-        shape: ShapeRef,
-        /// How many entries the store holds.
-        registered: usize,
-    },
-    /// A mesh entry, which the mesh pipeline (S3a2) will draw.
-    Mesh {
-        /// The ref.
-        shape: ShapeRef,
-        /// Where it was written.
-        site: &'static str,
-    },
-    /// The closed-form pipeline refused the item: its transform.
-    Undrawable {
-        /// The ref.
-        shape: ShapeRef,
-        /// Where it was written.
-        site: &'static str,
-        /// Why.
-        reason: ClosedFormError,
-    },
 }
 
 impl ShapeStore {
@@ -79,7 +50,9 @@ impl ShapeStore {
     /// # Errors
     /// For the first that fails: [`ShapeError::Unregistered`] for a ref
     /// the store did not issue, [`ShapeError::Mesh`] for a mesh entry,
-    /// [`ShapeError::Undrawable`] for a transform the pipeline refuses.
+    /// [`ShapeError::Undrawable`] for a transform the pipeline refuses,
+    /// [`ShapeError::OutsideBounds`] for bounds that do not hold what
+    /// the item draws.
     pub fn closed_forms(&self, shapes: &[Shape]) -> Result<Vec<ClosedFormShape>, ShapeError> {
         let mut drawn = Vec::with_capacity(shapes.len());
         for shape in shapes {
@@ -89,25 +62,44 @@ impl ShapeStore {
     }
 
     fn closed_form(&self, item: &Shape) -> Result<Option<ClosedFormShape>, ShapeError> {
-        let shape = item.shape;
-        let Registered { entry, stroke } =
-            self.entries
-                .get(shape.0 as usize)
-                .ok_or(ShapeError::Unregistered {
-                    shape,
-                    registered: self.entries.len(),
-                })?;
+        let (shape, Registered { entry, stroke }) = (item.shape, self.registered(item.shape)?);
         let site = entry.site;
         if let Geometry::Mesh { .. } = entry.geometry {
             return Err(ShapeError::Mesh { shape, site });
         }
-        ClosedFormShape::new(&entry.geometry, *stroke, item.transform, item.colour).map_err(
-            |reason| ShapeError::Undrawable {
+        let drawn = ClosedFormShape::new(&entry.geometry, *stroke, item.transform, item.colour)
+            .map_err(|reason| ShapeError::Undrawable {
                 shape,
                 site,
                 reason,
-            },
-        )
+            })?;
+        if drawn.is_some() {
+            check_bounds(entry, *stroke, item)?;
+        }
+        Ok(drawn)
+    }
+
+    fn registered(&self, shape: ShapeRef) -> Result<&Registered, ShapeError> {
+        self.entries
+            .get(shape.0 as usize)
+            .ok_or(ShapeError::Unregistered {
+                shape,
+                registered: self.entries.len(),
+            })
+    }
+}
+
+/// Refuses `item` when what `entry` draws under it lies outside its
+/// bounds, which culling reads.
+fn check_bounds(entry: &ShapeEntry, stroke: Option<f32>, item: &Shape) -> Result<(), ShapeError> {
+    match outside_bounds(&entry.geometry, stroke, item) {
+        None => Ok(()),
+        Some(drawn) => Err(ShapeError::OutsideBounds {
+            shape: item.shape,
+            site: entry.site,
+            drawn,
+            bounds: item.bounds,
+        }),
     }
 }
 
@@ -124,35 +116,6 @@ fn registered(entry: &'static ShapeEntry) -> Registered {
     };
     Registered { entry, stroke }
 }
-
-impl fmt::Display for ShapeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Table(error) => error.fmt(f),
-            Self::Unregistered { shape, registered } => write!(
-                f,
-                "shape {} is not registered in this painter's store, which holds {registered}; register its crate's table (ShapeStore::register) before drawing it",
-                shape.0
-            ),
-            Self::Undrawable {
-                shape,
-                site,
-                reason,
-            } => write!(
-                f,
-                "shape {}, the entry at {site}, cannot be drawn: {reason}",
-                shape.0
-            ),
-            Self::Mesh { shape, site } => write!(
-                f,
-                "shape {}, the mesh at {site}, is not drawn until the mesh pipeline (one-scene S3a2); draw it as a closed form or wait for S3a2",
-                shape.0
-            ),
-        }
-    }
-}
-
-impl std::error::Error for ShapeError {}
 
 #[cfg(test)]
 #[path = "shape_store_tests.rs"]

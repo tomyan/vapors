@@ -199,7 +199,12 @@ fn shifted(item: Item, delta: [f32; 2]) -> Item {
             origin: [origin[0] + delta[0], origin[1] + delta[1]],
             ink: ink.offset(delta),
         },
-        other => crate::kept_shift_items::shifted_item(other, delta),
+        moved @ (Item::Shadow(_)
+        | Item::Quad(_)
+        | Item::Image { .. }
+        | Item::Icon { .. }
+        | Item::Surface { .. }
+        | Item::Shape(_)) => crate::kept_shift_items::shifted_item(moved, delta),
     }
 }
 

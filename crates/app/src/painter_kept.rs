@@ -57,8 +57,10 @@ impl ScenePainter {
     /// Draws `run`, a shadow, quad, shape, image or surface batch keyed
     /// `key`, from its kept bytes moved by `shift`, writing them first
     /// when none are kept. A shape run naming an entry the store cannot
-    /// draw is refused before anything is written. Nothing is drawn when
-    /// the write is refused (the refusal is on the target's encoder).
+    /// draw is refused when its bytes are built, before any is written
+    /// (the store only grows, so kept bytes stay drawable). Nothing is
+    /// drawn when the write is refused (the refusal is on the target's
+    /// encoder).
     pub(super) fn draw_retained(
         &mut self,
         target: &Target<'_>,
@@ -66,11 +68,6 @@ impl ScenePainter {
         (run, key, at): (&Run, BatchKey, usize),
         shift: Shift,
     ) -> Result<(), PaintError> {
-        if let Run::Shapes(shapes) = run {
-            self.shapes
-                .closed_forms(shapes)
-                .map_err(PaintError::Shape)?;
-        }
         let pipelines = Pipelines {
             shadows: &mut self.shadows,
             quads: &mut self.quads,
@@ -80,7 +77,7 @@ impl ScenePainter {
             text: &mut self.text,
             atlas: &mut self.atlas,
         };
-        let Some(range) = self.kept.range(pipelines, target, (run, key, at)) else {
+        let Some(range) = self.kept.range(pipelines, target, (run, key, at))? else {
             return Ok(());
         };
         match run {
@@ -207,20 +204,21 @@ impl Kind {
 
 /// `run`'s instance or vertex bytes, as its pipeline draws them, a
 /// shape run's entries from `shapes`.
-pub(super) fn run_bytes(run: &Run, shapes: &ShapeStore) -> Vec<u8> {
-    match run {
+///
+/// # Errors
+/// A shape run naming an entry `shapes` cannot draw.
+pub(super) fn run_bytes(run: &Run, shapes: &ShapeStore) -> Result<Vec<u8>, PaintError> {
+    Ok(match run {
         Run::Shadows(shadows) => ShadowPipeline::bytes(shadows),
         Run::Quads(quads) => QuadPipeline::bytes(quads),
-        Run::Shapes(items) => ClosedFormPipeline::bytes(
-            &shapes
-                .closed_forms(items)
-                .expect("draw_retained refuses a shape run the store cannot draw"),
-        ),
+        Run::Shapes(items) => {
+            ClosedFormPipeline::bytes(&shapes.closed_forms(items).map_err(PaintError::Shape)?)
+        }
         Run::Images(items) | Run::Surfaces(items) => {
             ImagePipeline::rect_bytes(items.iter().map(item_rect))
         }
         Run::Texts(_) | Run::Icons(_) => unreachable!("text and icon runs are not kept"),
-    }
+    })
 }
 
 /// The blend a text or icon run draws with.

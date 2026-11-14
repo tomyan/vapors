@@ -68,3 +68,15 @@ fn runs_that_differ_are_not_the_same_to_the_bit() {
     assert!(!same_bits(&quads(0.0), &quads(1.0)));
     assert!(!same_bits(&quads(0.0), &shadows(0.0)));
 }
+
+#[test]
+fn shape_runs_naming_other_entries_are_not_the_same() {
+    // Given: equal floats, another entry
+    let Run::Shapes(mut other) = shapes(0.0) else {
+        unreachable!("shapes() is a shape run")
+    };
+    other[0].shape = ShapeRef(3);
+
+    // When / Then
+    assert!(!same_bits(&shapes(0.0), &Run::Shapes(other)));
+}
