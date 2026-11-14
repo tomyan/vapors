@@ -18,7 +18,7 @@ use super::lane_block::Container;
 use super::lane_block_child_place::{Placing, contribution, placed_x, relative_offset};
 use super::lane_block_item::Item;
 use super::lane_block_summary::{BlockChild, Margins};
-use super::lane_bounds::Bounds;
+use super::lane_bounds::{Bounds, earliest_end};
 use super::tree::BoxTree;
 use crate::lane_decline::LaneDecline;
 
@@ -198,9 +198,9 @@ fn leaf(c: &Container, item: &Item, output: &LayoutOutput, placing: &Placing) ->
         bounds: Bounds {
             low: along[0],
             reach: along[1],
-            end: along[1],
+            end: earliest_end(along),
             across,
-            across_end: across[1],
+            across_end: earliest_end(across),
             baseline: baseline.map(f64::from),
             cross: [0.0; 2],
         },

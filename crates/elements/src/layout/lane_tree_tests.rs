@@ -8,6 +8,7 @@ use crate::layout::lane_flex_summary::{FlexItem, FlexSummary};
 /// An item `size` tall with no margins, reaching its own bottom.
 fn item(size: f64) -> FlexSummary {
     FlexSummary::leaf(FlexItem {
+        shrinkable: false,
         margins: [0.0, 0.0],
         size,
         basis: size,

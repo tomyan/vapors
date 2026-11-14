@@ -130,6 +130,7 @@ pub(super) fn flex(child: Child) -> FlexSummary {
         size,
         basis: size,
         content: size,
+        shrinkable: false,
         bounds,
     })
 }

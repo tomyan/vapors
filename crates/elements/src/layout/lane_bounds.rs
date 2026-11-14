@@ -80,6 +80,18 @@ impl Bounds {
     }
 }
 
+/// Where a child's extent ends, for the earliest end of a run: an empty
+/// extent (`[inf, -inf]`) adds nothing, as Taffy leaves an empty
+/// contribution out before asking whether it is before the origin
+/// (`scrollable_overflow.rs` 42-47).
+pub(crate) fn earliest_end(extent: [f64; 2]) -> f64 {
+    if extent[0] > extent[1] {
+        f64::INFINITY
+    } else {
+        extent[1]
+    }
+}
+
 #[cfg(test)]
 #[path = "lane_bounds_tests.rs"]
 mod tests;

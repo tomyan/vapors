@@ -1,4 +1,4 @@
-//! Why a block container is not laid out as a lane
+//! Why a block or flex container is not laid out as a lane
 //! (`docs/plans/splice-layout.md`, sections 4 and 10.3), so a test can
 //! pin the condition it names: a declined container is laid out by
 //! Taffy as before, the exact answer, slower, never a wrong one.
@@ -44,4 +44,29 @@ pub enum LaneDecline {
     /// scrollable overflow; the fold cannot leave one child out, so the
     /// container is handed to Taffy.
     BeforeScrollOrigin,
+    /// A flex row (`row` or `row-reverse`): the horizontal lane is PR 6.
+    FlexRow,
+    /// `flex-direction: column-reverse`: positions run from the end, so
+    /// every item moves when the total changes.
+    ColumnReverse,
+    /// `flex-wrap` other than `nowrap`: lines are formed from the
+    /// running total.
+    FlexWrap,
+    /// `justify-content` other than `normal`, `flex-start`, `start` or
+    /// `stretch`: every item is moved by the free space.
+    JustifyContent,
+    /// An item's `flex-grow` is above 0: free space is shared by every
+    /// item.
+    FlexGrow,
+    /// An item's `margin-top` or `margin-bottom` is `auto`: it takes a
+    /// share of the free space.
+    MainAutoMargin,
+    /// A percentage `row-gap` on a column whose height is not definite:
+    /// Taffy resolves it against the height the items sum to.
+    PercentGap,
+    /// The items overflow the column's height and one of them can
+    /// shrink (its `flex-shrink` is above 0 and its minimum height is
+    /// below its hypothetical height), so its height depends on the
+    /// total: decided at layout, from the fold.
+    Shrinks,
 }

@@ -26,6 +26,10 @@ pub(crate) struct FlexItem {
     /// basis plus margins, not the content contribution. PR 3f computes
     /// it as Taffy does, per item.
     pub(crate) content: f64,
+    /// Whether it would shrink were the column shorter than its items:
+    /// its `flex-shrink` is above 0 and its minimum height below its
+    /// hypothetical height (`lane_flex_answer.rs` declines then).
+    pub(crate) shrinkable: bool,
     pub(crate) bounds: Bounds,
 }
 
@@ -43,6 +47,7 @@ struct FlexRun {
     trailing: f64,
     basis: f64,
     content: f64,
+    shrinkable: bool,
     bounds: Bounds,
 }
 
@@ -56,6 +61,7 @@ impl FlexSummary {
             trailing: item.margins[1],
             basis: item.basis,
             content: item.content,
+            shrinkable: item.shrinkable,
             bounds: item.bounds,
         }))
     }
@@ -65,6 +71,16 @@ impl FlexSummary {
     pub(crate) fn outer(&self, gap: f64) -> f64 {
         self.0
             .map_or(0.0, |run| run.outer + gaps(gap, run.count - 1))
+    }
+
+    /// The first item's leading margin: where its border box starts.
+    pub(crate) fn leading(&self) -> f64 {
+        self.0.map_or(0.0, |run| run.leading)
+    }
+
+    /// Whether some item would shrink.
+    pub(crate) fn shrinkable(&self) -> bool {
+        self.0.is_some_and(|run| run.shrinkable)
     }
 
     /// The base-size and content sums with their gaps.
@@ -90,6 +106,7 @@ impl Summary for FlexSummary {
             trailing: right.trailing,
             basis: left.basis + right.basis,
             content: left.content + right.content,
+            shrinkable: left.shrinkable || right.shrinkable,
             bounds: left.bounds.then(offset, &right.bounds),
         }))
     }
