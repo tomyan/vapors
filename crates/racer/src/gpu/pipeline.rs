@@ -1,4 +1,5 @@
 //! Shared bindings and depth state for ground and solid geometry.
+#[allow(clippy::too_many_lines)] // one pipeline descriptor, every field of it written out
 pub(super) fn create(
     device: &wgpu::Device,
     format: wgpu::TextureFormat,

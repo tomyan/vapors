@@ -188,6 +188,8 @@ impl UpdateCounts {
         self.styles_computed = 0;
         self.styles_unkeyed = 0;
         self.styles_unshareable = 0;
+        self.used_shared = 0;
+        self.used_derived = 0;
     }
 }
 

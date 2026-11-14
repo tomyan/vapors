@@ -19,6 +19,44 @@ fn each_rule_lists_its_forbidden_crates_trimmed() {
 }
 
 #[test]
+fn components_depending_on_vapors_css_normally_is_still_refused_by_the_repository_rules() {
+    // Given: the repository's own rule for vapors-components, and a
+    // graph holding every crate it names, where the dependency on
+    // vapors-css is linked, not a build script's
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let rules = rules(&Config::load_from(&root).expect("config")).expect("rules");
+    let rule = rules
+        .into_iter()
+        .find(|rule| rule.crate_name == "vapors-components")
+        .expect("the components rule");
+    let package = |name: &str| serde_json::json!({ "id": name, "name": name });
+    let node = |name: &str, deps: Vec<&str>| {
+        let deps: Vec<_> = deps
+            .into_iter()
+            .map(|dep| serde_json::json!({ "pkg": dep, "dep_kinds": [{ "kind": null }] }))
+            .collect();
+        serde_json::json!({ "id": name, "deps": deps })
+    };
+    let mut packages = vec![package("vapors-components")];
+    let mut nodes = vec![node("vapors-components", vec!["vapors-css"])];
+    for name in &rule.forbidden {
+        packages.push(package(name));
+        nodes.push(node(name, Vec::new()));
+    }
+    let graph = parse(&serde_json::json!({ "packages": packages, "resolve": { "nodes": nodes } }))
+        .expect("graph");
+
+    // When
+    let found = violations(&graph, &[rule]).expect("checked");
+
+    // Then
+    assert_eq!(
+        found,
+        ["vapors-components depends on vapors-css: vapors-components -> vapors-css"]
+    );
+}
+
+#[test]
 fn a_rule_with_an_empty_name_is_refused_naming_it() {
     // Given
     let config =

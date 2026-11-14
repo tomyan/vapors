@@ -4,7 +4,7 @@
 # 188..199. The panel's `.panel .title` is red and more specific than a
 # row's `.title`; scoped, it does not reach the rows' dots, which stay
 # green (proven by leaving the subject compound unscoped in
-# vapors-elements' style/scope.rs: the dots turn red).
+# vapors-css's scope.rs: the dots turn red).
 pixel 4 4 #e9ecef          page, top left
 pixel 167 200 #c7ccd1      the panel's 1px left border
 pixel 440 140 #d32f2f      the panel's title: red

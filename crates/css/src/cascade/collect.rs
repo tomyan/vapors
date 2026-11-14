@@ -1,5 +1,7 @@
 //! Collecting the declarations that apply to an element and picking the
-//! winner per property.
+//! winner per property. A winner refers to its declaration's value; the
+//! computed style is built from the references
+//! (docs/plans/style-allocations.md, O2), so nothing is cloned here.
 
 use std::collections::BTreeMap;
 
@@ -50,10 +52,10 @@ fn rank(origin: Origin, important: bool) -> u8 {
 }
 
 /// The winning declaration per longhand (by table index) and per custom
-/// property.
-pub(crate) struct Winners {
-    pub(crate) longhands: Vec<Option<Candidate<Specified>>>,
-    pub(crate) custom: BTreeMap<String, Candidate<Vec<ComponentValue>>>,
+/// property, each by reference into its declaration.
+pub(crate) struct Winners<'a> {
+    pub(crate) longhands: Vec<Option<Candidate<&'a Specified>>>,
+    pub(crate) custom: BTreeMap<&'a str, Candidate<&'a [ComponentValue]>>,
 }
 
 /// The winners among the rules that match `element`, and the
@@ -62,8 +64,8 @@ pub(crate) fn winners<'a, E: Element>(
     rules: impl Iterator<Item = &'a CascadeRule>,
     element: &E,
     env: &Environment,
-    inline: &[Declaration],
-) -> Winners {
+    inline: &'a [Declaration],
+) -> Winners<'a> {
     let mut winners = Winners {
         longhands: vec![None; PROPERTIES.len()],
         custom: BTreeMap::new(),
@@ -95,9 +97,9 @@ pub(crate) fn winners<'a, E: Element>(
     winners
 }
 
-impl Winners {
+impl<'a> Winners<'a> {
     /// Let one declaration compete for the properties it sets.
-    fn consider(&mut self, decl: &Declaration, standing: Standing) {
+    fn consider(&mut self, decl: &'a Declaration, standing: Standing) {
         let Standing {
             rank,
             specificity,
@@ -110,15 +112,15 @@ impl Winners {
                 rank,
                 specificity,
                 order,
-                value: decl.value.clone(),
+                value: decl.value.as_slice(),
                 position,
                 sheet,
             };
-            match self.custom.get_mut(&decl.name) {
+            match self.custom.get_mut(decl.name.as_str()) {
                 Some(current) if !new.beats(current) => {}
                 Some(current) => *current = new,
                 None => {
-                    self.custom.insert(decl.name.clone(), new);
+                    self.custom.insert(decl.name.as_str(), new);
                 }
             }
             return;
@@ -128,7 +130,7 @@ impl Winners {
                 rank,
                 specificity,
                 order,
-                value: longhand.value.clone(),
+                value: &longhand.value,
                 position,
                 sheet,
             };

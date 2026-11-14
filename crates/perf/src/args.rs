@@ -1,7 +1,9 @@
 //! The harness's command line: `[runs] [warmup]`, 200 and 20 by default,
-//! with `--only <substring>`, `--instructions` and `--scaling <change>`,
-//! or one of the modes that replace the full run.
+//! with `--only <substring>`, `--instructions`, `--off-path` and
+//! `--scaling <change>`, or one of the modes that replace the full run.
 
+pub use crate::args_off_path::WorkloadSet;
+use crate::args_off_path::refuse_off_path_with_modes;
 use crate::rows::RowChange;
 use crate::run::Settings;
 
@@ -9,9 +11,9 @@ use crate::run::Settings;
 /// into one query set, which holds at most `QUERY_SET_MAX_QUERIES`.
 pub const MAX_RUNS: usize = (wgpu::QUERY_SET_MAX_QUERIES / 2) as usize;
 
-const USAGE: &str = "cargo run --release -p vapors-perf -- \
-                     [runs] [warmup] [--only <substring> (once)] [--instructions] \
-                     [--scaling Idle|Text|FlexText|Class|HoveredClass|Insert] [--mount] [--mount-memory <rows>] \
+pub(crate) const USAGE: &str = "cargo run --release -p vapors-perf -- \
+                     [runs] [warmup] [--only <substring> (once)] [--instructions] [--off-path] \
+                     [--scaling all|Idle|Text|FlexText|Class|HoveredClass|Insert|Resize|Scroll|ScrollSize] [--mount] [--mount-memory <rows>] \
                      [--scene-run]";
 
 /// What the command line asks for.
@@ -23,9 +25,11 @@ pub struct Options {
     pub only: Option<String>,
     /// Report instructions retired per phase instead of times.
     pub instructions: bool,
-    /// Run this change at each size of `scaling::SIZES`, count its
-    /// instructions and judge their growth.
-    pub scaling: Option<RowChange>,
+    /// Which workloads the full run runs.
+    pub set: WorkloadSet,
+    /// Run these changes at each size of `scaling::SIZES` and judge their
+    /// growth: one named change, or [`RowChange::ALL`] for `--scaling all`.
+    pub scaling: Option<Vec<RowChange>>,
     /// Run the Mount workload at each size of `scaling::SIZES`.
     pub mount: bool,
     /// Run the Mount workload at one size, in this process, and print its
@@ -51,12 +55,22 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
         counts,
         only,
         instructions,
+        set,
         scaling,
         mount,
         mount_memory,
         scene_run,
     } = flags;
     refuse_scaling_with_others(scaling.is_some(), only.is_some(), instructions)?;
+    refuse_off_path_with_modes(
+        set,
+        [
+            ("--scaling", scaling.is_some()),
+            ("--mount", mount),
+            ("--mount-memory", mount_memory.is_some()),
+            ("--scene-run", scene_run),
+        ],
+    )?;
     refuse_mount_with_others([
         ("--only", only.is_some()),
         ("--instructions", instructions),
@@ -70,6 +84,7 @@ pub fn options(mut args: impl Iterator<Item = String>) -> Result<Options, String
         settings: settings(counts.into_iter())?,
         only,
         instructions,
+        set,
         scaling,
         mount,
         mount_memory,
@@ -82,7 +97,8 @@ struct Flags {
     counts: Vec<String>,
     only: Option<String>,
     instructions: bool,
-    scaling: Option<RowChange>,
+    set: WorkloadSet,
+    scaling: Option<Vec<RowChange>>,
     mount: bool,
     mount_memory: Option<usize>,
     scene_run: bool,
@@ -95,6 +111,7 @@ impl Flags {
             "--only" if self.only.is_some() => return Err(format!("--only given twice: {USAGE}")),
             "--only" => self.only = Some(only_value(rest.next())?),
             "--instructions" => self.instructions = true,
+            "--off-path" => self.set = WorkloadSet::OffPath,
             "--mount" => self.mount = true,
             "--scene-run" => self.scene_run = true,
             "--mount-memory" => self.mount_memory = Some(mount_rows(rest.next())?),
@@ -158,9 +175,13 @@ fn mount_rows(value: Option<String>) -> Result<usize, String> {
         .ok_or_else(|| format!("--mount-memory needs a row count: {USAGE}"))
 }
 
-fn scaling_change(value: Option<String>) -> Result<RowChange, String> {
+fn scaling_change(value: Option<String>) -> Result<Vec<RowChange>, String> {
     let name = value.ok_or_else(|| format!("--scaling needs a change: {USAGE}"))?;
-    RowChange::named(&name).ok_or_else(|| format!("--scaling {name} is not a change: {USAGE}"))
+    match RowChange::named(&name) {
+        _ if name == "all" => Ok(RowChange::ALL.to_vec()),
+        Some(change) => Ok(vec![change]),
+        None => Err(format!("--scaling {name} is not a change: {USAGE}")),
+    }
 }
 
 fn only_value(value: Option<String>) -> Result<String, String> {
@@ -193,3 +214,7 @@ mod tests;
 #[cfg(test)]
 #[path = "args_scene_run_tests.rs"]
 mod scene_run_tests;
+
+#[cfg(test)]
+#[path = "args_off_path_tests.rs"]
+mod off_path_tests;
