@@ -2,8 +2,9 @@
 //! they say: a boolean attribute from an expression, which is on even
 //! when the expression is false, and a colon-named attribute that is
 //! not a directive, which would become an attribute with a colon in
-//! its name; and `class={..}` or `style={..}`, a string the style
-//! analysis cannot see into.
+//! its name; and `class={..}`, `style={..}` or a bound SVG
+//! presentation attribute (`fill={..}`), a value the style analysis
+//! cannot see into.
 
 use crate::CompileError;
 use crate::ast::{AttrValue, Attribute};
@@ -81,6 +82,9 @@ pub(super) fn refuse_string_styling(
         }
         "style" => {
             "`style={..}` is refused: the compiler must see every declaration an element can have; write the declarations under a class in the <style> section and toggle it with class:name={condition}"
+        }
+        "fill" | "stroke" | "stroke-width" => {
+            "a bound SVG paint attribute is refused: the compiler must see every value it can take (docs/plans/svg-support.md 3.12); write the property under a class in the <style> section and toggle it with class:name={condition}, or set a custom property"
         }
         _ => return Ok(()),
     };

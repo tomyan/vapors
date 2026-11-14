@@ -180,3 +180,19 @@ fn a_style_attribute_from_an_expression_is_refused() {
         "counter.wisp:4:6: `style={..}` is refused: the compiler must see every declaration an element can have; write the declarations under a class in the <style> section and toggle it with class:name={condition}"
     );
 }
+
+#[test]
+fn a_bound_svg_paint_attribute_is_refused() {
+    for name in ["fill", "stroke", "stroke-width"] {
+        // When
+        let err = refusal_with_flag(&format!(
+            "<svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" aria-hidden=\"true\"><path d=\"M2 8h12\" {name}={{flag.get().to_string()}}/></svg>"
+        ));
+
+        // Then
+        assert!(
+            err.contains("a bound SVG paint attribute is refused"),
+            "{name}: {err}"
+        );
+    }
+}

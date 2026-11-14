@@ -6,6 +6,7 @@
 use std::collections::BTreeMap;
 
 use super::inline::{INLINE_SHEET, INLINE_SPECIFICITY};
+use super::presentation::{PRESENTATION_SHEET, PRESENTATION_SPECIFICITY};
 use super::{CascadeRule, Environment, Origin};
 use crate::Position;
 use crate::ast::{ComponentValue, Declaration};
@@ -58,18 +59,37 @@ pub(crate) struct Winners<'a> {
     pub(crate) custom: BTreeMap<&'a str, Candidate<&'a [ComponentValue]>>,
 }
 
-/// The winners among the rules that match `element`, and the
-/// declarations of its `style` attribute (`inline`).
+/// The declarations attached to an element rather than matched: its
+/// presentation attributes and its `style` attribute.
+#[derive(Clone, Copy)]
+pub(crate) struct Attached<'a> {
+    pub(crate) presentation: &'a [Declaration],
+    pub(crate) inline: &'a [Declaration],
+}
+
+/// The winners among the element's presentation attributes, the rules
+/// that match `element`, and the declarations of its `style`
+/// attribute. Presentation attributes go first, so an author rule of
+/// equal standing (`*`) beats them by coming later.
 pub(crate) fn winners<'a, E: Element>(
     rules: impl Iterator<Item = &'a CascadeRule>,
     element: &E,
     env: &Environment,
-    inline: &'a [Declaration],
+    attached: Attached<'a>,
 ) -> Winners<'a> {
     let mut winners = Winners {
         longhands: vec![None; PROPERTIES.len()],
         custom: BTreeMap::new(),
     };
+    for decl in attached.presentation {
+        let standing = Standing {
+            rank: rank(Origin::Author, false),
+            specificity: PRESENTATION_SPECIFICITY,
+            order: 0,
+            sheet: PRESENTATION_SHEET,
+        };
+        winners.consider(decl, standing);
+    }
     for rule in rules {
         if !rule.conditions.hold(element, env) || !matches(&rule.rule.selector, element) {
             continue;
@@ -85,7 +105,7 @@ pub(crate) fn winners<'a, E: Element>(
             winners.consider(decl, standing);
         }
     }
-    for decl in inline {
+    for decl in attached.inline {
         let standing = Standing {
             rank: rank(Origin::Author, decl.important),
             specificity: INLINE_SPECIFICITY,

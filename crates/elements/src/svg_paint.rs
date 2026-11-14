@@ -14,7 +14,8 @@ use crate::arena::Arena;
 use crate::layout::{BoxRect, Content, LayoutBox};
 use crate::paint::PaintInput;
 use crate::painting::Painting;
-use crate::svg::{positive, view_box};
+use crate::style::UsedMap;
+use crate::svg::view_box;
 
 /// The icon `node` draws when it is an `svg`; `None` for any other
 /// element.
@@ -22,7 +23,7 @@ use crate::svg::{positive, view_box};
 /// # Panics
 /// When the svg is outside the subset: `svg_checks` refuses it before
 /// layout, so reaching here with one is a bug in those checks.
-pub(crate) fn icon(arena: &Arena, node: NodeId) -> Option<Rc<Icon>> {
+pub(crate) fn icon(arena: &Arena, used: &UsedMap, node: NodeId) -> Option<Rc<Icon>> {
     let element = arena.get(node, "svg_paint").element()?;
     if element.tag != "svg" {
         return None;
@@ -33,19 +34,17 @@ pub(crate) fn icon(arena: &Arena, node: NodeId) -> Option<Rc<Icon>> {
         .children(node)
         .into_iter()
         .filter(|&child| crate::svg::is(arena, child, "path"))
-        .map(|child| stroke(arena, child).expect(passed))
+        .map(|child| stroke(arena, used, child).expect(passed))
         .collect();
     Some(Rc::new(Icon::new(view_box, strokes).expect(passed)))
 }
 
-/// The stroke the `path` `child` draws; `None` when it is outside the
-/// subset.
-fn stroke(arena: &Arena, child: NodeId) -> Option<IconStroke> {
+/// The stroke the `path` `child` draws, its width from its used
+/// style; `None` when it is outside the subset.
+fn stroke(arena: &Arena, used: &UsedMap, child: NodeId) -> Option<IconStroke> {
     let attributes = &arena.get(child, "svg_paint").element()?.attributes;
     let path = IconPath::parse(attributes.get("d")?).ok()?;
-    let width = attributes
-        .get("stroke-width")
-        .map_or(Some(1.0), |w| positive(w))?;
+    let width = used.get(&child)?.svg.stroke_width;
     Some(IconStroke { path, width })
 }
 

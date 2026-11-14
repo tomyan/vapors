@@ -52,6 +52,8 @@ code sets it.
   the two is required. A button holding a named image takes the
   image's `aria-label` into its name from content, as Chromium does.
 - `id`, `class`, and `xmlns` with the SVG namespace, which is ignored.
+- `fill`, `stroke` and `stroke-width`, which its paths inherit (see
+  `<path>`).
 - Children: `<path>` elements and whitespace only.
 - CSS: sized by its attributes only, so `width`, `height`, `min-*` and
   `max-*` in CSS are refused (in Chromium the attributes are
@@ -78,14 +80,20 @@ code sets it.
   (`C`) and quadratic (`Q`) curves are stroked as arcs are (zeno
   flattens both); the smooth forms `S` and `T` are refused naming the
   fix until docs/plans/svg-support.md V1.
-- `fill="none"`: required (SVG's default fill is black).
-- `stroke="currentColor"`: required.
-- `stroke-width`: a positive number in viewBox units; 1 when absent, as
-  in SVG.
+- `fill`, `stroke` and `stroke-width`: presentation attributes. They
+  are the CSS properties of their names, ranked below every author rule
+  as in Chromium, so a rule can give them instead (one-scene S4a; on the
+  `<svg>` they are inherited by its paths). Paint must come out as no
+  fill (SVG's default fill is black, so write `fill="none"`), a stroke
+  in the path's own colour (`stroke="currentColor"`), and a stroke
+  width above zero in viewBox units, written as a number or in px; 1
+  when nothing gives one, as in SVG. A bound one (`fill={..}`) is
+  refused at build time.
 - Nothing else: no `class`, `style`, `transform`, caps or joins. Joins
   are miter with limit 4 and caps butt, SVG's defaults.
 - CSS: a `color` different from its svg's, `display: none`, and a
-  `visibility` different from its svg's are refused. Paint strokes
+  `visibility` different from its svg's are refused, as is paint the
+  icon route does not draw (above). Paint strokes
   every path of an icon in the svg's colour and shows them with the
   svg's visibility, so a path styled otherwise would not be drawn as
   styled.
@@ -164,7 +172,8 @@ numbers. Its `path` children are not boxes.
   snapped content box in device pixels and draws with `ICON_BLEND`
   (gamma 1, contrast 0), which the text shader makes a plain blend.
 - Built in 2b: an svg's `Icon` is built with its box
-  (`elements::svg_paint`), stroke width 1 when absent. Paint pushes
+  (`elements::svg_paint`), each path's stroke width from its used
+  style. Paint pushes
   `Item::Icon` with an `IconId` that `Painted::icon` resolves, the
   colour the svg's used `color`, and none when the svg is not
   `visibility: visible`. Consecutive icons under one clip are one

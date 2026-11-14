@@ -2,7 +2,17 @@
 
 use vapors_scene::Color as Rgba;
 
+use crate::property::PropertyId;
+use crate::property::longhands::{FILL, STROKE};
 use crate::value::{Calc, CalcKind, Color, ColorScheme, Context, Length, LengthUnit, Value};
+
+/// Whether `id` keeps `currentcolor` as its computed value, as CSS
+/// Color 4 says every property does: SVG paint inherits the keyword,
+/// so a path takes its own `color`, not its svg's (Chromium). Other
+/// properties still resolve it at compute time (issue #301).
+pub(crate) fn keeps_current_color(id: PropertyId) -> bool {
+    id == FILL || id == STROKE
+}
 use crate::{Error, Position, Result};
 
 /// Lengths to px (percentages kept), `calc()` evaluated where it can be,
