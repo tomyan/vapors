@@ -37,23 +37,24 @@ impl ClosedFormShape {
     /// # Errors
     /// A geometry [`check_geometry`] refuses, a mesh, a stroke width
     /// that is not a finite number above zero, or a transform with a
-    /// value that is not finite; the error names the value.
+    /// value or a determinant that is not finite; the error names the
+    /// value, the fix and a reproducing command.
     pub fn new(
         geometry: &Geometry,
         stroke: Option<f32>,
         transform: [f32; 6],
         colour: Color,
     ) -> Result<Option<Self>, ClosedFormError> {
-        check_geometry(geometry).map_err(ClosedFormError)?;
+        check_geometry(geometry).map_err(|reason| {
+            refused(
+                &reason,
+                "the shape table's check refuses this geometry, so fix the emitter that wrote it",
+                REPRODUCE,
+            )
+        })?;
         let (kind, numbers, radius) = form(geometry)?;
         check_stroke(stroke)?;
-        if !transform.iter().all(|v| v.is_finite()) {
-            return Err(ClosedFormError(format!(
-                "transform {transform:?} is not finite"
-            )));
-        }
-        let [a, b, c, d, ..] = transform;
-        if a * d - b * c == 0.0 {
+        if check_transform(transform, REPRODUCE)? == 0.0 {
             return Ok(None);
         }
         Ok(Some(Self {
@@ -99,19 +100,58 @@ fn form(geometry: &Geometry) -> Result<(f32, [f32; 4], f32), ClosedFormError> {
         Geometry::Ellipse { centre, radii } => {
             Ok((1.0, [centre[0], centre[1], radii[0], radii[1]], 0.0))
         }
-        Geometry::Mesh { .. } => Err(ClosedFormError(
-            "a mesh is not a closed form; the mesh pipeline (one-scene S3a2) draws it".to_owned(),
+        Geometry::Mesh { .. } => Err(refused(
+            "a mesh is not a closed form",
+            "draw a mesh entry with the mesh pipeline (one-scene S3a2)",
+            REPRODUCE,
         )),
     }
 }
 
 fn check_stroke(stroke: Option<f32>) -> Result<(), ClosedFormError> {
     match stroke {
-        Some(width) if !(width.is_finite() && width > 0.0) => Err(ClosedFormError(format!(
-            "stroke width {width} is not a finite number above zero"
-        ))),
+        Some(width) if !(width.is_finite() && width > 0.0) => Err(refused(
+            &format!("stroke width {width} is not a finite number above zero"),
+            "give the shape a stroke-width above zero",
+            REPRODUCE,
+        )),
         _ => Ok(()),
     }
+}
+
+/// `transform`'s determinant, when it and every value are finite; zero
+/// for a transform with no area.
+pub(crate) fn check_transform(
+    transform: [f32; 6],
+    reproduce: &str,
+) -> Result<f32, ClosedFormError> {
+    let fix = "give the element a transform whose values and scale are finite";
+    if !transform.iter().all(|v| v.is_finite()) {
+        return Err(refused(
+            &format!("transform {transform:?} is not finite"),
+            fix,
+            reproduce,
+        ));
+    }
+    let [a, b, c, d, ..] = transform;
+    let determinant = a * d - b * c;
+    if !determinant.is_finite() {
+        return Err(refused(
+            &format!("transform {transform:?} has determinant {determinant}, which is not finite"),
+            fix,
+            reproduce,
+        ));
+    }
+    Ok(determinant)
+}
+
+/// The command that reproduces a closed form's refusal.
+const REPRODUCE: &str = "cargo test -p vapors-renderer --lib closed_form_shape";
+
+/// The refusal of `what`, with `fix` and the command, `reproduce`, that
+/// runs the tests of that refusal.
+pub(crate) fn refused(what: &str, fix: &str, reproduce: &str) -> ClosedFormError {
+    ClosedFormError(format!("{what}; {fix}; reproduce with `{reproduce}`"))
 }
 
 impl fmt::Display for ClosedFormError {

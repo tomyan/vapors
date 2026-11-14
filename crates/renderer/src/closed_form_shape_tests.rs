@@ -31,7 +31,9 @@ fn a_stroke_width_that_is_not_above_zero_is_refused_naming_it() {
     for width in [0.0, -1.0, f32::NAN, f32::INFINITY] {
         assert_eq!(
             refused(shape(&CIRCLE, Some(width), IDENTITY)),
-            format!("stroke width {width} is not a finite number above zero")
+            format!(
+                "stroke width {width} is not a finite number above zero; give the shape a stroke-width above zero; reproduce with `cargo test -p vapors-renderer --lib closed_form_shape`"
+            )
         );
     }
 }
@@ -47,7 +49,7 @@ fn geometry_the_shapes_check_refuses_is_refused_with_its_reason() {
     // When, Then
     assert_eq!(
         refused(shape(&flat, None, IDENTITY)),
-        "radii [2.0, 0.0] is not above zero"
+        "radii [2.0, 0.0] is not above zero; the shape table's check refuses this geometry, so fix the emitter that wrote it; reproduce with `cargo test -p vapors-renderer --lib closed_form_shape`"
     );
 }
 
@@ -64,7 +66,7 @@ fn a_mesh_is_refused_as_the_mesh_pipelines() {
     // When, Then
     assert_eq!(
         refused(shape(&mesh, None, IDENTITY)),
-        "a mesh is not a closed form; the mesh pipeline (one-scene S3a2) draws it"
+        "a mesh is not a closed form; draw a mesh entry with the mesh pipeline (one-scene S3a2); reproduce with `cargo test -p vapors-renderer --lib closed_form_shape`"
     );
 }
 
@@ -73,7 +75,19 @@ fn a_transform_with_a_value_that_is_not_finite_is_refused() {
     // When, Then
     assert_eq!(
         refused(shape(&CIRCLE, None, [1.0, 0.0, 0.0, f32::NAN, 0.0, 0.0])),
-        "transform [1.0, 0.0, 0.0, NaN, 0.0, 0.0] is not finite"
+        "transform [1.0, 0.0, 0.0, NaN, 0.0, 0.0] is not finite; give the element a transform whose values and scale are finite; reproduce with `cargo test -p vapors-renderer --lib closed_form_shape`"
+    );
+}
+
+#[test]
+fn a_transform_whose_determinant_is_not_finite_is_refused() {
+    // When: each value finite, the scale past f32
+    let huge = [1e30, 0.0, 0.0, 1e30, 0.0, 0.0];
+
+    // Then: not taken for a transform with area, nor for none
+    assert_eq!(
+        refused(shape(&CIRCLE, None, huge)),
+        "transform [1e30, 0.0, 0.0, 1e30, 0.0, 0.0] has determinant inf, which is not finite; give the element a transform whose values and scale are finite; reproduce with `cargo test -p vapors-renderer --lib closed_form_shape`"
     );
 }
 
