@@ -107,7 +107,8 @@ pub fn remove_if(dir: &Path, holder: &Holder) {
 }
 
 /// Remove staged files (`quiet.holder.<pid>.<n>`) whose process has gone:
-/// left by a taker that crashed between staging and linking.
+/// left by a taker that crashed between staging and linking. A file whose
+/// process cannot be looked up is kept, never taken as gone.
 fn sweep_staged(dir: &Path) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
@@ -121,10 +122,17 @@ fn sweep_staged(dir: &Path) {
                 .parse::<u32>()
                 .ok()
         });
-        if staged_by.is_some_and(|pid| !Path::new(&format!("/proc/{pid}")).exists()) {
+        if staged_by.is_some_and(|pid| process_gone(std::fs::metadata(format!("/proc/{pid}")))) {
             let _ = std::fs::remove_file(&path);
         }
     }
+}
+
+/// Whether a process is gone, from the lookup of its /proc directory:
+/// only when it is not found. Any other error is unresolvable, and reads
+/// as not gone.
+fn process_gone(lookup: std::io::Result<std::fs::Metadata>) -> bool {
+    matches!(lookup, Err(e) if e.kind() == std::io::ErrorKind::NotFound)
 }
 
 /// Write `holder` whether or not the lock is held, as another process
@@ -134,4 +142,17 @@ pub fn write(dir: &Path, holder: &Holder) -> Result<(), String> {
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let path = dir.join(FILE);
     std::fs::write(&path, holder.line()).map_err(|e| format!("{}: {e}", path.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_process_is_gone_only_when_its_proc_directory_is_not_found() {
+        use std::io::{Error, ErrorKind};
+        assert!(process_gone(Err(Error::from(ErrorKind::NotFound))));
+        assert!(!process_gone(Err(Error::from(ErrorKind::PermissionDenied))));
+        assert!(!process_gone(std::fs::metadata("/proc/self")));
+    }
 }

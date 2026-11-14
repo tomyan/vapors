@@ -95,13 +95,22 @@ impl Holder {
     ///
     /// Whether its process lives cannot be read: never taken as ended.
     pub fn ended(&self, now_ms: u64) -> Result<bool, String> {
+        self.ended_given(now_ms, Owner::liveness)
+    }
+
+    /// [`Holder::ended`], with how its owner's liveness is read.
+    fn ended_given(
+        &self,
+        now_ms: u64,
+        liveness: impl Fn(&Owner) -> Result<bool, String>,
+    ) -> Result<bool, String> {
         if self.left(now_ms).is_none() {
             return Ok(true);
         }
         if self.form == Form::Hold {
             return Ok(false);
         }
-        self.owner.liveness().map(|live| !live).map_err(|why| {
+        liveness(&self.owner).map(|live| !live).map_err(|why| {
             format!(
                 "whether the quiet lock's holder, pid {}, lives: {why}",
                 self.owner.pid
@@ -121,5 +130,34 @@ impl Holder {
             self.form.name(),
             left.as_secs()
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_holder_whose_liveness_cannot_be_read_is_refused_not_taken_as_ended() {
+        // Given
+        let run = Holder::me("/w/a", Duration::from_secs(60), Form::Run, "x");
+        let unreadable = |_: &Owner| Err("/proc/1/stat: permission denied".to_owned());
+
+        // When
+        let ended = run.ended_given(super::super::now_ms(), unreadable);
+
+        // Then
+        let refusal = ended.expect_err("refused");
+        assert!(
+            refusal.contains("permission denied") && refusal.contains("lives"),
+            "{refusal}"
+        );
+    }
+
+    #[test]
+    fn a_hold_by_hand_does_not_read_its_owner_s_liveness() {
+        let hold = Holder::me("/w/a", Duration::from_secs(60), Form::Hold, "x");
+        let unread = |_: &Owner| -> Result<bool, String> { panic!("read") };
+        assert_eq!(hold.ended_given(super::super::now_ms(), unread), Ok(false));
     }
 }
