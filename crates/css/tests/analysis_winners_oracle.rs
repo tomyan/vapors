@@ -21,7 +21,21 @@ use vapors_css::property::PropertyId;
 
 /// The pages the hand-written tests use, and a few more shapes.
 fn pages() -> Vec<Page> {
-    let mut pages = vec![
+    let mut pages = ranked_pages();
+    pages.extend(sheet_and_value_pages());
+    let mut styled = page(
+        "",
+        "div.card { color: red }\n.open { width: 1px !important }",
+        &[],
+    );
+    styled.style = Some("color: green; width: 2px");
+    pages.push(styled);
+    pages
+}
+
+/// Rank, specificity and order within the own sheets.
+fn ranked_pages() -> Vec<Page> {
+    vec![
         page("", ".card { color: red; width: 4px }", &[]),
         page("", ".card { color: red }\n.open { color: blue }", &[]),
         page("", ".open { color: blue }\n.card { color: red }", &[]),
@@ -42,6 +56,12 @@ fn pages() -> Vec<Page> {
         ),
         page("div { color: red }", ".card { color: blue }", &[]),
         page("", ".card { margin-top: 1px }\n.open { margin: 2px }", &[]),
+    ]
+}
+
+/// The other sheets, and values the cascade resolves against context.
+fn sheet_and_value_pages() -> Vec<Page> {
+    vec![
         page(
             "",
             ".card { color: blue }",
@@ -63,15 +83,7 @@ fn pages() -> Vec<Page> {
             ".card:hover { color: red }\n.open:hover { color: blue }",
             &[".card { color: green }"],
         ),
-    ];
-    let mut styled = page(
-        "",
-        "div.card { color: red }\n.open { width: 1px !important }",
-        &[],
-    );
-    styled.style = Some("color: green; width: 2px");
-    pages.push(styled);
-    pages
+    ]
 }
 
 #[test]
