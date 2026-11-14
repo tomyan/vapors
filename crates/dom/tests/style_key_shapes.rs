@@ -78,6 +78,10 @@ fn an_attribute_a_field_carries_or_listed_twice_is_refused() {
             "lists `style` under `attributes`, which its own field carries",
         ),
         (
+            &[("Data-Wisp", "s")],
+            "lists `Data-Wisp` under `attributes`, which its own field carries",
+        ),
+        (
             &[("title", "a"), ("Title", "b")],
             "lists attribute `Title` twice",
         ),
