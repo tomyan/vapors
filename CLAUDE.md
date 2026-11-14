@@ -27,6 +27,27 @@ cargo xtask serve         the release build of main on the tailnet where [serve]
                           tailscale serve mounts it, and again through the tailnet URL after.
                           Needs lingering (loginctl enable-linger); prints the URL
 cargo xtask test          one tier (default unit)
+cargo xtask scaling       vapors-perf's scaling judge (`--scaling all`, every change) in
+                          release on a clean tree; ends `scaling: pass|fail <sha>`
+scripts/nightly-scaling.sh [--install]
+                          that judge on origin/main in ~/.cache/w-nightly/vapors, a GitHub
+                          issue per failing change, closed when it passes; --install writes
+                          the systemd --user timer (03:00) and does not enable it:
+                          systemctl --user enable --now vapors-nightly-scaling.timer
+scripts/nightly-scaling-check.sh
+                          its guards with a fake git and gh: network deadlines, the lock,
+                          the runner's error quoted in its issue
+scripts/nightly-scaling-issues-check.sh
+                          its issues and run markers against scripts/fixtures/
+                          nightly-scaling.log, with a fake gh
+cargo xtask quiet 10 -- <command>
+                          keep xtask's ci, test and gate runs from starting (each waits,
+                          saying who holds it and when it expires) once running ones
+                          finish, run the command, release; `quiet hold [minutes]` (15
+                          by default, 60 at most) keeps it after returning (xtask runs
+                          from the same worktree go on), `quiet release` there ends it.
+                          The gate holds it for its run; a gate's or a command's hold
+                          also ends when its process does
 cargo run -p vapors-app --example demo -- hello
                           an F2c demo in a window (crates/demos)
 cargo xtask screenshot demo target/hello.png -- hello
@@ -59,7 +80,10 @@ target, #35). xtask refuses to build without it (`cargo xtask setup` installs it
 Incremental compilation is off for every build (`.cargo/config.toml`;
 `CARGO_INCREMENTAL` set in the environment overrides it): xtask's builds
 go through sccache, which needs it off, and an incremental target of a
-plain build reached 104 GB. A worktree's `target` lives under
+plain build reached 104 GB. Plain `cargo` builds 4 jobs at once (`[build] jobs` in
+`.cargo/config.toml`), as xtask's steps do; at most three `cargo xtask
+ci` runs go at once on the machine, and the next waits for a slot,
+naming who holds them. A worktree's `target` lives under
 `~/.cache`, never the `/tmp` tmpfs. When its PR merges, empty it and keep
 the directory:
 `find <target dir> -mindepth 1 -maxdepth 1 -exec rm -rf {} +`.
@@ -74,9 +98,15 @@ the directory:
 - Tests first. A check is proven by breaking what it guards, watching
   it fail, restoring. Say so in the commit.
 - A tier that cannot run fails and names what is missing. Never skip.
-- Files about 200 lines (checked: the `files` step of `cargo xtask lint`,
-  `[files] max_lines` in `.config/factory.toml`, allow with a reason);
-  functions 10 to 15 lines; no `unsafe`.
+- Files about 200 lines, functions 10 to 15 lines, no `unsafe`. The
+  checks sit at the tail (`cargo xtask lint`: `[files] max_lines` in
+  `.config/factory.toml`, clippy's `too_many_lines` and
+  `cognitive_complexity` at clippy.toml's thresholds; over one, fix it
+  or allow it at the site with a comment naming the one concept it
+  holds). The band below is judged in review (`docs/review.md`);
+  `cargo xtask quality` lists its worst, nightly and on demand, and
+  never fails on a finding. A split made only to pass a number is a
+  review finding.
 - Warnings are errors in CI (`-D warnings`, clippy pedantic).
 - Every failure message names the fix and the reproducing command.
 - Where a service asks for a contact address (a crates.io User-Agent,
@@ -89,8 +119,9 @@ the directory:
 2. Red, green, refactor. Commit.
 3. `cargo xtask ci` green locally.
 4. Pull request. An independent review agent reads the diff with the
-   "Failure must be loud" rules and no author context; findings are
-   verified before action.
+   "Failure must be loud" rules and `docs/review.md` (single
+   responsibility, reaching through other objects, splits made to pass
+   a number) and no author context; findings are verified before action.
 5. Merge on the local gate, not GitHub CI (Tom, 2026-11-11, as touche
    since 2026-10-23): once the review's findings are in, update the
    branch onto current `main`, run `cargo xtask gate --pr <n>` at the

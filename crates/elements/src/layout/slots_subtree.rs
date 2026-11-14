@@ -21,6 +21,11 @@ impl Taken {
     pub(crate) fn unclaimed(&self) -> Vec<(usize, Key)> {
         self.slots.iter().map(|(&key, &slot)| (slot, key)).collect()
     }
+
+    /// The slot `key` held, when its box was taken and not put back.
+    pub(crate) fn held(&self, key: Key) -> Option<usize> {
+        self.slots.get(&key).copied()
+    }
 }
 
 impl Placed {
@@ -49,7 +54,7 @@ impl Placed {
     }
 
     /// Takes out the box at `slot` into `taken`; its children.
-    fn take_box(&mut self, at: usize, taken: &mut Taken) -> Vec<usize> {
+    pub(super) fn take_box(&mut self, at: usize, taken: &mut Taken) -> Vec<usize> {
         let old = std::mem::replace(&mut self.boxes[at], LayoutBox::vacant());
         let key = self.slots.keys[at]
             .take()
@@ -109,6 +114,8 @@ impl Placed {
     /// mapped to slots by `to`.
     fn put_box(&mut self, mut layout_box: LayoutBox, (key, slot): (Key, usize), to: &[usize]) {
         self.hold(key, slot);
+        // a container built again starts its lane afresh
+        self.lanes.remove(&slot);
         for child in &mut layout_box.children {
             *child = to[*child];
         }
@@ -116,14 +123,14 @@ impl Placed {
     }
 
     /// Records that `key` holds `slot`.
-    fn hold(&mut self, key: Key, slot: usize) {
+    pub(super) fn hold(&mut self, key: Key, slot: usize) {
         let earlier = self.slots.of.insert(key, slot);
         assert!(earlier.is_none(), "box key {key:?} placed twice");
         self.slots.keys[slot] = Some(key);
     }
 
     /// The slot `key` takes, growing the boxes for a new one.
-    fn slot_for(&mut self, key: Key, taken: &mut Taken) -> usize {
+    pub(super) fn slot_for(&mut self, key: Key, taken: &mut Taken) -> usize {
         assert!(
             self.slots.of(key).is_none(),
             "box key {key:?} is built again but holds a slot outside every rebuilt subtree; \
@@ -150,6 +157,9 @@ impl Placed {
 
     /// Frees the taken slots no new box took, once every subtree is put.
     pub(crate) fn free_taken(&mut self, taken: &Taken) {
+        for slot in taken.slots.values() {
+            self.lanes.remove(slot);
+        }
         self.slots.free.extend(taken.slots.values().copied());
         self.slots.free.sort_unstable_by(|a, b| b.cmp(a));
         debug_assert_eq!(

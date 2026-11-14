@@ -37,6 +37,20 @@ pub enum Command {
     /// Check every source file is within `[files] max_lines` (the `files` step).
     #[command(hide = true)]
     CheckFiles,
+    /// Print the quality signals: functions, complexity, files and field
+    /// chains in the band from the guideline to the hard limit (nightly
+    /// and on demand; advisory, never failing on a finding).
+    Quality {
+        /// Print the measurement the thresholds were set from instead:
+        /// clippy's counts (a clippy run at threshold 1), the file-cap
+        /// fit, and the agreement of this command's counts with clippy's.
+        #[arg(long)]
+        distributions: bool,
+        /// Print every sample, one per line as `<metric>\t<value>\t<where>`,
+        /// for checking the counts against clippy's.
+        #[arg(long, conflicts_with = "distributions")]
+        list: bool,
+    },
     /// Write docs/gpu-limits.md from the adapters and limits wgpu reports here.
     GpuInfo,
     /// Run a windowed example under Xvfb and save its frame as a PNG.
@@ -97,6 +111,8 @@ pub enum Command {
         #[arg(long)]
         replace: bool,
     },
+    /// Run vapors-perf's scaling judge over every change, in release, on a clean tree.
+    Scaling,
     /// Run every step of .github/workflows/ci.yml here, in order, ending `gate: pass <sha>`.
     Gate {
         /// Post the gate's last lines to this pull request (`--pr` alone:
@@ -122,6 +138,14 @@ pub enum Command {
     CheckXtaskTwin {
         /// The sibling checkout, such as ../vapors.
         sibling: PathBuf,
+    },
+    /// Keep xtask's ci, test and gate runs from starting, for a timed run:
+    /// `quiet <minutes> -- <command>`, `quiet hold [<minutes>]` (15 by
+    /// default), or `quiet release`. A hold ends at its deadline.
+    Quiet {
+        /// The form and its arguments.
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
     },
     /// Run one test tier (default: unit).
     Test {

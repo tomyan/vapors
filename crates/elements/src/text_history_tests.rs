@@ -18,6 +18,7 @@ fn steps(kinds: &[EditKind]) -> usize {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)] // one table of edit sequences, a case per grouping rule
 fn edits_group_into_steps_as_chromium_groups_them() {
     let cases: &[(&str, &[EditKind], usize)] = &[
         ("typing is one step", &[Insert, Insert, Insert], 1),

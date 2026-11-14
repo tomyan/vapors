@@ -63,6 +63,8 @@ pub struct Document {
     pub(crate) images: crate::images::Images,
     /// What the a11y mirror keeps between takes (R6).
     pub(crate) ax: crate::a11y_mirror_state::AxMirror,
+    /// Each watched mesh anchor's appearance sink (`scene_sinks`).
+    pub(crate) sinks: crate::node_map::NodeMap<vapors_dom::AppearanceSink>,
 }
 
 impl Document {
@@ -102,6 +104,7 @@ impl Document {
             thumbs_shown: true,
             images: crate::images::Images::default(),
             ax: crate::a11y_mirror_state::AxMirror::default(),
+            sinks: crate::node_map::NodeMap::default(),
         }
     }
 

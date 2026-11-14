@@ -8,7 +8,7 @@ use crate::run::Workload;
 fn every_kind_and_change_makes_three_changes() {
     for kind in Kind::ALL {
         for &change in kind.changes() {
-            let mut workload = OffPath::new(kind, 60, change);
+            let mut workload = OffPath::new(kind, 200, change);
             for sample in 0..3 {
                 workload.change(sample);
             }

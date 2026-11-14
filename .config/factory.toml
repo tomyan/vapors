@@ -33,12 +33,14 @@ port = "8791"
 # The https port `cargo xtask dev` serves trunk's debug page on, at /.
 https = "8446"
 
-# `cargo xtask ci` and `cargo xtask gate` wait first while the one-minute
-# load is over `threshold`, and go on at `deadline_minutes` saying so
-# (xtask/src/load_wait.rs; why it goes on rather than fails:
-# docs/decisions/2026-11-01-load-wait-deadline.md). Unset, the threshold
-# is the machine's core count as std::thread::available_parallelism reads
-# it (12 on the dev machine, 2026-11-01): over that, runs queue for CPUs.
+# `cargo xtask ci` and `cargo xtask gate` wait first while the tasks
+# runnable (/proc/loadavg's fourth field, read every 5 s), averaged over
+# the last six readings, are over `threshold`, and go on at
+# `deadline_minutes` saying so (xtask/src/load_wait.rs; why it goes on
+# rather than fails: docs/decisions/2026-11-01-load-wait-deadline.md).
+# Unset, the threshold is the machine's core count as
+# std::thread::available_parallelism reads it (12 on the dev machine,
+# 2026-11-01): over that, runs queue for CPUs.
 # The deadline defaults to 10 minutes, the wait agents did by hand before.
 # `wait = "false"` turns the wait off, said on every run, for a machine
 # without /proc/loadavg. None is set here; to change them:
@@ -48,10 +50,26 @@ https = "8446"
 # deadline_minutes = "10"
 
 [files]
-# The file-length rule as a check (the `files` step of `lint` and `ci`).
-# The rule says about 200; 220 leaves room for a module doc comment and
-# a test-module mount without forcing a split that would only move lines.
-max_lines = "220"
+# The file-length rule's hard limit (the `files` step of `lint` and `ci`).
+# The guideline of about 200 is `[quality] file_lines` below; a file
+# between the two is for review to judge as one concept or two. 320 is
+# the p99 a lognormal fit gives main's file sizes on 2026-11-13 from
+# their median (104) and p90 (193), the part of the distribution the old
+# cap of 220 did not squash (docs/decisions/2026-11-13-quality-thresholds.md);
+# `cargo xtask quality --distributions` measures again.
+max_lines = "320"
+
+# The guidelines the quality signals print the band above (`cargo xtask
+# quality`, nightly and on demand; advisory). The hard limits are
+# `max_lines` above and clippy.toml. The rules' own numbers: files about
+# 200 (220 with a module doc comment and a test-module mount), functions
+# 10 to 15 lines; complexity 6 is main's p99 on 2026-11-13 (clippy's
+# count); a chain of 3 hops (`self.a.b.c`) reads through two other types.
+[quality]
+file_lines = "220"
+function_lines = "15"
+complexity = "6"
+chain_hops = "3"
 
 # Files allowed over the limit, each with its reason. `cargo xtask check-files`
 # and `lint --verbose` print them; the `files` step shows only refusals.

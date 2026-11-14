@@ -11,7 +11,7 @@ use super::flex_tests::column_with_margins;
 use super::tests::{ROW, Texts, changed_row, rebuild_row};
 use crate::layout::asked::SizeAnswer;
 use crate::layout::tree::cache::ASKED_LIMIT;
-use crate::layout::{Calcs, Placed, TextCache, lay_out};
+use crate::layout::{Calcs, Placed, Settling, TextCache, lay_out};
 
 #[test]
 fn a_block_row_records_its_answer_to_a_size_query_and_none_to_a_layout() {
@@ -128,7 +128,7 @@ fn laid_out_at(texts: &mut Texts, mut placed: Placed, widths: impl Iterator<Item
             1.0,
             size,
             &Calcs::default(),
-            Vec::new(),
+            Settling::of(Vec::new()),
         )
         .unwrap_or_else(|failed| panic!("refused: {}", failed.0))
         .0;

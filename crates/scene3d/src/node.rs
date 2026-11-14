@@ -1,6 +1,8 @@
 //! A node: what it is, where it sits, and reading it from the scene.
 
-use crate::{CameraHandle, Colour, GeometryId, NodeId, Projection, Scene, StoreError, Transform};
+use crate::{
+    CameraHandle, Colour, GeometryHandle, NodeId, Projection, Scene, StoreError, Transform,
+};
 use glam::Mat4;
 
 /// What a node is.
@@ -10,8 +12,9 @@ pub enum NodeKind {
     Group,
     /// Draws geometry in one colour.
     Mesh {
-        /// The triangles, given to the scene renderer's [`crate::Meshes`].
-        geometry: GeometryId,
+        /// The triangles, given to the scene renderer's [`crate::Meshes`]:
+        /// the node's handle keeps them held while it lives.
+        geometry: GeometryHandle,
         /// Drawn unlit.
         colour: Colour,
     },
@@ -31,8 +34,10 @@ pub(crate) struct Node {
     pub(crate) parent: Option<NodeId>,
     pub(crate) children: Vec<NodeId>,
     pub(crate) world: Mat4,
-    /// How many times `world` has been recomputed.
+    /// Advances when `world` is recomputed or the mesh's colour changes.
     pub(crate) world_version: u64,
+    /// Drawn; set by `Scene::set_appearance`.
+    pub(crate) visible: bool,
     pub(crate) dirty: bool,
 }
 

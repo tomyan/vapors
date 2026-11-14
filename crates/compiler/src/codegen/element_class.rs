@@ -7,6 +7,7 @@ use super::element::attribute_named;
 use super::emit::Emitter;
 use crate::CompileError;
 use crate::ast::{AttrValue, Attribute, Attributes, Expr};
+use crate::source::Source;
 
 const PREFIX: &str = "class:";
 
@@ -15,23 +16,50 @@ pub(super) fn is_class_directive(attribute: &Attribute) -> bool {
     attribute.name.starts_with(PREFIX)
 }
 
-impl Emitter<'_> {
-    /// Each `class:` directive's name, in template order, for the key's
-    /// toggles; a name that is not a class is refused.
-    pub(super) fn directive_names<'e>(
-        &self,
-        attributes: &'e Attributes,
-    ) -> Result<Vec<&'e str>, CompileError> {
-        attributes
-            .iter()
-            .filter(|attribute| is_class_directive(attribute))
-            .map(|attribute| {
-                directive_name(attribute)
-                    .map_err(|message| self.source.error(attribute.offset, message))
-            })
-            .collect()
-    }
+/// Each `class:` directive's name, in template order, for the key's
+/// toggles; a name that is not a class is refused.
+pub(crate) fn directive_names<'e>(
+    source: &Source,
+    attributes: &'e Attributes,
+) -> Result<Vec<&'e str>, CompileError> {
+    attributes
+        .iter()
+        .filter(|attribute| is_class_directive(attribute))
+        .map(|attribute| {
+            directive_name(attribute).map_err(|message| source.error(attribute.offset, message))
+        })
+        .collect()
+}
 
+/// The element's literal `class` names for its key; refused when one
+/// is also a directive's class. `class={..}` was refused before this
+/// (`attribute_refusals`, c1b).
+pub(crate) fn literal_classes<'e>(
+    source: &Source,
+    attributes: &'e Attributes,
+) -> Result<Vec<&'e str>, CompileError> {
+    let Some(class) = attribute_named(attributes, "class") else {
+        return Ok(Vec::new());
+    };
+    let AttrValue::Literal(value) = &class.value else {
+        // `emit_element` refuses `class={..}` first; a caller that
+        // did not still refuses here, naming the site
+        refuse_string_styling(source, class)?;
+        return Err(source.error(class.offset, "`class={..}` cannot be part of the element's style key: write class=\"name\" and class:name={condition}"));
+    };
+    for attribute in attributes.iter().filter(|a| is_class_directive(a)) {
+        let name = &attribute.name[PREFIX.len()..];
+        if value.split_ascii_whitespace().any(|set| set == name) {
+            return Err(source.error(
+                attribute.offset,
+                format!("`{PREFIX}{name}` toggles a class the literal `class` already sets: remove `{name}` from `class=\"...\"`"),
+            ));
+        }
+    }
+    Ok(value.split_ascii_whitespace().collect())
+}
+
+impl Emitter<'_> {
     /// The effect that toggles `var`'s directives, when `attributes`
     /// has any.
     pub(super) fn emit_class_directives(
@@ -55,34 +83,6 @@ impl Emitter<'_> {
         )];
         self.emit_effect(&clones, &body);
         Ok(())
-    }
-
-    /// The element's literal `class` names for its key; refused when
-    /// one is also a directive's class. `class={..}` was refused before
-    /// this (`attribute_refusals`, c1b).
-    pub(super) fn literal_classes<'e>(
-        &self,
-        attributes: &'e Attributes,
-    ) -> Result<Vec<&'e str>, CompileError> {
-        let Some(class) = attribute_named(attributes, "class") else {
-            return Ok(Vec::new());
-        };
-        let AttrValue::Literal(value) = &class.value else {
-            // `emit_element` refuses `class={..}` first; a caller that
-            // did not still refuses here, naming the site
-            refuse_string_styling(self.source, class)?;
-            return Err(self.source.error(class.offset, "`class={..}` cannot be part of the element's style key: write class=\"name\" and class:name={condition}"));
-        };
-        for attribute in attributes.iter().filter(|a| is_class_directive(a)) {
-            let name = &attribute.name[PREFIX.len()..];
-            if value.split_ascii_whitespace().any(|set| set == name) {
-                return Err(self.source.error(
-                    attribute.offset,
-                    format!("`{PREFIX}{name}` toggles a class the literal `class` already sets: remove `{name}` from `class=\"...\"`"),
-                ));
-            }
-        }
-        Ok(value.split_ascii_whitespace().collect())
     }
 
     fn class_directives<'e>(

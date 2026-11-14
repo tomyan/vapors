@@ -11,6 +11,7 @@
 //! code hands it closures that build a branch or a row, and it decides
 //! what to create, move, update or remove.
 
+mod appearance;
 pub mod blocks;
 mod class_names;
 mod dispatcher;
@@ -26,6 +27,7 @@ mod snippet;
 mod style_key;
 mod style_key_refusals;
 
+pub use appearance::{Appearance, AppearanceSink};
 pub use class_names::class_names;
 pub use dispatcher::{DispatchRefused, Dispatcher, Listeners, run_along};
 pub use event::Event;
@@ -123,6 +125,13 @@ pub trait Dom: Listeners {
     /// tree that refuses listeners for events it never fires takes
     /// listeners for these.
     fn declare_events(&mut self, names: &[&str]);
+    /// Calls `sink` with the appearance of `anchor`, a 3D scene
+    /// component's `mesh` anchor: at the first update after the watch
+    /// and at each update that changes it, until `anchor` leaves the
+    /// tree ([`AppearanceSink`]). A sink's error refuses that update, and
+    /// the next update reports the appearance again. Refused on any node
+    /// but a `mesh`, and on a mesh already watched.
+    fn watch_appearance(&mut self, anchor: NodeId, sink: AppearanceSink);
     /// A text node's text; `None` for an element. The `_if_changed`
     /// setters read this: `None` means absent or the wrong kind, and
     /// they then call the plain setter, which refuses the wrong kind

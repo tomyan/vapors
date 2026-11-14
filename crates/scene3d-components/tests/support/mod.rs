@@ -6,6 +6,7 @@
 include!(concat!(env!("OUT_DIR"), "/wisp.rs"));
 
 pub mod keyed;
+pub mod rows;
 
 use scene_page::{ScenePage, ScenePageProps};
 use std::cell::RefCell;
@@ -13,7 +14,7 @@ use std::rc::Rc;
 use vapors_app::{ElementsApp, SurfaceHandle};
 use vapors_elements::Document;
 use vapors_scene3d::{CameraHandle, Colour, Meshes, Projection, Scene, Transform, Vec3};
-use vapors_scene3d_gpu::SceneRenderer;
+use vapors_scene3d_gpu::{RendererLog, SceneRenderer};
 use vapors_signals::Signal;
 use vapors_text::FontSystem;
 
@@ -21,7 +22,8 @@ use vapors_text::FontSystem;
 pub struct Signals {
     pub back: Signal<Transform>,
     pub left: Signal<Transform>,
-    pub left_colour: Signal<Colour>,
+    pub blue: Signal<bool>,
+    pub gone: Signal<bool>,
     pub shown: Signal<bool>,
 }
 
@@ -31,6 +33,7 @@ pub struct Rig {
     pub scene: Rc<RefCell<Scene>>,
     pub meshes: Rc<RefCell<Meshes>>,
     pub surface: SurfaceHandle,
+    pub log: Rc<RendererLog>,
     pub page: ScenePage,
     pub signals: Signals,
 }
@@ -51,6 +54,8 @@ pub struct Stage {
     pub scene: Rc<RefCell<Scene>>,
     pub meshes: Rc<RefCell<Meshes>>,
     pub surface: SurfaceHandle,
+    /// The renderer's log: whether it was dropped.
+    pub log: Rc<RendererLog>,
 }
 
 impl Stage {
@@ -62,6 +67,7 @@ impl Stage {
         let scene = Rc::new(RefCell::new(Scene::new()));
         let meshes = Rc::new(RefCell::new(Meshes::new()));
         let renderer = SceneRenderer::new(Rc::clone(&scene), Rc::clone(&meshes));
+        let log = renderer.log();
         let surface = app.mount("view", Box::new(renderer)).unwrap();
         Self {
             doc,
@@ -69,6 +75,7 @@ impl Stage {
             scene,
             meshes,
             surface,
+            log,
         }
     }
 }
@@ -83,12 +90,14 @@ impl Rig {
             scene,
             meshes,
             surface,
+            log,
         } = Stage::new();
         let square = square(&meshes);
         let signals = Signals {
             back: Signal::new(Transform::from_translation(Vec3::new(0.0, 0.0, 5.0)).unwrap()),
             left: Signal::new(Transform::IDENTITY),
-            left_colour: Signal::new(red()),
+            blue: Signal::new(false),
+            gone: Signal::new(false),
             shown: Signal::new(false),
         };
         let eye = CameraHandle::new();
@@ -100,10 +109,10 @@ impl Rig {
             lens: Some(Projection::orthographic(4.0, 0.1, 100.0).unwrap()),
             back: signals.back,
             left: signals.left,
-            left_colour: signals.left_colour,
+            blue: signals.blue,
+            gone: signals.gone,
             right: Signal::new(at(1.0)),
             shown: signals.shown,
-            ..ScenePageProps::default()
         };
         let body = doc.borrow().body();
         let page = ScenePage::mount(&doc, body, props);
@@ -113,6 +122,7 @@ impl Rig {
             scene,
             meshes,
             surface,
+            log,
             page,
             signals,
         }
@@ -120,7 +130,7 @@ impl Rig {
 }
 
 /// A square 1 unit wide in the XY plane, centred on the origin.
-pub fn square(meshes: &Rc<RefCell<Meshes>>) -> vapors_scene3d::GeometryId {
+pub fn square(meshes: &Rc<RefCell<Meshes>>) -> vapors_scene3d::GeometryHandle {
     let corners = [(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)];
     let positions = corners.map(|(x, y)| Vec3::new(x, y, 0.0)).to_vec();
     meshes

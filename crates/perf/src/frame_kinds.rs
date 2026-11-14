@@ -3,38 +3,79 @@
 //! Insert inserts on one frame and removes on the next) gets a section
 //! per kind, as one median over alternating frames is the cheaper
 //! kind's slowest frame (`--scaling` splits its kinds the same way,
-//! `scaling_kinds.rs`).
+//! `scaling_kinds.rs`). Frames are named by their index from frame 0,
+//! warmup counted: the sampler records the warmup in `Samples::warmup`,
+//! so no caller passes it.
 
 use std::collections::BTreeMap;
 
 use crate::instructions_check::samples_counted;
-use crate::report::{PHASES, instructions_section, section, times_section};
+use crate::report::{instructions_section, section};
 use crate::run::Samples;
 use crate::scaling_kinds::MIN_FRAMES_PER_KIND;
 
-/// Said under a kind's section: why it has no GPU rows.
-pub const NO_GPU_ROWS: &str = "GPU rows left out: the app's GPU time is read back a frame late, \
-                               so a frame's index does not name its kind.";
-
 impl Samples {
-    /// The kept frames of kind `kind` of `step` kinds, whose first kept
-    /// frame is frame `warmup` (frame `i` is of kind `i % step`), with
-    /// no GPU times; the counts are the last frame's.
-    #[must_use]
-    pub fn of_kind(&self, kind: usize, step: usize, warmup: usize) -> Self {
-        let first = (kind + step - warmup % step) % step;
+    /// The kept frames of kind `kind` of `step` kinds (frame `i` is of
+    /// kind `i % step`, and the first kept frame is frame `warmup`), with
+    /// their GPU times, which the sampler keeps in frame order though it
+    /// reads each back a frame late; the counts are the last frame's.
+    ///
+    /// # Errors
+    /// A column without one entry per kept frame, naming it: its entries
+    /// would be read as the other kind's.
+    pub fn of_kind(&self, kind: usize, step: usize) -> Result<Self, String> {
+        self.columns_kept_whole()?;
+        let first = self.first_of_kind(kind, step);
         let pick = |times: &[_]| times.iter().copied().skip(first).step_by(step).collect();
         let phases: BTreeMap<_, _> = self
             .phases
             .iter()
             .map(|(phase, times)| (phase.clone(), pick(times)))
             .collect();
-        Self {
+        Ok(Self {
             frame: pick(&self.frame),
             phases,
+            gpu: self.gpu.as_deref().map(pick),
+            gpu_time: self.gpu_time.as_deref().map(pick),
+            gpu_resolution: self.gpu_resolution,
             instructions: self.instructions.as_ref().map(|i| i.every_nth(first, step)),
             counts: self.counts,
-            ..Self::default()
+            warmup: self.warmup,
+        })
+    }
+
+    /// The first kept frame of kind `kind` of `step` kinds: frame `i` is
+    /// of kind `i % step`, and kept frame `j` is frame `warmup + j`. The
+    /// one answer `--scaling` and the full run's sections both read.
+    #[must_use]
+    pub fn first_of_kind(&self, kind: usize, step: usize) -> usize {
+        (kind + step - self.warmup % step) % step
+    }
+
+    fn columns_kept_whole(&self) -> Result<(), String> {
+        let kept = self.frame.len();
+        let phases = self
+            .phases
+            .iter()
+            .map(|(phase, times)| (phase.as_str(), times.len()));
+        let gpu = [("GPU span", &self.gpu), ("GPU time", &self.gpu_time)]
+            .into_iter()
+            .filter_map(|(name, times)| times.as_ref().map(|times| (name, times.len())));
+        let instructions = self
+            .instructions
+            .as_ref()
+            .map(|i| ("instructions", i.frame.len()));
+        match phases
+            .chain(gpu)
+            .chain(instructions)
+            .find(|(_, len)| *len != kept)
+        {
+            None => Ok(()),
+            Some((column, len)) => Err(format!(
+                "{column} has {len} entries for {kept} kept frames; the sampler keeps one per \
+                 frame (crates/perf/src/sampler.rs), and a column out of step would be read as \
+                 the other kind's"
+            )),
         }
     }
 }
@@ -49,7 +90,6 @@ pub fn sections(
     name: &str,
     samples: &Samples,
     kinds: &[&str],
-    warmup: usize,
     instructions: bool,
 ) -> Result<Vec<String>, String> {
     if kinds.len() < 2 {
@@ -61,11 +101,7 @@ pub fn sections(
         .enumerate()
         .map(|(at, kind)| {
             let title = format!("{name}, {kind} frames");
-            kind_section(
-                &title,
-                &samples.of_kind(at, kinds.len(), warmup),
-                instructions,
-            )
+            one_section(&title, &samples.of_kind(at, kinds.len())?, instructions)
         })
         .collect()
 }
@@ -76,15 +112,6 @@ fn one_section(name: &str, samples: &Samples, instructions: bool) -> Result<Stri
     }
     samples_counted(name, samples)?;
     instructions_section(name, samples)
-}
-
-fn kind_section(title: &str, samples: &Samples, instructions: bool) -> Result<String, String> {
-    let report = if instructions {
-        one_section(title, samples, true)?
-    } else {
-        times_section(title, samples, &PHASES)
-    };
-    Ok(format!("{report}\n{NO_GPU_ROWS}\n"))
 }
 
 fn enough_frames(name: &str, runs: usize, kinds: &[&str]) -> Result<(), String> {

@@ -52,8 +52,13 @@ were pushed.
 ## In an ElementsApp
 
 `ElementsApp::mount(name, renderer)` mounts a renderer before the
-first frame; the painter is made on that frame and the app hands it
-the renderers then. A taken name is refused at `mount`
+first frame. `App::start`, which the platform calls once the GPU is
+ready and before the first frame, makes the painter, hands it the
+renderers and calls each renderer's `mount` (one-scene F0), so the
+first shown frame builds no pipeline. A renderer mounted after the
+start has its `mount` called on the first frame that paints it. An app
+driven without a start (tests calling `App::frame` alone) makes the
+painter on its first frame. A taken name is refused at `mount`
 (`MountError::AlreadyMounted`), not on the frame. `ElementsApp::unmount`
 hands a renderer back. After each frame the app returns
 `Next::Continue` while the document changed, a surface was

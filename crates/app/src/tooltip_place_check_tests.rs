@@ -25,6 +25,7 @@ fn pointer(x: f32, y: f32) -> Anchor {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)] // one table, a case per field
 fn every_bad_field_is_refused_naming_the_field() {
     // Given one bad value in each field
     let nan = f32::NAN;

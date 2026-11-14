@@ -168,6 +168,8 @@ fn a_patched_step_moves_and_the_index_equals_one_made_afresh() {
 
         // Then
         assert_eq!(patched, extents(&boxes), "slot {slot} to {now:?}");
+        assert_eq!(patched.items(), 10, "slot {slot} to {now:?}");
+        assert_eq!(patched.total_differing(), None, "slot {slot} to {now:?}");
     }
 }
 

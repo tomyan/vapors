@@ -5,13 +5,29 @@
 //! element tree refuses what it does not, so a path that passes the
 //! check rasterises. No GPU and no text dependency.
 
+mod canonical;
+mod classify;
+mod classify_near;
 mod geometry;
+mod mesh;
+mod mesh_edges;
+mod mesh_normals;
+mod mesh_slivers;
 mod path;
 mod path_lex;
+mod path_verb;
+mod segment;
 mod shape_id;
 mod table;
 mod table_error;
+mod tessellate;
+mod tessellate_path;
 
-pub use geometry::{Geometry, MeshVertex, check_geometry};
+pub use canonical::{Canonical, FillRule, Paint, hash_bytes};
+pub use classify::{Classified, classify};
+pub use geometry::{Geometry, check_geometry};
+pub use mesh::{FAR_EDGE, MeshVertex, check_mesh};
 pub use path::{IconPath, PathError};
+pub use segment::{Pen, Segment, non_finite, to_zeno};
 pub use table::{ShapeEntry, ShapeId, ShapeIndex, ShapeTable, TABLE_FORMAT, TableError};
+pub use tessellate::{Mesh, tessellate};

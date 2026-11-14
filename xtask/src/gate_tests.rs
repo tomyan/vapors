@@ -61,28 +61,30 @@ fn a_tree_with_changes_is_refused_before_anything_runs() {
     assert_eq!(refuse_dirty(&clean), Ok(()));
 }
 
-#[test]
-fn this_repositorys_workflow_is_one_the_gate_can_run() {
-    // Given
+/// This repository's workflow planned as the gate plans it, or why not.
+fn this_repositorys_plan() -> Result<Vec<PlannedStep>, String> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let settings =
         std::fs::read_to_string(root.join(".config/factory.toml")).expect("factory.toml");
     let workflow = std::fs::read_to_string(root.join(WORKFLOW)).expect("ci.yml");
-
     let config = Config::parse(&settings).expect("valid");
     let (setup, actions) = (setup_lines(&config), actions(&config).expect("reasons"));
     let read =
         |path: &str| std::fs::read_to_string(root.join(path)).map_err(|e| format!("{path}: {e}"));
-
-    // When
-    let planned = plan(
+    plan(
         &workflow,
         &Sources {
             setup: &setup,
             actions: &actions,
             read: &read,
         },
-    );
+    )
+}
+
+#[test]
+fn this_repositorys_workflow_is_one_the_gate_can_run() {
+    // When
+    let planned = this_repositorys_plan();
 
     // Then
     // A refusal names its own fix when it has one; the generic one otherwise.
@@ -97,5 +99,77 @@ fn this_repositorys_workflow_is_one_the_gate_can_run() {
     assert!(
         planned.iter().all(|step| !step.run.contains("sudo ")),
         "a setup step is planned: {planned:?}"
+    );
+}
+
+#[test]
+fn the_ci_job_runs_lint_wasm_and_unit_as_three_steps_so_the_log_times_each() {
+    // Given
+    let wanted = [
+        "cargo xtask lint",
+        "cargo xtask wasm",
+        "cargo xtask test --tier unit",
+    ];
+
+    // When
+    let planned = this_repositorys_plan().expect("plannable");
+
+    // Then
+    let runs: Vec<&str> = planned
+        .iter()
+        .filter(|step| step.job == "ci")
+        .map(|step| step.run.trim())
+        .filter(|run| {
+            run.contains("cargo xtask lint")
+                || run.contains("cargo xtask wasm")
+                || run.contains("--tier unit")
+        })
+        .collect();
+    assert_eq!(
+        runs, wanted,
+        "{WORKFLOW}: one command per step, in this order"
+    );
+}
+
+#[test]
+fn the_lint_wasm_and_unit_steps_have_no_if_so_a_failure_stops_the_rest_as_and_did() {
+    // Given (`continue-on-error` is refused by the gate's step keys)
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let text = std::fs::read_to_string(root.join(WORKFLOW)).expect("ci.yml");
+    let workflow = crate::gate_yaml::parse(&text, WORKFLOW).expect("yaml");
+    let commands = [
+        "cargo xtask lint",
+        "cargo xtask wasm",
+        "cargo xtask test --tier unit",
+    ];
+
+    // When
+    let conditional: Vec<&serde_json::Value> = workflow["jobs"]["ci"]["steps"]
+        .as_array()
+        .expect("the ci job's steps")
+        .iter()
+        .filter(|step| commands.contains(&step["run"].as_str().unwrap_or_default().trim()))
+        .filter(|step| step.get("if").is_some())
+        .collect();
+
+    // Then
+    assert!(conditional.is_empty(), "{WORKFLOW}: {conditional:?}");
+}
+
+#[test]
+fn the_build_timings_step_builds_bins_and_examples_not_the_test_targets_again() {
+    // When
+    let planned = this_repositorys_plan().expect("plannable");
+
+    // Then
+    let timings: Vec<&str> = planned
+        .iter()
+        .filter(|step| step.run.contains("--timings"))
+        .map(|step| step.run.trim())
+        .collect();
+    assert_eq!(
+        timings,
+        ["cargo build --workspace --bins --examples --timings"],
+        "{WORKFLOW}: nextest built the test targets in the step before; fix: build only what the cargo run steps need"
     );
 }

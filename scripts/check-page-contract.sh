@@ -18,7 +18,11 @@
 set -eu
 web=${1:?usage: scripts/check-page-contract.sh target/web <new or empty dir>}
 work=${2:?usage: scripts/check-page-contract.sh target/web <new or empty dir>}
-port=8731
+# Set by serve: a free port the server chose. A fixed port (8731 until
+# 2026-11-14) was shared by every worktree on the machine: a second run,
+# or a server a killed run left, answered instead, and the pages came
+# from its directory.
+port=
 failed=0
 
 fail() { echo "FAIL $*" >&2; failed=1; }
@@ -252,8 +256,9 @@ held() {
   fi
 }
 
-# The server answers within 10 s or the check fails (it starts in well
-# under 1 s here). It serves the copies, and holds /wait/<page> until a
+# The server binds a free port and writes it to $work/server.port, and
+# answers within 10 s or the check fails (it starts in well under 1 s
+# here). It serves the copies, and holds /wait/<page> until a
 # POST to /done/<page> or 30 s. The device-lost page, from Chromium's
 # start to its dump with the error shown, took 1.5 s here (Debian 13,
 # Chromium 155, 2026-10-23); the runner is several times slower to
@@ -280,8 +285,13 @@ class Pages(http.server.SimpleHTTPRequestHandler):
         self.send_response(204); self.end_headers()
     def log_message(self, *args):
         pass
-http.server.ThreadingHTTPServer(('127.0.0.1', $port), Pages).serve_forever()") >/dev/null 2>&1 &
+server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Pages)
+open('server.port', 'w').write(str(server.server_address[1]))
+server.serve_forever()") >/dev/null 2>&1 &
   server=$!
+  for _ in $(seq 100); do [ -s "$work/server.port" ] && break; sleep 0.1; done
+  [ -s "$work/server.port" ] || { echo "the page server did not start within 10 s" >&2; exit 1; }
+  port=$(cat "$work/server.port")
   python3 -c "
 import sys, time, urllib.request
 deadline = time.time() + 10

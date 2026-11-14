@@ -27,11 +27,13 @@ pub(crate) struct Slots {
     free: Vec<usize>,
 }
 
-/// Boxes in their slots, with the slots they were placed by.
+/// Boxes in their slots, with the slots they were placed by, and the
+/// lanes of the block containers among them (`lane.rs`).
 #[derive(Default)]
 pub(crate) struct Placed {
     pub(crate) boxes: Vec<LayoutBox>,
     pub(crate) slots: Slots,
+    pub(crate) lanes: super::lane::Lanes,
 }
 
 impl Slots {
@@ -69,7 +71,11 @@ impl Slots {
             None,
             "a walk from the root reaches a vacant slot or misses a box"
         );
-        Placed { boxes, slots }
+        Placed {
+            boxes,
+            slots,
+            lanes: super::lane::Lanes::default(),
+        }
     }
 
     /// Each new key's slot, by its pre-order index, and the slots after.
@@ -191,6 +197,8 @@ pub(super) fn keys(boxes: &[LayoutBox]) -> Vec<Key> {
     keys
 }
 
+#[path = "slots_edit.rs"]
+mod edit;
 #[path = "slots_subtree.rs"]
 mod subtree;
 pub(crate) use subtree::Taken;

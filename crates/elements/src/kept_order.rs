@@ -26,8 +26,7 @@ pub(crate) struct KeptOrder {
     pub(crate) tree: ClipTree,
     pub(crate) clips: Clips,
     pub(crate) chains: Chains,
-    /// The scroll containers, whose thumbs are painted on every update
-    /// that paints.
+    /// The scroll containers, each with a thumb step.
     pub(crate) thumbs: Vec<usize>,
     /// The slots whose clips the update that made this redid.
     pub(crate) redone: Vec<usize>,
@@ -46,6 +45,15 @@ pub(crate) struct OrderWalks {
     pub(crate) splices: usize,
     /// Why the splice declined a shape change, walked instead.
     pub(crate) declined: Option<SpliceDecline>,
+}
+
+impl OrderWalks {
+    /// Whether paint order was walked or spliced: the one answer to
+    /// whether the drawing steps and the scroll containers can differ
+    /// from the kept ones.
+    pub(crate) fn reshaped(&self) -> bool {
+        self.order > 0 || self.splices > 0
+    }
 }
 
 impl KeptOrder {

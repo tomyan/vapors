@@ -5,6 +5,7 @@ use crate::mounts::register_thumbnails;
 use crate::{Demo, INDEX, cards, checkbox, field, images, index, number, scroll, slider, toasts};
 
 /// Their demos, in slice order.
+#[allow(clippy::too_many_lines)] // the demo list, one literal per demo
 pub(crate) fn slices() -> Vec<Demo> {
     vec![
         Demo {

@@ -18,6 +18,8 @@ pub(crate) mod outline;
 mod overflow;
 mod parts;
 mod position;
+mod scene_appearance;
+mod scene_used;
 mod scrollbar;
 mod share;
 mod sibling_deps;
@@ -44,6 +46,9 @@ pub use cursor::{ALL_CURSORS, Cursor};
 pub(crate) use decoration::BoxShadow;
 pub(crate) use overflow::to_viewport;
 pub(crate) use parts::Parts;
+pub(crate) use scene_appearance::refuse_translucent;
+pub use scene_used::SceneUsed;
+pub(crate) use scene_used::{SceneContext, scene_used};
 pub(crate) use scrollbar::Scrollbar;
 pub(crate) use share::{ShareKey, Shared};
 pub(crate) use styles::{Counted, Styles};
@@ -71,10 +76,11 @@ pub(crate) struct Sheets {
 impl Sheets {
     pub(crate) fn new() -> Self {
         let ua = vapors_css::user_agent::sheet();
+        // first, at USER_AGENT_SHEET
         Self {
             features: features::Features::default().with(&ua),
             cascade: Cascade::new().user_agent(ua),
-            names: vec!["ua.css".to_owned()],
+            names: vec![USER_AGENT_NAME.to_owned()],
             scopes: std::collections::HashMap::new(),
             refused: Vec::new(),
         }
@@ -178,6 +184,14 @@ impl Sheets {
             })
     }
 }
+
+/// The user-agent sheet's index in the cascade: `Sheets::new` adds it
+/// first.
+pub(crate) const USER_AGENT_SHEET: usize = 0;
+
+/// The user-agent sheet's name, which `restyle_scene` checks is the one
+/// at [`USER_AGENT_SHEET`].
+pub(crate) const USER_AGENT_NAME: &str = "ua.css";
 
 impl Sheets {
     /// The name a sheet was added under, by its cascade order (0 is the

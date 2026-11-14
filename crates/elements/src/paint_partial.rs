@@ -4,18 +4,18 @@
 //! again, and it is returned. Which slots: those built again, and those
 //! moved or whose clip was redone whose part was made from other values
 //! (`BoxFrom`) and cannot be shifted to them (`kept_shift.rs`); no
-//! other kept part is read. A dropped part frees its
-//! slab ids and removes its map entries before any part is painted, so
-//! a part painted after takes them. Scroll thumbs are painted on every
-//! update that paints. The scene is the parts of the steps that draw
-//! walked in paint order (`scene_view.rs`, `drawn_steps.rs`); it
-//! equals a full paint's, which a debug build checks (`kept_paint.rs`).
+//! other kept part is read. A dropped part frees its slab ids and
+//! removes its map entries before any part is painted, so a part
+//! painted after takes them. The thumbs painted are those of the scroll
+//! containers that can have changed (`thumbs_again.rs`). The scene is
+//! the parts of the steps that draw walked in paint order
+//! (`scene_view.rs`, `drawn_steps.rs`); it equals a full paint's, which
+//! a debug build checks (`kept_paint.rs`).
 
 use crate::blocks::IndexCounts;
 use crate::changed_slots::ChangedSlots;
 use crate::drawn_steps::DrawnSteps;
 use crate::frame_extents::Extents;
-use crate::frames::Frames;
 use crate::kept_box::{BoxFrom, KeptBox};
 use crate::kept_hits::HitsChanged;
 use crate::kept_order::KeptOrder;
@@ -25,6 +25,7 @@ use crate::paint_order::Step;
 use crate::paint_partial_read::to_paint;
 use crate::painted::Painted;
 use crate::repaint::Repaint;
+use crate::thumbs_again;
 
 /// Paints `boxes` at `rects`, keeping `last`'s parts in place where
 /// they show what painting again would, and patching its maps for the
@@ -46,18 +47,21 @@ pub(crate) fn paint_partial(
     let place = &|step| painted.drawn.place_of(step);
     let order = KeptOrder::updated(kept_order, (boxes, rects), input, changed, place);
     let scale = input.scale;
-    let frames_were = std::mem::replace(&mut painted.frames, frames(&order, boxes, input));
+    let frames_moved_now =
+        crate::paint_frames::updated(&mut painted, &order, (boxes, input), (changed, kept));
     let (again, shifts) = to_paint(&order, (boxes, rects), (changed, kept), &mut painted, scale);
     dropped(&again, changed, boxes.len(), &mut painted);
     let shifted: Vec<usize> = shifts.iter().map(|shift| shift.slot).collect();
     crate::kept_shift::apply(&mut painted, shifts, scale);
     crate::kept_maps::fill(&mut painted, (boxes, rects, &order), kept, changed);
-    let (patched, with_hits) = patched_slots((&again, &shifted), changed, &order);
+    let shown_last = kept.then_some(painted.from.thumbs_shown);
+    let thumbs = thumbs_again::of_update(&order, (&again, &shifted), changed, (shown_last, input));
+    let (patched, with_hits) = patched_slots((&again, &shifted, &thumbs), changed);
     let mut repaint = Repaint::new(boxes, rects, &order);
     repaint.boxes(again, input, &mut painted);
-    repaint.thumbs(input, &mut painted);
+    repaint.thumbs(&thumbs, input, &mut painted);
     drawn_updated(&mut painted, &order, (&patched, with_hits));
-    if painted.frames != frames_were {
+    if frames_moved_now {
         frames_moved(&mut painted);
     }
     painted.order = order;
@@ -80,45 +84,19 @@ fn batches_unsorted(painted: &mut Painted) {
     }
 }
 
-/// The scroll frames of `order`'s scroll containers, each shifted by
-/// its offset in `input` as `scroll::frame_shift` gives it.
-fn frames(order: &KeptOrder, boxes: &[LayoutBox], input: &PaintInput<'_>) -> Frames {
-    let scrolls = |slot| input.stackings.scrolls(slot);
-    crate::frames_check::assert_scrollers_agree(&order.thumbs, &order.clips, &scrolls);
-    let depth = |slot| order.tree.depth(slot);
-    let shift =
-        |slot| crate::scroll::frame_shift(scroll_offset(boxes, slot, input.scroll), input.scale);
-    Frames::of(&order.thumbs, (&order.clips, &depth), &shift, input.scale)
-}
-
-/// The scroll offset of the scroll container at `slot`, or a panic
-/// naming it: placement settles every scroll container's offset
-/// before paint.
-fn scroll_offset(boxes: &[LayoutBox], slot: usize, scroll: &crate::scroll::Offsets) -> [f32; 2] {
-    let node = boxes[slot].element_in(slot);
-    node.and_then(|node| scroll.get(node)).unwrap_or_else(|| {
-        panic!(
-            "scroll container slot {slot} ({node:?}) has no settled offset: placement \
-             settles every scroll container's (placement_walk.rs `settled_offset`); \
-             reproduce with `cargo xtask test`"
-        )
-    })
-}
-
 /// The slots whose parts this update paints again, shifts or drops:
 /// those painted `again`, the `shifted` and the freed, then the scroll
-/// containers, whose thumbs add no hits; and how many come before the
-/// scroll containers.
+/// containers whose `thumbs` it paints, which add no hits; and how many
+/// come before those.
 fn patched_slots(
-    (again, shifted): (&[(usize, BoxFrom)], &[usize]),
+    (again, shifted, thumbs): (&[(usize, BoxFrom)], &[usize], &[usize]),
     changed: &ChangedSlots,
-    order: &KeptOrder,
 ) -> (Vec<usize>, usize) {
     let again = again.iter().map(|(slot, _)| *slot);
     let freed = changed.freed.iter().map(|(slot, _)| *slot);
     let mut slots: Vec<usize> = again.chain(shifted.iter().copied()).chain(freed).collect();
     let with_hits = slots.len();
-    slots.extend(order.thumbs.iter().copied());
+    slots.extend(thumbs.iter().copied());
     (slots, with_hits)
 }
 
@@ -133,7 +111,7 @@ fn drawn_updated(
 ) {
     // After a splice the drawing steps, hits and batches are made afresh
     // as after a walk, until a follow-up shifts them by the splice's edits.
-    if order.walks.order > 0 || order.walks.splices > 0 {
+    if order.walks.reshaped() {
         painted.drawn = DrawnSteps::of(&order.steps, &painted.kept_boxes);
         let places = order.steps.len();
         painted.extents = Extents::of(&painted.drawn, places, &painted.kept_boxes);
