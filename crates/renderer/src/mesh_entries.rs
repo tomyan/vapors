@@ -110,8 +110,8 @@ pub(crate) fn vertex_bytes(triangles: &[[MeshVertex; 3]]) -> Vec<u8> {
         );
         put(
             &mut bytes,
-            start + offset_of!(MeshVertex, shift),
-            &vertex.shift,
+            start + offset_of!(MeshVertex, edge_normals),
+            vertex.edge_normals.as_flattened(),
         );
     }
     bytes

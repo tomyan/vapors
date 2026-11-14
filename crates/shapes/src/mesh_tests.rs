@@ -3,35 +3,44 @@
 
 use super::*;
 
-/// A corner: its position, normal, edge distances and shifts.
-const fn v(position: [f32; 2], normal: [f32; 2], edges: [f32; 3], shift: [f32; 3]) -> MeshVertex {
+/// A corner: its position, normal and edge distances, with its
+/// triangle's `edge_normals`.
+const fn v(
+    position: [f32; 2],
+    normal: [f32; 2],
+    edges: [f32; 3],
+    edge_normals: [[f32; 2]; 3],
+) -> MeshVertex {
     MeshVertex {
         position,
         normal,
         edges,
-        shift,
+        edge_normals,
     }
 }
 
 const F: f32 = FAR_EDGE;
 
 /// A unit square as two triangles (0 1 2) and (0 2 3) sharing the
-/// diagonal 0-2; each corner's normal is its miter offset (1, 1) scaled
-/// for the right angle, so its shift is 1 on its own outline edges.
-/// Triangle (0, 1, 2): edge 0 is 1-2 (outline, normal +x), edge 1 is
-/// 2-0 (the diagonal, far), edge 2 is 0-1 (outline, normal -y).
+/// diagonal 0-2; each corner's normal is its miter offset (1, 1).
+/// Triangle (0, 1, 2): edge 0 is 1-2 (outline, outward +x), edge 1 is
+/// 2-0 (the diagonal, far), edge 2 is 0-1 (outline, outward -y).
+/// Triangle (0, 2, 3): edge 0 is 2-3 (outward +y), edge 1 is 3-0
+/// (outward -x), edge 2 is 0-2 (far).
 fn square() -> Vec<[MeshVertex; 3]> {
     let (a, b, c, d) = ([0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]);
+    let first = [[1.0, -0.0], [0.0, 0.0], [0.0, -1.0]];
+    let second = [[0.0, 1.0], [-1.0, 0.0], [0.0, 0.0]];
     vec![
         [
-            v(a, [-1.0, -1.0], [1.0, F, 0.0], [-1.0, 0.0, 1.0]),
-            v(b, [1.0, -1.0], [0.0, F, 0.0], [1.0, 0.0, 1.0]),
-            v(c, [1.0, 1.0], [0.0, F, 1.0], [1.0, 0.0, -1.0]),
+            v(a, [-1.0, -1.0], [1.0, F, 0.0], first),
+            v(b, [1.0, -1.0], [0.0, F, 0.0], first),
+            v(c, [1.0, 1.0], [0.0, F, 1.0], first),
         ],
         [
-            v(a, [-1.0, -1.0], [1.0, 0.0, F], [-1.0, 1.0, 0.0]),
-            v(c, [1.0, 1.0], [0.0, 1.0, F], [1.0, -1.0, 0.0]),
-            v(d, [-1.0, 1.0], [0.0, 0.0, F], [1.0, 1.0, 0.0]),
+            v(a, [-1.0, -1.0], [1.0, 0.0, F], second),
+            v(c, [1.0, 1.0], [0.0, 1.0, F], second),
+            v(d, [-1.0, 1.0], [0.0, 0.0, F], second),
         ],
     ]
 }
@@ -49,9 +58,9 @@ fn a_square_of_two_triangles_with_its_diagonal_far_passes() {
 }
 
 #[test]
-fn the_layout_is_position_normal_edges_shift() {
-    assert_eq!(size_of::<MeshVertex>(), 40);
-    assert_eq!(std::mem::offset_of!(MeshVertex, shift), 28);
+fn the_layout_is_position_normal_edges_edge_normals() {
+    assert_eq!(size_of::<MeshVertex>(), 52);
+    assert_eq!(std::mem::offset_of!(MeshVertex, edge_normals), 28);
 }
 
 #[test]
@@ -89,32 +98,30 @@ fn a_distance_that_the_positions_do_not_give_is_refused() {
 }
 
 #[test]
-fn a_shift_that_is_not_the_normals_projection_is_refused() {
-    // Given: corner 1 moves along +x, -y; its shift on edge 0 (normal
-    // +x) must be 1
+fn an_edge_normal_the_positions_do_not_give_is_refused() {
+    // Given: edge 0 (outward +x) given a normal half as long at corner 1
     let mut mesh = square();
-    mesh[0][1].shift[0] = 0.5;
+    mesh[0][1].edge_normals[0] = [0.5, 0.0];
 
     // When, Then
     refused(
         &mesh,
-        "triangle 0 corner 1 shift 0.5 to edge 0 should be 1 from the positions",
+        "triangle 0 corner 1 normal [0.5, 0.0] of edge 0 should be [1.0, -0.0], its outward unit normal from the positions",
     );
 }
 
 #[test]
-fn a_shift_on_a_far_edge_is_refused() {
+fn a_normal_on_a_far_edge_is_refused() {
     // Given
     let mut mesh = square();
-    mesh[1][2].shift[2] = 1.0;
+    mesh[1][2].edge_normals[2] = [1.0, 0.0];
 
     // When, Then
     refused(
         &mesh,
-        "triangle 1 corner 2 shift 1 on far edge 2 is not 0; a far edge stays far",
+        "triangle 1 corner 2 normal [1.0, 0.0] of far edge 2 is not zero; a far edge stays far",
     );
 }
-
 #[test]
 fn a_value_that_is_not_finite_is_refused_naming_the_field() {
     // Given
@@ -155,15 +162,12 @@ fn a_triangle_without_area_is_refused() {
 
 #[test]
 fn a_corner_on_the_outline_that_does_not_move_out_is_refused() {
-    // Given: corner 1 with no normal and so no shift, which would leave
-    // the hard outer edge the extrusion is for
+    // Given: corner 1 with no normal, which would leave the hard outer
+    // edge the extrusion is for, and corner 1 moving inwards
     let mut zero = square();
     zero[0][1].normal = [0.0, 0.0];
-    zero[0][1].shift = [0.0, 0.0, 0.0];
-    // and corner 1 moving inwards, its shifts its projection
     let mut inward = square();
     inward[0][1].normal = [-1.0, 1.0];
-    inward[0][1].shift = [-1.0, 0.0, -1.0];
 
     // When, Then
     refused(

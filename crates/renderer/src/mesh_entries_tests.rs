@@ -18,13 +18,13 @@ fn each_field_is_at_its_offset_in_a_vertex_of_its_size() {
         position: [0.0; 2],
         normal: [0.0; 2],
         edges: [0.0; 3],
-        shift: [0.0; 3],
+        edge_normals: [[0.0; 2]; 3],
     };
     let third = MeshVertex {
         position: [1.0, 2.0],
         normal: [3.0, 4.0],
         edges: [5.0, 6.0, 7.0],
-        shift: [8.0, 9.0, 10.0],
+        edge_normals: [[8.0, 9.0], [10.0, 11.0], [12.0, 13.0]],
     };
 
     // When
@@ -50,7 +50,7 @@ fn each_field_is_at_its_offset_in_a_vertex_of_its_size() {
         7.0
     );
     assert_eq!(
-        float_at(&bytes, start + offset_of!(MeshVertex, shift) + 8),
-        10.0
+        float_at(&bytes, start + offset_of!(MeshVertex, edge_normals) + 20),
+        13.0
     );
 }

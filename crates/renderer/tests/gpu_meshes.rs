@@ -108,7 +108,8 @@ fn gpu_a_rotated_mesh_covers_its_area_and_a_later_one_draws_over() {
     let alone = coverage(std::slice::from_ref(&turned));
     let covered = coverage(&[turned, black]);
 
-    // Then
+    // Then: it covers its area within one pixel; pixel by pixel against
+    // the closed form, gpu_mesh_divergences.rs pins it
     let area: f32 = alone.iter().sum();
     assert!((area - 96.0).abs() < 1.0, "covered {area} of 96");
     assert_at(&covered, (15, 15), 0.0, "the later square over it");
@@ -147,8 +148,9 @@ fn gpu_an_entrys_vertices_are_counted_when_written() {
     // When
     let _entry = entries.write(&on, &triangles).expect("room");
 
-    // Then: 40 bytes a vertex, three a triangle, padded to 16
-    let expected = (triangles.len() as u64 * 120).next_multiple_of(16);
+    // Then: a MeshVertex's size each, three a triangle, padded to 16
+    let vertex = size_of::<vapors_shapes::MeshVertex>() as u64;
+    let expected = (triangles.len() as u64 * 3 * vertex).next_multiple_of(16);
     assert_eq!(entries.take_work().buffer_bytes, expected);
     assert_eq!(entries.bytes(), expected);
     encoder.submit(&gpu.queue).expect("no refusal");

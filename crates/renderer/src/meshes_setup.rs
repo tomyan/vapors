@@ -7,8 +7,9 @@ use std::mem::offset_of;
 use vapors_shapes::MeshVertex;
 
 /// Per vertex, at `MeshVertex`'s own field offsets: position, normal
-/// (two floats each), three edge distances, three shifts.
-const VERTEX: [wgpu::VertexAttribute; 4] = [
+/// (two floats each), three edge distances, and the triangle's three
+/// edge normals (two floats each).
+const VERTEX: [wgpu::VertexAttribute; 6] = [
     attribute(
         0,
         offset_of!(MeshVertex, position),
@@ -26,14 +27,25 @@ const VERTEX: [wgpu::VertexAttribute; 4] = [
     ),
     attribute(
         3,
-        offset_of!(MeshVertex, shift),
-        wgpu::VertexFormat::Float32x3,
+        offset_of!(MeshVertex, edge_normals),
+        wgpu::VertexFormat::Float32x2,
+    ),
+    attribute(
+        4,
+        offset_of!(MeshVertex, edge_normals) + 8,
+        wgpu::VertexFormat::Float32x2,
+    ),
+    attribute(
+        5,
+        offset_of!(MeshVertex, edge_normals) + 16,
+        wgpu::VertexFormat::Float32x2,
     ),
 ];
 
-/// Per instance: the linear part; translation and extrusion; colour.
+/// Per instance: the linear part; translation and the inverse of the
+/// determinant; colour.
 const INSTANCE: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
-    4 => Float32x4, 5 => Float32x4, 6 => Float32x4
+    6 => Float32x4, 7 => Float32x4, 8 => Float32x4
 ];
 
 const fn attribute(

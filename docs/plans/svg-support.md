@@ -232,9 +232,9 @@ below.
   anti-aliasing is off exact coverage, the pixel is compared with
   exact coverage and declared, as `paint_support/exact.rs` does for
   Mute.
-- **Cost:** per entry, 40 bytes per vertex (position, normal, three
-  edge distances and their shifts) and three vertices per triangle
-  with no index buffer, 5 times the indexed layout (one-scene 1.2, as
+- **Cost:** per entry, 52 bytes per vertex (position, normal, three
+  edge distances, the triangle's three edge normals) and three vertices
+  per triangle with no index buffer, 6.5 times the indexed layout (one-scene 1.2, as
   S2 built it), to be measured in S5a; no new dependency beyond S2's
   lyon.
 - **Verdict:** support (V1, V2).

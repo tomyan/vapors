@@ -19,7 +19,7 @@ pub use crate::table_error::TableError;
 /// by a compiler with another format is refused at the merge: equal
 /// canonical bytes must mean equal geometry across crates (D3), and a
 /// changed flattening tolerance or tessellator changes this number.
-pub const TABLE_FORMAT: u32 = 1;
+pub const TABLE_FORMAT: u32 = 2;
 
 /// One crate's shapes, emitted by the compiler as a `static`.
 #[derive(Debug)]
