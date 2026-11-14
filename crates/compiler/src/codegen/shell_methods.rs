@@ -39,11 +39,8 @@ pub(super) fn accessors() -> String {
 /// live after a 10,000-row page was dropped, measured by
 /// vapors-perf-memory, docs/perf/memory-per-element-2026-11-14.md).
 /// Disposing an owner already disposed (`unmount`) does nothing.
-///
-/// While the thread is panicking it does not dispose: a cleanup that
-/// panicked during unwinding would abort the process and lose the first
-/// panic's message, so a component dropped by unwinding is left as it
-/// was before #353.
+/// While the thread is panicking it does not dispose; the reason is in
+/// the generated `Drop`, where it runs.
 pub(super) fn drop_impl(name: &str) -> String {
     format!(
         "
@@ -59,6 +56,12 @@ impl {name} {{
 
 impl Drop for {name} {{
     fn drop(&mut self) {{
+        // RELAXED: not disposed while the thread is panicking: a cleanup
+        // that panicked during unwinding would abort the process and lose
+        // the first panic's message, so a component dropped by unwinding
+        // is left undisposed (compiler-examples drop_while_panicking.rs).
+        // Retired when no cleanup can panic (each refusal returned, not
+        // raised, as the scene nodes' teardown does).
         if self.disposes_on_drop && !std::thread::panicking() {{
             self.owner.dispose();
         }}

@@ -130,7 +130,10 @@ the one difference from the brief in this slice.
   struct. Dropping it disposes its signals and effects (its nodes stay
   in the document until `unmount` removes them), so keep the struct
   while the page shows; the struct is `#[must_use]`, and a mount whose
-  result is dropped at once does not compile under `-D warnings`. A
+  result is dropped at once does not compile under `-D warnings`.
+  `let _ = Page::mount(..)` compiles: it is an explicit discard, and
+  disposes the component at the end of the statement (its nodes drawn
+  once, then never updated); bind a name (`let _page = ..`) to keep it. A
   child component's struct is dropped inside its parent's mount: the
   parent's generated code calls `owned_by_parent()` on it, its owner is
   a child of the parent's, and it is disposed with the parent (#353).

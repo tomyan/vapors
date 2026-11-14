@@ -42,3 +42,20 @@ fn the_directive_class_follows_the_signal_both_ways() {
     // Then
     assert_eq!(class(&dom, div).as_deref(), Some("card"));
 }
+
+#[test]
+fn a_mount_discarded_with_let_underscore_is_disposed_at_once() {
+    // Given: `let _ =` drops the component at the end of the statement,
+    // an explicit discard `#[must_use]` lets through
+    let dom = Rc::new(RefCell::new(RecordingDom::new()));
+    let root = dom.borrow().root();
+    let on = Signal::new(false);
+    let _ = ClassToggle::mount(&dom, root, ClassToggleProps { on });
+    let div = dom.borrow().children(root)[0];
+
+    // When
+    on.set(true);
+
+    // Then: its effects were disposed with it, so the class stays
+    assert_eq!(class(&dom, div).as_deref(), Some("card"));
+}

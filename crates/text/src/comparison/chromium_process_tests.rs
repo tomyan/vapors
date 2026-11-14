@@ -94,3 +94,38 @@ fn a_slow_timeout_line_of_another_shape_is_refused() {
         .expect("a message");
     assert!(message.starts_with("nextest.toml:2: "), "{message}");
 }
+
+#[test]
+fn an_override_header_is_skipped_and_other_bracketed_lines_are_not() {
+    let headers = [
+        "[[profile.default.overrides]]",
+        "  [[profile.ci.overrides]]  ",
+    ];
+    let others = [
+        "[profile.default]",
+        "[[profile..overrides]]",
+        "[[profile.a b.overrides]]",
+    ];
+    assert!(
+        headers.iter().all(|line| is_override_header(line)),
+        "{headers:?}"
+    );
+    assert!(
+        !others.iter().any(|line| is_override_header(line)),
+        "{others:?}"
+    );
+}
+
+#[test]
+fn an_override_s_slow_timeout_is_read_like_any_other() {
+    // Given: an override whose deadline is under the launcher's worst
+    let text = "[profile.default]\nslow-timeout = { period = \"30s\", terminate-after = 2 }\n\
+        [[profile.default.overrides]]\nfilter = 'binary(x)'\n\
+        slow-timeout = { period = \"1s\", terminate-after = 1 }\n";
+
+    // When
+    let kills = kill_times(text, "fixture");
+
+    // Then: its 1 s is read, so the deadline check would fail on it
+    assert_eq!(kills, [Duration::from_secs(60), Duration::from_secs(1)]);
+}
