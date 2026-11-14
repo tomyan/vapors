@@ -51,7 +51,7 @@ pub fn sweep(base: &Path, who: &Who<'_>) -> Result<Vec<String>, String> {
         if pid != who.pid && (who.is_running)(pid) {
             continue;
         }
-        said.extend(one(&entry.path(), pid, who.uid)?);
+        said.extend(one(&entry.path(), pid, who)?);
     }
     said.extend(set_aside(aside)?);
     Ok(said)
@@ -82,20 +82,38 @@ fn mine(path: &Path, uid: u32) -> bool {
     std::fs::symlink_metadata(path).is_ok_and(|m| m.uid() == uid)
 }
 
-/// Remove one dead run's directory, if it is this user's.
-fn one(path: &Path, pid: u32, uid: u32) -> Result<Option<String>, String> {
+/// Remove one dead run's directory, if it is this user's and no run
+/// started inside it is still going (that run's TMPDIR is in it).
+fn one(path: &Path, pid: u32, who: &Who<'_>) -> Result<Option<String>, String> {
     let owner = std::fs::symlink_metadata(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    if owner.uid() != uid {
+    if owner.uid() != who.uid {
         let other = owner.uid();
         return Ok(Some(format!(
             "left {} alone: it is user {other}'s, not this one's",
             path.display()
         )));
     }
-    let count = walk(path).entries.len();
+    let entries = walk(path).entries;
+    if let Some(live) = live_inside(&entries, who.is_running) {
+        return Ok(Some(format!(
+            "left {} alone: run {live} inside it is still going",
+            path.display()
+        )));
+    }
+    let count = entries.len();
     remove_or_set_aside(path)?;
     Ok(Some(format!(
         "removed {} ({count} entries), left by run {pid}, which is not going",
         path.display()
     )))
+}
+
+/// The pid of a run still going whose `xtask-run-<pid>` is among
+/// `entries` (paths under a dead run's directory).
+fn live_inside(entries: &[String], is_running: &dyn Fn(u32) -> bool) -> Option<u32> {
+    entries
+        .iter()
+        .filter_map(|entry| Path::new(entry).file_name())
+        .filter_map(|name| name.to_str()?.strip_prefix("xtask-run-")?.parse().ok())
+        .find(|&pid| is_running(pid))
 }
