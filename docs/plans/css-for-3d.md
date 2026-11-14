@@ -573,6 +573,16 @@ the update naming the declaration (`style/used.rs`), pulled forward
 from section 3: the user-agent rule, unlike #251's inline style, loses
 to an author's rule.
 
+C2 as built (C2a, C2b): the set is
+`vapors_css::property::scene` (`SceneTag::reads`, `instead`), every
+longhand in one group of section 3's rows, a test holding the groups
+and the property table together. A scene anchor keeps a `SceneUsed`
+(`Document::scene_used`) and no `Used`, so the layout and paint
+readers never see it; C1's computed `display` refusal is now the
+set's: an author's `display` of any value is refused, the user-agent
+sheet's is not. A declared `transition-*` or `animation-*` on a mesh,
+in the set, is refused naming C7 until it lands.
+
 Later, not in the stack: C9 `backface-visibility` as a per-mesh cull
 mode (two pipelines; the winding convention documented first); C10 a
 per-style appearance slot with `Instances` (D7); keyframe animations on

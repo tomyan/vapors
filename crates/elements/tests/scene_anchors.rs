@@ -25,7 +25,7 @@ fn page(tag: &str, css: &str) -> Document {
 fn a_scene_anchor_is_implemented_and_builds_no_box() {
     for tag in SCENE_TAGS {
         // Given
-        let mut doc = page(tag, ".node { color: #ff0000; }");
+        let mut doc = page(tag, ".node { --tint: #ff0000; }");
 
         // When
         let updated = doc.update(viewport(400.0, 300.0)).map(|_| ());

@@ -19,9 +19,11 @@
 //! `style` (`docs/plans/css-for-3d.md`, C1), or else the component's
 //! own (`own_keys.rs`). The user-agent sheet gives those tags
 //! `display: none`, so an anchor has no box, no paint and no place in
-//! the accessibility tree. No computed value reaches the node yet (C2,
-//! C3): a mesh's colour is its `colour` prop, whatever colour its
-//! anchor inherits. The anchor is the component's identity in the document: its
+//! the accessibility tree. Each anchor's used style is a `SceneUsed`
+//! (vapors-elements; C2), and a declaration its tag does not read is
+//! refused at the update; nothing writes it to the node yet (C3): a
+//! mesh's colour is its `colour` prop, whatever colour its anchor
+//! computes. The anchor is the component's identity in the document: its
 //! children, and the `{if}` and `{for}` blocks among them, are placed in
 //! it, and a node component finds its parent scene node from the
 //! anchor it is placed in, at mount and at any later rebuild of a block.
