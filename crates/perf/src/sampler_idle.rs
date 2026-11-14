@@ -6,9 +6,8 @@
 use std::time::Duration;
 
 use vapors_platform::Next;
-use vapors_renderer::pipelines::built;
 
-use super::judged::nothing_built;
+use super::start::{Apps, BuiltSince};
 use super::{FRAME_DEADLINE, INTERVAL, Sampler};
 use crate::gpu_time::wait;
 use crate::idle::{IdleCounts, SETTLE_FRAMES, Step, did_update, is_settled, max_frames, step};
@@ -33,7 +32,8 @@ impl Sampler<'_> {
     ) -> Result<IdleCounts, String> {
         let texture = self.texture(workload.size());
         let named = |error: String| format!("{error}; reproduce: {reproduce}");
-        self.start(workload, texture.format()).map_err(named)?;
+        self.begin(workload, texture.format(), Apps::Started)
+            .map_err(named)?;
         let mut index = 0;
         let mut next = self.idle_frame(workload, &texture, index).map_err(named)?;
         while !is_settled(next) {
@@ -71,13 +71,15 @@ impl Sampler<'_> {
         texture: &wgpu::Texture,
         index: usize,
     ) -> Result<Next, String> {
+        let since = BuiltSince::open();
         workload.change(index);
         workload
             .ready()
             .map_err(|error| format!("idle frame {index}: {error}"))?;
-        let before = built();
         let next = workload.app().frame(&self.frame_of(texture, index));
-        nothing_built(index, built().since(before)).map_err(|error| format!("idle {error}"))?;
+        since
+            .refuse_any(index, Apps::Started)
+            .map_err(|error| format!("idle {error}"))?;
         wait(&self.gpu.device, FRAME_DEADLINE)?;
         workload
             .check(next)
