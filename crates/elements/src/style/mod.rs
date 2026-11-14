@@ -28,6 +28,7 @@ pub(crate) use sibling_deps::SiblingDeps;
 mod sizes;
 mod styles;
 mod surface;
+mod svg_paint_style;
 mod text_style;
 mod used;
 mod used_share;
@@ -52,6 +53,7 @@ pub(crate) use scene_used::{SceneContext, scene_used};
 pub(crate) use scrollbar::Scrollbar;
 pub(crate) use share::{ShareKey, Shared};
 pub(crate) use styles::{Counted, Styles};
+pub(crate) use svg_paint_style::SvgPaint;
 pub(crate) use text_style::Face;
 pub(crate) use text_style::TextStyle;
 pub(crate) use used::{Context, Used, used};
@@ -199,6 +201,9 @@ impl Sheets {
     pub(crate) fn name(&self, index: usize) -> &str {
         if index == vapors_css::cascade::INLINE_SHEET {
             return "style attribute";
+        }
+        if index == vapors_css::cascade::PRESENTATION_SHEET {
+            return "presentation attribute";
         }
         self.names
             .get(index)

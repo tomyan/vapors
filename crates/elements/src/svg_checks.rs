@@ -16,8 +16,9 @@ use crate::node::Kind;
 use crate::style::UsedMap;
 use crate::svg::{NAMESPACE, positive, view_box};
 
-/// The attributes an `svg` takes.
-const ATTRIBUTES: [&str; 9] = [
+/// The attributes an `svg` takes; `fill`, `stroke` and `stroke-width`
+/// are presentation attributes its paths inherit.
+const ATTRIBUTES: [&str; 12] = [
     "viewBox",
     "width",
     "height",
@@ -27,6 +28,9 @@ const ATTRIBUTES: [&str; 9] = [
     "id",
     "class",
     "xmlns",
+    "fill",
+    "stroke",
+    "stroke-width",
 ];
 
 /// The refusals of every `svg` and `path` among `nodes`.

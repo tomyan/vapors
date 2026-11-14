@@ -25,6 +25,7 @@ mod format;
 mod handler_capture;
 pub(crate) mod key_parts;
 mod names;
+mod paint_attributes;
 mod prop_suggestion;
 mod props_index;
 mod render_dynamic;

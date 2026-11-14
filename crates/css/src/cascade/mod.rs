@@ -20,10 +20,12 @@ mod media_eval;
 mod media_feature;
 mod media_items;
 mod media_range;
+mod presentation;
 mod restyle;
 mod share;
 mod supports;
 
+pub use presentation::{PRESENTATION_ATTRIBUTES, PRESENTATION_SHEET, declarations_of};
 pub use share::{Unshareable, rule_indices_for_key, unshareable};
 pub(crate) use {collect::rank, compute::initial, compute::resolve_for};
 pub use {computed::ComputedStyle, environment::Environment};
@@ -163,7 +165,12 @@ impl Cascade {
         env: &Environment,
     ) -> Result<ComputedStyle> {
         let inline = inline::declarations(element)?;
-        let winners = collect::winners(self.candidate_rules(element), element, env, &inline);
+        let presentation = presentation::declarations(element)?;
+        let attached = collect::Attached {
+            presentation: &presentation,
+            inline: &inline,
+        };
+        let winners = collect::winners(self.candidate_rules(element), element, env, attached);
         compute::style(&winners, parent, env)
     }
 

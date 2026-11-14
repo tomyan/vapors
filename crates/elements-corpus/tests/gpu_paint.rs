@@ -130,6 +130,7 @@ macro_rules! paint_tests {
 paint_tests![
     clipping,
     icon_curves_paint,
+    icon_paint_css,
     icons_paint,
     outline_paint,
     paint_boxes,

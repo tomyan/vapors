@@ -3,7 +3,7 @@
 //! when the expression is false, and a colon-named attribute that is
 //! not a directive, which would become an attribute with a colon in
 //! its name; and `class={..}` or `style={..}`, a string the style
-//! analysis cannot see into.
+//! analysis cannot see into. SVG paint attributes: `paint_attributes`.
 
 use crate::CompileError;
 use crate::ast::{AttrValue, Attribute};

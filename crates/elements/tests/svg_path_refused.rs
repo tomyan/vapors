@@ -16,8 +16,14 @@ fn path_attributes_outside_the_subset_are_refused_naming_the_fix() {
         (&[("fill", "red")][..], &["fill=\"none\""]),
         (&[("stroke", "")][..], &["stroke=\"currentColor\""]),
         (&[("stroke", "#fff")][..], &["stroke=\"currentColor\""]),
-        (&[("stroke-width", "0")][..], &["stroke-width", "positive"]),
-        (&[("stroke-width", "1px")][..], &["stroke-width", "no unit"]),
+        (
+            &[("stroke-width", "0")][..],
+            &["stroke-width", "above zero"],
+        ),
+        (
+            &[("stroke-width", "thick")][..],
+            &["stroke-width attribute", "\"thick\""],
+        ),
         (
             &[("transform", "scale(2)")][..],
             &["transform", "not in the icon subset"],

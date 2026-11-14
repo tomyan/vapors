@@ -3,7 +3,9 @@
 //! inline (inline-block content, not built), percentage padding
 //! (`layout::replaced` reads lengths only) and a border-radius (no
 //! rounded clip); on a `path`, a colour, `display` or visibility of its
-//! own, since all of an icon's paths are drawn in its svg's.
+//! own, since all of an icon's paths are drawn in its svg's, and paint
+//! the icon route does not draw: a fill, a stroke other than its
+//! colour, a stroke width that is not above zero.
 
 use vapors_dom::NodeId;
 
@@ -75,6 +77,24 @@ fn path(own: &Used, svg: &Used) -> Vec<String> {
     }
     if own.visible != svg.visible {
         found.push("has a visibility of its own, and an icon's paths are shown with their svg; set visibility on the svg instead".to_owned());
+    }
+    found.extend(paint(own));
+    found
+}
+
+/// The fill, stroke and stroke width the icon route draws: no fill, a
+/// stroke in the path's colour (the svg's, by the check above), and a
+/// width above zero.
+fn paint(own: &Used) -> Vec<String> {
+    let mut found = Vec::new();
+    if own.svg.fill.is_some() {
+        found.push("has a fill, and the icon subset draws strokes only (SVG fills a path black by default); give it fill=\"none\"".to_owned());
+    }
+    if own.svg.stroke != Some(own.text.color) {
+        found.push("has a stroke other than its color, and an icon is stroked in its svg's color; give it stroke=\"currentColor\" and set color on the svg".to_owned());
+    }
+    if own.svg.stroke_width <= 0.0 {
+        found.push(format!("has a stroke-width of {}, which draws nothing; give a width above zero in viewBox units, such as stroke-width=\"1.5\"", own.svg.stroke_width));
     }
     found
 }

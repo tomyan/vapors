@@ -16,7 +16,7 @@ use crate::property::{PROPERTIES, PropertyId};
 use crate::syntax::match_value;
 use crate::value::{Color, Context, Length, Value, substitute_vars};
 
-use super::compute_resolve::resolve;
+use super::compute_resolve::{computed_form, resolve};
 use super::compute_source::{source, value_of};
 use crate::{Error, Position, Result};
 
@@ -69,6 +69,7 @@ pub(crate) fn style(
         };
         let source = source(id, winners, parent, &lookup)?;
         let value = value_of(source, id, &ctx, env, color).map_err(|e| at(&e, winners, id))?;
+        let value = computed_form(id, value);
         values.push(value);
     }
     super::font_weight::resolve_relative(&mut values, parent);

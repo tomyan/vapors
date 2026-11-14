@@ -82,6 +82,7 @@ fixtures![
     hello_box::HelloBox,
     icon_curves_paint::IconCurvesPaint,
     icon_names::IconNames,
+    icon_paint_css::IconPaintCss,
     icons_paint::IconsPaint,
     image_paint::ImagePaint,
     images::Images,

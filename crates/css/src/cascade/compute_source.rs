@@ -9,12 +9,12 @@ use vapors_scene::Color as Rgba;
 
 use super::collect::Winners;
 use super::compute::initial;
-use super::compute_resolve::resolve;
+use super::compute_resolve::{keeps_current_color, resolve};
 use super::{ComputedStyle, Environment};
 use crate::Result;
 use crate::ast::ComponentValue;
 use crate::property::{PropertyId, Specified, resolve_pending};
-use crate::value::{Context, Value};
+use crate::value::{Color, Context, Value};
 
 /// Where one longhand's computed value comes from.
 pub(super) enum Source<'a> {
@@ -27,7 +27,8 @@ pub(super) enum Source<'a> {
     /// The parent's computed value, copied as it is: computed values
     /// are absolute (lengths px, calcs with absolute lengths, colours
     /// rgba; `currentcolor` among them, where CSS Color 4 keeps the
-    /// keyword: issue #301), which `copied` checks in debug builds.
+    /// keyword: issue #301, except for `fill` and `stroke`, which keep
+    /// it, `keeps_current_color`), which `copied` checks in debug builds.
     Parent(&'a ComputedStyle),
 }
 
@@ -100,12 +101,26 @@ pub(super) fn value_of(
     env: &Environment,
     current: Rgba,
 ) -> Result<Value> {
+    if let Some(kept) = kept_current_color(&source, id) {
+        return Ok(kept);
+    }
     match source {
         Source::Declared(v) => resolve(v, ctx, env.color_scheme, current),
         Source::Substituted(v) => resolve(&v, ctx, env.color_scheme, current),
         Source::Initial => resolve(initial(id), ctx, env.color_scheme, current),
         Source::Parent(parent) => Ok(copied(id, parent, ctx, env, current)),
     }
+}
+
+/// `currentcolor` declared or substituted for a property that keeps it.
+fn kept_current_color(source: &Source<'_>, id: PropertyId) -> Option<Value> {
+    let current = Value::Color(Color::CurrentColor);
+    let declared = match source {
+        Source::Declared(v) => *v,
+        Source::Substituted(v) => v,
+        Source::Initial | Source::Parent(_) => return None,
+    };
+    (keeps_current_color(id) && *declared == current).then_some(current)
 }
 
 /// The parent's computed value of `id`, as it is. Debug builds check
@@ -120,7 +135,8 @@ fn copied(
 ) -> Value {
     let value = parent.values[id.index()].clone();
     debug_assert!(
-        resolve(&value, ctx, env.color_scheme, current).as_ref() == Ok(&value),
+        (keeps_current_color(id) && value == Value::Color(Color::CurrentColor))
+            || resolve(&value, ctx, env.color_scheme, current).as_ref() == Ok(&value),
         "{}: the parent's computed value `{}` does not resolve to itself, so a child cannot copy it (docs/plans/style-allocations.md, O2: a computed value is absolute); reproduce with the failing test",
         id.name(),
         value.to_css()
