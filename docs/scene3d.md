@@ -91,6 +91,46 @@ upload, write and draw goes through `SurfaceFrame::work`, so
 moved node writes its subtree's slots; a recoloured mesh writes its
 own (`scene3d-gpu/tests/gpu_scene_counts.rs` pins the bytes).
 
+## Picking
+
+`pick(scene, meshes, PickAt { point, size }, skip)` returns the nearest
+visible mesh under a surface point, or `None`
+(`vapors-scene3d/src/pick.rs`). It casts a ray from the active camera
+through the point, using the same view-projection the renderer draws
+with (`Scene::view_projection`). It tests the ray against each mesh's
+bounds in the mesh's own space, then tests the triangles of each mesh
+whose bounds the ray enters. Only hits between the near and far planes
+count. Hidden meshes and those `skip` returns true for are passed over.
+Of meshes hit at exactly the same depth, the first in draw order
+(parents before children) wins, which is the one the renderer's `Less`
+depth test shows. A point outside the surface (`0..=size` on each axis)
+picks nothing.
+
+It refuses (`PickError`): a size that is not finite and positive, a
+point that is not finite, no resolvable active camera, a projection
+refused at the surface's aspect, a camera whose view-projection or its
+inverse is not finite, a visible mesh whose world matrix has no finite
+inverse, and a mesh whose geometry the `Meshes` does not hold.
+
+It runs once per pointer move, not per frame. Cost grows linearly with
+mesh count. Figures from `cargo run --release -p vapors-scene3d
+--example pick_cost`, on an i5-10500T at load average 1.0, 2026-11-14:
+the lowest median and lowest 95th percentile per row over six runs of
+200 picks each, unit cubes of 12 triangles in a column:
+
+| Meshes | Bounds tests only (ray misses all): median, p95 | Every triangle tested (ray enters all): median, p95 |
+|---|---|---|
+| 10 | 0.87 µs, 0.88 µs | 2.2 µs, 2.2 µs |
+| 100 | 5.9 µs, 6.0 µs | 18 µs, 19 µs |
+| 1,000 | 55 µs, 55 µs | 182 µs, 188 µs |
+| 10,000 | 573 µs, 608 µs | 1.89 ms, 2.09 ms |
+
+That is about 57 ns a mesh for the bounds test and about 130 ns more
+for each mesh whose 12 triangles are tested. There is no spatial index,
+so every mesh's bounds are tested on every pick. The finiteness checks
+and the length-relative parallel test cost 10 to 20% over the first
+version, measured side by side.
+
 ## In a template
 
 ```html
