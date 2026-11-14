@@ -166,20 +166,28 @@ item's overlapping triangles (a self-crossing stroke, lyon's stroker
 at some joins) blend twice, so a translucent overlap draws darker
 (1 - (1 - a)^2 for a) where SVG paints the union once. S3b decided (lead, 2026-11-14; numbers in
 `docs/perf/s3b-antialiasing-2026-11-14.md`):
-- Closed forms keep their analytic method (16 of 16 cells against
-  Chromium).
+- Closed forms keep their analytic method. The measurement does not
+  rank it: it, MSAA and the exact-corner prototype each pass 16 of 16
+  closed-form cells. The reason is that a closed form needs no mesh,
+  not this data.
 - Meshes move to the exact-corner method (S3a3, before S4a): a
   shader-only prototype passed 39 of 40 icon cells, against 9 for the
-  method above and 39 for MSAA 4x. It is chosen over MSAA because it
-  stays in the one single-sample pass. Limit (1) goes with it: it
-  measured about 3 px long at lyon's butt caps, not one pixel.
+  method above and 39 for MSAA 4x. MSAA did as well on the icons and
+  better on the 0.25 px path (4 strongly-off pixels against 9). The
+  choice over MSAA is a design preference, keeping one single-sample
+  pass; the cost of either, in bytes or frame time, is not measured.
 - Recorded divergences:
-  - Mute at 1x fails for every method, the icon route too. Its joins
-    are sharper than the miter limit.
-  - A 0.25 px stroke fails for every shape method.
+  - Mute at 1x fails for every method, the icon route too. The cause
+    is not measured.
+  - A 0.25 px stroke fails for every mesh method. As closed forms at
+    0.25 px, the closed-form pipeline passes a rect and fails a circle
+    (8 strongly-off pixels).
   - Limit (2), the translucent overlap, stays within the rules, so its
     pinned test is a record, not a failure.
-- The curve tolerance is 0.1 device px at the largest scale drawn. A CPU fringe of fixed width is early antialiasing
+- The curve tolerance stays 0.1 device px at the largest scale drawn:
+  no difference was measured between 0.25 and 0.05 px (on the
+  analytic method only), and the exact-corner method was not run at
+  other tolerances. A CPU fringe of fixed width is early antialiasing
 and is not a candidate (the brief, "Antialiasing after every
 transform"). S3b compares, for each kind, MSAA against that kind's
 analytic method.

@@ -31,7 +31,9 @@ mod report;
 
 use std::path::PathBuf;
 
-use cases::{FAINT, ICONS, INK, Icon, Placement, SUB_PIXEL, closed_cases, placements};
+use cases::{
+    FAINT, ICONS, INK, Icon, Placement, SUB_PIXEL, closed_cases, placements, sub_pixel_closed_cases,
+};
 
 /// The flattening tolerance the methods draw at, device pixels.
 const TOLERANCE_PX: f32 = 0.1;
@@ -40,6 +42,7 @@ fn main() {
     let out = out_dir();
     let gpu = vapors_gpu_harness::gpu();
     let work = tempfile::tempdir().expect("a work directory");
+    println!("{}", report::identity(&gpu));
     println!("{}", report::HEADER);
     let icons: Vec<&Icon> = ICONS.iter().collect();
     for placement in placements() {
@@ -125,8 +128,9 @@ fn closed_forms(
     }
 }
 
-/// The known limits' cases at 1x: a quarter-pixel stroke, and Tools and
-/// Paste in translucent paint where their strokes overlap.
+/// The known limits' cases at 1x: a quarter-pixel stroke, as a path and
+/// as closed forms, and Tools and Paste in translucent paint where their
+/// strokes overlap.
 fn limits(gpu: &vapors_gpu_harness::Gpu, work: &std::path::Path, out: Option<&std::path::Path>) {
     let one = placements()[0];
     println!("{}", report::LIMITS_HEADER);
@@ -138,6 +142,25 @@ fn limits(gpu: &vapors_gpu_harness::Gpu, work: &std::path::Path, out: Option<&st
         for (method, ours) in methods(gpu, &icons, &one, ink) {
             report::limit_row(name, method, &icons, ours.as_deref(), &theirs, out);
         }
+    }
+    sub_pixel_closed(gpu, work, out);
+}
+
+/// A circle and a rect stroked 0.25 px at 1x, by the closed-form
+/// pipeline and the mesh methods.
+fn sub_pixel_closed(
+    gpu: &vapors_gpu_harness::Gpu,
+    work: &std::path::Path,
+    out: Option<&std::path::Path>,
+) {
+    let (one, name) = (placements()[0], "sub-pixel closed forms");
+    let cases = sub_pixel_closed_cases();
+    let shapes: Vec<&Icon> = cases.iter().map(|case| &case.shape).collect();
+    let theirs = chromium_page::drawn(&shapes, &one, INK, work);
+    let closed = closed::drawn(gpu, &cases, &one, INK);
+    report::limit_row(name, "closed form", &shapes, Some(&closed), &theirs, out);
+    for (method, ours) in methods(gpu, &shapes, &one, INK) {
+        report::limit_row(name, method, &shapes, ours.as_deref(), &theirs, out);
     }
 }
 

@@ -3,13 +3,27 @@
 //! fails its pixels over the rules, its strongly-off count and its
 //! largest difference.
 
-use std::fmt::Write as _;
 use std::path::Path;
 
 use vapors_text::comparison::{Rgba, write_png};
 
 use crate::cases::{CELL, Icon, Placement};
 use crate::compare::{Found, cell};
+
+/// The browser and adapter the run used.
+pub fn identity(gpu: &vapors_gpu_harness::Gpu) -> String {
+    let chrome = vapors_text::comparison::Chromium::find().unwrap_or_else(|e| panic!("{e}"));
+    let info = gpu.adapter.get_info();
+    format!(
+        "Chromium: {} ({})\n\nAdapter: {} ({:?}; {} {})\n",
+        chrome.version(),
+        chrome.binary().display(),
+        info.name,
+        info.backend,
+        info.driver,
+        info.driver_info
+    )
+}
 
 pub const HEADER: &str = "| placement | method | pass | failing icons (pixels over rules 1-2 / strongly off / max difference) |\n|---|---|---|---|";
 pub const CLOSED_HEADER: &str =
@@ -39,7 +53,7 @@ pub fn row(
         ours,
         theirs.width,
     );
-    let found = judged(ours, theirs, icons.len(), placement.scale);
+    let found = judged(ours, theirs, icons.len(), placement.scale, placement.name);
     let passed = found.iter().filter(|f| f.pass).count();
     println!(
         "| {} | {method} | {passed}/{} | {} |",
@@ -62,7 +76,7 @@ pub fn limit_row(
         return;
     };
     save(out, &format!("{case}-{method}"), ours, theirs.width);
-    let found = judged(ours, theirs, icons.len(), 1);
+    let found = judged(ours, theirs, icons.len(), 1, case);
     let passed = found.iter().filter(|f| f.pass).count();
     println!(
         "| {case} | {method} | {passed}/{} | {} |",
@@ -78,7 +92,7 @@ pub fn tolerance_row(
     ours: &[u8],
     theirs: &Rgba,
 ) {
-    let found = judged(ours, theirs, icons.len(), placement.scale);
+    let found = judged(ours, theirs, icons.len(), placement.scale, placement.name);
     let text: Vec<String> = found.iter().map(summary).collect();
     println!(
         "| {} | {tolerance} | {} | {} |",
@@ -86,19 +100,38 @@ pub fn tolerance_row(
     );
 }
 
-fn judged(ours: &[u8], theirs: &Rgba, count: usize, scale: u32) -> Vec<Found> {
+/// Each cell of `ours` against `theirs`, refusing images of other sizes
+/// than `count` cells at `scale`, which would compare the wrong pixels.
+fn judged(ours: &[u8], theirs: &Rgba, count: usize, scale: u32, what: &str) -> Vec<Found> {
     let side = CELL * scale;
+    let cells = u32::try_from(count).expect("a few");
+    assert!(
+        theirs.width == side * cells && theirs.height == side,
+        "{what}: Chromium's image is {} x {}, not {} x {side}; rerun the example",
+        theirs.width,
+        theirs.height,
+        side * cells
+    );
+    assert_eq!(
+        ours.len(),
+        theirs.data.len(),
+        "{what}: our image has {} bytes and Chromium's {}; the method drew another size",
+        ours.len(),
+        theirs.data.len()
+    );
     (0..u32::try_from(count).expect("a few"))
         .map(|at| cell(ours, &theirs.data, theirs.width, side, at))
         .collect()
 }
 
 fn failing(icons: &[&Icon], found: &[Found]) -> String {
-    let mut text = String::new();
-    for (icon, found) in icons.iter().zip(found).filter(|(_, f)| !f.pass) {
-        let _ = write!(text, "{} ({}); ", icon.name, summary(found));
-    }
-    text
+    let failed: Vec<String> = icons
+        .iter()
+        .zip(found)
+        .filter(|(_, f)| !f.pass)
+        .map(|(icon, found)| format!("{} ({})", icon.name, summary(found)))
+        .collect();
+    failed.join("; ")
 }
 
 fn summary(found: &Found) -> String {
