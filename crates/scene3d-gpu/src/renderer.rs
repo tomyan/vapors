@@ -3,28 +3,31 @@
 use crate::camera::{CameraUniform, view_projection};
 use crate::draw::{MeshNode, Pass, mesh_nodes, record};
 use crate::geometry::GpuGeometry;
+use crate::log::Tracked;
 use crate::pipeline::Pipeline;
 use crate::slots::Slots;
-use crate::{FrameError, depth};
+use crate::{FrameError, RendererLog, Resource, depth};
 use std::cell::RefCell;
 use std::rc::Rc;
 use vapors_app::{SurfaceError, SurfaceFrame, SurfaceRenderer, SurfaceSize};
 use vapors_scene3d::{Meshes, NodeId, Scene};
 
 /// Draws a [`Scene`] shared with the application, with the geometry
-/// given to its [`Meshes`]. See the crate docs for what a render does.
+/// given to its [`Meshes`]. Each render borrows the `Meshes` mutably to
+/// release unclaimed geometry, so a borrow held across a frame panics. See the crate docs for what a render does.
 pub struct SceneRenderer {
     scene: Rc<RefCell<Scene>>,
     meshes: Rc<RefCell<Meshes>>,
     mounted: Option<Mounted>,
-    depth: Option<wgpu::TextureView>,
+    depth: Option<Tracked<wgpu::TextureView>>,
+    log: Rc<RendererLog>,
 }
 
 /// What `mount` builds.
 struct Mounted {
-    pipeline: Pipeline,
-    camera: CameraUniform,
-    slots: Slots,
+    pipeline: Tracked<Pipeline>,
+    camera: Tracked<CameraUniform>,
+    slots: Tracked<Slots>,
     geometry: GpuGeometry,
 }
 
@@ -37,24 +40,39 @@ impl SceneRenderer {
             meshes,
             mounted: None,
             depth: None,
+            log: Rc::default(),
         }
+    }
+
+    /// Its log, which outlives it: whether it has been dropped.
+    #[must_use]
+    pub fn log(&self) -> Rc<RendererLog> {
+        Rc::clone(&self.log)
+    }
+}
+
+impl Drop for SceneRenderer {
+    fn drop(&mut self) {
+        self.log.drop_renderer();
     }
 }
 
 impl SurfaceRenderer for SceneRenderer {
     fn mount(&mut self, device: &wgpu::Device) -> Result<(), SurfaceError> {
+        let log = &self.log;
         let pipeline = Pipeline::new(device);
         self.mounted = Some(Mounted {
-            camera: CameraUniform::new(device, &pipeline),
-            slots: Slots::new(device, &pipeline),
-            geometry: GpuGeometry::default(),
-            pipeline,
+            camera: Tracked::new(CameraUniform::new(device, &pipeline), log, Resource::Camera),
+            slots: Tracked::new(Slots::new(device, &pipeline), log, Resource::Slots),
+            geometry: GpuGeometry::new(log),
+            pipeline: Tracked::new(pipeline, log, Resource::Pipeline),
         });
         Ok(())
     }
 
     fn resize(&mut self, device: &wgpu::Device, size: SurfaceSize) -> Result<(), SurfaceError> {
-        self.depth = Some(depth::texture(device, size));
+        let view = depth::texture(device, size);
+        self.depth = Some(Tracked::new(view, &self.log, Resource::Depth));
         Ok(())
     }
 
@@ -62,6 +80,7 @@ impl SurfaceRenderer for SceneRenderer {
         let (Some(mounted), Some(depth)) = (self.mounted.as_mut(), self.depth.as_ref()) else {
             return Err(FrameError::NotReady.into());
         };
+        release_geometry(&self.meshes, &mut mounted.geometry);
         let meshes = self.meshes.borrow();
         let mut scene = self.scene.borrow_mut();
         scene.update();
@@ -74,6 +93,15 @@ impl SurfaceRenderer for SceneRenderer {
         mounted.write_slots(&frame, &scene, &nodes)?;
         Ok(mounted.draw(&mut frame, depth, &nodes)?)
     }
+}
+
+/// Releases the pieces no handle claims any more, and drops this
+/// renderer's buffers of every piece its `Meshes` no longer holds,
+/// whichever renderer's sweep released it.
+fn release_geometry(meshes: &RefCell<Meshes>, uploaded: &mut GpuGeometry) {
+    meshes.borrow_mut().release_unclaimed();
+    let meshes = meshes.borrow();
+    uploaded.forget_released(|id| meshes.holds(id));
 }
 
 impl Mounted {

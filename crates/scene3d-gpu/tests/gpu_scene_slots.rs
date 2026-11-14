@@ -25,7 +25,7 @@ fn gpu_meshes_added_past_the_first_slot_buffer_all_draw_where_they_stand() {
     let add = |i| {
         fixture.mesh(
             root,
-            square,
+            &square,
             RED,
             Transform::from_translation(place(i)).unwrap(),
         )

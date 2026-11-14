@@ -17,7 +17,7 @@ fn gpu_a_node_another_caller_updated_draws_at_its_new_place() {
     fixture.camera(projection, Vec3::new(0.0, 0.0, 5.0));
     let square = fixture.square(0.5);
     let left = Transform::from_translation(Vec3::new(-2.0, 0.0, 0.0)).unwrap();
-    let node = fixture.mesh(fixture.root(), square, RED, left);
+    let node = fixture.mesh(fixture.root(), &square, RED, left);
     let mut renderer = fixture.renderer(&gpu);
     render(&mut renderer, &gpu).expect("renders");
     let right = Transform::from_translation(Vec3::new(2.0, 0.0, 0.0)).unwrap();
