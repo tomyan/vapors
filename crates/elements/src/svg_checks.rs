@@ -7,15 +7,13 @@
 
 use std::collections::BTreeMap;
 
-use crate::node_map::NodeMap;
-
 use vapors_dom::{NodeId, SCOPE_ATTRIBUTE};
 
 use crate::arena::Arena;
 use crate::check::describe;
 use crate::error::ElementError;
 use crate::node::Kind;
-use crate::style::Used;
+use crate::style::UsedMap;
 use crate::svg::{NAMESPACE, positive, view_box};
 
 /// The attributes an `svg` takes.
@@ -35,7 +33,7 @@ const ATTRIBUTES: [&str; 9] = [
 pub(crate) fn refusals(
     arena: &Arena,
     nodes: &[NodeId],
-    used: &NodeMap<Used>,
+    used: &UsedMap,
     scale: f32,
 ) -> Vec<ElementError> {
     nodes
@@ -51,7 +49,7 @@ pub(crate) fn refusals(
         .collect()
 }
 
-fn reasons(arena: &Arena, node: NodeId, used: &NodeMap<Used>, scale: f32) -> Vec<String> {
+fn reasons(arena: &Arena, node: NodeId, used: &UsedMap, scale: f32) -> Vec<String> {
     let Some(element) = arena.get(node, "svg_checks").element() else {
         return Vec::new();
     };

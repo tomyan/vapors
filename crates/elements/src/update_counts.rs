@@ -12,6 +12,14 @@ use crate::splice_decline::SpliceDecline;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct UpdateCounts {
+    /// Nodes whose tags, attributes, text and listeners the style phase
+    /// checked again before restyling: those marked or added since the
+    /// last update, each once; every node on the first update. A parent
+    /// whose children changed is one of them; each check reads its node
+    /// alone (`check_node` gives it no arena), so an insert checks the
+    /// same nodes at any size (`insert_checks_rows.rs`) and each for
+    /// the same work.
+    pub nodes_checked: usize,
     /// Elements the style phase checked again after restyling: those
     /// restyled, marked or added since the last update; every element
     /// on the first update.
@@ -38,6 +46,19 @@ pub struct UpdateCounts {
     /// Computed style allocations alive after the update: the share
     /// table's entries and every element styled for itself.
     pub styles_live: usize,
+    /// Restyled elements that took a used style from the used-style
+    /// table: their computed style came from the share table, and an
+    /// element with the same computed style, parent used style and
+    /// place (`style/used_share.rs`) was restyled before them. This and
+    /// the next are 0 when the restyle failed.
+    pub used_shared: usize,
+    /// Restyled elements whose used style was derived: one per distinct
+    /// entry of the used-style table, and every element whose computed
+    /// style is its own or whose used style is refused. An element
+    /// vapors does not implement (`check::implemented`) has no used
+    /// style and is counted in neither, so the two can add up to less
+    /// than `elements_restyled`.
+    pub used_derived: usize,
     /// Layout boxes built from the styled tree: one per element that
     /// is neither `display: none` nor inline (the root, block-level and
     /// replaced elements, and an `svg` as one box with none for its
@@ -122,6 +143,25 @@ pub struct UpdateCounts {
     /// last paint (IU3 3c-3b); every element when paint built the maps
     /// afresh, and none when the update showed the last update's paint.
     pub map_entries_patched: usize,
+    /// Entries of paint's two ordered indexes, the drawing steps and
+    /// the scroll frames' extents, that this update's patches moved,
+    /// a block pointer moved when a block splits or empties counting
+    /// as one: each index is kept in blocks of [`Self::INDEX_BLOCK`]
+    /// entries (`blocks.rs`), so a step that starts or stops drawing
+    /// moves at most a block's entries in each, plus the block
+    /// pointers after a split or an emptied block, whatever the page's
+    /// size. 0 when paint order was walked and both were made afresh
+    /// (`order_walks` is 1), when a patch made the extents index afresh
+    /// (`index_rebuilds` counts it), and when nothing was painted.
+    pub index_entries_moved: usize,
+    /// Times a patch made the extents index afresh instead, because
+    /// more steps were patched at once than it patches one by one
+    /// (`frame_extents.rs` `REBUILD`): 1 or 0. The work is O(drawing
+    /// steps) then, and `index_entries_moved` does not count it.
+    pub index_rebuilds: usize,
+    /// Blocks the two indexes hold after the update, which bound the
+    /// block pointers one patch can move.
+    pub index_blocks: usize,
     /// Times paint order (the paint steps, with each thumb's place)
     /// was walked over the whole tree: 1 when the tree's shape changed
     /// since the last paint (a box added, removed or moved among its

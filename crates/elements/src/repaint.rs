@@ -1,5 +1,6 @@
 //! Painting the slots an update paints again into parts kept in place
-//! (`paint_partial.rs`), and every scroll container's thumbs.
+//! (`paint_partial.rs`), and the thumbs of the scroll containers it
+//! names (`thumbs_again.rs`).
 
 use std::mem::take;
 
@@ -74,10 +75,15 @@ impl<'a> Repaint<'a> {
         }
     }
 
-    /// Paints every scroll container's thumbs into its kept paint;
-    /// their items counted.
-    pub(crate) fn thumbs(&mut self, input: &mut PaintInput<'_>, painted: &mut Painted) {
-        for &slot in &self.order.thumbs {
+    /// Paints the thumbs of the scroll containers `slots` into their
+    /// kept paint; their items counted.
+    pub(crate) fn thumbs(
+        &mut self,
+        slots: &[usize],
+        input: &mut PaintInput<'_>,
+        painted: &mut Painted,
+    ) {
+        for &slot in slots {
             clip_to(self.order.clips.own(slot), input, &mut self.scratch.scene);
             let (layout_box, rect) = (&self.boxes[slot], self.rects[slot]);
             crate::thumb::paint(layout_box, rect, input, &mut self.scratch);

@@ -11,7 +11,7 @@ use vapors_dom::NodeId;
 
 use crate::document::Document;
 use crate::error::ElementError;
-use crate::style::{Styles, Used};
+use crate::style::{Styles, UsedMap};
 use crate::update::Viewport;
 
 /// What changed since the last update.
@@ -51,7 +51,7 @@ pub(crate) struct Kept {
     pub(crate) viewport: Viewport,
     pub(crate) initial: ComputedStyle,
     pub(crate) styles: Styles,
-    pub(crate) used: NodeMap<Used>,
+    pub(crate) used: UsedMap,
     /// Each element's refusals, kept until it is restyled again.
     pub(crate) refused: NodeMap<Vec<ElementError>>,
     /// Which elements the last update restyled: their computed styles,
@@ -97,6 +97,28 @@ impl Document {
             self.dirty.subtree(self.parent(node).unwrap_or(node));
         } else {
             self.dirty.subtree(node);
+        }
+    }
+
+    /// Marks what moving `child` out of `old` to `parent` redoes: `old`'s
+    /// children, and, when `parent` is not under the root, nothing kept
+    /// for the subtree stays: a refusal kept for a node no walk of the
+    /// tree finds would refuse the next update as unmarked
+    /// (`style_checks.rs`, `walked`).
+    pub(crate) fn mark_moved_out(&mut self, old: NodeId, child: NodeId, parent: NodeId) {
+        self.mark_children_changed(old, child, false);
+        self.boxes.marks.mark_children(old);
+        if !self.attached(parent) {
+            self.forget_subtree(child);
+        }
+    }
+
+    /// Marks what a change to the text node `node` redoes: its own
+    /// check (right-to-left text, `check.rs`) and its parent's box.
+    pub(crate) fn mark_text_changed(&mut self, node: NodeId) {
+        self.checks.marked.insert(node);
+        if let Some(parent) = self.arena.get(node, "set_text").parent {
+            self.boxes.marks.mark(parent);
         }
     }
 

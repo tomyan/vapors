@@ -1,19 +1,20 @@
 //! Prints the timing baseline (docs/perf): every workload, in a release
 //! build. `cargo run --release -p vapors-perf -- [runs] [warmup]
-//! [--only <substring>] [--instructions] [--scaling <change>] [--mount]
+//! [--only <substring>] [--instructions] [--off-path] [--scaling all|<change>] [--mount]
 //! [--mount-memory <rows>] [--scene-run]`, 200 and 20 by default
 //! (`args.rs`).
 
 use vapors_gpu_harness::gpu_with;
-use vapors_perf::args::{Options, options};
+use vapors_perf::args::{Options, WorkloadSet, options};
+use vapors_perf::frame_kinds::sections;
 use vapors_perf::gpu_time::FEATURES;
-use vapors_perf::instructions_check::{checked_counter, samples_counted};
+use vapors_perf::instructions_check::checked_counter;
 use vapors_perf::mount_memory;
 use vapors_perf::mount_run;
-use vapors_perf::report::{instructions_section, section};
+use vapors_perf::off_path::{OFF_PATH_SETUP, off_path_workloads};
 use vapors_perf::run::Settings;
 use vapors_perf::sampler::Sampler;
-use vapors_perf::scaling_run;
+use vapors_perf::scaling_all;
 use vapors_perf::scene_run;
 use vapors_perf::select::matching;
 use vapors_perf::spans::PhaseClock;
@@ -26,6 +27,7 @@ fn main() {
     }
 }
 
+#[allow(clippy::too_many_lines)] // the command dispatch, one branch per mode
 fn run() -> Result<(), String> {
     if cfg!(debug_assertions) {
         return Err("a debug build; the baseline is timed in release: \
@@ -36,6 +38,7 @@ fn run() -> Result<(), String> {
         settings,
         only,
         instructions,
+        set,
         scaling,
         mount,
         mount_memory,
@@ -58,12 +61,16 @@ fn run() -> Result<(), String> {
         print_setup(&gpu, settings);
         return mount_run::run(&gpu, settings);
     }
-    if let Some(change) = scaling {
+    if let Some(changes) = scaling {
         let gpu = gpu_with(FEATURES);
         print_setup(&gpu, settings);
-        return scaling_run::run(&gpu, change, settings);
+        return scaling_all::run(&gpu, &changes, settings);
     }
-    let chosen = matching(workloads(), only.as_deref())?;
+    let all = match set {
+        WorkloadSet::Main => workloads(),
+        WorkloadSet::OffPath => off_path_workloads(),
+    };
+    let chosen = matching(all, only.as_deref())?;
     let clock = if instructions {
         PhaseClock::with_instructions(checked_counter()?)
     } else {
@@ -72,17 +79,19 @@ fn run() -> Result<(), String> {
     let gpu = gpu_with(FEATURES);
     print_setup(&gpu, settings);
     let mut timer = Sampler::with_clock(&gpu, clock);
+    if set == WorkloadSet::OffPath {
+        println!("{OFF_PATH_SETUP}\n");
+    }
     for (name, (rows, make)) in chosen {
+        let mut workload = make();
+        let at = settings_for(rows, settings);
         let samples = timer
-            .sample(make().as_mut(), settings_for(rows, settings))
+            .sample(workload.as_mut(), at)
             .map_err(|e| format!("{name}: {e}"))?;
-        let report = if instructions {
-            samples_counted(&name, &samples)?;
-            instructions_section(&name, &samples)?
-        } else {
-            section(&name, &samples)
-        };
-        println!("{report}");
+        let kinds = workload.frame_kinds();
+        for report in sections(&name, &samples, kinds, at.warmup, instructions)? {
+            println!("{report}");
+        }
     }
     println!("Load average at the end: {}", load());
     Ok(())

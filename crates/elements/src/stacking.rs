@@ -4,8 +4,7 @@
 //! compares to know when to walk them again (`changed_slots.rs`).
 
 use super::layout::{Content, Key, LayoutBox, Rebuilt};
-use crate::node_map::NodeMap;
-use crate::style::Used;
+use crate::style::{Used, UsedMap};
 
 /// What paint order needs to know of a box.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -76,7 +75,7 @@ pub(crate) struct Stackings(Vec<Option<Stacking>>);
 
 impl Stackings {
     /// The stackings of `boxes`, from their elements' used styles.
-    pub(crate) fn of(boxes: &[LayoutBox], used: &NodeMap<Used>) -> Self {
+    pub(crate) fn of(boxes: &[LayoutBox], used: &UsedMap) -> Self {
         Self(
             boxes
                 .iter()
@@ -93,7 +92,7 @@ impl Stackings {
     pub(crate) fn patched(
         mut self,
         boxes: &[LayoutBox],
-        used: &NodeMap<Used>,
+        used: &UsedMap,
         rebuilt: &Rebuilt,
     ) -> (Self, Patched) {
         self.0.resize(boxes.len(), None);
@@ -110,7 +109,7 @@ impl Stackings {
 
     /// Makes each of `slots`' stackings again from `boxes`; whether one
     /// differs from what the slot held (a newly taken slot held none).
-    fn make_again(&mut self, boxes: &[LayoutBox], used: &NodeMap<Used>, slots: &[usize]) -> bool {
+    fn make_again(&mut self, boxes: &[LayoutBox], used: &UsedMap, slots: &[usize]) -> bool {
         let mut restacked = false;
         for &slot in slots {
             let fresh = stacking_of(&boxes[slot], used);
@@ -182,7 +181,7 @@ pub(crate) struct Patched {
 }
 
 /// A box's stacking, from its element's used style; `None` when vacant.
-fn stacking_of(layout_box: &LayoutBox, used: &NodeMap<Used>) -> Option<Stacking> {
+fn stacking_of(layout_box: &LayoutBox, used: &UsedMap) -> Option<Stacking> {
     let node = match layout_box.content {
         Content::Element(node) => node,
         Content::Text(_) => return Some(Stacking::default()),
