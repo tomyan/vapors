@@ -47,7 +47,7 @@ impl Rows {
     #[must_use]
     pub fn new(count: usize, change: RowChange) -> Self {
         let page = match change {
-            RowChange::FlexText => Page::list(count),
+            RowChange::FlexText | RowChange::FlexInsert => Page::list(count),
             _ => Page::Rows(rows_page(count)),
         };
         match change {
@@ -58,7 +58,8 @@ impl Rows {
             | RowChange::Text
             | RowChange::FlexText
             | RowChange::Class
-            | RowChange::Insert => {}
+            | RowChange::Insert
+            | RowChange::FlexInsert => {}
         }
         let mut app = ElementsApp::new(Rc::clone(page.doc()));
         app.time_frames(true);
@@ -87,6 +88,18 @@ impl Rows {
         let body = doc.body();
         doc.insert_before(body, added, Some(middle));
         self.inserted = Some(added);
+    }
+}
+
+impl Rows {
+    /// Removes the inserted row, or inserts one before the list's middle
+    /// row.
+    fn toggle_inserted_list_row(&mut self) {
+        if let Some(inserted) = self.inserted.take() {
+            self.page.doc().borrow_mut().remove(inserted);
+            return;
+        }
+        self.inserted = Some(self.page.flex_list().insert_before_middle());
     }
 }
 
@@ -125,6 +138,7 @@ impl Workload for Rows {
             RowChange::FlexText => self.page.set_list_value(sample),
             RowChange::Class | RowChange::HoveredClass => self.page.rows().edit(Edit::ToggleClass),
             RowChange::Insert => self.toggle_inserted_row(),
+            RowChange::FlexInsert => self.toggle_inserted_list_row(),
             RowChange::Resize => self.page.rows().toggle_tall(),
             RowChange::Scroll => self.scroll_body(),
             RowChange::ScrollSize => {

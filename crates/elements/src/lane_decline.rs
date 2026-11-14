@@ -12,8 +12,6 @@ pub enum LaneDecline {
     /// `align-content` other than `normal` or `start`: every child is
     /// shifted by the free space.
     AlignContent,
-    /// A flex container: the flex lane is PR 3f.
-    FlexLaneNotBuilt,
     /// A grid container: tracks are shared by several items, so an
     /// insert moves items by cell; not planned.
     Grid,
@@ -64,6 +62,11 @@ pub enum LaneDecline {
     /// A percentage `row-gap` on a column whose height is not definite:
     /// Taffy resolves it against the height the items sum to.
     PercentGap,
+    /// An item's height measured under min-content and under
+    /// max-content space along the column differs, so its leaf would
+    /// depend on how the column is asked, which a parent's size queries
+    /// change from ask to ask: decided at layout, per item.
+    SpaceDependentHeight,
     /// The items overflow the column's height and one of them can
     /// shrink (its `flex-shrink` is above 0 and its minimum height is
     /// below its hypothetical height), so its height depends on the

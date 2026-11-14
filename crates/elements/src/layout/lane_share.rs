@@ -4,9 +4,75 @@
 //! lays out with it known, and only children whose styles read the
 //! height bases depend on them.
 
-use taffy::{AlignItems, Direction, Line, Rect, Style, TextAlign};
+use rustc_hash::FxHashMap;
+use taffy::{
+    AlignItems, Direction, Layout, LayoutOutput, Line, NodeId, Rect, RunMode, Style, TextAlign,
+};
 
+use super::lane::{Lane, Lanes};
 use super::lane_block::Container;
+use super::lane_block_answer::lane_answer;
+use super::lane_block_summary::BlockSummary;
+use super::lane_kind::LaneKind;
+use super::tree::BoxTree;
+use crate::lane_decline::LaneDecline;
+
+/// The block lane (`lane_block*.rs`).
+#[derive(Debug)]
+pub(crate) struct BlockLane;
+
+impl LaneKind for BlockLane {
+    type Summary = BlockSummary;
+    type Container = Container;
+    type Share = Share;
+    type Heights = Heights;
+
+    fn share(c: &Container) -> Share {
+        c.share()
+    }
+
+    fn heights(c: &Container) -> Heights {
+        c.heights()
+    }
+
+    /// `row-gap` does not apply to block layout.
+    fn gap(_: &Container) -> f64 {
+        0.0
+    }
+
+    fn writes(c: &Container) -> bool {
+        c.run_mode == RunMode::PerformLayout
+    }
+
+    /// The container's inset and, when its top margin collapses with its
+    /// first child's, less that margin, which Taffy applies outside the
+    /// container.
+    fn top(c: &Container, run: &BlockSummary) -> f64 {
+        let escape = if c.own_margins_collapse.start {
+            run.top().resolve()
+        } else {
+            0.0
+        };
+        f64::from(c.resolved_inset.top) - escape
+    }
+
+    fn lay_out_child(
+        tree: &mut BoxTree<'_>,
+        slot: usize,
+        c: &Container,
+    ) -> Result<(BlockSummary, Layout), LaneDecline> {
+        let laid = tree.lane_child(NodeId::from(slot), c)?;
+        Ok((BlockSummary::leaf(laid.leaf)?, laid.layout))
+    }
+
+    fn answer(c: &Container, run: &BlockSummary) -> Result<LayoutOutput, LaneDecline> {
+        lane_answer(c, run)
+    }
+
+    fn lanes(lanes: &mut Lanes) -> &mut FxHashMap<usize, Lane<Self>> {
+        &mut lanes.block
+    }
+}
 
 /// The container's inputs every child's leaf depends on.
 #[derive(Clone, Debug, PartialEq)]

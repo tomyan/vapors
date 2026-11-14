@@ -78,4 +78,17 @@ impl FlexList {
         let middle = self.rows.len() / 2;
         self.doc.borrow_mut().set_text(self.rows[middle].text, text);
     }
+
+    /// A new row put in before the middle row; the new row's element.
+    pub fn insert_before_middle(&self) -> NodeId {
+        let mut doc = self.doc.borrow_mut();
+        let middle = self.rows[self.rows.len() / 2].element;
+        let row = doc.create_element("div");
+        doc.set_attribute(row, "class", "row");
+        let label = doc.create_text(&row_text(self.rows.len(), 0));
+        doc.append(row, label);
+        let body = doc.body();
+        doc.insert_before(body, row, Some(middle));
+        row
+    }
 }

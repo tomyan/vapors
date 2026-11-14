@@ -705,6 +705,23 @@ column, since one item does not read the total; its height is known in
 every ask that passes it, so neither Taffy's cache nor the item reads
 that space.
 
+As built, 3f-2: one `Lane<K>` serves both kinds (`lane_kind.rs`: the
+summary, the settled container, laying one child out, where starts are
+measured from, the answer), `Lanes` holding a map per kind. A column's
+leaves must serve every ask of it, and a parent's size queries ask it
+under max-content, min-content and definite space along in turn, so
+the kind of space is not part of a column's share: a leaf holds the
+item's share under definite space and under min- or max-content
+space, and an item's height is measured under both min- and
+max-content space, the column declined at layout
+(`SpaceDependentHeight`) where the two differ. Block and text items
+measure the same under both. As for blocks, the column's height inputs
+(its height, inner height and whether it is definite) are apart from
+its share, and only items whose styles read them are laid out again
+when they change. The in-crate comparisons (`lane_compare.rs`) lay
+their pages out with lanes off (`KeptBoxes::lanes_off`, test builds
+only), so a mirror is compared with Taffy's answers and not a lane's.
+
 ### 10.4 Margins
 
 Block: margins collapse between siblings by the fold of section 2.1,

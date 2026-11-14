@@ -21,6 +21,13 @@ use crate::scaling::PhaseSeries;
 /// in flow, `docs/plans/splice-layout.md`) retires it, restoring 9500.
 pub const INSERT_A11Y_PER_ROW: u64 = 9600;
 
+/// As [`INSERT_A11Y_PER_ROW`] for `FlexInsert`, on the flex-column list,
+/// whose rows are one block holding their text: measured 1829.6 and
+/// 1832.9 per row (insert and remove frames, 2026-11-14, layout-lane PR
+/// 3f-2); 1900 is that rounded up to the next hundred. Layout-lane PR 5
+/// (the accessibility mirror in flow) retires it.
+pub const FLEX_INSERT_A11Y_PER_ROW: u64 = 1900;
+
 /// As [`INSERT_A11Y_PER_ROW`] for `Resize`: recorded at 12,021.
 ///
 /// Relaxed from 13,000 (2026-11-13) for the same reason: main measured
@@ -94,6 +101,10 @@ impl Judged {
             // style flat since docs/perf/insert-style-2026-11-13.md
             RowChange::Insert => Self::AccessibilityPerRow {
                 ceiling: INSERT_A11Y_PER_ROW,
+                flat: &["style"],
+            },
+            RowChange::FlexInsert => Self::AccessibilityPerRow {
+                ceiling: FLEX_INSERT_A11Y_PER_ROW,
                 flat: &["style"],
             },
             RowChange::Resize => Self::AccessibilityPerRow {

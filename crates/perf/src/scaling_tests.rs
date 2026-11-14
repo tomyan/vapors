@@ -5,8 +5,8 @@ use std::collections::BTreeMap;
 use super::{AtSize, Judged, Scaling};
 use crate::rows::RowChange;
 use crate::scaling_judged::{
-    FLEX_TEXT_FRAME_PERCENT, INSERT_A11Y_PER_ROW, RESIZE_A11Y_PER_ROW, SCROLL_A11Y_PER_ROW,
-    SCROLL_SIZE_A11Y_PER_ROW,
+    FLEX_INSERT_A11Y_PER_ROW, FLEX_TEXT_FRAME_PERCENT, INSERT_A11Y_PER_ROW, RESIZE_A11Y_PER_ROW,
+    SCROLL_A11Y_PER_ROW, SCROLL_SIZE_A11Y_PER_ROW,
 };
 
 fn size(rows: usize, phases: &[(&str, u64)]) -> AtSize {
@@ -168,6 +168,11 @@ fn each_change_is_judged_as_the_brief_says() {
         flat: &["style"],
     };
     assert_eq!(Judged::of(RowChange::Insert), insert);
+    let flex_insert = Judged::AccessibilityPerRow {
+        ceiling: FLEX_INSERT_A11Y_PER_ROW,
+        flat: &["style"],
+    };
+    assert_eq!(Judged::of(RowChange::FlexInsert), flex_insert);
     let resize = Judged::AccessibilityPerRow {
         ceiling: RESIZE_A11Y_PER_ROW,
         flat: &[],

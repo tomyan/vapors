@@ -19,6 +19,7 @@ pub(crate) fn page(css: &str, build: impl FnOnce(&mut Document, DomNode)) -> Doc
     let body = doc.body();
     build(&mut doc, body);
     doc.add_stylesheet("page.css", css).expect("parses");
+    doc.boxes.lanes_off = true;
     doc.update(VIEWPORT).expect("updates");
     doc
 }

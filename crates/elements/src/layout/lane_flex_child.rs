@@ -50,8 +50,8 @@ impl BoxTree<'_> {
         column: &Column,
     ) -> Result<LaidItem, LaneDecline> {
         let child = self.flex_child(id, column)?;
-        let base = self.flex_base(id, column, &child);
-        let [basis, content] = self.flex_contributions(id, column, &child, &base);
+        let base = self.flex_base(id, column, &child)?;
+        let [basis, content] = self.flex_contributions(id, column, &child, &base)?;
         let width = self.used_width(id, column, &child, &base);
         let (margin, offset_x) = cross_place(column, &child, width);
         let target = Target {

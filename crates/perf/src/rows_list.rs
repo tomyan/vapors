@@ -48,6 +48,15 @@ impl Page {
         }
     }
 
+    /// The flex-column list; the rows page has none.
+    #[must_use]
+    pub fn flex_list(&self) -> &FlexList {
+        match self {
+            Self::List(list) => list,
+            Self::Rows(_) => unreachable!("only the list changes run on the flex list"),
+        }
+    }
+
     /// Sets the list's middle row to a new five-digit value.
     pub fn set_list_value(&self, sample: usize) {
         match self {
