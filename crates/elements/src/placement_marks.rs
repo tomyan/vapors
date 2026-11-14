@@ -7,8 +7,8 @@
 
 use rustc_hash::FxHashMap;
 
-use crate::layout::{Lanes, Written};
-use crate::placement::{Changes, NO_SLOT, Placement};
+use crate::layout::Written;
+use crate::placement::{Changes, LaidOut, NO_SLOT, Placement};
 use crate::placement_walk::Mark;
 
 /// The root's slot, the one slot placed in no slot.
@@ -47,9 +47,9 @@ impl Marked {
 
 impl Placement {
     /// Marks the slots `changes` names, and those up each one's chain.
-    pub(crate) fn mark(&mut self, changes: &Changes<'_>, lanes: &Lanes) -> Marked {
+    pub(crate) fn mark(&mut self, changes: &Changes<'_>, boxes: &LaidOut<'_>) -> Marked {
         let written = &changes.written;
-        let started = self.started_unframed(written, lanes);
+        let started = self.started_unframed(written, boxes);
         let dirty = written
             .laid_out
             .iter()
@@ -69,17 +69,24 @@ impl Placement {
     }
 
     /// The children whose start may have changed in each lane that was
-    /// not framed: placed again, their starts added back, worked out in
-    /// one pass along each lane (`Lanes::offsets_from`). A framed
+    /// not framed: placed again, their starts added back. A framed
     /// lane's are not; their frames' shifts carry the start, and a lane
     /// whose framing changes places every child (`placement_frames.rs`).
-    fn started_unframed(&self, written: &Written, lanes: &Lanes) -> Vec<usize> {
+    /// A lane dropped later in the layout that noted it holds no child:
+    /// the container's children from `first` on, from its box, then.
+    fn started_unframed(&self, written: &Written, boxes: &LaidOut<'_>) -> Vec<usize> {
         let unframed = |&&(container, _): &&(usize, usize)| {
             !matches!(self.framing.get(&container), Some(Ok(())))
         };
-        let started = written.started.iter().filter(unframed);
-        started
-            .flat_map(|&(container, first)| lanes.offsets_from(container, first))
+        let children = |&(container, first): &(usize, usize)| {
+            let held = boxes.lanes.children_from(container, first);
+            held.unwrap_or_else(|| children_after(&boxes.boxes[container].children, first))
+        };
+        written
+            .started
+            .iter()
+            .filter(unframed)
+            .flat_map(children)
             .collect()
     }
 
@@ -99,4 +106,13 @@ impl Placement {
             up = self.up[up];
         }
     }
+}
+
+/// `children` from `first` on; all of them when `first` is not one.
+fn children_after(children: &[usize], first: usize) -> Vec<usize> {
+    let at = children
+        .iter()
+        .position(|&child| child == first)
+        .unwrap_or(0);
+    children[at..].to_vec()
 }

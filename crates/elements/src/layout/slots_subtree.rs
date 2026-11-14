@@ -170,7 +170,7 @@ impl Placed {
     /// Frees the taken slots no new box took, once every subtree is put.
     pub(crate) fn free_taken(&mut self, taken: &Taken) {
         for slot in taken.slots.values() {
-            self.lanes.borrow_mut().remove(*slot, &mut self.boxes);
+            self.lanes.borrow_mut().forget(*slot);
         }
         self.slots.free.extend(taken.slots.values().copied());
         self.slots.free.sort_unstable_by(|a, b| b.cmp(a));

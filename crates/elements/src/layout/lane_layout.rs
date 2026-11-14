@@ -4,9 +4,10 @@
 //! only the children put in, laid out again or sharing new inputs laid
 //! out and their leaves put in the tree (`lane_fill.rs`), their layouts
 //! written with the relative offset alone along the axis (section 11.2:
-//! the start stays in the lane), and the container's answer folded (`lane_kind.rs`). A container, or
-//! one of its children, the lane does not lay out is handed to Taffy's
-//! algorithm, counted with the reason (`LaneCounts`).
+//! the start stays in the lane), and the container's answer folded
+//! (`lane_kind.rs`). A container, or one of its children, the lane does
+//! not lay out is handed to Taffy's algorithm, counted with the reason
+//! (`LaneCounts`).
 
 use taffy::{
     BlockContext, LayoutInput, LayoutOutput, NodeId, RunMode, compute_block_layout,
@@ -19,6 +20,7 @@ use super::lane_flex::FlexSettled;
 use super::lane_flex_share::FlexLane;
 use super::lane_kind::LaneKind;
 use super::lane_share::BlockLane;
+use super::lane_view::LaneView;
 use super::tree::BoxTree;
 use crate::lane_decline::LaneDecline;
 
@@ -140,9 +142,13 @@ impl BoxTree<'_> {
         } else {
             self.fill(slot, c, &mut lane)
         };
-        // a lane answered aside is as written, even when the ask declines
+        // a lane answered aside is as written, even when the ask declines;
+        // one dropped puts its written children's starts back, as the
+        // container's next layout may come from Taffy's cache
         if run.is_ok() || aside {
             self.lane_kept(slot, lane);
+        } else {
+            lane.restore_starts(slot, &mut self.boxes);
         }
         K::answer(c, &run?)
     }

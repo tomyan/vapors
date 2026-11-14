@@ -112,21 +112,6 @@ impl<K: LaneKind> Lane<K> {
         self.facts.forget(slot);
     }
 
-    /// Puts each child's start back in its layout in `boxes`, when this
-    /// lane wrote them, so they hold Taffy's values with the lane gone.
-    /// O(children log children), on a lane dropped.
-    pub(super) fn restore_starts(&self, boxes: &mut [super::LayoutBox]) {
-        if self.written.is_none() {
-            return;
-        }
-        for (&slot, &handle) in &self.handles {
-            let start = super::narrow(self.facts.top + self.tree.start(handle));
-            if let Some(layout_box) = boxes.get_mut(slot) {
-                layout_box.layout.location.y += start;
-            }
-        }
-    }
-
     /// Notes the child in `slot`'s `position: relative` offset along
     /// the axis, `relative`, as its layout is written.
     pub(super) fn note_relative(&mut self, slot: usize, relative: f32) {
@@ -135,19 +120,6 @@ impl<K: LaneKind> Lane<K> {
         } else {
             self.relative.insert(slot, relative);
         }
-    }
-
-    /// The children from the one in `slot` on, by slot, each with its
-    /// `frame_offset`: one fold to reach it, then one step per child.
-    pub(super) fn offsets_from(&self, slot: usize) -> Vec<(usize, f64)> {
-        let Some(&handle) = self.handles.get(&slot) else {
-            return Vec::new();
-        };
-        let starts = self.tree.starts_from(handle).into_iter();
-        let top = self.facts.top;
-        starts
-            .map(|(handle, start)| (self.slots[&handle], top + start))
-            .collect()
     }
 
     /// The children from the one in `slot` on, by slot, in order.

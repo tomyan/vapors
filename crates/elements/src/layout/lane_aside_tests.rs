@@ -116,7 +116,46 @@ fn a_lane_a_size_query_made_is_not_framed_until_it_writes() {
         let query = content_query(&tree.boxes, list);
         tree.lane_or_flex(NodeId::from(list), query);
 
-        // Then: its rows hold Taffy's layouts, not its starts
+        // Then: its rows hold Taffy's layouts, not its starts: neither
+        // framed nor read with a start added
         assert_eq!(tree.lanes.framing(list, 0.0, 1.0), None);
+        let row = tree.boxes[list].children[10];
+        let layout = tree.boxes[row].layout;
+        assert_eq!(tree.lanes.taffy_location(row, &layout), layout.location);
+    });
+}
+
+#[test]
+fn a_size_query_a_child_declines_puts_the_starts_back() {
+    // Given: a list its lane wrote, in a flex column that asks it its
+    // content size, and each row where Taffy puts it
+    let css = "body { margin: 0; display: flex; flex-direction: column; height: 200px; } \
+               .list { display: flex; flex-direction: column; height: 100px; flex-shrink: 0; } \
+               .row { height: 20px; flex-shrink: 0; }";
+    let mut doc = laid_out(css, 50);
+
+    asked(&mut doc, 50, |tree, list| {
+        let rows = tree.boxes[list].children.clone();
+        let taffy = |tree: &BoxTree<'_>, row: usize| {
+            tree.lanes.taffy_location(row, &tree.boxes[row].layout)
+        };
+        let before: Vec<_> = rows.iter().map(|&row| taffy(tree, row)).collect();
+
+        // When: a row taken out of flow, so the content-size query, the
+        // lane laying it out again, declines it (`OutOfFlowChild`)
+        let out = rows[5];
+        tree.boxes[out].style.position = taffy::Position::Absolute;
+        tree.stale.insert(out);
+        let query = content_query(&tree.boxes, list);
+        tree.lane_or_flex(NodeId::from(list), query);
+
+        // Then: the lane is gone and every other row holds where Taffy
+        // put it, as a layout served from Taffy's cache leaves it
+        assert!(!tree.lanes.flex.contains_key(&list), "the lane was kept");
+        for (&row, location) in rows.iter().zip(&before) {
+            if row != out {
+                assert_eq!(tree.boxes[row].layout.location, *location, "row {row}");
+            }
+        }
     });
 }

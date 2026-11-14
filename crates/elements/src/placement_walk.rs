@@ -162,14 +162,13 @@ impl<'a, 'b> Walk<'a, 'b> {
     fn put(&mut self, slot: usize, origin: (f32, f32), mark: Mark) {
         let layout = &self.boxes.boxes[slot].layout;
         let framed = self.lane_framed(slot);
-        let location = self.boxes.lanes.taffy_location(slot, layout);
         let y = if framed {
             self.boxes.lanes.relative(self.kept.up[slot], slot)
         } else {
-            origin.1 + location.y
+            origin.1 + self.boxes.lanes.taffy_location(slot, layout).y
         };
         let rect = BoxRect {
-            x: origin.0 + location.x,
+            x: origin.0 + layout.location.x,
             y,
             width: layout.size.width,
             height: layout.size.height,

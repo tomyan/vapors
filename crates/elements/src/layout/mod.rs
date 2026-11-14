@@ -39,11 +39,13 @@ mod lane_flex_summary;
 mod lane_frame;
 mod lane_kind;
 mod lane_layout;
+mod lane_location;
 #[cfg(test)]
 mod lane_page;
 mod lane_set;
 mod lane_share;
 mod lane_tree;
+mod lane_view;
 mod lane_write;
 #[cfg(debug_assertions)]
 mod lane_written_check;
@@ -124,7 +126,6 @@ pub(crate) fn lay_out(
     let (fonts, cache) = texts;
     let shared = std::rc::Rc::clone(&placed.lanes);
     let mut lanes = shared.borrow_mut();
-    lanes.clear_offsets();
     let mut tree = BoxTree {
         boxes: placed.boxes,
         fonts,

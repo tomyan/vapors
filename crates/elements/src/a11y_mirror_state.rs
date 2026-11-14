@@ -92,7 +92,11 @@ impl AxMirror {
         let started = changed
             .started
             .iter()
-            .flat_map(|&(container, first)| lanes.children_from(container, first));
+            // a lane dropped later in the layout: Taffy laid its rows out
+            // again, and placement moved them (`moved` above)
+            .flat_map(|&(container, first)| {
+                lanes.children_from(container, first).unwrap_or_default()
+            });
         let built = changed.rebuilt.iter().chain(&changed.moved).copied();
         for key in built.chain(started).filter_map(|slot| slots.key(slot)) {
             self.touched.nodes.insert(node_of(key));
