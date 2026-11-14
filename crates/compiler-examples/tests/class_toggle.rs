@@ -10,13 +10,14 @@ use vapors_dom::NodeId;
 use vapors_dom::recording::RecordingDom;
 use vapors_signals::Signal;
 
-fn mounted(on: bool) -> (Rc<RefCell<RecordingDom>>, NodeId, Signal<bool>) {
+/// The component, kept: dropping it would dispose its effects.
+fn mounted(on: bool) -> (Rc<RefCell<RecordingDom>>, NodeId, Signal<bool>, ClassToggle) {
     let dom = Rc::new(RefCell::new(RecordingDom::new()));
     let root = dom.borrow().root();
     let on = Signal::new(on);
     let toggle = ClassToggle::mount(&dom, root, ClassToggleProps { on });
     let div = toggle.roots()[0];
-    (dom, div, on)
+    (dom, div, on, toggle)
 }
 
 fn class(dom: &Rc<RefCell<RecordingDom>>, div: NodeId) -> Option<String> {
@@ -26,7 +27,7 @@ fn class(dom: &Rc<RefCell<RecordingDom>>, div: NodeId) -> Option<String> {
 #[test]
 fn the_directive_class_follows_the_signal_both_ways() {
     // Given
-    let (dom, div, on) = mounted(false);
+    let (dom, div, on, _toggle) = mounted(false);
     assert_eq!(class(&dom, div).as_deref(), Some("card"));
 
     // When

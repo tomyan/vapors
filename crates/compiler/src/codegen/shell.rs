@@ -38,7 +38,8 @@ pub(crate) fn assemble(
         &super::events_decl::child_types(component),
         &uses,
     ));
-    file.push_str(&accessors());
+    file.push_str(&super::shell_methods::accessors());
+    file.push_str(&super::shell_methods::drop_impl(name));
     file
 }
 
@@ -116,6 +117,9 @@ fn component_struct(name: &str, info: &ScriptInfo) -> String {
 pub struct {name} {{
 {fields}    owner: Owner,
     roots: Vec<Root>,
+    /// Mounted with no current owner: dropping it disposes its owner,
+    /// its signals and effects (a child's owner goes with its parent's).
+    disposes_on_drop: bool,
 }}
 "
     )
@@ -170,43 +174,14 @@ fn mount_methods(name: &str, info: &ScriptInfo, body: &str, styled: bool) -> Str
     {{
         let {name}Props {{ {prop_names} }} = props;
 {add_style}        dom.borrow_mut().declare_events(&Self::events());
+        let disposes_on_drop = Owner::current().is_none();
         let owner = Owner::new();
         let {returned} = owner.with(|| {{
 {statements}            let mut roots = Vec::new();
 {body}            {returned}
         }});
-        {name} {{ {built} }}
+        {name} {{ {built}, disposes_on_drop }}
     }}
 "
     )
-}
-
-fn accessors() -> String {
-    "
-    /// The top-level nodes now, in order, including those of a block
-    /// or child component at the top level.
-    #[must_use]
-    pub fn roots(&self) -> Vec<NodeId> {
-        vapors_dom::current_nodes(&self.roots)
-    }
-
-    /// The top-level entries, for a parent that mounts this component
-    /// at its own top level.
-    #[must_use]
-    pub fn root_entries(&self) -> &[Root] {
-        &self.roots
-    }
-
-    /// Reads the top-level nodes, disposes the signals and effects, and
-    /// removes the nodes.
-    pub fn unmount<D: Dom + ?Sized>(self, dom: &Rc<RefCell<D>>) {
-        let nodes = self.roots();
-        self.owner.dispose();
-        for node in nodes {
-            dom.borrow_mut().remove(node);
-        }
-    }
-}
-"
-    .to_string()
 }

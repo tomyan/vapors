@@ -185,7 +185,7 @@ fn top_level_elements_become_roots() {
     assert_has(&code, "insert_before(parent, div0, before);");
     assert_has(&code, "roots.push(Root::Node(div0));");
     assert_has(&code, "roots.push(Root::Node(span1));");
-    assert_has(&code, "Counter { owner, roots }");
+    assert_has(&code, "Counter { owner, roots, disposes_on_drop }");
 }
 
 #[test]

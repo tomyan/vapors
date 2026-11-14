@@ -26,13 +26,15 @@ pub struct Signals {
     pub shown: Signal<bool>,
 }
 
+/// The page is the first field, so it is dropped (and disposed) first,
+/// while the app whose surface its nodes' cleanups invalidate still runs.
 pub struct Rig {
+    pub page: ScenePage,
     pub doc: Rc<RefCell<Document>>,
     pub app: ElementsApp,
     pub scene: Rc<RefCell<Scene>>,
     pub meshes: Rc<RefCell<Meshes>>,
     pub surface: SurfaceHandle,
-    pub page: ScenePage,
     pub signals: Signals,
 }
 
@@ -110,12 +112,12 @@ impl Rig {
         let body = doc.borrow().body();
         let page = ScenePage::mount(&doc, body, props);
         Self {
+            page,
             doc,
             app,
             scene,
             meshes,
             surface,
-            page,
             signals,
         }
     }
