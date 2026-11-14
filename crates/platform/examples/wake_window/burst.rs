@@ -35,6 +35,8 @@ pub struct Burst {
 impl Burst {
     /// The most frames the burst may draw, from its gap and interval.
     pub fn most(&self) -> u64 {
+        // `measure` refuses a zero interval; `max` only keeps the
+        // division defined.
         let nanos = self.interval.as_nanos().max(1);
         let spans = self.gap.as_nanos().div_ceil(nanos);
         1 + u64::try_from(spans).unwrap_or(u64::MAX - 1)
@@ -74,7 +76,12 @@ pub fn measure(waker: &Waker, shared: &Shared) -> Result<Burst, String> {
         .collect::<Result<Vec<_>, _>>()?
         .into_iter()
         .min()
-        .ok_or("no back-to-back pair was measured")?;
+        .ok_or("refused: no back-to-back pair was measured, so the frame interval is unknown")?;
+    if interval.is_zero() {
+        return Err(
+            "refused: two frames drawn back to back were 0ns apart, so the frame interval cannot bound the burst; the clock or the frame timestamps are wrong".into(),
+        );
+    }
     let mut gap = Duration::ZERO;
     let frames = frames_over(shared, || {
         gap = wake_all(waker)?;
@@ -100,7 +107,7 @@ fn back_to_back(waker: &Waker, shared: &Shared) -> Result<Duration, String> {
     match (drawn, shared.last_two()) {
         (2, Some((before, last))) => Ok(last - before),
         _ => Err(format!(
-            "a frame returning a time already past drew {drawn} frames, not 2, so the frame interval could not be measured"
+            "refused: a frame returning a time already past drew {drawn} frames, not 2, so the frame interval could not be measured"
         )),
     }
 }
