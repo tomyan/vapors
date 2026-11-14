@@ -1,7 +1,10 @@
 //! The 60 s run as Markdown (docs/plans/one-scene.md, 3.2): median,
 //! 99th percentile and maximum of CPU, GPU and frame-to-idle time, the
 //! frames over budget, each frame's GPU work, the first 20 frames on
-//! their own, and the load average at the start and the end.
+//! their own, the ten slowest with their lines (so a run that passes
+//! still shows where its margin is), and the load average at the start
+//! and the end. A frame's line names the scripted changes due in it and
+//! the scene's own work (`FrameCounts::surfaces`).
 
 use std::fmt::Write;
 use std::time::Duration;
@@ -9,19 +12,24 @@ use std::time::Duration;
 use crate::driver::{RUN_FRAMES, frame_time};
 use crate::sampler::JudgedFrame;
 use crate::scene_judge::{BUDGET, over_budget};
+use crate::scene_kind::SceneKind;
 use crate::stats::{median_count, nearest_rank};
 
 /// Frames printed one by one from the first: they hold first-use costs.
 const FIRST: usize = 20;
 
-/// `frames` of the run, with the load at its start and its end (`None`
-/// when it could not be read).
+/// The slowest frames to idle, printed with their lines on every run.
+const SLOWEST: usize = 10;
+
+/// `frames` of `kind`'s run, with the load at its start and its end
+/// (`None` when it could not be read).
 #[must_use]
-pub fn report(frames: &[JudgedFrame], start: f64, end: Option<f64>) -> String {
+pub fn report(frames: &[JudgedFrame], start: f64, end: Option<f64>, kind: SceneKind) -> String {
     let end = end.map_or_else(|| "unread".into(), |end| format!("{end:.2}"));
     let mut out = format!(
-        "### racer, one scene, 60 s\n\nFrames {} ({RUN_FRAMES} planned); over {} ms to idle: {}. \
+        "### {}\n\nFrames {} ({RUN_FRAMES} planned); over {} ms to idle: {}. \
          Load average (1 minute) at the start {start:.2}, at the end {end}.\n\n",
+        kind.title(),
         frames.len(),
         BUDGET.as_secs_f64() * 1e3,
         over_budget(frames).len()
@@ -29,7 +37,20 @@ pub fn report(frames: &[JudgedFrame], start: f64, end: Option<f64>) -> String {
     times_table(&mut out, frames);
     work_table(&mut out, frames);
     first_frames(&mut out, frames);
+    slowest_frames(&mut out, frames, kind);
     out
+}
+
+fn slowest_frames(out: &mut String, frames: &[JudgedFrame], kind: SceneKind) {
+    let mut slowest: Vec<&JudgedFrame> = frames.iter().collect();
+    slowest.sort_by_key(|frame| std::cmp::Reverse(frame.idle));
+    slowest.truncate(SLOWEST);
+    let _ = write!(
+        out,
+        "\nThe {} slowest frames to idle:\n\n{}",
+        slowest.len(),
+        over_budget_lines(&slowest, kind)
+    );
 }
 
 fn times_table(out: &mut String, frames: &[JudgedFrame]) {
@@ -80,25 +101,30 @@ fn first_frames(out: &mut String, frames: &[JudgedFrame]) {
     }
 }
 
-/// One line per frame over budget: its index, its time on the frame
-/// clock, its times and phases, and what it did.
+/// One line per frame: its index, its time on the frame clock, the
+/// scripted changes due in it, its times and phases, and what it did.
 #[must_use]
-pub fn over_budget_lines(frames: &[&JudgedFrame]) -> String {
-    frames.iter().map(|f| over_budget_line(f) + "\n").collect()
+pub fn over_budget_lines(frames: &[&JudgedFrame], kind: SceneKind) -> String {
+    frames
+        .iter()
+        .map(|f| over_budget_line(f, &kind.changes(f.index)) + "\n")
+        .collect()
 }
 
-fn over_budget_line(f: &JudgedFrame) -> String {
+fn over_budget_line(f: &JudgedFrame, changes: &[String]) -> String {
     let phases: Vec<String> = f
         .phases
         .iter()
         .map(|(name, time)| format!("{name} {}", micros(*time)))
         .collect();
-    let work = f.counts.frame.total();
+    let (work, scene) = (f.counts.frame.total(), f.counts.frame.surfaces);
     format!(
-        "frame {} at {:.3} s: to idle {} µs, CPU {} µs, GPU {} µs; phases (µs) {}; draw calls {}, \
-         buffer bytes {}, texture bytes {}, restyled {}, scene items {}",
+        "frame {} at {:.3} s, changes [{}]: to idle {} µs, CPU {} µs, GPU {} µs; phases (µs) {}; \
+         draw calls {}, buffer bytes {}, texture bytes {}, restyled {}, scene items {}; \
+         surfaces: draw calls {}, buffer bytes {}",
         f.index,
         frame_time(f.index).as_secs_f64(),
+        changes.join(", "),
         micros(f.idle),
         micros(f.cpu),
         micros(f.gpu),
@@ -107,7 +133,9 @@ fn over_budget_line(f: &JudgedFrame) -> String {
         work.buffer_bytes,
         work.texture_bytes,
         f.counts.update.elements_restyled,
-        f.counts.update.scene_items_built
+        f.counts.update.scene_items_built,
+        scene.draw_calls,
+        scene.buffer_bytes
     )
 }
 

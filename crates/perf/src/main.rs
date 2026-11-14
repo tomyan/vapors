@@ -1,7 +1,7 @@
 //! Prints the timing baseline (docs/perf): every workload, in a release
 //! build. `cargo run --release -p vapors-perf -- [runs] [warmup]
 //! [--only <substring>] [--instructions] [--off-path] [--scaling all|<change>] [--mount]
-//! [--mount-memory <rows>] [--scene-run]`, 200 and 20 by default
+//! [--mount-memory <rows>] [--scene-run [racer|one-scene]]`, 200 and 20 by default
 //! (`args.rs`).
 
 use vapors_gpu_harness::gpu_with;
@@ -44,12 +44,13 @@ fn run() -> Result<(), String> {
         mount_memory,
         scene_run,
     } = options(std::env::args().skip(1))?;
-    if scene_run {
-        return scene_run::run(|| {
+    if let Some(kind) = scene_run {
+        let open = || {
             let gpu = gpu_with(FEATURES);
             print_adapter(&gpu);
             gpu
-        });
+        };
+        return scene_run::run(open, kind);
     }
     if let Some(rows) = mount_memory {
         let gpu = gpu_with(FEATURES);

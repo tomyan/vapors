@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use super::{load_from, over_budget, quiet, require_timestamps};
+use super::{load_from, over_budget, quiet, require_hardware, require_timestamps};
 use crate::sampler::JudgedFrame;
 
 fn frame(index: usize, idle_micros: u64) -> JudgedFrame {
@@ -69,4 +69,32 @@ fn a_load_of_1_5_or_more_is_refused_printing_it_and_less_is_accepted() {
     assert!(error.contains("1.50 at the start"), "{error}");
     assert_eq!(quiet("end", Ok(1.49)), Ok(1.49));
     assert!(quiet("end", Err("unread".into())).is_err());
+}
+
+#[test]
+fn only_an_integrated_or_discrete_gpu_is_accepted_and_every_other_type_is_refused_by_name() {
+    use wgpu::DeviceType::{Cpu, DiscreteGpu, IntegratedGpu, Other, VirtualGpu};
+    let cases = [
+        (IntegratedGpu, None),
+        (DiscreteGpu, None),
+        (Cpu, Some("is Cpu: a software adapter")),
+        (VirtualGpu, Some("is VirtualGpu: not known to be a GPU")),
+        (Other, Some("is Other: not known to be a GPU")),
+    ];
+    for (device_type, refused) in cases {
+        // When
+        let checked = require_hardware(device_type, "an adapter", "a driver");
+
+        // Then
+        match refused {
+            None => assert_eq!(checked, Ok(()), "{device_type:?}"),
+            Some(why) => {
+                let error = checked.expect_err("refused");
+                assert!(
+                    error.starts_with(&format!("an adapter (a driver) {why}")),
+                    "{error}"
+                );
+            }
+        }
+    }
 }

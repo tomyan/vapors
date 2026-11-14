@@ -1,0 +1,19 @@
+settled after 521 s, load 1.35 11.37 26.34; busiest:
+%CPU     ELAPSED COMMAND
+ 100       00:00 ps
+15.6  9-21:44:25 claude
+ 2.6       20:05 kworker/u48:5-flush-259:0
+ 2.4  2-01:37:29 tailscaled
+ 1.5    04:05:43 kworker/u48:3-kvfree_rcu_reclaim
+run1-cold start 08:38:01 load 1.35 11.37 26.34
+run1-cold end 08:38:13 exit 0 load 1.38 11.04 26.07
+run1-warm start 08:38:13 load 1.38 11.04 26.07
+run1-warm end 08:38:24 exit 0 load 1.28 10.55 25.67
+run2-cold start 08:38:24 load 1.28 10.55 25.67
+run2-cold end 08:38:36 exit 0 load 1.16 10.22 25.40
+run2-warm start 08:38:36 load 1.16 10.22 25.40
+run2-warm end 08:38:47 exit 0 load 1.06 9.90 25.13
+run3-cold start 08:38:47 load 1.06 9.90 25.13
+run3-cold end 08:38:59 exit 0 load 1.13 9.48 24.75
+run3-warm start 08:38:59 load 1.13 9.48 24.75
+run3-warm end 08:39:11 exit 0 load 1.04 9.18 24.49
