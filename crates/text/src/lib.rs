@@ -20,6 +20,7 @@ mod draw_icon;
 mod draw_kept;
 mod draw_kept_check;
 mod draw_page;
+mod fit;
 mod font_system;
 pub mod fonts;
 #[cfg(test)]
@@ -50,6 +51,7 @@ pub use atlas_page::AtlasPage;
 pub use atlas_pins::AtlasPins;
 pub use draw::RenderTarget;
 pub use draw_icon::{ICON_BLEND, IconDraw};
+pub use fit::{FIT_SLACK, fit_limit, fits};
 pub use font_system::FontSystem;
 pub use icon::{Icon, IconError, IconStroke};
 pub use layout::{Align, Glyph, GlyphRun, Layout, LayoutOptions, LineInfo, PlacedGlyph};

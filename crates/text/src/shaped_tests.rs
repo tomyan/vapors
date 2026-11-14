@@ -35,7 +35,7 @@ fn shaped_and_broken(system: &mut FontSystem, options: &LayoutOptions) -> Layout
         builder.push(property, bold().range);
     }
     let mut inner = builder.build(TEXT);
-    inner.break_all_lines(options.width.map(|w| w * options.scale));
+    inner.break_all_lines(options.width.map(|w| crate::fit_limit(w * options.scale)));
     let align = crate::layout_runs::alignment(options.align);
     inner.align(align, parley::AlignmentOptions::default());
     Layout::broken(inner, TEXT.to_owned(), options.scale)

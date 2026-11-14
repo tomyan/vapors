@@ -6,6 +6,9 @@
 use parley::{AlignmentOptions, BaseDirection, ContentWidths};
 use vapors_scene::Color;
 
+use crate::fit::fit_limit;
+#[cfg(doc)]
+use crate::fit::fits;
 use crate::font_system::FontSystem;
 use crate::layout::Layout;
 use crate::layout_runs::alignment;
@@ -63,10 +66,12 @@ impl Shaped {
         self.clone().into_layout(width, align)
     }
 
-    /// Breaks this paragraph into lines at `width` and aligns them.
+    /// Breaks this paragraph into lines at `width` and aligns them; a
+    /// line fits the width as [`fits`] says.
     #[must_use]
     pub fn into_layout(mut self, width: Option<f32>, align: Align) -> Layout {
-        self.inner.break_all_lines(width.map(|w| w * self.scale));
+        let limit = width.map(|w| fit_limit(w * self.scale));
+        self.inner.break_all_lines(limit);
         self.inner
             .align(alignment(align), AlignmentOptions::default());
         Layout::broken(self.inner, self.text, self.scale)

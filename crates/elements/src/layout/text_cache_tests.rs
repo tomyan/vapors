@@ -117,20 +117,6 @@ fn a_centred_or_end_aligned_run_is_laid_out_again_at_its_width() {
 }
 
 #[test]
-fn a_number_that_is_not_finite_never_fits() {
-    for (content, available) in [
-        (10.0, f32::NAN),
-        (f32::NAN, 100.0),
-        (f32::NAN, f32::NAN),
-        (10.0, f32::INFINITY),
-        (f32::INFINITY, f32::INFINITY),
-    ] {
-        assert!(!fits(content, available), "{content} in {available}");
-    }
-    assert!(fits(10.0, 10.0));
-}
-
-#[test]
 fn a_run_with_a_nan_letter_spacing_is_laid_out_like_a_fresh_one() {
     // Given: a NaN spacing, so every glyph after the first sits at NaN
     let run = InlineRun {
