@@ -1,0 +1,12 @@
+run1-cold start 07:19:59 load 1.37 8.38 25.06
+run1-cold end 07:20:10 exit 0 load 1.49 8.06 24.69
+run1-warm start 07:20:10 load 1.49 8.06 24.69
+run1-warm end 07:20:22 exit 0 load 1.41 7.83 24.43
+run2-cold start 07:20:22 load 1.41 7.83 24.43
+run2-cold end 07:20:33 exit 0 load 1.35 7.61 24.18
+run2-warm start 07:20:33 load 1.35 7.61 24.18
+run2-warm end 07:20:45 exit 0 load 1.38 7.40 23.94
+run3-cold start 07:20:45 load 1.38 7.40 23.94
+run3-cold end 07:20:57 exit 0 load 1.35 7.11 23.58
+run3-warm start 07:20:57 load 1.35 7.11 23.58
+run3-warm end 07:21:09 exit 0 load 1.37 6.92 23.34
