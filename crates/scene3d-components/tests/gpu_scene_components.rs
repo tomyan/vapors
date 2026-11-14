@@ -123,6 +123,12 @@ fn gpu_a_class_toggle_recolours_one_mesh_writing_one_uniform_and_no_geometry() {
     assert_eq!(recoloured.texture_bytes, 0);
     assert_eq!(pixel(&pixels, 32, 32), BLUE);
     assert_eq!(pixel(&pixels, 48, 32), RED);
+    let (next, after, _) = frame(&mut rig.app, &gpu);
+    assert_eq!(
+        (next, after.buffer_bytes),
+        (Next::Wait, idle.buffer_bytes),
+        "idle again"
+    );
 }
 
 #[test]
@@ -155,10 +161,29 @@ fn gpu_visibility_hidden_drops_one_draw_and_writes_nothing() {
     rig.signals.gone.set(true);
     let (_, hidden, pixels) = frame(&mut rig.app, &gpu);
 
-    // Then: the composition's draw alone
+    // Then: the composition's draw alone; the page shows through where
+    // the mesh was, as in the surface's empty corner
     assert_eq!(hidden.buffer_bytes, idle.buffer_bytes);
     assert_eq!(hidden.draw_calls, idle.draw_calls);
-    assert_ne!(pixel(&pixels, 32, 32), RED);
+    assert_eq!(pixel(&pixels, 32, 32), pixel(&pixels, 2, 2));
+}
+
+#[test]
+fn gpu_a_mesh_hidden_then_shown_by_its_anchor_is_drawn_again_writing_nothing() {
+    // Given
+    let gpu = vapors_gpu_harness::gpu();
+    let (mut rig, idle) = settled(&gpu);
+    rig.signals.gone.set(true);
+    frame(&mut rig.app, &gpu);
+
+    // When
+    rig.signals.gone.set(false);
+    let (_, shown, pixels) = frame(&mut rig.app, &gpu);
+
+    // Then: the mesh's draw back, no uniform written
+    assert_eq!(shown.buffer_bytes, idle.buffer_bytes);
+    assert_eq!(shown.draw_calls, idle.draw_calls + 1);
+    assert_eq!(pixel(&pixels, 32, 32), RED);
 }
 
 #[test]

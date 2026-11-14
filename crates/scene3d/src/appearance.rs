@@ -4,19 +4,6 @@
 use crate::{Colour, NodeId, NodeKind, Scene, StoreError};
 
 impl Scene {
-    /// Sets a mesh's colour, keeping whether it is drawn: as
-    /// [`Scene::set_appearance`], the one writer of a mesh's colour, so
-    /// the same colour again advances no version.
-    ///
-    /// # Errors
-    ///
-    /// [`StoreError::Stale`], or [`StoreError::NotMesh`] for a group or
-    /// camera.
-    pub fn set_colour(&mut self, id: NodeId, colour: Colour) -> Result<(), StoreError> {
-        let visible = self.visible(id)?;
-        self.set_appearance(id, colour, visible).map(drop)
-    }
-
     /// Sets a mesh's colour and whether it is drawn (its anchor's
     /// `color` and `visibility`, docs/plans/css-for-3d.md C3); whether
     /// either changed. Another colour advances the mesh's

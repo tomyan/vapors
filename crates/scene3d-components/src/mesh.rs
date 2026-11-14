@@ -81,8 +81,12 @@ impl Mesh {
     }
 }
 
-/// Writes each appearance the anchor reports to the mesh, and
-/// invalidates its surface when that changed the mesh.
+/// Writes each appearance the anchor reports to the mesh, asking its
+/// surface for a frame first: when that is refused the mesh is left as
+/// drawn, so the anchor's next report (vapors-elements reports a refused
+/// appearance again) writes it and asks again, rather than finding the
+/// mesh already changed and the frame never asked for. vapors-elements
+/// reports only a changed appearance, so each report is a frame's worth.
 fn appearance_sink(placement: Placement) -> vapors_dom::AppearanceSink {
     Box::new(
         move |Appearance {
@@ -91,13 +95,10 @@ fn appearance_sink(placement: Placement) -> vapors_dom::AppearanceSink {
               }| {
             let failed = |error: &dyn std::fmt::Display| format!("<Mesh>: {error}");
             let colour = Colour::srgb(r, g, b).map_err(|e| failed(&e))?;
+            placement.surface.invalidate().map_err(|e| failed(&e))?;
             let mut scene = placement.scene.borrow_mut();
-            let changed = scene.set_appearance(placement.node, colour, visible);
-            drop(scene);
-            if changed.map_err(|e| failed(&e))? {
-                placement.surface.invalidate().map_err(|e| failed(&e))?;
-            }
-            Ok(())
+            let written = scene.set_appearance(placement.node, colour, visible);
+            written.map(drop).map_err(|e| failed(&e))
         },
     )
 }

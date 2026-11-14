@@ -148,3 +148,39 @@ fn a_group_given_a_key_with_another_tag_is_refused_naming_the_keys_site() {
     // When
     Group::mount(&rig.doc, anchor, props);
 }
+
+#[test]
+fn a_colour_whose_surface_cannot_render_it_is_not_written_and_refuses_the_update() {
+    // Given: the surface's renderer unmounted behind the page's back
+    let mut rig = Rig::new();
+    drop(rig.app.unmount("view").expect("mounted"));
+
+    // When
+    rig.signals.blue.set(true);
+    let viewport = vapors_elements::Viewport {
+        width: 64.0,
+        height: 64.0,
+        scale: 1.0,
+    };
+    let refused = rig.doc.borrow_mut().update(viewport).map(|_| ());
+
+    // Then: refused, and the node not recoloured, so the next report
+    // writes it and asks for the frame again
+    let errors = refused
+        .expect_err("refused")
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>();
+    assert!(
+        errors.join("\n").contains("no renderer mounted"),
+        "{errors:?}"
+    );
+    let scene = rig.scene.borrow();
+    let group = scene.children(scene.root()).unwrap()[1];
+    let mesh = scene.children(group).unwrap()[0];
+    let blue = vapors_scene3d::Colour::srgb(0.0, 0.0, 1.0).unwrap();
+    assert!(
+        !matches!(scene.kind(mesh).unwrap(), vapors_scene3d::NodeKind::Mesh { colour, .. } if *colour == blue),
+        "the mesh was recoloured for a frame that cannot be drawn"
+    );
+}
