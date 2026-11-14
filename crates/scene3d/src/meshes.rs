@@ -32,6 +32,8 @@ pub struct Geometry {
     positions: Vec<Vec3>,
     indices: Vec<u32>,
     shades: Vec<f32>,
+    /// The positions' least and greatest corner, worked out once.
+    bounds: (Vec3, Vec3),
 }
 
 impl Geometry {
@@ -45,6 +47,13 @@ impl Geometry {
     #[must_use]
     pub fn indices(&self) -> &[u32] {
         &self.indices
+    }
+
+    /// The box holding every position: its least and greatest corner,
+    /// in the mesh node's local space.
+    #[must_use]
+    pub fn bounds(&self) -> (Vec3, Vec3) {
+        self.bounds
     }
 
     /// Each position's shade, from 0 to 1: the fraction of the node's
@@ -117,10 +126,15 @@ impl Meshes {
         };
         self.issued += 1;
         let (handle, claim) = GeometryHandle::claim(id);
+        let bounds = (positions.iter())
+            .fold((Vec3::INFINITY, Vec3::NEG_INFINITY), |(low, high), p| {
+                (low.min(*p), high.max(*p))
+            });
         let geometry = Geometry {
             positions,
             indices,
             shades,
+            bounds,
         };
         self.held.insert(id.index, Held { geometry, claim });
         Ok(handle)
